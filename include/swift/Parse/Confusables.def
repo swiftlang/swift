@@ -8,13 +8,14 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
-//
+//===----------------------------------------------------------------------===//
+
 ////////////////////////////////////////////////////////////////////////////////
 // WARNING: This file is manually generated from
 // utils/UnicodeData/confusables.txt and should not be directly modified.
 // Run utils/generate_confusables.py to regenerate this file.
 ////////////////////////////////////////////////////////////////////////////////
-//===----------------------------------------------------------------------===//
+
 
 // CONFUSABLE(CONFUSABLE_POINT, CONFUSABLE_NAME, BASE_POINT, BASE_NAME)
 
@@ -86,31 +87,31 @@ CONFUSABLE(0x204e, "Low Asterisk", 0x2a, "Asterisk")
 CONFUSABLE(0x66d, "Arabic Five Pointed Star", 0x2a, "Asterisk")
 CONFUSABLE(0x2217, "Asterisk Operator", 0x2a, "Asterisk")
 CONFUSABLE(0x1031f, "Old Italic Letter Ess", 0x2a, "Asterisk")
-CONFUSABLE(0x1735, "Philippine Single Punctuation", 0x2f, "Back Slash")
-CONFUSABLE(0x2041, "Caret Insertion Point", 0x2f, "Back Slash")
-CONFUSABLE(0x2215, "Division Slash", 0x2f, "Back Slash")
-CONFUSABLE(0x2044, "Fraction Slash", 0x2f, "Back Slash")
-CONFUSABLE(0x2571, "Box Drawings Light Diagonal Upper Right To Lower Left", 0x2f, "Back Slash")
-CONFUSABLE(0x27cb, "Mathematical Rising Diagonal", 0x2f, "Back Slash")
-CONFUSABLE(0x29f8, "Big Solidus", 0x2f, "Back Slash")
-CONFUSABLE(0x1d23a, "Greek Instrumental Notation Symbol-47", 0x2f, "Back Slash")
-CONFUSABLE(0x31d3, "Cjk Stroke Sp", 0x2f, "Back Slash")
-CONFUSABLE(0x3033, "Vertical Kana Repeat Mark Upper Half", 0x2f, "Back Slash")
-CONFUSABLE(0x2cc6, "Coptic Capital Letter Old Coptic Esh", 0x2f, "Back Slash")
-CONFUSABLE(0x30ce, "Katakana Letter No", 0x2f, "Back Slash")
-CONFUSABLE(0x4e3f, "Cjk Unified Ideograph-4E3F", 0x2f, "Back Slash")
-CONFUSABLE(0x2f03, "Kangxi Radical Slash", 0x2f, "Back Slash")
-CONFUSABLE(0xff3c, "Fullwidth Reverse Solidus", 0x5c, "Forward Slash")
-CONFUSABLE(0xfe68, "Small Reverse Solidus", 0x5c, "Forward Slash")
-CONFUSABLE(0x2216, "Set Minus", 0x5c, "Forward Slash")
-CONFUSABLE(0x27cd, "Mathematical Falling Diagonal", 0x5c, "Forward Slash")
-CONFUSABLE(0x29f5, "Reverse Solidus Operator", 0x5c, "Forward Slash")
-CONFUSABLE(0x29f9, "Big Reverse Solidus", 0x5c, "Forward Slash")
-CONFUSABLE(0x1d20f, "Greek Vocal Notation Symbol-16", 0x5c, "Forward Slash")
-CONFUSABLE(0x1d23b, "Greek Instrumental Notation Symbol-48", 0x5c, "Forward Slash")
-CONFUSABLE(0x31d4, "Cjk Stroke D", 0x5c, "Forward Slash")
-CONFUSABLE(0x4e36, "Cjk Unified Ideograph-4E36", 0x5c, "Forward Slash")
-CONFUSABLE(0x2f02, "Kangxi Radical Dot", 0x5c, "Forward Slash")
+CONFUSABLE(0x1735, "Philippine Single Punctuation", 0x2f, "Forward Slash")
+CONFUSABLE(0x2041, "Caret Insertion Point", 0x2f, "Forward Slash")
+CONFUSABLE(0x2215, "Division Slash", 0x2f, "Forward Slash")
+CONFUSABLE(0x2044, "Fraction Slash", 0x2f, "Forward Slash")
+CONFUSABLE(0x2571, "Box Drawings Light Diagonal Upper Right To Lower Left", 0x2f, "Forward Slash")
+CONFUSABLE(0x27cb, "Mathematical Rising Diagonal", 0x2f, "Forward Slash")
+CONFUSABLE(0x29f8, "Big Solidus", 0x2f, "Forward Slash")
+CONFUSABLE(0x1d23a, "Greek Instrumental Notation Symbol-47", 0x2f, "Forward Slash")
+CONFUSABLE(0x31d3, "Cjk Stroke Sp", 0x2f, "Forward Slash")
+CONFUSABLE(0x3033, "Vertical Kana Repeat Mark Upper Half", 0x2f, "Forward Slash")
+CONFUSABLE(0x2cc6, "Coptic Capital Letter Old Coptic Esh", 0x2f, "Forward Slash")
+CONFUSABLE(0x30ce, "Katakana Letter No", 0x2f, "Forward Slash")
+CONFUSABLE(0x4e3f, "Cjk Unified Ideograph-4E3F", 0x2f, "Forward Slash")
+CONFUSABLE(0x2f03, "Kangxi Radical Slash", 0x2f, "Forward Slash")
+CONFUSABLE(0xff3c, "Fullwidth Reverse Solidus", 0x5c, "Back Slash")
+CONFUSABLE(0xfe68, "Small Reverse Solidus", 0x5c, "Back Slash")
+CONFUSABLE(0x2216, "Set Minus", 0x5c, "Back Slash")
+CONFUSABLE(0x27cd, "Mathematical Falling Diagonal", 0x5c, "Back Slash")
+CONFUSABLE(0x29f5, "Reverse Solidus Operator", 0x5c, "Back Slash")
+CONFUSABLE(0x29f9, "Big Reverse Solidus", 0x5c, "Back Slash")
+CONFUSABLE(0x1d20f, "Greek Vocal Notation Symbol-16", 0x5c, "Back Slash")
+CONFUSABLE(0x1d23b, "Greek Instrumental Notation Symbol-48", 0x5c, "Back Slash")
+CONFUSABLE(0x31d4, "Cjk Stroke D", 0x5c, "Back Slash")
+CONFUSABLE(0x4e36, "Cjk Unified Ideograph-4E36", 0x5c, "Back Slash")
+CONFUSABLE(0x2f02, "Kangxi Radical Dot", 0x5c, "Back Slash")
 CONFUSABLE(0xa778, "Latin Small Letter Um", 0x26, "Ampersand")
 CONFUSABLE(0x16ed, "Runic Cross Punctuation", 0x2b, "Plus Sign")
 CONFUSABLE(0x2795, "Heavy Plus Sign", 0x2b, "Plus Sign")
