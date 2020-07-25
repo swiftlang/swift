@@ -19,10 +19,12 @@
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILRemarkStreamer.h"
@@ -108,16 +110,39 @@ std::string Remark<DerivedT>::getDebugMsg() const {
   return stream.str();
 }
 
+static bool hasForceEmitSemanticAttr(SILFunction &fn, StringRef passName) {
+  return llvm::any_of(fn.getSemanticsAttrs(), [&](const std::string &str) {
+    auto ref = StringRef(str);
+
+    // First try to chomp the prefix.
+    if (!ref.consume_front(semantics::FORCE_EMIT_OPT_REMARK_PREFIX))
+      return false;
+
+    // Then see if we only have the prefix. Then always return true the user
+    // wants /all/ remarks.
+    if (ref.empty())
+      return true;
+
+    // Otherwise, lets try to chomp the '.' and then the passName.
+    if (!ref.consume_front(".") || !ref.consume_front(passName))
+      return false;
+
+    return ref.empty();
+  });
+}
+
 Emitter::Emitter(StringRef passName, SILFunction &fn)
     : fn(fn), passName(passName),
       passedEnabled(
-          fn.getASTContext().LangOpts.OptimizationRemarkPassedPattern &&
-          fn.getASTContext().LangOpts.OptimizationRemarkPassedPattern->match(
-              passName)),
+          hasForceEmitSemanticAttr(fn, passName) ||
+          (fn.getASTContext().LangOpts.OptimizationRemarkPassedPattern &&
+           fn.getASTContext().LangOpts.OptimizationRemarkPassedPattern->match(
+               passName))),
       missedEnabled(
-          fn.getASTContext().LangOpts.OptimizationRemarkMissedPattern &&
-          fn.getASTContext().LangOpts.OptimizationRemarkMissedPattern->match(
-              passName)) {}
+          hasForceEmitSemanticAttr(fn, passName) ||
+          (fn.getASTContext().LangOpts.OptimizationRemarkMissedPattern &&
+           fn.getASTContext().LangOpts.OptimizationRemarkMissedPattern->match(
+               passName))) {}
 
 /// The user has passed us an instruction that for some reason has a source loc
 /// that can not be used. Search down the current block for an instruction with
@@ -216,7 +241,8 @@ static void emitRemark(SILFunction &fn, const Remark<RemarkT> &remark,
   // If diagnostics are enabled, first emit the main diagnostic and then loop
   // through our arguments and allow the arguments to add additional diagnostics
   // if they want.
-  if (!diagEnabled)
+  if (!diagEnabled && !fn.hasSemanticsAttrThatStartsWith(
+                          semantics::FORCE_EMIT_OPT_REMARK_PREFIX))
     return;
 
   auto &de = module.getASTContext().Diags;

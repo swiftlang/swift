@@ -12,8 +12,10 @@
 
 #define DEBUG_TYPE "sil-opt-remark-gen"
 
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OptimizationRemark.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
@@ -266,7 +268,9 @@ class OptRemarkGenerator : public SILFunctionTransform {
 
     return bool(langOpts.OptimizationRemarkMissedPattern) ||
            bool(langOpts.OptimizationRemarkPassedPattern) ||
-           fn->getModule().getSILRemarkStreamer();
+           fn->getModule().getSILRemarkStreamer() ||
+           fn->hasSemanticsAttrThatStartsWith(
+               semantics::FORCE_EMIT_OPT_REMARK_PREFIX);
   }
 
   /// The entry point to the transformation.
