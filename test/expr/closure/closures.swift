@@ -504,3 +504,22 @@ var qux1: (() -> Void)? = {}
 
 SR9839(qux1!)
 SR9839(forceUnwrap(qux1))
+
+// rdar://problem/65155671 - crash referencing parameter of outer closure
+func rdar65155671(x: Int) {
+    { a in
+      _ = { [a] in a }
+    }(x)
+}
+
+func sr3186<T, U>(_ f: (@escaping (@escaping (T) -> U) -> ((T) -> U))) -> ((T) -> U) {
+    return { x in return f(sr3186(f))(x) }
+}
+
+class SR3186 {
+  init() {
+    // expected-warning@+1{{capture 'self' was never used}}
+    let v = sr3186 { f in { [unowned self, f] x in x != 1000 ? f(x + 1) : "success" } }(0)
+    print("\(v)")
+  }
+}

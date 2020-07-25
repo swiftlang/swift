@@ -1027,6 +1027,8 @@ namespace {
 
     bool walkToClosureExprPre(ClosureExpr *expr);
 
+    bool shouldWalkCaptureInitializerExpressions() override { return true; }
+
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       // If this is a call, record the argument expression.
       if (auto call = dyn_cast<ApplyExpr>(expr)) {
@@ -1075,21 +1077,6 @@ namespace {
 
         return std::make_pair(recursive, expr);
       };
-
-      // For capture lists, we typecheck the decls they contain.
-      if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
-        // Validate the capture list.
-        for (auto capture : captureList->getCaptureList()) {
-          TypeChecker::typeCheckDecl(capture.Init);
-          TypeChecker::typeCheckDecl(capture.Var);
-        }
-
-        // Since closure expression is contained by capture list
-        // let's handle it directly to avoid walking into capture
-        // list itself.
-        captureList->getClosureBody()->walk(*this);
-        return finish(false, expr);
-      }
 
       // For closures, type-check the patterns and result type as written,
       // but do not walk into the body. That will be type-checked after
