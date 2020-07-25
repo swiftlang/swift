@@ -4563,6 +4563,17 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         Attr = new (ctx) CompletionHandlerAsyncAttr(
             *mappedFunctionDecl, handlerIndex, /*handlerIndexLoc*/ SourceLoc(),
             /*atLoc*/ SourceLoc(), /*range*/ SourceRange());
+      }
+      
+      case decls_block::RequiresSuper_DECL_ATTR: {
+        bool isImplicit;
+        Optional<StringRef> message = None;
+        if (!blobData.empty()) {
+          message = blobData;
+        }
+        serialization::decls_block::RequiresSuperDeclAttrLayout::readRecord(
+            scratch, isImplicit);
+        Attr = new (ctx) RequiresSuperAttr(message, isImplicit);
         break;
       }
 

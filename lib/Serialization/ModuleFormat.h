@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 605; // global actor function
+const uint16_t SWIFTMODULE_VERSION_MINOR = 605; // # @requiresSuper
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1958,6 +1958,15 @@ namespace decls_block {
     TypeIDField, // type referenced by this custom attribute
     BCFixed<1>   // is the argument (unsafe)
   >;
+<<<<<<< HEAD
+=======
+
+  using RequiresSuperDeclAttrLayout =
+      BCRecordLayout<RequiresSuper_DECL_ATTR,
+                     BCFixed<1>, // implicit flag
+                     BCBlob      // message
+                     >;
+>>>>>>> ae897e4d9a4 ([Parse] [AST] [Serialization] Support an optional message on the '@requiresSuper' attribute)
 }
 
 /// Returns the encoding kind for the given decl.

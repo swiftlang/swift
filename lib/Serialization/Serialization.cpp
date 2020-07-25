@@ -2634,6 +2634,14 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       CompletionHandlerAsyncDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->CompletionHandlerIndex,
           asyncFuncDeclID);
+    }
+    
+    case DAK_RequiresSuper: {
+      auto *theAttr = cast<RequiresSuperAttr>(DA);
+      auto msg = theAttr->Message.hasValue() ? theAttr->Message.getValue() : "";
+      auto abbrCode = S.DeclTypeAbbrCodes[RequiresSuperDeclAttrLayout::Code];
+      RequiresSuperDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                              theAttr->isImplicit(), msg);
       return;
     }
     }

@@ -2077,6 +2077,28 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_CompletionHandlerAsync;
   }
+}
+
+/// Defines the @requiresSuper attribute.
+class RequiresSuperAttr : public DeclAttribute {
+public:
+  RequiresSuperAttr(Optional<StringRef> Message, SourceLoc AtLoc,
+                    SourceRange Range, bool Implicit)
+      : DeclAttribute(DAK_RequiresSuper, AtLoc, Range, Implicit),
+        Message(Message) {}
+
+  RequiresSuperAttr(Optional<StringRef> Message, bool Implicit)
+      : RequiresSuperAttr(Message, SourceLoc(), SourceRange(), Implicit) {}
+
+  RequiresSuperAttr(bool Implicit)
+      : RequiresSuperAttr(None, SourceLoc(), SourceRange(), Implicit) {}
+
+  /// The message to accompany the diagnostic.
+  const Optional<StringRef> Message;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_RequiresSuper;
+  }
 };
 
 /// Attributes that may be applied to declarations.

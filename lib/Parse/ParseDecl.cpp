@@ -2723,6 +2723,53 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
     if (!DiscardAttribute)
       Attributes.add(attr);
+  }
+
+  case DAK_RequiresSuper: {
+    // There is no message with the attribute.
+    if (Tok.isNot(tok::l_paren)) {
+      Attributes.add(new (Context) RequiresSuperAttr(None, AtLoc, AttrRange,
+                                                     /*Implicit*/ false));
+      break;
+    }
+
+    // Parse '('
+    if (!consumeIf(tok::l_paren)) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+
+    if (Tok.isNot(tok::string_literal)) {
+      diagnose(Loc, diag::attr_expected_string_literal, AttrName);
+      return false;
+    }
+
+    // Parse the message.
+    Optional<StringRef> Message =
+        getStringLiteralIfNotInterpolated(Loc, ("'" + AttrName + "'").str());
+
+    consumeToken(tok::string_literal);
+
+    if (Message.hasValue()) {
+      AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+
+      // The message cannot be empty!
+      if (Message.getValue().empty()) {
+        diagnose(Loc, diag::requires_super_attr_empty_message);
+        return false;
+      }
+    }
+
+    // Parse ')'
+    if (!consumeIf(tok::r_paren)) {
+      diagnose(Loc, diag::attr_expected_rparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+
+    Attributes.add(new (Context) RequiresSuperAttr(Message, AtLoc, AttrRange,
+                                                   /*Implicit*/ false));
     break;
   }
   }

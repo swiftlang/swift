@@ -1227,6 +1227,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "transpose";
   case DAK_CompletionHandlerAsync:
     return "completionHandlerAsync";
+  case DAK_RequiresSuper:
+    return "requiresSuper";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
