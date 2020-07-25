@@ -84,7 +84,7 @@ __asm(
   // 769 is the MetadataKind::Tuple
   "  .long 769\n"
   // This is a direct relative reference to the witness table defined below.
-  "  .long ((" TUPLE_EQUATABLE_WT ") - (" TUPLE_EQUATABLE_CONF ")) - 8\n"
+  "  .long (" TUPLE_EQUATABLE_WT ") - .\n"
   // 32 are the ConformanceFlags with the type reference bit set to MetadataKind.
   "  .long 32\n"
 );
@@ -176,7 +176,7 @@ __asm(
   // 769 is the MetadataKind::Tuple
   "  .long 769\n"
   // This is a direct relative reference to the witness table defined below.
-  "  .long ((" TUPLE_COMPARABLE_WT ") - (" TUPLE_COMPARABLE_CONF ")) - 8\n"
+  "  .long (" TUPLE_COMPARABLE_WT ") - .\n"
   // 32 are the ConformanceFlags with the type reference bit set to MetadataKind.
   "  .long 32\n"
 );
@@ -477,7 +477,7 @@ __asm(
   // 769 is the MetadataKind::Tuple
   "  .long 769\n"
   // This is a direct relative reference to the witness table defined below.
-  "  .long ((" TUPLE_HASHABLE_WT ") - (" TUPLE_HASHABLE_CONF ")) - 8\n"
+  "  .long (" TUPLE_HASHABLE_WT ") - .\n"
   // 32 are the ConformanceFlags with the type reference bit set to MetadataKind.
   "  .long 32\n"
 );
@@ -535,14 +535,14 @@ using HasherCombineFn = SWIFT_CC(swift) void(OpaqueValue *value,
 static HashValueFn *get_hashValueFunc() {
   auto descriptor = SWIFT_LAZY_CONSTANT(
     reinterpret_cast<HashValueFn *>(
-                     dlsym(RTLD_DEFAULT, STR(SWIFT_HASHVALUE_FUNC))));
+                     dlsym(RTLD_DEFAULT, XSTR(SWIFT_HASHVALUE_FUNC))));
   return descriptor;
 }
 
 static HasherCombineFn *getHashCombineFunc() {
   auto descriptor = SWIFT_LAZY_CONSTANT(
     reinterpret_cast<HasherCombineFn *>(
-                     dlsym(RTLD_DEFAULT, STR(SWIFT_HASHER_COMBINE_FUNC))));
+                     dlsym(RTLD_DEFAULT, XSTR(SWIFT_HASHER_COMBINE_FUNC))));
   return descriptor;
 }
 

@@ -1085,7 +1085,8 @@ public:
   }
 
   bool hasTypeWitness(AssociatedTypeDecl *assocType) const {
-    llvm_unreachable("builtin-conformances never have associated types");
+    llvm_unreachable("builtin-conformances currently don't have associated \
+                     types");
   }
 
   /// Retrieve the type witness and type decl (if one exists)
@@ -1093,7 +1094,8 @@ public:
   TypeWitnessAndDecl
   getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
                         SubstOptions options=None) const {
-    llvm_unreachable("builtin-conformances never have associated types");
+    llvm_unreachable("builtin-conformances currently don't have associated \
+                     types");
   }
 
   /// Given that the requirement signature of the protocol directly states
@@ -1101,7 +1103,8 @@ public:
   /// return its associated conformance.
   ProtocolConformanceRef
   getAssociatedConformance(Type assocType, ProtocolDecl *protocol) const {
-    llvm_unreachable("builtin-conformances never have associated types");
+    llvm_unreachable("builtin-conformances currently don't have associated \
+                     types");
   }
 
   /// Retrieve the witness corresponding to the given value requirement.
@@ -1112,7 +1115,8 @@ public:
   /// Determine whether the witness for the given requirement
   /// is either the default definition or was otherwise deduced.
   bool usesDefaultDefinition(AssociatedTypeDecl *requirement) const {
-    llvm_unreachable("builtin-conformances never have associated types");
+    llvm_unreachable("builtin-conformances currently don't have associated \
+                     types");
   }
 
   static bool classof(const ProtocolConformance *conformance) {

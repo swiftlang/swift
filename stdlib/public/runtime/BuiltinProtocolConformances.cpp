@@ -28,30 +28,19 @@ using StaticInfixWitness = SWIFT_CC(swift) bool(OpaqueValue *, OpaqueValue *,
                                                 const Metadata *,
                                                 const WitnessTable *);
 
+#if defined(__ELF__)
+#define INDIRECT_RELREF_GOTPCREL(SYMBOL) SYMBOL "@GOTPCREL + 1"
+#elif defined(__MACH__)
+#if defined(__aarch64__)
+#define INDIRECT_RELREF_GOTPCREL(SYMBOL) SYMBOL "@GOT - . + 1"
+#else
+#define INDIRECT_RELREF_GOTPCREL(SYMBOL) SYMBOL "@GOTPCREL + 5"
+#endif
+#endif
+
 //===----------------------------------------------------------------------===//
 // Tuple Equatable Conformance
 //===----------------------------------------------------------------------===//
-
-#if defined(__ELF__)
-// Create a GOT equivalent for the Equatable reference.
-__asm(
-  "  .type got." EQUATABLE_DESCRIPTOR_SYMBOL ", @object\n"
-  "  .section .data.rel.ro\n"
-  "  .p2align 3\n"
-  "got." EQUATABLE_DESCRIPTOR_SYMBOL ":\n"
-  "  .quad (" EQUATABLE_DESCRIPTOR_SYMBOL ")\n"
-  "  .size got." EQUATABLE_DESCRIPTOR_SYMBOL ", 8\n"
-);
-
-// Create a GOT equivalent for the Equatable.== method descriptor.
-__asm(
-  "  .type got." EQUATABLE_EE_METHOD_DESCRIPTOR ", @object\n"
-  "  .p2align 3\n"
-  "got." EQUATABLE_EE_METHOD_DESCRIPTOR ":\n"
-  "  .quad (" EQUATABLE_EE_METHOD_DESCRIPTOR ")\n"
-  "  .size got." EQUATABLE_EE_METHOD_DESCRIPTOR ", 8\n"
-);
-#endif
 
 // Define the conformance descriptor for tuple Equatable. We do this in
 // assembly to work around relative reference issues.
@@ -70,14 +59,9 @@ __asm(
   "  .globl " TUPLE_EQUATABLE_CONF "\n"
   "  .p2align 2\n"
   TUPLE_EQUATABLE_CONF ":\n"
-  #if defined(__ELF__)
-  // This is an indirectable relative reference to the GOT equivalent for the
-  // Equatable protocol descriptor, hence why we add 1 to indicate indirect.
-  "  .long (got." EQUATABLE_DESCRIPTOR_SYMBOL " - \
-              (" TUPLE_EQUATABLE_CONF ")) + 1\n"
-  #elif defined(__MACH__)
-  "  .long " EQUATABLE_DESCRIPTOR_SYMBOL "@GOTPCREL + 5\n"
-  #endif
+  // This is an indirectable relative reference to the GOT entry for the
+  // Equatable protocol descriptor.
+  "  .long " INDIRECT_RELREF_GOTPCREL(EQUATABLE_DESCRIPTOR_SYMBOL) "\n"
   // 769 is the MetadataKind::Tuple
   "  .long 769\n"
   // This indicates that we have no witness table pattern. We use a generic
@@ -90,16 +74,11 @@ __asm(
   // This 1 is the ResilientWitnessesHeader indicating we have 1 resilient
   // witness.
   "  .long 1\n"
-  #if defined(__ELF__)
-  // This is an indirectable relative reference to the GOT equivalent for the
-  // Equatable.== method descriptor, hence why we add 1 to indicate indirect.
-  "  .long ((got." EQUATABLE_EE_METHOD_DESCRIPTOR " - \
-              (" TUPLE_EQUATABLE_CONF ")) - 20) + 1\n"
-  #elif defined(__MACH__)
-  "  .long " EQUATABLE_EE_METHOD_DESCRIPTOR "@GOTPCREL + 5\n"
-  #endif
+  // This is an indirectable relative reference to the GOT entry for the
+  // Equatable == method descriptor.
+  "  .long " INDIRECT_RELREF_GOTPCREL(EQUATABLE_EE_METHOD_DESCRIPTOR) "\n"
   // This is a direct relative reference to the equals witness defined below.
-  "  .long ((" TUPLE_EQUATABLE_EQUALS ") - (" TUPLE_EQUATABLE_CONF ")) - 24\n"
+  "  .long (" TUPLE_EQUATABLE_EQUALS ") - .\n"
   // The witness table size in words.
   "  .short 0\n"
   // The witness table private size in words & requires instantiation.
@@ -108,7 +87,7 @@ __asm(
   "  .long 0\n"
   // This is a direct relative reference to the private data for the
   // conformance.
-  "  .long (__swift_tupleEquatable_private - (" TUPLE_EQUATABLE_CONF ")) - 36\n"
+  "  .long __swift_tupleEquatable_private - .\n"
   #if defined(__ELF__)
   "  .size " TUPLE_EQUATABLE_CONF ", 40\n"
   #endif
@@ -158,63 +137,6 @@ bool swift::_swift_tupleEquatable_equals(OpaqueValue *tuple1,
 // Tuple Comparable Conformance
 //===----------------------------------------------------------------------===//
 
-#if defined(__ELF__)
-// Create a GOT equivalent for the Comparable reference.
-__asm(
-  "  .type got." COMPARABLE_DESCRIPTOR_SYMBOL ", @object\n"
-  "  .section .data.rel.ro\n"
-  "  .p2align 3\n"
-  "got." COMPARABLE_DESCRIPTOR_SYMBOL ":\n"
-  "  .quad (" COMPARABLE_DESCRIPTOR_SYMBOL ")\n"
-  "  .size got." COMPARABLE_DESCRIPTOR_SYMBOL ", 8\n"
-);
-
-// Create a GOT equivalent for the Comparable base conformance to Equatable.
-__asm(
-  "  .type got." COMPARABLE_BASE_CONFORMANCE_DESCRIPTOR ", @object\n"
-  "  .p2align 3\n"
-  "got." COMPARABLE_BASE_CONFORMANCE_DESCRIPTOR ":\n"
-  "  .quad (" COMPARABLE_BASE_CONFORMANCE_DESCRIPTOR ")\n"
-  "  .size got." COMPARABLE_BASE_CONFORMANCE_DESCRIPTOR ", 8\n"
-);
-
-// Create a GOT equivalent for the Comparable.< method descriptor.
-__asm(
-  "  .type got." COMPARABLE_LT_METHOD_DESCRIPTOR ", @object\n"
-  "  .p2align 3\n"
-  "got." COMPARABLE_LT_METHOD_DESCRIPTOR ":\n"
-  "  .quad (" COMPARABLE_LT_METHOD_DESCRIPTOR ")\n"
-  "  .size got." COMPARABLE_LT_METHOD_DESCRIPTOR ", 8\n"
-);
-
-// Create a GOT equivalent for the Comparable.<= method descriptor.
-__asm(
-  "  .type got." COMPARBALE_LTE_METHOD_DESCRIPTOR ", @object\n"
-  "  .p2align 3\n"
-  "got." COMPARBALE_LTE_METHOD_DESCRIPTOR ":\n"
-  "  .quad (" COMPARBALE_LTE_METHOD_DESCRIPTOR ")\n"
-  "  .size got." COMPARBALE_LTE_METHOD_DESCRIPTOR ", 8\n"
-);
-
-// Create a GOT equivalent for the Comparable.>= method descriptor.
-__asm(
-  "  .type got." COMPARABLE_GTE_METHOD_DESCRIPTOR ", @object\n"
-  "  .p2align 3\n"
-  "got." COMPARABLE_GTE_METHOD_DESCRIPTOR ":\n"
-  "  .quad (" COMPARABLE_GTE_METHOD_DESCRIPTOR ")\n"
-  "  .size got." COMPARABLE_GTE_METHOD_DESCRIPTOR ", 8\n"
-);
-
-// Create a GOT equivalent for the Comparable.> method descriptor.
-__asm(
-  "  .type got." COMPARABLE_GT_METHOD_DESCRIPTOR ", @object\n"
-  "  .p2align 3\n"
-  "got." COMPARABLE_GT_METHOD_DESCRIPTOR ":\n"
-  "  .quad (" COMPARABLE_GT_METHOD_DESCRIPTOR ")\n"
-  "  .size got." COMPARABLE_GT_METHOD_DESCRIPTOR ", 8\n"
-);
-#endif
-
 // Define the associated conformance structure for tuple Comparable. We do this
 // in assembly to work around relative reference issues.
 __asm(
@@ -235,8 +157,7 @@ __asm(
   "  .byte 7\n"
   // This is a direct relative reference to the base accessor for Equatable
   // defined below.
-  "  .long ((" TUPLE_COMPARABLE_BASEACCESSOREQUATABLE ") - \
-            (\"" TUPLE_COMPARABLE_ASSOCIATEDCONFORMANCE "\")) - 2\n"
+  "  .long (" TUPLE_COMPARABLE_BASEACCESSOREQUATABLE ") - .\n"
   // This 0 is our null terminator.
   "  .byte 0\n"
   #if defined (__ELF__)
@@ -261,14 +182,9 @@ __asm(
   "  .globl " TUPLE_COMPARABLE_CONF "\n"
   "  .p2align 2\n"
   TUPLE_COMPARABLE_CONF ":\n"
-  #if defined(__ELF__)
-  // This is an indirectable relative reference to the GOT equivalent for the
-  // Comparable protocol descriptor, hence why we add 1 to indicate indirect.
-  "  .long (got." COMPARABLE_DESCRIPTOR_SYMBOL " - \
-              (" TUPLE_COMPARABLE_CONF ")) + 1\n"
-  #elif defined(__MACH__)
-  "  .long " COMPARABLE_DESCRIPTOR_SYMBOL "@GOTPCREL + 5\n"
-  #endif
+  // This is an indirectable relative reference to the GOT entry for the
+  // Comparable protocol descriptor.
+  "  .long " INDIRECT_RELREF_GOTPCREL(COMPARABLE_DESCRIPTOR_SYMBOL) "\n"
   // 769 is the MetadataKind::Tuple
   "  .long 769\n"
   // This indicates that we have no witness table pattern. We use a generic
@@ -281,69 +197,36 @@ __asm(
   // This 5 is the ResilientWitnessesHeader indicating we have 5 resilient
   // witnesses.
   "  .long 5\n"
-  #if defined(__ELF__)
-  // This is an indirectable relative reference to the GOT equivalent for the
-  // Comparable base conformance for Equatable, hence why we add 1 to indicate
-  // indirect.
-  "  .long ((got." COMPARABLE_BASE_CONFORMANCE_DESCRIPTOR " - \
-              (" TUPLE_COMPARABLE_CONF ")) - 20) + 1\n"
-  #elif defined(__MACH__)
-  "  .long " COMPARABLE_BASE_CONFORMANCE_DESCRIPTOR "@GOTPCREL + 5\n"
-  #endif
+  // This is an indirectable relative reference to the GOT entry for the
+  // Comparable base conformance for Equatable.
+  "  .long " INDIRECT_RELREF_GOTPCREL(COMPARABLE_BASE_CONFORMANCE_DESCRIPTOR) "\n"
   // This is a direct relative reference to the associated conformance for
-  // Equatable defined above in assembly. NOTE: This is minus 23 because the
+  // Equatable defined above in assembly. NOTE: We + 1 here because the
   // associated conformance structure is 1 aligned.
-  "  .long ((\"" TUPLE_COMPARABLE_ASSOCIATEDCONFORMANCE "\") - \
-            (" TUPLE_COMPARABLE_CONF ")) - 23\n"
-  #if defined(__ELF__)
-  // This is an indirectable relative reference to the GOT equivalent for the
-  // Comparable.< method descriptor, hence why we add 1 to indicate indirect.
-  "  .long ((got." COMPARABLE_LT_METHOD_DESCRIPTOR " - \
-              (" TUPLE_COMPARABLE_CONF ")) - 28) + 1\n"
-  #elif defined(__MACH__)
-  "  .long " COMPARABLE_LT_METHOD_DESCRIPTOR "@GOTPCREL + 5\n"
-  #endif
+  "  .long (\"" TUPLE_COMPARABLE_ASSOCIATEDCONFORMANCE "\") - . + 1\n"
+  // This is an indirectable relative reference to the GOT entry for the
+  // Comparable.< method descriptor.
+  "  .long " INDIRECT_RELREF_GOTPCREL(COMPARABLE_LT_METHOD_DESCRIPTOR) "\n"
   // This is a direct relative reference to the less than witness defined below.
-  "  .long ((" TUPLE_COMPARABLE_LESSTHAN ") - (" TUPLE_COMPARABLE_CONF ")) - 32\n"
-  #if defined(__ELF__)
-  // This is an indirectable relative reference to the GOT equivalent for the
-  // Comparable.<= method descriptor, hence why we add 1 to indicate
-  // indirect.
-  "  .long ((got." COMPARBALE_LTE_METHOD_DESCRIPTOR " - \
-              (" TUPLE_COMPARABLE_CONF ")) - 36) + 1\n"
-  #elif defined(__MACH__)
-  "  .long " COMPARBALE_LTE_METHOD_DESCRIPTOR "@GOTPCREL + 5\n"
-  #endif
+  "  .long (" TUPLE_COMPARABLE_LESSTHAN ") - .\n"
+  // This is an indirectable relative reference to the GOT entry for the
+  // Comparable.<= method descriptor.
+  "  .long " INDIRECT_RELREF_GOTPCREL(COMPARBALE_LTE_METHOD_DESCRIPTOR) "\n"
   // This is a direct relative reference to the less than or equal witness
   // defined below.
-  "  .long ((" TUPLE_COMPARABLE_LESSTHANOREQUAL ") - \
-              (" TUPLE_COMPARABLE_CONF ")) - 40\n"
-  #if defined(__ELF__)
-  // This is an indirectable relative reference to the GOT equivalent for the
-  // Comparable.>= method descriptor, hence why we add 1 to indicate
-  // indirect.
-  "  .long ((got." COMPARABLE_GTE_METHOD_DESCRIPTOR " - \
-              (" TUPLE_COMPARABLE_CONF ")) - 44) + 1\n"
-  #elif defined(__MACH__)
-  "  .long " COMPARABLE_GTE_METHOD_DESCRIPTOR "@GOTPCREL + 5\n"
-  #endif
+  "  .long (" TUPLE_COMPARABLE_LESSTHANOREQUAL ") - .\n"
+  // This is an indirectable relative reference to the GOT entry for the
+  // Comparable.>= method descriptor.
+  "  .long " INDIRECT_RELREF_GOTPCREL(COMPARABLE_GTE_METHOD_DESCRIPTOR) "\n"
   // This is a direct relative reference to the greater than or equal witness
   // defined below.
-  "  .long ((" TUPLE_COMPARABLE_GREATERTHANOREQUAL ") - \
-              (" TUPLE_COMPARABLE_CONF ")) - 48\n"
-  #if defined(__ELF__)
-  // This is an indirectable relative reference to the GOT equivalent for the
-  // Comparable.> method descriptor, hence why we add 1 to indicate
-  // indirect.
-  "  .long ((got." COMPARABLE_GT_METHOD_DESCRIPTOR " - \
-              (" TUPLE_COMPARABLE_CONF ")) - 52) + 1\n"
-  #elif defined(__MACH__)
-  "  .long " COMPARABLE_GT_METHOD_DESCRIPTOR "@GOTPCREL + 5\n"
-  #endif
+  "  .long (" TUPLE_COMPARABLE_GREATERTHANOREQUAL ") - .\n"
+  // This is an indirectable relative reference to the GOT entry for the
+  // Comparable.> method descriptor.
+  "  .long " INDIRECT_RELREF_GOTPCREL(COMPARABLE_GT_METHOD_DESCRIPTOR) "\n"
   // This is a direct relative reference to the greater than witness defined
   // below.
-  "  .long ((" TUPLE_COMPARABLE_GREATERTHAN ") - \
-              (" TUPLE_COMPARABLE_CONF ")) - 56\n"
+  "  .long (" TUPLE_COMPARABLE_GREATERTHAN ") - .\n"
   // The witness table size in words.
   "  .short 0\n"
   // The witness table private size in words & requires instantiation.
@@ -352,7 +235,7 @@ __asm(
   "  .long 0\n"
   // This is a direct relative reference to the private data for the
   // conformance.
-  "  .long (__swift_tupleComparable_private - (" TUPLE_COMPARABLE_CONF ")) - 68\n"
+  "  .long __swift_tupleComparable_private - .\n"
   #if defined(__ELF__)
   "  .size " TUPLE_COMPARABLE_CONF ", 72\n"
   #endif
@@ -365,6 +248,7 @@ _swift_tupleComparable_baseAccessorEquatable(Metadata *assocType,
                                              void **witnessTable) {
   auto tuple = cast<TupleTypeMetadata>(assocType);
   std::vector<void *> instantiationArgs;
+  instantiationArgs.reserve(tuple->NumElements);
 
   // Fill the instantiationArgs with the element Equatable tables.
   for (size_t i = 0; i != tuple->NumElements; i += 1) {
@@ -613,54 +497,6 @@ bool swift::_swift_tupleComparable_greaterThan(OpaqueValue *tuple1,
 // Tuple Hashable Conformance
 //===----------------------------------------------------------------------===//
 
-#if defined(__ELF__)
-// Create a GOT equivalent for the Hashable reference.
-__asm(
-  "  .type got." HASHABLE_DESCRIPTOR_SYMBOL ", @object\n"
-  "  .section .data.rel.ro\n"
-  "  .p2align 3\n"
-  "got." HASHABLE_DESCRIPTOR_SYMBOL ":\n"
-  "  .quad (" HASHABLE_DESCRIPTOR_SYMBOL ")\n"
-  "  .size got." HASHABLE_DESCRIPTOR_SYMBOL ", 8\n"
-);
-
-// Create a GOT equivalent for the Hashable base conformance to Equatable.
-__asm(
-  "  .type got." HASHABLE_BASE_CONFORMANCE_DESCRIPTOR ", @object\n"
-  "  .p2align 3\n"
-  "got." HASHABLE_BASE_CONFORMANCE_DESCRIPTOR ":\n"
-  "  .quad (" HASHABLE_BASE_CONFORMANCE_DESCRIPTOR ")\n"
-  "  .size got." HASHABLE_BASE_CONFORMANCE_DESCRIPTOR ", 8\n"
-);
-
-// Create a GOT equivalent for the Hashable.hashValue method descriptor.
-__asm(
-  "  .type got." HASHABLE_HASHVALUE_METHOD_DESCRIPTOR ", @object\n"
-  "  .p2align 3\n"
-  "got." HASHABLE_HASHVALUE_METHOD_DESCRIPTOR ":\n"
-  "  .quad (" HASHABLE_HASHVALUE_METHOD_DESCRIPTOR ")\n"
-  "  .size got." HASHABLE_HASHVALUE_METHOD_DESCRIPTOR ", 8\n"
-);
-
-// Create a GOT equivalent for the Hashable.hash(into:) method descriptor.
-__asm(
-  "  .type got." HASHABLE_HASH_METHOD_DESCRIPTOR ", @object\n"
-  "  .p2align 3\n"
-  "got." HASHABLE_HASH_METHOD_DESCRIPTOR ":\n"
-  "  .quad (" HASHABLE_HASH_METHOD_DESCRIPTOR ")\n"
-  "  .size got." HASHABLE_HASH_METHOD_DESCRIPTOR ", 8\n"
-);
-
-// Create a GOT equivalent for the Hashable._rawHashValue method descriptor.
-__asm(
-  "  .type got." HASHABLE_RAWHASHVALUE_METHOD_DESCRIPTOR ", @object\n"
-  "  .p2align 3\n"
-  "got." HASHABLE_RAWHASHVALUE_METHOD_DESCRIPTOR ":\n"
-  "  .quad (" HASHABLE_RAWHASHVALUE_METHOD_DESCRIPTOR ")\n"
-  "  .size got." HASHABLE_RAWHASHVALUE_METHOD_DESCRIPTOR ", 8\n"
-);
-#endif
-
 // Define the conformance descriptor for tuple Hashable. We do this in
 // assembly to work around relative reference issues.
 __asm(
@@ -678,14 +514,9 @@ __asm(
   "  .globl " TUPLE_HASHABLE_CONF "\n"
   "  .p2align 2\n"
   TUPLE_HASHABLE_CONF ":\n"
-  #if defined(__ELF__)
-  // This is an indirectable relative reference to the GOT equivalent for the
-  // Hashable protocol descriptor, hence why we add 1 to indicate indirect.
-  "  .long (got." HASHABLE_DESCRIPTOR_SYMBOL " - \
-              (" TUPLE_HASHABLE_CONF ")) + 1\n"
-  #elif defined(__MACH__)
-  "  .long " HASHABLE_DESCRIPTOR_SYMBOL "@GOTPCREL + 5\n"
-  #endif
+  // This is an indirectable relative reference to the GOT entry for the
+  // Hashable protocol descriptor.
+  "  .long " INDIRECT_RELREF_GOTPCREL(HASHABLE_DESCRIPTOR_SYMBOL) "\n"
   // 769 is the MetadataKind::Tuple
   "  .long 769\n"
   // This indicates that we have no witness table pattern. We use a generic
@@ -698,55 +529,30 @@ __asm(
   // This 4 is the ResilientWitnessesHeader indicating we have 4 resilient
   // witnesses.
   "  .long 4\n"
-  #if defined(__ELF__)
-  // This is an indirectable relative reference to the GOT equivalent for the
-  // Hashable base conformance for Equatable, hence why we add 1 to indicate
-  // indirect.
-  "  .long ((got." HASHABLE_BASE_CONFORMANCE_DESCRIPTOR " - \
-              (" TUPLE_HASHABLE_CONF ")) - 20) + 1\n"
-  #elif defined(__MACH__)
-  "  .long " HASHABLE_BASE_CONFORMANCE_DESCRIPTOR "@GOTPCREL + 5\n"
-  #endif
+  // This is an indirectable relative reference to the GOT entry for the
+  // Hashable base conformance for Equatable.
+  "  .long " INDIRECT_RELREF_GOTPCREL(HASHABLE_BASE_CONFORMANCE_DESCRIPTOR) "\n"
   // This is a direct relative reference to the associated conformance for
   // Equatable defined above in assembly. NOTE: We intentionally use the
   // Comparable implementation for this because the implementation is the same
   // for both Hashable and Comparable. Both want to grab the Equatable table
   // from its elements whose witness table is located in the same place for both
-  // protocols. NOTE: This is minus 23 because the associated conformance
+  // protocols. NOTE: We + 1 here because the associated conformance
   // structure is 1 aligned.
-  "  .long ((\"" TUPLE_COMPARABLE_ASSOCIATEDCONFORMANCE "\") - \
-            (" TUPLE_HASHABLE_CONF ")) - 23\n"
-  #if defined(__ELF__)
-  // This is an indirectable relative reference to the GOT equivalent for the
-  // Hashable.hashValue method descriptor, hence why we add 1 to indicate
-  // indirect.
-  "  .long ((got." HASHABLE_HASHVALUE_METHOD_DESCRIPTOR " - \
-              (" TUPLE_HASHABLE_CONF ")) - 28) + 1\n"
-  #elif defined(__MACH__)
-  "  .long " HASHABLE_HASHVALUE_METHOD_DESCRIPTOR "@GOTPCREL + 5\n"
-  #endif
+  "  .long (\"" TUPLE_COMPARABLE_ASSOCIATEDCONFORMANCE "\") - . + 1\n"
+  // This is an indirectable relative reference to the GOT entry for the
+  // Hashable.hashValue method descriptor.
+  "  .long " INDIRECT_RELREF_GOTPCREL(HASHABLE_HASHVALUE_METHOD_DESCRIPTOR) "\n"
   // This is a direct relative reference to the hashValue witness defined below.
-  "  .long ((" TUPLE_HASHABLE_HASHVALUE ") - (" TUPLE_HASHABLE_CONF ")) - 32\n"
-  #if defined(__ELF__)
-  // This is an indirectable relative reference to the GOT equivalent for the
-  // Hashable.hash(into:) method descriptor, hence why we add 1 to indicate
-  // indirect.
-  "  .long ((got." HASHABLE_HASH_METHOD_DESCRIPTOR " - \
-              (" TUPLE_HASHABLE_CONF ")) - 36) + 1\n"
-  #elif defined(__MACH__)
-  "  .long " HASHABLE_HASH_METHOD_DESCRIPTOR "@GOTPCREL + 5\n"
-  #endif
+  "  .long (" TUPLE_HASHABLE_HASHVALUE ") - .\n"
+  // This is an indirectable relative reference to the GOT entry for the
+  // Hashable.hash(into:) method descriptor.
+  "  .long " INDIRECT_RELREF_GOTPCREL(HASHABLE_HASH_METHOD_DESCRIPTOR) "\n"
   // This is a direct relative reference to the hash(into:) witness defined below.
-  "  .long ((" TUPLE_HASHABLE_HASH ") - (" TUPLE_HASHABLE_CONF ")) - 40\n"
-  #if defined(__ELF__)
+  "  .long (" TUPLE_HASHABLE_HASH ") - .\n"
   // This is an indirectable relative reference to the GOT equivalent for the
-  // Hashable._rawHashValue method descriptor, hence why we add 1 to indicate
-  // indirect.
-  "  .long ((got." HASHABLE_RAWHASHVALUE_METHOD_DESCRIPTOR " - \
-              (" TUPLE_HASHABLE_CONF ")) - 44) + 1\n"
-  #elif defined(__MACH__)
-  "  .long " HASHABLE_RAWHASHVALUE_METHOD_DESCRIPTOR "@GOTPCREL + 5\n"
-  #endif
+  // Hashable._rawHashValue method descriptor.
+  "  .long " INDIRECT_RELREF_GOTPCREL(HASHABLE_RAWHASHVALUE_METHOD_DESCRIPTOR) "\n"
   // This 0 indicates that we are requesting the default implementation for the
   // _rawHashValue getter.
   "  .long 0\n"
@@ -758,7 +564,7 @@ __asm(
   "  .long 0\n"
   // This is a direct relative reference to the private data for the
   // conformance.
-  "  .long (__swift_tupleHashable_private - (" TUPLE_HASHABLE_CONF ")) - 60\n"
+  "  .long __swift_tupleHashable_private - .\n"
   #if defined(__ELF__)
   "  .size " TUPLE_HASHABLE_CONF ", 64\n"
   #endif

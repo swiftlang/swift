@@ -4837,7 +4837,7 @@ WitnessTableCacheEntry::allocate(
   void **fullTable = reinterpret_cast<void**>(this + 1);
 
   // Zero out the witness table.
-  memset(fullTable, 0, getWitnessTableSize(conformance));
+  memset(fullTable, 0, getWitnessTableSize(Type, conformance));
 
   // Instantiate the table.
   return instantiateWitnessTable(Type, Conformance, instantiationArgs, fullTable);
@@ -4858,7 +4858,7 @@ getNondependentWitnessTable(const ProtocolConformanceDescriptor *conformance,
   }
 
   // Allocate space for the table.
-  auto tableSize = WitnessTableCacheEntry::getWitnessTableSize(conformance);
+  auto tableSize = WitnessTableCacheEntry::getWitnessTableSize(type, conformance);
   TaggedMetadataAllocator<SingletonGenericWitnessTableCacheTag> allocator;
   auto buffer = (void **)allocator.Allocate(tableSize, alignof(void*));
   memset(buffer, 0, tableSize);
