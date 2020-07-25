@@ -119,19 +119,6 @@ struct Argument {
       : Argument(ArgumentKey(ArgumentKeyKind::Default, key), msg, decl) {}
   Argument(ArgumentKey key, StringRef msg, const ValueDecl *decl)
       : key(key), val(msg), loc(decl->getLoc()) {}
-
-  /// Given a value, call \p funcPassedInferredArgs for each associated
-  /// ValueDecl that is associated with \p value. All created Arguments are
-  /// passed the same StringRef. To stop iteration, return false in \p
-  /// funcPassedInferedArgs.
-  ///
-  /// NOTE: the function may be called multiple times if the optimizer joined
-  /// two live ranges and thus when iterating over value's users we see multiple
-  /// debug_value operations.
-  static bool
-  inferArgumentsForValue(ArgumentKeyKind keyKind, StringRef message,
-                         SILValue value,
-                         function_ref<bool(Argument)> funcPassedInferedArgs);
 };
 
 /// Shorthand to insert named-value pairs.
