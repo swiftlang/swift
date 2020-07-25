@@ -140,14 +140,15 @@ static int run_driver(StringRef ExecName,
                                                 argv.data()+argv.size()),
                              argv[0], (void *)(intptr_t)getExecutablePath);
     }
-  }
 
-  // Run the integrated Swift frontend when called as "swift-frontend" but
-  // without a leading "-frontend".
-  if (ExecName == "swift-frontend") {
-    return performFrontend(llvm::makeArrayRef(argv.data()+1,
-                                              argv.data()+argv.size()),
-                           argv[0], (void *)(intptr_t)getExecutablePath);
+    // Run the integrated Swift frontend when called as "swift-frontend" but
+    // without a leading "-frontend".
+    if (!FirstArg.startswith("--driver-mode=")
+        && ExecName == "swift-frontend") {
+      return performFrontend(llvm::makeArrayRef(argv.data()+1,
+                                                argv.data()+argv.size()),
+                             argv[0], (void *)(intptr_t)getExecutablePath);
+    }
   }
 
   std::string Path = getExecutablePath(argv[0]);
