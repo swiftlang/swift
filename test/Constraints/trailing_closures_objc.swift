@@ -1,5 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
+// REQUIRES: rdar66110025
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
 
