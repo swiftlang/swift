@@ -250,7 +250,7 @@ struct RemarkMissed : public Remark<RemarkMissed> {
 /// Used to emit the remarks.  Passes reporting remarks should create an
 /// instance of this.
 class Emitter {
-  SILModule &module;
+  SILFunction &fn;
   std::string passName;
   bool passedEnabled;
   bool missedEnabled;
@@ -264,7 +264,7 @@ class Emitter {
   template <typename RemarkT> bool isEnabled();
 
 public:
-  Emitter(StringRef passName, SILModule &m);
+  Emitter(StringRef passName, SILFunction &fn);
 
   /// Take a lambda that returns a remark which will be emitted.  The
   /// lambda is not evaluated unless remarks are enabled.  Second argument is
@@ -273,7 +273,7 @@ public:
   void emit(T remarkBuilder, decltype(remarkBuilder()) * = nullptr) {
     using RemarkT = decltype(remarkBuilder());
     // Avoid building the remark unless remarks are enabled.
-    if (isEnabled<RemarkT>() || module.getSILRemarkStreamer()) {
+    if (isEnabled<RemarkT>() || fn.getModule().getSILRemarkStreamer()) {
       auto rb = remarkBuilder();
       rb.setPassName(passName);
       emit(rb);
@@ -287,8 +287,9 @@ public:
                           decltype(remarkBuilder()) * = nullptr) {
     using RemarkT = decltype(remarkBuilder());
     // Avoid building the remark unless remarks are enabled.
-    bool emitRemark = emitter && (emitter->isEnabled<RemarkT>() ||
-                                  emitter->module.getSILRemarkStreamer());
+    bool emitRemark =
+        emitter && (emitter->isEnabled<RemarkT>() ||
+                    emitter->fn.getModule().getSILRemarkStreamer());
     // Same for DEBUG.
     bool shouldEmitDebug = false;
 #ifndef NDEBUG
