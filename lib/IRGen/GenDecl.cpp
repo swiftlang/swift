@@ -2109,9 +2109,9 @@ swift::irgen::createLinkerDirectiveVariable(IRGenModule &IGM, StringRef name) {
 }
 
 void swift::irgen::disableAddressSanitizer(IRGenModule &IGM, llvm::GlobalVariable *var) {
-  // Add an operand to llvm.asan.globals blacklisting this global variable.
+  // Add an operand to llvm.asan.globals denylisting this global variable.
   llvm::Metadata *metadata[] = {
-    // The global variable to blacklist.
+    // The global variable to denylist.
     llvm::ConstantAsMetadata::get(var),
     
     // Source location. Optional, unnecessary here.
@@ -2124,7 +2124,7 @@ void swift::irgen::disableAddressSanitizer(IRGenModule &IGM, llvm::GlobalVariabl
     llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(
       llvm::Type::getInt1Ty(IGM.Module.getContext()), false)),
     
-    // Whether the global is blacklisted.
+    // Whether the global is denylisted.
     llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(
       llvm::Type::getInt1Ty(IGM.Module.getContext()), true))};
   
