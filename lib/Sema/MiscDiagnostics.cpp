@@ -3239,8 +3239,8 @@ performTopLevelDeclDiagnostics(TopLevelCodeDecl *TLCD) {
   TLCD->walk(checker);
 }
 
-/// Check if this function is an override and if it is, check if it
-/// needs to emit a 'super.foo()' call in the body.
+/// Check if this function is an override and whether it needs to emit
+// a 'super.foo()' call in its body.
 static void checkIfSuperCallIsRequired(FuncDecl *FD) {
   class SuperCallFinder : public ASTWalker {
     const FuncDecl *BaseFunc;
@@ -3306,7 +3306,10 @@ static void checkIfSuperCallIsRequired(FuncDecl *FD) {
     if (!hasSuperCall(baseDecl, FD)) {
       scratch.clear();
       auto baseMethodName = baseDecl->getName().getString(scratch);
-      Diags.diagnose(FD, diag::requires_super_call_override, baseMethodName);
+      auto attr = baseDecl->getAttrs().getAttribute<RequiresSuperAttr>();
+      auto msg = attr->Message.hasValue() ? attr->Message.getValue() : "";
+      Diags.diagnose(FD, diag::requires_super_call_override, baseMethodName,
+                     msg, !msg.empty());
       Diags.diagnose(FD, diag::silence_super_call_override)
           .fixItInsert(FD->getAttributeInsertionLoc(false), "@ignoresSuper ");
     }

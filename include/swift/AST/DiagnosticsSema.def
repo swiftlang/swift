@@ -2657,9 +2657,9 @@ ERROR(super_attr_only_valid_on_class_method, none,
       "'@%0' can only be applied on non-final class methods", (StringRef))
 ERROR(ignores_super_attr_no_effect, none, 
       "'@ignoresSuper' has no effect because base method does not require 'super' call", ())
-WARNING(requires_super_call_override, none, 
-        "method override is missing 'super.%0' call", 
-        (StringRef))
+ERROR(requires_super_call_override, none, 
+      "method override is missing 'super.%0' call%select{|: %1}2", 
+      (StringRef, StringRef, bool))
 NOTE(silence_super_call_override, none, 
      "annotate method with '@ignoresSuper' if this is intentional", ())
 
