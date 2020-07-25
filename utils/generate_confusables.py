@@ -57,8 +57,9 @@ def main(args=sys.argv):
     )
 
     pairs = []
+    regex = r"(.+)\W+;\W+(.+)\W+;\W+MA*.[#*]*.[(].*[)](.+)\W→(.+)\W#.*"
     with open(confusablesFilePath, 'r') as f:
-        pattern = re.compile(r"(.+)\W+;\W+(.+)\W+;\W+MA*.[#*]*.[(].*[)](.+)\W→(.+)\W#.*")
+        pattern = re.compile(regex)
         for line in f:
             match = pattern.match(line)
             if match is not None:
@@ -70,7 +71,8 @@ def main(args=sys.argv):
                     if hexValue == normalString:
                         confused = hex(int(confusedString, 16))
                         normal = hex(int(normalString, 16))
-                        pairs.append((confused, confusedName, normal, normalName))
+                        pairs.append((confused, confusedName,
+                                      normal, normalName))
 
     defFilePath = os.path.abspath(
         os.path.join(basepath, "..", "include/swift/Parse/Confusables.def")
@@ -88,24 +90,29 @@ def main(args=sys.argv):
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
-//
+//===----------------------------------------------------------------------===//
+
 ////////////////////////////////////////////////////////////////////////////////
 // WARNING: This file is manually generated from
 // utils/UnicodeData/confusables.txt and should not be directly modified.
 // Run utils/generate_confusables.py to regenerate this file.
 ////////////////////////////////////////////////////////////////////////////////
+
+
 '''
         f.write(header)
-        f.write("//===----------------------------------------------------")
-        f.write("------------------===//\n\n")
-        f.write("// CONFUSABLE(CONFUSABLE_POINT, CONFUSABLE_NAME, BASE_POINT, BASE_NAME)\n\n")
+        f.write("// CONFUSABLE(CONFUSABLE_POINT, CONFUSABLE_NAME, " +
+                "BASE_POINT, BASE_NAME)\n\n")
         for (confused, confusedName, expected, expectedName) in pairs:
             # Ad-hoc substitutions for clarity
-            mappings = { "Solidus": "Back Slash", "Reverse Solidus": "Forward Slash" }
+            mappings = {"Solidus": "Forward Slash",
+                        "Reverse Solidus": "Back Slash"}
             newExpectedName = expectedName
             if expectedName in mappings:
                 newExpectedName = mappings[expectedName]
-            f.write("CONFUSABLE(" + confused + ", " + '"' + confusedName + '"' + ", " + expected + ", " + '"' + newExpectedName + '"' + ")\n")
+            f.write("CONFUSABLE(" + confused + ", " + '"' +
+                    confusedName + '"' + ", " + expected + ", " +
+                    '"' + newExpectedName + '"' + ")\n")
         f.write("\n#undef CONFUSABLE\n")
 
 
