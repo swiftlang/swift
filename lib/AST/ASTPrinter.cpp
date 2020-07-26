@@ -4019,8 +4019,7 @@ public:
         break;
       case SILFunctionType::Representation::CFunctionPointer:
         Printer << "c";
-        // FIXME: [clang-function-type-serialization] Once we start serializing
-        // Clang function types, we should be able to remove the second check.
+        // [TODO: Clang-type-plumbing] Remove the second check.
         if (printNameOnly || !info.getUncommonInfo().hasValue())
           break;
         printCType(Ctx, Printer, info);
@@ -4086,8 +4085,7 @@ public:
         break;
       case SILFunctionType::Representation::CFunctionPointer:
         Printer << "c";
-        // FIXME: [clang-function-type-serialization] Once we start serializing
-        // Clang function types, we should be able to remove the second check.
+        // [TODO: Clang-type-plumbing] Remove the second check.
         if (printNameOnly || !info.getUncommonInfo().hasValue())
           break;
         printCType(Ctx, Printer, info);

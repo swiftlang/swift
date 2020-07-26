@@ -3013,8 +3013,7 @@ public:
     static void assertIsFunctionType(const clang::Type *);
 
     ExtInfo(unsigned Bits, Uncommon Other) : Bits(Bits), Other(Other) {
-      // TODO: [clang-function-type-serialization] Once we start serializing
-      // the Clang type, we should also assert that the pointer is non-null.
+      // [TODO: Clang-type-plumbing] Assert that the pointer is non-null.
       auto Rep = Representation(Bits & RepresentationMask);
       if ((Rep == Representation::CFunctionPointer) && Other.ClangFunctionType)
         assertIsFunctionType(Other.ClangFunctionType);
