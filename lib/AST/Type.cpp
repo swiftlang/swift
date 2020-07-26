@@ -3407,7 +3407,7 @@ const clang::Type *AnyFunctionType::getCanonicalClangFunctionType() const {
   return ty ? ty->getCanonicalTypeInternal().getTypePtr() : nullptr;
 }
 
-// TODO: [store-sil-clang-function-type]
+// [TODO: Store-SIL-Clang-type]
 const clang::FunctionType *SILFunctionType::getClangFunctionType() const {
   return nullptr;
 }
