@@ -613,7 +613,7 @@ class ModuleInterfaceLoaderImpl {
     case ModuleLoadingMode::OnlySerialized:
       llvm_unreachable("module interface loader should not have been created");
     }
-    // [Note: ModuleInterfaceLoader-defer-to-SerializedModuleLoader]
+    // [NOTE: ModuleInterfaceLoader-defer-to-ImplicitSerializedModuleLoader]
     // If there's a module adjacent to the .swiftinterface that we can
     // _likely_ load (it validates OK and is up to date), bail early with
     // errc::not_supported, so the next (serialized) loader in the chain will

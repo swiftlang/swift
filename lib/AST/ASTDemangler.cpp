@@ -530,7 +530,7 @@ Type ASTBuilder::createImplFunctionType(
     break;
   }
 
-  // TODO: [store-sil-clang-function-type]
+  // [TODO: Store-SIL-Clang-type]
   auto einfo = SILFunctionType::ExtInfo(representation, flags.isPseudogeneric(),
                                         !flags.isEscaping(), diffKind,
                                         /*clangFunctionType*/ nullptr);
