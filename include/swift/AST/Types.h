@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the TypeBase class and subclasses.
+// This file defines the TypeBase class and subclasses, which describe the Swift
+// and SIL ASTs. See also: Type.h.
 //
 //===----------------------------------------------------------------------===//
 
@@ -282,7 +283,9 @@ enum class TypeMatchFlags {
 };
 using TypeMatchOptions = OptionSet<TypeMatchFlags>;
 
-/// TypeBase - Base class for all types in Swift.
+/// Base class for all types which describe the Swift and SIL ASTs.
+///
+/// See TypeNodes.def for a succinct description of the full class hierarchy.
 class alignas(1 << TypeAlignInBits) TypeBase {
   
   friend class ASTContext;
