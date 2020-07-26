@@ -2680,8 +2680,7 @@ Type TypeResolver::resolveASTFunctionType(
   if (representation == AnyFunctionType::Representation::CFunctionPointer
       && !clangFnType)
     clangFnType = Context.getClangFunctionType(
-      params, outputTy, incompleteExtInfo,
-      AnyFunctionType::Representation::CFunctionPointer);
+        params, outputTy, AnyFunctionType::Representation::CFunctionPointer);
 
   auto extInfo = incompleteExtInfo.withRepresentation(representation)
                                   .withAsync(repr->async())

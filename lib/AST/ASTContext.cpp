@@ -4446,7 +4446,6 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
 const clang::Type *
 ASTContext::getClangFunctionType(ArrayRef<AnyFunctionType::Param> params,
                                  Type resultTy,
-                                 FunctionType::ExtInfo incompleteExtInfo,
                                  FunctionTypeRepresentation trueRep) {
   auto &impl = getImpl();
   if (!impl.Converter) {

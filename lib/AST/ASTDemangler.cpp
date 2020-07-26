@@ -407,7 +407,6 @@ Type ASTBuilder::createFunctionType(
   const clang::Type *clangFunctionType = nullptr;
   if (representation == FunctionTypeRepresentation::CFunctionPointer)
     clangFunctionType = Ctx.getClangFunctionType(funcParams, output,
-                                                 incompleteExtInfo,
                                                  representation);
 
   auto einfo = incompleteExtInfo.withRepresentation(representation)
