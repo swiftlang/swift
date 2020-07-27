@@ -6,14 +6,10 @@ import Builtin
 
 sil @foo : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
-  strong_retain %0 : $Builtin.NativeObject // expected-remark {{Found retain:}}
-                                           // expected-note @-1 {{Unable to infer any values being retained.}}
-  retain_value %0 : $Builtin.NativeObject  // expected-remark {{Found retain:}}
-                                           // expected-note @-1 {{Unable to infer any values being retained.}}
-  strong_release %0 : $Builtin.NativeObject // expected-remark {{Found release:}}
-                                            // expected-note @-1 {{Unable to infer any values being released.}}
-  release_value %0 : $Builtin.NativeObject // expected-remark {{Found release:}}
-                                           // expected-note @-1 {{Unable to infer any values being released.}}
+  strong_retain %0 : $Builtin.NativeObject // expected-remark {{retain}}
+  retain_value %0 : $Builtin.NativeObject  // expected-remark {{retain}}
+  strong_release %0 : $Builtin.NativeObject // expected-remark {{release}}
+  release_value %0 : $Builtin.NativeObject // expected-remark {{release}}
   %9999 = tuple()
   return %9999 : $()
 }

@@ -19,6 +19,7 @@
 #ifndef SWIFT_SIL_OPTIMIZATIONREMARKEMITTER_H
 #define SWIFT_SIL_OPTIMIZATIONREMARKEMITTER_H
 
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/SIL/SILArgument.h"
