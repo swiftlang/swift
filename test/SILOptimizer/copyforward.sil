@@ -25,8 +25,6 @@ protocol P {
 sil hidden @nrvo : $@convention(thin) <T where T : P> (Bool) -> @out T {
 bb0(%0 : $*T, %1 : $Bool):
   %2 = alloc_stack $T, var, name "ro"                 // users: %9, %15, %17, %19
-  debug_value_addr %0 : $*T
-  debug_value_addr %2 : $*T
   %3 = struct_extract %1 : $Bool, #Bool._value     // user: %4
   cond_br %3, bb1, bb2                            // id: %4
 
@@ -50,7 +48,6 @@ bb3:                                              // Preds: bb1 bb2
   copy_addr [take] %2 to [initialization] %0 : $*T // id: %17
   %18 = tuple ()                                  // user: %20
   debug_value_addr %0 : $*T
-  debug_value_addr %2 : $*T
   dealloc_stack %2 : $*T         // id: %19
   return %18 : $()                                // id: %20
 }
@@ -94,6 +91,8 @@ bb0(%0 : $*T):
   %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   debug_value_addr %l1 : $*T
   dealloc_stack %l1 : $*T
+  // forwardPropagateCopy should cleanup debug_value_addr. See rdar://66000188
+
   debug_value_addr %0 : $*T
   destroy_addr %0 : $*T
   %r1 = tuple ()
@@ -152,8 +151,6 @@ bb0(%0 : $*T):
   copy_addr [take] %0 to [initialization] %l1 : $*T
   %f1 = function_ref @f_in : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
-  debug_value_addr %0 : $*T
-  debug_value_addr %l1 : $*T
   dealloc_stack %l1 : $*T
   %r1 = tuple ()
   return %r1 : $()
@@ -172,8 +169,6 @@ bb0(%0 : $*T):
   copy_addr [take] %0 to %l1 : $*T
   %f2 = function_ref @f_in : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   %c2 = apply %f2<T>(%l1) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
-  debug_value_addr %0 : $*T
-  debug_value_addr %l1 : $*T
   dealloc_stack %l1 : $*T
   %r1 = tuple ()
   return %r1 : $()
@@ -192,6 +187,7 @@ bb0(%0 : $*T):
   debug_value_addr %l1 : $*T
   copy_addr %l1 to [initialization] %0 : $*T
   debug_value_addr %0 : $*T
+  // backwardPropagateCopy should cleanup debug_value_addr. See rdar://66000188
   debug_value_addr %l1 : $*T
   destroy_addr %l1 : $*T
   dealloc_stack %l1 : $*T
@@ -209,10 +205,10 @@ br bb1(%0: $*T)
 bb1(%1 : $*T):
   %f1 = function_ref @f_out : $@convention(thin) <τ_0_0> () -> @out τ_0_0
   %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> () -> @out τ_0_0
-  debug_value_addr %0 : $*T
+  debug_value_addr %1 : $*T
   debug_value_addr %l1 : $*T
-  copy_addr %l1 to [initialization] %0 : $*T
-  debug_value_addr %0 : $*T
+  copy_addr %l1 to [initialization] %1 : $*T
+  debug_value_addr %1 : $*T
   debug_value_addr %l1 : $*T
   destroy_addr %l1 : $*T
   dealloc_stack %l1 : $*T

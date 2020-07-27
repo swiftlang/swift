@@ -1543,7 +1543,7 @@ PatternBindingDecl *PatternBindingDecl::createDeserialized(
   return PBD;
 }
 
-ParamDecl *PatternBindingInitializer::getImplicitSelfDecl() {
+ParamDecl *PatternBindingInitializer::getImplicitSelfDecl() const {
   if (SelfParam)
     return SelfParam;
 
@@ -1555,12 +1555,14 @@ ParamDecl *PatternBindingInitializer::getImplicitSelfDecl() {
                         : ParamSpecifier::InOut);
 
       ASTContext &C = DC->getASTContext();
-      SelfParam = new (C) ParamDecl(SourceLoc(), SourceLoc(),
+      auto *mutableThis = const_cast<PatternBindingInitializer *>(this);
+      auto *LazySelfParam = new (C) ParamDecl(SourceLoc(), SourceLoc(),
                                     Identifier(), singleVar->getLoc(),
-                                    C.Id_self, this);
-      SelfParam->setImplicit();
-      SelfParam->setSpecifier(specifier);
-      SelfParam->setInterfaceType(DC->getSelfInterfaceType());
+                                    C.Id_self, mutableThis);
+      LazySelfParam->setImplicit();
+      LazySelfParam->setSpecifier(specifier);
+      LazySelfParam->setInterfaceType(DC->getSelfInterfaceType());
+      mutableThis->SelfParam = LazySelfParam;
     }
   }
 

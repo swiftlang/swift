@@ -93,5 +93,16 @@ SEMANTICS_ATTR(CONVERT_TO_OBJECTIVE_C, "convertToObjectiveC")
 
 SEMANTICS_ATTR(KEYPATH_KVC_KEY_PATH_STRING, "keypath.kvcKeyPathString")
 
+/// The prefix used to force opt-remarks to be emitted in a specific function.
+///
+/// If used just by itself "optremark", it is assumed that /all/ opt remarks
+/// should be emitted. Otherwise, one can add a suffix after a '.' that
+/// specifies a pass to emit opt-remarks from. So for instance to get just
+/// information from 'sil-opt-remark-gen', one would write:
+/// "optremark.sil-opt-remark-gen". One can add as many as one wishes. Keep in
+/// mind that if the function itself is inlined, one will lose the optremark so
+/// consider inlining where to put these.
+SEMANTICS_ATTR(FORCE_EMIT_OPT_REMARK_PREFIX, "optremark")
+
 #undef SEMANTICS_ATTR
 

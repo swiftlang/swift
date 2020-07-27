@@ -3768,8 +3768,8 @@ void GenericSignatureBuilder::addGenericParameter(GenericTypeParamType *GenericP
 /// Visit all of the types that show up in the list of inherited
 /// types.
 static ConstraintResult visitInherited(
-         llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-         llvm::function_ref<ConstraintResult(Type, const TypeRepr *)> visitType) {
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
+    llvm::function_ref<ConstraintResult(Type, const TypeRepr *)> visitType) {
   // Local function that (recursively) adds inherited types.
   ConstraintResult result = ConstraintResult::Resolved;
   std::function<void(Type, const TypeRepr *)> visitInherited;
@@ -3795,8 +3795,8 @@ static ConstraintResult visitInherited(
   };
 
   // Visit all of the inherited types.
-  auto typeDecl = decl.dyn_cast<TypeDecl *>();
-  auto extDecl = decl.dyn_cast<ExtensionDecl *>();
+  auto typeDecl = decl.dyn_cast<const TypeDecl *>();
+  auto extDecl = decl.dyn_cast<const ExtensionDecl *>();
   ASTContext &ctx = typeDecl ? typeDecl->getASTContext()
                              : extDecl->getASTContext();
   auto &evaluator = ctx.evaluator;

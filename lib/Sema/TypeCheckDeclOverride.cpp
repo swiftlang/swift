@@ -214,6 +214,19 @@ bool swift::isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
   return canDeclTy == canParentDeclTy;
 }
 
+static bool isUnavailableInAllVersions(ValueDecl *decl) {
+  ASTContext &ctx = decl->getASTContext();
+  auto *attr = decl->getAttrs().getUnavailable(ctx);
+
+  if (!attr)
+    return false;
+  if (attr->isUnconditionallyUnavailable())
+    return true;
+
+  return attr->getVersionAvailability(ctx)
+             == AvailableVersionComparison::Unavailable;
+}
+
 /// Perform basic checking to determine whether a declaration can override a
 /// declaration in a superclass.
 static bool areOverrideCompatibleSimple(ValueDecl *decl,
@@ -245,6 +258,15 @@ static bool areOverrideCompatibleSimple(ValueDecl *decl,
   // The declarations must be of the same kind.
   if (decl->getKind() != parentDecl->getKind())
     return false;
+
+  // If the parent decl is unavailable, the subclass decl can shadow it, but it
+  // can't override it. To avoid complex version logic, we don't apply this to
+  // `obsoleted` members, only `unavailable` ones.
+  // FIXME: Refactor to allow that when the minimum version is always satisfied.
+  if (isUnavailableInAllVersions(parentDecl))
+    // If the subclass decl is trying to override, we'll diagnose it later.
+    if (!decl->getAttrs().hasAttribute<OverrideAttr>())
+      return false;
 
   // Ignore invalid parent declarations.
   // FIXME: Do we really need this?
@@ -503,16 +525,18 @@ static void diagnoseGeneralOverrideFailure(ValueDecl *decl,
     break;
   case OverrideCheckingAttempt::MismatchedOptional:
   case OverrideCheckingAttempt::MismatchedTypes:
-  case OverrideCheckingAttempt::BaseNameWithMismatchedOptional:
+  case OverrideCheckingAttempt::BaseNameWithMismatchedOptional: {
+    auto isClassContext = decl->getDeclContext()->getSelfClassDecl() != nullptr;
+    auto diag = diag::method_does_not_override;
     if (isa<ConstructorDecl>(decl))
-      diags.diagnose(decl, diag::initializer_does_not_override);
+      diag = diag::initializer_does_not_override;
     else if (isa<SubscriptDecl>(decl))
-      diags.diagnose(decl, diag::subscript_does_not_override);
+      diag = diag::subscript_does_not_override;
     else if (isa<VarDecl>(decl))
-      diags.diagnose(decl, diag::property_does_not_override);
-    else
-      diags.diagnose(decl, diag::method_does_not_override);
+      diag = diag::property_does_not_override;
+    diags.diagnose(decl, diag, isClassContext);
     break;
+  }
   case OverrideCheckingAttempt::Final:
     llvm_unreachable("should have exited already");
   }
@@ -1124,6 +1148,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
   // If this is an exact type match, we're successful!
   Type declTy = getDeclComparisonType();
   Type owningTy = dc->getDeclaredInterfaceType();
+  auto isClassContext = classDecl != nullptr;
   if (declIUOAttr == matchDeclIUOAttr && declTy->isEqual(baseTy)) {
     // Nothing to do.
 
@@ -1132,7 +1157,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
       auto diagKind = diag::method_does_not_override;
       if (isa<ConstructorDecl>(method))
         diagKind = diag::initializer_does_not_override;
-      diags.diagnose(decl, diagKind);
+      diags.diagnose(decl, diagKind, isClassContext);
       noteFixableMismatchedTypes(decl, baseDecl);
       diags.diagnose(baseDecl, diag::overridden_near_match_here,
                      baseDecl->getDescriptiveKind(),
@@ -1164,7 +1189,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     }
 
     if (attempt == OverrideCheckingAttempt::MismatchedTypes) {
-      diags.diagnose(decl, diag::subscript_does_not_override);
+      diags.diagnose(decl, diag::subscript_does_not_override, isClassContext);
       noteFixableMismatchedTypes(decl, baseDecl);
       diags.diagnose(baseDecl, diag::overridden_near_match_here,
                      baseDecl->getDescriptiveKind(),
@@ -1864,6 +1889,15 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
   // FIXME: Possibly should extend to more availability checking.
   if (auto *attr = base->getAttrs().getUnavailable(ctx)) {
     diagnoseUnavailableOverride(override, base, attr);
+
+    if (isUnavailableInAllVersions(base)) {
+      auto modifier = override->getAttrs().getAttribute<OverrideAttr>();
+      if (modifier && modifier->isValid()) {
+        diags.diagnose(override, diag::suggest_removing_override,
+                       override->getBaseName())
+          .fixItRemove(modifier->getRange());
+      }
+    }
   }
 
   if (!ctx.LangOpts.DisableAvailabilityChecking) {

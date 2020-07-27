@@ -1967,8 +1967,15 @@ bool ClosureExpr::hasEmptyBody() const {
 }
 
 bool ClosureExpr::capturesSelfEnablingImplictSelf() const {
-  if (auto *VD = getCapturedSelfDecl())
-    return VD->isSelfParamCapture() && !VD->getType()->is<WeakStorageType>();
+  if (auto *VD = getCapturedSelfDecl()) {
+    if (!VD->isSelfParamCapture())
+      return false;
+
+    if (auto *attr = VD->getAttrs().getAttribute<ReferenceOwnershipAttr>())
+      return attr->get() != ReferenceOwnership::Weak;
+
+    return true;
+  }
   return false;
 }
 

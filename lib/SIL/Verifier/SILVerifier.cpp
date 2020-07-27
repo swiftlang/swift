@@ -1936,13 +1936,13 @@ public:
     }
 
     // Verify that all formal accesses patterns are recognized as part of a
-    // whitelist. The presence of an unknown pattern means that analysis will
+    // allowlist. The presence of an unknown pattern means that analysis will
     // silently fail, and the compiler may be introducing undefined behavior
     // with no other way to detect it.
     //
     // For example, AccessEnforcementWMO runs very late in the
     // pipeline and assumes valid storage for all dynamic Read/Modify access. It
-    // also requires that Unidentified access fit a whitelist on known
+    // also requires that Unidentified access fit a allowlist on known
     // non-internal globals or class properties.
     //
     // First check that identifyFormalAccess returns without asserting. For

@@ -19,10 +19,12 @@
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILRemarkStreamer.h"
@@ -77,42 +79,6 @@ Argument::Argument(StringRef key, CanType ty)
   ty.print(stream);
 }
 
-bool Argument::inferArgumentsForValue(
-    ArgumentKeyKind keyKind, StringRef msg, SILValue value,
-    function_ref<bool(Argument)> funcPassedInferedArgs) {
-
-  while (true) {
-    // If we have an argument, just use that.
-    if (auto *arg = dyn_cast<SILArgument>(value))
-      if (auto *decl = arg->getDecl())
-        return funcPassedInferedArgs(
-            Argument({keyKind, "InferredValue"}, msg, decl));
-
-    // Otherwise, look for debug_values.
-    for (auto *use : getDebugUses(value))
-      if (auto *dvi = dyn_cast<DebugValueInst>(use->getUser()))
-        if (auto *decl = dvi->getDecl())
-          if (!funcPassedInferedArgs(
-                  Argument({keyKind, "InferredValue"}, msg, decl)))
-            return false;
-
-    // If we have a load, look through it and continue. We may have a global or
-    // a function argument.
-    if (auto *li = dyn_cast<LoadInst>(value)) {
-      value = stripAccessMarkers(li->getOperand());
-      continue;
-    }
-
-    if (auto *ga = dyn_cast<GlobalAddrInst>(value))
-      if (auto *decl = ga->getReferencedGlobal()->getDecl())
-        if (!funcPassedInferedArgs(
-                Argument({keyKind, "InferredValue"}, msg, decl)))
-          return false;
-
-    return true;
-  }
-}
-
 template <typename DerivedT>
 std::string Remark<DerivedT>::getMsg() const {
   std::string str;
@@ -144,16 +110,39 @@ std::string Remark<DerivedT>::getDebugMsg() const {
   return stream.str();
 }
 
-Emitter::Emitter(StringRef passName, SILModule &m)
-    : module(m), passName(passName),
+static bool hasForceEmitSemanticAttr(SILFunction &fn, StringRef passName) {
+  return llvm::any_of(fn.getSemanticsAttrs(), [&](const std::string &str) {
+    auto ref = StringRef(str);
+
+    // First try to chomp the prefix.
+    if (!ref.consume_front(semantics::FORCE_EMIT_OPT_REMARK_PREFIX))
+      return false;
+
+    // Then see if we only have the prefix. Then always return true the user
+    // wants /all/ remarks.
+    if (ref.empty())
+      return true;
+
+    // Otherwise, lets try to chomp the '.' and then the passName.
+    if (!ref.consume_front(".") || !ref.consume_front(passName))
+      return false;
+
+    return ref.empty();
+  });
+}
+
+Emitter::Emitter(StringRef passName, SILFunction &fn)
+    : fn(fn), passName(passName),
       passedEnabled(
-          m.getASTContext().LangOpts.OptimizationRemarkPassedPattern &&
-          m.getASTContext().LangOpts.OptimizationRemarkPassedPattern->match(
-              passName)),
+          hasForceEmitSemanticAttr(fn, passName) ||
+          (fn.getASTContext().LangOpts.OptimizationRemarkPassedPattern &&
+           fn.getASTContext().LangOpts.OptimizationRemarkPassedPattern->match(
+               passName))),
       missedEnabled(
-          m.getASTContext().LangOpts.OptimizationRemarkMissedPattern &&
-          m.getASTContext().LangOpts.OptimizationRemarkMissedPattern->match(
-              passName)) {}
+          hasForceEmitSemanticAttr(fn, passName) ||
+          (fn.getASTContext().LangOpts.OptimizationRemarkMissedPattern &&
+           fn.getASTContext().LangOpts.OptimizationRemarkMissedPattern->match(
+               passName))) {}
 
 /// The user has passed us an instruction that for some reason has a source loc
 /// that can not be used. Search down the current block for an instruction with
@@ -240,17 +229,20 @@ SourceLoc swift::OptRemark::inferOptRemarkSourceLoc(
 }
 
 template <typename RemarkT, typename... ArgTypes>
-static void emitRemark(SILModule &module, const Remark<RemarkT> &remark,
+static void emitRemark(SILFunction &fn, const Remark<RemarkT> &remark,
                        Diag<ArgTypes...> id, bool diagEnabled) {
   if (remark.getLocation().isInvalid())
     return;
+
+  auto &module = fn.getModule();
   if (auto *remarkStreamer = module.getSILRemarkStreamer())
     remarkStreamer->emit(remark);
 
   // If diagnostics are enabled, first emit the main diagnostic and then loop
   // through our arguments and allow the arguments to add additional diagnostics
   // if they want.
-  if (!diagEnabled)
+  if (!diagEnabled && !fn.hasSemanticsAttrThatStartsWith(
+                          semantics::FORCE_EMIT_OPT_REMARK_PREFIX))
     return;
 
   auto &de = module.getASTContext().Diags;
@@ -273,13 +265,11 @@ static void emitRemark(SILModule &module, const Remark<RemarkT> &remark,
 }
 
 void Emitter::emit(const RemarkPassed &remark) {
-  emitRemark(module, remark, diag::opt_remark_passed,
-             isEnabled<RemarkPassed>());
+  emitRemark(fn, remark, diag::opt_remark_passed, isEnabled<RemarkPassed>());
 }
 
 void Emitter::emit(const RemarkMissed &remark) {
-  emitRemark(module, remark, diag::opt_remark_missed,
-             isEnabled<RemarkMissed>());
+  emitRemark(fn, remark, diag::opt_remark_missed, isEnabled<RemarkMissed>());
 }
 
 void Emitter::emitDebug(const RemarkPassed &remark) {

@@ -80,6 +80,11 @@ void
 swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
                                    swift_reflection_info_t Info);
 
+/// Add reflection sections from a loaded Swift image.
+SWIFT_REMOTE_MIRROR_LINKAGE
+void swift_reflection_addReflectionMappingInfo(
+    SwiftReflectionContextRef ContextRef, swift_reflection_mapping_info_t Info);
+
 /// Add reflection information from a loaded Swift image.
 /// Returns true on success, false if the image's memory couldn't be read.
 SWIFT_REMOTE_MIRROR_LINKAGE
