@@ -89,12 +89,9 @@ toolchains::Darwin::constructInvocation(const InterpretJobAction &job,
 }
 
 static StringRef
-getDarwinLibraryNameSuffixForTriple(const llvm::Triple &triple,
-                                    bool distinguishSimulator = true) {
+getDarwinLibraryNameSuffixForTriple(const llvm::Triple &triple) {
   const DarwinPlatformKind kind = getDarwinPlatformKind(triple);
-  const DarwinPlatformKind effectiveKind =
-      distinguishSimulator ? kind : getNonSimulatorPlatform(kind);
-  switch (effectiveKind) {
+  switch (kind) {
   case DarwinPlatformKind::MacOS:
     return "osx";
   case DarwinPlatformKind::IPhoneOS:
