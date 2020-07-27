@@ -11,10 +11,10 @@ github() {
   curl --header "authorization: Bearer $GITHUB_TOKEN" "$@"
 }
 
-latest_run=$(github "${gh_api}/repos/${repository}/actions/workflows/${workflow_name}/runs?branch=${branch}&status=completed" | jq '.workflow_runs | sort_by(.run_number) | last')
+latest_run=$(github "${gh_api}/repos/${repository}/actions/workflows/${workflow_name}/runs?head_branch=${branch}&status=completed&conclusion=success" \
+  | jq ".workflow_runs | map(select(.head_branch == \"$branch\")) | sort_by(.run_number) | last")
 artifacts_url=$(echo $latest_run | jq .artifacts_url --raw-output)
 head_sha=$(echo $latest_run | jq .head_sha --raw-output)
-
 
 get_artifact_url() {
   local name=$1
