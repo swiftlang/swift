@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.12.4)
 
+SET(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -mtune=native -march=native -flto")
 # TODO: Fix RPATH usage to be CMP0068 compliant
 # Disable Policy CMP0068 for CMake 3.9
 # rdar://37725888
