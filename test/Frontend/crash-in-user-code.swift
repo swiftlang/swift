@@ -8,7 +8,7 @@
 // UNSUPPORTED: OS=tvos
 // UNSUPPORTED: OS=watchos
 
-// CHECK: Stack dump:
+// CHECK: {{Stack dump|stack trace}}:
 // CHECK-NEXT: Program arguments:
 // CHECK-NEXT: Swift version
 // CHECK-NEXT: Contents of {{.*}}.filelist.txt:
