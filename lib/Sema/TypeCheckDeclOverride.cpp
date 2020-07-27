@@ -1618,7 +1618,7 @@ namespace  {
       if (!attrs.hasAttribute<RequiresSuperAttr>() &&
           !attrs.hasAttribute<IgnoresSuperAttr>() && !Override->isFinal()) {
         Override->getAttrs().add(new (C)
-                                     RequiresSuperAttr(attr->Message, true));
+                                     RequiresSuperAttr(attr->Message, false));
       }
     }
   };
