@@ -3013,8 +3013,7 @@ public:
     static void assertIsFunctionType(const clang::Type *);
 
     ExtInfo(unsigned Bits, Uncommon Other) : Bits(Bits), Other(Other) {
-      // TODO: [clang-function-type-serialization] Once we start serializing
-      // the Clang type, we should also assert that the pointer is non-null.
+      // [TODO: Clang-type-plumbing] Assert that the pointer is non-null.
       auto Rep = Representation(Bits & RepresentationMask);
       if ((Rep == Representation::CFunctionPointer) && Other.ClangFunctionType)
         assertIsFunctionType(Other.ClangFunctionType);
@@ -4372,7 +4371,7 @@ private:
   unsigned NumAnyResults : 16;         // Not including the ErrorResult.
   unsigned NumAnyIndirectFormalResults : 16; // Subset of NumAnyResults.
 
-  // [SILFunctionType-layout]
+  // [NOTE: SILFunctionType-layout]
   // The layout of a SILFunctionType in memory is:
   //   SILFunctionType
   //   SILParameterInfo[NumParameters]
