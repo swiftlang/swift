@@ -211,7 +211,7 @@ struct S {
   override func f() { } // expected-error{{'override' can only be specified on class members}} {{3-12=}}
 }
 extension S {
-  override func ef() {} // expected-error{{method does not override any method from its superclass}}
+  override func ef() {} // expected-error{{'override' can only be specified on class members}} {{3-12=}}
 }
 
 enum E {
