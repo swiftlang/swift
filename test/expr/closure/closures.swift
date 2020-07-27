@@ -523,3 +523,18 @@ class SR3186 {
     print("\(v)")
   }
 }
+
+// SR-13273
+class SR13273 {
+  var y: Int = 0
+
+  func foo() {
+    bar {
+      bar { [y] in // OK
+        print(y)
+      }
+    }
+  }
+
+  func bar(_: () -> Void) {}
+}

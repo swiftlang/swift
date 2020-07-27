@@ -1491,10 +1491,15 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
     /// use or capture of "self." for qualification of member references.
     static bool isClosureRequiringSelfQualification(
                   const AbstractClosureExpr *CE) {
+      auto closureTy = CE->getType();
+      // If we don't have a type for this closure yet (or the closure has error
+      // type), don't offer diagnostics for required 'self'. We will have
+      // another chance when (if) the closure successfully typechecks.
+      if (!closureTy || closureTy->hasError())
+        return false;
       // If the closure's type was inferred to be noescape, then it doesn't
       // need qualification.
-      return !AnyFunctionRef(const_cast<AbstractClosureExpr *>(CE))
-               .isKnownNoEscape();
+      return !closureTy->castTo<AnyFunctionType>()->isNoEscape();
     }
 
 
