@@ -2126,6 +2126,21 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
       auto *predBB = std::get<0>(pair);
       auto incomingValue = std::get<1>(pair);
       blockTemporaries[getPullbackBlock(predBB)].insert(concreteBBArgAdjCopy);
+      if (auto *termInst = bbArg->getSingleTerminator()) {
+        if (auto *sei = dyn_cast<SwitchEnumInst>(termInst)) {
+          auto *optionalEnumDecl = getASTContext().getOptionalDecl();
+          if (sei->getOperand()->getType().getASTType().getEnumOrBoundGenericEnum() == optionalEnumDecl) {
+            llvm::errs() << "HELLO!\n";
+            sei->dump();
+            // Construct a `Optional.TangentVector` and call `setAdjointValue`
+            // with it.
+            //
+            // setAdjointValue(predBB, incomingValue,
+            //                 makeConcreteAdjointValue(optionalAdjValue));
+            continue;
+          }
+        }
+      }
       setAdjointValue(predBB, incomingValue,
                       makeConcreteAdjointValue(concreteBBArgAdjCopy));
     }
