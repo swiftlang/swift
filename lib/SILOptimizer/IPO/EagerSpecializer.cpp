@@ -738,7 +738,7 @@ SILValue EagerDispatch::emitArgumentConversion(
 namespace {
 // FIXME: This should be a function transform that pushes cloned functions on
 // the pass manager worklist.
-class EagerSpecializerTransform : public SILModuleTransform {
+class EagerSpecializerTransform : public SILFunctionTransform {
 public:
   EagerSpecializerTransform() {}
 
@@ -751,7 +751,10 @@ public:
 static SILFunction *eagerSpecialize(SILOptFunctionBuilder &FuncBuilder,
                                     SILFunction *GenericFunc,
                                     const SILSpecializeAttr &SA,
-                                    const ReabstractionInfo &ReInfo) {
+                                    const ReabstractionInfo &ReInfo,
+                                    SmallVectorImpl<SILFunction *> &newFunctions) {
+  assert(ReInfo.getSpecializedType());
+
   LLVM_DEBUG(llvm::dbgs() << "Specializing " << GenericFunc->getName() << "\n");
 
   LLVM_DEBUG(auto FT = GenericFunc->getLoweredFunctionType();
@@ -767,7 +770,13 @@ static SILFunction *eagerSpecialize(SILOptFunctionBuilder &FuncBuilder,
                       ReInfo.getClonerParamSubstitutionMap(),
                       ReInfo);
 
-  SILFunction *NewFunc = FuncSpecializer.trySpecialization();
+  SILFunction *NewFunc = FuncSpecializer.lookupSpecialization();
+  if (!NewFunc) {
+    NewFunc = FuncSpecializer.tryCreateSpecialization();
+    if (NewFunc)
+      newFunctions.push_back(NewFunc);
+  }
+
   if (!NewFunc)
     LLVM_DEBUG(llvm::dbgs() << "  Failed. Cannot specialize function.\n");
   return NewFunc;
@@ -779,64 +788,69 @@ void EagerSpecializerTransform::run() {
     return;
 
   SILOptFunctionBuilder FuncBuilder(*this);
+  auto &F = *getFunction();
 
   // Process functions in any order.
-  for (auto &F : *getModule()) {
-    if (!F.shouldOptimize()) {
-      LLVM_DEBUG(llvm::dbgs() << "  Cannot specialize function " << F.getName()
-                              << " because it is marked to be "
-                                 "excluded from optimizations.\n");
-      continue;
-    }
+  if (!F.shouldOptimize()) {
+    LLVM_DEBUG(llvm::dbgs() << "  Cannot specialize function " << F.getName()
+                            << " because it is marked to be "
+                               "excluded from optimizations.\n");
+    return;
+  }
 
-    // Only specialize functions in their home module.
-    if (F.isExternalDeclaration() || F.isAvailableExternally())
-      continue;
+  // Only specialize functions in their home module.
+  if (F.isExternalDeclaration() || F.isAvailableExternally())
+    return;
 
-    if (F.isDynamicallyReplaceable())
-      continue;
+  if (F.isDynamicallyReplaceable())
+    return;
 
-    if (!F.getLoweredFunctionType()->getInvocationGenericSignature())
-      continue;
+  if (!F.getLoweredFunctionType()->getInvocationGenericSignature())
+    return;
 
-    // Create a specialized function with ReabstractionInfo for each attribute.
-    SmallVector<SILFunction *, 8> SpecializedFuncs;
-    SmallVector<ReabstractionInfo, 4> ReInfoVec;
-    ReInfoVec.reserve(F.getSpecializeAttrs().size());
+  // Create a specialized function with ReabstractionInfo for each attribute.
+  SmallVector<SILFunction *, 8> SpecializedFuncs;
+  SmallVector<ReabstractionInfo, 4> ReInfoVec;
+  ReInfoVec.reserve(F.getSpecializeAttrs().size());
+  SmallVector<SILFunction *, 8> newFunctions;
 
-    // TODO: Use a decision-tree to reduce the amount of dynamic checks being
-    // performed.
-    for (auto *SA : F.getSpecializeAttrs()) {
-      ReInfoVec.emplace_back(FuncBuilder.getModule().getSwiftModule(),
-                             FuncBuilder.getModule().isWholeModule(), &F,
-                             SA->getSpecializedSignature());
-      auto *NewFunc = eagerSpecialize(FuncBuilder, &F, *SA, ReInfoVec.back());
+  // TODO: Use a decision-tree to reduce the amount of dynamic checks being
+  // performed.
+  for (auto *SA : F.getSpecializeAttrs()) {
+    ReInfoVec.emplace_back(FuncBuilder.getModule().getSwiftModule(),
+                           FuncBuilder.getModule().isWholeModule(), &F,
+                           SA->getSpecializedSignature());
+    auto *NewFunc =
+        eagerSpecialize(FuncBuilder, &F, *SA, ReInfoVec.back(), newFunctions);
 
-      SpecializedFuncs.push_back(NewFunc);
-    }
+    SpecializedFuncs.push_back(NewFunc);
+  }
 
-    // TODO: Optimize the dispatch code to minimize the amount
-    // of checks. Use decision trees for this purpose.
-    bool Changed = false;
-    for_each3(F.getSpecializeAttrs(), SpecializedFuncs, ReInfoVec,
-              [&](const SILSpecializeAttr *SA, SILFunction *NewFunc,
-                  const ReabstractionInfo &ReInfo) {
-                if (NewFunc) {
-                  NewFunc->verify();
-                  Changed = true;
-                  EagerDispatch(&F, ReInfo).emitDispatchTo(NewFunc);
-                }
-              });
+  // TODO: Optimize the dispatch code to minimize the amount
+  // of checks. Use decision trees for this purpose.
+  bool Changed = false;
+  for_each3(F.getSpecializeAttrs(), SpecializedFuncs, ReInfoVec,
+            [&](const SILSpecializeAttr *SA, SILFunction *NewFunc,
+                const ReabstractionInfo &ReInfo) {
+              if (NewFunc) {
+                NewFunc->verify();
+                Changed = true;
+                EagerDispatch(&F, ReInfo).emitDispatchTo(NewFunc);
+              }
+            });
 
-    // Invalidate everything since we delete calls as well as add new
-    // calls and branches.
-    if (Changed) {
-      invalidateAnalysis(&F, SILAnalysis::InvalidationKind::Everything);
-    }
+  // Invalidate everything since we delete calls as well as add new
+  // calls and branches.
+  if (Changed) {
+    invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
+  }
 
-    // As specializations are created, the attributes should be removed.
-    F.clearSpecializeAttrs();
-    F.verify();
+  // As specializations are created, the attributes should be removed.
+  F.clearSpecializeAttrs();
+  F.verify();
+
+  for (SILFunction *newF : newFunctions) {
+    addFunctionToPassManagerWorklist(newF, nullptr);
   }
 }
 
