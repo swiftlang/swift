@@ -524,6 +524,9 @@ static void addSerializePipeline(SILPassPipelinePlan &P) {
 
 static void addMidLevelFunctionPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("MidLevel,Function", true /*isFunctionPassPipeline*/);
+
+  P.addStringOptimization();
+
   addFunctionPasses(P, OptimizationLevelKind::MidLevel);
 
   // Specialize partially applied functions with dead arguments as a preparation

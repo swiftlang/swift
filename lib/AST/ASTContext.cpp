@@ -40,6 +40,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/SILLayout.h"
@@ -239,6 +240,9 @@ struct ASTContext::Implementation {
 
   /// func append(Element) -> void
   FuncDecl *ArrayAppendElementDecl = nullptr;
+
+  /// init(Builtin.RawPointer, Builtin.Word, Builtin.Int1)
+  ConstructorDecl *MakeUTF8StringDecl = nullptr;
 
   /// func reserveCapacityForAppend(newElementsCount: Int)
   FuncDecl *ArrayReserveCapacityDecl = nullptr;
@@ -1242,6 +1246,33 @@ FuncDecl *ASTContext::getArrayReserveCapacityDecl() const {
 
       getImpl().ArrayReserveCapacityDecl = FnDecl;
       return FnDecl;
+    }
+  }
+  return nullptr;
+}
+
+ConstructorDecl *ASTContext::getMakeUTF8StringDecl() const {
+  if (getImpl().MakeUTF8StringDecl)
+    return getImpl().MakeUTF8StringDecl;
+
+  auto initializers =
+    getStringDecl()->lookupDirect(DeclBaseName::createConstructor());
+
+  for (Decl *initializer : initializers) {
+    auto *constructor = cast<ConstructorDecl>(initializer);
+    auto Attrs = constructor->getAttrs();
+    for (auto *A : Attrs.getAttributes<SemanticsAttr, false>()) {
+      if (A->Value != semantics::STRING_MAKE_UTF8)
+        continue;
+      auto ParamList = constructor->getParameters();
+      if (ParamList->size() != 3)
+        continue;
+      ParamDecl *param = constructor->getParameters()->get(0);
+      if (param->getArgumentName().str() != "_builtinStringLiteral")
+        continue;
+
+      getImpl().MakeUTF8StringDecl = constructor;
+      return constructor;
     }
   }
   return nullptr;
