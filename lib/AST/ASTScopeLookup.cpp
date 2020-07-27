@@ -370,6 +370,22 @@ bool GenericTypeOrExtensionWhereOrBodyPortion::lookupMembersOf(
                                 });
 }
 
+bool GenericTypeOrExtensionWherePortion::lookupMembersOf(
+    const GenericTypeOrExtensionScope *scope,
+    ArrayRef<const ASTScopeImpl *> history,
+    ASTScopeImpl::DeclConsumer consumer) const {
+  if (!scope->areMembersVisibleFromWhereClause())
+    return false;
+
+  return GenericTypeOrExtensionWhereOrBodyPortion::lookupMembersOf(
+    scope, history, consumer);
+}
+
+bool GenericTypeOrExtensionScope::areMembersVisibleFromWhereClause() const {
+  auto *decl = getDecl();
+  return isa<ProtocolDecl>(decl) || isa<ExtensionDecl>(decl);
+}
+
 #pragma mark looking in locals or members - locals
 
 bool GenericParamScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
