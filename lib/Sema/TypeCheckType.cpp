@@ -2213,7 +2213,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       }
 
       // Resolve the function type directly with these attributes.
-      // TODO: [store-sil-clang-function-type]
+      // [TODO: Store-SIL-Clang-type]
       SILFunctionType::ExtInfo extInfo(rep, attrs.has(TAK_pseudogeneric),
                                        attrs.has(TAK_noescape), diffKind,
                                        nullptr);

@@ -3621,7 +3621,7 @@ CanSILFunctionType SILFunctionType::get(
 
   // All SILFunctionTypes are canonical.
 
-  // See [SILFunctionType-layout]
+  // See [NOTE: SILFunctionType-layout]
   bool hasResultCache = normalResults.size() > 1;
   size_t bytes =
     totalSizeToAlloc<SILParameterInfo, SILResultInfo, SILYieldInfo,
