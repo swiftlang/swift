@@ -3369,9 +3369,9 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   return build(C, CanTypes, HasExplicitAnyObject);
 }
 
-void AnyFunctionType::ExtInfo::Uncommon::printClangFunctionType(
-    ClangModuleLoader *cml, llvm::raw_ostream &os) {
-  cml->printClangType(ClangFunctionType, os);
+void AnyFunctionType::ExtInfo::ClangTypeInfo::printType(
+    ClangModuleLoader *cml, llvm::raw_ostream &os) const {
+  cml->printClangType(type, os);
 }
 
 void
