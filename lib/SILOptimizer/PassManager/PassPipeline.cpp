@@ -663,6 +663,8 @@ static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
 
   // Only has an effect if opt-remark is enabled.
   P.addOptRemarkGenerator();
+
+  P.addPruneVTables();
 }
 
 static void addSILDebugInfoGeneratorPipeline(SILPassPipelinePlan &P) {
