@@ -6108,20 +6108,20 @@
 
 - id: method_does_not_override
   msg: >-
-    method does not override any method from its superclass
+    method does not override any method from its %select{parent protocol|superclass}0
 
 - id: property_does_not_override
   msg: >-
-    property does not override any property from its superclass
+    property does not override any property from its %select{parent protocol|superclass}0
 
 - id: subscript_does_not_override
   msg: >-
-    subscript does not override any subscript from its superclass
+    subscript does not override any subscript from its %select{parent protocol|superclass}0
 
 - id: initializer_does_not_override
   msg: >-
     initializer does not override a designated initializer from its
-    superclass
+    %select{parent protocol|superclass}0
 
 - id: failable_initializer_override
   msg: >-

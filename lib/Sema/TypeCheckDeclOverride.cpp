@@ -525,16 +525,18 @@ static void diagnoseGeneralOverrideFailure(ValueDecl *decl,
     break;
   case OverrideCheckingAttempt::MismatchedOptional:
   case OverrideCheckingAttempt::MismatchedTypes:
-  case OverrideCheckingAttempt::BaseNameWithMismatchedOptional:
+  case OverrideCheckingAttempt::BaseNameWithMismatchedOptional: {
+    auto isClassContext = decl->getDeclContext()->getSelfClassDecl() != nullptr;
+    auto diag = diag::method_does_not_override;
     if (isa<ConstructorDecl>(decl))
-      diags.diagnose(decl, diag::initializer_does_not_override);
+      diag = diag::initializer_does_not_override;
     else if (isa<SubscriptDecl>(decl))
-      diags.diagnose(decl, diag::subscript_does_not_override);
+      diag = diag::subscript_does_not_override;
     else if (isa<VarDecl>(decl))
-      diags.diagnose(decl, diag::property_does_not_override);
-    else
-      diags.diagnose(decl, diag::method_does_not_override);
+      diag = diag::property_does_not_override;
+    diags.diagnose(decl, diag, isClassContext);
     break;
+  }
   case OverrideCheckingAttempt::Final:
     llvm_unreachable("should have exited already");
   }
@@ -1146,6 +1148,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
   // If this is an exact type match, we're successful!
   Type declTy = getDeclComparisonType();
   Type owningTy = dc->getDeclaredInterfaceType();
+  auto isClassContext = classDecl != nullptr;
   if (declIUOAttr == matchDeclIUOAttr && declTy->isEqual(baseTy)) {
     // Nothing to do.
 
@@ -1154,7 +1157,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
       auto diagKind = diag::method_does_not_override;
       if (isa<ConstructorDecl>(method))
         diagKind = diag::initializer_does_not_override;
-      diags.diagnose(decl, diagKind);
+      diags.diagnose(decl, diagKind, isClassContext);
       noteFixableMismatchedTypes(decl, baseDecl);
       diags.diagnose(baseDecl, diag::overridden_near_match_here,
                      baseDecl->getDescriptiveKind(),
@@ -1186,7 +1189,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     }
 
     if (attempt == OverrideCheckingAttempt::MismatchedTypes) {
-      diags.diagnose(decl, diag::subscript_does_not_override);
+      diags.diagnose(decl, diag::subscript_does_not_override, isClassContext);
       noteFixableMismatchedTypes(decl, baseDecl);
       diags.diagnose(baseDecl, diag::overridden_near_match_here,
                      baseDecl->getDescriptiveKind(),
