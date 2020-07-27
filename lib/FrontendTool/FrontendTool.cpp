@@ -67,6 +67,7 @@
 #include "swift/TBDGen/TBDGen.h"
 
 #include "clang/AST/ASTContext.h"
+#include "clang/Basic/Module.h"
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/LLVMContext.h"
