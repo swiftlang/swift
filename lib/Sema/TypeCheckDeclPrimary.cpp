@@ -1798,19 +1798,19 @@ public:
       return;
     }
 
-    // We don't support nested types in generics yet.
-    if (NTD->isGenericContext()) {
-      auto DC = NTD->getDeclContext();
-      if (auto proto = DC->getSelfProtocolDecl()) {
-        if (DC->getExtendedProtocolDecl()) {
-          NTD->diagnose(diag::unsupported_type_nested_in_protocol_extension,
-                        NTD->getName(), proto->getName());
-        } else {
-          NTD->diagnose(diag::unsupported_type_nested_in_protocol,
-                        NTD->getName(), proto->getName());
-        }
+    // We don't support nested types in protocols.
+    if (auto proto = DC->getSelfProtocolDecl()) {
+      if (DC->getExtendedProtocolDecl()) {
+        NTD->diagnose(diag::unsupported_type_nested_in_protocol_extension,
+                      NTD->getName(), proto->getName());
+      } else {
+        NTD->diagnose(diag::unsupported_type_nested_in_protocol,
+                      NTD->getName(), proto->getName());
       }
+    }
 
+    // We don't support nested types in generic functions yet.
+    if (NTD->isGenericContext()) {
       if (DC->isLocalContext() && DC->isGenericContext()) {
         // A local generic context is a generic function.
         if (auto AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
