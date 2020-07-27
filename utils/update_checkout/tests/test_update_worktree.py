@@ -12,7 +12,7 @@
 
 import os
 
-from scheme_mock import call_quietly
+from .scheme_mock import call_quietly
 
 from . import scheme_mock
 
