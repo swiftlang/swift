@@ -247,7 +247,8 @@ public:
 
   Projection &operator=(Projection &&P) = default;
 
-  bool isValid() const { return Value.isValid(); }
+  bool isValid() const { return bool(*this); }
+  operator bool() const { return Value.isValid(); }
 
   /// Convenience method for getting the underlying index. Assumes that this
   /// projection is valid. Otherwise it asserts.
