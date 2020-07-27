@@ -5394,6 +5394,10 @@ void SILVTable::verify(const SILModule &M) const {
   for (unsigned i : indices(getEntries())) {
     auto &entry = getEntries()[i];
     
+    // Make sure the module's lookup cache is consistent.
+    assert(entry == *getEntry(const_cast<SILModule &>(M), entry.getMethod())
+           && "vtable entry is out of sync with method's vtable cache");
+    
     // All vtable entries must be decls in a class context.
     assert(entry.getMethod().hasDecl() && "vtable entry is not a decl");
     auto baseInfo = M.Types.getConstantInfo(TypeExpansionContext::minimal(),
