@@ -646,10 +646,10 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       if (auto subscript = dyn_cast<SubscriptDecl>(accessor->getStorage()))
          return subscript->getGenericSignature();
 
-    return GC->getParent()->getGenericSignatureOfContext();
+    return GC->getParentForLookup()->getGenericSignatureOfContext();
   }
 
-  auto parentSig = GC->getParent()->getGenericSignatureOfContext();
+  auto parentSig = GC->getParentForLookup()->getGenericSignatureOfContext();
   SmallVector<TypeLoc, 2> inferenceSources;
   SmallVector<Requirement, 2> sameTypeReqs;
   if (auto VD = dyn_cast_or_null<ValueDecl>(GC->getAsDecl())) {
@@ -731,19 +731,10 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
 
     // Allow parameters to be equated with concrete types.
     allowConcreteGenericParams = true;
-    // Extensions must occur at the top level, they have no
-    // (valid) parent signature.
-    parentSig = nullptr;
+
     inferenceSources.emplace_back(nullptr, extInterfaceType);
   }
 
-  // EGREGIOUS HACK: The GSB cannot handle the addition of parent signatures
-  // from malformed decls in many cases.  Check the invalid bit and null out the
-  // parent signature.
-  if (auto *DD = GC->getParent()->getAsDecl()) {
-    parentSig = DD->isInvalid() ? nullptr : parentSig;
-  }
-  
   return TypeChecker::checkGenericSignature(
       GC, GC, parentSig,
       allowConcreteGenericParams,
