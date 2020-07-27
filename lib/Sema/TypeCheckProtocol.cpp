@@ -3942,6 +3942,47 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
   return ResolveWitnessResult::ExplicitFailed;
 }
 
+static void checkExportability(Type depTy, Type replacementTy,
+                               const ProtocolConformance *conformance,
+                               NormalProtocolConformance *conformanceBeingChecked,
+                               SourceFile *SF) {
+  if (!SF)
+    return;
+
+  SubstitutionMap subs =
+      conformance->getSubstitutions(SF->getParentModule());
+  for (auto &subConformance : subs.getConformances()) {
+    if (!subConformance.isConcrete())
+      continue;
+    checkExportability(depTy, replacementTy, subConformance.getConcrete(),
+                       conformanceBeingChecked, SF);
+  }
+
+  const RootProtocolConformance *rootConformance =
+      conformance->getRootConformance();
+  ModuleDecl *M = rootConformance->getDeclContext()->getParentModule();
+  if (!SF->isImportedImplementationOnly(M))
+    return;
+
+  ASTContext &ctx = SF->getASTContext();
+
+  Type selfTy = rootConformance->getProtocol()->getProtocolSelfType();
+  if (depTy->isEqual(selfTy)) {
+    ctx.Diags.diagnose(
+        conformanceBeingChecked->getLoc(),
+        diag::conformance_from_implementation_only_module,
+        rootConformance->getType(),
+        rootConformance->getProtocol()->getName(), 0, M->getName());
+  } else {
+    ctx.Diags.diagnose(
+        conformanceBeingChecked->getLoc(),
+        diag::assoc_conformance_from_implementation_only_module,
+        rootConformance->getType(),
+        rootConformance->getProtocol()->getName(), M->getName(),
+        depTy, replacementTy->getCanonicalType());
+  }
+}
+
 void ConformanceChecker::ensureRequirementsAreSatisfied() {
   Conformance->finishSignatureConformances();
   auto proto = Conformance->getProtocol();
@@ -3956,89 +3997,18 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
   auto substitutions = SubstitutionMap::getProtocolSubstitutions(
       proto, substitutingType, ProtocolConformanceRef(Conformance));
 
-  SourceFile *fileForCheckingExportability = nullptr;
-  if (getRequiredAccessScope().isPublic() || isUsableFromInlineRequired())
-    fileForCheckingExportability = DC->getParentSourceFile();
-
-  class GatherConformancesListener : public GenericRequirementsCheckListener {
-    NormalProtocolConformance *conformanceBeingChecked;
-    SourceFile *SF;
-
-    void checkExportability(Type depTy, Type replacementTy,
-                            const ProtocolConformance *conformance) {
-      if (!SF)
-        return;
-
-      SubstitutionMap subs =
-          conformance->getSubstitutions(SF->getParentModule());
-      for (auto &subConformance : subs.getConformances()) {
-        if (!subConformance.isConcrete())
-          continue;
-        checkExportability(depTy, replacementTy, subConformance.getConcrete());
-      }
-
-      const RootProtocolConformance *rootConformance =
-          conformance->getRootConformance();
-      ModuleDecl *M = rootConformance->getDeclContext()->getParentModule();
-      if (!SF->isImportedImplementationOnly(M))
-        return;
-
-      ASTContext &ctx = M->getASTContext();
-
-      Type selfTy = rootConformance->getProtocol()->getProtocolSelfType();
-      if (depTy->isEqual(selfTy)) {
-        ctx.Diags.diagnose(
-            conformanceBeingChecked->getLoc(),
-            diag::conformance_from_implementation_only_module,
-            rootConformance->getType(),
-            rootConformance->getProtocol()->getName(), 0, M->getName());
-      } else {
-        ctx.Diags.diagnose(
-            conformanceBeingChecked->getLoc(),
-            diag::assoc_conformance_from_implementation_only_module,
-            rootConformance->getType(),
-            rootConformance->getProtocol()->getName(), M->getName(),
-            depTy, replacementTy->getCanonicalType());
-      }
-    }
-
-  public:
-    GatherConformancesListener(
-        NormalProtocolConformance *conformance,
-        SourceFile *fileForCheckingExportability)
-      : conformanceBeingChecked(conformance),
-        SF(fileForCheckingExportability) { }
-
-    void satisfiedConformance(Type depTy, Type replacementTy,
-                              ProtocolConformanceRef conformance) override {
-      if (conformance.isConcrete())
-        checkExportability(depTy, replacementTy, conformance.getConcrete());
-    }
-
-    bool diagnoseUnsatisfiedRequirement(
-                      const Requirement &req, Type first, Type second,
-                      ArrayRef<ParentConditionalConformance> parents) override {
-      // Invalidate the conformance to suppress further diagnostics.
-      if (conformanceBeingChecked->getLoc().isValid()) {
-        conformanceBeingChecked->setInvalid();
-      }
-
-      return false;
-    }
-  } listener(Conformance, fileForCheckingExportability);
-
   auto result = TypeChecker::checkGenericArguments(
       DC, Loc, Loc,
       // FIXME: maybe this should be the conformance's type
       proto->getDeclaredInterfaceType(),
       { proto->getSelfInterfaceType() },
       proto->getRequirementSignature(),
-      QuerySubstitutionMap{substitutions},
-      &listener);
+      QuerySubstitutionMap{substitutions});
 
   switch (result) {
   case RequirementCheckResult::Success:
-    return;
+    // Go on to check exportability.
+    break;
 
   case RequirementCheckResult::Failure:
     Conformance->setInvalid();
@@ -4053,6 +4023,28 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
       Conformance->setInvalid();
     }
     return;
+  }
+
+  // Now check that our associated conformances are at least as visible as
+  // the conformance itself.
+  //
+  // FIXME: Do we need to check SPI here too?
+  if (getRequiredAccessScope().isPublic() || isUsableFromInlineRequired()) {
+    auto *fileForCheckingExportability = DC->getParentSourceFile();
+
+    for (auto req : proto->getRequirementSignature()) {
+      if (req.getKind() == RequirementKind::Conformance) {
+        auto depTy = req.getFirstType();
+        auto *proto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
+        auto conformance = Conformance->getAssociatedConformance(depTy, proto);
+        if (conformance.isConcrete()) {
+          auto *concrete = conformance.getConcrete();
+          auto replacementTy = DC->mapTypeIntoContext(concrete->getType());
+          checkExportability(depTy, replacementTy, concrete,
+                             Conformance, fileForCheckingExportability);
+        }
+      }
+    }
   }
 }
 
