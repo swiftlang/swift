@@ -750,7 +750,6 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
     TypeArrayView<GenericTypeParamType> genericParams,
     ArrayRef<Requirement> requirements,
     TypeSubstitutionFn substitutions,
-    GenericRequirementsCheckListener *listener,
     SubstOptions options) {
   bool valid = true;
 
@@ -805,8 +804,6 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
       }
 
       bool requirementFailure = false;
-      if (listener && !listener->shouldCheck(kind, firstType, secondType))
-        continue;
 
       Diag<Type, Type, Type> diagnostic;
       Diag<Type, Type, StringRef> diagnosticNote;
@@ -818,12 +815,6 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
         auto conformance = module->lookupConformance(firstType, proto->getDecl());
 
         if (conformance) {
-          // Report the conformance.
-          if (listener && valid && current.Parents.empty()) {
-            listener->satisfiedConformance(rawFirstType, firstType,
-                                           conformance);
-          }
-
           auto conditionalReqs = conformance.getConditionalRequirements();
           if (!conditionalReqs.empty()) {
             auto history = current.Parents;
@@ -878,11 +869,6 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
 
       if (!requirementFailure)
         continue;
-
-      if (listener &&
-          listener->diagnoseUnsatisfiedRequirement(rawReq, firstType,
-                                                   secondType, current.Parents))
-        return RequirementCheckResult::Failure;
 
       if (loc.isValid()) {
         // FIXME: Poor source-location information.
