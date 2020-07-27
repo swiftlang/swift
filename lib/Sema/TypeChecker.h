@@ -278,52 +278,6 @@ struct ParentConditionalConformance {
                            ArrayRef<ParentConditionalConformance> conformances);
 };
 
-/// An abstract interface that is used by `checkGenericArguments`.
-class GenericRequirementsCheckListener {
-public:
-  virtual ~GenericRequirementsCheckListener();
-
-  /// Callback invoked before trying to check generic requirement placed
-  /// between given types. Note: if either of the types assigned to the
-  /// requirement is generic parameter or dependent member, this callback
-  /// method is going to get their substitutions.
-  ///
-  /// \param kind The kind of generic requirement to check.
-  ///
-  /// \param first The left-hand side type assigned to the requirement,
-  /// possibly represented by its generic substitute.
-  ///
-  /// \param second The right-hand side type assigned to the requirement,
-  /// possibly represented by its generic substitute.
-  ///
-  ///
-  /// \returns true if it's ok to validate requirement, false otherwise.
-  virtual bool shouldCheck(RequirementKind kind, Type first, Type second);
-
-  /// Callback to report the result of a satisfied conformance requirement.
-  ///
-  /// \param depTy The dependent type, from the signature.
-  /// \param replacementTy The type \c depTy was replaced with.
-  /// \param conformance The conformance itself.
-  virtual void satisfiedConformance(Type depTy, Type replacementTy,
-                                    ProtocolConformanceRef conformance);
-
-  /// Callback to diagnose problem with unsatisfied generic requirement.
-  ///
-  /// \param req The unsatisfied generic requirement.
-  ///
-  /// \param first The left-hand side type assigned to the requirement,
-  /// possibly represented by its generic substitute.
-  ///
-  /// \param second The right-hand side type assigned to the requirement,
-  /// possibly represented by its generic substitute.
-  ///
-  /// \returns true if problem has been diagnosed, false otherwise.
-  virtual bool diagnoseUnsatisfiedRequirement(
-      const Requirement &req, Type first, Type second,
-      ArrayRef<ParentConditionalConformance> parents);
-};
-
 /// The result of `checkGenericRequirement`.
 enum class RequirementCheckResult {
   Success, Failure, SubstitutionFailure
@@ -633,13 +587,10 @@ std::string gatherGenericParamBindingsText(
 /// \param requirements The requirements against which the generic arguments
 /// should be checked.
 /// \param substitutions Substitutions from interface types of the signature.
-/// \param listener The generic check listener used to pick requirements and
-/// notify callers about diagnosed errors.
 RequirementCheckResult checkGenericArguments(
     DeclContext *dc, SourceLoc loc, SourceLoc noteLoc, Type owner,
     TypeArrayView<GenericTypeParamType> genericParams,
     ArrayRef<Requirement> requirements, TypeSubstitutionFn substitutions,
-    GenericRequirementsCheckListener *listener = nullptr,
     SubstOptions options = None);
 
 /// Add any implicitly-defined constructors required for the given
