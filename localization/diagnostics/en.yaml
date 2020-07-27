@@ -344,7 +344,7 @@
 
 - id: lex_confusable_character
   msg: >-
-    unicode character '%0' looks similar to '%1'; did you mean to use '%1'?
+    unicode character '%0' (%1) looks similar to '%2' (%3); did you mean to use '%2' (%3)?
 
 - id: lex_nonbreaking_space
   msg: >-
@@ -3943,6 +3943,9 @@
   msg: >-
     %select{identifier|operator}0 '%1' contains possibly confused characters;
     did you mean to use '%2'?
+- id: single_confusable_character
+  msg: >-
+    %select{identifier|operator}0 '%1' (%2) looks similar to '%3' (%4); did you mean '%3' (%4)?"
 
 - id: cannot_find_type_in_scope
   msg: >-
