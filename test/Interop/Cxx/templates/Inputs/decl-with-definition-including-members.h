@@ -18,9 +18,9 @@ inline int forceInstantiation() {
   return t.callGetInt();
 }
 
-// MagicWrapper<MagicNumber> ClassTemplateSpecializationDecl has definition
+// MagicWrapper<MagicNumber> ClassTemplateSpecializationDecl has a definition
 // because function above forced the instantiation. Its members are fully
-// instantiated, so nothing needs to be explicitly instantiated in swift.
+// instantiated, so nothing needs to be explicitly instantiated by the Swift compiler.
 typedef MagicWrapper<MagicNumber> FullyDefinedWrappedMagicNumber;
 
 #endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_DECL_WITH_DEFINITION_INCLUDING_MEMBERS_H
