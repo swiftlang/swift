@@ -457,6 +457,8 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       Builder.useReturnType(
           std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
       Builder.useArrow(SyntaxContext->popToken());
+      if (asyncLoc.isValid())
+        Builder.useAsyncKeyword(SyntaxContext->popToken());
       if (throwsLoc.isValid())
         Builder.useThrowsOrRethrowsKeyword(SyntaxContext->popToken());
 
