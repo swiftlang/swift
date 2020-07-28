@@ -89,12 +89,9 @@ toolchains::Darwin::constructInvocation(const InterpretJobAction &job,
 }
 
 static StringRef
-getDarwinLibraryNameSuffixForTriple(const llvm::Triple &triple,
-                                    bool distinguishSimulator = true) {
+getDarwinLibraryNameSuffixForTriple(const llvm::Triple &triple) {
   const DarwinPlatformKind kind = getDarwinPlatformKind(triple);
-  const DarwinPlatformKind effectiveKind =
-      distinguishSimulator ? kind : getNonSimulatorPlatform(kind);
-  switch (effectiveKind) {
+  switch (kind) {
   case DarwinPlatformKind::MacOS:
     return "osx";
   case DarwinPlatformKind::IPhoneOS:
@@ -709,7 +706,7 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
   llvm::sys::path::append(
       CompilerRTPath,
       Twine("libclang_rt.") +
-        getDarwinLibraryNameSuffixForTriple(Triple, /*simulator*/false) +
+        getDarwinLibraryNameSuffixForTriple(Triple) +
         ".a");
   if (llvm::sys::fs::exists(CompilerRTPath))
     Arguments.push_back(context.Args.MakeArgString(CompilerRTPath));
