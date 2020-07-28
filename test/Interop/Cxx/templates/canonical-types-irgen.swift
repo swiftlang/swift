@@ -13,7 +13,7 @@ public func testCanonicalTypes() -> Bool {
   return wrappedMagicNumberA.callGetInt() == wrappedMagicNumberB.callGetInt()
 }
 
-// CHECK_NOT: __CxxTemplateInst
+// CHECK-NOT: __CxxTemplateInst
 // CHECK: define {{(protected |dllexport )?}}swiftcc i1 @"$s4main18testCanonicalTypesSbyF"()
 // CHECK: %wrappedMagicNumberA = alloca %TSo12MagicWrapperV, align 1
 // CHECK: %wrappedMagicNumberB = alloca %TSo12MagicWrapperV, align 1
