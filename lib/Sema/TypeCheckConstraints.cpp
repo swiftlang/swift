@@ -525,6 +525,8 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     llvm::SmallString<64> expectedIdentifier;
     bool isConfused = false;
     uint32_t codepoint;
+    uint32_t firstConfusableCodepoint = 0;
+    int totalCodepoints = 0;
     int offset = 0;
     while ((codepoint = validateUTF8CharacterAndAdvance(buffer,
                                                         buffer +
@@ -533,11 +535,16 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
       int length = (buffer - simpleName.get()) - offset;
       if (auto expectedCodepoint =
           confusable::tryConvertConfusableCharacterToASCII(codepoint)) {
+        if (firstConfusableCodepoint == 0) {
+          firstConfusableCodepoint = codepoint;
+        }
         isConfused = true;
         expectedIdentifier += expectedCodepoint;
       } else {
         expectedIdentifier += (char)codepoint;
       }
+
+      totalCodepoints++;
 
       offset += length;
     }
@@ -580,11 +587,21 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     } else {
       emitBasicError();
 
-      Context.Diags
-          .diagnose(Loc, diag::confusable_character,
-                    UDRE->getName().isOperator(), simpleName.str(),
-                    expectedIdentifier)
-          .fixItReplace(Loc, expectedIdentifier);
+      if (totalCodepoints == 1) {
+        auto charNames = confusable::getConfusableAndBaseCodepointNames(
+            firstConfusableCodepoint);
+        Context.Diags
+            .diagnose(Loc, diag::single_confusable_character,
+                      UDRE->getName().isOperator(), simpleName.str(),
+                      charNames.first, expectedIdentifier, charNames.second)
+            .fixItReplace(Loc, expectedIdentifier);
+      } else {
+        Context.Diags
+            .diagnose(Loc, diag::confusable_character,
+                      UDRE->getName().isOperator(), simpleName.str(),
+                      expectedIdentifier)
+            .fixItReplace(Loc, expectedIdentifier);
+      }
     }
 
     // TODO: consider recovering from here.  We may want some way to suppress
@@ -1027,6 +1044,8 @@ namespace {
 
     bool walkToClosureExprPre(ClosureExpr *expr);
 
+    bool shouldWalkCaptureInitializerExpressions() override { return true; }
+
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       // If this is a call, record the argument expression.
       if (auto call = dyn_cast<ApplyExpr>(expr)) {
@@ -1075,21 +1094,6 @@ namespace {
 
         return std::make_pair(recursive, expr);
       };
-
-      // For capture lists, we typecheck the decls they contain.
-      if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
-        // Validate the capture list.
-        for (auto capture : captureList->getCaptureList()) {
-          TypeChecker::typeCheckDecl(capture.Init);
-          TypeChecker::typeCheckDecl(capture.Var);
-        }
-
-        // Since closure expression is contained by capture list
-        // let's handle it directly to avoid walking into capture
-        // list itself.
-        captureList->getClosureBody()->walk(*this);
-        return finish(false, expr);
-      }
 
       // For closures, type-check the patterns and result type as written,
       // but do not walk into the body. That will be type-checked after

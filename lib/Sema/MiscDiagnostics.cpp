@@ -96,6 +96,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       return false;
     }
 
+    bool shouldWalkCaptureInitializerExpressions() override { return true; }
+
     bool shouldWalkIntoTapExpression() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
@@ -1332,6 +1334,8 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
       return false;
     }
 
+    bool shouldWalkCaptureInitializerExpressions() override { return true; }
+
     bool shouldWalkIntoTapExpression() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
@@ -1505,6 +1509,8 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       return false;
     }
 
+    bool shouldWalkCaptureInitializerExpressions() override { return true; }
+
     bool shouldWalkIntoTapExpression() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
@@ -1514,7 +1520,6 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         if (isClosureRequiringSelfQualification(CE))
           Closures.push_back(CE);
       }
-
 
       // If we aren't in a closure, no diagnostics will be produced.
       if (Closures.size() == 0)
@@ -3332,6 +3337,8 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
       return false;
     }
 
+    bool shouldWalkCaptureInitializerExpressions() override { return true; }
+
     bool shouldWalkIntoTapExpression() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
@@ -3481,6 +3488,8 @@ public:
   bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
     return false;
   }
+
+  bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
   bool shouldWalkIntoTapExpression() override { return false; }
 
@@ -4222,6 +4231,8 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
       return false;
     }
 
+    bool shouldWalkCaptureInitializerExpressions() override { return true; }
+
     bool shouldWalkIntoTapExpression() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
@@ -4297,6 +4308,8 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
     bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
       return false;
     }
+
+    bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
     bool shouldWalkIntoTapExpression() override { return false; }
 

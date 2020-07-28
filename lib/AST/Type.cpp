@@ -3369,9 +3369,9 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   return build(C, CanTypes, HasExplicitAnyObject);
 }
 
-void AnyFunctionType::ExtInfo::Uncommon::printClangFunctionType(
-    ClangModuleLoader *cml, llvm::raw_ostream &os) {
-  cml->printClangType(ClangFunctionType, os);
+void AnyFunctionType::ExtInfo::ClangTypeInfo::printType(
+    ClangModuleLoader *cml, llvm::raw_ostream &os) const {
+  cml->printClangType(type, os);
 }
 
 void
@@ -3405,7 +3405,7 @@ const clang::Type *AnyFunctionType::getCanonicalClangFunctionType() const {
   return ty ? ty->getCanonicalTypeInternal().getTypePtr() : nullptr;
 }
 
-// TODO: [store-sil-clang-function-type]
+// [TODO: Store-SIL-Clang-type]
 const clang::FunctionType *SILFunctionType::getClangFunctionType() const {
   return nullptr;
 }

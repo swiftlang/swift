@@ -105,8 +105,8 @@ SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequest,
                                  SmallVector<TypeLoc, 2>, bool),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InheritedTypeRequest,
-              Type(llvm::PointerUnion<TypeDecl *, ExtensionDecl *>, unsigned,
-                   TypeResolutionStage),
+              Type(llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *>,
+                   unsigned, TypeResolutionStage),
               SeparatelyCached, HasNearestLocation)
 SWIFT_REQUEST(TypeChecker, InheritsSuperclassInitializersRequest,
               bool(ClassDecl *), SeparatelyCached, NoLocationInfo)

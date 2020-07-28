@@ -344,7 +344,7 @@
 
 - id: lex_confusable_character
   msg: >-
-    unicode character '%0' looks similar to '%1'; did you mean to use '%1'?
+    unicode character '%0' (%1) looks similar to '%2' (%3); did you mean to use '%2' (%3)?
 
 - id: lex_nonbreaking_space
   msg: >-
@@ -3943,6 +3943,9 @@
   msg: >-
     %select{identifier|operator}0 '%1' contains possibly confused characters;
     did you mean to use '%2'?
+- id: single_confusable_character
+  msg: >-
+    %select{identifier|operator}0 '%1' (%2) looks similar to '%3' (%4); did you mean '%3' (%4)?"
 
 - id: cannot_find_type_in_scope
   msg: >-
@@ -6081,6 +6084,10 @@
   msg: >-
     cannot override %0 which has been marked unavailable%select{|: %1}1
 
+- id: suggest_removing_override
+  msg: >-
+    remove 'override' modifier to declare a new %0
+
 - id: override_less_available
   msg: >-
     overriding %0 must be as available as declaration it overrides
@@ -6104,20 +6111,20 @@
 
 - id: method_does_not_override
   msg: >-
-    method does not override any method from its superclass
+    method does not override any method from its %select{parent protocol|superclass}0
 
 - id: property_does_not_override
   msg: >-
-    property does not override any property from its superclass
+    property does not override any property from its %select{parent protocol|superclass}0
 
 - id: subscript_does_not_override
   msg: >-
-    subscript does not override any subscript from its superclass
+    subscript does not override any subscript from its %select{parent protocol|superclass}0
 
 - id: initializer_does_not_override
   msg: >-
     initializer does not override a designated initializer from its
-    superclass
+    %select{parent protocol|superclass}0
 
 - id: failable_initializer_override
   msg: >-

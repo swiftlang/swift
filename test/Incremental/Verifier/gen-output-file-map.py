@@ -65,7 +65,6 @@ def main(arguments):
     # TODO: this is for python 2 and python 3 compatibility.  Once Python 2 is
     # removed, this function can be removed.
     def to_unicode(r):
-        import sys
         if sys.version_info[0] < 3:
             return unicode(r)
         return str(r)

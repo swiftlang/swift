@@ -3409,6 +3409,8 @@ void ClangModuleUnit::getImportedModules(
   if (filter.containsOnly(ModuleDecl::ImportFilterKind::ImplementationOnly))
     return;
 
+  // [NOTE: Pure-Clang-modules-privately-import-stdlib]:
+  // Needed for implicitly synthesized conformances.
   if (filter.contains(ModuleDecl::ImportFilterKind::Private))
     if (auto stdlib = owner.getStdlibModule())
       imports.push_back({ModuleDecl::AccessPathTy(), stdlib});

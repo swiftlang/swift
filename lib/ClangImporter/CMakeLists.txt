@@ -24,6 +24,7 @@ add_swift_host_library(swiftClangImporter STATIC
 target_link_libraries(swiftClangImporter PRIVATE
   swiftAST
   swiftParse
+  clangTooling
   LLVMBitstreamReader)
 
 target_link_libraries(swiftClangImporter INTERFACE

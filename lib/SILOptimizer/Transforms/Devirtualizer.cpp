@@ -60,7 +60,7 @@ class Devirtualizer : public SILFunctionTransform {
 void Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
                                                   ClassHierarchyAnalysis *CHA) {
   llvm::SmallVector<ApplySite, 8> NewApplies;
-  OptRemark::Emitter ORE(DEBUG_TYPE, F.getModule());
+  OptRemark::Emitter ORE(DEBUG_TYPE, F);
 
   SmallVector<ApplySite, 16> Applies;
   for (auto &BB : F) {

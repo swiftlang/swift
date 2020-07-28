@@ -533,6 +533,12 @@ std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
   return finalize();
 }
 
+std::string ASTMangler::mangleTypeForTypeName(Type type) {
+  beginMangling();
+  appendType(type);
+  return finalize();
+}
+
 std::string ASTMangler::mangleDeclType(const ValueDecl *decl) {
   DWARFMangling = true;
   beginMangling();
