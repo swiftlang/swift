@@ -4,6 +4,10 @@
 // RUN: %swift_driver -print-target-info -target x86_64-unknown-linux | %FileCheck -check-prefix CHECK-LINUX %s
 // RUN: %target-swift-frontend -print-target-info -target x86_64-unknown-linux | %FileCheck -check-prefix CHECK-LINUX %s
 
+// RUN: %swift_driver -print-target-info -target x86_64-unknown-linux -static-executable | %FileCheck -check-prefix CHECK-LINUX-STATIC %s
+// RUN: %swift_driver -print-target-info -target x86_64-unknown-linux -static-stdlib | %FileCheck -check-prefix CHECK-LINUX-STATIC %s
+// RUN: %target-swift-frontend -print-target-info -target x86_64-unknown-linux -use-static-resource-dir | %FileCheck -check-prefix CHECK-LINUX-STATIC %s
+
 // RUN: %swift_driver -print-target-info -target x86_64-apple-macosx10.15 -target-variant x86_64-apple-ios13-macabi | %FileCheck -check-prefix CHECK-ZIPPERED %s
 // RUN: %target-swift-frontend -print-target-info -target x86_64-apple-macosx10.15 -target-variant x86_64-apple-ios13-macabi | %FileCheck -check-prefix CHECK-ZIPPERED %s
 
@@ -44,7 +48,22 @@
 // CHECK-LINUX:     "librariesRequireRPath": false
 // CHECK-LINUX:   }
 
+// CHECK-LINUX:   "runtimeResourcePath": "{{.*}}lib{{(/|\\\\)}}swift"
+
 // CHECK-LINUX-NOT: "targetVariant":
+
+
+// CHECK-LINUX-STATIC:   "compilerVersion": "{{.*}}Swift version
+
+// CHECK-LINUX-STATIC:   "target": {
+// CHECK-LINUX-STATIC:     "triple": "x86_64-unknown-linux",
+// CHECK-LINUX-STATIC:     "moduleTriple": "x86_64-unknown-linux",
+// CHECK-LINUX-STATIC:     "librariesRequireRPath": false
+// CHECK-LINUX-STATIC:   }
+
+// CHECK-LINUX-STATIC:   "runtimeResourcePath": "{{.*}}lib{{(/|\\\\)}}swift_static"
+
+// CHECK-LINUX-STATIC-NOT: "targetVariant":
 
 
 // CHECK-ZIPPERED: "target": {
