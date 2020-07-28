@@ -3250,17 +3250,17 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
     return funcTy;
   }
 
-  Optional<ExtInfo::Uncommon> uncommon = info.getUncommonInfo();
+  Optional<ExtInfo::ClangTypeInfo> clangTypeInfo = info.getClangTypeInfo();
 
   size_t allocSize =
-    totalSizeToAlloc<AnyFunctionType::Param, ExtInfo::Uncommon>(
-      params.size(), uncommon.hasValue() ? 1 : 0);
+    totalSizeToAlloc<AnyFunctionType::Param, ExtInfo::ClangTypeInfo>(
+      params.size(), clangTypeInfo.hasValue() ? 1 : 0);
   void *mem = ctx.Allocate(allocSize, alignof(FunctionType), arena);
 
   bool isCanonical = isFunctionTypeCanonical(params, result);
-  if (uncommon.hasValue()) {
+  if (clangTypeInfo.hasValue()) {
     if (ctx.LangOpts.UseClangFunctionTypes)
-      isCanonical &= uncommon->ClangFunctionType->isCanonicalUnqualified();
+      isCanonical &= clangTypeInfo->type->isCanonicalUnqualified();
     else
       isCanonical = false;
   }
@@ -3281,9 +3281,9 @@ FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params,
                       output, properties, params.size(), info) {
   std::uninitialized_copy(params.begin(), params.end(),
                           getTrailingObjects<AnyFunctionType::Param>());
-  Optional<ExtInfo::Uncommon> uncommon = info.getUncommonInfo();
-  if (uncommon.hasValue())
-    *getTrailingObjects<ExtInfo::Uncommon>() = uncommon.getValue();
+  auto clangTypeInfo = info.getClangTypeInfo();
+  if (clangTypeInfo.hasValue())
+    *getTrailingObjects<ExtInfo::ClangTypeInfo>() = clangTypeInfo.getValue();
 }
 
 void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
@@ -3376,7 +3376,7 @@ ArrayRef<Requirement> GenericFunctionType::getRequirements() const {
   return Signature->getRequirements();
 }
 
-void SILFunctionType::ExtInfo::Uncommon::printClangFunctionType(
+void SILFunctionType::ExtInfo::ClangTypeInfo::printType(
     ClangModuleLoader *cml, llvm::raw_ostream &os) const {
   cml->printClangType(ClangFunctionType, os);
 }
@@ -3440,7 +3440,7 @@ SILFunctionType::SILFunctionType(
 
   Bits.SILFunctionType.HasErrorResult = errorResult.hasValue();
   Bits.SILFunctionType.ExtInfoBits = ext.Bits;
-  Bits.SILFunctionType.HasUncommonInfo = false;
+  Bits.SILFunctionType.HasClangTypeInfo = false;
   Bits.SILFunctionType.HasPatternSubs = (bool) patternSubs;
   Bits.SILFunctionType.HasInvocationSubs = (bool) invocationSubs;
   // The use of both assert() and static_assert() below is intentional.
