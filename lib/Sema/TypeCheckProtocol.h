@@ -234,7 +234,7 @@ enum class MatchKind : uint8_t {
   /// The witness would match if an additional requirement were met.
   MissingRequirement,
 
-  /// The witness is async, but the requirement does not.
+  /// The witness and requirement disagree on 'async'.
   AsyncConflict,
 
   /// The witness throws, but the requirement does not.

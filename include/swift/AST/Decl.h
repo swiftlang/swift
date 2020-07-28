@@ -5913,7 +5913,8 @@ public:
   /// Retrieve the location of the 'throws' keyword, if present.
   SourceLoc getThrowsLoc() const { return ThrowsLoc; }
 
-  /// Returns true if the function is async.
+  /// Returns true if the function is marked as `async`. The
+  /// type of the function will be `async` as well.
   bool hasAsync() const { return Bits.AbstractFunctionDecl.Async; }
 
   /// Returns true if the function body throws.
