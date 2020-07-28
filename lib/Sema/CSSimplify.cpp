@@ -3653,22 +3653,6 @@ bool ConstraintSystem::repairFailures(
     if (rhs->isAny())
       break;
 
-    // If there are any other argument mismatches already detected
-    // for this call, we can consider overload unrelated.
-    if (llvm::any_of(getFixes(), [&](const ConstraintFix *fix) {
-          auto *locator = fix->getLocator();
-          // Since arguments to @dynamicCallable form either an array
-          // or a dictionary and all have to match the same element type,
-          // let's allow multiple invalid arguments.
-          if (locator->findFirst<LocatorPathElt::DynamicCallable>())
-            return false;
-
-          return locator->findLast<LocatorPathElt::ApplyArgToParam>()
-                     ? locator->getAnchor() == anchor
-                     : false;
-        }))
-      break;
-
     // If there are any restrictions here we need to wait and let
     // `simplifyRestrictedConstraintImpl` handle them.
     if (llvm::any_of(conversionsOrFixes,
@@ -9840,8 +9824,19 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   }
 
   case FixKind::AllowArgumentTypeMismatch: {
-    increaseScore(SK_Fix);
-    return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+    auto impact = 2;
+    // If there are any other argument mismatches already detected for this
+    // call, we increase the score even higher so more argument fixes means
+    // less viable is the overload.
+    if (llvm::any_of(getFixes(), [&](const ConstraintFix *fix) {
+          auto *fixLocator = fix->getLocator();
+          return fixLocator->findLast<LocatorPathElt::ApplyArgToParam>()
+                     ? fixLocator->getAnchor() == locator.getAnchor()
+                     : false;
+        }))
+      impact += 3;
+
+    return recordFix(fix, impact) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
   case FixKind::ContextualMismatch: {

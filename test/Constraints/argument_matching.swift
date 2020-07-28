@@ -1623,3 +1623,18 @@ func sr13135() {
 
   foo(Foo().bar, [baz])
 }
+
+// SR-13240
+func twoargs(_ x: String, _ y: String) {}
+
+func test() {
+  let x = 1
+  twoargs(x, x) // expected-error 2 {{cannot convert value of type 'Int' to expected argument type 'String'}}
+}
+
+infix operator ---
+
+func --- (_ lhs: String, _ rhs: String) -> Bool { true }
+
+let x = 1
+x --- x // expected-error 2 {{cannot convert value of type 'Int' to expected argument type 'String'}}

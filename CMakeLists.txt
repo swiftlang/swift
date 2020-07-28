@@ -1112,6 +1112,13 @@ if(SWIFT_INCLUDE_TOOLS)
   # https://bugs.swift.org/browse/SR-5975
   add_subdirectory(tools)
 
+  # Localization targets are configured in a way that assume the swift
+  # frontend is being built, so trying to include them for other builds
+  # (like stdlib) fail!
+  #
+  # Diagnostics information is only useful for the frontend compiler
+  # anyway, so let's only include it if the compiler is being built,
+  # which at the moment seems like if SWIFT_INCLUDE_TOOLS is defined.
   add_subdirectory(localization)
 endif()
 
