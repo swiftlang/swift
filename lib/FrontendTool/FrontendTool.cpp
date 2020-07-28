@@ -1976,6 +1976,10 @@ static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
   // Free up some compiler resources now that we have an IRModule.
   freeASTContextIfPossible(Instance);
 
+  // If we emitted any errors while perfoming the end-of-pipeline actions, bail.
+  if (Instance.getDiags().hadAnyError())
+    return true;
+
   // Now that we have a single IR Module, hand it over to performLLVM.
   return performLLVM(opts, Instance.getDiags(), nullptr, HashGlobal, IRModule,
                      TargetMachine.get(), OutputFilename,
@@ -2097,21 +2101,17 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
       IRGenOpts, Invocation.getTBDGenOptions(), std::move(SM), PSPs,
       OutputFilename, MSF, HashGlobal, ParallelOutputFilenames);
 
-  // Just because we had an AST error it doesn't mean we can't performLLVM.
-  bool HadError = Instance.getASTContext().hadError();
-
-  // If the AST Context has no errors but no IRModule is available,
-  // parallelIRGen happened correctly, since parallel IRGen produces multiple
-  // modules.
+  // If no IRModule is available, bail. This can either happen if IR generation
+  // fails, or if parallelIRGen happened correctly (in which case it would have
+  // already performed LLVM).
   if (!IRModule)
-    return HadError;
+    return Instance.getDiags().hadAnyError();
 
   if (validateTBDIfNeeded(Invocation, MSF, *IRModule.getModule()))
     return true;
 
   return generateCode(Instance, OutputFilename, IRModule.getModule(),
-                      HashGlobal) ||
-         HadError;
+                      HashGlobal);
 }
 
 static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,
