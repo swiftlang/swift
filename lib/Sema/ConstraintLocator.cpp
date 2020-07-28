@@ -91,6 +91,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::ClosureResult:
   case ConstraintLocator::ClosureBody:
   case ConstraintLocator::ConstructorMember:
+  case ConstraintLocator::FunctionBuilderBodyResult:
   case ConstraintLocator::InstanceType:
   case ConstraintLocator::AutoclosureResult:
   case ConstraintLocator::OptionalPayload:
@@ -249,6 +250,11 @@ bool ConstraintLocator::isForOptionalTry() const {
   return directlyAt<OptionalTryExpr>();
 }
 
+bool ConstraintLocator::isForFunctionBuilderBodyResult() const {
+  auto elt = getFirstElementAs<LocatorPathElt::FunctionBuilderBodyResult>();
+  return elt.hasValue();
+}
+
 GenericTypeParamType *ConstraintLocator::getGenericParameter() const {
   // Check whether we have a path that terminates at a generic parameter.
   return isForGenericParameter() ?
@@ -345,6 +351,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
 
     case FunctionResult:
       out << "function result";
+      break;
+
+    case FunctionBuilderBodyResult:
+      out << "function builder body result";
       break;
 
     case SequenceElementType:
