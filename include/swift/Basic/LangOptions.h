@@ -250,6 +250,14 @@ namespace swift {
     /// Build the ASTScope tree lazily
     bool LazyASTScopes = true;
 
+    /// Whether to enable the "fuzzy" forward-scanning behavior for trailing
+    /// closure matching, which skips over defaulted closure parameters
+    /// to match later (non-defaulted) closure parameters
+    ///
+    /// This is a backward-compatibility hack for unlabeled trailing closures,
+    /// to be disabled in Swift 6+.
+    bool EnableFuzzyForwardScanTrailingClosureMatching = true;
+
     /// Use Clang function types for computing canonical types.
     /// If this option is false, the clang function types will still be computed
     /// but will not be used for checking type equality.

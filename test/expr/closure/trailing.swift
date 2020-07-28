@@ -6,6 +6,7 @@ func takeValueAndFunc(_ value: Int, _ f: (Int) -> Int) {}
 func takeTwoFuncs(_ f: (Int) -> Int, _ g: (Int) -> Int) {}
 func takeFuncWithDefault(f : ((Int) -> Int)? = nil) {}
 func takeTwoFuncsWithDefaults(f1 : ((Int) -> Int)? = nil, f2 : ((String) -> String)? = nil) {}
+// expected-note@-1{{'takeTwoFuncsWithDefaults(f1:f2:)' declared here}}
 
 struct X {
   func takeFunc(_ f: (Int) -> Int) {}
@@ -93,9 +94,7 @@ var c3 = C().map // expected-note{{callee is here}}
 // <rdar://problem/16835718> Ban multiple trailing closures
 func multiTrailingClosure(_ a : () -> (), b : () -> ()) {  // expected-note {{'multiTrailingClosure(_:b:)' declared here}}
   multiTrailingClosure({}) {} // ok
-  multiTrailingClosure {} {}   // expected-error {{missing argument for parameter #1 in call}} expected-error {{consecutive statements on a line must be separated by ';'}} {{26-26=;}} expected-error {{closure expression is unused}} expected-note{{did you mean to use a 'do' statement?}} {{27-27=do }}
-  
-  
+  multiTrailingClosure {} {}   // expected-error {{missing argument for parameter 'b' in call}} expected-error {{consecutive statements on a line must be separated by ';'}} {{26-26=;}} expected-error {{closure expression is unused}} expected-note{{did you mean to use a 'do' statement?}} {{27-27=do }}
 }
 
 func labeledArgumentAndTrailingClosure() {
@@ -106,9 +105,9 @@ func labeledArgumentAndTrailingClosure() {
   takeFuncWithDefault({ $0 + 1 }) // expected-error {{missing argument label 'f:' in call}} {{23-23=f: }}
   takeFuncWithDefault(f: { $0 + 1 })
 
-  // Trailing closure binds to last parameter, always.
- takeTwoFuncsWithDefaults { "Hello, " + $0 }
-  takeTwoFuncsWithDefaults { $0 + 1 } // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
+  // Trailing closure binds to first parameter... unless only the second matches.
+ takeTwoFuncsWithDefaults { "Hello, " + $0 } // expected-warning{{backward matching of the unlabeled trailing closure is deprecated; label the argument with 'f2' to suppress this warning}}
+ takeTwoFuncsWithDefaults { $0 + 1 }
   takeTwoFuncsWithDefaults(f1: {$0 + 1 })
 }
 
@@ -420,11 +419,11 @@ func variadicAndNonOverloadLabel(b: (() -> Void)...) -> Int { return 0 }
 func testVariadic() {
   variadic {}
   variadic() {}
-  variadic({}) {} // expected-error {{extra argument in call}}
+  variadic({}) {}
 
   variadicLabel {}
   variadicLabel() {}
-  variadicLabel(closures: {}) {} // expected-error {{extra argument 'closures' in call}}
+  variadicLabel(closures: {}) {}
 
   let a1 = variadicOverloadMismatch {}
   _ = a1 as String // expected-error {{cannot convert value of type 'Bool' to type 'String'}}

@@ -3484,6 +3484,7 @@ END_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
 /// has a default argument.
 struct ParameterListInfo {
   SmallBitVector defaultArguments;
+  SmallBitVector acceptsUnlabeledTrailingClosures;
 
 public:
   ParameterListInfo() { }
@@ -3493,6 +3494,10 @@ public:
 
   /// Whether the parameter at the given index has a default argument.
   bool hasDefaultArgument(unsigned paramIdx) const;
+
+  /// Whether the parameter accepts an unlabeled trailing closure argument
+  /// according to the "forward-scan" rule.
+  bool acceptsUnlabeledTrailingClosureArgument(unsigned paramIdx) const;
 
   /// Retrieve the number of non-defaulted parameters.
   unsigned numNonDefaultedParameters() const {
