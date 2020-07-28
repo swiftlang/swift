@@ -3477,15 +3477,24 @@ namespace {
 
     Decl *VisitClassTemplateSpecializationDecl(
                  const clang::ClassTemplateSpecializationDecl *decl) {
+      // `sema.isCompleteType` will try to instantiate the class template as a
+      // side-effect and we rely on this here. `decl->getDefinition()` can
+      // return nullptr before the call to sema and return its definition
+      // afterwards.
       if (!Impl.getClangSema().isCompleteType(
               decl->getLocation(),
               Impl.getClangASTContext().getRecordType(decl))) {
-        // Not importing incomplete types
+        // If we got nullptr definition now it means the type is not complete.
+        // We don't import incomplete types.
         return nullptr;
       }
       auto def = dyn_cast<clang::ClassTemplateSpecializationDecl>(
           decl->getDefinition());
       assert(def && "Class template instantiation didn't have definition");
+      // This will instantiate all members of the specialization (and detect
+      // instantiation failures in them), which can be more than is necessary
+      // and is more than what Clang does. As a result we reject some C++
+      // programs that Clang accepts.
       Impl.getClangSema().InstantiateClassTemplateSpecializationMembers(
           def->getLocation(), def, clang::TSK_ExplicitInstantiationDefinition);
 
