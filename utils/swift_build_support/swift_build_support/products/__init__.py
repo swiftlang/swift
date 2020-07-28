@@ -31,7 +31,6 @@ from .swiftformat import SwiftFormat
 from .swiftinspect import SwiftInspect
 from .swiftpm import SwiftPM
 from .swiftsyntax import SwiftSyntax
-from .tensorflow import TensorFlowSwiftAPIs
 from .tsan_libdispatch import TSanLibDispatch
 from .xctest import XCTest
 
@@ -52,7 +51,6 @@ __all__ = [
     'SwiftInspect',
     'SwiftPM',
     'SwiftDriver',
-    'TensorFlowSwiftAPIs',
     'XCTest',
     'SwiftSyntax',
     'SKStressTester',
