@@ -3006,6 +3006,8 @@ ERROR(lazy_must_be_property,none,
       "lazy is only valid for members of a struct or class", ())
 ERROR(lazy_not_strong,none,
       "lazy properties cannot be %0", (ReferenceOwnership))
+ERROR(lazy_var_storage_access,none,
+     "access to the underlying storage of a lazy property is not allowed", ())
 
 // Debugger function attribute.
 ERROR(attr_for_debugger_support_only,none,

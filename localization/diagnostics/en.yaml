@@ -1993,6 +1993,9 @@
   msg: >-
     cannot declare entity named %0; the '$' prefix is reserved for
     implicitly-synthesized declarations
+- id: lazy_var_storage_access
+  msg: >-
+    access to the underlying storage of a lazy property is not allowed
 
 - id: anon_closure_arg_not_in_closure
   msg: >-
