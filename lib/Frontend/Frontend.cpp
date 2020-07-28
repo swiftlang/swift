@@ -428,10 +428,10 @@ void CompilerInstance::setUpDiagnosticOptions() {
 //    this modules was specified as an explicit input to the compiler.
 // 4. ModuleInterfaceLoader: Tries to find an up-to-date swiftmodule. If it
 //    succeeds, it issues a particular "error" (see
-//    [Note: ModuleInterfaceLoader-defer-to-ImplicitSerializedModuleLoader]), which
-//    is interpreted by the overarching loader as a command to use the
-//    ImplicitSerializedModuleLoader. If we failed to find a .swiftmodule, this falls
-//    back to using an interface. Actual errors lead to diagnostics.
+//    [NOTE: ModuleInterfaceLoader-defer-to-ImplicitSerializedModuleLoader]),
+//    which is interpreted by the overarching loader as a command to use the
+//    ImplicitSerializedModuleLoader. If we failed to find a .swiftmodule,
+//    this falls back to using an interface. Actual errors lead to diagnostics.
 // 5. ImplicitSerializedModuleLoader: Loads a serialized module if it can.
 //    Used for implicit loading of modules from the compiler's search paths.
 // 6. ClangImporter: This must come after all the Swift module loaders because

@@ -368,7 +368,7 @@ public:
 };
 } // end anonymous namespace
 
-// See [Note: Bailing-vs-crashing-in-trace-emission].
+// See [NOTE: Bailing-vs-crashing-in-trace-emission].
 // TODO: Use PrettyStackTrace instead?
 void ABIDependencyEvaluator::crashOnInvariantViolation(
   llvm::function_ref<void (llvm::raw_string_ostream &)> f) const {
@@ -381,7 +381,7 @@ void ABIDependencyEvaluator::crashOnInvariantViolation(
 #endif
 }
 
-// [Note: Trace-Clang-submodule-complexity]
+// [NOTE: Trace-Clang-submodule-complexity]
 //
 // A Clang module may have zero or more submodules. In practice, when traversing
 // the imports of a module, we observe that different submodules of the same
@@ -394,7 +394,7 @@ void ABIDependencyEvaluator::crashOnInvariantViolation(
 //    branches, so long as we don't try to visit an ancestor when one of its
 //    descendants is still on the traversal stack, so that we don't end up with
 //    arbitrarily complex intra-module cycles.
-//    See also: [Note: Intra-module-leafwards-traversal].
+//    See also: [NOTE: Intra-module-leafwards-traversal].
 // 2. When adding entries to the ABI export map, we need to avoid marking
 //    dependencies within the same top-level module. This step is needed in
 //    addition to step 1 to avoid creating cycles like
@@ -422,7 +422,7 @@ void ABIDependencyEvaluator::reexposeImportedABI(
         && module->isNonSwiftModule()
         && module->getTopLevelModule() == reexport->getTopLevelModule()) {
       // Dependencies within the same top-level Clang module are not useful.
-      // See also: [Note: Trace-Clang-submodule-complexity].
+      // See also: [NOTE: Trace-Clang-submodule-complexity].
       return;
     }
 
@@ -505,18 +505,18 @@ void ABIDependencyEvaluator::computeABIDependenciesForClangModule(
     // There are three cases here which can potentially create cycles:
     //
     // 1. Clang modules importing the stdlib.
-    //    See [Note: Pure-Clang-modules-privately-import-stdlib].
+    //    See [NOTE: Pure-Clang-modules-privately-import-stdlib].
     // 2. Overlay S @_exported-imports underlying module S' and another Clang
     //    module C'. C' (transitively) #imports S' but it gets treated as if
     //    C' imports S. This creates a cycle: S -> C' -> ... -> S.
     //    In practice, this case is hit for
     //      Darwin (Swift) -> SwiftOverlayShims (Clang) -> Darwin (Swift).
-    // 3. [Note: Intra-module-leafwards-traversal]
+    // 3. [NOTE: Intra-module-leafwards-traversal]
     //    Cycles within the same top-level module.
     //    These don't matter for us, since we only care about the dependency
     //    graph at the granularity of top-level modules. So we ignore these
     //    by only considering parent -> submodule dependencies.
-    //    See also [Note: Trace-Clang-submodule-complexity].
+    //    See also [NOTE: Trace-Clang-submodule-complexity].
     if (import->isStdlibModule()) {
       continue;
     }
@@ -721,7 +721,7 @@ static void computeSwiftModuleTraceInfo(
   });
 }
 
-// [Note: Bailing-vs-crashing-in-trace-emission] There are certain edge cases
+// [NOTE: Bailing-vs-crashing-in-trace-emission] There are certain edge cases
 // in trace emission where an invariant that you think should hold does not hold
 // in practice. For example, sometimes we have seen modules without any
 // corresponding filename.
@@ -1977,6 +1977,10 @@ static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
   // Free up some compiler resources now that we have an IRModule.
   freeASTContextIfPossible(Instance);
 
+  // If we emitted any errors while perfoming the end-of-pipeline actions, bail.
+  if (Instance.getDiags().hadAnyError())
+    return true;
+
   // Now that we have a single IR Module, hand it over to performLLVM.
   return performLLVM(opts, Instance.getDiags(), nullptr, HashGlobal, IRModule,
                      TargetMachine.get(), OutputFilename,
@@ -2098,21 +2102,17 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
       IRGenOpts, Invocation.getTBDGenOptions(), std::move(SM), PSPs,
       OutputFilename, MSF, HashGlobal, ParallelOutputFilenames);
 
-  // Just because we had an AST error it doesn't mean we can't performLLVM.
-  bool HadError = Instance.getASTContext().hadError();
-
-  // If the AST Context has no errors but no IRModule is available,
-  // parallelIRGen happened correctly, since parallel IRGen produces multiple
-  // modules.
+  // If no IRModule is available, bail. This can either happen if IR generation
+  // fails, or if parallelIRGen happened correctly (in which case it would have
+  // already performed LLVM).
   if (!IRModule)
-    return HadError;
+    return Instance.getDiags().hadAnyError();
 
   if (validateTBDIfNeeded(Invocation, MSF, *IRModule.getModule()))
     return true;
 
   return generateCode(Instance, OutputFilename, IRModule.getModule(),
-                      HashGlobal) ||
-         HadError;
+                      HashGlobal);
 }
 
 static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,

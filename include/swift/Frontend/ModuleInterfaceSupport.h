@@ -33,7 +33,7 @@ struct ModuleInterfaceOptions {
   bool PreserveTypesAsWritten = false;
 
   /// Should we emit the cType when printing @convention(c) or no?
-  /// FIXME: [clang-function-type-serialization] This check should go away.
+  /// [TODO: Clang-type-plumbing] This check should go away.
   bool PrintFullConvention = false;
 
   /// Copy of all the command-line flags passed at .swiftinterface
