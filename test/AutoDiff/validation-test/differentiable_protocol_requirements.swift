@@ -1,12 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-// Disabled due to test failure with `-O`: SR-13250.
-// SR-13250 is tracking the fix for compiling this test with optimizations.
-// XFAIL: swift_test_mode_optimize
-// XFAIL: swift_test_mode_optimize_size
-// XFAIL: swift_test_mode_optimize_unchecked
-
 import StdlibUnittest
 import DifferentiationUnittest
 
