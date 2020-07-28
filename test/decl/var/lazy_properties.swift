@@ -189,3 +189,32 @@ class ReferenceStaticInLazyProperty {
   static var i = 42
   static func f() -> Int { return 0 }
 }
+
+// Explicit access to the lazy variable storage
+class LazyVarContainer {
+  lazy var foo: Int = {
+    return 0
+  }()
+
+  func accessLazyStorage() {
+    $__lazy_storage_$_foo = nil // expected-error {{access to the underlying storage of a lazy property is not allowed}}
+    print($__lazy_storage_$_foo!) // expected-error {{access to the underlying storage of a lazy property is not allowed}}
+    _ = $__lazy_storage_$_foo == nil // expected-error {{access to the underlying storage of a lazy property is not allowed}}
+  }
+}
+
+// Make sure we can still access a synthesized variable with the same name as a lazy storage variable
+// i.e. $__lazy_storage_$_{property_name} when using property wrapper where the property name is 
+// '__lazy_storage_$_{property_name}'.
+@propertyWrapper
+struct Wrapper {
+  var wrappedValue: Int { 1 }
+  var projectedValue: Int { 1 }
+}
+
+struct PropertyWrapperContainer {
+  @Wrapper var __lazy_storage_$_foo
+  func test() {
+    _ = $__lazy_storage_$_foo  // This is okay.
+  }
+}
