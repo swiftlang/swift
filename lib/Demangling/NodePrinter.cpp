@@ -1131,8 +1131,12 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       Printer << "):";
     }
     print(Node->getChild(1));
-    if (Node->getNumChildren() == 3)
-      print(Node->getChild(2));
+    if (Node->getNumChildren() == 3) {
+      // Currently the runtime does not mangle the generic signature.
+      // This is an open to-do in swift::_buildDemanglingForContext().
+      if (!Options.PrintForTypeName)
+        print(Node->getChild(2));
+    }
     return nullptr;
   case Node::Kind::Variable:
     return printEntity(Node, asPrefixContext, TypePrinting::WithColon,

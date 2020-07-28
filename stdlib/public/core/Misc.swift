@@ -71,6 +71,7 @@ public func _getTypeName(_ type: Any.Type, qualified: Bool)
   -> (UnsafePointer<UInt8>, Int)
 
 /// Returns the demangled qualified name of a metatype.
+@_semantics("typeName")
 public // @testable
 func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
   let (stringPtr, count) = _getTypeName(type, qualified: qualified)
