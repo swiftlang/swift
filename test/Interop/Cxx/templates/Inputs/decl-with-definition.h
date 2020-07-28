@@ -13,7 +13,7 @@ struct MagicNumber {
   int getInt() const { return 24; }
 };
 
-inline MagicWrapper<MagicNumber> forceInstantiating() {
+inline MagicWrapper<MagicNumber> forceInstantiation() {
   return MagicWrapper<MagicNumber>();
 }
 
