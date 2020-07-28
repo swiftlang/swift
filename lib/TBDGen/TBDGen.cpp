@@ -61,21 +61,27 @@ static bool isGlobalOrStaticVar(VarDecl *VD) {
   return VD->isStatic() || VD->getDeclContext()->isModuleScopeContext();
 }
 
+TBDGenVisitor::TBDGenVisitor(TBDGenDescriptor desc,
+                             SymbolCallbackFn symbolCallback)
+    : TBDGenVisitor(desc.getTarget(), desc.getDataLayout(),
+                    desc.getParentModule(), desc.getOptions(),
+                    symbolCallback) {}
+
 void TBDGenVisitor::addSymbolInternal(StringRef name,
                                       llvm::MachO::SymbolKind kind,
                                       bool isLinkerDirective) {
   if (!isLinkerDirective && Opts.LinkerDirectivesOnly)
     return;
-  Symbols.addSymbol(kind, name, Targets);
-  if (kind == SymbolKind::GlobalSymbol) {
-    StringSymbols.push_back(name);
+
 #ifndef NDEBUG
+  if (kind == SymbolKind::GlobalSymbol) {
     if (!DuplicateSymbolChecker.insert(name).second) {
       llvm::dbgs() << "TBDGen duplicate symbol: " << name << '\n';
       assert(false && "TBDGen symbol appears twice");
     }
-#endif
   }
+#endif
+  SymbolCallback(name, kind);
 }
 
 static std::vector<OriginallyDefinedInAttr::ActiveVersion>
@@ -1053,6 +1059,63 @@ void TBDGenVisitor::visit(Decl *D) {
   ASTVisitor::visit(D);
 }
 
+static bool hasLinkerDirective(Decl *D) {
+  return !getAllMovedPlatformVersions(D).empty();
+}
+
+void TBDGenVisitor::visitFile(FileUnit *file) {
+  if (file == SwiftModule->getFiles()[0])
+    addFirstFileSymbols();
+
+  SmallVector<Decl *, 16> decls;
+  file->getTopLevelDecls(decls);
+
+  addMainIfNecessary(file);
+
+  for (auto d : decls) {
+    if (Opts.LinkerDirectivesOnly && !hasLinkerDirective(d))
+      continue;
+    visit(d);
+  }
+}
+
+void TBDGenVisitor::visit(const TBDGenDescriptor &desc) {
+  if (auto *singleFile = desc.getSingleFile()) {
+    assert(SwiftModule == singleFile->getParentModule() &&
+           "mismatched file and module");
+    visitFile(singleFile);
+
+    // Visit synthesized file, if it exists.
+    if (auto *SF = dyn_cast<SourceFile>(singleFile)) {
+      if (auto *synthesizedFile = SF->getSynthesizedFile())
+        visitFile(synthesizedFile);
+    }
+    return;
+  }
+
+  llvm::SmallVector<ModuleDecl*, 4> Modules;
+  Modules.push_back(SwiftModule);
+
+  auto &ctx = SwiftModule->getASTContext();
+  for (auto Name: Opts.embedSymbolsFromModules) {
+    if (auto *MD = ctx.getModuleByName(Name)) {
+      // If it is a clang module, the symbols should be collected by TAPI.
+      if (!MD->isNonSwiftModule()) {
+        Modules.push_back(MD);
+        continue;
+      }
+    }
+    // Diagnose module name that cannot be found
+    ctx.Diags.diagnose(SourceLoc(), diag::unknown_swift_module_name, Name);
+  }
+  // Collect symbols in each module.
+  llvm::for_each(Modules, [&](ModuleDecl *M) {
+    for (auto *file : M->getFiles()) {
+      visitFile(file);
+    }
+  });
+}
+
 /// The kind of version being parsed, used for diagnostics.
 /// Note: Must match the order in DiagnosticsFrontend.def
 enum DylibVersionKind_t: unsigned {
@@ -1100,25 +1163,15 @@ static bool isApplicationExtensionSafe(const LangOptions &LangOpts) {
          llvm::sys::Process::GetEnv("LD_APPLICATION_EXTENSION_SAFE");
 }
 
-static bool hasLinkerDirective(Decl *D) {
-  return !getAllMovedPlatformVersions(D).empty();
-}
-
-TBDFileAndSymbols
-GenerateTBDRequest::evaluate(Evaluator &evaluator,
-                             TBDGenDescriptor desc) const {
+TBDFile GenerateTBDRequest::evaluate(Evaluator &evaluator,
+                                     TBDGenDescriptor desc) const {
   auto *M = desc.getParentModule();
   auto &opts = desc.getOptions();
-
   auto &ctx = M->getASTContext();
-  const auto &triple = ctx.LangOpts.Target;
-  UniversalLinkageInfo linkInfo(triple, opts.HasMultipleIGMs,
-                                /*forcePublicDecls*/ false);
 
   llvm::MachO::InterfaceFile file;
   file.setFileType(llvm::MachO::FileType::TBD_V4);
-  file.setApplicationExtensionSafe(
-    isApplicationExtensionSafe(M->getASTContext().LangOpts));
+  file.setApplicationExtensionSafe(isApplicationExtensionSafe(ctx.LangOpts));
   file.setInstallName(opts.InstallName);
   file.setTwoLevelNamespace();
   file.setSwiftABIVersion(irgen::getSwiftABIVersion());
@@ -1134,75 +1187,47 @@ GenerateTBDRequest::evaluate(Evaluator &evaluator,
     file.setCompatibilityVersion(*packed);
   }
 
-  llvm::MachO::Target target(triple);
+  llvm::MachO::Target target(ctx.LangOpts.Target);
   file.addTarget(target);
   // Add target variant
   if (ctx.LangOpts.TargetVariant.hasValue()) {
     llvm::MachO::Target targetVar(*ctx.LangOpts.TargetVariant);
     file.addTarget(targetVar);
   }
-  auto *clang = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
-  TBDGenVisitor visitor(file, {target}, clang->getTargetInfo().getDataLayout(),
-                        linkInfo, M, opts);
 
-  auto visitFile = [&](FileUnit *file) {
-    if (file == M->getFiles()[0]) {
-      visitor.addFirstFileSymbols();
-    }
-
-    SmallVector<Decl *, 16> decls;
-    file->getTopLevelDecls(decls);
-
-    visitor.addMainIfNecessary(file);
-
-    for (auto d : decls) {
-      if (opts.LinkerDirectivesOnly && !hasLinkerDirective(d))
-        continue;
-      visitor.visit(d);
-    }
+  llvm::MachO::TargetList targets{target};
+  auto addSymbol = [&](StringRef symbol, SymbolKind kind) {
+    file.addSymbol(kind, symbol, targets);
   };
 
-  if (auto *singleFile = desc.getSingleFile()) {
-    assert(M == singleFile->getParentModule() && "mismatched file and module");
-    visitFile(singleFile);
-    // Visit synthesized file, if it exists.
-    if (auto *SF = dyn_cast<SourceFile>(singleFile))
-      if (auto *synthesizedFile = SF->getSynthesizedFile())
-        visitFile(synthesizedFile);
-  } else {
-    llvm::SmallVector<ModuleDecl*, 4> Modules;
-    Modules.push_back(M);
-    for (auto Name: opts.embedSymbolsFromModules) {
-      if (auto *MD = ctx.getModuleByName(Name)) {
-        // If it is a clang module, the symbols should be collected by TAPI.
-        if (!MD->isNonSwiftModule()) {
-          Modules.push_back(MD);
-          continue;
-        }
-      }
-      // Diagnose module name that cannot be found
-      ctx.Diags.diagnose(SourceLoc(), diag::unknown_swift_module_name, Name);
-    }
-    // Collect symbols in each module.
-    llvm::for_each(Modules, [&](ModuleDecl *M) {
-      for (auto *file : M->getFiles()) {
-        visitFile(file);
-      }
-    });
-  }
+  TBDGenVisitor visitor(desc, addSymbol);
+  visitor.visit(desc);
+  return file;
+}
 
-  return std::make_pair(std::move(file), std::move(visitor.StringSymbols));
+std::vector<std::string>
+PublicSymbolsRequest::evaluate(Evaluator &evaluator,
+                               TBDGenDescriptor desc) const {
+  std::vector<std::string> symbols;
+  auto addSymbol = [&](StringRef symbol, SymbolKind kind) {
+    if (kind == SymbolKind::GlobalSymbol)
+      symbols.push_back(symbol.str());
+  };
+
+  TBDGenVisitor visitor(desc, addSymbol);
+  visitor.visit(desc);
+  return symbols;
 }
 
 std::vector<std::string> swift::getPublicSymbols(TBDGenDescriptor desc) {
   auto &evaluator = desc.getParentModule()->getASTContext().evaluator;
-  return llvm::cantFail(evaluator(GenerateTBDRequest{desc})).second;
+  return llvm::cantFail(evaluator(PublicSymbolsRequest{desc}));
 }
 void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
                          const TBDGenOptions &opts) {
   auto &evaluator = M->getASTContext().evaluator;
   auto desc = TBDGenDescriptor::forModule(M, opts);
-  auto file = llvm::cantFail(evaluator(GenerateTBDRequest{desc})).first;
+  auto file = llvm::cantFail(evaluator(GenerateTBDRequest{desc}));
   llvm::cantFail(llvm::MachO::TextAPIWriter::writeToStream(os, file),
                  "YAML writing should be error-free");
 }
