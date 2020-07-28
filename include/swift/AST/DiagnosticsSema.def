@@ -4369,6 +4369,8 @@ NOTE(not_objc_generic_type_param,none,
 NOTE(not_objc_function_type_param,none,
      "function types cannot be represented in Objective-C unless their "
      "parameters and returns can be", ())
+ERROR(not_objc_function_async,none,
+      "'async' function cannot be represented in Objective-C", ())
 NOTE(not_objc_function_type_async,none,
       "'async' function types cannot be represented in Objective-C", ())
 NOTE(not_objc_function_type_throwing,none,

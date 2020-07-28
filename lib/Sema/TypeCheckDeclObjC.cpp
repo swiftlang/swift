@@ -613,6 +613,16 @@ bool swift::isRepresentableInObjC(
     }
   }
 
+  // Async functions cannot be mapped into Objective-C.
+  if (AFD->hasAsync()) {
+    if (Diagnose) {
+      AFD->diagnose(diag::not_objc_function_async)
+        .highlight(AFD->getAsyncLoc());
+      describeObjCReason(AFD, Reason);
+    }
+    return false;
+  }
+
   // Throwing functions must map to a particular error convention.
   if (AFD->hasThrows()) {
     DeclContext *dc = const_cast<AbstractFunctionDecl *>(AFD);
