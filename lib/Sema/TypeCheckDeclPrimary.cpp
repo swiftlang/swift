@@ -704,7 +704,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
           // If both declarations are implicit, we do not diagnose anything
           // as it would lead to misleading diagnostics and it's likely that
           // there's nothing actionable about it due to its implicit nature.
-          // One special case for this is property wrappers.
+          // Special case for this is property wrappers or lazy variables.
           //
           // Otherwise, if 'current' is implicit, then we diagnose 'other'
           // since 'other' is a redeclaration of 'current'. Similarly, if
@@ -718,6 +718,22 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
               if (auto originalWrappedProperty =
                       VD->getOriginalWrappedProperty()) {
                 declToDiagnose = originalWrappedProperty;
+              }
+
+              // If 'current' is a synthesized lazy storage variable and
+              // 'other' is synthesized projected value variable, then
+              // diagnose the wrapped property.
+              //
+              // TODO: We should probably emit a diagnostic note on the lazy
+              // variable as well, but there is currently no way to grab the
+              // lazy property from its backing storage.
+              if (VD->isLazyStorageProperty()) {
+                if (auto otherVar = dyn_cast<VarDecl>(other)) {
+                  if (auto originalWrappedProperty =
+                          otherVar->getOriginalWrappedProperty()) {
+                    declToDiagnose = originalWrappedProperty;
+                  }
+                }
               }
             }
           } else {

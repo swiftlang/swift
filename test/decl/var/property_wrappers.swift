@@ -874,6 +874,14 @@ struct TestInvalidRedeclaration3 {
   var _foo1 = 123 // expected-error {{invalid redeclaration of synthesized property '_foo1'}}
 }
 
+// Diagnose when wrapped property uses the name we use for lazy variable storage property.
+struct TestInvalidRedeclaration4 {
+  @WrapperWithProjectedValue var __lazy_storage_$_foo: Int
+  // expected-error@-1 {{invalid redeclaration of synthesized property '$__lazy_storage_$_foo'}}
+  // expected-note@-2 {{'$__lazy_storage_$_foo' synthesized for property wrapper projected value}}
+  lazy var foo = 1
+}
+
 // ---------------------------------------------------------------------------
 // Closures in initializers
 // ---------------------------------------------------------------------------
