@@ -166,7 +166,7 @@ def update_single_repository(pool_args):
                         result = shell.run(['git', 'rev-parse', checkout_target])
                         revision = result[0].strip()
                         shell.run(['git', 'checkout', revision], echo=True)
-                    except Exception as e:
+                    except Exception:
                         raise originalException
 
             # It's important that we checkout, fetch, and rebase, in order.
