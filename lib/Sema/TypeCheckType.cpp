@@ -2345,15 +2345,23 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     }
   }
 
-  if (hasFunctionAttr && !fnRepr) {
-    if (attrs.has(TAK_autoclosure)) {
+  if (attrs.has(TAK_autoclosure)) {
+    // If this is a situation where function type is wrapped
+    // into a number of parens, let's try to look through them,
+    // because parens are insignificant here e.g.:
+    //
+    // let _: (@autoclosure (() -> Void)) -> Void = { _ in }
+    if (!ty->is<FunctionType>()) {
       // @autoclosure is going to be diagnosed when type of
       // the parameter is validated, because that attribute
       // applies to the declaration now.
       repr->setInvalid();
-      attrs.clearAttribute(TAK_autoclosure);
     }
 
+    attrs.clearAttribute(TAK_autoclosure);
+  }
+
+  if (hasFunctionAttr && !fnRepr) {
     const auto diagnoseInvalidAttr = [&](TypeAttrKind kind) {
       if (kind == TAK_escaping) {
         Type optionalObjectType = ty->getOptionalObjectType();
