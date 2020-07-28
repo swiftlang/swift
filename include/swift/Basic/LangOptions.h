@@ -111,6 +111,9 @@ namespace swift {
     /// when using RequireExplicitAvailability.
     std::string RequireExplicitAvailabilityTarget;
 
+    // Availability macros definitions to be expanded at parsing.
+    SmallVector<StringRef, 4> AvailabilityMacros;
+
     /// If false, '#file' evaluates to the full path rather than a
     /// human-readable string.
     bool EnableConcisePoundFile = false;
