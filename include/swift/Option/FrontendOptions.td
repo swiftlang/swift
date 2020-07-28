@@ -224,6 +224,10 @@ def swift_module_file
 def explict_swift_module_map
   : Separate<["-"], "explicit-swift-module-map-file">, MetaVarName<"<path>">,
     HelpText<"Specify a JSON file containing information of explict Swift modules">;
+
+def placeholder_dependency_module_map
+  : Separate<["-"], "placeholder-dependency-module-map-file">, MetaVarName<"<path>">,
+    HelpText<"Specify a JSON file containing information of external Swift module dependencies">;
 }
 
 
