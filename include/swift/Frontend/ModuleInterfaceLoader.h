@@ -165,11 +165,11 @@ public:
 /// Information about explicitly specified Swift module files.
 struct ExplicitModuleInfo {
   // Path of the .swiftmodule file.
-  StringRef modulePath;
+  std::string modulePath;
   // Path of the .swiftmoduledoc file.
-  StringRef moduleDocPath;
+  std::string moduleDocPath;
   // Path of the .swiftsourceinfo file.
-  StringRef moduleSourceInfoPath;
+  std::string moduleSourceInfoPath;
   // Opened buffer for the .swiftmodule file.
   std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
 };
