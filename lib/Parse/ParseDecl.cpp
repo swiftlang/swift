@@ -7421,6 +7421,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   }
 
   // Initializers cannot be 'async'.
+  // FIXME: We should be able to lift this restriction.
   if (asyncLoc.isValid()) {
     diagnose(asyncLoc, diag::async_init)
       .fixItRemove(asyncLoc);
