@@ -756,6 +756,12 @@ static llvm::cl::opt<std::string>
 ExplicitSwiftModuleMap("explicit-swift-module-map-file",
                        llvm::cl::desc("JSON file to include explicit Swift modules"),
                        llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
+EnableExperimentalConcurrency("enable-experimental-concurrency",
+                              llvm::cl::desc("Enable experimental concurrency model"),
+                              llvm::cl::init(false));
+
 } // namespace options
 
 static std::unique_ptr<llvm::MemoryBuffer>
@@ -3819,6 +3825,9 @@ int main(int argc, char *argv[]) {
   }
   if (options::EnableCxxInterop) {
     InitInvok.getLangOptions().EnableCXXInterop = true;
+  }
+  if (options::EnableExperimentalConcurrency) {
+    InitInvok.getLangOptions().EnableExperimentalConcurrency = true;
   }
 
   // We disable source location resolutions from .swiftsourceinfo files by
