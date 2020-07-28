@@ -2296,6 +2296,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       SmallVector<AnyFunctionType::Param, 4> argTy;
       AFD->getParameters()->getParams(argTy);
 
+      info = info.withAsync(AFD->hasAsync());
       // 'throws' only applies to the innermost function.
       info = info.withThrows(AFD->hasThrows());
       // Defer bodies must not escape.

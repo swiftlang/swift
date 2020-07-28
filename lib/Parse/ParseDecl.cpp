@@ -6366,10 +6366,12 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   TypeRepr *FuncRetTy = nullptr;
   DeclName FullName;
   ParameterList *BodyParams;
+  SourceLoc asyncLoc;
   SourceLoc throwsLoc;
   bool rethrows;
   Status |= parseFunctionSignature(SimpleName, FullName, BodyParams,
-                                   DefaultArgs, throwsLoc, rethrows, FuncRetTy);
+                                   DefaultArgs, asyncLoc, throwsLoc, rethrows,
+                                   FuncRetTy);
   if (Status.hasCodeCompletion() && !CodeCompletion) {
     // Trigger delayed parsing, no need to continue.
     return Status;
@@ -6380,6 +6382,7 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   // Create the decl for the func and add it to the parent scope.
   auto *FD = FuncDecl::create(Context, StaticLoc, StaticSpelling,
                               FuncLoc, FullName, NameLoc,
+                              /*Async=*/asyncLoc.isValid(), asyncLoc,
                               /*Throws=*/throwsLoc.isValid(), throwsLoc,
                               GenericParams,
                               BodyParams, FuncRetTy,
@@ -7411,12 +7414,21 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     return nullptr;
   }
 
-  // Parse 'throws' or 'rethrows'.
+  // Parse 'async' / 'throws' / 'rethrows'.
+  SourceLoc asyncLoc;
   SourceLoc throwsLoc;
-  if (consumeIf(tok::kw_throws, throwsLoc)) {
-    // okay
-  } else if (consumeIf(tok::kw_rethrows, throwsLoc)) {
+  bool rethrows = false;
+  parseAsyncThrows(SourceLoc(), asyncLoc, throwsLoc, &rethrows);
+
+  if (rethrows) {
     Attributes.add(new (Context) RethrowsAttr(throwsLoc));
+  }
+
+  // Initializers cannot be 'async'.
+  if (asyncLoc.isValid()) {
+    diagnose(asyncLoc, diag::async_init)
+      .fixItRemove(asyncLoc);
+    asyncLoc = SourceLoc();
   }
 
   diagnoseWhereClauseInGenericParamList(GenericParams);

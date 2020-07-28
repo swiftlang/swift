@@ -308,7 +308,7 @@ class alignas(1 << TypeAlignInBits) TypeBase {
   }
 
 protected:
-  enum { NumAFTExtInfoBits = 8 };
+  enum { NumAFTExtInfoBits = 9 };
   enum { NumSILExtInfoBits = 8 };
   union { uint64_t OpaqueBits;
 
@@ -2969,7 +2969,7 @@ public:
   /// A class which abstracts out some details necessary for
   /// making a call.
   class ExtInfo {
-    // If bits are added or removed, then TypeBase::AnyFunctionTypeBits
+    // If bits are added or removed, then TypeBase::NumAFTExtInfoBits
     // and NumMaskBits must be updated, and they must match.
     //
     //   |representation|noEscape|throws|differentiability|
@@ -2978,10 +2978,11 @@ public:
     enum : unsigned {
       RepresentationMask          = 0xF << 0,
       NoEscapeMask                = 1 << 4,
-      ThrowsMask                  = 1 << 5,
-      DifferentiabilityMaskOffset = 6,
+      AsyncMask                   = 1 << 5,
+      ThrowsMask                  = 1 << 6,
+      DifferentiabilityMaskOffset = 7,
       DifferentiabilityMask       = 0x3 << DifferentiabilityMaskOffset,
-      NumMaskBits                 = 8
+      NumMaskBits                 = 9
     };
 
     unsigned Bits; // Naturally sized for speed.
@@ -3050,6 +3051,7 @@ public:
     }
 
     bool isNoEscape() const { return Bits & NoEscapeMask; }
+    bool async() const { return Bits & AsyncMask; }
     bool throws() const { return Bits & ThrowsMask; }
     bool isDifferentiable() const {
       return getDifferentiabilityKind() >
@@ -3116,6 +3118,11 @@ public:
     LLVM_NODISCARD
     ExtInfo withNoEscape(bool NoEscape = true) const {
       return ExtInfo(NoEscape ? (Bits | NoEscapeMask) : (Bits & ~NoEscapeMask),
+                     Other);
+    }
+    LLVM_NODISCARD
+    ExtInfo withAsync(bool Async = true) const {
+      return ExtInfo(Async ? (Bits | AsyncMask) : (Bits & ~AsyncMask),
                      Other);
     }
     LLVM_NODISCARD
@@ -3375,6 +3382,10 @@ public:
   /// to not persist the closure for longer than the duration of the call.
   bool isNoEscape() const {
     return getExtInfo().isNoEscape();
+  }
+
+  bool async() const {
+    return getExtInfo().async();
   }
 
   bool throws() const {

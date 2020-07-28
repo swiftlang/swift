@@ -385,7 +385,7 @@ protected:
   SWIFT_INLINE_BITFIELD(SubscriptDecl, VarDecl, 2,
     StaticSpelling : 2
   );
-  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+1+1+1+1+1+1+1,
     /// \see AbstractFunctionDecl::BodyKind
     BodyKind : 3,
 
@@ -397,6 +397,9 @@ protected:
 
     /// Whether we are overridden later.
     Overridden : 1,
+
+    /// Whether the function is async.
+    Async : 1,
 
     /// Whether the function body throws.
     Throws : 1,
@@ -5822,6 +5825,9 @@ protected:
 
   CaptureInfo Captures;
 
+  /// Location of the 'async' token.
+  SourceLoc AsyncLoc;
+
   /// Location of the 'throws' token.
   SourceLoc ThrowsLoc;
 
@@ -5831,15 +5837,17 @@ protected:
   } LazySemanticInfo = { };
 
   AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, DeclName Name,
-                       SourceLoc NameLoc, bool Throws, SourceLoc ThrowsLoc,
+                       SourceLoc NameLoc, bool Async, SourceLoc AsyncLoc,
+                       bool Throws, SourceLoc ThrowsLoc,
                        bool HasImplicitSelfDecl,
                        GenericParamList *GenericParams)
       : GenericContext(DeclContextKind::AbstractFunctionDecl, Parent, GenericParams),
         ValueDecl(Kind, Parent, Name, NameLoc),
-        Body(nullptr), ThrowsLoc(ThrowsLoc) {
+        Body(nullptr), AsyncLoc(AsyncLoc), ThrowsLoc(ThrowsLoc) {
     setBodyKind(BodyKind::None);
     Bits.AbstractFunctionDecl.HasImplicitSelfDecl = HasImplicitSelfDecl;
     Bits.AbstractFunctionDecl.Overridden = false;
+    Bits.AbstractFunctionDecl.Async = Async;
     Bits.AbstractFunctionDecl.Throws = Throws;
     Bits.AbstractFunctionDecl.Synthesized = false;
     Bits.AbstractFunctionDecl.HasSingleExpressionBody = false;
@@ -5899,8 +5907,14 @@ public:
     Bits.AbstractFunctionDecl.IAMStatus = newValue.getRawValue();
   }
 
+  /// Retrieve the location of the 'async' keyword, if present.
+  SourceLoc getAsyncLoc() const { return AsyncLoc; }
+
   /// Retrieve the location of the 'throws' keyword, if present.
   SourceLoc getThrowsLoc() const { return ThrowsLoc; }
+
+  /// Returns true if the function is async.
+  bool hasAsync() const { return Bits.AbstractFunctionDecl.Async; }
 
   /// Returns true if the function body throws.
   bool hasThrows() const { return Bits.AbstractFunctionDecl.Throws; }
@@ -6147,11 +6161,13 @@ protected:
            SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
            SourceLoc FuncLoc,
            DeclName Name, SourceLoc NameLoc,
+           bool Async, SourceLoc AsyncLoc,
            bool Throws, SourceLoc ThrowsLoc,
            bool HasImplicitSelfDecl,
            GenericParamList *GenericParams, DeclContext *Parent)
     : AbstractFunctionDecl(Kind, Parent,
                            Name, NameLoc,
+                           Async, AsyncLoc,
                            Throws, ThrowsLoc,
                            HasImplicitSelfDecl, GenericParams),
       StaticLoc(StaticLoc), FuncLoc(FuncLoc) {
@@ -6173,6 +6189,7 @@ private:
                               StaticSpellingKind StaticSpelling,
                               SourceLoc FuncLoc,
                               DeclName Name, SourceLoc NameLoc,
+                              bool Async, SourceLoc AsyncLoc,
                               bool Throws, SourceLoc ThrowsLoc,
                               GenericParamList *GenericParams,
                               DeclContext *Parent,
@@ -6198,6 +6215,7 @@ public:
                                       StaticSpellingKind StaticSpelling,
                                       SourceLoc FuncLoc,
                                       DeclName Name, SourceLoc NameLoc,
+                                      bool Async, SourceLoc AsyncLoc,
                                       bool Throws, SourceLoc ThrowsLoc,
                                       GenericParamList *GenericParams,
                                       DeclContext *Parent);
@@ -6206,6 +6224,7 @@ public:
                           StaticSpellingKind StaticSpelling,
                           SourceLoc FuncLoc,
                           DeclName Name, SourceLoc NameLoc,
+                          bool Async, SourceLoc AsyncLoc,
                           bool Throws, SourceLoc ThrowsLoc,
                           GenericParamList *GenericParams,
                           ParameterList *ParameterList,
@@ -6347,7 +6366,8 @@ class AccessorDecl final : public FuncDecl {
     : FuncDecl(DeclKind::Accessor,
                staticLoc, staticSpelling, /*func loc*/ declLoc,
                /*name*/ Identifier(), /*name loc*/ declLoc,
-               throws, throwsLoc, hasImplicitSelfDecl, genericParams, parent),
+               /*Async=*/false, SourceLoc(), throws, throwsLoc,
+               hasImplicitSelfDecl, genericParams, parent),
       AccessorKeywordLoc(accessorKeywordLoc),
       Storage(storage) {
     Bits.AccessorDecl.AccessorKind = unsigned(accessorKind);

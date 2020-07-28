@@ -200,6 +200,12 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   }
 
   if (auto fnTy = T->getAs<FunctionType>()) {
+    if (fnTy->getExtInfo().async() ) {
+      diags.diagnose(TypeRange.Start, diag::not_objc_function_type_async)
+        .highlight(TypeRange);
+      return;
+    }
+
     if (fnTy->getExtInfo().throws() ) {
       diags.diagnose(TypeRange.Start, diag::not_objc_function_type_throwing)
         .highlight(TypeRange);

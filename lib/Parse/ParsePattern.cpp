@@ -761,7 +761,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
 
 /// Parse a function definition signature.
 ///   func-signature:
-///     func-arguments func-throws? func-signature-result?
+///     func-arguments 'async'? func-throws? func-signature-result?
 ///   func-signature-result:
 ///     '->' type
 ///
@@ -771,6 +771,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
                                DeclName &FullName,
                                ParameterList *&bodyParams,
                                DefaultArgumentInfo &defaultArgs,
+                               SourceLoc &asyncLoc,
                                SourceLoc &throwsLoc,
                                bool &rethrows,
                                TypeRepr *&retType) {
@@ -783,40 +784,18 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   Status |= parseFunctionArguments(NamePieces, bodyParams, paramContext,
                                    defaultArgs);
   FullName = DeclName(Context, SimpleName, NamePieces);
-  
-  // Check for the 'throws' keyword.
-  rethrows = false;
-  if (Tok.is(tok::kw_throws)) {
-    throwsLoc = consumeToken();
-  } else if (Tok.is(tok::kw_rethrows)) {
-    throwsLoc = consumeToken();
-    rethrows = true;
-  } else if (Tok.isAny(tok::kw_throw, tok::kw_try)) {
-    throwsLoc = consumeToken();
-    diagnose(throwsLoc, diag::throw_in_function_type)
-      .fixItReplace(throwsLoc, "throws");
+
+  // Check for the 'async' keyword.
+  if (Context.LangOpts.EnableExperimentalAsync &&
+      Tok.isContextualKeyword("async")) {
+    asyncLoc = consumeToken();
   }
 
+  // Check for the 'async' and 'throws' keywords.
+  rethrows = false;
+  parseAsyncThrows(SourceLoc(), asyncLoc, throwsLoc, &rethrows);
+
   SourceLoc arrowLoc;
-
-  auto diagnoseInvalidThrows = [&]() -> Optional<InFlightDiagnostic> {
-    if (throwsLoc.isValid())
-      return None;
-
-    if (Tok.is(tok::kw_throws)) {
-      throwsLoc = consumeToken();
-    } else if (Tok.is(tok::kw_rethrows)) {
-      throwsLoc = consumeToken();
-      rethrows = true;
-    }
-
-    if (!throwsLoc.isValid())
-      return None;
-
-    auto diag = rethrows ? diag::rethrows_in_wrong_position
-                         : diag::throws_in_wrong_position;
-    return diagnose(Tok, diag);
-  };
 
   // If there's a trailing arrow, parse the rest as the result type.
   if (Tok.isAny(tok::arrow, tok::colon)) {
@@ -830,12 +809,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
 
     // Check for 'throws' and 'rethrows' after the arrow, but
     // before the type, and correct it.
-    if (auto diagOpt = diagnoseInvalidThrows()) {
-      assert(arrowLoc.isValid());
-      assert(throwsLoc.isValid());
-      (*diagOpt).fixItExchange(SourceRange(arrowLoc),
-                               SourceRange(throwsLoc));
-    }
+    parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, &rethrows);
 
     ParserResult<TypeRepr> ResultType =
         parseDeclResultType(diag::expected_type_function_result);
@@ -849,19 +823,58 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   }
 
   // Check for 'throws' and 'rethrows' after the type and correct it.
-  if (auto diagOpt = diagnoseInvalidThrows()) {
-    assert(arrowLoc.isValid());
-    assert(retType);
-    SourceLoc typeEndLoc = Lexer::getLocForEndOfToken(SourceMgr,
-                                                      retType->getEndLoc());
-    SourceLoc throwsEndLoc = Lexer::getLocForEndOfToken(SourceMgr, throwsLoc);
-    (*diagOpt).fixItInsert(arrowLoc, rethrows ? "rethrows " : "throws ")
-              .fixItRemoveChars(typeEndLoc, throwsEndLoc);
-  }
+  parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, &rethrows);
 
   return Status;
 }
 
+void Parser::parseAsyncThrows(
+    SourceLoc existingArrowLoc, SourceLoc &asyncLoc, SourceLoc &throwsLoc,
+    bool *rethrows) {
+  if (Context.LangOpts.EnableExperimentalAsync &&
+      Tok.isContextualKeyword("async")) {
+    asyncLoc = consumeToken();
+
+    if (existingArrowLoc.isValid()) {
+      diagnose(asyncLoc, diag::async_or_throws_in_wrong_position, 2)
+        .fixItRemove(asyncLoc)
+        .fixItInsert(existingArrowLoc, "async ");
+    }
+  }
+
+  if (Tok.isAny(tok::kw_throws, tok::kw_throw, tok::kw_try) ||
+      (rethrows && Tok.is(tok::kw_rethrows))) {
+    // If we allowed parsing rethrows, record whether we did in fact parse it.
+    if (rethrows)
+      *rethrows = Tok.is(tok::kw_rethrows);
+
+    // Replace 'throw' or 'try' with 'throws'.
+    if (Tok.isAny(tok::kw_throw, tok::kw_try)) {
+      diagnose(Tok, diag::throw_in_function_type)
+        .fixItReplace(Tok.getLoc(), "throws");
+    }
+
+    StringRef keyword = Tok.getText();
+    throwsLoc = consumeToken();
+
+    if (existingArrowLoc.isValid()) {
+      diagnose(throwsLoc, diag::async_or_throws_in_wrong_position,
+               rethrows ? (*rethrows ? 1 : 0) : 0)
+        .fixItRemove(throwsLoc)
+        .fixItInsert(existingArrowLoc, (keyword + " ").str());
+    }
+
+    if (Context.LangOpts.EnableExperimentalAsync &&
+        Tok.isContextualKeyword("async")) {
+      asyncLoc = consumeToken();
+
+      diagnose(asyncLoc, diag::async_after_throws, rethrows && *rethrows)
+        .fixItRemove(asyncLoc)
+        .fixItInsert(
+          existingArrowLoc.isValid() ? existingArrowLoc : throwsLoc, "async ");
+    }
+  }
+}
 
 /// Parse a pattern with an optional type annotation.
 ///

@@ -411,6 +411,7 @@ Type ASTBuilder::createFunctionType(
                                                  representation);
 
   auto einfo = incompleteExtInfo.withRepresentation(representation)
+                                .withAsync(flags.async())
                                 .withClangFunctionType(clangFunctionType);
 
   return FunctionType::get(funcParams, output, einfo);

@@ -381,6 +381,10 @@ def enable_experimental_static_assert :
   Flag<["-"], "enable-experimental-static-assert">,
   HelpText<"Enable experimental #assert">;
 
+def enable_experimental_async :
+  Flag<["-"], "enable-experimental-async">,
+  HelpText<"Enable experimental async concurrency">;
+
 def enable_subst_sil_function_types_for_function_values :
   Flag<["-"], "enable-subst-sil-function-types-for-function-values">,
   HelpText<"Use substituted function types for SIL type lowering of function values">;

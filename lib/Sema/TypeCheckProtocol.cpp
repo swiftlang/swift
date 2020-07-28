@@ -694,6 +694,12 @@ swift::matchWitness(
       }
     }
 
+    // If the witness is 'async', the requirement must be.
+    if (witnessFnType->getExtInfo().async() !=
+          reqFnType->getExtInfo().async()) {
+      return RequirementMatch(witness, MatchKind::AsyncConflict);
+    }
+
     // If the witness is 'throws', the requirement must be.
     if (witnessFnType->getExtInfo().throws() &&
         !reqFnType->getExtInfo().throws()) {
@@ -2283,6 +2289,11 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     diags.diagnose(match.Witness, diag::protocol_witness_missing_requirement,
                    match.WitnessType, match.MissingRequirement->getSecondType(),
                    (unsigned)match.MissingRequirement->getKind());
+    break;
+
+  case MatchKind::AsyncConflict:
+    diags.diagnose(match.Witness, diag::protocol_witness_async_conflict,
+                   cast<AbstractFunctionDecl>(match.Witness)->hasAsync());
     break;
 
   case MatchKind::ThrowsConflict:

@@ -727,10 +727,9 @@ ERROR(generic_non_function,PointsToFirstBadToken,
 ERROR(rethrowing_function_type,none,
       "only function declarations may be marked 'rethrows'; "
       "did you mean 'throws'?", ())
-ERROR(throws_in_wrong_position,none,
-      "'throws' may only occur before '->'", ())
-ERROR(rethrows_in_wrong_position,none,
-      "'rethrows' may only occur before '->'", ())
+ERROR(async_or_throws_in_wrong_position,none,
+      "%select{'throws'|'rethrows'|'async'}0 may only occur before '->'",
+      (unsigned))
 ERROR(throw_in_function_type,none,
       "expected throwing specifier; did you mean 'throws'?", ())
 ERROR(expected_type_before_arrow,none,
@@ -742,6 +741,9 @@ ERROR(function_type_argument_label,none,
       (Identifier))
 ERROR(expected_dynamic_func_attr,none,
       "expected a dynamically_replaceable function", ())
+ERROR(async_after_throws,none,
+      "'async' must precede %select{'throws'|'rethrows'}0", (bool))
+ERROR(async_init,none, "initializer cannot be marked 'async'", ())
 
 // Enum Types
 ERROR(expected_expr_enum_case_raw_value,PointsToFirstBadToken,

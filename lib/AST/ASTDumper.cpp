@@ -2637,7 +2637,12 @@ public:
     printExplicitCastExpr(E, "coerce_expr");
   }
   void visitArrowExpr(ArrowExpr *E) {
-    printCommon(E, "arrow") << '\n';
+    printCommon(E, "arrow");
+    if (E->getAsyncLoc().isValid())
+      OS << " async";
+    if (E->getThrowsLoc().isValid())
+      OS << " throws";
+    OS << '\n';
     printRec(E->getArgsExpr());
     OS << '\n';
     printRec(E->getResultExpr());
@@ -2972,6 +2977,8 @@ public:
   void visitFunctionTypeRepr(FunctionTypeRepr *T) {
     printCommon("type_function");
     OS << '\n'; printRec(T->getArgsTypeRepr());
+    if (T->async())
+      OS << " async ";
     if (T->throws())
       OS << " throws ";
     OS << '\n'; printRec(T->getResultTypeRepr());
@@ -3742,6 +3749,7 @@ namespace {
                    getSILFunctionTypeRepresentationString(representation));
 
       printFlag(!T->isNoEscape(), "escaping");
+      printFlag(T->async(), "async");
       printFlag(T->throws(), "throws");
 
       OS << "\n";

@@ -2667,7 +2667,7 @@ Type TypeResolver::resolveASTFunctionType(
   FunctionType::ExtInfo incompleteExtInfo(FunctionTypeRepresentation::Swift,
                                           noescape, repr->throws(), diffKind,
                                           /*clangFunctionType*/nullptr);
-  
+
   const clang::Type *clangFnType = parsedClangFunctionType;
   if (representation == AnyFunctionType::Representation::CFunctionPointer
       && !clangFnType)
@@ -2676,6 +2676,7 @@ Type TypeResolver::resolveASTFunctionType(
       AnyFunctionType::Representation::CFunctionPointer);
 
   auto extInfo = incompleteExtInfo.withRepresentation(representation)
+                                  .withAsync(repr->async())
                                   .withClangFunctionType(clangFnType);
 
   // Diagnose a couple of things that we can parse in SIL mode but we don't
