@@ -29,3 +29,7 @@ module UsingDirective {
 module EagerInstantiationProblems {
   header "eager-instantiation-problems.h"
 }
+
+module Mangling {
+  header "mangling.h"
+}
