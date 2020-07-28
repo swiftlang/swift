@@ -14,7 +14,7 @@ TemplatesTestSuite.test("eager-instantiation-of-members") {
   //   T::getIntDoesNotExist();
   //
   // whereas in C++ this compiles. This is caused by ClangImporter eagerly
-  // instantiating typedeffed templates and also its members.
+  // instantiating typedeffed templates and also their members.
   // TODO(scentini): Fix this
   // let _brokenMagicWrapper = BrokenMagicWrapper()
 }
