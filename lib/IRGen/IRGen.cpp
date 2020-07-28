@@ -221,7 +221,7 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
                            addSwiftContractPass);
   }
 
-  if (RunSwiftSpecificLLVMOptzns)
+  if (!Opts.DisableSwiftSpecificLLVMOptzns)
     addCoroutinePassesToExtensionPoints(PMBuilder);
 
   if (Opts.Sanitizers & SanitizerKind::Address) {
