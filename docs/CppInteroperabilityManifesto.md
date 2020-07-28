@@ -67,6 +67,7 @@ Assumptions:
     + [Function templates: calls with generic type parameters](#function-templates-calls-with-generic-type-parameters)
     + [Function templates: importing as real generic functions](#function-templates-importing-as-real-generic-functions)
     + [Class templates](#class-templates)
+    + [Class templates: importing instantiation behind typedef](#class-templates-importing-instantiation-behind-typedef)
     + [Class templates: importing specific specilalizations](#class-templates-importing-specific-specilalizations)
     + [Class templates: using with generic type parameters](#class-templates-using-with-generic-type-parameters)
     + [Class templates: using in generic code through a synthesized protocol](#class-templates-using-in-generic-code-through-a-synthesized-protocol)
@@ -2575,6 +2576,42 @@ We could ignore explicit specializations of function templates, because they
 don't affect the API. Explicit specializations of class templates can
 dramatically change the API of the type.
 
+### Class templates: importing instantiation behind typedef
+
+Typedefs having template instantiation as their underlying type could be
+imported as a non-generit struct with the given name.
+
+```c++
+// C++ header.
+
+template<typename T>
+class ClassTemplate {};
+
+typedef ClassTemplate<int> ClassTemplateOfInt;
+```
+
+```swift
+// C++ header imported to Swift.
+
+struct ClassTemplateOfInt {}
+```
+
+In C++, multiple distinct typedeffed instantiations must resolve to the same
+canonical type. We could implement this by creating a hidden intermediate struct
+that typedef aliasses.
+
+The struct could be named as `__CxxTemplateInst` plus Itanium mangled type of
+the instantiation. For the example above the name of the hidden struct is
+`__CxxTemplateInst13ClassTemplateIiE`. Double underscore (denoting a reserved
+C++ identifier) is used to discourage direct usage. We chose Itanium mangling
+scheme because it produces valid Swift identifiers and covers all C++ edge
+cases. The example above will therefore be imported as follows:
+
+```swift
+struct __CxxTemplateInst13ClassTemplateIiE {}
+typealias ClassTemplateOfInt = __CxxTemplateInst13ClassTemplateIiE
+```
+
 ### Class templates: importing specific specilalizations
 
 Just like with calls to C++ function templates, it is easy to compile a use of a
@@ -2752,7 +2789,7 @@ func useConcrete() {
 
 ### Class templates: importing as real generic structs
 
-If we know the complete set of allowed type arguments to a C++ function
+If we know the complete set of allowed type arguments to a C++ struct
 template, we could import it as an actual Swift generic struct. Every method of
 that struct will perform dynamic dispatch based on type parameters. See
 the section about function templates for more details.
