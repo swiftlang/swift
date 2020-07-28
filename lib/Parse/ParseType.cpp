@@ -404,7 +404,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
 
   // Parse an async specifier.
   SourceLoc asyncLoc;
-  if (Context.LangOpts.EnableExperimentalAsync &&
+  if (Context.LangOpts.EnableExperimentalConcurrency &&
       Tok.isContextualKeyword("async")) {
     asyncLoc = consumeToken();
   }
@@ -415,7 +415,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   SourceLoc throwsLoc;
   if (Tok.isAny(tok::kw_throws, tok::kw_rethrows, tok::kw_throw, tok::kw_try) &&
       (peekToken().is(tok::arrow) ||
-       (Context.LangOpts.EnableExperimentalAsync &&
+       (Context.LangOpts.EnableExperimentalConcurrency &&
         peekToken().isContextualKeyword("async")))) {
     if (Tok.isAny(tok::kw_rethrows, tok::kw_throw, tok::kw_try)) {
       // 'rethrows' is only allowed on function declarations for now.
@@ -427,7 +427,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
     throwsLoc = consumeToken();
 
     // 'async' must preceed 'throws'; accept this but complain.
-    if (Context.LangOpts.EnableExperimentalAsync &&
+    if (Context.LangOpts.EnableExperimentalConcurrency &&
         Tok.isContextualKeyword("async")) {
       asyncLoc = consumeToken();
 
@@ -1570,7 +1570,7 @@ bool Parser::canParseType() {
   }
 
   // Handle type-function if we have an 'async'.
-  if (Context.LangOpts.EnableExperimentalAsync &&
+  if (Context.LangOpts.EnableExperimentalConcurrency &&
       Tok.isContextualKeyword("async")) {
     consumeToken();
 
@@ -1586,7 +1586,7 @@ bool Parser::canParseType() {
 
     // Allow 'async' here even though it is ill-formed, so we can provide
     // a better error.
-    if (Context.LangOpts.EnableExperimentalAsync &&
+    if (Context.LangOpts.EnableExperimentalConcurrency &&
         Tok.isContextualKeyword("async"))
       consumeToken();
 

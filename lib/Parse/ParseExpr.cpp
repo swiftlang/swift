@@ -330,7 +330,7 @@ parse_operator:
     case tok::identifier: {
       // 'async' followed by 'throws' or '->' implies that we have an arrow
       // expression.
-      if (!(Context.LangOpts.EnableExperimentalAsync &&
+      if (!(Context.LangOpts.EnableExperimentalConcurrency &&
             Tok.isContextualKeyword("async") &&
             peekToken().isAny(tok::arrow, tok::kw_throws)))
         goto done;

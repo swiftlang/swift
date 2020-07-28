@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -enable-experimental-async -parse-stdlib %s -module-name main -o %t/a.out
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-stdlib %s -module-name main -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
