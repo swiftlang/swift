@@ -19,6 +19,7 @@ target_sources(swiftSILOptimizer PRIVATE
   DestroyHoisting.cpp
   Devirtualizer.cpp
   DifferentiabilityWitnessDevirtualizer.cpp
+  EagerSpecializer.cpp
   GenericSpecializer.cpp
   MergeCondFail.cpp
   Outliner.cpp
