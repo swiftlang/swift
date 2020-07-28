@@ -359,6 +359,18 @@ public struct String {
     _invariantCheck()
   }
 
+  // This is intentionally a static function and not an initializer, because
+  // an initializer would conflict with the Int-parsing initializer, when used
+  // as function name, e.g.
+  //   [1, 2, 3].map(String.init)
+  @_alwaysEmitIntoClient
+  @_semantics("string.init_empty_with_capacity")
+  @_semantics("inline_late")
+  @inlinable
+  internal static func _createEmpty(withInitialCapacity: Int) -> String {
+    return String(_StringGuts(_initialCapacity: withInitialCapacity))
+  }
+
   /// Creates an empty string.
   ///
   /// Using this initializer is equivalent to initializing a string with an

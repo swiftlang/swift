@@ -75,7 +75,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol {
     let capacityPerInterpolation = 2
     let initialCapacity = literalCapacity +
       interpolationCount * capacityPerInterpolation
-    _storage = String(_StringGuts(_initialCapacity: initialCapacity))
+    _storage = String._createEmpty(withInitialCapacity: initialCapacity)
   }
   
   /// Appends a literal segment of a string interpolation.

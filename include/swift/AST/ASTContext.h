@@ -585,6 +585,9 @@ public:
   /// Array.reserveCapacityForAppend(newElementsCount: Int)
   FuncDecl *getArrayReserveCapacityDecl() const;
 
+  /// Retrieve the declaration of String.init(_builtinStringLiteral ...)
+  ConstructorDecl *getMakeUTF8StringDecl() const;
+
   // Retrieve the declaration of Swift._stdlib_isOSVersionAtLeast.
   FuncDecl *getIsOSVersionAtLeastDecl() const;
   

@@ -774,6 +774,20 @@ struct ObjCClassImpl : ClassImpl {
                       void (**outFreeFunc)(const char *)) {
     swift::crash("Cannot get children of Objective-C objects.");
   }
+
+  virtual intptr_t recursiveCount() {
+    return 0;
+  }
+
+  virtual intptr_t recursiveChildOffset(intptr_t index) {
+    swift::crash("Cannot get children of Objective-C objects.");
+  }
+  virtual const FieldType recursiveChildMetadata(intptr_t index,
+                                                 const char **outName,
+                                                 void (**outFreeFunc)(const char *))
+  {
+    swift::crash("Cannot get children of Objective-C objects.");
+  }
 };
 #endif
 

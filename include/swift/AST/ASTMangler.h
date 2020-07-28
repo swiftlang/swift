@@ -213,6 +213,9 @@ public:
 
   std::string mangleTypeForDebugger(Type decl, const DeclContext *DC);
 
+  /// Create a mangled name to be used for _typeName constant propagation.
+  std::string mangleTypeForTypeName(Type type);
+
   std::string mangleOpaqueTypeDescriptor(const OpaqueTypeDecl *decl);
   
   std::string mangleDeclType(const ValueDecl *decl);

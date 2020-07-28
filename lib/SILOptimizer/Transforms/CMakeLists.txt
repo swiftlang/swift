@@ -39,6 +39,7 @@ target_sources(swiftSILOptimizer PRIVATE
   Sink.cpp
   SpeculativeDevirtualizer.cpp
   StackPromotion.cpp
+  StringOptimization.cpp
   TempLValueOpt.cpp
   TempRValueElimination.cpp
   UnsafeGuaranteedPeephole.cpp)
