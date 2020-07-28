@@ -3103,52 +3103,56 @@ void SILInstruction::printInContext(llvm::raw_ostream &OS) const {
   SILPrinter(Ctx).printInContext(this);
 }
 
+void SILVTableEntry::print(llvm::raw_ostream &OS) const {
+  getMethod().print(OS);
+  OS << ": ";
+
+  PrintOptions QualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
+  bool HasSingleImplementation = false;
+  switch (getMethod().kind) {
+  default:
+    break;
+  case SILDeclRef::Kind::IVarDestroyer:
+  case SILDeclRef::Kind::Destroyer:
+  case SILDeclRef::Kind::Deallocator:
+    HasSingleImplementation = true;
+  }
+  // No need to emit the signature for methods that may have only
+  // single implementation, e.g. for destructors.
+  if (!HasSingleImplementation) {
+    QualifiedSILTypeOptions.CurrentModule =
+        getMethod().getDecl()->getDeclContext()->getParentModule();
+    getMethod().getDecl()->getInterfaceType().print(
+        OS, QualifiedSILTypeOptions);
+    OS << " : ";
+  }
+  OS << '@' << getImplementation()->getName();
+  switch (getKind()) {
+  case SILVTable::Entry::Kind::Normal:
+    break;
+  case SILVTable::Entry::Kind::Inherited:
+    OS << " [inherited]";
+    break;
+  case SILVTable::Entry::Kind::Override:
+    OS << " [override]";
+    break;
+  }
+  if (isNonOverridden()) {
+    OS << " [nonoverridden]";
+  }
+
+  OS << "\t// " << demangleSymbol(getImplementation()->getName());
+}
+
 void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   OS << "sil_vtable ";
   if (isSerialized())
     OS << "[serialized] ";
   OS << getClass()->getName() << " {\n";
 
-  PrintOptions QualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
   for (auto &entry : getEntries()) {
     OS << "  ";
-    entry.getMethod().print(OS);
-    OS << ": ";
-
-    bool HasSingleImplementation = false;
-    switch (entry.getMethod().kind) {
-    default:
-      break;
-    case SILDeclRef::Kind::IVarDestroyer:
-    case SILDeclRef::Kind::Destroyer:
-    case SILDeclRef::Kind::Deallocator:
-      HasSingleImplementation = true;
-    }
-    // No need to emit the signature for methods that may have only
-    // single implementation, e.g. for destructors.
-    if (!HasSingleImplementation) {
-      QualifiedSILTypeOptions.CurrentModule =
-          entry.getMethod().getDecl()->getDeclContext()->getParentModule();
-      entry.getMethod().getDecl()->getInterfaceType().print(
-          OS, QualifiedSILTypeOptions);
-      OS << " : ";
-    }
-    OS << '@' << entry.getImplementation()->getName();
-    switch (entry.getKind()) {
-    case SILVTable::Entry::Kind::Normal:
-      break;
-    case SILVTable::Entry::Kind::Inherited:
-      OS << " [inherited]";
-      break;
-    case SILVTable::Entry::Kind::Override:
-      OS << " [override]";
-      break;
-    }
-    if (entry.isNonOverridden()) {
-      OS << " [nonoverridden]";
-    }
-
-    OS << "\t// " << demangleSymbol(entry.getImplementation()->getName());
+    entry.print(OS);
     OS << "\n";
   }
   OS << "}\n\n";

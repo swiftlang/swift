@@ -17,11 +17,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "Callee.h"
+#include "ClassMetadataVisitor.h"
 #include "Explosion.h"
 #include "GenDecl.h"
 #include "GenClass.h"
 #include "GenHeap.h"
 #include "GenOpaque.h"
+#include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -171,6 +173,65 @@ void IRGenModule::emitMethodLookupFunction(ClassDecl *classDecl) {
   auto *description = getAddrOfTypeContextDescriptor(classDecl,
                                                      RequireMetadata);
 
+  // Check for lookups of nonoverridden methods first.
+  class LookUpNonoverriddenMethods
+    : public ClassMetadataScanner<LookUpNonoverriddenMethods> {
+  
+    IRGenFunction &IGF;
+    llvm::Value *methodArg;
+      
+  public:
+    LookUpNonoverriddenMethods(IRGenFunction &IGF,
+                               ClassDecl *classDecl,
+                               llvm::Value *methodArg)
+      : ClassMetadataScanner(IGF.IGM, classDecl), IGF(IGF),
+        methodArg(methodArg) {}
+      
+    void noteNonoverriddenMethod(SILDeclRef method) {
+      // The method lookup function would be used only for `super.` calls
+      // from other modules, so we only need to look at public-visibility
+      // methods here.
+      if (!hasPublicVisibility(method.getLinkage(NotForDefinition))) {
+        return;
+      }
+      
+      auto methodDesc = IGM.getAddrOfMethodDescriptor(method, NotForDefinition);
+      
+      auto isMethod = IGF.Builder.CreateICmpEQ(methodArg, methodDesc);
+      
+      auto falseBB = IGF.createBasicBlock("");
+      auto trueBB = IGF.createBasicBlock("");
+
+      IGF.Builder.CreateCondBr(isMethod, trueBB, falseBB);
+      
+      IGF.Builder.emitBlock(trueBB);
+      // Since this method is nonoverridden, we can produce a static result.
+      auto entry = VTable->getEntry(IGM.getSILModule(), method);
+      llvm::Value *impl = IGM.getAddrOfSILFunction(entry->getImplementation(),
+                                                   NotForDefinition);
+      // Sign using the discriminator we would include in the method
+      // descriptor.
+      if (auto &schema = IGM.getOptions().PointerAuth.SwiftClassMethods) {
+        auto discriminator =
+          PointerAuthInfo::getOtherDiscriminator(IGM, schema, method);
+        
+        impl = emitPointerAuthSign(IGF, impl,
+                            PointerAuthInfo(schema.getKey(), discriminator));
+      }
+      impl = IGF.Builder.CreateBitCast(impl, IGM.Int8PtrTy);
+      IGF.Builder.CreateRet(impl);
+      
+      IGF.Builder.emitBlock(falseBB);
+      // Continue emission on the false branch.
+    }
+      
+    void noteResilientSuperclass() {}
+    void noteStartOfImmediateMembers(ClassDecl *clas) {}
+  };
+  
+  LookUpNonoverriddenMethods(IGF, classDecl, method).layout();
+  
+  // Use the runtime to look up vtable entries.
   auto *result = IGF.Builder.CreateCall(getLookUpClassMethodFn(),
                                         {metadata, method, description});
   IGF.Builder.CreateRet(result);

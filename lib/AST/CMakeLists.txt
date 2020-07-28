@@ -5,7 +5,7 @@ else()
   set(SWIFTAST_LLVM_LINK_COMPONENTS
     bitreader bitwriter coroutines coverage irreader debuginfoDWARF
     profiledata instrumentation object objcarcopts mc mcparser
-    bitreader bitwriter lto ipo option core support ${LLVM_TARGETS_TO_BUILD}
+    bitreader bitwriter lto ipo option core support remarks ${LLVM_TARGETS_TO_BUILD}
   )
 endif()
 

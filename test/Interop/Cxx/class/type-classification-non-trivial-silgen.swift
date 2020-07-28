@@ -12,7 +12,7 @@ public func testStructWithDestructor() {
   let d = StructWithDestructor()
 }
 
-// Make sure that "HasMemberWithDestructor" is marked as non-trivial by checking
+// Make sure that "StructWithSubobjectDestructor" is marked as non-trivial by checking
 // for a "destroy_addr".
 // CHECK-LABEL: @$s4main33testStructWithSubobjectDestructoryyF
 // CHECK: [[AS:%.*]] = alloc_stack $StructWithSubobjectDestructor

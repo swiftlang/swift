@@ -39,3 +39,6 @@ Struct _ObjectRuntimeFunctionCountersState is a new API without @available attri
 Struct _RuntimeFunctionCounters is a new API without @available attribute
 Func _swift_isImmutableCOWBuffer(_:) is a new API without @available attribute
 Func _swift_setImmutableCOWBuffer(_:_:) is a new API without @available attribute
+Func _getMetadataSection(_:) is a new API without @available attribute
+Func _getMetadataSectionCount() is a new API without @available attribute
+Func _getMetadataSectionName(_:) is a new API without @available attribute

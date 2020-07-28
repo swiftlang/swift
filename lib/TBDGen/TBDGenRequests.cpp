@@ -11,11 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/TBDGenRequests.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Subsystems.h"
 #include "swift/TBDGen/TBDGen.h"
+#include "clang/Basic/TargetInfo.h"
 #include "llvm/TextAPI/MachO/InterfaceFile.h"
 
 using namespace swift;
@@ -41,6 +44,16 @@ ModuleDecl *TBDGenDescriptor::getParentModule() const {
   if (auto *module = Input.dyn_cast<ModuleDecl *>())
     return module;
   return Input.get<FileUnit *>()->getParentModule();
+}
+
+const llvm::DataLayout &TBDGenDescriptor::getDataLayout() const {
+  auto &ctx = getParentModule()->getASTContext();
+  auto *clang = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+  return clang->getTargetInfo().getDataLayout();
+}
+
+const llvm::Triple &TBDGenDescriptor::getTarget() const {
+  return getParentModule()->getASTContext().LangOpts.Target;
 }
 
 bool TBDGenDescriptor::operator==(const TBDGenDescriptor &other) const {

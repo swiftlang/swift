@@ -411,7 +411,7 @@ llvm::ErrorOr<ModuleDependencies> SerializedModuleLoaderBase::scanModuleFile(
     if (dotPos != std::string::npos)
       moduleName = moduleName.slice(0, dotPos);
 
-    dependencies.addModuleDependency(moduleName, addedModuleNames);
+    dependencies.addModuleDependency(moduleName, &addedModuleNames);
   }
 
   return std::move(dependencies);

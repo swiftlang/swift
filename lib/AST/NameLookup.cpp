@@ -819,13 +819,12 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
                           SmallVectorImpl<ModuleDecl *> &modulesFound,
                           bool &anyObject);
 
-SelfBounds
-SelfBoundsFromWhereClauseRequest::evaluate(
+SelfBounds SelfBoundsFromWhereClauseRequest::evaluate(
     Evaluator &evaluator,
-    llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl) const {
-  auto *typeDecl = decl.dyn_cast<TypeDecl *>();
-  auto *protoDecl = dyn_cast_or_null<ProtocolDecl>(typeDecl);
-  auto *extDecl = decl.dyn_cast<ExtensionDecl *>();
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl) const {
+  auto *typeDecl = decl.dyn_cast<const TypeDecl *>();
+  auto *protoDecl = dyn_cast_or_null<const ProtocolDecl>(typeDecl);
+  auto *extDecl = decl.dyn_cast<const ExtensionDecl *>();
 
   DeclContext *dc = protoDecl ? (DeclContext *)protoDecl : (DeclContext *)extDecl;
 
@@ -880,9 +879,9 @@ SelfBoundsFromWhereClauseRequest::evaluate(
 }
 
 SelfBounds swift::getSelfBoundsFromWhereClause(
-    llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl) {
-  auto *typeDecl = decl.dyn_cast<TypeDecl *>();
-  auto *extDecl = decl.dyn_cast<ExtensionDecl *>();
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl) {
+  auto *typeDecl = decl.dyn_cast<const TypeDecl *>();
+  auto *extDecl = decl.dyn_cast<const ExtensionDecl *>();
   auto &ctx = typeDecl ? typeDecl->getASTContext()
                        : extDecl->getASTContext();
   return evaluateOrDefault(ctx.evaluator,
@@ -2139,18 +2138,18 @@ static DirectlyReferencedTypeDecls directReferencesForType(Type type) {
 
 DirectlyReferencedTypeDecls InheritedDeclsReferencedRequest::evaluate(
     Evaluator &evaluator,
-    llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
     unsigned index) const {
 
   // Prefer syntactic information when we have it.
-  TypeLoc &typeLoc = getInheritedTypeLocAtIndex(decl, index);
+  const TypeLoc &typeLoc = getInheritedTypeLocAtIndex(decl, index);
   if (auto typeRepr = typeLoc.getTypeRepr()) {
     // Figure out the context in which name lookup will occur.
     DeclContext *dc;
-    if (auto typeDecl = decl.dyn_cast<TypeDecl *>())
+    if (auto typeDecl = decl.dyn_cast<const TypeDecl *>())
       dc = typeDecl->getInnermostDeclContext();
     else
-      dc = decl.get<ExtensionDecl *>();
+      dc = (DeclContext *)decl.get<const ExtensionDecl *>();
 
     return directReferencesForTypeRepr(evaluator, dc->getASTContext(), typeRepr,
                                        dc);
@@ -2356,12 +2355,11 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
 }
 
 void swift::getDirectlyInheritedNominalTypeDecls(
-    llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-    unsigned i,
-    llvm::SmallVectorImpl<Located<NominalTypeDecl *>> &result,
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
+    unsigned i, llvm::SmallVectorImpl<Located<NominalTypeDecl *>> &result,
     bool &anyObject) {
-  auto typeDecl = decl.dyn_cast<TypeDecl *>();
-  auto extDecl = decl.dyn_cast<ExtensionDecl *>();
+  auto typeDecl = decl.dyn_cast<const TypeDecl *>();
+  auto extDecl = decl.dyn_cast<const ExtensionDecl *>();
 
   ASTContext &ctx = typeDecl ? typeDecl->getASTContext()
                              : extDecl->getASTContext();
@@ -2393,10 +2391,10 @@ void swift::getDirectlyInheritedNominalTypeDecls(
 
 SmallVector<Located<NominalTypeDecl *>, 4>
 swift::getDirectlyInheritedNominalTypeDecls(
-                        llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-                        bool &anyObject) {
-  auto typeDecl = decl.dyn_cast<TypeDecl *>();
-  auto extDecl = decl.dyn_cast<ExtensionDecl *>();
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
+    bool &anyObject) {
+  auto typeDecl = decl.dyn_cast<const TypeDecl *>();
+  auto extDecl = decl.dyn_cast<const ExtensionDecl *>();
 
   // Gather results from all of the inherited types.
   unsigned numInherited = typeDecl ? typeDecl->getInherited().size()

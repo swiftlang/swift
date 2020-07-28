@@ -832,6 +832,9 @@ NOTE(confusable_character,none,
       "%select{identifier|operator}0 '%1' contains possibly confused characters; "
       "did you mean to use '%2'?",
       (bool, StringRef, StringRef))
+NOTE(single_confusable_character,none,
+      "%select{identifier|operator}0 '%1' (%2) looks similar to '%3' (%4); did you mean '%3' (%4)?",
+      (bool, StringRef, StringRef, StringRef, StringRef))
 ERROR(cannot_find_type_in_scope,none,
       "cannot find type %0 in scope", (DeclNameRef))
 ERROR(cannot_find_type_in_scope_did_you_mean,none,
@@ -2415,6 +2418,9 @@ NOTE(multiple_override_prev,none,
 ERROR(override_unavailable, none,
       "cannot override %0 which has been marked unavailable%select{|: %1}1",
       (DeclBaseName, StringRef))
+NOTE(suggest_removing_override, none,
+     "remove 'override' modifier to declare a new %0",
+     (DeclBaseName))
 
 ERROR(override_less_available,none,
       "overriding %0 must be as available as declaration it overrides",
@@ -2439,14 +2445,14 @@ ERROR(override_of_non_open,none,
       (DescriptiveDeclKind))
 
 ERROR(method_does_not_override,none,
-      "method does not override any method from its superclass", ())
+      "method does not override any method from its %select{parent protocol|superclass}0", (bool))
 ERROR(property_does_not_override,none,
-      "property does not override any property from its superclass", ())
+      "property does not override any property from its %select{parent protocol|superclass}0", (bool))
 ERROR(subscript_does_not_override,none,
-      "subscript does not override any subscript from its superclass", ())
+      "subscript does not override any subscript from its %select{parent protocol|superclass}0", (bool))
 ERROR(initializer_does_not_override,none,
       "initializer does not override a designated initializer from its "
-      "superclass", ())
+      "%select{parent protocol|superclass}0", (bool))
 ERROR(failable_initializer_override,none,
       "failable initializer %0 cannot override a non-failable initializer",
       (DeclName))
