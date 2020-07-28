@@ -249,8 +249,7 @@ bool ConstraintLocator::isForOptionalTry() const {
 }
 
 bool ConstraintLocator::isForFunctionBuilderBodyResult() const {
-  auto elt = getFirstElementAs<LocatorPathElt::FunctionBuilderBodyResult>();
-  return elt.hasValue();
+  return isFirstElement<LocatorPathElt::FunctionBuilderBodyResult>();
 }
 
 GenericTypeParamType *ConstraintLocator::getGenericParameter() const {

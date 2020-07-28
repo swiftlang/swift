@@ -384,6 +384,14 @@ public:
     return anchor && isa<E>(anchor) && getPath().empty();
   }
 
+  /// Check whether the first element in the path of this locator (if any)
+  /// is a given \c LocatorPathElt subclass.
+  template <class T>
+  bool isFirstElement() const {
+    auto path = getPath();
+    return !path.empty() && path.front().is<T>();
+  }
+
   /// Attempts to cast the first path element of the locator to a specific
   /// \c LocatorPathElt subclass, returning \c None if either unsuccessful or
   /// the locator has no path elements.
