@@ -2097,8 +2097,9 @@ bool Lexer::lexUnknown(bool EmitDiagnosticsIfToken) {
     EncodeToUTF8(Codepoint, ConfusedChar);
     llvm::SmallString<1> ExpectedChar;
     ExpectedChar += ExpectedCodepoint;
+    auto charNames = confusable::getConfusableAndBaseCodepointNames(Codepoint);
     diagnose(CurPtr - 1, diag::lex_confusable_character, ConfusedChar,
-             ExpectedChar)
+             charNames.first, ExpectedChar, charNames.second)
         .fixItReplaceChars(getSourceLoc(CurPtr - 1), getSourceLoc(Tmp),
                            ExpectedChar);
   }

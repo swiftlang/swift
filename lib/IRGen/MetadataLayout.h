@@ -168,11 +168,34 @@ public:
 class ClassMetadataLayout : public NominalMetadataLayout {
 public:
   class MethodInfo {
-    Offset TheOffset;
+  public:
+    enum class Kind {
+      Offset,
+      DirectImpl,
+    };
+    
+  private:
+    Kind TheKind;
+    union {
+      Offset TheOffset;
+      llvm::Function *TheImpl;
+    };
   public:
     MethodInfo(Offset offset)
-      : TheOffset(offset) {}
-    Offset getOffset() const { return TheOffset; }
+      : TheKind(Kind::Offset), TheOffset(offset) {}
+    MethodInfo(llvm::Function *impl)
+      : TheKind(Kind::DirectImpl), TheImpl(impl) {}
+
+    Kind getKind() const { return TheKind; }
+    
+    Offset getOffsett() const {
+      assert(getKind() == Kind::Offset);
+      return TheOffset;
+    }
+    llvm::Function *getDirectImpl() const {
+      assert(getKind() == Kind::DirectImpl);
+      return TheImpl;
+    }
   };
 
 private:
@@ -187,8 +210,16 @@ private:
   StoredOffset InstanceAlignMask;
 
   struct StoredMethodInfo {
-    StoredOffset TheOffset;
-    StoredMethodInfo(StoredOffset offset) : TheOffset(offset) {}
+    MethodInfo::Kind TheKind;
+    union {
+      StoredOffset TheOffset;
+      llvm::Function *TheImpl;
+    };
+    StoredMethodInfo(StoredOffset offset) : TheKind(MethodInfo::Kind::Offset),
+                                            TheOffset(offset) {}
+    StoredMethodInfo(llvm::Function *impl)
+      : TheKind(MethodInfo::Kind::DirectImpl),
+        TheImpl(impl) {}
   };
   llvm::DenseMap<SILDeclRef, StoredMethodInfo> MethodInfos;
 
