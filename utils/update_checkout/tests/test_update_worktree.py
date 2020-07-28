@@ -12,9 +12,9 @@
 
 import os
 
-from scheme_mock import call_quietly
-
 from . import scheme_mock
+from .scheme_mock import call_quietly
+
 
 WORKTREE_NAME = "feature"
 
