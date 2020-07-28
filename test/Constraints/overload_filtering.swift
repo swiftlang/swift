@@ -38,14 +38,3 @@ func testUnresolvedMember(i: Int) -> X {
   // CHECK-NEXT: introducing single enabled disjunction term {{.*}} bound to decl overload_filtering.(file).X.init(_:_:)
   return .init(i, i)
 }
-
-func trailing(x: Int = 0, y: () -> Void) { }
-func trailing(x: Int = 0, z: Float) { }
-
-func testTrailing() {
-  // CHECK: disabled disjunction term {{.*}} bound to decl overload_filtering.(file).trailing(x:z:)
-  trailing() { }
-
-  // CHECK: disabled disjunction term {{.*}} bound to decl overload_filtering.(file).trailing(x:z:)
-  trailing(x: 5) { }
-}
