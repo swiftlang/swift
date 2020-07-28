@@ -133,7 +133,10 @@ public func _getTypeByMangledNameInContext(
   genericArguments: UnsafeRawPointer?)
   -> Any.Type?
 
-#if INTERNAL_CHECKS_ENABLED
+// SWIFT_ENABLE_TENSORFLOW
+// Temporarily disable `#if` check added in 014918c0cab399fc532e45cf725c3c9c0c425aa6 to
+// fix builds.
+// #if INTERNAL_CHECKS_ENABLED
 @_silgen_name("swift_getMetadataSection")
 public func _getMetadataSection(
   _ index: UInt)
@@ -147,4 +150,4 @@ public func _getMetadataSectionCount()
 public func _getMetadataSectionName(
   _ metadata_section: UnsafeRawPointer)
   -> UnsafePointer<CChar>
-#endif
+// #endif
