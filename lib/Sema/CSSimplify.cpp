@@ -7443,10 +7443,9 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
 
   // If there is a function builder to apply, do so now.
   if (functionBuilderType) {
-    auto *calleeLocator = getCalleeLocator(getConstraintLocator(locator));
     if (auto result = matchFunctionBuilder(
             closure, functionBuilderType, closureType->getResult(),
-            ConstraintKind::Conversion, calleeLocator, locator)) {
+            ConstraintKind::Conversion, locator)) {
       return result->isSuccess();
     }
   }

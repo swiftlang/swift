@@ -240,6 +240,13 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     return type->getAnyGeneric();
   };
 
+  // If the locator is for a function builder body result type, the requirement
+  // came from the function's return type.
+  if (getLocator()->isForFunctionBuilderBodyResult()) {
+    auto *func = getAsDecl<FuncDecl>(getAnchor());
+    return getAffectedDeclFromType(func->getResultInterfaceType());
+  }
+
   if (isFromContextualType())
     return getAffectedDeclFromType(getContextualType(getRawAnchor()));
 
