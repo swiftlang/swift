@@ -1189,6 +1189,12 @@ ERROR(extra_trailing_closure_in_call,none,
 ERROR(trailing_closure_bad_param,none,
       "trailing closure passed to parameter of type %0 that does not "
       "accept a closure", (Type))
+WARNING(unlabeled_trailing_closure_deprecated,none,
+        "backward matching of the unlabeled trailing closure is deprecated; label the argument with %0 to suppress this warning",
+        (Identifier))
+NOTE(decl_multiple_defaulted_closure_parameters,none,
+     "%0 contains defaulted closure parameters %1 and %2",
+     (DeclName, Identifier, Identifier))
 NOTE(candidate_with_extraneous_args,none,
       "candidate %0 requires %1 argument%s1, "
       "but %2 %select{were|was}3 %select{provided|used in closure body}4",
