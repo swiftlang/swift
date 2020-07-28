@@ -12,7 +12,7 @@ import sys
 # Python 2 `unicode` was renamed `str` in Python 3.  To consistently support
 # both, define `unicode` to be `str` when using Python 3.  Once we can drop
 # Python 2 support, delete this and change all uses of `unicode` to `str`.
-if sys.version_info[0] >= 2:
+if sys.version_info[0] >= 3:
     unicode = str
 
 
