@@ -19,7 +19,7 @@ logging.basicConfig(format='%(message)s', level=logging.INFO)
 # Python 2 support, delete this and change all uses of `unicode` to `str`.
 # (Currently, this is only here to avoid a python_lint failure from unicode
 # references below.)
-if sys.version_info[0] >= 2:
+if sys.version_info[0] >= 3:
     unicode = str
 
 
