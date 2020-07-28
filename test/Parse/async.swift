@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-async
+// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
 
 // Parsing function declarations with 'async'
 func asyncGlobal1() async { }

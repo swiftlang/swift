@@ -786,7 +786,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   FullName = DeclName(Context, SimpleName, NamePieces);
 
   // Check for the 'async' keyword.
-  if (Context.LangOpts.EnableExperimentalAsync &&
+  if (Context.LangOpts.EnableExperimentalConcurrency &&
       Tok.isContextualKeyword("async")) {
     asyncLoc = consumeToken();
   }
@@ -831,7 +831,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
 void Parser::parseAsyncThrows(
     SourceLoc existingArrowLoc, SourceLoc &asyncLoc, SourceLoc &throwsLoc,
     bool *rethrows) {
-  if (Context.LangOpts.EnableExperimentalAsync &&
+  if (Context.LangOpts.EnableExperimentalConcurrency &&
       Tok.isContextualKeyword("async")) {
     asyncLoc = consumeToken();
 
@@ -864,7 +864,7 @@ void Parser::parseAsyncThrows(
         .fixItInsert(existingArrowLoc, (keyword + " ").str());
     }
 
-    if (Context.LangOpts.EnableExperimentalAsync &&
+    if (Context.LangOpts.EnableExperimentalConcurrency &&
         Tok.isContextualKeyword("async")) {
       asyncLoc = consumeToken();
 

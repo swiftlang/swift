@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-async
+// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
 
 func doAsynchronously() async { }
 func doSynchronously() { }

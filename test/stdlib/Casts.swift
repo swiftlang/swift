@@ -13,7 +13,7 @@
 /// Contains tests for conversions between types which shouldn't trap.
 ///
 // -----------------------------------------------------------------------------
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-async)
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency)
 // REQUIRES: executable_test
 
 import StdlibUnittest

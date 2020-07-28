@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-async
+// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
 
 // Redeclaration checking
 func redecl1() async { } // expected-note{{previously declared here}}
