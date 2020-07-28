@@ -556,26 +556,13 @@ ConstraintSystem::inferBindingsFor(TypeVariableType *typeVar,
       typeVar, ConstraintGraph::GatheringKind::EquivalenceClass);
 
   llvm::SmallPtrSet<CanType, 4> exactTypes;
-  bool hasNonDependentMemberRelationalConstraints = false;
-  bool hasDependentMemberRelationalConstraints = false;
 
   for (auto *constraint : constraints) {
-    bool failed = bindings.infer(*this, exactTypes, constraint,
-                                 hasNonDependentMemberRelationalConstraints,
-                                 hasDependentMemberRelationalConstraints);
+    bool failed = bindings.infer(*this, exactTypes, constraint);
 
     // Upon inference failure let's produce an empty set of bindings.
     if (failed)
       return {typeVar};
-  }
-
-  // If there were both dependent-member and non-dependent-member relational
-  // constraints, consider this "fully bound"; we don't want to touch it.
-  if (hasDependentMemberRelationalConstraints) {
-    if (hasNonDependentMemberRelationalConstraints)
-      bindings.FullyBound = true;
-    else
-      bindings.Bindings.clear();
   }
 
   if (finalize) {
@@ -590,9 +577,7 @@ ConstraintSystem::inferBindingsFor(TypeVariableType *typeVar,
 
 Optional<ConstraintSystem::PotentialBinding>
 ConstraintSystem::getPotentialBindingForRelationalConstraint(
-    PotentialBindings &result, Constraint *constraint,
-    bool &hasDependentMemberRelationalConstraints,
-    bool &hasNonDependentMemberRelationalConstraints) const {
+    PotentialBindings &result, Constraint *constraint) const {
   assert(constraint->getClassification() ==
              ConstraintClassification::Relational &&
          "only relational constraints handled here");
@@ -675,11 +660,11 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
   if (type->is<DependentMemberType>()) {
     if (!ConstraintSystem::typeVarOccursInType(typeVar, type,
                                                &result.InvolvesTypeVariables)) {
-      hasDependentMemberRelationalConstraints = true;
+      result.FullyBound = true;
     }
+
     return None;
   }
-  hasNonDependentMemberRelationalConstraints = true;
 
   // If our binding choice is a function type and we're attempting
   // to bind to a type variable that is the result of opening a
@@ -751,8 +736,7 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
 /// those types should be opened.
 bool ConstraintSystem::PotentialBindings::infer(
     const ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &exactTypes,
-    Constraint *constraint, bool &hasNonDependentMemberRelationalConstraints,
-    bool &hasDependentMemberRelationalConstraints) {
+    Constraint *constraint) {
   switch (constraint->getKind()) {
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
@@ -777,9 +761,8 @@ bool ConstraintSystem::PotentialBindings::infer(
         constraint->getSecondType()->isEqual(TypeVar))
       PotentiallyIncomplete = true;
 
-    auto binding = cs.getPotentialBindingForRelationalConstraint(
-        *this, constraint, hasDependentMemberRelationalConstraints,
-        hasNonDependentMemberRelationalConstraints);
+    auto binding =
+        cs.getPotentialBindingForRelationalConstraint(*this, constraint);
     if (!binding)
       break;
 
@@ -870,7 +853,6 @@ bool ConstraintSystem::PotentialBindings::infer(
     if (cs.getFixedTypeRecursive(constraint->getFirstType(), true)
             ->getAs<TypeVariableType>() == TypeVar) {
       Defaults.push_back(constraint);
-      hasNonDependentMemberRelationalConstraints = true;
     }
     break;
 
@@ -904,7 +886,6 @@ bool ConstraintSystem::PotentialBindings::infer(
     // Record constraint where protocol requirement originated
     // this is useful to use for the binding later.
     Protocols.push_back(constraint);
-    hasNonDependentMemberRelationalConstraints = true;
     break;
   }
 
