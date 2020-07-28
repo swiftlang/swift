@@ -13,7 +13,7 @@ struct MagicNumber {
   int getInt() const { return 48; }
 };
 
-inline int forceInstantiating() {
+inline int forceInstantiation() {
   auto t = MagicWrapper<MagicNumber>();
   return t.callGetInt();
 }
