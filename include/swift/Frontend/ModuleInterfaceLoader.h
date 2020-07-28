@@ -162,6 +162,106 @@ public:
   ~ExplicitSwiftModuleLoader();
 };
 
+/// Information about explicitly specified Swift module files.
+struct ExplicitModuleInfo {
+  // Path of the .swiftmodule file.
+  StringRef modulePath;
+  // Path of the .swiftmoduledoc file.
+  StringRef moduleDocPath;
+  // Path of the .swiftsourceinfo file.
+  StringRef moduleSourceInfoPath;
+  // Opened buffer for the .swiftmodule file.
+  std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
+};
+
+/// Parser of explicit module maps passed into the compiler.
+//  [
+//    {
+//      "moduleName": "A",
+//      "modulePath": "A.swiftmodule",
+//      "docPath": "A.swiftdoc",
+//      "sourceInfoPath": "A.swiftsourceinfo"
+//    },
+//    {
+//      "moduleName": "B",
+//      "modulePath": "B.swiftmodule",
+//      "docPath": "B.swiftdoc",
+//      "sourceInfoPath": "B.swiftsourceinfo"
+//    }
+//  ]
+class ExplicitModuleMapParser {
+public:
+  ExplicitModuleMapParser(llvm::BumpPtrAllocator &Allocator) : Saver(Allocator) {}
+
+  std::error_code
+  parseSwiftExplicitModuleMap(llvm::StringRef fileName,
+                              llvm::StringMap<ExplicitModuleInfo> &moduleMap) {
+    using namespace llvm::yaml;
+    // Load the input file.
+    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> fileBufOrErr =
+        llvm::MemoryBuffer::getFile(fileName);
+    if (!fileBufOrErr) {
+      return std::make_error_code(std::errc::no_such_file_or_directory);
+    }
+    StringRef Buffer = fileBufOrErr->get()->getBuffer();
+    // Use a new source manager instead of the one from ASTContext because we
+    // don't want the JSON file to be persistent.
+    llvm::SourceMgr SM;
+    Stream Stream(llvm::MemoryBufferRef(Buffer, fileName), SM);
+    for (auto DI = Stream.begin(); DI != Stream.end(); ++DI) {
+      assert(DI != Stream.end() && "Failed to read a document");
+      if (auto *MN = dyn_cast_or_null<SequenceNode>(DI->getRoot())) {
+        for (auto &entry : *MN) {
+          if (parseSingleModuleEntry(entry, moduleMap)) {
+            return std::make_error_code(std::errc::invalid_argument);
+          }
+        }
+      } else {
+        return std::make_error_code(std::errc::invalid_argument);
+      }
+    }
+    return std::error_code{}; // success
+  }
+
+private:
+  StringRef getScalaNodeText(llvm::yaml::Node *N) {
+    SmallString<32> Buffer;
+    return Saver.save(cast<llvm::yaml::ScalarNode>(N)->getValue(Buffer));
+  }
+  
+  bool parseSingleModuleEntry(llvm::yaml::Node &node,
+                              llvm::StringMap<ExplicitModuleInfo> &moduleMap) {
+    using namespace llvm::yaml;
+    auto *mapNode = dyn_cast<MappingNode>(&node);
+    if (!mapNode)
+      return true;
+    StringRef moduleName;
+    ExplicitModuleInfo result;
+    for (auto &entry : *mapNode) {
+      auto key = getScalaNodeText(entry.getKey());
+      auto val = getScalaNodeText(entry.getValue());
+      if (key == "moduleName") {
+        moduleName = val;
+      } else if (key == "modulePath") {
+        result.modulePath = val;
+      } else if (key == "docPath") {
+        result.moduleDocPath = val;
+      } else if (key == "sourceInfoPath") {
+        result.moduleSourceInfoPath = val;
+      } else {
+        // Being forgiving for future fields.
+        continue;
+      }
+    }
+    if (moduleName.empty())
+      return true;
+    moduleMap[moduleName] = std::move(result);
+    return false;
+  }
+
+  llvm::StringSaver Saver;
+};
+
 struct ModuleInterfaceLoaderOptions {
   bool remarkOnRebuildFromInterface = false;
   bool disableInterfaceLock = false;
