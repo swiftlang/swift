@@ -269,6 +269,8 @@ public:
       Apply = dyn_cast<ApplyExpr>(parentExpr);
   }
 
+  SourceLoc getLoc() const override;
+
   unsigned getRequirementIndex() const {
     auto reqElt =
         getLocator()->castLastElementTo<LocatorPathElt::AnyRequirement>();

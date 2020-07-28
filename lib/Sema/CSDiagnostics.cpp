@@ -176,6 +176,13 @@ Type FailureDiagnostic::restoreGenericParameters(
   });
 }
 
+SourceLoc RequirementFailure::getLoc() const {
+  if (getLocator()->isForFunctionBuilderBodyResult())
+    return getConstraintSystem().DC->getAsDecl()->getLoc();
+
+  return FailureDiagnostic::getLoc();
+}
+
 Type RequirementFailure::getOwnerType() const {
   auto anchor = getRawAnchor();
 
@@ -249,6 +256,14 @@ ValueDecl *RequirementFailure::getDeclRef() const {
 
     return type->getAnyGeneric();
   };
+
+  // If the locator is for a function builder body result type, the requirement
+  // came from the function's return type.
+  if (getLocator()->isForFunctionBuilderBodyResult()) {
+    auto *func = dyn_cast<FuncDecl>(getConstraintSystem().DC->getAsDecl());
+    assert(getSolution().functionBuilderTransformed.count(func));
+    return getAffectedDeclFromType(func->getResultInterfaceType());
+  }
 
   if (isFromContextualType())
     return getAffectedDeclFromType(getContextualType(getRawAnchor()));
