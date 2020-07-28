@@ -133,7 +133,7 @@ public func _getTypeByMangledNameInContext(
   genericArguments: UnsafeRawPointer?)
   -> Any.Type?
 
-
+#if INTERNAL_CHECKS_ENABLED
 @_silgen_name("swift_getMetadataSection")
 public func _getMetadataSection(
   _ index: UInt)
@@ -147,4 +147,4 @@ public func _getMetadataSectionCount()
 public func _getMetadataSectionName(
   _ metadata_section: UnsafeRawPointer)
   -> UnsafePointer<CChar>
-
+#endif
