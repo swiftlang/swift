@@ -427,13 +427,13 @@ func generic_mono_subscript_set<T>(_ g: inout Generic<T>, i: Int, x: Float) {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}bound_generic_mono_phys_get
-func bound_generic_mono_phys_get(_ g: inout Generic<UnicodeScalar>, x: Int) -> Int {
+func bound_generic_mono_phys_get(_ g: inout Generic<Unicode.Scalar>, x: Int) -> Int {
   return g.mono_phys
   // CHECK: struct_element_addr %{{.*}}, #Generic.mono_phys
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s10properties26bound_generic_mono_log_get{{[_0-9a-zA-Z]*}}F
-func bound_generic_mono_log_get(_ g: Generic<UnicodeScalar>, x: Int) -> Int {
+func bound_generic_mono_log_get(_ g: Generic<Unicode.Scalar>, x: Int) -> Int {
   return g.mono_log
 // CHECK: [[GENERIC_GET_METHOD:%[0-9]+]] = function_ref @$s10properties7GenericV8mono_log{{[_0-9a-zA-Z]*}}vg
   // CHECK: apply [[GENERIC_GET_METHOD]]<

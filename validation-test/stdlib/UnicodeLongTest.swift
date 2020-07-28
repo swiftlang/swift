@@ -11,19 +11,19 @@ var UTF8Decoder = TestSuite("UTF8Decoder")
 UTF8Decoder.test("Internal/_decodeOne") {
 
   // Ensure we accept all valid scalars
-  func ensureValid(_ scalar: UnicodeScalar) {
+  func ensureValid(_ scalar: Unicode.Scalar) {
     var data: UInt32 = 0
     var i: UInt32 = 0
-    Swift.UTF8.encode(scalar) { cp in
+    Unicode.UTF8.encode(scalar) { cp in
       data |= UInt32(cp) << (i*8)
       i += 1
     }
-    let (codePoint, _) = UTF8._decodeOne(data)
+    let (codePoint, _) = Unicode.UTF8._decodeOne(data)
     expectEqual(scalar.value, codePoint, "data=\(asHex(data))")
   }
 
-  for i in 0..<0xd800 { ensureValid(UnicodeScalar(i)!) }
-  for i in 0xe000...0x10ffff { ensureValid(UnicodeScalar(i)!) }
+  for i in 0..<0xd800 { ensureValid(Unicode.Scalar(i)!) }
+  for i in 0xe000...0x10ffff { ensureValid(Unicode.Scalar(i)!) }
 
   // Check number of valid/invalid sequences of different lengths
   var validLengthCounts = [ 0, 0, 0, 0, 0 ]
@@ -34,7 +34,7 @@ UTF8Decoder.test("Internal/_decodeOne") {
     for cu0 in head {
       for rest in tail {
         let data = rest << 8 | cu0
-        let (codePoint, length) = UTF8._decodeOne(data)
+        let (codePoint, length) = Unicode.UTF8._decodeOne(data)
         if codePoint != nil {
           validLengthCounts[Int(length)] += 1
         } else {

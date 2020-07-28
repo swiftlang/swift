@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -28,13 +28,13 @@ extension Unicode.UTF8 {
   ///     let anA: Unicode.Scalar = "A"
   ///     print(anA.value)
   ///     // Prints "65"
-  ///     print(UTF8.width(anA))
+  ///     print(Unicode.UTF8.width(anA))
   ///     // Prints "1"
   ///
   ///     let anApple: Unicode.Scalar = "🍎"
   ///     print(anApple.value)
   ///     // Prints "127822"
-  ///     print(UTF8.width(anApple))
+  ///     print(Unicode.UTF8.width(anApple))
   ///     // Prints "4"
   ///
   /// - Parameter x: A Unicode scalar value.
@@ -134,8 +134,8 @@ extension Unicode.UTF8: _UnicodeEncoding {
   public static func transcode<FromEncoding: _UnicodeEncoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
   ) -> EncodedScalar? {
-    if _fastPath(FromEncoding.self == UTF16.self) {
-      let c = _identityCast(content, to: UTF16.EncodedScalar.self)
+    if _fastPath(FromEncoding.self == Unicode.UTF16.self) {
+      let c = _identityCast(content, to: Unicode.UTF16.EncodedScalar.self)
       var u0 = UInt16(truncatingIfNeeded: c._storage)
       if _fastPath(u0 < 0x80) {
         return EncodedScalar(_containing: UInt8(truncatingIfNeeded: u0))
@@ -155,8 +155,8 @@ extension Unicode.UTF8: _UnicodeEncoding {
           _biasedBits: (UInt32(u0) | r) &+ 0b0__1000_0001__1000_0001__1110_0001)
       }
     }
-    else if _fastPath(FromEncoding.self == UTF8.self) {
-      return _identityCast(content, to: UTF8.EncodedScalar.self)
+    else if _fastPath(FromEncoding.self == Unicode.UTF8.self) {
+      return _identityCast(content, to: Unicode.UTF8.EncodedScalar.self)
     }
     return encode(FromEncoding.decode(content))
   }
@@ -180,7 +180,7 @@ extension Unicode.UTF8: _UnicodeEncoding {
   }
 }
 
-extension UTF8.ReverseParser: Unicode.Parser, _UTFParser {
+extension Unicode.UTF8.ReverseParser: Unicode.Parser, _UTFParser {
   public typealias Encoding = Unicode.UTF8
   @inline(__always)
   @inlinable

@@ -10,16 +10,16 @@ protocol StringProtocol {
   mutating func append<T: StringProtocol>(other: T)
   where Content == T.Content,
   Element<UnicodeScalars> == Element<T.UnicodeScalars>,
-    Element<T.UnicodeScalars> == UnicodeScalar
+    Element<T.UnicodeScalars> == Unicode.Scalar
 }
 
 struct X : StringProtocol {
   typealias Content = Int
-  var unicodeScalars: [UnicodeScalar]
+  var unicodeScalars: [Unicode.Scalar]
 
   mutating func append<T: StringProtocol>(other: T)
   where Content == T.Content,
-    T.UnicodeScalars.Iterator.Element == UnicodeScalar
+    T.UnicodeScalars.Iterator.Element == Unicode.Scalar
   {
     print(other.unicodeScalars.first!)
   }

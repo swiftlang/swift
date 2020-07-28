@@ -31,7 +31,7 @@ A(1)
 // CHECK: c
 A(1, "2")
 
-typealias BChar = B<UnicodeScalar>
+typealias BChar = B<Unicode.Scalar>
 // CHECK: d
 BChar()
 // CHECK: e

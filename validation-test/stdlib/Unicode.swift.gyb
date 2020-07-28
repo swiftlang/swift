@@ -12,86 +12,86 @@ import StdlibCollectionUnittest
 var UTF16APIs = TestSuite("UTF16APIs")
 
 UTF16APIs.test("width") {
-  expectEqual(1, UTF16.width("x"))
-  expectEqual(2, UTF16.width("\u{101010}"))
-  expectEqual(2, UTF16.width("𝄞"))
+  expectEqual(1, Unicode.UTF16.width("x"))
+  expectEqual(2, Unicode.UTF16.width("\u{101010}"))
+  expectEqual(2, Unicode.UTF16.width("𝄞"))
 }
 
 UTF16APIs.test("leadSurrogate,trailSurrogate") {
   do {
-    let us: UnicodeScalar = "𝄞"
-    expectEqual(0xD834, UTF16.leadSurrogate(us))
-    expectEqual(0xDD1E, UTF16.trailSurrogate(us))
+    let us: Unicode.Scalar = "𝄞"
+    expectEqual(0xD834, Unicode.UTF16.leadSurrogate(us))
+    expectEqual(0xDD1E, Unicode.UTF16.trailSurrogate(us))
   }
   do {
-    let us: UnicodeScalar = "\u{10000}"
-    expectEqual(0xD800, UTF16.leadSurrogate(us))
-    expectEqual(0xDC00, UTF16.trailSurrogate(us))
+    let us: Unicode.Scalar = "\u{10000}"
+    expectEqual(0xD800, Unicode.UTF16.leadSurrogate(us))
+    expectEqual(0xDC00, Unicode.UTF16.trailSurrogate(us))
   }
   do {
-    let us: UnicodeScalar = "\u{20000}"
-    expectEqual(0xD840, UTF16.leadSurrogate(us))
-    expectEqual(0xDC00, UTF16.trailSurrogate(us))
+    let us: Unicode.Scalar = "\u{20000}"
+    expectEqual(0xD840, Unicode.UTF16.leadSurrogate(us))
+    expectEqual(0xDC00, Unicode.UTF16.trailSurrogate(us))
   }
   do {
-    let us: UnicodeScalar = "\u{80000}"
-    expectEqual(0xD9C0, UTF16.leadSurrogate(us))
-    expectEqual(0xDC00, UTF16.trailSurrogate(us))
+    let us: Unicode.Scalar = "\u{80000}"
+    expectEqual(0xD9C0, Unicode.UTF16.leadSurrogate(us))
+    expectEqual(0xDC00, Unicode.UTF16.trailSurrogate(us))
   }
   do {
-    let us: UnicodeScalar = "\u{F0000}"
-    expectEqual(0xDB80, UTF16.leadSurrogate(us))
-    expectEqual(0xDC00, UTF16.trailSurrogate(us))
+    let us: Unicode.Scalar = "\u{F0000}"
+    expectEqual(0xDB80, Unicode.UTF16.leadSurrogate(us))
+    expectEqual(0xDC00, Unicode.UTF16.trailSurrogate(us))
   }
   do {
-    let us: UnicodeScalar = "\u{100000}"
-    expectEqual(0xDBC0, UTF16.leadSurrogate(us))
-    expectEqual(0xDC00, UTF16.trailSurrogate(us))
+    let us: Unicode.Scalar = "\u{100000}"
+    expectEqual(0xDBC0, Unicode.UTF16.leadSurrogate(us))
+    expectEqual(0xDC00, Unicode.UTF16.trailSurrogate(us))
   }
   do {
-    let us: UnicodeScalar = "\u{10FFFF}"
-    expectEqual(0xDBFF, UTF16.leadSurrogate(us))
-    expectEqual(0xDFFF, UTF16.trailSurrogate(us))
+    let us: Unicode.Scalar = "\u{10FFFF}"
+    expectEqual(0xDBFF, Unicode.UTF16.leadSurrogate(us))
+    expectEqual(0xDFFF, Unicode.UTF16.trailSurrogate(us))
   }
 }
 
 UTF16APIs.test("leadSurrogate/trap/U+0000") {
-  let us: UnicodeScalar = "\u{00}"
+  let us: Unicode.Scalar = "\u{00}"
   expectCrashLater()
-  _ = UTF16.leadSurrogate(us)
+  _ = Unicode.UTF16.leadSurrogate(us)
 }
 
 UTF16APIs.test("leadSurrogate/trap/U+005A") {
-  let us: UnicodeScalar = "\u{5A}"
+  let us: Unicode.Scalar = "\u{5A}"
   expectCrashLater()
-  _ = UTF16.leadSurrogate(us)
+  _ = Unicode.UTF16.leadSurrogate(us)
 }
 
 UTF16APIs.test("leadSurrogate/trap/U+FFFF") {
-  let us: UnicodeScalar = "\u{FFFF}"
+  let us: Unicode.Scalar = "\u{FFFF}"
   expectCrashLater()
-  _ = UTF16.leadSurrogate(us)
+  _ = Unicode.UTF16.leadSurrogate(us)
 }
 
 UTF16APIs.test("trailSurrogate/trap/U+0000") {
-  let us: UnicodeScalar = "\u{00}"
+  let us: Unicode.Scalar = "\u{00}"
   expectCrashLater()
-  _ = UTF16.trailSurrogate(us)
+  _ = Unicode.UTF16.trailSurrogate(us)
 }
 
 UTF16APIs.test("trailSurrogate/trap/U+005A") {
-  let us: UnicodeScalar = "\u{5A}"
+  let us: Unicode.Scalar = "\u{5A}"
   expectCrashLater()
-  _ = UTF16.trailSurrogate(us)
+  _ = Unicode.UTF16.trailSurrogate(us)
 }
 
 UTF16APIs.test("trailSurrogate/trap/U+FFFF") {
-  let us: UnicodeScalar = "\u{FFFF}"
+  let us: Unicode.Scalar = "\u{FFFF}"
   expectCrashLater()
-  _ = UTF16.trailSurrogate(us)
+  _ = Unicode.UTF16.trailSurrogate(us)
 }
 
-func checkDecodeUTF<Codec : UnicodeCodec>(
+func checkDecodeUTF<Codec: Unicode.Encoding>(
     _ codec: Codec.Type, _ expectedHead: [UInt32],
     _ expectedRepairedTail: [UInt32], _ utfStr: [Codec.CodeUnit]
 ) -> AssertionResult {
@@ -102,7 +102,7 @@ func checkDecodeUTF<Codec : UnicodeCodec>(
     transcode(
       iterator,
       from: codec,
-      to: UTF32.self,
+      to: Unicode.UTF32.self,
       stoppingOnError: true,
       into: output)
     if expectedHead != decoded {
@@ -123,7 +123,7 @@ func checkDecodeUTF<Codec : UnicodeCodec>(
     transcode(
       iterator,
       from: codec,
-      to: UTF32.self,
+      to: Unicode.UTF32.self,
       stoppingOnError: false,
       into: output)
     if expected != decoded {
@@ -141,14 +141,14 @@ func checkDecodeUTF8(
     _ expectedHead: [UInt32],
     _ expectedRepairedTail: [UInt32], _ utf8Str: [UInt8]
 ) -> AssertionResult {
-  return checkDecodeUTF(UTF8.self, expectedHead, expectedRepairedTail, utf8Str)
+  return checkDecodeUTF(Unicode.UTF8.self, expectedHead, expectedRepairedTail, utf8Str)
 }
 
 func checkDecodeUTF16(
     _ expectedHead: [UInt32],
     _ expectedRepairedTail: [UInt32], _ utf16Str: [UInt16]
 ) -> AssertionResult {
-  return checkDecodeUTF(UTF16.self, expectedHead, expectedRepairedTail,
+  return checkDecodeUTF(Unicode.UTF16.self, expectedHead, expectedRepairedTail,
       utf16Str)
 }
 
@@ -156,7 +156,7 @@ func checkDecodeUTF32(
     _ expectedHead: [UInt32],
     _ expectedRepairedTail: [UInt32], _ utf32Str: [UInt32]
 ) -> AssertionResult {
-  return checkDecodeUTF(UTF32.self, expectedHead, expectedRepairedTail,
+  return checkDecodeUTF(Unicode.UTF32.self, expectedHead, expectedRepairedTail,
       utf32Str)
 }
 
@@ -167,8 +167,8 @@ func checkEncodeUTF8(_ expected: [UInt8],
   let iterator = scalars.makeIterator()
   let hadError = transcode(
     iterator,
-    from: UTF32.self,
-    to: UTF8.self,
+    from: Unicode.UTF32.self,
+    to: Unicode.UTF8.self,
     stoppingOnError: true,
     into: output)
   expectFalse(hadError)
@@ -187,29 +187,29 @@ var UnicodeScalarTests = TestSuite("UnicodeScalarTests")
 UnicodeScalarTests.test("literal") {
   do {
     // U+0041 LATIN CAPITAL LETTER A
-    let us: UnicodeScalar = "A"
+    let us: Unicode.Scalar = "A"
     expectEqual(0x0041, us.value)
   }
 
   do {
     // U+3042 HIRAGANA LETTER A
-    let us: UnicodeScalar = "あ"
+    let us: Unicode.Scalar = "あ"
     expectEqual(0x3042, us.value)
   }
 
   do {
     // U+4F8B CJK UNIFIED IDEOGRAPH-4F8B
-    let us: UnicodeScalar = "例"
+    let us: Unicode.Scalar = "例"
     expectEqual(0x4F8B, us.value)
   }
 }
 
 UnicodeScalarTests.test("init") {
-  expectEqual("f", UnicodeScalar(102))
-  expectEqual("g", UnicodeScalar(UInt32(103)))
-  expectEqual("h", UnicodeScalar(UInt16(104)))
-  expectEqual("i", UnicodeScalar(UInt8(105)))
-  expectEqual(nil, UnicodeScalar(UInt32(0xD800)))
+  expectEqual("f", Unicode.Scalar(102))
+  expectEqual("g", Unicode.Scalar(UInt32(103)))
+  expectEqual("h", Unicode.Scalar(UInt16(104)))
+  expectEqual("i", Unicode.Scalar(UInt8(105)))
+  expectEqual(nil, Unicode.Scalar(UInt32(0xD800)))
 }
 
 var UTF8Decoder = TestSuite("UTF8Decoder")
@@ -1305,10 +1305,10 @@ var UTF16Decoder = TestSuite("UTF16Decoder")
 
 UTF16Decoder.test("UTF16.transcodedLength") {
   do {
-    var u8: [UTF8.CodeUnit] = [ 0, 1, 2, 3, 4, 5 ]
-    let (count, isASCII) = UTF16.transcodedLength(
+    var u8: [Unicode.UTF8.CodeUnit] = [ 0, 1, 2, 3, 4, 5 ]
+    let (count, isASCII) = Unicode.UTF16.transcodedLength(
       of: u8.makeIterator(),
-      decodedAs: UTF8.self,
+      decodedAs: Unicode.UTF8.self,
       repairingIllFormedSequences: false)!
     expectEqual(6, count)
     expectTrue(isASCII)
@@ -1316,20 +1316,20 @@ UTF16Decoder.test("UTF16.transcodedLength") {
 
   do {
     // "€" == U+20AC.
-    var u8: [UTF8.CodeUnit] = [ 0xF0, 0xA4, 0xAD, 0xA2 ]
-    let (count, isASCII) = UTF16.transcodedLength(
+    var u8: [Unicode.UTF8.CodeUnit] = [ 0xF0, 0xA4, 0xAD, 0xA2 ]
+    let (count, isASCII) = Unicode.UTF16.transcodedLength(
       of: u8.makeIterator(),
-      decodedAs: UTF8.self,
+      decodedAs: Unicode.UTF8.self,
       repairingIllFormedSequences: false)!
     expectEqual(2, count)
     expectFalse(isASCII)
   }
 
   do {
-    let u16: [UTF16.CodeUnit] = [ 6, 7, 8, 9, 10, 11 ]
-    let (count, isASCII) = UTF16.transcodedLength(
+    let u16: [Unicode.UTF16.CodeUnit] = [ 6, 7, 8, 9, 10, 11 ]
+    let (count, isASCII) = Unicode.UTF16.transcodedLength(
       of: u16.makeIterator(),
-      decodedAs: UTF16.self,
+      decodedAs: Unicode.UTF16.self,
       repairingIllFormedSequences: false)!
     expectEqual(6, count)
     expectTrue(isASCII)
@@ -1514,8 +1514,8 @@ UnicodeAPIs.test("transcode/MutableArray") {
   let output: (UInt16) -> Void = { transcoded.append($0) }
   transcode(
     input.makeIterator(),
-    from: UTF16.self,
-    to: UTF16.self,
+    from: Unicode.UTF16.self,
+    to: Unicode.UTF16.self,
     stoppingOnError: true,
     into: output)
   expectEqual(input, transcoded)
@@ -1527,8 +1527,8 @@ UnicodeAPIs.test("transcode/ReferenceTypedArray") {
   let output: (UInt16) -> Void = { transcoded.append($0) }
   transcode(
     input.makeIterator(),
-    from: UTF16.self,
-    to: UTF16.self,
+    from: Unicode.UTF16.self,
+    to: Unicode.UTF16.self,
     stoppingOnError: true,
     into: output)
   expectEqual(input, transcoded)
@@ -1559,8 +1559,8 @@ class NonContiguousNSString : NSString {
     let iterator = utf8.makeIterator()
     let hadError = transcode(
       iterator,
-      from: UTF8.self,
-      to: UTF16.self,
+      from: Unicode.UTF8.self,
+      to: Unicode.UTF16.self,
       stoppingOnError: true,
       into: output)
     expectFalse(hadError)
@@ -1580,8 +1580,8 @@ class NonContiguousNSString : NSString {
     let iterator = scalars.makeIterator()
     let hadError = transcode(
       iterator,
-      from: UTF32.self,
-      to: UTF16.self,
+      from: Unicode.UTF32.self,
+      to: Unicode.UTF16.self,
       stoppingOnError: true,
       into: output)
     expectFalse(hadError)
@@ -1652,8 +1652,8 @@ StringCookedViews.test("UTF8ForContiguousUTF16").forEach(in: utfTests) {
   var iterator = test.utf32.makeIterator()
   transcode(
     iterator,
-    from: UTF32.self,
-    to: UTF16.self,
+    from: Unicode.UTF32.self,
+    to: Unicode.UTF16.self,
     stoppingOnError: false,
     into: output)
 
@@ -1679,8 +1679,8 @@ StringCookedViews.test("UTF8ForContiguousUTF16/StringsWithUnpairedSurrogates") {
     var iterator = expectedScalars.makeIterator()
     transcode(
       iterator,
-      from: UTF32.self,
-      to: UTF8.self,
+      from: Unicode.UTF32.self,
+      to: Unicode.UTF8.self,
       stoppingOnError: false,
       into: output)
 
@@ -1729,8 +1729,8 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16/fromUTF16").forEach(in: utfTes
   var expectedScalars = test.utf32 + test.utf32RepairedTail
   transcode(
     expectedScalars.makeIterator(),
-    from: UTF32.self,
-    to: UTF8.self,
+    from: Unicode.UTF32.self,
+    to: Unicode.UTF8.self,
     stoppingOnError: false,
     into: { expected.append($0) })
 
@@ -1749,8 +1749,8 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16/utf16Tests"){
       var iterator = expectedScalars.makeIterator()
       transcode(
         iterator,
-        from: UTF32.self,
-        to: UTF8.self,
+        from: Unicode.UTF32.self,
+        to: Unicode.UTF8.self,
         stoppingOnError: false,
         into: output)
 
@@ -1823,8 +1823,8 @@ StringCookedViews.test("UTF16").forEach(in: utfTests) {
   var iterator = expectedScalars.makeIterator()
   transcode(
     iterator,
-    from: UTF32.self,
-    to: UTF16.self,
+    from: Unicode.UTF32.self,
+    to: Unicode.UTF16.self,
     stoppingOnError: false,
     into: output)
 
@@ -1841,8 +1841,8 @@ StringCookedViews.test("UTF16/StringsWithUnpairedSurrogates") {
     var iterator = expectedScalars.makeIterator()
     transcode(
       iterator,
-      from: UTF32.self,
-      to: UTF16.self,
+      from: Unicode.UTF32.self,
+      to: Unicode.UTF16.self,
       stoppingOnError: false,
       into: output)
 
@@ -1862,7 +1862,7 @@ StringCookedViews.test("UnicodeScalars/StringsWithUnpairedSurrogates") {
   forStringsWithUnpairedSurrogates {
     (test: UTF16Test, subject: String) -> Void in
     let expectedScalars = (test.scalarsHead + test.scalarsRepairedTail).map {
-      UnicodeScalar($0)!
+      Unicode.Scalar($0)!
     }
     checkBidirectionalCollection(
       expectedScalars, subject.unicodeScalars)
@@ -1893,9 +1893,9 @@ let nullOffsetTests = [
 let NullCodeUnitOffsetTests = TestSuite("NullCodeUnitOffsetTests")
 
 % for (Encoding, View) in [
-%   ('UTF8', 'utf8'),
-%   ('UTF16', 'utf16'),
-%   ('UTF32', 'unicodeScalars.map{ $0.value }')
+%   ('Unicode.UTF8', 'utf8'),
+%   ('Unicode.UTF16', 'utf16'),
+%   ('Unicode.UTF32', 'unicodeScalars.map{ $0.value }')
 % ]:
 
 NullCodeUnitOffsetTests.test("${Encoding}._nullCodeUnitOffset(in:)") {

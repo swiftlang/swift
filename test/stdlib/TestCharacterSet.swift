@@ -1,4 +1,4 @@
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -21,9 +21,9 @@ class TestCharacterSetSuper { }
 #endif
 
 class TestCharacterSet : TestCharacterSetSuper {
-    let capitalA = UnicodeScalar(0x0041)! // LATIN CAPITAL LETTER A
-    let capitalB = UnicodeScalar(0x0042)! // LATIN CAPITAL LETTER B
-    let capitalC = UnicodeScalar(0x0043)! // LATIN CAPITAL LETTER C
+    let capitalA = Unicode.Scalar(0x0041)! // LATIN CAPITAL LETTER A
+    let capitalB = Unicode.Scalar(0x0042)! // LATIN CAPITAL LETTER B
+    let capitalC = Unicode.Scalar(0x0043)! // LATIN CAPITAL LETTER C
     
     func testBasicConstruction() {
         // Create a character set
@@ -87,14 +87,14 @@ class TestCharacterSet : TestCharacterSetSuper {
 
     func testRanges() {
         // Simple range check
-        let asciiUppercase = CharacterSet(charactersIn: UnicodeScalar(0x41)!...UnicodeScalar(0x5A)!)
-        expectTrue(asciiUppercase.contains(UnicodeScalar(0x49)!))
-        expectTrue(asciiUppercase.contains(UnicodeScalar(0x5A)!))
-        expectTrue(asciiUppercase.contains(UnicodeScalar(0x41)!))
-        expectTrue(!asciiUppercase.contains(UnicodeScalar(0x5B)!))
+        let asciiUppercase = CharacterSet(charactersIn: Unicode.Scalar(0x41)!...Unicode.Scalar(0x5A)!)
+        expectTrue(asciiUppercase.contains(Unicode.Scalar(0x49)!))
+        expectTrue(asciiUppercase.contains(Unicode.Scalar(0x5A)!))
+        expectTrue(asciiUppercase.contains(Unicode.Scalar(0x41)!))
+        expectTrue(!asciiUppercase.contains(Unicode.Scalar(0x5B)!))
         
         // Some string filtering tests
-        let asciiLowercase = CharacterSet(charactersIn: UnicodeScalar(0x61)!...UnicodeScalar(0x7B)!)
+        let asciiLowercase = CharacterSet(charactersIn: Unicode.Scalar(0x61)!...Unicode.Scalar(0x7B)!)
         let testString = "helloHELLOhello"
         let expected = "HELLO"
         
@@ -103,8 +103,8 @@ class TestCharacterSet : TestCharacterSetSuper {
     }
 
     func testClosedRanges_SR_2988() {
-      // "CharacterSet.insert(charactersIn: ClosedRange) crashes on a closed ClosedRange<UnicodeScalar> containing U+D7FF"
-      let problematicChar = UnicodeScalar(0xD7FF)!
+      // "CharacterSet.insert(charactersIn: ClosedRange) crashes on a closed ClosedRange<Unicode.Scalar> containing U+D7FF"
+      let problematicChar = Unicode.Scalar(0xD7FF)!
       let range = capitalA...problematicChar
       var characters = CharacterSet(charactersIn: range) // this should not crash
       expectTrue(characters.contains(problematicChar))
@@ -116,7 +116,7 @@ class TestCharacterSet : TestCharacterSetSuper {
 
     func testUpperBoundaryInsert_SR_2988() {
       // "CharacterSet.insert(_: Unicode.Scalar) crashes on U+D7FF"
-      let problematicChar = UnicodeScalar(0xD7FF)!
+      let problematicChar = Unicode.Scalar(0xD7FF)!
       var characters = CharacterSet()
       characters.insert(problematicChar) // this should not crash
       expectTrue(characters.contains(problematicChar))
@@ -125,26 +125,26 @@ class TestCharacterSet : TestCharacterSetSuper {
     }
 
     func testInsertAndRemove() {
-        var asciiUppercase = CharacterSet(charactersIn: UnicodeScalar(0x41)!...UnicodeScalar(0x5A)!)
-        expectTrue(asciiUppercase.contains(UnicodeScalar(0x49)!))
-        expectTrue(asciiUppercase.contains(UnicodeScalar(0x5A)!))
-        expectTrue(asciiUppercase.contains(UnicodeScalar(0x41)!))
+        var asciiUppercase = CharacterSet(charactersIn: Unicode.Scalar(0x41)!...Unicode.Scalar(0x5A)!)
+        expectTrue(asciiUppercase.contains(Unicode.Scalar(0x49)!))
+        expectTrue(asciiUppercase.contains(Unicode.Scalar(0x5A)!))
+        expectTrue(asciiUppercase.contains(Unicode.Scalar(0x41)!))
         
-        asciiUppercase.remove(UnicodeScalar(0x49)!)
-        expectTrue(!asciiUppercase.contains(UnicodeScalar(0x49)!))
-        expectTrue(asciiUppercase.contains(UnicodeScalar(0x5A)!))
-        expectTrue(asciiUppercase.contains(UnicodeScalar(0x41)!))
+        asciiUppercase.remove(Unicode.Scalar(0x49)!)
+        expectTrue(!asciiUppercase.contains(Unicode.Scalar(0x49)!))
+        expectTrue(asciiUppercase.contains(Unicode.Scalar(0x5A)!))
+        expectTrue(asciiUppercase.contains(Unicode.Scalar(0x41)!))
        
 
         // Zero-length range
-        asciiUppercase.remove(charactersIn: UnicodeScalar(0x41)!..<UnicodeScalar(0x41)!)
-        expectTrue(asciiUppercase.contains(UnicodeScalar(0x41)!))
+        asciiUppercase.remove(charactersIn: Unicode.Scalar(0x41)!..<Unicode.Scalar(0x41)!)
+        expectTrue(asciiUppercase.contains(Unicode.Scalar(0x41)!))
 
-        asciiUppercase.remove(charactersIn: UnicodeScalar(0x41)!..<UnicodeScalar(0x42)!)
-        expectTrue(!asciiUppercase.contains(UnicodeScalar(0x41)!))
+        asciiUppercase.remove(charactersIn: Unicode.Scalar(0x41)!..<Unicode.Scalar(0x42)!)
+        expectTrue(!asciiUppercase.contains(Unicode.Scalar(0x41)!))
         
         asciiUppercase.remove(charactersIn: "Z")
-        expectTrue(!asciiUppercase.contains(UnicodeScalar(0x5A)))
+        expectTrue(!asciiUppercase.contains(Unicode.Scalar(0x5A)))
     }
     
     func testBasics() {

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -115,7 +115,7 @@ extension String.UTF8View {
 extension String.UTF8View: BidirectionalCollection {
   public typealias Index = String.Index
 
-  public typealias Element = UTF8.CodeUnit
+  public typealias Element = Unicode.UTF8.CodeUnit
 
   /// The position of the first code unit if the UTF-8 view is
   /// nonempty.
@@ -206,7 +206,7 @@ extension String.UTF8View: BidirectionalCollection {
   /// - Parameter position: A valid index of the view. `position`
   ///   must be less than the view's end index.
   @inlinable @inline(__always)
-  public subscript(i: Index) -> UTF8.CodeUnit {
+  public subscript(i: Index) -> Unicode.UTF8.CodeUnit {
     String(_guts)._boundsCheck(i)
     if _fastPath(_guts.isFastUTF8) {
       return _guts.withFastUTF8 { utf8 in utf8[_unchecked: i._encodedOffset] }
@@ -419,7 +419,7 @@ extension String.UTF8View {
 
     let (scalar, scalarLen) = _guts.foreignErrorCorrectedScalar(
       startingAt: idx.strippingTranscoding)
-    let utf8Len = UTF8.width(scalar)
+    let utf8Len = Unicode.UTF8.width(scalar)
 
     if utf8Len == 1 {
       _internalInvariant(idx.transcodedOffset == 0)
@@ -450,7 +450,7 @@ extension String.UTF8View {
 
     let (scalar, scalarLen) = _guts.foreignErrorCorrectedScalar(
       endingAt: idx.strippingTranscoding)
-    let utf8Len = UTF8.width(scalar)
+    let utf8Len = Unicode.UTF8.width(scalar)
     return idx.encoded(
       offsetBy: -scalarLen
     ).transcoded(withOffset: utf8Len &- 1)
@@ -458,7 +458,7 @@ extension String.UTF8View {
 
   @usableFromInline @inline(never)
   @_effects(releasenone)
-  internal func _foreignSubscript(position idx: Index) -> UTF8.CodeUnit {
+  internal func _foreignSubscript(position idx: Index) -> Unicode.UTF8.CodeUnit {
     _internalInvariant(_guts.isForeign)
 
     let idx = _utf8AlignForeignIndex(idx)

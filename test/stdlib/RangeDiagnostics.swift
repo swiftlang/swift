@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -144,8 +144,8 @@ func typeInference_commonTypes() {
     expectType(Range<Character>.self, &range)
   }
   do {
-    var range = UnicodeScalar("a")..<"z"
-    expectType(Range<UnicodeScalar>.self, &range)
+    var range = Unicode.Scalar("a")..<"z"
+    expectType(Range<Unicode.Scalar>.self, &range)
   }
   do {
     let s = ""
@@ -225,8 +225,8 @@ func typeInference_commonTypes() {
     expectType(ClosedRange<Character>.self, &range)
   }
   do {
-    var range = UnicodeScalar("a")..."z"
-    expectType(ClosedRange<UnicodeScalar>.self, &range)
+    var range = Unicode.Scalar("a")..."z"
+    expectType(ClosedRange<Unicode.Scalar>.self, &range)
   }
   do {
     let s = ""

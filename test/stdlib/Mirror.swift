@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1772,7 +1772,7 @@ mirrors.test("Character/Mirror") {
 mirrors.test("UnicodeScalar") {
   do {
     // U+0061 LATIN SMALL LETTER A
-    let input: UnicodeScalar = "\u{61}"
+    let input: Unicode.Scalar = "\u{61}"
     var output = ""
     dump(input, to: &output)
 
@@ -1784,7 +1784,7 @@ mirrors.test("UnicodeScalar") {
 
   do {
     // U+304B HIRAGANA LETTER KA
-    let input: UnicodeScalar = "\u{304b}"
+    let input: Unicode.Scalar = "\u{304b}"
     var output = ""
     dump(input, to: &output)
 
@@ -1796,7 +1796,7 @@ mirrors.test("UnicodeScalar") {
 
   do {
     // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
-    let input: UnicodeScalar = "\u{3099}"
+    let input: Unicode.Scalar = "\u{3099}"
     var output = ""
     dump(input, to: &output)
 
@@ -1808,7 +1808,7 @@ mirrors.test("UnicodeScalar") {
 
   do {
     // U+1F425 FRONT-FACING BABY CHICK
-    let input: UnicodeScalar = "\u{1f425}"
+    let input: Unicode.Scalar = "\u{1f425}"
     var output = ""
     dump(input, to: &output)
 

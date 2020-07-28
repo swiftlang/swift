@@ -22,14 +22,14 @@ extension String {
 StringCreateTests.test("String(decoding:as:)") {
   func validateDecodingAs(_ str: String) {
     // Non-contiguous (maybe) storage
-    expectEqual(str, String(decoding: str.utf8, as: UTF8.self))
-    expectEqual(str, String(decoding: str.utf16, as: UTF16.self))
-    expectEqual(str, String(decoding: str.utf32, as: UTF32.self))
+    expectEqual(str, String(decoding: str.utf8, as: Unicode.UTF8.self))
+    expectEqual(str, String(decoding: str.utf16, as: Unicode.UTF16.self))
+    expectEqual(str, String(decoding: str.utf32, as: Unicode.UTF32.self))
 
     // Contiguous storage
-    expectEqual(str, String(decoding: Array(str.utf8), as: UTF8.self))
-    expectEqual(str, String(decoding: Array(str.utf16), as: UTF16.self))
-    expectEqual(str, String(decoding: Array(str.utf32), as: UTF32.self))
+    expectEqual(str, String(decoding: Array(str.utf8), as: Unicode.UTF8.self))
+    expectEqual(str, String(decoding: Array(str.utf16), as: Unicode.UTF16.self))
+    expectEqual(str, String(decoding: Array(str.utf32), as: Unicode.UTF32.self))
 
   }
 
@@ -39,11 +39,11 @@ StringCreateTests.test("String(decoding:as:)") {
 
   // Corner-case: UBP with null pointer (https://bugs.swift.org/browse/SR-9869)
   expectEqual(
-    "", String(decoding: UnsafeBufferPointer(_empty: ()), as: UTF8.self))
+    "", String(decoding: UnsafeBufferPointer(_empty: ()), as: Unicode.UTF8.self))
   expectEqual(
-    "", String(decoding: UnsafeBufferPointer(_empty: ()), as: UTF16.self))
+    "", String(decoding: UnsafeBufferPointer(_empty: ()), as: Unicode.UTF16.self))
   expectEqual(
-    "", String(decoding: UnsafeBufferPointer(_empty: ()), as: UTF32.self))
+    "", String(decoding: UnsafeBufferPointer(_empty: ()), as: Unicode.UTF32.self))
 }
 
 if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {

@@ -18,7 +18,7 @@ private struct Expressible
 }
 
 public func string(_ characters: UInt32...) -> String {
-  return String(characters.map { Character(UnicodeScalar($0)!) })
+  return String(characters.map { Character(Unicode.Scalar($0)!) })
 }
 private func expressible<T>(_ literal: Expressible<T>, as type: T.Type)
   -> String where T: CustomStringConvertible {

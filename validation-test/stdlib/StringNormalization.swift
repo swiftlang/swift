@@ -1,8 +1,8 @@
-//===--- StringNormalization.swift ------------------------------------------------===//
+//===--- StringNormalization.swift ----------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -38,10 +38,10 @@ private func expectEqualIterators(
   file: String = #file,
   line: UInt = #line
 ) {
-  let expectedString = String(decoding: expected, as: UTF8.self)
+  let expectedString = String(decoding: expected, as: Unicode.UTF8.self)
   let expectedCodeUnits = expectedString._nfcCodeUnits
   for (otherLabel, other) in others {
-    let otherString = String(decoding: other, as: UTF8.self)
+    let otherString = String(decoding: other, as: Unicode.UTF8.self)
     expectEqual(
       expectedCodeUnits,
       otherString._nfcCodeUnits,

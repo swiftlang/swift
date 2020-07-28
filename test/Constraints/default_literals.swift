@@ -27,7 +27,7 @@ var d = 3.5
 genericFloatingLiteral(d)
 
 extension UInt32 {
-  func asChar() -> UnicodeScalar { return UnicodeScalar(self)! }
+  func asChar() -> Unicode.Scalar { return Unicode.Scalar(self)! }
 }
 var ch = UInt32(65).asChar()
 

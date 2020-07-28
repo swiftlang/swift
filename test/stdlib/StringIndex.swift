@@ -31,12 +31,12 @@ StringIndexTests.test("basic sanity checks") {
     let utf32 = Array(s.unicodeScalars.map { $0.value })
     let subUTF32 = Array(s[...].unicodeScalars.map { $0.value })
 
-    expectEqual(s, String(decoding: utf8, as: UTF8.self))
-    expectEqual(s, String(decoding: subUTF8, as: UTF8.self))
-    expectEqual(s, String(decoding: utf16, as: UTF16.self))
-    expectEqual(s, String(decoding: subUTF16, as: UTF16.self))
-    expectEqual(s, String(decoding: utf32, as: UTF32.self))
-    expectEqual(s, String(decoding: subUTF32, as: UTF32.self))
+    expectEqual(s, String(decoding: utf8, as: Unicode.UTF8.self))
+    expectEqual(s, String(decoding: subUTF8, as: Unicode.UTF8.self))
+    expectEqual(s, String(decoding: utf16, as: Unicode.UTF16.self))
+    expectEqual(s, String(decoding: subUTF16, as: Unicode.UTF16.self))
+    expectEqual(s, String(decoding: utf32, as: Unicode.UTF32.self))
+    expectEqual(s, String(decoding: subUTF32, as: Unicode.UTF32.self))
   }
 }
 
@@ -260,7 +260,7 @@ StringIndexTests.test("Misaligned") {
         lastScalarI += 1
         continue
       }
-      expectTrue(UTF8.isContinuation(str.utf8[idx]))
+      expectTrue(Unicode.UTF8.isContinuation(str.utf8[idx]))
 
       let lastScalarIdx = scalarIndices[lastScalarI]
 
@@ -381,7 +381,7 @@ StringIndexTests.test("Exhaustive Index Interchange") {
         while curUTF8Idx < curScalarIdx {
           expect(curScalar == str.unicodeScalars[curUTF8Idx])
           expect(curSubChar == str[curUTF8Idx])
-          expect(!UTF16.isTrailSurrogate(str.utf16[curUTF8Idx]))
+          expect(!Unicode.UTF16.isTrailSurrogate(str.utf16[curUTF8Idx]))
           expect(utf8StartIdx == str[curUTF8Idx...].startIndex)
           expect(str[utf8StartIdx..<curUTF8Idx].isEmpty)
           expect(0 == str.utf16.distance(from: utf8StartIdx, to: curUTF8Idx))
@@ -400,7 +400,7 @@ StringIndexTests.test("Exhaustive Index Interchange") {
 
           expect(curScalar == str.unicodeScalars[utf8RevIdx])
           expect(curSubChar == str[utf8RevIdx])
-          expect(!UTF16.isTrailSurrogate(str.utf16[utf8RevIdx]))
+          expect(!Unicode.UTF16.isTrailSurrogate(str.utf16[utf8RevIdx]))
           expect(utf8StartIdx == str[utf8RevIdx...].startIndex)
           expect(str[utf8StartIdx..<utf8RevIdx].isEmpty)
           expect(0 == str.utf16.distance(from: utf8StartIdx, to: utf8RevIdx))
@@ -421,7 +421,7 @@ StringIndexTests.test("Exhaustive Index Interchange") {
         while curUTF16Idx < curScalarIdx {
           expect(curScalar == str.unicodeScalars[curUTF16Idx])
           expect(curSubChar == str[curUTF16Idx])
-          expect(!UTF8.isContinuation(str.utf8[curUTF16Idx]))
+          expect(!Unicode.UTF8.isContinuation(str.utf8[curUTF16Idx]))
           expect(utf16StartIdx == str[curUTF16Idx...].startIndex)
           expect(str[utf16StartIdx..<curUTF16Idx].isEmpty)
           expect(0 == str.utf8.distance(from: utf16StartIdx, to: curUTF16Idx))
@@ -440,7 +440,7 @@ StringIndexTests.test("Exhaustive Index Interchange") {
 
           expect(curScalar == str.unicodeScalars[utf16RevIdx])
           expect(curSubChar == str[utf16RevIdx])
-          expect(!UTF8.isContinuation(str.utf8[utf16RevIdx]))
+          expect(!Unicode.UTF8.isContinuation(str.utf8[utf16RevIdx]))
           expect(utf16StartIdx == str[utf16RevIdx...].startIndex)
           expect(str[utf16StartIdx..<utf16RevIdx].isEmpty)
           expect(0 == str.utf8.distance(from: utf16StartIdx, to: utf16RevIdx))

@@ -276,7 +276,7 @@ func subscript_rvalue_materialize(_ i: inout Int) {
   i = X1(stored: 0)[i]
 }
 
-func subscript_coerce(_ fn: ([UnicodeScalar], [UnicodeScalar]) -> Bool) {}
+func subscript_coerce(_ fn: ([Unicode.Scalar], [Unicode.Scalar]) -> Bool) {}
 func test_subscript_coerce() {
   subscript_coerce({ $0[$0.count-1] < $1[$1.count-1] })
 }

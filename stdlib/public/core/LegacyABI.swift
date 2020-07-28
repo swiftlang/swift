@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -30,7 +30,7 @@ internal func _isASCII(_ x: UInt8) -> Bool {
 @available(*, unavailable, renamed: "Unicode.UTF8.isContinuation")
 @inlinable
 internal func _isContinuation(_ x: UInt8) -> Bool {
-  return UTF8.isContinuation(x)
+  return Unicode.UTF8.isContinuation(x)
 }
 
 extension Substring {

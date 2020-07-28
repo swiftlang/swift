@@ -33,7 +33,7 @@ _ = ternary(true, ef, c)
 
 class X {
   init() {}
-  init(x:Int, y:UnicodeScalar) {}
+  init(x:Int, y:Unicode.Scalar) {}
 }
 
 var x0 = X()

@@ -392,7 +392,7 @@ StringTests.test("Regression/corelibs-foundation") {
     //The CRLF ("\r\n") sequence is also treated like a surrogate pair, but its constinuent
     //characters "\r" and "\n" can exist outside the pair!
 
-    let replacementCharacter = String(describing: UnicodeScalar(0xFFFD)!)
+    let replacementCharacter = String(describing: Unicode.Scalar(0xFFFD)!)
     let CR: UInt16 = 13  //carriage return
     let LF: UInt16 = 10  //new line
 

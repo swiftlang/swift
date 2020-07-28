@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -316,7 +316,7 @@ extension _StringGuts {
 
   // FIXME: Remove. Still used by swift-corelibs-foundation
   @available(*, deprecated)
-  public var startUTF16: UnsafeMutablePointer<UTF16.CodeUnit> {
+  public var startUTF16: UnsafeMutablePointer<Unicode.UTF16.CodeUnit> {
     fatalError("Not contiguous UTF-16")
   }
 }
@@ -325,7 +325,7 @@ extension _StringGuts {
 public // SPI(corelibs-foundation)
 func _persistCString(_ p: UnsafePointer<CChar>?) -> [CChar]? {
   guard let s = p else { return nil }
-  let bytesToCopy = UTF8._nullCodeUnitOffset(in: s) + 1 // +1 for the terminating NUL
+  let bytesToCopy = Unicode.UTF8._nullCodeUnitOffset(in: s) + 1 // +1 for the terminating NUL
   let result = [CChar](unsafeUninitializedCapacity: bytesToCopy) { buf, initedCount in
     buf.baseAddress!.assign(from: s, count: bytesToCopy)
     initedCount = bytesToCopy

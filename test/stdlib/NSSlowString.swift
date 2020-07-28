@@ -80,7 +80,7 @@ tests.test("Zalgo")
 	// Check that we handle absurdly long graphemes
 	var zalgo = "a👩‍👩‍👧‍👦c"
 	for combo in 0x300...0x36f {
-		zalgo.append(String(UnicodeScalar(combo)!))
+		zalgo.append(String(Unicode.Scalar(combo)!))
 	}
 	check(
 		NSSlowString(string: zalgo) as String, 

@@ -772,10 +772,10 @@ func _stdlib_getline() -> String? {
       if result.isEmpty {
         return nil
       }
-      return String(decoding: result, as: UTF8.self)
+      return String(decoding: result, as: Unicode.UTF8.self)
     }
     if c == CInt(Unicode.Scalar("\n").value) {
-      return String(decoding: result, as: UTF8.self)
+      return String(decoding: result, as: Unicode.UTF8.self)
     }
     result.append(UInt8(c))
   }

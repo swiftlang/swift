@@ -104,7 +104,7 @@ UTF8Tests.test("Contiguous Access") {
     bytes.withContiguousStorageIfAvailable {
       let slowString = NSSlowString(characters: $0.baseAddress!,
                                     length: UInt($0.count))
-      let string = String(decoding: $0, as: UTF16.self)
+      let string = String(decoding: $0, as: Unicode.UTF16.self)
       testForeignContiguous(slowString: slowString, string: string)
     }
   }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -418,7 +418,7 @@ extension Unicode.Scalar.UTF16View: RandomAccessCollection {
   /// If the collection is empty, `endIndex` is equal to `startIndex`.
   @inlinable
   public var endIndex: Int {
-    return 0 + UTF16.width(value)
+    return 0 + Unicode.UTF16.width(value)
   }
 
   /// Accesses the code unit at the specified position.
@@ -427,10 +427,10 @@ extension Unicode.Scalar.UTF16View: RandomAccessCollection {
   ///   must be a valid index of the collection that is not equal to the
   ///   `endIndex` property.
   @inlinable
-  public subscript(position: Int) -> UTF16.CodeUnit {
-    if position == 1 { return UTF16.trailSurrogate(value) }
-    if endIndex == 1 { return UTF16.CodeUnit(value.value) }
-    return UTF16.leadSurrogate(value)
+  public subscript(position: Int) -> Unicode.UTF16.CodeUnit {
+    if position == 1 { return Unicode.UTF16.trailSurrogate(value) }
+    if endIndex == 1 { return Unicode.UTF16.CodeUnit(value.value) }
+    return Unicode.UTF16.leadSurrogate(value)
   }
 }
 
@@ -464,7 +464,7 @@ extension Unicode.Scalar.UTF8View: RandomAccessCollection {
   ///
   /// If the collection is empty, `endIndex` is equal to `startIndex`.
   @inlinable
-  public var endIndex: Int { return 0 + UTF8.width(value) }
+  public var endIndex: Int { return 0 + Unicode.UTF8.width(value) }
 
   /// Accesses the code unit at the specified position.
   ///
@@ -472,7 +472,7 @@ extension Unicode.Scalar.UTF8View: RandomAccessCollection {
   ///   must be a valid index of the collection that is not equal to the
   ///   `endIndex` property.
   @inlinable
-  public subscript(position: Int) -> UTF8.CodeUnit {
+  public subscript(position: Int) -> Unicode.UTF8.CodeUnit {
     _precondition(position >= startIndex && position < endIndex,
       "Unicode.Scalar.UTF8View index is out of bounds")
     return value.withUTF8CodeUnits { $0[position] }
@@ -481,7 +481,7 @@ extension Unicode.Scalar.UTF8View: RandomAccessCollection {
 
 extension Unicode.Scalar {
   internal static var _replacementCharacter: Unicode.Scalar {
-    return Unicode.Scalar(_value: UTF32._replacementCodeUnit)
+    return Unicode.Scalar(_value: Unicode.UTF32._replacementCodeUnit)
   }
 }
 
@@ -517,7 +517,7 @@ extension Unicode.Scalar {
   internal func withUTF8CodeUnits<Result>(
     _ body: (UnsafeBufferPointer<UInt8>) throws -> Result
   ) rethrows -> Result {
-    let encodedScalar = UTF8.encode(self)!
+    let encodedScalar = Unicode.UTF8.encode(self)!
     var (codeUnits, utf8Count) = encodedScalar._bytes
 
     // The first code unit is in the least significant byte of codeUnits.

@@ -1,14 +1,14 @@
 // RUN: not %target-swift-frontend %s -typecheck
 
 //===----------------------------------------------------------------------===//
-extension UnicodeScalar {
+extension Unicode.Scalar {
   // Hack providing an efficient API that is available to the standard library
   @usableFromInline
   @inline(__always)
-  init(_unchecked x: UInt32) { self = unsafeBitCast(x, to: UnicodeScalar.self) }
+  init(_unchecked x: UInt32) { self = unsafeBitCast(x, to: Unicode.Scalar.self) }
 
-  static var replacementCharacter: UnicodeScalar {
-    return UnicodeScalar(_unchecked: 0xfffd)
+  static var replacementCharacter: Unicode.Scalar {
+    return Unicode.Scalar(_unchecked: 0xfffd)
   }
 }
 //===----------------------------------------------------------------------===//
@@ -250,7 +250,7 @@ extension UnicodeDecoder {
   public static func decode<I: IteratorProtocol>(
     _ input: inout I,
     repairingIllFormedSequences makeRepairs: Bool,
-    into output: (UnicodeScalar)->Void
+    into output: (Unicode.Scalar)->Void
   ) -> Int
   where I.Element == CodeUnit
   {
@@ -263,7 +263,7 @@ extension UnicodeDecoder {
       case .invalid:
         if !makeRepairs { return 1 }
         errors += 1
-        output(UnicodeScalar(_unchecked: 0xFFFD))
+        output(Unicode.Scalar(_unchecked: 0xFFFD))
       case .emptyInput:
         return errors
       }
@@ -324,7 +324,7 @@ extension Unicode.DefaultScalarView : Sequence {
 }
 
 extension Unicode.DefaultScalarView.Iterator : IteratorProtocol, Sequence {
-  mutating func next() -> UnicodeScalar? {
+  mutating func next() -> Unicode.Scalar? {
     return parsing.next().map {
       Encoding.ForwardDecoder.decodeOne($0)
     }
@@ -334,7 +334,7 @@ extension Unicode.DefaultScalarView.Iterator : IteratorProtocol, Sequence {
 extension Unicode.DefaultScalarView {
   struct Index {
     var codeUnitIndex: CodeUnits.Index
-    var scalar: UnicodeScalar
+    var scalar: Unicode.Scalar
     var stride: UInt8
   }
 }
@@ -364,7 +364,7 @@ extension Unicode.DefaultScalarView : Collection {
       return index(
         after: Index(
           codeUnitIndex: codeUnits.startIndex,
-          scalar: UnicodeScalar(_unchecked: 0),
+          scalar: Unicode.Scalar(_unchecked: 0),
           stride: 0)
       )
     }
@@ -375,12 +375,12 @@ extension Unicode.DefaultScalarView : Collection {
     get {
       return Index(
         codeUnitIndex: codeUnits.endIndex,
-        scalar: UnicodeScalar(_unchecked: 0),
+        scalar: Unicode.Scalar(_unchecked: 0),
         stride: 0)
     }
   }
 
-  public subscript(i: Index) -> UnicodeScalar {
+  public subscript(i: Index) -> Unicode.Scalar {
     @inline(__always) get { return i.scalar }
   }
 
@@ -401,7 +401,7 @@ extension Unicode.DefaultScalarView : Collection {
     case .invalid(let stride):
       return Index(
         codeUnitIndex: nextPosition,
-        scalar: UnicodeScalar(_unchecked: 0xfffd),
+        scalar: Unicode.Scalar(_unchecked: 0xfffd),
         stride: numericCast(stride))
     case .emptyInput:
       return endIndex
@@ -459,7 +459,7 @@ extension Unicode.DefaultScalarView : BidirectionalCollection {
       let d: Int = -numericCast(stride)
       return Index(
         codeUnitIndex: codeUnits.index(i.codeUnitIndex, offsetBy: d) ,
-        scalar: UnicodeScalar(_unchecked: 0xfffd),
+        scalar: Unicode.Scalar(_unchecked: 0xfffd),
         stride: numericCast(stride))
     case .emptyInput: fatalError("index out of bounds.")
     }
@@ -473,7 +473,7 @@ public protocol UnicodeEncoding {
     where CodeUnit == EncodedScalar.Iterator.Element
 
   static var encodedReplacementScalar : EncodedScalar { get }
-  static func decode(_ content: EncodedScalar) -> UnicodeScalar
+  static func decode(_ content: EncodedScalar) -> Unicode.Scalar
   
   associatedtype ForwardDecoder : UnicodeDecoder
   where EncodedScalar == ForwardDecoder.EncodedScalar
@@ -573,27 +573,27 @@ extension Unicode.UTF8 : UnicodeEncoding {
     public var buffer = Buffer()
   }
 
-  public static func decode(_ source: EncodedScalar) -> UnicodeScalar {
+  public static func decode(_ source: EncodedScalar) -> Unicode.Scalar {
     let bits = source._storage
     switch source._bitCount {
     case 8:
-      return UnicodeScalar(_unchecked: bits)
+      return Unicode.Scalar(_unchecked: bits)
     case 16:
       var value = (bits & 0b0_______________________11_1111__0000_0000) &>> 8
       value    |= (bits & 0b0________________________________0001_1111) &<< 6
-      return UnicodeScalar(_unchecked: value)
+      return Unicode.Scalar(_unchecked: value)
     case 24:
       var value = (bits & 0b0____________11_1111__0000_0000__0000_0000) &>> 16
       value    |= (bits & 0b0_______________________11_1111__0000_0000) &>> 2
       value    |= (bits & 0b0________________________________0000_1111) &<< 12
-      return UnicodeScalar(_unchecked: value)
+      return Unicode.Scalar(_unchecked: value)
     default:
       assert(source.count == 4)
       var value = (bits & 0b0_11_1111__0000_0000__0000_0000__0000_0000) &>> 24
       value    |= (bits & 0b0____________11_1111__0000_0000__0000_0000) &>> 10
       value    |= (bits & 0b0_______________________11_1111__0000_0000) &<< 4
       value    |= (bits & 0b0________________________________0000_0111) &<< 18
-      return UnicodeScalar(_unchecked: value)
+      return Unicode.Scalar(_unchecked: value)
     }
   }
 }
@@ -850,14 +850,14 @@ extension Unicode.UTF16 : UnicodeEncoding {
     public var buffer: Buffer
   }
 
-  public static func decode(_ source: EncodedScalar) -> UnicodeScalar {
+  public static func decode(_ source: EncodedScalar) -> Unicode.Scalar {
     let bits = source._storage
     if _fastPath(source._bitCount == 16) {
-      return UnicodeScalar(_unchecked: bits & 0xffff)
+      return Unicode.Scalar(_unchecked: bits & 0xffff)
     }
     assert(source._bitCount == 32)
     let value = 0x10000 + (bits >> 16 & 0x03ff | (bits & 0x03ff) << 10)
-    return UnicodeScalar(_unchecked: value)
+    return Unicode.Scalar(_unchecked: value)
   }  
 }
 
@@ -880,14 +880,14 @@ extension Unicode.UTF16.ForwardDecoder : _UTF16Decoder {
 import StdlibUnittest
 import SwiftPrivate
 
-func checkDecodeUTF<Codec : UnicodeCodec & UnicodeEncoding>(
+func checkDecodeUTF<Codec: Unicode.Encoding>(
     _ codec: Codec.Type, _ expectedHead: [UInt32],
     _ expectedRepairedTail: [UInt32], _ utfStr: [Codec.CodeUnit]
 ) -> AssertionResult {
   var decoded = [UInt32]()
   var expected = expectedHead
   func output(_ scalar: UInt32) { decoded.append(scalar) }
-  func output1(_ scalar: UnicodeScalar) { decoded.append(scalar.value) }
+  func output1(_ scalar: Unicode.Scalar) { decoded.append(scalar.value) }
   
   var result = assertionSuccess()
   
@@ -1047,8 +1047,8 @@ public struct UTFTest {
   public let string: String
   public let utf8: [UInt8]
   public let utf16: [UInt16]
-  public let unicodeScalars: [UnicodeScalar]
-  public let unicodeScalarsRepairedTail: [UnicodeScalar]
+  public let unicodeScalars: [Unicode.Scalar]
+  public let unicodeScalarsRepairedTail: [Unicode.Scalar]
   public let flags: Flags
   public let loc: SourceLoc
 
@@ -1072,9 +1072,9 @@ public struct UTFTest {
     self.string = string
     self.utf8 = utf8
     self.utf16 = utf16
-    self.unicodeScalars = scalars.map { UnicodeScalar($0)! }
+    self.unicodeScalars = scalars.map { Unicode.Scalar($0)! }
     self.unicodeScalarsRepairedTail =
-      scalarsRepairedTail.map { UnicodeScalar($0)! }
+      scalarsRepairedTail.map { Unicode.Scalar($0)! }
     self.flags = flags
     self.loc = SourceLoc(file, line, comment: "test data")
   }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -117,7 +117,9 @@ internal func _isNSString(_ str:AnyObject) -> Bool {
 }
 
 @_effects(readonly)
-private func _NSStringCharactersPtr(_ str: _StringSelectorHolder) -> UnsafeMutablePointer<UTF16.CodeUnit>? {
+private func _NSStringCharactersPtr(
+  _ str: _StringSelectorHolder
+) -> UnsafeMutablePointer<Unicode.UTF16.CodeUnit>? {
   return UnsafeMutablePointer(mutating: str._fastCharacterContents())
 }
 
@@ -125,7 +127,7 @@ private func _NSStringCharactersPtr(_ str: _StringSelectorHolder) -> UnsafeMutab
 @_effects(readonly)
 internal func _stdlib_binary_CFStringGetCharactersPtr(
   _ source: _CocoaString
-) -> UnsafeMutablePointer<UTF16.CodeUnit>? {
+) -> UnsafeMutablePointer<Unicode.UTF16.CodeUnit>? {
   return _NSStringCharactersPtr(_objc(source))
 }
 
@@ -133,7 +135,7 @@ internal func _stdlib_binary_CFStringGetCharactersPtr(
 private func _NSStringGetCharacters(
   from source: _StringSelectorHolder,
   range: Range<Int>,
-  into destination: UnsafeMutablePointer<UTF16.CodeUnit>
+  into destination: UnsafeMutablePointer<Unicode.UTF16.CodeUnit>
 ) {
   source.getCharacters(destination, range: _SwiftNSRange(
     location: range.startIndex,
@@ -147,7 +149,7 @@ private func _NSStringGetCharacters(
 internal func _cocoaStringCopyCharacters(
   from source: _CocoaString,
   range: Range<Int>,
-  into destination: UnsafeMutablePointer<UTF16.CodeUnit>
+  into destination: UnsafeMutablePointer<Unicode.UTF16.CodeUnit>
 ) {
   _NSStringGetCharacters(from: _objc(source), range: range, into: destination)
 }
@@ -155,14 +157,14 @@ internal func _cocoaStringCopyCharacters(
 @_effects(readonly)
 private func _NSStringGetCharacter(
   _ target: _StringSelectorHolder, _ position: Int
-) -> UTF16.CodeUnit {
+) -> Unicode.UTF16.CodeUnit {
   return target.character(at: position)
 }
 
 @_effects(readonly)
 internal func _cocoaStringSubscript(
   _ target: _CocoaString, _ position: Int
-) -> UTF16.CodeUnit {
+) -> Unicode.UTF16.CodeUnit {
   return _NSStringGetCharacter(_objc(target), position)
 }
 
@@ -676,7 +678,7 @@ internal func _NSStringFromUTF8(_ s: UnsafePointer<UInt8>, _ len: Int)
   -> AnyObject {
   return String(
     decoding: UnsafeBufferPointer(start: s, count: len),
-    as: UTF8.self
+    as: Unicode.UTF8.self
   )._bridgeToObjectiveCImpl()
 }
 

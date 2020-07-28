@@ -18,7 +18,7 @@ class Foo {
 
 func Foo1() {
     let msg = String([65, 108, 105, 103, 110].map { c in
-        Character(UnicodeScalar(c))
+        Character(Unicode.Scalar(c))
 })
 }
 

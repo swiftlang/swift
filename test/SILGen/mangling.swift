@@ -83,7 +83,7 @@ func uses_objc_class_and_protocol(o: NSObject, p: NSAnsing, p2: BetterAnsing) {}
 func uses_clang_struct(r: NSRect) {}
 
 // CHECK-LABEL: sil hidden [ossa] @$s8mangling14uses_optionals1xs7UnicodeO6ScalarVSgSiSg_tF
-func uses_optionals(x: Int?) -> UnicodeScalar? { return nil }
+func uses_optionals(x: Int?) -> Unicode.Scalar? { return nil }
 
 struct HasVarInit {
   static var state = true && false

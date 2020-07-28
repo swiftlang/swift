@@ -22,16 +22,16 @@ PrintTests.test("Printable") {
   expectPrinted("a", ch)
   expectDebugPrinted("\"a\"", ch)
 
-  let us0: UnicodeScalar = "a"
+  let us0: Unicode.Scalar = "a"
   expectPrinted("a", us0)
   expectDebugPrinted("\"a\"", us0)
 
-  let us1: UnicodeScalar = "\\"
+  let us1: Unicode.Scalar = "\\"
   expectPrinted("\\", us1)
   expectEqual("\"\\\\\"", us1.description)
   expectDebugPrinted("\"\\\\\"", us1)
 
-  let us2: UnicodeScalar = "あ"
+  let us2: Unicode.Scalar = "あ"
   expectPrinted("あ", us2)
   expectEqual("\"あ\"", us2.description)
   expectDebugPrinted("\"\\u{3042}\"", us2)

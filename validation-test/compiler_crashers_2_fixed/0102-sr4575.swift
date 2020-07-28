@@ -7,7 +7,7 @@ struct S {
 }
 
 extension S {
-  func foo<R>(_ body: (UnsafeBufferPointer<UTF16.CodeUnit>) -> R) -> R {
-    return Array(self.bar(UTF16.self)).withUnsafeBufferPointer(body)
+  func foo<R>(_ body: (UnsafeBufferPointer<Unicode.UTF16.CodeUnit>) -> R) -> R {
+    return Array(self.bar(Unicode.UTF16.self)).withUnsafeBufferPointer(body)
   }
 }

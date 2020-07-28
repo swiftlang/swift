@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,11 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Returns c as a UTF16.CodeUnit.  Meant to be used as _ascii16("x").
+/// Returns c as a Unicode.UTF16.CodeUnit.  Meant to be used as _ascii16("x").
 @inlinable
-internal func _ascii16(_ c: Unicode.Scalar) -> UTF16.CodeUnit {
+internal func _ascii16(_ c: Unicode.Scalar) -> Unicode.UTF16.CodeUnit {
   _internalInvariant(c.value >= 0 && c.value <= 0x7F, "not ASCII")
-  return UTF16.CodeUnit(c.value)
+  return Unicode.UTF16.CodeUnit(c.value)
 }
 
 @inlinable

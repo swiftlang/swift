@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -115,7 +115,7 @@ public func run_UTF8Decode(_ N: Int) {
   for _ in 1...200*N {
     for string in strings {
       var it = string.makeIterator()
-      var utf8 = UTF8()
+      var utf8 = Unicode.UTF8()
       while !isEmpty(utf8.decode(&it)) { }
     }
   }
@@ -132,7 +132,7 @@ public func run_UTF8Decode_InitFromData(_ N: Int) {
 public func run_UTF8Decode_InitDecoding(_ N: Int) {
   let input = allStringsBytes
   for _ in 0..<200*N {
-    blackHole(String(decoding: input, as: UTF8.self))
+    blackHole(String(decoding: input, as: Unicode.UTF8.self))
   }
 }
 @inline(never)
@@ -154,7 +154,7 @@ public func run_UTF8Decode_InitFromData_ascii(_ N: Int) {
 public func run_UTF8Decode_InitDecoding_ascii(_ N: Int) {
   let input = asciiBytes
   for _ in 0..<1_000*N {
-    blackHole(String(decoding: input, as: UTF8.self))
+    blackHole(String(decoding: input, as: Unicode.UTF8.self))
   }
 }
 @inline(never)
@@ -232,14 +232,14 @@ let asciiCustomNoncontiguous = CustomNoncontiguousCollection(Array(ascii.utf8))
 public func run_UTF8Decode_InitFromCustom_contiguous(_ N: Int) {
   let input = allStringsCustomContiguous
   for _ in 0..<200*N {
-    blackHole(String(decoding: input, as: UTF8.self))
+    blackHole(String(decoding: input, as: Unicode.UTF8.self))
   }
 }
 @inline(never)
 public func run_UTF8Decode_InitFromCustom_contiguous_ascii(_ N: Int) {
   let input = asciiCustomContiguous
   for _ in 0..<1_000*N {
-    blackHole(String(decoding: input, as: UTF8.self))
+    blackHole(String(decoding: input, as: Unicode.UTF8.self))
   }
 }
 @inline(never)
@@ -254,14 +254,14 @@ public func run_UTF8Decode_InitFromCustom_contiguous_ascii_as_ascii(_ N: Int) {
 public func run_UTF8Decode_InitFromCustom_noncontiguous(_ N: Int) {
   let input = allStringsCustomNoncontiguous
   for _ in 0..<200*N {
-    blackHole(String(decoding: input, as: UTF8.self))
+    blackHole(String(decoding: input, as: Unicode.UTF8.self))
   }
 }
 @inline(never)
 public func run_UTF8Decode_InitFromCustom_noncontiguous_ascii(_ N: Int) {
   let input = asciiCustomNoncontiguous
   for _ in 0..<1_000*N {
-    blackHole(String(decoding: input, as: UTF8.self))
+    blackHole(String(decoding: input, as: Unicode.UTF8.self))
   }
 }
 @inline(never)

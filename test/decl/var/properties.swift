@@ -573,13 +573,13 @@ func test_settable_of_nonsettable(_ a: Aleph) {
 
 struct MonoStruct {
   static var foo: Int = 0
-  static var (bar, bas): (String, UnicodeScalar) = ("zero", "0")
+  static var (bar, bas): (String, Unicode.Scalar) = ("zero", "0")
 
   static var zim: UInt8 {
     return 0
   }
 
-  static var zang = UnicodeScalar("\0")
+  static var zang = Unicode.Scalar("\0")
 
   static var zung: UInt16 {
     get {
@@ -616,7 +616,7 @@ protocol Proto {
   static var foo: Int { get }
 }
 
-func staticPropRefs() -> (Int, Int, String, UnicodeScalar, UInt8) {
+func staticPropRefs() -> (Int, Int, String, Unicode.Scalar, UInt8) {
   return (MonoStruct.foo, MonoEnum.foo, MonoStruct.bar, MonoStruct.bas,
           MonoStruct.zim)
 }

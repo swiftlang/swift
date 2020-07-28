@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -25,7 +25,7 @@ extension Unicode.ASCII: Unicode.Encoding {
 
   /// Returns whether the given code unit represents an ASCII scalar
   @_alwaysEmitIntoClient
-  public static func isASCII(_ x: CodeUnit) -> Bool { return UTF8.isASCII(x) }
+  public static func isASCII(_ x: CodeUnit) -> Bool { Unicode.UTF8.isASCII(x) }
 
   @inline(__always)
   @inlinable
@@ -54,13 +54,13 @@ extension Unicode.ASCII: Unicode.Encoding {
   public static func transcode<FromEncoding: Unicode.Encoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
   ) -> EncodedScalar? {
-    if _fastPath(FromEncoding.self == UTF16.self) {
-      let c = _identityCast(content, to: UTF16.EncodedScalar.self)
+    if _fastPath(FromEncoding.self == Unicode.UTF16.self) {
+      let c = _identityCast(content, to: Unicode.UTF16.EncodedScalar.self)
       guard (c._storage & 0xFF80 == 0) else { return nil }
       return EncodedScalar(CodeUnit(c._storage & 0x7f))
     }
-    else if _fastPath(FromEncoding.self == UTF8.self) {
-      let c = _identityCast(content, to: UTF8.EncodedScalar.self)
+    else if _fastPath(FromEncoding.self == Unicode.UTF8.self) {
+      let c = _identityCast(content, to: Unicode.UTF8.EncodedScalar.self)
       let first = c.first.unsafelyUnwrapped
       guard (first < 0x80) else { return nil }
       return EncodedScalar(CodeUnit(first))

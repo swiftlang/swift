@@ -149,13 +149,13 @@ CStringTests.test("String(cString:)") {
 CStringTests.test("String.decodeCString") {
   do {
     let s = getNullUTF8()
-    let result = String.decodeCString(s, as: UTF8.self)
+    let result = String.decodeCString(s, as: Unicode.UTF8.self)
     expectNil(result)
   }
   do { // repairing
     let (s, dealloc) = getIllFormedUTF8String1()
     if let (result, repairsMade) = String.decodeCString(
-      s, as: UTF8.self, repairingInvalidCodeUnits: true) {
+      s, as: Unicode.UTF8.self, repairingInvalidCodeUnits: true) {
       expectEqual("\u{41}\u{fffd}\u{fffd}\u{fffd}\u{41}", result)
       expectTrue(repairsMade)
     } else {
@@ -166,7 +166,7 @@ CStringTests.test("String.decodeCString") {
   do { // non repairing
     let (s, dealloc) = getIllFormedUTF8String1()
     let result = String.decodeCString(
-      s, as: UTF8.self, repairingInvalidCodeUnits: false)
+      s, as: Unicode.UTF8.self, repairingInvalidCodeUnits: false)
     expectNil(result)
     dealloc()
   }

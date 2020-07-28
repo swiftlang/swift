@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -27,9 +27,9 @@ import Foundation
 // CHECK: testing...
 print("testing...")
 
-let replacementUTF16: UTF16.CodeUnit = 0xFFFD
-let replacementUTF8: [UTF8.CodeUnit] = [0xEF, 0xBF, 0xBD]
-let replacementScalar = UnicodeScalar(replacementUTF16)!
+let replacementUTF16: Unicode.UTF16.CodeUnit = 0xFFFD
+let replacementUTF8: [Unicode.UTF8.CodeUnit] = [0xEF, 0xBF, 0xBD]
+let replacementScalar = Unicode.Scalar(replacementUTF16)!
 let replacementCharacter = Character(replacementScalar)
 
 // This string contains a variety of non-ASCII characters, including
@@ -41,8 +41,9 @@ var winter = winterUTF16.withUnsafeBufferPointer {
   String._fromInvalidUTF16($0)
 }
 
-let winterInvalidUTF8: [UTF8.CodeUnit] = replacementUTF8 + ([0x20] as [UTF8.CodeUnit]) + replacementUTF8 + replacementUTF8
-let winterUTF8: [UTF8.CodeUnit] = [
+let winterInvalidUTF8: [Unicode.UTF8.CodeUnit] = replacementUTF8 +
+  ([0x20] as [Unicode.UTF8.CodeUnit]) + replacementUTF8 + replacementUTF8
+let winterUTF8: [Unicode.UTF8.CodeUnit] = [
   0xf0, 0x9f, 0x8f, 0x82, 0xe2, 0x98, 0x83, 0xe2, 0x9d, 0x85, 0xe2,
   0x9d, 0x86, 0xe2, 0x9d, 0x84, 0xef, 0xb8, 0x8e, 0xe2, 0x9b, 0x84,
   0xef, 0xb8, 0x8f, 0xe2, 0x9d, 0x84, 0xef, 0xb8, 0x8f
@@ -74,7 +75,7 @@ tests.test("decoding") {
   )
 
   expectEqualSequence(
-    summerBytes.map {UTF16.CodeUnit($0)},
+    summerBytes.map {Unicode.UTF16.CodeUnit($0)},
     summer.utf16
   )
 }
@@ -105,7 +106,7 @@ tests.test("index-mapping/character-to-utf8/\(id)") {
       [0x20] + replacementUTF8[0..<2],
       replacementUTF8,
       replacementUTF8
-    ] as [[UTF8.CodeUnit]],
+    ] as [[Unicode.UTF8.CodeUnit]],
 
     winter.indices.map {
       i in (0..<3).map {
@@ -147,7 +148,7 @@ tests.test("index-mapping/unicode-scalar-to-utf8/\(id)") {
       [0x20] + replacementUTF8[0..<2],
       replacementUTF8,
       replacementUTF8
-    ] as [[UTF8.CodeUnit]],
+    ] as [[Unicode.UTF8.CodeUnit]],
 
     winter.unicodeScalars.indices.map {
       i in (0..<3).map {
@@ -204,7 +205,7 @@ tests.test("index-mapping/utf16-to-utf8/\(id)") {
       [0x20] + replacementUTF8[0..<2],
       replacementUTF8,
       replacementUTF8
-    ] as [[UTF8.CodeUnit]],
+    ] as [[Unicode.UTF8.CodeUnit]],
     winter.utf16.indices.map {
       i16 in mapIndex(i16, winter.utf8).map {
         i8 in (0..<3).map {
@@ -263,7 +264,7 @@ tests.test("index-mapping/character-to-utf16/\(id)") {
       0x26c4, // 0xfe0f,
       0x2744, // 0xfe0f,
       replacementUTF16, 0x20, replacementUTF16, replacementUTF16
-    ] as [UTF16.CodeUnit],
+    ] as [Unicode.UTF16.CodeUnit],
 
     winter.indices.map {
       winter.utf16[mapIndex($0, winter.utf16)!]
@@ -273,7 +274,7 @@ tests.test("index-mapping/character-to-utf16/\(id)") {
   expectEqual(winter.utf16.endIndex, mapIndex(winter.endIndex, winter.utf16))
 
   expectEqualSequence(
-    summerBytes.map { UTF16.CodeUnit($0) },
+    summerBytes.map { Unicode.UTF16.CodeUnit($0) },
     summer.indices.map { summer.utf16[mapIndex($0, summer.utf16)!] }
   )
 
@@ -291,7 +292,7 @@ tests.test("index-mapping/unicode-scalar-to-utf16/\(id)") {
       0x26c4, 0xfe0f,
       0x2744, 0xfe0f,
       replacementUTF16, 0x20, replacementUTF16, replacementUTF16
-    ] as [UTF16.CodeUnit],
+    ] as [Unicode.UTF16.CodeUnit],
 
     winter.unicodeScalars.indices.map {
       winter.utf16[mapIndex($0, winter.utf16)!]
@@ -302,7 +303,7 @@ tests.test("index-mapping/unicode-scalar-to-utf16/\(id)") {
     mapIndex(winter.unicodeScalars.endIndex, winter.utf16))
 
   expectEqualSequence(
-    summerBytes.map { UTF16.CodeUnit($0) },
+    summerBytes.map { Unicode.UTF16.CodeUnit($0) },
     summer.unicodeScalars.indices.map {
       summer.utf16[mapIndex($0, summer.utf16)!]
     }
@@ -330,7 +331,7 @@ tests.test("index-mapping/utf8-to-utf16/\(id)") {
       0x20,
       replacementUTF16, err(replacementUTF16), err(replacementUTF16),
       replacementUTF16, err(replacementUTF16), err(replacementUTF16)
-    ] as [UTF16.CodeUnit?],
+    ] as [Unicode.UTF16.CodeUnit?],
 
     winter.utf8.indices.map {
       mapIndex($0, winter.utf16).map {
@@ -344,7 +345,7 @@ tests.test("index-mapping/utf8-to-utf16/\(id)") {
     mapIndex(winter.utf8.endIndex, winter.utf16)!)
 
   expectEqualSequence(
-    summerBytes.map { UTF16.CodeUnit($0) },
+    summerBytes.map { Unicode.UTF16.CodeUnit($0) },
     summer.utf8.indices.map { summer.utf16[mapIndex($0, summer.utf16)!] }
   )
 
@@ -363,20 +364,20 @@ func checkToUnicodeScalar(
   mapIndex: @escaping (String.Index, String.UnicodeScalarView)->String.Index?
 ) {
 
-func err(_ scalarValue: UInt32) -> UnicodeScalar? {
-  return id == "legacy" ? nil : UnicodeScalar(scalarValue)
+func err(_ scalarValue: UInt32) -> Unicode.Scalar? {
+  return id == "legacy" ? nil : Unicode.Scalar(scalarValue)
 }
 
 tests.test("index-mapping/character-to-unicode-scalar/\(id)") {
-  let winterCharacterUnicodeScalars: [UnicodeScalar] = [
-    UnicodeScalar(0x1f3c2)!,
-    UnicodeScalar(0x2603)!,
-    UnicodeScalar(0x2745)!,
-    UnicodeScalar(0x2746)!,
-    UnicodeScalar(0x2744)!, // 0xfe0e,
-    UnicodeScalar(0x26c4)!, // 0xfe0f,
-    UnicodeScalar(0x2744)!, // 0xfe0f
-    replacementScalar, UnicodeScalar(0x20)!, replacementScalar, replacementScalar
+  let winterCharacterUnicodeScalars: [Unicode.Scalar] = [
+    Unicode.Scalar(0x1f3c2)!,
+    Unicode.Scalar(0x2603)!,
+    Unicode.Scalar(0x2745)!,
+    Unicode.Scalar(0x2746)!,
+    Unicode.Scalar(0x2744)!, // 0xfe0e,
+    Unicode.Scalar(0x26c4)!, // 0xfe0f,
+    Unicode.Scalar(0x2744)!, // 0xfe0f
+    replacementScalar, Unicode.Scalar(0x20)!, replacementScalar, replacementScalar
   ]
 
   expectEqualSequence(
@@ -389,7 +390,7 @@ tests.test("index-mapping/character-to-unicode-scalar/\(id)") {
   expectEqual(winter.unicodeScalars.endIndex, mapIndex(winter.endIndex, winter.unicodeScalars))
 
   expectEqualSequence(
-    summerBytes.map { UnicodeScalar($0) },
+    summerBytes.map { Unicode.Scalar($0) },
     summer.indices.map { summer.unicodeScalars[mapIndex($0, summer.unicodeScalars)!] }
   )
 
@@ -399,20 +400,20 @@ tests.test("index-mapping/character-to-unicode-scalar/\(id)") {
 tests.test("index-mapping/utf8-to-unicode-scalar/\(id)") {
   // Define expectation separately to help the type-checker, which
   // otherwise runs out of time solving.
-  let winterUtf8UnicodeScalars: [UnicodeScalar?] = [
-    UnicodeScalar(0x1f3c2), err(0x1f3c2), err(0x1f3c2), err(0x1f3c2),
-    UnicodeScalar(0x2603), err(0x2603), err(0x2603),
-    UnicodeScalar(0x2745), err(0x2745), err(0x2745),
-    UnicodeScalar(0x2746), err(0x2746), err(0x2746),
-    UnicodeScalar(0x2744), err(0x2744), err(0x2744),
-    UnicodeScalar(0xfe0e), err(0xfe0e), err(0xfe0e),
-    UnicodeScalar(0x26c4), err(0x26c4), err(0x26c4),
-    UnicodeScalar(0xfe0f), err(0xfe0f), err(0xfe0f),
-    UnicodeScalar(0x2744), err(0x2744), err(0x2744),
-    UnicodeScalar(0xfe0f), err(0xfe0f), err(0xfe0f),
+  let winterUtf8UnicodeScalars: [Unicode.Scalar?] = [
+    Unicode.Scalar(0x1f3c2), err(0x1f3c2), err(0x1f3c2), err(0x1f3c2),
+    Unicode.Scalar(0x2603), err(0x2603), err(0x2603),
+    Unicode.Scalar(0x2745), err(0x2745), err(0x2745),
+    Unicode.Scalar(0x2746), err(0x2746), err(0x2746),
+    Unicode.Scalar(0x2744), err(0x2744), err(0x2744),
+    Unicode.Scalar(0xfe0e), err(0xfe0e), err(0xfe0e),
+    Unicode.Scalar(0x26c4), err(0x26c4), err(0x26c4),
+    Unicode.Scalar(0xfe0f), err(0xfe0f), err(0xfe0f),
+    Unicode.Scalar(0x2744), err(0x2744), err(0x2744),
+    Unicode.Scalar(0xfe0f), err(0xfe0f), err(0xfe0f),
     replacementScalar,
       err(replacementScalar.value), err(replacementScalar.value),
-    UnicodeScalar(0x20),
+    Unicode.Scalar(0x20),
     replacementScalar,
       err(replacementScalar.value), err(replacementScalar.value),
     replacementScalar,
@@ -433,7 +434,7 @@ tests.test("index-mapping/utf8-to-unicode-scalar/\(id)") {
     mapIndex(winter.utf8.endIndex, winter.unicodeScalars)!)
 
   expectEqualSequence(
-    summerBytes.map { UnicodeScalar($0) as UnicodeScalar? },
+    summerBytes.map { Unicode.Scalar($0) as Unicode.Scalar? },
     summer.utf8.indices.map {
       i in mapIndex(i, summer.unicodeScalars).map {
         summer.unicodeScalars[$0]
@@ -447,8 +448,8 @@ tests.test("index-mapping/utf8-to-unicode-scalar/\(id)") {
 }
 
 tests.test("index-mapping/utf16-to-unicode-scalar/\(id)") {
-  let winterUtf16UnicodeScalars: [UnicodeScalar?] = [
-    UnicodeScalar(0x1f3c2),
+  let winterUtf16UnicodeScalars: [Unicode.Scalar?] = [
+    Unicode.Scalar(0x1f3c2),
 
   // Prior to UTF-8 String, this tested for empty array in "legacy mode" or
   // the replacemnet character otherwise. However, SE-0180 (String Index
@@ -461,13 +462,13 @@ tests.test("index-mapping/utf16-to-unicode-scalar/\(id)") {
   //   err(replacementScalar.value),
     err(0x1f3c2),
 
-    UnicodeScalar(0x2603),
-    UnicodeScalar(0x2745),
-    UnicodeScalar(0x2746),
-    UnicodeScalar(0x2744), UnicodeScalar(0xfe0e),
-    UnicodeScalar(0x26c4), UnicodeScalar(0xfe0f),
-    UnicodeScalar(0x2744), UnicodeScalar(0xfe0f),
-    replacementScalar, UnicodeScalar(0x20), replacementScalar, replacementScalar
+    Unicode.Scalar(0x2603),
+    Unicode.Scalar(0x2745),
+    Unicode.Scalar(0x2746),
+    Unicode.Scalar(0x2744), Unicode.Scalar(0xfe0e),
+    Unicode.Scalar(0x26c4), Unicode.Scalar(0xfe0f),
+    Unicode.Scalar(0x2744), Unicode.Scalar(0xfe0f),
+    replacementScalar, Unicode.Scalar(0x20), replacementScalar, replacementScalar
   ]
 
   expectEqualSequence(
@@ -484,7 +485,7 @@ tests.test("index-mapping/utf16-to-unicode-scalar/\(id)") {
     mapIndex(winter.utf16.endIndex, winter.unicodeScalars)!)
 
   expectEqualSequence(
-    summerBytes.map { UnicodeScalar($0) as UnicodeScalar? },
+    summerBytes.map { Unicode.Scalar($0) as Unicode.Scalar? },
     summer.utf16.indices.map {
       i in mapIndex(i, summer.unicodeScalars).map {
         summer.unicodeScalars[$0]
@@ -529,7 +530,7 @@ tests.test("index-mapping/unicode-scalar-to-character/\(id)") {
   expectEqual(winter.endIndex, mapIndex(winter.unicodeScalars.endIndex, winter)!)
 
   expectEqualSequence(
-    summerBytes.map { Character(UnicodeScalar($0)) },
+    summerBytes.map { Character(Unicode.Scalar($0)) },
     summer.unicodeScalars.indices.map { summer[mapIndex($0, summer)!] }
   )
 
@@ -570,7 +571,7 @@ tests.test("index-mapping/utf8-to-character/\(id)") {
     mapIndex(winter.utf8.endIndex, winter)!)
 
   expectEqualSequence(
-    summerBytes.map { Character(UnicodeScalar($0)) },
+    summerBytes.map { Character(Unicode.Scalar($0)) },
     summer.utf8.indices.map { summer[mapIndex($0, summer)!] }
   )
 
@@ -615,7 +616,7 @@ tests.test("index-mapping/utf16-to-character/\(id)") {
     mapIndex(winter.utf16.endIndex, winter)!)
 
   expectEqualSequence(
-    summerBytes.map { Character(UnicodeScalar($0)) },
+    summerBytes.map { Character(Unicode.Scalar($0)) },
     summer.utf16.indices.map {
       summer[mapIndex($0, summer)!]
     }
@@ -672,7 +673,7 @@ tests.test("UTF8 indexes") {
       while true {
         //===--- loop condition -------------------------------------------===//
         let b = u8[u8i0a]
-        let isLeadingByte = !UTF8.isContinuation(b)
+        let isLeadingByte = !Unicode.UTF8.isContinuation(b)
         if dsa == ds && isLeadingByte { break } //
         //===--------------------------------------------------------------===//
 
@@ -683,7 +684,7 @@ tests.test("UTF8 indexes") {
            // we should be able to round-trip through UTF16
           expectEqual(u8i0a, u16i0a.samePosition(in: u8)!)
 
-          if UTF16.isLeadSurrogate(u16[u16i0a]) {
+          if Unicode.UTF16.isLeadSurrogate(u16[u16i0a]) {
             // We only have well-formed UTF16 in this string, so the
             // successor points to a trailing surrogate of a pair and
             // thus shouldn't convert to a UTF8 position

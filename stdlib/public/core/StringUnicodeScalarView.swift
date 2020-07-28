@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -284,7 +284,10 @@ extension String.UnicodeScalarView: RangeReplaceableCollection {
   public mutating func append<S: Sequence>(contentsOf newElements: S)
   where S.Element == Unicode.Scalar {
     // TODO(String performance): Skip extra String allocation
-    let scalars = String(decoding: newElements.map { $0.value }, as: UTF32.self)
+    let scalars = String(
+      decoding: newElements.map { $0.value },
+      as: Unicode.UTF32.self
+    )
     self = (String(self._guts) + scalars).unicodeScalars
   }
 
@@ -417,7 +420,7 @@ extension String.UnicodeScalarView {
   internal func _foreignIndex(after i: Index) -> Index {
     _internalInvariant(_guts.isForeign)
     let cu = _guts.foreignErrorCorrectedUTF16CodeUnit(at: i)
-    let len = UTF16.isLeadSurrogate(cu) ? 2 : 1
+    let len = Unicode.UTF16.isLeadSurrogate(cu) ? 2 : 1
 
     return i.encoded(offsetBy: len)._scalarAligned
   }
@@ -428,7 +431,7 @@ extension String.UnicodeScalarView {
     _internalInvariant(_guts.isForeign)
     let priorIdx = i.priorEncoded
     let cu = _guts.foreignErrorCorrectedUTF16CodeUnit(at: priorIdx)
-    let len = UTF16.isTrailSurrogate(cu) ? 2 : 1
+    let len = Unicode.UTF16.isTrailSurrogate(cu) ? 2 : 1
 
     return i.encoded(offsetBy: -len)._scalarAligned
   }

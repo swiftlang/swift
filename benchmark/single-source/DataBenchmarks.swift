@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -534,7 +534,7 @@ public func setCount(_ N: Int, data: Data, extra: Int) {
 @inline(never)
 public func string(_ N: Int, from data: Data) {
   for _ in 1...N {
-    blackHole(String(decoding: data, as: UTF8.self))
+    blackHole(String(decoding: data, as: Unicode.UTF8.self))
   }
 }
 

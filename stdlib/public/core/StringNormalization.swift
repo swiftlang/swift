@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -108,7 +108,7 @@ extension UnsafeBufferPointer where Element == UInt8 {
     if index == 0 || index == count {
       return true
     }
-    _internalInvariant(!UTF8.isContinuation(self[_unchecked: index]))
+    _internalInvariant(!Unicode.UTF8.isContinuation(self[_unchecked: index]))
 
     // Sub-300 latiny fast-path
     if self[_unchecked: index] < 0xCC { return true }
@@ -165,7 +165,7 @@ extension UnsafeBufferPointer where Element == UInt8 {
       _internalInvariant(index == count)
       return true
     }
-    return !UTF8.isContinuation(self[index])
+    return !Unicode.UTF8.isContinuation(self[index])
   }
   
 }
@@ -235,7 +235,7 @@ private func fastFill(
     }
     inputCount &+= len
 
-    for cu in UTF8.encode(scalar)._unsafelyUnwrappedUnchecked {
+    for cu in Unicode.UTF8.encode(scalar)._unsafelyUnwrappedUnchecked {
       outputBuffer[_unchecked: outputCount] = cu
       outputCount &+= 1
     }
@@ -294,7 +294,7 @@ private func transcodeValidUTF16ToUTF8(
     
     readIndex += length
     
-    for cu in UTF8.encode(scalar)._unsafelyUnwrappedUnchecked {
+    for cu in Unicode.UTF8.encode(scalar)._unsafelyUnwrappedUnchecked {
       if writeIndex < outputCount {
         outputBuffer[writeIndex] = cu
         writeIndex &+= 1

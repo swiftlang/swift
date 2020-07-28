@@ -11,7 +11,7 @@ class D : B {
 
   override func bar(_ a: Float) -> Int { return super.bar(a) }
 
-  func bas() -> (Int, UnicodeScalar, String) {
+  func bas() -> (Int, Unicode.Scalar, String) {
     return (super.zim(), super.zang(), super.zung())
   }
 
@@ -29,7 +29,7 @@ class B {
   func bar(_ a: Float) -> Int {}
 
   func zim() -> Int {}
-  func zang() -> UnicodeScalar {}
+  func zang() -> Unicode.Scalar {}
   func zung() -> String {}
 
   var zippity : Int { return 123 }

@@ -21,7 +21,7 @@ func weirdConcat<T : ConcatToAnything, U>(_ t: T, u: U) {
 var b1, b2 : Bool
 _ = b1 != b2
 
-extension UnicodeScalar {
+extension Unicode.Scalar {
   func isAlpha2() -> Bool {
     return (self >= "A" && self <= "Z") || (self >= "a" && self <= "z")
   }

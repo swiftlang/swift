@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -19,8 +19,8 @@ import StdlibUnittest
 var UnicodeInternals = TestSuite("UnicodeInternals")
 
 UnicodeInternals.test("copy") {
-  var u8: [UTF8.CodeUnit] = [ 0, 1, 2, 3, 4, 5 ]
-  var u16: [UTF16.CodeUnit] = [ 6, 7, 8, 9, 10, 11 ]
+  var u8: [Unicode.UTF8.CodeUnit] = [ 0, 1, 2, 3, 4, 5 ]
+  var u16: [Unicode.UTF16.CodeUnit] = [ 6, 7, 8, 9, 10, 11 ]
 
   u16.withUnsafeMutableBufferPointer {
     (u16) -> () in
@@ -30,16 +30,16 @@ UnicodeInternals.test("copy") {
       (u8) -> () in
       let p8 = u8.baseAddress!
 
-      UTF16._copy(source: p8, destination: p16, count: 3)
+      Unicode.UTF16._copy(source: p8, destination: p16, count: 3)
       expectEqual([ 0, 1, 2, 9, 10, 11 ], Array(u16))
 
-      UTF16._copy(source: p16 + 3, destination: p8, count: 3)
+      Unicode.UTF16._copy(source: p16 + 3, destination: p8, count: 3)
       expectEqual([ 9, 10, 11, 3, 4, 5 ], Array(u8))
 
-      UTF16._copy(source: p16, destination: p16 + 3, count: 3)
+      Unicode.UTF16._copy(source: p16, destination: p16 + 3, count: 3)
       expectEqual([ 0, 1, 2, 0, 1, 2 ], Array(u16))
 
-      UTF16._copy(source: p8, destination: p8 + 3, count: 3)
+      Unicode.UTF16._copy(source: p8, destination: p8 + 3, count: 3)
       expectEqual([ 9, 10, 11, 9, 10, 11 ], Array(u8))
     }
   }
@@ -57,12 +57,12 @@ UnicodeAPIs.test("UnicodeDecodingResult/Equatable") {
   checkEquatable(instances, oracle: ==)
 }
 
-typealias ASCII = Unicode.ASCII
-typealias UTF8 = Unicode.UTF8
-typealias UTF16 = Unicode.UTF16
-typealias UTF32 = Unicode.UTF32
-
 UnicodeAPIs.test("UTF-8 and UTF-16 queries") {
+  typealias ASCII = Unicode.ASCII
+  typealias UTF8 = Unicode.UTF8
+  typealias UTF16 = Unicode.UTF16
+  typealias UTF32 = Unicode.UTF32
+
   guard #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) else {
     return
   }

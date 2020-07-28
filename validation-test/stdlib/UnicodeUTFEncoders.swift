@@ -20,7 +20,7 @@ protocol TestableUnicodeCodec : UnicodeCodec {
   static func name() -> NSString
 }
 
-extension UTF8 : TestableUnicodeCodec {
+extension Unicode.UTF8: TestableUnicodeCodec {
   static func encodingId() -> String.Encoding {
     return .utf8
   }
@@ -29,7 +29,7 @@ extension UTF8 : TestableUnicodeCodec {
   }
 }
 
-extension UTF16 : TestableUnicodeCodec {
+extension Unicode.UTF16: TestableUnicodeCodec {
   static func encodingId() -> String.Encoding {
     return .utf16LittleEndian
   }
@@ -38,7 +38,7 @@ extension UTF16 : TestableUnicodeCodec {
   }
 }
 
-extension UTF32 : TestableUnicodeCodec {
+extension Unicode.UTF32: TestableUnicodeCodec {
   static func encodingId() -> String.Encoding {
     return .utf32LittleEndian
   }
@@ -58,12 +58,12 @@ var unicodeScalarCount: Int {
   return count
 }
 
-func nthUnicodeScalar(_ n: UInt32) -> UnicodeScalar {
+func nthUnicodeScalar(_ n: UInt32) -> Unicode.Scalar {
   var count: UInt32 = 0
   for r in unicodeScalarRanges {
     count += r.upperBound - r.lowerBound
     if count > n {
-      return UnicodeScalar(r.upperBound - (count - n))!
+      return Unicode.Scalar(r.upperBound - (count - n))!
     }
   }
   preconditionFailure("Index out of range")
@@ -100,7 +100,7 @@ final class CodecTest<Codec : TestableUnicodeCodec> {
   var nsEncodeBuffer: [CodeUnit] = Array(repeating: 0, count: 4)
   var encodeBuffer: [CodeUnit] = Array(repeating: 0, count: 4)
 
-  final func testOne(_ scalar: UnicodeScalar) {
+  final func testOne(_ scalar: Unicode.Scalar) {
     /* Progress reporter
     if (scalar.value % 0x1000) == 0 {
       print("\(asHex(scalar.value))")
@@ -153,9 +153,9 @@ var UTFEncoders = TestSuite("UTFEncoders")
 UTFEncoders.test("encode") {
   let minScalarOrd = 0
   let maxScalarOrd = unicodeScalarCount
-  CodecTest<UTF8>().run(minScalarOrd, maxScalarOrd)
-  CodecTest<UTF16>().run(minScalarOrd, maxScalarOrd)
-  CodecTest<UTF32>().run(minScalarOrd, maxScalarOrd)
+  CodecTest<Unicode.UTF8>().run(minScalarOrd, maxScalarOrd)
+  CodecTest<Unicode.UTF16>().run(minScalarOrd, maxScalarOrd)
+  CodecTest<Unicode.UTF32>().run(minScalarOrd, maxScalarOrd)
 }
 
 runAllTests()

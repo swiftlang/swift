@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -297,7 +297,7 @@ internal struct _Buffer72 {
 // doesn't have _Float16 on all platforms yet.
 @_silgen_name("swift_float16ToString")
 internal func _float16ToStringImpl(
-  _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
+  _ buffer: UnsafeMutablePointer<Unicode.UTF8.CodeUnit>,
   _ bufferLength: UInt,
   _ value: Float32,
   _ debug: Bool
@@ -324,7 +324,7 @@ internal func _float16ToString(
 // to any integer type without checks, however.
 @_silgen_name("swift_float32ToString")
 internal func _float32ToStringImpl(
-  _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
+  _ buffer: UnsafeMutablePointer<Unicode.UTF8.CodeUnit>,
   _ bufferLength: UInt,
   _ value: Float32,
   _ debug: Bool
@@ -348,7 +348,7 @@ internal func _float32ToString(
 // to any integer type without checks, however.
 @_silgen_name("swift_float64ToString")
 internal func _float64ToStringImpl(
-  _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
+  _ buffer: UnsafeMutablePointer<Unicode.UTF8.CodeUnit>,
   _ bufferLength: UInt,
   _ value: Float64,
   _ debug: Bool
@@ -375,7 +375,7 @@ internal func _float64ToString(
 // to any integer type without checks, however.
 @_silgen_name("swift_float80ToString")
 internal func _float80ToStringImpl(
-  _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
+  _ buffer: UnsafeMutablePointer<Unicode.UTF8.CodeUnit>,
   _ bufferLength: UInt,
   _ value: Float80,
   _ debug: Bool
@@ -400,7 +400,7 @@ internal func _float80ToString(
 // to any integer type without checks, however.
 @_silgen_name("swift_int64ToString")
 internal func _int64ToStringImpl(
-  _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
+  _ buffer: UnsafeMutablePointer<Unicode.UTF8.CodeUnit>,
   _ bufferLength: UInt,
   _ value: Int64,
   _ radix: Int64,
@@ -437,7 +437,7 @@ internal func _int64ToString(
 // to any integer type without checks, however.
 @_silgen_name("swift_uint64ToString")
 internal func _uint64ToStringImpl(
-  _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
+  _ buffer: UnsafeMutablePointer<Unicode.UTF8.CodeUnit>,
   _ bufferLength: UInt,
   _ value: UInt64,
   _ radix: Int64,

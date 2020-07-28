@@ -86,8 +86,8 @@ ErrorHandlingTests.test("ErrorHandling/withCString extends lifetime") {
     do {
       // Don't use x anywhere in this test after this point.
       try x.withCString { p in
-        expectEqual(p[0], Int8(("a" as UnicodeScalar).value))
-        expectEqual(p[1], Int8(("d" as UnicodeScalar).value))
+        expectEqual(p[0], Int8(("a" as Unicode.Scalar).value))
+        expectEqual(p[1], Int8(("d" as Unicode.Scalar).value))
         throw SillyError.JazzHands
       }
       expectUnreachable()

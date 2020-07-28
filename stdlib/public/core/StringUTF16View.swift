@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -244,7 +244,7 @@ extension String.UTF16View: BidirectionalCollection {
   /// - Parameter position: A valid index of the view. `position` must be
   ///   less than the view's end index.
   @inlinable @inline(__always)
-  public subscript(idx: Index) -> UTF16.CodeUnit {
+  public subscript(idx: Index) -> Unicode.UTF16.CodeUnit {
     String(_guts)._boundsCheck(idx)
 
     if _fastPath(_guts.isFastUTF8) {
@@ -440,7 +440,7 @@ extension String.UTF16View {
 
   @usableFromInline @inline(never)
   @_effects(releasenone)
-  internal func _foreignSubscript(position i: Index) -> UTF16.CodeUnit {
+  internal func _foreignSubscript(position i: Index) -> Unicode.UTF16.CodeUnit {
     _internalInvariant(_guts.isForeign)
     return _guts.foreignErrorCorrectedUTF16CodeUnit(at: i.strippingTranscoding)
   }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -173,8 +173,8 @@ extension String {
     contents.reserveCapacity(input.count)
     let repaired = transcode(
       input.makeIterator(),
-      from: UTF16.self,
-      to: UTF8.self,
+      from: Unicode.UTF16.self,
+      to: Unicode.UTF8.self,
       stoppingOnError: false,
       into: { contents.append($0) })
     _internalInvariant(!repaired, "Error present")
@@ -201,7 +201,7 @@ extension String {
     let repaired = transcode(
       input.makeIterator(),
       from: Encoding.self,
-      to: UTF8.self,
+      to: Unicode.UTF8.self,
       stoppingOnError: false,
       into: { contents.append($0) })
     guard repair || !repaired else { return nil }
@@ -266,7 +266,7 @@ extension String {
   static func _fromInvalidUTF16(
     _ utf16: UnsafeBufferPointer<UInt16>
   ) -> String {
-    return String._fromCodeUnits(utf16, encoding: UTF16.self, repair: true)!.0
+    String._fromCodeUnits(utf16, encoding: Unicode.UTF16.self, repair: true)!.0
   }
 
   @usableFromInline

@@ -26,7 +26,7 @@ func verify<T>(
   with: T.Type) {
 }
 
-verify(unicodeScalarLiteral: "å", with: UnicodeScalar.self)
+verify(unicodeScalarLiteral: "å", with: Unicode.Scalar.self)
 verify(unicodeScalarLiteral: "ß", with: Character.self)
 verify(unicodeScalarLiteral: "c", with: String.self)
 verify(unicodeScalarLiteral: "∂", with: StaticString.self)

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -83,7 +83,7 @@ public protocol UnicodeCodec: Unicode.Encoding {
   ///
   ///     var bytesIterator = str.utf8.makeIterator()
   ///     var scalars: [Unicode.Scalar] = []
-  ///     var utf8Decoder = UTF8()
+  ///     var utf8Decoder = Unicode.UTF8()
   ///     Decode: while true {
   ///         switch utf8Decoder.decode(&bytesIterator) {
   ///         case .scalarValue(let v): scalars.append(v)
@@ -115,8 +115,8 @@ public protocol UnicodeCodec: Unicode.Encoding {
   /// representation. The following code uses the `UTF8` codec to encode a
   /// fermata in UTF-8:
   ///
-  ///     var bytes: [UTF8.CodeUnit] = []
-  ///     UTF8.encode("𝄐", into: { bytes.append($0) })
+  ///     var bytes: [Unicode.UTF8.CodeUnit] = []
+  ///     Unicode.UTF8.encode("𝄐", into: { bytes.append($0) })
   ///     print(bytes)
   ///     // Prints "[240, 157, 132, 144]"
   ///
@@ -165,7 +165,7 @@ extension Unicode.UTF8: UnicodeCodec {
   ///
   ///     var bytesIterator = str.utf8.makeIterator()
   ///     var scalars: [Unicode.Scalar] = []
-  ///     var utf8Decoder = UTF8()
+  ///     var utf8Decoder = Unicode.UTF8()
   ///     Decode: while true {
   ///         switch utf8Decoder.decode(&bytesIterator) {
   ///         case .scalarValue(let v): scalars.append(v)
@@ -196,7 +196,7 @@ extension Unicode.UTF8: UnicodeCodec {
     defer { self = ._swift3Buffer(parser) }
 
     switch parser.parseScalar(from: &input) {
-    case .valid(let s): return .scalarValue(UTF8.decode(s))
+    case .valid(let s): return .scalarValue(Unicode.UTF8.decode(s))
     case .error: return .error
     case .emptyInput: return .emptyInput
     }
@@ -234,7 +234,7 @@ extension Unicode.UTF8: UnicodeCodec {
     switch p.parseScalar(from: &i) {
     case .valid(let s):
       return (
-        result: UTF8.decode(s).value,
+        result: Unicode.UTF8.decode(s).value,
         length: UInt8(truncatingIfNeeded: s.count))
     case .error(let l):
       return (result: nil, length: UInt8(truncatingIfNeeded: l))
@@ -249,8 +249,8 @@ extension Unicode.UTF8: UnicodeCodec {
   /// value (`\u{1D110}`) but requires four code units for its UTF-8
   /// representation. The following code encodes a fermata in UTF-8:
   ///
-  ///     var bytes: [UTF8.CodeUnit] = []
-  ///     UTF8.encode("𝄐", into: { bytes.append($0) })
+  ///     var bytes: [Unicode.UTF8.CodeUnit] = []
+  ///     Unicode.UTF8.encode("𝄐", into: { bytes.append($0) })
   ///     print(bytes)
   ///     // Prints "[240, 157, 132, 144]"
   ///
@@ -287,7 +287,7 @@ extension Unicode.UTF8: UnicodeCodec {
   ///
   ///     let eAcute = "é"
   ///     for codeUnit in eAcute.utf8 {
-  ///         print(codeUnit, UTF8.isContinuation(codeUnit))
+  ///         print(codeUnit, Unicode.UTF8.isContinuation(codeUnit))
   ///     }
   ///     // Prints "195 false"
   ///     // Prints "169 true"
@@ -342,7 +342,7 @@ extension Unicode.UTF16: UnicodeCodec {
   ///
   ///     var codeUnitIterator = str.utf16.makeIterator()
   ///     var scalars: [Unicode.Scalar] = []
-  ///     var utf16Decoder = UTF16()
+  ///     var utf16Decoder = Unicode.UTF16()
   ///     Decode: while true {
   ///         switch utf16Decoder.decode(&codeUnitIterator) {
   ///         case .scalarValue(let v): scalars.append(v)
@@ -371,7 +371,7 @@ extension Unicode.UTF16: UnicodeCodec {
     }
     defer { self = ._swift3Buffer(parser) }
     switch parser.parseScalar(from: &input) {
-    case .valid(let s): return .scalarValue(UTF16.decode(s))
+    case .valid(let s): return .scalarValue(Unicode.UTF16.decode(s))
     case .error: return .error
     case .emptyInput: return .emptyInput
     }
@@ -387,7 +387,7 @@ extension Unicode.UTF16: UnicodeCodec {
     let result = decode(&input)
     switch result {
     case .scalarValue(let us):
-      return (result, UTF16.width(us))
+      return (result, Unicode.UTF16.width(us))
 
     case .emptyInput:
       return (result, 0)
@@ -404,8 +404,8 @@ extension Unicode.UTF16: UnicodeCodec {
   /// value (`\u{1D110}`) but requires two code units for its UTF-16
   /// representation. The following code encodes a fermata in UTF-16:
   ///
-  ///     var codeUnits: [UTF16.CodeUnit] = []
-  ///     UTF16.encode("𝄐", into: { codeUnits.append($0) })
+  ///     var codeUnits: [Unicode.UTF16.CodeUnit] = []
+  ///     Unicode.UTF16.encode("𝄐", into: { codeUnits.append($0) })
   ///     print(codeUnits)
   ///     // Prints "[55348, 56592]"
   ///
@@ -449,12 +449,12 @@ extension Unicode.UTF32: UnicodeCodec {
   /// its `unicodeScalars` view.
   ///
   ///     // UTF-32 representation of "✨Unicode✨"
-  ///     let codeUnits: [UTF32.CodeUnit] =
+  ///     let codeUnits: [Unicode.UTF32.CodeUnit] =
   ///             [10024, 85, 110, 105, 99, 111, 100, 101, 10024]
   ///
   ///     var codeUnitIterator = codeUnits.makeIterator()
   ///     var scalars: [Unicode.Scalar] = []
-  ///     var utf32Decoder = UTF32()
+  ///     var utf32Decoder = Unicode.UTF32()
   ///     Decode: while true {
   ///         switch utf32Decoder.decode(&codeUnitIterator) {
   ///         case .scalarValue(let v): scalars.append(v)
@@ -481,7 +481,7 @@ extension Unicode.UTF32: UnicodeCodec {
     var parser = ForwardParser()
     
     switch parser.parseScalar(from: &input) {
-    case .valid(let s): return .scalarValue(UTF32.decode(s))
+    case .valid(let s): return .scalarValue(Unicode.UTF32.decode(s))
     case .error:      return .error
     case .emptyInput:   return .emptyInput
     }
@@ -494,8 +494,8 @@ extension Unicode.UTF32: UnicodeCodec {
   /// can be represented in UTF-32 as a single code unit. The following code
   /// encodes a fermata in UTF-32:
   ///
-  ///     var codeUnit: UTF32.CodeUnit = 0
-  ///     UTF32.encode("𝄐", into: { codeUnit = $0 })
+  ///     var codeUnit: Unicode.UTF32.CodeUnit = 0
+  ///     Unicode.UTF32.encode("𝄐", into: { codeUnit = $0 })
   ///     print(codeUnit)
   ///     // Prints "119056"
   ///
@@ -523,10 +523,13 @@ extension Unicode.UTF32: UnicodeCodec {
 ///     print(Array(bytes))
 ///     // Prints "[70, 101, 114, 109, 97, 116, 97, 32, 240, 157, 132, 144]"
 ///
-///     var codeUnits: [UTF32.CodeUnit] = []
+///     var codeUnits: [Unicode.UTF32.CodeUnit] = []
 ///     let sink = { codeUnits.append($0) }
-///     transcode(bytes.makeIterator(), from: UTF8.self, to: UTF32.self,
-///               stoppingOnError: false, into: sink)
+///     transcode(bytes.makeIterator(),
+///               from: Unicode.UTF8.self,
+///               to: Unicode.UTF32.self,
+///               stoppingOnError: false,
+///               into: sink)
 ///     print(codeUnits)
 ///     // Prints "[70, 101, 114, 109, 97, 116, 97, 32, 119056]"
 ///
@@ -591,40 +594,36 @@ public func transcode<
 /// representation.
 public // @testable
 protocol _StringElement {
-  static func _toUTF16CodeUnit(_: Self) -> UTF16.CodeUnit
+  static func _toUTF16CodeUnit(_ x: Self) -> Unicode.UTF16.CodeUnit
 
-  static func _fromUTF16CodeUnit(_ utf16: UTF16.CodeUnit) -> Self
+  static func _fromUTF16CodeUnit(_ utf16: Unicode.UTF16.CodeUnit) -> Self
 }
 
-extension UTF16.CodeUnit: _StringElement {
+extension Unicode.UTF16.CodeUnit: _StringElement {
   @inlinable
   public // @testable
-  static func _toUTF16CodeUnit(_ x: UTF16.CodeUnit) -> UTF16.CodeUnit {
+  static func _toUTF16CodeUnit(_ x: Self) -> Unicode.UTF16.CodeUnit {
     return x
   }
   @inlinable
   public // @testable
-  static func _fromUTF16CodeUnit(
-    _ utf16: UTF16.CodeUnit
-  ) -> UTF16.CodeUnit {
+  static func _fromUTF16CodeUnit(_ utf16: Unicode.UTF16.CodeUnit) -> Self {
     return utf16
   }
 }
 
-extension UTF8.CodeUnit: _StringElement {
+extension Unicode.UTF8.CodeUnit: _StringElement {
   @inlinable
   public // @testable
-  static func _toUTF16CodeUnit(_ x: UTF8.CodeUnit) -> UTF16.CodeUnit {
+  static func _toUTF16CodeUnit(_ x: Self) -> Unicode.UTF16.CodeUnit {
     _internalInvariant(x <= 0x7f, "should only be doing this with ASCII")
-    return UTF16.CodeUnit(truncatingIfNeeded: x)
+    return Unicode.UTF16.CodeUnit(truncatingIfNeeded: x)
   }
   @inlinable
   public // @testable
-  static func _fromUTF16CodeUnit(
-    _ utf16: UTF16.CodeUnit
-  ) -> UTF8.CodeUnit {
+  static func _fromUTF16CodeUnit(_ utf16: Unicode.UTF16.CodeUnit) -> Self {
     _internalInvariant(utf16 <= 0x7f, "should only be doing this with ASCII")
-    return UTF8.CodeUnit(truncatingIfNeeded: utf16)
+    return Self(truncatingIfNeeded: utf16)
   }
 }
 

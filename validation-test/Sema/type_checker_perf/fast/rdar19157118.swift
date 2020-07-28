@@ -9,7 +9,7 @@ SelfType, ArgumentType, Result : Equatable
   _ function2: (SelfType) -> (ArgumentType) -> Result
 ) { fatalError() }
 
-func test(ascii0to126: [UnicodeScalar], ascii1to127: [UnicodeScalar]) {
+func test(ascii0to126: [Unicode.Scalar], ascii1to127: [Unicode.Scalar]) {
   expectEqualMethodsForDomain(
     ascii0to126,
     ascii1to127,

@@ -67,7 +67,7 @@ extension Substring {
 
 // A thin wrapper around _StringGuts implementing RangeReplaceableCollection
 struct StringFauxUTF16Collection: RangeReplaceableCollection, RandomAccessCollection {
-  typealias Element = UTF16.CodeUnit
+  typealias Element = Unicode.UTF16.CodeUnit
   typealias Index = Int
   typealias Indices = CountableRange<Int>
 
@@ -96,7 +96,7 @@ struct StringFauxUTF16Collection: RangeReplaceableCollection, RandomAccessCollec
   ) where C : Collection, C.Element == Element {
     var utf16 = Array(_str.utf16)
     utf16.replaceSubrange(subrange, with: newElements)
-    self._str = String(decoding: utf16, as: UTF16.self)
+    self._str = String(decoding: utf16, as: Unicode.UTF16.self)
   }
 
   mutating func reserveCapacity(_ n: Int) {
@@ -900,8 +900,8 @@ StringTests.test("stringGutsExtensibility")
   .skip(.nativeRuntime("Foundation dependency"))
   .code {
 #if _runtime(_ObjC)
-  let ascii = UTF16.CodeUnit(UnicodeScalar("X").value)
-  let nonAscii = UTF16.CodeUnit(UnicodeScalar("é").value)
+  let ascii = Unicode.UTF16.CodeUnit(Unicode.Scalar("X").value)
+  let nonAscii = Unicode.UTF16.CodeUnit(Unicode.Scalar("é").value)
 
   for k in 0..<3 {
     for count in 1..<16 {
@@ -918,14 +918,14 @@ StringTests.test("stringGutsExtensibility")
         for i in 0..<count {
           x.append(String(
             decoding: repeatElement(i < boundary ? ascii : nonAscii, count: 3),
-            as: UTF16.self))
+            as: Unicode.UTF16.self))
         }
         // Make sure we can append pure ASCII to wide storage
         x.append(String(
-          decoding: repeatElement(ascii, count: 2), as: UTF16.self))
+          decoding: repeatElement(ascii, count: 2), as: Unicode.UTF16.self))
 
         expectEqualSequence(
-          [UTF16.CodeUnit(UnicodeScalar("b").value)]
+          [Unicode.UTF16.CodeUnit(Unicode.Scalar("b").value)]
           + Array(repeatElement(ascii, count: 3*boundary))
           + repeatElement(nonAscii, count: 3*(count - boundary))
           + repeatElement(ascii, count: 2),
@@ -1063,7 +1063,7 @@ StringTests.test("UnicodeScalarViewReplace") {
       let doubleS2 = Array(String(makeStringGuts(s2 + s2)).utf16)
       checkRangeReplaceable(
         { () -> String.UnicodeScalarView in String(makeStringGuts(s1)).unicodeScalars },
-        { String(decoding: doubleS2[0..<$0], as: UTF16.self).unicodeScalars }
+        { String(decoding: doubleS2[0..<$0], as: Unicode.UTF16.self).unicodeScalars }
       )
       checkRangeReplaceable(
         { String(makeStringGuts(s1)).unicodeScalars },
@@ -1081,7 +1081,7 @@ StringTests.test("StringRRC") {
       let doubleS2 = Array(String(makeStringGuts(s2 + s2)).utf16)
       checkRangeReplaceable(
         { () -> String in String(makeStringGuts(s1)) },
-        { String(decoding: doubleS2[0..<$0], as: UTF16.self) }
+        { String(decoding: doubleS2[0..<$0], as: Unicode.UTF16.self) }
       )
       checkRangeReplaceable(
         { String(makeStringGuts(s1)) },
@@ -1133,11 +1133,11 @@ StringTests.test("toInt") {
   // then print if the new String is or is not still an Int.
   func testConvertabilityOfStringWithModification(
     _ initialValue: Int,
-    modification: (_ chars: inout [UTF8.CodeUnit]) -> Void
+    modification: (_ chars: inout [Unicode.UTF8.CodeUnit]) -> Void
   ) {
     var chars = Array(String(initialValue).utf8)
     modification(&chars)
-    let str = String(decoding: chars, as: UTF8.self)
+    let str = String(decoding: chars, as: Unicode.UTF8.self)
     expectNil(Int(str))
   }
 
@@ -1239,8 +1239,8 @@ StringTests.test("lowercased()") {
   let asciiDomain: [Int32] = Array(0..<128)
   expectEqualFunctionsForDomain(
     asciiDomain,
-    { String(UnicodeScalar(Int(tolower($0)))!) },
-    { String(UnicodeScalar(Int($0))!).lowercased() })
+    { String(Unicode.Scalar(Int(tolower($0)))!) },
+    { String(Unicode.Scalar(Int($0))!).lowercased() })
 
   expectEqual("", "".lowercased())
   expectEqual("abcd", "abCD".lowercased())
@@ -1273,8 +1273,8 @@ StringTests.test("uppercased()") {
   let asciiDomain: [Int32] = Array(0..<128)
   expectEqualFunctionsForDomain(
     asciiDomain,
-    { String(UnicodeScalar(Int(toupper($0)))!) },
-    { String(UnicodeScalar(Int($0))!).uppercased() })
+    { String(Unicode.Scalar(Int(toupper($0)))!) },
+    { String(Unicode.Scalar(Int($0))!).uppercased() })
 
   expectEqual("", "".uppercased())
   expectEqual("ABCD", "abCD".uppercased())
@@ -1407,25 +1407,25 @@ StringTests.test("String.append(_: UnicodeScalar)") {
 
   do {
     // U+0061 LATIN SMALL LETTER A
-    let input: UnicodeScalar = "\u{61}"
+    let input: Unicode.Scalar = "\u{61}"
     s.append(String(input))
     expectEqual(["\u{61}"], Array(s.unicodeScalars))
   }
   do {
     // U+304B HIRAGANA LETTER KA
-    let input: UnicodeScalar = "\u{304b}"
+    let input: Unicode.Scalar = "\u{304b}"
     s.append(String(input))
     expectEqual(["\u{61}", "\u{304b}"], Array(s.unicodeScalars))
   }
   do {
     // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
-    let input: UnicodeScalar = "\u{3099}"
+    let input: Unicode.Scalar = "\u{3099}"
     s.append(String(input))
     expectEqual(["\u{61}", "\u{304b}", "\u{3099}"], Array(s.unicodeScalars))
   }
   do {
     // U+1F425 FRONT-FACING BABY CHICK
-    let input: UnicodeScalar = "\u{1f425}"
+    let input: Unicode.Scalar = "\u{1f425}"
     s.append(String(input))
     expectEqual(
       ["\u{61}", "\u{304b}", "\u{3099}", "\u{1f425}"],
@@ -1486,7 +1486,7 @@ StringTests.test("String.append(_: Character)") {
 }
 
 internal func decodeCString<
-  C : UnicodeCodec
+  C: Unicode.Encoding
 >(_ s: String, as codec: C.Type)
 -> (result: String, repairsMade: Bool)? {
   let units = s.unicodeScalars.map({ $0.value }) + [0]
@@ -1496,19 +1496,19 @@ internal func decodeCString<
 }
 
 StringTests.test("String.decodeCString/UTF8") {
-  let actual = decodeCString("foobar", as: UTF8.self)
+  let actual = decodeCString("foobar", as: Unicode.UTF8.self)
   expectFalse(actual!.repairsMade)
   expectEqual("foobar", actual!.result)
 }
 
 StringTests.test("String.decodeCString/UTF16") {
-  let actual = decodeCString("foobar", as: UTF16.self)
+  let actual = decodeCString("foobar", as: Unicode.UTF16.self)
   expectFalse(actual!.repairsMade)
   expectEqual("foobar", actual!.result)
 }
 
 StringTests.test("String.decodeCString/UTF32") {
-  let actual = decodeCString("foobar", as: UTF32.self)
+  let actual = decodeCString("foobar", as: Unicode.UTF32.self)
   expectFalse(actual!.repairsMade)
   expectEqual("foobar", actual!.result)
 }

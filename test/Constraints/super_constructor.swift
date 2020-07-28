@@ -42,9 +42,9 @@ class B {
   init(x:Int) { // expected-note{{candidate expects value of type 'Int' for parameter #1}}
   }
 
-  init(a:UnicodeScalar) { // expected-note {{candidate expects value of type 'UnicodeScalar' (aka 'Unicode.Scalar') for parameter #1}}
+  init(a:Unicode.Scalar) { // expected-note {{candidate expects value of type 'Unicode.Scalar' for parameter #1}}
   }
-  init(b:UnicodeScalar) { // expected-note {{candidate expects value of type 'UnicodeScalar' (aka 'Unicode.Scalar') for parameter #1}}
+  init(b:Unicode.Scalar) { // expected-note {{candidate expects value of type 'Unicode.Scalar' for parameter #1}}
   }
 
   init(z:Float) { // expected-note{{candidate expects value of type 'Float' for parameter #1}}

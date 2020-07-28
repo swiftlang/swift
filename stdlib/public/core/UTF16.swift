@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -29,13 +29,13 @@ extension Unicode.UTF16 {
   ///     let anA: Unicode.Scalar = "A"
   ///     print(anA.value)
   ///     // Prints "65"
-  ///     print(UTF16.width(anA))
+  ///     print(Unicode.UTF16.width(anA))
   ///     // Prints "1"
   ///
   ///     let anApple: Unicode.Scalar = "🍎"
   ///     print(anApple.value)
   ///     // Prints "127822"
-  ///     print(UTF16.width(anApple))
+  ///     print(Unicode.UTF16.width(anApple))
   ///     // Prints "2"
   ///
   /// - Parameter x: A Unicode scalar value.
@@ -55,17 +55,19 @@ extension Unicode.UTF16 {
   /// pair*.
   ///
   ///     let apple: Unicode.Scalar = "🍎"
-  ///     print(UTF16.leadSurrogate(apple))
+  ///     print(Unicode.UTF16.leadSurrogate(apple))
   ///     // Prints "55356"
   ///
   /// - Parameter x: A Unicode scalar value. `x` must be represented by a
   ///   surrogate pair when encoded in UTF-16. To check whether `x` is
-  ///   represented by a surrogate pair, use `UTF16.width(x) == 2`.
+  ///   represented by a surrogate pair, use `Unicode.UTF16.width(x) == 2`.
   /// - Returns: The leading surrogate code unit of `x` when encoded in UTF-16.
   @inlinable
-  public static func leadSurrogate(_ x: Unicode.Scalar) -> UTF16.CodeUnit {
+  public static func leadSurrogate(
+    _ x: Unicode.Scalar
+  ) -> Unicode.UTF16.CodeUnit {
     _precondition(width(x) == 2)
-    return 0xD800 + UTF16.CodeUnit(truncatingIfNeeded:
+    return 0xD800 + Unicode.UTF16.CodeUnit(truncatingIfNeeded:
       (x.value - 0x1_0000) &>> (10 as UInt32))
   }
 
@@ -79,17 +81,19 @@ extension Unicode.UTF16 {
   /// pair*.
   ///
   ///     let apple: Unicode.Scalar = "🍎"
-  ///     print(UTF16.trailSurrogate(apple))
+  ///     print(Unicode.UTF16.trailSurrogate(apple))
   ///     // Prints "57166"
   ///
   /// - Parameter x: A Unicode scalar value. `x` must be represented by a
   ///   surrogate pair when encoded in UTF-16. To check whether `x` is
-  ///   represented by a surrogate pair, use `UTF16.width(x) == 2`.
+  ///   represented by a surrogate pair, use `Unicode.UTF16.width(x) == 2`.
   /// - Returns: The trailing surrogate code unit of `x` when encoded in UTF-16.
   @inlinable
-  public static func trailSurrogate(_ x: Unicode.Scalar) -> UTF16.CodeUnit {
+  public static func trailSurrogate(
+    _ x: Unicode.Scalar
+  ) -> Unicode.UTF16.CodeUnit {
     _precondition(width(x) == 2)
-    return 0xDC00 + UTF16.CodeUnit(truncatingIfNeeded:
+    return 0xDC00 + Unicode.UTF16.CodeUnit(truncatingIfNeeded:
       (x.value - 0x1_0000) & (((1 as UInt32) &<< 10) - 1))
   }
 
@@ -102,7 +106,7 @@ extension Unicode.UTF16 {
   ///
   ///     let apple = "🍎"
   ///     for unit in apple.utf16 {
-  ///         print(UTF16.isLeadSurrogate(unit))
+  ///         print(Unicode.UTF16.isLeadSurrogate(unit))
   ///     }
   ///     // Prints "true"
   ///     // Prints "false"
@@ -129,7 +133,7 @@ extension Unicode.UTF16 {
   ///
   ///     let apple = "🍎"
   ///     for unit in apple.utf16 {
-  ///         print(UTF16.isTrailSurrogate(unit))
+  ///         print(Unicode.UTF16.isTrailSurrogate(unit))
   ///     }
   ///     // Prints "false"
   ///     // Prints "true"
@@ -186,9 +190,10 @@ extension Unicode.UTF16 {
   ///     print(Array(bytes))
   ///     // Prints "[70, 101, 114, 109, 97, 116, 97, 32, 240, 157, 132, 144]"
   ///
-  ///     let result = UTF16.transcodedLength(of: bytes.makeIterator(),
-  ///                                         decodedAs: UTF8.self,
-  ///                                         repairingIllFormedSequences: false)
+  ///     let result = Unicode.UTF16.transcodedLength(
+  ///         of: bytes.makeIterator(),
+  ///         decodedAs: Unicode.UTF8.self,
+  ///         repairingIllFormedSequences: false)
   ///     print(result)
   ///     // Prints "Optional((count: 10, isASCII: false))"
   ///
@@ -233,7 +238,7 @@ extension Unicode.UTF16 {
       }
       if _fastPath(peek < 0x80) { return (utf16Count, true) }
 
-      var d1 = UTF8.ForwardParser()
+      var d1 = Unicode.UTF8.ForwardParser()
       d1._buffer.append(numericCast(peek))
       d = _identityCast(d1, to: Encoding.ForwardParser.self)
     }
@@ -250,7 +255,7 @@ extension Unicode.UTF16 {
       else if let _ = s._error {
         guard _fastPath(repairingIllFormedSequences) else { return nil }
         utf16Count += 1
-        utf16BitUnion |= UTF16._replacementCodeUnit
+        utf16BitUnion |= Unicode.UTF16._replacementCodeUnit
       }
       else {
         return (utf16Count, utf16BitUnion < 0x80)
@@ -330,8 +335,8 @@ extension Unicode.UTF16: Unicode.Encoding {
   public static func transcode<FromEncoding: Unicode.Encoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
   ) -> EncodedScalar? {
-    if _fastPath(FromEncoding.self == UTF8.self) {
-      let c = _identityCast(content, to: UTF8.EncodedScalar.self)
+    if _fastPath(FromEncoding.self == Unicode.UTF8.self) {
+      let c = _identityCast(content, to: Unicode.UTF8.EncodedScalar.self)
       var b = c.count
       b = b &- 1
       if _fastPath(b == 0) {
@@ -363,8 +368,8 @@ extension Unicode.UTF16: Unicode.Encoding {
       r &= (1 &<< 21) - 1
       return encode(Unicode.Scalar(_unchecked: r))
     }
-    else if _fastPath(FromEncoding.self == UTF16.self) {
-      return unsafeBitCast(content, to: UTF16.EncodedScalar.self)
+    else if _fastPath(FromEncoding.self == Unicode.UTF16.self) {
+      return unsafeBitCast(content, to: Unicode.UTF16.EncodedScalar.self)
     }
     return encode(FromEncoding.decode(content))
   }
@@ -386,7 +391,7 @@ extension Unicode.UTF16: Unicode.Encoding {
   }
 }
 
-extension UTF16.ReverseParser: Unicode.Parser, _UTFParser {
+extension Unicode.UTF16.ReverseParser: Unicode.Parser, _UTFParser {
   public typealias Encoding = Unicode.UTF16
 
   @inlinable

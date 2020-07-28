@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -105,7 +105,7 @@ public func spawnChild(_ args: [String])
   // for more details on how to properly quote the command line for Windows.
   let command: String =
       ([CommandLine.arguments[0]] + args).joined(separator: " ")
-  command.withCString(encodedAs: UTF16.self) { cString in
+  command.withCString(encodedAs: Unicode.UTF16.self) { cString in
     if !CreateProcessW(nil, UnsafeMutablePointer<WCHAR>(mutating: cString),
                        nil, nil, true, 0, nil, nil,
                        &siStartupInfo, &piProcessInfo) {

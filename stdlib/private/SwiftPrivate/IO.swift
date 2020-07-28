@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -37,13 +37,13 @@ public struct _FDInputStream {
     // on that and remove the workaround in the test harness
     if let index =
         _buffer[0..<_offset].firstIndex(of: UInt8(Unicode.Scalar("\n").value)) {
-      let result = String(decoding: _buffer[0..<index], as: UTF8.self)
+      let result = String(decoding: _buffer[0..<index], as: Unicode.UTF8.self)
       _buffer.removeSubrange(0...index)
       _offset -= index + 1
       return result
     }
     if isEOF && _offset > 0 {
-      let result = String(decoding: _buffer[0..<_offset], as: UTF8.self)
+      let result = String(decoding: _buffer[0..<_offset], as: Unicode.UTF8.self)
       _buffer.removeAll()
       _offset = 0
       return result
@@ -94,13 +94,13 @@ public struct _FDInputStream {
   public mutating func getline() -> String? {
     if let newlineIndex =
       _buffer[0..<_bufferUsed].firstIndex(of: UInt8(Unicode.Scalar("\n").value)) {
-      let result = String(decoding: _buffer[0..<newlineIndex], as: UTF8.self)
+      let result = String(decoding: _buffer[0..<newlineIndex], as: Unicode.UTF8.self)
       _buffer.removeSubrange(0...newlineIndex)
       _bufferUsed -= newlineIndex + 1
       return result
     }
     if isEOF && _bufferUsed > 0 {
-      let result = String(decoding: _buffer[0..<_bufferUsed], as: UTF8.self)
+      let result = String(decoding: _buffer[0..<_bufferUsed], as: Unicode.UTF8.self)
       _buffer.removeAll()
       _bufferUsed = 0
       return result

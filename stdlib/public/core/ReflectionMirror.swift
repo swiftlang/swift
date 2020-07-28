@@ -169,7 +169,7 @@ extension Mirror {
     }
     
     let rawDisplayStyle = _getDisplayStyle(subject)
-    switch UnicodeScalar(Int(rawDisplayStyle)) {
+    switch Unicode.Scalar(Int(rawDisplayStyle)) {
     case "c": self.displayStyle = .class
     case "e": self.displayStyle = .enum
     case "s": self.displayStyle = .struct

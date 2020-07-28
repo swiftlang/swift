@@ -14,7 +14,7 @@ import SwiftPrivate
 //
 // These scalars should be "base characters" with regards to their position in
 // a grapheme cluster.
-let baseScalars: [UnicodeScalar] = [
+let baseScalars: [Unicode.Scalar] = [
   // U+0065 LATIN SMALL LETTER E
   "\u{0065}",
 
@@ -54,7 +54,7 @@ let baseScalars: [UnicodeScalar] = [
 
 // Single Unicode scalars that are "continuing characters" with regards to
 // their position in a grapheme cluster.
-let continuingScalars: [UnicodeScalar] = [
+let continuingScalars: [Unicode.Scalar] = [
   // U+0300 COMBINING GRAVE ACCENT
   "\u{0300}",
 
@@ -316,7 +316,7 @@ CharacterTests.test("RoundTripping/Random") {
 CharacterTests.test("forall x: ASCII . String(Character(x)) == String(x)") {
   // For all ASCII chars, constructing a Character then a String should be the
   // same as constructing a String directly.
-  let asciiDomain = (0..<128).map({ UnicodeScalar(Int($0))! })
+  let asciiDomain = (0..<128).map({ Unicode.Scalar(Int($0))! })
   expectEqualFunctionsForDomain(asciiDomain,
     { String($0) },
     { String(Character($0)) })
@@ -327,8 +327,8 @@ CharacterTests.test(
   // For all ASCII chars, constructing a Character then a String should ordered
   // the same as constructing a String directly.
   let asciiDomain = Array(0..<127)
-  let ascii0to126 = asciiDomain.map({ UnicodeScalar(Int($0))! })
-  let ascii1to127 = asciiDomain.map({ UnicodeScalar(Int($0 + 1))! })
+  let ascii0to126 = asciiDomain.map({ Unicode.Scalar(Int($0))! })
+  let ascii1to127 = asciiDomain.map({ Unicode.Scalar(Int($0 + 1))! })
   expectEqualMethodsForDomain(
     ascii0to126,
     ascii1to127,
@@ -364,7 +364,7 @@ var UnicodeScalarTests = TestSuite("UnicodeScalar")
 
 UnicodeScalarTests.test("UInt8(ascii: UnicodeScalar)") {
   for i in 0..<0x7f {
-    let us = UnicodeScalar(i)!
+    let us = Unicode.Scalar(i)!
     expectEqual(UInt8(i), UInt8(ascii: us))
   }
 }
@@ -374,7 +374,7 @@ UnicodeScalarTests.test("UInt8(ascii: UnicodeScalar)/non-ASCII should trap")
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
-  let us: UnicodeScalar = "\u{E5}"
+  let us: Unicode.Scalar = "\u{E5}"
   expectCrashLater()
   _blackHole(UInt8(ascii: us))
 }
@@ -387,17 +387,17 @@ UnicodeScalarTests.test("UInt32(_: UnicodeScalar),UInt64(_: UnicodeScalar)") {
 }
 
 UnicodeScalarTests.test("isASCII()") {
-  expectTrue(UnicodeScalar(0)!.isASCII)
-  expectTrue(("A" as UnicodeScalar).isASCII)
-  expectTrue(UnicodeScalar(127)!.isASCII)
-  expectFalse(UnicodeScalar(128)!.isASCII)
-  expectFalse(UnicodeScalar(256)!.isASCII)
+  expectTrue(Unicode.Scalar(0)!.isASCII)
+  expectTrue(("A" as Unicode.Scalar).isASCII)
+  expectTrue(Unicode.Scalar(127)!.isASCII)
+  expectFalse(Unicode.Scalar(128)!.isASCII)
+  expectFalse(Unicode.Scalar(256)!.isASCII)
 }
 
 UnicodeScalarTests.test("Comparable") {
   // FIXME: these tests are insufficient.
 
-  let CharA: UnicodeScalar = "A"
+  let CharA: Unicode.Scalar = "A"
 
   expectTrue(CharA == "A")
   expectTrue("A" == CharA)
@@ -413,8 +413,8 @@ UnicodeScalarTests.test("Comparable") {
 UnicodeScalarTests.test("LosslessStringConvertible") {
   // FIXME: these tests are insufficient.
 
-  checkLosslessStringConvertible((0xE000...0xF000).map { UnicodeScalar(Int($0))! })
-  checkLosslessStringConvertible((0...127).map { UnicodeScalar(Int($0))! })
+  checkLosslessStringConvertible((0xE000...0xF000).map { Unicode.Scalar(Int($0))! })
+  checkLosslessStringConvertible((0...127).map { Unicode.Scalar(Int($0))! })
 }
 
 if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {

@@ -417,7 +417,7 @@ extension String {
   public init<C: Collection, Encoding: Unicode.Encoding>(
     decoding codeUnits: C, as sourceEncoding: Encoding.Type
   ) where C.Iterator.Element == Encoding.CodeUnit {
-    guard _fastPath(sourceEncoding == UTF8.self) else {
+    guard _fastPath(sourceEncoding == Unicode.UTF8.self) else {
       self = String._fromCodeUnits(
         codeUnits, encoding: sourceEncoding, repair: true)!.0
       return
@@ -560,7 +560,7 @@ extension String {
     encodedAs targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
   ) rethrows -> Result {
-    if targetEncoding == UTF8.self {
+    if targetEncoding == Unicode.UTF8.self {
       return try self.withCString {
         (cPtr: UnsafePointer<CChar>) -> Result  in
         _internalInvariant(UInt8.self == TargetEncoding.CodeUnit.self)
@@ -584,7 +584,7 @@ extension String {
       arg.reserveCapacity(1 &+ self._guts.count / 4)
       let repaired = transcode(
         utf8.makeIterator(),
-        from: UTF8.self,
+        from: Unicode.UTF8.self,
         to: targetEncoding,
         stoppingOnError: false,
         into: { arg.append($0) })

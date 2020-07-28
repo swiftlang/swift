@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -44,7 +44,7 @@ extension String {
   ///
   /// - Parameter cString: A pointer to a null-terminated UTF-8 code sequence.
   public init(cString: UnsafePointer<CChar>) {
-    let len = UTF8._nullCodeUnitOffset(in: cString)
+    let len = Unicode.UTF8._nullCodeUnitOffset(in: cString)
     self = String._fromUTF8Repairing(
       UnsafeBufferPointer(start: cString._asUInt8, count: len)).0
   }
@@ -55,7 +55,7 @@ extension String {
   /// This is identical to `init(cString: UnsafePointer<CChar>)` but operates on
   /// an unsigned sequence of bytes.
   public init(cString: UnsafePointer<UInt8>) {
-    let len = UTF8._nullCodeUnitOffset(in: cString)
+    let len = Unicode.UTF8._nullCodeUnitOffset(in: cString)
     self = String._fromUTF8Repairing(
       UnsafeBufferPointer(start: cString, count: len)).0
   }
@@ -87,7 +87,7 @@ extension String {
   ///
   /// - Parameter cString: A pointer to a null-terminated UTF-8 code sequence.
   public init?(validatingUTF8 cString: UnsafePointer<CChar>) {
-    let len = UTF8._nullCodeUnitOffset(in: cString)
+    let len = Unicode.UTF8._nullCodeUnitOffset(in: cString)
     guard let str = String._tryFromUTF8(
       UnsafeBufferPointer(start: cString._asUInt8, count: len))
     else { return nil }
@@ -110,7 +110,7 @@ extension String {
   ///     let validUTF8: [UInt8] = [67, 97, 102, 195, 169, 0]
   ///     validUTF8.withUnsafeBufferPointer { ptr in
   ///         let s = String.decodeCString(ptr.baseAddress,
-  ///                                      as: UTF8.self,
+  ///                                      as: Unicode.UTF8.self,
   ///                                      repairingInvalidCodeUnits: true)
   ///         print(s)
   ///     }
@@ -119,7 +119,7 @@ extension String {
   ///     let invalidUTF8: [UInt8] = [67, 97, 102, 195, 0]
   ///     invalidUTF8.withUnsafeBufferPointer { ptr in
   ///         let s = String.decodeCString(ptr.baseAddress,
-  ///                                      as: UTF8.self,
+  ///                                      as: Unicode.UTF8.self,
   ///                                      repairingInvalidCodeUnits: true)
   ///         print(s)
   ///     }
@@ -149,7 +149,7 @@ extension String {
 
     if _fastPath(encoding == Unicode.UTF8.self) {
       let ptr = UnsafeRawPointer(cPtr).assumingMemoryBound(to: UInt8.self)
-      let len = UTF8._nullCodeUnitOffset(in: ptr)
+      let len = Unicode.UTF8._nullCodeUnitOffset(in: ptr)
       let codeUnits = UnsafeBufferPointer(start: ptr, count: len)
       if isRepairing {
         return String._fromUTF8Repairing(codeUnits)

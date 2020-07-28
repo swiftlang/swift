@@ -2,9 +2,9 @@
 // REQUIRES: executable_test
 
 struct Foo {
-  var _x : (Int, UnicodeScalar, String)
+  var _x : (Int, Unicode.Scalar, String)
 
-  var x : (Int, String, UnicodeScalar) {
+  var x : (Int, String, Unicode.Scalar) {
     get {
       var (a, b, c) = _x
       return (a, c, b)
@@ -17,7 +17,7 @@ struct Foo {
     }
   }
 
-  init(a:Int, b:String, c:UnicodeScalar) {
+  init(a:Int, b:String, c:Unicode.Scalar) {
     _x = (a, c, b)
   }
 }

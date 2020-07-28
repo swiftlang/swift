@@ -269,7 +269,7 @@ func | <M0: Pattern, M1: Pattern>(m0: M0, m1: M1) -> MatchOneOf<M0,M1> {
 
 //===--- Just for testing -------------------------------------------------===//
 struct MatchStaticString : Pattern {
-  typealias Element = UTF8.CodeUnit
+  typealias Element = Unicode.UTF8.CodeUnit
   typealias Buffer = UnsafeBufferPointer<Element>
   typealias Index = Buffer.Index
 
@@ -296,9 +296,9 @@ extension StaticString {
   }
 }
 
-extension Collection where Iterator.Element == UTF8.CodeUnit {
+extension Collection where Iterator.Element == Unicode.UTF8.CodeUnit {
   var u8str : String {
-    var a = Array<UTF8.CodeUnit>()
+    var a = Array<Unicode.UTF8.CodeUnit>()
     a.reserveCapacity(count + 1)
     a.append(contentsOf: self)
     a.append(0)
@@ -306,7 +306,7 @@ extension Collection where Iterator.Element == UTF8.CodeUnit {
   }
 }
 
-extension Pattern where Element == UTF8.CodeUnit {
+extension Pattern where Element == Unicode.UTF8.CodeUnit {
   func searchTest<C: Collection>(
     in c: C,
     format: (MatchData)->String = { String(reflecting: $0) })

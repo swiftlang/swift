@@ -7,7 +7,7 @@ struct S {
     self.a = a
     self.b = b
   }
-  init(_ x:UnicodeScalar) {
+  init(_ x: Unicode.Scalar) {
     a = 219
     b = 912
     print("constructed \(x)")
@@ -16,7 +16,7 @@ struct S {
 
 class C {
   var a, b : Int
-  init(x:UnicodeScalar) {
+  init(x: Unicode.Scalar) {
     a = 20721
     b = 12702
     print("constructed \(x)")

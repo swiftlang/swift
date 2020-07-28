@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,7 +16,7 @@
 @inlinable
 @inline(__always)
 internal func _decodeUTF8(_ x: UInt8) -> Unicode.Scalar {
-  _internalInvariant(UTF8.isASCII(x))
+  _internalInvariant(Unicode.UTF8.isASCII(x))
   return Unicode.Scalar(_unchecked: UInt32(x))
 }
 
@@ -24,7 +24,7 @@ internal func _decodeUTF8(_ x: UInt8) -> Unicode.Scalar {
 @inline(__always)
 internal func _decodeUTF8(_ x: UInt8, _ y: UInt8) -> Unicode.Scalar {
   _internalInvariant(_utf8ScalarLength(x) == 2)
-  _internalInvariant(UTF8.isContinuation(y))
+  _internalInvariant(Unicode.UTF8.isContinuation(y))
   let x = UInt32(x)
   let value = ((x & 0b0001_1111) &<< 6) | _continuationPayload(y)
   return Unicode.Scalar(_unchecked: value)
@@ -36,7 +36,8 @@ internal func _decodeUTF8(
   _ x: UInt8, _ y: UInt8, _ z: UInt8
 ) -> Unicode.Scalar {
   _internalInvariant(_utf8ScalarLength(x) == 3)
-  _internalInvariant(UTF8.isContinuation(y) && UTF8.isContinuation(z))
+  _internalInvariant(Unicode.UTF8.isContinuation(y))
+  _internalInvariant(Unicode.UTF8.isContinuation(z))
   let x = UInt32(x)
   let value = ((x & 0b0000_1111) &<< 12)
             | (_continuationPayload(y) &<< 6)
@@ -50,9 +51,9 @@ internal func _decodeUTF8(
   _ x: UInt8, _ y: UInt8, _ z: UInt8, _ w: UInt8
 ) -> Unicode.Scalar {
   _internalInvariant(_utf8ScalarLength(x) == 4)
-  _internalInvariant(
-    UTF8.isContinuation(y) && UTF8.isContinuation(z)
-    && UTF8.isContinuation(w))
+  _internalInvariant(Unicode.UTF8.isContinuation(y))
+  _internalInvariant(Unicode.UTF8.isContinuation(z))
+  _internalInvariant(Unicode.UTF8.isContinuation(w))
   let x = UInt32(x)
   let value = ((x & 0b0000_1111) &<< 18)
             | (_continuationPayload(y) &<< 12)
@@ -66,20 +67,20 @@ internal func _decodeScalar(
 ) -> (Unicode.Scalar, scalarLength: Int) {
   let high = utf16[i]
   if i + 1 >= utf16.count {
-    _internalInvariant(!UTF16.isLeadSurrogate(high))
-    _internalInvariant(!UTF16.isTrailSurrogate(high))
+    _internalInvariant(!Unicode.UTF16.isLeadSurrogate(high))
+    _internalInvariant(!Unicode.UTF16.isTrailSurrogate(high))
     return (Unicode.Scalar(_unchecked: UInt32(high)), 1)
   }
 
-  if !UTF16.isLeadSurrogate(high) {
-    _internalInvariant(!UTF16.isTrailSurrogate(high))
+  if !Unicode.UTF16.isLeadSurrogate(high) {
+    _internalInvariant(!Unicode.UTF16.isTrailSurrogate(high))
     return (Unicode.Scalar(_unchecked: UInt32(high)), 1)
   }
 
   let low = utf16[i+1]
-  _internalInvariant(UTF16.isLeadSurrogate(high))
-  _internalInvariant(UTF16.isTrailSurrogate(low))
-  return (UTF16._decodeSurrogates(high, low), 2)
+  _internalInvariant(Unicode.UTF16.isLeadSurrogate(high))
+  _internalInvariant(Unicode.UTF16.isTrailSurrogate(low))
+  return (Unicode.UTF16._decodeSurrogates(high, low), 2)
 }
 
 @inlinable
@@ -116,8 +117,8 @@ internal func _decodeScalar(
 
 @inlinable @inline(__always)
 internal func _utf8ScalarLength(_ x: UInt8) -> Int {
-  _internalInvariant(!UTF8.isContinuation(x))
-  if UTF8.isASCII(x) { return 1 }
+  _internalInvariant(!Unicode.UTF8.isContinuation(x))
+  if Unicode.UTF8.isASCII(x) { return 1 }
   // TODO(String micro-performance): check codegen
   return (~x).leadingZeroBitCount
 }
@@ -127,7 +128,7 @@ internal func _utf8ScalarLength(
   _ utf8: UnsafeBufferPointer<UInt8>, endingAt i: Int
   ) -> Int {
   var len = 1
-  while UTF8.isContinuation(utf8[_unchecked: i &- len]) {
+  while Unicode.UTF8.isContinuation(utf8[_unchecked: i &- len]) {
     len &+= 1
   }
   _internalInvariant(len == _utf8ScalarLength(utf8[i &- len]))
@@ -147,7 +148,7 @@ internal func _scalarAlign(
   guard _fastPath(idx != utf8.count) else { return idx }
 
   var i = idx
-  while _slowPath(UTF8.isContinuation(utf8[_unchecked: i])) {
+  while _slowPath(Unicode.UTF8.isContinuation(utf8[_unchecked: i])) {
     i &-= 1
     _internalInvariant(i >= 0,
       "Malformed contents: starts with continuation byte")
@@ -216,9 +217,11 @@ extension _StringGuts {
     _internalInvariant(isFastUTF8)
 
     return self.withFastUTF8 { utf8 in
-      _internalInvariant(i == utf8.count || !UTF8.isContinuation(utf8[i]))
+      _internalInvariant(
+        i == utf8.count || !Unicode.UTF8.isContinuation(utf8[i])
+      )
       var len = 1
-      while UTF8.isContinuation(utf8[i &- len]) {
+      while Unicode.UTF8.isContinuation(utf8[i &- len]) {
         _internalInvariant(i &- len > 0)
         len += 1
       }
@@ -244,7 +247,7 @@ extension _StringGuts {
 
     if _fastPath(isFastUTF8) {
       return self.withFastUTF8 {
-        return !UTF8.isContinuation($0[i._encodedOffset])
+        return !Unicode.UTF8.isContinuation($0[i._encodedOffset])
       }
     }
 
@@ -278,7 +281,7 @@ extension _StringGuts {
     let start = idx._encodedOffset
     let leading = _getForeignCodeUnit(at: start)
 
-    if _fastPath(!UTF16.isSurrogate(leading)) {
+    if _fastPath(!Unicode.UTF16.isSurrogate(leading)) {
       return (Unicode.Scalar(_unchecked: UInt32(leading)), 1)
     }
 
@@ -288,15 +291,17 @@ extension _StringGuts {
     // TODO(String performance): Consider having a valid performance flag
     // available to check, and assert it's not set in the condition here.
     let nextOffset = start &+ 1
-    if _slowPath(UTF16.isTrailSurrogate(leading) || nextOffset == self.count) {
+    if _slowPath(
+      Unicode.UTF16.isTrailSurrogate(leading) || nextOffset == self.count
+    ) {
       return (Unicode.Scalar._replacementCharacter, 1)
     }
     let trailing = _getForeignCodeUnit(at: nextOffset)
-    if _slowPath(!UTF16.isTrailSurrogate(trailing)) {
+    if _slowPath(!Unicode.UTF16.isTrailSurrogate(trailing)) {
       return (Unicode.Scalar._replacementCharacter, 1)
     }
 
-    return (UTF16._decodeSurrogates(leading, trailing), 2)
+    return (Unicode.UTF16._decodeSurrogates(leading, trailing), 2)
   }
 
   @_effects(releasenone)
@@ -309,7 +314,7 @@ extension _StringGuts {
 
     let end = idx._encodedOffset
     let trailing = _getForeignCodeUnit(at: end &- 1)
-    if _fastPath(!UTF16.isSurrogate(trailing)) {
+    if _fastPath(!Unicode.UTF16.isSurrogate(trailing)) {
       return (Unicode.Scalar(_unchecked: UInt32(trailing)), 1)
     }
 
@@ -319,15 +324,15 @@ extension _StringGuts {
     // TODO(String performance): Consider having a valid performance flag
     // available to check, and assert it's not set in the condition here.
     let priorOffset = end &- 2
-    if _slowPath(UTF16.isLeadSurrogate(trailing) || priorOffset < 0) {
+    if _slowPath(Unicode.UTF16.isLeadSurrogate(trailing) || priorOffset < 0) {
       return (Unicode.Scalar._replacementCharacter, 1)
     }
     let leading = _getForeignCodeUnit(at: priorOffset)
-    if _slowPath(!UTF16.isLeadSurrogate(leading)) {
+    if _slowPath(!Unicode.UTF16.isLeadSurrogate(leading)) {
       return (Unicode.Scalar._replacementCharacter, 1)
     }
 
-    return (UTF16._decodeSurrogates(leading, trailing), 2)
+    return (Unicode.UTF16._decodeSurrogates(leading, trailing), 2)
   }
 
   @_effects(releasenone)
@@ -339,7 +344,7 @@ extension _StringGuts {
 
     let start = idx._encodedOffset
     let cu = _getForeignCodeUnit(at: start)
-    if _fastPath(!UTF16.isSurrogate(cu)) {
+    if _fastPath(!Unicode.UTF16.isSurrogate(cu)) {
       return cu
     }
 
@@ -348,16 +353,16 @@ extension _StringGuts {
     //
     // TODO(String performance): Consider having a valid performance flag
     // available to check, and assert it's not set in the condition here.
-    if UTF16.isLeadSurrogate(cu) {
+    if Unicode.UTF16.isLeadSurrogate(cu) {
       let nextOffset = start &+ 1
       guard nextOffset < self.count,
-            UTF16.isTrailSurrogate(_getForeignCodeUnit(at: nextOffset))
-      else { return UTF16._replacementCodeUnit }
+            Unicode.UTF16.isTrailSurrogate(_getForeignCodeUnit(at: nextOffset))
+      else { return Unicode.UTF16._replacementCodeUnit }
     } else {
       let priorOffset = start &- 1
       guard priorOffset >= 0,
-            UTF16.isLeadSurrogate(_getForeignCodeUnit(at: priorOffset))
-      else { return UTF16._replacementCodeUnit }
+            Unicode.UTF16.isLeadSurrogate(_getForeignCodeUnit(at: priorOffset))
+      else { return Unicode.UTF16._replacementCodeUnit }
     }
 
     return cu
@@ -371,7 +376,7 @@ extension _StringGuts {
     _internalInvariant(idx._encodedOffset < self.count)
 
     let ecCU = foreignErrorCorrectedUTF16CodeUnit(at: idx)
-    if _fastPath(!UTF16.isTrailSurrogate(ecCU)) {
+    if _fastPath(!Unicode.UTF16.isTrailSurrogate(ecCU)) {
       return idx._scalarAligned
     }
     _internalInvariant(idx._encodedOffset > 0,

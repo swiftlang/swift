@@ -1,3 +1,15 @@
+//===--- StringUTF8Validation.swift ---------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2018 - 2020 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
 private func _isUTF8MultiByteLeading(_ x: UInt8) -> Bool {
   return (0xC2...0xF4).contains(x)
 }
@@ -7,7 +19,7 @@ private func _isNotOverlong_F0(_ x: UInt8) -> Bool {
 }
 
 private func _isNotOverlong_F4(_ x: UInt8) -> Bool {
-  return UTF8.isContinuation(x) && x <= 0x8F
+  return Unicode.UTF8.isContinuation(x) && x <= 0x8F
 }
 
 private func _isNotOverlong_E0(_ x: UInt8) -> Bool {
@@ -15,7 +27,7 @@ private func _isNotOverlong_E0(_ x: UInt8) -> Bool {
 }
 
 private func _isNotOverlong_ED(_ x: UInt8) -> Bool {
-  return UTF8.isContinuation(x) && x <= 0x9F
+  return Unicode.UTF8.isContinuation(x) && x <= 0x9F
 }
 
 internal struct UTF8ExtraInfo: Equatable {
@@ -44,11 +56,11 @@ internal func validateUTF8(_ buf: UnsafeBufferPointer<UInt8>) -> UTF8ValidationR
     guard f(cu) else { throw UTF8ValidationError() }
   }
   @inline(__always) func guaranteeContinuation() throws {
-    try guaranteeIn(UTF8.isContinuation)
+    try guaranteeIn(Unicode.UTF8.isContinuation)
   }
 
   func _legacyInvalidLengthCalculation(_ _buffer: (_storage: UInt32, ())) -> Int {
-    // function body copied from UTF8.ForwardParser._invalidLength
+    // function body copied from Unicode.UTF8.ForwardParser._invalidLength
     if _buffer._storage               & 0b0__1100_0000__1111_0000
                                      == 0b0__1000_0000__1110_0000 {
       // 2-byte prefix of 3-byte sequence. The top 5 bits of the decoded result
@@ -90,7 +102,7 @@ internal func validateUTF8(_ buf: UnsafeBufferPointer<UInt8>) -> UTF8ValidationR
     var endIndex = buf.startIndex
     var iter = buf.makeIterator()
     _ = iter.next()
-    while let cu = iter.next(), UTF8.isContinuation(cu) {
+    while let cu = iter.next(), Unicode.UTF8.isContinuation(cu) {
       endIndex += 1
     }
     let illegalRange = Range(buf.startIndex...endIndex)
@@ -103,7 +115,7 @@ internal func validateUTF8(_ buf: UnsafeBufferPointer<UInt8>) -> UTF8ValidationR
   do {
     var isASCII = true
     while let cu = iter.next() {
-      if UTF8.isASCII(cu) { lastValidIndex &+= 1; continue }
+      if Unicode.UTF8.isASCII(cu) { lastValidIndex &+= 1; continue }
       isASCII = false
       if _slowPath(!_isUTF8MultiByteLeading(cu)) {
         throw UTF8ValidationError()
