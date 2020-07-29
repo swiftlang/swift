@@ -78,7 +78,7 @@ function(add_sourcekit_default_compiler_flags target)
       ${${SWIFT_HOST_VARIANT_ARCH}_INCLUDE})
   endif()
   target_compile_options(${target} PRIVATE
-    -fblocks)
+    ${c_compile_flags} -fblocks)
   target_link_options(${target} PRIVATE
     ${link_flags})
   target_link_directories(${target} PRIVATE
