@@ -68,7 +68,7 @@ class CommandRunner(object):
         self.run_sftp(sftp_commands)
 
     def run_remote(self, command, remote_env={}):
-        env_strings = ['{0}={1}'.format(k,v) for k,v in remote_env.items()]
+        env_strings = ['{0}={1}'.format(k,v) for k,v in sorted(remote_env.items())]
         remote_invocation = self.remote_invocation(
             ['/usr/bin/env'] + env_strings + command)
         remote_proc = self.popen(remote_invocation, stdin=subprocess.PIPE,
