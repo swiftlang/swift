@@ -243,11 +243,11 @@ private:
       if (key == "moduleName") {
         moduleName = val;
       } else if (key == "modulePath") {
-        result.modulePath = val;
+        result.modulePath = val.str();
       } else if (key == "docPath") {
-        result.moduleDocPath = val;
+        result.moduleDocPath = val.str();
       } else if (key == "sourceInfoPath") {
-        result.moduleSourceInfoPath = val;
+        result.moduleSourceInfoPath = val.str();
       } else {
         // Being forgiving for future fields.
         continue;
