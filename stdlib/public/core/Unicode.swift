@@ -2,11 +2,17 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// [SE-0163] UnicodeCodec and UnicodeDecodingResult are "soft deprecated" only.
+// See the API_TO_BE_DEPRECATED macro in the <os/availability.h> header.
+// Another evolution proposal might be required, to formally deprecate them.
 //
 //===----------------------------------------------------------------------===//
 
@@ -20,6 +26,7 @@ import SwiftShims
 /// Each `UnicodeDecodingResult` instance can represent a Unicode scalar value,
 /// an indication that no more Unicode scalars are available, or an indication
 /// of a decoding error.
+@available(swift, deprecated: 100000, message: "[SE-0163] Use the Unicode.Encoding APIs")
 @frozen
 public enum UnicodeDecodingResult: Equatable {
   /// A decoded Unicode scalar value.
@@ -30,23 +37,6 @@ public enum UnicodeDecodingResult: Equatable {
   
   /// An indication of a decoding error.
   case error
-
-  @inlinable
-  public static func == (
-    lhs: UnicodeDecodingResult,
-    rhs: UnicodeDecodingResult
-  ) -> Bool {
-    switch (lhs, rhs) {
-    case (.scalarValue(let lhsScalar), .scalarValue(let rhsScalar)):
-      return lhsScalar == rhsScalar
-    case (.emptyInput, .emptyInput):
-      return true
-    case (.error, .error):
-      return true
-    default:
-      return false
-    }
-  }
 }
 
 /// A Unicode encoding form that translates between Unicode scalar values and
@@ -58,6 +48,7 @@ public enum UnicodeDecodingResult: Equatable {
 /// UTF-8, UTF-16, and UTF-32 encoding schemes as the `UTF8`, `UTF16`, and
 /// `UTF32` types, respectively. Use the `Unicode.Scalar` type to work with
 /// decoded Unicode scalar values.
+@available(swift, deprecated: 100000, message: "[SE-0163] Use the Unicode.Encoding APIs")
 public protocol UnicodeCodec: Unicode.Encoding {
 
   /// Creates an instance of the codec.
@@ -139,6 +130,7 @@ public protocol UnicodeCodec: Unicode.Encoding {
 
 /// A codec for translating between Unicode scalar values and UTF-8 code
 /// units.
+@available(swift, deprecated: 100000, message: "[SE-0163] Use the Unicode.Encoding APIs")
 extension Unicode.UTF8: UnicodeCodec {
   /// Creates an instance of the UTF-8 codec.
   @inlinable
@@ -276,6 +268,9 @@ extension Unicode.UTF8: UnicodeCodec {
     if _fastPath(s == 0) { return }
     processCodeUnit(UInt8(truncatingIfNeeded: s) &- 0x01)
   }
+}
+
+extension Unicode.UTF8 {
 
   /// Returns a Boolean value indicating whether the specified code unit is a
   /// UTF-8 continuation byte.
@@ -316,6 +311,7 @@ extension Unicode.UTF8: UnicodeCodec {
 
 /// A codec for translating between Unicode scalar values and UTF-16 code
 /// units.
+@available(swift, deprecated: 100000, message: "[SE-0163] Use the Unicode.Encoding APIs")
 extension Unicode.UTF16: UnicodeCodec {
   /// Creates an instance of the UTF-16 codec.
   @inlinable
@@ -428,6 +424,7 @@ extension Unicode.UTF16: UnicodeCodec {
 
 /// A codec for translating between Unicode scalar values and UTF-32 code
 /// units.
+@available(swift, deprecated: 100000, message: "[SE-0163] Use the Unicode.Encoding APIs")
 extension Unicode.UTF32: UnicodeCodec {
   /// Creates an instance of the UTF-32 codec.
   @inlinable
@@ -643,6 +640,7 @@ extension Unicode.Scalar {
   }
 }
 
+@available(swift, deprecated: 100000, message: "[SE-0163] Use the Unicode.Encoding APIs")
 extension UnicodeCodec {
   @inlinable
   public static func _nullCodeUnitOffset(

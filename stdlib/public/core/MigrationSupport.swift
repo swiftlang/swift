@@ -2,16 +2,18 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-
+//
 // This file contains only support for types deprecated from previous versions
 // of Swift
+//
+//===----------------------------------------------------------------------===//
 
 @available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "BidirectionalCollection")
 public typealias BidirectionalIndexable = BidirectionalCollection
@@ -243,17 +245,22 @@ extension String.UnicodeScalarView: _CustomPlaygroundQuickLookable {
   }
 }
 
-//===--- Slicing Support --------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+//
+// [SE-0163] The following typealiases are "soft deprecated" only.
+// See the API_TO_BE_DEPRECATED macro in the <os/availability.h> header.
+// Another evolution proposal might be required, to formally deprecate them.
 
-// @available(swift,deprecated: 5.0, renamed: "Unicode.UTF8")
+@available(swift, deprecated: 100000, renamed: "Unicode.UTF8")
 public typealias UTF8 = Unicode.UTF8
-// @available(swift, deprecated: 5.0, renamed: "Unicode.UTF16")
+@available(swift, deprecated: 100000, renamed: "Unicode.UTF16")
 public typealias UTF16 = Unicode.UTF16
-// @available(swift, deprecated: 5.0, renamed: "Unicode.UTF32")
+@available(swift, deprecated: 100000, renamed: "Unicode.UTF32")
 public typealias UTF32 = Unicode.UTF32
-// @available(swift, deprecated: 5.0, renamed: "Unicode.Scalar")
+@available(swift, deprecated: 100000, renamed: "Unicode.Scalar")
 public typealias UnicodeScalar = Unicode.Scalar
 
+//===----------------------------------------------------------------------===//
 
 extension String.UTF16View: _CustomPlaygroundQuickLookable {
   @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "UTF16View.customPlaygroundQuickLook will be removed in Swift 5.0")
