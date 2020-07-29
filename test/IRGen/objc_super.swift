@@ -136,5 +136,5 @@ class GenericRuncer<T> : Gizmo {
 }
 
 // CHECK: define internal swiftcc void [[PARTIAL_FORWARDING_THUNK]](%swift.refcounted* swiftself %0) {{.*}} {
-// CHECK: @"$ss12StaticStringV14withUTF8BufferyxxSRys5UInt8VGXElFyAEcfU_"
+// CHECK: @"$ss12StaticStringV14withUTF8BufferyxxSRys5UInt8VGXElFxAFXEfU_"
 // CHECK: }
