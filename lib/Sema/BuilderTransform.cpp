@@ -1208,7 +1208,7 @@ public:
     // Note that this is for staging in support for buildLimitedAvailability();
     // the diagnostic is currently a warning, so that existing code that
     // compiles today will continue to compile. Once function builder types
-    // have had the change to adopt buildLimitedAvailability(), we'll upgrade
+    // have had the chance to adopt buildLimitedAvailability(), we'll upgrade
     // this warning to an error.
     if (auto availabilityCond = findAvailabilityCondition(ifStmt->getCond())) {
       SourceLoc loc = availabilityCond->getStartLoc();
