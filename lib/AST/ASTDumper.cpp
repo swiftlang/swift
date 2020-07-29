@@ -561,8 +561,7 @@ namespace {
       };
 
       if (const auto GC = Owner.dyn_cast<const GenericContext *>()) {
-        if (!GC->isGeneric() || isa<ProtocolDecl>(GC))
-          printWhere(GC->getTrailingWhereClause());
+        printWhere(GC->getTrailingWhereClause());
       } else {
         const auto ATD = Owner.get<const AssociatedTypeDecl *>();
         printWhere(ATD->getTrailingWhereClause());
@@ -730,9 +729,9 @@ namespace {
       OS << ' ';
       printDeclName(VD);
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
-        printGenericParameters(OS, AFD->getGenericParams());
+        printGenericParameters(OS, AFD->getParsedGenericParams());
       if (auto *GTD = dyn_cast<GenericTypeDecl>(VD))
-        printGenericParameters(OS, GTD->getGenericParams());
+        printGenericParameters(OS, GTD->getParsedGenericParams());
 
       if (auto *var = dyn_cast<VarDecl>(VD)) {
         PrintWithColorRAII(OS, TypeColor) << " type='";

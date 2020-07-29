@@ -485,7 +485,7 @@ private:
       bool SafeToAskForGenerics = !isa<ExtensionDecl>(D) &&
         !isa<ProtocolDecl>(D);
       if (SafeToAskForGenerics) {
-        if (auto *GP = GC->getGenericParams()) {
+        if (auto *GP = GC->getParsedGenericParams()) {
           if (!handleAngles(GP->getLAngleLoc(), GP->getRAngleLoc(), ContextLoc))
             return Stop;
         }
@@ -1583,7 +1583,9 @@ private:
         return Ctx;
       if (auto Ctx = getIndentContextFrom(AFD->getParameters(), ContextLoc))
         return Ctx;
-      if (auto Ctx = getIndentContextFrom(AFD->getGenericParams(), ContextLoc, D))
+      if (auto Ctx = getIndentContextFrom(AFD->getParsedGenericParams(), ContextLoc, D))
+        return Ctx;
+      if (auto Ctx = getIndentContextFrom(AFD->getTrailingWhereClause(), ContextLoc, D))
         return Ctx;
 
       if (TrailingTarget)
@@ -1598,7 +1600,7 @@ private:
         return Ctx;
       if (auto Ctx = getIndentContextFromBraces(NTD->getBraces(), ContextLoc, NTD))
         return Ctx;
-      if (auto Ctx = getIndentContextFrom(NTD->getGenericParams(), ContextLoc, D))
+      if (auto Ctx = getIndentContextFrom(NTD->getParsedGenericParams(), ContextLoc, D))
         return Ctx;
       if (auto Ctx = getIndentContextFrom(NTD->getTrailingWhereClause(), ContextLoc, D))
         return Ctx;
@@ -1656,7 +1658,9 @@ private:
         return Ctx;
       if (auto Ctx = getIndentContextFrom(SD->getIndices(), ContextLoc))
         return Ctx;
-      if (auto Ctx = getIndentContextFrom(SD->getGenericParams(), ContextLoc, D))
+      if (auto Ctx = getIndentContextFrom(SD->getParsedGenericParams(), ContextLoc, D))
+        return Ctx;
+      if (auto Ctx = getIndentContextFrom(SD->getTrailingWhereClause(), ContextLoc, D))
         return Ctx;
 
       if (TrailingTarget)
@@ -1752,7 +1756,11 @@ private:
     if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
       SourceLoc ContextLoc = TAD->getStartLoc();
 
-      if (auto Ctx = getIndentContextFrom(TAD->getGenericParams(), ContextLoc,
+      if (auto Ctx = getIndentContextFrom(TAD->getParsedGenericParams(), ContextLoc,
+                                          D)) {
+        return Ctx;
+      }
+      if (auto Ctx = getIndentContextFrom(TAD->getTrailingWhereClause(), ContextLoc,
                                           D)) {
         return Ctx;
       }
@@ -1874,11 +1882,6 @@ private:
         return Ctx;
     }
 
-    SourceRange TrailingRange = GP->getTrailingWhereClauseSourceRange();
-    if (auto Ctx = getIndentContextFromWhereClause(GP->getRequirements(),
-                                                   TrailingRange, ContextLoc,
-                                                   WalkableParent))
-      return Ctx;
     return None;
   }
 
