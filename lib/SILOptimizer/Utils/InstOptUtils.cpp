@@ -43,6 +43,11 @@ using namespace swift;
 static llvm::cl::opt<bool> EnableExpandAll("enable-expand-all",
                                            llvm::cl::init(false));
 
+static llvm::cl::opt<bool> KeepWillThrowCall(
+    "keep-will-throw-call", llvm::cl::init(false),
+    llvm::cl::desc(
+      "Keep calls to swift_willThrow, even if the throw is optimized away"));
+
 /// Creates an increment on \p Ptr before insertion point \p InsertPt that
 /// creates a strong_retain if \p Ptr has reference semantics itself or a
 /// retain_value if \p Ptr is a non-trivial value without reference-semantics.
@@ -665,6 +670,91 @@ void swift::eraseUsesOfValue(SILValue v) {
     inst->replaceAllUsesOfAllResultsWithUndef();
     inst->eraseFromParent();
   }
+}
+
+SILValue swift::
+getConcreteValueOfExistentialBox(AllocExistentialBoxInst *existentialBox,
+                                  SILInstruction *ignoreUser) {
+  StoreInst *singleStore = nullptr;
+  for (Operand *use : getNonDebugUses(existentialBox)) {
+    SILInstruction *user = use->getUser();
+    switch (user->getKind()) {
+      case SILInstructionKind::StrongRetainInst:
+      case SILInstructionKind::StrongReleaseInst:
+        break;
+      case SILInstructionKind::ProjectExistentialBoxInst: {
+        auto *projectedAddr = cast<ProjectExistentialBoxInst>(user);
+        for (Operand *addrUse : getNonDebugUses(projectedAddr)) {
+          if (auto *store = dyn_cast<StoreInst>(addrUse->getUser())) {
+            assert(store->getSrc() != projectedAddr &&
+                   "cannot store an address");
+            // Bail if there are multiple stores.
+            if (singleStore)
+              return SILValue();
+            singleStore = store;
+            continue;
+          }
+          // If there are other users to the box value address then bail out.
+          return SILValue();
+        }
+        break;
+      }
+      case SILInstructionKind::BuiltinInst: {
+        auto *builtin = cast<BuiltinInst>(user);
+        if (KeepWillThrowCall ||
+            builtin->getBuiltinInfo().ID != BuiltinValueKind::WillThrow) {
+          return SILValue();
+        }
+        break;
+      }
+      default:
+        if (user != ignoreUser)
+          return SILValue();
+        break;
+    }
+  }
+  if (!singleStore)
+    return SILValue();
+  return singleStore->getSrc();
+}
+
+SILValue swift::
+getConcreteValueOfExistentialBoxAddr(SILValue addr, SILInstruction *ignoreUser) {
+  auto *stackLoc = dyn_cast<AllocStackInst>(addr);
+  if (!stackLoc)
+    return SILValue();
+
+  StoreInst *singleStackStore = nullptr;
+  for (Operand *stackUse : stackLoc->getUses()) {
+    SILInstruction *stackUser = stackUse->getUser();
+    switch (stackUser->getKind()) {
+      case SILInstructionKind::DeallocStackInst:
+      case SILInstructionKind::DebugValueAddrInst:
+      case SILInstructionKind::LoadInst:
+        break;
+      case SILInstructionKind::StoreInst: {
+        auto *store = cast<StoreInst>(stackUser);
+        assert(store->getSrc() != stackLoc && "cannot store an address");
+        // Bail if there are multiple stores.
+        if (singleStackStore)
+          return SILValue();
+        singleStackStore = store;
+        break;
+      }
+      default:
+        if (stackUser != ignoreUser)
+          return SILValue();
+        break;
+    }
+  }
+  if (!singleStackStore)
+    return SILValue();
+
+  auto *box = dyn_cast<AllocExistentialBoxInst>(singleStackStore->getSrc());
+  if (!box)
+    return SILValue();
+
+  return getConcreteValueOfExistentialBox(box, singleStackStore);
 }
 
 // Devirtualization of functions with covariant return types produces
