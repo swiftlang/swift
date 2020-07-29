@@ -432,12 +432,19 @@ struct OwnershipModelEliminator : SILFunctionTransform {
         FunctionBodyDeserializationNotificationHandler;
     std::unique_ptr<DeserializationNotificationHandler> ptr;
     if (SkipTransparent) {
-      ptr.reset(new NotificationHandlerTy(
-          prepareNonTransparentSILFunctionForOptimization));
+      if (!Mod.hasRegisteredDeserializationNotificationHandlerForNonTransparentFuncOME()) {
+        ptr.reset(new NotificationHandlerTy(
+            prepareNonTransparentSILFunctionForOptimization));
+        Mod.registerDeserializationNotificationHandler(std::move(ptr));
+        Mod.setRegisteredDeserializationNotificationHandlerForNonTransparentFuncOME();
+      }
     } else {
-      ptr.reset(new NotificationHandlerTy(prepareSILFunctionForOptimization));
+      if (!Mod.hasRegisteredDeserializationNotificationHandlerForAllFuncOME()) {
+        ptr.reset(new NotificationHandlerTy(prepareSILFunctionForOptimization));
+        Mod.registerDeserializationNotificationHandler(std::move(ptr));
+        Mod.setRegisteredDeserializationNotificationHandlerForAllFuncOME();
+      }
     }
-    Mod.registerDeserializationNotificationHandler(std::move(ptr));
   }
 };
 
