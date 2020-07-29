@@ -3836,19 +3836,23 @@ void TypeChecker::checkUnsupportedProtocolType(Decl *decl) {
     return;
 
   auto &ctx = decl->getASTContext();
-  if (auto *protocolDecl = dyn_cast<ProtocolDecl>(decl))
+  if (auto *protocolDecl = dyn_cast<ProtocolDecl>(decl)) {
     checkUnsupportedProtocolType(ctx, protocolDecl->getTrailingWhereClause());
-  else if (auto *genericDecl = dyn_cast<GenericTypeDecl>(decl))
+  } else if (auto *genericDecl = dyn_cast<GenericTypeDecl>(decl)) {
     checkUnsupportedProtocolType(ctx, genericDecl->getGenericParams());
-  else if (auto *assocType = dyn_cast<AssociatedTypeDecl>(decl))
+    checkUnsupportedProtocolType(ctx, genericDecl->getTrailingWhereClause());
+  } else if (auto *assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
     checkUnsupportedProtocolType(ctx, assocType->getTrailingWhereClause());
-  else if (auto *extDecl = dyn_cast<ExtensionDecl>(decl))
+  } else if (auto *extDecl = dyn_cast<ExtensionDecl>(decl)) {
     checkUnsupportedProtocolType(ctx, extDecl->getTrailingWhereClause());
-  else if (auto *subscriptDecl = dyn_cast<SubscriptDecl>(decl))
+  } else if (auto *subscriptDecl = dyn_cast<SubscriptDecl>(decl)) {
     checkUnsupportedProtocolType(ctx, subscriptDecl->getGenericParams());
-  else if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(decl)) {
-    if (!isa<AccessorDecl>(funcDecl))
+    checkUnsupportedProtocolType(ctx, subscriptDecl->getTrailingWhereClause());
+  } else if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(decl)) {
+    if (!isa<AccessorDecl>(funcDecl)) {
       checkUnsupportedProtocolType(ctx, funcDecl->getGenericParams());
+      checkUnsupportedProtocolType(ctx, funcDecl->getTrailingWhereClause());
+    }
   }
 
   if (isa<TypeDecl>(decl) || isa<ExtensionDecl>(decl))
