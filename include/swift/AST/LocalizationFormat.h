@@ -36,9 +36,9 @@ using namespace llvm::support;
 
 class LocalizationWriterInfo {
 public:
-  using key_type = llvm::StringRef;
+  using key_type = std::string;
   using key_type_ref = key_type;
-  using data_type = llvm::StringRef;
+  using data_type = std::string;
   using data_type_ref = data_type;
   using hash_value_type = uint32_t;
   using offset_type = uint32_t;
