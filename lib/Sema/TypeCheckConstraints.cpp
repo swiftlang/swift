@@ -1981,24 +1981,6 @@ void ParentConditionalConformance::diagnoseConformanceStack(
   }
 }
 
-GenericRequirementsCheckListener::~GenericRequirementsCheckListener() {}
-
-bool GenericRequirementsCheckListener::shouldCheck(RequirementKind kind,
-                                                   Type first, Type second) {
-  return true;
-}
-
-void GenericRequirementsCheckListener::satisfiedConformance(
-                                          Type depTy, Type replacementTy,
-                                          ProtocolConformanceRef conformance) {
-}
-
-bool GenericRequirementsCheckListener::diagnoseUnsatisfiedRequirement(
-    const Requirement &req, Type first, Type second,
-    ArrayRef<ParentConditionalConformance> parents) {
-  return false;
-}
-
 namespace {
 /// Produce any additional syntactic diagnostics for the body of a function
 /// that had a function builder applied.

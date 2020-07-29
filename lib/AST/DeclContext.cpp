@@ -301,13 +301,9 @@ bool DeclContext::isGenericContext() const {
       if (auto GC = decl->getAsGenericContext()) {
         if (GC->getGenericParams())
           return true;
-
-        // Extensions do not capture outer generic parameters.
-        if (isa<ExtensionDecl>(decl))
-          break;
       }
     }
-  } while ((dc = dc->getParent()));
+  } while ((dc = dc->getParentForLookup()));
 
   return false;
 }

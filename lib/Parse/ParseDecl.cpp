@@ -5052,10 +5052,10 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
   TAD->setUnderlyingTypeRepr(UnderlyingTy.getPtrOrNull());
   TAD->getAttrs() = Attributes;
 
-  // Parse a 'where' clause if present, adding it to our GenericParamList.
+  // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
     ContextChange CC(*this, TAD);
-    Status |= parseFreestandingGenericWhereClause(TAD, genericParams, Flags);
+    Status |= parseFreestandingGenericWhereClause(TAD);
   }
 
   if (UnderlyingTy.isNull()) {
@@ -6393,11 +6393,11 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
     }
   }
   
-  // Parse a 'where' clause if present, adding it to our GenericParamList.
+  // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
     ContextChange CC(*this, FD);
 
-    Status |= parseFreestandingGenericWhereClause(FD, GenericParams, Flags);
+    Status |= parseFreestandingGenericWhereClause(FD);
     if (Status.hasCodeCompletion() && !CodeCompletion) {
       // Trigger delayed parsing, no need to continue.
       return Status;
@@ -6650,10 +6650,9 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
   
-  // Parse a 'where' clause if present, adding it to our GenericParamList.
+  // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
-    auto whereStatus =
-        parseFreestandingGenericWhereClause(ED, GenericParams, Flags);
+    auto whereStatus = parseFreestandingGenericWhereClause(ED);
     if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
       // Trigger delayed parsing, no need to continue.
       return whereStatus;
@@ -6931,10 +6930,9 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
 
-  // Parse a 'where' clause if present, adding it to our GenericParamList.
+  // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
-    auto whereStatus =
-        parseFreestandingGenericWhereClause(SD, GenericParams, Flags);
+    auto whereStatus = parseFreestandingGenericWhereClause(SD);
     if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
       // Trigger delayed parsing, no need to continue.
       return whereStatus;
@@ -7044,10 +7042,9 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
 
-  // Parse a 'where' clause if present, adding it to our GenericParamList.
+  // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
-    auto whereStatus =
-        parseFreestandingGenericWhereClause(CD, GenericParams, Flags);
+    auto whereStatus = parseFreestandingGenericWhereClause(CD);
     if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
       // Trigger delayed parsing, no need to continue.
       return whereStatus;
@@ -7287,12 +7284,11 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
 
   DefaultArgs.setFunctionContext(Subscript, Subscript->getIndices());
 
-  // Parse a 'where' clause if present, adding it to our GenericParamList.
+  // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
     ContextChange CC(*this, Subscript);
 
-    Status |= parseFreestandingGenericWhereClause(Subscript, GenericParams,
-                                                  Flags);
+    Status |= parseFreestandingGenericWhereClause(Subscript);
     if (Status.hasCodeCompletion() && !CodeCompletion) {
       // Trigger delayed parsing, no need to continue.
       return Status;
@@ -7430,11 +7426,11 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   CD->setImplicitlyUnwrappedOptional(IUO);
   CD->getAttrs() = Attributes;
 
-  // Parse a 'where' clause if present, adding it to our GenericParamList.
+  // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
     ContextChange(*this, CD);
 
-    Status |= parseFreestandingGenericWhereClause(CD, GenericParams, Flags);
+    Status |= parseFreestandingGenericWhereClause(CD);
     if (Status.hasCodeCompletion() && !CodeCompletion) {
       // Trigger delayed parsing, no need to continue.
       return Status;

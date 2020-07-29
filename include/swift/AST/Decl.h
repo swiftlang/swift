@@ -1190,9 +1190,6 @@ class GenericParamList final :
 
   GenericParamList *OuterParameters;
 
-  SourceLoc TrailingWhereLoc;
-  unsigned FirstTrailingWhereArg;
-
   GenericParamList(SourceLoc LAngleLoc,
                    ArrayRef<GenericTypeParamDecl *> Params,
                    SourceLoc WhereLoc,
@@ -1272,31 +1269,6 @@ public:
   /// implicitly-generated requirements, and may be non-empty even if no
   /// 'where' keyword is present.
   ArrayRef<RequirementRepr> getRequirements() const { return Requirements; }
-
-  /// Retrieve only those requirements that are written within the brackets,
-  /// which does not include any requirements written in a trailing where
-  /// clause.
-  ArrayRef<RequirementRepr> getNonTrailingRequirements() const {
-    return Requirements.slice(0, FirstTrailingWhereArg);
-  }
-
-  /// Retrieve only those requirements written in a trailing where
-  /// clause.
-  ArrayRef<RequirementRepr> getTrailingRequirements() const {
-    return Requirements.slice(FirstTrailingWhereArg);
-  }
-
-  /// Determine whether the generic parameters have a trailing where clause.
-  bool hasTrailingWhereClause() const {
-    return FirstTrailingWhereArg < Requirements.size();
-  }
-
-  /// Add a trailing 'where' clause to the list of requirements.
-  ///
-  /// Trailing where clauses are written outside the angle brackets, after the
-  /// main part of a declaration's signature.
-  void addTrailingWhereClause(ASTContext &ctx, SourceLoc trailingWhereLoc,
-                              ArrayRef<RequirementRepr> trailingRequirements);
   
   /// Retrieve the outer generic parameter list.
   ///
@@ -1309,6 +1281,8 @@ public:
   /// for more information.
   void setOuterParameters(GenericParamList *Outer) { OuterParameters = Outer; }
 
+  void setDeclContext(DeclContext *dc);
+
   SourceLoc getLAngleLoc() const { return Brackets.Start; }
   SourceLoc getRAngleLoc() const { return Brackets.End; }
 
@@ -1319,17 +1293,8 @@ public:
     if (WhereLoc.isInvalid())
       return SourceRange();
 
-    auto endLoc = Requirements[FirstTrailingWhereArg-1].getSourceRange().End;
+    auto endLoc = Requirements.back().getSourceRange().End;
     return SourceRange(WhereLoc, endLoc);
-  }
-
-  /// Retrieve the source range covering the trailing where clause.
-  SourceRange getTrailingWhereClauseSourceRange() const {
-    if (!hasTrailingWhereClause())
-      return SourceRange();
-
-    return SourceRange(TrailingWhereLoc,
-                       Requirements.back().getSourceRange().End);
   }
 
   /// Configure the depth of the generic parameters in this list.
@@ -1412,6 +1377,11 @@ public:
   /// Retrieve the set of parameters to a generic context, or null if
   /// this context is not generic.
   GenericParamList *getGenericParams() const;
+
+  /// Retrieve the generic parameters as written in source. Unlike
+  /// getGenericParams() this will not synthesize generic parameters for
+  /// extensions, protocols and certain type aliases.
+  GenericParamList *getParsedGenericParams() const;
 
   /// Determine whether this context has generic parameters
   /// of its own.
