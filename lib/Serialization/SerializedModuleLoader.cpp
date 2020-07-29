@@ -337,8 +337,27 @@ std::error_code SerializedModuleLoaderBase::openModuleFile(
   }
 
   // Actually load the file and error out if necessary.
+  //
+  // Use the default arguments except for IsVolatile that is set by the
+  // frontend option -enable-volatile-modules. If set, we avoid the use of
+  // mmap to workaround issues on NFS when the swiftmodule file loaded changes
+  // on disk while it's in use.
+  //
+  // In practice, a swiftmodule file can chane when a client uses a
+  // swiftmodule file from a framework while the framework is recompiled and
+  // installed over existing files. Or when many processes rebuild the same
+  // module interface.
+  //
+  // We have seen these scenarios leading to deserialization errors that on
+  // the surface look like memory corruption.
+  //
+  // rdar://63755989
+  bool enableVolatileModules = Ctx.LangOpts.EnableVolatileModules;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleOrErr =
-      FS.getBufferForFile(ModulePath);
+      FS.getBufferForFile(ModulePath,
+                          /*FileSize=*/-1,
+                          /*RequiresNullTerminator=*/true,
+                          /*IsVolatile=*/enableVolatileModules);
   if (!ModuleOrErr)
     return ModuleOrErr.getError();
 
