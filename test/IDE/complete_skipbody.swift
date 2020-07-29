@@ -1,4 +1,5 @@
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token FUNCTIONBODY -debug-forbid-typecheck-prefix FORBIDDEN | %FileCheck %s
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token LOCALFUNC_PARAMINIT -debug-forbid-typecheck-prefix FORBIDDEN | %FileCheck %s
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token TOPLEVEL -debug-forbid-typecheck-prefix FORBIDDEN | %FileCheck %s
 
 struct FORBIDDEN_Struct {
@@ -33,12 +34,30 @@ func test(valueOptOpt: MyStruct??) {
     return
   }
 
+  func localFunc(_ x: Int) -> Int {
+    let FORBIDDEN_unrelatedLocal = FORBIDDEN_Struct()
+    return 1
+  }
+
   if (value.x == 1) {
     let unrelated2 = FORBIDDEN_Struct()
     switch value.x {
     case let x where x < 2:
       let unrelated3 = FORBIDDEN_Struct()
-      if x == value.#^FUNCTIONBODY^# {}
+      _ = { xx in
+        let unrelated4 = FORBIDDEN_Struct()
+
+        if xx == localFunc(value.#^FUNCTIONBODY^#) {
+          let unrelated5 = FORBIDDEN_Struct()
+          return 1
+        }
+
+        func innerFunc(x: Int = value.#^LOCALFUNC_PARAMINIT^#) {
+          let unrelated6 = FORBIDDEN_Struct()
+        }
+
+        return 0;
+      } (x)
     default:
       break
     }

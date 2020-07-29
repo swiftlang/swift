@@ -442,12 +442,11 @@ void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
   TypeChecker::typeCheckPatternBinding(PBD, bindingIndex);
 }
 
-bool swift::typeCheckAbstractFunctionBodyAtLoc(AbstractFunctionDecl *AFD,
-                                               SourceLoc TargetLoc) {
-  auto &Ctx = AFD->getASTContext();
+bool swift::typeCheckASTNodeAtLoc(DeclContext *DC, SourceLoc TargetLoc) {
+  auto &Ctx = DC->getASTContext();
   DiagnosticSuppression suppression(Ctx.Diags);
   return !evaluateOrDefault(Ctx.evaluator,
-                            TypeCheckFunctionBodyAtLocRequest{AFD, TargetLoc},
+                            TypeCheckASTNodeAtLocRequest{DC, TargetLoc},
                             true);
 }
 
