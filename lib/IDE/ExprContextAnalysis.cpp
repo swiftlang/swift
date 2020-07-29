@@ -48,17 +48,30 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
   if (DC->isModuleScopeContext())
     return;
 
-  typeCheckContextImpl(DC->getParent(), Loc);
+  // Make sure the extension has been bound, in case it is in an inactive #if
+  // or something weird like that.
+  {
+    SmallVector<ExtensionDecl *, 1> extensions;
+    for (auto typeCtx = DC->getInnermostTypeContext(); typeCtx != nullptr;
+         typeCtx = typeCtx->getParent()->getInnermostTypeContext()) {
+      if (auto *ext = dyn_cast<ExtensionDecl>(typeCtx))
+        extensions.push_back(ext);
+    }
+    while (!extensions.empty()) {
+      extensions.back()->computeExtendedNominal();
+      extensions.pop_back();
+    }
+  }
 
   // Type-check this context.
   switch (DC->getContextKind()) {
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::Module:
   case DeclContextKind::SerializedLocal:
-  case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::EnumElementDecl:
   case DeclContextKind::GenericTypeDecl:
   case DeclContextKind::SubscriptDecl:
+  case DeclContextKind::ExtensionDecl:
     // Nothing to do for these.
     break;
 
@@ -76,24 +89,22 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
     }
     break;
 
+  case DeclContextKind::TopLevelCodeDecl:
+    swift::typeCheckASTNodeAtLoc(DC, Loc);
+    break;
+
   case DeclContextKind::AbstractFunctionDecl: {
     auto *AFD = cast<AbstractFunctionDecl>(DC);
     auto &SM = DC->getASTContext().SourceMgr;
     auto bodyRange = AFD->getBodySourceRange();
     if (SM.rangeContainsTokenLoc(bodyRange, Loc)) {
-      swift::typeCheckAbstractFunctionBodyAtLoc(AFD, Loc);
+      swift::typeCheckASTNodeAtLoc(DC, Loc);
     } else {
       assert(bodyRange.isInvalid() && "The body should not be parsed if the "
                                       "completion happens in the signature");
     }
     break;
   }
-
-  case DeclContextKind::ExtensionDecl:
-    // Make sure the extension has been bound, in case it is in an
-    // inactive #if or something weird like that.
-    cast<ExtensionDecl>(DC)->computeExtendedNominal();
-    break;
 
   case DeclContextKind::FileUnit:
     llvm_unreachable("module scope context handled above");
@@ -105,11 +116,7 @@ void swift::ide::typeCheckContextAt(DeclContext *DC, SourceLoc Loc) {
   while (isa<AbstractClosureExpr>(DC))
     DC = DC->getParent();
 
-  if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(DC)) {
-    typeCheckTopLevelCodeDecl(TLCD);
-  } else {
-    typeCheckContextImpl(DC, Loc);
-  }
+  typeCheckContextImpl(DC, Loc);
 }
 
 //===----------------------------------------------------------------------===//
@@ -300,6 +307,10 @@ void swift::ide::collectPossibleReturnTypesFromContext(
   }
 
   if (auto ACE = dyn_cast<AbstractClosureExpr>(DC)) {
+    // Try type checking the closure signature if it hasn't.
+    if (!ACE->getType())
+      swift::typeCheckASTNodeAtLoc(ACE->getParent(), ACE->getLoc());
+
     // Use the type checked type if it has.
     if (ACE->getType() && !ACE->getType()->hasError() &&
         !ACE->getResultType()->hasUnresolvedType()) {

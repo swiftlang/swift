@@ -1136,7 +1136,7 @@ static void findAvailabilityFixItNodes(SourceRange ReferenceRange,
         if (Expr *ParentExpr = Parent.getAsExpr()) {
           auto *ParentClosure = dyn_cast<ClosureExpr>(ParentExpr);
           if (!ParentClosure ||
-              ParentClosure->wasSeparatelyTypeChecked()) {
+              ParentClosure->isSeparatelyTypeChecked()) {
             return false;
           }
         } else if (auto *ParentStmt = Parent.getAsStmt()) {
