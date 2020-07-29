@@ -375,10 +375,21 @@ public:
   /// Determine whether this locator points to the `try?` expression.
   bool isForOptionalTry() const;
 
+  /// Determine whether this locator is for a function builder body result type.
+  bool isForFunctionBuilderBodyResult() const;
+
   /// Determine whether this locator points directly to a given expression.
   template <class E> bool directlyAt() const {
     auto *anchor = getAnchor();
     return anchor && isa<E>(anchor) && getPath().empty();
+  }
+
+  /// Check whether the first element in the path of this locator (if any)
+  /// is a given \c LocatorPathElt subclass.
+  template <class T>
+  bool isFirstElement() const {
+    auto path = getPath();
+    return !path.empty() && path.front().is<T>();
   }
 
   /// Attempts to cast the first path element of the locator to a specific

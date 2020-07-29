@@ -1583,8 +1583,12 @@ ConstraintSystem::matchFunctionBuilder(
   // If builder is applied to the closure expression then
   // `closure body` to `closure result` matching should
   // use special locator.
-  if (auto *closure = fn.getAbstractClosureExpr())
+  if (auto *closure = fn.getAbstractClosureExpr()) {
     locator = getConstraintLocator(closure, ConstraintLocator::ClosureResult);
+  } else {
+    locator = getConstraintLocator(locator.getAnchor(),
+                                   ConstraintLocator::FunctionBuilderBodyResult);
+  }
 
   // Bind the body result type to the type of the transformed expression.
   addConstraint(bodyResultConstraintKind, transformedType, bodyResultType,
