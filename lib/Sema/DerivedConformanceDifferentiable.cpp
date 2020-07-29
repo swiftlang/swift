@@ -895,9 +895,6 @@ DerivedConformance::deriveDifferentiable(AssociatedTypeDecl *requirement) {
                            diag::broken_differentiable_requirement);
     return std::make_pair(nullptr, nullptr);
   }
-  // Diagnose conformances in disallowed contexts.
-  if (checkAndDiagnoseDisallowedContext(requirement))
-    return std::make_pair(nullptr, nullptr);
 
   // Start an error diagnostic before attempting derivation.
   // If derivation succeeds, cancel the diagnostic.

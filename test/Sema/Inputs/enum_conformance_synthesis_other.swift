@@ -29,3 +29,7 @@ extension ImpliedMain: ImplierMain {}
 enum ImpliedOther: ImplierOther {
     case a(Int)
 }
+
+enum CaseIterableAcrossFiles {
+  case A
+}
