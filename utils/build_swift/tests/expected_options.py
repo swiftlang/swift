@@ -143,6 +143,7 @@ EXPECTED_DEFAULTS = {
     'dry_run': False,
     'enable_asan': False,
     'enable_experimental_differentiable_programming': True,
+    'enable_experimental_concurrency': True,
     'enable_lsan': False,
     'enable_sanitize_coverage': False,
     'disable_guaranteed_normal_arguments': False,

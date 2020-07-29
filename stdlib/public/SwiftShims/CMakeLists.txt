@@ -20,6 +20,7 @@ set(sources
   ThreadLocalStorage.h
   UnicodeShims.h
   Visibility.h
+  _SwiftConcurrency.h
 
   CoreMediaOverlayShims.h
   DispatchOverlayShims.h
