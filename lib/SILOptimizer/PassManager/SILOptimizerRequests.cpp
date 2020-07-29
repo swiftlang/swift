@@ -57,6 +57,37 @@ swift::extractNearestSourceLoc(const SILPipelineExecutionDescriptor &desc) {
   return extractNearestSourceLoc(desc.SM);
 }
 
+//----------------------------------------------------------------------------//
+// LoweredSILRequest computation.
+//----------------------------------------------------------------------------//
+
+std::unique_ptr<SILModule>
+LoweredSILRequest::evaluate(Evaluator &evaluator,
+                            ASTLoweringDescriptor desc) const {
+  auto silMod = llvm::cantFail(evaluator(ASTLoweringRequest{desc}));
+  silMod->installSILRemarkStreamer();
+  silMod->setSerializeSILAction([]() {});
+
+  runSILDiagnosticPasses(*silMod);
+
+  {
+    FrontendStatsTracer tracer(silMod->getASTContext().Stats,
+                               "SIL verification, pre-optimization");
+    silMod->verify();
+  }
+
+  runSILOptimizationPasses(*silMod);
+
+  {
+    FrontendStatsTracer tracer(silMod->getASTContext().Stats,
+                               "SIL verification, post-optimization");
+    silMod->verify();
+  }
+
+  runSILLoweringPasses(*silMod);
+  return silMod;
+}
+
 // Define request evaluation functions for each of the SILGen requests.
 static AbstractRequestFunction *silOptimizerRequestFunctions[] = {
 #define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)                    \
