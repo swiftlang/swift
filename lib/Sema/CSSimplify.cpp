@@ -1821,6 +1821,10 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     }
   }
 
+  // 'async' and non-'async' function types are not compatible.
+  if (func1->async() != func2->async())
+    return getTypeMatchFailure(locator);
+
   // A non-@noescape function type can be a subtype of a @noescape function
   // type.
   if (func1->isNoEscape() != func2->isNoEscape() &&
@@ -7552,10 +7556,9 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
 
   // If there is a function builder to apply, do so now.
   if (functionBuilderType) {
-    auto *calleeLocator = getCalleeLocator(getConstraintLocator(locator));
     if (auto result = matchFunctionBuilder(
             closure, functionBuilderType, closureType->getResult(),
-            ConstraintKind::Conversion, calleeLocator, locator)) {
+            ConstraintKind::Conversion, locator)) {
       return result->isSuccess();
     }
   }

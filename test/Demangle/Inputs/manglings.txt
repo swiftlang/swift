@@ -362,3 +362,5 @@ $sS5fIedtyyywddw_D ---> @escaping @differentiable @convention(thin) (@unowned Sw
 $syQo ---> $syQo
 $s0059xxxxxxxxxxxxxxx_ttttttttBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBee -> $s0059xxxxxxxxxxxxxxx_ttttttttBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBee
 $sx1td_t ---> (t: A...)
+$s7example1fyyYF -> example.f() async -> ()
+$s7example1fyyYKF -> example.f() async throws -> ()

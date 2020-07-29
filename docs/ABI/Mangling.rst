@@ -527,13 +527,14 @@ Types
   FUNCTION-KIND ::= 'H'                      // @differentiable(linear) function type
   FUNCTION-KIND ::= 'I'                      // @differentiable(linear) function type (escaping)
 
-  function-signature ::= params-type params-type throws? // results and parameters
+  function-signature ::= params-type params-type async? throws? // results and parameters
 
   params-type ::= type 'z'? 'h'?              // tuple in case of multiple parameters or a single parameter with a single tuple type
                                              // with optional inout convention, shared convention. parameters don't have labels,
                                              // they are mangled separately as part of the entity.
   params-type ::= empty-list                  // shortcut for no parameters
 
+  async ::= 'Y'                              // 'async' annotation on function types
   throws ::= 'K'                             // 'throws' annotation on function types
 
   type-list ::= list-type '_' list-type*     // list of types

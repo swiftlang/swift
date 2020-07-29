@@ -572,3 +572,16 @@ wrapperifyInfer(true) { x in // expected-error{{unable to infer type of a closur
   intValue + x
 }
 
+struct DoesNotConform {}
+
+struct MyView {
+  @TupleBuilder var value: some P { // expected-error {{return type of property 'value' requires that 'DoesNotConform' conform to 'P'}}
+    // expected-note@-1 {{opaque return type declared here}}
+    DoesNotConform()
+  }
+
+  @TupleBuilder func test() -> some P { // expected-error {{return type of instance method 'test()' requires that 'DoesNotConform' conform to 'P'}}
+    // expected-note@-1 {{opaque return type declared here}}
+    DoesNotConform()
+  }
+}
