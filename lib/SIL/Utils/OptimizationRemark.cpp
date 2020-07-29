@@ -70,7 +70,8 @@ Argument::Argument(ArgumentKey key, SILFunction *f) : key(key) {
 Argument::Argument(StringRef key, SILType ty)
     : key(ArgumentKeyKind::Default, key) {
   llvm::raw_string_ostream stream(val);
-  ty.print(stream);
+  PrintOptions subPrinter = PrintOptions::printSIL();
+  ty.getASTType().print(stream, subPrinter);
 }
 
 Argument::Argument(StringRef key, CanType ty)
