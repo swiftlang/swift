@@ -785,19 +785,12 @@ Parser::parseFunctionSignature(Identifier SimpleName,
                                    defaultArgs);
   FullName = DeclName(Context, SimpleName, NamePieces);
 
-  // Check for the 'async' keyword.
-  if (Context.LangOpts.EnableExperimentalConcurrency &&
-      Tok.isContextualKeyword("async")) {
-    asyncLoc = consumeToken();
-  }
-
   // Check for the 'async' and 'throws' keywords.
   rethrows = false;
   parseAsyncThrows(SourceLoc(), asyncLoc, throwsLoc, &rethrows);
 
-  SourceLoc arrowLoc;
-
   // If there's a trailing arrow, parse the rest as the result type.
+  SourceLoc arrowLoc;
   if (Tok.isAny(tok::arrow, tok::colon)) {
     SyntaxParsingContext ReturnCtx(SyntaxContext, SyntaxKind::ReturnClause);
     if (!consumeIf(tok::arrow, arrowLoc)) {
@@ -817,13 +810,13 @@ Parser::parseFunctionSignature(Identifier SimpleName,
     Status |= ResultType;
     if (Status.isError())
       return Status;
+
+    // Check for 'throws' and 'rethrows' after the type and correct it.
+    parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, &rethrows);
   } else {
     // Otherwise, we leave retType null.
     retType = nullptr;
   }
-
-  // Check for 'throws' and 'rethrows' after the type and correct it.
-  parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, &rethrows);
 
   return Status;
 }
