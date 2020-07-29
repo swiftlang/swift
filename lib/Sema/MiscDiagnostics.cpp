@@ -86,7 +86,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
     bool walkToDeclPre(Decl *D) override {
       if (auto *closure = dyn_cast<ClosureExpr>(D->getDeclContext()))
-        return !closure->wasSeparatelyTypeChecked();
+        return !closure->isSeparatelyTypeChecked();
       return false;
     }
 
@@ -1501,7 +1501,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
     // Don't walk into nested decls.
     bool walkToDeclPre(Decl *D) override {
       if (auto *closure = dyn_cast<ClosureExpr>(D->getDeclContext()))
-        return !closure->wasSeparatelyTypeChecked();
+        return !closure->isSeparatelyTypeChecked();
       return false;
     }
 
