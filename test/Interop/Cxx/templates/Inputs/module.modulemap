@@ -33,3 +33,7 @@ module EagerInstantiationProblems {
 module Mangling {
   header "mangling.h"
 }
+
+module Linkage {
+  header "linkage.h"
+}
