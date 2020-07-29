@@ -17,6 +17,7 @@
 #ifndef SWIFT_LOCALIZATIONFORMAT_H
 #define SWIFT_LOCALIZATIONFORMAT_H
 
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Bitstream/BitstreamReader.h"
 #include "llvm/Support/DJB.h"
@@ -139,42 +140,18 @@ public:
 };
 
 class YAMLLocalizationProducer final : public LocalizationProducer {
-  // Type of the `diagnostics` vector.
-  using T = std::vector<std::string>;
-  struct Node {
-    uint32_t id;
-    typename T::value_type &msg;
-  };
-  typedef Node value_type;
-
-  class iterator {
-    typename T::iterator it;
-    uint32_t counter;
-
-  public:
-    iterator(T::iterator _it, uint32_t counter = 0)
-        : it(_it), counter(counter) {}
-
-    iterator operator++() { return iterator(++it, ++counter); }
-
-    bool operator!=(iterator other) { return it != other.it; }
-
-    typename T::iterator::value_type node() { return *it; }
-
-    value_type operator*() { return value_type{counter, *it}; }
-
-    uint32_t index() { return counter; }
-  };
+  std::vector<std::string> diagnostics;
 
 public:
-  std::vector<std::string> diagnostics;
   explicit YAMLLocalizationProducer(llvm::StringRef filePath);
   llvm::StringRef getMessageOr(swift::DiagID id,
                                llvm::StringRef defaultMessage) const override;
 
-  iterator begin() { return iterator(diagnostics.begin()); }
-
-  iterator end() { return iterator(diagnostics.end()); }
+  /// Iterate over all of the available (non-empty) translations
+  /// maintained by this producer, callback gets each translation
+  /// with its unique identifier.
+  void forEachAvailable(
+      llvm::function_ref<void(uint32_t, llvm::StringRef)> callback) const;
 };
 
 class SerializedLocalizationProducer final : public LocalizationProducer {

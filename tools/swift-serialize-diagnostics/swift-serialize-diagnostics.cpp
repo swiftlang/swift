@@ -70,9 +70,10 @@ int main(int argc, char *argv[]) {
   llvm::sys::path::replace_extension(SerializedFilePath, ".db");
 
   SerializedLocalizationWriter Serializer;
-  for (const auto translation : yaml) {
-    Serializer.insert(diagnosticID[translation.id], translation.msg);
-  }
+  yaml.forEachAvailable(
+      [&Serializer](uint32_t id, llvm::StringRef translation) {
+        Serializer.insert(diagnosticID[id], translation);
+      });
 
   if (Serializer.emit(SerializedFilePath.str())) {
     llvm::errs() << "Cannot serialize diagnostic file "

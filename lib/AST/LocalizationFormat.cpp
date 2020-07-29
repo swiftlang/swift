@@ -114,6 +114,7 @@ llvm::StringRef SerializedLocalizationProducer::getMessageOr(
                                     value.getDataLen());
   if (diagnosticMessage.empty())
     return defaultMessage;
+
   return diagnosticMessage;
 }
 
@@ -133,6 +134,15 @@ YAMLLocalizationProducer::getMessageOr(swift::DiagID id,
   if (diagnosticMessage.empty())
     return defaultMessage;
   return diagnosticMessage;
+}
+
+void YAMLLocalizationProducer::forEachAvailable(
+    llvm::function_ref<void(uint32_t, llvm::StringRef)> callback) const {
+  for (uint32_t i = 0, n = diagnostics.size(); i != n; ++i) {
+    auto translation = diagnostics[i];
+    if (!translation.empty())
+      callback(i, translation);
+  }
 }
 
 template <typename T, typename Context>
