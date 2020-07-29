@@ -734,6 +734,7 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
   DeclName name(C, C.Id_encode, params);
   auto *encodeDecl = FuncDecl::create(
       C, SourceLoc(), StaticSpellingKind::None, SourceLoc(), name, SourceLoc(),
+      /*Async*/ false, SourceLoc(),
       /*Throws=*/true, SourceLoc(), nullptr, params,
       TypeLoc::withoutLoc(returnType), conformanceDC);
   encodeDecl->setImplicit();

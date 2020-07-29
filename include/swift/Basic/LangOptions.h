@@ -235,6 +235,9 @@ namespace swift {
     /// Enable experimental #assert feature.
     bool EnableExperimentalStaticAssert = false;
 
+    /// Enable experimental concurrency model.
+    bool EnableExperimentalConcurrency = false;
+
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;

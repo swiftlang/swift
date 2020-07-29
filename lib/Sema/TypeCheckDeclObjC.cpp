@@ -200,6 +200,12 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   }
 
   if (auto fnTy = T->getAs<FunctionType>()) {
+    if (fnTy->getExtInfo().async() ) {
+      diags.diagnose(TypeRange.Start, diag::not_objc_function_type_async)
+        .highlight(TypeRange);
+      return;
+    }
+
     if (fnTy->getExtInfo().throws() ) {
       diags.diagnose(TypeRange.Start, diag::not_objc_function_type_throwing)
         .highlight(TypeRange);
@@ -605,6 +611,16 @@ bool swift::isRepresentableInObjC(
       }
       return false;
     }
+  }
+
+  // Async functions cannot be mapped into Objective-C.
+  if (AFD->hasAsync()) {
+    if (Diagnose) {
+      AFD->diagnose(diag::not_objc_function_async)
+        .highlight(AFD->getAsyncLoc());
+      describeObjCReason(AFD, Reason);
+    }
+    return false;
   }
 
   // Throwing functions must map to a particular error convention.

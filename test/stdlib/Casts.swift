@@ -13,7 +13,7 @@
 /// Contains tests for conversions between types which shouldn't trap.
 ///
 // -----------------------------------------------------------------------------
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency)
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -220,6 +220,16 @@ CastsTests.test("Any.Protocol") {
   expectNil(Any?.self as? Any.Protocol)
   expectFalse(isAnyProtocol(Any?.self))
   expectFalse(isType(Any?.self, to: Any.self))
+}
+
+CastsTests.test("Async function types") {
+  let asyncFnType: Any.Type = (() async -> Void).self
+  let fnType: Any.Type = (() -> Void).self
+
+  expectTrue(fnType is (() -> Void).Type)
+  expectTrue(asyncFnType is (() async -> Void).Type)
+  expectFalse(fnType is (() async -> Void).Type)
+  expectFalse(asyncFnType is (() -> Void).Type)
 }
 
 runAllTests()
