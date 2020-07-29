@@ -38,6 +38,10 @@ constexpr static const StringLiteral MANGLING_MODULE_OBJC = "__C";
 constexpr static const StringLiteral MANGLING_MODULE_CLANG_IMPORTER =
     "__C_Synthesized";
 
+/// The name prefix for C++ template instantiation imported as a Swift struct.
+constexpr static const StringLiteral CXX_TEMPLATE_INST_PREFIX =
+    "__CxxTemplateInst";
+
 constexpr static const StringLiteral SEMANTICS_PROGRAMTERMINATION_POINT =
     "programtermination_point";
 

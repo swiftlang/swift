@@ -31,6 +31,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporterOptions.h"
 #include "swift/Parse/Parser.h"
+#include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/Mangle.h"
@@ -1718,7 +1719,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       // (a prefix reserved for C++ compiler usage).
       llvm::SmallString<128> mangledNameStorage;
       llvm::raw_svector_ostream mangledName(mangledNameStorage);
-      mangledName << "__CxxTemplateInst" << buffer.str().drop_front(4);
+      mangledName << CXX_TEMPLATE_INST_PREFIX << buffer.str().drop_front(4);
 
       baseName = swiftCtx.getIdentifier(mangledName.str()).get();
     }
