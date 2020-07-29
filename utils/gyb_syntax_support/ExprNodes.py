@@ -183,8 +183,8 @@ EXPR_NODES = [
     # NOTE: This appears only in SequenceExpr.
     Node('ArrowExpr', kind='Expr',
          children=[
-             Child('AsyncKeyword', kind='Token', text_choices=['async'],
-                   is_optional=True),
+             Child('AsyncKeyword', kind='ContextualKeywordToken',
+                   text_choices=['async'], is_optional=True),
              Child('ThrowsToken', kind='ThrowsToken',
                    is_optional=True),
              Child('ArrowToken', kind='ArrowToken'),
