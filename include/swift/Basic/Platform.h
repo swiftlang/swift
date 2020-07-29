@@ -71,11 +71,6 @@ namespace swift {
   /// Returns the platform Kind for Darwin triples.
   DarwinPlatformKind getDarwinPlatformKind(const llvm::Triple &triple);
 
-  /// Maps an arbitrary platform to its non-simulator equivalent.
-  ///
-  /// If \p platform is not a simulator platform, it will be returned as is.
-  DarwinPlatformKind getNonSimulatorPlatform(DarwinPlatformKind platform);
-
   /// Returns the architecture component of the path for a given target triple.
   ///
   /// Typically this is used for mapping the architecture component of the
