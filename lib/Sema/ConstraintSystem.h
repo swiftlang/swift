@@ -486,6 +486,12 @@ template <typename T> bool isExpr(ASTNode node) {
   return isa<T>(E);
 }
 
+template <typename T = Decl> T *getAsDecl(ASTNode node) {
+  if (auto *E = node.dyn_cast<Decl *>())
+    return dyn_cast_or_null<T>(E);
+  return nullptr;
+}
+
 SourceLoc getLoc(ASTNode node);
 SourceRange getSourceRange(ASTNode node);
 
@@ -4383,7 +4389,7 @@ public:
   Optional<TypeMatchResult> matchFunctionBuilder(
       AnyFunctionRef fn, Type builderType, Type bodyResultType,
       ConstraintKind bodyResultConstraintKind,
-      ConstraintLocator *calleeLocator, ConstraintLocatorBuilder locator);
+      ConstraintLocatorBuilder locator);
 
 private:
   /// The kind of bindings that are permitted.
