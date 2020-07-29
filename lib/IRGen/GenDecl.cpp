@@ -1908,11 +1908,7 @@ void irgen::updateLinkageForDefinition(IRGenModule &IGM,
 
   // Everything externally visible is considered used in Swift.
   // That mostly means we need to be good at not marking things external.
-  //
-  // Exclude "main", because it should naturally be used, and because adding it
-  // to llvm.used leaves a dangling use when the REPL attempts to discard
-  // intermediate mains.
-  if (LinkInfo::isUsed(IRL) && global->getName() != SWIFT_ENTRY_POINT_FUNCTION)
+  if (LinkInfo::isUsed(IRL))
     IGM.addUsedGlobal(global);
 }
 
@@ -2003,11 +1999,7 @@ llvm::Function *irgen::createFunction(IRGenModule &IGM,
 
   // Everything externally visible is considered used in Swift.
   // That mostly means we need to be good at not marking things external.
-  //
-  // Exclude "main", because it should naturally be used, and because adding it
-  // to llvm.used leaves a dangling use when the REPL attempts to discard
-  // intermediate mains.
-  if (linkInfo.isUsed() && name != SWIFT_ENTRY_POINT_FUNCTION) {
+  if (linkInfo.isUsed()) {
     IGM.addUsedGlobal(fn);
   }
 
