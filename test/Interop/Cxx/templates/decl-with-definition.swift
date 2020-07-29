@@ -8,9 +8,9 @@ import StdlibUnittest
 var TemplatesTestSuite = TestSuite("TemplatesTestSuite")
 
 TemplatesTestSuite.test("has-partial-definition") {
-  let magicNumber = MagicNumber()
-  var wrappedMagicNumber = PartiallyDefinedWrappedMagicNumber(t: magicNumber)
-  expectEqual(wrappedMagicNumber.callGetInt(), 29)
+  let myInt = IntWrapper(value: 32)
+  var magicInt = PartiallyDefinedMagicallyWrappedInt(t: myInt)
+  expectEqual(magicInt.getValuePlusArg(5), 37)
 }
 
 runAllTests()

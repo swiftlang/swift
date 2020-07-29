@@ -4,23 +4,23 @@
 template<class T>
 struct MagicWrapper {
   T t;
-  int callGetInt() const {
-    return t.getInt() + 5;
-  }
+  int getValuePlusArg(int arg) const { return t.getValue() + arg; }
 };
 
-struct MagicNumber {
-  int getInt() const { return 48; }
+struct IntWrapper {
+  int value;
+  int getValue() const { return value; }
 };
 
 inline int forceInstantiation() {
-  auto t = MagicWrapper<MagicNumber>();
-  return t.callGetInt();
+  auto t = MagicWrapper<IntWrapper>();
+  return t.getValuePlusArg(14);
 }
 
-// MagicWrapper<MagicNumber> ClassTemplateSpecializationDecl has a definition
+// MagicWrapper<IntWrapper> ClassTemplateSpecializationDecl has a definition
 // because function above forced the instantiation. Its members are fully
-// instantiated, so nothing needs to be explicitly instantiated by the Swift compiler.
-typedef MagicWrapper<MagicNumber> FullyDefinedWrappedMagicNumber;
+// instantiated, so nothing needs to be explicitly instantiated by the Swift
+// compiler.
+typedef MagicWrapper<IntWrapper> FullyDefinedMagicallyWrappedInt;
 
 #endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_DECL_WITH_DEFINITION_INCLUDING_MEMBERS_H

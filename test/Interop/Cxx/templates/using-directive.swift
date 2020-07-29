@@ -8,9 +8,9 @@ import StdlibUnittest
 var TemplatesTestSuite = TestSuite("TemplatesTestSuite")
 
 TemplatesTestSuite.test("using-directive") {
-  let magicNumber = MagicNumber()
-  var wrappedMagicNumber = UsingWrappedMagicNumber(t: magicNumber)
-  expectEqual(wrappedMagicNumber.callGetInt(), 11)
+  let myInt = IntWrapper(value: 333)
+  var magicInt = UsingWrappedMagicNumber(t: myInt)
+  expectEqual(magicInt.getValuePlusArg(111), 444)
 }
 
 runAllTests()

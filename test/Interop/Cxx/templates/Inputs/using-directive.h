@@ -4,15 +4,14 @@
 template<class T>
 struct MagicWrapper {
   T t;
-  int callGetInt() const {
-    return t.getInt() + 5;
-  }
+  int getValuePlusArg(int arg) const { return t.getValue() + arg; }
 };
 
-struct MagicNumber {
-  int getInt() const { return 6; }
+struct IntWrapper {
+  int value;
+  int getValue() const { return value; }
 };
 
-using UsingWrappedMagicNumber = MagicWrapper<MagicNumber>;
+using UsingWrappedMagicNumber = MagicWrapper<IntWrapper>;
 
 #endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_USING_DIRECTIVE_H

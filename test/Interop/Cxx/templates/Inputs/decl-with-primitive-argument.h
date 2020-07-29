@@ -4,9 +4,7 @@
 template<class T>
 struct MagicWrapper {
   T t;
-  int getInt() const {
-    return t + 5;
-  }
+  int getValuePlusArg(int arg) const { return t + arg; }
 };
 
 typedef MagicWrapper<int> WrappedMagicInt;

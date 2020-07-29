@@ -1,20 +1,29 @@
 #ifndef TEST_INTEROP_CXX_TEMPLATES_INPUTS_EXPLICIT_SPECIALIZATION_H
 #define TEST_INTEROP_CXX_TEMPLATES_INPUTS_EXPLICIT_SPECIALIZATION_H
 
-struct MagicNumber {
-  int getInt() const { return 26; }
+struct SpecializedIntWrapper {
+  int value;
+  int getValue() const { return value; }
 };
 
-template <class T> struct MagicWrapper {
+struct NonSpecializedIntWrapper {
+  int value;
+  int getValue() const { return value; }
+};
+
+template <class T>
+struct MagicWrapper {
   T t;
-  int callGetInt() const { return t.getInt() + 5; }
+  int getValuePlusAConstant() const { return t.getValue() + 13; }
 };
 
-template <> struct MagicWrapper<MagicNumber> {
-  MagicNumber t;
-  int callGetInt() const { return t.getInt() + 10; }
+template <>
+struct MagicWrapper<SpecializedIntWrapper> {
+  SpecializedIntWrapper t;
+  int getValuePlusAConstant() const { return t.getValue() + 3; }
 };
 
-typedef MagicWrapper<MagicNumber> MagicWrappedNumberWithExplicitSpecialization;
+typedef MagicWrapper<SpecializedIntWrapper> WrapperWithSpecialization;
+typedef MagicWrapper<NonSpecializedIntWrapper> WrapperWithoutSpecialization;
 
 #endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_EXPLICIT_SPECIALIZATION_H

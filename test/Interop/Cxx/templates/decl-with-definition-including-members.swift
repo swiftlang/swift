@@ -8,9 +8,9 @@ import StdlibUnittest
 var TemplatesTestSuite = TestSuite("TemplatesTestSuite")
 
 TemplatesTestSuite.test("fully-defined") {
-  let magicNumber = MagicNumber()
-  var wrappedMagicNumber = FullyDefinedWrappedMagicNumber(t: magicNumber)
-  expectEqual(wrappedMagicNumber.callGetInt(), 53)
+  let myInt = IntWrapper(value: 10)
+  var magicInt = FullyDefinedMagicallyWrappedInt(t: myInt)
+  expectEqual(magicInt.getValuePlusArg(5), 15)
 }
 
 runAllTests()

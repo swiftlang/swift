@@ -4,18 +4,18 @@
 template<class T>
 struct MagicWrapper {
   T t;
-  int callGetInt() const {
-    return t.getInt() + 5;
-  }
+  int getValuePlusArg(int arg) const { return t.getValue() + arg; }
 };
 
-struct MagicNumber {
-  int getInt() const { return 12; }
+struct IntWrapper {
+  int value;
+  int getValue() const { return value; }
 };
 
-// MagicWrapper<MagicNumber> ClassTemplateSpecializationDecl doesn't have a definition in Clang
-// because nothing in this header required the instantiation. Therefore we have
-// to construct the definition on the swift side.
-typedef MagicWrapper<MagicNumber> WrappedMagicNumberWithoutDefinition;
+// MagicWrapper<IntWrapper> ClassTemplateSpecializationDecl doesn't have a
+// definition in Clang because nothing in this header required the
+// instantiation. Therefore we have to construct the definition on the swift
+// side.
+typedef MagicWrapper<IntWrapper> MagicallyWrappedIntWithoutDefinition;
 
 #endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_DECL_WITHOUT_DEFINITION_H

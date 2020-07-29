@@ -1,13 +1,15 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=UsingDirective -I %S/Inputs -source-filename=x -enable-cxx-interop | %FileCheck %s
 
-// CHECK: struct __CxxTemplateInst12MagicWrapperI11MagicNumberE {
-// CHECK:   var t: MagicNumber
+// CHECK: struct __CxxTemplateInst12MagicWrapperI10IntWrapperE {
+// CHECK:   var t: IntWrapper
 // CHECK:   init()
-// CHECK:   init(t: MagicNumber)
-// CHECK:   mutating func callGetInt() -> Int32
+// CHECK:   init(t: IntWrapper)
+// CHECK:   mutating func getValuePlusArg(_ arg: Int32) -> Int32
 // CHECK: }
-// CHECK: struct MagicNumber {
+// CHECK: struct IntWrapper {
+// CHECK:   var value: Int32
 // CHECK:   init()
-// CHECK:   mutating func getInt() -> Int32
+// CHECK:   init(value: Int32)
+// CHECK:   mutating func getValue() -> Int32
 // CHECK: }
-// CHECK: typealias UsingWrappedMagicNumber = __CxxTemplateInst12MagicWrapperI11MagicNumberE
+// CHECK: typealias UsingWrappedMagicNumber = __CxxTemplateInst12MagicWrapperI10IntWrapperE

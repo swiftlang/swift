@@ -8,9 +8,13 @@ import StdlibUnittest
 var TemplatesTestSuite = TestSuite("TemplatesTestSuite")
 
 TemplatesTestSuite.test("explicit-specialization") {
-  let magicNumber = MagicNumber()
-  var wrappedMagicNumber = MagicWrappedNumberWithExplicitSpecialization(t: magicNumber)
-  expectEqual(wrappedMagicNumber.callGetInt(), 36)
+  let specializedInt = SpecializedIntWrapper(value: 7)
+  var specializedMagicInt = WrapperWithSpecialization(t: specializedInt)
+  expectEqual(specializedMagicInt.getValuePlusAConstant(), 10)
+
+	let nonSpecializedInt = NonSpecializedIntWrapper(value: 7)
+	var nonSpecializedMagicInt = WrapperWithoutSpecialization(t: nonSpecializedInt)
+	expectEqual(nonSpecializedMagicInt.getValuePlusAConstant(), 20)
 }
 
 runAllTests()

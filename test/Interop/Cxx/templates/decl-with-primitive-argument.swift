@@ -9,7 +9,7 @@ var TemplatesTestSuite = TestSuite("TemplatesTestSuite")
 
 TemplatesTestSuite.test("int-argument") {
   var wrappedMagicInt = WrappedMagicInt(t: 42)
-  expectEqual(wrappedMagicInt.getInt(), 47)
+  expectEqual(wrappedMagicInt.getValuePlusArg(5), 47)
 }
 
 runAllTests()

@@ -4,16 +4,15 @@
 template<class T>
 struct MagicWrapper {
   T t;
-  int callGetInt() const {
-    return t.getInt() + 5;
-  }
+  int getValuePlusArg(int arg) const { return t.getValue() + arg; }
 };
 
-struct MagicNumber {
-  int getInt() const { return 24; }
+struct IntWrapper {
+  int value;
+  int getValue() const { return value; }
 };
 
-typedef MagicWrapper<MagicNumber> WrappedMagicNumberA;
-typedef MagicWrapper<MagicNumber> WrappedMagicNumberB;
+typedef MagicWrapper<IntWrapper> WrappedMagicNumberA;
+typedef MagicWrapper<IntWrapper> WrappedMagicNumberB;
 
 #endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_CANONICAL_TYPES_H
