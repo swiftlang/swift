@@ -131,6 +131,9 @@ struct IRGenDescriptor {
   const SILOptions &SILOpts;
 
   Lowering::TypeConverter &Conv;
+
+  /// The SILModule to emit. If \c nullptr, a fresh SILModule will be requested
+  /// during IRGen (which will eventually become the default behavior).
   SILModule *SILMod;
 
   StringRef ModuleName;
