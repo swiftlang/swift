@@ -9,9 +9,9 @@ public func getWrappedMagicNumber() -> CInt {
 }
 
 // CHECK: define {{(protected |dllexport )?}}swiftcc i32 @"$s4main21getWrappedMagicNumbers5Int32VyF"()
-// CHECK: %wrappedMagicNumber = alloca %TSo12MagicWrapperV, align 1
-// CHECK: %wrappedMagicNumber.t = getelementptr inbounds %TSo12MagicWrapperV, %TSo12MagicWrapperV* %wrappedMagicNumber, i32 0, i32 0
-// CHECK: [[MAGIC_WRAPPER:%.*]] = bitcast %TSo12MagicWrapperV* %wrappedMagicNumber to %struct.MagicWrapper*
+// CHECK: %wrappedMagicNumber = alloca %TSo034__CxxTemplateInst12MagicWrapperI11D7NumberEV, align 1
+// CHECK: %wrappedMagicNumber.t = getelementptr inbounds %TSo034__CxxTemplateInst12MagicWrapperI11D7NumberEV, %TSo034__CxxTemplateInst12MagicWrapperI11D7NumberEV* %wrappedMagicNumber, i32 0, i32 0
+// CHECK: [[MAGIC_WRAPPER:%.*]] = bitcast %TSo034__CxxTemplateInst12MagicWrapperI11D7NumberEV* %wrappedMagicNumber to %struct.MagicWrapper*
 // CHECK: call i32 @{{_ZNK12MagicWrapperI11MagicNumberE10callGetIntEv|"\?callGetInt@\?\$MagicWrapper@UMagicNumber@@@@QEBAHXZ"}}(%struct.MagicWrapper* [[MAGIC_WRAPPER]])
 
 // CHECK: define weak_odr{{( dso_local)?}} i32 @{{_ZNK12MagicWrapperI11MagicNumberE10callGetIntEv|"\?callGetInt@\?\$MagicWrapper@UMagicNumber@@@@QEBAHXZ"}}(%struct.MagicWrapper* %this)

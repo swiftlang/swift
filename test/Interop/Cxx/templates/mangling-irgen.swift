@@ -1,27 +1,18 @@
 // RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-cxx-interop | %FileCheck %s
-// R UN: %target-swift-frontend -Xcc -target -Xcc x86_64-unknown-windows-msvc -Xcc -fno-PIC -emit-ir %s -I %S/Inputs -enable-cxx-interop | %FileCheck %s
-// R UN: %target-swift-frontend -Xcc -target -Xcc x86_64-apple-macosx10.9 -Xcc -fno-PIC -emit-ir %s -I %S/Inputs -enable-cxx-interop | %FileCheck %s
-// R UN: %target-swift-frontend -Xcc -target -Xcc arm64-apple-ios11.2.0 -Xcc -fno-PIC -emit-ir %s -I %S/Inputs -enable-cxx-interop | %FileCheck %s
-// R UN: %target-swift-frontend -Xcc -target -Xcc i386-apple-ios7.0-simulator -Xcc -fno-PIC -emit-ir %s -I %S/Inputs -enable-cxx-interop | %FileCheck %s
 
 import Mangling
 
-// MagicWrapper
-// MagicWrapper<MagicNumber>
-// __CxxTemplateInst12MagicWrapperI11MagicNumberE
-public func read(_ i: inout WrappedMagicInt) {}
+public func recvInstantiation(_ i: inout WrappedMagicInt) {}
 
-public func read(_ i: inout WrappedMagicBool) {}
+// CHECK: define {{(protected |dllexport )?}}swiftcc void @"$s4main17recvInstantiationyySo34__CxxTemplateInst12MagicWrapperIiEVzF"(%TSo34__CxxTemplateInst12MagicWrapperIiEV* nocapture dereferenceable(1) %0)
 
-// public struct Foo<T> {}
-// public struct Bar {}
+public func recvInstantiation(_ i: inout WrappedMagicBool) {}
 
-// public typealias FooA=Foo<Int>
-// public typealias FooB=Foo<Bool>
-// public typealias FooC=Foo<Bar>
+// CHECK: define {{(protected |dllexport )?}}swiftcc void @"$s4main17recvInstantiationyySo34__CxxTemplateInst12MagicWrapperIbEVzF"(%TSo34__CxxTemplateInst12MagicWrapperIbEV* nocapture dereferenceable(1) %0)
 
-// public func asdf(a: FooA) {}
-// public func asdf(a: FooB) {}
-// public func asdf(a: FooC) {}
+public func returnInstantiation() -> WrappedMagicInt {
+  return WrappedMagicInt()
+}
 
-// CHECK: asdasdaf
+// CHECK: define {{(protected |dllexport )?}}swiftcc void @"$s4main19returnInstantiationSo34__CxxTemplateInst12MagicWrapperIiEVyF"()
+
