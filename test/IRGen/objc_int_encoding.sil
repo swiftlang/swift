@@ -5,7 +5,7 @@
 // CHECK-64: [[INT_UINT_METHOD_ENCODING:@.*]] = private unnamed_addr constant {{.*}} c"Q24@0:8q16\00"
 // CHECK-32: [[INT_UINT_METHOD_ENCODING:@.*]] = private unnamed_addr constant {{.*}} c"I12@0:4i8\00"
 
-// CHECK: @_INSTANCE_METHODS__TtC17objc_int_encoding3Foo = private constant {{.*}} [[SELECTOR]], {{.*}} [[INT_UINT_METHOD_ENCODING]], {{.*}} @"$s17objc_int_encoding3FooC3foo1xSuSi_tFTo{{(\.ptrauth)?}}"
+// CHECK: @_INSTANCE_METHODS__TtC17objc_int_encoding3Foo = internal constant {{.*}} [[SELECTOR]], {{.*}} [[INT_UINT_METHOD_ENCODING]], {{.*}} @"$s17objc_int_encoding3FooC3foo1xSuSi_tFTo{{(\.ptrauth)?}}"
 
 sil_stage canonical
 

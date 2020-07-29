@@ -8,7 +8,7 @@
 // CHECK: [[KEYED_SETTER_ENCODING:@.+]] = private unnamed_addr constant [14 x i8] c"v32@0:8q16@24\00"
 
 // CHECK: @_INSTANCE_METHODS__TtC15objc_subscripts10SomeObject = 
-// CHECK:   private constant { i32, i32, [5 x { i8*, i8*, i8* }] } 
+// CHECK:   internal constant { i32, i32, [5 x { i8*, i8*, i8* }] } 
 // CHECK:   { i32 24, i32 5, [5 x { i8*, i8*, i8* }] 
 // CHECK:     [
 // CHECK:       { i8*, i8*, i8* } 
