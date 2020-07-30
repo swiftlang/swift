@@ -52,7 +52,7 @@ protocol ABO : A, B, O { func abo() }
 // CHECK-SAME: }
 
 // -- @objc protocol O uses ObjC symbol mangling and layout
-// CHECK-LABEL: @_PROTOCOL__TtP17protocol_metadata1O_ = private constant
+// CHECK-LABEL: @_PROTOCOL__TtP17protocol_metadata1O_ = internal constant
 // CHECK-SAME:   @_PROTOCOL_INSTANCE_METHODS__TtP17protocol_metadata1O_,
 // -- size, flags: 1 = Swift
 // CHECK-SAME:   i32 96, i32 1
@@ -60,7 +60,7 @@ protocol ABO : A, B, O { func abo() }
 // CHECK-SAME: }
 
 // -- @objc protocol OPT uses ObjC symbol mangling and layout
-// CHECK: @_PROTOCOL__TtP17protocol_metadata3OPT_ = private constant { {{.*}} i32, [4 x i8*]*, i8*, i8* } {
+// CHECK: @_PROTOCOL__TtP17protocol_metadata3OPT_ = internal constant { {{.*}} i32, [4 x i8*]*, i8*, i8* } {
 // CHECK-SAME:   @_PROTOCOL_INSTANCE_METHODS_OPT__TtP17protocol_metadata3OPT_,
 // CHECK-SAME:   @_PROTOCOL_CLASS_METHODS_OPT__TtP17protocol_metadata3OPT_,
 // -- size, flags: 1 = Swift

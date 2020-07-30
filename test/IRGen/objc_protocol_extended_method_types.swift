@@ -26,7 +26,7 @@ import Foundation
 // CHECK-JIT-DAG: [[TY_ID:@.*]] = private unnamed_addr constant [8 x i8] c"@16@0:8\00"
 // CHECK-JIT-DAG: [[TY_INT_INT:@.*]] = private unnamed_addr constant [11 x i8] c"q24@0:8q16\00"
 
-// CHECK-LABEL: @_PROTOCOL_METHOD_TYPES__TtP35objc_protocol_extended_method_types1P_ = private constant [16 x i8*] [
+// CHECK-LABEL: @_PROTOCOL_METHOD_TYPES__TtP35objc_protocol_extended_method_types1P_ = internal constant [16 x i8*] [
 // -- required instance methods:
 //   -- requiredInstanceMethod
 // CHECK:         i8* getelementptr inbounds ([31 x i8], [31 x i8]* [[NSNUMBER]], i64 0, i64 0),

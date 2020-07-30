@@ -18,7 +18,7 @@ sil_vtable C {}
 // <rdar://14812566>: include _Tt prefix here
 //   CHECK: [[C_NAME:@.*]] = private unnamed_addr constant [13 x i8] c"_TtC5class1C\00"
 
-// CHECK:      @_DATA__TtC5class1C = private constant {{.*}} {
+// CHECK:      @_DATA__TtC5class1C = internal constant {{.*}} {
 // CHECK-SAME:   i32 128,
 // CHECK-SAME:   i32 16,
 // CHECK-SAME:   i32 16,
