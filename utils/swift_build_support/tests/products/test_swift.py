@@ -322,7 +322,6 @@ class SwiftTestCase(unittest.TestCase):
             [x for x in swift.cmake_options
              if 'DSWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING' in x])
 
-
     def test_experimental_concurrency_flags(self):
         self.args.enable_experimental_concurrency = True
         swift = Swift(
