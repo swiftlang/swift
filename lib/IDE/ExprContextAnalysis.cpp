@@ -790,6 +790,8 @@ class ExprContextAnalyzer {
             auto argTy = ty;
             if (paramType.isInOut())
               argTy = InOutType::get(argTy);
+            else if (paramType.isAutoClosure() && argTy->is<AnyFunctionType>())
+              argTy = argTy->castTo<AnyFunctionType>()->getResult();
             if (seenTypes.insert(argTy.getPointer()).second)
               recordPossibleType(argTy);
           }
