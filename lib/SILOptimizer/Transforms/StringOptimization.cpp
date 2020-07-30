@@ -199,6 +199,32 @@ bool StringOptimization::optimizeStringAppend(ApplyInst *appendCall,
   return false;
 }
 
+/// Checks if the demangling tree contains any node which prevents constant
+/// folding of the type name.
+static bool containsProblematicNode(Demangle::Node *node, bool qualified) {
+  switch (node->getKind()) {
+    case Demangle::Node::Kind::LocalDeclName:
+      // The printing of contexts for local types is completely different
+      // in the runtime. Don't constant fold if we need to print the context.
+      if (qualified)
+        return true;
+      break;
+    case Demangle::Node::Kind::Class:
+      // ObjC class names are not derived from the mangling but from the
+      // ObjC runtime. We cannot constant fold this.
+      if (node->getChild(0)->getText() == "__C")
+        return true;
+      break;
+    default:
+      break;
+  }
+  for (Demangle::Node *child : *node) {
+    if (containsProblematicNode(child, qualified))
+      return true;
+  }
+  return false;
+}
+
 /// Try to replace a _typeName() call with a constant string if the type is
 /// statically known.
 bool StringOptimization::optimizeTypeName(ApplyInst *typeNameCall) {
@@ -217,9 +243,10 @@ bool StringOptimization::optimizeTypeName(ApplyInst *typeNameCall) {
     return false;
   
   // Usually the "qualified" parameter of _typeName() is a constant boolean.
-  Optional<int> isQualified = getIntConstant(typeNameCall->getArgument(1));
-  if (!isQualified)
+  Optional<int> isQualifiedOpt = getIntConstant(typeNameCall->getArgument(1));
+  if (!isQualifiedOpt)
     return false;
+  bool isQualified = isQualifiedOpt.getValue();
 
   // Create the constant type string by mangling + demangling.
   Mangle::ASTMangler mangler;
@@ -227,10 +254,18 @@ bool StringOptimization::optimizeTypeName(ApplyInst *typeNameCall) {
 
   Demangle::DemangleOptions options;
   options.PrintForTypeName = true;
-  options.QualifyEntities = (isQualified.getValue() != 0);
-  std::string typeStr = Demangle::demangleSymbolAsString(mangledTypeName,
-                                                         options);
-  
+  options.DisplayLocalNameContexts = false;
+  options.QualifyEntities = isQualified;
+
+  Demangle::Context ctx;
+  Demangle::NodePointer root = ctx.demangleTypeAsNode(mangledTypeName);
+  if (!root || containsProblematicNode(root, isQualified))
+    return false;
+
+  std::string typeStr = nodeToString(root, options);
+  if (typeStr.empty())
+    return false;
+
   ApplyInst *stringInit = createStringInit(typeStr, typeNameCall);
   if (!stringInit)
     return false;
