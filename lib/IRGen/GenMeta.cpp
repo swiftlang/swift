@@ -1492,7 +1492,7 @@ namespace {
     void addMethod(SILDeclRef fn) {
       if (!VTable || methodRequiresReifiedVTableEntry(IGM, VTable, fn)) {
         VTableEntries.push_back(fn);
-      } else if (hasPublicVisibility(fn.getLinkage(NotForDefinition))) {
+      } else {
         // Emit a stub method descriptor and lookup function for nonoverridden
         // methods so that resilient code sequences can still use them.
         emitNonoverriddenMethod(fn);
@@ -1634,7 +1634,10 @@ namespace {
       // method for external clients.
       
       // Emit method dispatch thunk.
-      IGM.emitDispatchThunk(fn);
+      if (hasPublicVisibility(fn.getLinkage(NotForDefinition))) {
+        IGM.emitDispatchThunk(fn);
+      }
+      
       // Emit a freestanding method descriptor structure. This doesn't have to
       // exist in the table in the class's context descriptor since it isn't
       // in the vtable, but external clients need to be able to link against the

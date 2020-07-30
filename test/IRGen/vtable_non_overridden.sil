@@ -24,6 +24,10 @@ sil_vtable InternalA {
   #InternalA.bas : @InternalA_bas [nonoverridden]
 }
 
+// -- we should still generate method descriptors for the elided methods
+// CHECK-LABEL: @"$s21vtable_non_overridden9InternalAC3fooyyFTq" =
+// CHECK-LABEL: @"$s21vtable_non_overridden9InternalAC3basyyFTq" =
+
 // -- only overridden entries in internal method descriptor table
 // CHECK-LABEL: @"$s21vtable_non_overridden9InternalACMn" =
 // CHECK-SAME:     i32 2, %swift.method_descriptor
