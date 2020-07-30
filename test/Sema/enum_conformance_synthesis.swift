@@ -224,7 +224,12 @@ enum Complex2 {
 }
 extension Complex2 : Hashable {}
 extension Complex2 : CaseIterable {}  // expected-error {{type 'Complex2' does not conform to protocol 'CaseIterable'}}
-extension FromOtherFile: CaseIterable {} // expected-error {{cannot be automatically synthesized in an extension in a different file to the type}} expected-error {{does not conform to protocol 'CaseIterable'}}
+extension FromOtherFile: CaseIterable {} // expected-error {{cannot be automatically synthesized in an extension in a different file to the type}}
+extension CaseIterableAcrossFiles: CaseIterable {
+  public static var allCases: [CaseIterableAcrossFiles] {
+    return [ .A ]
+  }
+}
 
 // No explicit conformance and it cannot be derived.
 enum NotExplicitlyHashableAndCannotDerive {
