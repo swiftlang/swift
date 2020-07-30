@@ -3038,21 +3038,14 @@ namespace {
     Type visitCoerceExpr(CoerceExpr *expr) {
       // Validate the resulting type.
       auto *const repr = expr->getCastTypeRepr();
-      const auto type = resolveTypeReferenceInExpression(
-          repr, TypeResolverContext::ExplicitCastExpr, [](auto unboundTy) {
-            // FIXME: We ought to pass an OpenUnboundGenericType object rather
-            // than calling CS.openUnboundGenericType after resolving, but
-            // sometimes the type expression is resolved eagerly in
-            // PreCheckExpression::simplifyTypeConstructionWithLiteralArg,
-            // letting unbound generics escape.
-            return unboundTy;
-          });
-      if (!type)
+      const auto toType = resolveTypeReferenceInExpression(
+          repr, TypeResolverContext::ExplicitCastExpr,
+          // Introduce type variables for unbound generics.
+          OpenUnboundGenericType(CS, CS.getConstraintLocator(expr)));
+      if (!toType)
         return nullptr;
 
-      // Open the type we're casting to.
-      const auto toType =
-          CS.openUnboundGenericTypes(type, CS.getConstraintLocator(expr));
+      // Cache the type we're casting to.
       if (repr) CS.setType(repr, toType);
 
       auto fromType = CS.getType(expr->getSubExpr());
