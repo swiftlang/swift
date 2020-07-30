@@ -1507,6 +1507,97 @@ public:
     }
   }
 
+  /// Handle `unchecked_take_enum_data_addr` instruction.
+  ///   Original: y = unchecked_take_enum_data_addr x : $*Enum, #Enum.Case
+  ///   Adjoint: adj[x] += adj[y]
+  ///             (assuming adj[x] and adj[y] have the same type)
+  void visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *utedai) {
+    auto *bb = utedai->getParent();
+    auto adjBuf = getAdjointBuffer(bb, utedai);
+    auto enumTy = utedai->getOperand()->getType();
+    auto *optionalEnumDecl = getASTContext().getOptionalDecl();
+    if (enumTy.getASTType().getEnumOrBoundGenericEnum() != optionalEnumDecl) {
+      LLVM_DEBUG(getADDebugStream()
+               << "Unhandled instruction in PullbackCloner: " << *utedai);
+      getContext().emitNondifferentiabilityError(
+        utedai, getInvoker(), diag::autodiff_expression_not_differentiable_note);
+      errorOccurred = true;
+      return;
+    }
+    auto pbLoc = getPullback().getLocation();
+    // `Optional<T>`
+    auto optionalTy = remapType(enumTy);
+    // `T`
+    auto Ty = optionalTy.getOptionalObjectType();
+    // `T.TangentVector`
+    auto tanTy = remapType(adjBuf->getType());
+    // `Optional<T.TangentVector>`
+    auto optionalTanTy = SILType::getOptionalType(tanTy);
+    // `Optional<T>.TangentVector`
+    auto tangentVectorTy = getRemappedTangentType(optionalTy);
+    // `Optional<T>.TangentVector` Decl
+    auto *structDecl = cast<StructType>(tangentVectorTy.getASTType()).getStructOrBoundGenericStruct();
+    // Lookup `Optional<T>.TangentVector.init`.
+    auto initLookup = structDecl->lookupDirect(DeclBaseName::createConstructor());
+    ConstructorDecl *constructorDecl = nullptr;
+    for (auto *candidate : initLookup) {
+      auto candidateModule = candidate->getModuleContext();
+      if (candidateModule->getName() == builder.getASTContext().Id_Differentiation ||
+        candidateModule->isStdlibModule()) {
+        assert(!constructorDecl && "Multiple `Optional.TangentVector.init`s");
+        constructorDecl = cast<ConstructorDecl>(candidate);
+#ifdef NDEBUG
+        break;
+#endif
+      }
+    }
+    assert(constructorDecl && "No `Optional.TangentVector.init`");
+
+    // Allocate a local buffer to store the Optional adjoint value.
+    auto *optTanAdjBuf = builder.createAllocStack(pbLoc, tangentVectorTy);
+    // %metatype = metatype $Optional<T>.TangentVector.Type
+    auto metatypeType = CanMetatypeType::get(tangentVectorTy.getASTType(),
+                                              MetatypeRepresentation::Thin);
+    auto metatypeSILType = SILType::getPrimitiveObjectType(metatypeType);
+    auto metatype = builder.createMetatype(pbLoc, metatypeSILType);
+    // Find `Optional<T.TangentVector>.some` EnumElementDecl.
+    auto someEltDecl = builder.getASTContext().getOptionalSomeDecl();
+    // Allocate a local buffer to convert the `concreteBBArgAdjCopy` to `Optional<T.TangentVector>`.
+    // (For `Optional<T>.TangentVector.init` input.)
+    auto *optArgBuf = builder.createAllocStack(pbLoc, optionalTanTy);
+    // %enum = init_enum_data_addr %optArgBuf $Optional<T.TangentVector>, #Optional.some!enumelt, %concreteBBArgAdjCopy : $T
+    auto enumAddr = builder.createInitEnumDataAddr(
+        pbLoc, optArgBuf, someEltDecl, tanTy.getAddressType());
+    // copy_addr %adjBuf to [initialization] %enum
+    builder.createCopyAddr(pbLoc, adjBuf, enumAddr, IsNotTake,
+                           IsInitialization);
+    // inject_enum_addr %optArgBuf : $*Optional<T.TangentVector>, #Optional.some!enumelt
+    builder.createInjectEnumAddr(pbLoc, optArgBuf, someEltDecl);
+    SILOptFunctionBuilder fb(getContext().getTransform());
+    // %init_fn = function_ref @Optional<T>.TangentVector.init
+    auto *initFn = fb.getOrCreateFunction(
+        pbLoc, SILDeclRef(constructorDecl), NotForDefinition);
+    auto *initFnRef = builder.createFunctionRef(pbLoc, initFn);
+    // Find Differentiable conformance for `T` and get SubstitutionMap.
+    auto *swiftModule = getModule().getSwiftModule();
+    auto *diffProto = builder.getASTContext().getProtocol(KnownProtocolKind::Differentiable);
+    auto diffConf = swiftModule->lookupConformance(Ty.getASTType(), diffProto);
+    assert(!diffConf.isInvalid() && "Missing conformance to `Differentiable`");
+    auto subMap = SubstitutionMap::get(
+        initFn->getLoweredFunctionType()->getSubstGenericSignature(),
+        ArrayRef<Type>(Ty.getASTType()), {diffConf});
+    // %apply %init_fn(%optTanAdjBuf, %optArgBuf, %metatype)
+    builder.createApply(pbLoc, initFnRef, subMap,
+                        {optTanAdjBuf, optArgBuf, metatype});
+    builder.emitDestroyAddr(pbLoc, optArgBuf);
+    builder.createDeallocStack(pbLoc, optArgBuf);
+
+    // Add created `Optional<T>.TangentVector` to the adjoint.
+    addToAdjointBuffer(bb, utedai->getOperand(), optTanAdjBuf, pbLoc);
+    builder.emitDestroyAddr(pbLoc, optTanAdjBuf);
+    builder.createDeallocStack(pbLoc, optTanAdjBuf);
+  }
+
 #define NOT_DIFFERENTIABLE(INST, DIAG) void visit##INST##Inst(INST##Inst *inst);
 #undef NOT_DIFFERENTIABLE
 

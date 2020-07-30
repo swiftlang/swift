@@ -98,4 +98,17 @@ OptionalTests.test("Var2") {
   expectEqual(gradient(at: nil, in: optional5), .init(0.0))
 }
 
+OptionalTests.test("Generic") {
+  @differentiable
+  func optional6<T: Differentiable>(_ maybeX: T?, _ defaultValue: T) -> T {
+    switch maybeX {
+    case nil: return defaultValue
+    case let .some(x): return x
+    }
+  }
+
+  expectEqual(gradient(at: 10, 20, in: optional6), (.init(1.0), 0.0))
+  expectEqual(gradient(at: nil, 20, in: optional6), (.init(0.0), 1.0))
+}
+
 runAllTests()
