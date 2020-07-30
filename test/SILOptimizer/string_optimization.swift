@@ -105,9 +105,14 @@ printEmbeeded(testUnqualifiedLocalType())
 printEmbeeded(testQualifiedLocalType())
 
 #if _runtime(_ObjC)
-// CHECK-OUTPUT: <NSObject>
-printEmbeeded(testObjcClassName(qualified: false))
-// CHECK-OUTPUT: <NSObject>
-printEmbeeded(testObjcClassName(qualified: true))
+
+// Can't use check-output here, because for non ObjC runtimes it would not match.  
+if testObjcClassName(qualified: false) != "NSObject" {
+  fatalError()
+}
+if testObjcClassName(qualified: true) != "NSObject" {
+  fatalError()
+}
+
 #endif
 
