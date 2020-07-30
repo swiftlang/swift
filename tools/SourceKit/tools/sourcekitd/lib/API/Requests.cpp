@@ -440,11 +440,9 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     if (!Req.getInt64(KeyOptimizeForIDE, EditorMode, true)) {
       OptimizeForIDE = EditorMode;
     }
-    Optional<unsigned> CompletionCheckDependencyInterval;
-    int64_t IntervalValue = 0;
-    if (!Req.getInt64(KeyCompletionCheckDependencyInterval,
-                      IntervalValue, /*isOptional=*/true))
-      CompletionCheckDependencyInterval = IntervalValue;
+    Optional<unsigned> CompletionCheckDependencyInterval =
+      Req.getOptionalInt64(KeyCompletionCheckDependencyInterval)
+        .map([](int64_t v)->unsigned{return v;});
 
     GlobalConfig::Settings UpdatedConfig = Config->update(
         OptimizeForIDE, CompletionCheckDependencyInterval);
