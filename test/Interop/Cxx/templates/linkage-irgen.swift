@@ -7,7 +7,6 @@ public func forceValueWitnessTableCreation() -> Any {
   return WrappedMagicNumber(t: magicNumber)
 }
 
-
 public func getMagicNumberForLinkageComparison() -> Any {
 	return MagicNumber()
 }

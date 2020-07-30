@@ -2,8 +2,8 @@
 //
 // REQUIRES: executable_test
 
-import UsingDirective
 import StdlibUnittest
+import UsingDirective
 
 var TemplatesTestSuite = TestSuite("TemplatesTestSuite")
 
