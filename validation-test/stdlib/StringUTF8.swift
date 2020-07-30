@@ -25,7 +25,12 @@ extension String {
   var isFastUTF8: Bool {
     return withFastUTF8IfAvailable({ _ in return 0 }) != nil
   }
-  mutating func makeNative() { self += "" }
+
+  // Prevent that the optimizer removes 'self += ""' in makeNative()
+  @inline(never)
+  static func emptyString() -> String { return "" }
+
+  mutating func makeNative() { self += String.emptyString() }
 
   var isASCII: Bool { return utf8.allSatisfy { $0 < 0x7f } }
 }
