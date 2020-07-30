@@ -8,7 +8,10 @@ add_custom_command(
 
 add_custom_command(
   TARGET diagnostic-translation-database
-  COMMAND swift-serialize-diagnostics --input-file-path="${SWIFT_BINARY_DIR}/share/swift/diagnostics/en.yaml"  --output-directory="${SWIFT_BINARY_DIR}/share/swift/diagnostics/")
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  COMMAND swift-serialize-diagnostics
+    --input-file-path diagnostics/en.yaml
+    --output-directory ${SWIFT_BINARY_DIR}/share/swift/diagnostics)
 
 add_dependencies(swift-frontend diagnostic-translation-database)
 

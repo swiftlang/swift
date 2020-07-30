@@ -101,7 +101,8 @@ bool SerializedLocalizationWriter::emit(llvm::StringRef filePath) {
 SerializedLocalizationProducer::SerializedLocalizationProducer(
     std::unique_ptr<llvm::MemoryBuffer> buffer)
     : Buffer(std::move(buffer)) {
-  auto base = reinterpret_cast<const uint8_t *>(Buffer.get()->getBufferStart());
+  auto base =
+      reinterpret_cast<const unsigned char *>(Buffer.get()->getBufferStart());
   auto tableOffset = endian::read<offset_type>(base, little);
   SerializedTable.reset(SerializedLocalizationTable::Create(
       base + tableOffset, base + sizeof(offset_type), base));

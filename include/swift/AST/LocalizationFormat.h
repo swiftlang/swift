@@ -45,9 +45,9 @@ public:
 
   hash_value_type ComputeHash(key_type_ref key) { return llvm::djbHash(key); }
 
-  std::pair<unsigned, unsigned> EmitKeyDataLength(llvm::raw_ostream &out,
-                                                  key_type_ref key,
-                                                  data_type_ref data) {
+  std::pair<offset_type, offset_type> EmitKeyDataLength(llvm::raw_ostream &out,
+                                                        key_type_ref key,
+                                                        data_type_ref data) {
     offset_type keyLength = static_cast<offset_type>(key.size());
     offset_type dataLength = static_cast<offset_type>(data.size());
     endian::write<offset_type>(out, keyLength, little);
@@ -85,7 +85,8 @@ public:
     return llvm::djbHash(key);
   }
 
-  static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
+  static std::pair<offset_type, offset_type>
+  ReadKeyDataLength(const unsigned char *&data) {
     offset_type keyLength =
         endian::readNext<offset_type, little, unaligned>(data);
     offset_type dataLength =
@@ -93,11 +94,11 @@ public:
     return {keyLength, dataLength};
   }
 
-  internal_key_type ReadKey(const uint8_t *data, offset_type length) {
+  internal_key_type ReadKey(const unsigned char *data, offset_type length) {
     return internal_key_type((const char *)data, length);
   }
 
-  data_type ReadData(llvm::StringRef Key, const uint8_t *data,
+  data_type ReadData(llvm::StringRef Key, const unsigned char *data,
                      offset_type length) {
     return data_type((const char *)data, length);
   }
