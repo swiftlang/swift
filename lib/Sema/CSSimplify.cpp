@@ -7902,6 +7902,16 @@ ConstraintSystem::simplifyKeyPathConstraint(
   bool definitelyKeyPathType = false;
   bool resolveAsMultiArgFuncFix = false;
 
+  auto unsolved = [&]() {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(Constraint::create(
+          *this, ConstraintKind::KeyPath, keyPathTy, rootTy, valueTy,
+          locator.getBaseLocator(), componentTypeVars));
+      return SolutionKind::Solved;
+    }
+    return SolutionKind::Unsolved;
+  };
+
   auto tryMatchRootAndValueFromType = [&](Type type,
                                           bool allowPartial = true) -> bool {
     Type boundRoot = Type(), boundValue = Type();
@@ -7983,6 +7993,10 @@ ConstraintSystem::simplifyKeyPathConstraint(
         })) {
       return SolutionKind::Solved;
     }
+  }
+
+  if (keyPathTy->isTypeVariableOrMember()) {
+    return unsolved();
   }
 
   // If we're fixed to a bound generic type, trying harvesting context from it.
@@ -8146,10 +8160,7 @@ ConstraintSystem::simplifyKeyPathConstraint(
     return matchTypes(keyPathTy, resolvedKPTy, ConstraintKind::Bind, subflags,
                       loc);
   } else {
-    addUnsolvedConstraint(Constraint::create(*this, ConstraintKind::KeyPath,
-                                             keyPathTy, rootTy, valueTy,
-                                             locator.getBaseLocator(),
-                                             componentTypeVars));
+    return unsolved();
   }
   return SolutionKind::Solved;
 }
