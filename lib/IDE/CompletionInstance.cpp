@@ -295,6 +295,7 @@ bool CompletionInstance::performCachedOperationIfPossible(
 
   auto &CI = *CachedCI;
   auto *oldSF = CI.getCodeCompletionFile();
+  assert(oldSF->getBufferID());
 
   auto *oldState = oldSF->getDelayedParserState();
   assert(oldState->hasCodeCompletionDelayedDeclState());
@@ -302,12 +303,12 @@ bool CompletionInstance::performCachedOperationIfPossible(
 
   auto &SM = CI.getSourceMgr();
   auto bufferName = completionBuffer->getBufferIdentifier();
-  if (SM.getIdentifierForBuffer(SM.getCodeCompletionBufferID()) != bufferName)
+  if (SM.getIdentifierForBuffer(*oldSF->getBufferID()) != bufferName)
     return false;
 
   if (shouldCheckDependencies()) {
     if (areAnyDependentFilesInvalidated(
-            CI, *FileSystem, SM.getCodeCompletionBufferID(),
+            CI, *FileSystem, *oldSF->getBufferID(),
             DependencyCheckedTimestamp, InMemoryDependencyHash))
       return false;
     DependencyCheckedTimestamp = std::chrono::system_clock::now();
