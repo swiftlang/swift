@@ -379,9 +379,10 @@ done:
 /// parseExprSequenceElement
 ///
 ///   expr-sequence-element(Mode):
-///     'try' expr-unary(Mode)
-///     'try' '?' expr-unary(Mode)
-///     'try' '!' expr-unary(Mode)
+///     '__await' expr-sequence-element(Mode)
+///     'try' expr-sequence-element(Mode)
+///     'try' '?' expr-sequence-element(Mode)
+///     'try' '!' expr-sequence-element(Mode)
 ///     expr-unary(Mode)
 ///
 /// 'try' is not actually allowed at an arbitrary position of a
@@ -390,6 +391,19 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
                                                     bool isExprBasic) {
   SyntaxParsingContext ElementContext(SyntaxContext,
                                       SyntaxContextKind::Expr);
+
+  if (Context.LangOpts.EnableExperimentalConcurrency &&
+      Tok.is(tok::kw___await)) {
+    SourceLoc awaitLoc = consumeToken(tok::kw___await);
+    ParserResult<Expr> sub = parseExprUnary(message, isExprBasic);
+    if (!sub.hasCodeCompletion() && !sub.isNull()) {
+      ElementContext.setCreateSyntax(SyntaxKind::TryExpr);
+      sub = makeParserResult(new (Context) AwaitExpr(awaitLoc, sub.get()));
+    }
+
+    return sub;
+  }
+
   SourceLoc tryLoc;
   bool hadTry = consumeIf(tok::kw_try, tryLoc);
   Optional<Token> trySuffix;

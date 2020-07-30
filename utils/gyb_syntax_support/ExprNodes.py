@@ -45,6 +45,14 @@ EXPR_NODES = [
              Child('Expression', kind='Expr'),
          ]),
 
+    # The await operator.
+    # await foo()
+    Node('AwaitExpr', kind='Expr',
+         children=[
+             Child('AwaitKeyword', kind='AwaitToken'),
+             Child('Expression', kind='Expr'),
+         ]),
+
     # declname-arguments -> '(' declname-argument-list ')'
     # declname-argument-list -> declname-argument*
     # declname-argument -> identifier ':'
