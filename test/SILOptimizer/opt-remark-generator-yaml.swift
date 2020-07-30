@@ -1,3 +1,4 @@
+// REQUIRES: rdar66330768
 // RUN: %target-swiftc_driver -O -Rpass-missed=sil-opt-remark-gen -Xllvm -sil-disable-pass=FunctionSignatureOpts -emit-sil %s -o /dev/null -Xfrontend -verify
 
 // RUN: %empty-directory(%t)
