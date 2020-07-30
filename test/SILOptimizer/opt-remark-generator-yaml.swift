@@ -1,4 +1,3 @@
-// REQUIRES: rdar66330768
 // RUN: %target-swiftc_driver -O -Rpass-missed=sil-opt-remark-gen -Xllvm -sil-disable-pass=FunctionSignatureOpts -emit-sil %s -o /dev/null -Xfrontend -verify
 
 // RUN: %empty-directory(%t)
@@ -54,7 +53,9 @@ public func getGlobal() -> Klass {
 // CHECK-NEXT: Function:        'useGlobal()'
 // CHECK-NEXT: Args:
 // CHECK-NEXT:   - String:          'release of type '''
-// CHECK-NEXT:   - ValueType:       {{'Array<Any>'|__ContiguousArrayStorageBase}}
+// This should be: {{'Array<Any>'|__ContiguousArrayStorageBase}}. But it is
+// pretty platform dependent, so we don't pattern match it explicitly.
+// CHECK-NEXT:   - ValueType:
 // CHECK-NEXT:   - String:          ''''
 // CHECK-NEXT: ...
 // CHECK-NEXT: --- !Missed
