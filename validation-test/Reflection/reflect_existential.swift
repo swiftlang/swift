@@ -2,9 +2,9 @@
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/reflect_existential
 // RUN: %target-codesign %t/reflect_existential
 
-// RUN: %target-run %target-swift-reflection-test %t/reflect_existential | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-run %target-swift-reflection-test %t/reflect_existential | %FileCheck %s --check-prefix=CHECK-%target-ptrsize %add_num_extra_inhabitants
 
-// REQUIRES: objc_interop
+// REQUIRES: reflection_test_support
 // REQUIRES: executable_test
 // UNSUPPORTED: use_os_stdlib
 
@@ -32,9 +32,9 @@ reflect(object: TestGeneric(D() as Any))
 // CHECK-64: Type info:
 // CHECK-64: (class_instance size=48 alignment=8 stride=48 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64:   (field name=t offset=16
-// CHECK-64:     (opaque_existential size=32 alignment=8 stride=32 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64:     (opaque_existential size=32 alignment=8 stride=32 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK-64:       (field name=metadata offset=24
-// CHECK-64:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1)))))
+// CHECK-64:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1)))))
 
 // CHECK-32: Type reference:
 // CHECK-32: (bound_generic_class reflect_existential.TestGeneric
@@ -57,9 +57,9 @@ reflect(object: TestGeneric(D() as P))
 // CHECK-64: Type info:
 // CHECK-64: (class_instance size=56 alignment=8 stride=56 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64:   (field name=t offset=16
-// CHECK-64:     (opaque_existential size=40 alignment=8 stride=40 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64:     (opaque_existential size=40 alignment=8 stride=40 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK-64:       (field name=metadata offset=24
-// CHECK-64:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))
+// CHECK-64:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1))
 // CHECK-64:       (field name=wtable offset=32
 // CHECK-64:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1)))))
 
@@ -87,7 +87,7 @@ reflect(object: TestGeneric(D() as (P & AnyObject)))
 // CHECK-64: Type info:
 // CHECK-64: (class_instance size=32 alignment=8 stride=32 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64:   (field name=t offset=16
-// CHECK-64:     (class_existential size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64:     (class_existential size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK-64:       (field name=object offset=0
 // CHECK-64:         (reference kind=strong refcounting=unknown))
 // CHECK-64:       (field name=wtable offset=8
@@ -117,7 +117,7 @@ reflect(object: TestGeneric(D() as CP))
 // CHECK-64: Type info:
 // CHECK-64: (class_instance size=32 alignment=8 stride=32 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64:   (field name=t offset=16
-// CHECK-64:     (class_existential size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64:     (class_existential size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK-64:       (field name=object offset=0
 // CHECK-64:         (reference kind=strong refcounting=unknown))
 // CHECK-64:       (field name=wtable offset=8
@@ -148,7 +148,7 @@ reflect(object: TestGeneric(D() as (C & P)))
 // CHECK-64: Type info:
 // CHECK-64: (class_instance size=32 alignment=8 stride=32 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64:   (field name=t offset=16
-// CHECK-64:     (class_existential size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64:     (class_existential size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK-64:       (field name=object offset=0
 // CHECK-64:         (reference kind=strong refcounting=native))
 // CHECK-64:       (field name=wtable offset=8
