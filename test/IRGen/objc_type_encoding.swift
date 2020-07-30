@@ -171,17 +171,17 @@ import gizmo
 // CHECK-macosx: [[ENC2:@.*]] = private unnamed_addr constant [46 x i8] c"v32@0:8@\22Gizmo\2216@?<v@?@\22NSView\22@\22NSSpoon\22>24\00"
 // CHECK-macosx: [[ENC3:@.*]] = private unnamed_addr constant [53 x i8] c"v24@0:8@\22_TtC18objc_type_encoding14MyCustomObject\2216\00"
 // CHECK-macosx: [[ENC4:@.*]] = private unnamed_addr constant [75 x i8] c"v24@0:8@\22_TtC18objc_type_encoding14MyCustomObject<NSFunging><NSRuncing>\2216\00"
-// CHECK-macosx: @_PROTOCOL_METHOD_TYPES__TtP18objc_type_encoding10MyProtocol_ = private constant [4 x i8*] [i8* getelementptr inbounds ([35 x i8], [35 x i8]* [[ENC1]], i64 0, i64 0), i8* getelementptr inbounds ([46 x i8], [46 x i8]* [[ENC2]], i64 0, i64 0), i8* getelementptr inbounds ([53 x i8], [53 x i8]* [[ENC3]], i64 0, i64 0), i8* getelementptr inbounds ([75 x i8], [75 x i8]* [[ENC4]], i64 0, i64 0)]
+// CHECK-macosx: @_PROTOCOL_METHOD_TYPES__TtP18objc_type_encoding10MyProtocol_ = internal constant [4 x i8*] [i8* getelementptr inbounds ([35 x i8], [35 x i8]* [[ENC1]], i64 0, i64 0), i8* getelementptr inbounds ([46 x i8], [46 x i8]* [[ENC2]], i64 0, i64 0), i8* getelementptr inbounds ([53 x i8], [53 x i8]* [[ENC3]], i64 0, i64 0), i8* getelementptr inbounds ([75 x i8], [75 x i8]* [[ENC4]], i64 0, i64 0)]
 // CHECK-ios: [[ENC1:@.*]] = private unnamed_addr constant [35 x i8] c"v24@0:8@\22<NSFunging><NSRuncing>\2216\00"
 // CHECK-ios: [[ENC2:@.*]] = private unnamed_addr constant [46 x i8] c"v32@0:8@\22Gizmo\2216@?<v@?@\22NSView\22@\22NSSpoon\22>24\00"
 // CHECK-ios: [[ENC3:@.*]] = private unnamed_addr constant [53 x i8] c"v24@0:8@\22_TtC18objc_type_encoding14MyCustomObject\2216\00"
 // CHECK-ios: [[ENC4:@.*]] = private unnamed_addr constant [75 x i8] c"v24@0:8@\22_TtC18objc_type_encoding14MyCustomObject<NSFunging><NSRuncing>\2216\00"
-// CHECK-ios: @_PROTOCOL_METHOD_TYPES__TtP18objc_type_encoding10MyProtocol_ = private constant [4 x i8*] [i8* getelementptr inbounds ([35 x i8], [35 x i8]* [[ENC1]], i64 0, i64 0), i8* getelementptr inbounds ([46 x i8], [46 x i8]* [[ENC2]], i64 0, i64 0), i8* getelementptr inbounds ([53 x i8], [53 x i8]* [[ENC3]], i64 0, i64 0), i8* getelementptr inbounds ([75 x i8], [75 x i8]* [[ENC4]], i64 0, i64 0)]
+// CHECK-ios: @_PROTOCOL_METHOD_TYPES__TtP18objc_type_encoding10MyProtocol_ = internal constant [4 x i8*] [i8* getelementptr inbounds ([35 x i8], [35 x i8]* [[ENC1]], i64 0, i64 0), i8* getelementptr inbounds ([46 x i8], [46 x i8]* [[ENC2]], i64 0, i64 0), i8* getelementptr inbounds ([53 x i8], [53 x i8]* [[ENC3]], i64 0, i64 0), i8* getelementptr inbounds ([75 x i8], [75 x i8]* [[ENC4]], i64 0, i64 0)]
 // CHECK-tvos: [[ENC1:@.*]] = private unnamed_addr constant [35 x i8] c"v24@0:8@\22<NSFunging><NSRuncing>\2216\00"
 // CHECK-tvos: [[ENC2:@.*]] = private unnamed_addr constant [46 x i8] c"v32@0:8@\22Gizmo\2216@?<v@?@\22NSView\22@\22NSSpoon\22>24\00"
 // CHECK-tvos: [[ENC3:@.*]] = private unnamed_addr constant [53 x i8] c"v24@0:8@\22_TtC18objc_type_encoding14MyCustomObject\2216\00"
 // CHECK-tvos: [[ENC4:@.*]] = private unnamed_addr constant [75 x i8] c"v24@0:8@\22_TtC18objc_type_encoding14MyCustomObject<NSFunging><NSRuncing>\2216\00"
-// CHECK-tvos: @_PROTOCOL_METHOD_TYPES__TtP18objc_type_encoding10MyProtocol_ = private constant [4 x i8*] [i8* getelementptr inbounds ([35 x i8], [35 x i8]* [[ENC1]], i64 0, i64 0), i8* getelementptr inbounds ([46 x i8], [46 x i8]* [[ENC2]], i64 0, i64 0), i8* getelementptr inbounds ([53 x i8], [53 x i8]* [[ENC3]], i64 0, i64 0), i8* getelementptr inbounds ([75 x i8], [75 x i8]* [[ENC4]], i64 0, i64 0)]
+// CHECK-tvos: @_PROTOCOL_METHOD_TYPES__TtP18objc_type_encoding10MyProtocol_ = internal constant [4 x i8*] [i8* getelementptr inbounds ([35 x i8], [35 x i8]* [[ENC1]], i64 0, i64 0), i8* getelementptr inbounds ([46 x i8], [46 x i8]* [[ENC2]], i64 0, i64 0), i8* getelementptr inbounds ([53 x i8], [53 x i8]* [[ENC3]], i64 0, i64 0), i8* getelementptr inbounds ([75 x i8], [75 x i8]* [[ENC4]], i64 0, i64 0)]
 
 class C: P {
   func stuff() {}
