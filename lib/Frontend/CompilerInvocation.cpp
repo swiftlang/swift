@@ -52,6 +52,7 @@ void CompilerInvocation::computeRuntimeResourcePathFromExecutablePath(
 }
 
 void CompilerInvocation::setMainExecutablePath(StringRef Path) {
+  FrontendOpts.MainExecutablePath = Path.str();
   llvm::SmallString<128> LibPath;
   computeRuntimeResourcePathFromExecutablePath(Path, LibPath);
   setRuntimeResourcePath(LibPath.str());
