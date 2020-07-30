@@ -123,6 +123,10 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_6 | %FileCheck %s -check-prefix=UNRESOLVED_3_NOTIDEAL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_CONDITION | %FileCheck %s -check-prefix=TERNARY_CONDITION
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOADED_CLOSURE_RETURN | %FileCheck %s -check-prefix=OVERLOADED_CLOSURE_RETURN
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AUTOCLOSURE | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AUTOCLOSURE_OPT | %FileCheck %s -check-prefix=UNRESOLVED_3_OPT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AUTOCLOSURE_FUNCTY | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AUTOCLOSURE_FUNCTY_OPT | %FileCheck %s -check-prefix=UNRESOLVED_3_OPT
 
 enum SomeEnum1 {
   case South
@@ -797,4 +801,20 @@ func testClosureReturnTypeForOverloaded() {
 // OVERLOADED_CLOSURE_RETURN-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: East[#SomeEnum2#];
 // OVERLOADED_CLOSURE_RETURN-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: West[#SomeEnum2#];
 // OVERLOADED_CLOSURE_RETURN: End completions
+}
+
+func receiveAutoclosure(_: @autoclosure () -> SomeEnum1) {}
+func receiveAutoclosureOpt(_: @autoclosure () -> SomeEnum1?) {}
+func testAutoclosre() {
+  receiveAutoclosure(.#^AUTOCLOSURE^#)
+  // Same as UNRESOLVED_3
+
+  receiveAutoclosureOpt(.#^AUTOCLOSURE_OPT^#)
+  // Same as UNRESOLVED_3_OPT
+}
+func testAutoclosreFuncTy(fn: (@autoclosure () -> SomeEnum1) -> Void, fnOpt: (@autoclosure () -> SomeEnum1?) -> Void) {
+  fn(.#^AUTOCLOSURE_FUNCTY^#)
+  // Same as UNRESOLVED_3
+  fnOpt(.#^AUTOCLOSURE_FUNCTY_OPT^#)
+  // Same as UNRESOLVED_3_OPT
 }
