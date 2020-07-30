@@ -1,6 +1,5 @@
 // RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-cxx-interop | %FileCheck %s
 
-// RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-cxx-interop -Xcc -target -Xcc x86_64-unknown-windows-msvc -Xcc -fno-PIC | %FileCheck %s
 import DeclWithDefinition
 
 public func getWrappedMagicInt() -> CInt {
