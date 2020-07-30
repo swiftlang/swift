@@ -837,7 +837,6 @@ namespace {
     SUGAR_TYPE(Auto)
     SUGAR_TYPE(DeducedTemplateSpecialization)
     SUGAR_TYPE(Adjusted)
-    SUGAR_TYPE(PackExpansion)
     SUGAR_TYPE(Attributed)
     SUGAR_TYPE(MacroQualified)
 
