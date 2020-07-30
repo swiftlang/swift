@@ -1,4 +1,4 @@
-// RUN: %not --crash %target-swift-frontend -primary-file %s -parse-stdlib -module-name Swift -emit-ir
+// RUN: not --crash %target-swift-frontend %s -emit-ir
 
 class Klass {}
 
