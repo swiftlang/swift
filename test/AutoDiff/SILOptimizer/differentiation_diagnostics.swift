@@ -157,8 +157,8 @@ class C<T: Differentiable>: Differentiable {
 @differentiable
 // expected-note @+1 {{when differentiating this function definition}}
 func usesOptionals(_ x: Float) -> Float {
-  // expected-note @+1 {{differentiating enum values is not yet supported}}
   var maybe: Float? = 10
+  // expected-note @+1 {{expression is not differentiable}}
   maybe = x
   return maybe!
 }
