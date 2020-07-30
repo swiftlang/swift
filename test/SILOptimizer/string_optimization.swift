@@ -6,6 +6,10 @@
 
 // REQUIRES: executable_test,swift_stdlib_no_asserts
 
+#if _runtime(_ObjC)
+import Foundation
+#endif
+
 struct Outer {
   struct Inner { }
 }
@@ -50,6 +54,33 @@ public func testQualifiedTypeName() -> String {
   return _typeName(Outer.Inner.self, qualified: true)
 }
 
+// CHECK-LABEL: sil [noinline] @$s4test0A20UnqualifiedLocalTypeSSyF
+// CHECK-NOT: apply
+// CHECK-NOT: bb1
+// CHECK: } // end sil function '$s4test0A20UnqualifiedLocalTypeSSyF'
+@inline(never)
+public func testUnqualifiedLocalType() -> String {
+  struct LocalStruct { }
+  return _typeName(LocalStruct.self, qualified: false)
+}
+
+// CHECK-LABEL: sil [noinline] @$s4test0A18QualifiedLocalTypeSSyF
+// CHECK:    [[F:%[0-9]+]] = function_ref @$ss9_typeName_9qualifiedSSypXp_SbtF
+// CHECK:    apply [[F]]
+// CHECK: } // end sil function '$s4test0A18QualifiedLocalTypeSSyF'
+@inline(never)
+public func testQualifiedLocalType() -> String {
+  struct LocalStruct { }
+  return _typeName(LocalStruct.self, qualified: true)
+}
+
+#if _runtime(_ObjC)
+@inline(never)
+public func testObjcClassName(qualified: Bool) -> String {
+  return _typeName(NSObject.self, qualified: qualified)
+}
+#endif
+
 @inline(never)
 func printEmbeeded(_ s: String) {
   print("<\(s)>")
@@ -57,10 +88,26 @@ func printEmbeeded(_ s: String) {
 
 // CHECK-OUTPUT: <-Inner+>
 printEmbeeded(testTypeNameInterpolation())
+
 // CHECK-OUTPUT: <-Array<Int> is cool+>
 printEmbeeded(testFoldCompleteInterpolation())
+
 // CHECK-OUTPUT: <Inner>
 printEmbeeded(testUnqualifiedTypeName())
+
 // CHECK-OUTPUT: <test.Outer.Inner>
 printEmbeeded(testQualifiedTypeName())
+
+// CHECK-OUTPUT: <LocalStruct>
+printEmbeeded(testUnqualifiedLocalType())
+
+// CHECK-OUTPUT: <test.(unknown context at {{.*}}).LocalStruct>
+printEmbeeded(testQualifiedLocalType())
+
+#if _runtime(_ObjC)
+// CHECK-OUTPUT: <NSObject>
+printEmbeeded(testObjcClassName(qualified: false))
+// CHECK-OUTPUT: <NSObject>
+printEmbeeded(testObjcClassName(qualified: true))
+#endif
 
