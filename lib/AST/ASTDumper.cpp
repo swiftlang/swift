@@ -2130,6 +2130,13 @@ public:
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+  void visitAwaitExpr(AwaitExpr *E) {
+    printCommon(E, "await_expr");
+    OS << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitTupleExpr(TupleExpr *E) {
     printCommon(E, "tuple_expr");
     if (E->hasTrailingClosure())
