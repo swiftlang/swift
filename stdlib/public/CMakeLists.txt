@@ -89,6 +89,10 @@ if(SWIFT_BUILD_STDLIB)
   if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
     add_subdirectory(Differentiation)
   endif()
+
+  if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
+    add_subdirectory(Concurrency)
+  endif()
 endif()
 
 if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
