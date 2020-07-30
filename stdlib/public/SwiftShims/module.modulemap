@@ -80,3 +80,7 @@ module _SwiftClockKitOverlayShims {
 module _SwiftCoreMediaOverlayShims {
   header "CoreMediaOverlayShims.h"
 }
+
+module _SwiftConcurrencyShims {
+  header "_SwiftConcurrency.h"
+}

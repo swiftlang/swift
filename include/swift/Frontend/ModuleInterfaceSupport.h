@@ -43,6 +43,10 @@ struct ModuleInterfaceOptions {
 
   // Print SPI decls and attributes.
   bool PrintSPIs = false;
+
+  /// Print imports with both @_implementationOnly and @_spi, only applies
+  /// when PrintSPIs is true.
+  bool ExperimentalSPIImports = false;
 };
 
 extern version::Version InterfaceFormatVersion;
