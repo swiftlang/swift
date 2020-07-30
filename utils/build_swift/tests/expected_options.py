@@ -498,6 +498,7 @@ EXPECTED_OPTIONS = [
     EnableOption('--distcc'),
     EnableOption('--enable-asan'),
     EnableOption('--enable-experimental-differentiable-programming'),
+    EnableOption('--enable-experimental-concurrency'),
     EnableOption('--enable-lsan'),
     EnableOption('--enable-sanitize-coverage'),
     EnableOption('--enable-tsan'),
