@@ -2,12 +2,12 @@
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/functions
 // RUN: %target-codesign %t/functions
 
-// RUN: %target-run %target-swift-reflection-test %t/functions | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-run %target-swift-reflection-test %t/functions | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize %add_num_extra_inhabitants
 
 // FIXME: Should not require objc_interop -- please put Objective-C-specific
 // testcases in functions_objc.swift
 
-// REQUIRES: objc_interop
+// REQUIRES: reflection_test_support
 // REQUIRES: executable_test
 // UNSUPPORTED: use_os_stdlib
 
@@ -57,9 +57,9 @@ func concrete(x: Int, y: Any) {
 // CHECK-64:      Type info:
 // CHECK-64-NEXT: (closure_context size=48 alignment=8 stride=48 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:   (field offset=16
-// CHECK-64-NEXT:     (opaque_existential size=32 alignment=8 stride=32 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:     (opaque_existential size=32 alignment=8 stride=32 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK-64-NEXT:       (field name=metadata offset=24
-// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1)))))
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1)))))
 }
 
 concrete(x: 10, y: true)
@@ -153,17 +153,17 @@ func generic<T : P, U, V : C>(x: T, y: U, z: V, i: Int) {
 // CHECK-64-NEXT:      (field name=_value offset=0
 // CHECK-64-NEXT:        (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
 // CHECK-64-NEXT:  (field offset=56
-// CHECK-64-NEXT:    (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:    (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK-64-NEXT:      (field name=_guts offset=0
-// CHECK-64-NEXT:        (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:        (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK-64-NEXT:          (field name=_object offset=0
-// CHECK-64-NEXT:            (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:            (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK-64-NEXT:              (field name=_countAndFlagsBits offset=0
 // CHECK-64-NEXT:                (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:                  (field name=_value offset=0
 // CHECK-64-NEXT:                    (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
 // CHECK-64-NEXT:              (field name=_object offset=8
-// CHECK-64-NEXT:                (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK-64-NEXT:                (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1))))))))
 // CHECK-64-NEXT:  (field offset=72
 // CHECK-64-NEXT:    (reference kind=strong refcounting=native)))
 }
@@ -291,7 +291,7 @@ class CapturingClass {
   // CHECK-64:      Type info:
   // CHECK-64-NEXT: (closure_context size=32 alignment=8 stride=32 num_extra_inhabitants=0 bitwise_takable=1
   // CHECK-64-NEXT: (field offset=16
-  // CHECK-64-NEXT:   (tuple size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+  // CHECK-64-NEXT:   (tuple size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
   // CHECK-64-NEXT:     (field offset=0
   // CHECK-64-NEXT:       (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
   // CHECK-64-NEXT:         (field name=_value offset=0
@@ -327,9 +327,9 @@ class CapturingClass {
   // CHECK-64:        Type info:
   // CHECK-64-NEXT: (closure_context size=24 alignment=8 stride=24 num_extra_inhabitants=0 bitwise_takable=1
   // CHECK-64-NEXT:   (field offset=16
-  // CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483646 bitwise_takable=1
+  // CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit-1]] bitwise_takable=1
   // CHECK-64-NEXT:       (case name=some index=0 offset=0
-  // CHECK-64-NEXT:         (class_existential size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+  // CHECK-64-NEXT:         (class_existential size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
   // CHECK-64-NEXT:           (field name=object offset=0
   // CHECK-64-NEXT:             (reference kind=strong refcounting=unknown))))
   // CHECK-64-NEXT:       (case name=none index=1))))
@@ -408,7 +408,7 @@ class CapturingClass {
   // CHECK-64-NEXT:   (field offset=16
   // CHECK-64-NEXT:     (reference kind=strong refcounting=native))
   // CHECK-64-NEXT:   (field offset=24
-  // CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483646 bitwise_takable=1
+  // CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit-1]] bitwise_takable=1
   // CHECK-64-NEXT:       (case name=some index=0 offset=0
   // CHECK-64-NEXT:         (reference kind=strong refcounting=native))
   // CHECK-64-NEXT:       (case name=none index=1))))
