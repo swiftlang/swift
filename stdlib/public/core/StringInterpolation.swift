@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -206,7 +206,7 @@ extension DefaultStringInterpolation: TextOutputStream {
   }
   
   public mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>) {
-    _storage._guts.append(_StringGuts(buffer, isASCII: true))
+    _storage._writeASCII(buffer)
   }
 }
 

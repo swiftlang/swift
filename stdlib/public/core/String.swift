@@ -642,7 +642,7 @@ extension String: _ExpressibleByBuiltinStringLiteral {
     _builtinStringLiteral start: Builtin.RawPointer,
     utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1
-    ) {
+  ) {
     let bufPtr = UnsafeBufferPointer(
       start: UnsafeRawPointer(start).assumingMemoryBound(to: UInt8.self),
       count: Int(utf8CodeUnitCount))
@@ -650,7 +650,7 @@ extension String: _ExpressibleByBuiltinStringLiteral {
       self = String(_StringGuts(smol))
       return
     }
-    self.init(_StringGuts(bufPtr, isASCII: Bool(isASCII)))
+    self.init(_StringGuts(immortal: bufPtr, isASCII: Bool(isASCII)))
   }
 }
 

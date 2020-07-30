@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -545,7 +545,12 @@ extension String: TextOutputStream {
   }
 
   public mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>) {
-    self._guts.append(_StringGuts(buffer, isASCII: true))
+    if let smol = _SmallString(buffer) {
+      _guts.append(_StringGuts(smol))
+    } else {
+      _guts.reserveCapacity(_guts.utf8Count + buffer.count)
+      _guts.appendInPlace(buffer, isASCII: true)
+    }
   }
 }
 

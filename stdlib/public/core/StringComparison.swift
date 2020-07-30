@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -195,8 +195,10 @@ private func _stringCompareSlow(
 ) -> Bool {
   // TODO: Just call the normalizer directly
 
-  let left = _StringGutsSlice(_StringGuts(leftUTF8, isASCII: false))
-  let right = _StringGutsSlice(_StringGuts(rightUTF8, isASCII: false))
+  // NOTE: Uses `_StringGuts.init(immortal:isASCII:)` for performance reasons.
+  // The given buffers aren't immortal, but they'll outlive the slices below.
+  let left = _StringGutsSlice(_StringGuts(immortal: leftUTF8, isASCII: false))
+  let right = _StringGutsSlice(_StringGuts(immortal: rightUTF8, isASCII: false))
   return left.compare(with: right, expecting: expecting)
 }
 

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -86,4 +86,12 @@ extension String.UTF16View {
   // compatibility (even though it shouldn't matter), but is unused.
   @inlinable @inline(__always)
   internal var _shortHeuristic: Int { return 32 }
+}
+
+extension _StringGuts {
+  @available(*, unavailable, renamed: "_StringGuts.init(immortal:isASCII:)")
+  @inlinable @inline(__always)
+  internal init(_ bufPtr: UnsafeBufferPointer<UInt8>, isASCII: Bool) {
+    self.init(_StringObject(immortal: bufPtr, isASCII: isASCII))
+  }
 }

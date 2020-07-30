@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -30,7 +30,7 @@ struct _StringGuts {
 
   // Empty string
   @inlinable @inline(__always)
-  init() {
+  internal init() {
     self.init(_StringObject(empty: ()))
   }
 }
@@ -50,8 +50,9 @@ extension _StringGuts {
     self.init(_StringObject(smol))
   }
 
+  @_alwaysEmitIntoClient
   @inlinable @inline(__always)
-  internal init(_ bufPtr: UnsafeBufferPointer<UInt8>, isASCII: Bool) {
+  internal init(immortal bufPtr: UnsafeBufferPointer<UInt8>, isASCII: Bool) {
     self.init(_StringObject(immortal: bufPtr, isASCII: isASCII))
   }
 
