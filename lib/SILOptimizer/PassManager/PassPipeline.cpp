@@ -493,6 +493,8 @@ static void addHighLevelFunctionPipeline(SILPassPipelinePlan &P) {
   addFunctionPasses(P, OptimizationLevelKind::HighLevel);
 
   addHighLevelLoopOptPasses(P);
+  
+  P.addStringOptimization();
 }
 
 // After "high-level" function passes have processed the entire call tree, run
@@ -528,8 +530,6 @@ static void addSerializePipeline(SILPassPipelinePlan &P) {
 
 static void addMidLevelFunctionPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("MidLevel,Function", true /*isFunctionPassPipeline*/);
-
-  P.addStringOptimization();
 
   addFunctionPasses(P, OptimizationLevelKind::MidLevel);
 
