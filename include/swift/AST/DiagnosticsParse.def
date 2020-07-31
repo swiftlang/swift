@@ -112,8 +112,8 @@ ERROR(lex_single_quote_string,none,
 ERROR(lex_invalid_curly_quote,none,
       "unicode curly quote found, replace with '\"'", ())
 NOTE(lex_confusable_character,none,
-      "unicode character '%0' looks similar to '%1'; did you mean to use '%1'?",
-      (StringRef, StringRef))
+      "unicode character '%0' (%1) looks similar to '%2' (%3); did you mean to use '%2' (%3)?",
+      (StringRef, StringRef, StringRef, StringRef))
 WARNING(lex_nonbreaking_space,none,
         "non-breaking space (U+00A0) used instead of regular space", ())
 

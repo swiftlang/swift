@@ -519,9 +519,8 @@ void recordLookupOfTopLevelName(DeclContext *topLevelContext, DeclName name,
 /// Add anything we find to the \c result vector. If we come across the
 /// AnyObject type, set \c anyObject true.
 void getDirectlyInheritedNominalTypeDecls(
-    llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-    unsigned i,
-    llvm::SmallVectorImpl<Located<NominalTypeDecl *>> &result,
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
+    unsigned i, llvm::SmallVectorImpl<Located<NominalTypeDecl *>> &result,
     bool &anyObject);
 
 /// Retrieve the set of nominal type declarations that are directly
@@ -529,26 +528,25 @@ void getDirectlyInheritedNominalTypeDecls(
 /// and splitting out the components of compositions.
 ///
 /// If we come across the AnyObject type, set \c anyObject true.
-SmallVector<Located<NominalTypeDecl *>, 4>
-getDirectlyInheritedNominalTypeDecls(
-                      llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-                      bool &anyObject);
+SmallVector<Located<NominalTypeDecl *>, 4> getDirectlyInheritedNominalTypeDecls(
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
+    bool &anyObject);
 
 /// Retrieve the set of nominal type declarations that appear as the
 /// constraint type of any "Self" constraints in the where clause of the
 /// given protocol or protocol extension.
 SelfBounds getSelfBoundsFromWhereClause(
-    llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl);
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl);
 
 /// Retrieve the TypeLoc at the given \c index from among the set of
 /// type declarations that are directly "inherited" by the given declaration.
-inline TypeLoc &
-getInheritedTypeLocAtIndex(llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-                           unsigned index) {
-  if (auto typeDecl = decl.dyn_cast<TypeDecl *>())
+inline const TypeLoc &getInheritedTypeLocAtIndex(
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
+    unsigned index) {
+  if (auto typeDecl = decl.dyn_cast<const TypeDecl *>())
     return typeDecl->getInherited()[index];
 
-  return decl.get<ExtensionDecl *>()->getInherited()[index];
+  return decl.get<const ExtensionDecl *>()->getInherited()[index];
 }
 
 namespace namelookup {

@@ -358,5 +358,5 @@ func testKeyPathSubscriptArgFixes(_ fn: @escaping () -> Int) {
 
 func sr12426(a: Any, _ str: String?) {
   a == str // expected-error {{binary operator '==' cannot be applied to operands of type 'Any' and 'String?'}}
-  // expected-note@-1 {{overloads for '==' exist with these partially matching parameter lists: (String, String)}}
+  // expected-note@-1 {{overloads for '==' exist with these partially matching parameter lists: (CodingUserInfoKey, CodingUserInfoKey), (String, String)}}
 }

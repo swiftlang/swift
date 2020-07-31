@@ -557,6 +557,7 @@ extension String: TextOutputStreamable {
   /// Writes the string into the given output stream.
   ///
   /// - Parameter target: An output stream.
+  @inlinable
   public func write<Target: TextOutputStream>(to target: inout Target) {
     target.write(self)
   }

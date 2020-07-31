@@ -52,13 +52,13 @@ import SubE
 // CHECK-NEXT: "swift": "SwiftOnoneSupport"
 // CHECK-NEXT: }
 // CHECK-NEXT: {
+// CHECK-NEXT:   "swift": "_cross_import_E"
+// CHECK-NEXT: }
+// CHECK-NEXT: {
 // CHECK-NEXT: "swift": "F"
 // CHECK-NEXT: }
 // CHECK-NEXT: {
 // CHECK-NEXT: "swift": "A"
-// CHECK-NEXT: }
-// CHECK-NEXT: {
-// CHECK-NEXT:   "swift": "_cross_import_E"
 // CHECK-NEXT: }
 // CHECK-NEXT: ],
 

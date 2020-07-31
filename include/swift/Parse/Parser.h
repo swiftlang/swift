@@ -660,7 +660,7 @@ public:
   /// \returns true if there is an instance of \c T1 on the current line (this
   /// avoids the foot-gun of not considering T1 starting the next line for a
   /// plain Tok.is(T1) check).
-  bool skipUntilTokenOrEndOfLine(tok T1);
+  bool skipUntilTokenOrEndOfLine(tok T1, tok T2 = tok::NUM_TOKENS);
 
   /// Skip a braced block (e.g. function body). The current token must be '{'.
   /// Returns \c true if the parser hit the eof before finding matched '}'.

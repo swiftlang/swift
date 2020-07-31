@@ -230,8 +230,9 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
         // the property wrapper backing initializer.
         if (auto *wrappedVar = field->getOriginalWrappedProperty()) {
           auto wrappedInfo = wrappedVar->getPropertyWrapperBackingPropertyInfo();
-          if (wrappedInfo.originalInitialValue) {
-            auto arg = SGF.emitRValue(wrappedInfo.originalInitialValue);
+          auto *placeholder = wrappedInfo.wrappedValuePlaceholder;
+          if (placeholder && placeholder->getOriginalWrappedValue()) {
+            auto arg = SGF.emitRValue(placeholder->getOriginalWrappedValue());
             maybeEmitPropertyWrapperInitFromValue(SGF, Loc, field, subs,
                                                   std::move(arg))
               .forwardInto(SGF, Loc, init.get());
@@ -274,8 +275,9 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
       // memberwise initialized, use the original wrapped value if it exists.
       if (auto *wrappedVar = field->getOriginalWrappedProperty()) {
         auto wrappedInfo = wrappedVar->getPropertyWrapperBackingPropertyInfo();
-        if (wrappedInfo.originalInitialValue) {
-          init = wrappedInfo.originalInitialValue;
+        auto *placeholder = wrappedInfo.wrappedValuePlaceholder;
+        if (placeholder && placeholder->getOriginalWrappedValue()) {
+          init = placeholder->getOriginalWrappedValue();
         }
       }
 
@@ -937,9 +939,9 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
                           cast<TypedPattern>(pattern)->getSubPattern(),
                           std::move(src));
 
-  case PatternKind::Var:
+  case PatternKind::Binding:
     return emitMemberInit(SGF, selfDecl,
-                          cast<VarPattern>(pattern)->getSubPattern(),
+                          cast<BindingPattern>(pattern)->getSubPattern(),
                           std::move(src));
 
 #define PATTERN(Name, Parent)

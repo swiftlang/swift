@@ -338,3 +338,22 @@ ValueDecl *DerivedConformance::deriveComparable(ValueDecl *requirement) {
   }
   return deriveComparable_lt(*this, synthesizer);
 }
+
+void DerivedConformance::tryDiagnoseFailedComparableDerivation(
+    DeclContext *DC, NominalTypeDecl *nominal) {
+  auto &ctx = DC->getASTContext();
+  auto *comparableProto = ctx.getProtocol(KnownProtocolKind::Comparable);
+  diagnoseAnyNonConformingMemberTypes(DC, nominal, comparableProto);
+  diagnoseIfSynthesisUnsupportedForDecl(nominal, comparableProto);
+
+  if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
+    if (enumDecl->hasRawType() && !enumDecl->getRawType()->is<ErrorType>()) {
+      auto rawType = enumDecl->getRawType();
+      auto rawTypeLoc = enumDecl->getInherited()[0].getSourceRange().Start;
+      ctx.Diags.diagnose(rawTypeLoc,
+                         diag::comparable_synthesis_raw_value_not_allowed,
+                         rawType, nominal->getDeclaredInterfaceType(),
+                         comparableProto->getDeclaredType());
+    }
+  }
+}

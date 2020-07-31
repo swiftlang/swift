@@ -546,7 +546,7 @@ irgen::tryEmitConstantTypeMetadataRef(IRGenModule &IGM, CanType type,
                                       SymbolReferenceKind refKind) {
   if (IGM.isStandardLibrary())
     return ConstantReference();
-  if (isCompleteTypeMetadataStaticallyAddressable(IGM, type))
+  if (isCanonicalCompleteTypeMetadataStaticallyAddressable(IGM, type))
     return ConstantReference();
   return IGM.getAddrOfTypeMetadata(type, refKind);
 }
@@ -583,9 +583,10 @@ llvm::Value *irgen::emitObjCHeapMetadataRef(IRGenFunction &IGF,
 
 static MetadataResponse emitNominalPrespecializedGenericMetadataRef(
     IRGenFunction &IGF, NominalTypeDecl *theDecl, CanType theType,
-    DynamicMetadataRequest request) {
-  assert(isCompleteCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
-      IGF.IGM, *theDecl, theType));
+    DynamicMetadataRequest request,
+    SpecializedMetadataCanonicality canonicality) {
+  assert(isCompleteSpecializedNominalTypeMetadataStaticallyAddressable(
+      IGF.IGM, *theDecl, theType, canonicality));
   // We are applying generic parameters to a generic type.
   assert(theType->getAnyNominal() == theDecl);
 
@@ -593,8 +594,27 @@ static MetadataResponse emitNominalPrespecializedGenericMetadataRef(
   if (auto cache = IGF.tryGetLocalTypeMetadata(theType, request))
     return cache;
 
-  auto metadata = IGF.IGM.getAddrOfTypeMetadata(theType);
-  return MetadataResponse::forComplete(metadata);
+  switch (canonicality) {
+  case CanonicalSpecializedMetadata: {
+    auto metadata = IGF.IGM.getAddrOfTypeMetadata(theType);
+    return MetadataResponse::forComplete(metadata);
+  }
+  case NoncanonicalSpecializedMetadata: {
+    auto cacheVariable =
+        IGF.IGM.getAddrOfNoncanonicalSpecializedGenericTypeMetadataCacheVariable(theType);
+    auto call = IGF.Builder.CreateCall(
+        IGF.IGM.getGetCanonicalSpecializedMetadataFn(),
+        {request.get(IGF),
+         IGF.IGM.getAddrOfTypeMetadata(theType,
+                                       TypeMetadataCanonicality::Noncanonical),
+         cacheVariable});
+    call->setDoesNotThrow();
+    call->setCallingConv(IGF.IGM.SwiftCC);
+    call->addAttribute(llvm::AttributeList::FunctionIndex,
+                       llvm::Attribute::ReadNone);
+    return MetadataResponse::handle(IGF, request, call);
+  }
+  }
 }
 
 static llvm::Value *
@@ -666,13 +686,17 @@ static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
 
   MetadataResponse response;
 
-  if (isCompleteCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
-          IGF.IGM, *theDecl, theType)) {
-    response = emitNominalPrespecializedGenericMetadataRef(IGF, theDecl,
-                                                           theType, request);
+  if (isCompleteSpecializedNominalTypeMetadataStaticallyAddressable(
+          IGF.IGM, *theDecl, theType, CanonicalSpecializedMetadata)) {
+    response = emitNominalPrespecializedGenericMetadataRef(
+        IGF, theDecl, theType, request, CanonicalSpecializedMetadata);
+  } else if (isCompleteSpecializedNominalTypeMetadataStaticallyAddressable(
+                 IGF.IGM, *theDecl, theType, NoncanonicalSpecializedMetadata)) {
+    response = emitNominalPrespecializedGenericMetadataRef(
+        IGF, theDecl, theType, request, NoncanonicalSpecializedMetadata);
   } else if (auto theClass = dyn_cast<ClassDecl>(theDecl)) {
-    if (isCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
-            IGF.IGM, *theClass, theType,
+    if (isSpecializedNominalTypeMetadataStaticallyAddressable(
+            IGF.IGM, *theClass, theType, CanonicalSpecializedMetadata,
             ForUseOnlyFromAccessor)) {
       llvm::Function *accessor =
           IGF.IGM
@@ -698,9 +722,10 @@ static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
   return response;
 }
 
-bool irgen::isCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
+bool irgen::isSpecializedNominalTypeMetadataStaticallyAddressable(
     IRGenModule &IGM, NominalTypeDecl &nominal, CanType type,
-    CanonicalSpecializedMetadataUsageIsOnlyFromAccessor onlyFromAccessor) {
+    SpecializedMetadataCanonicality canonicality,
+    SpecializedMetadataUsageIsOnlyFromAccessor onlyFromAccessor) {
   assert(nominal.isGenericContext());
 
   if (!IGM.shouldPrespecializeGenericMetadata()) {
@@ -711,30 +736,40 @@ bool irgen::isCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
     return false;
   }
 
-  if (IGM.getSILModule().isWholeModule()) {
-    // Canonical prespecializations can only be emitted within the module where
-    // the generic type is itself defined, since it is the module where the 
-    // metadata accessor is defined.
-    if (IGM.getSwiftModule() != nominal.getModuleContext()) {
-      return false;
-    }
-  } else {
-    // If whole module optimization is not enabled, we can only construct a
-    // canonical prespecialization if the usage is in the same *file* as that
-    // containing the type's decl!  The reason is that the generic metadata
-    // accessor is defined in the IRGenModule corresponding to the source file
-    // containing the type's decl.
-    SourceFile *nominalFile = nominal.getDeclContext()->getParentSourceFile();
-    if (auto *moduleFile = IGM.IRGen.getSourceFile(&IGM)) {
-      if (nominalFile != moduleFile) {
+  switch (canonicality) {
+  case CanonicalSpecializedMetadata:
+    if (IGM.getSILModule().isWholeModule()) {
+      // Canonical prespecializations can only be emitted within the module
+      // where the generic type is itself defined, since it is the module where
+      // the metadata accessor is defined.
+      if (IGM.getSwiftModule() != nominal.getModuleContext()) {
         return false;
       }
+    } else {
+      // If whole module optimization is not enabled, we can only construct a
+      // canonical prespecialization if the usage is in the same *file* as that
+      // containing the type's decl!  The reason is that the generic metadata
+      // accessor is defined in the IRGenModule corresponding to the source file
+      // containing the type's decl.
+      SourceFile *nominalFile = nominal.getDeclContext()->getParentSourceFile();
+      if (auto *moduleFile = IGM.IRGen.getSourceFile(&IGM)) {
+        if (nominalFile != moduleFile) {
+          return false;
+        }
+      }
     }
-  }
-
-  if (nominal.isResilient(IGM.getSwiftModule(),
-                          ResilienceExpansion::Maximal)) {
-    return false;
+    break;
+  case NoncanonicalSpecializedMetadata:
+    // Non-canonical metadata prespecializations for a type cannot be formed
+    // within the module that defines that type.
+    if (IGM.getSwiftModule() == nominal.getModuleContext()) {
+      return false;
+    }
+    if (nominal.isResilient(IGM.getSwiftModule(),
+                            ResilienceExpansion::Maximal)) {
+      return false;
+    }
+    break;
   }
 
   if (auto *theClass = dyn_cast<ClassDecl>(&nominal)) {
@@ -750,8 +785,8 @@ bool irgen::isCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
     if (auto *theSuperclass = theClass->getSuperclassDecl()) {
       auto superclassType =
           type->getSuperclass(/*useArchetypes=*/false)->getCanonicalType();
-      if (!isInitializableTypeMetadataStaticallyAddressable(IGM,
-                                                            superclassType) &&
+      if (!isCanonicalInitializableTypeMetadataStaticallyAddressable(
+              IGM, superclassType) &&
           !tryEmitConstantHeapMetadataRef(
               IGM, superclassType,
               /*allowDynamicUninitialized=*/false)) {
@@ -767,52 +802,107 @@ bool irgen::isCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
   auto substitutions =
       type->getContextSubstitutionMap(IGM.getSwiftModule(), &nominal);
 
-  auto allWitnessTablesAreReferenceable = llvm::all_of(environment->getGenericParams(), [&](auto parameter) {
-    auto signature = environment->getGenericSignature();
-    const auto protocols = signature->getRequiredProtocols(parameter);
-    auto argument = ((Type *)parameter)->subst(substitutions);
-    auto canonicalType = argument->getCanonicalType();
-    auto witnessTablesAreReferenceable = [&]() {
-      return llvm::all_of(protocols, [&](ProtocolDecl *protocol) {
-        auto conformance =
-            signature->lookupConformance(canonicalType, protocol);
-        if (!conformance.isConcrete()) {
-          return false;
-        }
-        auto rootConformance = conformance.getConcrete()->getRootConformance();
-        return !IGM.isDependentConformance(rootConformance) &&
-               !IGM.isResilientConformance(rootConformance);
+  auto allArgumentsAreStaticallyAddressable =
+      llvm::all_of(environment->getGenericParams(), [&](auto parameter) {
+        auto signature = environment->getGenericSignature();
+        const auto protocols = signature->getRequiredProtocols(parameter);
+        auto argument = ((Type *)parameter)->subst(substitutions);
+        auto canonicalType = argument->getCanonicalType();
+        auto witnessTablesAreReferenceable = [&]() {
+          return llvm::all_of(protocols, [&](ProtocolDecl *protocol) {
+            auto conformance =
+                signature->lookupConformance(canonicalType, protocol);
+            if (!conformance.isConcrete()) {
+              return false;
+            }
+            auto rootConformance =
+                conformance.getConcrete()->getRootConformance();
+            return !IGM.isDependentConformance(rootConformance) &&
+                   !IGM.isResilientConformance(rootConformance);
+          });
+        };
+        // TODO: Once witness tables are statically specialized, check whether
+        // the
+        //       ConformanceInfo returns nullptr from tryGetConstantTable.
+        auto isGenericWithoutPrespecializedConformance = [&]() {
+          auto genericArgument = argument->getAnyGeneric();
+          return genericArgument && genericArgument->isGenericContext() &&
+                 (protocols.size() > 0);
+        };
+        auto metadataAccessIsTrivial = [&]() {
+          if (onlyFromAccessor) {
+            // If an accessor is being used, then the accessor will be able to
+            // initialize the arguments, i.e. register classes with the ObjC
+            // runtime.
+            return irgen::
+                isCanonicalInitializableTypeMetadataStaticallyAddressable(
+                    IGM, canonicalType);
+          } else {
+            return irgen::isCanonicalCompleteTypeMetadataStaticallyAddressable(
+                IGM, canonicalType);
+          }
+        };
+        return !isGenericWithoutPrespecializedConformance() &&
+               metadataAccessIsTrivial() && witnessTablesAreReferenceable();
       });
-    };
-    // TODO: Once witness tables are statically specialized, check whether the
-    //       ConformanceInfo returns nullptr from tryGetConstantTable.
-    auto isGenericWithoutPrespecializedConformance = [&]() {
-      auto genericArgument = argument->getAnyGeneric();
-      return genericArgument && genericArgument->isGenericContext() && 
-        (protocols.size() > 0);
-    };
-    auto metadataAccessIsTrivial = [&]() {
-      if (onlyFromAccessor) {
-        // If an accessor is being used, then the accessor will be able to
-        // initialize the arguments, i.e. register classes with the ObjC
-        // runtime.
-        return irgen::isInitializableTypeMetadataStaticallyAddressable(
-            IGM, argument->getCanonicalType());
-      } else {
-        return irgen::isCompleteTypeMetadataStaticallyAddressable(
-            IGM, argument->getCanonicalType());
-      }
-    };
-    return !isGenericWithoutPrespecializedConformance() &&
-           metadataAccessIsTrivial() && witnessTablesAreReferenceable();
-  });
-  return allWitnessTablesAreReferenceable
-  && IGM.getTypeInfoForUnlowered(type).isFixedSize(ResilienceExpansion::Maximal);
+  auto anyArgumentIsFromCurrentModule =
+      llvm::any_of(environment->getGenericParams(), [&](auto parameter) {
+        auto signature = environment->getGenericSignature();
+        const auto protocols = signature->getRequiredProtocols(parameter);
+        auto argument = ((Type *)parameter)->subst(substitutions);
+        auto canonicalType = argument->getCanonicalType();
+
+        auto argumentIsFromCurrentModule = [&]() {
+          if (auto *argumentNominal = argument->getAnyNominal()) {
+            return IGM.getSwiftModule() == argumentNominal->getModuleContext();
+          }
+          return false;
+        };
+        auto anyConformanceIsFromCurrentModule = [&]() {
+          return llvm::any_of(protocols, [&](ProtocolDecl *protocol) {
+            auto conformance =
+                signature->lookupConformance(canonicalType, protocol);
+            if (!conformance.isConcrete()) {
+              return false;
+            }
+            auto rootConformance =
+                conformance.getConcrete()->getRootConformance();
+            return IGM.getSwiftModule() ==
+                   rootConformance->getDeclContext()->getParentModule();
+          });
+        };
+
+        return argumentIsFromCurrentModule() ||
+               anyConformanceIsFromCurrentModule();
+      });
+  return allArgumentsAreStaticallyAddressable &&
+         // A type's metadata cannot be prespecialized non-canonically if it
+         // could be specialized canonically.  The reasons for that:
+         // (1) Canonically prespecialized metadata is not registered with the
+         //     runtime; at runtime, whether canonically prespecialized
+         //     metadata exists can only be determined by calling the metadata
+         //     accessor.
+         // (2) At compile time, there is no way to determine whether the
+         //     defining module has prespecialized metadata at a particular
+         //     argument list.
+         // (3) Subsequent versions of the defining module may add or remove
+         //     prespecialized metadata.
+         //
+         // To account for that, we only allow non-canonical prespecialization
+         // when at least one of the arguments is from the current module
+         // where non-canonical prespecialization might occur.  Consequently,
+         // some prespecialization opportunities may be missed (such as when
+         // an argument comes from a module which it is known the defining
+         // module does not depend on).
+         !((canonicality == NoncanonicalSpecializedMetadata) &&
+           !anyArgumentIsFromCurrentModule) &&
+         IGM.getTypeInfoForUnlowered(type).isFixedSize(
+             ResilienceExpansion::Maximal);
 }
 
-bool irgen::
-    isCompleteCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
-        IRGenModule &IGM, NominalTypeDecl &nominal, CanType type) {
+bool irgen::isCompleteSpecializedNominalTypeMetadataStaticallyAddressable(
+    IRGenModule &IGM, NominalTypeDecl &nominal, CanType type,
+    SpecializedMetadataCanonicality canonicality) {
   if (isa<ClassType>(type) || isa<BoundGenericClassType>(type)) {
     // TODO: On platforms without ObjC interop, we can do direct access to
     // class metadata.
@@ -824,15 +914,15 @@ bool irgen::
   // yet:
   //   Struct<Klass<Int>>
   //   Enum<Klass<Int>>
-  return isCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
-      IGM, nominal, type, NotForUseOnlyFromAccessor);
+  return isSpecializedNominalTypeMetadataStaticallyAddressable(
+      IGM, nominal, type, canonicality, NotForUseOnlyFromAccessor);
 }
 
 /// Is there a known address for canonical specialized metadata?  The metadata
 /// there may need initialization before it is complete.
-bool irgen::isInitializableTypeMetadataStaticallyAddressable(IRGenModule &IGM,
-                                                             CanType type) {
-  if (isCompleteTypeMetadataStaticallyAddressable(IGM, type)) {
+bool irgen::isCanonicalInitializableTypeMetadataStaticallyAddressable(
+    IRGenModule &IGM, CanType type) {
+  if (isCanonicalCompleteTypeMetadataStaticallyAddressable(IGM, type)) {
     // The address of the complete metadata is the address of the abstract
     // metadata.
     return true;
@@ -844,16 +934,39 @@ bool irgen::isInitializableTypeMetadataStaticallyAddressable(IRGenModule &IGM,
     // the work of registering the class and its arguments with the ObjC
     // runtime.
     // Concretely, Clazz<Klass<Int>> can be prespecialized.
-    return isCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
-        IGM, *nominal, type, ForUseOnlyFromAccessor);
+    return isSpecializedNominalTypeMetadataStaticallyAddressable(
+        IGM, *nominal, type, CanonicalSpecializedMetadata,
+        ForUseOnlyFromAccessor);
   }
 
   return false;
 }
 
+bool irgen::isNoncanonicalCompleteTypeMetadataStaticallyAddressable(
+    IRGenModule &IGM, CanType type) {
+  // If the canonical metadata record can be statically addressed, then there
+  // should be no visible non-canonical metadata record to address.
+  if (isCanonicalCompleteTypeMetadataStaticallyAddressable(IGM, type)) {
+    return false;
+  }
+
+  if (isa<BoundGenericStructType>(type) || isa<BoundGenericEnumType>(type)) {
+    auto nominalType = cast<BoundGenericType>(type);
+    auto *nominalDecl = nominalType->getDecl();
+
+    // Imported type metadata always requires an accessor.
+    if (isa<ClangModuleUnit>(nominalDecl->getModuleScopeContext()))
+      return false;
+
+    return isCompleteSpecializedNominalTypeMetadataStaticallyAddressable(
+        IGM, *nominalDecl, type, NoncanonicalSpecializedMetadata);
+  }
+  return false;
+}
+
 /// Is complete metadata for the given type available at a fixed address?
-bool irgen::isCompleteTypeMetadataStaticallyAddressable(IRGenModule &IGM,
-                                                        CanType type) {
+bool irgen::isCanonicalCompleteTypeMetadataStaticallyAddressable(
+    IRGenModule &IGM, CanType type) {
   assert(!type->hasArchetype());
 
   // Value type metadata only requires dynamic initialization on first
@@ -867,8 +980,8 @@ bool irgen::isCompleteTypeMetadataStaticallyAddressable(IRGenModule &IGM,
       return false;
 
     if (nominalDecl->isGenericContext())
-      return isCompleteCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
-          IGM, *nominalDecl, type);
+      return isCompleteSpecializedNominalTypeMetadataStaticallyAddressable(
+          IGM, *nominalDecl, type, CanonicalSpecializedMetadata);
 
     auto expansion = ResilienceExpansion::Maximal;
 
@@ -902,8 +1015,8 @@ bool irgen::isCompleteTypeMetadataStaticallyAddressable(IRGenModule &IGM,
     if (isa<ClangModuleUnit>(nominalDecl->getModuleScopeContext()))
       return false;
 
-    return isCompleteCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
-        IGM, *nominalDecl, type);
+    return isCompleteSpecializedNominalTypeMetadataStaticallyAddressable(
+        IGM, *nominalDecl, type, CanonicalSpecializedMetadata);
   }
 
   return false;
@@ -926,17 +1039,21 @@ bool irgen::shouldCacheTypeMetadataAccess(IRGenModule &IGM, CanType type) {
     if (!hasKnownSwiftMetadata(IGM, classDecl))
       return true;
     if (classDecl->isGenericContext() &&
-        isCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
-            IGM, *classDecl, type, ForUseOnlyFromAccessor))
+        isSpecializedNominalTypeMetadataStaticallyAddressable(
+            IGM, *classDecl, type, CanonicalSpecializedMetadata,
+            ForUseOnlyFromAccessor))
       return false;
     auto strategy = IGM.getClassMetadataStrategy(classDecl);
     return strategy != ClassMetadataStrategy::Fixed;
   }
 
   // Trivially accessible metadata does not need a cache.
-  if (isCompleteTypeMetadataStaticallyAddressable(IGM, type))
+  if (isCanonicalCompleteTypeMetadataStaticallyAddressable(IGM, type))
     return false;
-  
+
+  if (isNoncanonicalCompleteTypeMetadataStaticallyAddressable(IGM, type))
+    return false;
+
   return true;
 }
 
@@ -2351,7 +2468,7 @@ emitDirectTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
   }
 
   // We should not be doing more serious work along this path.
-  assert(isCompleteTypeMetadataStaticallyAddressable(IGF.IGM, type));
+  assert(isCanonicalCompleteTypeMetadataStaticallyAddressable(IGF.IGM, type));
 
   // Okay, everything else is built from a Swift metadata object.
   llvm::Constant *metadata = IGF.IGM.getAddrOfTypeMetadata(type);

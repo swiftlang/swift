@@ -213,16 +213,30 @@ public:
     } else if (auto tuple = dyn_cast<TupleExpr>(E->getArg())) {
       lParenLoc = tuple->getLParenLoc();
       rParenLoc = tuple->getRParenLoc();
+
+      assert((!E->getUnlabeledTrailingClosureIndex().hasValue() ||
+              (tuple->getNumElements() == E->getArgumentLabels().size() &&
+               tuple->getNumElements() == E->getArgumentLabelLocs().size())) &&
+             "CallExpr with trailing closure must have the same number of "
+             "argument labels");
+      assert(tuple->getNumElements() == E->getArgumentLabels().size());
+      assert(tuple->getNumElements() == E->getArgumentLabelLocs().size() ||
+             E->getArgumentLabelLocs().size() == 0);
+
+      bool hasArgumentLabelLocs = E->getArgumentLabelLocs().size() > 0;
+
       for (unsigned i = 0, e = tuple->getNumElements(); i != e; ++i) {
         if (isa<CodeCompletionExpr>(tuple->getElement(i))) {
           removing = true;
           continue;
         }
 
-        if (i < E->getUnlabeledTrailingClosureIndex()) {
+        if (!E->getUnlabeledTrailingClosureIndex().hasValue() ||
+            i < *E->getUnlabeledTrailingClosureIndex()) {
           // Normal arguments.
           argLabels.push_back(E->getArgumentLabels()[i]);
-          argLabelLocs.push_back(E->getArgumentLabelLocs()[i]);
+          if (hasArgumentLabelLocs)
+            argLabelLocs.push_back(E->getArgumentLabelLocs()[i]);
           args.push_back(tuple->getElement(i));
         } else {
           // Trailing closure arguments.
@@ -246,7 +260,20 @@ public:
   }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-    return {true, visit(E)};
+    if (Removed)
+      return {false, nullptr};
+    E = visit(E);
+    return {!Removed, E};
+  }
+
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    if (Removed)
+      return {false, nullptr};
+    return {true, S};
+  }
+
+  bool walkToDeclPre(Decl *D) override {
+    return !Removed;
   }
 };
 }
@@ -258,40 +285,61 @@ bool swift::ide::removeCodeCompletionExpr(ASTContext &Ctx, Expr *&expr) {
 }
 
 //===----------------------------------------------------------------------===//
-// getReturnTypeFromContext(DeclContext)
+// collectPossibleReturnTypesFromContext(DeclContext, SmallVectorImpl<Type>)
 //===----------------------------------------------------------------------===//
 
-Type swift::ide::getReturnTypeFromContext(const DeclContext *DC) {
+void swift::ide::collectPossibleReturnTypesFromContext(
+    DeclContext *DC, SmallVectorImpl<Type> &candidates) {
   if (auto FD = dyn_cast<AbstractFunctionDecl>(DC)) {
     auto Ty = FD->getInterfaceType();
     if (FD->getDeclContext()->isTypeContext())
       Ty = FD->getMethodInterfaceType();
-    if (auto FT = Ty->getAs<AnyFunctionType>())
-      return DC->mapTypeIntoContext(FT->getResult());
-  } else if (auto ACE = dyn_cast<AbstractClosureExpr>(DC)) {
-    if (ACE->getType() && !ACE->getType()->hasError())
-      return ACE->getResultType();
-    if (auto CE = dyn_cast<ClosureExpr>(ACE)) {
-      if (CE->hasExplicitResultType()) {
-        if (auto ty = CE->getExplicitResultType()) {
-          return ty;
-        }
-
-        auto typeLoc = TypeLoc{CE->getExplicitResultTypeRepr()};
-        if (swift::performTypeLocChecking(DC->getASTContext(),
-                                          typeLoc,
-                                          /*isSILMode*/ false,
-                                          /*isSILType*/ false,
-                                          DC->getGenericEnvironmentOfContext(),
-                                          const_cast<DeclContext *>(DC),
-                                          /*diagnostics*/ false)) {
-          return Type();
-        }
-        return typeLoc.getType();
-      }
+    if (auto FT = Ty->getAs<AnyFunctionType>()) {
+      candidates.push_back(DC->mapTypeIntoContext(FT->getResult()));
     }
   }
-  return Type();
+
+  if (auto ACE = dyn_cast<AbstractClosureExpr>(DC)) {
+    // Use the type checked type if it has.
+    if (ACE->getType() && !ACE->getType()->hasError() &&
+        !ACE->getResultType()->hasUnresolvedType()) {
+      candidates.push_back(ACE->getResultType());
+      return;
+    }
+
+    if (auto CE = dyn_cast<ClosureExpr>(ACE)) {
+      if (CE->hasExplicitResultType()) {
+        // If the closure has a explicit return type, use it.
+        if (auto ty = CE->getExplicitResultType()) {
+          candidates.push_back(ty);
+          return;
+        } else {
+          auto typeLoc = TypeLoc{CE->getExplicitResultTypeRepr()};
+          if (!swift::performTypeLocChecking(
+                  DC->getASTContext(), typeLoc, /*isSILMode=*/false,
+                  /*isSILType=*/false, DC->getGenericEnvironmentOfContext(),
+                  const_cast<DeclContext *>(DC), /*diagnostics=*/false)) {
+            candidates.push_back(typeLoc.getType());
+            return;
+          }
+        }
+      } else {
+        // Otherwise, check the context type of the closure.
+        ExprContextInfo closureCtxInfo(CE->getParent(), CE);
+        for (auto closureTy : closureCtxInfo.getPossibleTypes()) {
+          if (auto funcTy = closureTy->getAs<AnyFunctionType>())
+            candidates.push_back(funcTy->getResult());
+        }
+        if (!candidates.empty())
+          return;
+      }
+    }
+
+    // Even if the type checked type has unresolved types, it's better than
+    // nothing.
+    if (ACE->getType() && !ACE->getType()->hasError())
+      candidates.push_back(ACE->getResultType());
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -739,10 +787,7 @@ class ExprContextAnalyzer {
         auto Params = typeAndDecl.Type->getParams();
         ParameterList *paramList = nullptr;
         if (auto VD = typeAndDecl.Decl) {
-          if (auto FD = dyn_cast<AbstractFunctionDecl>(VD))
-            paramList = FD->getParameters();
-          else if (auto SD = dyn_cast<SubscriptDecl>(VD))
-            paramList = SD->getIndices();
+          paramList = getParameterList(VD);
           if (paramList && paramList->size() != Params.size())
             paramList = nullptr;
         }
@@ -905,7 +950,10 @@ class ExprContextAnalyzer {
       auto *CE = cast<ClosureExpr>(Parent);
       assert(isSingleExpressionBodyForCodeCompletion(CE->getBody()));
       singleExpressionBody = true;
-      recordPossibleType(getReturnTypeFromContext(CE));
+      SmallVector<Type, 2> candidates;
+      collectPossibleReturnTypesFromContext(CE, candidates);
+      for (auto ty : candidates)
+        recordPossibleType(ty);
       break;
     }
     default:
@@ -915,9 +963,13 @@ class ExprContextAnalyzer {
 
   void analyzeStmt(Stmt *Parent) {
     switch (Parent->getKind()) {
-    case StmtKind::Return:
-      recordPossibleType(getReturnTypeFromContext(DC));
+    case StmtKind::Return: {
+      SmallVector<Type, 2> candidates;
+      collectPossibleReturnTypesFromContext(DC, candidates);
+      for (auto ty : candidates)
+        recordPossibleType(ty);
       break;
+    }
     case StmtKind::ForEach:
       if (auto SEQ = cast<ForEachStmt>(Parent)->getSequence()) {
         if (containsTarget(SEQ)) {
@@ -980,7 +1032,10 @@ class ExprContextAnalyzer {
       if (auto *FD = dyn_cast<FuncDecl>(D)) {
         assert(isSingleExpressionBodyForCodeCompletion(FD->getBody()));
         singleExpressionBody = true;
-        recordPossibleType(getReturnTypeFromContext(FD));
+        SmallVector<Type, 2> candidates;
+        collectPossibleReturnTypesFromContext(DC, candidates);
+        for (auto ty : candidates)
+          recordPossibleType(ty);
         break;
       }
       llvm_unreachable("Unhandled decl kind.");

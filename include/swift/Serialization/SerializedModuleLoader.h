@@ -51,8 +51,9 @@ struct SerializedModuleBaseName {
   std::string getName(file_types::ID fileTy) const;
 };
 
-/// Common functionality shared between \c SerializedModuleLoader,
-/// \c ModuleInterfaceLoader and \c MemoryBufferSerializedModuleLoader.
+/// Common functionality shared between \c ImplicitSerializedModuleLoader,
+/// \c ModuleInterfaceLoader, \c ExplicitSwiftModuleLoader
+/// and \c MemoryBufferSerializedModuleLoader.
 class SerializedModuleLoaderBase : public ModuleLoader {
   /// A { module, generation # } pair.
   using LoadedModulePair = std::pair<std::unique_ptr<ModuleFile>, unsigned>;
@@ -201,16 +202,23 @@ public:
       StringRef moduleName, ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate) override;
 
-  virtual std::string getUpToDateCompiledModuleForInterface(StringRef moduleName,
-                                                      StringRef interfacePath) {
-    return std::string();
+  virtual std::vector<std::string>
+  getCompiledModuleCandidatesForInterface(StringRef moduleName,
+                                          StringRef interfacePath) {
+    return std::vector<std::string>();
+  }
+  virtual bool tryEmitForwardingModule(StringRef moduleName,
+                                       StringRef interfacePath,
+                                       ArrayRef<std::string> candidates,
+                                       StringRef outPath) {
+    return false;
   }
 };
 
 /// Imports serialized Swift modules into an ASTContext.
-class SerializedModuleLoader : public SerializedModuleLoaderBase {
+class ImplicitSerializedModuleLoader : public SerializedModuleLoaderBase {
 
-  SerializedModuleLoader(ASTContext &ctx, DependencyTracker *tracker,
+  ImplicitSerializedModuleLoader(ASTContext &ctx, DependencyTracker *tracker,
                          ModuleLoadingMode loadMode, bool IgnoreSwiftSourceInfo)
     : SerializedModuleLoaderBase(ctx, tracker, loadMode, IgnoreSwiftSourceInfo)
   {}
@@ -229,7 +237,7 @@ class SerializedModuleLoader : public SerializedModuleLoaderBase {
       const SerializedModuleBaseName &BaseName) override;
 
 public:
-  virtual ~SerializedModuleLoader();
+  virtual ~ImplicitSerializedModuleLoader();
 
   /// Append visible module names to \p names. Note that names are possibly
   /// duplicated, and not guaranteed to be ordered in any way.
@@ -238,12 +246,12 @@ public:
 
   /// Create a new importer that can load serialized Swift modules
   /// into the given ASTContext.
-  static std::unique_ptr<SerializedModuleLoader>
+  static std::unique_ptr<ImplicitSerializedModuleLoader>
   create(ASTContext &ctx, DependencyTracker *tracker = nullptr,
          ModuleLoadingMode loadMode = ModuleLoadingMode::PreferSerialized,
          bool IgnoreSwiftSourceInfo = false) {
-    return std::unique_ptr<SerializedModuleLoader>{
-      new SerializedModuleLoader(ctx, tracker, loadMode, IgnoreSwiftSourceInfo)
+    return std::unique_ptr<ImplicitSerializedModuleLoader>{
+      new ImplicitSerializedModuleLoader(ctx, tracker, loadMode, IgnoreSwiftSourceInfo)
     };
   }
 };

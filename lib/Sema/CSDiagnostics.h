@@ -2191,6 +2191,24 @@ private:
   void fixIt(InFlightDiagnostic &diagnostic) const override;
 };
 
+/// Diagnose a key path optional base that should be unwraped in order to 
+/// apply key path subscript.
+///
+/// \code
+/// func f(_ bar: Bar? , keyPath: KeyPath<Bar, Int>) {
+///   bar[keyPath: keyPath]
+/// }
+/// \endcode
+class MissingOptionalUnwrapKeyPathFailure final : public ContextualFailure {
+public:
+  MissingOptionalUnwrapKeyPathFailure(const Solution &solution, Type lhs,
+                                      Type rhs, ConstraintLocator *locator)
+      : ContextualFailure(solution, lhs, rhs, locator) {}
+
+  bool diagnoseAsError() override;
+  SourceLoc getLoc() const override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

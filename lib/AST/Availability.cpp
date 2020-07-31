@@ -318,6 +318,11 @@ ASTContext::getCompareProtocolConformanceDescriptorsAvailability() {
   return getSwiftFutureAvailability();
 }
 
+AvailabilityContext
+ASTContext::getIntermodulePrespecializedGenericMetadataAvailability() {
+  return getSwiftFutureAvailability();
+}
+
 AvailabilityContext ASTContext::getSwift52Availability() {
   auto target = LangOpts.Target;
 

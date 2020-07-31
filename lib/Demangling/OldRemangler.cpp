@@ -2147,6 +2147,16 @@ void Remangler::mangleCanonicalSpecializedGenericTypeMetadataAccessFunction(
   Buffer << "Mb";
 }
 
+void Remangler::mangleNoncanonicalSpecializedGenericTypeMetadata(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "MN";
+}
+
+void Remangler::mangleNoncanonicalSpecializedGenericTypeMetadataCache(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "MJ";
+}
+
 /// The top-level interface to the remangler.
 std::string Demangle::mangleNodeOld(NodePointer node) {
   if (!node) return "";

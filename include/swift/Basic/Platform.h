@@ -16,6 +16,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Config.h"
 #include "llvm/ADT/StringRef.h"
+#include "clang/Driver/DarwinSDKInfo.h"
 
 namespace llvm {
   class Triple;
@@ -106,6 +107,10 @@ namespace swift {
   /// LLVM target triple.
   Optional<llvm::VersionTuple>
   getSwiftRuntimeCompatibilityVersionForTarget(const llvm::Triple &Triple);
+
+  /// Retrieve the target SDK version for the given SDKInfo and target triple.
+  llvm::VersionTuple getTargetSDKVersion(clang::driver::DarwinSDKInfo &SDKInfo,
+                                         const llvm::Triple &triple);
 } // end namespace swift
 
 #endif // SWIFT_BASIC_PLATFORM_H

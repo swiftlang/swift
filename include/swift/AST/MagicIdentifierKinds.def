@@ -1,0 +1,116 @@
+//===--- MagicIdentifierKinds.def - Swift #ident metaprogramming -*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2020 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines macros used for macro-metaprogramming with magic
+// identifier literals.
+//
+//===----------------------------------------------------------------------===//
+
+// Used for any magic identifier.
+#ifndef MAGIC_IDENTIFIER
+#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND)
+#endif
+
+// Used for magic identifiers which produce string literals.
+#ifndef MAGIC_STRING_IDENTIFIER
+#define MAGIC_STRING_IDENTIFIER(NAME, STRING, SYNTAX_KIND) MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND)
+#endif
+
+// Used for magic identifiers which produce integer literals.
+#ifndef MAGIC_INT_IDENTIFIER
+#define MAGIC_INT_IDENTIFIER(NAME, STRING, SYNTAX_KIND) MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND)
+#endif
+
+// Used for magic identifiers which produce raw pointers.
+#ifndef MAGIC_POINTER_IDENTIFIER
+#define MAGIC_POINTER_IDENTIFIER(NAME, STRING, SYNTAX_KIND) MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND)
+#endif
+
+// Used when a given token always maps to a particular magic identifier kind.
+#ifndef MAGIC_IDENTIFIER_TOKEN
+#define MAGIC_IDENTIFIER_TOKEN(NAME, TOKEN)
+#endif
+
+// Used when a given token always maps to a particular magic identifier kind,
+// but that token is deprecated.
+#ifndef MAGIC_IDENTIFIER_DEPRECATED_TOKEN
+#define MAGIC_IDENTIFIER_DEPRECATED_TOKEN(NAME, TOKEN) MAGIC_IDENTIFIER_TOKEN(NAME, TOKEN)
+#endif
+
+
+
+//
+// Magic string literals
+//
+
+/// The \c #fileID magic identifier literal.
+MAGIC_STRING_IDENTIFIER(FileID, "#fileID", PoundFileIDExpr)
+  MAGIC_IDENTIFIER_TOKEN(FileID, pound_fileID)
+
+/// The \c #file magic identifier literal, written in code where it is
+/// a synonym for \c #fileID (i.e. "Swift 6 mode" code).
+MAGIC_STRING_IDENTIFIER(FileIDSpelledAsFile, "#file", PoundFileExpr)
+  // tok::pound_file is shared with FilePathSpelledAsFile; please write custom
+  // code paths for it.
+
+/// The \c #filePath magic identifier literal.
+MAGIC_STRING_IDENTIFIER(FilePath, "#filePath", PoundFilePathExpr)
+  MAGIC_IDENTIFIER_TOKEN(FilePath, pound_filePath)
+
+/// The \c #file magic identifier literal, written in code where it is
+/// a synonym for \c #filePath (i.e. Swift 5 mode code).
+MAGIC_STRING_IDENTIFIER(FilePathSpelledAsFile, "#file", PoundFileExpr)
+  // tok::pound_file is shared with FileIDSpelledAsFile; please write custom
+  // code paths for it.
+  MAGIC_IDENTIFIER_DEPRECATED_TOKEN(FilePathSpelledAsFile, kw___FILE__)
+
+/// The \c #function magic identifier literal.
+MAGIC_STRING_IDENTIFIER(Function, "#function", PoundFunctionExpr)
+  MAGIC_IDENTIFIER_TOKEN(Function, pound_function)
+  MAGIC_IDENTIFIER_DEPRECATED_TOKEN(Function, kw___FUNCTION__)
+
+
+
+//
+// Magic integer literals
+//
+
+/// The \c #line magic identifier literal.
+MAGIC_INT_IDENTIFIER(Line, "#line", PoundLineExpr)
+  MAGIC_IDENTIFIER_TOKEN(Line, pound_line)
+  MAGIC_IDENTIFIER_DEPRECATED_TOKEN(Line, kw___LINE__)
+
+/// The \c #column magic identifier literal.
+MAGIC_INT_IDENTIFIER(Column, "#column", PoundColumnExpr)
+  MAGIC_IDENTIFIER_TOKEN(Column, pound_column)
+  MAGIC_IDENTIFIER_DEPRECATED_TOKEN(Column, kw___COLUMN__)
+
+
+
+//
+// Magic raw pointer literals
+//
+
+/// The \c #dsohandle magic identifier literal.
+MAGIC_POINTER_IDENTIFIER(DSOHandle, "#dsohandle", PoundDsohandleExpr)
+  MAGIC_IDENTIFIER_TOKEN(DSOHandle, pound_dsohandle)
+  MAGIC_IDENTIFIER_DEPRECATED_TOKEN(DSOHandle, kw___DSO_HANDLE__)
+
+
+
+
+#undef MAGIC_IDENTIFIER
+#undef MAGIC_STRING_IDENTIFIER
+#undef MAGIC_INT_IDENTIFIER
+#undef MAGIC_POINTER_IDENTIFIER
+#undef MAGIC_IDENTIFIER_TOKEN
+#undef MAGIC_IDENTIFIER_DEPRECATED_TOKEN

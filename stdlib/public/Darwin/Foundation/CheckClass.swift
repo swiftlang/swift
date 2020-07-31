@@ -38,8 +38,7 @@ extension NSKeyedUnarchiver {
   /// - Returns: 0 if the given class is safe to archive, and non-zero if it
   ///     isn't.
   @objc(_swift_checkClassAndWarnForKeyedArchiving:operation:)
-  @usableFromInline
-  internal class func _swift_checkClassAndWarnForKeyedArchiving(
+  internal class func __swift_checkClassAndWarnForKeyedArchiving(
     _ theClass: AnyClass,
     operation: CInt
   ) -> CInt {

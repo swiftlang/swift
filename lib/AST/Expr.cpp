@@ -1463,13 +1463,13 @@ static ValueDecl *getCalledValue(Expr *E) {
 
 PropertyWrapperValuePlaceholderExpr *
 PropertyWrapperValuePlaceholderExpr::create(ASTContext &ctx, SourceRange range,
-                                            Type ty, Expr *wrappedValue) {
+                                            Type ty, Expr *wrappedValue,
+                                            bool isAutoClosure) {
   auto *placeholder =
       new (ctx) OpaqueValueExpr(range, ty, /*isPlaceholder=*/true);
 
-  return new (ctx) PropertyWrapperValuePlaceholderExpr(range, ty,
-                                                       placeholder,
-                                                       wrappedValue);
+  return new (ctx) PropertyWrapperValuePlaceholderExpr(
+      range, ty, placeholder, wrappedValue, isAutoClosure);
 }
 
 const ParamDecl *DefaultArgumentExpr::getParamDecl() const {
@@ -1808,17 +1808,6 @@ ConditionalCheckedCastExpr::createImplicit(ASTContext &ctx, Expr *sub,
   return expr;
 }
 
-ConditionalCheckedCastExpr *
-ConditionalCheckedCastExpr::createImplicit(ASTContext &ctx, Expr *sub,
-                                           TypeRepr *tyRepr, Type castTy) {
-  auto *const expr = new (ctx) ConditionalCheckedCastExpr(
-      sub, SourceLoc(), SourceLoc(), new (ctx) TypeExpr(tyRepr));
-  expr->setType(OptionalType::get(castTy));
-  expr->setImplicit();
-  expr->setCastType(castTy);
-  return expr;
-}
-
 IsExpr *IsExpr::create(ASTContext &ctx, SourceLoc isLoc, TypeRepr *tyRepr) {
   return new (ctx) IsExpr(nullptr, isLoc, new (ctx) TypeExpr(tyRepr));
 }
@@ -1979,8 +1968,15 @@ bool ClosureExpr::hasEmptyBody() const {
 }
 
 bool ClosureExpr::capturesSelfEnablingImplictSelf() const {
-  if (auto *VD = getCapturedSelfDecl())
-    return VD->isSelfParamCapture() && !VD->getType()->is<WeakStorageType>();
+  if (auto *VD = getCapturedSelfDecl()) {
+    if (!VD->isSelfParamCapture())
+      return false;
+
+    if (auto *attr = VD->getAttrs().getAttribute<ReferenceOwnershipAttr>())
+      return attr->get() != ReferenceOwnership::Weak;
+
+    return true;
+  }
   return false;
 }
 

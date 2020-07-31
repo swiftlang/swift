@@ -850,6 +850,36 @@ public:
     }
   }
 
+  llvm::Optional<MetadataCacheNode<Runtime>>
+  metadataAllocationCacheNode(MetadataAllocation<Runtime> Allocation) {
+    switch (Allocation.Tag) {
+    case BoxesTag:
+    case ObjCClassWrappersTag:
+    case FunctionTypesTag:
+    case MetatypeTypesTag:
+    case ExistentialMetatypeValueWitnessTablesTag:
+    case ExistentialMetatypesTag:
+    case ExistentialTypesTag:
+    case OpaqueExistentialValueWitnessTablesTag:
+    case ClassExistentialValueWitnessTablesTag:
+    case ForeignWitnessTablesTag:
+    case TupleCacheTag:
+    case GenericMetadataCacheTag:
+    case ForeignMetadataCacheTag:
+    case GenericWitnessTableCacheTag: {
+      auto NodeBytes = getReader().readBytes(
+          RemoteAddress(Allocation.Ptr), sizeof(MetadataCacheNode<Runtime>));
+      auto Node =
+          reinterpret_cast<const MetadataCacheNode<Runtime> *>(NodeBytes.get());
+      if (!Node)
+        return llvm::None;
+      return *Node;
+    }
+    default:
+      return llvm::None;
+    }
+  }
+
   /// Iterate the metadata allocations in the target process, calling Call with
   /// each allocation found. Returns None on success, and a string describing
   /// the error on failure.

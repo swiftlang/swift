@@ -172,10 +172,20 @@ static bool validateCodingKeysEnum(DerivedConformance &derived,
         properties.erase(it);
         break;
 
-      case DoesNotConform:
+      case DoesNotConform: {
+        // We use a TypeLoc here so diagnostics can show the type
+        // as written by the user in source if possible. This is useful
+        // when the user has written an IUO type for example, since
+        // diagnostics would show the type as 'T?' instead of 'T!' if
+        // we use a Type instead.
+        TypeLoc typeLoc = {
+            it->second->getTypeReprOrParentPatternTypeRepr(),
+            it->second->getType(),
+        };
         it->second->diagnose(diag::codable_non_conforming_property_here,
-                             derived.getProtocolType(), it->second->getType());
+                             derived.getProtocolType(), typeLoc);
         LLVM_FALLTHROUGH;
+      }
 
       case TypeNotValidated:
         // We don't produce a diagnostic for a type which failed to validate.
@@ -352,10 +362,20 @@ static EnumDecl *synthesizeCodingKeysEnum(DerivedConformance &derived) {
         break;
       }
 
-      case DoesNotConform:
+      case DoesNotConform: {
+        // We use a TypeLoc here so diagnostics can show the type
+        // as written by the user in source if possible. This is useful
+        // when the user has written an IUO type for example, since
+        // diagnostics would show the type as 'T?' instead of 'T!' if
+        // we use a Type instead.
+        TypeLoc typeLoc = {
+            varDecl->getTypeReprOrParentPatternTypeRepr(),
+            varDecl->getType(),
+        };
         varDecl->diagnose(diag::codable_non_conforming_property_here,
-                          derived.getProtocolType(), varDecl->getType());
+                          derived.getProtocolType(), typeLoc);
         LLVM_FALLTHROUGH;
+      }
 
       case TypeNotValidated:
         // We don't produce a diagnostic for a type which failed to validate.

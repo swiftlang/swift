@@ -88,6 +88,20 @@ void CompilerInvocation::setDefaultPrebuiltCacheIfNecessary() {
     platform = getPlatformNameForTriple(LangOpts.Target);
   }
   llvm::sys::path::append(defaultPrebuiltPath, platform, "prebuilt-modules");
+
+  // If the SDK version is given, we should check if SDK-versioned prebuilt
+  // module cache is available and use it if so.
+  if (auto ver = LangOpts.SDKVersion) {
+    // "../macosx/prebuilt-modules"
+    SmallString<64> defaultPrebuiltPathWithSDKVer = defaultPrebuiltPath;
+    // "../macosx/prebuilt-modules/10.15"
+    llvm::sys::path::append(defaultPrebuiltPathWithSDKVer, ver->getAsString());
+    // If the versioned prebuilt module cache exists in the disk, use it.
+    if (llvm::sys::fs::exists(defaultPrebuiltPathWithSDKVer)) {
+      FrontendOpts.PrebuiltModuleCachePath = defaultPrebuiltPathWithSDKVer.str();
+      return;
+    }
+  }
   FrontendOpts.PrebuiltModuleCachePath = defaultPrebuiltPath.str();
 }
 
@@ -598,6 +612,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.VerifyAllSubstitutionMaps |= Args.hasArg(OPT_verify_all_substitution_maps);
 
+  Opts.EnableVolatileModules |= Args.hasArg(OPT_enable_volatile_modules);
+
   Opts.UseDarwinPreStableABIBit =
     (Target.isMacOSX() && Target.isMacOSXVersionLT(10, 14, 4)) ||
     (Target.isiOS() && Target.isOSVersionLT(12, 2)) ||
@@ -886,6 +902,10 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   }
   if (const Arg *A = Args.getLastArg(OPT_explict_swift_module_map))
     Opts.ExplicitSwiftModuleMap = A->getValue();
+  for (auto A: Args.filtered(OPT_candidate_module_file)) {
+    Opts.CandidateCompiledModules.push_back(resolveSearchPath(A->getValue()));
+  }
+
   // Opts.RuntimeIncludePath is set by calls to
   // setRuntimeIncludePath() or setMainExecutablePath().
   // Opts.RuntimeImportPath is set by calls to

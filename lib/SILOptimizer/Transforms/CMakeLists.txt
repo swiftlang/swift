@@ -23,6 +23,7 @@ target_sources(swiftSILOptimizer PRIVATE
   MergeCondFail.cpp
   Outliner.cpp
   ObjectOutliner.cpp
+  OptRemarkGenerator.cpp
   PerformanceInliner.cpp
   PhiArgumentOptimizations.cpp
   PruneVTables.cpp
@@ -38,6 +39,7 @@ target_sources(swiftSILOptimizer PRIVATE
   Sink.cpp
   SpeculativeDevirtualizer.cpp
   StackPromotion.cpp
+  StringOptimization.cpp
   TempLValueOpt.cpp
   TempRValueElimination.cpp
   UnsafeGuaranteedPeephole.cpp)

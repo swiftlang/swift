@@ -53,7 +53,7 @@
 
 namespace swift {
 
-class SerializedModuleLoader;
+class SerializedModuleLoaderBase;
 class MemoryBufferSerializedModuleLoader;
 class SILModule;
 
@@ -434,7 +434,7 @@ class CompilerInstance {
   std::unique_ptr<UnifiedStatsReporter> Stats;
 
   mutable ModuleDecl *MainModule = nullptr;
-  SerializedModuleLoader *SML = nullptr;
+  SerializedModuleLoaderBase *DefaultSerializedLoader = nullptr;
   MemoryBufferSerializedModuleLoader *MemoryBufferLoader = nullptr;
 
   /// Contains buffer IDs for input source code files.

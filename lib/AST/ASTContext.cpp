@@ -40,6 +40,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/SILLayout.h"
@@ -254,6 +255,9 @@ struct ASTContext::Implementation {
 
   /// func append(Element) -> void
   FuncDecl *ArrayAppendElementDecl = nullptr;
+
+  /// init(Builtin.RawPointer, Builtin.Word, Builtin.Int1)
+  ConstructorDecl *MakeUTF8StringDecl = nullptr;
 
   /// func reserveCapacityForAppend(newElementsCount: Int)
   FuncDecl *ArrayReserveCapacityDecl = nullptr;
@@ -1410,6 +1414,33 @@ FuncDecl *ASTContext::getArrayReserveCapacityDecl() const {
 
       getImpl().ArrayReserveCapacityDecl = FnDecl;
       return FnDecl;
+    }
+  }
+  return nullptr;
+}
+
+ConstructorDecl *ASTContext::getMakeUTF8StringDecl() const {
+  if (getImpl().MakeUTF8StringDecl)
+    return getImpl().MakeUTF8StringDecl;
+
+  auto initializers =
+    getStringDecl()->lookupDirect(DeclBaseName::createConstructor());
+
+  for (Decl *initializer : initializers) {
+    auto *constructor = cast<ConstructorDecl>(initializer);
+    auto Attrs = constructor->getAttrs();
+    for (auto *A : Attrs.getAttributes<SemanticsAttr, false>()) {
+      if (A->Value != semantics::STRING_MAKE_UTF8)
+        continue;
+      auto ParamList = constructor->getParameters();
+      if (ParamList->size() != 3)
+        continue;
+      ParamDecl *param = constructor->getParameters()->get(0);
+      if (param->getArgumentName().str() != "_builtinStringLiteral")
+        continue;
+
+      getImpl().MakeUTF8StringDecl = constructor;
+      return constructor;
     }
   }
   return nullptr;
@@ -3250,17 +3281,17 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
     return funcTy;
   }
 
-  Optional<ExtInfo::Uncommon> uncommon = info.getUncommonInfo();
+  Optional<ExtInfo::ClangTypeInfo> clangTypeInfo = info.getClangTypeInfo();
 
   size_t allocSize =
-    totalSizeToAlloc<AnyFunctionType::Param, ExtInfo::Uncommon>(
-      params.size(), uncommon.hasValue() ? 1 : 0);
+    totalSizeToAlloc<AnyFunctionType::Param, ExtInfo::ClangTypeInfo>(
+      params.size(), clangTypeInfo.hasValue() ? 1 : 0);
   void *mem = ctx.Allocate(allocSize, alignof(FunctionType), arena);
 
   bool isCanonical = isFunctionTypeCanonical(params, result);
-  if (uncommon.hasValue()) {
+  if (clangTypeInfo.hasValue()) {
     if (ctx.LangOpts.UseClangFunctionTypes)
-      isCanonical &= uncommon->ClangFunctionType->isCanonicalUnqualified();
+      isCanonical &= clangTypeInfo->type->isCanonicalUnqualified();
     else
       isCanonical = false;
   }
@@ -3281,9 +3312,9 @@ FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params,
                       output, properties, params.size(), info) {
   std::uninitialized_copy(params.begin(), params.end(),
                           getTrailingObjects<AnyFunctionType::Param>());
-  Optional<ExtInfo::Uncommon> uncommon = info.getUncommonInfo();
-  if (uncommon.hasValue())
-    *getTrailingObjects<ExtInfo::Uncommon>() = uncommon.getValue();
+  auto clangTypeInfo = info.getClangTypeInfo();
+  if (clangTypeInfo.hasValue())
+    *getTrailingObjects<ExtInfo::ClangTypeInfo>() = clangTypeInfo.getValue();
 }
 
 void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
@@ -3376,7 +3407,7 @@ ArrayRef<Requirement> GenericFunctionType::getRequirements() const {
   return Signature->getRequirements();
 }
 
-void SILFunctionType::ExtInfo::Uncommon::printClangFunctionType(
+void SILFunctionType::ExtInfo::ClangTypeInfo::printType(
     ClangModuleLoader *cml, llvm::raw_ostream &os) const {
   cml->printClangType(ClangFunctionType, os);
 }
@@ -3440,7 +3471,7 @@ SILFunctionType::SILFunctionType(
 
   Bits.SILFunctionType.HasErrorResult = errorResult.hasValue();
   Bits.SILFunctionType.ExtInfoBits = ext.Bits;
-  Bits.SILFunctionType.HasUncommonInfo = false;
+  Bits.SILFunctionType.HasClangTypeInfo = false;
   Bits.SILFunctionType.HasPatternSubs = (bool) patternSubs;
   Bits.SILFunctionType.HasInvocationSubs = (bool) invocationSubs;
   // The use of both assert() and static_assert() below is intentional.
@@ -3621,7 +3652,7 @@ CanSILFunctionType SILFunctionType::get(
 
   // All SILFunctionTypes are canonical.
 
-  // See [SILFunctionType-layout]
+  // See [NOTE: SILFunctionType-layout]
   bool hasResultCache = normalResults.size() > 1;
   size_t bytes =
     totalSizeToAlloc<SILParameterInfo, SILResultInfo, SILYieldInfo,

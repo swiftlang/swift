@@ -5460,7 +5460,7 @@ void InOutConversionFailure::fixItChangeArgumentType() const {
   SourceLoc startLoc; // Left invalid if we're inserting
 
   auto isSimpleTypelessPattern = [](Pattern *P) -> bool {
-    if (auto VP = dyn_cast_or_null<VarPattern>(P))
+    if (auto VP = dyn_cast_or_null<BindingPattern>(P))
       P = VP->getSubPattern();
     return P && isa<NamedPattern>(P);
   };
@@ -6494,4 +6494,20 @@ void MissingRawValueFailure::fixIt(InFlightDiagnostic &diagnostic) const {
   }
 
   diagnostic.fixItInsertAfter(range.End, fix);
+}
+
+bool MissingOptionalUnwrapKeyPathFailure::diagnoseAsError() {
+  emitDiagnostic(diag::optional_not_unwrapped, getFromType(),
+                 getFromType()->lookThroughSingleOptionalType());
+  
+  emitDiagnostic(diag::optional_keypath_application_base)
+      .fixItInsertAfter(getLoc(), "?");
+  emitDiagnostic(diag::unwrap_with_force_value)
+      .fixItInsertAfter(getLoc(), "!");
+  return true;
+}
+
+SourceLoc MissingOptionalUnwrapKeyPathFailure::getLoc() const {
+  auto *SE = castToExpr<SubscriptExpr>(getAnchor());
+  return SE->getBase()->getEndLoc();
 }

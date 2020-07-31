@@ -1596,7 +1596,7 @@ SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
   if (checkingABI()) {
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       // Private vars with fixed binary orders can have ABI-impact, so we should
-      // whitelist them if we're checking ABI.
+      // allowlist them if we're checking ABI.
       if (getFixedBinaryOrder(VD).hasValue())
         return false;
       // Typealias should have no impact on ABI.

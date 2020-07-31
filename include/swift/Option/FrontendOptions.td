@@ -259,8 +259,6 @@ def build_request_dependency_graph : Flag<["-"], "build-request-dependency-graph
 def output_request_graphviz : Separate<["-"], "output-request-graphviz">,
   HelpText<"Emit GraphViz output visualizing the request dependency graph">;
 
-def debug_time_compilation : Flag<["-"], "debug-time-compilation">,
-  HelpText<"Prints the time taken by each compilation phase">;
 def debug_time_function_bodies : Flag<["-"], "debug-time-function-bodies">,
   HelpText<"Dumps the time it takes to type-check each function body">;
 def debug_time_expression_type_checking : Flag<["-"], "debug-time-expression-type-checking">,
@@ -456,6 +454,9 @@ def warn_long_expression_type_checking_EQ : Joined<["-"], "warn-long-expression-
 
 def Rmodule_interface_rebuild : Flag<["-"], "Rmodule-interface-rebuild">,
   HelpText<"Emits a remark if an imported module needs to be re-compiled from its module interface">;
+
+def enable_volatile_modules : Flag<["-"], "enable-volatile-modules">,
+  HelpText<"Load Swift modules in memory">;
 
 def solver_expression_time_threshold_EQ : Joined<["-"], "solver-expression-time-threshold=">;
 
@@ -721,4 +722,8 @@ def target_variant_sdk_version : Separate<["-"], "target-variant-sdk-version">,
 
 def extra_clang_options_only : Flag<["-"], "only-use-extra-clang-opts">,
   HelpText<"Options passed via -Xcc are sufficient for Clang configuration">;
+
+def candidate_module_file
+  : Separate<["-"], "candidate-module-file">, MetaVarName<"<path>">,
+    HelpText<"Specify Swift module may be ready to use for an interface">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

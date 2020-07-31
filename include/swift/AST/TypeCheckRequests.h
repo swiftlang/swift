@@ -58,18 +58,17 @@ class StorageImplInfo;
 
 /// Display a nominal type or extension thereof.
 void simple_display(
-       llvm::raw_ostream &out,
-       const llvm::PointerUnion<TypeDecl *, ExtensionDecl *> &value);
+    llvm::raw_ostream &out,
+    const llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> &value);
 
 /// Request the type from the ith entry in the inheritance clause for the
 /// given declaration.
-class InheritedTypeRequest :
-    public SimpleRequest<InheritedTypeRequest,
-                         Type(llvm::PointerUnion<TypeDecl *, ExtensionDecl *>,
-                              unsigned,
-                              TypeResolutionStage),
-                         RequestFlags::SeparatelyCached>
-{
+class InheritedTypeRequest
+    : public SimpleRequest<
+          InheritedTypeRequest,
+          Type(llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *>,
+               unsigned, TypeResolutionStage),
+          RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -79,9 +78,8 @@ private:
   // Evaluation.
   Type
   evaluate(Evaluator &evaluator,
-           llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-           unsigned index,
-           TypeResolutionStage stage) const;
+           llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
+           unsigned index, TypeResolutionStage stage) const;
 
 public:
   // Source location
@@ -1823,6 +1821,45 @@ public:
   void cacheResult(Witness value) const;
 };
 
+struct PreCheckFunctionBuilderDescriptor {
+  AnyFunctionRef Fn;
+
+private:
+  // NOTE: Since source tooling (e.g. code completion) might replace the body,
+  // we need to take the body into account to calculate 'hash_value' and '=='.
+  // Also, we cannot 'getBody()' inside 'hash_value' and '==' because it invokes
+  // another request (even if it's cached).
+  BraceStmt *Body;
+
+public:
+  PreCheckFunctionBuilderDescriptor(AnyFunctionRef Fn)
+      : Fn(Fn), Body(Fn.getBody()) {}
+
+  friend llvm::hash_code
+  hash_value(const PreCheckFunctionBuilderDescriptor &owner) {
+    return llvm::hash_combine(owner.Fn, owner.Body);
+  }
+
+  friend bool operator==(const PreCheckFunctionBuilderDescriptor &lhs,
+                         const PreCheckFunctionBuilderDescriptor &rhs) {
+    return lhs.Fn == rhs.Fn && lhs.Body == rhs.Body;
+  }
+
+  friend bool operator!=(const PreCheckFunctionBuilderDescriptor &lhs,
+                         const PreCheckFunctionBuilderDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+
+  friend SourceLoc extractNearestSourceLoc(PreCheckFunctionBuilderDescriptor d) {
+    return extractNearestSourceLoc(d.Fn);
+  }
+
+  friend void simple_display(llvm::raw_ostream &out,
+                             const PreCheckFunctionBuilderDescriptor &d) {
+    simple_display(out, d.Fn);
+  }
+};
+
 enum class FunctionBuilderBodyPreCheck : uint8_t {
   /// There were no problems pre-checking the closure.
   Okay,
@@ -1836,7 +1873,8 @@ enum class FunctionBuilderBodyPreCheck : uint8_t {
 
 class PreCheckFunctionBuilderRequest
     : public SimpleRequest<PreCheckFunctionBuilderRequest,
-                           FunctionBuilderBodyPreCheck(AnyFunctionRef),
+                           FunctionBuilderBodyPreCheck(
+                               PreCheckFunctionBuilderDescriptor),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1846,7 +1884,7 @@ private:
 
   // Evaluation.
   FunctionBuilderBodyPreCheck
-  evaluate(Evaluator &evaluator, AnyFunctionRef fn) const;
+  evaluate(Evaluator &evaluator, PreCheckFunctionBuilderDescriptor owner) const;
 
 public:
   // Separate caching.

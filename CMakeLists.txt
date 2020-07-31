@@ -54,6 +54,10 @@ include(CheckSymbolExists)
 # This is primarily to support building smaller or faster project files.
 #
 
+option(SWIFT_APPEND_VC_REV
+  "Embed the version control system revision in Swift"
+  TRUE)
+
 option(SWIFT_INCLUDE_TOOLS
     "Generate build targets for swift tools"
     TRUE)
@@ -1131,9 +1135,16 @@ if(SWIFT_INCLUDE_TOOLS)
   # Refer to the large comment above the add_subdirectory(stdlib) call.
   # https://bugs.swift.org/browse/SR-5975
   add_subdirectory(tools)
-endif()
 
-add_subdirectory(localization)
+  # Localization targets are configured in a way that assume the swift
+  # frontend is being built, so trying to include them for other builds
+  # (like stdlib) fail!
+  #
+  # Diagnostics information is only useful for the frontend compiler
+  # anyway, so let's only include it if the compiler is being built,
+  # which at the moment seems like if SWIFT_INCLUDE_TOOLS is defined.
+  add_subdirectory(localization)
+endif()
 
 add_subdirectory(utils)
 

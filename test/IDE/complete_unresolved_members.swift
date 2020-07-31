@@ -122,6 +122,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_5 | %FileCheck %s -check-prefix=UNRESOLVED_3_NOTIDEAL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_6 | %FileCheck %s -check-prefix=UNRESOLVED_3_NOTIDEAL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_CONDITION | %FileCheck %s -check-prefix=TERNARY_CONDITION
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOADED_CLOSURE_RETURN | %FileCheck %s -check-prefix=OVERLOADED_CLOSURE_RETURN
 
 enum SomeEnum1 {
   case South
@@ -782,4 +783,18 @@ func testTernaryOperator2(cond: Bool) {
 // TERNARY_CONDITION: Begin completions
 // TERNARY_CONDITION-DAG: Decl[Constructor]/CurrNominal/IsSystem/TypeRelation[Identical]: init()[#Bool#]; name=init()
 // TERNARY_CONDITION: End completions
+}
+
+func overloadedClosureRcv(_: () -> SomeEnum1) {}
+func overloadedClosureRcv(_: () -> SomeEnum2) {}
+func testClosureReturnTypeForOverloaded() {
+  overloadedClosureRcv {
+    .#^OVERLOADED_CLOSURE_RETURN^#
+  }
+// OVERLOADED_CLOSURE_RETURN: Begin completions, 4 items
+// OVERLOADED_CLOSURE_RETURN-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: South[#SomeEnum1#];
+// OVERLOADED_CLOSURE_RETURN-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: North[#SomeEnum1#];
+// OVERLOADED_CLOSURE_RETURN-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: East[#SomeEnum2#];
+// OVERLOADED_CLOSURE_RETURN-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: West[#SomeEnum2#];
+// OVERLOADED_CLOSURE_RETURN: End completions
 }

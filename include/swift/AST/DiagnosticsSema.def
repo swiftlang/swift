@@ -832,6 +832,9 @@ NOTE(confusable_character,none,
       "%select{identifier|operator}0 '%1' contains possibly confused characters; "
       "did you mean to use '%2'?",
       (bool, StringRef, StringRef))
+NOTE(single_confusable_character,none,
+      "%select{identifier|operator}0 '%1' (%2) looks similar to '%3' (%4); did you mean '%3' (%4)?",
+      (bool, StringRef, StringRef, StringRef, StringRef))
 ERROR(cannot_find_type_in_scope,none,
       "cannot find type %0 in scope", (DeclNameRef))
 ERROR(cannot_find_type_in_scope_did_you_mean,none,
@@ -1077,7 +1080,9 @@ NOTE(optional_base_chain,none,
      "base values", (DeclNameRef))
 NOTE(optional_base_remove_optional_for_keypath_root, none,
      "use unwrapped type %0 as key path root", (Type))
-
+NOTE(optional_keypath_application_base, none,
+     "use '?' to access key path subscript only for non-'nil' base values", ())
+    
 ERROR(missing_unwrap_optional_try,none,
       "value of optional type %0 not unwrapped; did you mean to use 'try!' "
       "or chain with '?'?",
@@ -2414,6 +2419,9 @@ NOTE(multiple_override_prev,none,
 ERROR(override_unavailable, none,
       "cannot override %0 which has been marked unavailable%select{|: %1}1",
       (DeclBaseName, StringRef))
+NOTE(suggest_removing_override, none,
+     "remove 'override' modifier to declare a new %0",
+     (DeclBaseName))
 
 ERROR(override_less_available,none,
       "overriding %0 must be as available as declaration it overrides",
@@ -2438,14 +2446,14 @@ ERROR(override_of_non_open,none,
       (DescriptiveDeclKind))
 
 ERROR(method_does_not_override,none,
-      "method does not override any method from its superclass", ())
+      "method does not override any method from its %select{parent protocol|superclass}0", (bool))
 ERROR(property_does_not_override,none,
-      "property does not override any property from its superclass", ())
+      "property does not override any property from its %select{parent protocol|superclass}0", (bool))
 ERROR(subscript_does_not_override,none,
-      "subscript does not override any subscript from its superclass", ())
+      "subscript does not override any subscript from its %select{parent protocol|superclass}0", (bool))
 ERROR(initializer_does_not_override,none,
       "initializer does not override a designated initializer from its "
-      "superclass", ())
+      "%select{parent protocol|superclass}0", (bool))
 ERROR(failable_initializer_override,none,
       "failable initializer %0 cannot override a non-failable initializer",
       (DeclName))
@@ -2810,7 +2818,7 @@ ERROR(broken_tensor_group_requirement,none,
 NOTE(codable_extraneous_codingkey_case_here,none,
      "CodingKey case %0 does not match any stored properties", (Identifier))
 NOTE(codable_non_conforming_property_here,none,
-     "cannot automatically synthesize %0 because %1 does not conform to %0", (Type, Type))
+     "cannot automatically synthesize %0 because %1 does not conform to %0", (Type, TypeLoc))
 NOTE(codable_non_decoded_property_here,none,
      "cannot automatically synthesize %0 because %1 does not have a matching CodingKey and does not have a default value", (Type, Identifier))
 NOTE(codable_codingkeys_type_is_not_an_enum_here,none,
@@ -2850,9 +2858,12 @@ NOTE(missing_member_type_conformance_prevents_synthesis, none,
      "protocol %2, preventing synthesized conformance "
      "of %3 to %2",
      (unsigned, Type, Type, Type))
-NOTE(classes_automatic_protocol_synthesis,none,
-    "automatic synthesis of '%0' is not supported for classes",
-    (StringRef))
+NOTE(automatic_protocol_synthesis_unsupported,none,
+    "automatic synthesis of '%0' is not supported for %select{classes|structs}1",
+    (StringRef, unsigned))
+NOTE(comparable_synthesis_raw_value_not_allowed, none,
+     "enum declares raw type %0, preventing synthesized conformance of %1 to %2", 
+     (Type, Type, Type))
 
 // Dynamic Self
 ERROR(dynamic_self_non_method,none,
@@ -3015,6 +3026,8 @@ ERROR(lazy_must_be_property,none,
       "lazy is only valid for members of a struct or class", ())
 ERROR(lazy_not_strong,none,
       "lazy properties cannot be %0", (ReferenceOwnership))
+ERROR(lazy_var_storage_access,none,
+     "access to the underlying storage of a lazy property is not allowed", ())
 
 // Debugger function attribute.
 ERROR(attr_for_debugger_support_only,none,
@@ -5181,6 +5194,10 @@ NOTE(function_builder_infer_add_return, none,
 NOTE(function_builder_infer_pick_specific, none,
      "apply function builder %0 (inferred from %select{protocol|dynamic replacement of}1 %2)",
      (Type, unsigned, DeclName))
+WARNING(function_builder_missing_limited_availability, none,
+        "function builder %0 does not implement 'buildLimitedAvailability'; "
+        "this code may crash on earlier versions of the OS",
+        (Type))
 
 //------------------------------------------------------------------------------
 // MARK: Tuple Shuffle Diagnostics

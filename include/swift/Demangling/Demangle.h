@@ -62,6 +62,8 @@ struct DemangleOptions {
   bool DisplayDebuggerGeneratedModule = true;
   bool DisplayStdlibModule = true;
   bool DisplayObjCModule = true;
+  bool PrintForTypeName = false;
+
   /// If this is nonempty, entities in this module name will not be qualified.
   llvm::StringRef HidingCurrentModule;
   /// A function to render generic parameter names.

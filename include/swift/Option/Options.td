@@ -543,7 +543,7 @@ def enable_experimental_additive_arithmetic_derivation :
 
 def enable_experimental_concise_pound_file : Flag<["-"],
     "enable-experimental-concise-pound-file">,
-  Flags<[FrontendOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Enable experimental concise '#file' identifier">;
 
 def enable_direct_intramodule_dependencies : Flag<["-"],

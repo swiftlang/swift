@@ -84,17 +84,8 @@ namespace {
     unsigned haveStringLiteral : 1;
 
     llvm::SmallSet<TypeBase*, 16> collectedTypes;
-
-    llvm::SmallVector<TypeVariableType *, 16> intLiteralTyvars;
-    llvm::SmallVector<TypeVariableType *, 16> floatLiteralTyvars;
-    llvm::SmallVector<TypeVariableType *, 16> stringLiteralTyvars;
-
     llvm::SmallVector<BinaryExpr *, 4> binaryExprs;
 
-    // TODO: manage as a set of lists, to speed up addition of binding
-    // constraints.
-    llvm::SmallVector<DeclRefExpr *, 16> anonClosureParams;
-    
     LinkedTypeInfo() {
       haveIntLiteral = false;
       haveFloatLiteral = false;
@@ -192,35 +183,16 @@ namespace {
       
       if (isa<IntegerLiteralExpr>(expr)) {
         LTI.haveIntLiteral = true;
-        auto tyvar = CS.getType(expr)->getAs<TypeVariableType>();
-
-        if (tyvar) {
-          LTI.intLiteralTyvars.push_back(tyvar);
-        }
-        
         return { false, expr };
       }
       
       if (isa<FloatLiteralExpr>(expr)) {
         LTI.haveFloatLiteral = true;
-        auto tyvar = CS.getType(expr)->getAs<TypeVariableType>();
-
-        if (tyvar) {
-          LTI.floatLiteralTyvars.push_back(tyvar);
-        }
-
         return { false, expr };
       }
       
       if (isa<StringLiteralExpr>(expr)) {
         LTI.haveStringLiteral = true;
-
-        auto tyvar = CS.getType(expr)->getAs<TypeVariableType>();
-
-        if (tyvar) {
-          LTI.stringLiteralTyvars.push_back(tyvar);
-        }
-
         return { false, expr };
       }
 
@@ -249,10 +221,7 @@ namespace {
 
       if (auto DRE = dyn_cast<DeclRefExpr>(expr)) {
         if (auto varDecl = dyn_cast<VarDecl>(DRE->getDecl())) {
-          if (isa<ParamDecl>(varDecl) &&
-              cast<ParamDecl>(varDecl)->isAnonClosureParam()) {
-            LTI.anonClosureParams.push_back(DRE);
-          } else if (CS.hasType(DRE)) {
+          if (CS.hasType(DRE)) {
             LTI.collectedTypes.insert(CS.getType(DRE).getPointer());
           }
           return { false, expr };
@@ -345,40 +314,6 @@ namespace {
     LinkedTypeInfo lti;
 
     expr->walk(LinkedExprAnalyzer(lti, CS));
-
-    // Link anonymous closure params of the same index.
-    // TODO: As stated above, we should bucket these whilst collecting the
-    // exprs to avoid quadratic behavior.
-    for (auto acp1 : lti.anonClosureParams) {
-      for (auto acp2 : lti.anonClosureParams) {
-        if (acp1 == acp2)
-          continue;
-
-        if (acp1->getDecl()->getBaseName() == acp2->getDecl()->getBaseName()) {
-
-          auto tyvar1 = CS.getType(acp1)->getAs<TypeVariableType>();
-          auto tyvar2 = CS.getType(acp2)->getAs<TypeVariableType>();
-
-          mergeRepresentativeEquivalenceClasses(CS, tyvar1, tyvar2);
-        }
-      }
-    }
-
-    auto mergeTypeVariables = [&](ArrayRef<TypeVariableType *> typeVars) {
-      if (typeVars.size() < 2)
-        return;
-
-      auto rep1 = CS.getRepresentative(typeVars.front());
-      for (unsigned i = 1, n = typeVars.size(); i != n; ++i) {
-        auto rep2 = CS.getRepresentative(typeVars[i]);
-        if (rep1 != rep2)
-          CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
-      }
-    };
-
-    mergeTypeVariables(lti.intLiteralTyvars);
-    mergeTypeVariables(lti.floatLiteralTyvars);
-    mergeTypeVariables(lti.stringLiteralTyvars);
 
     if (lti.collectedTypes.size() == 1) {
       // TODO: Compute the BCT.
@@ -1277,15 +1212,11 @@ namespace {
 
     Type visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *expr) {
       switch (expr->getKind()) {
-      case MagicIdentifierLiteralExpr::Column:
-      case MagicIdentifierLiteralExpr::File:
-      case MagicIdentifierLiteralExpr::FilePath:
-      case MagicIdentifierLiteralExpr::Function:
-      case MagicIdentifierLiteralExpr::Line:
-        return visitLiteralExpr(expr);
-
-      case MagicIdentifierLiteralExpr::DSOHandle: {
-        // #dsohandle has type UnsafeMutableRawPointer.
+      // Magic pointer identifiers are of type UnsafeMutableRawPointer.
+#define MAGIC_POINTER_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+      case MagicIdentifierLiteralExpr::NAME:
+#include "swift/AST/MagicIdentifierKinds.def"
+      {
         auto &ctx = CS.getASTContext();
         if (TypeChecker::requirePointerArgumentIntrinsics(ctx, expr->getLoc()))
           return nullptr;
@@ -1293,6 +1224,10 @@ namespace {
         auto unsafeRawPointer = ctx.getUnsafeRawPointerDecl();
         return unsafeRawPointer->getDeclaredType();
       }
+
+      default:
+        // Others are actual literals and should be handled like any literal.
+        return visitLiteralExpr(expr);
       }
 
       llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
@@ -1472,6 +1407,13 @@ namespace {
         type = CS.getInstanceType(CS.cacheType(E));
         assert(type && "Implicit type expr must have type set!");
         type = CS.openUnboundGenericTypes(type, locator);
+      } else if (CS.hasType(E)) {
+        // If there's a type already set into the constraint system, honor it.
+        // FIXME: This supports the function builder transform, which sneakily
+        // stashes a type in the constraint system through a TypeExpr in order
+        // to pass it down to the rest of CSGen. This is a terribly
+        // unprincipled thing to do.
+        return CS.getType(E);
       } else {
         auto *repr = E->getTypeRepr();
         assert(repr && "Explicit node has no type repr!");
@@ -2293,8 +2235,8 @@ namespace {
 
         return setType(ParenType::get(CS.getASTContext(), underlyingType));
       }
-      case PatternKind::Var: {
-        auto *subPattern = cast<VarPattern>(pattern)->getSubPattern();
+      case PatternKind::Binding: {
+        auto *subPattern = cast<BindingPattern>(pattern)->getSubPattern();
         auto type = getTypeForPattern(subPattern, locator, externalPatternType,
                                       bindPatternVarsOneWay);
 
@@ -2304,7 +2246,6 @@ namespace {
         // Var doesn't affect the type.
         return setType(type);
       }
-
       case PatternKind::Any: {
         return setType(
             externalPatternType
@@ -2842,6 +2783,8 @@ namespace {
 
         CollectVarRefs(ConstraintSystem &cs) : cs(cs) { }
 
+        bool shouldWalkCaptureInitializerExpressions() override { return true; }
+
         std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
           // If there are any error expressions in this closure
           // it wouldn't be possible to infer its type.
@@ -3012,6 +2955,9 @@ namespace {
       auto selfTy = CS.DC->mapTypeIntoContext(
         typeContext->getDeclaredInterfaceType());
       auto superclassTy = selfTy->getSuperclass();
+
+      if (!superclassTy)
+        return Type();
 
       if (selfDecl->getInterfaceType()->is<MetatypeType>())
         superclassTy = MetatypeType::get(superclassTy);
@@ -3792,6 +3738,16 @@ namespace {
         }
       }
 
+      // Generate constraints for each of the entries in the capture list.
+      if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
+        auto &CS = CG.getConstraintSystem();
+        for (const auto &capture : captureList->getCaptureList()) {
+          SolutionApplicationTarget target(capture.Init);
+          if (CS.generateConstraints(target, FreeTypeVariableBinding::Disallow))
+            return {false, nullptr};
+        }
+      }
+
       // Both multi- and single-statement closures now behave the same way
       // when it comes to constraint generation.
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
@@ -3907,8 +3863,9 @@ static Expr *generateConstraintsFor(ConstraintSystem &cs, Expr *expr,
 /// initializes the underlying storage variable.
 /// \param wrappedVar The property that has a property wrapper.
 /// \returns the type of the property.
-static Type generateWrappedPropertyTypeConstraints(
-   ConstraintSystem &cs, Type initializerType, VarDecl *wrappedVar) {
+static bool generateWrappedPropertyTypeConstraints(
+   ConstraintSystem &cs, Type initializerType, VarDecl *wrappedVar,
+   Type propertyType) {
   auto dc = wrappedVar->getInnermostDeclContext();
 
   Type wrapperType = LValueType::get(initializerType);
@@ -3922,7 +3879,7 @@ static Type generateWrappedPropertyTypeConstraints(
     Type rawWrapperType = wrappedVar->getAttachedPropertyWrapperType(i);
     auto wrapperInfo = wrappedVar->getAttachedPropertyWrapperTypeInfo(i);
     if (rawWrapperType->hasError() || !wrapperInfo)
-      return Type();
+      return true;
 
     // The former wrappedValue type must be equal to the current wrapper type
     if (wrappedValueType) {
@@ -3940,12 +3897,12 @@ static Type generateWrappedPropertyTypeConstraints(
         dc->getParentModule(), wrapperInfo.valueVar);
   }
 
-  // Set up an equality constraint to drop the lvalue-ness of the value
-  // type we produced.
-  auto locator = cs.getConstraintLocator(wrappedVar);
-  Type propertyType = cs.createTypeVariable(locator, 0);
-  cs.addConstraint(ConstraintKind::Equal, propertyType, wrappedValueType, locator);
-  return propertyType;
+  // The property type must be equal to the wrapped value type
+  cs.addConstraint(ConstraintKind::Equal, propertyType, wrappedValueType,
+      cs.getConstraintLocator(wrappedVar, LocatorPathElt::ContextualType()));
+  cs.setContextualType(wrappedVar, TypeLoc::withoutLoc(wrappedValueType),
+                       CTP_WrappedProperty);
+  return false;
 }
 
 /// Generate additional constraints for the pattern of an initialization.
@@ -3962,17 +3919,11 @@ static bool generateInitPatternConstraints(
   if (!patternType)
     return true;
 
-  if (auto wrappedVar = target.getInitializationWrappedVar()) {
-    Type propertyType = generateWrappedPropertyTypeConstraints(
-        cs, cs.getType(target.getAsExpr()), wrappedVar);
-    if (!propertyType)
-      return true;
+  if (auto wrappedVar = target.getInitializationWrappedVar())
+    return generateWrappedPropertyTypeConstraints(
+        cs, cs.getType(target.getAsExpr()), wrappedVar, patternType);
 
-    // Add an equal constraint between the pattern type and the
-    // property wrapper's "value" type.
-    cs.addConstraint(ConstraintKind::Equal, patternType,
-                     propertyType, locator, /*isFavored*/ true);
-  } else if (!patternType->is<OpaqueTypeArchetypeType>()) {
+  if (!patternType->is<OpaqueTypeArchetypeType>()) {
     // Add a conversion constraint between the types.
     cs.addConstraint(ConstraintKind::Conversion, cs.getType(target.getAsExpr()),
                      patternType, locator, /*isFavored*/true);
@@ -4216,17 +4167,12 @@ bool ConstraintSystem::generateConstraints(
                                                getConstraintLocator(typeRepr));
     setType(typeRepr, backingType);
 
-    auto wrappedValueType =
-        generateWrappedPropertyTypeConstraints(*this, backingType, wrappedVar);
-    Type propertyType = wrappedVar->getType();
-    if (!wrappedValueType || propertyType->hasError())
+    auto propertyType = wrappedVar->getType();
+    if (propertyType->hasError())
       return true;
 
-    addConstraint(ConstraintKind::Equal, propertyType, wrappedValueType,
-        getConstraintLocator(wrappedVar, LocatorPathElt::ContextualType()));
-    setContextualType(wrappedVar, TypeLoc::withoutLoc(wrappedValueType),
-                      CTP_WrappedProperty);
-    return false;
+    return generateWrappedPropertyTypeConstraints(
+        *this, backingType, wrappedVar, propertyType);
   }
   }
 }

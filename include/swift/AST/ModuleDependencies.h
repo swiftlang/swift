@@ -69,6 +69,9 @@ public:
   /// The Swift interface file, if it can be used to generate the module file.
   const Optional<std::string> swiftInterfaceFile;
 
+  /// Potentially ready-to-use compiled modules for the interface file.
+  const std::vector<std::string> compiledModuleCandidates;
+
   /// The Swift frontend invocation arguments to build the Swift module from the
   /// interface.
   const std::vector<std::string> buildCommandLine;
@@ -96,11 +99,14 @@ public:
   SwiftModuleDependenciesStorage(
       const std::string &compiledModulePath,
       const Optional<std::string> &swiftInterfaceFile,
+      ArrayRef<std::string> compiledModuleCandidates,
       ArrayRef<StringRef> buildCommandLine,
       ArrayRef<StringRef> extraPCMArgs,
       StringRef contextHash
   ) : ModuleDependenciesStorageBase(/*isSwiftModule=*/true, compiledModulePath),
       swiftInterfaceFile(swiftInterfaceFile),
+      compiledModuleCandidates(compiledModuleCandidates.begin(),
+                               compiledModuleCandidates.end()),
       buildCommandLine(buildCommandLine.begin(), buildCommandLine.end()),
       extraPCMArgs(extraPCMArgs.begin(), extraPCMArgs.end()),
       contextHash(contextHash) { }
@@ -181,13 +187,14 @@ public:
   /// built from a Swift interface file (\c .swiftinterface).
   static ModuleDependencies forSwiftInterface(
       const std::string &swiftInterfaceFile,
+      ArrayRef<std::string> compiledCandidates,
       ArrayRef<StringRef> buildCommands,
       ArrayRef<StringRef> extraPCMArgs,
       StringRef contextHash) {
     std::string compiledModulePath;
     return ModuleDependencies(
         std::make_unique<SwiftModuleDependenciesStorage>(
-          compiledModulePath, swiftInterfaceFile, buildCommands,
+          compiledModulePath, swiftInterfaceFile, compiledCandidates, buildCommands,
           extraPCMArgs, contextHash));
   }
 
@@ -196,7 +203,7 @@ public:
       const std::string &compiledModulePath) {
     return ModuleDependencies(
         std::make_unique<SwiftModuleDependenciesStorage>(
-          compiledModulePath, None, ArrayRef<StringRef>(),
+          compiledModulePath, None, ArrayRef<std::string>(), ArrayRef<StringRef>(),
           ArrayRef<StringRef>(), StringRef()));
   }
 
@@ -205,8 +212,8 @@ public:
     std::string compiledModulePath;
     return ModuleDependencies(
         std::make_unique<SwiftModuleDependenciesStorage>(
-          compiledModulePath, None, ArrayRef<StringRef>(), extraPCMArgs,
-          StringRef()));
+          compiledModulePath, None, ArrayRef<std::string>(),
+          ArrayRef<StringRef>(), extraPCMArgs, StringRef()));
   }
 
   /// Describe the module dependencies for a Clang module that can be
@@ -248,7 +255,7 @@ public:
 
   /// Add a dependency on the given module, if it was not already in the set.
   void addModuleDependency(StringRef module,
-                           llvm::StringSet<> &alreadyAddedModules);
+                           llvm::StringSet<> *alreadyAddedModules = nullptr);
 
   /// Add all of the module dependencies for the imports in the given source
   /// file to the set of module dependencies.

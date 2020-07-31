@@ -10,8 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SIL/SILInstruction.h"
 #define DEBUG_TYPE "ConstExpr"
 #include "swift/SILOptimizer/Utils/ConstExpr.h"
+#include "swift/AST/Builtins.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -1756,8 +1758,8 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
       isa<ReleaseValueInst>(inst) || isa<StrongRetainInst>(inst) ||
       isa<StrongReleaseInst>(inst) || isa<DestroyValueInst>(inst) ||
       isa<EndBorrowInst>(inst) ||
-      // Skip sanitizer instrumentation
-      isSanitizerInstrumentation(inst))
+      // Skip instrumentation
+      isInstrumentation(inst))
     return None;
 
   // If this is a special flow-sensitive instruction like a stack allocation,

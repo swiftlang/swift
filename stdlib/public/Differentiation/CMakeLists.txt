@@ -17,7 +17,7 @@
 # Instead, on tensorflow branch, the differentiation-related Swift source files
 # in this directory are directly built as part of swiftCore: see
 # stdlib/public/core/CMakeLists.txt. The `_Differentiation` module is created
-# empty to avoid `#if canImport(_Differentiation)` guards in tests.
+# empty to enable `#if canImport(_Differentiation)` guards in tests.
 # SWIFT_ENABLE_TENSORFLOW END
 
 add_swift_target_library(swift_Differentiation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB

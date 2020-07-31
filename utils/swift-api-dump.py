@@ -161,8 +161,11 @@ def print_command(cmd, outfile=""):
 # Dump the API for the given module.
 
 
-def dump_module_api((cmd, extra_dump_args, output_dir, module, quiet,
-                     verbose)):
+def dump_module_api_star(pack):
+    dump_module_api(*pack)
+
+
+def dump_module_api(cmd, extra_dump_args, output_dir, module, quiet, verbose):
     # Collect the submodules
     submodules = collect_submodules(cmd, module)
 
@@ -341,7 +344,7 @@ def main():
 
     # Execute the API dumps
     pool = multiprocessing.Pool(processes=args.jobs)
-    pool.map(dump_module_api, jobs)
+    pool.map(dump_module_api_star, jobs)
 
     # Remove the .swift file we fed into swift-ide-test
     subprocess.call(['rm', '-f', source_filename])

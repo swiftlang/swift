@@ -91,6 +91,9 @@ function(handle_swift_sources
     # FIXME: We shouldn't /have/ to build things in a single process.
     # <rdar://problem/15972329>
     list(APPEND swift_compile_flags "-whole-module-optimization")
+    if(sdk IN_LIST SWIFT_APPLE_PLATFORMS OR sdk STREQUAL "MACCATALYST")
+      list(APPEND swift_compile_flags "-save-optimization-record=bitstream")
+    endif()
 
     _compile_swift_files(
         dependency_target

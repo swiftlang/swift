@@ -276,8 +276,7 @@ namespace swift {
     /// Use Clang function types for computing canonical types.
     /// If this option is false, the clang function types will still be computed
     /// but will not be used for checking type equality.
-    /// FIXME: [clang-function-type-serialization] This option should be turned
-    /// on once we start serializing clang function types.
+    /// [TODO: Clang-type-plumbing] Turn on for feature rollout.
     bool UseClangFunctionTypes = false;
 
     /// Whether to use the import as member inference system
@@ -376,6 +375,9 @@ namespace swift {
 
     /// Enable verification when every SubstitutionMap is constructed.
     bool VerifyAllSubstitutionMaps = false;
+
+    /// Load swiftmodule files in memory as volatile and avoid mmap.
+    bool EnableVolatileModules = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.

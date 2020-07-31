@@ -39,7 +39,6 @@
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/STLExtras.h"
-#include "swift/Basic/Timer.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -1132,8 +1131,10 @@ static uint8_t getRawStableDefaultArgumentKind(swift::DefaultArgumentKind kind) 
   CASE(Normal)
   CASE(Inherited)
   CASE(Column)
-  CASE(File)
+  CASE(FileID)
   CASE(FilePath)
+  CASE(FileIDSpelledAsFile)
+  CASE(FilePathSpelledAsFile)
   CASE(Line)
   CASE(Function)
   CASE(DSOHandle)
@@ -2733,12 +2734,12 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case PatternKind::Expr:
       llvm_unreachable("Refutable patterns cannot be serialized");
 
-    case PatternKind::Var: {
-      auto var = cast<VarPattern>(pattern);
+    case PatternKind::Binding: {
+      auto var = cast<BindingPattern>(pattern);
 
-      unsigned abbrCode = S.DeclTypeAbbrCodes[VarPatternLayout::Code];
-      VarPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                   var->isLet());
+      unsigned abbrCode = S.DeclTypeAbbrCodes[BindingPatternLayout::Code];
+      BindingPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                       var->isLet());
       writePattern(var->getSubPattern());
       break;
     }
@@ -4499,7 +4500,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<TuplePatternLayout>();
   registerDeclTypeAbbr<TuplePatternEltLayout>();
   registerDeclTypeAbbr<NamedPatternLayout>();
-  registerDeclTypeAbbr<VarPatternLayout>();
+  registerDeclTypeAbbr<BindingPatternLayout>();
   registerDeclTypeAbbr<AnyPatternLayout>();
   registerDeclTypeAbbr<TypedPatternLayout>();
   registerDeclTypeAbbr<InlinableBodyTextLayout>();
@@ -5294,7 +5295,8 @@ void swift::serializeToMemory(
     std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer, const SILModule *M) {
   if (moduleBuffer) {
-    SharedTimer timer("Serialization, swiftmodule, to memory");
+    auto name = "Serialization, swiftmodule, to memory";
+    llvm::NamedRegionTimer timer(name, name, "Swift", "Swift compilation");
     llvm::SmallString<1024> buf;
     llvm::raw_svector_ostream stream(buf);
     Serializer::writeToStream(stream, DC, M, options);
@@ -5303,7 +5305,8 @@ void swift::serializeToMemory(
   }
 
   if (moduleDocBuffer) {
-    SharedTimer timer("Serialization, swiftdoc, to memory");
+    auto name = "Serialization, swiftdoc, to memory";
+    llvm::NamedRegionTimer timer(name, name, "Swift", "Swift compilation");
     llvm::SmallString<1024> buf;
     llvm::raw_svector_ostream stream(buf);
     writeDocToStream(stream, DC, options.GroupInfoPath);

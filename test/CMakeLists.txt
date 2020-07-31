@@ -114,15 +114,10 @@ function(get_test_dependencies SDK result_var_name)
     message(FATAL_ERROR "Unknown SDK: ${SDK}")
   endif()
 
-  if(XCODE)
-    # Xcode's build paths have a configuration variable in them,
-    # so CMake can't match them at compile time. Just use target names.
-    list(APPEND deps ${deps_binaries})
-  else()
-    foreach(binary ${deps_binaries})
-      list(APPEND deps "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/${binary}${CMAKE_EXECUTABLE_SUFFIX}")
-    endforeach()
-  endif()
+  # Just use target names for dependency generation. This works for both Xcode
+  # and non-Xcode build systems. In the case of Xcode, its build paths have a
+  # configuration variable in them, so CMake can't match them at compile time.
+  list(APPEND deps ${deps_binaries})
 
   set("${result_var_name}" "${deps}" PARENT_SCOPE)
 endfunction()

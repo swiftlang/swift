@@ -3757,7 +3757,8 @@ Parser::parseDecl(ParseDeclOptions Flags,
                               StaticSpelling, tryLoc, HasLetOrVarKeyword);
     StaticLoc = SourceLoc(); // we handled static if present.
     MayNeedOverrideCompletion = true;
-    if (DeclResult.hasCodeCompletion() && isCodeCompletionFirstPass())
+    if ((AttrStatus.hasCodeCompletion() || DeclResult.hasCodeCompletion())
+        && isCodeCompletionFirstPass())
       return;
     std::for_each(Entries.begin(), Entries.end(), Handler);
     if (auto *D = DeclResult.getPtrOrNull())
@@ -3804,7 +3805,8 @@ Parser::parseDecl(ParseDeclOptions Flags,
     llvm::SmallVector<Decl *, 4> Entries;
     DeclParsingContext.setCreateSyntax(SyntaxKind::EnumCaseDecl);
     DeclResult = parseDeclEnumCase(Flags, Attributes, Entries);
-    if (DeclResult.hasCodeCompletion() && isCodeCompletionFirstPass())
+    if ((AttrStatus.hasCodeCompletion() || DeclResult.hasCodeCompletion()) &&
+        isCodeCompletionFirstPass())
       break;
     std::for_each(Entries.begin(), Entries.end(), Handler);
     if (auto *D = DeclResult.getPtrOrNull())
@@ -3848,7 +3850,8 @@ Parser::parseDecl(ParseDeclOptions Flags,
     DeclResult = parseDeclSubscript(StaticLoc, StaticSpelling, Flags,
                                     Attributes, Entries);
     StaticLoc = SourceLoc(); // we handled static if present.
-    if (DeclResult.hasCodeCompletion() && isCodeCompletionFirstPass())
+    if ((AttrStatus.hasCodeCompletion() || DeclResult.hasCodeCompletion()) &&
+        isCodeCompletionFirstPass())
       break;
     std::for_each(Entries.begin(), Entries.end(), Handler);
     MayNeedOverrideCompletion = true;
@@ -4027,6 +4030,8 @@ Parser::parseDecl(ParseDeclOptions Flags,
       CodeCompletion->setAttrTargetDeclKind(DK);
     }
     DeclResult.setHasCodeCompletion();
+    if (isCodeCompletionFirstPass())
+      return DeclResult;
   }
 
   if (DeclResult.isNonNull()) {
@@ -5726,7 +5731,7 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
       } else if (auto paren = dyn_cast<ParenPattern>(cur)) {
         primaryVarIsWellFormed = false;
         cur = paren->getSubPattern();
-      } else if (auto var = dyn_cast<VarPattern>(cur)) {
+      } else if (auto var = dyn_cast<BindingPattern>(cur)) {
         primaryVarIsWellFormed = false;
         cur = var->getSubPattern();
       } else {

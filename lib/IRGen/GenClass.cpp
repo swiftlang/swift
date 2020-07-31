@@ -2512,18 +2512,26 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
   // Find the vtable entry we're interested in.
   auto methodInfo =
     IGF.IGM.getClassMetadataLayout(classDecl).getMethodInfo(IGF, method);
-  auto offset = methodInfo.getOffset();
+  switch (methodInfo.getKind()) {
+  case ClassMetadataLayout::MethodInfo::Kind::Offset: {
+    auto offset = methodInfo.getOffsett();
 
-  auto slot = IGF.emitAddressAtOffset(metadata, offset,
-                                      signature.getType()->getPointerTo(),
-                                      IGF.IGM.getPointerAlignment());
-  auto fnPtr = IGF.emitInvariantLoad(slot);
-
-  auto &schema = IGF.getOptions().PointerAuth.SwiftClassMethods;
-  auto authInfo =
-    PointerAuthInfo::emit(IGF, schema, slot.getAddress(), method);
-
-  return FunctionPointer(fnPtr, authInfo, signature);
+    auto slot = IGF.emitAddressAtOffset(metadata, offset,
+                                        signature.getType()->getPointerTo(),
+                                        IGF.IGM.getPointerAlignment());
+    auto fnPtr = IGF.emitInvariantLoad(slot);
+    auto &schema = IGF.getOptions().PointerAuth.SwiftClassMethods;
+    auto authInfo =
+      PointerAuthInfo::emit(IGF, schema, slot.getAddress(), method);
+    return FunctionPointer(fnPtr, authInfo, signature);
+  }
+  case ClassMetadataLayout::MethodInfo::Kind::DirectImpl: {
+    auto fnPtr = llvm::ConstantExpr::getBitCast(methodInfo.getDirectImpl(),
+                                           signature.getType()->getPointerTo());
+    return FunctionPointer::forDirect(fnPtr, signature);
+  }
+  }
+  
 }
 
 FunctionPointer

@@ -287,12 +287,12 @@ NODE(OpaqueTypeDescriptorAccessorVar)
 NODE(OpaqueReturnType)
 CONTEXT_NODE(OpaqueReturnTypeOf)
 
-// Added in Swift 5.3
+// Added in Swift 5.4
 NODE(CanonicalSpecializedGenericMetaclass)
 NODE(CanonicalSpecializedGenericTypeMetadataAccessFunction)
-
-// Added in Swift 5.4
 NODE(MetadataInstantiationCache)
+NODE(NoncanonicalSpecializedGenericTypeMetadata)
+NODE(NoncanonicalSpecializedGenericTypeMetadataCache)
 
 #undef CONTEXT_NODE
 #undef NODE

@@ -174,6 +174,17 @@ ReflectionSection<Iterator> sectionFromInfo(const swift_reflection_info_t &Info,
              (uintptr_t)Section.section.End - (uintptr_t)Section.section.Begin);
 }
 
+template <typename Iterator>
+ReflectionSection<Iterator> reflectionSectionFromLocalAndRemote(
+    const swift_reflection_section_mapping_t &Section) {
+  auto RemoteSectionStart = (uint64_t)Section.remote_section.StartAddress;
+
+  auto Start = RemoteRef<void>(RemoteSectionStart, Section.local_section.Begin);
+
+  return ReflectionSection<Iterator>(Start,
+                                     (uintptr_t)Section.remote_section.Size);
+}
+
 void
 swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
                                    swift_reflection_info_t Info) {
@@ -198,6 +209,26 @@ swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
     sectionFromInfo<const void *>(Info, Info.type_references),
     sectionFromInfo<const void *>(Info, Info.reflection_strings)};
   
+  Context->addReflectionInfo(ContextInfo);
+}
+
+void swift_reflection_addReflectionMappingInfo(
+    SwiftReflectionContextRef ContextRef,
+    swift_reflection_mapping_info_t Info) {
+  auto Context = ContextRef->nativeContext;
+
+  ReflectionInfo ContextInfo{
+      reflectionSectionFromLocalAndRemote<FieldDescriptorIterator>(Info.field),
+      reflectionSectionFromLocalAndRemote<AssociatedTypeIterator>(
+          Info.associated_types),
+      reflectionSectionFromLocalAndRemote<BuiltinTypeDescriptorIterator>(
+          Info.builtin_types),
+      reflectionSectionFromLocalAndRemote<CaptureDescriptorIterator>(
+          Info.capture),
+      reflectionSectionFromLocalAndRemote<const void *>(Info.type_references),
+      reflectionSectionFromLocalAndRemote<const void *>(
+          Info.reflection_strings)};
+
   Context->addReflectionInfo(ContextInfo);
 }
 
@@ -643,6 +674,25 @@ const char *swift_reflection_metadataAllocationTagName(
   auto Context = ContextRef->nativeContext;
   auto Result = Context->metadataAllocationTagName(Tag);
   return returnableCString(ContextRef, Result);
+}
+
+int swift_reflection_metadataAllocationCacheNode(
+    SwiftReflectionContextRef ContextRef,
+    swift_metadata_allocation_t Allocation,
+    swift_metadata_cache_node_t *OutNode) {
+  auto Context = ContextRef->nativeContext;
+  MetadataAllocation<Runtime> ConvertedAllocation;
+  ConvertedAllocation.Tag = Allocation.Tag;
+  ConvertedAllocation.Ptr = Allocation.Ptr;
+  ConvertedAllocation.Size = Allocation.Size;
+
+  auto Result = Context->metadataAllocationCacheNode(ConvertedAllocation);
+  if (!Result)
+    return 0;
+
+  OutNode->Left = Result->Left;
+  OutNode->Right = Result->Right;
+  return 1;
 }
 
 const char *swift_reflection_iterateMetadataAllocationBacktraces(

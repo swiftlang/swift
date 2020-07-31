@@ -525,6 +525,8 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     llvm::SmallString<64> expectedIdentifier;
     bool isConfused = false;
     uint32_t codepoint;
+    uint32_t firstConfusableCodepoint = 0;
+    int totalCodepoints = 0;
     int offset = 0;
     while ((codepoint = validateUTF8CharacterAndAdvance(buffer,
                                                         buffer +
@@ -533,11 +535,16 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
       int length = (buffer - simpleName.get()) - offset;
       if (auto expectedCodepoint =
           confusable::tryConvertConfusableCharacterToASCII(codepoint)) {
+        if (firstConfusableCodepoint == 0) {
+          firstConfusableCodepoint = codepoint;
+        }
         isConfused = true;
         expectedIdentifier += expectedCodepoint;
       } else {
         expectedIdentifier += (char)codepoint;
       }
+
+      totalCodepoints++;
 
       offset += length;
     }
@@ -580,11 +587,21 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     } else {
       emitBasicError();
 
-      Context.Diags
-          .diagnose(Loc, diag::confusable_character,
-                    UDRE->getName().isOperator(), simpleName.str(),
-                    expectedIdentifier)
-          .fixItReplace(Loc, expectedIdentifier);
+      if (totalCodepoints == 1) {
+        auto charNames = confusable::getConfusableAndBaseCodepointNames(
+            firstConfusableCodepoint);
+        Context.Diags
+            .diagnose(Loc, diag::single_confusable_character,
+                      UDRE->getName().isOperator(), simpleName.str(),
+                      charNames.first, expectedIdentifier, charNames.second)
+            .fixItReplace(Loc, expectedIdentifier);
+      } else {
+        Context.Diags
+            .diagnose(Loc, diag::confusable_character,
+                      UDRE->getName().isOperator(), simpleName.str(),
+                      expectedIdentifier)
+            .fixItReplace(Loc, expectedIdentifier);
+      }
     }
 
     // TODO: consider recovering from here.  We may want some way to suppress
@@ -1027,6 +1044,8 @@ namespace {
 
     bool walkToClosureExprPre(ClosureExpr *expr);
 
+    bool shouldWalkCaptureInitializerExpressions() override { return true; }
+
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       // If this is a call, record the argument expression.
       if (auto call = dyn_cast<ApplyExpr>(expr)) {
@@ -1075,21 +1094,6 @@ namespace {
 
         return std::make_pair(recursive, expr);
       };
-
-      // For capture lists, we typecheck the decls they contain.
-      if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
-        // Validate the capture list.
-        for (auto capture : captureList->getCaptureList()) {
-          TypeChecker::typeCheckDecl(capture.Init);
-          TypeChecker::typeCheckDecl(capture.Var);
-        }
-
-        // Since closure expression is contained by capture list
-        // let's handle it directly to avoid walking into capture
-        // list itself.
-        captureList->getClosureBody()->walk(*this);
-        return finish(false, expr);
-      }
 
       // For closures, type-check the patterns and result type as written,
       // but do not walk into the body. That will be type-checked after
@@ -1995,6 +1999,85 @@ bool GenericRequirementsCheckListener::diagnoseUnsatisfiedRequirement(
   return false;
 }
 
+namespace {
+/// Produce any additional syntactic diagnostics for the body of a function
+/// that had a function builder applied.
+class FunctionSyntacticDiagnosticWalker : public ASTWalker {
+  SmallVector<DeclContext *, 4> dcStack;
+
+public:
+  FunctionSyntacticDiagnosticWalker(DeclContext *dc) { dcStack.push_back(dc); }
+
+  std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    performSyntacticExprDiagnostics(expr, dcStack.back(), /*isExprStmt=*/false);
+
+    if (auto closure = dyn_cast<ClosureExpr>(expr)) {
+      if (closure->wasSeparatelyTypeChecked()) {
+        dcStack.push_back(closure);
+        return {true, expr};
+      }
+    }
+
+    return {false, expr};
+  }
+
+  Expr *walkToExprPost(Expr *expr) override {
+    if (auto closure = dyn_cast<ClosureExpr>(expr)) {
+      if (closure->wasSeparatelyTypeChecked()) {
+        assert(dcStack.back() == closure);
+        dcStack.pop_back();
+      }
+    }
+
+    return expr;
+  }
+
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+    performStmtDiagnostics(dcStack.back()->getASTContext(), stmt);
+    return {true, stmt};
+  }
+
+  std::pair<bool, Pattern *> walkToPatternPre(Pattern *pattern) override {
+    return {false, pattern};
+  }
+
+  bool walkToTypeLocPre(TypeLoc &typeLoc) override { return false; }
+  bool walkToTypeReprPre(TypeRepr *typeRepr) override { return false; }
+  bool walkToParameterListPre(ParameterList *params) override { return false; }
+};
+} // end anonymous namespace
+
+void constraints::performSyntacticDiagnosticsForTarget(
+    const SolutionApplicationTarget &target, bool isExprStmt) {
+  auto *dc = target.getDeclContext();
+  switch (target.kind) {
+  case SolutionApplicationTarget::Kind::expression: {
+    // First emit diagnostics for the main expression.
+    performSyntacticExprDiagnostics(target.getAsExpr(), dc, isExprStmt);
+
+    // If this is a for-in statement, we also need to check the where clause if
+    // present.
+    if (target.isForEachStmt()) {
+      if (auto *whereExpr = target.getForEachStmtInfo().whereExpr)
+        performSyntacticExprDiagnostics(whereExpr, dc, /*isExprStmt*/ false);
+    }
+    return;
+  }
+  case SolutionApplicationTarget::Kind::function: {
+    FunctionSyntacticDiagnosticWalker walker(dc);
+    target.getFunctionBody()->walk(walker);
+    return;
+  }
+  case SolutionApplicationTarget::Kind::stmtCondition:
+  case SolutionApplicationTarget::Kind::caseLabelItem:
+  case SolutionApplicationTarget::Kind::patternBinding:
+  case SolutionApplicationTarget::Kind::uninitializedWrappedVar:
+    // Nothing to do for these.
+    return;
+  }
+  llvm_unreachable("Unhandled case in switch!");
+}
+
 #pragma mark High-level entry points
 Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       Type convertType,
@@ -2003,31 +2086,20 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   SolutionApplicationTarget target(
       expr, dc, convertTypePurpose, convertType,
       options.contains(TypeCheckExprFlags::IsDiscarded));
-  bool unresolvedTypeExprs = false;
-  auto resultTarget = typeCheckExpression(
-      target, unresolvedTypeExprs, options);
+  auto resultTarget = typeCheckExpression(target, options);
   if (!resultTarget) {
     expr = target.getAsExpr();
     return Type();
   }
 
   expr = resultTarget->getAsExpr();
-
-  // HACK for clients that want unresolved types.
-  if (unresolvedTypeExprs) {
-    return ErrorType::get(dc->getASTContext());
-  }
-
-
   return expr->getType();
 }
 
 Optional<SolutionApplicationTarget>
 TypeChecker::typeCheckExpression(
     SolutionApplicationTarget &target,
-    bool &unresolvedTypeExprs,
     TypeCheckExprOptions options) {
-  unresolvedTypeExprs = false;
   Expr *expr = target.getAsExpr();
   DeclContext *dc = target.getDeclContext();
   auto &Context = dc->getASTContext();
@@ -2081,14 +2153,12 @@ TypeChecker::typeCheckExpression(
   }
 
   // If the client allows the solution to have unresolved type expressions,
-  // check for them now.  We cannot apply the solution with unresolved TypeVars,
+  // check for them now. We cannot apply the solution with unresolved TypeVars,
   // because they will leak out into arbitrary places in the resultant AST.
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables) &&
        (viable->size() != 1 ||
         (target.getExprConversionType() &&
          target.getExprConversionType()->hasUnresolvedType()))) {
-    // FIXME: This hack should only be needed for CSDiag.
-    unresolvedTypeExprs = true;
     return target;
   }
 
@@ -2109,7 +2179,7 @@ TypeChecker::typeCheckExpression(
   // expression now.
   if (!cs.shouldSuppressDiagnostics()) {
     bool isExprStmt = options.contains(TypeCheckExprFlags::IsExprStmt);
-    performSyntacticExprDiagnostics(result, dc, isExprStmt);
+    performSyntacticDiagnosticsForTarget(*resultTarget, isExprStmt);
   }
 
   resultTarget->setExpr(result);
@@ -2137,8 +2207,7 @@ bool TypeChecker::typeCheckBinding(
             /*bindPatternVarsOneWay=*/false);
 
   // Type-check the initializer.
-  bool unresolvedTypeExprs = false;
-  auto resultTarget = typeCheckExpression(target, unresolvedTypeExprs);
+  auto resultTarget = typeCheckExpression(target);
 
   if (resultTarget) {
     initializer = resultTarget->getAsExpr();
@@ -2267,8 +2336,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
 
   auto target = SolutionApplicationTarget::forForEachStmt(
       stmt, sequenceProto, dc, /*bindPatternVarsOneWay=*/false);
-  bool unresolvedTypeExprs = false;
-  return !typeCheckExpression(target, unresolvedTypeExprs);
+  return !typeCheckExpression(target);
 }
 
 bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {

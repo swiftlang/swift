@@ -254,3 +254,14 @@ func sr_10837() {
     }
   }
 }
+
+// To make sure that hack related to type variable bindings works as expected we need to test
+// that in the following case result of a call to `reduce` maintains optionality.
+func test_that_optionality_of_closure_result_is_preserved() {
+  struct S {}
+
+  let arr: [S?] = []
+  let _: [S]? = arr.reduce([], { (a: [S]?, s: S?) -> [S]? in
+    a.flatMap { (group: [S]) -> [S]? in s.map { group + [$0] } } // Ok
+  })
+}

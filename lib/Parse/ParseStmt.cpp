@@ -658,7 +658,8 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
     diagnose(Tok, ID);
 
     // Attempt to recover by looking for a left brace on the same line
-    if (!skipUntilTokenOrEndOfLine(tok::l_brace))
+    if (!skipUntilTokenOrEndOfLine(tok::l_brace, tok::r_brace) ||
+        !Tok.is(tok::l_brace))
       return nullptr;
   }
   SyntaxParsingContext LocalContext(SyntaxContext, SyntaxKind::CodeBlock);
@@ -1092,8 +1093,8 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
                                        P.CurDeclContext);
     var->setImplicit();
     auto namePattern = new (P.Context) NamedPattern(var);
-    auto varPattern = new (P.Context) VarPattern(loc, /*isLet*/true,
-                                                 namePattern);
+    auto varPattern =
+        new (P.Context) BindingPattern(loc, /*isLet*/ true, namePattern);
     varPattern->setImplicit();
     patternResult = makeParserResult(varPattern);
   }
@@ -1485,8 +1486,8 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     ThePattern = parseMatchingPattern(/*isExprBasic*/ true);
     
     if (ThePattern.isNonNull()) {
-      auto *P = new (Context) VarPattern(IntroducerLoc, wasLet,
-                                          ThePattern.get());
+      auto *P =
+          new (Context) BindingPattern(IntroducerLoc, wasLet, ThePattern.get());
       ThePattern = makeParserResult(Status, P);
     }
 
@@ -1699,7 +1700,8 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo,
       // got a problem. If the last bit is 'else ... {' on one line, let's
       // assume they've forgotten the 'if'.
       BacktrackingScope backtrack(*this);
-      implicitlyInsertIf = skipUntilTokenOrEndOfLine(tok::l_brace);
+      if (skipUntilTokenOrEndOfLine(tok::l_brace, tok::r_brace))
+        implicitlyInsertIf = Tok.is(tok::l_brace);
     }
 
     if (Tok.is(tok::kw_if) || implicitlyInsertIf) {

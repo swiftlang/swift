@@ -173,6 +173,9 @@ Globals
 
   global ::= global 'MK'                 // instantiation cache associated with global
 
+  global ::= global 'MJ'                 // noncanonical specialized generic type metadata instantiation cache associated with global
+  global ::= global 'MN'                 // noncanonical specialized generic type metadata for global
+
 A direct symbol resolves directly to the address of an object.  An
 indirect symbol resolves to the address of a pointer to the object.
 They are distinct manglings to make a certain class of bugs

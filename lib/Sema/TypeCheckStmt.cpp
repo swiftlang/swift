@@ -992,9 +992,9 @@ public:
         auto diag = vd->diagnose(diag::mutability_mismatch_multiple_pattern_list,
                                  vd->isLet(), initialCaseVarDecl->isLet());
 
-        VarPattern *foundVP = nullptr;
+        BindingPattern *foundVP = nullptr;
         vd->getParentPattern()->forEachNode([&](Pattern *P) {
-          if (auto *VP = dyn_cast<VarPattern>(P))
+          if (auto *VP = dyn_cast<BindingPattern>(P))
             if (VP->getSingleVar() == vd)
               foundVP = VP;
         });
@@ -2068,9 +2068,9 @@ void swift::bindSwitchCasePatternVars(CaseStmt *caseStmt) {
         auto diag = var->diagnose(diag::mutability_mismatch_multiple_pattern_list,
                                   var->isLet(), initialCaseVarDecl->isLet());
 
-        VarPattern *foundVP = nullptr;
+        BindingPattern *foundVP = nullptr;
         var->getParentPattern()->forEachNode([&](Pattern *P) {
-          if (auto *VP = dyn_cast<VarPattern>(P))
+          if (auto *VP = dyn_cast<BindingPattern>(P))
             if (VP->getSingleVar() == var)
               foundVP = VP;
         });

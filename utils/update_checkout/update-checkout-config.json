@@ -47,9 +47,6 @@
             "remote": { "id": "KitWare/CMake" },
             "platforms": [ "Linux" ]
         },
-        "PythonKit": {
-            "remote": { "id": "pvieito/PythonKit" }
-        },
         "tensorflow-swift-apis": {
             "remote": { "id": "tensorflow/swift-apis" }
         },
@@ -89,7 +86,6 @@
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master",
                 "swift-format": "master",
-                "PythonKit": "master",
                 "tensorflow-swift-apis": "master"
             }
         },
@@ -121,7 +117,6 @@
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master",
                 "swift-format": "master",
-                "pythonkit": "master",
                 "tensorflow-swift-apis": "master"
             }
         },
@@ -319,7 +314,6 @@
                 "indexstore-db": "release/5.3",
                 "sourcekit-lsp": "release/5.3",
                 "swift-format": "master",
-                "pythonkit": "master",
                 "tensorflow-swift-apis": "master"
             }
         },
@@ -351,26 +345,26 @@
        "tensorflow": {
             "aliases": ["tensorflow"],
             "repos": {
-                "llvm-project": "6306fa3e4fa4b0363f08a28173933d87838b95cf",
+                "llvm-project": "db8896f3f345af247bd2a23432f49c9dd01d8003",
                 "swift": "tensorflow",
-                "cmark": "swift-DEVELOPMENT-SNAPSHOT-2020-07-12-a",
-                "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2020-07-12-a",
+                "cmark": "swift-DEVELOPMENT-SNAPSHOT-2020-07-22-a",
+                "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2020-07-22-a",
                 "swift-tools-support-core": "0.1.8",
-                "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2020-07-12-a",
+                "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2020-07-22-a",
                 "swift-argument-parser": "0.2.0",
                 "swift-driver": "bf0026c636347b4c31aab21deb01943529b7e556",
-                "swift-syntax": "swift-DEVELOPMENT-SNAPSHOT-2020-07-12-a",
-                "swift-stress-tester": "swift-DEVELOPMENT-SNAPSHOT-2020-07-12-a",
-                "swift-corelibs-xctest": "swift-DEVELOPMENT-SNAPSHOT-2020-07-12-a",
-                "swift-corelibs-foundation": "swift-DEVELOPMENT-SNAPSHOT-2020-07-12-a",
-                "swift-corelibs-libdispatch": "swift-DEVELOPMENT-SNAPSHOT-2020-07-12-a",
-                "swift-integration-tests": "swift-DEVELOPMENT-SNAPSHOT-2020-07-12-a",
-                "swift-xcode-playground-support": "swift-DEVELOPMENT-SNAPSHOT-2020-07-12-a",
+                "swift-syntax": "swift-DEVELOPMENT-SNAPSHOT-2020-07-22-a",
+                "swift-stress-tester": "swift-DEVELOPMENT-SNAPSHOT-2020-07-22-a",
+                "swift-corelibs-xctest": "swift-DEVELOPMENT-SNAPSHOT-2020-07-22-a",
+                "swift-corelibs-foundation": "swift-DEVELOPMENT-SNAPSHOT-2020-07-22-a",
+                "swift-corelibs-libdispatch": "swift-DEVELOPMENT-SNAPSHOT-2020-07-22-a",
+                "swift-integration-tests": "swift-DEVELOPMENT-SNAPSHOT-2020-07-22-a",
+                "swift-xcode-playground-support": "swift-DEVELOPMENT-SNAPSHOT-2020-07-22-a",
                 "ninja": "release",
                 "icu": "release-65-1",
                 "yams": "3.0.1-patched",
-                "indexstore-db": "swift-DEVELOPMENT-SNAPSHOT-2020-07-12-a",
-                "sourcekit-lsp": "swift-DEVELOPMENT-SNAPSHOT-2020-07-12-a",
+                "indexstore-db": "swift-DEVELOPMENT-SNAPSHOT-2020-07-22-a",
+                "sourcekit-lsp": "swift-DEVELOPMENT-SNAPSHOT-2020-07-22-a",
                 "PythonKit": "master",
                 "swift-format": "master",
                 "tensorflow": "v2.2.0-rc0",

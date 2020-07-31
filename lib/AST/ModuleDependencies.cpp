@@ -37,8 +37,8 @@ ModuleDependencies::getAsClangModule() const {
 }
 
 void ModuleDependencies::addModuleDependency(
-    StringRef module, llvm::StringSet<> &alreadyAddedModules) {
-  if (alreadyAddedModules.insert(module).second)
+    StringRef module, llvm::StringSet<> *alreadyAddedModules) {
+  if (!alreadyAddedModules || alreadyAddedModules->insert(module).second)
     storage->moduleDependencies.push_back(module.str());
 }
 
@@ -53,7 +53,7 @@ void ModuleDependencies::addModuleDependencies(
       continue;
 
     addModuleDependency(importDecl->getModulePath().front().Item.str(),
-                        alreadyAddedModules);
+                        &alreadyAddedModules);
   }
 
   auto fileName = sf.getFilename();

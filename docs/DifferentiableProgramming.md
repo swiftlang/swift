@@ -1192,7 +1192,14 @@ extension Optional: Differentiable where Wrapped: Differentiable {
 
     @noDerivative
     public var zeroTangentVectorInitializer: () -> TangentVector {
-        { TangentVector(.zero) }
+        switch self {
+        case nil:
+            return { TangentVector(nil) }
+        case let x?:
+            return { [zeroTanInit = x.zeroTangentVectorInitializer] in
+                TangentVector(zeroTanInit())
+            }
+        }
     }
 }
 ```

@@ -850,14 +850,8 @@ ParameterListInfo::ParameterListInfo(
     return;
 
   // Find the corresponding parameter list.
-  const ParameterList *paramList = nullptr;
-  if (auto *func = dyn_cast<AbstractFunctionDecl>(paramOwner)) {
-    paramList = func->getParameters();
-  } else if (auto *subscript = dyn_cast<SubscriptDecl>(paramOwner)) {
-    paramList = subscript->getIndices();
-  } else if (auto *enumElement = dyn_cast<EnumElementDecl>(paramOwner)) {
-    paramList = enumElement->getParameterList();
-  }
+  const ParameterList *paramList =
+      getParameterList(const_cast<ValueDecl *>(paramOwner));
 
   // No parameter list means no default arguments - hand back the zeroed
   // bitvector.
@@ -3375,9 +3369,9 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   return build(C, CanTypes, HasExplicitAnyObject);
 }
 
-void AnyFunctionType::ExtInfo::Uncommon::printClangFunctionType(
-    ClangModuleLoader *cml, llvm::raw_ostream &os) {
-  cml->printClangType(ClangFunctionType, os);
+void AnyFunctionType::ExtInfo::ClangTypeInfo::printType(
+    ClangModuleLoader *cml, llvm::raw_ostream &os) const {
+  cml->printClangType(type, os);
 }
 
 void
@@ -3413,7 +3407,7 @@ const clang::Type *AnyFunctionType::getCanonicalClangFunctionType() const {
   return ty ? ty->getCanonicalTypeInternal().getTypePtr() : nullptr;
 }
 
-// TODO: [store-sil-clang-function-type]
+// [TODO: Store-SIL-Clang-type]
 const clang::FunctionType *SILFunctionType::getClangFunctionType() const {
   return nullptr;
 }

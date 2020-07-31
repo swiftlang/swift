@@ -1,4 +1,4 @@
-//===--- Type.h - Swift Language Type ASTs ----------------------*- C++ -*-===//
+//===--- Type.h - Value objects for Swift and SIL types ---------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the Type class.
+// This file defines the Type and CanType classes, which are value objects
+// used to cheaply pass around different kinds of types. The full hierarchy for
+// Swift and SIL types -- including tuple types, function types and more -- is
+// defined in Types.h.
 //
 //===----------------------------------------------------------------------===//
 
@@ -213,7 +216,10 @@ public:
   
   bool isNull() const { return Ptr == 0; }
   
-  TypeBase *operator->() const { return Ptr; }
+  TypeBase *operator->() const {
+    assert(Ptr && "Cannot dereference a null Type!");
+    return Ptr;
+  }
   
   explicit operator bool() const { return Ptr != 0; }
 
@@ -530,7 +536,10 @@ public:                                                             \
   TYPE *getPointer() const {                                        \
     return static_cast<TYPE*>(Type::getPointer());                  \
   }                                                                 \
-  TYPE *operator->() const { return getPointer(); }                 \
+  TYPE *operator->() const {                                        \
+    assert(getPointer() && "Cannot dereference a null " #TYPE);     \
+    return getPointer();                                            \
+  }                                                                 \
   operator TYPE *() const { return getPointer(); }                  \
   explicit operator bool() const { return getPointer() != nullptr; }
 

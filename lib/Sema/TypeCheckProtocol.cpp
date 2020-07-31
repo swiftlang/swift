@@ -2076,10 +2076,8 @@ SourceLoc OptionalAdjustment::getOptionalityLoc(ValueDecl *witness) const {
 
   // For parameter adjustments, dig out the pattern.
   ParameterList *params = nullptr;
-  if (auto func = dyn_cast<AbstractFunctionDecl>(witness)) {
-    params = func->getParameters();
-  } else if (auto subscript = dyn_cast<SubscriptDecl>(witness)) {
-    params = subscript->getIndices();
+  if (isa<AbstractFunctionDecl>(witness) || isa<SubscriptDecl>(witness)) {
+    params = getParameterList(witness);
   } else {
     return SourceLoc();
   }
@@ -4793,12 +4791,11 @@ static bool isGeneric(ValueDecl *decl) {
 /// Determine whether this is an unlabeled initializer or subscript.
 static bool isUnlabeledInitializerOrSubscript(ValueDecl *value) {
   ParameterList *paramList = nullptr;
-  if (auto constructor = dyn_cast<ConstructorDecl>(value))
-    paramList = constructor->getParameters();
-  else if (auto subscript = dyn_cast<SubscriptDecl>(value))
-    paramList = subscript->getIndices();
-  else
+  if (isa<ConstructorDecl>(value) || isa<SubscriptDecl>(value)) {
+    paramList = getParameterList(value);
+  } else {
     return false;
+  }
 
   for (auto param : *paramList) {
     if (!param->getArgumentName().empty()) return false;
@@ -5821,7 +5818,15 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
     if (!valueDecl->isProtocolRequirement())
       continue;
 
-    checker.resolveWitnessViaLookup(valueDecl);
+    ResolveWitnessResult result = checker.resolveWitnessViaLookup(valueDecl);
+
+    if (result == ResolveWitnessResult::Missing &&
+        requirement->isSPI() &&
+        !proto->isSPI()) {
+      // SPI requirements need a default value, unless the protocol is SPI too.
+      valueDecl->diagnose(diag::spi_attribute_on_protocol_requirement,
+                          valueDecl->getName());
+    }
   }
 
   // Find defaults for any associated conformances rooted on defaulted

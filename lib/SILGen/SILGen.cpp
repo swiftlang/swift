@@ -29,7 +29,6 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
-#include "swift/Basic/Timer.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
@@ -51,8 +50,7 @@ using namespace Lowering;
 
 SILGenModule::SILGenModule(SILModule &M, ModuleDecl *SM)
     : M(M), Types(M.Types), SwiftModule(SM), TopLevelSGF(nullptr),
-      MagicFileStringsByFilePath(
-          SM->computeMagicFileStringMap(/*shouldDiagnose=*/true)) {
+      FileIDsByFilePath(SM->computeFileIDMap(/*shouldDiagnose=*/true)) {
   const SILOptions &Opts = M.getOptions();
   if (!Opts.UseProfile.empty()) {
     auto ReaderOrErr = llvm::IndexedInstrProfReader::create(Opts.UseProfile);
@@ -772,8 +770,8 @@ static void emitDelayedFunction(SILGenModule &SGM,
               ->isPropertyMemberwiseInitializedWithWrappedType()) {
         auto wrapperInfo =
             originalProperty->getPropertyWrapperBackingPropertyInfo();
-        assert(wrapperInfo.originalInitialValue);
-        init = wrapperInfo.originalInitialValue;
+        assert(wrapperInfo.wrappedValuePlaceholder->getOriginalWrappedValue());
+        init = wrapperInfo.wrappedValuePlaceholder->getOriginalWrappedValue();
       }
     }
 
@@ -1319,12 +1317,9 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant,
     break;
 
   case DefaultArgumentKind::Inherited:
-  case DefaultArgumentKind::Column:
-  case DefaultArgumentKind::File:
-  case DefaultArgumentKind::FilePath:
-  case DefaultArgumentKind::Line:
-  case DefaultArgumentKind::Function:
-  case DefaultArgumentKind::DSOHandle:
+#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+  case DefaultArgumentKind::NAME:
+#include "swift/AST/MagicIdentifierKinds.def"
   case DefaultArgumentKind::NilLiteral:
   case DefaultArgumentKind::EmptyArray:
   case DefaultArgumentKind::EmptyDictionary:

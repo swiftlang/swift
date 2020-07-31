@@ -585,6 +585,9 @@ public:
   /// Array.reserveCapacityForAppend(newElementsCount: Int)
   FuncDecl *getArrayReserveCapacityDecl() const;
 
+  /// Retrieve the declaration of String.init(_builtinStringLiteral ...)
+  ConstructorDecl *getMakeUTF8StringDecl() const;
+
   // Retrieve the declaration of Swift._stdlib_isOSVersionAtLeast.
   FuncDecl *getIsOSVersionAtLeastDecl() const;
   
@@ -689,6 +692,10 @@ public:
   /// swift_compareProtocolConformanceDescriptors entry point for the target
   /// platform.
   AvailabilityContext getCompareProtocolConformanceDescriptorsAvailability();
+
+  /// Get the runtime availability of support for inter-module prespecialized
+  /// generic metadata.
+  AvailabilityContext getIntermodulePrespecializedGenericMetadataAvailability();
 
   /// Get the runtime availability of features introduced in the Swift 5.2
   /// compiler for the target platform.

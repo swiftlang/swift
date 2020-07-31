@@ -452,20 +452,24 @@ func testKeyPathSubscriptExistentialBase(concreteBase: inout B,
   _ = concreteBase[keyPath: rkp]
   _ = concreteBase[keyPath: pkp]
 
-  concreteBase[keyPath: kp] = s // expected-error{{}}
-  concreteBase[keyPath: wkp] = s // expected-error{{}}
+  concreteBase[keyPath: kp] = s // expected-error {{cannot assign through subscript: 'kp' is a read-only key path}}
+  concreteBase[keyPath: wkp] = s // expected-error {{key path with root type 'P' cannot be applied to a base of type 'B'}}
   concreteBase[keyPath: rkp] = s
-  concreteBase[keyPath: pkp] = s // expected-error{{}}
+  // TODO(diagnostics): Improve this diagnostic message because concreteBase is mutable, the problem is related to assign 
+  // through PartialKeyPath.
+  concreteBase[keyPath: pkp] = s // expected-error {{cannot assign through subscript: 'concreteBase' is immutable}}
 
   _ = existentialBase[keyPath: kp]
   _ = existentialBase[keyPath: wkp]
   _ = existentialBase[keyPath: rkp]
   _ = existentialBase[keyPath: pkp]
 
-  existentialBase[keyPath: kp] = s // expected-error{{}}
+  existentialBase[keyPath: kp] = s // expected-error {{cannot assign through subscript: 'kp' is a read-only key path}}
   existentialBase[keyPath: wkp] = s
   existentialBase[keyPath: rkp] = s
-  existentialBase[keyPath: pkp] = s // expected-error{{}}
+  // TODO(diagnostics): Improve this diagnostic message because existentialBase is mutable, the problem is related to assign 
+  // through PartialKeyPath.
+  existentialBase[keyPath: pkp] = s // expected-error {{cannot assign through subscript: 'existentialBase' is immutable}}
 }
 
 struct AA {
@@ -1009,7 +1013,7 @@ func testMemberAccessOnOptionalKeyPathComponent() {
   // expected-error@-1 {{value of optional type 'String?' must be unwrapped to refer to member 'count' of wrapped base type 'String'}}
 }
 
-func testSyntaxErrors() { // expected-note{{}}
+func testSyntaxErrors() {
   _ = \.  ; // expected-error{{expected member name following '.'}}
   _ = \.a ;
   _ = \[a ;
@@ -1041,4 +1045,4 @@ func testSyntaxErrors() { // expected-note{{}}
   _ = \A[a];
   _ = \A.a?;
   _ = \A.a!;
-} // expected-error@+1{{}}
+}

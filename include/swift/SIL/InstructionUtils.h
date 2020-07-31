@@ -118,6 +118,10 @@ bool mayCheckRefCount(SILInstruction *User);
 /// run-time sanitizers.
 bool isSanitizerInstrumentation(SILInstruction *Instruction);
 
+/// Return true when the instruction represents added instrumentation for
+/// run-time sanitizers or code coverage.
+bool isInstrumentation(SILInstruction *Instruction);
+
 /// Check that this is a partial apply of a reabstraction thunk and return the
 /// argument of the partial apply if it is.
 SILValue isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI);

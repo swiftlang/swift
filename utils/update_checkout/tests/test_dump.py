@@ -10,7 +10,7 @@
 #
 # ===----------------------------------------------------------------------===#
 
-import scheme_mock
+from . import scheme_mock
 
 
 class DumpTestCase(scheme_mock.SchemeMockTestCase):

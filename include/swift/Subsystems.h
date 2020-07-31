@@ -62,6 +62,7 @@ namespace swift {
   class SourceManager;
   class SyntaxParseActions;
   class SyntaxParsingCache;
+  struct TBDGenOptions;
   class Token;
   class TopLevelContext;
   class TypeCheckerOptions;
@@ -220,33 +221,40 @@ namespace swift {
              std::string>
   getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx);
 
-  /// Turn the given Swift module into either LLVM IR or native code
-  /// and return the generated LLVM IR module.
-  /// If you set an outModuleHash, then you need to call performLLVM.
+  /// Turn the given Swift module into LLVM IR and return the generated module.
+  /// To compile and output the generated code, call \c performLLVM.
   GeneratedModule
-  performIRGeneration(const IRGenOptions &Opts, ModuleDecl *M,
+  performIRGeneration(ModuleDecl *M, const IRGenOptions &Opts,
+                      const TBDGenOptions &TBDOpts,
                       std::unique_ptr<SILModule> SILMod,
                       StringRef ModuleName, const PrimarySpecificPaths &PSPs,
                       ArrayRef<std::string> parallelOutputFilenames,
-                      llvm::GlobalVariable **outModuleHash = nullptr,
-                      llvm::StringSet<> *LinkerDirectives = nullptr);
+                      llvm::GlobalVariable **outModuleHash = nullptr);
 
-  /// Turn the given Swift module into either LLVM IR or native code
-  /// and return the generated LLVM IR module.
-  /// If you set an outModuleHash, then you need to call performLLVM.
+  /// Turn the given Swift file into LLVM IR and return the generated module.
+  /// To compile and output the generated code, call \c performLLVM.
   GeneratedModule
-  performIRGeneration(const IRGenOptions &Opts, SourceFile &SF,
+  performIRGeneration(FileUnit *file, const IRGenOptions &Opts, 
+                      const TBDGenOptions &TBDOpts,
                       std::unique_ptr<SILModule> SILMod,
                       StringRef ModuleName, const PrimarySpecificPaths &PSPs,
                       StringRef PrivateDiscriminator,
-                      llvm::GlobalVariable **outModuleHash = nullptr,
-                      llvm::StringSet<> *LinkerDirectives = nullptr);
+                      llvm::GlobalVariable **outModuleHash = nullptr);
 
   /// Given an already created LLVM module, construct a pass pipeline and run
   /// the Swift LLVM Pipeline upon it. This does not cause the module to be
   /// printed, only to be optimized.
   void performLLVMOptimizations(const IRGenOptions &Opts, llvm::Module *Module,
                                 llvm::TargetMachine *TargetMachine);
+
+  /// Compiles and writes the given LLVM module into an output stream in the
+  /// format specified in the \c IRGenOptions.
+  bool compileAndWriteLLVM(llvm::Module *module,
+                           llvm::TargetMachine *targetMachine,
+                           const IRGenOptions &opts,
+                           UnifiedStatsReporter *stats, DiagnosticEngine &diags,
+                           llvm::raw_pwrite_stream &out,
+                           llvm::sys::Mutex *diagMutex = nullptr);
 
   /// Wrap a serialized module inside a swift AST section in an object file.
   void createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
@@ -267,7 +275,6 @@ namespace swift {
   ///                   was already compiled, may be null if not desired.
   /// \param Module LLVM module to code gen, required.
   /// \param TargetMachine target of code gen, required.
-  /// \param effectiveLanguageVersion version of the language, effectively.
   /// \param OutputFilename Filename for output.
   bool performLLVM(const IRGenOptions &Opts,
                    DiagnosticEngine &Diags,
@@ -275,7 +282,6 @@ namespace swift {
                    llvm::GlobalVariable *HashGlobal,
                    llvm::Module *Module,
                    llvm::TargetMachine *TargetMachine,
-                   const version::Version &effectiveLanguageVersion,
                    StringRef OutputFilename,
                    UnifiedStatsReporter *Stats);
 

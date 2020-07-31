@@ -14,6 +14,7 @@
 
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringSet.h"
+#include "swift/AST/TBDGenRequests.h"
 #include "swift/Basic/Version.h"
 #include <vector>
 
@@ -29,10 +30,10 @@ class ModuleDecl;
 /// output.
 struct TBDGenOptions {
   /// Whether this compilation has multiple IRGen instances.
-  bool HasMultipleIGMs;
+  bool HasMultipleIGMs = false;
 
   /// Whether this compilation is producing a TBD for InstallAPI.
-  bool IsInstallAPI;
+  bool IsInstallAPI = false;
 
   /// Only collect linker directive symbols.
   bool LinkerDirectivesOnly = false;
@@ -88,10 +89,7 @@ struct TBDGenOptions {
   }
 };
 
-void enumeratePublicSymbols(FileUnit *module, llvm::StringSet<> &symbols,
-                            const TBDGenOptions &opts);
-void enumeratePublicSymbols(ModuleDecl *module, llvm::StringSet<> &symbols,
-                            const TBDGenOptions &opts);
+std::vector<std::string> getPublicSymbols(TBDGenDescriptor desc);
 
 void writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
                   const TBDGenOptions &opts);

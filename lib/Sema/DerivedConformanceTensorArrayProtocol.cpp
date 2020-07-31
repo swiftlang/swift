@@ -95,7 +95,7 @@ deriveBodyTensorArrayProtocol_unpackTensorHandles(
 
   Pattern *currAddressPat = NamedPattern::createImplicit(C, currAddressDecl);
   currAddressPat =
-      VarPattern::createImplicit(C, /*isLet*/ false, currAddressPat);
+      BindingPattern::createImplicit(C, /*isLet*/ false, currAddressPat);
   currAddressPat =
       new (C) OptionalSomePattern(currAddressPat, currAddressPat->getEndLoc());
   currAddressPat->setImplicit();
@@ -451,7 +451,7 @@ deriveBodyTensorArrayProtocol_init(AbstractFunctionDecl *funcDecl, void *) {
 
   Pattern *currAddressPat = NamedPattern::createImplicit(C, currAddressDecl);
   currAddressPat =
-      VarPattern::createImplicit(C, /*isLet*/ false, currAddressPat);
+      BindingPattern::createImplicit(C, /*isLet*/ false, currAddressPat);
   currAddressPat =
       new (C) OptionalSomePattern(currAddressPat, currAddressPat->getEndLoc());
   currAddressPat->setImplicit();

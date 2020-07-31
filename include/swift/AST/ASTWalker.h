@@ -229,6 +229,11 @@ public:
   /// TapExpr.
   virtual bool shouldWalkIntoTapExpression() { return true; }
 
+  /// This method configures whether the walker should visit the capture
+  /// initializer expressions within a capture list directly, rather than
+  /// walking the declarations.
+  virtual bool shouldWalkCaptureInitializerExpressions() { return false; }
+
   /// This method configures whether the walker should exhibit the legacy
   /// behavior where accessors appear as peers of their storage, rather
   /// than children nested inside of it.

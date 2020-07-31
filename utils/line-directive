@@ -13,6 +13,7 @@
 from __future__ import print_function
 
 import bisect
+import io
 import os
 import re
 import shlex
@@ -63,7 +64,7 @@ def _make_line_map(target_filename, stream=None):
     """
     >>> try:
     ...     from StringIO import StringIO # py2
-    ... except ModuleNotFoundError:
+    ... except ImportError:
     ...     from io import StringIO # py3
     >>> _make_line_map('box',
     ... StringIO('''// ###sourceLocation(file: "foo.bar", line: 3)
@@ -77,7 +78,7 @@ def _make_line_map(target_filename, stream=None):
     [(0, 'box', 1), (1, 'foo.bar', 3), (5, 'baz.txt', 20)]
     """
     result = [(0, target_filename, 1)]
-    input = stream or open(target_filename)
+    input = stream or io.open(target_filename, encoding='utf-8')
     for i, l in enumerate(input.readlines()):
         m = line_pattern.match(l)
         if m:
@@ -142,7 +143,7 @@ def map_line_to_source_file(target_filename, target_line_num):
     map = fline_map(target_filename)
     index = bisect.bisect_left(map, (target_line_num, '', 0))
     base = map[index - 1]
-    return base[1], base[2] + (target_line_num - base[0] - 1)
+    return str(base[1]), base[2] + (target_line_num - base[0] - 1)
 
 
 def map_line_from_source_file(source_filename, source_line_num,
@@ -714,8 +715,8 @@ def run():
                 break
             output = input
 
-            def decode_match(p, l):
-                m = p.match(l)
+            def decode_match(p, line):
+                m = p.match(line)
                 if m is None:
                     return ()
                 file, line_num = map_line_to_source_file(

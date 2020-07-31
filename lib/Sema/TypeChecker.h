@@ -678,7 +678,6 @@ Type typeCheckExpression(Expr *&expr, DeclContext *dc,
 
 Optional<constraints::SolutionApplicationTarget>
 typeCheckExpression(constraints::SolutionApplicationTarget &target,
-                    bool &unresolvedTypeExprs,
                     TypeCheckExprOptions options = TypeCheckExprOptions());
 
 /// Return the type of operator function for specified LHS, or a null

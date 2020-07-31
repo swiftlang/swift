@@ -244,6 +244,7 @@
     "AnyDifferentiable.swift",
     "ArrayDifferentiation.swift",
     "FloatingPointDifferentiation.swift",
+    "OptionalDifferentiation.swift",
     "SIMDDifferentiation.swift",
     "TgmathDerivatives.swift"
   ]

@@ -4,12 +4,12 @@ import sys
 
 import update_checkout
 
-# The internal Windows implementation tries to import the current module using
-# sys.modules[__name__]. This file (called 'update-checkout') is not a valid
-# Python module name, as it contains a '-' and doesn't end with '.py'. This
-# results in errors running update-checkout on Windows:'ImportError: No module
-# named update-checkout'.
-# As such, we need to manually set sys.modules[__name__] to a valid module
-# identifier to work around these errors.
-sys.modules[__name__] = sys.modules['update_checkout']
-update_checkout.main()
+if __name__ == '__main__':
+    # This line was added in dfe3af81b2 to address an importing issue on
+    # Windows.  It causes this script to break badly when used with
+    # Python 3.8 on macOS. Disabling for all Python 3 until someone
+    # can help sort out what's really needed for Windows:
+    if sys.version_info.major < 3:
+        sys.modules[__name__] = sys.modules['update_checkout']
+
+    update_checkout.main()

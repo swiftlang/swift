@@ -803,8 +803,16 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
   Expr *visitCaptureListExpr(CaptureListExpr *expr) {
     for (auto c : expr->getCaptureList()) {
-      if (doIt(c.Var) || doIt(c.Init))
+      if (Walker.shouldWalkCaptureInitializerExpressions()) {
+        for (auto entryIdx : range(c.Init->getNumPatternEntries())) {
+          if (auto newInit = doIt(c.Init->getInit(entryIdx)))
+            c.Init->setInit(entryIdx, newInit);
+          else
+            return nullptr;
+        }
+      } else if (doIt(c.Var) || doIt(c.Init)) {
         return nullptr;
+      }
     }
 
     ClosureExpr *body = expr->getClosureBody();
@@ -951,7 +959,11 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         return nullptr;
       E->setSubExpr(Sub);
     }
-    
+
+    if (auto *typerepr = E->getCaseTypeRepr())
+      if (doIt(typerepr))
+        return nullptr;
+
     return E;
   }
   
@@ -1738,7 +1750,7 @@ Pattern *Traversal::visitExprPattern(ExprPattern *P) {
   return nullptr;
 }
 
-Pattern *Traversal::visitVarPattern(VarPattern *P) {
+Pattern *Traversal::visitBindingPattern(BindingPattern *P) {
   if (Pattern *newSub = doIt(P->getSubPattern())) {
     P->setSubPattern(newSub);
     return P;

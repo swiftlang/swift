@@ -524,6 +524,9 @@ static void addSerializePipeline(SILPassPipelinePlan &P) {
 
 static void addMidLevelFunctionPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("MidLevel,Function", true /*isFunctionPassPipeline*/);
+
+  P.addStringOptimization();
+
   addFunctionPasses(P, OptimizationLevelKind::MidLevel);
 
   // Specialize partially applied functions with dead arguments as a preparation
@@ -660,6 +663,11 @@ static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
 
   // Only has an effect if the -assume-single-thread option is specified.
   P.addAssumeSingleThreaded();
+
+  // Only has an effect if opt-remark is enabled.
+  P.addOptRemarkGenerator();
+
+  P.addPruneVTables();
 }
 
 static void addSILDebugInfoGeneratorPipeline(SILPassPipelinePlan &P) {

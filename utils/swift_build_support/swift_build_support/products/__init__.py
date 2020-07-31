@@ -22,7 +22,6 @@ from .lldb import LLDB
 from .llvm import LLVM
 from .ninja import Ninja
 from .playgroundsupport import PlaygroundSupport
-from .pythonkit import PythonKit
 from .skstresstester import SKStressTester
 from .sourcekitlsp import SourceKitLSP
 from .swift import Swift
@@ -48,7 +47,6 @@ __all__ = [
     'LLVM',
     'Ninja',
     'PlaygroundSupport',
-    'PythonKit',
     'Swift',
     'SwiftFormat',
     'SwiftInspect',

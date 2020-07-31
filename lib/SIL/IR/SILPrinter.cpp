@@ -2918,12 +2918,10 @@ printSILCoverageMaps(SILPrintContext &Ctx,
     M->print(Ctx);
 }
 
-using MagicFileStringMap =
-    llvm::StringMap<std::pair<std::string, /*isWinner=*/bool>>;
+using FileIDMap = llvm::StringMap<std::pair<std::string, /*isWinner=*/bool>>;
 
-static void
-printMagicFileStringMapEntry(SILPrintContext &Ctx,
-                             const MagicFileStringMap::MapEntryTy &entry) {
+static void printFileIDMapEntry(SILPrintContext &Ctx,
+                                const FileIDMap::MapEntryTy &entry) {
   auto &OS = Ctx.OS();
   OS << "//   '" << std::get<0>(entry.second)
      << "' => '" << entry.first() << "'";
@@ -2934,12 +2932,11 @@ printMagicFileStringMapEntry(SILPrintContext &Ctx,
   OS << "\n";
 }
 
-static void printMagicFileStringMap(SILPrintContext &Ctx,
-                                    const MagicFileStringMap map) {
+static void printFileIDMap(SILPrintContext &Ctx, const FileIDMap map) {
   if (map.empty())
     return;
 
-  Ctx.OS() << "\n\n// Mappings from '#file' to '#filePath':\n";
+  Ctx.OS() << "\n\n// Mappings from '#fileID' to '#filePath':\n";
 
   if (Ctx.sortSIL()) {
     llvm::SmallVector<llvm::StringRef, 16> keys;
@@ -2962,10 +2959,10 @@ static void printMagicFileStringMap(SILPrintContext &Ctx,
     });
 
     for (auto key : keys)
-      printMagicFileStringMapEntry(Ctx, *map.find(key));
+      printFileIDMapEntry(Ctx, *map.find(key));
   } else {
     for (const auto &entry : map)
-      printMagicFileStringMapEntry(Ctx, entry);
+      printFileIDMapEntry(Ctx, entry);
   }
 }
 
@@ -3084,8 +3081,8 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   printExternallyVisibleDecls(PrintCtx, externallyVisible.getArrayRef());
 
   if (M)
-    printMagicFileStringMap(
-        PrintCtx, M->computeMagicFileStringMap(/*shouldDiagnose=*/false));
+    printFileIDMap(
+        PrintCtx, M->computeFileIDMap(/*shouldDiagnose=*/false));
 
   OS << "\n\n";
 }
@@ -3106,52 +3103,56 @@ void SILInstruction::printInContext(llvm::raw_ostream &OS) const {
   SILPrinter(Ctx).printInContext(this);
 }
 
+void SILVTableEntry::print(llvm::raw_ostream &OS) const {
+  getMethod().print(OS);
+  OS << ": ";
+
+  PrintOptions QualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
+  bool HasSingleImplementation = false;
+  switch (getMethod().kind) {
+  default:
+    break;
+  case SILDeclRef::Kind::IVarDestroyer:
+  case SILDeclRef::Kind::Destroyer:
+  case SILDeclRef::Kind::Deallocator:
+    HasSingleImplementation = true;
+  }
+  // No need to emit the signature for methods that may have only
+  // single implementation, e.g. for destructors.
+  if (!HasSingleImplementation) {
+    QualifiedSILTypeOptions.CurrentModule =
+        getMethod().getDecl()->getDeclContext()->getParentModule();
+    getMethod().getDecl()->getInterfaceType().print(
+        OS, QualifiedSILTypeOptions);
+    OS << " : ";
+  }
+  OS << '@' << getImplementation()->getName();
+  switch (getKind()) {
+  case SILVTable::Entry::Kind::Normal:
+    break;
+  case SILVTable::Entry::Kind::Inherited:
+    OS << " [inherited]";
+    break;
+  case SILVTable::Entry::Kind::Override:
+    OS << " [override]";
+    break;
+  }
+  if (isNonOverridden()) {
+    OS << " [nonoverridden]";
+  }
+
+  OS << "\t// " << demangleSymbol(getImplementation()->getName());
+}
+
 void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   OS << "sil_vtable ";
   if (isSerialized())
     OS << "[serialized] ";
   OS << getClass()->getName() << " {\n";
 
-  PrintOptions QualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
   for (auto &entry : getEntries()) {
     OS << "  ";
-    entry.getMethod().print(OS);
-    OS << ": ";
-
-    bool HasSingleImplementation = false;
-    switch (entry.getMethod().kind) {
-    default:
-      break;
-    case SILDeclRef::Kind::IVarDestroyer:
-    case SILDeclRef::Kind::Destroyer:
-    case SILDeclRef::Kind::Deallocator:
-      HasSingleImplementation = true;
-    }
-    // No need to emit the signature for methods that may have only
-    // single implementation, e.g. for destructors.
-    if (!HasSingleImplementation) {
-      QualifiedSILTypeOptions.CurrentModule =
-          entry.getMethod().getDecl()->getDeclContext()->getParentModule();
-      entry.getMethod().getDecl()->getInterfaceType().print(
-          OS, QualifiedSILTypeOptions);
-      OS << " : ";
-    }
-    OS << '@' << entry.getImplementation()->getName();
-    switch (entry.getKind()) {
-    case SILVTable::Entry::Kind::Normal:
-      break;
-    case SILVTable::Entry::Kind::Inherited:
-      OS << " [inherited]";
-      break;
-    case SILVTable::Entry::Kind::Override:
-      OS << " [override]";
-      break;
-    }
-    if (entry.isNonOverridden()) {
-      OS << " [nonoverridden]";
-    }
-
-    OS << "\t// " << demangleSymbol(entry.getImplementation()->getName());
+    entry.print(OS);
     OS << "\n";
   }
   OS << "}\n\n";

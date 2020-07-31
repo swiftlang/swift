@@ -52,18 +52,41 @@ where
 extension SIMD${n}
 where
   Scalar: Differentiable & BinaryFloatingPoint,
-  Scalar.TangentVector: BinaryFloatingPoint
+  Scalar.TangentVector == Scalar
 {
   // NOTE(TF-1094): serialized `@derivative` for `.swiftinterface` compilation.
   @inlinable
   @derivative(of: subscript(_:))
-  internal func _vjpSubscript(index: Int)
+  internal func _vjpSubscript(_ index: Int)
     -> (value: Scalar, pullback: (Scalar.TangentVector) -> TangentVector)
   {
     return (self[index], { v in
       var zeros = Self.zero
-      zeros[index] = Scalar(v)
+      zeros[index] = v
       return zeros
+    })
+  }
+
+  @inlinable
+  @derivative(of: subscript(_:))
+  internal func _jvpSubscript(index: Int)
+    -> (value: Scalar, differential: (TangentVector) -> Scalar.TangentVector)
+  {
+    return (self[index], { v in
+      return .init(v[index])
+    })
+  }
+
+  @inlinable
+  @derivative(of: subscript(_:).set)
+  internal mutating func _vjpSubscriptSetter(_ newValue: Scalar, _ index: Int)
+    -> (value: Void, pullback: (inout TangentVector) -> Scalar.TangentVector)
+  {
+    self[index] = newValue
+    return ((), { dSelf in
+      let dNewValue = dSelf[index]
+      dSelf[index] = 0
+      return dNewValue
     })
   }
 }
@@ -90,6 +113,18 @@ where
   }
 
   @inlinable
+  @derivative(of: +)
+  static func _jvpAdd(lhs: Self, rhs: Self)
+    -> (
+      value: Self, differential: (TangentVector, TangentVector) -> TangentVector
+    )
+  {
+    return (lhs + rhs, { ltan, rtan in
+      return ltan + rtan
+    })
+  }
+
+  @inlinable
   @derivative(of: -)
   static func _vjpSubtract(lhs: Self, rhs: Self)
     -> (
@@ -103,8 +138,30 @@ where
 
   @inlinable
   @derivative(of: -)
+  static func _jvpSubtract(lhs: Self, rhs: Self)
+    -> (
+      value: Self, differential: (TangentVector, TangentVector) -> TangentVector
+    )
+  {
+    return (lhs - rhs, { ltan, rtan in
+      return ltan - rtan
+    })
+  }
+
+  @inlinable
+  @derivative(of: -)
   static func _vjpNegate(rhs: Self)
     -> (value: Self, pullback: (TangentVector) -> (TangentVector))
+  {
+    return (-rhs, { v in
+      return -v
+    })
+  }
+
+  @inlinable
+  @derivative(of: -)
+  static func _jvpNegate(rhs: Self)
+    -> (value: Self, differential: (TangentVector) -> (TangentVector))
   {
     return (-rhs, { v in
       return -v
@@ -132,6 +189,18 @@ where
   }
 
   @inlinable
+  @derivative(of: *)
+  static func _jvpMultiply(lhs: Self, rhs: Self)
+    -> (
+      value: Self,  differential: (TangentVector, TangentVector) -> TangentVector
+    )
+  {
+    return (lhs * rhs, { ltan, rtan in
+      return lhs * rtan + ltan * rhs
+    })
+  }
+
+  @inlinable
   @derivative(of: /)
   static func _vjpDivide(lhs: Self, rhs: Self)
     -> (
@@ -140,6 +209,18 @@ where
   {
     return ( lhs / rhs, { v in
       (v / rhs, -lhs / (rhs * rhs) * v)
+    })
+  }
+
+  @inlinable
+  @derivative(of: /)
+  static func _jvpDivide(lhs: Self, rhs: Self)
+    -> (
+      value: Self, differential: (TangentVector, TangentVector) -> TangentVector
+    )
+  {
+    return ( lhs / rhs, { ltan, rtan in
+      (ltan * rhs - lhs * rtan) / (rhs * rhs)
     })
   }
 }
@@ -164,6 +245,17 @@ where
   }
 
   @inlinable
+  @derivative(of: +)
+  static func _jvpAdd(lhs: Scalar, rhs: Self) -> (
+    value: Self,
+    differential: (Scalar.TangentVector, TangentVector) -> TangentVector
+  ) {
+    return (lhs + rhs, { ltan, rtan in
+      return ltan + rtan
+    })
+  }
+
+  @inlinable
   @derivative(of: -)
   static func _vjpSubtract(lhs: Scalar, rhs: Self) -> (
     value: Self,
@@ -171,6 +263,17 @@ where
   ) {
     return (lhs - rhs, { v in
       return (v.sum(), -v)
+    })
+  }
+
+  @inlinable
+  @derivative(of: -)
+  static func _jvpSubtract(lhs: Scalar, rhs: Self) -> (
+    value: Self,
+    differential: (Scalar.TangentVector, TangentVector) -> TangentVector
+  ) {
+    return (lhs - rhs, { ltan, rtan in
+      return ltan - rtan
     })
   }
 
@@ -186,6 +289,17 @@ where
   }
 
   @inlinable
+  @derivative(of: +)
+  static func _jvpAdd(lhs: Self, rhs: Scalar) -> (
+    value: Self,
+    differential: (TangentVector, Scalar.TangentVector) -> TangentVector
+  ) {
+    return (lhs + rhs, { ltan, rtan in
+      return ltan + rtan
+    })
+  }
+
+  @inlinable
   @derivative(of: -)
   static func _vjpSubtract(lhs: Self, rhs: Scalar) -> (
     value: Self,
@@ -193,6 +307,17 @@ where
   ) {
     return (lhs - rhs, { v in
       return (v, -v.sum())
+    })
+  }
+
+  @inlinable
+  @derivative(of: -)
+  static func _jvpSubtract(lhs: Self, rhs: Scalar) -> (
+    value: Self,
+    differential: (TangentVector, Scalar.TangentVector) -> TangentVector
+  ) {
+    return (lhs - rhs, { ltan, rtan in
+      return ltan - rtan
     })
   }
 }
@@ -217,6 +342,17 @@ where
   }
 
   @inlinable
+  @derivative(of: *)
+  static func _jvpMultiply(lhs: Self, rhs: Scalar) -> (
+    value: Self,
+    differential: (TangentVector, Scalar.TangentVector) -> TangentVector
+  ) {
+    return (lhs * rhs, { ltan, rtan in
+      return lhs * rtan + ltan * rhs
+    })
+  }
+
+  @inlinable
   @derivative(of: /)
   static func _vjpDivide(lhs: Self, rhs: Scalar) -> (
     value: Self,
@@ -224,6 +360,17 @@ where
   ) {
     return (lhs / rhs, { v in
       (v / rhs, (-lhs / (rhs * rhs) * v).sum())
+    })
+  }
+
+  @inlinable
+  @derivative(of: /)
+  static func _jvpDivide(lhs: Self, rhs: Scalar) -> (
+    value: Self,
+    differential: (TangentVector, Scalar.TangentVector) -> TangentVector
+  ) {
+    return (lhs / rhs, { ltan, rtan in
+      (ltan * rhs - lhs * rtan) / (rhs * rhs)
     })
   }
 
@@ -239,6 +386,17 @@ where
   }
 
   @inlinable
+  @derivative(of: *)
+  static func _jvpMultiply(lhs: Scalar, rhs: Self) -> (
+    value: Self,
+    differential: (Scalar.TangentVector, TangentVector) -> TangentVector
+  ) {
+    return (lhs * rhs, { ltan, rtan in
+      return lhs * rtan + ltan * rhs
+    })
+  }
+
+  @inlinable
   @derivative(of: /)
   static func _vjpDivide(lhs: Scalar, rhs: Self) -> (
     value: Self,
@@ -246,6 +404,17 @@ where
   ) {
     return (lhs / rhs, { v in
       ((v / rhs).sum(), -lhs / (rhs * rhs) * v)
+    })
+  }
+
+  @inlinable
+  @derivative(of: /)
+  static func _jvpDivide(lhs: Scalar, rhs: Self) -> (
+    value: Self,
+    differential: (Scalar.TangentVector, TangentVector) -> TangentVector
+  ) {
+    return (lhs / rhs, { ltan, rtan in
+      (ltan * rhs - lhs * rtan) / (rhs * rhs)
     })
   }
 }
@@ -265,6 +434,14 @@ where
   ) {
     return (sum(), { v in Self(repeating: Scalar(v)) })
   }
+
+  @inlinable
+  @derivative(of: sum)
+  func _jvpSum() -> (
+    value: Scalar, differential: (TangentVector) -> Scalar.TangentVector
+  ) {
+    return (sum(), { v in Scalar.TangentVector(v.sum()) })
+  }
 }
 
 extension SIMD
@@ -281,5 +458,13 @@ where
     -> (value: Self, pullback: (TangentVector) -> Scalar.TangentVector)
   {
     return (Self(repeating: value), { v in v.sum() })
+  }
+
+  @inlinable
+  @derivative(of: init(repeating:))
+  static func _jvpInit(repeating value: Scalar)
+    -> (value: Self, differential: (Scalar.TangentVector) -> TangentVector)
+  {
+    return (Self(repeating: value), { v in Self(repeating: v) })
   }
 }

@@ -215,7 +215,8 @@ if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
     ../Differentiation/DifferentiationUtilities.swift
     ../Differentiation/DifferentiationSupport.swift
     ../Differentiation/AnyDifferentiable.swift
-    ../Differentiation/ArrayDifferentiation.swift)
+    ../Differentiation/ArrayDifferentiation.swift
+    ../Differentiation/OptionalDifferentiation.swift)
   list(APPEND SWIFTLIB_DIFFERENTIABLE_PROGRAMMING_GYB_SOURCES
     ../Differentiation/FloatingPointDifferentiation.swift.gyb
     ../Differentiation/SIMDDifferentiation.swift.gyb)
@@ -321,6 +322,9 @@ list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
 if(SWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING)
   list(APPEND swift_stdlib_compile_flags "-enforce-exclusivity=checked")
 endif()
+
+# STAGING: Temporarily avoids having to write #fileID in Swift.swiftinterface.
+list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-experimental-concise-pound-file")
 
 if(SWIFT_CHECK_ESSENTIAL_STDLIB)
   add_swift_target_library(swift_stdlib_essential ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE

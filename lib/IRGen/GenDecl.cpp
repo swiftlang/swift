@@ -1030,7 +1030,8 @@ static bool hasCodeCoverageInstrumentation(SILFunction &f, SILModule &m) {
   return f.getProfiler() && m.getOptions().EmitProfileCoverageMapping;
 }
 
-void IRGenerator::emitGlobalTopLevel(llvm::StringSet<> *linkerDirectives) {
+void IRGenerator::emitGlobalTopLevel(
+    const std::vector<std::string> &linkerDirectives) {
   // Generate order numbers for the functions in the SIL module that
   // correspond to definitions in the LLVM module.
   unsigned nextOrderNumber = 0;
@@ -1050,10 +1051,8 @@ void IRGenerator::emitGlobalTopLevel(llvm::StringSet<> *linkerDirectives) {
     CurrentIGMPtr IGM = getGenModule(wt.getProtocol()->getDeclContext());
     ensureRelativeSymbolCollocation(wt);
   }
-  if (linkerDirectives) {
-    for (auto &entry: *linkerDirectives) {
-      createLinkerDirectiveVariable(*PrimaryIGM, entry.getKey());
-    }
+  for (auto &directive: linkerDirectives) {
+    createLinkerDirectiveVariable(*PrimaryIGM, directive);
   }
   for (SILGlobalVariable &v : PrimaryIGM->getSILModule().getSILGlobals()) {
     Decl *decl = v.getDecl();
@@ -1427,7 +1426,22 @@ void IRGenerator::noteUseOfCanonicalSpecializedMetadataAccessor(
   }
 }
 
+static bool typeKindCanBePrespecialized(TypeKind theKind) {
+  switch (theKind) {
+  case TypeKind::Struct:
+  case TypeKind::BoundGenericStruct:
+  case TypeKind::Enum:
+  case TypeKind::BoundGenericEnum:
+  case TypeKind::Class:
+  case TypeKind::BoundGenericClass:
+    return true;
+  default:
+    return false;
+  }
+}
+
 void IRGenerator::noteUseOfSpecializedGenericTypeMetadata(CanType type) {
+  assert(typeKindCanBePrespecialized(type->getKind()));
   auto key = type->getAnyNominal();
   assert(key);
   assert(key->isGenericContext());
@@ -2095,9 +2109,9 @@ swift::irgen::createLinkerDirectiveVariable(IRGenModule &IGM, StringRef name) {
 }
 
 void swift::irgen::disableAddressSanitizer(IRGenModule &IGM, llvm::GlobalVariable *var) {
-  // Add an operand to llvm.asan.globals blacklisting this global variable.
+  // Add an operand to llvm.asan.globals denylisting this global variable.
   llvm::Metadata *metadata[] = {
-    // The global variable to blacklist.
+    // The global variable to denylist.
     llvm::ConstantAsMetadata::get(var),
     
     // Source location. Optional, unnecessary here.
@@ -2110,7 +2124,7 @@ void swift::irgen::disableAddressSanitizer(IRGenModule &IGM, llvm::GlobalVariabl
     llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(
       llvm::Type::getInt1Ty(IGM.Module.getContext()), false)),
     
-    // Whether the global is blacklisted.
+    // Whether the global is denylisted.
     llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(
       llvm::Type::getInt1Ty(IGM.Module.getContext()), true))};
   
@@ -3735,6 +3749,22 @@ IRGenModule::getAddrOfTypeMetadataLazyCacheVariable(CanType type) {
   return variable;
 }
 
+llvm::Constant *
+IRGenModule::getAddrOfNoncanonicalSpecializedGenericTypeMetadataCacheVariable(CanType type) {
+  assert(!type->hasArchetype() && !type->hasTypeParameter());
+  LinkEntity entity = LinkEntity::forNoncanonicalSpecializedGenericTypeMetadataCacheVariable(type);
+  if (auto &entry = GlobalVars[entity]) {
+    return entry;
+  }
+  auto variable =
+    getAddrOfLLVMVariable(entity, ForDefinition, DebugTypeInfo());
+
+  cast<llvm::GlobalVariable>(variable)->setInitializer(
+    llvm::ConstantPointerNull::get(TypeMetadataPtrTy));
+
+  return variable;
+}
+
 /// Get or create a type metadata cache variable.  These are an
 /// implementation detail of type metadata access functions.
 llvm::Constant *
@@ -3816,6 +3846,9 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
                                                    llvm::StringRef section) {
   assert(init);
 
+  auto isPrespecialized = concreteType->getAnyGeneric() &&
+                          concreteType->getAnyGeneric()->isGenericContext();
+
   if (isPattern) {
     assert(isConstant && "Type metadata patterns must be constant");
     auto addr = getAddrOfTypeMetadataPattern(concreteType->getAnyNominal(),
@@ -3843,7 +3876,13 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
     adjustmentIndex = MetadataAdjustmentIndex::ValueType;
   }
 
-  auto entity = LinkEntity::forTypeMetadata(concreteType, addrKind);
+  auto entity =
+      (isPrespecialized &&
+       !irgen::isCanonicalInitializableTypeMetadataStaticallyAddressable(
+           *this, concreteType))
+          ? LinkEntity::forNoncanonicalSpecializedGenericTypeMetadata(
+                concreteType)
+          : LinkEntity::forTypeMetadata(concreteType, addrKind);
 
   auto DbgTy = DebugTypeInfo::getMetadata(MetatypeType::get(concreteType),
     entity.getDefaultDeclarationType(*this)->getPointerTo(),
@@ -3867,9 +3906,7 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
 
   // Don't define the alias for foreign type metadata or prespecialized generic
   // metadata, since neither is ABI.
-  if ((nominal && requiresForeignTypeMetadata(nominal)) ||
-      (concreteType->getAnyGeneric() &&
-       concreteType->getAnyGeneric()->isGenericContext()))
+  if ((nominal && requiresForeignTypeMetadata(nominal)) || isPrespecialized)
     return var;
 
   // For concrete metadata, declare the alias to its address point.
@@ -3891,13 +3928,18 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
 }
 
 /// Fetch the declaration of the (possibly uninitialized) metadata for a type.
-llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType) {
-  return getAddrOfTypeMetadata(concreteType,
-                               SymbolReferenceKind::Absolute).getDirectValue();
+llvm::Constant *
+IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
+                                   TypeMetadataCanonicality canonicality) {
+  return getAddrOfTypeMetadata(concreteType, SymbolReferenceKind::Absolute,
+                               canonicality)
+      .getDirectValue();
 }
 
-ConstantReference IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
-                                               SymbolReferenceKind refKind) {
+ConstantReference
+IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
+                                   SymbolReferenceKind refKind,
+                                   TypeMetadataCanonicality canonicality) {
   assert(!isa<UnboundGenericType>(concreteType));
 
   auto nominal = concreteType->getAnyNominal();
@@ -3951,12 +3993,20 @@ ConstantReference IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   Optional<LinkEntity> entity;
   DebugTypeInfo DbgTy;
 
-  if (fullMetadata) {
-    entity = LinkEntity::forTypeMetadata(concreteType,
-                                         TypeMetadataAddress::FullMetadata);
-  } else {
-    entity = LinkEntity::forTypeMetadata(concreteType,
-                                         TypeMetadataAddress::AddressPoint);
+  switch (canonicality) {
+  case TypeMetadataCanonicality::Canonical:
+    if (fullMetadata) {
+      entity = LinkEntity::forTypeMetadata(concreteType,
+                                           TypeMetadataAddress::FullMetadata);
+    } else {
+      entity = LinkEntity::forTypeMetadata(concreteType,
+                                           TypeMetadataAddress::AddressPoint);
+    }
+    break;
+  case TypeMetadataCanonicality::Noncanonical:
+    entity =
+        LinkEntity::forNoncanonicalSpecializedGenericTypeMetadata(concreteType);
+    break;
   }
   DbgTy = DebugTypeInfo::getMetadata(MetatypeType::get(concreteType),
                                      defaultVarTy->getPointerTo(), Size(0),

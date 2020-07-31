@@ -24,7 +24,6 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Basic/Timer.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/ParseSILSupport.h"
@@ -661,7 +660,7 @@ void Parser::skipSingle() {
   switch (Tok.getKind()) {
   case tok::l_paren:
     consumeToken();
-    skipUntil(tok::r_paren);
+    skipUntil(tok::r_paren, tok::r_brace);
     consumeIf(tok::r_paren);
     break;
   case tok::l_brace:
@@ -671,7 +670,7 @@ void Parser::skipSingle() {
     break;
   case tok::l_square:
     consumeToken();
-    skipUntil(tok::r_square);
+    skipUntil(tok::r_square, tok::r_brace);
     consumeIf(tok::r_square);
     break;
   case tok::pound_if:
@@ -826,11 +825,11 @@ void Parser::skipUntilConditionalBlockClose() {
   }
 }
 
-bool Parser::skipUntilTokenOrEndOfLine(tok T1) {
-  while (Tok.isNot(tok::eof, T1) && !Tok.isAtStartOfLine())
+bool Parser::skipUntilTokenOrEndOfLine(tok T1, tok T2) {
+  while (Tok.isNot(tok::eof, T1, T2) && !Tok.isAtStartOfLine())
     skipSingle();
 
-  return Tok.is(T1) && !Tok.isAtStartOfLine();
+  return Tok.isAny(T1, T2) && !Tok.isAtStartOfLine();
 }
 
 bool Parser::loadCurrentSyntaxNodeFromCache() {

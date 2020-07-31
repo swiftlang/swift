@@ -44,18 +44,9 @@ static DefaultArgumentKind getDefaultArgKind(Expr *init) {
     return DefaultArgumentKind::Normal;
 
   switch (magic->getKind()) {
-  case MagicIdentifierLiteralExpr::Column:
-    return DefaultArgumentKind::Column;
-  case MagicIdentifierLiteralExpr::File:
-    return DefaultArgumentKind::File;
-  case MagicIdentifierLiteralExpr::FilePath:
-    return DefaultArgumentKind::FilePath;
-  case MagicIdentifierLiteralExpr::Line:
-    return DefaultArgumentKind::Line;
-  case MagicIdentifierLiteralExpr::Function:
-    return DefaultArgumentKind::Function;
-  case MagicIdentifierLiteralExpr::DSOHandle:
-    return DefaultArgumentKind::DSOHandle;
+#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+  case MagicIdentifierLiteralExpr::NAME: return DefaultArgumentKind::NAME;
+#include "swift/AST/MagicIdentifierKinds.def"
   }
 
   llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
@@ -848,13 +839,10 @@ Parser::parseFunctionSignature(Identifier SimpleName,
 
     ParserResult<TypeRepr> ResultType =
         parseDeclResultType(diag::expected_type_function_result);
-    if (ResultType.hasCodeCompletion())
-      return ResultType;
     retType = ResultType.getPtrOrNull();
-    if (!retType) {
-      Status.setIsParseError();
+    Status |= ResultType;
+    if (Status.isError())
       return Status;
-    }
   } else {
     // Otherwise, we leave retType null.
     retType = nullptr;
@@ -1022,8 +1010,8 @@ ParserResult<Pattern> Parser::parsePattern() {
       return makeParserCodeCompletionResult<Pattern>();
     if (subPattern.isNull())
       return nullptr;
-    return makeParserResult(new (Context) VarPattern(varLoc, isLet,
-                                                     subPattern.get()));
+    return makeParserResult(
+        new (Context) BindingPattern(varLoc, isLet, subPattern.get()));
   }
       
   default:
@@ -1233,7 +1221,7 @@ ParserResult<Pattern> Parser::parseMatchingPatternAsLetOrVar(bool isLet,
   ParserResult<Pattern> subPattern = parseMatchingPattern(isExprBasic);
   if (subPattern.isNull())
     return nullptr;
-  auto *varP = new (Context) VarPattern(varLoc, isLet, subPattern.get());
+  auto *varP = new (Context) BindingPattern(varLoc, isLet, subPattern.get());
   return makeParserResult(ParserStatus(subPattern), varP);
 }
 

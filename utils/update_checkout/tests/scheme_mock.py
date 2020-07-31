@@ -119,6 +119,8 @@ def setup_mock_remote(base_dir):
     with open(get_config_path(base_dir), 'w') as f:
         json.dump(base_config, f)
 
+    return (LOCAL_PATH, REMOTE_PATH)
+
 
 BASEDIR_ENV_VAR = 'UPDATECHECKOUT_TEST_WORKSPACE_DIR'
 CURRENT_FILE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -147,7 +149,7 @@ class SchemeMockTestCase(unittest.TestCase):
 
     def setUp(self):
         create_dir(self.source_root)
-        setup_mock_remote(self.workspace)
+        (self.local_path, self.remote_path) = setup_mock_remote(self.workspace)
 
     def tearDown(self):
         teardown_mock_remote(self.workspace)

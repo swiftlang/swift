@@ -598,8 +598,6 @@ def create_argument_parser():
            toggle_true('swiftsyntax_verify_generated_files'),
            help='set to verify that the generated files in the source tree '
                 'match the ones that would be generated from current master')
-    option(['--install-pythonkit'], toggle_true('install_pythonkit'),
-           help='install PythonKit')
     option(['--install-sourcekit-lsp'], toggle_true('install_sourcekitlsp'),
            help='install SourceKitLSP')
     option(['--install-skstresstester'], toggle_true('install_skstresstester'),
@@ -634,9 +632,6 @@ def create_argument_parser():
     option('--install-playgroundsupport',
            store_true('install_playgroundsupport'),
            help='install playground support')
-
-    option('--pythonkit', store_true('build_pythonkit'),
-           help='build PythonKit')
 
     option('--tensorflow-swift-apis', store_true('build_tensorflow_swift_apis'),
            help='build TensorFlow Swift APIs')
@@ -894,9 +889,6 @@ def create_argument_parser():
            help='skip testing Swift stdlibs for FreeBSD')
     option('--skip-test-cygwin', toggle_false('test_cygwin'),
            help='skip testing Swift stdlibs for Cygwin')
-
-    option('--test-pythonkit', toggle_true('test_pythonkit'),
-           help='skip testing PythonKit')
 
     # -------------------------------------------------------------------------
     in_group('Run build')

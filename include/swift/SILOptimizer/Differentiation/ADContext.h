@@ -73,12 +73,21 @@ private:
   llvm::SmallVector<DifferentiableFunctionInst *, 32>
       differentiableFunctionInsts;
 
+  /// The worklist (stack) of `linear_function` instructions to be processed.
+  llvm::SmallVector<LinearFunctionInst *, 32> linearFunctionInsts;
+
   /// The set of `differentiable_function` instructions that have been
   /// processed. Used to avoid reprocessing invalidated instructions.
   /// NOTE(TF-784): if we use `CanonicalizeInstruction` subclass to replace
   /// `ADContext::processDifferentiableFunctionInst`, this field may be removed.
   llvm::SmallPtrSet<DifferentiableFunctionInst *, 32>
       processedDifferentiableFunctionInsts;
+
+  /// The set of `linear_function` instructions that have been processed. Used
+  /// to avoid reprocessing invalidated instructions.
+  /// NOTE(TF-784): if we use `CanonicalizeInstruction` subclass to replace
+  /// `ADContext::processLinearFunctionInst`, this field may be removed.
+  llvm::SmallPtrSet<LinearFunctionInst *, 32> processedLinearFunctionInsts;
 
   /// Mapping from witnesses to invokers.
   /// `SmallMapVector` is used for deterministic insertion order iteration.
@@ -121,30 +130,19 @@ public:
   SILPassManager &getPassManager() const { return passManager; }
   Lowering::TypeConverter &getTypeConverter() { return module.Types; }
 
+  llvm::SmallVectorImpl<DifferentiableFunctionInst *> &
+  getDifferentiableFunctionInstWorklist() {
+    return differentiableFunctionInsts;
+  }
+
+  llvm::SmallVectorImpl<LinearFunctionInst *> &getLinearFunctionInstWorklist() {
+    return linearFunctionInsts;
+  }
+
   /// Get or create the synthesized file for the given `SILFunction`.
   /// Used by `LinearMapInfo` for adding generated linear map struct and
   /// branching trace enum declarations.
   SynthesizedFileUnit &getOrCreateSynthesizedFile(SILFunction *original);
-
-  /// Returns true if the `differentiable_function` instruction worklist is
-  /// empty.
-  bool isDifferentiableFunctionInstsWorklistEmpty() const {
-    return differentiableFunctionInsts.empty();
-  }
-
-  /// Pops and returns a `differentiable_function` instruction from the
-  /// worklist. Returns nullptr if the worklist is empty.
-  DifferentiableFunctionInst *popDifferentiableFunctionInstFromWorklist() {
-    if (differentiableFunctionInsts.empty())
-      return nullptr;
-    return differentiableFunctionInsts.pop_back_val();
-  }
-
-  /// Adds the given `differentiable_function` instruction to the worklist.
-  void
-  addDifferentiableFunctionInstToWorklist(DifferentiableFunctionInst *dfi) {
-    differentiableFunctionInsts.push_back(dfi);
-  }
 
   /// Returns true if the given `differentiable_function` instruction has
   /// already been processed.
@@ -157,6 +155,17 @@ public:
   void
   markDifferentiableFunctionInstAsProcessed(DifferentiableFunctionInst *dfi) {
     processedDifferentiableFunctionInsts.insert(dfi);
+  }
+
+  /// Returns true if the given `linear_function` instruction has already been
+  /// processed.
+  bool isLinearFunctionInstProcessed(LinearFunctionInst *lfi) const {
+    return processedLinearFunctionInsts.count(lfi);
+  }
+
+  /// Adds the given `linear_function` instruction to the worklist.
+  void markLinearFunctionInstAsProcessed(LinearFunctionInst *lfi) {
+    processedLinearFunctionInsts.insert(lfi);
   }
 
   const llvm::SmallMapVector<SILDifferentiabilityWitness *,
@@ -204,11 +213,25 @@ public:
       IndexSubset *resultIndices, SILValue original,
       Optional<std::pair<SILValue, SILValue>> derivativeFunctions = None);
 
-  // Given an `differentiable_function` instruction, finds the corresponding
+  /// Creates a `linear_function` instruction using the given builder
+  /// and arguments. Erase the newly created instruction from the processed set,
+  /// if it exists - it may exist in the processed set if it has the same
+  /// pointer value as a previously processed and deleted instruction.
+  LinearFunctionInst *
+  createLinearFunction(SILBuilder &builder, SILLocation loc,
+                       IndexSubset *parameterIndices, SILValue original,
+                       Optional<SILValue> transposeFunction = None);
+
+  // Given a `differentiable_function` instruction, finds the corresponding
   // differential operator used in the AST. If no differential operator is
   // found, return nullptr.
   DifferentiableFunctionExpr *
   findDifferentialOperator(DifferentiableFunctionInst *inst);
+
+  // Given a `linear_function` instruction, finds the corresponding differential
+  // operator used in the AST. If no differential operator is found, return
+  // nullptr.
+  LinearFunctionExpr *findDifferentialOperator(LinearFunctionInst *inst);
 
   template <typename... T, typename... U>
   InFlightDiagnostic diagnose(SourceLoc loc, Diag<T...> diag,
@@ -291,6 +314,21 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
   // non-differentiation operation.
   case DifferentiationInvoker::Kind::DifferentiableFunctionInst: {
     auto *inst = invoker.getDifferentiableFunctionInst();
+    if (auto *expr = findDifferentialOperator(inst)) {
+      diagnose(expr->getLoc(), diag::autodiff_function_not_differentiable_error)
+          .highlight(expr->getSubExpr()->getSourceRange());
+      return diagnose(loc, diag, std::forward<U>(args)...);
+    }
+    diagnose(loc, diag::autodiff_expression_not_differentiable_error);
+    return diagnose(loc, diag, std::forward<U>(args)...);
+  }
+
+  // For `linear_function` instructions: if the `linear_function` instruction
+  // comes from a differential operator, emit an error on the expression and a
+  // note on the non-differentiable operation. Otherwise, emit both an error and
+  // note on the non-differentiation operation.
+  case DifferentiationInvoker::Kind::LinearFunctionInst: {
+    auto *inst = invoker.getLinearFunctionInst();
     if (auto *expr = findDifferentialOperator(inst)) {
       diagnose(expr->getLoc(), diag::autodiff_function_not_differentiable_error)
           .highlight(expr->getSubExpr()->getSourceRange());

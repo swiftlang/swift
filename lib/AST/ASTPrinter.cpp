@@ -1192,12 +1192,12 @@ void PrintAST::printPattern(const Pattern *pattern) {
     // FIXME: Print expr.
     break;
 
-  case PatternKind::Var:
+  case PatternKind::Binding:
     if (!Options.SkipIntroducerKeywords)
-      Printer << (cast<VarPattern>(pattern)->isLet() ? tok::kw_let
-                                                     : tok::kw_var)
+      Printer << (cast<BindingPattern>(pattern)->isLet() ? tok::kw_let
+                                                         : tok::kw_var)
               << " ";
-    printPattern(cast<VarPattern>(pattern)->getSubPattern());
+    printPattern(cast<BindingPattern>(pattern)->getSubPattern());
   }
 }
 
@@ -2811,12 +2811,9 @@ void PrintAST::printOneParameter(const ParamDecl *param,
     Printer << " = ";
 
     switch (param->getDefaultArgumentKind()) {
-    case DefaultArgumentKind::File:
-    case DefaultArgumentKind::Line:
-    case DefaultArgumentKind::Column:
-    case DefaultArgumentKind::Function:
-    case DefaultArgumentKind::DSOHandle:
-    case DefaultArgumentKind::NilLiteral:
+#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+    case DefaultArgumentKind::NAME:
+#include "swift/AST/MagicIdentifierKinds.def"
       Printer.printKeyword(defaultArgStr, Options);
       break;
     default:
@@ -3601,7 +3598,7 @@ void printCType(ASTContext &Ctx, ASTPrinter &Printer, ExtInfo &info) {
   auto *cml = Ctx.getClangModuleLoader();
   SmallString<64> buf;
   llvm::raw_svector_ostream os(buf);
-  info.getUncommonInfo().getValue().printClangFunctionType(cml, os);
+  info.getClangTypeInfo().getValue().printType(cml, os);
   Printer << ", cType: " << QuotedString(os.str());
 }
 
@@ -4038,9 +4035,8 @@ public:
         break;
       case SILFunctionType::Representation::CFunctionPointer:
         Printer << "c";
-        // FIXME: [clang-function-type-serialization] Once we start serializing
-        // Clang function types, we should be able to remove the second check.
-        if (printNameOnly || !info.getUncommonInfo().hasValue())
+        // [TODO: Clang-type-plumbing] Remove the second check.
+        if (printNameOnly || !info.getClangTypeInfo().hasValue())
           break;
         printCType(Ctx, Printer, info);
         break;
@@ -4105,9 +4101,8 @@ public:
         break;
       case SILFunctionType::Representation::CFunctionPointer:
         Printer << "c";
-        // FIXME: [clang-function-type-serialization] Once we start serializing
-        // Clang function types, we should be able to remove the second check.
-        if (printNameOnly || !info.getUncommonInfo().hasValue())
+        // [TODO: Clang-type-plumbing] Remove the second check.
+        if (printNameOnly || !info.getClangTypeInfo().hasValue())
           break;
         printCType(Ctx, Printer, info);
         break;
