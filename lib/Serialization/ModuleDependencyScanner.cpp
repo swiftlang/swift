@@ -131,7 +131,9 @@ public:
 
     // FIXME: Find a better place for this map to live, to avoid
     // doing the parsing on every module.
-    parsePlaceholderModuleMap(PlaceholderDependencyModuleMap);
+    if (!PlaceholderDependencyModuleMap.empty()) {
+      parsePlaceholderModuleMap(PlaceholderDependencyModuleMap);
+    }
   }
 
   std::error_code findModuleFilesInDirectory(
