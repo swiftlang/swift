@@ -852,3 +852,47 @@ bool isLocWithinAnInactiveClause(const SourceLoc loc, SourceFile *SF) {
   SF->walk(tester);
   return tester.wasFoundWithinInactiveClause;
 }
+
+#pragma mark isLabeledStmtLookupTerminator implementations
+bool ASTScopeImpl::isLabeledStmtLookupTerminator() const {
+  return true;
+}
+
+bool ConditionalClauseScope::isLabeledStmtLookupTerminator() const {
+  return false;
+}
+
+bool ConditionalClausePatternUseScope::isLabeledStmtLookupTerminator() const {
+  return false;
+}
+
+bool AbstractStmtScope::isLabeledStmtLookupTerminator() const {
+  return false;
+}
+
+bool ForEachPatternScope::isLabeledStmtLookupTerminator() const {
+  return false;
+}
+
+llvm::SmallVector<LabeledStmt *, 4>
+ASTScopeImpl::lookupLabeledStmts(SourceFile *sourceFile, SourceLoc loc) {
+  // Find the innermost scope from which to start our search.
+  auto *const fileScope = sourceFile->getScope().impl;
+  const auto *innermost = fileScope->findInnermostEnclosingScope(loc, nullptr);
+  ASTScopeAssert(innermost->getWasExpanded(),
+                 "If looking in a scope, it must have been expanded.");
+
+  llvm::SmallVector<LabeledStmt *, 4> labeledStmts;
+  for (auto scope = innermost; scope && !scope->isLabeledStmtLookupTerminator();
+       scope = scope->getParent().getPtrOrNull()) {
+    // If we have a labeled statement, record it.
+    if (auto stmt = scope->getStmtIfAny()) {
+      if (auto labeledStmt = dyn_cast<LabeledStmt>(stmt.get())) {
+        labeledStmts.push_back(labeledStmt);
+        continue;
+      }
+    }
+  }
+
+  return labeledStmts;
+}

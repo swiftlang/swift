@@ -195,7 +195,7 @@ protected:
 
   /// Get ride of descendants and remove them from scopedNodes so the scopes
   /// can be recreated. Needed because typechecking inserts a return statment
-  /// into intiailizers.
+  /// into initializers.
   void disownDescendants(ScopeCreator &);
 
 public: // for addReusedBodyScopes
@@ -415,6 +415,10 @@ public:
   unqualifiedLookup(SourceFile *, DeclNameRef, SourceLoc,
                     const DeclContext *startingContext, DeclConsumer);
 
+  /// Entry point into ASTScopeImpl-land for labeled statement lookups.
+  static llvm::SmallVector<LabeledStmt *, 4>
+  lookupLabeledStmts(SourceFile *sourceFile, SourceLoc loc);
+
   static Optional<bool>
   computeIsCascadingUse(ArrayRef<const ASTScopeImpl *> history,
                         Optional<bool> initialIsCascadingUse);
@@ -538,6 +542,12 @@ protected:
 
   NullablePtr<const ASTScopeImpl>
   ancestorWithDeclSatisfying(function_ref<bool(const Decl *)> predicate) const;
+
+  /// Whether this scope terminates lookup of labeled statements in the
+  /// children below it, because one cannot perform a "break" or a "continue"
+  /// in a child that goes outside of this scope.
+  virtual bool isLabeledStmtLookupTerminator() const;
+
 }; // end of ASTScopeImpl
 
 #pragma mark - specific scope classes
@@ -1357,6 +1367,9 @@ public:
 private:
   ArrayRef<StmtConditionElement> getCond() const;
   const StmtConditionElement &getStmtConditionElement() const;
+
+protected:
+  bool isLabeledStmtLookupTerminator() const override;
 };
 
 /// If, while, & guard statements all start with a conditional clause, then some
@@ -1380,6 +1393,7 @@ protected:
   bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
                              DeclConsumer) const override;
   void printSpecifics(llvm::raw_ostream &out) const override;
+  bool isLabeledStmtLookupTerminator() const override;
 };
 
 
@@ -1713,6 +1727,9 @@ public:
   virtual Stmt *getStmt() const = 0;
   NullablePtr<Stmt> getStmtIfAny() const override { return getStmt(); }
   NullablePtr<const void> getReferrent() const override;
+
+protected:
+  bool isLabeledStmtLookupTerminator() const override;
 };
 
 class LabeledConditionalStmtScope : public AbstractStmtScope {
@@ -1910,6 +1927,7 @@ public:
 protected:
   bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
                              DeclConsumer) const override;
+  bool isLabeledStmtLookupTerminator() const override;
 };
 
 class CaseStmtScope final : public AbstractStmtScope {

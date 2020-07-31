@@ -54,6 +54,11 @@ Optional<bool> ASTScope::computeIsCascadingUse(
   return ASTScopeImpl::computeIsCascadingUse(history, initialIsCascadingUse);
 }
 
+llvm::SmallVector<LabeledStmt *, 4> ASTScope::lookupLabeledStmts(
+    SourceFile *sourceFile, SourceLoc loc) {
+  return ASTScopeImpl::lookupLabeledStmts(sourceFile, loc);
+}
+
 #if SWIFT_COMPILER_IS_MSVC
 #pragma warning(push)
 #pragma warning(disable : 4996)

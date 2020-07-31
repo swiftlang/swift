@@ -347,6 +347,36 @@ public:
       // In any case, remember that we're in this labeled statement so that
       // break and continue are aware of it.
       SC.ActiveLabeledStmts.push_back(LS);
+
+      // Verify that the ASTScope-based query for active labeled statements
+      // is equivalent to what we have here.
+      if (LS->getStartLoc().isValid()) {
+        if (auto sourceFile = SC.DC->getParentSourceFile()) {
+          // The labeled statements from ASTScope lookup have the
+          // innermost labeled statement first, so reverse it to
+          // match the data structure maintained here.
+          auto activeFromASTScope = ASTScope::lookupLabeledStmts(
+              sourceFile, LS->getStartLoc());
+          assert(activeFromASTScope.front() == LS);
+          std::reverse(activeFromASTScope.begin(), activeFromASTScope.end());
+          if (activeFromASTScope != SC.ActiveLabeledStmts) {
+            llvm::errs() << "Old: ";
+            llvm::interleave(SC.ActiveLabeledStmts, [&](LabeledStmt *LS) {
+              llvm::errs() << LS;
+            }, [&] {
+              llvm::errs() << ' ';
+            });
+            llvm::errs() << "\nNew: ";
+            llvm::interleave(activeFromASTScope, [&](LabeledStmt *LS) {
+              llvm::errs() << LS;
+            }, [&] {
+              llvm::errs() << ' ';
+            });
+            llvm::errs() << "\n";
+          }
+          assert(activeFromASTScope == SC.ActiveLabeledStmts);
+        }
+      }
     }
     ~AddLabeledStmt() {
       SC.ActiveLabeledStmts.pop_back();
