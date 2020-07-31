@@ -561,8 +561,7 @@ namespace {
       };
 
       if (const auto GC = Owner.dyn_cast<const GenericContext *>()) {
-        if (!GC->isGeneric() || isa<ProtocolDecl>(GC))
-          printWhere(GC->getTrailingWhereClause());
+        printWhere(GC->getTrailingWhereClause());
       } else {
         const auto ATD = Owner.get<const AssociatedTypeDecl *>();
         printWhere(ATD->getTrailingWhereClause());
@@ -730,9 +729,9 @@ namespace {
       OS << ' ';
       printDeclName(VD);
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
-        printGenericParameters(OS, AFD->getGenericParams());
+        printGenericParameters(OS, AFD->getParsedGenericParams());
       if (auto *GTD = dyn_cast<GenericTypeDecl>(VD))
-        printGenericParameters(OS, GTD->getGenericParams());
+        printGenericParameters(OS, GTD->getParsedGenericParams());
 
       if (auto *var = dyn_cast<VarDecl>(VD)) {
         PrintWithColorRAII(OS, TypeColor) << " type='";
@@ -2131,6 +2130,13 @@ public:
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+  void visitAwaitExpr(AwaitExpr *E) {
+    printCommon(E, "await_expr");
+    OS << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitTupleExpr(TupleExpr *E) {
     printCommon(E, "tuple_expr");
     if (E->hasTrailingClosure())
@@ -2637,7 +2643,12 @@ public:
     printExplicitCastExpr(E, "coerce_expr");
   }
   void visitArrowExpr(ArrowExpr *E) {
-    printCommon(E, "arrow") << '\n';
+    printCommon(E, "arrow");
+    if (E->getAsyncLoc().isValid())
+      OS << " async";
+    if (E->getThrowsLoc().isValid())
+      OS << " throws";
+    OS << '\n';
     printRec(E->getArgsExpr());
     OS << '\n';
     printRec(E->getResultExpr());
@@ -2972,6 +2983,8 @@ public:
   void visitFunctionTypeRepr(FunctionTypeRepr *T) {
     printCommon("type_function");
     OS << '\n'; printRec(T->getArgsTypeRepr());
+    if (T->async())
+      OS << " async ";
     if (T->throws())
       OS << " throws ";
     OS << '\n'; printRec(T->getResultTypeRepr());
@@ -3742,6 +3755,7 @@ namespace {
                    getSILFunctionTypeRepresentationString(representation));
 
       printFlag(!T->isNoEscape(), "escaping");
+      printFlag(T->async(), "async");
       printFlag(T->throws(), "throws");
 
       OS << "\n";

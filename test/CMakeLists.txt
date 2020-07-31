@@ -163,6 +163,7 @@ normalize_boolean_spelling(SWIFT_ASAN_BUILD)
 normalize_boolean_spelling(SWIFT_BUILD_SYNTAXPARSERLIB)
 normalize_boolean_spelling(SWIFT_ENABLE_SOURCEKIT_TESTS)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
+normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
 # SWIFT_ENABLE_TENSORFLOW
 normalize_boolean_spelling(SWIFT_ENABLE_TENSORFLOW)
 # SWIFT_ENABLE_TENSORFLOW END
@@ -364,6 +365,10 @@ _Block_release(void) { }\n")
 
       if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
         list(APPEND LIT_ARGS "--param" "differentiable_programming")
+      endif()
+
+      if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
+        list(APPEND LIT_ARGS "--param" "concurrency")
       endif()
 
       foreach(test_subset ${TEST_SUBSETS})

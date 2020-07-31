@@ -52,6 +52,7 @@ void CompilerInvocation::computeRuntimeResourcePathFromExecutablePath(
 }
 
 void CompilerInvocation::setMainExecutablePath(StringRef Path) {
+  FrontendOpts.MainExecutablePath = Path.str();
   llvm::SmallString<128> LibPath;
   computeRuntimeResourcePathFromExecutablePath(Path, LibPath);
   setRuntimeResourcePath(LibPath.str());
@@ -313,6 +314,8 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
     Args.hasArg(OPT_module_interface_preserve_types_as_written);
   Opts.PrintFullConvention |=
     Args.hasArg(OPT_experimental_print_full_convention);
+  Opts.ExperimentalSPIImports |=
+    Args.hasArg(OPT_experimental_spi_imports);
 }
 
 /// Save a copy of any flags marked as ModuleInterfaceOption, if running
@@ -372,6 +375,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableExperimentalStaticAssert |=
     Args.hasArg(OPT_enable_experimental_static_assert);
+
+  Opts.EnableExperimentalConcurrency |=
+    Args.hasArg(OPT_enable_experimental_concurrency);
 
   Opts.EnableSubstSILFunctionTypesForFunctionValues |=
     Args.hasArg(OPT_enable_subst_sil_function_types_for_function_values);

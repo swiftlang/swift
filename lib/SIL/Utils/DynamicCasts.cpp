@@ -492,6 +492,11 @@ swift::classifyDynamicCast(ModuleDecl *M,
       // A function cast can succeed if the function types can be identical,
       // or if the target type is throwier than the original.
 
+      // An async function cannot be cast to a non-async function and
+      // vice-versa.
+      if (sourceFunction->async() != targetFunction->async())
+        return DynamicCastFeasibility::WillFail;
+
       // A non-throwing source function can be cast to a throwing target type,
       // but not vice versa.
       if (sourceFunction->throws() && !targetFunction->throws())

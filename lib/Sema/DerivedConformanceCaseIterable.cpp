@@ -113,9 +113,6 @@ ValueDecl *DerivedConformance::deriveCaseIterable(ValueDecl *requirement) {
 }
 
 Type DerivedConformance::deriveCaseIterable(AssociatedTypeDecl *assocType) {
-  if (checkAndDiagnoseDisallowedContext(assocType))
-    return nullptr;
-
   // Check that we can actually derive CaseIterable for this type.
   if (!canDeriveConformance(Nominal))
     return nullptr;

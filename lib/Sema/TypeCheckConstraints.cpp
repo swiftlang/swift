@@ -1693,8 +1693,8 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     }
 
     auto NewTypeRepr = new (ctx)
-        FunctionTypeRepr(nullptr, ArgsTypeRepr, AE->getThrowsLoc(),
-                         AE->getArrowLoc(), ResultTypeRepr);
+        FunctionTypeRepr(nullptr, ArgsTypeRepr, AE->getAsyncLoc(),
+                         AE->getThrowsLoc(), AE->getArrowLoc(), ResultTypeRepr);
     return new (ctx) TypeExpr(NewTypeRepr);
   }
   
@@ -1981,24 +1981,6 @@ void ParentConditionalConformance::diagnoseConformanceStack(
   }
 }
 
-GenericRequirementsCheckListener::~GenericRequirementsCheckListener() {}
-
-bool GenericRequirementsCheckListener::shouldCheck(RequirementKind kind,
-                                                   Type first, Type second) {
-  return true;
-}
-
-void GenericRequirementsCheckListener::satisfiedConformance(
-                                          Type depTy, Type replacementTy,
-                                          ProtocolConformanceRef conformance) {
-}
-
-bool GenericRequirementsCheckListener::diagnoseUnsatisfiedRequirement(
-    const Requirement &req, Type first, Type second,
-    ArrayRef<ParentConditionalConformance> parents) {
-  return false;
-}
-
 namespace {
 /// Produce any additional syntactic diagnostics for the body of a function
 /// that had a function builder applied.
@@ -2012,7 +1994,7 @@ public:
     performSyntacticExprDiagnostics(expr, dcStack.back(), /*isExprStmt=*/false);
 
     if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-      if (closure->wasSeparatelyTypeChecked()) {
+      if (closure->isSeparatelyTypeChecked()) {
         dcStack.push_back(closure);
         return {true, expr};
       }
@@ -2023,7 +2005,7 @@ public:
 
   Expr *walkToExprPost(Expr *expr) override {
     if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-      if (closure->wasSeparatelyTypeChecked()) {
+      if (closure->isSeparatelyTypeChecked()) {
         assert(dcStack.back() == closure);
         dcStack.pop_back();
       }
@@ -2123,6 +2105,9 @@ TypeChecker::typeCheckExpression(
 
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))
     csOptions |= ConstraintSystemFlags::AllowUnresolvedTypeVariables;
+
+  if (options.contains(TypeCheckExprFlags::LeaveClosureBodyUnchecked))
+    csOptions |= ConstraintSystemFlags::LeaveClosureBodyUnchecked;
 
   ConstraintSystem cs(dc, csOptions);
 
@@ -2315,28 +2300,44 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
 }
 
 bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
+  auto &Context = dc->getASTContext();
+
+  auto failed = [&]() -> bool {
+    // Invalidate the pattern and the var decl.
+    stmt->getPattern()->setType(ErrorType::get(Context));
+    stmt->getPattern()->forEachVariable([&](VarDecl *var) {
+      if (var->hasInterfaceType() && !var->isInvalid())
+        return;
+      var->setInvalid();
+    });
+    return true;
+  };
+
   auto sequenceProto = TypeChecker::getProtocol(
       dc->getASTContext(), stmt->getForLoc(), KnownProtocolKind::Sequence);
   if (!sequenceProto)
-    return true;
+    return failed();
 
   // Precheck the sequence.
   Expr *sequence = stmt->getSequence();
   if (ConstraintSystem::preCheckExpression(sequence, dc))
-    return true;
+    return failed();
   stmt->setSequence(sequence);
 
   // Precheck the filtering condition.
   if (Expr *whereExpr = stmt->getWhere()) {
     if (ConstraintSystem::preCheckExpression(whereExpr, dc))
-      return true;
+      return failed();
 
     stmt->setWhere(whereExpr);
   }
 
   auto target = SolutionApplicationTarget::forForEachStmt(
       stmt, sequenceProto, dc, /*bindPatternVarsOneWay=*/false);
-  return !typeCheckExpression(target);
+  if (!typeCheckExpression(target))
+    return failed();
+
+  return false;
 }
 
 bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
@@ -2388,7 +2389,7 @@ bool TypeChecker::typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
       elt.getPattern()->forEachVariable([&](VarDecl *var) {
         // Don't change the type of a variable that we've been able to
         // compute a type for.
-        if (var->hasInterfaceType() && !var->getType()->hasError())
+        if (var->hasInterfaceType() && !var->isInvalid())
           return;
         var->setInvalid();
       });

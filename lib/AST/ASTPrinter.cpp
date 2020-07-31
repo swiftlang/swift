@@ -2856,6 +2856,9 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
   printParameterList(BodyParams, parameterListTypes,
                      AFD->argumentNameIsAPIByDefault());
 
+  if (AFD->hasAsync())
+    Printer << " " << "async";
+
   if (AFD->hasThrows()) {
     if (AFD->getAttrs().hasAttribute<RethrowsAttr>())
       Printer << " " << tok::kw_rethrows;
@@ -4179,6 +4182,9 @@ public:
     // If we're stripping argument labels from types, do it when printing.
     visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/false);
 
+    if (T->async())
+      Printer << " " << "async";
+
     if (T->throws())
       Printer << " " << tok::kw_throws;
 
@@ -4218,6 +4224,9 @@ public:
     Printer << " ";
 
    visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/true);
+
+    if (T->async())
+      Printer << " " << "async";
 
     if (T->throws())
       Printer << " " << tok::kw_throws;

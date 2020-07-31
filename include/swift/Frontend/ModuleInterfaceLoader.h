@@ -165,11 +165,11 @@ public:
 /// Information about explicitly specified Swift module files.
 struct ExplicitModuleInfo {
   // Path of the .swiftmodule file.
-  StringRef modulePath;
+  std::string modulePath;
   // Path of the .swiftmoduledoc file.
-  StringRef moduleDocPath;
+  std::string moduleDocPath;
   // Path of the .swiftsourceinfo file.
-  StringRef moduleSourceInfoPath;
+  std::string moduleSourceInfoPath;
   // Opened buffer for the .swiftmodule file.
   std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
 };
@@ -243,11 +243,11 @@ private:
       if (key == "moduleName") {
         moduleName = val;
       } else if (key == "modulePath") {
-        result.modulePath = val;
+        result.modulePath = val.str();
       } else if (key == "docPath") {
-        result.moduleDocPath = val;
+        result.moduleDocPath = val.str();
       } else if (key == "sourceInfoPath") {
-        result.moduleSourceInfoPath = val;
+        result.moduleSourceInfoPath = val.str();
       } else {
         // Being forgiving for future fields.
         continue;
@@ -266,10 +266,12 @@ struct ModuleInterfaceLoaderOptions {
   bool remarkOnRebuildFromInterface = false;
   bool disableInterfaceLock = false;
   bool disableImplicitSwiftModule = false;
+  std::string mainExecutablePath;
   ModuleInterfaceLoaderOptions(const FrontendOptions &Opts):
     remarkOnRebuildFromInterface(Opts.RemarkOnRebuildFromModuleInterface),
     disableInterfaceLock(Opts.DisableInterfaceFileLock),
-    disableImplicitSwiftModule(Opts.DisableImplicitModules) {}
+    disableImplicitSwiftModule(Opts.DisableImplicitModules),
+    mainExecutablePath(Opts.MainExecutablePath) {}
   ModuleInterfaceLoaderOptions() = default;
 };
 

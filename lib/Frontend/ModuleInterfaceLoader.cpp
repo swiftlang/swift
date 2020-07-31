@@ -1268,6 +1268,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     StringRef prebuiltCachePath,
     bool serializeDependencyHashes,
     bool trackSystemDependencies): SM(SM), Diags(Diags), ArgSaver(Allocator) {
+  subInvocation.setMainExecutablePath(LoaderOpts.mainExecutablePath);
   inheritOptionsForBuildingInterface(searchPathOpts, langOpts);
   // Configure front-end input.
   auto &SubFEOpts = subInvocation.getFrontendOptions();

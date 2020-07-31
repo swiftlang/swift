@@ -715,6 +715,10 @@ public:
   GenericTypeOrExtensionWherePortion()
       : GenericTypeOrExtensionWhereOrBodyPortion("Where") {}
 
+  bool lookupMembersOf(const GenericTypeOrExtensionScope *scope,
+                       ArrayRef<const ASTScopeImpl *>,
+                       ASTScopeImpl::DeclConsumer consumer) const override;
+
   ASTScopeImpl *expandScope(GenericTypeOrExtensionScope *,
                             ScopeCreator &) const override;
 
@@ -814,6 +818,8 @@ public:
   virtual NullablePtr<NominalTypeDecl> getCorrespondingNominalTypeDecl() const {
     return nullptr;
   }
+
+  bool areMembersVisibleFromWhereClause() const;
 
   virtual void createBodyScope(ASTScopeImpl *leaf, ScopeCreator &) {}
 

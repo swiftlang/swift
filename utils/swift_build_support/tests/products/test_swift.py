@@ -58,7 +58,8 @@ class SwiftTestCase(unittest.TestCase):
             disable_guaranteed_normal_arguments=True,
             force_optimized_typechecker=False,
             enable_stdlibcore_exclusivity_checking=False,
-            enable_experimental_differentiable_programming=False)
+            enable_experimental_differentiable_programming=False,
+            enable_experimental_concurrency=False)
 
         # Setup shell
         shell.dry_run = True
@@ -89,7 +90,8 @@ class SwiftTestCase(unittest.TestCase):
             '-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE',
             '-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER:BOOL=FALSE',
             '-DSWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING:BOOL=FALSE',
-            '-DSWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING:BOOL=FALSE'
+            '-DSWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING:BOOL=FALSE',
+            '-DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY:BOOL=FALSE',
         ]
         self.assertEqual(set(swift.cmake_options), set(expected))
 
@@ -105,7 +107,8 @@ class SwiftTestCase(unittest.TestCase):
             '-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE',
             '-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER:BOOL=FALSE',
             '-DSWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING:BOOL=FALSE',
-            '-DSWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING:BOOL=FALSE'
+            '-DSWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING:BOOL=FALSE',
+            '-DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY:BOOL=FALSE'
         ]
         self.assertEqual(set(swift.cmake_options), set(flags_set))
 
@@ -318,3 +321,16 @@ class SwiftTestCase(unittest.TestCase):
              'TRUE'],
             [x for x in swift.cmake_options
              if 'DSWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING' in x])
+
+    def test_experimental_concurrency_flags(self):
+        self.args.enable_experimental_concurrency = True
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertEqual(
+            ['-DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY:BOOL='
+             'TRUE'],
+            [x for x in swift.cmake_options
+             if 'DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY' in x])

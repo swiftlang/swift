@@ -292,7 +292,10 @@ NullablePtr<const GenericParamList> GenericTypeScope::genericParams() const {
   // Sigh... These must be here so that from body, we search generics before
   // members. But they also must be on the Decl scope for lookups starting from
   // generic parameters, where clauses, etc.
-  return getGenericContext()->getGenericParams();
+  auto *context = getGenericContext();
+  if (isa<TypeAliasDecl>(context))
+    return context->getParsedGenericParams();
+  return context->getGenericParams();
 }
 NullablePtr<const GenericParamList> ExtensionScope::genericParams() const {
   return decl->getGenericParams();
@@ -365,6 +368,22 @@ bool GenericTypeOrExtensionWhereOrBodyPortion::lookupMembersOf(
                                              history, initialIsCascadingUse)
                                       .getValueOr(true);
                                 });
+}
+
+bool GenericTypeOrExtensionWherePortion::lookupMembersOf(
+    const GenericTypeOrExtensionScope *scope,
+    ArrayRef<const ASTScopeImpl *> history,
+    ASTScopeImpl::DeclConsumer consumer) const {
+  if (!scope->areMembersVisibleFromWhereClause())
+    return false;
+
+  return GenericTypeOrExtensionWhereOrBodyPortion::lookupMembersOf(
+    scope, history, consumer);
+}
+
+bool GenericTypeOrExtensionScope::areMembersVisibleFromWhereClause() const {
+  auto *decl = getDecl();
+  return isa<ProtocolDecl>(decl) || isa<ExtensionDecl>(decl);
 }
 
 #pragma mark looking in locals or members - locals
