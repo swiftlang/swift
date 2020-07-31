@@ -3872,12 +3872,10 @@ namespace {
           if (auto *UME = dyn_cast<UnresolvedMemberExpr>(chainBase)) {
             auto chainTy = CG.addUnresolvedMemberChainConstraints(UME, expr,
                                                                 simplifiedType);
-            auto *PE = new (CS.getASTContext()) ParenExpr(SourceLoc(), expr,
-                                                          SourceLoc(), false);
-            PE->setImplicit();
-            PE->setIsUnresolvedMemberChainPlaceholder();
-            CS.setType(PE, chainTy);
-            return PE;
+            auto *resultExpr =
+              new (CS.getASTContext()) UnresolvedMemberChainResultExpr(expr);
+            CS.setType(resultExpr, chainTy);
+            return resultExpr;
           }
         }
 

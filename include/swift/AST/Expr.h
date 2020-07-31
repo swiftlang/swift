@@ -2048,14 +2048,13 @@ public:
 /// has tuple type, of course).
 class ParenExpr : public IdentityExpr {
   SourceLoc LParenLoc, RParenLoc;
-  bool IsUnresolvedMemberChainPlaceholder;
+  
 public:
   ParenExpr(SourceLoc lploc, Expr *subExpr, SourceLoc rploc,
             bool hasTrailingClosure,
             Type ty = Type())
     : IdentityExpr(ExprKind::Paren, subExpr, ty),
-      LParenLoc(lploc), RParenLoc(rploc),
-      IsUnresolvedMemberChainPlaceholder(false) {
+      LParenLoc(lploc), RParenLoc(rploc) {
     Bits.ParenExpr.HasTrailingClosure = hasTrailingClosure;
     assert(lploc.isValid() == rploc.isValid() &&
            "Mismatched source location information");
@@ -2087,15 +2086,24 @@ public:
     return hasTrailingClosure() ? Optional<unsigned>(0) : None;
   }
 
-  bool isUnresolvedMemberChainPlaceholder() const {
-    return IsUnresolvedMemberChainPlaceholder;
-  }
-
-  void setIsUnresolvedMemberChainPlaceholder() {
-    IsUnresolvedMemberChainPlaceholder = true;
-  }
-
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Paren; }
+};
+
+/// Represents the result of a chain of accesses or calls hanging off of an
+/// \c UnresolvedMemberExpr at the root. This is only used during type checking
+/// to give the result type of such a chain representation in the AST. This
+/// expression type is always implicit.
+class UnresolvedMemberChainResultExpr : public IdentityExpr {
+public:
+  UnresolvedMemberChainResultExpr(Expr *subExpr, Type ty = Type())
+    : IdentityExpr(ExprKind::UnresolvedMemberChainResult, subExpr, ty,
+                   /*isImplicit=*/true) {}
+
+  SWIFT_FORWARD_SOURCE_LOCS_TO(getSubExpr())
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::UnresolvedMemberChainResult;
+  }
 };
   
 /// AwaitExpr - An 'await' surrounding an expression, marking that the
