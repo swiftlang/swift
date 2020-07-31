@@ -4310,11 +4310,6 @@ public:
   /// protocol.
   bool inheritsFrom(const ProtocolDecl *Super) const;
   
-  ProtocolType *getDeclaredType() const {
-    return reinterpret_cast<ProtocolType *>(
-      NominalTypeDecl::getDeclaredType().getPointer());
-  }
-  
   SourceLoc getStartLoc() const { return ProtocolLoc; }
   SourceRange getSourceRange() const {
     return SourceRange(ProtocolLoc, getBraces().End);
