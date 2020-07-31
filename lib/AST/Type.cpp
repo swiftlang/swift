@@ -1243,9 +1243,7 @@ CanType TypeBase::computeCanonicalType() {
     getCanonicalParams(funcTy, genericSig, canParams);
     auto resultTy = funcTy->getResult()->getCanonicalType(genericSig);
 
-    bool useClangFunctionType =
-      resultTy->getASTContext().LangOpts.UseClangFunctionTypes;
-    auto extInfo = funcTy->getCanonicalExtInfo(useClangFunctionType);
+    auto extInfo = funcTy->getCanonicalExtInfo(useClangTypes(resultTy));
     if (genericSig) {
       Result = GenericFunctionType::get(genericSig, canParams, resultTy,
                                         extInfo);
@@ -1783,7 +1781,7 @@ public:
   CanType visitFunctionType(FunctionType *func, CanType subst,
                             ArchetypeType*, ArrayRef<ProtocolConformanceRef>) {
     if (auto substFunc = dyn_cast<FunctionType>(subst)) {
-      if (func->getExtInfo() != substFunc->getExtInfo())
+      if (!func->hasSameExtInfoAs(substFunc))
         return CanType();
       
       if (func->getParams().size() != substFunc->getParams().size())
@@ -1822,7 +1820,7 @@ public:
   CanType visitSILFunctionType(SILFunctionType *func, CanType subst,
                              ArchetypeType*, ArrayRef<ProtocolConformanceRef>) {
     if (auto substFunc = dyn_cast<SILFunctionType>(subst)) {
-      if (func->getExtInfo() != substFunc->getExtInfo())
+      if (!func->hasSameExtInfoAs(substFunc))
         return CanType();
 
       if (func->getInvocationGenericSignature()
@@ -2618,7 +2616,7 @@ static bool matchesFunctionType(CanAnyFunctionType fn1, CanAnyFunctionType fn2,
     if (!ext2.isNoEscape())
       ext1 = ext1.withNoEscape(false);
   }
-  if (ext1 != ext2)
+  if (!ext1.isEqualTo(ext2, useClangTypes(fn1)))
     return false;
 
   return paramsAndResultMatch();
@@ -3427,9 +3425,17 @@ ClangTypeInfo AnyFunctionType::getCanonicalClangTypeInfo() const {
   return getClangTypeInfo().getCanonical();
 }
 
+bool AnyFunctionType::hasSameExtInfoAs(const AnyFunctionType *otherFn) {
+  return getExtInfo().isEqualTo(otherFn->getExtInfo(), useClangTypes(this));
+}
+
 // [TODO: Store-SIL-Clang-type]
 ClangTypeInfo SILFunctionType::getClangTypeInfo() const {
   return ClangTypeInfo();
+}
+
+bool SILFunctionType::hasSameExtInfoAs(const SILFunctionType *otherFn) {
+  return getExtInfo().isEqualTo(otherFn->getExtInfo(), useClangTypes(this));
 }
 
 FunctionType *

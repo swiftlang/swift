@@ -2932,6 +2932,8 @@ public:
                                         : ClangTypeInfo());
   }
 
+  bool hasSameExtInfoAs(const AnyFunctionType *otherFn);
+
   /// Get the representation of the function type.
   Representation getRepresentation() const {
     return getExtInfo().getRepresentation();
@@ -4294,6 +4296,8 @@ public:
   }
 
   ClangTypeInfo getClangTypeInfo() const;
+
+  bool hasSameExtInfoAs(const SILFunctionType *otherFn);
 
   /// Given that `this` is a `@differentiable` or `@differentiable(linear)`
   /// function type, returns an `IndexSubset` corresponding to the

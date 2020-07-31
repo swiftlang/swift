@@ -23,6 +23,15 @@ namespace swift {
 
 // MARK: - ClangTypeInfo
 
+bool operator==(ClangTypeInfo lhs, ClangTypeInfo rhs) {
+  if (lhs.type == rhs.type)
+    return true;
+  if (lhs.type && rhs.type)
+    return lhs.type->getCanonicalTypeInternal() ==
+           rhs.type->getCanonicalTypeInternal();
+  return false;
+}
+
 ClangTypeInfo ClangTypeInfo::getCanonical() const {
   if (!type)
     return ClangTypeInfo();

@@ -932,7 +932,7 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
 CanAnyFunctionType
 Lowering::adjustFunctionType(CanAnyFunctionType t,
                              AnyFunctionType::ExtInfo extInfo) {
-  if (t->getExtInfo() == extInfo)
+  if (t->getExtInfo().isEqualTo(extInfo, useClangTypes(t)))
     return t;
   return CanAnyFunctionType(t->withExtInfo(extInfo));
 }
@@ -943,7 +943,8 @@ Lowering::adjustFunctionType(CanSILFunctionType type,
                              SILFunctionType::ExtInfo extInfo,
                              ParameterConvention callee,
                              ProtocolConformanceRef witnessMethodConformance) {
-  if (type->getExtInfo() == extInfo && type->getCalleeConvention() == callee &&
+  if (type->getExtInfo().isEqualTo(extInfo, useClangTypes(type)) &&
+      type->getCalleeConvention() == callee &&
       type->getWitnessMethodConformanceOrInvalid() == witnessMethodConformance)
     return type;
 
@@ -965,7 +966,7 @@ SILFunctionType::getWithRepresentation(Representation repr) {
 
 CanSILFunctionType SILFunctionType::getWithExtInfo(ExtInfo newExt) {
   auto oldExt = getExtInfo();
-  if (newExt == oldExt)
+  if (newExt.isEqualTo(oldExt, useClangTypes(this)))
     return CanSILFunctionType(this);
 
   auto calleeConvention =
@@ -3968,7 +3969,7 @@ TypeConverter::getBridgedFunctionType(AbstractionPattern pattern,
   case SILFunctionTypeRepresentation::Closure:
   case SILFunctionTypeRepresentation::WitnessMethod: {
     // No bridging needed for native functions.
-    if (t->getExtInfo() == extInfo)
+    if (t->getExtInfo().isEqualTo(extInfo, useClangTypes(t)))
       return t;
     return CanAnyFunctionType::get(genericSig, t.getParams(), t.getResult(),
                                    extInfo);

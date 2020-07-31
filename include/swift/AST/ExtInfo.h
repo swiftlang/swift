@@ -66,6 +66,7 @@ class ClangTypeInfo {
   constexpr ClangTypeInfo() : type(nullptr) {}
   constexpr ClangTypeInfo(const clang::Type *type) : type(type) {}
 
+  friend bool operator==(ClangTypeInfo lhs, ClangTypeInfo rhs);
   ClangTypeInfo getCanonical() const;
 
 public:
@@ -345,7 +346,12 @@ public:
                              clangTypeInfo);
   }
 
-  std::pair<unsigned, const void *> getFuncAttrKey() const {
+  bool isEqualTo(ASTExtInfoBuilder other, bool useClangTypes) const {
+    return bits == other.bits &&
+      (useClangTypes ? (clangTypeInfo == other.clangTypeInfo) : true);
+  }
+
+  constexpr std::pair<unsigned, const void *> getFuncAttrKey() const {
     return std::make_pair(bits, clangTypeInfo.getType());
   }
 }; // end ASTExtInfoBuilder
@@ -430,11 +436,8 @@ public:
     return builder.withThrows(throws).build();
   }
 
-  bool operator==(ASTExtInfo other) const {
-    return builder.bits == other.builder.bits;
-  }
-  bool operator!=(ASTExtInfo other) const {
-    return builder.bits != other.builder.bits;
+  bool isEqualTo(ASTExtInfo other, bool useClangTypes) const {
+    return builder.isEqualTo(other.builder, useClangTypes);
   }
 
   constexpr std::pair<unsigned, const void *> getFuncAttrKey() const {
@@ -613,7 +616,12 @@ public:
         clangTypeInfo);
   }
 
-  std::pair<unsigned, const void *> getFuncAttrKey() const {
+  bool isEqualTo(SILExtInfoBuilder other, bool useClangTypes) const {
+    return bits == other.bits &&
+           (useClangTypes ? (clangTypeInfo == other.clangTypeInfo) : true);
+  }
+
+  constexpr std::pair<unsigned, const void *> getFuncAttrKey() const {
     return std::make_pair(bits, clangTypeInfo.getType());
   }
 }; // end SILExtInfoBuilder
@@ -693,18 +701,23 @@ public:
     return builder.withNoEscape(noEscape).build();
   }
 
-  bool operator==(SILExtInfo other) const {
-    return builder.bits == other.builder.bits;
+  bool isEqualTo(SILExtInfo other, bool useClangTypes) const {
+    return builder.isEqualTo(other.builder, useClangTypes);
   }
-  bool operator!=(SILExtInfo other) const {
-    return builder.bits != other.builder.bits;
-  }
-
 
   constexpr std::pair<unsigned, const void *> getFuncAttrKey() const {
     return builder.getFuncAttrKey();
   }
 };
+
+/// Helper function to obtain the useClangTypes parameter for checking equality
+/// of ExtInfos.
+///
+/// Typically, the argument will be a function type which was used to obtain one
+/// of the ExtInfos.
+template <typename HasContext> bool useClangTypes(HasContext hasContext) {
+  return hasContext->getASTContext().LangOpts.UseClangFunctionTypes;
+}
 
 } // end namespace swift
 

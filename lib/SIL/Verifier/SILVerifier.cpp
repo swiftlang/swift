@@ -3718,8 +3718,10 @@ public:
             .withRepresentation(SILFunctionType::Representation::Thick)
             .withNoEscape(resFTy->isNoEscape())
             .build();
-    require(adjustedOperandExtInfo == resFTy->getExtInfo(),
-            "operand and result of thin_to_think_function must agree in particulars");
+    require(adjustedOperandExtInfo.isEqualTo(resFTy->getExtInfo(),
+                                             useClangTypes(opFTy)),
+            "operand and result of thin_to_think_function must agree in "
+            "particulars");
   }
 
   void checkThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCI) {

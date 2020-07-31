@@ -3476,8 +3476,9 @@ static CanSILFunctionType buildWithoutActuallyEscapingThunkType(
     CanSILFunctionType &escapingType, GenericEnvironment *&genericEnv,
     SubstitutionMap &interfaceSubs, CanType &dynamicSelfType) {
 
-  assert(escapingType->getExtInfo() ==
-         noEscapingType->getExtInfo().withNoEscape(false));
+  assert(escapingType->getExtInfo().isEqualTo(
+      noEscapingType->getExtInfo().withNoEscape(false),
+      useClangTypes(escapingType)));
 
   CanType inputSubstType, outputSubstType;
   auto type = SGF.buildThunkType(noEscapingType, escapingType,
@@ -3539,8 +3540,9 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
   auto noEscapingFnSubstTy = noEscapingFunctionValue.getType()
     .castTo<SILFunctionType>();
   // TODO: maybe this should use a more explicit instruction.
-  assert(escapingFnSubstTy->getExtInfo() == noEscapingFnSubstTy->getExtInfo()
-                                                         .withNoEscape(false));
+  assert(escapingFnSubstTy->getExtInfo().isEqualTo(
+      noEscapingFnSubstTy->getExtInfo().withNoEscape(false),
+      useClangTypes(escapingFnSubstTy)));
 
   // Apply function type substitutions, since the code sequence for a thunk
   // doesn't vary with function representation.
