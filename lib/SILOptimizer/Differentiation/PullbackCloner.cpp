@@ -2131,12 +2131,14 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
           auto *optionalEnumDecl = getASTContext().getOptionalDecl();
           auto operandTy = sei->getOperand()->getType();
           if (operandTy.getASTType().getEnumOrBoundGenericEnum() == optionalEnumDecl) {
+            // `Optional<T>`
+            auto optionalTy = remapType(operandTy);
+            // `T`
+            auto Ty = optionalTy.getOptionalObjectType();
             // `T.TangentVector`
             auto tanTy = remapType(concreteBBArgAdjCopy->getType());
             // `Optional<T.TangentVector>`
             auto optionalTanTy = SILType::getOptionalType(tanTy);
-            // `Optional<T>`
-            auto optionalTy = remapType(operandTy);
             // `Optional<T>.TangentVector`
             auto tangentVectorTy = getRemappedTangentType(optionalTy);
             // `Optional<T>.TangentVector` Decl
@@ -2179,15 +2181,15 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
             auto *initFn = fb.getOrCreateFunction(
                 pbLoc, SILDeclRef(constructorDecl), NotForDefinition);
             auto *initFnRef = builder.createFunctionRef(pbLoc, initFn);
-            // `T.TangentVector`
-            auto incomingTy = remapType(concreteBBArgAdjCopy->getType());
-            // Find Differentiable conformance for `T.TangentVector` and get SubstitutionMap.
+            // Find Differentiable conformance for `T` and get SubstitutionMap.
             auto *swiftModule = getModule().getSwiftModule();
             auto *diffProto = builder.getASTContext().getProtocol(KnownProtocolKind::Differentiable);
-            auto diffConf = swiftModule->lookupConformance(incomingTy.getASTType(), diffProto);
+            auto diffConf =
+                swiftModule->lookupConformance(Ty.getASTType(), diffProto);
             assert(!diffConf.isInvalid() && "Missing conformance to `Differentiable`");
-            auto subMap = SubstitutionMap::get(initFn->getLoweredFunctionType()->getSubstGenericSignature(),
-                                               ArrayRef<Type>(incomingTy.getASTType()), {diffConf});
+            auto subMap = SubstitutionMap::get(
+                initFn->getLoweredFunctionType()->getSubstGenericSignature(),
+                ArrayRef<Type>(Ty.getASTType()), {diffConf});
             // %apply %init_fn(%optTanAdjBuf, %optArgBuf, %metatype)
             builder.createApply(pbLoc, initFnRef, subMap,
                                 {optTanAdjBuf, optArgBuf, metatype});
