@@ -714,7 +714,10 @@ public:
   /// class-bounded existential type whose required conformances are
   /// all @objc.  Such types are compatible with ObjC.
   bool isObjCExistentialType();
-  
+
+  // // Is this an ObjC generic class.
+  bool isTypeErasedGenericClassType();
+
   /// Determines whether this type is an existential type with a class protocol
   /// bound.
   bool isClassExistentialType();
