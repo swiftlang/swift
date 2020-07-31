@@ -585,7 +585,8 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
   if (auto PD = dyn_cast<ProtocolDecl>(GC)) {
     auto self = PD->getSelfInterfaceType()->castTo<GenericTypeParamType>();
     auto req =
-        Requirement(RequirementKind::Conformance, self, PD->getDeclaredType());
+        Requirement(RequirementKind::Conformance, self,
+                    PD->getDeclaredInterfaceType());
     auto sig = GenericSignature::get({self}, {req});
 
     // Debugging of the generic signature builder and generic signature

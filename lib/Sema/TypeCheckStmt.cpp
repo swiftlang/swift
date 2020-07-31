@@ -600,7 +600,7 @@ public:
     // Coerce the operand to the exception type.
     auto E = TS->getSubExpr();
 
-    Type exnType = getASTContext().getErrorDecl()->getDeclaredType();
+    Type exnType = getASTContext().getErrorDecl()->getDeclaredInterfaceType();
     if (!exnType) return TS;
 
     TypeChecker::typeCheckExpression(E, DC, exnType,

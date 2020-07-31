@@ -337,7 +337,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   for (auto reqt : genericSig->getRequirements()) {
     if (reqt.getKind() == RequirementKind::Conformance) {
       if (reqt.getFirstType()->isEqual(type) &&
-          reqt.getSecondType()->isEqual(proto->getDeclaredType()))
+          reqt.getSecondType()->isEqual(proto->getDeclaredInterfaceType()))
         return getConformances()[index];
 
       ++index;

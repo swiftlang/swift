@@ -1749,11 +1749,11 @@ static Type
 defaultTypeLiteralKind(CodeCompletionLiteralKind kind, ASTContext &Ctx) {
   switch (kind) {
   case CodeCompletionLiteralKind::BooleanLiteral:
-    return Ctx.getBoolDecl()->getDeclaredType();
+    return Ctx.getBoolDecl()->getDeclaredInterfaceType();
   case CodeCompletionLiteralKind::IntegerLiteral:
-    return Ctx.getIntDecl()->getDeclaredType();
+    return Ctx.getIntDecl()->getDeclaredInterfaceType();
   case CodeCompletionLiteralKind::StringLiteral:
-    return Ctx.getStringDecl()->getDeclaredType();
+    return Ctx.getStringDecl()->getDeclaredInterfaceType();
   case CodeCompletionLiteralKind::ArrayLiteral:
     return Ctx.getArrayDecl()->getDeclaredType();
   case CodeCompletionLiteralKind::DictionaryLiteral:
@@ -4130,7 +4130,7 @@ public:
       builder.addRightBracket();
     });
 
-    auto floatType = context.getFloatDecl()->getDeclaredType();
+    auto floatType = context.getFloatDecl()->getDeclaredInterfaceType();
     addFromProto(LK::ColorLiteral, [&](Builder &builder) {
       builder.addBaseName("#colorLiteral");
       builder.addLeftParen();
@@ -4144,7 +4144,7 @@ public:
       builder.addRightParen();
     });
 
-    auto stringType = context.getStringDecl()->getDeclaredType();
+    auto stringType = context.getStringDecl()->getDeclaredInterfaceType();
     addFromProto(LK::ImageLiteral, [&](Builder &builder) {
       builder.addBaseName("#imageLiteral");
       builder.addLeftParen();

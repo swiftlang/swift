@@ -621,9 +621,9 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
 
   // Otherwise, synthesize a new struct.
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
-  auto diffableType = TypeLoc::withoutLoc(diffableProto->getDeclaredType());
+  auto diffableType = TypeLoc::withoutLoc(diffableProto->getDeclaredInterfaceType());
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
-  auto addArithType = TypeLoc::withoutLoc(addArithProto->getDeclaredType());
+  auto addArithType = TypeLoc::withoutLoc(addArithProto->getDeclaredInterfaceType());
 
   // By definition, `TangentVector` must conform to `Differentiable` and
   // `AdditiveArithmetic`.
