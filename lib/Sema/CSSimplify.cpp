@@ -4135,6 +4135,20 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::FunctionResult: {
+    // FIXME: Is this necessary?
+    if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
+                                locator))
+      break;
+
+    // If this mismatch occurs at the tail of an unresolved member chain,
+    // there's a contextual mismatch.
+    if (isUnresolvedMemberChainTail(anchor)) {
+      auto *fix = IgnoreContextualType::create(*this, lhs, rhs,
+                                               getConstraintLocator(locator));
+      conversionsOrFixes.push_back(fix);
+      break;
+    }
+
     auto *loc = getConstraintLocator(anchor, {path.begin(), path.end() - 1});
     // If this is a mismatch between contextual type and (trailing)
     // closure with explicitly specified result type let's record it
@@ -4181,6 +4195,16 @@ bool ConstraintSystem::repairFailures(
           repairByInsertingExplicitCall(lhs, rhs))
         return true;
     }
+
+    // If this mismatch occurs at the tail of an unresolved member chain,
+    // there's a contextual mismatch.
+    if (isUnresolvedMemberChainTail(anchor)) {
+      auto *fix = IgnoreContextualType::create(*this, lhs, rhs,
+                                               getConstraintLocator(locator));
+      conversionsOrFixes.push_back(fix);
+      break;
+    }
+
     break;
   }
 
@@ -4306,12 +4330,7 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
-  // Unresolved member type mismatches are handled when
-  // r-value adjustment constraint fails.
-  case ConstraintLocator::UnresolvedMember:
-    return true;
-
-  case ConstraintLocator::RValueAdjustment: {
+  case ConstraintLocator::UnresolvedMember: {
     if (!isExpr<UnresolvedMemberExpr>(anchor))
       break;
 
@@ -4319,9 +4338,7 @@ bool ConstraintSystem::repairFailures(
                                 locator))
       break;
 
-    // r-value adjustment is used to connect base type of
-    // unresolved member to its output type, if there is
-    // a type mismatch here it's contextual e.g.
+    // If there is a type mismatch here it's contextual e.g.,
     // `let x: E = .foo(42)`, where `.foo` is a member of `E`
     // but produces an incorrect type.
     auto *fix = IgnoreContextualType::create(*this, lhs, rhs,
@@ -6779,27 +6796,32 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
       }
     }
     // Initializer reference which requires contextual base type e.g.
-    // `.init(...)`.
+    // `.init(...)`. Could also be a nested type or typealias being constructed
+    // via implicit member syntax, e.g., `let _: Base = .Nested()` where
+    // `Base.Nested: Base`.
   } else if (auto *UME = getAsExpr<UnresolvedMemberExpr>(anchor)) {
-    // We need to find type variable which represents contextual base.
-    auto *baseLocator = cs.getConstraintLocator(
-        UME, locatorEndsWith(locator, ConstraintLocator::ConstructorMember)
-                 ? ConstraintLocator::UnresolvedMember
-                 : ConstraintLocator::MemberRefBase);
+    // If we're accessing a nested type to perform the construction implicitly,
+    // then the type we're constructing may not actually be the base of the
+    // UnresolvedMemberExpr--instead, it will be the type of the nested type
+    // member.
+    if (locatorEndsWith(locator, ConstraintLocator::ConstructorMember)) {
+      auto *baseLocator = cs.getConstraintLocator(UME,
+                                           ConstraintLocator::UnresolvedMember);
+      auto result = llvm::find_if(
+          cs.getTypeVariables(), [&baseLocator](const TypeVariableType *typeVar) {
+            return typeVar->getImpl().getLocator() == baseLocator;
+          });
+      assert(result != cs.getTypeVariables().end());
+      baseType = cs.simplifyType(*result);
 
-    // FIXME: Type variables responsible for contextual base could be cached
-    // in the constraint system to speed up lookup.
-    auto result = llvm::find_if(
-        cs.getTypeVariables(), [&baseLocator](const TypeVariableType *typeVar) {
-          return typeVar->getImpl().getLocator() == baseLocator;
-        });
-
-    assert(result != cs.getTypeVariables().end());
-    baseType = cs.simplifyType(*result)->getRValueType();
-    // Constraint for member base is formed as '$T.Type[.<member] = ...`
-    // which means MetatypeType has to be added after finding a type variable.
-    if (locatorEndsWith(baseLocator, ConstraintLocator::MemberRefBase))
-      baseType = MetatypeType::get(baseType);
+    // Otherwise, this an explicit reference to an initializer member
+    // (`.init(...)`).
+    } else {
+      // Constraint for member base is formed as '$T.Type[.<member] = ...`
+      // which means MetatypeType has to be added after finding a type variable.
+      auto instanceTy = cs.simplifyType(cs.getUnresolvedMemberBaseType(UME));
+      baseType = MetatypeType::get(instanceTy);
+    }
   } else if (auto *keyPathExpr = getAsExpr<KeyPathExpr>(anchor)) {
     // Key path can't refer to initializers e.g. `\Type.init`
     return AllowInvalidRefInKeyPath::forRef(cs, init, locator);
@@ -10059,6 +10081,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
       // each mismatched branch.
       if (branchElt->forElse())
         impact = 10;
+    }
+
+    if (locator->isLastElement<LocatorPathElt::UnresolvedMember>()) {
+      // If this is a contextual failure for an unresolved member, then increase
+      // the impact to attempt other fixes first and avoid ambiguity.
+      impact = 5;
     }
 
     if (recordFix(fix, impact))

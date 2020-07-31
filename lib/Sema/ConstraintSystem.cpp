@@ -3679,6 +3679,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
     }
 
     case ConstraintLocator::ApplyFunction:
+    case ConstraintLocator::FunctionResult:
       // Extract application function.
       if (auto applyExpr = getAsExpr<ApplyExpr>(anchor)) {
         anchor = applyExpr->getFn();

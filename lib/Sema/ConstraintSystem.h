@@ -1080,6 +1080,9 @@ public:
   /// The node -> type mappings introduced by this solution.
   llvm::DenseMap<ASTNode, Type> nodeTypes;
 
+  /// The unresolved member base types introduced by this solution.
+  llvm::MapVector<UnresolvedMemberExpr *, Type> unresolvedMemberBaseTypes;
+
   /// Contextual types introduced by this solution.
   std::vector<std::pair<ASTNode, ContextualTypeInfo>> contextualTypes;
 
@@ -1194,6 +1197,9 @@ public:
   /// and resolve all of the type variables in contains to form a fully
   /// "resolved" concrete type.
   Type getResolvedType(ASTNode node) const;
+
+  /// Retrieve the type of a particular \c UnresolvedMemberExpr's base.
+  Type getUnresolvedMemberBaseType(UnresolvedMemberExpr *expr) const;
 
   /// Resolve type variables present in the raw type, using generic parameter
   /// types where possible.
@@ -2050,6 +2056,9 @@ private:
   llvm::DenseMap<const ParamDecl *, TypeVariableType *>
     OpenedParameterTypes;
 
+  /// Maps \c UnresolvedMemberExprs to their (implicit) base types.
+  llvm::MapVector<UnresolvedMemberExpr *, Type> UnresolvedMemberBaseTypes;
+
   /// The set of constraint restrictions used to reach the
   /// current constraint system.
   ///
@@ -2571,6 +2580,8 @@ public:
 
     unsigned numAddedNodeTypes;
 
+    unsigned numUnresolvedMemberBaseTypes;
+
     unsigned numCheckedConformances;
 
     unsigned numDisabledConstraints;
@@ -2873,6 +2884,17 @@ public:
     return CTP_Unused;
   }
 
+  void setUnresolvedMemberBaseType(UnresolvedMemberExpr *expr, Type type) {
+    assert(expr && "Expected non-null expression");
+    assert(type && "Expected non-null type");
+    UnresolvedMemberBaseTypes[expr] = type;
+  }
+
+  Type getUnresolvedMemberBaseType(UnresolvedMemberExpr *expr) {
+    assert(expr && "Expected non-null expression");
+    return UnresolvedMemberBaseTypes.find(expr)->second;
+  }
+
   void setSolutionApplicationTarget(
       SolutionApplicationTargetsKey key, SolutionApplicationTarget target) {
     assert(solutionApplicationTargets.count(key) == 0 &&
@@ -3021,6 +3043,58 @@ public:
   /// Determine whether given declaration is unavailable in the current context.
   bool isDeclUnavailable(const Decl *D,
                          ConstraintLocator *locator = nullptr) const;
+
+  /// Find the next element in a chain of members. If this expression is (or
+  /// could be) the base of such a chain, this will return \c nullptr.
+  Expr *getMemberChainSubExpr(Expr *expr) {
+    assert(expr && "isMemberChainSubExpr called with null expr!");
+    if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
+      return UDE->getBase();
+    } else if (auto *CE = dyn_cast<CallExpr>(expr)) {
+      return CE->getFn();
+    } else if (auto *BOE = dyn_cast<BindOptionalExpr>(expr)) {
+      return BOE->getSubExpr();
+    } else if (auto *FVE = dyn_cast<ForceValueExpr>(expr)) {
+      return FVE->getSubExpr();
+    } else if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
+      return SE->getBase();
+    } else {
+      return nullptr;
+    }
+  }
+
+  /// Returns the base of a chain of member accesses/method calls. Most
+  /// expressions do not participate in member chains, and just return \c this.
+  Expr *getMemberChainBase(Expr *expr) {
+    if (auto *subExpr = getMemberChainSubExpr(expr))
+      return getMemberChainBase(subExpr);
+    else
+      return expr;
+  }
+
+  /// Whether this expression is a member of a member chain.
+  bool isMemberChainMember(Expr *expr) {
+    return getMemberChainSubExpr(expr) != nullptr;
+  }
+  /// Whether this expression sits at the end of a chain of member accesses.
+  bool isMemberChainTail(Expr *expr) {
+    assert(expr && "isMemberChainTail called with null expr!");
+    // If this expression's parent is not itself part of a chain (or, this expr
+    // has no parent expr), this must be the tail of the chain.
+    Expr *parent = getParentExpr(expr);
+
+    return parent == nullptr || !isMemberChainMember(parent);
+  }
+
+  /// Whether this node sits at the end of a member chain that hangs off an
+  /// \c UnresolvedMemberExpr at the base.
+  bool isUnresolvedMemberChainTail(ASTNode node) {
+    if (auto *expr = getAsExpr(node))
+      return isMemberChainTail(expr)
+        && isa<UnresolvedMemberExpr>(getMemberChainBase(expr));
+    else
+      return false;
+  }
 
 public:
 
