@@ -108,7 +108,7 @@ bool StringOptimization::run(SILFunction *F) {
   if (!stringDecl)
     return false;
   stringType = SILType::getPrimitiveObjectType(
-                 CanType(stringDecl->getDeclaredType()));
+                 stringDecl->getDeclaredInterfaceType()->getCanonicalType());
 
   bool changed = false;
   

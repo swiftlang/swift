@@ -1177,8 +1177,8 @@ public:
     for (unsigned i : indices(upperBoundConformances)) {
       auto proto = upperBoundConformances[i];
       auto conformance = substTypeConformances[i];
-      substRequirements.push_back(Requirement(RequirementKind::Conformance,
-                                              param, proto->getDeclaredType()));
+      substRequirements.push_back(Requirement(RequirementKind::Conformance, param,
+                                              proto->getDeclaredInterfaceType()));
       substConformances.push_back(conformance);
     }
     

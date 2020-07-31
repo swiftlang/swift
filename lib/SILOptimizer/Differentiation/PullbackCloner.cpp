@@ -2823,7 +2823,7 @@ AllocStackInst *PullbackCloner::Implementation::getArrayAdjointElementBuffer(
   auto *eltIndexLiteral =
       builder.createIntegerLiteral(loc, builtinIntType, eltIndex);
   auto intType = SILType::getPrimitiveObjectType(
-      ctx.getIntDecl()->getDeclaredType()->getCanonicalType());
+      ctx.getIntDecl()->getDeclaredInterfaceType()->getCanonicalType());
   // %index_int = struct $Int (%index_literal)
   auto *eltIndexInt = builder.createStruct(loc, intType, {eltIndexLiteral});
   auto *swiftModule = getModule().getSwiftModule();

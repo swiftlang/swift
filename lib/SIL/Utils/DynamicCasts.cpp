@@ -205,7 +205,7 @@ static CanType getHashableExistentialType(ModuleDecl *M) {
   auto hashable =
     M->getASTContext().getProtocol(KnownProtocolKind::Hashable);
   if (!hashable) return CanType();
-  return hashable->getDeclaredType()->getCanonicalType();
+  return hashable->getDeclaredInterfaceType()->getCanonicalType();
 }
 
 /// Check if a given type conforms to _BridgedToObjectiveC protocol.
