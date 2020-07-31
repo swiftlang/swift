@@ -1518,7 +1518,7 @@ SwiftDeclCollector::constructTypeNode(Type T, TypeInitInfo Info) {
     Root->addChild(constructTypeNode(MTT->getInstanceType()));
   } else if (auto ATT = T->getAs<ArchetypeType>()) {
     for (auto Pro : ATT->getConformsTo()) {
-      Root->addChild(constructTypeNode(Pro->getDeclaredType()));
+      Root->addChild(constructTypeNode(Pro->getDeclaredInterfaceType()));
     }
   }
   return Root;

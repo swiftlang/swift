@@ -1698,7 +1698,7 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
                        diag::default_associated_type_req_fail,
                        failedDefaultedWitness,
                        failedDefaultedAssocType->getName(),
-                       proto->getDeclaredType(),
+                       proto->getDeclaredInterfaceType(),
                        failedDefaultedResult.getRequirement(),
                        failedDefaultedResult.isConformanceRequirement());
       });

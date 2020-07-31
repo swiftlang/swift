@@ -25,7 +25,11 @@ def run_command(cmd):
     if sys.version_info[0] < 3:
         cmd = list(map(lambda s: s.encode('utf-8'), cmd))
     print(' '.join([escapeCmdArg(arg) for arg in cmd]))
-    return subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+    if sys.version_info[0] < 3:
+        return subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+    else:
+        return subprocess.check_output(list(map(lambda s: s.encode('utf-8'), cmd)),
+                                       stderr=subprocess.STDOUT)
 
 
 def parseLine(line, line_no, test_case, incremental_edit_args, reparse_args,

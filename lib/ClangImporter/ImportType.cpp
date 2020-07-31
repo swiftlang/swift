@@ -181,7 +181,7 @@ namespace {
     if (!opaquePointer) {
       return Type();
     }
-    return {opaquePointer->getDeclaredType(),
+    return {opaquePointer->getDeclaredInterfaceType(),
             type.isReferenceType() ? ImportHint::None
                                     : ImportHint::OtherPointer};
   }
@@ -423,7 +423,7 @@ namespace {
            : Impl.SwiftContext.getUnsafeMutableRawPointerDecl());
         if (!pointerTypeDecl)
           return Type();
-        return {pointerTypeDecl->getDeclaredType(),
+        return {pointerTypeDecl->getDeclaredInterfaceType(),
                 ImportHint::OtherPointer};
       }
 
@@ -969,7 +969,7 @@ namespace {
                 memberTypes.push_back(superclassType);
 
               for (auto protocolDecl : typeParam->getConformingProtocols())
-                memberTypes.push_back(protocolDecl->getDeclaredType());
+                memberTypes.push_back(protocolDecl->getDeclaredInterfaceType());
 
               bool hasExplicitAnyObject = false;
               if (memberTypes.empty())
@@ -985,7 +985,7 @@ namespace {
           importedType = BoundGenericClassType::get(
             imported, nullptr, importedTypeArgs);
         } else {
-          importedType = imported->getDeclaredType();
+          importedType = imported->getDeclaredInterfaceType();
         }
 
         if (!type->qual_empty()) {
@@ -1033,7 +1033,7 @@ namespace {
         if (auto objcClassDef = objcClass->getDefinition())
           bridgedType = mapSwiftBridgeAttr(objcClassDef);
         else if (objcClass->getName() == "NSString")
-          bridgedType = Impl.SwiftContext.getStringDecl()->getDeclaredType();
+          bridgedType = Impl.SwiftContext.getStringDecl()->getDeclaredInterfaceType();
 
         if (bridgedType) {
           // Gather the type arguments.
@@ -1088,7 +1088,7 @@ namespace {
                   keyStructDecl == Impl.SwiftContext.getDictionaryDecl() ||
                   keyStructDecl == Impl.SwiftContext.getArrayDecl()) {
                 if (auto anyHashable = Impl.SwiftContext.getAnyHashableDecl())
-                  keyType = anyHashable->getDeclaredType();
+                  keyType = anyHashable->getDeclaredInterfaceType();
                 else
                   keyType = Type();
               }
@@ -1129,7 +1129,7 @@ namespace {
           if (!proto)
             return Type();
 
-          members.push_back(proto->getDeclaredType());
+          members.push_back(proto->getDeclaredInterfaceType());
         }
 
         importedType = ProtocolCompositionType::get(Impl.SwiftContext,
@@ -1414,14 +1414,14 @@ static ImportedType adjustTypeForConcreteImport(
     // Turn BOOL and DarwinBoolean into Bool in contexts that can bridge types
     // losslessly.
     if (bridging == Bridgeability::Full && canBridgeTypes(importKind))
-      importedType = impl.SwiftContext.getBoolDecl()->getDeclaredType();
+      importedType = impl.SwiftContext.getBoolDecl()->getDeclaredInterfaceType();
     break;
 
   case ImportHint::NSUInteger:
     // When NSUInteger is used as an enum's underlying type or if it does not
     // come from a system module, make sure it stays unsigned.
     if (importKind == ImportTypeKind::Enum || !allowNSUIntegerAsInt)
-      importedType = impl.SwiftContext.getUIntDecl()->getDeclaredType();
+      importedType = impl.SwiftContext.getUIntDecl()->getDeclaredInterfaceType();
     break;
 
   case ImportHint::CFPointer:
@@ -1652,7 +1652,7 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
     switch (getClangASTContext().BuiltinInfo.getTypeString(builtinID)[0]) {
     case 'z': // size_t
     case 'Y': // ptrdiff_t
-      return {SwiftContext.getIntDecl()->getDeclaredType(), false};
+      return {SwiftContext.getIntDecl()->getDeclaredInterfaceType(), false};
     default:
       break;
     }
@@ -2467,7 +2467,7 @@ Type ClangImporter::Implementation::getNSObjectType() {
     return NSObjectTy;
 
   if (auto decl = dyn_cast_or_null<ClassDecl>(importDeclByName("NSObject"))) {
-    NSObjectTy = decl->getDeclaredType();
+    NSObjectTy = decl->getDeclaredInterfaceType();
     return NSObjectTy;
   }
 
@@ -2533,7 +2533,7 @@ static Type getNamedProtocolType(ClangImporter::Implementation &impl,
             impl.importDecl(decl->getUnderlyingDecl(), impl.CurrentVersion)) {
       if (auto protoDecl =
               dynCastIgnoringCompatibilityAlias<ProtocolDecl>(swiftDecl)) {
-        return protoDecl->getDeclaredType();
+        return protoDecl->getDeclaredInterfaceType();
       }
     }
   }

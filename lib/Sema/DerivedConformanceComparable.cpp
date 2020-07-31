@@ -244,7 +244,7 @@ deriveComparable_lt(
     getParamDecl("b")
   });
 
-  auto boolTy = C.getBoolDecl()->getDeclaredType();
+  auto boolTy = C.getBoolDecl()->getDeclaredInterfaceType();
 
   Identifier generatedIdentifier;
   if (parentDC->getParentModule()->isResilient()) {
@@ -271,7 +271,7 @@ deriveComparable_lt(
   // Add the @_implements(Comparable, < (_:_:)) attribute
   if (generatedIdentifier != C.Id_LessThanOperator) {
     auto comparable = C.getProtocol(KnownProtocolKind::Comparable);
-    auto comparableType = comparable->getDeclaredType();
+    auto comparableType = comparable->getDeclaredInterfaceType();
     auto comparableTypeExpr = TypeExpr::createImplicit(comparableType, C);
     SmallVector<Identifier, 2> argumentLabels = { Identifier(), Identifier() };
     auto comparableDeclName = DeclName(C, DeclBaseName(C.Id_LessThanOperator),
@@ -354,7 +354,7 @@ void DerivedConformance::tryDiagnoseFailedComparableDerivation(
       ctx.Diags.diagnose(rawTypeLoc,
                          diag::comparable_synthesis_raw_value_not_allowed,
                          rawType, nominal->getDeclaredInterfaceType(),
-                         comparableProto->getDeclaredType());
+                         comparableProto->getDeclaredInterfaceType());
     }
   }
 }

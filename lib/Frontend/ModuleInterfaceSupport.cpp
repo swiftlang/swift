@@ -465,7 +465,7 @@ public:
       printer << " : ";
 
       ProtocolDecl *proto = protoAndAvailability.first;
-      proto->getDeclaredType()->print(printer, printOptions);
+      proto->getDeclaredInterfaceType()->print(printer, printOptions);
 
       printer << " {}\n";
     }
