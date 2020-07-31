@@ -266,10 +266,12 @@ struct ModuleInterfaceLoaderOptions {
   bool remarkOnRebuildFromInterface = false;
   bool disableInterfaceLock = false;
   bool disableImplicitSwiftModule = false;
+  std::string mainExecutablePath;
   ModuleInterfaceLoaderOptions(const FrontendOptions &Opts):
     remarkOnRebuildFromInterface(Opts.RemarkOnRebuildFromModuleInterface),
     disableInterfaceLock(Opts.DisableInterfaceFileLock),
-    disableImplicitSwiftModule(Opts.DisableImplicitModules) {}
+    disableImplicitSwiftModule(Opts.DisableImplicitModules),
+    mainExecutablePath(Opts.MainExecutablePath) {}
   ModuleInterfaceLoaderOptions() = default;
 };
 
