@@ -2130,11 +2130,10 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
         if (auto *sei = dyn_cast<SwitchEnumInst>(termInst)) {
           auto *optionalEnumDecl = getASTContext().getOptionalDecl();
           auto operandTy = sei->getOperand()->getType();
-          if (operandTy.getASTType().getEnumOrBoundGenericEnum() == optionalEnumDecl) {
+          if (operandTy.getASTType().getEnumOrBoundGenericEnum() ==
+              optionalEnumDecl) {
             // `Optional<T>`
             auto optionalTy = remapType(operandTy);
-            // `T`
-            auto Ty = optionalTy.getOptionalObjectType();
             // `T.TangentVector`
             auto tanTy = remapType(concreteBBArgAdjCopy->getType());
             // `Optional<T.TangentVector>`
@@ -2142,15 +2141,18 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
             // `Optional<T>.TangentVector`
             auto tangentVectorTy = getRemappedTangentType(optionalTy);
             // `Optional<T>.TangentVector` Decl
-            auto *structDecl = cast<StructType>(tangentVectorTy.getASTType()).getStructOrBoundGenericStruct();
-            // Lookup `Optional<T>.TangentVector.init`.
-            auto initLookup = structDecl->lookupDirect(DeclBaseName::createConstructor());
+            auto *structDecl = tangentVectorTy.getStructOrBoundGenericStruct();
+            // Look up the `Optional<T>.TangentVector.init` declaration.
+            auto initLookup =
+                structDecl->lookupDirect(DeclBaseName::createConstructor());
             ConstructorDecl *constructorDecl = nullptr;
             for (auto *candidate : initLookup) {
               auto candidateModule = candidate->getModuleContext();
-              if (candidateModule->getName() == builder.getASTContext().Id_Differentiation ||
-                candidateModule->isStdlibModule()) {
-                assert(!constructorDecl && "Multiple `Optional.TangentVector.init`s");
+              if (candidateModule->getName() ==
+                      builder.getASTContext().Id_Differentiation ||
+                  candidateModule->isStdlibModule()) {
+                assert(!constructorDecl &&
+                       "Multiple `Optional.TangentVector.init`s");
                 constructorDecl = cast<ConstructorDecl>(candidate);
 #ifdef NDEBUG
                 break;
@@ -2159,20 +2161,17 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
             }
             assert(constructorDecl && "No `Optional.TangentVector.init`");
 
-            // Allocate a local buffer to store the Optional adjoint value.
-            auto *optTanAdjBuf = builder.createAllocStack(pbLoc, tangentVectorTy);
-            // %metatype = metatype $Optional<T>.TangentVector.Type
-            auto metatypeType = CanMetatypeType::get(tangentVectorTy.getASTType(),
-                                                     MetatypeRepresentation::Thin);
-            auto metatypeSILType = SILType::getPrimitiveObjectType(metatypeType);
-            auto metatype = builder.createMetatype(pbLoc, metatypeSILType);
+            // Allocate a local buffer for the `Optional` adjoint value.
+            auto *optTanAdjBuf =
+                builder.createAllocStack(pbLoc, tangentVectorTy);
             // Find `Optional<T.TangentVector>.some` EnumElementDecl.
             auto someEltDecl = builder.getASTContext().getOptionalSomeDecl();
-            // %enum = enum $Optional<T.TangentVector>, #Optional.some!enumelt, %concreteBBArgAdjCopy : $T
+            // %enum = enum $Optional<T.TangentVector>, #Optional.some!enumelt,
+            // %concreteBBArgAdjCopy : $T
             auto enumInst = builder.createEnum(pbLoc, concreteBBArgAdjCopy,
                                                someEltDecl, optionalTanTy);
-            // Allocate a local buffer to convert the `concreteBBArgAdjCopy` to `Optional<T.TangentVector>`.
-            // (For `Optional<T>.TangentVector.init` input.)
+            // Initialize a `Optional<T.TangentVector>` buffer as the input for
+            // `Optional<T>.TangentVector.init`.
             auto *optArgBuf = builder.createAllocStack(pbLoc, optionalTanTy);
             builder.emitStoreValueOperation(pbLoc, enumInst, optArgBuf,
                                             StoreOwnershipQualifier::Trivial);
@@ -2181,22 +2180,34 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
             auto *initFn = fb.getOrCreateFunction(
                 pbLoc, SILDeclRef(constructorDecl), NotForDefinition);
             auto *initFnRef = builder.createFunctionRef(pbLoc, initFn);
-            // Find Differentiable conformance for `T` and get SubstitutionMap.
+            // Find the `T: Differentiable` conformance.
+            // Create `SubstitutionMap` for applying
+            // `Optional<T>.TangentVector.init`.
             auto *swiftModule = getModule().getSwiftModule();
-            auto *diffProto = builder.getASTContext().getProtocol(KnownProtocolKind::Differentiable);
+            auto *diffProto = builder.getASTContext().getProtocol(
+                KnownProtocolKind::Differentiable);
+            // `T`
+            auto Ty = optionalTy.getOptionalObjectType();
             auto diffConf =
                 swiftModule->lookupConformance(Ty.getASTType(), diffProto);
-            assert(!diffConf.isInvalid() && "Missing conformance to `Differentiable`");
+            assert(!diffConf.isInvalid() &&
+                   "Missing conformance to `Differentiable`");
             auto subMap = SubstitutionMap::get(
                 initFn->getLoweredFunctionType()->getSubstGenericSignature(),
                 ArrayRef<Type>(Ty.getASTType()), {diffConf});
-            // %apply %init_fn(%optTanAdjBuf, %optArgBuf, %metatype)
+            // %metatype = metatype $Optional<T>.TangentVector.Type
+            auto metatypeType = CanMetatypeType::get(
+                tangentVectorTy.getASTType(), MetatypeRepresentation::Thin);
+            auto metatypeSILType =
+                SILType::getPrimitiveObjectType(metatypeType);
+            auto metatype = builder.createMetatype(pbLoc, metatypeSILType);
+            // apply %init_fn(%optTanAdjBuf, %optArgBuf, %metatype)
             builder.createApply(pbLoc, initFnRef, subMap,
                                 {optTanAdjBuf, optArgBuf, metatype});
             builder.emitDestroyAddr(pbLoc, optArgBuf);
             builder.createDeallocStack(pbLoc, optArgBuf);
 
-            // Add created `Optional<T>.TangentVector` to the adjoint.
+            // Accumulate adjoint for the incoming `Optional` value.
             addToAdjointBuffer(bb, incomingValue, optTanAdjBuf, pbLoc);
             builder.emitDestroyAddr(pbLoc, optTanAdjBuf);
             builder.createDeallocStack(pbLoc, optTanAdjBuf);
