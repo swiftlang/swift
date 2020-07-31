@@ -67,7 +67,7 @@ import SubE
 // CHECK-NEXT:    "-target",
 // CHECK-NEXT:    "-Xcc",
 // CHECK:         "-fapinotes-swift-version=4"
-
+// CHECK-NOT: "error: cannot open Swift placeholder dependency module map from"
 // CHECK: "bridgingHeader":
 // CHECK-NEXT: "path":
 // CHECK-SAME: Bridging.h
