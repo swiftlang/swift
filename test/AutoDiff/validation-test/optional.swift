@@ -11,8 +11,8 @@ var OptionalTests = TestSuite("OptionalDifferentiation")
 //===----------------------------------------------------------------------===//
 
 /*
-// Note: this lowers to `try_apply` instead of `switch_enum`, and is
-// not directly relevant.
+// TODO(TF-433): operator `??` lowers to `try_apply` instead of `switch_enum`,
+// which is not yet supported by differentiation.
 @differentiable
 func optional1(_ maybeX: Float?) -> Float {
   return maybeX ?? 10
