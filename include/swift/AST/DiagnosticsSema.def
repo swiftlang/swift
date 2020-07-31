@@ -455,6 +455,9 @@ ERROR(cannot_convert_closure_result_nil,none,
 ERROR(cannot_convert_parent_type,none,
       "cannot convert parent type %0 to expected type %1",
       (Type, Type))
+ERROR(cannot_convert_chain_result_type,none,
+      "member chain produces result of type %0 but contextual base was inferred as %1",
+      (Type, Type))
 
 NOTE(generic_argument_mismatch,none,
      "arguments to generic parameter %0 (%1 and %2) are expected to be equal",

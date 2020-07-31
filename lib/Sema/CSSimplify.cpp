@@ -10056,10 +10056,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
         impact = 10;
     }
 
-    if (locator->isLastElement<LocatorPathElt::UnresolvedMember>()) {
+    if (locator->isLastElement<LocatorPathElt::UnresolvedMemberChainResult>()) {
       // If this is a contextual failure for an unresolved member, then increase
       // the impact to attempt other fixes first and avoid ambiguity.
-      impact = 5;
+      impact = 2;
     }
 
     if (recordFix(fix, impact))

@@ -182,7 +182,7 @@ func implicit(_ i: inout ImplicitMembers) {
     if i == .createOptional()?.another {}
 }
 
-struct ImplicitGeneric<T> {
+struct ImplicitGeneric<T> { // expected-note4 {{arguments to generic parameter 'T' ('Int' and 'String') are expected to be equal}}
     static var implicit: ImplicitGeneric<T> { ImplicitGeneric<T>() }
     var another: ImplicitGeneric<T> { ImplicitGeneric<T>() }
     func getAnother() -> ImplicitGeneric<T> {
@@ -227,7 +227,7 @@ implicit(.implicitString.anotherStringInt)
 // Member types along the chain can have different generic arguments
 implicit(.implicit.anotherIntString.anotherStringInt)
 
-implicit(.implicit.anotherString.anotherStringInt) // expected-error {{type of expression is ambiguous without more context}}
-implicit(.implicit.getAnotherString().anotherStringInt) // expected-error {{type of expression is ambiguous without more context}}
-implicit(.implicit.anotherString.getAnotherStringInt()) // expected-error {{type of expression is ambiguous without more context}}
-implicit(.implicit.getAnotherString().getAnotherStringInt()) // expected-error {{type of expression is ambiguous without more context}}
+implicit(.implicit.anotherString.anotherStringInt) // expected-error {{member chain produces result of type 'ImplicitGeneric<Int>' but contextual base was inferred as 'ImplicitGeneric<String>'}}
+implicit(.implicit.getAnotherString().anotherStringInt) // expected-error {{member chain produces result of type 'ImplicitGeneric<Int>' but contextual base was inferred as 'ImplicitGeneric<String>'}}
+implicit(.implicit.anotherString.getAnotherStringInt()) // expected-error {{member chain produces result of type 'ImplicitGeneric<Int>' but contextual base was inferred as 'ImplicitGeneric<String>'}}
+implicit(.implicit.getAnotherString().getAnotherStringInt()) // expected-error {{member chain produces result of type 'ImplicitGeneric<Int>' but contextual base was inferred as 'ImplicitGeneric<String>'}}

@@ -755,6 +755,11 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
       break;
     }
 
+    case ConstraintLocator::UnresolvedMemberChainResult: {
+      diagnostic = diag::cannot_convert_chain_result_type;
+      break;
+    }
+
     default:
       break;
     }
