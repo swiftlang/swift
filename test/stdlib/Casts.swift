@@ -15,6 +15,7 @@
 // -----------------------------------------------------------------------------
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency)
 // REQUIRES: executable_test
+// UNSUPPORTED: use_os_stdlib
 
 import StdlibUnittest
 #if _runtime(_ObjC)
