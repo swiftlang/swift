@@ -290,6 +290,27 @@ static void tryDiagnoseUnnecessaryCastOverOptionSet(ASTContext &Ctx,
     .fixItRemove(SourceRange(ME->getDotLoc(), E->getEndLoc()));
 }
 
+/// Check that a labeled statement doesn't shadow another statement with the
+/// same label.
+static void checkLabeledStmtShadowing(
+    ASTContext &ctx, SourceFile *sourceFile, LabeledStmt *ls) {
+  auto name = ls->getLabelInfo().Name;
+  if (name.empty() || !sourceFile || ls->getStartLoc().isInvalid())
+    return;
+
+  auto activeLabeledStmtsVec = ASTScope::lookupLabeledStmts(
+      sourceFile, ls->getStartLoc());
+  auto activeLabeledStmts = llvm::makeArrayRef(activeLabeledStmtsVec);
+  for (auto prevLS : activeLabeledStmts.slice(1)) {
+    if (prevLS->getLabelInfo().Name == name) {
+      ctx.Diags.diagnose(
+          ls->getLabelInfo().Loc, diag::label_shadowed, name);
+      ctx.Diags.diagnose(
+          prevLS->getLabelInfo().Loc, diag::invalid_redecl_prev, name);
+    }
+  }
+}
+
 namespace {
 class StmtChecker : public StmtVisitor<StmtChecker, Stmt*> {
 public:
@@ -332,17 +353,8 @@ public:
     StmtChecker &SC;
     AddLabeledStmt(StmtChecker &SC, LabeledStmt *LS) : SC(SC) {
       // Verify that we don't have label shadowing.
-      if (!LS->getLabelInfo().Name.empty())
-        for (auto PrevLS : SC.ActiveLabeledStmts) {
-          if (PrevLS->getLabelInfo().Name == LS->getLabelInfo().Name) {
-            auto &DE = SC.getASTContext().Diags;
-            DE.diagnose(LS->getLabelInfo().Loc,
-                        diag::label_shadowed, LS->getLabelInfo().Name);
-            DE.diagnose(PrevLS->getLabelInfo().Loc,
-                        diag::invalid_redecl_prev,
-                        PrevLS->getLabelInfo().Name);
-          }
-        }
+      auto sourceFile = SC.DC->getParentSourceFile();
+      checkLabeledStmtShadowing(SC.getASTContext(), sourceFile, LS);
 
       // In any case, remember that we're in this labeled statement so that
       // break and continue are aware of it.
@@ -350,32 +362,30 @@ public:
 
       // Verify that the ASTScope-based query for active labeled statements
       // is equivalent to what we have here.
-      if (LS->getStartLoc().isValid()) {
-        if (auto sourceFile = SC.DC->getParentSourceFile()) {
-          // The labeled statements from ASTScope lookup have the
-          // innermost labeled statement first, so reverse it to
-          // match the data structure maintained here.
-          auto activeFromASTScope = ASTScope::lookupLabeledStmts(
-              sourceFile, LS->getStartLoc());
-          assert(activeFromASTScope.front() == LS);
-          std::reverse(activeFromASTScope.begin(), activeFromASTScope.end());
-          if (activeFromASTScope != SC.ActiveLabeledStmts) {
-            llvm::errs() << "Old: ";
-            llvm::interleave(SC.ActiveLabeledStmts, [&](LabeledStmt *LS) {
-              llvm::errs() << LS;
-            }, [&] {
-              llvm::errs() << ' ';
-            });
-            llvm::errs() << "\nNew: ";
-            llvm::interleave(activeFromASTScope, [&](LabeledStmt *LS) {
-              llvm::errs() << LS;
-            }, [&] {
-              llvm::errs() << ' ';
-            });
-            llvm::errs() << "\n";
-          }
-          assert(activeFromASTScope == SC.ActiveLabeledStmts);
+      if (LS->getStartLoc().isValid() && sourceFile) {
+        // The labeled statements from ASTScope lookup have the
+        // innermost labeled statement first, so reverse it to
+        // match the data structure maintained here.
+        auto activeFromASTScope = ASTScope::lookupLabeledStmts(
+            sourceFile, LS->getStartLoc());
+        assert(activeFromASTScope.front() == LS);
+        std::reverse(activeFromASTScope.begin(), activeFromASTScope.end());
+        if (activeFromASTScope != SC.ActiveLabeledStmts) {
+          llvm::errs() << "Old: ";
+          llvm::interleave(SC.ActiveLabeledStmts, [&](LabeledStmt *LS) {
+            llvm::errs() << LS;
+          }, [&] {
+            llvm::errs() << ' ';
+          });
+          llvm::errs() << "\nNew: ";
+          llvm::interleave(activeFromASTScope, [&](LabeledStmt *LS) {
+            llvm::errs() << LS;
+          }, [&] {
+            llvm::errs() << ' ';
+          });
+          llvm::errs() << "\n";
         }
+        assert(activeFromASTScope == SC.ActiveLabeledStmts);
       }
     }
     ~AddLabeledStmt() {
