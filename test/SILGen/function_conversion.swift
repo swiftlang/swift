@@ -663,14 +663,14 @@ struct FunctionConversionParameterSubstToOrigReabstractionTest {
   }
 }
 
-// CHECK: sil hidden [ossa] @$s19function_conversion9dontCrashyyF
-// CHECK: [[FORCE_CAST:%.*]] = function_ref @$ss15_arrayForceCastySayq_GSayxGr0_lF
-// CHECK-NEXT: [[DOWNCAST_RESULT:%.*]] = apply [[FORCE_CAST]]<(String, String), (AnyHashable, Any)>({{.*}})
-// CHECK-NEXT: [[ADDR:%.*]] = alloc_stack $Array<(AnyHashable, Any)>
-// CHECK-NEXT: store [[DOWNCAST_RESULT]] to [init] [[ADDR]] : $*Array<(AnyHashable, Any)>
-// CHECK-NEXT: // function_ref Dictionary.init<A>(uniqueKeysWithValues:)
-// CHECK-NEXT: [[DICT_INIT:%.*]] = function_ref @$sSD20uniqueKeysWithValuesSDyxq_Gqd__n_tcSTRd__x_q_t7ElementRtd__lufC
-// CHECK-NEXT: apply [[DICT_INIT]]<AnyHashable, Any, [(AnyHashable, Any)]>([[ADDR]], [[TYPE:%.*]])
+// CHECK: sil {{.*}} [ossa] @$sS4SIgggoo_S2Ss11AnyHashableVyps5Error_pIegggrrzo_TR
+// CHECK:  [[TUPLE:%.*]] = apply %4(%2, %3) : $@noescape @callee_guaranteed (@guaranteed String, @guaranteed String) -> (@owned String, @owned String)
+// CHECK:  ([[LHS:%.*]], [[RHS:%.*]]) = destructure_tuple [[TUPLE]]
+// CHECK:  [[ADDR:%.*]] = alloc_stack $String
+// CHECK:  store [[LHS]] to [init] [[ADDR]] : $*String
+// CHECK:  [[CVT:%.*]] = function_ref @$ss21_convertToAnyHashableys0cD0VxSHRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : Hashable> (@in_guaranteed τ_0_0) -> @out AnyHashable
+// CHECK:  apply [[CVT]]<String>(%0, [[ADDR]])
+// CHECK: } // end sil function '$sS4SIgggoo_S2Ss11AnyHashableVyps5Error_pIegggrrzo_TR'
 
 func dontCrash() {
   let userInfo = ["hello": "world"]
