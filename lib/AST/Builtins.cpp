@@ -496,7 +496,7 @@ namespace {
     void addConformanceRequirement(const G &generator, ProtocolDecl *proto) {
       Requirement req(RequirementKind::Conformance,
                       generator.build(*this),
-                      proto->getDeclaredType());
+                      proto->getDeclaredInterfaceType());
       addedRequirements.push_back(req);
     }
 

@@ -2353,7 +2353,7 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
     return true;
 
   auto resultTy = TypeChecker::typeCheckExpression(
-      expr, dc, boolDecl->getDeclaredType(),
+      expr, dc, boolDecl->getDeclaredInterfaceType(),
       CTP_Condition);
   return !resultTy;
 }
@@ -2552,7 +2552,7 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
         }
         for (auto proto : archetypeType->getConformsTo()) {
           cs.addConstraint(ConstraintKind::ConformsTo, replacement,
-                           proto->getDeclaredType(), locator);
+                           proto->getDeclaredInterfaceType(), locator);
         }
         types[origType] = replacement;
         return replacement;
@@ -3918,7 +3918,7 @@ static bool checkForDynamicAttribute(CanType ty,
   // (superclass or protocols) have the attribute.
   if (auto archetype = dyn_cast<ArchetypeType>(ty)) {
     for (auto proto : archetype->getConformsTo()) {
-      if (hasAttribute(proto->getDeclaredType()))
+      if (hasAttribute(proto->getDeclaredInterfaceType()))
         return true;
     }
     if (auto superclass = archetype->getSuperclass()) {
@@ -3949,7 +3949,7 @@ static bool checkForDynamicAttribute(CanType ty,
 
   // Check the protocols the type conforms to.
   for (auto proto : nominal->getAllProtocols()) {
-    if (hasAttribute(proto->getDeclaredType()))
+    if (hasAttribute(proto->getDeclaredInterfaceType()))
       return true;
   }
 

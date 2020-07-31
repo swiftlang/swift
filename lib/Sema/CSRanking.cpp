@@ -567,13 +567,15 @@ bool CompareDeclSpecializationRequest::evaluate(
   case SelfTypeRelationship::ConformsTo:
     assert(conformance);
     cs.addConstraint(ConstraintKind::ConformsTo, selfTy1,
-                     cast<ProtocolDecl>(outerDC2)->getDeclaredType(), locator);
+                     cast<ProtocolDecl>(outerDC2)->getDeclaredInterfaceType(),
+                     locator);
     break;
 
   case SelfTypeRelationship::ConformedToBy:
     assert(conformance);
     cs.addConstraint(ConstraintKind::ConformsTo, selfTy2,
-                     cast<ProtocolDecl>(outerDC1)->getDeclaredType(), locator);
+                     cast<ProtocolDecl>(outerDC1)->getDeclaredInterfaceType(),
+                     locator);
     break;
   }
 
