@@ -139,12 +139,9 @@ ImportCache::getImportSet(ASTContext &ctx,
   // getImportedModulesForLookup().
   if (ImportSet *result = ImportSets.FindNodeOrInsertPos(ID, InsertPos))
     return *result;
-
-  void *mem = ctx.Allocate(
-    sizeof(ImportSet) +
-    sizeof(ModuleDecl::ImportedModule) * topLevelImports.size() +
-    sizeof(ModuleDecl::ImportedModule) * transitiveImports.size(),
-    alignof(ImportSet), AllocationArena::Permanent);
+  
+  size_t bytes = ImportSet::totalSizeToAlloc<ModuleDecl::ImportedModule>(topLevelImports.size() + transitiveImports.size());
+  void *mem = ctx.Allocate(bytes, alignof(ImportSet), AllocationArena::Permanent);
 
   auto *result = new (mem) ImportSet(hasHeaderImportModule,
                                      topLevelImports,
