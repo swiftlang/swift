@@ -584,4 +584,9 @@ struct MyView {
     // expected-note@-1 {{opaque return type declared here}}
     DoesNotConform()
   }
+
+  @TupleBuilder var emptySwitch: some P {
+    switch Optional.some(1) { // expected-error {{'switch' statement body must have at least one 'case' or 'default' block; do you want to add a default case?}}
+    }
+  }
 }

@@ -699,6 +699,18 @@ protected:
     if (!cs)
       return nullptr;
 
+    // If there are no 'case' statements in the body let's try
+    // to diagnose this situation via limited exhaustiveness check
+    // before failing a builder transform, otherwise type-checker
+    // might end up without any diagnostics which leads to crashes
+    // in SILGen.
+    if (capturedCaseVars.empty()) {
+      TypeChecker::checkSwitchExhaustiveness(switchStmt, dc,
+                                             /*limitChecking=*/true);
+      hadError = true;
+      return nullptr;
+    }
+
     // Form the expressions that inject the result of each case into the
     // appropriate
     llvm::TinyPtrVector<Expr *> injectedCaseExprs;
