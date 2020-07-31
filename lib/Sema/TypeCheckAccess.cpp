@@ -1486,8 +1486,42 @@ public:
 class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
   class Diagnoser;
 
+  // Problematic origin of an exported type.
+  //
+  // This enum must be kept in sync with
+  // diag::decl_from_hidden_module and
+  // diag::conformance_from_implementation_only_module.
+  enum class DisallowedOriginKind : uint8_t {
+    ImplementationOnly,
+    SPIImported,
+    None
+  };
+
+  // If there's an exportability problem with \p typeDecl, get its origin kind.
+  static DisallowedOriginKind getDisallowedOriginKind(
+      const TypeDecl *typeDecl, const SourceFile &SF, const Decl *context,
+      DowngradeToWarning &downgradeToWarning) {
+    downgradeToWarning = DowngradeToWarning::No;
+    ModuleDecl *M = typeDecl->getModuleContext();
+    if (SF.isImportedImplementationOnly(M)) {
+      // Temporarily downgrade implementation-only exportability in SPI to
+      // a warning.
+      if (context->isSPI())
+        downgradeToWarning = DowngradeToWarning::Yes;
+
+      // Implementation-only imported, cannot be reexported.
+      return DisallowedOriginKind::ImplementationOnly;
+    } else if (SF.isImportedAsSPI(typeDecl) && !context->isSPI()) {
+      // SPI can only be exported in SPI.
+      return DisallowedOriginKind::SPIImported;
+    }
+
+    return DisallowedOriginKind::None;
+  };
+
   void checkTypeImpl(
       Type type, const TypeRepr *typeRepr, const SourceFile &SF,
+      const Decl *context,
       const Diagnoser &diagnoser) {
     // Don't bother checking errors.
     if (type && type->hasError())
@@ -1500,14 +1534,14 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
     if (typeRepr) {
       const_cast<TypeRepr *>(typeRepr)->walk(TypeReprIdentFinder(
           [&](const ComponentIdentTypeRepr *component) {
-        ModuleDecl *M = component->getBoundDecl()->getModuleContext();
-        if (!SF.isImportedImplementationOnly(M) &&
-            !SF.isImportedAsSPI(component->getBoundDecl()))
-          return true;
+        TypeDecl *typeDecl = component->getBoundDecl();
+        auto downgradeToWarning = DowngradeToWarning::No;
+        auto originKind = getDisallowedOriginKind(typeDecl, SF, context, downgradeToWarning);
+        if (originKind != DisallowedOriginKind::None) {
+          diagnoser.diagnoseType(typeDecl, component, originKind, downgradeToWarning);
+          foundAnyIssues = true;
+        }
 
-        diagnoser.diagnoseType(component->getBoundDecl(), component,
-                               SF.isImportedImplementationOnly(M));
-        foundAnyIssues = true;
         // We still continue even in the diagnostic case to report multiple
         // violations.
         return true;
@@ -1525,19 +1559,17 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
 
     class ProblematicTypeFinder : public TypeDeclFinder {
       const SourceFile &SF;
+      const Decl *context;
       const Diagnoser &diagnoser;
     public:
-      ProblematicTypeFinder(const SourceFile &SF, const Diagnoser &diagnoser)
-        : SF(SF), diagnoser(diagnoser) {}
+      ProblematicTypeFinder(const SourceFile &SF, const Decl *context, const Diagnoser &diagnoser)
+        : SF(SF), context(context), diagnoser(diagnoser) {}
 
       void visitTypeDecl(const TypeDecl *typeDecl) {
-        ModuleDecl *M = typeDecl->getModuleContext();
-        if (!SF.isImportedImplementationOnly(M) &&
-            !SF.isImportedAsSPI(typeDecl))
-          return;
-
-        diagnoser.diagnoseType(typeDecl, /*typeRepr*/nullptr,
-                               SF.isImportedImplementationOnly(M));
+        auto downgradeToWarning = DowngradeToWarning::No;
+        auto originKind = getDisallowedOriginKind(typeDecl, SF, context, downgradeToWarning);
+        if (originKind != DisallowedOriginKind::None)
+          diagnoser.diagnoseType(typeDecl, /*typeRepr*/nullptr, originKind, downgradeToWarning);
       }
 
       void visitSubstitutionMap(SubstitutionMap subs) {
@@ -1597,7 +1629,7 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
       }
     };
 
-    type.walk(ProblematicTypeFinder(SF, diagnoser));
+    type.walk(ProblematicTypeFinder(SF, context, diagnoser));
   }
 
   void checkType(
@@ -1605,7 +1637,7 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
       const Diagnoser &diagnoser) {
     auto *SF = context->getDeclContext()->getParentSourceFile();
     assert(SF && "checking a non-source declaration?");
-    return checkTypeImpl(type, typeRepr, *SF, diagnoser);
+    return checkTypeImpl(type, typeRepr, *SF, context, diagnoser);
   }
 
   void checkType(
@@ -1634,7 +1666,7 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
     });
   }
 
-  // These enums must be kept in sync with
+  // This enum must be kept in sync with
   // diag::decl_from_hidden_module and
   // diag::conformance_from_implementation_only_module.
   enum class Reason : unsigned {
@@ -1642,10 +1674,6 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
     PropertyWrapper,
     ExtensionWithPublicMembers,
     ExtensionWithConditionalConformances
-  };
-  enum class HiddenImportKind : uint8_t {
-    ImplementationOnly,
-    SPI
   };
 
   class Diagnoser {
@@ -1656,16 +1684,17 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
 
     void diagnoseType(const TypeDecl *offendingType,
                       const TypeRepr *complainRepr,
-                      bool isImplementationOnly) const {
+                      DisallowedOriginKind originKind,
+                      DowngradeToWarning downgradeToWarning) const {
       ModuleDecl *M = offendingType->getModuleContext();
-      HiddenImportKind importKind = isImplementationOnly?
-                                HiddenImportKind::ImplementationOnly:
-                                HiddenImportKind::SPI;
-      auto diag = D->diagnose(diag::decl_from_hidden_module,
+      auto errorOrWarning = downgradeToWarning == DowngradeToWarning::Yes?
+                            diag::decl_from_hidden_module_warn:
+                            diag::decl_from_hidden_module;
+      auto diag = D->diagnose(errorOrWarning,
                               offendingType->getDescriptiveKind(),
                               offendingType->getName(),
                               static_cast<unsigned>(reason), M->getName(),
-                              static_cast<unsigned>(importKind));
+                              static_cast<unsigned>(originKind));
       highlightOffendingType(diag, complainRepr);
     }
 
@@ -1702,7 +1731,7 @@ public:
     AccessScope accessScope =
         VD->getFormalAccessScope(nullptr,
                                  /*treatUsableFromInlineAsPublic*/true);
-    if (accessScope.isPublic() && !accessScope.isSPI())
+    if (accessScope.isPublic())
       return false;
 
     // Is this a stored property in a non-resilient struct or class?
@@ -1994,7 +2023,7 @@ public:
         DE.diagnose(diagLoc, diag::decl_from_hidden_module,
                     PGD->getDescriptiveKind(), PGD->getName(),
                     static_cast<unsigned>(Reason::General), M->getName(),
-                    static_cast<unsigned>(HiddenImportKind::ImplementationOnly)
+                    static_cast<unsigned>(DisallowedOriginKind::ImplementationOnly)
                     );
     if (refRange.isValid())
       diag.highlight(refRange);
