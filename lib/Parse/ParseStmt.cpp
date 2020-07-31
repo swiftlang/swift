@@ -950,6 +950,7 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
                        /*FuncLoc=*/ SourceLoc(),
                        name,
                        /*NameLoc=*/ PreviousLoc,
+                       /*Async=*/ false, /*AsyncLoc=*/ SourceLoc(),
                        /*Throws=*/ false, /*ThrowsLoc=*/ SourceLoc(),
                        /*generic params*/ nullptr,
                        params,

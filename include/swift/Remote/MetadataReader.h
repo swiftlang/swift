@@ -803,6 +803,7 @@ public:
 
       auto flags = FunctionTypeFlags()
                        .withConvention(Function->getConvention())
+                       .withAsync(Function->async())
                        .withThrows(Function->throws())
                        .withParameterFlags(Function->hasParameterFlags())
                        .withEscaping(Function->isEscaping());

@@ -1765,10 +1765,10 @@ private:
   }
   
   NodePointer demangleFunctionType(Node::Kind kind) {
-    bool throws = false;
-    if (Mangled &&
-        Mangled.nextIf('z')) {
-      throws = true;
+    bool throws = false, async = false;
+    if (Mangled) {
+      throws = Mangled.nextIf('z');
+      async = Mangled.nextIf('Z');
     }
     NodePointer in_args = demangleType();
     if (!in_args)
@@ -1781,7 +1781,10 @@ private:
     if (throws) {
       block->addChild(Factory.createNode(Node::Kind::ThrowsAnnotation), Factory);
     }
-    
+    if (async) {
+      block->addChild(Factory.createNode(Node::Kind::AsyncAnnotation), Factory);
+    }
+
     NodePointer in_node = Factory.createNode(Node::Kind::ArgumentTuple);
     block->addChild(in_node, Factory);
     in_node->addChild(in_args, Factory);
