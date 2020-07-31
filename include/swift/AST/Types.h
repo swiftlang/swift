@@ -2179,6 +2179,8 @@ END_CAN_TYPE_WRAPPER(TupleType, Type)
 
 /// UnboundGenericType - Represents a generic type where the type arguments have
 /// not yet been resolved.
+///
+/// This type is on its way out. Try to avoid introducing new usages.
 class UnboundGenericType : public AnyGenericType,
     public llvm::FoldingSetNode {
 private:
