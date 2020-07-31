@@ -410,7 +410,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     auto error = args.claimNext();
     auto errorBuffer = IGF.getErrorResultSlot(
                SILType::getPrimitiveObjectType(IGF.IGM.Context.getErrorDecl()
-                                                  ->getDeclaredType()
+                                                  ->getDeclaredInterfaceType()
                                                   ->getCanonicalType()));
     IGF.Builder.CreateStore(error, errorBuffer);
     
