@@ -3086,16 +3086,6 @@ public:
     return parent == nullptr || !isMemberChainMember(parent);
   }
 
-  /// Whether this node sits at the end of a member chain that hangs off an
-  /// \c UnresolvedMemberExpr at the base.
-  bool isUnresolvedMemberChainTail(ASTNode node) {
-    if (auto *expr = getAsExpr(node))
-      return isMemberChainTail(expr)
-        && isa<UnresolvedMemberExpr>(getMemberChainBase(expr));
-    else
-      return false;
-  }
-
 public:
 
   /// Whether we should attempt to fix problems.

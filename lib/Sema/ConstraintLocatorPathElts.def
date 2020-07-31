@@ -192,6 +192,9 @@ CUSTOM_LOCATOR_PATH_ELT(PatternMatch)
 /// of a problem.
 CUSTOM_LOCATOR_PATH_ELT(ArgumentAttribute)
 
+/// The result of a chain of member accesses off an UnresolvedMemberExpr
+SIMPLE_LOCATOR_PATH_ELT(UnresolvedMemberChainResult)
+
 #undef LOCATOR_PATH_ELT
 #undef CUSTOM_LOCATOR_PATH_ELT
 #undef SIMPLE_LOCATOR_PATH_ELT

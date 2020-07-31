@@ -2129,15 +2129,19 @@ bool ContextualFailure::diagnoseAsError() {
     return false;
   }
 
-  case ConstraintLocator::Member:
-  case ConstraintLocator::FunctionResult:
-  case ConstraintLocator::UnresolvedMember: {
+  case ConstraintLocator::UnresolvedMemberChainResult: {
     auto &solution = getSolution();
-    auto locator = getConstraintLocator(anchor,
-                                        isExpr<UnresolvedMemberExpr>(anchor)
-                                          ? ConstraintLocator::UnresolvedMember
-                                          : ConstraintLocator::Member);
-    auto overload = getOverloadChoiceIfAvailable(locator);
+    auto member = anchor;
+    if (auto *CE = getAsExpr<CallExpr>(anchor))
+      member = CE->getFn();
+
+    auto kind = ConstraintLocator::Member;
+    if (isExpr<UnresolvedMemberExpr>(anchor))
+      kind = ConstraintLocator::UnresolvedMember;
+    else if (isExpr<SubscriptExpr>(anchor))
+      kind = ConstraintLocator::SubscriptMember;
+    auto overload = getOverloadChoiceIfAvailable(getConstraintLocator(member,
+                                                                      kind));
     if (!(overload && overload->choice.isDecl()))
       return false;
 

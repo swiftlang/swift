@@ -4135,20 +4135,6 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::FunctionResult: {
-    // FIXME: Is this necessary?
-    if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
-                                locator))
-      break;
-
-    // If this mismatch occurs at the tail of an unresolved member chain,
-    // there's a contextual mismatch.
-    if (isUnresolvedMemberChainTail(anchor)) {
-      auto *fix = IgnoreContextualType::create(*this, lhs, rhs,
-                                               getConstraintLocator(locator));
-      conversionsOrFixes.push_back(fix);
-      break;
-    }
-
     auto *loc = getConstraintLocator(anchor, {path.begin(), path.end() - 1});
     // If this is a mismatch between contextual type and (trailing)
     // closure with explicitly specified result type let's record it
@@ -4195,16 +4181,6 @@ bool ConstraintSystem::repairFailures(
           repairByInsertingExplicitCall(lhs, rhs))
         return true;
     }
-
-    // If this mismatch occurs at the tail of an unresolved member chain,
-    // there's a contextual mismatch.
-    if (isUnresolvedMemberChainTail(anchor)) {
-      auto *fix = IgnoreContextualType::create(*this, lhs, rhs,
-                                               getConstraintLocator(locator));
-      conversionsOrFixes.push_back(fix);
-      break;
-    }
-
     break;
   }
 
@@ -4330,10 +4306,7 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
-  case ConstraintLocator::UnresolvedMember: {
-    if (!isExpr<UnresolvedMemberExpr>(anchor))
-      break;
-
+  case ConstraintLocator::UnresolvedMemberChainResult: {
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
       break;

@@ -849,7 +849,6 @@ namespace {
     }
 
     Type addUnresolvedMemberChainConstraints(Expr *expr, Type resultTy,
-                                             ConstraintLocator *resultLocator,
                                              unsigned additionalOptions = 0) {
       // If this is a member chain hanging off of an UnresolvedMemberExpr,
       // and we're at the last element of the chain, then the contextual type
@@ -858,14 +857,16 @@ namespace {
         auto *chainBaseExpr = CS.getMemberChainBase(expr);
         if (auto *UME = dyn_cast<UnresolvedMemberExpr>(chainBaseExpr)) {
           // Create a new type variable representing the result of the chain.
-          auto chainResultTy = CS.createTypeVariable(resultLocator,
+          auto locator = CS.getConstraintLocator(expr,
+                                ConstraintLocator::UnresolvedMemberChainResult);
+          auto chainResultTy = CS.createTypeVariable(locator,
                  additionalOptions | TVO_CanBindToHole | TVO_CanBindToNoEscape);
           auto chainBaseTy = CS.getUnresolvedMemberBaseType(UME);
 
           // The result of this element of the chain must be convertible to the
           // contextual type, and the contextual type must be equal to the base.
           CS.addConstraint(ConstraintKind::Conversion, resultTy, chainResultTy,
-                           resultLocator);
+                           locator);
           CS.addConstraint(ConstraintKind::Equal, chainBaseTy, chainResultTy,
                 CS.getConstraintLocator(UME, ConstraintLocator::MemberRefBase));
 
@@ -1487,10 +1488,9 @@ namespace {
       // If there is an argument, apply it.
       if (auto arg = expr->getArgument()) {
         // Create a new type variable for the result of the function.
-        auto outputLocator = CS.getConstraintLocator(expr,
-                                             ConstraintLocator::FunctionResult);
-        auto outputTy = CS.createTypeVariable(outputLocator,
-                                              TVO_CanBindToNoEscape);
+        auto outputTy = CS.createTypeVariable(
+            CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult),
+            TVO_CanBindToNoEscape);
 
         // The function/enum case must be callable with the given argument.
 
@@ -1509,13 +1509,12 @@ namespace {
             CS.getConstraintLocator(expr),
             {expr->getArgumentLabels(),
              expr->getUnlabeledTrailingClosureIndex()});
-        return addUnresolvedMemberChainConstraints(expr, outputTy,
-                                                   outputLocator);
+        return addUnresolvedMemberChainConstraints(expr, outputTy);
       }
       
       // Otherwise, add the usual constraints for an element of an unresolved
       // member chain.
-      return addUnresolvedMemberChainConstraints(expr, memberTy, memberLocator,
+      return addUnresolvedMemberChainConstraints(expr, memberTy,
                                                  TVO_CanBindToLValue);
     }
 
@@ -1586,7 +1585,6 @@ namespace {
                                               expr->getOuterAlternatives());
 
       return addUnresolvedMemberChainConstraints(expr, resultTy,
-                      CS.getConstraintLocator(expr, ConstraintLocator::Member),
                                                  TVO_CanBindToLValue);
     }
 
@@ -1750,10 +1748,8 @@ namespace {
                                               expr->getIndex(),
                                               decl, expr->getArgumentLabels(),
                                       expr->getUnlabeledTrailingClosureIndex());
-      auto resultLocator = CS.getConstraintLocator(expr,
-                                             ConstraintLocator::FunctionResult);
 
-      return addUnresolvedMemberChainConstraints(expr, resultTy, resultLocator,
+      return addUnresolvedMemberChainConstraints(expr, resultTy,
                                                  TVO_CanBindToLValue);
     }
     
@@ -2938,13 +2934,8 @@ namespace {
       }
 
       // If the ApplyExpr is a CallExpr, add chain constraints as necessary.
-      if (isa<CallExpr>(expr)) {
-        auto resultLocator = CS.getConstraintLocator(expr,
-                                            ConstraintLocator::FunctionResult);
-
-        return addUnresolvedMemberChainConstraints(expr, resultType,
-                                                   resultLocator);
-      }
+      if (isa<CallExpr>(expr))
+        return addUnresolvedMemberChainConstraints(expr, resultType);
 
       return resultType;
     }
@@ -3256,7 +3247,7 @@ namespace {
       CS.addConstraint(ConstraintKind::OptionalObject,
                        CS.getType(expr->getSubExpr()), objectTy,
                        locator);
-      return addUnresolvedMemberChainConstraints(expr, objectTy, locator,
+      return addUnresolvedMemberChainConstraints(expr, objectTy,
                                                  TVO_CanBindToLValue);
     }
     
@@ -3292,7 +3283,7 @@ namespace {
       CS.addConstraint(ConstraintKind::OptionalObject,
                        CS.getType(expr->getSubExpr()), objectTy,
                        locator);
-      return addUnresolvedMemberChainConstraints(expr, objectTy, locator);
+      return addUnresolvedMemberChainConstraints(expr, objectTy);
     }
 
     Type visitOpenExistentialExpr(OpenExistentialExpr *expr) {
