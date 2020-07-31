@@ -78,7 +78,7 @@ deriveRawValueInit(AbstractFunctionDecl *initDecl, void *) {
   auto *rawValueDecl = new (C) ParamDecl(
       SourceLoc(), SourceLoc(), C.Id_rawValue,
       SourceLoc(), C.Id_rawValue, parentDC);
-  rawValueDecl->setInterfaceType(C.getIntDecl()->getDeclaredType());
+  rawValueDecl->setInterfaceType(C.getIntDecl()->getDeclaredInterfaceType());
   rawValueDecl->setSpecifier(ParamSpecifier::Default);
   rawValueDecl->setImplicit();
   auto *paramList = ParameterList::createWithoutLoc(rawValueDecl);
@@ -362,7 +362,7 @@ ValueDecl *DerivedConformance::deriveCodingKey(ValueDecl *requirement) {
   auto name = requirement->getBaseName();
   if (name == Context.Id_stringValue) {
     // Synthesize `var stringValue: String { get }`
-    auto stringType = Context.getStringDecl()->getDeclaredType();
+    auto stringType = Context.getStringDecl()->getDeclaredInterfaceType();
     auto synth = [rawType, stringType](AbstractFunctionDecl *getterDecl) {
       if (rawType && rawType->isEqual(stringType)) {
         // enum SomeStringEnum : String {
@@ -393,7 +393,7 @@ ValueDecl *DerivedConformance::deriveCodingKey(ValueDecl *requirement) {
 
   } else if (name == Context.Id_intValue) {
     // Synthesize `var intValue: Int? { get }`
-    auto intType = Context.getIntDecl()->getDeclaredType();
+    auto intType = Context.getIntDecl()->getDeclaredInterfaceType();
     auto optionalIntType = OptionalType::get(intType);
 
     auto synth = [rawType, intType](AbstractFunctionDecl *getterDecl) {
@@ -422,7 +422,7 @@ ValueDecl *DerivedConformance::deriveCodingKey(ValueDecl *requirement) {
     if (argumentNames.size() == 1) {
       if (argumentNames[0] == Context.Id_stringValue) {
         // Derive `init?(stringValue:)`
-        auto stringType = Context.getStringDecl()->getDeclaredType();
+        auto stringType = Context.getStringDecl()->getDeclaredInterfaceType();
         auto synth = [rawType, stringType](AbstractFunctionDecl *initDecl) {
           if (rawType && rawType->isEqual(stringType)) {
             // enum SomeStringEnum : String {
@@ -455,7 +455,7 @@ ValueDecl *DerivedConformance::deriveCodingKey(ValueDecl *requirement) {
         return deriveInitDecl(*this, stringType, Context.Id_stringValue, synth);
       } else if (argumentNames[0] == Context.Id_intValue) {
         // Synthesize `init?(intValue:)`
-        auto intType = Context.getIntDecl()->getDeclaredType();
+        auto intType = Context.getIntDecl()->getDeclaredInterfaceType();
         auto synthesizer = [rawType, intType](AbstractFunctionDecl *initDecl) {
           if (rawType && rawType->isEqual(intType)) {
             // enum SomeIntEnum : Int {

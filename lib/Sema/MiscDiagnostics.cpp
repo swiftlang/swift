@@ -1733,7 +1733,7 @@ bool TypeChecker::getDefaultGenericArgumentsString(
       }
 
       for (auto proto : archetypeTy->getConformsTo()) {
-        members.push_back(proto->getDeclaredType());
+        members.push_back(proto->getDeclaredInterfaceType());
         if (proto->requiresClass())
           hasExplicitAnyObject = false;
       }

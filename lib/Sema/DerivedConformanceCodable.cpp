@@ -314,7 +314,7 @@ static EnumDecl *synthesizeCodingKeysEnum(DerivedConformance &derived) {
   // We want to look through all the var declarations of this type to create
   // enum cases based on those var names.
   auto *codingKeyProto = C.getProtocol(KnownProtocolKind::CodingKey);
-  auto *codingKeyType = codingKeyProto->getDeclaredType();
+  auto codingKeyType = codingKeyProto->getDeclaredInterfaceType();
   TypeLoc protoTypeLoc[1] = {TypeLoc::withoutLoc(codingKeyType)};
   MutableArrayRef<TypeLoc> inherited = C.AllocateCopy(protoTypeLoc);
 

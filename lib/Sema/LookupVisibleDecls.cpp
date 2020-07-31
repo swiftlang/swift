@@ -503,8 +503,9 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
     // Add members from any extensions.
     if (LS.isIncludingProtocolExtensionMembers()) {
       SmallVector<ValueDecl *, 2> FoundDecls;
-      doGlobalExtensionLookup(BaseTy, Proto->getDeclaredType(), FoundDecls,
-                              FromContext, LS, ReasonForThisProtocol);
+      doGlobalExtensionLookup(BaseTy, Proto->getDeclaredInterfaceType(),
+                              FoundDecls, FromContext, LS,
+                              ReasonForThisProtocol);
       for (auto *VD : FoundDecls)
         Consumer.foundDecl(VD, ReasonForThisProtocol);
     }
@@ -519,20 +520,22 @@ lookupVisibleMemberDeclsImpl(Type BaseTy, VisibleDeclConsumer &Consumer,
                              VisitedSet &Visited);
 
 static void
-  lookupVisibleProtocolMemberDecls(Type BaseTy, ProtocolType *PT,
+  lookupVisibleProtocolMemberDecls(Type BaseTy, ProtocolDecl *PD,
                                    VisibleDeclConsumer &Consumer,
                                    const DeclContext *CurrDC, LookupState LS,
                                    DeclVisibilityKind Reason,
                                    GenericSignatureBuilder *GSB,
                                    VisitedSet &Visited) {
-  if (!Visited.insert(PT->getDecl()).second)
+  if (!Visited.insert(PD).second)
     return;
 
-  for (auto Proto : PT->getDecl()->getInheritedProtocols())
-    lookupVisibleProtocolMemberDecls(BaseTy, Proto->getDeclaredType(), Consumer, CurrDC,
-                                     LS, getReasonForSuper(Reason),
+  for (auto Proto : PD->getInheritedProtocols())
+    lookupVisibleProtocolMemberDecls(BaseTy, Proto,
+                                     Consumer, CurrDC, LS,
+                                     getReasonForSuper(Reason),
                                      GSB, Visited);
-  lookupTypeMembers(BaseTy, PT, Consumer, CurrDC, LS, Reason);
+  lookupTypeMembers(BaseTy, PD->getDeclaredInterfaceType(),
+                    Consumer, CurrDC, LS, Reason);
 }
 
 // Generate '$' and '_' prefixed variables that have attached property
@@ -635,7 +638,8 @@ static void lookupVisibleMemberDeclsImpl(
 
   // If the base is a protocol, enumerate its members.
   if (ProtocolType *PT = BaseTy->getAs<ProtocolType>()) {
-    lookupVisibleProtocolMemberDecls(BaseTy, PT, Consumer, CurrDC, LS, Reason,
+    lookupVisibleProtocolMemberDecls(BaseTy, PT->getDecl(),
+                                     Consumer, CurrDC, LS, Reason,
                                      GSB, Visited);
     return;
   }
@@ -652,7 +656,7 @@ static void lookupVisibleMemberDeclsImpl(
   if (ArchetypeType *Archetype = BaseTy->getAs<ArchetypeType>()) {
     for (auto Proto : Archetype->getConformsTo())
       lookupVisibleProtocolMemberDecls(
-          BaseTy, Proto->getDeclaredType(), Consumer, CurrDC, LS,
+          BaseTy, Proto, Consumer, CurrDC, LS,
           Reason, GSB, Visited);
 
     if (auto superclass = Archetype->getSuperclass())
@@ -675,7 +679,7 @@ static void lookupVisibleMemberDeclsImpl(
       // Conformances
       for (const auto &Conforms : EquivClass->conformsTo) {
         lookupVisibleProtocolMemberDecls(
-            BaseTy, Conforms.first->getDeclaredType(), Consumer, CurrDC,
+            BaseTy, Conforms.first, Consumer, CurrDC,
             LS, getReasonForSuper(Reason), GSB, Visited);
       }
 

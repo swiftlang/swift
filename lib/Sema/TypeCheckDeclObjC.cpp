@@ -179,7 +179,7 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
 
       if (!PD->isObjC()) {
         diags.diagnose(TypeRange.Start, diag::not_objc_protocol,
-                       PD->getDeclaredType());
+                       PD->getDeclaredInterfaceType());
         return;
       }
     }
@@ -672,7 +672,7 @@ bool swift::isRepresentableInObjC(
         return false;
       }
 
-      errorResultType = boolDecl->getDeclaredType()->getCanonicalType();
+      errorResultType = boolDecl->getDeclaredInterfaceType()->getCanonicalType();
     } else if (!resultType->getOptionalObjectType() &&
                isValidObjectiveCErrorResultType(dc, resultType)) {
       // Functions that return a (non-optional) type bridged to Objective-C
@@ -1345,8 +1345,8 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
       for (auto inherited : proto->getInheritedProtocols()) {
         if (!inherited->isObjC()) {
           proto->diagnose(diag::objc_protocol_inherits_non_objc_protocol,
-                          proto->getDeclaredType(),
-                          inherited->getDeclaredType());
+                          proto->getDeclaredInterfaceType(),
+                          inherited->getDeclaredInterfaceType());
           inherited->diagnose(diag::kind_declname_declared_here,
                               DescriptiveDeclKind::Protocol,
                               inherited->getName());

@@ -91,7 +91,7 @@ deriveBridgedNSError_enum_nsErrorDomain(
   //   }
   // }
 
-  auto stringTy = derived.Context.getStringDecl()->getDeclaredType();
+  auto stringTy = derived.Context.getStringDecl()->getDeclaredInterfaceType();
 
   // Define the property.
   VarDecl *propDecl;

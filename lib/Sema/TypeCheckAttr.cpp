@@ -2654,7 +2654,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
   auto &ctx = protocol->getASTContext();
   auto &diags = ctx.Diags;
   DeclContext *dc = protocol->getDeclContext();
-  Type protocolType = protocol->getDeclaredType();
+  Type protocolType = protocol->getDeclaredInterfaceType();
 
   // Get the NominalTypeDecl for the type eraser.
   Type typeEraser = attr->getResolvedType(protocol);
