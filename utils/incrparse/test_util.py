@@ -29,7 +29,7 @@ def run_command(cmd):
         return subprocess.check_output(cmd, stderr=subprocess.STDOUT)
     else:
         return subprocess.check_output(list(map(lambda s: s.encode('utf-8'), cmd)),
-                stderr=subprocess.STDOUT)
+                                       stderr=subprocess.STDOUT)
 
 
 def parseLine(line, line_no, test_case, incremental_edit_args, reparse_args,
