@@ -1472,7 +1472,7 @@ public:
       return false;
 
     auto *wrappedVar = expression.wrappedVar;
-    if (!wrappedVar || wrappedVar->isStatic())
+    if (!apply || !wrappedVar || wrappedVar->isStatic())
       return false;
 
     return expression.innermostWrappedValueInit == apply;
