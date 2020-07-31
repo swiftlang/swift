@@ -4313,7 +4313,14 @@ case TypeKind::Id:
   case TypeKind::SILFunction: {
     auto fnTy = cast<SILFunctionType>(base);
     bool changed = false;
-
+    auto hasTypeErasedGenericClassType = [](Type ty) -> bool {
+      return ty.findIf([](Type subType) -> bool {
+        if (subType->getCanonicalType().isTypeErasedGenericClassType())
+          return true;
+        else
+          return false;
+      });
+    };
     auto updateSubs = [&](SubstitutionMap &subs) -> bool {
       // This interface isn't suitable for updating the substitution map in a
       // substituted SILFunctionType.
@@ -4323,9 +4330,8 @@ case TypeKind::Id:
         auto transformed = type.transformRec(fn);
         assert((type->isEqual(transformed) ||
                 (type->hasTypeParameter() && transformed->hasTypeParameter()) ||
-                (type->getCanonicalType().isTypeErasedGenericClassType() &&
-                 transformed->getCanonicalType()
-                     .isTypeErasedGenericClassType())) &&
+                (hasTypeErasedGenericClassType(type) &&
+                 hasTypeErasedGenericClassType(transformed))) &&
                "Substituted SILFunctionType can't be transformed into a "
                "concrete type");
         newReplacements.push_back(transformed->getCanonicalType());
