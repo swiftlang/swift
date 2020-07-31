@@ -690,20 +690,18 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
       SILParameterInfo(argv->getType().getASTType(),
                        ParameterConvention::Direct_Unowned),
     };
-    auto NSApplicationMainType = SILFunctionType::get(nullptr,
-                  SILFunctionType::ExtInfo()
-                    // Should be C calling convention, but NSApplicationMain
-                    // has an overlay to fix the type of argv.
-                    .withRepresentation(SILFunctionType::Representation::Thin),
-                  SILCoroutineKind::None,
-                  ParameterConvention::Direct_Unowned,
-                  argTypes,
-                  /*yields*/ {},
-                  SILResultInfo(argc->getType().getASTType(),
-                                ResultConvention::Unowned),
-                  /*error result*/ None,
-                  SubstitutionMap(), SubstitutionMap(),
-                  getASTContext());
+    auto NSApplicationMainType = SILFunctionType::get(
+        nullptr,
+        SILFunctionType::ExtInfoBuilder()
+            // Should be C calling convention, but NSApplicationMain
+            // has an overlay to fix the type of argv.
+            .withRepresentation(SILFunctionType::Representation::Thin)
+            .build(),
+        SILCoroutineKind::None, ParameterConvention::Direct_Unowned, argTypes,
+        /*yields*/ {},
+        SILResultInfo(argc->getType().getASTType(), ResultConvention::Unowned),
+        /*error result*/ None, SubstitutionMap(), SubstitutionMap(),
+        getASTContext());
 
     SILGenFunctionBuilder builder(SGM);
     auto NSApplicationMainFn = builder.getOrCreateFunction(

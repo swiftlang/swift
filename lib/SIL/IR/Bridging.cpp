@@ -205,9 +205,12 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
                                bridging,
                                /*non-optional*/false);
 
-      return FunctionType::get(newParams, newResult,
-                               funTy->getExtInfo().withSILRepresentation(
-                                       SILFunctionType::Representation::Block));
+      return FunctionType::get(
+          newParams, newResult,
+          funTy->getExtInfo()
+              .intoBuilder()
+              .withSILRepresentation(SILFunctionType::Representation::Block)
+              .build());
     }
     }
   }

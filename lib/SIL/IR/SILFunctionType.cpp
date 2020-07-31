@@ -268,7 +268,8 @@ SILFunctionType::getWithDifferentiability(DifferentiabilityKind kind,
             ? SILResultDifferentiability::DifferentiableOrNotApplicable
             : SILResultDifferentiability::NotDifferentiable));
   }
-  auto newExtInfo = getExtInfo().withDifferentiabilityKind(kind);
+  auto newExtInfo =
+      getExtInfo().intoBuilder().withDifferentiabilityKind(kind).build();
   return get(getInvocationGenericSignature(), newExtInfo, getCoroutineKind(),
              getCalleeConvention(), newParameters, getYields(), newResults,
              getOptionalErrorResult(), getPatternSubstitutions(),
@@ -279,8 +280,11 @@ SILFunctionType::getWithDifferentiability(DifferentiabilityKind kind,
 CanSILFunctionType SILFunctionType::getWithoutDifferentiability() {
   if (!isDifferentiable())
     return CanSILFunctionType(this);
-  auto nondiffExtInfo = getExtInfo().withDifferentiabilityKind(
-      DifferentiabilityKind::NonDifferentiable);
+  auto nondiffExtInfo =
+      getExtInfo()
+          .intoBuilder()
+          .withDifferentiabilityKind(DifferentiabilityKind::NonDifferentiable)
+          .build();
   SmallVector<SILParameterInfo, 8> newParams;
   for (auto &param : getParameters())
     newParams.push_back(param.getWithDifferentiability(
@@ -2106,11 +2110,13 @@ static CanSILFunctionType getSILFunctionType(
 
   // NOTE: SILFunctionType::ExtInfo doesn't track everything that
   // AnyFunctionType::ExtInfo tracks. For example: 'throws' or 'auto-closure'
-  auto silExtInfo = SILFunctionType::ExtInfo()
-    .withRepresentation(extInfo.getSILRepresentation())
-    .withIsPseudogeneric(pseudogeneric)
-    .withNoEscape(extInfo.isNoEscape())
-    .withDifferentiabilityKind(extInfo.getDifferentiabilityKind());
+  auto silExtInfo =
+      SILFunctionType::ExtInfoBuilder()
+          .withRepresentation(extInfo.getSILRepresentation())
+          .withIsPseudogeneric(pseudogeneric)
+          .withNoEscape(extInfo.isNoEscape())
+          .withDifferentiabilityKind(extInfo.getDifferentiabilityKind())
+          .build();
   
   // Build the substituted generic signature we extracted.
   SubstitutionMap substitutions;
@@ -3716,7 +3722,7 @@ public:
     // pseudogeneric.
     auto extInfo = origType->getExtInfo();
     if (!shouldSubstituteOpaqueArchetypes)
-      extInfo = extInfo.withIsPseudogeneric(false);
+      extInfo = extInfo.intoBuilder().withIsPseudogeneric(false).build();
 
     auto genericSig = shouldSubstituteOpaqueArchetypes
                         ? origType->getInvocationGenericSignature()

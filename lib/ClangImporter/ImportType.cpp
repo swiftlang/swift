@@ -167,11 +167,13 @@ namespace {
     return {FunctionType::get(
                 funcTy->getParams(), funcTy->getResult(),
                 funcTy->getExtInfo()
+                    .intoBuilder()
                     .withRepresentation(
                         AnyFunctionType::Representation::CFunctionPointer)
-                    .withClangFunctionType(&type)),
+                    .withClangFunctionType(&type)
+                    .build()),
             type.isReferenceType() ? ImportHint::None
-                                    : ImportHint::CFunctionPointer};
+                                   : ImportHint::CFunctionPointer};
   }
 
   static ImportResult importOverAlignedFunctionPointerLikeType(

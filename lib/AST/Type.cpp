@@ -3411,47 +3411,25 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   return build(C, CanTypes, HasExplicitAnyObject);
 }
 
-void AnyFunctionType::ExtInfo::ClangTypeInfo::printType(
-    ClangModuleLoader *cml, llvm::raw_ostream &os) const {
-  cml->printClangType(type, os);
-}
-
-void
-AnyFunctionType::ExtInfo::assertIsFunctionType(const clang::Type *type) {
-#ifndef NDEBUG
-  if (!(type->isFunctionPointerType() || type->isBlockPointerType() ||
-        type->isFunctionReferenceType())) {
-    SmallString<256> buf;
-    llvm::raw_svector_ostream os(buf);
-    os << "Expected a Clang function type wrapped in a pointer type or "
-       << "a block pointer type but found:\n";
-    type->dump(os);
-    llvm_unreachable(os.str().data());
-  }
-#endif
-  return;
-}
-
-const clang::Type *AnyFunctionType::getClangFunctionType() const {
+ClangTypeInfo AnyFunctionType::getClangTypeInfo() const {
   switch (getKind()) {
   case TypeKind::Function:
-    return cast<FunctionType>(this)->getClangFunctionType();
+    return cast<FunctionType>(this)->getClangTypeInfo();
   case TypeKind::GenericFunction:
     // Generic functions do not have C types.
-    return nullptr;
+    return ClangTypeInfo();
   default:
     llvm_unreachable("Illegal type kind for AnyFunctionType.");
   }
 }
 
-const clang::Type *AnyFunctionType::getCanonicalClangFunctionType() const {
-  auto *ty = getClangFunctionType();
-  return ty ? ty->getCanonicalTypeInternal().getTypePtr() : nullptr;
+ClangTypeInfo AnyFunctionType::getCanonicalClangTypeInfo() const {
+  return getClangTypeInfo().getCanonical();
 }
 
 // [TODO: Store-SIL-Clang-type]
-const clang::FunctionType *SILFunctionType::getClangFunctionType() const {
-  return nullptr;
+ClangTypeInfo SILFunctionType::getClangTypeInfo() const {
+  return ClangTypeInfo();
 }
 
 FunctionType *
@@ -5099,8 +5077,11 @@ AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {
                    param.getParameterFlags().withNoDerivative(false));
     newParams.push_back(newParam);
   }
-  auto nonDiffExtInfo = getExtInfo()
-      .withDifferentiabilityKind(DifferentiabilityKind::NonDifferentiable);
+  auto nonDiffExtInfo =
+      getExtInfo()
+          .intoBuilder()
+          .withDifferentiabilityKind(DifferentiabilityKind::NonDifferentiable)
+          .build();
   if (isa<FunctionType>(this))
     return FunctionType::get(newParams, getResult(), nonDiffExtInfo);
   assert(isa<GenericFunctionType>(this));

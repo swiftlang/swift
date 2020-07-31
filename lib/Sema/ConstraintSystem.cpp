@@ -1906,23 +1906,27 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
         TVO_CanBindToNoEscape);
     FunctionType::Param arg(escapeClosure);
-    auto bodyClosure = FunctionType::get(arg, result,
-        FunctionType::ExtInfo(FunctionType::Representation::Swift,
-                              /*noescape*/ true,
-                              /*throws*/ true,
-                              DifferentiabilityKind::NonDifferentiable,
-                              /*clangFunctionType*/ nullptr));
+    auto bodyClosure = FunctionType::get(
+        arg, result,
+        FunctionType::ExtInfoBuilder(FunctionType::Representation::Swift,
+                                     /*noescape*/ true,
+                                     /*throws*/ true,
+                                     DifferentiabilityKind::NonDifferentiable,
+                                     /*clangFunctionType*/ nullptr)
+            .build());
     FunctionType::Param args[] = {
       FunctionType::Param(noescapeClosure),
       FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
     };
 
-    auto refType = FunctionType::get(args, result,
-      FunctionType::ExtInfo(FunctionType::Representation::Swift,
-                            /*noescape*/ false,
-                            /*throws*/ true,
-                            DifferentiabilityKind::NonDifferentiable,
-                            /*clangFunctionType*/ nullptr));
+    auto refType = FunctionType::get(
+        args, result,
+        FunctionType::ExtInfoBuilder(FunctionType::Representation::Swift,
+                                     /*noescape*/ false,
+                                     /*throws*/ true,
+                                     DifferentiabilityKind::NonDifferentiable,
+                                     /*clangFunctionType*/ nullptr)
+            .build());
     return {refType, refType};
   }
   case DeclTypeCheckingSemantics::OpenExistential: {
@@ -1941,22 +1945,26 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
         TVO_CanBindToNoEscape);
     FunctionType::Param bodyArgs[] = {FunctionType::Param(openedTy)};
-    auto bodyClosure = FunctionType::get(bodyArgs, result,
-        FunctionType::ExtInfo(FunctionType::Representation::Swift,
-                              /*noescape*/ true,
-                              /*throws*/ true,
-                              DifferentiabilityKind::NonDifferentiable,
-                              /*clangFunctionType*/ nullptr));
+    auto bodyClosure = FunctionType::get(
+        bodyArgs, result,
+        FunctionType::ExtInfoBuilder(FunctionType::Representation::Swift,
+                                     /*noescape*/ true,
+                                     /*throws*/ true,
+                                     DifferentiabilityKind::NonDifferentiable,
+                                     /*clangFunctionType*/ nullptr)
+            .build());
     FunctionType::Param args[] = {
       FunctionType::Param(existentialTy),
       FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
     };
-    auto refType = FunctionType::get(args, result,
-      FunctionType::ExtInfo(FunctionType::Representation::Swift,
-                            /*noescape*/ false,
-                            /*throws*/ true,
-                            DifferentiabilityKind::NonDifferentiable,
-                            /*clangFunctionType*/ nullptr));
+    auto refType = FunctionType::get(
+        args, result,
+        FunctionType::ExtInfoBuilder(FunctionType::Representation::Swift,
+                                     /*noescape*/ false,
+                                     /*throws*/ true,
+                                     DifferentiabilityKind::NonDifferentiable,
+                                     /*clangFunctionType*/ nullptr)
+            .build());
     return {refType, refType};
   }
   }

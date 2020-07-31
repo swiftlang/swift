@@ -3760,10 +3760,10 @@ namespace {
 
       OS << "\n";
       Indent += 2;
-      if (auto *cty = T->getClangFunctionType()) {
+      if (!T->getClangTypeInfo().empty()) {
         std::string s;
         llvm::raw_string_ostream os(s);
-        cty->dump(os);
+        T->getClangTypeInfo().dump(os);
         printField("clang_type", os.str());
       }
       printAnyFunctionParams(T->getParams(), "input");

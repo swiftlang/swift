@@ -3714,8 +3714,10 @@ public:
 
     auto adjustedOperandExtInfo =
         opFTy->getExtInfo()
+            .intoBuilder()
             .withRepresentation(SILFunctionType::Representation::Thick)
-            .withNoEscape(resFTy->isNoEscape());
+            .withNoEscape(resFTy->isNoEscape())
+            .build();
     require(adjustedOperandExtInfo == resFTy->getExtInfo(),
             "operand and result of thin_to_think_function must agree in particulars");
   }

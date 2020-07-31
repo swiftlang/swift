@@ -3113,10 +3113,9 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
     return funcTy;
   }
 
-  Optional<ExtInfo::ClangTypeInfo> clangTypeInfo = info.getClangTypeInfo();
+  Optional<ClangTypeInfo> clangTypeInfo = info.getClangTypeInfo();
 
-  size_t allocSize =
-    totalSizeToAlloc<AnyFunctionType::Param, ExtInfo::ClangTypeInfo>(
+  size_t allocSize = totalSizeToAlloc<AnyFunctionType::Param, ClangTypeInfo>(
       params.size(), clangTypeInfo.hasValue() ? 1 : 0);
   void *mem = ctx.Allocate(allocSize, alignof(FunctionType), arena);
 
@@ -3146,7 +3145,7 @@ FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params,
                           getTrailingObjects<AnyFunctionType::Param>());
   auto clangTypeInfo = info.getClangTypeInfo();
   if (clangTypeInfo.hasValue())
-    *getTrailingObjects<ExtInfo::ClangTypeInfo>() = clangTypeInfo.getValue();
+    *getTrailingObjects<ClangTypeInfo>() = clangTypeInfo.getValue();
 }
 
 void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
@@ -3239,11 +3238,6 @@ ArrayRef<Requirement> GenericFunctionType::getRequirements() const {
   return Signature->getRequirements();
 }
 
-void SILFunctionType::ExtInfo::ClangTypeInfo::printType(
-    ClangModuleLoader *cml, llvm::raw_ostream &os) const {
-  cml->printClangType(ClangFunctionType, os);
-}
-
 void SILFunctionType::Profile(
     llvm::FoldingSetNodeID &id,
     GenericSignature genericParams,
@@ -3302,13 +3296,14 @@ SILFunctionType::SILFunctionType(
       WitnessMethodConformance(witnessMethodConformance) {
 
   Bits.SILFunctionType.HasErrorResult = errorResult.hasValue();
-  Bits.SILFunctionType.ExtInfoBits = ext.Bits;
+  Bits.SILFunctionType.ExtInfoBits = ext.getBits();
   Bits.SILFunctionType.HasClangTypeInfo = false;
   Bits.SILFunctionType.HasPatternSubs = (bool) patternSubs;
   Bits.SILFunctionType.HasInvocationSubs = (bool) invocationSubs;
   // The use of both assert() and static_assert() below is intentional.
-  assert(Bits.SILFunctionType.ExtInfoBits == ext.Bits && "Bits were dropped!");
-  static_assert(ExtInfo::NumMaskBits == NumSILExtInfoBits,
+  assert(Bits.SILFunctionType.ExtInfoBits == ext.getBits() &&
+         "Bits were dropped!");
+  static_assert(SILExtInfoBuilder::NumMaskBits == NumSILExtInfoBits,
                 "ExtInfo and SILFunctionTypeBitfields must agree on bit size");
   Bits.SILFunctionType.CoroutineKind = unsigned(coroutineKind);
   NumParameters = params.size();

@@ -872,9 +872,7 @@ static void emitFatalError(ADContext &context, SILFunction *f,
                     ResultConvention::Unowned);
   // Fatal error function must have type `@convention(thin) () -> Never`.
   auto fatalErrorFnType = SILFunctionType::get(
-      /*genericSig*/ nullptr,
-      SILFunctionType::ExtInfo().withRepresentation(
-          SILFunctionTypeRepresentation::Thin),
+      /*genericSig*/ nullptr, SILFunctionType::ExtInfo::getThin(),
       SILCoroutineKind::None, ParameterConvention::Direct_Unowned, {},
       /*interfaceYields*/ {}, neverResultInfo,
       /*interfaceErrorResults*/ None, {}, {}, context.getASTContext());
@@ -1020,8 +1018,10 @@ static SILValue promoteCurryThunkApplicationToDifferentiableFunction(
   // Construct new curry thunk type with `@differentiable` function
   // result.
   auto diffResultFnTy = resultFnTy->getWithExtInfo(
-      resultFnTy->getExtInfo().withDifferentiabilityKind(
-          DifferentiabilityKind::Normal));
+      resultFnTy->getExtInfo()
+          .intoBuilder()
+          .withDifferentiabilityKind(DifferentiabilityKind::Normal)
+          .build());
   auto newThunkResult = thunkResult.getWithInterfaceType(diffResultFnTy);
   auto thunkType = SILFunctionType::get(
       thunkTy->getSubstGenericSignature(), thunkTy->getExtInfo(),
