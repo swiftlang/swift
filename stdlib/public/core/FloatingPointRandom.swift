@@ -609,10 +609,4 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
   // contains only one value, then we do not need to generate a significand.
   @_transparent
   private static var _sectionBitCount: Int { UInt64.bitWidth - 4 }
-  
-  @usableFromInline @_transparent
-  internal static var _significandMask: RawSignificand {
-    // We use `<<` in case significandBitCount == RawSignificand.bitwidth
-    return (1 << significandBitCount) &- 1
-  }
 }
