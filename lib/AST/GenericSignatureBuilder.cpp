@@ -5068,7 +5068,7 @@ public:
       if (differentiableProtocol && fnTy->isDifferentiable()) {
         auto addConformanceConstraint = [&](Type type, ProtocolDecl *protocol) {
           Requirement req(RequirementKind::Conformance, type,
-                          protocol->getDeclaredType());
+                          protocol->getDeclaredInterfaceType());
           Builder.addRequirement(req, source, nullptr);
         };
         auto addSameTypeConstraint = [&](Type firstType,

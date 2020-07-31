@@ -772,7 +772,7 @@ FuncDecl *ASTContext::getSequenceMakeIterator() const {
 
 CanType ASTContext::getExceptionType() const {
   if (auto exn = getErrorDecl()) {
-    return exn->getDeclaredType()->getCanonicalType();
+    return exn->getDeclaredInterfaceType()->getCanonicalType();
   } else {
     // Use Builtin.NativeObject just as a stand-in.
     return TheNativeObjectType;
@@ -864,7 +864,7 @@ CanType ASTContext::getNeverType() const {
   auto neverDecl = getNeverDecl();
   if (!neverDecl)
     return CanType();
-  return neverDecl->getDeclaredType()->getCanonicalType();
+  return neverDecl->getDeclaredInterfaceType()->getCanonicalType();
 }
 
 #define KNOWN_OBJC_TYPE_DECL(MODULE, NAME, DECLTYPE) \
@@ -1073,7 +1073,7 @@ ASTContext::getBuiltinInitDecl(NominalTypeDecl *decl,
   if (witness)
     return witness;
 
-  auto type = decl->getDeclaredType();
+  auto type = decl->getDeclaredInterfaceType();
   auto builtinProtocol = getProtocol(builtinProtocolKind);
   auto builtinConformance = getStdlibModule()->lookupConformance(
       type, builtinProtocol);
@@ -1102,12 +1102,12 @@ FuncDecl *getBinaryComparisonOperatorIntDecl(const ASTContext &C, StringRef op, 
   if (!C.getIntDecl() || !C.getBoolDecl())
     return nullptr;
 
-  auto intType = C.getIntDecl()->getDeclaredType();
+  auto intType = C.getIntDecl()->getDeclaredInterfaceType();
   auto isIntParam = [&](AnyFunctionType::Param param) {
     return (!param.isVariadic() && !param.isInOut() &&
             param.getPlainType()->isEqual(intType));
   };
-  auto boolType = C.getBoolDecl()->getDeclaredType();
+  auto boolType = C.getBoolDecl()->getDeclaredInterfaceType();
   auto decl = lookupOperatorFunc(C, op, intType, 
       [=](FunctionType *type) {
     // Check for the signature: (Int, Int) -> Bool
@@ -4264,7 +4264,7 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
       if (auto objcBridgeable
             = getProtocol(KnownProtocolKind::ObjectiveCBridgeable)) {
         auto conformance = dc->getParentModule()->lookupConformance(
-            nominal->getDeclaredType(), objcBridgeable);
+            nominal->getDeclaredInterfaceType(), objcBridgeable);
         if (conformance) {
           result =
               ForeignRepresentationInfo::forBridged(conformance.getConcrete());

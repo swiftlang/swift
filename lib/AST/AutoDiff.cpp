@@ -282,7 +282,7 @@ GenericSignature autodiff::getConstrainedDerivativeGenericSignature(
     // Require differentiability parameters to conform to `Differentiable`.
     auto paramType = originalFnTy->getParameters()[paramIdx].getInterfaceType();
     Requirement req(RequirementKind::Conformance, paramType,
-                    diffableProto->getDeclaredType());
+                    diffableProto->getDeclaredInterfaceType());
     requirements.push_back(req);
     if (isTranspose) {
       // Require linearity parameters to additionally satisfy

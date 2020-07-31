@@ -5045,7 +5045,7 @@ swift::getInheritedForPrinting(const Decl *decl, const PrintOptions &options,
           isa<EnumDecl>(decl) &&
           cast<EnumDecl>(decl)->hasRawType())
         continue;
-      Results.push_back(TypeLoc::withoutLoc(proto->getDeclaredType()));
+      Results.push_back(TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()));
     }
   }
 }
