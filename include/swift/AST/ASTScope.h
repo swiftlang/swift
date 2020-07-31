@@ -1720,10 +1720,6 @@ public:
   Stmt *getStmt() const override;
   virtual LabeledConditionalStmt *getLabeledConditionalStmt() const = 0;
 
-  /// If a condition is present, create the martuska.
-  /// Return the lookupParent for the use scope.
-  ASTScopeImpl *createCondScopes();
-
 protected:
   /// Return the lookupParent required to search these.
   ASTScopeImpl *createNestedConditionalClauseScopes(ScopeCreator &,
