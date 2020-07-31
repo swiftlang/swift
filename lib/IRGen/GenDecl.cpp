@@ -1864,7 +1864,9 @@ void irgen::updateLinkageForDefinition(IRGenModule &IGM,
   // Exclude "main", because it should naturally be used, and because adding it
   // to llvm.used leaves a dangling use when the REPL attempts to discard
   // intermediate mains.
-  if (LinkInfo::isUsed(IRL) && global->getName() != SWIFT_ENTRY_POINT_FUNCTION)
+  if (LinkInfo::isUsed(IRL)
+      && (!IGM.getOptions().IntegratedREPL
+          || global->getName() != SWIFT_ENTRY_POINT_FUNCTION))
     IGM.addUsedGlobal(global);
 }
 
@@ -1959,7 +1961,9 @@ llvm::Function *irgen::createFunction(IRGenModule &IGM,
   // Exclude "main", because it should naturally be used, and because adding it
   // to llvm.used leaves a dangling use when the REPL attempts to discard
   // intermediate mains.
-  if (linkInfo.isUsed() && name != SWIFT_ENTRY_POINT_FUNCTION) {
+  if (linkInfo.isUsed()
+      && (!IGM.getOptions().IntegratedREPL
+          || name != SWIFT_ENTRY_POINT_FUNCTION)) {
     IGM.addUsedGlobal(fn);
   }
 
