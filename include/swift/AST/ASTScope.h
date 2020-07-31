@@ -1826,6 +1826,23 @@ public:
   Stmt *getStmt() const override { return stmt; }
 };
 
+class DoStmtScope final : public AbstractStmtScope {
+public:
+  DoStmt *const stmt;
+  DoStmtScope(DoStmt *e) : stmt(e) {}
+  virtual ~DoStmtScope() {}
+
+protected:
+  ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
+  std::string getClassName() const override;
+  Stmt *getStmt() const override { return stmt; }
+};
+
 class DoCatchStmtScope final : public AbstractStmtScope {
 public:
   DoCatchStmt *const stmt;
