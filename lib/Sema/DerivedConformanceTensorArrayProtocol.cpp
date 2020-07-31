@@ -221,6 +221,7 @@ static ValueDecl *deriveTensorArrayProtocol_method(
   DeclName declName(C, methodName, params);
   auto funcDecl = FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None,
                                    SourceLoc(), declName, SourceLoc(),
+				   /*Async*/ false, SourceLoc(),
                                    /*Throws*/ false, SourceLoc(),
                                    /*GenericParams*/ nullptr, params,
                                    TypeLoc::withoutLoc(returnType), parentDC);
