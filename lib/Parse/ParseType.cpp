@@ -569,10 +569,9 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       }
     }
 
-    tyR = new (Context) FunctionTypeRepr(generics, argsTyR, asyncLoc, throwsLoc,
-                                         arrowLoc, SecondHalf.get(),
-                                         patternGenerics, patternSubsTypes,
-                                         invocationSubsTypes);
+    tyR = new (Context) FunctionTypeRepr(generics, argsTyR, throwsLoc, arrowLoc,
+                                         SecondHalf.get(), patternGenerics,
+                                         patternSubsTypes, invocationSubsTypes);
   } else if (auto firstGenerics = generics ? generics : patternGenerics) {
     // Only function types may be generic.
     auto brackets = firstGenerics->getSourceRange();
@@ -1569,17 +1568,6 @@ bool Parser::canParseType() {
       continue;
     }
     break;
-  }
-
-  // Handle type-function if we have an 'async'.
-  if (Context.LangOpts.EnableExperimentalConcurrency &&
-      Tok.isContextualKeyword("async")) {
-    consumeToken();
-
-    // 'async' isn't a valid type without being followed by throws/rethrows
-    // or a return.
-    if (!Tok.isAny(tok::kw_throws, tok::kw_rethrows, tok::arrow))
-      return false;
   }
 
   // Handle type-function if we have an arrow or 'throws'/'rethrows' modifier.
