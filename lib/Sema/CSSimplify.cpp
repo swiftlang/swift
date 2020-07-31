@@ -4306,6 +4306,9 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
+  case ConstraintLocator::RValueAdjustment:
+    return true;
+
   case ConstraintLocator::UnresolvedMemberChainResult: {
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))

@@ -1493,16 +1493,18 @@ namespace {
       // the base type.
       auto locator = CS.getConstraintLocator(tail,
                                 ConstraintLocator::UnresolvedMemberChainResult);
-      auto chainResultTy = CS.createTypeVariable(locator,
-                 additionalOptions | TVO_CanBindToHole | TVO_CanBindToNoEscape);
+      auto tvo = additionalOptions | TVO_CanBindToHole | TVO_CanBindToNoEscape;
+      auto chainResultTy = CS.createTypeVariable(locator, tvo);
       auto chainBaseTy = UnresolvedBaseTypes.find(base)->second;
 
       // The result of this element of the chain must be convertible to the
       // contextual type, and the contextual type must be equal to the base.
+      CS.addConstraint(ConstraintKind::Conversion, resultTy, chainBaseTy,
+            CS.getConstraintLocator(tail, ConstraintLocator::RValueAdjustment));
       CS.addConstraint(ConstraintKind::Conversion, resultTy, chainResultTy,
                        locator);
       CS.addConstraint(ConstraintKind::Equal, chainBaseTy, chainResultTy,
-               CS.getConstraintLocator(base, ConstraintLocator::MemberRefBase));
+                       locator);
 
       return chainResultTy;
     }
@@ -3858,16 +3860,26 @@ namespace {
       }
 
       if (auto type = CG.visit(expr)) {
-        if (isMemberChainTail(CG.getConstraintSystem(), expr)) {
-          auto *chainBase = getMemberChainBase(expr);
-          if (auto *UME = dyn_cast<UnresolvedMemberExpr>(chainBase)) {
-            type = CG.addUnresolvedMemberChainConstraints(UME, expr, type);
-          }
-        }
 
         auto simplifiedType = CS.simplifyType(type);
 
         CS.setType(expr, simplifiedType);
+
+        // If this is the end of a member chain, inject an implicit ParenExpr
+        // to link the contextual type to the (implicit) base of the chain.
+        if (isMemberChainTail(CG.getConstraintSystem(), expr)) {
+          auto *chainBase = getMemberChainBase(expr);
+          if (auto *UME = dyn_cast<UnresolvedMemberExpr>(chainBase)) {
+            auto chainTy = CG.addUnresolvedMemberChainConstraints(UME, expr,
+                                                                simplifiedType);
+            auto *PE = new (CS.getASTContext()) ParenExpr(SourceLoc(), expr,
+                                                          SourceLoc(), false);
+            PE->setImplicit();
+            PE->setIsUnresolvedMemberChainPlaceholder();
+            CS.setType(PE, chainTy);
+            return PE;
+          }
+        }
 
         return expr;
       }

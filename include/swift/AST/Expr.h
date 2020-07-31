@@ -2048,13 +2048,14 @@ public:
 /// has tuple type, of course).
 class ParenExpr : public IdentityExpr {
   SourceLoc LParenLoc, RParenLoc;
-  
+  bool IsUnresolvedMemberChainPlaceholder;
 public:
   ParenExpr(SourceLoc lploc, Expr *subExpr, SourceLoc rploc,
             bool hasTrailingClosure,
             Type ty = Type())
     : IdentityExpr(ExprKind::Paren, subExpr, ty),
-      LParenLoc(lploc), RParenLoc(rploc) {
+      LParenLoc(lploc), RParenLoc(rploc),
+      IsUnresolvedMemberChainPlaceholder(false) {
     Bits.ParenExpr.HasTrailingClosure = hasTrailingClosure;
     assert(lploc.isValid() == rploc.isValid() &&
            "Mismatched source location information");
@@ -2084,6 +2085,14 @@ public:
   Optional<unsigned>
   getUnlabeledTrailingClosureIndexOfPackedArgument() const {
     return hasTrailingClosure() ? Optional<unsigned>(0) : None;
+  }
+
+  bool isUnresolvedMemberChainPlaceholder() const {
+    return IsUnresolvedMemberChainPlaceholder;
+  }
+
+  void setIsUnresolvedMemberChainPlaceholder() {
+    IsUnresolvedMemberChainPlaceholder = true;
   }
 
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Paren; }

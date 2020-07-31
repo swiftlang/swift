@@ -3259,6 +3259,18 @@ namespace {
     }
 
     Expr *visitParenExpr(ParenExpr *expr) {
+      // If this was an implicit ParenExpr inserted to give an unresolved member
+      // chain result type visibility in the AST (see
+      // ConstraintWalker::walkToExprPost), remove it from the AST now that we
+      // have a solution.
+      if (expr->isUnresolvedMemberChainPlaceholder()) {
+        auto *subExpr = expr->getSubExpr();
+        auto type = simplifyType(cs.getType(expr));
+        subExpr = coerceToType(subExpr, type, cs.getConstraintLocator(subExpr));
+        cs.setType(subExpr, type);
+        return subExpr;
+      }
+
       return simplifyExprType(expr);
     }
 
