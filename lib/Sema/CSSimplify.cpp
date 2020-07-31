@@ -6777,24 +6777,25 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
     // then the type we're constructing may not actually be the base of the
     // UnresolvedMemberExpr--instead, it will be the type of the nested type
     // member.
-    if (locatorEndsWith(locator, ConstraintLocator::ConstructorMember)) {
-      auto *baseLocator = cs.getConstraintLocator(UME,
-                                           ConstraintLocator::UnresolvedMember);
-      auto result = llvm::find_if(
-          cs.getTypeVariables(), [&baseLocator](const TypeVariableType *typeVar) {
-            return typeVar->getImpl().getLocator() == baseLocator;
-          });
-      assert(result != cs.getTypeVariables().end());
-      baseType = cs.simplifyType(*result);
+    // We need to find type variable which represents contextual base.
+    auto *baseLocator = cs.getConstraintLocator(
+        UME, locatorEndsWith(locator, ConstraintLocator::ConstructorMember)
+                 ? ConstraintLocator::UnresolvedMember
+                 : ConstraintLocator::MemberRefBase);
 
-    // Otherwise, this an explicit reference to an initializer member
-    // (`.init(...)`).
-    } else {
-      // Constraint for member base is formed as '$T.Type[.<member] = ...`
-      // which means MetatypeType has to be added after finding a type variable.
-      auto instanceTy = cs.simplifyType(cs.getUnresolvedMemberBaseType(UME));
-      baseType = MetatypeType::get(instanceTy);
-    }
+    // FIXME: Type variables responsible for contextual base could be cached
+    // in the constraint system to speed up lookup.
+    auto result = llvm::find_if(
+        cs.getTypeVariables(), [&baseLocator](const TypeVariableType *typeVar) {
+          return typeVar->getImpl().getLocator() == baseLocator;
+        });
+
+    assert(result != cs.getTypeVariables().end());
+    baseType = cs.simplifyType(*result)->getRValueType();
+    // Constraint for member base is formed as '$T.Type[.<member] = ...`
+    // which means MetatypeType has to be added after finding a type variable.
+    if (locatorEndsWith(baseLocator, ConstraintLocator::MemberRefBase))
+      baseType = MetatypeType::get(baseType);
   } else if (auto *keyPathExpr = getAsExpr<KeyPathExpr>(anchor)) {
     // Key path can't refer to initializers e.g. `\Type.init`
     return AllowInvalidRefInKeyPath::forRef(cs, init, locator);

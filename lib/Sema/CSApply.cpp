@@ -2753,30 +2753,16 @@ namespace {
     }
 
     Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
-      // If constraint solving resolved the base type to an UnresolvedType,
-      // then we're in an ambiguity tolerant mode used for diagnostic
-      // generation.  Just leave this as an unresolved member reference.
-      Type baseTy = simplifyType(solution.getUnresolvedMemberBaseType(expr));
-
-      if (baseTy->hasUnresolvedType()) {
-        cs.setType(expr, baseTy);
-        return expr;
-      }
-
       auto &ctx = cs.getASTContext();
-
-      // Find the selected member.
+      // Find the selected member and base type.
       auto memberLocator = cs.getConstraintLocator(
                              expr, ConstraintLocator::UnresolvedMember);
       auto selected = solution.getOverloadChoice(memberLocator);
-      
-      // If the member came by optional unwrapping, then unwrap the base type.
-      if (selected.choice.getKind()
-                              == OverloadChoiceKind::DeclViaUnwrappedOptional) {
-        baseTy = baseTy->getOptionalObjectType();
-        assert(baseTy
-               && "got unwrapped optional decl from non-optional base?!");
-      }
+
+      // Unresolved member lookup always happens in a metatype so dig out the
+      // instance type.
+      auto metaTy = selected.choice.getBaseType()->castTo<MetatypeType>();
+      auto baseTy = cs.simplifyType(metaTy->getInstanceType());
 
       // The base expression is simply the metatype of the base type.
       // FIXME: This location info is bogus.
@@ -8447,15 +8433,6 @@ void Solution::setExprTypes(Expr *expr) const {
 
   SetExprTypes SET(*this);
   expr->walk(SET);
-}
-
-Type Solution::getUnresolvedMemberBaseType(UnresolvedMemberExpr *expr) const {
-  auto result = unresolvedMemberBaseTypes.find(expr);
-  if (result != unresolvedMemberBaseTypes.end())
-    return result->second;
-
-  auto &cs = getConstraintSystem();
-  return cs.getUnresolvedMemberBaseType(expr);
 }
 
 /// MARK: SolutionResult implementation.
