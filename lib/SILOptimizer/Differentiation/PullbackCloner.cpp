@@ -2131,6 +2131,10 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
           auto *optionalEnumDecl = getASTContext().getOptionalDecl();
           auto operandTy = sei->getOperand()->getType();
           if (operandTy.getASTType().getEnumOrBoundGenericEnum() == optionalEnumDecl) {
+            // `T.TangentVector`
+            auto tanTy = remapType(concreteBBArgAdjCopy->getType());
+            // `Optional<T.TangentVector>`
+            auto optionalTanTy = SILType::getOptionalType(tanTy);
             // `Optional<T>`
             auto optionalTy = remapType(operandTy);
             // `Optional<T>.TangentVector`
@@ -2161,15 +2165,13 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
             auto metatypeSILType = SILType::getPrimitiveObjectType(metatypeType);
             auto metatype = builder.createMetatype(pbLoc, metatypeSILType);
             // Find `Optional<T.TangentVector>.some` EnumElementDecl.
-            auto someEltIt = llvm::find_if(optionalEnumDecl->getAllElements(),
-              [] (EnumElementDecl *eed) { return eed->getNameStr() == "some"; });
-            assert(someEltIt != std::end(optionalEnumDecl->getAllElements()) && "Optional.some not found");
-            auto someEltDecl = *someEltIt;
+            auto someEltDecl = builder.getASTContext().getOptionalSomeDecl();
             // %enum = enum $Optional<T.TangentVector>, #Optional.some!enumelt, %concreteBBArgAdjCopy : $T
-            auto enumInst = builder.createEnum(pbLoc, concreteBBArgAdjCopy, someEltDecl, optionalTy);
+            auto enumInst = builder.createEnum(pbLoc, concreteBBArgAdjCopy,
+                                               someEltDecl, optionalTanTy);
             // Allocate a local buffer to convert the `concreteBBArgAdjCopy` to `Optional<T.TangentVector>`.
             // (For `Optional<T>.TangentVector.init` input.)
-            auto *optArgBuf = builder.createAllocStack(pbLoc, optionalTy);
+            auto *optArgBuf = builder.createAllocStack(pbLoc, optionalTanTy);
             builder.emitStoreValueOperation(pbLoc, enumInst, optArgBuf,
                                             StoreOwnershipQualifier::Trivial);
             SILOptFunctionBuilder fb(getContext().getTransform());
