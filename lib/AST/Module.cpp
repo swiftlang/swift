@@ -1459,9 +1459,10 @@ SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
   llvm::SmallDenseSet<ModuleDecl *, 32> visited;
   SmallVector<ModuleDecl::ImportedModule, 32> stack;
 
-  ModuleDecl::ImportFilter filter = ModuleDecl::ImportFilterKind::Public;
-  filter |= ModuleDecl::ImportFilterKind::Private;
-  filter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
+  ModuleDecl::ImportFilter filter = {
+      ModuleDecl::ImportFilterKind::Public,
+      ModuleDecl::ImportFilterKind::Private,
+      ModuleDecl::ImportFilterKind::SPIAccessControl};
 
   auto *topLevel = getParentModule();
 
