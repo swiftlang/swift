@@ -877,7 +877,16 @@ public:
   }
 
   Stmt *visitFallthroughStmt(FallthroughStmt *S) {
-    if (!SwitchLevel) {
+    auto sourceFile = DC->getParentSourceFile();
+    auto activeLabeledStmts = ASTScope::lookupLabeledStmts(
+        sourceFile, S->getLoc());
+    auto numSwitches = llvm::count_if(activeLabeledStmts,
+                                      [](LabeledStmt *labeledStmt) {
+      return isa<SwitchStmt>(labeledStmt);
+    });
+    assert(numSwitches == SwitchLevel);
+
+    if (!numSwitches) {
       getASTContext().Diags.diagnose(S->getLoc(),
                                      diag::fallthrough_outside_switch);
       return nullptr;
