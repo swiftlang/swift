@@ -290,6 +290,14 @@ static void tryDiagnoseUnnecessaryCastOverOptionSet(ASTContext &Ctx,
     .fixItRemove(SourceRange(ME->getDotLoc(), E->getEndLoc()));
 }
 
+/// Whether the given enclosing function is a "defer" body.
+static bool isDefer(Optional<AnyFunctionRef> enclosingFunc) {
+  if (!enclosingFunc.hasValue()) return false;
+  auto *FD = dyn_cast_or_null<FuncDecl>
+    (enclosingFunc.getValue().getAbstractFunctionDecl());
+  return FD && FD->isDeferBody();
+}
+
 /// Check that a labeled statement doesn't shadow another statement with the
 /// same label.
 static void checkLabeledStmtShadowing(
@@ -309,6 +317,104 @@ static void checkLabeledStmtShadowing(
           prevLS->getLabelInfo().Loc, diag::invalid_redecl_prev, name);
     }
   }
+}
+
+static void
+emitUnresolvedLabelDiagnostics(DiagnosticEngine &DE,
+                               SourceLoc targetLoc, Identifier targetName,
+                               TopCollection<unsigned, LabeledStmt *> corrections) {
+  // If an unresolved label was used, but we have a single correction,
+  // produce the specific diagnostic and fixit.
+  if (corrections.size() == 1) {
+    DE.diagnose(targetLoc, diag::unresolved_label_corrected,
+                targetName, corrections.begin()->Value->getLabelInfo().Name)
+      .highlight(SourceRange(targetLoc))
+      .fixItReplace(SourceRange(targetLoc),
+                    corrections.begin()->Value->getLabelInfo().Name.str());
+    DE.diagnose(corrections.begin()->Value->getLabelInfo().Loc,
+                diag::decl_declared_here,
+                corrections.begin()->Value->getLabelInfo().Name);
+  } else {
+    // If we have multiple corrections or none, produce a generic diagnostic
+    // and all corrections available.
+    DE.diagnose(targetLoc, diag::unresolved_label, targetName)
+      .highlight(SourceRange(targetLoc));
+    for (auto &entry : corrections)
+      DE.diagnose(entry.Value->getLabelInfo().Loc, diag::note_typo_candidate,
+                  entry.Value->getLabelInfo().Name.str())
+        .fixItReplace(SourceRange(targetLoc),
+                      entry.Value->getLabelInfo().Name.str());
+  }
+}
+
+/// Find the target of a break statement.
+///
+/// \returns the target, if one was found, or \c nullptr if no such target
+/// exists.
+static LabeledStmt *findBreakStmtTarget(
+    ASTContext &ctx, SourceFile *sourceFile, BreakStmt *breakStmt,
+    Optional<AnyFunctionRef> enclosingFunc) {
+  TopCollection<unsigned, LabeledStmt *> labelCorrections(3);
+
+  // Pick the nearest break target that matches the specified name.
+  auto activeLabeledStmts = ASTScope::lookupLabeledStmts(
+      sourceFile, breakStmt->getStartLoc());
+  if (breakStmt->getTargetName().empty()) {
+    for (auto labeledStmt : activeLabeledStmts) {
+      // 'break' with no label looks through non-loop structures
+      // except 'switch'.
+      if (!labeledStmt->requiresLabelOnJump()) {
+        return labeledStmt;
+      }
+    }
+  } else {
+    // Scan inside out until we find something with the right label.
+    for (auto labeledStmt : activeLabeledStmts) {
+      if (breakStmt->getTargetName() == labeledStmt->getLabelInfo().Name) {
+        return labeledStmt;
+      }
+
+      unsigned distance =
+        TypeChecker::getCallEditDistance(
+            DeclNameRef(breakStmt->getTargetName()),
+            labeledStmt->getLabelInfo().Name,
+            TypeChecker::UnreasonableCallEditDistance);
+      if (distance < TypeChecker::UnreasonableCallEditDistance)
+        labelCorrections.insert(distance, std::move(labeledStmt));
+    }
+    labelCorrections.filterMaxScoreRange(
+      TypeChecker::MaxCallEditDistanceFromBestCandidate);
+  }
+
+  // If we're in a defer, produce a tailored diagnostic.
+  if (isDefer(enclosingFunc)) {
+    ctx.Diags.diagnose(
+        breakStmt->getLoc(), diag::jump_out_of_defer, "break");
+    return nullptr;
+  }
+
+  if (breakStmt->getTargetName().empty()) {
+    // If we're dealing with an unlabeled break inside of an 'if' or 'do'
+    // statement, produce a more specific error.
+    if (llvm::any_of(activeLabeledStmts,
+                     [&](Stmt *S) -> bool {
+                       return isa<IfStmt>(S) || isa<DoStmt>(S);
+                     })) {
+      ctx.Diags.diagnose(
+          breakStmt->getLoc(), diag::unlabeled_break_outside_loop);
+      return nullptr;
+    }
+
+    // Otherwise produce a generic error.
+    ctx.Diags.diagnose(breakStmt->getLoc(), diag::break_outside_loop);
+    return nullptr;
+  }
+
+  // Provide potential corrections for an incorrect label.
+  emitUnresolvedLabelDiagnostics(
+      ctx.Diags, breakStmt->getTargetLoc(), breakStmt->getTargetName(),
+      labelCorrections);
+  return nullptr;
 }
 
 namespace {
@@ -423,10 +529,7 @@ public:
   //===--------------------------------------------------------------------===//
   
   bool isInDefer() const {
-    if (!TheFunc.hasValue()) return false;
-    auto *FD = dyn_cast_or_null<FuncDecl>
-      (TheFunc.getValue().getAbstractFunctionDecl());
-    return FD && FD->isDeferBody();
+    return isDefer(TheFunc);
   }
   
   template<typename StmtTy>
@@ -739,67 +842,9 @@ public:
   }
 
   Stmt *visitBreakStmt(BreakStmt *S) {
-    LabeledStmt *Target = nullptr;
-    TopCollection<unsigned, LabeledStmt *> labelCorrections(3);
-    // Pick the nearest break target that matches the specified name.
-    if (S->getTargetName().empty()) {
-      for (auto I = ActiveLabeledStmts.rbegin(), E = ActiveLabeledStmts.rend();
-           I != E; ++I) {
-        // 'break' with no label looks through non-loop structures
-        // except 'switch'.
-        if (!(*I)->requiresLabelOnJump()) {
-          Target = *I;
-          break;
-        }
-      }
+    if (auto target = findBreakStmtTarget(getASTContext(), DC->getParentSourceFile(), S, TheFunc))
+      S->setTarget(target);
 
-    } else {
-      // Scan inside out until we find something with the right label.
-      for (auto I = ActiveLabeledStmts.rbegin(), E = ActiveLabeledStmts.rend();
-           I != E; ++I) {
-        if (S->getTargetName() == (*I)->getLabelInfo().Name) {
-          Target = *I;
-          break;
-        } else {
-          unsigned distance =
-            TypeChecker::getCallEditDistance(
-                DeclNameRef(S->getTargetName()), (*I)->getLabelInfo().Name,
-                TypeChecker::UnreasonableCallEditDistance);
-          if (distance < TypeChecker::UnreasonableCallEditDistance)
-            labelCorrections.insert(distance, std::move(*I));
-        }
-      }
-      labelCorrections.filterMaxScoreRange(
-        TypeChecker::MaxCallEditDistanceFromBestCandidate);
-    }
-    
-    if (!Target) {
-      // If we're in a defer, produce a tailored diagnostic.
-      if (isInDefer()) {
-        getASTContext().Diags.diagnose(S->getLoc(),
-                                       diag::jump_out_of_defer, "break");
-      } else if (S->getTargetName().empty()) {
-        // If we're dealing with an unlabeled break inside of an 'if' or 'do'
-        // statement, produce a more specific error.
-        if (std::any_of(ActiveLabeledStmts.rbegin(),
-                        ActiveLabeledStmts.rend(),
-                        [&](Stmt *S) -> bool {
-                          return isa<IfStmt>(S) || isa<DoStmt>(S);
-                        })) {
-          getASTContext().Diags.diagnose(S->getLoc(),
-                                         diag::unlabeled_break_outside_loop);
-        } else {
-          // Otherwise produce a generic error.
-          getASTContext().Diags.diagnose(S->getLoc(), diag::break_outside_loop);
-        }
-      } else {
-        emitUnresolvedLabelDiagnostics(getASTContext().Diags,
-                                       S->getTargetLoc(), S->getTargetName(),
-                                       labelCorrections);
-      }
-      return nullptr;
-    }
-    S->setTarget(Target);
     return S;
   }
 
@@ -866,34 +911,6 @@ public:
     return S;
   }
 
-  static void
-  emitUnresolvedLabelDiagnostics(DiagnosticEngine &DE,
-                                 SourceLoc targetLoc, Identifier targetName,
-                                 TopCollection<unsigned, LabeledStmt *> corrections) {
-    // If an unresolved label was used, but we have a single correction,
-    // produce the specific diagnostic and fixit.
-    if (corrections.size() == 1) {
-      DE.diagnose(targetLoc, diag::unresolved_label_corrected,
-                  targetName, corrections.begin()->Value->getLabelInfo().Name)
-        .highlight(SourceRange(targetLoc))
-        .fixItReplace(SourceRange(targetLoc),
-                      corrections.begin()->Value->getLabelInfo().Name.str());
-      DE.diagnose(corrections.begin()->Value->getLabelInfo().Loc,
-                  diag::decl_declared_here,
-                  corrections.begin()->Value->getLabelInfo().Name);
-    } else {
-      // If we have multiple corrections or none, produce a generic diagnostic
-      // and all corrections available.
-      DE.diagnose(targetLoc, diag::unresolved_label, targetName)
-        .highlight(SourceRange(targetLoc));
-      for (auto &entry : corrections)
-        DE.diagnose(entry.Value->getLabelInfo().Loc, diag::note_typo_candidate,
-                    entry.Value->getLabelInfo().Name.str())
-          .fixItReplace(SourceRange(targetLoc),
-                        entry.Value->getLabelInfo().Name.str());
-    }
-  }
-  
   Stmt *visitFallthroughStmt(FallthroughStmt *S) {
     if (!SwitchLevel) {
       getASTContext().Diags.diagnose(S->getLoc(),
