@@ -88,16 +88,30 @@ buildFunctionSummaryIndex(SILFunction &F) {
   return indexer.takeSummary();
 }
 
-void indexWitnessTable(ModuleSummaryIndex &index, SILWitnessTable &WT) {
-  for (auto entry : WT.getEntries()) {
-    if (entry.getKind() != SILWitnessTable::Method) break;
-
-    auto methodWitness = entry.getMethodWitness();
-    auto Witness = methodWitness.Witness;
-    if (!Witness) continue;
-    VirtualMethodSlot slot(methodWitness.Requirement, VirtualMethodSlot::KindTy::Witness);
-    index.addImplementation(slot, getGUID(Witness->getName()));
+void indexWitnessTable(ModuleSummaryIndex &index, SILModule &M) {
+  std::vector<FunctionSummary::EdgeTy> Preserved;
+  for (auto &WT : M.getWitnessTableList()) {
+    auto isExternalProto = WT.getDeclContext()->getParentModule() != M.getSwiftModule() ||
+                           WT.getProtocol()->getParentModule() != M.getSwiftModule();
+    for (auto entry : WT.getEntries()) {
+      if (entry.getKind() != SILWitnessTable::Method) continue;
+      
+      auto methodWitness = entry.getMethodWitness();
+      auto Witness = methodWitness.Witness;
+      if (!Witness) continue;
+      VirtualMethodSlot slot(methodWitness.Requirement, VirtualMethodSlot::KindTy::Witness);
+      index.addImplementation(slot, getGUID(Witness->getName()));
+      if (isExternalProto) {
+        auto edge = FunctionSummary::EdgeTy::staticCall(Witness);
+        Preserved.push_back(edge);
+      }
+    }
   }
+  
+  auto FS = std::make_unique<FunctionSummary>(Preserved);
+  FS->setPreserved(true);
+  llvm::dbgs() << "Summary: Preserved " << Preserved.size() << " external witnesses\n";
+  index.addFunctionSummary("__external_witnesses_preserved_fs", std::move(FS));
 }
 
 
@@ -113,6 +127,12 @@ void indexVTable(ModuleSummaryIndex &index, SILModule &M) {
         llvm::dbgs() << "Preserve deallocator '" << Impl->getName() << "'\n";
         Preserved.push_back(edge);
       }
+      auto methodMod = entry.getMethod().getDecl()->getModuleContext();
+      auto isExternalMethod = methodMod != M.getSwiftModule();
+      if (entry.getKind() == SILVTableEntry::Override && isExternalMethod) {
+        auto edge = FunctionSummary::EdgeTy::staticCall(Impl);
+        Preserved.push_back(edge);
+      }
       VirtualMethodSlot slot(entry.getMethod(), VirtualMethodSlot::KindTy::VTable);
       index.addImplementation(slot, getGUID(Impl->getName()));
     }
@@ -121,7 +141,7 @@ void indexVTable(ModuleSummaryIndex &index, SILModule &M) {
   auto FS = std::make_unique<FunctionSummary>(Preserved);
   FS->setPreserved(true);
   llvm::dbgs() << "Summary: Preserved " << Preserved.size() << " deallocators\n";
-  index.addFunctionSummary("__destructors_preserved_fs", std::move(FS));
+  index.addFunctionSummary("__vtable_destructors_and_externals_preserved_fs", std::move(FS));
 }
 
 void indexKeyPathComponent(ModuleSummaryIndex &index, SILModule &M) {
@@ -173,11 +193,8 @@ ModuleSummaryIndex swift::buildModuleSummaryIndex(SILModule &M,
     FS->setLive(false);
     index.addFunctionSummary(F.getName(), std::move(FS));
   }
-  
-  for (auto &WT : M.getWitnessTableList()) {
-    indexWitnessTable(index, WT);
-  }
-  
+
+  indexWitnessTable(index, M);
   indexVTable(index, M);
   return index;
 }
