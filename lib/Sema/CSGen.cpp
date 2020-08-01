@@ -2501,30 +2501,22 @@ namespace {
         if (enumPattern->getParentType() || enumPattern->getParentTypeRepr()) {
           // Resolve the parent type.
           Type parentType = [&]() -> Type {
-            if (auto preTy = enumPattern->getParentType()) {
-              return preTy;
+            if (const auto resolvedTy = enumPattern->getParentType()) {
+              assert(resolvedTy->hasUnboundGenericType() == false &&
+                     "A pre-resolved type must be fully bound");
+              return resolvedTy;
             }
             return resolveTypeReferenceInExpression(
                 enumPattern->getParentTypeRepr(),
-                TypeResolverContext::InExpression, [](auto unboundTy) {
-                  // FIXME: We ought to pass an OpenUnboundGenericType object
-                  // rather than calling CS.openUnboundGenericType below, but
-                  // sometimes the parent type is resolved eagerly in
-                  // ResolvePattern::visitUnresolvedDotExpr, letting unbound
-                  // generics escape.
-                  return unboundTy;
-                });
+                TypeResolverContext::InExpression,
+                OpenUnboundGenericType(
+                    CS, CS.getConstraintLocator(
+                            locator, {LocatorPathElt::PatternMatch(pattern),
+                                      ConstraintLocator::ParentType})));
           }();
 
           if (!parentType)
             return Type();
-
-          parentType = CS.openUnboundGenericTypes(
-              parentType, CS.getConstraintLocator(
-                              locator, {LocatorPathElt::PatternMatch(pattern),
-                                        ConstraintLocator::ParentType}));
-
-          assert(parentType);
 
           // Perform member lookup into the parent's metatype.
           Type parentMetaType = MetatypeType::get(parentType);
@@ -3038,21 +3030,14 @@ namespace {
     Type visitCoerceExpr(CoerceExpr *expr) {
       // Validate the resulting type.
       auto *const repr = expr->getCastTypeRepr();
-      const auto type = resolveTypeReferenceInExpression(
-          repr, TypeResolverContext::ExplicitCastExpr, [](auto unboundTy) {
-            // FIXME: We ought to pass an OpenUnboundGenericType object rather
-            // than calling CS.openUnboundGenericType after resolving, but
-            // sometimes the type expression is resolved eagerly in
-            // PreCheckExpression::simplifyTypeConstructionWithLiteralArg,
-            // letting unbound generics escape.
-            return unboundTy;
-          });
-      if (!type)
+      const auto toType = resolveTypeReferenceInExpression(
+          repr, TypeResolverContext::ExplicitCastExpr,
+          // Introduce type variables for unbound generics.
+          OpenUnboundGenericType(CS, CS.getConstraintLocator(expr)));
+      if (!toType)
         return nullptr;
 
-      // Open the type we're casting to.
-      const auto toType =
-          CS.openUnboundGenericTypes(type, CS.getConstraintLocator(expr));
+      // Cache the type we're casting to.
       if (repr) CS.setType(repr, toType);
 
       auto fromType = CS.getType(expr->getSubExpr());
