@@ -858,6 +858,10 @@ bool ASTScopeImpl::isLabeledStmtLookupTerminator() const {
   return true;
 }
 
+bool LookupParentDiversionScope::isLabeledStmtLookupTerminator() const {
+  return false;
+}
+
 bool ConditionalClauseScope::isLabeledStmtLookupTerminator() const {
   return false;
 }
@@ -886,12 +890,17 @@ ASTScopeImpl::lookupLabeledStmts(SourceFile *sourceFile, SourceLoc loc) {
   for (auto scope = innermost; scope && !scope->isLabeledStmtLookupTerminator();
        scope = scope->getParent().getPtrOrNull()) {
     // If we have a labeled statement, record it.
-    if (auto stmt = scope->getStmtIfAny()) {
-      if (auto labeledStmt = dyn_cast<LabeledStmt>(stmt.get())) {
-        labeledStmts.push_back(labeledStmt);
-        continue;
-      }
-    }
+    auto stmt = scope->getStmtIfAny();
+    if (!stmt) continue;
+
+    auto labeledStmt = dyn_cast<LabeledStmt>(stmt.get());
+    if (!labeledStmt) continue;
+
+    // Skip guard statements; they aren't actually targets for break or
+    // continue.
+    if (isa<GuardStmt>(labeledStmt)) continue;
+
+    labeledStmts.push_back(labeledStmt);
   }
 
   return labeledStmts;

@@ -687,8 +687,6 @@ public:
   Stmt *visitGuardStmt(GuardStmt *GS) {
     TypeChecker::typeCheckConditionForStatement(GS, DC);
 
-    AddLabeledStmt ifNest(*this, GS);
-    
     Stmt *S = GS->getBody();
     typeCheckStmt(S);
     GS->setBody(S);

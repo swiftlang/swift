@@ -1820,6 +1820,7 @@ protected:
   NullablePtr<const ASTScopeImpl> getLookupParent() const override {
     return lookupParent;
   }
+  bool isLabeledStmtLookupTerminator() const override;
 };
 
 class RepeatWhileScope final : public AbstractStmtScope {
