@@ -1666,7 +1666,7 @@ public:
       return false;
 
     auto *wrappedVar = expression.propertyWrapper.wrappedVar;
-    if (!wrappedVar || wrappedVar->isStatic())
+    if (!apply || !wrappedVar || wrappedVar->isStatic())
       return false;
 
     return expression.propertyWrapper.innermostWrappedValueInit == apply;
