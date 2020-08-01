@@ -347,36 +347,47 @@ emitUnresolvedLabelDiagnostics(DiagnosticEngine &DE,
   }
 }
 
-/// Find the target of a break statement.
+/// Find the target of a break or continue statement.
 ///
 /// \returns the target, if one was found, or \c nullptr if no such target
 /// exists.
-static LabeledStmt *findBreakStmtTarget(
-    ASTContext &ctx, SourceFile *sourceFile, BreakStmt *breakStmt,
+static LabeledStmt *findBreakOrContinueStmtTarget(
+    ASTContext &ctx, SourceFile *sourceFile,
+    SourceLoc loc, Identifier targetName, SourceLoc targetLoc,
+    bool isContinue,
     Optional<AnyFunctionRef> enclosingFunc) {
   TopCollection<unsigned, LabeledStmt *> labelCorrections(3);
 
   // Pick the nearest break target that matches the specified name.
-  auto activeLabeledStmts = ASTScope::lookupLabeledStmts(
-      sourceFile, breakStmt->getStartLoc());
-  if (breakStmt->getTargetName().empty()) {
+  auto activeLabeledStmts = ASTScope::lookupLabeledStmts(sourceFile, loc);
+  if (targetName.empty()) {
     for (auto labeledStmt : activeLabeledStmts) {
       // 'break' with no label looks through non-loop structures
       // except 'switch'.
-      if (!labeledStmt->requiresLabelOnJump()) {
+      // 'continue' ignores non-loop structures.
+      if (!labeledStmt->requiresLabelOnJump() &&
+          (!isContinue || labeledStmt->isPossibleContinueTarget())) {
         return labeledStmt;
       }
     }
   } else {
     // Scan inside out until we find something with the right label.
     for (auto labeledStmt : activeLabeledStmts) {
-      if (breakStmt->getTargetName() == labeledStmt->getLabelInfo().Name) {
+      if (targetName == labeledStmt->getLabelInfo().Name) {
+        // Continue cannot be used to repeat switches, use fallthrough instead.
+        if (isContinue && !labeledStmt->isPossibleContinueTarget()) {
+          ctx.Diags.diagnose(
+              loc, diag::continue_not_in_this_stmt,
+              isa<SwitchStmt>(labeledStmt) ? "switch" : "if");
+          return nullptr;
+        }
+
         return labeledStmt;
       }
 
       unsigned distance =
         TypeChecker::getCallEditDistance(
-            DeclNameRef(breakStmt->getTargetName()),
+            DeclNameRef(targetName),
             labeledStmt->getLabelInfo().Name,
             TypeChecker::UnreasonableCallEditDistance);
       if (distance < TypeChecker::UnreasonableCallEditDistance)
@@ -389,31 +400,33 @@ static LabeledStmt *findBreakStmtTarget(
   // If we're in a defer, produce a tailored diagnostic.
   if (isDefer(enclosingFunc)) {
     ctx.Diags.diagnose(
-        breakStmt->getLoc(), diag::jump_out_of_defer, "break");
+        loc, diag::jump_out_of_defer, isContinue ? "continue": "break");
     return nullptr;
   }
 
-  if (breakStmt->getTargetName().empty()) {
+  if (targetName.empty()) {
     // If we're dealing with an unlabeled break inside of an 'if' or 'do'
     // statement, produce a more specific error.
-    if (llvm::any_of(activeLabeledStmts,
+    if (!isContinue &&
+        llvm::any_of(activeLabeledStmts,
                      [&](Stmt *S) -> bool {
                        return isa<IfStmt>(S) || isa<DoStmt>(S);
                      })) {
       ctx.Diags.diagnose(
-          breakStmt->getLoc(), diag::unlabeled_break_outside_loop);
+          loc, diag::unlabeled_break_outside_loop);
       return nullptr;
     }
 
     // Otherwise produce a generic error.
-    ctx.Diags.diagnose(breakStmt->getLoc(), diag::break_outside_loop);
+    ctx.Diags.diagnose(
+        loc,
+        isContinue ? diag::continue_outside_loop : diag::break_outside_loop);
     return nullptr;
   }
 
   // Provide potential corrections for an incorrect label.
   emitUnresolvedLabelDiagnostics(
-      ctx.Diags, breakStmt->getTargetLoc(), breakStmt->getTargetName(),
-      labelCorrections);
+      ctx.Diags, targetLoc, targetName, labelCorrections);
   return nullptr;
 }
 
@@ -842,72 +855,24 @@ public:
   }
 
   Stmt *visitBreakStmt(BreakStmt *S) {
-    if (auto target = findBreakStmtTarget(getASTContext(), DC->getParentSourceFile(), S, TheFunc))
+    if (auto target = findBreakOrContinueStmtTarget(
+            getASTContext(), DC->getParentSourceFile(), S->getLoc(),
+            S->getTargetName(), S->getTargetLoc(), /*isContinue=*/false,
+            TheFunc)) {
       S->setTarget(target);
+    }
 
     return S;
   }
 
   Stmt *visitContinueStmt(ContinueStmt *S) {
-    LabeledStmt *Target = nullptr;
-    TopCollection<unsigned, LabeledStmt *> labelCorrections(3);
-    // Scan to see if we are in any non-switch labeled statements (loops).  Scan
-    // inside out.
-    if (S->getTargetName().empty()) {
-      for (auto I = ActiveLabeledStmts.rbegin(), E = ActiveLabeledStmts.rend();
-           I != E; ++I) {
-        // 'continue' with no label ignores non-loop structures.
-        if (!(*I)->requiresLabelOnJump() &&
-            (*I)->isPossibleContinueTarget()) {
-          Target = *I;
-          break;
-        }
-      }
-    } else {
-      // Scan inside out until we find something with the right label.
-      for (auto I = ActiveLabeledStmts.rbegin(), E = ActiveLabeledStmts.rend();
-           I != E; ++I) {
-        if (S->getTargetName() == (*I)->getLabelInfo().Name) {
-          Target = *I;
-          break;
-        } else {
-          unsigned distance =
-            TypeChecker::getCallEditDistance(
-                DeclNameRef(S->getTargetName()), (*I)->getLabelInfo().Name,
-                TypeChecker::UnreasonableCallEditDistance);
-          if (distance < TypeChecker::UnreasonableCallEditDistance)
-            labelCorrections.insert(distance, std::move(*I));
-        }
-      }
-      labelCorrections.filterMaxScoreRange(
-        TypeChecker::MaxCallEditDistanceFromBestCandidate);
+    if (auto target = findBreakOrContinueStmtTarget(
+            getASTContext(), DC->getParentSourceFile(), S->getLoc(),
+            S->getTargetName(), S->getTargetLoc(), /*isContinue=*/true,
+            TheFunc)) {
+      S->setTarget(target);
     }
 
-    if (Target) {
-      // Continue cannot be used to repeat switches, use fallthrough instead.
-      if (!Target->isPossibleContinueTarget()) {
-        getASTContext().Diags.diagnose(
-            S->getLoc(), diag::continue_not_in_this_stmt,
-            isa<SwitchStmt>(Target) ? "switch" : "if");
-        return nullptr;
-      }
-    } else {
-      // If we're in a defer, produce a tailored diagnostic.
-      if (isInDefer()) {
-        getASTContext().Diags.diagnose(S->getLoc(),
-                                       diag::jump_out_of_defer, "break");
-      } else if (S->getTargetName().empty()) {
-        // If we're dealing with an unlabeled continue, produce a generic error.
-        getASTContext().Diags.diagnose(S->getLoc(),
-                                       diag::continue_outside_loop);
-      } else {
-        emitUnresolvedLabelDiagnostics(getASTContext().Diags,
-                                       S->getTargetLoc(), S->getTargetName(),
-                                       labelCorrections);
-      }
-      return nullptr;
-    }
-    S->setTarget(Target);
     return S;
   }
 
