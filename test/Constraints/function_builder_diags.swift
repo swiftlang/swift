@@ -589,4 +589,17 @@ struct MyView {
     switch Optional.some(1) { // expected-error {{'switch' statement body must have at least one 'case' or 'default' block; do you want to add a default case?}}
     }
   }
+
+  @TupleBuilder var invalidSwitchOne: some P {
+    switch Optional.some(1) {
+    case . // expected-error {{expected ':' after 'case'}}
+    } // expected-error {{expected identifier after '.' expression}}
+  }
+
+  @TupleBuilder var invalidSwitchMultiple: some P {
+    switch Optional.some(1) {
+    case .none: // expected-error {{'case' label in a 'switch' should have at least one executable statement}}
+    case . // expected-error {{expected ':' after 'case'}}
+    } // expected-error {{expected identifier after '.' expression}}
+  }
 }

@@ -759,6 +759,18 @@ protected:
   }
 
   VarDecl *visitCaseStmt(CaseStmt *caseStmt, Expr *subjectExpr) {
+    auto *body = caseStmt->getBody();
+
+    // Explicitly disallow `case` statements with empty bodies
+    // since that helps to diagnose other issues with switch
+    // statements by excluding invalid cases.
+    if (auto *BS = dyn_cast<BraceStmt>(body)) {
+      if (BS->getNumElements() == 0) {
+        hadError = true;
+        return nullptr;
+      }
+    }
+
     // If needed, generate constraints for everything in the case statement.
     if (cs) {
       auto locator = cs->getConstraintLocator(
