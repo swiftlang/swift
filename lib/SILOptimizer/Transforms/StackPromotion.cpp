@@ -118,16 +118,16 @@ bool StackPromotion::tryPromoteAlloc(AllocRefInst *ARI, EscapeAnalysis *EA,
 
   LLVM_DEBUG(llvm::dbgs() << "Promote " << *ARI);
 
-  // Collect all use-points of the allocation. These are refcount instructions
-  // and apply instructions.
-  llvm::SmallVector<SILInstruction *, 8> UsePoints;
-  ConGraph->getUsePoints(contentNode, UsePoints);
+  // Collect all release-points of the allocation. These are refcount
+  // instructions and apply instructions.
+  llvm::SmallVector<SILInstruction *, 8> ReleasePoints;
+  ConGraph->getReleasePoints(contentNode, ReleasePoints);
 
-  ValueLifetimeAnalysis VLA(ARI, UsePoints);
-  // Check if there is a use point before the allocation (this can happen e.g.
-  // if the allocated object is stored into another object, which is already
-  // alive at the allocation point).
-  // In such a case the value lifetime extends up to the function entry.
+  ValueLifetimeAnalysis VLA(ARI, ReleasePoints);
+  // Check if there is a release point before the allocation (this can happen
+  // e.g. if the allocated object is stored into another object, which is
+  // already alive at the allocation point). In such a case the value lifetime
+  // extends up to the function entry.
   if (VLA.isAliveAtBeginOfBlock(ARI->getFunction()->getEntryBlock())) {
     LLVM_DEBUG(llvm::dbgs() << "  use before allocation -> don't promote");
     return false;

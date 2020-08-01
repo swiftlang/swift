@@ -689,7 +689,7 @@ bool AliasAnalysis::canApplyDecrementRefCount(FullApplySite FAS, SILValue Ptr) {
     return true;
 
   /// If the pointer cannot escape to the function we are done.
-  if (!EA->canEscapeTo(Ptr, FAS))
+  if (!EA->canEscapeToRelease(Ptr, FAS))
     return false;
 
   FunctionSideEffects ApplyEffects;

@@ -144,15 +144,18 @@
 /// connection graph.
 ///
 /// In addition to the connection graph, EscapeAnalysis caches information about
-/// "use points". Each release operation in which the released reference can be
-/// identified is a considered a use point. The use point instructions are
-/// recorded in a table and given an ID. Each connection graph content node
-/// stores a bitset indicating the use points that may release references that
-/// point to by that content node. Correctness relies on an invariant: for each
-/// reference-type value in the function, all points in the function which may
-/// release the reference must be identified as use points of the node that the
-/// value points to. If the reference-type value may be released any other
-/// way, then its content node must be marked escaping.
+/// "release points" and "access points". Each release operation in which the
+/// reference can be released is considered a release point. Each
+/// apply operation which is passed an guaranteed arg is considered as an access
+/// point. These release and access point instructions are recorded in a table
+/// and given an ID. Each connection graph content node stores a bitset
+/// indicating the release points that may release references that point to by
+/// that content node and access points that may read/write without releasing
+/// the reference. Correctness relies on an invariant: for each reference-type
+/// value in the function, all points in the function which may release the
+/// reference must be identified as release points of the node that the value
+/// points to. If the reference-type value may be released any other way, then
+/// its content node must be marked escaping.
 /// ===---------------------------------------------------------------------===//
 
 #ifndef SWIFT_SILOPTIMIZER_ANALYSIS_ESCAPEANALYSIS_H_
@@ -317,10 +320,15 @@ public:
     /// the merge destination.
     CGNode *mergeTo = nullptr;
 
-    /// Information where the node's value is used in its function.
-    /// Each bit corresponds to an argument/instruction where the value is used.
-    /// The UsePoints on demand when calling ConnectionGraph::getUsePoints().
-    SmallBitVector UsePoints;
+    /// Information where the node's value maybe read/written in its function.
+    /// Each bit corresponds to an apply instruction where the value can be
+    /// read/written but not released.
+    SmallBitVector AccessPoints;
+
+    /// Information where the node's value is released in its function.
+    /// Each bit corresponds to an argument/instruction where the value is
+    /// released.
+    SmallBitVector ReleasePoints;
 
     /// The actual result of the escape analysis. It tells if and how (global or
     /// through arguments) the value escapes.
@@ -375,8 +383,9 @@ public:
     
     /// The constructor.
     CGNode(ValueBase *V, NodeType Type, bool isInterior, bool hasReferenceOnly)
-        : mappedValue(V), UsePoints(0), isInteriorFlag(isInterior),
-          hasReferenceOnlyFlag(hasReferenceOnly), Type(Type) {
+        : mappedValue(V), AccessPoints(0), ReleasePoints(0),
+          isInteriorFlag(isInterior), hasReferenceOnlyFlag(hasReferenceOnly),
+          Type(Type) {
       switch (Type) {
       case NodeType::Argument:
       case NodeType::Value:
@@ -397,11 +406,13 @@ public:
     std::pair<const CGNode *, unsigned>
     getRepNode(SmallPtrSetImpl<const CGNode *> &visited) const;
 
-    /// Merges the use points from another node and returns true if there are
-    /// any changes.
-    bool mergeUsePoints(CGNode *RHS) {
-      bool Changed = RHS->UsePoints.test(UsePoints);
-      UsePoints |= RHS->UsePoints;
+    /// Merges the access points and release points from another node and
+    /// returns true if there are any changes.
+    bool mergeAccessAndReleasePoints(CGNode *RHS) {
+      bool Changed = RHS->AccessPoints.test(AccessPoints);
+      AccessPoints |= RHS->AccessPoints;
+      Changed |= RHS->ReleasePoints.test(ReleasePoints);
+      ReleasePoints |= RHS->ReleasePoints;
       return Changed;
     }
 
@@ -468,9 +479,14 @@ public:
       return Target;
     }
 
-    void setUsePointBit(int Idx) {
-      UsePoints.resize(Idx + 1, false);
-      UsePoints.set(Idx);
+    void setAccessPointBit(int Idx) {
+      AccessPoints.resize(Idx + 1, false);
+      AccessPoints.set(Idx);
+    }
+
+    void setReleasePointBit(int Idx) {
+      ReleasePoints.resize(Idx + 1, false);
+      ReleasePoints.set(Idx);
     }
 
     /// Checks an invariant of the connection graph: The points-to nodes of
@@ -640,11 +656,17 @@ public:
     /// NodeType::Return.
     CGNode *ReturnNode = nullptr;
 
-    /// The list of use points.
-    llvm::SmallVector<SILInstruction *, 16> UsePointTable;
+    /// The list of access points.
+    llvm::SmallVector<SILInstruction *, 16> AccessPointTable;
 
-    /// Mapping of use points to bit indices in CGNode::UsePoints.
-    llvm::DenseMap<SILInstruction *, int> UsePoints;
+    /// Mapping of access points to bit indices in CGNode::AccessPoints.
+    llvm::DenseMap<SILInstruction *, int> AccessPoints;
+
+    /// The list of release points.
+    llvm::SmallVector<SILInstruction *, 16> ReleasePointTable;
+
+    /// Mapping of release points to bit indices in CGNode::ReleasePoints.
+    llvm::DenseMap<SILInstruction *, int> ReleasePoints;
 
     /// The allocator for nodes.
     llvm::SpecificBumpPtrAllocator<CGNode> NodeAllocator;
@@ -664,7 +686,8 @@ public:
 
     /// Returns true if the connection graph is empty.
     bool isEmpty() const {
-      return Values2Nodes.empty() && Nodes.empty() && UsePoints.empty();
+      return Values2Nodes.empty() && Nodes.empty() && AccessPoints.empty() &&
+             ReleasePoints.empty();
     }
 
     /// Removes all nodes from the graph.
@@ -805,8 +828,11 @@ public:
         content->markEscaping();
     }
 
-    /// Adds an argument/instruction in which the node's value is used.
-    int addUsePoint(CGNode *Node, SILInstruction *User);
+    /// Adds an argument/instruction in which the node's value is accessed.
+    int addAccessPoint(CGNode *Node, SILInstruction *Access);
+
+    /// Adds an argument/instruction in which the node's value is released.
+    int addReleasePoint(CGNode *Node, SILInstruction *Release);
 
     /// Creates a defer-edge between \p From and \p To.
     /// This may trigger node merges to keep the graph invariance 4).
@@ -886,25 +912,43 @@ public:
     /// the content that \p ptrVal points to.
     CGNode *getValueContent(SILValue ptrVal);
 
-    /// Returns the number of use-points of a node.
-    int getNumUsePoints(CGNode *Node) {
+    /// Returns the number of access-points of a node.
+    int getNumAccessPoints(CGNode *Node) {
       assert(!Node->escapes() &&
-             "Use points are only valid for non-escaping nodes");
-      return Node->UsePoints.count();
+             "Access points are only valid for non-escaping nodes");
+      return Node->AccessPoints.count();
     }
 
-    /// Returns true if \p UsePoint is a use of \p Node, i.e. UsePoint may
-    /// (indirectly) somehow refer to the Node's value.
-    /// Use-points are only values which are relevant for lifeness computation,
-    /// e.g. release or apply instructions.
-    bool isUsePoint(SILInstruction *UsePoint, CGNode *Node);
+    /// Returns the number of release-points of a node.
+    int getNumReleasePoints(CGNode *Node) {
+      assert(!Node->escapes() &&
+             "Release points are only valid for non-escaping nodes");
+      return Node->ReleasePoints.count();
+    }
 
-    /// Returns all use points of \p Node in \p UsePoints.
-    void getUsePoints(CGNode *Node,
-                      llvm::SmallVectorImpl<SILInstruction *> &UsePoints);
+    /// Returns true if \p AccessPoint is a read/write of \p Node, i.e.
+    /// AccessPoint may (indirectly) somehow refer to the Node's value.
+    /// Access-points are only values which are relevant for lifeness
+    /// computation, e.g.apply instructions.
+    bool isAccessPoint(SILInstruction *AccessPoint, CGNode *Node);
 
-    /// Computes the use point information.
-    void computeUsePoints();
+    /// Returns true if \p ReleasePoint is a use of \p Node, i.e. ReleasePoint
+    /// may (indirectly) somehow refer to the Node's value. Release-points are
+    /// only values which are relevant for lifeness computation, e.g. release or
+    /// apply instructions.
+    bool isReleasePoint(SILInstruction *ReleasePoint, CGNode *Node);
+
+    /// Returns all access points of \p Node in \p AccessPoints.
+    void getAccessPoints(CGNode *Node,
+                         llvm::SmallVectorImpl<SILInstruction *> &AccessPoints);
+
+    /// Returns all release points of \p Node in \p ReleasePoints.
+    void
+    getReleasePoints(CGNode *Node,
+                     llvm::SmallVectorImpl<SILInstruction *> &ReleasePoints);
+
+    /// Computes the access point and release point information.
+    void computeAccessAndReleasePoints();
 
     /// Debug print the graph.
     void print(llvm::raw_ostream &OS) const;
@@ -979,6 +1023,9 @@ private:
     /// A limit for the number of call-graph iterations in recompute().
     MaxGraphMerges = 4
   };
+
+  /// Mode to check if a value escapes to a "release point" or "access point"
+  enum EscapeKind { EscapeToRelease, EscapeToAccess };
 
   using PointerKindCache = llvm::DenseMap<SILType, PointerKind>;
 
@@ -1109,10 +1156,10 @@ private:
                          ConnectionGraph *Graph);
 
   /// Returns true if the value \p value or any address within that value can
-  /// escape to the \p usePoint, where \p usePoint is either a
+  /// escape to the \p User, where \p User is either a
   /// release-instruction or a function call.
-  bool canEscapeToUsePoint(SILValue value, SILInstruction *usePoint,
-                           ConnectionGraph *conGraph);
+  bool canEscapeTo(SILValue value, SILInstruction *User,
+                   ConnectionGraph *conGraph, EscapeKind kind);
 
   friend struct ::CGForDotView;
 
@@ -1146,17 +1193,25 @@ public:
   /// See EscapeAnalysis::NodeType::Value.
   bool isPointer(ValueBase *V) const { return getPointerKind(V) > NoPointer; }
 
-  /// Returns true if the value \p V can escape to the function call \p FAS.
-  /// This means that the called function may access the value \p V.
-  /// If \p V has reference semantics, this function returns false if only the
-  /// address of a contained property escapes, but not the object itself.
-  bool canEscapeTo(SILValue V, FullApplySite FAS);
+  /// Returns true if the value \p V can escape to a release point by the
+  /// function call \p FAS. This means that the called function may release the
+  /// value \p V. If \p V has reference semantics, this function returns false
+  /// if only the address of a contained property escapes, but not the object
+  /// itself.
+  bool canEscapeToRelease(SILValue V, FullApplySite FAS);
+
+  /// Returns true if the value \p V can escape to a read/write point by the
+  /// function call \p FAS. This means that the called function may access the
+  /// value \p V. If \p V has reference semantics, this function returns false
+  /// if only the address of a contained property escapes, but not the object
+  /// itself.
+  bool canEscapeToAccess(SILValue V, FullApplySite FAS);
 
   /// Returns true if the value \p V can escape to the release-instruction \p
   /// RI. This means that \p RI may release \p V or any called destructor may
   /// access (or release) \p V.
   /// Note that if \p RI is a retain-instruction always false is returned.
-  bool canEscapeTo(SILValue V, RefCountingInst *RI);
+  bool canEscapeToRelease(SILValue V, RefCountingInst *RI);
 
   /// Return true if \p releasedReference deinitialization may release memory
   /// pointed to by \p accessedAddress.

@@ -400,8 +400,10 @@ void EscapeAnalysis::ConnectionGraph::clear() {
   Values2Nodes.clear();
   Nodes.clear();
   ReturnNode = nullptr;
-  UsePoints.clear();
-  UsePointTable.clear();
+  AccessPoints.clear();
+  AccessPointTable.clear();
+  ReleasePoints.clear();
+  ReleasePointTable.clear();
   NodeAllocator.DestroyAll();
   valid = true;
   assert(ToMerge.empty());
@@ -461,10 +463,10 @@ EscapeAnalysis::ConnectionGraph::getNode(SILValue V) {
   return Node;
 }
 
-/// Adds an argument/instruction in which the node's memory is released.
-int EscapeAnalysis::ConnectionGraph::addUsePoint(CGNode *Node,
-                                                 SILInstruction *User) {
-  // Use points are never consulted for escaping nodes, but still need to
+/// Adds an argument/instruction in which the node's memory is accessed.
+int EscapeAnalysis::ConnectionGraph::addAccessPoint(
+    CGNode *Node, SILInstruction *AccessPoint) {
+  // Access points are never consulted for escaping nodes, but still need to
   // propagate to other nodes in a defer web. Even if this node is escaping,
   // some defer predecessors may not be escaping. Only checking if this node has
   // defer predecessors is insufficient because a defer successor of this node
@@ -472,12 +474,34 @@ int EscapeAnalysis::ConnectionGraph::addUsePoint(CGNode *Node,
   if (Node->getEscapeState() >= EscapeState::Global)
     return -1;
 
-  int Idx = (int)UsePoints.size();
-  assert(UsePoints.count(User) == 0 && "value is already a use-point");
-  UsePoints[User] = Idx;
-  UsePointTable.push_back(User);
-  assert(UsePoints.size() == UsePointTable.size());
-  Node->setUsePointBit(Idx);
+  int Idx = (int)AccessPoints.size();
+  assert(AccessPoints.count(AccessPoint) == 0 &&
+         "value is already a access-point");
+  AccessPoints[AccessPoint] = Idx;
+  AccessPointTable.push_back(AccessPoint);
+  assert(AccessPoints.size() == AccessPointTable.size());
+  Node->setAccessPointBit(Idx);
+  return Idx;
+}
+
+/// Adds an argument/instruction in which the node's memory is released.
+int EscapeAnalysis::ConnectionGraph::addReleasePoint(
+    CGNode *Node, SILInstruction *ReleasePoint) {
+  // Release points are never consulted for escaping nodes, but still need to
+  // propagate to other nodes in a defer web. Even if this node is escaping,
+  // some defer predecessors may not be escaping. Only checking if this node has
+  // defer predecessors is insufficient because a defer successor of this node
+  // may have defer predecessors.
+  if (Node->getEscapeState() >= EscapeState::Global)
+    return -1;
+
+  int Idx = (int)ReleasePoints.size();
+  assert(ReleasePoints.count(ReleasePoint) == 0 &&
+         "value is already a access-point");
+  ReleasePoints[ReleasePoint] = Idx;
+  ReleasePointTable.push_back(ReleasePoint);
+  assert(ReleasePoints.size() == ReleasePointTable.size());
+  Node->setReleasePointBit(Idx);
   return Idx;
 }
 
@@ -576,7 +600,7 @@ void EscapeAnalysis::ConnectionGraph::initializePointsTo(CGNode *initialNode,
         // step 1) or (2) an arbitrary node in a defer-cycle (identified in a
         // previous iteration of the outer loop).
         edgeNode->setPointsToEdge(newPointsTo);
-        newPointsTo->mergeUsePoints(edgeNode);
+        newPointsTo->mergeAccessAndReleasePoints(edgeNode);
         assert(updateCount--);
       }
       // If edgeNode is already set to newPointsTo, it either was already
@@ -595,7 +619,7 @@ void EscapeAnalysis::ConnectionGraph::initializePointsTo(CGNode *initialNode,
           return Traversal::Backtrack;
         }
         predNode->pointsTo = newPointsTo;
-        newPointsTo->mergeUsePoints(predNode);
+        newPointsTo->mergeAccessAndReleasePoints(predNode);
         assert(updateCount--);
         return Traversal::Follow;
       });
@@ -852,12 +876,15 @@ void EscapeAnalysis::ConnectionGraph::propagateEscapeStates() {
   } while (Changed);
 }
 
-void EscapeAnalysis::ConnectionGraph::computeUsePoints() {
+void EscapeAnalysis::ConnectionGraph::computeAccessAndReleasePoints() {
 #ifndef NDEBUG
-  for (CGNode *Nd : Nodes)
-    assert(Nd->UsePoints.empty() && "premature use point computation");
+  for (CGNode *Nd : Nodes) {
+    assert(Nd->AccessPoints.empty() && "premature access point computation");
+    assert(Nd->ReleasePoints.empty() && "premature release point computation");
+  }
 #endif
-  // First scan the whole function and add relevant instructions as use-points.
+  // First scan the whole function and add relevant instructions as
+  // access-points.
   for (auto &BB : *F) {
     for (auto &I : BB) {
       switch (I.getKind()) {
@@ -877,9 +904,9 @@ void EscapeAnalysis::ConnectionGraph::computeUsePoints() {
             if (!content)
               continue;
             if (ValueIdx < 0)
-              ValueIdx = addUsePoint(content, &I);
+              ValueIdx = addReleasePoint(content, &I);
             else
-              content->setUsePointBit(ValueIdx);
+              content->setReleasePointBit(ValueIdx);
           }
           break;
         }
@@ -889,15 +916,17 @@ void EscapeAnalysis::ConnectionGraph::computeUsePoints() {
     }
   }
 
-  // Second, we propagate the use-point information through the graph.
+  // Second, we propagate the access-point and release-point information through
+  // the graph.
   bool Changed = false;
   do {
     Changed = false;
     for (CGNode *Node : Nodes) {
       // Propagate the bits to pointsTo. A release of a node may also release
       // any content pointed to be the node.
-      if (Node->pointsTo)
-        Changed |= Node->pointsTo->mergeUsePoints(Node);
+      if (Node->pointsTo) {
+        Changed |= Node->pointsTo->mergeAccessAndReleasePoints(Node);
+      }
     }
   } while (Changed);
 }
@@ -918,9 +947,10 @@ CGNode *EscapeAnalysis::ConnectionGraph::getOrCreateContentNode(
   }
   CGNode *content = createContentNode(addrNode, isInterior, hasReferenceOnly);
   // getValueContent may be called after the graph is built and escape states
-  // are propagated. Keep the escape state and use points consistent here.
+  // are propagated. Keep the escape state and access/release points consistent
+  // here.
   content->mergeEscapeState(addrNode->State);
-  content->mergeUsePoints(addrNode);
+  content->mergeAccessAndReleasePoints(addrNode);
   return content;
 }
 
@@ -1120,30 +1150,55 @@ bool EscapeAnalysis::ConnectionGraph::mergeFrom(ConnectionGraph *SourceGraph,
   return Changed;
 }
 
-/// Returns true if \p V is a use of \p Node, i.e. V may (indirectly)
+/// Returns true if \p V is a access of \p Node, i.e. V may (indirectly)
 /// somehow refer to the Node's value.
-/// Use-points are only values which are relevant for lifeness computation,
-/// e.g. release or apply instructions.
-bool EscapeAnalysis::ConnectionGraph::isUsePoint(SILInstruction *UsePoint,
-                                                 CGNode *Node) {
+bool EscapeAnalysis::ConnectionGraph::isAccessPoint(SILInstruction *AccessPoint,
+                                                    CGNode *Node) {
   assert(Node->getEscapeState() < EscapeState::Global &&
-         "Use points are only valid for non-escaping nodes");
-  auto Iter = UsePoints.find(UsePoint);
-  if (Iter == UsePoints.end())
+         "Access points are only valid for non-escaping nodes");
+  auto Iter = AccessPoints.find(AccessPoint);
+  if (Iter == AccessPoints.end())
     return false;
   int Idx = Iter->second;
-  if (Idx >= (int)Node->UsePoints.size())
+  if (Idx >= (int)Node->AccessPoints.size())
     return false;
-  return Node->UsePoints.test(Idx);
+  return Node->AccessPoints.test(Idx);
 }
 
-void EscapeAnalysis::ConnectionGraph::getUsePoints(
-    CGNode *Node, llvm::SmallVectorImpl<SILInstruction *> &UsePoints) {
+/// Returns true if \p V is a access of \p Node, i.e. V may (indirectly)
+/// somehow refer to the Node's value.
+/// Release-points are only values which are relevant for lifeness computation,
+/// e.g. release or consuming apply instructions.
+bool EscapeAnalysis::ConnectionGraph::isReleasePoint(
+    SILInstruction *ReleasePoint, CGNode *Node) {
   assert(Node->getEscapeState() < EscapeState::Global &&
-         "Use points are only valid for non-escaping nodes");
-  for (int Idx = Node->UsePoints.find_first(); Idx >= 0;
-       Idx = Node->UsePoints.find_next(Idx)) {
-    UsePoints.push_back(UsePointTable[Idx]);
+         "Release points are only valid for non-escaping nodes");
+  auto Iter = ReleasePoints.find(ReleasePoint);
+  if (Iter == ReleasePoints.end())
+    return false;
+  int Idx = Iter->second;
+  if (Idx >= (int)Node->ReleasePoints.size())
+    return false;
+  return Node->ReleasePoints.test(Idx);
+}
+
+void EscapeAnalysis::ConnectionGraph::getAccessPoints(
+    CGNode *Node, llvm::SmallVectorImpl<SILInstruction *> &AccessPoints) {
+  assert(Node->getEscapeState() < EscapeState::Global &&
+         "Access points are only valid for non-escaping nodes");
+  for (int Idx = Node->AccessPoints.find_first(); Idx >= 0;
+       Idx = Node->AccessPoints.find_next(Idx)) {
+    AccessPoints.push_back(AccessPointTable[Idx]);
+  }
+}
+
+void EscapeAnalysis::ConnectionGraph::getReleasePoints(
+    CGNode *Node, llvm::SmallVectorImpl<SILInstruction *> &ReleasePoints) {
+  assert(Node->getEscapeState() < EscapeState::Global &&
+         "Release points are only valid for non-escaping nodes");
+  for (int Idx = Node->ReleasePoints.find_first(); Idx >= 0;
+       Idx = Node->ReleasePoints.find_next(Idx)) {
+    ReleasePoints.push_back(ReleasePointTable[Idx]);
   }
 }
 
@@ -1546,9 +1601,15 @@ void EscapeAnalysis::ConnectionGraph::print(llvm::raw_ostream &OS) const {
     switch (Nd->getEscapeState()) {
       case EscapeState::None: {
         const char *Separator = "";
-        for (unsigned VIdx = Nd->UsePoints.find_first(); VIdx != -1u;
-             VIdx = Nd->UsePoints.find_next(VIdx)) {
-          auto node = UsePointTable[VIdx];
+        for (unsigned VIdx = Nd->ReleasePoints.find_first(); VIdx != -1u;
+             VIdx = Nd->ReleasePoints.find_next(VIdx)) {
+          auto node = ReleasePointTable[VIdx];
+          OS << Separator << '%' << InstToIDMap[node];
+          Separator = ",";
+        }
+        for (unsigned VIdx = Nd->AccessPoints.find_first(); VIdx != -1u;
+             VIdx = Nd->AccessPoints.find_next(VIdx)) {
+          auto node = AccessPointTable[VIdx];
           OS << Separator << '%' << InstToIDMap[node];
           Separator = ",";
         }
@@ -2497,7 +2558,7 @@ void EscapeAnalysis::recompute(FunctionInfo *Initial) {
 
   for (FunctionInfo *FInfo : BottomUpOrder) {
     if (BottomUpOrder.wasRecomputedWithCurrentUpdateID(FInfo)) {
-      FInfo->Graph.computeUsePoints();
+      FInfo->Graph.computeAccessAndReleasePoints();
       FInfo->Graph.verify();
       FInfo->SummaryGraph.verifyStructure();
     }
@@ -2603,19 +2664,19 @@ bool EscapeAnalysis::mergeSummaryGraph(ConnectionGraph *SummaryGraph,
 //
 // Get the value's content node and check the escaping flag on all nodes within
 // that object. An interior CG node points to content within the same object.
-bool EscapeAnalysis::canEscapeToUsePoint(SILValue value,
-                                         SILInstruction *usePoint,
-                                         ConnectionGraph *conGraph) {
+bool EscapeAnalysis::canEscapeTo(SILValue value, SILInstruction *user,
+                                 ConnectionGraph *conGraph, EscapeKind kind) {
 
-  assert((FullApplySite::isa(usePoint) || isa<RefCountingInst>(usePoint))
-         && "use points are only created for calls and refcount instructions");
+  assert((FullApplySite::isa(user) || isa<RefCountingInst>(user)) &&
+         "access and release points are only created for calls and refcount "
+         "instructions");
 
   CGNode *node = conGraph->getValueContent(value);
   if (!node)
     return true;
 
   // Follow points-to edges and return true if the current 'node' may escape at
-  // 'usePoint'.
+  // 'user'.
   CGNodeWorklist worklist(conGraph);
   while (node) {
     // Merging arbitrary nodes is supported, which may lead to cycles of
@@ -2627,13 +2688,20 @@ bool EscapeAnalysis::canEscapeToUsePoint(SILValue value,
     // connection graph, assuming that it may represent part of the object
     // pointed to by 'value'. If 'node' happens to represent another object
     // indirectly reachabe from 'value', then it cannot actually escape to this
-    // usePoint, so passing the original value is still conservatively correct.
+    // user, so passing the original value is still conservatively
+    // correct.
     if (node->valueEscapesInsideFunction(value))
       return true;
 
-    // No hidden escapes; check if 'usePoint' may access memory at 'node'.
-    if (conGraph->isUsePoint(usePoint, node))
-      return true;
+    if (kind == EscapeToRelease) {
+      // No hidden escapes; check if 'user' may release memory at 'node'.
+      if (conGraph->isReleasePoint(user, node))
+        return true;
+    } else {
+      // No hidden escapes; check if 'user' may access memory at 'node'.
+      if (conGraph->isAccessPoint(user, node))
+        return true;
+    }
 
     if (!node->isInterior())
       break;
@@ -2645,12 +2713,22 @@ bool EscapeAnalysis::canEscapeToUsePoint(SILValue value,
   return false;
 }
 
-bool EscapeAnalysis::canEscapeTo(SILValue V, FullApplySite FAS) {
+bool EscapeAnalysis::canEscapeToRelease(SILValue V, FullApplySite FAS) {
   // If it's not a local object we don't know anything about the value.
   if (!isUniquelyIdentified(V))
     return true;
   auto *ConGraph = getConnectionGraph(FAS.getFunction());
-  return canEscapeToUsePoint(V, FAS.getInstruction(), ConGraph);
+  return canEscapeTo(V, FAS.getInstruction(), ConGraph,
+                     EscapeKind::EscapeToRelease);
+}
+
+bool EscapeAnalysis::canEscapeToAccess(SILValue V, FullApplySite FAS) {
+  // If it's not a local object we don't know anything about the value.
+  if (!isUniquelyIdentified(V))
+    return true;
+  auto *ConGraph = getConnectionGraph(FAS.getFunction());
+  return canEscapeTo(V, FAS.getInstruction(), ConGraph,
+                     EscapeKind::EscapeToAccess);
 }
 
 // FIXME: remove this to avoid confusion with SILType.hasReferenceSemantics.
@@ -2659,12 +2737,12 @@ static bool hasReferenceSemantics(SILType T) {
   return T.isObject() && T.hasReferenceSemantics();
 }
 
-bool EscapeAnalysis::canEscapeTo(SILValue V, RefCountingInst *RI) {
+bool EscapeAnalysis::canEscapeToRelease(SILValue V, RefCountingInst *RI) {
   // If it's not uniquely identified we don't know anything about the value.
   if (!isUniquelyIdentified(V))
     return true;
   auto *ConGraph = getConnectionGraph(RI->getFunction());
-  return canEscapeToUsePoint(V, RI, ConGraph);
+  return canEscapeTo(V, RI, ConGraph, EscapeKind::EscapeToRelease);
 }
 
 /// Utility to get the function which contains both values \p V1 and \p V2.
