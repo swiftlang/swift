@@ -390,6 +390,7 @@ ClassTests.test("ClassMethods - generic") {
     }
   }
 
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
   class SubSpecializeOverrideCustomDerivatives: Super<Float80> {
     @differentiable(wrt: x)
     override func f(_ x: Tracked<Float80>) -> Tracked<Float80> {
@@ -408,6 +409,7 @@ ClassTests.test("ClassMethods - generic") {
       return (f(x), { v in 3 * v })
     }
   }
+#endif
 
   func classValueWithGradient<T: Differentiable & FloatingPoint>(
     _ c: Super<T>
@@ -420,7 +422,9 @@ ClassTests.test("ClassMethods - generic") {
   expectEqual((1, 1), classValueWithGradient(SubOverride<Float>()))
   expectEqual((3, 3), classValueWithGradient(SubSpecializeOverride()))
   expectEqual((3, 3), classValueWithGradient(SubOverrideCustomDerivatives<Float>()))
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
   expectEqual((3, 3), classValueWithGradient(SubSpecializeOverrideCustomDerivatives()))
+#endif
 }
 
 ClassTests.test("ClassMethods - closure captures") {
