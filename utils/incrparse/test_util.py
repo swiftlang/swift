@@ -5,6 +5,7 @@ from __future__ import print_function
 import argparse
 import io
 import os
+import platform
 import re
 import subprocess
 import sys
@@ -25,7 +26,7 @@ def run_command(cmd):
     if sys.version_info[0] < 3:
         cmd = list(map(lambda s: s.encode('utf-8'), cmd))
     print(' '.join([escapeCmdArg(arg) for arg in cmd]))
-    if sys.version_info[0] < 3:
+    if sys.version_info[0] < 3 or platform.system() == 'Windows':
         return subprocess.check_output(cmd, stderr=subprocess.STDOUT)
     else:
         return subprocess.check_output(list(map(lambda s: s.encode('utf-8'), cmd)),
