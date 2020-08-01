@@ -302,6 +302,11 @@ static bool isDefer(Optional<AnyFunctionRef> enclosingFunc) {
 /// same label.
 static void checkLabeledStmtShadowing(
     ASTContext &ctx, SourceFile *sourceFile, LabeledStmt *ls) {
+  // If ASTScope lookup is disabled, don't do this check at all.
+  // FIXME: Enable ASTScope lookup everywhere.
+  if (!ctx.LangOpts.EnableASTScopeLookup)
+    return;
+
   auto name = ls->getLabelInfo().Name;
   if (name.empty() || !sourceFile || ls->getStartLoc().isInvalid())
     return;
@@ -355,11 +360,23 @@ static LabeledStmt *findBreakOrContinueStmtTarget(
     ASTContext &ctx, SourceFile *sourceFile,
     SourceLoc loc, Identifier targetName, SourceLoc targetLoc,
     bool isContinue,
-    Optional<AnyFunctionRef> enclosingFunc) {
+    Optional<AnyFunctionRef> enclosingFunc,
+    ArrayRef<LabeledStmt *> oldActiveLabeledStmts) {
   TopCollection<unsigned, LabeledStmt *> labelCorrections(3);
 
+  // Retrieve the active set of labeled statements.
+  // FIXME: Once everything uses ASTScope lookup, \c oldActiveLabeledStmts
+  // can go away.
+  SmallVector<LabeledStmt *, 4> activeLabeledStmts;
+  if (ctx.LangOpts.EnableASTScopeLookup) {
+    activeLabeledStmts = ASTScope::lookupLabeledStmts(sourceFile, loc);
+  } else {
+    activeLabeledStmts.insert(
+        activeLabeledStmts.end(),
+        oldActiveLabeledStmts.rbegin(), oldActiveLabeledStmts.rend());
+  }
+
   // Pick the nearest break target that matches the specified name.
-  auto activeLabeledStmts = ASTScope::lookupLabeledStmts(sourceFile, loc);
   if (targetName.empty()) {
     for (auto labeledStmt : activeLabeledStmts) {
       // 'break' with no label looks through non-loop structures
@@ -481,7 +498,9 @@ public:
 
       // Verify that the ASTScope-based query for active labeled statements
       // is equivalent to what we have here.
-      if (LS->getStartLoc().isValid() && sourceFile) {
+      if (LS->getStartLoc().isValid() && sourceFile &&
+          SC.getASTContext().LangOpts.EnableASTScopeLookup &&
+          !SC.getASTContext().Diags.hadAnyError()) {
         // The labeled statements from ASTScope lookup have the
         // innermost labeled statement first, so reverse it to
         // match the data structure maintained here.
@@ -858,7 +877,7 @@ public:
     if (auto target = findBreakOrContinueStmtTarget(
             getASTContext(), DC->getParentSourceFile(), S->getLoc(),
             S->getTargetName(), S->getTargetLoc(), /*isContinue=*/false,
-            TheFunc)) {
+            TheFunc, ActiveLabeledStmts)) {
       S->setTarget(target);
     }
 
@@ -869,7 +888,7 @@ public:
     if (auto target = findBreakOrContinueStmtTarget(
             getASTContext(), DC->getParentSourceFile(), S->getLoc(),
             S->getTargetName(), S->getTargetLoc(), /*isContinue=*/true,
-            TheFunc)) {
+            TheFunc, ActiveLabeledStmts)) {
       S->setTarget(target);
     }
 
@@ -878,15 +897,21 @@ public:
 
   Stmt *visitFallthroughStmt(FallthroughStmt *S) {
     auto sourceFile = DC->getParentSourceFile();
-    auto activeLabeledStmts = ASTScope::lookupLabeledStmts(
-        sourceFile, S->getLoc());
-    auto numSwitches = llvm::count_if(activeLabeledStmts,
-                                      [](LabeledStmt *labeledStmt) {
-      return isa<SwitchStmt>(labeledStmt);
-    });
-    assert(numSwitches == SwitchLevel);
+    bool hasAnySwitches;
+    if (getASTContext().LangOpts.EnableASTScopeLookup) {
+      auto activeLabeledStmts = ASTScope::lookupLabeledStmts(
+          sourceFile, S->getLoc());
+      auto numSwitches = llvm::count_if(activeLabeledStmts,
+                                        [](LabeledStmt *labeledStmt) {
+        return isa<SwitchStmt>(labeledStmt);
+      });
+      assert(numSwitches == SwitchLevel);
+      hasAnySwitches = numSwitches > 0;
+    } else {
+      hasAnySwitches = SwitchLevel > 0;
+    }
 
-    if (!numSwitches) {
+    if (!hasAnySwitches) {
       getASTContext().Diags.diagnose(S->getLoc(),
                                      diag::fallthrough_outside_switch);
       return nullptr;
