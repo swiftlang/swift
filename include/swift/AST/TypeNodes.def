@@ -35,7 +35,7 @@
 //
 // If you add a new sugared type, be sure to test it in PrintAsObjC!
 
-/// UNCHECKED_TYPE(id, parent)
+/// INVALID_TYPE(id, parent)
 ///   This type is not present in valid, type-checked programs.
 ///   The default behavior is TYPE(id, parent).
 
@@ -47,6 +47,10 @@
 ///   programs and it cannot be the type of an expression.
 ///   The default behavior is TYPE(id, parent).
 
+/// NON_SIL_TYPE(id, parent)
+///   This type is not part of the type system after SIL type lowering.
+///   The default behavior is TYPE(id, parent).
+
 #ifndef ALWAYS_CANONICAL_TYPE
 #define ALWAYS_CANONICAL_TYPE(id, parent) TYPE(id, parent)
 #endif
@@ -55,12 +59,16 @@
 #define BUILTIN_TYPE(id, parent) ALWAYS_CANONICAL_TYPE(id, parent)
 #endif
 
+#ifndef NON_SIL_TYPE
+#define NON_SIL_TYPE(id, parent) TYPE(id, parent)
+#endif
+
 #ifndef SUGARED_TYPE
 #define SUGARED_TYPE(id, parent) TYPE(id, parent)
 #endif
 
-#ifndef UNCHECKED_TYPE
-#define UNCHECKED_TYPE(id, parent) TYPE(id, parent)
+#ifndef INVALID_TYPE
+#define INVALID_TYPE(id, parent) NON_SIL_TYPE(id, parent)
 #endif
 
 #ifndef ARTIFICIAL_TYPE
@@ -71,6 +79,10 @@
 /// is to ignore them.
 #ifndef ABSTRACT_TYPE
 #define ABSTRACT_TYPE(Id, Parent)
+#endif
+
+#ifndef NON_SIL_ABSTRACT_TYPE
+#define NON_SIL_ABSTRACT_TYPE(Id, Parent) ABSTRACT_TYPE(Id, Parent)
 #endif
 
 #ifndef ABSTRACT_SUGARED_TYPE
@@ -87,8 +99,8 @@
 #define LAST_TYPE(Id)
 #endif
 
-TYPE(Error, Type)
-UNCHECKED_TYPE(Unresolved, Type)
+INVALID_TYPE(Error, Type)
+INVALID_TYPE(Unresolved, Type)
 ABSTRACT_TYPE(Builtin, Type)
   ABSTRACT_TYPE(AnyBuiltinInteger, BuiltinType)
     BUILTIN_TYPE(BuiltinInteger, AnyBuiltinIntegerType)
@@ -122,13 +134,13 @@ ABSTRACT_TYPE(AnyGeneric, Type)
       TYPE(BoundGenericStruct, BoundGenericType)
       TYPE_RANGE(BoundGeneric, BoundGenericClass, BoundGenericStruct)
     TYPE_RANGE(NominalOrBoundGenericNominal, Enum, BoundGenericStruct)
-  UNCHECKED_TYPE(UnboundGeneric, Type)
+  INVALID_TYPE(UnboundGeneric, Type)
   TYPE_RANGE(AnyGeneric, Enum, UnboundGeneric)
 ABSTRACT_TYPE(AnyMetatype, Type)
   TYPE(Metatype, AnyMetatypeType)
   TYPE(ExistentialMetatype, AnyMetatypeType)
 ALWAYS_CANONICAL_TYPE(Module, Type)
-TYPE(DynamicSelf, Type)
+NON_SIL_TYPE(DynamicSelf, Type)
 ABSTRACT_TYPE(Substitutable, Type)
   ABSTRACT_TYPE(Archetype, SubstitutableType)
     ALWAYS_CANONICAL_TYPE(PrimaryArchetype, ArchetypeType)
@@ -139,18 +151,18 @@ ABSTRACT_TYPE(Substitutable, Type)
   TYPE(GenericTypeParam, SubstitutableType)
   TYPE_RANGE(Substitutable, PrimaryArchetype, GenericTypeParam)
 TYPE(DependentMember, Type)
-ABSTRACT_TYPE(AnyFunction, Type)
-  TYPE(Function, AnyFunctionType)
-  TYPE(GenericFunction, AnyFunctionType)
+NON_SIL_ABSTRACT_TYPE(AnyFunction, Type)
+  NON_SIL_TYPE(Function, AnyFunctionType)
+  NON_SIL_TYPE(GenericFunction, AnyFunctionType)
   TYPE_RANGE(AnyFunction, Function, GenericFunction)
 ARTIFICIAL_TYPE(SILFunction, Type)
 ARTIFICIAL_TYPE(SILBlockStorage, Type)
 ARTIFICIAL_TYPE(SILBox, Type)
 ARTIFICIAL_TYPE(SILToken, Type)
 TYPE(ProtocolComposition, Type)
-TYPE(LValue, Type)
-TYPE(InOut, Type)
-UNCHECKED_TYPE(TypeVariable, Type)
+NON_SIL_TYPE(LValue, Type)
+NON_SIL_TYPE(InOut, Type)
+INVALID_TYPE(TypeVariable, Type)
 ABSTRACT_SUGARED_TYPE(Sugar, Type)
   SUGARED_TYPE(Paren, SugarType)
   SUGARED_TYPE(TypeAlias, SugarType)
@@ -166,9 +178,11 @@ LAST_TYPE(Dictionary) // Sugared types are last to make isa<SugarType>() fast.
 
 #undef TYPE_RANGE
 #undef ABSTRACT_SUGARED_TYPE
+#undef NON_SIL_ABSTRACT_TYPE
 #undef ABSTRACT_TYPE
-#undef UNCHECKED_TYPE
+#undef INVALID_TYPE
 #undef ARTIFICIAL_TYPE
+#undef NON_SIL_TYPE
 #undef SUGARED_TYPE
 #undef BUILTIN_TYPE
 #undef ALWAYS_CANONICAL_TYPE

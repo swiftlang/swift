@@ -6838,11 +6838,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
 #define SUGARED_TYPE(Name, Parent) case TypeKind::Name:
 #define BUILTIN_TYPE(Name, Parent) case TypeKind::Name:
-#define UNCHECKED_TYPE(Name, Parent) case TypeKind::Name:
+#define INVALID_TYPE(Name, Parent) case TypeKind::Name:
 #define ARTIFICIAL_TYPE(Name, Parent) case TypeKind::Name:
 #define TYPE(Name, Parent)
 #include "swift/AST/TypeNodes.def"
-  case TypeKind::Error:
   case TypeKind::InOut:
   case TypeKind::Module:
   case TypeKind::Enum:
@@ -6887,11 +6886,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
 #define SUGARED_TYPE(Name, Parent) case TypeKind::Name:
 #define BUILTIN_TYPE(Name, Parent) case TypeKind::Name:
-#define UNCHECKED_TYPE(Name, Parent) case TypeKind::Name:
+#define INVALID_TYPE(Name, Parent) case TypeKind::Name:
 #define ARTIFICIAL_TYPE(Name, Parent) case TypeKind::Name:
 #define TYPE(Name, Parent)
 #include "swift/AST/TypeNodes.def"
-  case TypeKind::Error:
   case TypeKind::Module:
   case TypeKind::Tuple:
   case TypeKind::Enum:

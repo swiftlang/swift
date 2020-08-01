@@ -39,11 +39,10 @@ static bool isLeafTypeMetadata(CanType type) {
   switch (type->getKind()) {
 #define SUGARED_TYPE(ID, SUPER) \
   case TypeKind::ID:
-#define UNCHECKED_TYPE(ID, SUPER) \
+#define INVALID_TYPE(ID, SUPER) \
   case TypeKind::ID:
 #define TYPE(ID, SUPER)
 #include "swift/AST/TypeNodes.def"
-  case TypeKind::Error:
     llvm_unreachable("kind is invalid for a canonical type");
 
 #define ARTIFICIAL_TYPE(ID, SUPER) \

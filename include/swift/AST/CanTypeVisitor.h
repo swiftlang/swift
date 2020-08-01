@@ -61,11 +61,11 @@ public:
 #define TYPE(CLASS, PARENT) ABSTRACT_TYPE(CLASS, PARENT)
 #define ABSTRACT_SUGARED_TYPE(CLASS, PARENT)
 #define SUGARED_TYPE(CLASS, PARENT)
-  // Don't allow unchecked types by default, but allow visitors to opt-in to
+  // Don't allow invalid types by default, but allow visitors to opt-in to
   // handling them.
-#define UNCHECKED_TYPE(CLASS, PARENT)                          \
+#define INVALID_TYPE(CLASS, PARENT)                            \
   RetTy visit##CLASS##Type(Can##CLASS##Type T, Args... args) { \
-     llvm_unreachable("unchecked type");                       \
+     llvm_unreachable("invalid type");                         \
   }
 #include "swift/AST/TypeNodes.def"
 };

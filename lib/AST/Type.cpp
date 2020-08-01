@@ -464,29 +464,48 @@ static bool isLegalSILType(CanType type) {
   // L-values and inouts are not legal.
   if (!type->isMaterializable()) return false;
 
-  // Function types must be lowered.
-  if (isa<AnyFunctionType>(type)) return false;
+  switch (type->getKind()) {
+  // Reference storage types are legal if their object type is legal.
+#define REF_STORAGE(Name, ...) \
+  case TypeKind::Name##Storage:
+#include "swift/AST/ReferenceStorage.def"
+  {
+    auto refType = cast<ReferenceStorageType>(type);
+    return isLegalSILType(refType.getReferentType());
+  }
+
+#define TYPE(Id, Parent)
+#define SUGAR_TYPE(Id, Parent) \
+  case TypeKind::Id: llvm_unreachable("CanType must never be sugared");
+#define NON_SIL_TYPE(Id, Parent) \
+  case TypeKind::Id: return false;
+#include "swift/AST/TypeNodes.def"
 
   // Metatypes must have a representation.
-  if (auto meta = dyn_cast<AnyMetatypeType>(type))
+  case TypeKind::ExistentialMetatype:
+  case TypeKind::Metatype: {
+    auto meta = cast<AnyMetatypeType>(type);
     return meta->hasRepresentation();
+  }
 
   // Tuples are legal if all their elements are legal.
-  if (auto tupleType = dyn_cast<TupleType>(type)) {
+  case TypeKind::Tuple: {
+    auto tupleType = cast<TupleType>(type);
     for (auto eltType : tupleType.getElementTypes()) {
-      if (!isLegalSILType(eltType)) return false;
+      if (!isLegalSILType(eltType))
+        return false;
     }
     return true;
+  }
+
+  default:
+    break;
   }
 
   // Optionals are legal if their object type is legal.
   if (auto objectType = type.getOptionalObjectType()) {
     return isLegalSILType(objectType);
   }
-
-  // Reference storage types are legal if their object type is legal.
-  if (auto refType = dyn_cast<ReferenceStorageType>(type))
-    return isLegalSILType(refType.getReferentType());
 
   return true;
 }
