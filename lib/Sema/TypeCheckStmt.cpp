@@ -471,7 +471,6 @@ public:
   /// switch.
   CaseStmt /*nullable*/ *FallthroughSource = nullptr;
   CaseStmt /*nullable*/ *FallthroughDest = nullptr;
-  FallthroughStmt /*nullable*/ *PreviousFallthrough = nullptr;
 
   /// Skip type checking any elements inside 'BraceStmt', also this is
   /// propagated to ConstraintSystem.
@@ -910,7 +909,10 @@ public:
     }
     S->setFallthroughSource(fallthroughSource);
     S->setFallthroughDest(fallthroughDest);
-    PreviousFallthrough = S;
+
+    checkFallthroughPatternBindingsAndTypes(
+        fallthroughDest, fallthroughSource, S);
+
     return S;
   }
 
@@ -1057,7 +1059,8 @@ public:
   }
 
   void checkFallthroughPatternBindingsAndTypes(CaseStmt *caseBlock,
-                                               CaseStmt *previousBlock) {
+                                               CaseStmt *previousBlock,
+                                               FallthroughStmt *fallthrough) {
     auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
     SmallVector<VarDecl *, 4> vars;
     firstPattern->collectVariables(vars);
@@ -1095,7 +1098,7 @@ public:
       }
 
       if (!matched) {
-        getASTContext().Diags.diagnose(PreviousFallthrough->getLoc(),
+        getASTContext().Diags.diagnose(fallthrough->getLoc(),
                     diag::fallthrough_into_case_with_var_binding,
                     expected->getName());
       }
@@ -1115,15 +1118,9 @@ public:
     SmallVector<VarDecl *, 8> scratchMemory2;
     CaseStmt *previousBlock = nullptr;
 
+    // First pass: check all of the bindings.
     for (auto i = casesBegin; i != casesEnd; ++i) {
       auto *caseBlock = *i;
-
-      if (parentKind == CaseParentKind::Switch) {
-        // Fallthrough transfers control to the next case block. In the
-        // final case block, it is invalid. Only switch supports fallthrough.
-        FallthroughSource = caseBlock;
-        FallthroughDest = std::next(i) == casesEnd ? nullptr : *std::next(i);
-      }
 
       scratchMemory1.clear();
       scratchMemory2.clear();
@@ -1209,6 +1206,20 @@ public:
         }
       }
 
+      previousBlock = caseBlock;
+    }
+
+    // Second pass: type-check the body statements.
+    for (auto i = casesBegin; i != casesEnd; ++i) {
+      auto *caseBlock = *i;
+
+      if (parentKind == CaseParentKind::Switch) {
+        // Fallthrough transfers control to the next case block. In the
+        // final case block, it is invalid. Only switch supports fallthrough.
+        FallthroughSource = caseBlock;
+        FallthroughDest = std::next(i) == casesEnd ? nullptr : *std::next(i);
+      }
+
       // Check restrictions on '@unknown'.
       if (caseBlock->hasUnknownAttr()) {
         assert(parentKind == CaseParentKind::Switch &&
@@ -1218,21 +1229,9 @@ public:
             limitExhaustivityChecks);
       }
 
-      if (parentKind == CaseParentKind::Switch) {
-        // If the previous case fellthrough, similarly check that that case's
-        // bindings includes our first label item's pattern bindings and types.
-        // Only switch statements support fallthrough.
-        if (PreviousFallthrough && previousBlock) {
-          checkFallthroughPatternBindingsAndTypes(caseBlock, previousBlock);
-        }
-        PreviousFallthrough = nullptr;
-      }
-
-      // Type-check the body statements.
       Stmt *body = caseBlock->getBody();
       limitExhaustivityChecks |= typeCheckStmt(body);
       caseBlock->setBody(body);
-      previousBlock = caseBlock;
     }
   }
 
