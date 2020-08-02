@@ -423,6 +423,9 @@ public:
   computeIsCascadingUse(ArrayRef<const ASTScopeImpl *> history,
                         Optional<bool> initialIsCascadingUse);
 
+  static std::pair<CaseStmt *, CaseStmt *>
+  lookupFallthroughSourceAndDest(SourceFile *sourceFile, SourceLoc loc);
+
 #pragma mark - - lookup- starting point
 private:
   static const ASTScopeImpl *findStartingScopeForLookup(SourceFile *,

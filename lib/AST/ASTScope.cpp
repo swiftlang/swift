@@ -59,6 +59,11 @@ llvm::SmallVector<LabeledStmt *, 4> ASTScope::lookupLabeledStmts(
   return ASTScopeImpl::lookupLabeledStmts(sourceFile, loc);
 }
 
+std::pair<CaseStmt *, CaseStmt *> ASTScope::lookupFallthroughSourceAndDest(
+    SourceFile *sourceFile, SourceLoc loc) {
+  return ASTScopeImpl::lookupFallthroughSourceAndDest(sourceFile, loc);
+}
+
 #if SWIFT_COMPILER_IS_MSVC
 #pragma warning(push)
 #pragma warning(disable : 4996)

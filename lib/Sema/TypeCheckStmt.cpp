@@ -466,9 +466,6 @@ public:
   /// where this is greater than one.
   SmallVector<LabeledStmt*, 2> ActiveLabeledStmts;
 
-  /// The level of 'switch' nesting. 'fallthrough' is valid only in scopes where
-  /// this is greater than one.
-  unsigned SwitchLevel = 0;
   /// The destination block for a 'fallthrough' statement. Null if the switch
   /// scope depth is zero or if we are checking the final 'case' of the current
   /// switch.
@@ -536,11 +533,9 @@ public:
     CaseStmt *OuterFallthroughDest;
     AddSwitchNest(StmtChecker &SC) : SC(SC),
         OuterFallthroughDest(SC.FallthroughDest) {
-      ++SC.SwitchLevel;
     }
     
     ~AddSwitchNest() {
-      --SC.SwitchLevel;
       SC.FallthroughDest = OuterFallthroughDest;
     }
   };
@@ -896,33 +891,31 @@ public:
   }
 
   Stmt *visitFallthroughStmt(FallthroughStmt *S) {
-    auto sourceFile = DC->getParentSourceFile();
-    bool hasAnySwitches;
+    CaseStmt *fallthroughSource;
+    CaseStmt *fallthroughDest;
     if (getASTContext().LangOpts.EnableASTScopeLookup) {
-      auto activeLabeledStmts = ASTScope::lookupLabeledStmts(
-          sourceFile, S->getLoc());
-      auto numSwitches = llvm::count_if(activeLabeledStmts,
-                                        [](LabeledStmt *labeledStmt) {
-        return isa<SwitchStmt>(labeledStmt);
-      });
-      assert(numSwitches == SwitchLevel);
-      hasAnySwitches = numSwitches > 0;
+      auto sourceFile = DC->getParentSourceFile();
+      std::tie(fallthroughSource, fallthroughDest) =
+          ASTScope::lookupFallthroughSourceAndDest(sourceFile, S->getLoc());
+      assert(fallthroughSource == FallthroughSource);
+      assert(fallthroughDest == FallthroughDest);
     } else {
-      hasAnySwitches = SwitchLevel > 0;
+      fallthroughSource = FallthroughSource;
+      fallthroughDest = FallthroughDest;
     }
 
-    if (!hasAnySwitches) {
+    if (!fallthroughSource) {
       getASTContext().Diags.diagnose(S->getLoc(),
                                      diag::fallthrough_outside_switch);
       return nullptr;
     }
-    if (!FallthroughDest) {
+    if (!fallthroughDest) {
       getASTContext().Diags.diagnose(S->getLoc(),
                                      diag::fallthrough_from_last_case);
       return nullptr;
     }
-    S->setFallthroughSource(FallthroughSource);
-    S->setFallthroughDest(FallthroughDest);
+    S->setFallthroughSource(fallthroughSource);
+    S->setFallthroughDest(fallthroughDest);
     PreviousFallthrough = S;
     return S;
   }
@@ -1676,7 +1669,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
 void TypeChecker::typeCheckASTNode(ASTNode &node, DeclContext *DC,
                                    bool LeaveBodyUnchecked) {
   StmtChecker stmtChecker(DC);
-  // FIXME: 'ActiveLabeledStmts', 'SwitchLevel', etc. in StmtChecker are not
+  // FIXME: 'ActiveLabeledStmts', etc. in StmtChecker are not
   // populated. Since they don't affect "type checking", it's doesn't cause
   // any issue for now. But it should be populated nonetheless.
   stmtChecker.LeaveBraceStmtBodyUnchecked = LeaveBodyUnchecked;

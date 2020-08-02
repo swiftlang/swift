@@ -905,3 +905,55 @@ ASTScopeImpl::lookupLabeledStmts(SourceFile *sourceFile, SourceLoc loc) {
 
   return labeledStmts;
 }
+
+std::pair<CaseStmt *, CaseStmt *> ASTScopeImpl::lookupFallthroughSourceAndDest(
+    SourceFile *sourceFile, SourceLoc loc) {
+  // Find the innermost scope from which to start our search.
+  auto *const fileScope = sourceFile->getScope().impl;
+  const auto *innermost = fileScope->findInnermostEnclosingScope(loc, nullptr);
+  ASTScopeAssert(innermost->getWasExpanded(),
+                 "If looking in a scope, it must have been expanded.");
+
+  // Look for the enclosing case statement and its 'switch' statement.
+  CaseStmt *fallthroughSource = nullptr;
+  SwitchStmt *switchStmt = nullptr;
+  for (auto scope = innermost; scope && !scope->isLabeledStmtLookupTerminator();
+       scope = scope->getParent().getPtrOrNull()) {
+    // If we have a case statement, record it.
+    auto stmt = scope->getStmtIfAny();
+    if (!stmt) continue;
+
+    // If we've found the first case statement of a switch, record it as the
+    // fallthrough source. do-catch statements don't support fallthrough.
+    if (auto caseStmt = dyn_cast<CaseStmt>(stmt.get())) {
+      if (!fallthroughSource &&
+          caseStmt->getParentKind() == CaseParentKind::Switch)
+        fallthroughSource = caseStmt;
+
+      continue;
+    }
+
+    // If we've found the first switch statement, record it and we're done.
+    switchStmt = dyn_cast<SwitchStmt>(stmt.get());
+    if (switchStmt)
+      break;
+  }
+
+  // If we don't have both a fallthrough source and a switch statement
+  // enclosing it, the 'fallthrough' statement is ill-formed.
+  if (!fallthroughSource || !switchStmt)
+    return { nullptr, nullptr };
+
+  // Find this case in the list of cases for the switch. If we don't find it
+  // here, it means that the case isn't directly nested inside the switch, so
+  // the case and fallthrough are both ill-formed.
+  auto caseIter = llvm::find(switchStmt->getCases(), fallthroughSource);
+  if (caseIter == switchStmt->getCases().end())
+    return { nullptr, nullptr };
+
+  // Move along to the next case. This is the fallthrough destination.
+  ++caseIter;
+  auto fallthroughDest = caseIter == switchStmt->getCases().end() ? nullptr
+      : *caseIter;
+  return { fallthroughSource, fallthroughDest };
+}

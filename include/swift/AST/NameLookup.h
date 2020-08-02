@@ -711,6 +711,18 @@ public:
   static llvm::SmallVector<LabeledStmt *, 4>
   lookupLabeledStmts(SourceFile *sourceFile, SourceLoc loc);
 
+  /// Look for the directly enclosing case statement and the next case
+  /// statement, which together act as the source and destination for a
+  /// 'fallthrough' statement within a switch case.
+  ///
+  /// \returns a pair (fallthrough source, fallthrough dest). If the location
+  /// is not within the body of a case statement at all, the fallthrough
+  /// source will be \c nullptr. If there is a fallthrough source that case is
+  /// the last one, the fallthrough destination will be \c nullptr. A
+  /// well-formed 'fallthrough' statement has both a source and destination.
+  static std::pair<CaseStmt *, CaseStmt *>
+  lookupFallthroughSourceAndDest(SourceFile *sourceFile, SourceLoc loc);
+
   SWIFT_DEBUG_DUMP;
   void print(llvm::raw_ostream &) const;
   void dumpOneScopeMapLocation(std::pair<unsigned, unsigned>);
