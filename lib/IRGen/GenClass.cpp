@@ -2246,7 +2246,6 @@ irgen::emitClassPrivateDataFields(IRGenModule &IGM,
 
   // This should only be used with generic classes.
   assert(cls->isGenericContext());
-    llvm::dbgs() << "Emitting Class private data field for " << cls->getName() << "\n";
 
   SILType selfType = getSelfType(cls);
   auto &classTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();

@@ -512,14 +512,14 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   GenericSignatureID genericSigID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, specialPurpose, inlineStrategy,
-      optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
+      optimizationMode, subclassScope, effect, numSpecAttrs, hasQualifiedOwnership,
       isWeakImported, LIST_VER_TUPLE_PIECES(available),
       isDynamic, isExactSelfClass;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, specialPurpose, inlineStrategy,
-      optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
+      optimizationMode, subclassScope, effect, numSpecAttrs, hasQualifiedOwnership,
       isWeakImported, LIST_VER_TUPLE_PIECES(available),
       isDynamic, isExactSelfClass,
       funcTyID, replacedFunctionID, genericSigID,
@@ -640,6 +640,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setEffectsKind(EffectsKind(effect));
     fn->setOptimizationMode(OptimizationMode(optimizationMode));
     fn->setAlwaysWeakImported(isWeakImported);
+    fn->setClassSubclassScope(SubclassScope(subclassScope));
 
     llvm::VersionTuple available;
     DECODE_VER_TUPLE(available);
@@ -2825,14 +2826,14 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   GenericSignatureID genericSigID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
-      optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
+      optimizationMode, subclassScope, effect, numSpecAttrs, hasQualifiedOwnership,
       isWeakImported, LIST_VER_TUPLE_PIECES(available),
       isDynamic, isExactSelfClass;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
-      optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
+      optimizationMode, subclassScope, effect, numSpecAttrs, hasQualifiedOwnership,
       isWeakImported, LIST_VER_TUPLE_PIECES(available),
       isDynamic, isExactSelfClass,
       funcTyID, replacedFunctionID, genericSigID,

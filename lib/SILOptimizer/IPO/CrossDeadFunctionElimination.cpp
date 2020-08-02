@@ -84,8 +84,6 @@ public:
 
       auto F = M.lookUpFunction(info.Name);
       if (!F) {
-        llvm::dbgs() << "Couldn't eliminate " << info.Name
-                     << " because it's not found\n";
         continue;
       }
       F->dropAllReferences();

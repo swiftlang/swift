@@ -125,7 +125,7 @@ void Serializer::emitModuleSummary(const ModuleSummaryIndex &index) {
   
   {
     for (auto &method : index.virtualMethods()) {
-      llvm::BCBlockRAII restoreBlock(Out, VIRTUAL_METHOD_INFO_ID, 8);
+      llvm::BCBlockRAII restoreBlock(Out, VIRTUAL_METHOD_INFO_ID, 32);
       auto &slot = method.first;
       auto impls = method.second;
       using namespace virtual_method_info;
