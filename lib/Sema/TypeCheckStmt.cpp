@@ -473,9 +473,6 @@ public:
   CaseStmt /*nullable*/ *FallthroughDest = nullptr;
   FallthroughStmt /*nullable*/ *PreviousFallthrough = nullptr;
 
-  /// Used to distinguish the first BraceStmt that starts a TopLevelCodeDecl.
-  bool IsBraceStmtFromTopLevelDecl;
-
   /// Skip type checking any elements inside 'BraceStmt', also this is
   /// propagated to ConstraintSystem.
   bool LeaveBraceStmtBodyUnchecked = false;
@@ -541,14 +538,11 @@ public:
   };
 
   StmtChecker(DeclContext *DC)
-      : Ctx(DC->getASTContext()), TheFunc(), DC(DC),
-        IsBraceStmtFromTopLevelDecl(false) {
+      : Ctx(DC->getASTContext()), TheFunc(), DC(DC) {
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC))
       TheFunc = AFD;
     else if (auto *CE = dyn_cast<ClosureExpr>(DC))
       TheFunc = CE;
-    else if (isa<TopLevelCodeDecl>(DC))
-      IsBraceStmtFromTopLevelDecl = true;
   }
 
   //===--------------------------------------------------------------------===//
@@ -1647,15 +1641,16 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
 
   // Diagnose defer statement being last one in block (only if
   // BraceStmt does not start a TopLevelDecl).
-  if (IsBraceStmtFromTopLevelDecl) {
-    IsBraceStmtFromTopLevelDecl = false;
-  } else if (!BS->empty()) {
+  if (!BS->empty()) {
     if (auto stmt =
             BS->getLastElement().dyn_cast<Stmt *>()) {
       if (auto deferStmt = dyn_cast<DeferStmt>(stmt)) {
-        getASTContext().Diags.diagnose(deferStmt->getStartLoc(),
-                                       diag::defer_stmt_at_block_end)
-            .fixItReplace(deferStmt->getStartLoc(), "do");
+        if (!isa<TopLevelCodeDecl>(DC) ||
+            cast<TopLevelCodeDecl>(DC)->getBody() != BS) {
+          getASTContext().Diags.diagnose(deferStmt->getStartLoc(),
+                                         diag::defer_stmt_at_block_end)
+              .fixItReplace(deferStmt->getStartLoc(), "do");
+        }
       }
     }
   }
