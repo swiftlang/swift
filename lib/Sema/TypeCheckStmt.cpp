@@ -290,12 +290,12 @@ static void tryDiagnoseUnnecessaryCastOverOptionSet(ASTContext &Ctx,
     .fixItRemove(SourceRange(ME->getDotLoc(), E->getEndLoc()));
 }
 
-/// Whether the given enclosing function is a "defer" body.
-static bool isDefer(Optional<AnyFunctionRef> enclosingFunc) {
-  if (!enclosingFunc.hasValue()) return false;
-  auto *FD = dyn_cast_or_null<FuncDecl>
-    (enclosingFunc.getValue().getAbstractFunctionDecl());
-  return FD && FD->isDeferBody();
+/// Whether the given enclosing context is a "defer" body.
+static bool isDefer(DeclContext *dc) {
+  if (auto *func = dyn_cast<FuncDecl>(dc))
+    return func->isDeferBody();
+
+  return false;
 }
 
 /// Check that a labeled statement doesn't shadow another statement with the
@@ -359,8 +359,7 @@ emitUnresolvedLabelDiagnostics(DiagnosticEngine &DE,
 static LabeledStmt *findBreakOrContinueStmtTarget(
     ASTContext &ctx, SourceFile *sourceFile,
     SourceLoc loc, Identifier targetName, SourceLoc targetLoc,
-    bool isContinue,
-    Optional<AnyFunctionRef> enclosingFunc,
+    bool isContinue, DeclContext *dc,
     ArrayRef<LabeledStmt *> oldActiveLabeledStmts) {
   TopCollection<unsigned, LabeledStmt *> labelCorrections(3);
 
@@ -415,7 +414,7 @@ static LabeledStmt *findBreakOrContinueStmtTarget(
   }
 
   // If we're in a defer, produce a tailored diagnostic.
-  if (isDefer(enclosingFunc)) {
+  if (isDefer(dc)) {
     ctx.Diags.diagnose(
         loc, diag::jump_out_of_defer, isContinue ? "continue": "break");
     return nullptr;
@@ -452,10 +451,6 @@ class StmtChecker : public StmtVisitor<StmtChecker, Stmt*> {
 public:
   ASTContext &Ctx;
 
-  /// This is the current function or closure being checked.
-  /// This is null for top level code.
-  Optional<AnyFunctionRef> TheFunc;
-  
   /// DC - This is the current DeclContext.
   DeclContext *DC;
 
@@ -464,11 +459,13 @@ public:
 
   /// The level of loop nesting. 'break' and 'continue' are valid only in scopes
   /// where this is greater than one.
+  /// FIXME: Only required because EnableASTScopeLookup can be false
   SmallVector<LabeledStmt*, 2> ActiveLabeledStmts;
 
   /// The destination block for a 'fallthrough' statement. Null if the switch
   /// scope depth is zero or if we are checking the final 'case' of the current
   /// switch.
+  /// FIXME: Only required because EnableASTScopeLookup can be false
   CaseStmt /*nullable*/ *FallthroughSource = nullptr;
   CaseStmt /*nullable*/ *FallthroughDest = nullptr;
 
@@ -536,20 +533,14 @@ public:
     }
   };
 
-  StmtChecker(DeclContext *DC)
-      : Ctx(DC->getASTContext()), TheFunc(), DC(DC) {
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC))
-      TheFunc = AFD;
-    else if (auto *CE = dyn_cast<ClosureExpr>(DC))
-      TheFunc = CE;
-  }
+  StmtChecker(DeclContext *DC) : Ctx(DC->getASTContext()), DC(DC) { }
 
   //===--------------------------------------------------------------------===//
   // Helper Functions.
   //===--------------------------------------------------------------------===//
   
   bool isInDefer() const {
-    return isDefer(TheFunc);
+    return isDefer(DC);
   }
   
   template<typename StmtTy>
@@ -581,6 +572,8 @@ public:
   Stmt *visitBraceStmt(BraceStmt *BS);
 
   Stmt *visitReturnStmt(ReturnStmt *RS) {
+    auto TheFunc = AnyFunctionRef::fromDeclContext(DC);
+
     if (!TheFunc.hasValue()) {
       getASTContext().Diags.diagnose(RS->getReturnLoc(),
                                      diag::return_invalid_outside_func);
@@ -703,6 +696,7 @@ public:
     }
 
     SmallVector<AnyFunctionType::Yield, 4> buffer;
+    auto TheFunc = AnyFunctionRef::fromDeclContext(DC);
     auto yieldResults = TheFunc->getBodyYieldResults(buffer);
 
     auto yieldExprs = YS->getMutableYields();
@@ -865,7 +859,7 @@ public:
     if (auto target = findBreakOrContinueStmtTarget(
             getASTContext(), DC->getParentSourceFile(), S->getLoc(),
             S->getTargetName(), S->getTargetLoc(), /*isContinue=*/false,
-            TheFunc, ActiveLabeledStmts)) {
+            DC, ActiveLabeledStmts)) {
       S->setTarget(target);
     }
 
@@ -876,7 +870,7 @@ public:
     if (auto target = findBreakOrContinueStmtTarget(
             getASTContext(), DC->getParentSourceFile(), S->getLoc(),
             S->getTargetName(), S->getTargetLoc(), /*isContinue=*/true,
-            TheFunc, ActiveLabeledStmts)) {
+            DC, ActiveLabeledStmts)) {
       S->setTarget(target);
     }
 
