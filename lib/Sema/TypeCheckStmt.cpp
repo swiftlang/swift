@@ -290,15 +290,167 @@ static void tryDiagnoseUnnecessaryCastOverOptionSet(ASTContext &Ctx,
     .fixItRemove(SourceRange(ME->getDotLoc(), E->getEndLoc()));
 }
 
+/// Whether the given enclosing context is a "defer" body.
+static bool isDefer(DeclContext *dc) {
+  if (auto *func = dyn_cast<FuncDecl>(dc))
+    return func->isDeferBody();
+
+  return false;
+}
+
+/// Check that a labeled statement doesn't shadow another statement with the
+/// same label.
+static void checkLabeledStmtShadowing(
+    ASTContext &ctx, SourceFile *sourceFile, LabeledStmt *ls) {
+  // If ASTScope lookup is disabled, don't do this check at all.
+  // FIXME: Enable ASTScope lookup everywhere.
+  if (!ctx.LangOpts.EnableASTScopeLookup)
+    return;
+
+  auto name = ls->getLabelInfo().Name;
+  if (name.empty() || !sourceFile || ls->getStartLoc().isInvalid())
+    return;
+
+  auto activeLabeledStmtsVec = ASTScope::lookupLabeledStmts(
+      sourceFile, ls->getStartLoc());
+  auto activeLabeledStmts = llvm::makeArrayRef(activeLabeledStmtsVec);
+  for (auto prevLS : activeLabeledStmts.slice(1)) {
+    if (prevLS->getLabelInfo().Name == name) {
+      ctx.Diags.diagnose(
+          ls->getLabelInfo().Loc, diag::label_shadowed, name);
+      ctx.Diags.diagnose(
+          prevLS->getLabelInfo().Loc, diag::invalid_redecl_prev, name);
+    }
+  }
+}
+
+static void
+emitUnresolvedLabelDiagnostics(DiagnosticEngine &DE,
+                               SourceLoc targetLoc, Identifier targetName,
+                               TopCollection<unsigned, LabeledStmt *> corrections) {
+  // If an unresolved label was used, but we have a single correction,
+  // produce the specific diagnostic and fixit.
+  if (corrections.size() == 1) {
+    DE.diagnose(targetLoc, diag::unresolved_label_corrected,
+                targetName, corrections.begin()->Value->getLabelInfo().Name)
+      .highlight(SourceRange(targetLoc))
+      .fixItReplace(SourceRange(targetLoc),
+                    corrections.begin()->Value->getLabelInfo().Name.str());
+    DE.diagnose(corrections.begin()->Value->getLabelInfo().Loc,
+                diag::decl_declared_here,
+                corrections.begin()->Value->getLabelInfo().Name);
+  } else {
+    // If we have multiple corrections or none, produce a generic diagnostic
+    // and all corrections available.
+    DE.diagnose(targetLoc, diag::unresolved_label, targetName)
+      .highlight(SourceRange(targetLoc));
+    for (auto &entry : corrections)
+      DE.diagnose(entry.Value->getLabelInfo().Loc, diag::note_typo_candidate,
+                  entry.Value->getLabelInfo().Name.str())
+        .fixItReplace(SourceRange(targetLoc),
+                      entry.Value->getLabelInfo().Name.str());
+  }
+}
+
+/// Find the target of a break or continue statement.
+///
+/// \returns the target, if one was found, or \c nullptr if no such target
+/// exists.
+static LabeledStmt *findBreakOrContinueStmtTarget(
+    ASTContext &ctx, SourceFile *sourceFile,
+    SourceLoc loc, Identifier targetName, SourceLoc targetLoc,
+    bool isContinue, DeclContext *dc,
+    ArrayRef<LabeledStmt *> oldActiveLabeledStmts) {
+  TopCollection<unsigned, LabeledStmt *> labelCorrections(3);
+
+  // Retrieve the active set of labeled statements.
+  // FIXME: Once everything uses ASTScope lookup, \c oldActiveLabeledStmts
+  // can go away.
+  SmallVector<LabeledStmt *, 4> activeLabeledStmts;
+  if (ctx.LangOpts.EnableASTScopeLookup) {
+    activeLabeledStmts = ASTScope::lookupLabeledStmts(sourceFile, loc);
+  } else {
+    activeLabeledStmts.insert(
+        activeLabeledStmts.end(),
+        oldActiveLabeledStmts.rbegin(), oldActiveLabeledStmts.rend());
+  }
+
+  // Pick the nearest break target that matches the specified name.
+  if (targetName.empty()) {
+    for (auto labeledStmt : activeLabeledStmts) {
+      // 'break' with no label looks through non-loop structures
+      // except 'switch'.
+      // 'continue' ignores non-loop structures.
+      if (!labeledStmt->requiresLabelOnJump() &&
+          (!isContinue || labeledStmt->isPossibleContinueTarget())) {
+        return labeledStmt;
+      }
+    }
+  } else {
+    // Scan inside out until we find something with the right label.
+    for (auto labeledStmt : activeLabeledStmts) {
+      if (targetName == labeledStmt->getLabelInfo().Name) {
+        // Continue cannot be used to repeat switches, use fallthrough instead.
+        if (isContinue && !labeledStmt->isPossibleContinueTarget()) {
+          ctx.Diags.diagnose(
+              loc, diag::continue_not_in_this_stmt,
+              isa<SwitchStmt>(labeledStmt) ? "switch" : "if");
+          return nullptr;
+        }
+
+        return labeledStmt;
+      }
+
+      unsigned distance =
+        TypeChecker::getCallEditDistance(
+            DeclNameRef(targetName),
+            labeledStmt->getLabelInfo().Name,
+            TypeChecker::UnreasonableCallEditDistance);
+      if (distance < TypeChecker::UnreasonableCallEditDistance)
+        labelCorrections.insert(distance, std::move(labeledStmt));
+    }
+    labelCorrections.filterMaxScoreRange(
+      TypeChecker::MaxCallEditDistanceFromBestCandidate);
+  }
+
+  // If we're in a defer, produce a tailored diagnostic.
+  if (isDefer(dc)) {
+    ctx.Diags.diagnose(
+        loc, diag::jump_out_of_defer, isContinue ? "continue": "break");
+    return nullptr;
+  }
+
+  if (targetName.empty()) {
+    // If we're dealing with an unlabeled break inside of an 'if' or 'do'
+    // statement, produce a more specific error.
+    if (!isContinue &&
+        llvm::any_of(activeLabeledStmts,
+                     [&](Stmt *S) -> bool {
+                       return isa<IfStmt>(S) || isa<DoStmt>(S);
+                     })) {
+      ctx.Diags.diagnose(
+          loc, diag::unlabeled_break_outside_loop);
+      return nullptr;
+    }
+
+    // Otherwise produce a generic error.
+    ctx.Diags.diagnose(
+        loc,
+        isContinue ? diag::continue_outside_loop : diag::break_outside_loop);
+    return nullptr;
+  }
+
+  // Provide potential corrections for an incorrect label.
+  emitUnresolvedLabelDiagnostics(
+      ctx.Diags, targetLoc, targetName, labelCorrections);
+  return nullptr;
+}
+
 namespace {
 class StmtChecker : public StmtVisitor<StmtChecker, Stmt*> {
 public:
   ASTContext &Ctx;
 
-  /// This is the current function or closure being checked.
-  /// This is null for top level code.
-  Optional<AnyFunctionRef> TheFunc;
-  
   /// DC - This is the current DeclContext.
   DeclContext *DC;
 
@@ -307,20 +459,15 @@ public:
 
   /// The level of loop nesting. 'break' and 'continue' are valid only in scopes
   /// where this is greater than one.
+  /// FIXME: Only required because EnableASTScopeLookup can be false
   SmallVector<LabeledStmt*, 2> ActiveLabeledStmts;
 
-  /// The level of 'switch' nesting. 'fallthrough' is valid only in scopes where
-  /// this is greater than one.
-  unsigned SwitchLevel = 0;
   /// The destination block for a 'fallthrough' statement. Null if the switch
   /// scope depth is zero or if we are checking the final 'case' of the current
   /// switch.
+  /// FIXME: Only required because EnableASTScopeLookup can be false
   CaseStmt /*nullable*/ *FallthroughSource = nullptr;
   CaseStmt /*nullable*/ *FallthroughDest = nullptr;
-  FallthroughStmt /*nullable*/ *PreviousFallthrough = nullptr;
-
-  /// Used to distinguish the first BraceStmt that starts a TopLevelCodeDecl.
-  bool IsBraceStmtFromTopLevelDecl;
 
   /// Skip type checking any elements inside 'BraceStmt', also this is
   /// propagated to ConstraintSystem.
@@ -332,21 +479,42 @@ public:
     StmtChecker &SC;
     AddLabeledStmt(StmtChecker &SC, LabeledStmt *LS) : SC(SC) {
       // Verify that we don't have label shadowing.
-      if (!LS->getLabelInfo().Name.empty())
-        for (auto PrevLS : SC.ActiveLabeledStmts) {
-          if (PrevLS->getLabelInfo().Name == LS->getLabelInfo().Name) {
-            auto &DE = SC.getASTContext().Diags;
-            DE.diagnose(LS->getLabelInfo().Loc,
-                        diag::label_shadowed, LS->getLabelInfo().Name);
-            DE.diagnose(PrevLS->getLabelInfo().Loc,
-                        diag::invalid_redecl_prev,
-                        PrevLS->getLabelInfo().Name);
-          }
-        }
+      auto sourceFile = SC.DC->getParentSourceFile();
+      checkLabeledStmtShadowing(SC.getASTContext(), sourceFile, LS);
 
       // In any case, remember that we're in this labeled statement so that
       // break and continue are aware of it.
       SC.ActiveLabeledStmts.push_back(LS);
+
+      // Verify that the ASTScope-based query for active labeled statements
+      // is equivalent to what we have here.
+      if (LS->getStartLoc().isValid() && sourceFile &&
+          SC.getASTContext().LangOpts.EnableASTScopeLookup &&
+          !SC.getASTContext().Diags.hadAnyError()) {
+        // The labeled statements from ASTScope lookup have the
+        // innermost labeled statement first, so reverse it to
+        // match the data structure maintained here.
+        auto activeFromASTScope = ASTScope::lookupLabeledStmts(
+            sourceFile, LS->getStartLoc());
+        assert(activeFromASTScope.front() == LS);
+        std::reverse(activeFromASTScope.begin(), activeFromASTScope.end());
+        if (activeFromASTScope != SC.ActiveLabeledStmts) {
+          llvm::errs() << "Old: ";
+          llvm::interleave(SC.ActiveLabeledStmts, [&](LabeledStmt *LS) {
+            llvm::errs() << LS;
+          }, [&] {
+            llvm::errs() << ' ';
+          });
+          llvm::errs() << "\nNew: ";
+          llvm::interleave(activeFromASTScope, [&](LabeledStmt *LS) {
+            llvm::errs() << LS;
+          }, [&] {
+            llvm::errs() << ' ';
+          });
+          llvm::errs() << "\n";
+        }
+        assert(activeFromASTScope == SC.ActiveLabeledStmts);
+      }
     }
     ~AddLabeledStmt() {
       SC.ActiveLabeledStmts.pop_back();
@@ -358,35 +526,21 @@ public:
     CaseStmt *OuterFallthroughDest;
     AddSwitchNest(StmtChecker &SC) : SC(SC),
         OuterFallthroughDest(SC.FallthroughDest) {
-      ++SC.SwitchLevel;
     }
     
     ~AddSwitchNest() {
-      --SC.SwitchLevel;
       SC.FallthroughDest = OuterFallthroughDest;
     }
   };
 
-  StmtChecker(DeclContext *DC)
-      : Ctx(DC->getASTContext()), TheFunc(), DC(DC),
-        IsBraceStmtFromTopLevelDecl(false) {
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC))
-      TheFunc = AFD;
-    else if (auto *CE = dyn_cast<ClosureExpr>(DC))
-      TheFunc = CE;
-    else if (isa<TopLevelCodeDecl>(DC))
-      IsBraceStmtFromTopLevelDecl = true;
-  }
+  StmtChecker(DeclContext *DC) : Ctx(DC->getASTContext()), DC(DC) { }
 
   //===--------------------------------------------------------------------===//
   // Helper Functions.
   //===--------------------------------------------------------------------===//
   
   bool isInDefer() const {
-    if (!TheFunc.hasValue()) return false;
-    auto *FD = dyn_cast_or_null<FuncDecl>
-      (TheFunc.getValue().getAbstractFunctionDecl());
-    return FD && FD->isDeferBody();
+    return isDefer(DC);
   }
   
   template<typename StmtTy>
@@ -418,6 +572,8 @@ public:
   Stmt *visitBraceStmt(BraceStmt *BS);
 
   Stmt *visitReturnStmt(ReturnStmt *RS) {
+    auto TheFunc = AnyFunctionRef::fromDeclContext(DC);
+
     if (!TheFunc.hasValue()) {
       getASTContext().Diags.diagnose(RS->getReturnLoc(),
                                      diag::return_invalid_outside_func);
@@ -540,6 +696,7 @@ public:
     }
 
     SmallVector<AnyFunctionType::Yield, 4> buffer;
+    auto TheFunc = AnyFunctionRef::fromDeclContext(DC);
     auto yieldResults = TheFunc->getBodyYieldResults(buffer);
 
     auto yieldExprs = YS->getMutableYields();
@@ -647,8 +804,6 @@ public:
   Stmt *visitGuardStmt(GuardStmt *GS) {
     TypeChecker::typeCheckConditionForStatement(GS, DC);
 
-    AddLabeledStmt ifNest(*this, GS);
-    
     Stmt *S = GS->getBody();
     typeCheckStmt(S);
     GS->setBody(S);
@@ -701,175 +856,57 @@ public:
   }
 
   Stmt *visitBreakStmt(BreakStmt *S) {
-    LabeledStmt *Target = nullptr;
-    TopCollection<unsigned, LabeledStmt *> labelCorrections(3);
-    // Pick the nearest break target that matches the specified name.
-    if (S->getTargetName().empty()) {
-      for (auto I = ActiveLabeledStmts.rbegin(), E = ActiveLabeledStmts.rend();
-           I != E; ++I) {
-        // 'break' with no label looks through non-loop structures
-        // except 'switch'.
-        if (!(*I)->requiresLabelOnJump()) {
-          Target = *I;
-          break;
-        }
-      }
+    if (auto target = findBreakOrContinueStmtTarget(
+            getASTContext(), DC->getParentSourceFile(), S->getLoc(),
+            S->getTargetName(), S->getTargetLoc(), /*isContinue=*/false,
+            DC, ActiveLabeledStmts)) {
+      S->setTarget(target);
+    }
 
-    } else {
-      // Scan inside out until we find something with the right label.
-      for (auto I = ActiveLabeledStmts.rbegin(), E = ActiveLabeledStmts.rend();
-           I != E; ++I) {
-        if (S->getTargetName() == (*I)->getLabelInfo().Name) {
-          Target = *I;
-          break;
-        } else {
-          unsigned distance =
-            TypeChecker::getCallEditDistance(
-                DeclNameRef(S->getTargetName()), (*I)->getLabelInfo().Name,
-                TypeChecker::UnreasonableCallEditDistance);
-          if (distance < TypeChecker::UnreasonableCallEditDistance)
-            labelCorrections.insert(distance, std::move(*I));
-        }
-      }
-      labelCorrections.filterMaxScoreRange(
-        TypeChecker::MaxCallEditDistanceFromBestCandidate);
-    }
-    
-    if (!Target) {
-      // If we're in a defer, produce a tailored diagnostic.
-      if (isInDefer()) {
-        getASTContext().Diags.diagnose(S->getLoc(),
-                                       diag::jump_out_of_defer, "break");
-      } else if (S->getTargetName().empty()) {
-        // If we're dealing with an unlabeled break inside of an 'if' or 'do'
-        // statement, produce a more specific error.
-        if (std::any_of(ActiveLabeledStmts.rbegin(),
-                        ActiveLabeledStmts.rend(),
-                        [&](Stmt *S) -> bool {
-                          return isa<IfStmt>(S) || isa<DoStmt>(S);
-                        })) {
-          getASTContext().Diags.diagnose(S->getLoc(),
-                                         diag::unlabeled_break_outside_loop);
-        } else {
-          // Otherwise produce a generic error.
-          getASTContext().Diags.diagnose(S->getLoc(), diag::break_outside_loop);
-        }
-      } else {
-        emitUnresolvedLabelDiagnostics(getASTContext().Diags,
-                                       S->getTargetLoc(), S->getTargetName(),
-                                       labelCorrections);
-      }
-      return nullptr;
-    }
-    S->setTarget(Target);
     return S;
   }
 
   Stmt *visitContinueStmt(ContinueStmt *S) {
-    LabeledStmt *Target = nullptr;
-    TopCollection<unsigned, LabeledStmt *> labelCorrections(3);
-    // Scan to see if we are in any non-switch labeled statements (loops).  Scan
-    // inside out.
-    if (S->getTargetName().empty()) {
-      for (auto I = ActiveLabeledStmts.rbegin(), E = ActiveLabeledStmts.rend();
-           I != E; ++I) {
-        // 'continue' with no label ignores non-loop structures.
-        if (!(*I)->requiresLabelOnJump() &&
-            (*I)->isPossibleContinueTarget()) {
-          Target = *I;
-          break;
-        }
-      }
-    } else {
-      // Scan inside out until we find something with the right label.
-      for (auto I = ActiveLabeledStmts.rbegin(), E = ActiveLabeledStmts.rend();
-           I != E; ++I) {
-        if (S->getTargetName() == (*I)->getLabelInfo().Name) {
-          Target = *I;
-          break;
-        } else {
-          unsigned distance =
-            TypeChecker::getCallEditDistance(
-                DeclNameRef(S->getTargetName()), (*I)->getLabelInfo().Name,
-                TypeChecker::UnreasonableCallEditDistance);
-          if (distance < TypeChecker::UnreasonableCallEditDistance)
-            labelCorrections.insert(distance, std::move(*I));
-        }
-      }
-      labelCorrections.filterMaxScoreRange(
-        TypeChecker::MaxCallEditDistanceFromBestCandidate);
+    if (auto target = findBreakOrContinueStmtTarget(
+            getASTContext(), DC->getParentSourceFile(), S->getLoc(),
+            S->getTargetName(), S->getTargetLoc(), /*isContinue=*/true,
+            DC, ActiveLabeledStmts)) {
+      S->setTarget(target);
     }
 
-    if (Target) {
-      // Continue cannot be used to repeat switches, use fallthrough instead.
-      if (!Target->isPossibleContinueTarget()) {
-        getASTContext().Diags.diagnose(
-            S->getLoc(), diag::continue_not_in_this_stmt,
-            isa<SwitchStmt>(Target) ? "switch" : "if");
-        return nullptr;
-      }
-    } else {
-      // If we're in a defer, produce a tailored diagnostic.
-      if (isInDefer()) {
-        getASTContext().Diags.diagnose(S->getLoc(),
-                                       diag::jump_out_of_defer, "break");
-      } else if (S->getTargetName().empty()) {
-        // If we're dealing with an unlabeled continue, produce a generic error.
-        getASTContext().Diags.diagnose(S->getLoc(),
-                                       diag::continue_outside_loop);
-      } else {
-        emitUnresolvedLabelDiagnostics(getASTContext().Diags,
-                                       S->getTargetLoc(), S->getTargetName(),
-                                       labelCorrections);
-      }
-      return nullptr;
-    }
-    S->setTarget(Target);
     return S;
   }
 
-  static void
-  emitUnresolvedLabelDiagnostics(DiagnosticEngine &DE,
-                                 SourceLoc targetLoc, Identifier targetName,
-                                 TopCollection<unsigned, LabeledStmt *> corrections) {
-    // If an unresolved label was used, but we have a single correction,
-    // produce the specific diagnostic and fixit.
-    if (corrections.size() == 1) {
-      DE.diagnose(targetLoc, diag::unresolved_label_corrected,
-                  targetName, corrections.begin()->Value->getLabelInfo().Name)
-        .highlight(SourceRange(targetLoc))
-        .fixItReplace(SourceRange(targetLoc),
-                      corrections.begin()->Value->getLabelInfo().Name.str());
-      DE.diagnose(corrections.begin()->Value->getLabelInfo().Loc,
-                  diag::decl_declared_here,
-                  corrections.begin()->Value->getLabelInfo().Name);
-    } else {
-      // If we have multiple corrections or none, produce a generic diagnostic
-      // and all corrections available.
-      DE.diagnose(targetLoc, diag::unresolved_label, targetName)
-        .highlight(SourceRange(targetLoc));
-      for (auto &entry : corrections)
-        DE.diagnose(entry.Value->getLabelInfo().Loc, diag::note_typo_candidate,
-                    entry.Value->getLabelInfo().Name.str())
-          .fixItReplace(SourceRange(targetLoc),
-                        entry.Value->getLabelInfo().Name.str());
-    }
-  }
-  
   Stmt *visitFallthroughStmt(FallthroughStmt *S) {
-    if (!SwitchLevel) {
+    CaseStmt *fallthroughSource;
+    CaseStmt *fallthroughDest;
+    if (getASTContext().LangOpts.EnableASTScopeLookup) {
+      auto sourceFile = DC->getParentSourceFile();
+      std::tie(fallthroughSource, fallthroughDest) =
+          ASTScope::lookupFallthroughSourceAndDest(sourceFile, S->getLoc());
+      assert(fallthroughSource == FallthroughSource);
+      assert(fallthroughDest == FallthroughDest);
+    } else {
+      fallthroughSource = FallthroughSource;
+      fallthroughDest = FallthroughDest;
+    }
+
+    if (!fallthroughSource) {
       getASTContext().Diags.diagnose(S->getLoc(),
                                      diag::fallthrough_outside_switch);
       return nullptr;
     }
-    if (!FallthroughDest) {
+    if (!fallthroughDest) {
       getASTContext().Diags.diagnose(S->getLoc(),
                                      diag::fallthrough_from_last_case);
       return nullptr;
     }
-    S->setFallthroughSource(FallthroughSource);
-    S->setFallthroughDest(FallthroughDest);
-    PreviousFallthrough = S;
+    S->setFallthroughSource(fallthroughSource);
+    S->setFallthroughDest(fallthroughDest);
+
+    checkFallthroughPatternBindingsAndTypes(
+        fallthroughDest, fallthroughSource, S);
+
     return S;
   }
 
@@ -1016,7 +1053,8 @@ public:
   }
 
   void checkFallthroughPatternBindingsAndTypes(CaseStmt *caseBlock,
-                                               CaseStmt *previousBlock) {
+                                               CaseStmt *previousBlock,
+                                               FallthroughStmt *fallthrough) {
     auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
     SmallVector<VarDecl *, 4> vars;
     firstPattern->collectVariables(vars);
@@ -1054,7 +1092,7 @@ public:
       }
 
       if (!matched) {
-        getASTContext().Diags.diagnose(PreviousFallthrough->getLoc(),
+        getASTContext().Diags.diagnose(fallthrough->getLoc(),
                     diag::fallthrough_into_case_with_var_binding,
                     expected->getName());
       }
@@ -1074,15 +1112,9 @@ public:
     SmallVector<VarDecl *, 8> scratchMemory2;
     CaseStmt *previousBlock = nullptr;
 
+    // First pass: check all of the bindings.
     for (auto i = casesBegin; i != casesEnd; ++i) {
       auto *caseBlock = *i;
-
-      if (parentKind == CaseParentKind::Switch) {
-        // Fallthrough transfers control to the next case block. In the
-        // final case block, it is invalid. Only switch supports fallthrough.
-        FallthroughSource = caseBlock;
-        FallthroughDest = std::next(i) == casesEnd ? nullptr : *std::next(i);
-      }
 
       scratchMemory1.clear();
       scratchMemory2.clear();
@@ -1168,6 +1200,20 @@ public:
         }
       }
 
+      previousBlock = caseBlock;
+    }
+
+    // Second pass: type-check the body statements.
+    for (auto i = casesBegin; i != casesEnd; ++i) {
+      auto *caseBlock = *i;
+
+      if (parentKind == CaseParentKind::Switch) {
+        // Fallthrough transfers control to the next case block. In the
+        // final case block, it is invalid. Only switch supports fallthrough.
+        FallthroughSource = caseBlock;
+        FallthroughDest = std::next(i) == casesEnd ? nullptr : *std::next(i);
+      }
+
       // Check restrictions on '@unknown'.
       if (caseBlock->hasUnknownAttr()) {
         assert(parentKind == CaseParentKind::Switch &&
@@ -1177,21 +1223,9 @@ public:
             limitExhaustivityChecks);
       }
 
-      if (parentKind == CaseParentKind::Switch) {
-        // If the previous case fellthrough, similarly check that that case's
-        // bindings includes our first label item's pattern bindings and types.
-        // Only switch statements support fallthrough.
-        if (PreviousFallthrough && previousBlock) {
-          checkFallthroughPatternBindingsAndTypes(caseBlock, previousBlock);
-        }
-        PreviousFallthrough = nullptr;
-      }
-
-      // Type-check the body statements.
       Stmt *body = caseBlock->getBody();
       limitExhaustivityChecks |= typeCheckStmt(body);
       caseBlock->setBody(body);
-      previousBlock = caseBlock;
     }
   }
 
@@ -1600,15 +1634,16 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
 
   // Diagnose defer statement being last one in block (only if
   // BraceStmt does not start a TopLevelDecl).
-  if (IsBraceStmtFromTopLevelDecl) {
-    IsBraceStmtFromTopLevelDecl = false;
-  } else if (!BS->empty()) {
+  if (!BS->empty()) {
     if (auto stmt =
             BS->getLastElement().dyn_cast<Stmt *>()) {
       if (auto deferStmt = dyn_cast<DeferStmt>(stmt)) {
-        getASTContext().Diags.diagnose(deferStmt->getStartLoc(),
-                                       diag::defer_stmt_at_block_end)
-            .fixItReplace(deferStmt->getStartLoc(), "do");
+        if (!isa<TopLevelCodeDecl>(DC) ||
+            cast<TopLevelCodeDecl>(DC)->getBody() != BS) {
+          getASTContext().Diags.diagnose(deferStmt->getStartLoc(),
+                                         diag::defer_stmt_at_block_end)
+              .fixItReplace(deferStmt->getStartLoc(), "do");
+        }
       }
     }
   }
@@ -1622,7 +1657,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
 void TypeChecker::typeCheckASTNode(ASTNode &node, DeclContext *DC,
                                    bool LeaveBodyUnchecked) {
   StmtChecker stmtChecker(DC);
-  // FIXME: 'ActiveLabeledStmts', 'SwitchLevel', etc. in StmtChecker are not
+  // FIXME: 'ActiveLabeledStmts', etc. in StmtChecker are not
   // populated. Since they don't affect "type checking", it's doesn't cause
   // any issue for now. But it should be populated nonetheless.
   stmtChecker.LeaveBraceStmtBodyUnchecked = LeaveBodyUnchecked;
