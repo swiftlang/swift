@@ -268,7 +268,8 @@ SILFunctionType::getWithDifferentiability(DifferentiabilityKind kind,
             ? SILResultDifferentiability::DifferentiableOrNotApplicable
             : SILResultDifferentiability::NotDifferentiable));
   }
-  auto newExtInfo = getExtInfo().withDifferentiabilityKind(kind);
+  auto newExtInfo =
+      getExtInfo().intoBuilder().withDifferentiabilityKind(kind).build();
   return get(getInvocationGenericSignature(), newExtInfo, getCoroutineKind(),
              getCalleeConvention(), newParameters, getYields(), newResults,
              getOptionalErrorResult(), getPatternSubstitutions(),
@@ -279,8 +280,11 @@ SILFunctionType::getWithDifferentiability(DifferentiabilityKind kind,
 CanSILFunctionType SILFunctionType::getWithoutDifferentiability() {
   if (!isDifferentiable())
     return CanSILFunctionType(this);
-  auto nondiffExtInfo = getExtInfo().withDifferentiabilityKind(
-      DifferentiabilityKind::NonDifferentiable);
+  auto nondiffExtInfo =
+      getExtInfo()
+          .intoBuilder()
+          .withDifferentiabilityKind(DifferentiabilityKind::NonDifferentiable)
+          .build();
   SmallVector<SILParameterInfo, 8> newParams;
   for (auto &param : getParameters())
     newParams.push_back(param.getWithDifferentiability(
@@ -928,7 +932,7 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
 CanAnyFunctionType
 Lowering::adjustFunctionType(CanAnyFunctionType t,
                              AnyFunctionType::ExtInfo extInfo) {
-  if (t->getExtInfo() == extInfo)
+  if (t->getExtInfo().isEqualTo(extInfo, useClangTypes(t)))
     return t;
   return CanAnyFunctionType(t->withExtInfo(extInfo));
 }
@@ -939,7 +943,8 @@ Lowering::adjustFunctionType(CanSILFunctionType type,
                              SILFunctionType::ExtInfo extInfo,
                              ParameterConvention callee,
                              ProtocolConformanceRef witnessMethodConformance) {
-  if (type->getExtInfo() == extInfo && type->getCalleeConvention() == callee &&
+  if (type->getExtInfo().isEqualTo(extInfo, useClangTypes(type)) &&
+      type->getCalleeConvention() == callee &&
       type->getWitnessMethodConformanceOrInvalid() == witnessMethodConformance)
     return type;
 
@@ -961,7 +966,7 @@ SILFunctionType::getWithRepresentation(Representation repr) {
 
 CanSILFunctionType SILFunctionType::getWithExtInfo(ExtInfo newExt) {
   auto oldExt = getExtInfo();
-  if (newExt == oldExt)
+  if (newExt.isEqualTo(oldExt, useClangTypes(this)))
     return CanSILFunctionType(this);
 
   auto calleeConvention =
@@ -2106,11 +2111,13 @@ static CanSILFunctionType getSILFunctionType(
 
   // NOTE: SILFunctionType::ExtInfo doesn't track everything that
   // AnyFunctionType::ExtInfo tracks. For example: 'throws' or 'auto-closure'
-  auto silExtInfo = SILFunctionType::ExtInfo()
-    .withRepresentation(extInfo.getSILRepresentation())
-    .withIsPseudogeneric(pseudogeneric)
-    .withNoEscape(extInfo.isNoEscape())
-    .withDifferentiabilityKind(extInfo.getDifferentiabilityKind());
+  auto silExtInfo =
+      SILFunctionType::ExtInfoBuilder()
+          .withRepresentation(extInfo.getSILRepresentation())
+          .withIsPseudogeneric(pseudogeneric)
+          .withNoEscape(extInfo.isNoEscape())
+          .withDifferentiabilityKind(extInfo.getDifferentiabilityKind())
+          .build();
   
   // Build the substituted generic signature we extracted.
   SubstitutionMap substitutions;
@@ -3716,7 +3723,7 @@ public:
     // pseudogeneric.
     auto extInfo = origType->getExtInfo();
     if (!shouldSubstituteOpaqueArchetypes)
-      extInfo = extInfo.withIsPseudogeneric(false);
+      extInfo = extInfo.intoBuilder().withIsPseudogeneric(false).build();
 
     auto genericSig = shouldSubstituteOpaqueArchetypes
                         ? origType->getInvocationGenericSignature()
@@ -3962,7 +3969,7 @@ TypeConverter::getBridgedFunctionType(AbstractionPattern pattern,
   case SILFunctionTypeRepresentation::Closure:
   case SILFunctionTypeRepresentation::WitnessMethod: {
     // No bridging needed for native functions.
-    if (t->getExtInfo() == extInfo)
+    if (t->getExtInfo().isEqualTo(extInfo, useClangTypes(t)))
       return t;
     return CanAnyFunctionType::get(genericSig, t.getParams(), t.getResult(),
                                    extInfo);

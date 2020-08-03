@@ -57,7 +57,8 @@ CanAnyFunctionType adjustFunctionType(CanAnyFunctionType type,
 /// Change the given function type's representation.
 inline CanAnyFunctionType adjustFunctionType(CanAnyFunctionType t,
                                           SILFunctionType::Representation rep) {
-  auto extInfo = t->getExtInfo().withSILRepresentation(rep);
+  auto extInfo =
+      t->getExtInfo().intoBuilder().withSILRepresentation(rep).build();
   return adjustFunctionType(t, extInfo);  
 }
 

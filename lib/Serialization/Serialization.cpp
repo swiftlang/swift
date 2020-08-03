@@ -4128,7 +4128,7 @@ public:
     using namespace decls_block;
 
     auto resultType = S.addTypeRef(fnTy->getResult());
-    auto clangType = S.addClangTypeRef(fnTy->getClangFunctionType());
+    auto clangType = S.addClangTypeRef(fnTy->getClangTypeInfo().getType());
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[FunctionTypeLayout::Code];
     FunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -4216,7 +4216,7 @@ public:
       S.addSubstitutionMapRef(fnTy->getInvocationSubstitutions());
     auto patternSubstMapID =
       S.addSubstitutionMapRef(fnTy->getPatternSubstitutions());
-    auto clangTypeID = S.addClangTypeRef(fnTy->getClangFunctionType());
+    auto clangTypeID = S.addClangTypeRef(fnTy->getClangTypeInfo().getType());
 
     auto stableCoroutineKind =
       getRawStableSILCoroutineKind(fnTy->getCoroutineKind());

@@ -400,19 +400,16 @@ Type ASTBuilder::createFunctionType(
      || representation == FunctionTypeRepresentation::Block)
     && !flags.isEscaping();
 
-  FunctionType::ExtInfo incompleteExtInfo(
-    FunctionTypeRepresentation::Swift,
-    noescape, flags.throws(), diffKind, /*clangFunctionType*/nullptr);
-
   const clang::Type *clangFunctionType = nullptr;
   if (representation == FunctionTypeRepresentation::CFunctionPointer)
     clangFunctionType = Ctx.getClangFunctionType(funcParams, output,
-                                                 incompleteExtInfo,
                                                  representation);
 
-  auto einfo = incompleteExtInfo.withRepresentation(representation)
-                                .withAsync(flags.async())
-                                .withClangFunctionType(clangFunctionType);
+  auto einfo =
+      FunctionType::ExtInfoBuilder(representation, noescape, flags.throws(),
+                                   diffKind, clangFunctionType)
+          .withAsync(flags.async())
+          .build();
 
   return FunctionType::get(funcParams, output, einfo);
 }
@@ -532,9 +529,10 @@ Type ASTBuilder::createImplFunctionType(
   }
 
   // [TODO: Store-SIL-Clang-type]
-  auto einfo = SILFunctionType::ExtInfo(representation, flags.isPseudogeneric(),
-                                        !flags.isEscaping(), diffKind,
-                                        /*clangFunctionType*/ nullptr);
+  auto einfo = SILExtInfoBuilder(representation, flags.isPseudogeneric(),
+                                 !flags.isEscaping(), diffKind,
+                                 /*clangFunctionType*/ nullptr)
+                   .build();
 
   llvm::SmallVector<SILParameterInfo, 8> funcParams;
   llvm::SmallVector<SILYieldInfo, 8> funcYields;

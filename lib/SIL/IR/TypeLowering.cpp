@@ -2150,15 +2150,16 @@ static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
 
   assert((!isForeign || isDeallocating)
          && "There are no foreign destroying destructors");
-  auto extInfo =
-            AnyFunctionType::ExtInfo(FunctionType::Representation::Thin,
-                                     /*throws*/ false);
+  auto extInfoBuilder =
+      AnyFunctionType::ExtInfoBuilder(FunctionType::Representation::Thin,
+                                      /*throws*/ false);
   if (isForeign)
-    extInfo = extInfo
-      .withSILRepresentation(SILFunctionTypeRepresentation::ObjCMethod);
+    extInfoBuilder = extInfoBuilder.withSILRepresentation(
+        SILFunctionTypeRepresentation::ObjCMethod);
   else
-    extInfo = extInfo
-      .withSILRepresentation(SILFunctionTypeRepresentation::Method);
+    extInfoBuilder = extInfoBuilder.withSILRepresentation(
+        SILFunctionTypeRepresentation::Method);
+  auto extInfo = extInfoBuilder.build();
 
   auto &C = dd->getASTContext();
   CanType resultTy = (isDeallocating
@@ -2184,11 +2185,14 @@ static CanAnyFunctionType getIVarInitDestroyerInterfaceType(ClassDecl *cd,
   auto resultType = (isDestroyer
                      ? TupleType::getEmpty(cd->getASTContext())
                      : classType);
-  auto extInfo = AnyFunctionType::ExtInfo(FunctionType::Representation::Thin,
-                                          /*throws*/ false);
-  extInfo = extInfo
-    .withSILRepresentation(isObjC? SILFunctionTypeRepresentation::ObjCMethod
-                           : SILFunctionTypeRepresentation::Method);
+  auto extInfoBuilder =
+      AnyFunctionType::ExtInfoBuilder(FunctionType::Representation::Thin,
+                                      /*throws*/ false);
+  auto extInfo = extInfoBuilder
+                     .withSILRepresentation(
+                         isObjC ? SILFunctionTypeRepresentation::ObjCMethod
+                                : SILFunctionTypeRepresentation::Method)
+                     .build();
 
   resultType = CanFunctionType::get({}, resultType, extInfo);
   auto sig = cd->getGenericSignature();
@@ -2210,8 +2214,10 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
   auto closure = *constant.getAnyFunctionRef();
   auto genericSig = getEffectiveGenericSignature(closure, captureInfo);
 
-  auto innerExtInfo = AnyFunctionType::ExtInfo(FunctionType::Representation::Thin,
-                                               funcType->throws());
+  auto innerExtInfo =
+      AnyFunctionType::ExtInfoBuilder(FunctionType::Representation::Thin,
+                                      funcType->throws())
+          .build();
 
   return CanAnyFunctionType::get(
       getCanonicalSignatureOrNull(genericSig),

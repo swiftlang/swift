@@ -6742,7 +6742,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       maybeDiagnoseUnsupportedDifferentiableConversion(cs, expr, toFunc);
       if (!isFromDifferentiable && isToDifferentiable) {
         auto newEI =
-            fromEI.withDifferentiabilityKind(toEI.getDifferentiabilityKind());
+            fromEI.intoBuilder()
+                .withDifferentiabilityKind(toEI.getDifferentiabilityKind())
+                .build();
         fromFunc = FunctionType::get(toFunc->getParams(), fromFunc->getResult())
             ->withExtInfo(newEI)
             ->castTo<FunctionType>();

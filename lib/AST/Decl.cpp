@@ -2576,10 +2576,11 @@ mapSignatureExtInfo(AnyFunctionType::ExtInfo info,
                     bool topLevelFunction) {
   if (topLevelFunction)
     return AnyFunctionType::ExtInfo();
-  return AnyFunctionType::ExtInfo()
+  return AnyFunctionType::ExtInfoBuilder()
       .withRepresentation(info.getRepresentation())
       .withAsync(info.async())
-      .withThrows(info.throws());
+      .withThrows(info.throws())
+      .build();
 }
 
 /// Map a function's type to the type used for computing signatures,
