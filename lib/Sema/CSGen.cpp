@@ -3845,8 +3845,8 @@ namespace {
       auto *parent = Parent.getAsExpr();
       if (isMemberChainTail(expr, parent)) {
         if (auto *UME = getUnresolvedMemberChainBase(expr)) {
+          CG.setUnresolvedChainBase(expr, UME);
           if (!parent || !isa<UnresolvedMemberChainResultExpr>(parent)) {
-            CG.setUnresolvedChainBase(expr, UME);
             auto &context = CG.getConstraintSystem().getASTContext();
             expr = new (context) UnresolvedMemberChainResultExpr(expr);
           }
