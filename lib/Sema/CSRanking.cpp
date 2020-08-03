@@ -1188,21 +1188,6 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       continue;
     }
 
-    // Prefer binding to an l-value over an r-value of the same type, since we
-    // can load from an l-value to produce an r-value during solution
-    // application.
-    if (type1->is<LValueType>() != type2->is<LValueType>()) {
-      auto rValTy1 = type1->getRValueType();
-      auto rValTy2 = type2->getRValueType();
-      if (rValTy1->isEqual(rValTy2)) {
-        if (type1->is<LValueType>())
-          ++score1;
-        else
-          ++score2;
-      }
-      continue;
-    }
-
     // FIXME:
     // This terrible hack is in place to support equality comparisons of non-
     // equatable option types to 'nil'. Until we have a way to constrain a type

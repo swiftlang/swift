@@ -26,6 +26,10 @@ struct ImplicitMembers: Equatable {
     static var superOptional: ImplicitMembers??? = ImplicitMembers()
 
     var another: ImplicitMembers { ImplicitMembers() }
+    var anotherMutable: ImplicitMembers {
+        get { ImplicitMembers() }
+        set {}
+    }
 
     func getAnother() -> ImplicitMembers {
         ImplicitMembers()
@@ -36,6 +40,10 @@ struct ImplicitMembers: Equatable {
     }
 
     var anotherOptional: ImplicitMembers? { ImplicitMembers() }
+    var anotherOptionalMutable: ImplicitMembers? {
+        get { ImplicitMembers() }
+        set {}
+    }
 
     func getAnotherOptional() -> ImplicitMembers? {
         ImplicitMembers()
@@ -45,8 +53,14 @@ struct ImplicitMembers: Equatable {
         ImplicitMembers()
     }
     
-    subscript(arg: Void) -> ImplicitMembers { ImplicitMembers() }
-    subscript(optional arg: Void) -> ImplicitMembers? { ImplicitMembers() }
+    subscript(arg: Void) -> ImplicitMembers {
+        get { ImplicitMembers() }
+        set {}
+    }
+    subscript(optional arg: Void) -> ImplicitMembers? {
+        get { ImplicitMembers() }
+        set {}
+    }
     subscript(func arg: Void) -> (() -> ImplicitMembers) { { ImplicitMembers() } }
     subscript(funcOptional arg: Void) -> (() -> ImplicitMembers?) { { ImplicitMembers() } }
     subscript(optionalFunc arg: Void) -> (() -> ImplicitMembers)? { { ImplicitMembers() } }
@@ -180,6 +194,22 @@ func implicit(_ i: inout ImplicitMembers) {
     if i == .optional?.another {}
     if i == .optional!.another {}
     if i == .createOptional()?.another {}
+}
+
+func testLValues() {
+    let local = ImplicitMembers();
+
+    .implicit = local;
+    .implicit.anotherMutable = local;
+    .implicit.anotherOptionalMutable? = local;
+    .implicit.anotherOptionalMutable! = local;
+    .implicit[()] = local;
+    .implicit[()].anotherMutable = local;
+    .optional?[optional: ()]?.anotherOptionalMutable! = local
+
+    // FIXME: These should probably be allowed
+    //.implicit.anotherOptionalMutable = local;
+    //.optional = local;
 }
 
 struct ImplicitGeneric<T> { // expected-note4 {{arguments to generic parameter 'T' ('Int' and 'String') are expected to be equal}}

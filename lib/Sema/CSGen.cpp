@@ -1475,6 +1475,7 @@ namespace {
 
     Type addUnresolvedMemberChainConstraints(UnresolvedMemberExpr *base,
                                              Expr *tail,
+                                        UnresolvedMemberChainResultExpr *result,
                                              Type resultTy) {
       assert(isa<UnresolvedMemberExpr>(tail) ||
              isa<UnresolvedDotExpr>(tail) ||
@@ -1491,7 +1492,7 @@ namespace {
 
       // The contextual type (represented with a new type variable) must equal
       // the base type.
-      auto locator = CS.getConstraintLocator(tail,
+      auto locator = CS.getConstraintLocator(result,
                                 ConstraintLocator::UnresolvedMemberChainResult);
       auto tvo = additionalOptions | TVO_CanBindToHole | TVO_CanBindToNoEscape;
       auto chainResultTy = CS.createTypeVariable(locator, tvo);
@@ -3865,15 +3866,17 @@ namespace {
 
         CS.setType(expr, simplifiedType);
 
-        // If this is the end of a member chain, inject an implicit ParenExpr
-        // to link the contextual type to the (implicit) base of the chain.
+        // If this is the end of an unresolved member chain, inject the
+        // appropriate constraints to link the contextual type to the (implicit)
+        // base of the chain.
         if (isMemberChainTail(CG.getConstraintSystem(), expr)) {
           auto *chainBase = getMemberChainBase(expr);
+          auto *resultExpr =
+            new (CS.getASTContext()) UnresolvedMemberChainResultExpr(expr);
           if (auto *UME = dyn_cast<UnresolvedMemberExpr>(chainBase)) {
             auto chainTy = CG.addUnresolvedMemberChainConstraints(UME, expr,
+                                                                  resultExpr,
                                                                 simplifiedType);
-            auto *resultExpr =
-              new (CS.getASTContext()) UnresolvedMemberChainResultExpr(expr);
             CS.setType(resultExpr, chainTy);
             return resultExpr;
           }
