@@ -2011,11 +2011,4 @@ extension BinaryFloatingPoint where Self.RawSignificand: FixedWidthInteger {
     guard exact else { return nil }
     self = value_
   }
-  
-  @_transparent
-  @_alwaysEmitIntoClient
-  internal static var _significandMask: RawSignificand {
-    // We use `<<` in case significandBitCount == RawSignificand.bitwidth
-    return (1 << significandBitCount) &- 1
-  }
 }
