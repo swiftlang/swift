@@ -163,3 +163,6 @@ __attribute__((swift_name("OuterType.InnerType")))
 @protocol P
 - (oneway void)stuff;
 @end
+
+@interface ObjcGenericClass<__covariant SectionType>
+@end
