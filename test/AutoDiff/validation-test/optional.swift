@@ -30,7 +30,6 @@ OptionalTests.test("Let") {
   expectEqual(gradient(at: 10, in: optional2), .init(20.0))
   expectEqual(gradient(at: nil, in: optional2), .init(0.0))
 
-  // FIXME: This test currently crashes.
   @differentiable
   func optional_nested2(_ nestedMaybeX: Float??) -> Float {
     if let maybeX = nestedMaybeX {
@@ -56,6 +55,20 @@ OptionalTests.test("Switch") {
 
   expectEqual(gradient(at: 10, in: optional3), .init(20.0))
   expectEqual(gradient(at: nil, in: optional3), .init(0.0))
+
+  @differentiable
+  func optional_nested3(_ nestedMaybeX: Float??) -> Float {
+    switch nestedMaybeX {
+    case nil: return 10
+    case let .some(maybeX):
+      switch maybeX {
+        case nil: return 10
+        case let .some(x): return x * x
+      }
+    }
+  }
+  expectEqual(gradient(at: 10, in: optional_nested3), .init(.init(20.0)))
+  expectEqual(gradient(at: nil, in: optional_nested3), .init(.init(0.0)))
 }
 
 OptionalTests.test("Var1") {
