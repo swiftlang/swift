@@ -2761,8 +2761,7 @@ namespace {
 
       // Unresolved member lookup always happens in a metatype so dig out the
       // instance type.
-      auto metaTy = selected.choice.getBaseType()->castTo<MetatypeType>();
-      auto baseTy = cs.simplifyType(metaTy->getInstanceType());
+      auto baseTy = selected.choice.getBaseType()->getMetatypeInstanceType();
 
       // The base expression is simply the metatype of the base type.
       // FIXME: This location info is bogus.
