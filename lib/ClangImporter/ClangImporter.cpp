@@ -1736,10 +1736,8 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
   auto &diagClient = static_cast<ClangDiagnosticConsumer &>(rawDiagClient);
 
   auto loadModule = [&](clang::ModuleIdPath path,
-                        bool makeVisible) -> clang::ModuleLoadResult {
-    clang::Module::NameVisibilityKind visibility =
-        makeVisible ? clang::Module::AllVisible : clang::Module::Hidden;
-
+                        clang::Module::NameVisibilityKind visibility)
+      -> clang::ModuleLoadResult {
     auto importRAII =
         diagClient.handleImport(clangPath.front().first, importLoc);
 
@@ -1765,14 +1763,14 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
       clangFEOpts.IndexStorePath = preservedIndexStorePathOption;
     }
 
-    if (result && makeVisible)
+    if (result && (visibility == clang::Module::AllVisible)) {
       getClangPreprocessor().makeModuleVisible(result, clangImportLoc);
+    }
     return result;
   };
 
   // Now load the top-level module, so that we can check if the submodule
   // exists without triggering a fatal error.
-  clangModule = loadModule(clangPath.front(), false);
   if (!clangModule)
     return nullptr;
 
@@ -1787,7 +1785,8 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
     // put the Clang AST in a fatal error state if it /doesn't/ exist.
     if (!submodule && component.Item.str() == "Private" &&
         (&component) == (&path[1])) {
-      submodule = loadModule(llvm::makeArrayRef(clangPath).slice(0, 2), false);
+      submodule = loadModule(llvm::makeArrayRef(clangPath).slice(0, 2),
+                             clang::Module::Hidden);
     }
 
     if (!submodule) {
@@ -1797,7 +1796,7 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
   }
 
   // Finally, load the submodule and make it visible.
-  clangModule = loadModule(clangPath, true);
+  clangModule = loadModule(clangPath, clang::Module::AllVisible);
   if (!clangModule)
     return nullptr;
 
