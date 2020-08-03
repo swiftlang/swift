@@ -3079,13 +3079,9 @@ public:
     return getExtInfo().isNoEscape();
   }
 
-  bool async() const {
-    return getExtInfo().async();
-  }
+  bool isAsync() const { return getExtInfo().isAsync(); }
 
-  bool throws() const {
-    return getExtInfo().throws();
-  }
+  bool isThrowing() const { return getExtInfo().isThrowing(); }
 
   bool isDifferentiable() const { return getExtInfo().isDifferentiable(); }
   DifferentiabilityKind getDifferentiabilityKind() const {

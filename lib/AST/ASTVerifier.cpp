@@ -1801,7 +1801,7 @@ public:
         E->dump(Out);
         Out << "\n";
         abort();
-      } else if (E->throws() && !FT->throws()) {
+      } else if (E->throws() && !FT->isThrowing()) {
         Out << "apply expression is marked as throwing, but function operand"
                "does not have a throwing function type\n";
         E->dump(Out);
@@ -3024,7 +3024,7 @@ public:
       if (AFD->hasImplicitSelfDecl())
         fnTy = fnTy->getResult()->castTo<FunctionType>();
 
-      if (AFD->hasThrows() != fnTy->getExtInfo().throws()) {
+      if (AFD->hasThrows() != fnTy->getExtInfo().isThrowing()) {
         Out << "function 'throws' flag does not match function type\n";
         AFD->dump(Out);
         abort();

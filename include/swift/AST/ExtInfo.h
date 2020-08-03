@@ -240,9 +240,9 @@ public:
 
   constexpr bool isNoEscape() const { return bits & NoEscapeMask; }
 
-  constexpr bool async() const { return bits & AsyncMask; }
+  constexpr bool isAsync() const { return bits & AsyncMask; }
 
-  constexpr bool throws() const { return bits & ThrowsMask; }
+  constexpr bool isThrowing() const { return bits & ThrowsMask; }
 
   constexpr DifferentiabilityKind getDifferentiabilityKind() const {
     return DifferentiabilityKind((bits & DifferentiabilityMask) >>
@@ -394,9 +394,9 @@ public:
 
   constexpr bool isNoEscape() const { return builder.isNoEscape(); }
 
-  constexpr bool async() const { return builder.async(); }
+  constexpr bool isAsync() const { return builder.isAsync(); }
 
-  constexpr bool throws() const { return builder.throws(); }
+  constexpr bool isThrowing() const { return builder.isThrowing(); }
 
   constexpr DifferentiabilityKind getDifferentiabilityKind() const {
     return builder.getDifferentiabilityKind();

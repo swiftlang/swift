@@ -2988,9 +2988,9 @@ public:
   void visitFunctionTypeRepr(FunctionTypeRepr *T) {
     printCommon("type_function");
     OS << '\n'; printRec(T->getArgsTypeRepr());
-    if (T->async())
+    if (T->isAsync())
       OS << " async ";
-    if (T->throws())
+    if (T->isThrowing())
       OS << " throws ";
     OS << '\n'; printRec(T->getResultTypeRepr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
@@ -3760,8 +3760,8 @@ namespace {
                    getSILFunctionTypeRepresentationString(representation));
 
       printFlag(!T->isNoEscape(), "escaping");
-      printFlag(T->async(), "async");
-      printFlag(T->throws(), "throws");
+      printFlag(T->isAsync(), "async");
+      printFlag(T->isThrowing(), "throws");
 
       OS << "\n";
       Indent += 2;

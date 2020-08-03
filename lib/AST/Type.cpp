@@ -2269,8 +2269,8 @@ getForeignRepresentable(Type type, ForeignLanguage language,
   // Function types.
   if (auto functionType = type->getAs<FunctionType>()) {
     // Cannot handle async or throwing functions.
-    if (functionType->getExtInfo().async() ||
-        functionType->getExtInfo().throws())
+    if (functionType->getExtInfo().isAsync() ||
+        functionType->getExtInfo().isThrowing())
       return failure();
 
     // Whether we have found any types that are bridged.
@@ -2607,7 +2607,7 @@ static bool matchesFunctionType(CanAnyFunctionType fn1, CanAnyFunctionType fn2,
   auto ext1 = fn1->getExtInfo();
   auto ext2 = fn2->getExtInfo();
   if (matchMode.contains(TypeMatchFlags::AllowOverride)) {
-    if (ext2.throws()) {
+    if (ext2.isThrowing()) {
       ext1 = ext1.withThrows(true);
     }
   }
