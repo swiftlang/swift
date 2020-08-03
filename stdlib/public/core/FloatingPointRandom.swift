@@ -624,4 +624,11 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
   @_transparent
   @_alwaysEmitIntoClient
   internal static var _sectionBitCount: Int { UInt64.bitWidth - 4 }
+  
+  @_transparent
+  @_alwaysEmitIntoClient
+  internal static var _significandMask: RawSignificand {
+    // We use `<<` in case significandBitCount == RawSignificand.bitwidth
+    return (1 << significandBitCount) &- 1
+  }
 }
