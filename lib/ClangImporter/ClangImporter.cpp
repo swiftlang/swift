@@ -1771,8 +1771,15 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
 
   // Now load the top-level module, so that we can check if the submodule
   // exists without triggering a fatal error.
+  clangModule = loadModule(clangPath.front(), clang::Module::AllVisible);
   if (!clangModule)
     return nullptr;
+
+  // If we're asked to import the top-level module then we're done here.
+  auto *topSwiftModule = finishLoadingClangModule(clangModule, importLoc);
+  if (path.size() == 1) {
+    return topSwiftModule;
+  }
 
   // Verify that the submodule exists.
   clang::Module *submodule = clangModule;
