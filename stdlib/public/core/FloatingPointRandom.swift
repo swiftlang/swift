@@ -621,6 +621,7 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
   // We take 4 of them here to make choosing a section faster and leave 5 of
   // them to keep the sections small, because when each section in a raw binade
   // contains only one value, then we do not need to generate a significand.
+  @_transparent
   @_alwaysEmitIntoClient
   internal static var _sectionBitCount: Int { UInt64.bitWidth - 4 }
 }
