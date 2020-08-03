@@ -301,18 +301,33 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
   eraseFromParentWithDebugInsts(AI);
 }
 
-static bool runSROAOnFunction(SILFunction &Fn) {
+/// Returns true, if values of \ty should be ignored, because \p ty is known
+/// by a high-level SIL optimization. Values of that type must not be split
+/// so that those high-level optimizations can analyze the code.
+static bool isSemanticType(ASTContext &ctxt, SILType ty) {
+  NominalTypeDecl *stringDecl = ctxt.getStringDecl();
+  if (ty.getStructOrBoundGenericStruct() == stringDecl)
+    return true;
+  return false;
+}
+
+static bool runSROAOnFunction(SILFunction &Fn, bool splitSemanticTypes) {
   std::vector<AllocStackInst *> Worklist;
   bool Changed = false;
+  ASTContext &ctxt = Fn.getModule().getASTContext();
 
   // For each basic block BB in Fn...
   for (auto &BB : Fn)
     // For each instruction in BB...
     for (auto &I : BB)
       // If the instruction is an alloc stack inst, add it to the worklist.
-      if (auto *AI = dyn_cast<AllocStackInst>(&I))
+      if (auto *AI = dyn_cast<AllocStackInst>(&I)) {
+        if (!splitSemanticTypes && isSemanticType(ctxt, AI->getElementType()))
+          continue;
+
         if (shouldExpand(Fn.getModule(), AI->getElementType()))
           Worklist.push_back(AI);
+      }
 
   while (!Worklist.empty()) {
     AllocStackInst *AI = Worklist.back();
@@ -332,6 +347,11 @@ static bool runSROAOnFunction(SILFunction &Fn) {
 namespace {
 class SILSROA : public SILFunctionTransform {
 
+  bool splitSemanticTypes;
+  
+public:
+  SILSROA(bool splitSemanticTypes) : splitSemanticTypes(splitSemanticTypes) { }
+
   /// The entry point to the transformation.
   void run() override {
     SILFunction *F = getFunction();
@@ -343,7 +363,7 @@ class SILSROA : public SILFunctionTransform {
     LLVM_DEBUG(llvm::dbgs() << "***** SROA on function: " << F->getName()
                             << " *****\n");
 
-    if (runSROAOnFunction(*F))
+    if (runSROAOnFunction(*F, splitSemanticTypes))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 
@@ -352,5 +372,9 @@ class SILSROA : public SILFunctionTransform {
 
 
 SILTransform *swift::createSROA() {
-  return new SILSROA();
+  return new SILSROA(/*splitSemanticTypes*/ true);
+}
+
+SILTransform *swift::createEarlySROA() {
+  return new SILSROA(/*splitSemanticTypes*/ false);
 }
