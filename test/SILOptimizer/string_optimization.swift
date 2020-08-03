@@ -12,6 +12,8 @@ import Foundation
 
 struct Outer {
   struct Inner { }
+
+  static let staticString = "static"
 }
 
 // More types are tested in test/stdlib/TypeName.swift and
@@ -34,6 +36,15 @@ public func testTypeNameInterpolation() -> String {
 public func testFoldCompleteInterpolation() -> String {
   let s = "is"
   return "-\([Int].self) \(s) \("cool")+"
+}
+
+// CHECK-LABEL: sil [noinline] @$s4test0A13FoldStaticLetSSyF
+// CHECK-NOT: apply
+// CHECK-NOT: bb1
+// CHECK: } // end sil function '$s4test0A13FoldStaticLetSSyF'
+@inline(never)
+public func testFoldStaticLet() -> String {
+  return "-\(Outer.staticString)+"
 }
 
 // CHECK-LABEL: sil [noinline] @$s4test0A19UnqualifiedTypeNameSSyF 
@@ -91,6 +102,9 @@ printEmbeeded(testTypeNameInterpolation())
 
 // CHECK-OUTPUT: <-Array<Int> is cool+>
 printEmbeeded(testFoldCompleteInterpolation())
+
+// CHECK-OUTPUT: <-static+>
+printEmbeeded(testFoldStaticLet())
 
 // CHECK-OUTPUT: <Inner>
 printEmbeeded(testUnqualifiedTypeName())
