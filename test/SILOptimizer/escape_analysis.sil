@@ -1784,7 +1784,7 @@ bb10(%arg3 : $C):
 // CHECK-NEXT:   Val %1 Esc: , Succ: (%0.1)
 // CHECK-NEXT:   Val %5 Esc: , Succ: %0, %1
 // CHECK-LABEL: End
-// CHECK: MayEscape: %5 = argument of bb3 : $*Builtin.Int32
+// CHECK: MayEscapeToRelease: %5 = argument of bb3 : $*Builtin.Int32
 // CHECK-NEXT:  to   %{{.*}} = apply %{{.*}}(%0) : $@convention(thin) (@inout Builtin.Int32) -> ()
 sil @takeAdr : $@convention(thin) (@inout Builtin.Int32) -> ()
 
