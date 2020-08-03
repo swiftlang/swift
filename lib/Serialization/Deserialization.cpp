@@ -1611,6 +1611,14 @@ giveUpFastPath:
                                            getXRefDeclNameForError());
       }
 
+      if (memberName.getKind() == DeclBaseName::Kind::Destructor) {
+        assert(isa<ClassDecl>(nominal));
+        // Force creation of an implicit destructor
+        auto CD = dyn_cast<ClassDecl>(nominal);
+        values.push_back(CD->getDestructor());
+        break;
+      }
+
       if (!privateDiscriminator.empty()) {
         ModuleDecl *searchModule = M;
         if (!searchModule)
