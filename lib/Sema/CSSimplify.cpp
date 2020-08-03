@@ -2913,6 +2913,9 @@ static bool
 repairViaBridgingCast(ConstraintSystem &cs, Type fromType, Type toType,
                       SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
                       ConstraintLocatorBuilder locator) {
+  if (fromType->hasTypeVariable() || toType->hasTypeVariable())
+    return false;
+
   auto objectType1 = fromType->getOptionalObjectType();
   auto objectType2 = toType->getOptionalObjectType();
 
@@ -2929,6 +2932,9 @@ repairViaBridgingCast(ConstraintSystem &cs, Type fromType, Type toType,
   }
 
   if (!canBridgeThroughCast(cs, fromType, toType))
+    return false;
+
+  if (!TypeChecker::checkedCastMaySucceed(fromType, toType, cs.DC))
     return false;
 
   conversionsOrFixes.push_back(ForceDowncast::create(
