@@ -580,9 +580,6 @@ DeclID Serializer::addDeclRef(const Decl *D, bool allowTypeAliasXRef) {
   assert((!D || allowTypeAliasXRef || !isa<TypeAliasDecl>(D) ||
           D->getModuleContext() == M) &&
          "cannot cross-reference typealiases directly (use the TypeAliasType)");
-  if (D && isDeclXRef(D) && isa<DestructorDecl>(D)) {
-    llvm::dbgs() << "[katei debug] addDeclRef destructor\n";
-  }
   return DeclsToSerialize.addRef(D);
 }
 
