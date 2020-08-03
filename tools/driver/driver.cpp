@@ -146,7 +146,7 @@ static int run_driver(StringRef ExecName,
 
     if (FirstArg == "-cross-module-opt") {
       return cross_module_opt_main(
-          llvm::makeArrayRef(argv.data() + 2, argv.data() + argv.size()),
+          llvm::makeArrayRef(argv.data() + 1, argv.data() + argv.size()),
           argv[0], (void *)(intptr_t)getExecutablePath);
     }
   }

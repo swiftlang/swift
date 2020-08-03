@@ -1,3 +1,5 @@
+#define DEBUG_TYPE "lto-cross-module-opt"
+
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Frontend/Frontend.h"
@@ -13,6 +15,8 @@
 #include "llvm/Bitstream/BitstreamReader.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -21,60 +25,15 @@
 using namespace llvm::opt;
 using namespace swift;
 
-class MergeModuleSummaryInvocation {
-private:
-  std::string MainExecutablePath;
-  std::string OutputFilename = "-";
-  std::vector<std::string> InputFilenames;
+static llvm::cl::opt<std::string>
+    LTOPrintLiveTrace("lto-print-live-trace", llvm::cl::init(""),
+                      llvm::cl::desc("Print liveness trace for the symbol"));
 
-public:
-  void setMainExecutablePath(const std::string &Path) {
-    MainExecutablePath = Path;
-  }
-
-  const std::string &getOutputFilename() { return OutputFilename; }
-
-  const std::vector<std::string> &getInputFilenames() { return InputFilenames; }
-
-  int parseArgs(llvm::ArrayRef<const char *> Args, DiagnosticEngine &Diags) {
-    using namespace options;
-
-    // Parse frontend command line options using Swift's option table.
-    std::unique_ptr<llvm::opt::OptTable> Table = createSwiftOptTable();
-    unsigned MissingIndex;
-    unsigned MissingCount;
-    llvm::opt::InputArgList ParsedArgs =
-        Table->ParseArgs(Args, MissingIndex, MissingCount, ModuleWrapOption);
-    if (MissingCount) {
-      Diags.diagnose(SourceLoc(), diag::error_missing_arg_value,
-                     ParsedArgs.getArgString(MissingIndex), MissingCount);
-      return 1;
-    }
-
-    if (ParsedArgs.hasArg(OPT_UNKNOWN)) {
-      for (const Arg *A : ParsedArgs.filtered(OPT_UNKNOWN)) {
-        Diags.diagnose(SourceLoc(), diag::error_unknown_arg,
-                       A->getAsString(ParsedArgs));
-      }
-      return true;
-    }
-
-    for (const Arg *A : ParsedArgs.filtered(OPT_INPUT)) {
-      InputFilenames.push_back(A->getValue());
-    }
-
-    if (InputFilenames.empty()) {
-      Diags.diagnose(SourceLoc(), diag::error_mode_requires_an_input_file);
-      return 1;
-    }
-
-    if (const Arg *A = ParsedArgs.getLastArg(OPT_o)) {
-      OutputFilename = A->getValue();
-    }
-
-    return 0;
-  }
-};
+static llvm::cl::list<std::string>
+    InputFilenames(llvm::cl::Positional, llvm::cl::desc("[input files...]"),
+                   llvm::cl::OneOrMore);
+static llvm::cl::opt<std::string>
+    OutputFilename("o", llvm::cl::desc("output filename"));
 
 static llvm::DenseSet<GUID> computePreservedGUIDs(ModuleSummaryIndex *summary) {
   llvm::DenseSet<GUID> Set(1);
@@ -88,34 +47,79 @@ static llvm::DenseSet<GUID> computePreservedGUIDs(ModuleSummaryIndex *summary) {
   return Set;
 }
 
+class LivenessTrace {
+public:
+  enum ReasonTy { Preserved, StaticReferenced, IndirectReferenced };
+  std::shared_ptr<LivenessTrace> markedBy;
+  std::string symbol;
+  GUID guid;
+  ReasonTy reason;
+
+  LivenessTrace(std::shared_ptr<LivenessTrace> markedBy, GUID guid,
+                ReasonTy reason)
+      : markedBy(markedBy), guid(guid), reason(reason) {}
+
+  void setName(std::string name) { this->symbol = name; }
+
+  void dump() { dump(llvm::errs()); }
+  void dump(llvm::raw_ostream &os) {
+    if (!symbol.empty()) {
+      os << symbol;
+    } else {
+      os << "**missing name**"
+         << " (" << guid << ")";
+    }
+    os << "is referenced by:\n";
+
+    auto target = markedBy;
+    while (target) {
+      os << " - ";
+      if (!target->symbol.empty()) {
+        os << target->symbol;
+      } else {
+        os << "**missing name**";
+      }
+      os << " (" << target->guid << ")";
+      os << "\n";
+      target = target->markedBy;
+    }
+  }
+};
+
 void markDeadSymbols(ModuleSummaryIndex &summary, llvm::DenseSet<GUID> &PreservedGUIDs) {
-  
-  SmallVector<GUID, 8> Worklist;
+
+  SmallVector<std::shared_ptr<LivenessTrace>, 8> Worklist;
   unsigned LiveSymbols = 0;
 
   for (auto GUID : PreservedGUIDs) {
-    Worklist.push_back(GUID);
+    Worklist.push_back(std::make_shared<LivenessTrace>(
+        nullptr, GUID, LivenessTrace::Preserved));
   }
-  
+  std::shared_ptr<LivenessTrace> dumpTarget;
   while (!Worklist.empty()) {
-    auto GUID = Worklist.pop_back_val();
-    
-    auto maybePair = summary.getFunctionInfo(GUID);
+    auto trace = Worklist.pop_back_val();
+
+    auto maybePair = summary.getFunctionInfo(trace->guid);
     if (!maybePair) {
       llvm_unreachable("Bad GUID");
     }
     auto pair = maybePair.getValue();
     auto FS = pair.first;
+    trace->setName(pair.second);
+    if (LTOPrintLiveTrace == pair.second) {
+      dumpTarget = trace;
+    }
     if (FS->isLive()) continue;
 
-    llvm::dbgs() << "Mark " << pair.second << " as live\n";
+    LLVM_DEBUG(llvm::dbgs() << "Mark " << pair.second << " as live\n");
     FS->setLive(true);
     LiveSymbols++;
     
     for (auto Call : FS->calls()) {
       switch (Call.getKind()) {
       case FunctionSummary::EdgeTy::Kind::Static: {
-        Worklist.push_back(Call.getCallee());
+        Worklist.push_back(std::make_shared<LivenessTrace>(
+            trace, Call.getCallee(), LivenessTrace::StaticReferenced));
         continue;
       }
       case FunctionSummary::EdgeTy::Kind::Witness:
@@ -125,7 +129,8 @@ void markDeadSymbols(ModuleSummaryIndex &summary, llvm::DenseSet<GUID> &Preserve
           continue;
         }
         for (auto Impl : Impls.getValue()) {
-          Worklist.push_back(Impl);
+          Worklist.push_back(std::make_shared<LivenessTrace>(
+              trace, Impl, LivenessTrace::IndirectReferenced));
         }
         break;
       }
@@ -134,29 +139,31 @@ void markDeadSymbols(ModuleSummaryIndex &summary, llvm::DenseSet<GUID> &Preserve
       }
     }
   }
+  if (dumpTarget) {
+    dumpTarget->dump();
+  }
 }
 
 int cross_module_opt_main(ArrayRef<const char *> Args, const char *Argv0,
                           void *MainAddr) {
   INITIALIZE_LLVM();
 
+  llvm::cl::ParseCommandLineOptions(Args.size(), Args.data(), "Swift LTO\n");
+
   CompilerInstance Instance;
   PrintingDiagnosticConsumer PDC;
   Instance.addDiagnosticConsumer(&PDC);
 
-  MergeModuleSummaryInvocation Invocation;
-  std::string MainExecutablePath =
-      llvm::sys::fs::getMainExecutable(Argv0, MainAddr);
-  Invocation.setMainExecutablePath(MainExecutablePath);
-
-  // Parse arguments.
-  if (Invocation.parseArgs(Args, Instance.getDiags()) != 0) {
+  if (InputFilenames.empty()) {
+    Instance.getDiags().diagnose(SourceLoc(),
+                                 diag::error_mode_requires_an_input_file);
     return 1;
   }
 
   auto TheSummary = std::make_unique<ModuleSummaryIndex>();
 
-  for (auto Filename : Invocation.getInputFilenames()) {
+  for (auto Filename : InputFilenames) {
+    LLVM_DEBUG(llvm::dbgs() << "Loading module summary " << Filename << "\n");
     auto ErrOrBuf = llvm::MemoryBuffer::getFile(Filename);
     if (!ErrOrBuf) {
       Instance.getDiags().diagnose(
@@ -177,6 +184,6 @@ int cross_module_opt_main(ArrayRef<const char *> Args, const char *Argv0,
   markDeadSymbols(*TheSummary.get(), PreservedGUIDs);
 
   modulesummary::emitModuleSummaryIndex(*TheSummary, Instance.getDiags(),
-                                        Invocation.getOutputFilename());
+                                        OutputFilename);
   return 0;
 }
