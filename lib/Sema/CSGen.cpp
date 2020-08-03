@@ -1505,7 +1505,7 @@ namespace {
       // Since base type in this case is completely dependent on context it
       // should be marked as a potential hole.
       auto baseTy = CS.createTypeVariable(baseLocator, TVO_CanBindToNoEscape |
-                                                       TVO_CanBindToHole);
+                                                           TVO_CanBindToHole);
       setUnresolvedBaseType(expr, baseTy);
 
       auto memberTy = CS.createTypeVariable(
@@ -1555,15 +1555,13 @@ namespace {
     }
 
     Type visitUnresolvedMemberChainResultExpr(
-                                        UnresolvedMemberChainResultExpr *expr) {
+        UnresolvedMemberChainResultExpr *expr) {
       auto *tail = expr->getSubExpr();
-      assert(isa<UnresolvedMemberExpr>(tail) ||
-             isa<UnresolvedDotExpr>(tail) ||
-             isa<CallExpr>(tail) ||
-             isa<BindOptionalExpr>(tail) ||
+      assert(isa<UnresolvedMemberExpr>(tail) || isa<UnresolvedDotExpr>(tail) ||
+             isa<CallExpr>(tail) || isa<BindOptionalExpr>(tail) ||
              isa<ForceValueExpr>(tail) ||
              isa<SubscriptExpr>(tail) &&
-             "Unexpected expression at end of unresolved member chain");
+                 "Unexpected expression at end of unresolved member chain");
 
       auto memberTy = CS.getType(tail);
       auto *base = getUnresolvedChainBase(tail);
@@ -1576,16 +1574,17 @@ namespace {
 
       // The contextual type (represented with a new type variable) must equal
       // the base type.
-      auto locator = CS.getConstraintLocator(expr,
-                                ConstraintLocator::UnresolvedMemberChainResult);
+      auto locator = CS.getConstraintLocator(
+          expr, ConstraintLocator::UnresolvedMemberChainResult);
       auto tvo = additionalOptions | TVO_CanBindToHole | TVO_CanBindToNoEscape;
       auto chainResultTy = CS.createTypeVariable(locator, tvo);
       auto chainBaseTy = UnresolvedBaseTypes.find(base)->second;
 
       // The result of this element of the chain must be convertible to the
       // contextual type, and the contextual type must be equal to the base.
-      CS.addConstraint(ConstraintKind::Conversion, memberTy, chainBaseTy,
-            CS.getConstraintLocator(tail, ConstraintLocator::RValueAdjustment));
+      CS.addConstraint(
+          ConstraintKind::Conversion, memberTy, chainBaseTy,
+          CS.getConstraintLocator(tail, ConstraintLocator::RValueAdjustment));
       CS.addConstraint(ConstraintKind::Conversion, memberTy, chainResultTy,
                        locator);
       CS.addConstraint(ConstraintKind::Equal, chainBaseTy, chainResultTy,

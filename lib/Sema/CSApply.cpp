@@ -3262,7 +3262,7 @@ namespace {
     }
 
     Expr *visitUnresolvedMemberChainResultExpr(
-                                        UnresolvedMemberChainResultExpr *expr) {
+        UnresolvedMemberChainResultExpr *expr) {
       // Since this expression only exists to give the result type of an
       // unresolved member chain visibility in the AST, remove it from the AST
       // now that we have a solution and coerce the subexpr to the resulting
