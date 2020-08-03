@@ -56,6 +56,7 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
   ///   - generator: The random number generator to use when creating the
   ///     new random value.
   /// - Returns: A random value within the bounds of `range`.
+  @inlinable
   public static func random<T: RandomNumberGenerator>(
     in range: Range<Self>,
     using generator: inout T
@@ -129,6 +130,7 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
   ///   - generator: The random number generator to use when creating the
   ///     new random value.
   /// - Returns: A random value within the bounds of `range`.
+  @inlinable
   public static func random<T: RandomNumberGenerator>(
     in range: ClosedRange<Self>,
     using generator: inout T
@@ -222,7 +224,8 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
   // represents a section which begins at 0 and has the same length as all
   // other sections. Similarly, negative integers represent sections of the
   // same length extending below zero.
-  private static func _uniformRandomRoundedDown<R: RandomNumberGenerator>(
+  @_alwaysEmitIntoClient
+  internal static func _uniformRandomRoundedDown<R: RandomNumberGenerator>(
     in range: Range<Self>,
     using generator: inout R
   ) -> Self {
@@ -287,7 +290,8 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
   
   // Convert a range of Self into a range of Int64 section numbers and the
   // corresponding maximum exponent.
-  private static func _sectionsAndExponent(
+  @_alwaysEmitIntoClient
+  internal static func _sectionsAndExponent(
     _ range: Range<Self>
   ) -> (sections: ClosedRange<Int64>, maxExponent: RawExponent) {
     let (a, b) = (range.lowerBound, range.upperBound)
@@ -306,7 +310,8 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
   // exponent from the maximum allowed, to obtain the number of leading zeros
   // in the section number. Then shift its significand bits (including the
   // implicit bit) to that position.
-  private func _sectionNumber(
+  @_alwaysEmitIntoClient
+  internal func _sectionNumber(
     maxExponent eMax: RawExponent
   ) -> (section: Int64, isLowerBound: Bool) {
     let (e, s) = (exponentBitPattern, significandBitPattern)
@@ -369,7 +374,8 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
   //
   // Section 0 may span multiple raw binades, and is handled specially. Negative
   // sections are nearly mirrors of the positive, but off by one.
-  private static func _uniformRandomInSection<R: RandomNumberGenerator>(
+  @_alwaysEmitIntoClient
+  internal static func _uniformRandomInSection<R: RandomNumberGenerator>(
     _ section: Int64,
     maxExponent eMax: RawExponent,
     using generator: inout R
@@ -415,7 +421,8 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
   
   // Choose a uniformly random representable number with raw exponent less than
   // eMax. If allowNegative is true, then make it negative half the time.
-  private static func _randomUpToExponent<R: RandomNumberGenerator>(
+  @_alwaysEmitIntoClient
+  internal static func _randomUpToExponent<R: RandomNumberGenerator>(
     _ eMax: RawExponent,
     allowNegative: Bool = false,
     using generator: inout R
@@ -472,7 +479,8 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
   //
   // This function is generic over T because it is faster for Int, but also
   // needs to work for RawExponent.
-  private static func _randomExponent<T, R>(
+  @_alwaysEmitIntoClient
+  internal static func _randomExponent<T, R>(
     upperBound: T,
     using generator: inout R
   ) -> (e: T, bits: UInt64, bitCount: Int)
@@ -516,7 +524,8 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
   // The purpose here is to ensure that the large range path is only taken
   // when there is a low probability of needing multiple attempts. Currently,
   // that probability is less than 1 in 2^56 in the worst case.
-  private static func _smallRangeUniformRandom<R: RandomNumberGenerator>(
+  @_alwaysEmitIntoClient
+  internal static func _smallRangeUniformRandom<R: RandomNumberGenerator>(
     in range: Range<Self>,
     using generator: inout R
   ) -> Self? {
@@ -607,6 +616,6 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
   // We take 4 of them here to make choosing a section faster and leave 5 of
   // them to keep the sections small, because when each section in a raw binade
   // contains only one value, then we do not need to generate a significand.
-  @_transparent
-  private static var _sectionBitCount: Int { UInt64.bitWidth - 4 }
+  @_alwaysEmitIntoClient
+  internal static var _sectionBitCount: Int { UInt64.bitWidth - 4 }
 }
