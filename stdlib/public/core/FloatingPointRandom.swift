@@ -605,7 +605,7 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
   
   // MARK: Helpers
   
-  // We do not use the high bits of section numbers, to reduce the chance that
+  // We use only 60 bits for section numbers, not 64, to reduce the chance that
   // the `Int64.random(in:)` call in the general-case will itself need to call
   // `next()` more than once.
   //
