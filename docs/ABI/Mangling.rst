@@ -1042,12 +1042,10 @@ If the first character of the string literal is a digit ``[0-9]`` or an
 underscore ``_``, the identifier for the string literal is prefixed with an
 additional underscore ``_``.
 
-Conventions for constructing names
+Conventions for foreign symbols
 ----------------------------------
 
-Swift is a language that integrates with multiple languages (C, C++, ObjC,
-ObjC++). To achieve interoperability symbols from other languages have to be
-adapted in order to be integrated into Swift.
+Swift interoperates with multiple other languages - C, C++, Objective-C, and Objective-C++. Each of these languages defines their own mangling conventions, so Swift must take care to follow them. However, these conventions do not restrict Swift-specific constructs like Swift type metadata, so the Swift language may impose its own conventions in these cases. 
 
 Importing C and C++ structs
 ~~~~~~~~~~~~~~~~~~~
