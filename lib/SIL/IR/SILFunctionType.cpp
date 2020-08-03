@@ -2016,9 +2016,10 @@ static CanSILFunctionType getSILFunctionType(
 
   // Map 'throws' to the appropriate error convention.
   Optional<SILResultInfo> errorResult;
-  assert((!foreignInfo.Error || substFnInterfaceType->getExtInfo().throws()) &&
-         "foreignError was set but function type does not throw?");
-  if (substFnInterfaceType->getExtInfo().throws() && !foreignInfo.Error) {
+  assert(
+      (!foreignInfo.Error || substFnInterfaceType->getExtInfo().isThrowing()) &&
+      "foreignError was set but function type does not throw?");
+  if (substFnInterfaceType->getExtInfo().isThrowing() && !foreignInfo.Error) {
     assert(!origType.isForeign() &&
            "using native Swift error convention for foreign type!");
     SILType exnType = SILType::getExceptionType(TC.Context);
@@ -4178,7 +4179,7 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
   bridgingFnPattern.rewriteType(genericSig, curried);
 
   // Build the uncurried function type.
-  if (innerExtInfo.throws())
+  if (innerExtInfo.isThrowing())
     extInfo = extInfo.withThrows(true);
 
   bridgedParams.push_back(selfParam);

@@ -2578,8 +2578,8 @@ mapSignatureExtInfo(AnyFunctionType::ExtInfo info,
     return AnyFunctionType::ExtInfo();
   return AnyFunctionType::ExtInfoBuilder()
       .withRepresentation(info.getRepresentation())
-      .withAsync(info.async())
-      .withThrows(info.throws())
+      .withAsync(info.isAsync())
+      .withThrows(info.isThrowing())
       .build();
 }
 

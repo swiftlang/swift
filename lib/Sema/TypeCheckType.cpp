@@ -2674,7 +2674,7 @@ Type TypeResolver::resolveASTFunctionType(
   }
 
   FunctionType::ExtInfoBuilder extInfoBuilder(
-      FunctionTypeRepresentation::Swift, noescape, repr->throws(), diffKind,
+      FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), diffKind,
       /*clangFunctionType*/ nullptr);
 
   const clang::Type *clangFnType = parsedClangFunctionType;
@@ -2684,7 +2684,7 @@ Type TypeResolver::resolveASTFunctionType(
         params, outputTy, AnyFunctionType::Representation::CFunctionPointer);
 
   auto extInfo = extInfoBuilder.withRepresentation(representation)
-                     .withAsync(repr->async())
+                     .withAsync(repr->isAsync())
                      .withClangFunctionType(clangFnType)
                      .build();
 

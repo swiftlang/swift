@@ -494,12 +494,12 @@ swift::classifyDynamicCast(ModuleDecl *M,
 
       // An async function cannot be cast to a non-async function and
       // vice-versa.
-      if (sourceFunction->async() != targetFunction->async())
+      if (sourceFunction->isAsync() != targetFunction->isAsync())
         return DynamicCastFeasibility::WillFail;
 
       // A non-throwing source function can be cast to a throwing target type,
       // but not vice versa.
-      if (sourceFunction->throws() && !targetFunction->throws())
+      if (sourceFunction->isThrowing() && !targetFunction->isThrowing())
         return DynamicCastFeasibility::WillFail;
       
       // The cast can't change the representation at runtime.

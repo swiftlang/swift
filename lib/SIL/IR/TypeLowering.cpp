@@ -2216,7 +2216,7 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
 
   auto innerExtInfo =
       AnyFunctionType::ExtInfoBuilder(FunctionType::Representation::Thin,
-                                      funcType->throws())
+                                      funcType->isThrowing())
           .build();
 
   return CanAnyFunctionType::get(

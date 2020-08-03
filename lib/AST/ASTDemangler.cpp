@@ -406,9 +406,9 @@ Type ASTBuilder::createFunctionType(
                                                  representation);
 
   auto einfo =
-      FunctionType::ExtInfoBuilder(representation, noescape, flags.throws(),
+      FunctionType::ExtInfoBuilder(representation, noescape, flags.isThrowing(),
                                    diffKind, clangFunctionType)
-          .withAsync(flags.async())
+          .withAsync(flags.isAsync())
           .build();
 
   return FunctionType::get(funcParams, output, einfo);

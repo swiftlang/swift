@@ -410,10 +410,10 @@ public:
     auto fnType = type->getAs<AnyFunctionType>();
     if (!fnType) return Classification::forInvalidCode();
 
-    bool isAsync = fnType->async();
+    bool isAsync = fnType->isAsync();
     
     // If the function doesn't throw at all, we're done here.
-    if (!fnType->throws())
+    if (!fnType->isThrowing())
       return isAsync ? Classification::forAsync() : Classification();
 
     // Decompose the application.
@@ -518,7 +518,10 @@ private:
 
   Classification classifyThrowingParameterBody(ParamDecl *param,
                                                PotentialReason reason) {
-    assert(param->getType()->lookThroughAllOptionalTypes()->castTo<AnyFunctionType>()->throws());
+    assert(param->getType()
+               ->lookThroughAllOptionalTypes()
+               ->castTo<AnyFunctionType>()
+               ->isThrowing());
 
     // If we're currently doing rethrows-checking on the body of the
     // function which declares the parameter, it's rethrowing-only.
@@ -745,7 +748,7 @@ private:
     // Otherwise, if the original parameter type was not a throwing
     // function type, it does not contribute to 'rethrows'.
     auto paramFnType = paramType->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>();
-    if (!paramFnType || !paramFnType->throws())
+    if (!paramFnType || !paramFnType->isThrowing())
       return Classification();
 
     PotentialReason reason = PotentialReason::forRethrowsArgument(arg);
@@ -765,7 +768,8 @@ private:
     if (!argFnType) return Classification::forInvalidCode();
 
     // If it doesn't throw, this argument does not cause the call to throw.
-    if (!argFnType->throws()) return Classification();
+    if (!argFnType->isThrowing())
+      return Classification();
 
     // Otherwise, classify the function implementation.
     return classifyThrowingFunctionBody(fn, reason);
@@ -793,7 +797,7 @@ private:
     if (!paramType || paramType->hasError())
       return Classification::forInvalidCode();
     if (auto fnType = paramType->getAs<AnyFunctionType>()) {
-      if (fnType->throws()) {
+      if (fnType->isThrowing()) {
         return Classification::forThrow(reason, /*async*/false);
       } else {
         return Classification();
@@ -864,7 +868,7 @@ private:
       auto fnType = type->getAs<AnyFunctionType>();
       if (!fnType) return Kind::Handled;
       
-      if (fnType->getExtInfo().throws())
+      if (fnType->getExtInfo().isThrowing())
         return Kind::Handled;
       
       if (--numArgs == 0)
