@@ -412,6 +412,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       case KeyPathExpr::Component::Kind::OptionalWrap:
       case KeyPathExpr::Component::Kind::OptionalForce:
       case KeyPathExpr::Component::Kind::Identity:
+      case KeyPathExpr::Component::Kind::DictionaryKey:
         break;
       }
     }
