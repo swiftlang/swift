@@ -95,11 +95,11 @@ static Expr *getMemberChainSubExpr(Expr *expr) {
 
 /// Returns the base of a chain of member accesses/method calls. Most
 /// expressions do not participate in member chains, and just return \c this.
-static Expr *getMemberChainBase(Expr *expr) {
+static UnresolvedMemberExpr *getUnresolvedMemberChainBase(Expr *expr) {
   if (auto *subExpr = getMemberChainSubExpr(expr))
-    return getMemberChainBase(subExpr);
+    return getUnresolvedMemberChainBase(subExpr);
   else
-    return expr;
+    return dyn_cast<UnresolvedMemberExpr>(expr);
 }
 
 /// Whether this expression is a member of a member chain.
@@ -107,12 +107,10 @@ static bool isMemberChainMember(Expr *expr) {
   return getMemberChainSubExpr(expr) != nullptr;
 }
 /// Whether this expression sits at the end of a chain of member accesses.
-static bool isMemberChainTail(ConstraintSystem &cs, Expr *expr) {
+static bool isMemberChainTail(Expr *expr, Expr *parent) {
   assert(expr && "isMemberChainTail called with null expr!");
   // If this expression's parent is not itself part of a chain (or, this expr
   // has no parent expr), this must be the tail of the chain.
-  Expr *parent = cs.getParentExpr(expr);
-
   return parent == nullptr || !isMemberChainMember(parent);
 }
 
@@ -834,9 +832,13 @@ namespace {
     /// Keep track of acceptable DiscardAssignmentExpr's.
     llvm::SmallPtrSet<DiscardAssignmentExpr*, 2> CorrectDiscardAssignmentExprs;
 
-    /// A map from the heads to the tails of each unresolved member chain found
-    /// during our walk.
+    /// A map from each UnresolvedMemberExpr to the respective (implicit) base
+    /// found during our walk.
     llvm::MapVector<UnresolvedMemberExpr *, Type> UnresolvedBaseTypes;
+
+    /// A map from the tail of each unresolved member chain to the respective
+    /// base of the chain.
+    llvm::MapVector<Expr *, UnresolvedMemberExpr *>UnresolvedChainBases;
 
     /// Returns false and emits the specified diagnostic if the member reference
     /// base is a nil literal. Returns true otherwise.
@@ -1473,41 +1475,20 @@ namespace {
       UnresolvedBaseTypes.insert({UME, ty});
     }
 
-    Type addUnresolvedMemberChainConstraints(UnresolvedMemberExpr *base,
-                                             Expr *tail,
-                                        UnresolvedMemberChainResultExpr *result,
-                                             Type resultTy) {
-      assert(isa<UnresolvedMemberExpr>(tail) ||
-             isa<UnresolvedDotExpr>(tail) ||
-             isa<CallExpr>(tail) ||
-             isa<BindOptionalExpr>(tail) ||
-             isa<ForceValueExpr>(tail) ||
-             isa<SubscriptExpr>(tail) &&
-             "Unexpected expression at end of unresolved member chain");
-      // Copy any type variable options from the result of the tail member to
-      // the result of the entire chain.
-      unsigned additionalOptions = 0;
-      if (auto *tvt = resultTy->getAs<TypeVariableType>())
-        additionalOptions = tvt->getImpl().getRawOptions();
+    Type getUnresolvedBaseType(UnresolvedMemberExpr *UME) {
+      auto result = UnresolvedBaseTypes.find(UME);
+      assert(result != UnresolvedBaseTypes.end());
+      return result->second;
+    }
 
-      // The contextual type (represented with a new type variable) must equal
-      // the base type.
-      auto locator = CS.getConstraintLocator(result,
-                                ConstraintLocator::UnresolvedMemberChainResult);
-      auto tvo = additionalOptions | TVO_CanBindToHole | TVO_CanBindToNoEscape;
-      auto chainResultTy = CS.createTypeVariable(locator, tvo);
-      auto chainBaseTy = UnresolvedBaseTypes.find(base)->second;
+    void setUnresolvedChainBase(Expr *tail, UnresolvedMemberExpr *base) {
+      UnresolvedChainBases.insert({tail, base});
+    }
 
-      // The result of this element of the chain must be convertible to the
-      // contextual type, and the contextual type must be equal to the base.
-      CS.addConstraint(ConstraintKind::Conversion, resultTy, chainBaseTy,
-            CS.getConstraintLocator(tail, ConstraintLocator::RValueAdjustment));
-      CS.addConstraint(ConstraintKind::Conversion, resultTy, chainResultTy,
-                       locator);
-      CS.addConstraint(ConstraintKind::Equal, chainBaseTy, chainResultTy,
-                       locator);
-
-      return chainResultTy;
+    UnresolvedMemberExpr *getUnresolvedChainBase(Expr *tail) {
+      auto result = UnresolvedChainBases.find(tail);
+      assert(result != UnresolvedChainBases.end());
+      return result->second;
     }
     
     virtual Type visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
@@ -1571,6 +1552,46 @@ namespace {
       
       // Otherwise, the result is just the type of the member.
       return memberTy;
+    }
+
+    Type visitUnresolvedMemberChainResultExpr(
+                                        UnresolvedMemberChainResultExpr *expr) {
+      auto *tail = expr->getSubExpr();
+      assert(isa<UnresolvedMemberExpr>(tail) ||
+             isa<UnresolvedDotExpr>(tail) ||
+             isa<CallExpr>(tail) ||
+             isa<BindOptionalExpr>(tail) ||
+             isa<ForceValueExpr>(tail) ||
+             isa<SubscriptExpr>(tail) &&
+             "Unexpected expression at end of unresolved member chain");
+
+      auto memberTy = CS.getType(tail);
+      auto *base = getUnresolvedChainBase(tail);
+
+      // Copy any type variable options from the result of the tail member to
+      // the result of the entire chain.
+      unsigned additionalOptions = 0;
+      if (auto *tvt = memberTy->getAs<TypeVariableType>())
+        additionalOptions = tvt->getImpl().getRawOptions();
+
+      // The contextual type (represented with a new type variable) must equal
+      // the base type.
+      auto locator = CS.getConstraintLocator(expr,
+                                ConstraintLocator::UnresolvedMemberChainResult);
+      auto tvo = additionalOptions | TVO_CanBindToHole | TVO_CanBindToNoEscape;
+      auto chainResultTy = CS.createTypeVariable(locator, tvo);
+      auto chainBaseTy = UnresolvedBaseTypes.find(base)->second;
+
+      // The result of this element of the chain must be convertible to the
+      // contextual type, and the contextual type must be equal to the base.
+      CS.addConstraint(ConstraintKind::Conversion, memberTy, chainBaseTy,
+            CS.getConstraintLocator(tail, ConstraintLocator::RValueAdjustment));
+      CS.addConstraint(ConstraintKind::Conversion, memberTy, chainResultTy,
+                       locator);
+      CS.addConstraint(ConstraintKind::Equal, chainBaseTy, chainResultTy,
+                       locator);
+
+      return chainResultTy;
     }
 
     Type visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {
@@ -3819,6 +3840,20 @@ namespace {
       if (auto *assignment = dyn_cast<AssignExpr>(expr))
         CG.markAcceptableDiscardExprs(assignment->getDest());
 
+      // If we find an unresolved member chain, wrap it in an
+      // UnresolvedMemberChainResultExpr (unless this has already been done)
+      // and generate constraints for the wrapped expression.
+      auto *parent = Parent.getAsExpr();
+      if (isMemberChainTail(expr, parent)) {
+        if (auto *UME = getUnresolvedMemberChainBase(expr)) {
+          if (!parent || !isa<UnresolvedMemberChainResultExpr>(parent)) {
+            CG.setUnresolvedChainBase(expr, UME);
+            auto &context = CG.getConstraintSystem().getASTContext();
+            expr = new (context) UnresolvedMemberChainResultExpr(expr);
+          }
+        }
+      }
+
       return { true, expr };
     }
 
@@ -3865,22 +3900,6 @@ namespace {
         auto simplifiedType = CS.simplifyType(type);
 
         CS.setType(expr, simplifiedType);
-
-        // If this is the end of an unresolved member chain, inject the
-        // appropriate constraints to link the contextual type to the (implicit)
-        // base of the chain.
-        if (isMemberChainTail(CG.getConstraintSystem(), expr)) {
-          auto *chainBase = getMemberChainBase(expr);
-          auto *resultExpr =
-            new (CS.getASTContext()) UnresolvedMemberChainResultExpr(expr);
-          if (auto *UME = dyn_cast<UnresolvedMemberExpr>(chainBase)) {
-            auto chainTy = CG.addUnresolvedMemberChainConstraints(UME, expr,
-                                                                  resultExpr,
-                                                                simplifiedType);
-            CS.setType(resultExpr, chainTy);
-            return resultExpr;
-          }
-        }
 
         return expr;
       }

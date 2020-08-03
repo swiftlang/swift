@@ -3461,6 +3461,13 @@ bool MissingMemberFailure::diagnoseInLiteralCollectionContext() const {
   if (!(parentExpr && isa<UnresolvedMemberExpr>(expr)))
     return false;
 
+  if (!isa<UnresolvedMemberChainResultExpr>(parentExpr))
+    return false;
+
+  parentExpr = findParentExpr(parentExpr);
+  if (!parentExpr)
+    return false;
+
   auto parentType = getType(parentExpr);
 
   if (!parentType->isKnownStdlibCollectionType() && !parentType->is<TupleType>())
