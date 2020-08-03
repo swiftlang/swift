@@ -218,8 +218,6 @@ bool Deserializer::readModuleSummaryMetadata() {
 
   moduleSummary.setModuleName(BlobData.str());
 
-  llvm::dbgs() << "Start loading module " << moduleSummary.getModuleName()
-               << "\n";
   return false;
 }
 

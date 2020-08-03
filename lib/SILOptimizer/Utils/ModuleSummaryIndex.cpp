@@ -8,7 +8,7 @@
 #include "llvm/Support/MD5.h"
 #include "llvm/Support/raw_ostream.h"
 
-#define DEBUG_TYPE "function-order-printer"
+#define DEBUG_TYPE "module-summary-index"
 
 using namespace swift;
 
@@ -110,7 +110,7 @@ void indexWitnessTable(ModuleSummaryIndex &index, SILModule &M) {
   
   auto FS = std::make_unique<FunctionSummary>(Preserved);
   FS->setPreserved(true);
-  llvm::dbgs() << "Summary: Preserved " << Preserved.size() << " external witnesses\n";
+  LLVM_DEBUG(llvm::dbgs() << "Summary: Preserved " << Preserved.size() << " external witnesses\n");
   index.addFunctionSummary("__external_witnesses_preserved_fs", std::move(FS));
 }
 
@@ -124,7 +124,7 @@ void indexVTable(ModuleSummaryIndex &index, SILModule &M) {
           entry.getMethod().kind == SILDeclRef::Kind::IVarDestroyer) {
         // Destructors are alive because they are called from swift_release
         auto edge = FunctionSummary::EdgeTy::staticCall(Impl);
-        llvm::dbgs() << "Preserve deallocator '" << Impl->getName() << "'\n";
+        LLVM_DEBUG(llvm::dbgs() << "Preserve deallocator '" << Impl->getName() << "'\n");
         Preserved.push_back(edge);
       }
       auto methodMod = entry.getMethod().getDecl()->getModuleContext();
@@ -140,7 +140,7 @@ void indexVTable(ModuleSummaryIndex &index, SILModule &M) {
   
   auto FS = std::make_unique<FunctionSummary>(Preserved);
   FS->setPreserved(true);
-  llvm::dbgs() << "Summary: Preserved " << Preserved.size() << " deallocators\n";
+  LLVM_DEBUG(llvm::dbgs() << "Summary: Preserved " << Preserved.size() << " deallocators\n");
   index.addFunctionSummary("__vtable_destructors_and_externals_preserved_fs", std::move(FS));
 }
 
@@ -151,7 +151,7 @@ void indexKeyPathComponent(ModuleSummaryIndex &index, SILModule &M) {
       component->visitReferencedFunctionsAndMethods(
         [&](SILFunction *F) {
           auto FS = buildFunctionSummaryIndex(*F);
-          llvm::dbgs() << "Preserve keypath funcs " << F->getName() << "\n";
+          LLVM_DEBUG(llvm::dbgs() << "Preserve keypath funcs " << F->getName() << "\n");
           FS->setPreserved(true);
           index.addFunctionSummary(F->getName(), std::move(FS));
         },
@@ -187,7 +187,7 @@ ModuleSummaryIndex swift::buildModuleSummaryIndex(SILModule &M,
   for (auto &F : M) {
     auto FS = buildFunctionSummaryIndex(F);
     if (F.getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod) {
-      llvm::dbgs() << "Preserve " << F.getName() << " due to ObjCMethod\n";
+      LLVM_DEBUG(llvm::dbgs() << "Preserve " << F.getName() << " due to ObjCMethod\n");
       FS->setPreserved(true);
     }
     FS->setLive(false);

@@ -30,8 +30,7 @@ static llvm::cl::opt<std::string>
                       llvm::cl::desc("Print liveness trace for the symbol"));
 
 static llvm::cl::list<std::string>
-    InputFilenames(llvm::cl::Positional, llvm::cl::desc("[input files...]"),
-                   llvm::cl::OneOrMore);
+    InputFilenames(llvm::cl::Positional, llvm::cl::desc("[input files...]"));
 static llvm::cl::opt<std::string>
     OutputFilename("o", llvm::cl::desc("output filename"));
 

@@ -88,7 +88,7 @@ public:
       }
       F->dropAllReferences();
       DeadFunctions.push_back(F);
-      llvm::dbgs() << "Eliminate " << info.Name << "\n";
+      LLVM_DEBUG(llvm::dbgs() << "Eliminate " << info.Name << "\n");
     }
   }
   
