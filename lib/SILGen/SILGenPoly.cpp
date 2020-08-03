@@ -4753,6 +4753,23 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
   // Perform the call.
   SILType witnessSILTy = SILType::getPrimitiveObjectType(witnessFTy);
 
+  // If `witness` is a derivative function and the witness substitution map's
+  // generic signature is not equal to the witness callee's generic signature,
+  // update the witness substitution map's generic signature to the callee's
+  // generic signature.
+  if (witness.derivativeFunctionIdentifier) {
+    auto fnTy = witnessFnRef->getType().castTo<SILFunctionType>();
+    auto invocationGenSig = fnTy->getInvocationGenericSignature();
+    if (fnTy->getInvocationGenericSignature() &&
+        fnTy->getInvocationGenericSignature() !=
+            witnessSubs.getGenericSignature().getCanonicalSignature()) {
+      witnessSubs = SubstitutionMap::get(
+          invocationGenSig,
+          QuerySubstitutionMap{getForwardingSubstitutionMap()},
+          LookUpConformanceInSignature(invocationGenSig.getPointer()));
+    }
+  }
+
   SILValue reqtResultValue;
   switch (coroutineKind) {
   case SILCoroutineKind::None: {
