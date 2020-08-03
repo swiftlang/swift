@@ -19,8 +19,8 @@
 //
 // Test that we get the same results when typechecking the interface:
 //
-// RUN: not %target-swift-frontend -typecheck-module-from-interface %t/UnbuildableCurrent.swiftinterface 2>&1 | %FileCheck -check-prefixes=ALL,CURRENT-PREBUILD %s
-// RUN: not %target-swift-frontend -typecheck-module-from-interface %t/UnbuildableFuture.swiftinterface 2>&1 | %FileCheck -check-prefixes=ALL,FUTURE-PREBUILD %s
+// RUN: not %target-swift-frontend -typecheck-module-from-interface %t/UnbuildableCurrent.swiftinterface 2>&1 | %FileCheck -check-prefixes=ALL,CURRENT-VERIFY %s
+// RUN: not %target-swift-frontend -typecheck-module-from-interface %t/UnbuildableFuture.swiftinterface 2>&1 | %FileCheck -check-prefixes=ALL,FUTURE-VERIFY %s
 
 // ALL: Unbuildable{{[^.]+}}.swiftinterface:{{[0-9]+}}:{{[0-9]+}}: error: use of unknown directive '#somethingYouveNeverHeardOf'
 
@@ -32,5 +32,5 @@ import UnbuildableFuture
 // FUTURE: unbuildable.swift:[[@LINE-1]]:8: error: failed to build module 'UnbuildableFuture' from its module interface; the compiler that produced it, 'NeoTokyoSwift 2000.42', may have used features that aren't supported by this compiler, '{{.*Swift version.*}}'
 #endif
 
-// CURRENT-PREBUILD: UnbuildableCurrent.swiftinterface:1:1: error: failed to build module 'UnbuildableCurrent' from its module interface; it may have been damaged or it may have triggered a bug in the Swift compiler when it was produced
-// FUTURE-PREBUILD: UnbuildableFuture.swiftinterface:1:1: error: failed to build module 'UnbuildableFuture' from its module interface; the compiler that produced it, 'NeoTokyoSwift 2000.42', may have used features that aren't supported by this compiler, '{{.*Swift version.*}}'
+// CURRENT-VERIFY: UnbuildableCurrent.swiftinterface:1:1: error: failed to verify module interface of 'UnbuildableCurrent'; it may have been damaged or it may have triggered a bug in the Swift compiler when it was produced
+// FUTURE-VERIFY: UnbuildableFuture.swiftinterface:1:1: error: failed to verify module interface of 'UnbuildableFuture'; the compiler that produced it, 'NeoTokyoSwift 2000.42', may have used features that aren't supported by this compiler, '{{.*Swift version.*}}'
