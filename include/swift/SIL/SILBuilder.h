@@ -725,6 +725,27 @@ public:
     return lowering.emitLoad(*this, Loc, LV, Qualifier);
   }
 
+  /// Convenience function for calling emitLoad on the type lowering for
+  /// non-address values.
+  SILValue emitLoweredLoadValueOperation(
+      SILLocation Loc, SILValue LV, LoadOwnershipQualifier Qualifier,
+      Lowering::TypeLowering::TypeExpansionKind ExpansionKind) {
+    assert(isLoadableOrOpaque(LV->getType()));
+    const auto &lowering = getTypeLowering(LV->getType());
+    return lowering.emitLoweredLoad(*this, Loc, LV, Qualifier, ExpansionKind);
+  }
+
+  /// Convenience function for calling emitLoweredStore on the type lowering for
+  /// non-address values.
+  void emitLoweredStoreValueOperation(
+      SILLocation Loc, SILValue Value, SILValue Addr,
+      StoreOwnershipQualifier Qual,
+      Lowering::TypeLowering::TypeExpansionKind ExpansionKind) {
+    assert(isLoadableOrOpaque(Value->getType()));
+    const auto &lowering = getTypeLowering(Value->getType());
+    lowering.emitLoweredStore(*this, Loc, Value, Addr, Qual, ExpansionKind);
+  }
+
   LoadBorrowInst *createLoadBorrow(SILLocation Loc, SILValue LV) {
     assert(isLoadableOrOpaque(LV->getType()) &&
            !LV->getType().isTrivial(getFunction()));
@@ -2186,6 +2207,16 @@ public:
     return lowering.emitCopyValue(*this, Loc, v);
   }
 
+  /// Convenience function for calling emitCopy on the type lowering
+  /// for the non-address value.
+  SILValue emitLoweredCopyValueOperation(
+      SILLocation Loc, SILValue v,
+      Lowering::TypeLowering::TypeExpansionKind expansionKind) {
+    assert(!v->getType().isAddress());
+    auto &lowering = getTypeLowering(v->getType());
+    return lowering.emitLoweredCopyValue(*this, Loc, v, expansionKind);
+  }
+
   /// Convenience function for calling TypeLowering.emitDestroy on the type
   /// lowering for the non-address value.
   void emitDestroyValueOperation(SILLocation Loc, SILValue v) {
@@ -2194,6 +2225,18 @@ public:
       return;
     auto &lowering = getTypeLowering(v->getType());
     lowering.emitDestroyValue(*this, Loc, v);
+  }
+
+  /// Convenience function for calling TypeLowering.emitDestroy on the type
+  /// lowering for the non-address value.
+  void emitLoweredDestroyValueOperation(
+      SILLocation Loc, SILValue v,
+      Lowering::TypeLowering::TypeExpansionKind expansionKind) {
+    assert(!v->getType().isAddress());
+    if (F->hasOwnership() && v.getOwnershipKind() == ValueOwnershipKind::None)
+      return;
+    auto &lowering = getTypeLowering(v->getType());
+    lowering.emitLoweredDestroyValue(*this, Loc, v, expansionKind);
   }
 
   /// Convenience function for destroying objects and addresses.
