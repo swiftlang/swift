@@ -1989,10 +1989,18 @@ void SwiftEditorDocument::parse(ImmutableTextSnapshotRef Snapshot,
   Impl.SyntaxInfo->parse();
 }
 
-void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
+static UIdent SemaDiagStage("source.diagnostic.stage.swift.sema");
+static UIdent ParseDiagStage("source.diagnostic.stage.swift.parse");
+
+void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer, bool ReportDiags) {
   llvm::sys::ScopedLock L(Impl.AccessMtx);
 
   Impl.ParserDiagnostics = Impl.SyntaxInfo->getDiagnostics();
+  if (ReportDiags) {
+    Consumer.setDiagnosticStage(ParseDiagStage);
+    for (auto &Diag : Impl.ParserDiagnostics)
+      Consumer.handleDiagnostic(Diag, ParseDiagStage);
+  }
 
   SwiftSyntaxMap NewMap = SwiftSyntaxMap(Impl.SyntaxMap.Tokens.size() + 16);
 
@@ -2058,9 +2066,6 @@ void SwiftEditorDocument::readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
     if (Kind.isValid())
       Consumer.handleSemanticAnnotation(Offset, Length, Kind, IsSystem);
   }
-
-  static UIdent SemaDiagStage("source.diagnostic.stage.swift.sema");
-  static UIdent ParseDiagStage("source.diagnostic.stage.swift.parse");
 
   // If there's no value returned for diagnostics it means they are out-of-date
   // (based on a different snapshot).
@@ -2304,7 +2309,6 @@ void SwiftEditorDocument::reportDocumentStructure(SourceFile &SrcFile,
 //===----------------------------------------------------------------------===//
 // EditorOpen
 //===----------------------------------------------------------------------===//
-
 void SwiftLangSupport::editorOpen(
     StringRef Name, llvm::MemoryBuffer *Buf, EditorConsumer &Consumer,
     ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions) {
@@ -2343,8 +2347,7 @@ void SwiftLangSupport::editorOpen(
     EditorDoc->updateSemaInfo();
   }
 
-  EditorDoc->readSyntaxInfo(Consumer);
-  EditorDoc->readSemanticInfo(Snapshot, Consumer);
+  EditorDoc->readSyntaxInfo(Consumer, /*ReportDiags=*/true);
 
   if (Consumer.syntaxTreeEnabled()) {
     assert(EditorDoc->getSyntaxTree().hasValue());
@@ -2506,7 +2509,8 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
     }
     EditorDoc->parse(Snapshot, *this, Consumer.syntaxTreeEnabled(),
                      SyntaxCachePtr);
-    EditorDoc->readSyntaxInfo(Consumer);
+    // Do not report syntactic diagnostics; will be handled in readSemanticInfo.
+    EditorDoc->readSyntaxInfo(Consumer, /*ReportDiags=*/false);
 
     // Log reuse information
     if (SyntaxCache.hasValue() && LogReuseRegions) {
