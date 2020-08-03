@@ -337,6 +337,10 @@ bool TypeBase::isObjCExistentialType() {
   return getCanonicalType().isObjCExistentialType();
 }
 
+bool TypeBase::isTypeErasedGenericClassType() {
+  return getCanonicalType().isTypeErasedGenericClassType();
+}
+
 bool CanType::isObjCExistentialTypeImpl(CanType type) {
   if (!type.isExistentialType())
     return false;
@@ -4300,7 +4304,7 @@ case TypeKind::Id:
     bool changed = false;
     auto hasTypeErasedGenericClassType = [](Type ty) -> bool {
       return ty.findIf([](Type subType) -> bool {
-        if (subType->getCanonicalType().isTypeErasedGenericClassType())
+        if (subType->isTypeErasedGenericClassType())
           return true;
         else
           return false;
