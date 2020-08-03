@@ -33,6 +33,9 @@ using StaticInfixWitness = SWIFT_CC(swift) bool(OpaqueValue *, OpaqueValue *,
 #elif defined(__MACH__)
 #if defined(__aarch64__)
 #define INDIRECT_RELREF_GOTPCREL(SYMBOL) SYMBOL "@GOT - . + 1"
+#elif defined(__arm__)
+// Darwin doesn't support @GOT like syntax for 32 bit ARM.
+#define INDIRECT_RELREF_GOTPCREL(SYMBOL) "L" SYMBOL "$non_lazy_ptr - . + 1"
 #else
 #define INDIRECT_RELREF_GOTPCREL(SYMBOL) SYMBOL "@GOTPCREL + 5"
 #endif
@@ -41,6 +44,22 @@ using StaticInfixWitness = SWIFT_CC(swift) bool(OpaqueValue *, OpaqueValue *,
 //===----------------------------------------------------------------------===//
 // Tuple Equatable Conformance
 //===----------------------------------------------------------------------===//
+
+// For 32 bit ARM (specifically armv7 and armv7s for iphoneos), emit non-lazy
+// pointer stubs to indirectly reference. Darwin doesn't support @GOT syntax for
+// ARM.
+#if defined(__MACH__) && defined(__arm__) && !defined(__aarch64__)
+__asm(
+  "  .section __DATA, __nl_symbol_ptr, non_lazy_symbol_pointers\n"
+  "  .p2align 2\n"
+  "L" EQUATABLE_DESCRIPTOR_SYMBOL "$non_lazy_ptr:\n"
+  "  .indirect_symbol " EQUATABLE_DESCRIPTOR_SYMBOL "\n"
+  "  .long 0\n"
+  "L" EQUATABLE_EE_METHOD_DESCRIPTOR "$non_lazy_ptr:\n"
+  "  .indirect_symbol " EQUATABLE_EE_METHOD_DESCRIPTOR "\n"
+  "  .long 0\n"
+);
+#endif
 
 // Define the conformance descriptor for tuple Equatable. We do this in
 // assembly to work around relative reference issues.
@@ -137,14 +156,42 @@ bool swift::_swift_tupleEquatable_equals(OpaqueValue *tuple1,
 // Tuple Comparable Conformance
 //===----------------------------------------------------------------------===//
 
+// For 32 bit ARM (specifically armv7 and armv7s for iphoneos), emit non-lazy
+// pointer stubs to indirectly reference. Darwin doesn't support @GOT syntax for
+// ARM.
+#if defined(__MACH__) && defined(__arm__) && !defined(__aarch64__)
+__asm(
+  "  .section __DATA, __nl_symbol_ptr, non_lazy_symbol_pointers\n"
+  "  .p2align 2\n"
+  "L" COMPARABLE_DESCRIPTOR_SYMBOL "$non_lazy_ptr:\n"
+  "  .indirect_symbol " COMPARABLE_DESCRIPTOR_SYMBOL "\n"
+  "  .long 0\n"
+  "L" COMPARABLE_BASE_CONFORMANCE_DESCRIPTOR "$non_lazy_ptr:\n"
+  "  .indirect_symbol " COMPARABLE_BASE_CONFORMANCE_DESCRIPTOR "\n"
+  "  .long 0\n"
+  "L" COMPARABLE_LT_METHOD_DESCRIPTOR "$non_lazy_ptr:\n"
+  "  .indirect_symbol " COMPARABLE_LT_METHOD_DESCRIPTOR "\n"
+  "  .long 0\n"
+  "L" COMPARBALE_LTE_METHOD_DESCRIPTOR "$non_lazy_ptr:\n"
+  "  .indirect_symbol " COMPARBALE_LTE_METHOD_DESCRIPTOR "\n"
+  "  .long 0\n"
+  "L" COMPARABLE_GTE_METHOD_DESCRIPTOR "$non_lazy_ptr:\n"
+  "  .indirect_symbol " COMPARABLE_GTE_METHOD_DESCRIPTOR "\n"
+  "  .long 0\n"
+  "L" COMPARABLE_GT_METHOD_DESCRIPTOR "$non_lazy_ptr:\n"
+  "  .indirect_symbol " COMPARABLE_GT_METHOD_DESCRIPTOR "\n"
+  "  .long 0\n"
+);
+#endif
+
 // Define the associated conformance structure for tuple Comparable. We do this
 // in assembly to work around relative reference issues.
 __asm(
   #if defined(__ELF__)
   "  .hidden \"" TUPLE_COMPARABLE_ASSOCIATEDCONFORMANCE "\"\n"
   "  .type \"" TUPLE_COMPARABLE_ASSOCIATEDCONFORMANCE "\", @object\n"
-  "  .section swift5_typeref, \"a\""
-  "  .weak \"" TUPLE_COMPARABLE_ASSOCIATEDCONFORMANCE "\""
+  "  .section swift5_typeref, \"a\"\n"
+  "  .weak \"" TUPLE_COMPARABLE_ASSOCIATEDCONFORMANCE "\"\n"
   #elif defined(__MACH__)
   "  .private_extern \"" TUPLE_COMPARABLE_ASSOCIATEDCONFORMANCE "\"\n"
   "  .section __TEXT, __swift5_typeref\n"
@@ -497,6 +544,31 @@ bool swift::_swift_tupleComparable_greaterThan(OpaqueValue *tuple1,
 // Tuple Hashable Conformance
 //===----------------------------------------------------------------------===//
 
+// For 32 bit ARM (specifically armv7 and armv7s for iphoneos), emit non-lazy
+// pointer stubs to indirectly reference. Darwin doesn't support @GOT syntax for
+// ARM.
+#if defined(__MACH__) && defined(__arm__) && !defined(__aarch64__)
+__asm(
+  "  .section __DATA, __nl_symbol_ptr, non_lazy_symbol_pointers\n"
+  "  .p2align 2\n"
+  "L" HASHABLE_DESCRIPTOR_SYMBOL "$non_lazy_ptr:\n"
+  "  .indirect_symbol " HASHABLE_DESCRIPTOR_SYMBOL "\n"
+  "  .long 0\n"
+  "L" HASHABLE_BASE_CONFORMANCE_DESCRIPTOR "$non_lazy_ptr:\n"
+  "  .indirect_symbol " HASHABLE_BASE_CONFORMANCE_DESCRIPTOR "\n"
+  "  .long 0\n"
+  "L" HASHABLE_HASHVALUE_METHOD_DESCRIPTOR "$non_lazy_ptr:\n"
+  "  .indirect_symbol " HASHABLE_HASHVALUE_METHOD_DESCRIPTOR "\n"
+  "  .long 0\n"
+  "L" HASHABLE_HASH_METHOD_DESCRIPTOR "$non_lazy_ptr:\n"
+  "  .indirect_symbol " HASHABLE_HASH_METHOD_DESCRIPTOR "\n"
+  "  .long 0\n"
+  "L" HASHABLE_RAWHASHVALUE_METHOD_DESCRIPTOR "$non_lazy_ptr:\n"
+  "  .indirect_symbol " HASHABLE_RAWHASHVALUE_METHOD_DESCRIPTOR "\n"
+  "  .long 0\n"
+);
+#endif
+
 // Define the conformance descriptor for tuple Hashable. We do this in
 // assembly to work around relative reference issues.
 __asm(
@@ -570,22 +642,19 @@ __asm(
   #endif
 );
 
-// These are all function values that we reinterpret later.
-extern void *SWIFT_HASHVALUE_FUNC;
-extern void *SWIFT_HASHER_COMBINE_FUNC;
+extern "C" SWIFT_CC(swift)
+intptr_t SWIFT_HASHVALUE_FUNC(OpaqueValue *value, Metadata *Self,
+                              void *witnessTable);
 
-using HashValueFn = SWIFT_CC(swift) intptr_t(OpaqueValue *value, Metadata *Self,
-                                             void *witnessTable);
-using HasherCombineFn = SWIFT_CC(swift) void(OpaqueValue *value,
-                                             const Metadata *Self,
-                                             const WitnessTable *witnessTable,
-                                             SWIFT_CONTEXT OpaqueValue *hasher);
+extern "C" SWIFT_CC(swift)
+void SWIFT_HASHER_COMBINE_FUNC(OpaqueValue *value, const Metadata *Self,
+                               const WitnessTable *witnessTable,
+                               SWIFT_CONTEXT OpaqueValue *hasher);
 
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 intptr_t _swift_tupleHashable_hashValue(SWIFT_CONTEXT OpaqueValue *tuple,
                                         Metadata *Self, void *witnessTable) {
-  auto _hashValue = reinterpret_cast<HashValueFn *>(&SWIFT_HASHVALUE_FUNC);
-  return _hashValue(tuple, Self, witnessTable);
+  return SWIFT_HASHVALUE_FUNC(tuple, Self, witnessTable);
 }
 
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
@@ -606,11 +675,8 @@ void _swift_tupleHashable_hash(OpaqueValue *hasher,
     auto value = reinterpret_cast<OpaqueValue *>(
                   reinterpret_cast<char *>(tuple) + elt.Offset);
 
-    auto hasherCombine = 
-        reinterpret_cast<HasherCombineFn *>(&SWIFT_HASHER_COMBINE_FUNC);
-
     // Call the combine function on the hasher for this element value and we're
     // done!
-    hasherCombine(value, elt.Type, conformance, hasher);
+    SWIFT_HASHER_COMBINE_FUNC(value, elt.Type, conformance, hasher);
   }
 }
