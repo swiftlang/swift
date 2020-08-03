@@ -15,10 +15,15 @@
 // probability proportional to the distance between each representable value
 // and the next.
 //
-// In other words, the behavior is as if choosing a real number in a range, and
+// The behavior is as if choosing a real number in a range, and
 // rounding down to the next representible value. For closed ranges, we extend
 // to a half-open range bounded by upperBound.nextUp (treating infinity as one
 // ulp beyond greatestFiniteMagnitude).
+//
+// This is analogous to the methods for generating random integers in a range,
+// which also behave as if generating a uniform real number in the half-open
+// interval and rounding down to the next integer. And for closed ranges, by
+// extending to the half-open interval bounded by the next-larger integer.
 //
 // Terminology note: "raw binade" as used in this file refers to the set of
 // all floating-point numbers that share the same sign and raw exponent.
