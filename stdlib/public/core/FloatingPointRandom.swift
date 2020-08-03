@@ -15,10 +15,10 @@
 // probability proportional to the distance between each representable value
 // and the next.
 //
-// The behavior is as if choosing a real number in a range, and
-// rounding down to the next representible value. For closed ranges, we extend
-// to a half-open range bounded by upperBound.nextUp (treating infinity as one
-// ulp beyond greatestFiniteMagnitude).
+// The behavior is as if choosing a real number in a range, and rounding down
+// to the next representible value. For closed ranges, we extend to a half-open
+// range bounded by upperBound.nextUp (treating infinity as one ulp beyond
+// greatestFiniteMagnitude).
 //
 // This is analogous to the methods for generating random integers in a range,
 // which also behave as if generating a uniform real number in the half-open
