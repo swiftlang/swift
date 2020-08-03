@@ -335,8 +335,11 @@ MemBehavior MemoryBehaviorVisitor::visitBuiltinInst(BuiltinInst *BI) {
 MemBehavior MemoryBehaviorVisitor::visitTryApplyInst(TryApplyInst *AI) {
   MemBehavior Behavior = MemBehavior::MayHaveSideEffects;
   // Ask escape analysis.
-  if (!EA->canEscapeToRelease(V, AI))
-    Behavior = MemBehavior::None;
+  if (!EA->canEscapeToRelease(V, AI)) {
+    Behavior = MemBehavior::MayReadWrite;
+    if (!EA->canEscapeToAccess(V, AI))
+      Behavior = MemBehavior::None;
+  }
 
   // Otherwise be conservative and return that we may have side effects.
   LLVM_DEBUG(llvm::dbgs() << "  Found tryapply, returning " << Behavior <<'\n');
@@ -354,7 +357,8 @@ MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
   bool any_in_guaranteed_params = false;
   for (auto op : enumerate(AI->getArgumentOperands())) {
     if (op.value().get() == V &&
-        AI->getSubstCalleeConv().getSILArgumentConvention(op.index()) == swift::SILArgumentConvention::Indirect_In_Guaranteed) {
+        AI->getSubstCalleeConv().getSILArgumentConvention(op.index()) ==
+            swift::SILArgumentConvention::Indirect_In_Guaranteed) {
       any_in_guaranteed_params = true;
       break;
     }
@@ -396,8 +400,12 @@ MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
       Behavior = MemBehavior::MayRead;
 
     // Ask escape analysis.
-    if (!EA->canEscapeToRelease(V, AI))
-      Behavior = MemBehavior::None;
+    if (!EA->canEscapeToRelease(V, AI)) {
+      if (Behavior > MemBehavior::MayWrite)
+        Behavior = MemBehavior::MayReadWrite;
+      if (!EA->canEscapeToAccess(V, AI))
+        Behavior = MemBehavior::None;
+    }
   }
   LLVM_DEBUG(llvm::dbgs() << "  Found apply, returning " << Behavior << '\n');
   return Behavior;

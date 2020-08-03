@@ -898,15 +898,27 @@ void EscapeAnalysis::ConnectionGraph::computeAccessAndReleasePoints() {
           /// Actually we only add instructions which may release a reference.
           /// We need the use points only for getting the end of a reference's
           /// liferange. And that must be a releasing instruction.
-          int ValueIdx = -1;
-          for (const Operand &Op : I.getAllOperands()) {
+          int ValueIdx1 = -1;
+          int ValueIdx2 = -1;
+          for (auto &Op : I.getAllOperands()) {
             CGNode *content = getValueContent(Op.get());
             if (!content)
               continue;
-            if (ValueIdx < 0)
-              ValueIdx = addReleasePoint(content, &I);
+            if (isa<ApplySite>(&I)) {
+              const ApplySite Apply(&I);
+              if (Apply.isArgumentOperand(Op) &&
+                  Apply.getArgumentConvention(Op).isGuaranteedConvention()) {
+                if (ValueIdx1 < 0)
+                  ValueIdx1 = addAccessPoint(content, &I);
+                else
+                  content->setAccessPointBit(ValueIdx1);
+                continue;
+              }
+            }
+            if (ValueIdx2 < 0)
+              ValueIdx2 = addReleasePoint(content, &I);
             else
-              content->setReleasePointBit(ValueIdx);
+              content->setReleasePointBit(ValueIdx2);
           }
           break;
         }
