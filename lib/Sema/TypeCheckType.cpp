@@ -1397,6 +1397,27 @@ static Type resolveTopLevelIdentTypeComponent(TypeResolution resolution,
     if (type->is<ErrorType>())
       return type;
 
+    // Compatibility hack; see test/NameLookup/property_wrappers_ambig.swift.
+    if (auto *unboundMemberType = type->getAs<UnboundGenericType>()) {
+      auto *unboundMemberDecl = unboundMemberType->getDecl();
+      if (auto *unboundTypeAlias = dyn_cast<TypeAliasDecl>(unboundMemberDecl)) {
+        auto underlyingType = unboundTypeAlias->getUnderlyingType();
+        auto genericSig = unboundTypeAlias->getGenericSignature();
+        auto *otherNominal = underlyingType->getAnyNominal();
+        if (genericSig &&
+            otherNominal &&
+            otherNominal->getDeclContext()->isModuleScopeContext() &&
+            unboundTypeAlias->getDeclContext()->isModuleScopeContext() &&
+            underlyingType->isEqual(otherNominal->getDeclaredInterfaceType()) &&
+            genericSig->isEqual(otherNominal->getGenericSignature()) &&
+            unboundTypeAlias->getName() == otherNominal->getName()) {
+          type = otherNominal->getDeclaredType();
+          typeDecl = otherNominal;
+          foundDC = otherNominal->getDeclContext();
+        }
+      }
+    }
+
     // If this is the first result we found, record it.
     if (current.isNull()) {
       current = type;
