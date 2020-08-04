@@ -951,8 +951,6 @@ bool MissingExplicitConversionFailure::diagnoseAsError() {
     return false;
 
   bool useAs = TypeChecker::isExplicitlyConvertibleTo(fromType, toType, DC);
-  if (!useAs && !TypeChecker::checkedCastMaySucceed(fromType, toType, DC))
-    return false;
 
   auto *expr = findParentExpr(anchor);
   if (!expr)
