@@ -107,7 +107,7 @@ struct InterfaceSubContextDelegate {
                                StringRef interfacePath,
                                StringRef outputPath,
                                SourceLoc diagLoc,
-  llvm::function_ref<bool(ASTContext&,ArrayRef<StringRef>,
+  llvm::function_ref<bool(ASTContext&, ModuleDecl*, ArrayRef<StringRef>,
                           ArrayRef<StringRef>, StringRef)> action) = 0;
   virtual bool runInSubCompilerInstance(StringRef moduleName,
                                         StringRef interfacePath,

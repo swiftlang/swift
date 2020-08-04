@@ -122,6 +122,9 @@ import SubE
 // CHECK-NEXT: },
 // CHECK-NEXT: {
 // CHECK-NEXT:   "clang": "G"
+// CHECK-NEXT: },
+// CHECK-NEXT: {
+// CHECK-NEXT:   "swift": "SwiftOnoneSupport"
 // CHECK-NEXT: }
 // CHECK-NEXT: ],
 // CHECK-NEXT: "details": {
@@ -147,6 +150,22 @@ import SubE
 // CHECK: directDependencies
 // CHECK-NEXT: {
 // CHECK-NEXT: "clang": "SwiftShims"
+
+/// --------Swift module F
+// CHECK:      "modulePath": "F.swiftmodule",
+// CHECK-NEXT: "sourceFiles": [
+// CHECK-NEXT: ],
+// CHECK-NEXT: "directDependencies": [
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "swift": "Swift"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "clang": "F"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "swift": "SwiftOnoneSupport"
+// CHECK-NEXT:   }
+// CHECK-NEXT: ],
 
 /// --------Swift module A
 // CHECK-LABEL: "modulePath": "A.swiftmodule",
