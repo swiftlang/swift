@@ -560,6 +560,92 @@ static bool typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
   return false;
 }
 
+/// Verify that the pattern bindings for the cases that we're falling through
+/// from and to are equivalent.
+static void checkFallthroughPatternBindingsAndTypes(
+    ASTContext &ctx,
+    CaseStmt *caseBlock, CaseStmt *previousBlock,
+    FallthroughStmt *fallthrough) {
+  auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
+  SmallVector<VarDecl *, 4> vars;
+  firstPattern->collectVariables(vars);
+
+  // We know that the typechecker has already guaranteed that all of
+  // the case label items in the fallthrough have the same var
+  // decls. So if we match against the case body var decls,
+  // transitively we will match all of the other case label items in
+  // the fallthrough destination as well.
+  auto previousVars = previousBlock->getCaseBodyVariablesOrEmptyArray();
+  for (auto *expected : vars) {
+    bool matched = false;
+    if (!expected->hasName())
+      continue;
+
+    for (auto *previous : previousVars) {
+      if (!previous->hasName() ||
+          expected->getName() != previous->getName()) {
+        continue;
+      }
+
+      if (!previous->getType()->isEqual(expected->getType())) {
+        ctx.Diags.diagnose(
+            previous->getLoc(), diag::type_mismatch_fallthrough_pattern_list,
+            previous->getType(), expected->getType());
+        previous->setInvalid();
+        expected->setInvalid();
+      }
+
+      // Ok, we found our match. Make the previous fallthrough statement var
+      // decl our parent var decl.
+      expected->setParentVarDecl(previous);
+      matched = true;
+      break;
+    }
+
+    if (!matched) {
+      ctx.Diags.diagnose(
+          fallthrough->getLoc(), diag::fallthrough_into_case_with_var_binding,
+          expected->getName());
+    }
+  }
+}
+
+/// Check the correctness of a 'fallthrough' statement.
+///
+/// \returns true if an error occurred.
+static bool checkFallthroughStmt(
+    DeclContext *dc, FallthroughStmt *stmt,
+    CaseStmt *oldFallthroughSource, CaseStmt *oldFallthroughDest) {
+  CaseStmt *fallthroughSource;
+  CaseStmt *fallthroughDest;
+  ASTContext &ctx = dc->getASTContext();
+  if (ctx.LangOpts.EnableASTScopeLookup) {
+    auto sourceFile = dc->getParentSourceFile();
+    std::tie(fallthroughSource, fallthroughDest) =
+        ASTScope::lookupFallthroughSourceAndDest(sourceFile, stmt->getLoc());
+    assert(fallthroughSource == oldFallthroughSource);
+    assert(fallthroughDest == oldFallthroughDest);
+  } else {
+    fallthroughSource = oldFallthroughSource;
+    fallthroughDest = oldFallthroughDest;
+  }
+
+  if (!fallthroughSource) {
+    ctx.Diags.diagnose(stmt->getLoc(), diag::fallthrough_outside_switch);
+    return true;
+  }
+  if (!fallthroughDest) {
+    ctx.Diags.diagnose(stmt->getLoc(), diag::fallthrough_from_last_case);
+    return true;
+  }
+  stmt->setFallthroughSource(fallthroughSource);
+  stmt->setFallthroughDest(fallthroughDest);
+
+  checkFallthroughPatternBindingsAndTypes(
+      ctx, fallthroughDest, fallthroughSource, stmt);
+  return false;
+}
+
 namespace {
 class StmtChecker : public StmtVisitor<StmtChecker, Stmt*> {
 public:
@@ -992,34 +1078,8 @@ public:
   }
 
   Stmt *visitFallthroughStmt(FallthroughStmt *S) {
-    CaseStmt *fallthroughSource;
-    CaseStmt *fallthroughDest;
-    if (getASTContext().LangOpts.EnableASTScopeLookup) {
-      auto sourceFile = DC->getParentSourceFile();
-      std::tie(fallthroughSource, fallthroughDest) =
-          ASTScope::lookupFallthroughSourceAndDest(sourceFile, S->getLoc());
-      assert(fallthroughSource == FallthroughSource);
-      assert(fallthroughDest == FallthroughDest);
-    } else {
-      fallthroughSource = FallthroughSource;
-      fallthroughDest = FallthroughDest;
-    }
-
-    if (!fallthroughSource) {
-      getASTContext().Diags.diagnose(S->getLoc(),
-                                     diag::fallthrough_outside_switch);
+    if (checkFallthroughStmt(DC, S, FallthroughSource, FallthroughDest))
       return nullptr;
-    }
-    if (!fallthroughDest) {
-      getASTContext().Diags.diagnose(S->getLoc(),
-                                     diag::fallthrough_from_last_case);
-      return nullptr;
-    }
-    S->setFallthroughSource(fallthroughSource);
-    S->setFallthroughDest(fallthroughDest);
-
-    checkFallthroughPatternBindingsAndTypes(
-        fallthroughDest, fallthroughSource, S);
 
     return S;
   }
@@ -1164,53 +1224,6 @@ public:
     // next iteration.
     (*prevCaseDecls)->clear();
     std::swap(*prevCaseDecls, *nextCaseDecls);
-  }
-
-  void checkFallthroughPatternBindingsAndTypes(CaseStmt *caseBlock,
-                                               CaseStmt *previousBlock,
-                                               FallthroughStmt *fallthrough) {
-    auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
-    SmallVector<VarDecl *, 4> vars;
-    firstPattern->collectVariables(vars);
-
-    // We know that the typechecker has already guaranteed that all of
-    // the case label items in the fallthrough have the same var
-    // decls. So if we match against the case body var decls,
-    // transitively we will match all of the other case label items in
-    // the fallthrough destination as well.
-    auto previousVars = previousBlock->getCaseBodyVariablesOrEmptyArray();
-    for (auto *expected : vars) {
-      bool matched = false;
-      if (!expected->hasName())
-        continue;
-
-      for (auto *previous : previousVars) {
-        if (!previous->hasName() ||
-            expected->getName() != previous->getName()) {
-          continue;
-        }
-
-        if (!previous->getType()->isEqual(expected->getType())) {
-          getASTContext().Diags.diagnose(previous->getLoc(),
-                      diag::type_mismatch_fallthrough_pattern_list,
-                      previous->getType(), expected->getType());
-          previous->setInvalid();
-          expected->setInvalid();
-        }
-
-        // Ok, we found our match. Make the previous fallthrough statement var
-        // decl our parent var decl.
-        expected->setParentVarDecl(previous);
-        matched = true;
-        break;
-      }
-
-      if (!matched) {
-        getASTContext().Diags.diagnose(fallthrough->getLoc(),
-                    diag::fallthrough_into_case_with_var_binding,
-                    expected->getName());
-      }
-    }
   }
 
   template <typename Iterator>
