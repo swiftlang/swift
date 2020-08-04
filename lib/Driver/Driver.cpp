@@ -2266,6 +2266,13 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
       commandLine.push_back(resourceDirArg->getValue());
     }
 
+    if (Args.hasFlag(options::OPT_static_executable,
+                     options::OPT_no_static_executable, false) ||
+        Args.hasFlag(options::OPT_static_stdlib, options::OPT_no_static_stdlib,
+                     false)) {
+      commandLine.push_back("-use-static-resource-dir");
+    }
+
     std::string executable = getSwiftProgramPath();
 
     // FIXME: This bypasses mechanisms like -v and -###. (SR-12119)
