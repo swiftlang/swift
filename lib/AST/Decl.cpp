@@ -4008,7 +4008,7 @@ StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
     StructLoc(StructLoc)
 {
   Bits.StructDecl.HasUnreferenceableStorage = false;
-  Bits.StructDecl.IsCxxNotTriviallyCopyable = false;
+  Bits.StructDecl.IsCxxNonTrivial = false;
 }
 
 bool NominalTypeDecl::hasMemberwiseInitializer() const {

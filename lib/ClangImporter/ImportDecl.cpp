@@ -3455,20 +3455,19 @@ namespace {
       result->setHasUnreferenceableStorage(hasUnreferenceableStorage);
 
       if (auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(decl)) {
-        result->setIsCxxNotTriviallyCopyable(
-            !cxxRecordDecl->isTriviallyCopyable());
+        result->setIsCxxNonTrivial(!cxxRecordDecl->isTriviallyCopyable());
 
         for (auto ctor : cxxRecordDecl->ctors()) {
           if (ctor->isCopyConstructor() &&
               (ctor->isDeleted() || ctor->getAccess() != clang::AS_public)) {
-            result->setIsCxxNotTriviallyCopyable(true);
+            result->setIsCxxNonTrivial(true);
             break;
           }
         }
 
         if (auto dtor = cxxRecordDecl->getDestructor()) {
           if (dtor->isDeleted() || dtor->getAccess() != clang::AS_public) {
-            result->setIsCxxNotTriviallyCopyable(true);
+            result->setIsCxxNonTrivial(true);
           }
         }
       }
