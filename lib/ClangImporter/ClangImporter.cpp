@@ -730,22 +730,22 @@ importer::addCommonInvocationArguments(
 
   } else if (triple.isOSDarwin()) {
     // Special case CPU based on known deployments:
-    //   - arm64 deploys to cyclone
+    //   - arm64 deploys to apple-a7
     //   - arm64 on macOS
     //   - arm64 for iOS/tvOS/watchOS simulators
-    //   - arm64e deploys to vortex
-    // and arm64e (everywhere) and arm64e macOS defaults to the "vortex" CPU
+    //   - arm64e deploys to apple-a12
+    // and arm64e (everywhere) and arm64e macOS defaults to the "apple-a12" CPU
     // for Darwin, but Clang only detects this if we use -arch.
     if (triple.getArchName() == "arm64e")
-      invocationArgStrs.push_back("-mcpu=vortex");
+      invocationArgStrs.push_back("-mcpu=apple-a12");
     else if (triple.isAArch64() && triple.isMacOSX())
-      invocationArgStrs.push_back("-mcpu=vortex");
+      invocationArgStrs.push_back("-mcpu=apple-a12");
     else if (triple.isAArch64() && triple.isSimulatorEnvironment() &&
              (triple.isiOS() || triple.isWatchOS()))
-      invocationArgStrs.push_back("-mcpu=vortex");
+      invocationArgStrs.push_back("-mcpu=apple-a12");
     else if (triple.getArch() == llvm::Triple::aarch64 ||
              triple.getArch() == llvm::Triple::aarch64_be) {
-      invocationArgStrs.push_back("-mcpu=cyclone");
+      invocationArgStrs.push_back("-mcpu=apple-a7");
     }
   } else if (triple.getArch() == llvm::Triple::systemz) {
     invocationArgStrs.push_back("-march=z13");
@@ -1736,10 +1736,8 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
   auto &diagClient = static_cast<ClangDiagnosticConsumer &>(rawDiagClient);
 
   auto loadModule = [&](clang::ModuleIdPath path,
-                        bool makeVisible) -> clang::ModuleLoadResult {
-    clang::Module::NameVisibilityKind visibility =
-        makeVisible ? clang::Module::AllVisible : clang::Module::Hidden;
-
+                        clang::Module::NameVisibilityKind visibility)
+      -> clang::ModuleLoadResult {
     auto importRAII =
         diagClient.handleImport(clangPath.front().first, importLoc);
 
@@ -1765,16 +1763,23 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
       clangFEOpts.IndexStorePath = preservedIndexStorePathOption;
     }
 
-    if (result && makeVisible)
+    if (result && (visibility == clang::Module::AllVisible)) {
       getClangPreprocessor().makeModuleVisible(result, clangImportLoc);
+    }
     return result;
   };
 
   // Now load the top-level module, so that we can check if the submodule
   // exists without triggering a fatal error.
-  clangModule = loadModule(clangPath.front(), false);
+  clangModule = loadModule(clangPath.front(), clang::Module::AllVisible);
   if (!clangModule)
     return nullptr;
+
+  // If we're asked to import the top-level module then we're done here.
+  auto *topSwiftModule = finishLoadingClangModule(clangModule, importLoc);
+  if (path.size() == 1) {
+    return topSwiftModule;
+  }
 
   // Verify that the submodule exists.
   clang::Module *submodule = clangModule;
@@ -1787,7 +1792,8 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
     // put the Clang AST in a fatal error state if it /doesn't/ exist.
     if (!submodule && component.Item.str() == "Private" &&
         (&component) == (&path[1])) {
-      submodule = loadModule(llvm::makeArrayRef(clangPath).slice(0, 2), false);
+      submodule = loadModule(llvm::makeArrayRef(clangPath).slice(0, 2),
+                             clang::Module::Hidden);
     }
 
     if (!submodule) {
@@ -1797,7 +1803,7 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
   }
 
   // Finally, load the submodule and make it visible.
-  clangModule = loadModule(clangPath, true);
+  clangModule = loadModule(clangPath, clang::Module::AllVisible);
   if (!clangModule)
     return nullptr;
 

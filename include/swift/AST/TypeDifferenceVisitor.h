@@ -214,7 +214,7 @@ public:
 
   bool visitAnyFunctionType(CanAnyFunctionType type1,
                             CanAnyFunctionType type2) {
-    if (type1->getExtInfo() != type2->getExtInfo())
+    if (!type1->hasSameExtInfoAs(type2))
       return asImpl().visitDifferentTypeStructure(type1, type2);
 
     if (asImpl().visit(type1.getResult(), type2.getResult()))
@@ -242,10 +242,10 @@ public:
 
   bool visitSILFunctionTypeStructure(CanSILFunctionType type1,
                                      CanSILFunctionType type2) {
-    if (type1->getExtInfo() != type2->getExtInfo() ||
+    if (!type1->hasSameExtInfoAs(type2) ||
         type1->getCoroutineKind() != type2->getCoroutineKind() ||
-        type1->getInvocationGenericSignature()
-          != type2->getInvocationGenericSignature())
+        type1->getInvocationGenericSignature() !=
+            type2->getInvocationGenericSignature())
       return asImpl().visitDifferentTypeStructure(type1, type2);
     return false;
   }

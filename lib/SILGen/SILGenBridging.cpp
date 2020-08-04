@@ -574,7 +574,7 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
     // context. Currently we don't capture anything directly into a block but a
     // Swift closure, but that's totally dumb.
     if (genericSig)
-      extInfo = extInfo.withIsPseudogeneric();
+      extInfo = extInfo.intoBuilder().withIsPseudogeneric().build();
   }
 
   auto invokeTy = SILFunctionType::get(

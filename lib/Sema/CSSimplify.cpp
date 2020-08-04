@@ -1808,9 +1808,9 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      ConstraintKind kind, TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator) {
   // A non-throwing function can be a subtype of a throwing function.
-  if (func1->throws() != func2->throws()) {
+  if (func1->isThrowing() != func2->isThrowing()) {
     // Cannot drop 'throws'.
-    if (func1->throws() || kind < ConstraintKind::Subtype) {
+    if (func1->isThrowing() || kind < ConstraintKind::Subtype) {
       if (!shouldAttemptFixes())
         return getTypeMatchFailure(locator);
 
@@ -1822,7 +1822,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   }
 
   // 'async' and non-'async' function types are not compatible.
-  if (func1->async() != func2->async())
+  if (func1->isAsync() != func2->isAsync())
     return getTypeMatchFailure(locator);
 
   // A non-@noescape function type can be a subtype of a @noescape function
@@ -2968,6 +2968,9 @@ static bool
 repairViaBridgingCast(ConstraintSystem &cs, Type fromType, Type toType,
                       SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
                       ConstraintLocatorBuilder locator) {
+  if (fromType->hasTypeVariable() || toType->hasTypeVariable())
+    return false;
+
   auto objectType1 = fromType->getOptionalObjectType();
   auto objectType2 = toType->getOptionalObjectType();
 
@@ -2984,6 +2987,9 @@ repairViaBridgingCast(ConstraintSystem &cs, Type fromType, Type toType,
   }
 
   if (!canBridgeThroughCast(cs, fromType, toType))
+    return false;
+
+  if (!TypeChecker::checkedCastMaySucceed(fromType, toType, cs.DC))
     return false;
 
   conversionsOrFixes.push_back(ForceDowncast::create(
@@ -8229,6 +8235,9 @@ ConstraintSystem::simplifyKeyPathConstraint(
 
     case KeyPathExpr::Component::Kind::TupleElement:
       llvm_unreachable("not implemented");
+      break;
+    case KeyPathExpr::Component::Kind::DictionaryKey:
+      llvm_unreachable("DictionaryKey only valid in #keyPath");
       break;
     }
   }

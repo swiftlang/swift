@@ -47,6 +47,15 @@ public func testFoldStaticLet() -> String {
   return "-\(Outer.staticString)+"
 }
 
+// CHECK-LABEL: sil [noinline] @$s4test0A10FoldConcatSSyF
+// CHECK-NOT: apply
+// CHECK-NOT: bb1
+// CHECK: } // end sil function '$s4test0A10FoldConcatSSyF'
+@inline(never)
+public func testFoldConcat() -> String {
+  return "a" + "b" + "c"
+}
+
 // CHECK-LABEL: sil [noinline] @$s4test0A19UnqualifiedTypeNameSSyF 
 // CHECK-NOT: apply
 // CHECK-NOT: bb1
@@ -105,6 +114,9 @@ printEmbeeded(testFoldCompleteInterpolation())
 
 // CHECK-OUTPUT: <-static+>
 printEmbeeded(testFoldStaticLet())
+
+// CHECK-OUTPUT: <abc>
+printEmbeeded(testFoldConcat())
 
 // CHECK-OUTPUT: <Inner>
 printEmbeeded(testUnqualifiedTypeName())

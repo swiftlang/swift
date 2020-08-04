@@ -1492,7 +1492,7 @@ namespace {
     void addMethod(SILDeclRef fn) {
       if (!VTable || methodRequiresReifiedVTableEntry(IGM, VTable, fn)) {
         VTableEntries.push_back(fn);
-      } else if (hasPublicVisibility(fn.getLinkage(NotForDefinition))) {
+      } else {
         // Emit a stub method descriptor and lookup function for nonoverridden
         // methods so that resilient code sequences can still use them.
         emitNonoverriddenMethod(fn);
@@ -1609,8 +1609,9 @@ namespace {
     }
 
     void emitMethodDescriptor(SILDeclRef fn) {
+
       // Define the method descriptor to point to the current position in the
-      // nominal type descriptor.
+      // nominal type descriptor, if it has a well-defined symbol name.
       IGM.defineMethodDescriptor(fn, Type,
                       B.getAddrOfCurrentPosition(IGM.MethodDescriptorStructTy));
 
@@ -1628,13 +1629,21 @@ namespace {
     }
     
     void emitNonoverriddenMethod(SILDeclRef fn) {
-      HasNonoverriddenMethods = true;
+      // TODO: Derivative functions do not distinguish themselves in the mangled
+      // names of method descriptor symbols yet, causing symbol name collisions.
+      if (fn.derivativeFunctionIdentifier)
+        return;
+
+     HasNonoverriddenMethods = true;
       // Although this method is non-overridden and therefore left out of the
       // vtable, we still need to maintain the ABI of a potentially-overridden
       // method for external clients.
       
       // Emit method dispatch thunk.
-      IGM.emitDispatchThunk(fn);
+      if (hasPublicVisibility(fn.getLinkage(NotForDefinition))) {
+        IGM.emitDispatchThunk(fn);
+      }
+      
       // Emit a freestanding method descriptor structure. This doesn't have to
       // exist in the table in the class's context descriptor since it isn't
       // in the vtable, but external clients need to be able to link against the

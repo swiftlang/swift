@@ -325,12 +325,14 @@ void swift::ide::collectPossibleReturnTypesFromContext(
           candidates.push_back(ty);
           return;
         } else {
-          auto typeLoc = TypeLoc{CE->getExplicitResultTypeRepr()};
-          if (!swift::performTypeLocChecking(
-                  DC->getASTContext(), typeLoc, /*isSILMode=*/false,
-                  /*isSILType=*/false, DC->getGenericEnvironmentOfContext(),
-                  const_cast<DeclContext *>(DC), /*diagnostics=*/false)) {
-            candidates.push_back(typeLoc.getType());
+          const auto type = swift::performTypeResolution(
+              CE->getExplicitResultTypeRepr(), DC->getASTContext(),
+              /*isSILMode=*/false, /*isSILType=*/false,
+              DC->getGenericEnvironmentOfContext(),
+              const_cast<DeclContext *>(DC), /*diagnostics=*/false);
+
+          if (!type->hasError()) {
+            candidates.push_back(type);
             return;
           }
         }

@@ -493,9 +493,6 @@ ArrayRef<ImplicitImport> ModuleDecl::getImplicitImports() const {
                            {});
 }
 
-bool ModuleDecl::isClangModule() const {
-  return findUnderlyingClangModule() != nullptr;
-}
 
 void ModuleDecl::addFile(FileUnit &newFile) {
   // If this is a LoadedFile, make sure it loaded without error.
