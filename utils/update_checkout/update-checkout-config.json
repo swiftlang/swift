@@ -345,13 +345,13 @@
        "tensorflow": {
             "aliases": ["tensorflow"],
             "repos": {
-                "llvm-project": "db8896f3f345af247bd2a23432f49c9dd01d8003",
+                "llvm-project": "adb96b0f2da2ae9fa63491a21f579f188f33dd8c",
                 "swift": "tensorflow",
                 "cmark": "swift-DEVELOPMENT-SNAPSHOT-2020-07-22-a",
                 "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2020-07-22-a",
                 "swift-tools-support-core": "0.1.8",
                 "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2020-07-22-a",
-                "swift-argument-parser": "0.2.0",
+                "swift-argument-parser": "0.2.1",
                 "swift-driver": "bf0026c636347b4c31aab21deb01943529b7e556",
                 "swift-syntax": "swift-DEVELOPMENT-SNAPSHOT-2020-07-22-a",
                 "swift-stress-tester": "swift-DEVELOPMENT-SNAPSHOT-2020-07-22-a",
