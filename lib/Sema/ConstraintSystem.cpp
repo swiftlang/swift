@@ -4666,8 +4666,10 @@ SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
     if (auto *typedPattern = dyn_cast<TypedPattern>(pattern)) {
       const Pattern *inner = typedPattern->getSemanticsProvidingPattern();
       if (isa<NamedPattern>(inner) || isa<AnyPattern>(inner)) {
-        contextualType = typedPattern->getTypeLoc();
-        if (!contextualType.getType())
+        contextualType = TypeLoc(typedPattern->getTypeRepr());
+        if (typedPattern->hasType())
+          contextualType.setType(typedPattern->getType());
+        else
           contextualType.setType(patternType);
       }
     }

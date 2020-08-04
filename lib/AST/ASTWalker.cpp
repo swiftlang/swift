@@ -155,8 +155,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       if (doIt(typeRepr))
         return true;
     for (auto &Inherit : ED->getInherited()) {
-      if (doIt(Inherit))
-        return true;
+      if (auto *const TyR = Inherit.getTypeRepr())
+        if (doIt(TyR))
+          return true;
     }
     if (visitTrailingRequirements(ED))
       return true;
@@ -258,9 +259,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitAbstractTypeParamDecl(AbstractTypeParamDecl *TPD) {
-    for (auto Inherit: TPD->getInherited()) {
-      if (doIt(Inherit))
-        return true;
+    for (const auto &Inherit: TPD->getInherited()) {
+      if (auto *const TyR = Inherit.getTypeRepr())
+        if (doIt(TyR))
+          return true;
     }
 
     if (const auto ATD = dyn_cast<AssociatedTypeDecl>(TPD)) {
@@ -282,9 +284,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
     bool WalkGenerics = visitGenericParamListIfNeeded(NTD);
 
-    for (auto &Inherit : NTD->getInherited()) {
-      if (doIt(Inherit))
-        return true;
+    for (const auto &Inherit : NTD->getInherited()) {
+      if (auto *const TyR = Inherit.getTypeRepr())
+        if (doIt(Inherit.getTypeRepr()))
+          return true;
     }
 
     // Visit requirements
@@ -355,8 +358,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     bool WalkGenerics = visitGenericParamListIfNeeded(SD);
 
     visit(SD->getIndices());
-    if (doIt(SD->getElementTypeLoc()))
-      return true;
+    if (auto *const TyR = SD->getElementTypeLoc().getTypeRepr())
+      if (doIt(TyR))
+        return true;
 
    // Visit trailing requirements
     if (WalkGenerics && visitTrailingRequirements(SD))
@@ -388,10 +392,12 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       visit(PD);
     visit(AFD->getParameters());
 
-    if (auto *FD = dyn_cast<FuncDecl>(AFD))
+    if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
       if (!isa<AccessorDecl>(FD))
-        if (doIt(FD->getBodyResultTypeLoc()))
-          return true;
+        if (auto *const TyR = FD->getBodyResultTypeLoc().getTypeRepr())
+          if (doIt(TyR))
+            return true;
+    }
 
     // Visit trailing requirements
     if (WalkGenerics && visitTrailingRequirements(AFD))
@@ -1318,21 +1324,6 @@ public:
       }
     }
     return false;
-  }
-
-  bool doIt(TypeLoc &TL) {
-    if (!Walker.walkToTypeLocPre(TL))
-      return false;
-
-    // No "visit" since TypeLocs are not a class hierarchy.  Clients can do what
-    // they want in walkToTypeLocPre.
-
-    if (auto typerepr = TL.getTypeRepr())
-      if (doIt(typerepr))
-        return true;
-
-    // If we didn't bail out, do post-order visitation.
-    return !Walker.walkToTypeLocPost(TL);
   }
 
   /// Returns true on failure.

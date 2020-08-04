@@ -177,7 +177,6 @@ public:
     return {isInterstingRange(S), S};
   }
 
-  bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
   bool walkToTypeReprPre(TypeRepr *T) override { return false; }
 };
 } // anonymous namespace

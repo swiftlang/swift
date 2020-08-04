@@ -158,7 +158,7 @@ namespace {
     }
 
     /// Ignore types.
-    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
+     bool walkToTypeReprPre(TypeRepr *T) override { return false; }
   };
   
   /// Given a collection of "linked" expressions, analyzes them for
@@ -305,7 +305,7 @@ namespace {
     }
 
     /// Ignore types.
-    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
+    bool walkToTypeReprPre(TypeRepr *T) override { return false; }
   };
   
   /// For a given expression, given information that is global to the
