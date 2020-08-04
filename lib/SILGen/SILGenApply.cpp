@@ -315,7 +315,8 @@ private:
   CanFunctionType SubstFormalInterfaceType;
 
   /// The substitutions applied to OrigFormalInterfaceType to produce
-  /// SubstFormalInterfaceType.
+  /// SubstFormalInterfaceType, substituted into the current type expansion
+  /// context.
   SubstitutionMap Substitutions;
 
   /// The list of values captured by our callee.
@@ -351,14 +352,14 @@ private:
   /// Constructor for Callee::forDirect.
   Callee(SILGenFunction &SGF, SILDeclRef standaloneFunction,
          AbstractionPattern origFormalType, CanAnyFunctionType substFormalType,
-         SubstitutionMap subs, SILLocation l,
+         SubstitutionMap subs, SubstitutionMap formalSubs, SILLocation l,
          bool callDynamicallyReplaceableImpl = false)
       : kind(callDynamicallyReplaceableImpl
                  ? Kind::StandaloneFunctionDynamicallyReplaceableImpl
                  : Kind::StandaloneFunction),
         Constant(standaloneFunction), OrigFormalInterfaceType(origFormalType),
         SubstFormalInterfaceType(
-            getSubstFormalInterfaceType(substFormalType, subs)),
+            getSubstFormalInterfaceType(substFormalType, formalSubs)),
         Substitutions(subs), Loc(l) {}
 
   /// Constructor called by all for* factory methods except forDirect and
@@ -387,7 +388,9 @@ public:
     auto &ci = SGF.getConstantInfo(SGF.getTypeExpansionContext(), c);
     return Callee(
         SGF, c, ci.FormalPattern, ci.FormalType,
-        subs.mapIntoTypeExpansionContext(SGF.getTypeExpansionContext()), l,
+        subs.mapIntoTypeExpansionContext(SGF.getTypeExpansionContext()),
+        subs,
+        l,
         callPreviousDynamicReplaceableImpl);
   }
 
