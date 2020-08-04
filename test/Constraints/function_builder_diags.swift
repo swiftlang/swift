@@ -602,4 +602,8 @@ struct MyView {
     case . // expected-error {{expected ':' after 'case'}}
     } // expected-error {{expected identifier after '.' expression}}
   }
+
+  @TupleBuilder var invalidConversion: Int {
+    "" // expected-error {{cannot convert value of type 'String' to specified type 'Int'}}
+  }
 }
