@@ -1587,6 +1587,13 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
     // The system was salvaged; continue on as if nothing happened.
   }
 
+  if (cs.isDebugMode()) {
+    auto &log = llvm::errs();
+    log << "--- Applying Solution ---\n";
+    solutions.front().dump(log);
+    log << '\n';
+  }
+
   // FIXME: Shouldn't need to do this.
   cs.applySolution(solutions.front());
 
