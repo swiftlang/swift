@@ -352,6 +352,50 @@ emitUnresolvedLabelDiagnostics(DiagnosticEngine &DE,
   }
 }
 
+/// Find the target of a break or continue statement without a label.
+///
+/// \returns the target, if one was found, or \c nullptr if no such target
+/// exists.
+static LabeledStmt *findUnlabeledBreakOrContinueStmtTarget(
+    ASTContext &ctx, SourceFile *sourceFile, SourceLoc loc,
+    bool isContinue, DeclContext *dc,
+    ArrayRef<LabeledStmt *> activeLabeledStmts) {
+  for (auto labeledStmt : activeLabeledStmts) {
+    // 'break' with no label looks through non-loop structures
+    // except 'switch'.
+    // 'continue' ignores non-loop structures.
+    if (!labeledStmt->requiresLabelOnJump() &&
+        (!isContinue || labeledStmt->isPossibleContinueTarget())) {
+      return labeledStmt;
+    }
+  }
+
+  // If we're in a defer, produce a tailored diagnostic.
+  if (isDefer(dc)) {
+    ctx.Diags.diagnose(
+        loc, diag::jump_out_of_defer, isContinue ? "continue": "break");
+    return nullptr;
+  }
+
+  // If we're dealing with an unlabeled break inside of an 'if' or 'do'
+  // statement, produce a more specific error.
+  if (!isContinue &&
+      llvm::any_of(activeLabeledStmts,
+                   [&](Stmt *S) -> bool {
+                     return isa<IfStmt>(S) || isa<DoStmt>(S);
+                   })) {
+    ctx.Diags.diagnose(
+        loc, diag::unlabeled_break_outside_loop);
+    return nullptr;
+  }
+
+  // Otherwise produce a generic error.
+  ctx.Diags.diagnose(
+      loc,
+      isContinue ? diag::continue_outside_loop : diag::break_outside_loop);
+  return nullptr;
+}
+
 /// Find the target of a break or continue statement.
 ///
 /// \returns the target, if one was found, or \c nullptr if no such target
@@ -361,7 +405,6 @@ static LabeledStmt *findBreakOrContinueStmtTarget(
     SourceLoc loc, Identifier targetName, SourceLoc targetLoc,
     bool isContinue, DeclContext *dc,
     ArrayRef<LabeledStmt *> oldActiveLabeledStmts) {
-  TopCollection<unsigned, LabeledStmt *> labelCorrections(3);
 
   // Retrieve the active set of labeled statements.
   // FIXME: Once everything uses ASTScope lookup, \c oldActiveLabeledStmts
@@ -375,68 +418,42 @@ static LabeledStmt *findBreakOrContinueStmtTarget(
         oldActiveLabeledStmts.rbegin(), oldActiveLabeledStmts.rend());
   }
 
-  // Pick the nearest break target that matches the specified name.
+  // Handle an unlabeled break separately; that's the easy case.
   if (targetName.empty()) {
-    for (auto labeledStmt : activeLabeledStmts) {
-      // 'break' with no label looks through non-loop structures
-      // except 'switch'.
-      // 'continue' ignores non-loop structures.
-      if (!labeledStmt->requiresLabelOnJump() &&
-          (!isContinue || labeledStmt->isPossibleContinueTarget())) {
-        return labeledStmt;
-      }
-    }
-  } else {
-    // Scan inside out until we find something with the right label.
-    for (auto labeledStmt : activeLabeledStmts) {
-      if (targetName == labeledStmt->getLabelInfo().Name) {
-        // Continue cannot be used to repeat switches, use fallthrough instead.
-        if (isContinue && !labeledStmt->isPossibleContinueTarget()) {
-          ctx.Diags.diagnose(
-              loc, diag::continue_not_in_this_stmt,
-              isa<SwitchStmt>(labeledStmt) ? "switch" : "if");
-          return nullptr;
-        }
-
-        return labeledStmt;
-      }
-
-      unsigned distance =
-        TypeChecker::getCallEditDistance(
-            DeclNameRef(targetName),
-            labeledStmt->getLabelInfo().Name,
-            TypeChecker::UnreasonableCallEditDistance);
-      if (distance < TypeChecker::UnreasonableCallEditDistance)
-        labelCorrections.insert(distance, std::move(labeledStmt));
-    }
-    labelCorrections.filterMaxScoreRange(
-      TypeChecker::MaxCallEditDistanceFromBestCandidate);
+    return findUnlabeledBreakOrContinueStmtTarget(
+        ctx, sourceFile, loc, isContinue, dc, activeLabeledStmts);
   }
+
+  // Scan inside out until we find something with the right label.
+  TopCollection<unsigned, LabeledStmt *> labelCorrections(3);
+  for (auto labeledStmt : activeLabeledStmts) {
+    if (targetName == labeledStmt->getLabelInfo().Name) {
+      // Continue cannot be used to repeat switches, use fallthrough instead.
+      if (isContinue && !labeledStmt->isPossibleContinueTarget()) {
+        ctx.Diags.diagnose(
+            loc, diag::continue_not_in_this_stmt,
+            isa<SwitchStmt>(labeledStmt) ? "switch" : "if");
+        return nullptr;
+      }
+
+      return labeledStmt;
+    }
+
+    unsigned distance =
+      TypeChecker::getCallEditDistance(
+          DeclNameRef(targetName),
+          labeledStmt->getLabelInfo().Name,
+          TypeChecker::UnreasonableCallEditDistance);
+    if (distance < TypeChecker::UnreasonableCallEditDistance)
+      labelCorrections.insert(distance, std::move(labeledStmt));
+  }
+  labelCorrections.filterMaxScoreRange(
+    TypeChecker::MaxCallEditDistanceFromBestCandidate);
 
   // If we're in a defer, produce a tailored diagnostic.
   if (isDefer(dc)) {
     ctx.Diags.diagnose(
         loc, diag::jump_out_of_defer, isContinue ? "continue": "break");
-    return nullptr;
-  }
-
-  if (targetName.empty()) {
-    // If we're dealing with an unlabeled break inside of an 'if' or 'do'
-    // statement, produce a more specific error.
-    if (!isContinue &&
-        llvm::any_of(activeLabeledStmts,
-                     [&](Stmt *S) -> bool {
-                       return isa<IfStmt>(S) || isa<DoStmt>(S);
-                     })) {
-      ctx.Diags.diagnose(
-          loc, diag::unlabeled_break_outside_loop);
-      return nullptr;
-    }
-
-    // Otherwise produce a generic error.
-    ctx.Diags.diagnose(
-        loc,
-        isContinue ? diag::continue_outside_loop : diag::break_outside_loop);
     return nullptr;
   }
 
@@ -1316,8 +1333,7 @@ public:
         assert(parentKind == CaseParentKind::Switch &&
                "'@unknown' can only appear on switch cases");
         checkUnknownAttrRestrictions(
-            getASTContext(), caseBlock, FallthroughDest,
-            limitExhaustivityChecks);
+            getASTContext(), caseBlock, limitExhaustivityChecks);
       }
 
       Stmt *body = caseBlock->getBody();
@@ -2237,8 +2253,9 @@ void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
 }
 
 void swift::checkUnknownAttrRestrictions(
-    ASTContext &ctx, CaseStmt *caseBlock, CaseStmt *fallthroughDest,
+    ASTContext &ctx, CaseStmt *caseBlock,
     bool &limitExhaustivityChecks) {
+  CaseStmt *fallthroughDest = caseBlock->findNextCaseStmt();
   if (caseBlock->getCaseLabelItems().size() != 1) {
     assert(!caseBlock->getCaseLabelItems().empty() &&
            "parser should not produce case blocks with no items");

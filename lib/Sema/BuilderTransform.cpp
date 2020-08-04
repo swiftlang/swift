@@ -1348,8 +1348,7 @@ public:
       // Check restrictions on '@unknown'.
       if (caseStmt->hasUnknownAttr()) {
         checkUnknownAttrRestrictions(
-            cs.getASTContext(), caseStmt, /*fallthroughDest=*/nullptr,
-            limitExhaustivityChecks);
+            cs.getASTContext(), caseStmt, limitExhaustivityChecks);
       }
 
       ++caseIndex;
