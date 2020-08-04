@@ -286,6 +286,11 @@ public:
   /// -dump-scope-maps.
   SmallVector<std::pair<unsigned, unsigned>, 2> DumpScopeMapLocations;
 
+  /// Determines whether the static or shared resource folder is used.
+  /// When set to `true`, the default resource folder will be set to
+  /// '.../lib/swift', otherwise '.../lib/swift_static'.
+  bool UseSharedResourceFolder = true;
+
   /// \return true if action only parses without doing other compilation steps.
   static bool shouldActionOnlyParse(ActionType);
 

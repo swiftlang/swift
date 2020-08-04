@@ -738,4 +738,8 @@ def extra_clang_options_only : Flag<["-"], "only-use-extra-clang-opts">,
 def candidate_module_file
   : Separate<["-"], "candidate-module-file">, MetaVarName<"<path>">,
     HelpText<"Specify Swift module may be ready to use for an interface">;
+
+def use_static_resource_dir
+  : Flag<["-"], "use-static-resource-dir">,
+    HelpText<"Use resources in the static resource directory">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
