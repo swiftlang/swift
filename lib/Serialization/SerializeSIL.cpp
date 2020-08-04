@@ -435,11 +435,11 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.isThunk(), (unsigned)F.isWithoutActuallyEscapingThunk(),
       (unsigned)F.isAsync(), (unsigned)F.getSpecialPurpose(),
       (unsigned)F.getInlineStrategy(), (unsigned)F.getOptimizationMode(),
-      (unsigned)F.getEffectsKind(), (unsigned)numSpecAttrs,
-      (unsigned)F.hasOwnership(), F.isAlwaysWeakImported(),
-      LIST_VER_TUPLE_PIECES(available), (unsigned)F.isDynamicallyReplaceable(),
-      (unsigned)F.isExactSelfClass(), FnID, replacedFunctionID, genericSigID,
-      clangNodeOwnerID, SemanticsIDs);
+      (unsigned)F.getClassSubclassScope(), (unsigned)F.getEffectsKind(),
+      (unsigned)numSpecAttrs, (unsigned)F.hasOwnership(),
+      F.isAlwaysWeakImported(), LIST_VER_TUPLE_PIECES(available),
+      (unsigned)F.isDynamicallyReplaceable(), (unsigned)F.isExactSelfClass(),
+      FnID, replacedFunctionID, genericSigID, clangNodeOwnerID, SemanticsIDs);
 
   if (NoBody)
     return;
