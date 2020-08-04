@@ -3847,8 +3847,14 @@ namespace {
         if (auto *UME = getUnresolvedMemberChainBase(expr)) {
           CG.setUnresolvedChainBase(expr, UME);
           if (!parent || !isa<UnresolvedMemberChainResultExpr>(parent)) {
-            auto &context = CG.getConstraintSystem().getASTContext();
+            auto &cs = CG.getConstraintSystem();
+            auto &context = cs.getASTContext();
+            auto typeInfo = cs.getContextualTypeInfo(expr);
             expr = new (context) UnresolvedMemberChainResultExpr(expr);
+            if (typeInfo) {
+              cs.setContextualType(expr, (*typeInfo).typeLoc,
+                                   (*typeInfo).purpose);
+            }
           }
         }
       }
