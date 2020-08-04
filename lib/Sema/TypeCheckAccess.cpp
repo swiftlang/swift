@@ -497,7 +497,8 @@ public:
     if (!anyVar)
       return;
 
-    checkTypeAccess(TP->getTypeLoc(), anyVar, /*mayBeInferred*/true,
+    checkTypeAccess(TP->hasType() ? TP->getType() : Type(),
+                    TP->getTypeRepr(), anyVar, /*mayBeInferred*/true,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeToWarning) {
@@ -1117,7 +1118,8 @@ public:
       return;
 
     checkTypeAccess(
-        TP->getTypeLoc(),
+        TP->hasType() ? TP->getType() : Type(),
+        TP->getTypeRepr(),
         fixedLayoutStructContext ? fixedLayoutStructContext : anyVar,
         /*mayBeInferred*/ true,
         [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
@@ -1835,7 +1837,8 @@ public:
     if (shouldSkipChecking(anyVar))
       return;
 
-    checkType(TP->getTypeLoc(), anyVar, getDiagnoser(anyVar));
+    checkType(TP->hasType() ? TP->getType() : Type(),
+              TP->getTypeRepr(), anyVar, getDiagnoser(anyVar));
 
     // Check the property wrapper types.
     for (auto attr : anyVar->getAttachedPropertyWrappers())

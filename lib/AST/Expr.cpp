@@ -423,7 +423,6 @@ forEachImmediateChildExpr(llvm::function_ref<Expr *(Expr *)> callback) {
     }
     bool walkToDeclPre(Decl *D) override { return false; }
     bool walkToTypeReprPre(TypeRepr *T) override { return false; }
-    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
   };
   
   this->walk(ChildWalker(callback, this));
@@ -453,7 +452,6 @@ void Expr::forEachChildExpr(llvm::function_ref<Expr *(Expr *)> callback) {
     }
     bool walkToDeclPre(Decl *D) override { return false; }
     bool walkToTypeReprPre(TypeRepr *T) override { return false; }
-    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
   };
 
   this->walk(ChildWalker(callback));

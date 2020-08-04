@@ -447,7 +447,6 @@ static void writeDeclCommentTable(
       return { false, E };
     }
 
-    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
     bool walkToTypeReprPre(TypeRepr *T) override { return false; }
     bool walkToParameterListPre(ParameterList *PL) override { return false; }
   };
@@ -685,7 +684,6 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
 
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override { return { false, S };}
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override { return { false, E };}
-  bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
   bool walkToTypeReprPre(TypeRepr *T) override { return false; }
   bool walkToParameterListPre(ParameterList *PL) override { return false; }
 
