@@ -338,7 +338,7 @@ variadic(arrayWithOtherEltType) // expected-error {{cannot convert value of type
 variadic(1, arrayWithOtherEltType) // expected-error {{cannot convert value of type '[String]' to expected argument type 'Int'}}
 
 // FIXME: SR-11104
-variadic(["hello", "world"]) // expected-error 2 {{cannot convert value of type 'String' to expected element type 'Int'}}
+variadic(["hello", "world"]) // expected-error {{cannot convert value of type 'String' to expected element type 'Int'}}
 // expected-error@-1 {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
 // expected-note@-2 {{remove brackets to pass array elements directly}}
 

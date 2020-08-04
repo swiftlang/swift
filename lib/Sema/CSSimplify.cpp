@@ -4216,6 +4216,7 @@ bool ConstraintSystem::repairFailures(
 
       conversionsOrFixes.push_back(CollectionElementContextualMismatch::create(
           *this, lhs, rhs, getConstraintLocator(locator)));
+      break;
     }
 
     // Drop the `tuple element` locator element so that all tuple element
