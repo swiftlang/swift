@@ -329,6 +329,9 @@ def disable_llvm_verify : Flag<["-"], "disable-llvm-verify">,
 def disable_llvm_value_names : Flag<["-"], "disable-llvm-value-names">,
   HelpText<"Don't add names to local values in LLVM IR">;
 
+def dump_jit : JoinedOrSeparate<["-"], "dump-jit">,
+  HelpText<"Dump JIT contents">;
+
 def enable_llvm_value_names : Flag<["-"], "enable-llvm-value-names">,
   HelpText<"Add names to local values in LLVM IR">;
 
