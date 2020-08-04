@@ -74,46 +74,6 @@ static bool mergeRepresentativeEquivalenceClasses(ConstraintSystem &CS,
   return false;
 }
 
-/// Find the next element in a chain of members. If this expression is (or
-/// could be) the base of such a chain, this will return \c nullptr.
-static Expr *getMemberChainSubExpr(Expr *expr) {
-  assert(expr && "getMemberChainSubExpr called with null expr!");
-  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
-    return UDE->getBase();
-  } else if (auto *CE = dyn_cast<CallExpr>(expr)) {
-    return CE->getFn();
-  } else if (auto *BOE = dyn_cast<BindOptionalExpr>(expr)) {
-    return BOE->getSubExpr();
-  } else if (auto *FVE = dyn_cast<ForceValueExpr>(expr)) {
-    return FVE->getSubExpr();
-  } else if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
-    return SE->getBase();
-  } else {
-    return nullptr;
-  }
-}
-
-/// Returns the base of a chain of member accesses/method calls. Most
-/// expressions do not participate in member chains, and just return \c this.
-static UnresolvedMemberExpr *getUnresolvedMemberChainBase(Expr *expr) {
-  if (auto *subExpr = getMemberChainSubExpr(expr))
-    return getUnresolvedMemberChainBase(subExpr);
-  else
-    return dyn_cast<UnresolvedMemberExpr>(expr);
-}
-
-/// Whether this expression is a member of a member chain.
-static bool isMemberChainMember(Expr *expr) {
-  return getMemberChainSubExpr(expr) != nullptr;
-}
-/// Whether this expression sits at the end of a chain of member accesses.
-static bool isMemberChainTail(Expr *expr, Expr *parent) {
-  assert(expr && "isMemberChainTail called with null expr!");
-  // If this expression's parent is not itself part of a chain (or, this expr
-  // has no parent expr), this must be the tail of the chain.
-  return parent == nullptr || !isMemberChainMember(parent);
-}
-
 namespace {
   
   /// Internal struct for tracking information about types within a series
@@ -836,10 +796,6 @@ namespace {
     /// found during our walk.
     llvm::MapVector<UnresolvedMemberExpr *, Type> UnresolvedBaseTypes;
 
-    /// A map from the tail of each unresolved member chain to the respective
-    /// base of the chain.
-    llvm::MapVector<Expr *, UnresolvedMemberExpr *>UnresolvedChainBases;
-
     /// Returns false and emits the specified diagnostic if the member reference
     /// base is a nil literal. Returns true otherwise.
     bool isValidBaseOfMemberRef(Expr *base, Diag<> diagnostic) {
@@ -1480,16 +1436,6 @@ namespace {
       assert(result != UnresolvedBaseTypes.end());
       return result->second;
     }
-
-    void setUnresolvedChainBase(Expr *tail, UnresolvedMemberExpr *base) {
-      UnresolvedChainBases.insert({tail, base});
-    }
-
-    UnresolvedMemberExpr *getUnresolvedChainBase(Expr *tail) {
-      auto result = UnresolvedChainBases.find(tail);
-      assert(result != UnresolvedChainBases.end());
-      return result->second;
-    }
     
     virtual Type visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
       auto baseLocator = CS.getConstraintLocator(
@@ -1564,7 +1510,7 @@ namespace {
                  "Unexpected expression at end of unresolved member chain");
 
       auto memberTy = CS.getType(tail);
-      auto *base = getUnresolvedChainBase(tail);
+      auto *base = TypeChecker::getUnresolvedMemberChainBase(tail);
 
       // Copy any type variable options from the result of the tail member to
       // the result of the entire chain.
@@ -3838,26 +3784,6 @@ namespace {
 
       if (auto *assignment = dyn_cast<AssignExpr>(expr))
         CG.markAcceptableDiscardExprs(assignment->getDest());
-
-      // If we find an unresolved member chain, wrap it in an
-      // UnresolvedMemberChainResultExpr (unless this has already been done)
-      // and generate constraints for the wrapped expression.
-      auto *parent = Parent.getAsExpr();
-      if (isMemberChainTail(expr, parent)) {
-        if (auto *UME = getUnresolvedMemberChainBase(expr)) {
-          CG.setUnresolvedChainBase(expr, UME);
-          if (!parent || !isa<UnresolvedMemberChainResultExpr>(parent)) {
-            auto &cs = CG.getConstraintSystem();
-            auto &context = cs.getASTContext();
-            auto typeInfo = cs.getContextualTypeInfo(expr);
-            expr = new (context) UnresolvedMemberChainResultExpr(expr);
-            if (typeInfo) {
-              cs.setContextualType(expr, (*typeInfo).typeLoc,
-                                   (*typeInfo).purpose);
-            }
-          }
-        }
-      }
 
       return { true, expr };
     }

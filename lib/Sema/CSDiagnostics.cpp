@@ -1131,6 +1131,8 @@ void MissingOptionalUnwrapFailure::offerDefaultValueUnwrapFixIt(
   bool needsParensInside =
       exprNeedsParensBeforeAddingNilCoalescing(DC, const_cast<Expr *>(expr));
   auto parentExpr = findParentExpr(anchor);
+  if (parentExpr && isa<UnresolvedMemberChainResultExpr>(parentExpr))
+    parentExpr = findParentExpr(parentExpr);
   bool needsParensOutside = exprNeedsParensAfterAddingNilCoalescing(
       DC, const_cast<Expr *>(expr), parentExpr);
 
@@ -6325,6 +6327,12 @@ bool MissingContextualBaseInMemberRefFailure::diagnoseAsError() {
   // Member reference could be wrapped into a number of parens
   // e.g. `((.foo))`.
   auto *parentExpr = findParentExpr(anchor);
+  UnresolvedMemberChainResultExpr *resultExpr = nullptr;
+  if (parentExpr && isa<UnresolvedMemberChainResultExpr>(parentExpr)) {
+    resultExpr = cast<UnresolvedMemberChainResultExpr>(parentExpr);
+    parentExpr = findParentExpr(parentExpr);
+  }
+
   do {
     // If we have found something which isn't a paren let's stop,
     // otherwise let's keep unwrapping until there are either no
@@ -6333,7 +6341,7 @@ bool MissingContextualBaseInMemberRefFailure::diagnoseAsError() {
       break;
   } while ((parentExpr = findParentExpr(parentExpr)));
 
-  auto diagnostic = parentExpr || getContextualType(anchor)
+  auto diagnostic = parentExpr || (resultExpr && getContextualType(resultExpr))
                         ? diag::cannot_infer_base_of_unresolved_member
                         : diag::unresolved_member_no_inference;
 
