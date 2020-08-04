@@ -1073,6 +1073,10 @@ public:
     return *CaseBodyVariables;
   }
 
+  /// Find the next case statement within the same 'switch' or 'do-catch',
+  /// if there is one.
+  CaseStmt *findNextCaseStmt() const;
+
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Case; }
 
   size_t numTrailingObjects(OverloadToken<CaseLabelItem>) const {
