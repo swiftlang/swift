@@ -1348,8 +1348,7 @@ public:
       // Check restrictions on '@unknown'.
       if (caseStmt->hasUnknownAttr()) {
         checkUnknownAttrRestrictions(
-            cs.getASTContext(), caseStmt, /*fallthroughDest=*/nullptr,
-            limitExhaustivityChecks);
+            cs.getASTContext(), caseStmt, limitExhaustivityChecks);
       }
 
       ++caseIndex;
@@ -1586,6 +1585,13 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
     }
 
     // The system was salvaged; continue on as if nothing happened.
+  }
+
+  if (cs.isDebugMode()) {
+    auto &log = llvm::errs();
+    log << "--- Applying Solution ---\n";
+    solutions.front().dump(log);
+    log << '\n';
   }
 
   // FIXME: Shouldn't need to do this.

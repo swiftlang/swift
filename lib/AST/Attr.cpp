@@ -1679,8 +1679,9 @@ DifferentiableAttr::create(AbstractFunctionDecl *original, bool implicit,
                            IndexSubset *parameterIndices,
                            GenericSignature derivativeGenSig) {
   auto &ctx = original->getASTContext();
-  void *mem = ctx.Allocate(sizeof(DifferentiableAttr),
-                           alignof(DifferentiableAttr));
+  
+  size_t size = totalSizeToAlloc<ParsedAutoDiffParameter>(0); 
+  void *mem = ctx.Allocate(size, alignof(DifferentiableAttr));
   return new (mem) DifferentiableAttr(original, implicit, atLoc, baseRange,
                                       linear, parameterIndices, derivativeGenSig);
 }

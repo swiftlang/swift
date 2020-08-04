@@ -691,15 +691,6 @@ void checkSwitchExhaustiveness(const SwitchStmt *stmt, const DeclContext *DC,
 /// \returns true if an error occurred, false otherwise.
 bool typeCheckCondition(Expr *&expr, DeclContext *dc);
 
-/// Type check the given 'if', 'while', or 'guard' statement condition.
-///
-/// \param stmt The conditional statement to type-check, which will be modified
-/// in place.
-///
-/// \returns true if an error occurred, false otherwise.
-bool typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
-                                    DeclContext *dc);
-
 /// Determine the semantics of a checked cast operation.
 ///
 /// \param fromType       The source type of the cast.
@@ -1377,8 +1368,7 @@ bool areGenericRequirementsSatisfied(const DeclContext *DC,
 /// Check for restrictions on the use of the @unknown attribute on a
 /// case statement.
 void checkUnknownAttrRestrictions(
-    ASTContext &ctx, CaseStmt *caseBlock, CaseStmt *fallthroughDest,
-    bool &limitExhaustivityChecks);
+    ASTContext &ctx, CaseStmt *caseBlock, bool &limitExhaustivityChecks);
 
 /// Bind all of the pattern variables that occur within a case statement and
 /// all of its case items to their "parent" pattern variables, forming chains
