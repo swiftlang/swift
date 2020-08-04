@@ -13,6 +13,8 @@
 #include "swift/Runtime/Concurrent.h"
 #include "gtest/gtest.h"
 
+#include "ThreadingHelpers.h"
+
 using namespace swift;
 
 TEST(ConcurrentReadableArrayTest, SingleThreaded) {
@@ -41,4 +43,49 @@ TEST(ConcurrentReadableArrayTest, SingleThreaded) {
   check();
   add(1000000);
   check();
+}
+
+TEST(ConcurrentReadableArrayTest, MultiThreaded) {
+  const int writerCount = 16;
+  const int readerCount = 8;
+  const int insertCount = 100000;
+
+  struct Value {
+    int threadNumber;
+    int x;
+  };
+  ConcurrentReadableArray<Value> array;
+
+  auto writer = [&](int threadNumber) {
+    for (int i = 0; i < insertCount; i++)
+      array.push_back({ threadNumber, i });
+  };
+
+  auto reader = [&] {
+    int maxByThread[writerCount];
+    bool done = false;
+    while (!done) {
+      for (int i = 0; i < writerCount; i++)
+        maxByThread[i] = -1;
+      for (auto element : array.snapshot()) {
+        ASSERT_LT(element.threadNumber, writerCount);
+        ASSERT_GT(element.x, maxByThread[element.threadNumber]);
+        maxByThread[element.threadNumber] = element.x;
+      }
+      done = true;
+      for (int i = 0; i < writerCount; i++) {
+        if (maxByThread[i] < insertCount - 1)
+          done = false;
+      }
+    }
+  };
+
+  threadedExecute(writerCount + readerCount, [&](int i) {
+    if (i < writerCount)
+      writer(i);
+    else
+      reader();
+  });
+
+  ASSERT_EQ(array.snapshot().count(), writerCount * insertCount);
 }
