@@ -70,8 +70,6 @@ private:
   /// Called for each constant folded instruction.
   std::function<void (SILInstruction *)> Callback;
 
-  bool constantFoldStringConcatenation(ApplyInst *AI);
-
 public:
   /// The constructor.
   ///
