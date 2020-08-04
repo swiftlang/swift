@@ -3191,7 +3191,7 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
     SmallVector<ModuleDecl::ImportedModule, 16> scratch;
     for (auto next : namelookup::getAllImports(M)) {
       llvm::outs() << next.importedModule->getName();
-      if (next.importedModule->isClangModule())
+      if (next.importedModule->isNonSwiftModule())
         llvm::outs() << " (Clang)";
       llvm::outs() << ":\n";
 
@@ -3205,7 +3205,7 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
           llvm::outs() << "." << accessPathPiece.Item;
         }
 
-        if (import.importedModule->isClangModule())
+        if (import.importedModule->isNonSwiftModule())
           llvm::outs() << " (Clang)";
         llvm::outs() << "\n";
       }
