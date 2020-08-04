@@ -50,7 +50,7 @@ void DerivedConformance::addMembersToConformanceContext(
 }
 
 Type DerivedConformance::getProtocolType() const {
-  return Protocol->getDeclaredType();
+  return Protocol->getDeclaredInterfaceType();
 }
 
 bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
@@ -239,7 +239,8 @@ void DerivedConformance::diagnoseAnyNonConformingMemberTypes(
       ctx.Diags.diagnose(
           reprLoc, diag::missing_member_type_conformance_prevents_synthesis,
           NonconformingMemberKind::AssociatedValue,
-          typeToDiagnose->getInterfaceType(), protocol->getDeclaredType(),
+          typeToDiagnose->getInterfaceType(),
+          protocol->getDeclaredInterfaceType(),
           nominal->getDeclaredInterfaceType());
     }
   }
@@ -252,7 +253,8 @@ void DerivedConformance::diagnoseAnyNonConformingMemberTypes(
           propertyToDiagnose->getLoc(),
           diag::missing_member_type_conformance_prevents_synthesis,
           NonconformingMemberKind::StoredProperty,
-          propertyToDiagnose->getInterfaceType(), protocol->getDeclaredType(),
+          propertyToDiagnose->getInterfaceType(),
+          protocol->getDeclaredInterfaceType(),
           nominal->getDeclaredInterfaceType());
     }
   }
@@ -817,7 +819,7 @@ GuardStmt *DerivedConformance::returnComparisonIfNotEqualGuard(ASTContext &C,
 
 /// Build a type-checked integer literal.
 static IntegerLiteralExpr *buildIntegerLiteral(ASTContext &C, unsigned index) {
-  Type intType = C.getIntDecl()->getDeclaredType();
+  Type intType = C.getIntDecl()->getDeclaredInterfaceType();
 
   auto literal = IntegerLiteralExpr::createFromUnsigned(C, index);
   literal->setType(intType);
@@ -842,7 +844,7 @@ DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &st
                                        const char *indexName) {
   ASTContext &C = enumDecl->getASTContext();
   Type enumType = enumVarDecl->getType();
-  Type intType = C.getIntDecl()->getDeclaredType();
+  Type intType = C.getIntDecl()->getDeclaredInterfaceType();
 
   auto indexVar = new (C) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
                                   /*IsCaptureList*/false, SourceLoc(),

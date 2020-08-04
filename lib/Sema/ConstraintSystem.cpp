@@ -2205,7 +2205,7 @@ void ConstraintSystem::bindOverloadType(
       return;
 
     addConstraint(ConstraintKind::LiteralConformsTo, argType,
-                  stringLiteral->getDeclaredType(), locator);
+                  stringLiteral->getDeclaredInterfaceType(), locator);
 
     // If this is used inside of the keypath expression, we need to make
     // sure that argument is Hashable.
@@ -2358,7 +2358,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
             argType->getASTContext(), choice.getDecl()->getLoc(),
             KnownProtocolKind::Hashable)) {
       addConstraint(ConstraintKind::ConformsTo, argType,
-                    hashable->getDeclaredType(),
+                    hashable->getDeclaredInterfaceType(),
                     getConstraintLocator(
                         locator, LocatorPathElt::TupleElement(index)));
     }
@@ -4690,7 +4690,7 @@ SolutionApplicationTarget SolutionApplicationTarget::forForEachStmt(
     bool bindPatternVarsOneWay) {
   SolutionApplicationTarget target(
       stmt->getSequence(), dc, CTP_ForEachStmt,
-      sequenceProto->getDeclaredType(), /*isDiscarded=*/false);
+      sequenceProto->getDeclaredInterfaceType(), /*isDiscarded=*/false);
   target.expression.pattern = stmt->getPattern();
   target.expression.bindPatternVarsOneWay =
     bindPatternVarsOneWay || (stmt->getWhere() != nullptr);

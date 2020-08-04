@@ -2323,7 +2323,7 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     // Protocol extensions need an inheritance clause due to how name lookup
     // is implemented.
     if (auto *proto = ext->getExtendedProtocolDecl()) {
-      auto protoType = proto->getDeclaredType();
+      auto protoType = proto->getDeclaredInterfaceType();
       TypeLoc selfInherited[1] = { TypeLoc::withoutLoc(protoType) };
       genericParams->getParams().front()->setInherited(
         ctx.AllocateCopy(selfInherited));
@@ -2343,7 +2343,7 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     auto selfId = ctx.Id_Self;
     auto selfDecl = new (ctx) GenericTypeParamDecl(
         proto, selfId, SourceLoc(), /*depth=*/0, /*index=*/0);
-    auto protoType = proto->getDeclaredType();
+    auto protoType = proto->getDeclaredInterfaceType();
     TypeLoc selfInherited[1] = { TypeLoc::withoutLoc(protoType) };
     selfDecl->setInherited(ctx.AllocateCopy(selfInherited));
     selfDecl->setImplicit();

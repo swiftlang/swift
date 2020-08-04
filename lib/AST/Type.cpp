@@ -1031,8 +1031,8 @@ addMinimumProtocols(Type T, SmallVectorImpl<ProtocolDecl *> &Protocols,
     if (Visited.insert(Proto->getDecl()).second) {
       Stack.push_back(Proto->getDecl());
       for (auto Inherited : Proto->getDecl()->getInheritedProtocols())
-        addMinimumProtocols(Inherited->getDeclaredType(), Protocols, Known,
-                            Visited, Stack, ZappedAny);
+        addMinimumProtocols(Inherited->getDeclaredInterfaceType(),
+                            Protocols, Known, Visited, Stack, ZappedAny);
     }
     return;
   }
@@ -1108,8 +1108,8 @@ void ProtocolType::canonicalizeProtocols(
     
     // Add the protocols we inherited.
     for (auto Inherited : Current->getInheritedProtocols()) {
-      addMinimumProtocols(Inherited->getDeclaredType(), protocols, known,
-                          visited, stack, zappedAny);
+      addMinimumProtocols(Inherited->getDeclaredInterfaceType(),
+                          protocols, known, visited, stack, zappedAny);
     }
   }
   
@@ -2391,7 +2391,8 @@ getForeignRepresentable(Type type, ForeignLanguage language,
         if (wasOptional) {
           if (nominal->hasClangNode()) {
             Type underlyingType =
-                nominal->getDeclaredType()->getSwiftNewtypeUnderlyingType();
+                nominal->getDeclaredInterfaceType()
+                       ->getSwiftNewtypeUnderlyingType();
             if (underlyingType) {
               return getForeignRepresentable(OptionalType::get(underlyingType),
                                              language, dc);
@@ -2841,7 +2842,7 @@ Type ArchetypeType::getExistentialType() const {
     constraintTypes.push_back(super);
   }
   for (auto proto : getConformsTo()) {
-    constraintTypes.push_back(proto->getDeclaredType());
+    constraintTypes.push_back(proto->getDeclaredInterfaceType());
   }
   return ProtocolCompositionType::get(
      const_cast<ArchetypeType*>(this)->getASTContext(), constraintTypes, false);
@@ -3393,7 +3394,7 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   // If one protocol remains with no further constraints, its nominal
   // type is the canonical type.
   if (Protocols.size() == 1 && !Superclass && !HasExplicitAnyObject)
-    return Protocols.front()->getDeclaredType();
+    return Protocols.front()->getDeclaredInterfaceType();
 
   // Form the set of canonical protocol types from the protocol
   // declarations, and use that to build the canonical composition type.
@@ -3403,7 +3404,7 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   std::transform(Protocols.begin(), Protocols.end(),
                  std::back_inserter(CanTypes),
                  [](ProtocolDecl *Proto) {
-                   return Proto->getDeclaredType();
+                   return Proto->getDeclaredInterfaceType();
                  });
 
   // TODO: Canonicalize away HasExplicitAnyObject if it is implied

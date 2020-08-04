@@ -1040,7 +1040,8 @@ public:
       case StmtConditionElement::CK_Boolean: {
         auto *E = elt.getBoolean();
         if (shouldVerifyChecked(E))
-          checkSameType(E->getType(), Ctx.getBoolDecl()->getDeclaredType(),
+          checkSameType(E->getType(),
+                        Ctx.getBoolDecl()->getDeclaredInterfaceType(),
                         "condition type");
         break;
       }
@@ -1633,7 +1634,8 @@ public:
         abort();
       }
 
-      checkSameType(E->getType(), anyHashableDecl->getDeclaredType(),
+      checkSameType(E->getType(),
+                    anyHashableDecl->getDeclaredInterfaceType(),
                     "AnyHashableErasureExpr and the standard AnyHashable type");
 
       if (E->getConformance().getRequirement() != hashableDecl) {
@@ -3360,7 +3362,7 @@ public:
 
     Type checkExceptionTypeExists(const char *where) {
       auto exn = Ctx.getErrorDecl();
-      if (exn) return exn->getDeclaredType();
+      if (exn) return exn->getDeclaredInterfaceType();
 
       Out << "exception type does not exist in " << where << "\n";
       abort();

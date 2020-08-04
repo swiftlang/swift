@@ -4118,7 +4118,8 @@ public:
       case SILFunctionType::Representation::WitnessMethod:
         Printer << "witness_method: ";
         printTypeDeclName(
-            witnessMethodConformance.getRequirement()->getDeclaredType());
+            witnessMethodConformance.getRequirement()->getDeclaredType()
+                ->castTo<ProtocolType>());
         break;
       case SILFunctionType::Representation::Closure:
         Printer << "closure";
@@ -5061,7 +5062,7 @@ swift::getInheritedForPrinting(const Decl *decl, const PrintOptions &options,
           isa<EnumDecl>(decl) &&
           cast<EnumDecl>(decl)->hasRawType())
         continue;
-      Results.push_back(TypeLoc::withoutLoc(proto->getDeclaredType()));
+      Results.push_back(TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()));
     }
   }
 }

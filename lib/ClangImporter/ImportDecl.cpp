@@ -552,7 +552,7 @@ synthesizeEnumRawValueGetterBody(AbstractFunctionDecl *afd, void *context) {
   auto getterDecl = cast<AccessorDecl>(afd);
   auto enumDecl = static_cast<EnumDecl *>(context);
   auto rawTy = enumDecl->getRawType();
-  auto enumTy = enumDecl->getDeclaredType();
+  auto enumTy = enumDecl->getDeclaredInterfaceType();
 
   ASTContext &ctx = getterDecl->getASTContext();
   auto *selfDecl = getterDecl->getImplicitSelfDecl();
@@ -1892,7 +1892,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   auto &C = importer.SwiftContext;
   auto swiftValueDecl = dyn_cast_or_null<ValueDecl>(
       importer.importDecl(errorDomainDecl, importer.CurrentVersion));
-  auto stringTy = C.getStringDecl()->getDeclaredType();
+  auto stringTy = C.getStringDecl()->getDeclaredInterfaceType();
   assert(stringTy && "no string type available");
   if (!swiftValueDecl || !swiftValueDecl->getInterfaceType()->isEqual(stringTy)) {
     // Couldn't actually import it as an error enum, fall back to enum
@@ -6968,7 +6968,8 @@ void SwiftDeclConverter::importObjCProtocols(
     if (auto proto = castIgnoringCompatibilityAlias<ProtocolDecl>(
             Impl.importDecl(*cp, getActiveSwiftVersion()))) {
       addProtocols(proto, protocols, knownProtocols);
-      inheritedTypes.push_back(TypeLoc::withoutLoc(proto->getDeclaredType()));
+      inheritedTypes.push_back(
+        TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()));
     }
   }
 
@@ -7019,7 +7020,8 @@ Optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
         if (!proto) {
           return None;
         }
-        inherited.push_back(TypeLoc::withoutLoc(proto->getDeclaredType()));
+        inherited.push_back(
+          TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()));
       }
     }
     if (inherited.empty()) {

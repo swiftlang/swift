@@ -5501,7 +5501,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     // If we're supposed to generate constraints, do so.
     if (flags.contains(TMF_GenerateConstraints)) {
       addUnsolvedConstraint(
-        Constraint::create(*this, kind, type, protocol->getDeclaredType(),
+        Constraint::create(*this, kind, type,
+                           protocol->getDeclaredInterfaceType(),
                            getConstraintLocator(locator)));
       return SolutionKind::Solved;
     }
@@ -5558,7 +5559,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   if (!shouldAttemptFixes())
     return SolutionKind::Error;
 
-  auto protocolTy = protocol->getDeclaredType();
+  auto protocolTy = protocol->getDeclaredInterfaceType();
 
   // If this conformance has been fixed already, let's just consider this done.
   if (isFixedRequirement(getConstraintLocator(locator), protocolTy))
@@ -7196,9 +7197,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
               auto result =
                   baseTy->is<MetatypeType>()
                       ? solveWithNewBaseOrName(ExistentialMetatypeType::get(
-                                                   proto->getDeclaredType()),
+                                                   proto->getDeclaredInterfaceType()),
                                                member)
-                      : solveWithNewBaseOrName(proto->getDeclaredType(),
+                      : solveWithNewBaseOrName(proto->getDeclaredInterfaceType(),
                                                member);
               if (result == SolutionKind::Solved)
                 return recordFix(
@@ -8963,7 +8964,7 @@ getDynamicCallableMethods(Type type, ConstraintSystem &CS,
     if (auto archetype = dyn_cast<ArchetypeType>(canType)) {
       SmallVector<Type, 2> componentTypes;
       for (auto protocolDecl : archetype->getConformsTo())
-        componentTypes.push_back(protocolDecl->getDeclaredType());
+        componentTypes.push_back(protocolDecl->getDeclaredInterfaceType());
       if (auto superclass = archetype->getSuperclass())
         componentTypes.push_back(superclass);
       return calculateForComponentTypes(componentTypes);
@@ -9159,7 +9160,7 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
     auto arrayLitProto =
       ctx.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);
     addConstraint(ConstraintKind::ConformsTo, tvParam,
-                  arrayLitProto->getDeclaredType(), locator);
+                  arrayLitProto->getDeclaredInterfaceType(), locator);
     auto elementAssocType = arrayLitProto->getAssociatedType(
         ctx.Id_ArrayLiteralElement);
     argumentType = DependentMemberType::get(tvParam, elementAssocType);
@@ -9167,7 +9168,7 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
     auto dictLitProto =
       ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral);
     addConstraint(ConstraintKind::ConformsTo, tvParam,
-                  dictLitProto->getDeclaredType(), locator);
+                  dictLitProto->getDeclaredInterfaceType(), locator);
     auto valueAssocType = dictLitProto->getAssociatedType(ctx.Id_Value);
     argumentType = DependentMemberType::get(tvParam, valueAssocType);
   }
@@ -9639,7 +9640,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
                                  TVO_CanBindToNoEscape);
     
     addConstraint(ConstraintKind::ConformsTo, tv,
-                  hashableProtocol->getDeclaredType(), constraintLocator);
+                  hashableProtocol->getDeclaredInterfaceType(),
+                  constraintLocator);
 
     return matchTypes(type1, tv, ConstraintKind::Conversion, subflags,
                       locator);

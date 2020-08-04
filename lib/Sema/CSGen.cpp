@@ -1159,7 +1159,7 @@ namespace {
                                       TVO_PrefersSubtypeBinding |
                                       TVO_CanBindToNoEscape);
       CS.addConstraint(ConstraintKind::LiteralConformsTo, tv,
-                       protocol->getDeclaredType(),
+                       protocol->getDeclaredInterfaceType(),
                        CS.getConstraintLocator(expr));
       return tv;
     }
@@ -1184,7 +1184,7 @@ namespace {
                                       TVO_PrefersSubtypeBinding |
                                       TVO_CanBindToNoEscape);
       CS.addConstraint(ConstraintKind::LiteralConformsTo, tv,
-                       interpolationProto->getDeclaredType(),
+                       interpolationProto->getDeclaredInterfaceType(),
                        locator);
 
       if (auto appendingExpr = expr->getAppendingExpr()) {
@@ -1222,7 +1222,7 @@ namespace {
           return nullptr;
 
         auto unsafeRawPointer = ctx.getUnsafeRawPointerDecl();
-        return unsafeRawPointer->getDeclaredType();
+        return unsafeRawPointer->getDeclaredInterfaceType();
       }
 
       default:
@@ -1257,7 +1257,7 @@ namespace {
                        TVO_CanBindToHole);
 
       CS.addConstraint(ConstraintKind::LiteralConformsTo, witnessType,
-                       protocol->getDeclaredType(), exprLoc);
+                       protocol->getDeclaredInterfaceType(), exprLoc);
 
       // The arguments are required to be argument-convertible to the
       // idealized parameter type of the initializer, which generally
@@ -1815,7 +1815,7 @@ namespace {
         contextualArrayElementType = *arrayElementType;
 
         CS.addConstraint(ConstraintKind::LiteralConformsTo, contextualType,
-                         arrayProto->getDeclaredType(),
+                         arrayProto->getDeclaredInterfaceType(),
                          locator);
         
         unsigned index = 0;
@@ -1885,7 +1885,7 @@ namespace {
 
       // The array must be an array literal type.
       CS.addConstraint(ConstraintKind::LiteralConformsTo, arrayTy,
-                       arrayProto->getDeclaredType(),
+                       arrayProto->getDeclaredInterfaceType(),
                        locator);
       
       // Its subexpression should be convertible to a tuple (T.Element...).
@@ -1950,7 +1950,7 @@ namespace {
         Type contextualDictionaryElementType = TupleType::get(tupleElts, C);
         
         CS.addConstraint(ConstraintKind::LiteralConformsTo, contextualType,
-                         dictionaryProto->getDeclaredType(),
+                         dictionaryProto->getDeclaredInterfaceType(),
                          locator);
         
         unsigned index = 0;
@@ -1971,7 +1971,7 @@ namespace {
 
       // The dictionary must be a dictionary literal type.
       CS.addConstraint(ConstraintKind::LiteralConformsTo, dictionaryTy,
-                       dictionaryProto->getDeclaredType(),
+                       dictionaryProto->getDeclaredInterfaceType(),
                        locator);
 
 
@@ -2481,7 +2481,7 @@ namespace {
       }
 
       case PatternKind::Bool:
-        return setType(CS.getASTContext().getBoolDecl()->getDeclaredType());
+        return setType(CS.getASTContext().getBoolDecl()->getDeclaredInterfaceType());
 
       case PatternKind::EnumElement: {
         auto enumPattern = cast<EnumElementPattern>(pattern);
@@ -2701,7 +2701,7 @@ namespace {
           // Okay, now it should be safe to coerce the pattern.
           // Pull the top-level pattern back out.
           pattern = LabelItem.getPattern();
-          Type exnType = CS.getASTContext().getErrorDecl()->getDeclaredType();
+          Type exnType = CS.getASTContext().getErrorDecl()->getDeclaredInterfaceType();
 
           if (!exnType)
             return false;
@@ -2978,7 +2978,7 @@ namespace {
 
       CS.addConstraint(
           ConstraintKind::Conversion, CS.getType(expr->getCondExpr()),
-          boolDecl->getDeclaredType(),
+          boolDecl->getDeclaredInterfaceType(),
           CS.getConstraintLocator(expr, ConstraintLocator::Condition));
 
       // The branches must be convertible to a common type.
@@ -3137,7 +3137,7 @@ namespace {
         return Type();
       }
 
-      return boolDecl->getDeclaredType();
+      return boolDecl->getDeclaredInterfaceType();
     }
 
     Type visitDiscardAssignmentExpr(DiscardAssignmentExpr *expr) {
@@ -3314,7 +3314,7 @@ namespace {
     }
     
     Type visitEnumIsCaseExpr(EnumIsCaseExpr *expr) {
-      return CS.getASTContext().getBoolDecl()->getDeclaredType();
+      return CS.getASTContext().getBoolDecl()->getDeclaredInterfaceType();
     }
 
     Type visitLazyInitializerExpr(LazyInitializerExpr *expr) {
@@ -3954,7 +3954,8 @@ generateForEachStmtConstraints(
   cs.addConstraint(ConstraintKind::Conversion, cs.getType(sequence),
                    sequenceType, locator);
   cs.addConstraint(ConstraintKind::ConformsTo, sequenceType,
-                   sequenceProto->getDeclaredType(), contextualLocator);
+                   sequenceProto->getDeclaredInterfaceType(),
+                   contextualLocator);
 
   // Check the element pattern.
   ASTContext &ctx = cs.getASTContext();
@@ -4015,7 +4016,7 @@ generateForEachStmtConstraints(
     if (!boolDecl)
       return None;
 
-    Type boolType = boolDecl->getDeclaredType();
+    Type boolType = boolDecl->getDeclaredInterfaceType();
     if (!boolType)
       return None;
 
@@ -4201,7 +4202,7 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
     return true;
   }
 
-  Type boolTy = boolDecl->getDeclaredType();
+  Type boolTy = boolDecl->getDeclaredInterfaceType();
   for (const auto &condElement : condition) {
     switch (condElement.getKind()) {
     case StmtConditionElement::CK_Availability:

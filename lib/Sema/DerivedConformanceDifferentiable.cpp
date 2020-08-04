@@ -638,19 +638,24 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
 
   // Otherwise, synthesize a new struct.
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
-  auto diffableType = TypeLoc::withoutLoc(diffableProto->getDeclaredType());
+  auto diffableType =
+      TypeLoc::withoutLoc(diffableProto->getDeclaredInterfaceType());
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
-  auto addArithType = TypeLoc::withoutLoc(addArithProto->getDeclaredType());
+  auto addArithType =
+      TypeLoc::withoutLoc(addArithProto->getDeclaredInterfaceType());
   // SWIFT_ENABLE_TENSORFLOW
   auto *pointMulProto =
       C.getProtocol(KnownProtocolKind::PointwiseMultiplicative);
-  auto pointMulType = TypeLoc::withoutLoc(pointMulProto->getDeclaredType());
+  auto pointMulType =
+      TypeLoc::withoutLoc(pointMulProto->getDeclaredInterfaceType());
   auto *mathProto = C.getProtocol(KnownProtocolKind::ElementaryFunctions);
-  auto mathType = TypeLoc::withoutLoc(mathProto->getDeclaredType());
+  auto mathType = TypeLoc::withoutLoc(mathProto->getDeclaredInterfaceType());
   auto *vectorProto = C.getProtocol(KnownProtocolKind::VectorProtocol);
-  auto vectorType = TypeLoc::withoutLoc(vectorProto->getDeclaredType());
+  auto vectorType =
+      TypeLoc::withoutLoc(vectorProto->getDeclaredInterfaceType());
   auto *kpIterableProto = C.getProtocol(KnownProtocolKind::KeyPathIterable);
-  auto kpIterableType = TypeLoc::withoutLoc(kpIterableProto->getDeclaredType());
+  auto kpIterableType =
+      TypeLoc::withoutLoc(kpIterableProto->getDeclaredInterfaceType());
   // SWIFT_ENABLE_TENSORFLOW END
 
   // By definition, `TangentVector` must conform to `Differentiable` and

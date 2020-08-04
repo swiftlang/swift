@@ -3594,7 +3594,10 @@ namespace {
           ctx.Diags.diagnose(SourceLoc(), diag::broken_bool);
         }
 
-        cs.setType(isSomeExpr, boolDecl ? boolDecl->getDeclaredType() : Type());
+        cs.setType(isSomeExpr,
+                   boolDecl
+                   ? boolDecl->getDeclaredInterfaceType()
+                   : Type());
         return isSomeExpr;
       }
 
@@ -8078,7 +8081,7 @@ static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
   if (forEachStmtInfo.whereExpr) {
     auto *boolDecl = dc->getASTContext().getBoolDecl();
     assert(boolDecl);
-    Type boolType = boolDecl->getDeclaredType();
+    Type boolType = boolDecl->getDeclaredInterfaceType();
     assert(boolType);
 
     SolutionApplicationTarget whereTarget(
@@ -8279,7 +8282,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
         return None;
 
       // FIXME: Feels like we could leverage existing code more.
-      Type boolType = cs.getASTContext().getBoolDecl()->getDeclaredType();
+      Type boolType = cs.getASTContext().getBoolDecl()->getDeclaredInterfaceType();
       guardExpr = solution.coerceToType(
           guardExpr, boolType, cs.getConstraintLocator(info.guardExpr));
       if (!guardExpr)

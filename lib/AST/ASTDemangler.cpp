@@ -153,7 +153,7 @@ Type ASTBuilder::createNominalType(GenericTypeDecl *decl, Type parent) {
   bool isImported = nominalDecl->hasClangNode() ||
       nominalDecl->getAttrs().hasAttribute<ClangImporterSynthesizedTypeAttr>();
   if (isImported && !nominalDecl->isGenericContext())
-    return nominalDecl->getDeclaredType();
+    return nominalDecl->getDeclaredInterfaceType();
 
   // Validate the parent type.
   if (!validateParentType(nominalDecl, parent))
@@ -572,7 +572,7 @@ Type ASTBuilder::createProtocolCompositionType(
     bool isClassBound) {
   std::vector<Type> members;
   for (auto protocol : protocols)
-    members.push_back(protocol->getDeclaredType());
+    members.push_back(protocol->getDeclaredInterfaceType());
   if (superclass && superclass->getClassOrBoundGenericClass())
     members.push_back(superclass);
   return ProtocolCompositionType::get(Ctx, members, isClassBound);

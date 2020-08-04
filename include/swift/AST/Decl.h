@@ -2986,6 +2986,11 @@ public:
   Type getCachedUnderlyingType() const { return UnderlyingTy.getType(); }
 
   /// For generic typealiases, return the unbound generic type.
+  ///
+  /// Since UnboundGenericType is on its way out, so is this method. Try to
+  /// avoid introducing new callers if possible. Instead of passing around
+  /// an UnboundGenericType, considering passing around the Decl itself
+  /// instead.
   UnboundGenericType *getUnboundGenericType() const;
 
   /// Retrieve a sugared interface type containing the structure of the interface
@@ -3372,6 +3377,11 @@ public:
 
   /// getDeclaredType - Retrieve the type declared by this entity, without
   /// any generic parameters bound if this is a generic type.
+  ///
+  /// Since UnboundGenericType is on its way out, so is this method. Try to
+  /// avoid introducing new callers if possible. Instead of passing around
+  /// an UnboundGenericType, considering passing around the Decl itself
+  /// instead.
   Type getDeclaredType() const;
 
   /// getDeclaredInterfaceType - Retrieve the type declared by this entity, with
@@ -4322,11 +4332,6 @@ public:
   /// Determine whether this protocol inherits from the given ("super")
   /// protocol.
   bool inheritsFrom(const ProtocolDecl *Super) const;
-  
-  ProtocolType *getDeclaredType() const {
-    return reinterpret_cast<ProtocolType *>(
-      NominalTypeDecl::getDeclaredType().getPointer());
-  }
   
   SourceLoc getStartLoc() const { return ProtocolLoc; }
   SourceRange getSourceRange() const {

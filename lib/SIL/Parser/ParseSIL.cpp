@@ -1779,7 +1779,7 @@ SubstitutionMap getApplySubstitutionsFromParsed(
           return conformance;
 
         SP.P.diagnose(loc, diag::sil_substitution_mismatch, replacementType,
-                      proto->getDeclaredType());
+                      proto->getDeclaredInterfaceType());
         failed = true;
 
         return ProtocolConformanceRef(proto);
