@@ -2277,7 +2277,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
     auto sig = AFD->getGenericSignature();
     bool hasSelf = AFD->hasImplicitSelfDecl();
 
-    AnyFunctionType::ExtInfo info;
+    AnyFunctionType::ExtInfoBuilder infoBuilder;
 
     // Result
     Type resultTy;
@@ -2297,12 +2297,13 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       SmallVector<AnyFunctionType::Param, 4> argTy;
       AFD->getParameters()->getParams(argTy);
 
-      info = info.withAsync(AFD->hasAsync());
+      infoBuilder = infoBuilder.withAsync(AFD->hasAsync());
       // 'throws' only applies to the innermost function.
-      info = info.withThrows(AFD->hasThrows());
+      infoBuilder = infoBuilder.withThrows(AFD->hasThrows());
       // Defer bodies must not escape.
       if (auto fd = dyn_cast<FuncDecl>(D))
-        info = info.withNoEscape(fd->isDeferBody());
+        infoBuilder = infoBuilder.withNoEscape(fd->isDeferBody());
+      auto info = infoBuilder.build();
 
       if (sig && !hasSelf) {
         funcTy = GenericFunctionType::get(sig, argTy, resultTy, info);

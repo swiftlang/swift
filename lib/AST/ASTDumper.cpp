@@ -2829,6 +2829,11 @@ public:
         PrintWithColorRAII(OS, DiscriminatorColor)
           << "#" << component.getTupleIndex();
         break;
+      case KeyPathExpr::Component::Kind::DictionaryKey:
+        PrintWithColorRAII(OS, ASTNodeColor) << "dict_key";
+        PrintWithColorRAII(OS, IdentifierColor)
+          << "  key='" << component.getUnresolvedDeclName() << "'";
+        break;
       }
       PrintWithColorRAII(OS, TypeColor)
         << " type='" << GetTypeOfKeyPathComponent(E, i) << "'";
@@ -2983,9 +2988,9 @@ public:
   void visitFunctionTypeRepr(FunctionTypeRepr *T) {
     printCommon("type_function");
     OS << '\n'; printRec(T->getArgsTypeRepr());
-    if (T->async())
+    if (T->isAsync())
       OS << " async ";
-    if (T->throws())
+    if (T->isThrowing())
       OS << " throws ";
     OS << '\n'; printRec(T->getResultTypeRepr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
@@ -3755,15 +3760,15 @@ namespace {
                    getSILFunctionTypeRepresentationString(representation));
 
       printFlag(!T->isNoEscape(), "escaping");
-      printFlag(T->async(), "async");
-      printFlag(T->throws(), "throws");
+      printFlag(T->isAsync(), "async");
+      printFlag(T->isThrowing(), "throws");
 
       OS << "\n";
       Indent += 2;
-      if (auto *cty = T->getClangFunctionType()) {
+      if (!T->getClangTypeInfo().empty()) {
         std::string s;
         llvm::raw_string_ostream os(s);
-        cty->dump(os);
+        T->getClangTypeInfo().dump(os);
         printField("clang_type", os.str());
       }
       printAnyFunctionParams(T->getParams(), "input");

@@ -411,12 +411,13 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
                     : ParameterConvention::Indirect_In_Guaranteed },
   };
 
-  auto extInfo = SILFunctionType::ExtInfo(
-      SILFunctionTypeRepresentation::Thin,
-      /*pseudogeneric*/ false,
-      /*non-escaping*/ false,
-      DifferentiabilityKind::NonDifferentiable,
-      /*clangFunctionType*/ nullptr);
+  auto extInfo =
+      SILFunctionType::ExtInfoBuilder(SILFunctionTypeRepresentation::Thin,
+                                      /*pseudogeneric*/ false,
+                                      /*non-escaping*/ false,
+                                      DifferentiabilityKind::NonDifferentiable,
+                                      /*clangFunctionType*/ nullptr)
+          .build();
 
   auto functionTy = SILFunctionType::get(sig, extInfo,
                                          SILCoroutineKind::YieldOnce,

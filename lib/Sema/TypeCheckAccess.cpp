@@ -1585,7 +1585,7 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
       // types first.
       Action walkToTypePost(Type T) override {
         if (auto fnType = T->getAs<AnyFunctionType>()) {
-          if (auto clangType = fnType->getClangFunctionType()) {
+          if (auto clangType = fnType->getClangTypeInfo().getType()) {
             auto loader = T->getASTContext().getClangModuleLoader();
             // Serialization will serialize the sugared type if it can,
             // but we need the canonical type to be serializable or else

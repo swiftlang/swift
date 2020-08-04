@@ -2214,9 +2214,10 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
       // Resolve the function type directly with these attributes.
       // [TODO: Store-SIL-Clang-type]
-      SILFunctionType::ExtInfo extInfo(rep, attrs.has(TAK_pseudogeneric),
-                                       attrs.has(TAK_noescape), diffKind,
-                                       nullptr);
+      auto extInfo = SILFunctionType::ExtInfoBuilder(
+                         rep, attrs.has(TAK_pseudogeneric),
+                         attrs.has(TAK_noescape), diffKind, nullptr)
+                         .build();
 
       ty = resolveSILFunctionType(fnRepr, options, coroutineKind, extInfo,
                                   calleeConvention, witnessMethodProtocol);
@@ -2672,20 +2673,20 @@ Type TypeResolver::resolveASTFunctionType(
     }
   }
 
-  FunctionType::ExtInfo incompleteExtInfo(FunctionTypeRepresentation::Swift,
-                                          noescape, repr->throws(), diffKind,
-                                          /*clangFunctionType*/nullptr);
+  FunctionType::ExtInfoBuilder extInfoBuilder(
+      FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), diffKind,
+      /*clangFunctionType*/ nullptr);
 
   const clang::Type *clangFnType = parsedClangFunctionType;
   if (representation == AnyFunctionType::Representation::CFunctionPointer
       && !clangFnType)
     clangFnType = Context.getClangFunctionType(
-      params, outputTy, incompleteExtInfo,
-      AnyFunctionType::Representation::CFunctionPointer);
+        params, outputTy, AnyFunctionType::Representation::CFunctionPointer);
 
-  auto extInfo = incompleteExtInfo.withRepresentation(representation)
-                                  .withAsync(repr->async())
-                                  .withClangFunctionType(clangFnType);
+  auto extInfo = extInfoBuilder.withRepresentation(representation)
+                     .withAsync(repr->isAsync())
+                     .withClangFunctionType(clangFnType)
+                     .build();
 
   // Diagnose a couple of things that we can parse in SIL mode but we don't
   // allow in formal types.

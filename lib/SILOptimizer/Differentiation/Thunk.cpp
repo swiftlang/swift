@@ -129,13 +129,14 @@ CanSILFunctionType buildThunkType(SILFunction *fn,
   // - Building a reabstraction thunk type.
   // - Building an index subset thunk type, where the expected type has context
   //   (i.e. is `@convention(thick)`).
-  auto extInfo = expectedType->getExtInfo();
+  auto extInfoBuilder = expectedType->getExtInfo().intoBuilder();
   if (thunkKind == DifferentiationThunkKind::Reabstraction ||
-      extInfo.hasContext()) {
-    extInfo = extInfo.withRepresentation(SILFunctionType::Representation::Thin);
+      extInfoBuilder.hasContext()) {
+    extInfoBuilder = extInfoBuilder.withRepresentation(
+        SILFunctionType::Representation::Thin);
   }
   if (withoutActuallyEscaping)
-    extInfo = extInfo.withNoEscape(false);
+    extInfoBuilder = extInfoBuilder.withNoEscape(false);
 
   // Does the thunk type involve archetypes other than opened existentials?
   bool hasArchetypes = false;
@@ -191,7 +192,7 @@ CanSILFunctionType buildThunkType(SILFunction *fn,
   // pseudogeneric, since we have no way to pass generic parameters.
   if (genericSig)
     if (fn->getLoweredFunctionType()->isPseudogeneric())
-      extInfo = extInfo.withIsPseudogeneric();
+      extInfoBuilder = extInfoBuilder.withIsPseudogeneric();
 
   // Add the function type as the parameter.
   auto contextConvention =
@@ -241,7 +242,7 @@ CanSILFunctionType buildThunkType(SILFunction *fn,
 
   // The type of the thunk function.
   return SILFunctionType::get(
-      genericSig, extInfo, expectedType->getCoroutineKind(),
+      genericSig, extInfoBuilder.build(), expectedType->getCoroutineKind(),
       ParameterConvention::Direct_Unowned, interfaceParams, interfaceYields,
       interfaceResults, interfaceErrorResult,
       expectedType->getPatternSubstitutions(), SubstitutionMap(),

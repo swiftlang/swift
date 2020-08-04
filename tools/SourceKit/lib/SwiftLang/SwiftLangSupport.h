@@ -109,7 +109,7 @@ public:
   void parse(ImmutableTextSnapshotRef Snapshot, SwiftLangSupport &Lang,
              bool BuildSyntaxTree,
              swift::SyntaxParsingCache *SyntaxCache = nullptr);
-  void readSyntaxInfo(EditorConsumer &consumer);
+  void readSyntaxInfo(EditorConsumer &consumer, bool ReportDiags);
   void readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
                         EditorConsumer& Consumer);
 

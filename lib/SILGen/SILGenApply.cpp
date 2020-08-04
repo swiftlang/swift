@@ -131,8 +131,11 @@ getDynamicMethodLoweredType(SILModule &M,
                             SILDeclRef constant,
                             CanAnyFunctionType substMemberTy) {
   assert(constant.isForeign);
-  auto objcFormalTy = substMemberTy.withExtInfo(substMemberTy->getExtInfo()
-             .withSILRepresentation(SILFunctionTypeRepresentation::ObjCMethod));
+  auto objcFormalTy = substMemberTy.withExtInfo(
+      substMemberTy->getExtInfo()
+          .intoBuilder()
+          .withSILRepresentation(SILFunctionTypeRepresentation::ObjCMethod)
+          .build());
   return SILType::getPrimitiveObjectType(
       M.Types.getUncachedSILFunctionTypeForConstant(
           TypeExpansionContext::minimal(), constant, objcFormalTy));
@@ -3857,7 +3860,7 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
     auto emitter = specializedEmitter.getEarlyEmitter();
 
     assert(uncurriedSites.size() == 1);
-    assert(!formalType->getExtInfo().throws());
+    assert(!formalType->getExtInfo().isThrowing());
     SILLocation uncurriedLoc = uncurriedSites[0].Loc;
 
     // We should be able to enforce that these arguments are
@@ -5438,7 +5441,7 @@ RValue SILGenFunction::emitGetAccessor(SILLocation loc, SILDeclRef get,
     subscriptIndices.emplace({});
 
   emission.addCallSite(loc, std::move(subscriptIndices),
-                       accessType->throws());
+                       accessType->isThrowing());
 
   // T
   return emission.apply(c);
@@ -5480,8 +5483,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
     }
   }
   assert(values.isValid());
-  emission.addCallSite(loc, std::move(values),
-                       accessType->throws());
+  emission.addCallSite(loc, std::move(values), accessType->isThrowing());
   // ()
   emission.apply();
 }
@@ -5515,7 +5517,7 @@ ManagedValue SILGenFunction::emitAddressorAccessor(
     subscriptIndices.emplace({});
 
   emission.addCallSite(loc, std::move(subscriptIndices),
-                       accessType->throws());
+                       accessType->isThrowing());
 
   // Unsafe{Mutable}Pointer<T> or
   // (Unsafe{Mutable}Pointer<T>, Builtin.UnknownPointer) or
@@ -5577,7 +5579,7 @@ SILGenFunction::emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
     subscriptIndices.emplace({});
 
   emission.addCallSite(loc, std::move(subscriptIndices),
-                       accessType->throws());
+                       accessType->isThrowing());
 
   auto endApplyHandle = emission.applyCoroutine(yields);
 

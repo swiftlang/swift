@@ -100,10 +100,10 @@ static void printImports(raw_ostream &out,
                          ModuleDecl *M) {
   // FIXME: This is very similar to what's in Serializer::writeInputBlock, but
   // it's not obvious what higher-level optimization would be factored out here.
-  ModuleDecl::ImportFilter allImportFilter;
-  allImportFilter |= ModuleDecl::ImportFilterKind::Public;
-  allImportFilter |= ModuleDecl::ImportFilterKind::Private;
-  allImportFilter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
+  ModuleDecl::ImportFilter allImportFilter = {
+      ModuleDecl::ImportFilterKind::Public,
+      ModuleDecl::ImportFilterKind::Private,
+      ModuleDecl::ImportFilterKind::SPIAccessControl};
 
   // With -experimental-spi-imports:
   // When printing the private swiftinterface file, print implementation-only

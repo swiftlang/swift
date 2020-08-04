@@ -2501,30 +2501,22 @@ namespace {
         if (enumPattern->getParentType() || enumPattern->getParentTypeRepr()) {
           // Resolve the parent type.
           Type parentType = [&]() -> Type {
-            if (auto preTy = enumPattern->getParentType()) {
-              return preTy;
+            if (const auto resolvedTy = enumPattern->getParentType()) {
+              assert(resolvedTy->hasUnboundGenericType() == false &&
+                     "A pre-resolved type must be fully bound");
+              return resolvedTy;
             }
             return resolveTypeReferenceInExpression(
                 enumPattern->getParentTypeRepr(),
-                TypeResolverContext::InExpression, [](auto unboundTy) {
-                  // FIXME: We ought to pass an OpenUnboundGenericType object
-                  // rather than calling CS.openUnboundGenericType below, but
-                  // sometimes the parent type is resolved eagerly in
-                  // ResolvePattern::visitUnresolvedDotExpr, letting unbound
-                  // generics escape.
-                  return unboundTy;
-                });
+                TypeResolverContext::InExpression,
+                OpenUnboundGenericType(
+                    CS, CS.getConstraintLocator(
+                            locator, {LocatorPathElt::PatternMatch(pattern),
+                                      ConstraintLocator::ParentType})));
           }();
 
           if (!parentType)
             return Type();
-
-          parentType = CS.openUnboundGenericTypes(
-              parentType, CS.getConstraintLocator(
-                              locator, {LocatorPathElt::PatternMatch(pattern),
-                                        ConstraintLocator::ParentType}));
-
-          assert(parentType);
 
           // Perform member lookup into the parent's metatype.
           Type parentMetaType = MetatypeType::get(parentType);
@@ -3041,25 +3033,18 @@ namespace {
       // SWIFT_ENABLE_TENSORFLOW
       // Handle implicit `CoerceExpr` with null `TypeRepr`.
       // Created by `KeyPathIterable` derived conformances.
-      auto type = expr->getCastType();
-      if (!type) {
-        type = resolveTypeReferenceInExpression(
-            repr, TypeResolverContext::ExplicitCastExpr, [](auto unboundTy) {
-              // FIXME: We ought to pass an OpenUnboundGenericType object rather
-              // than calling CS.openUnboundGenericType after resolving, but
-              // sometimes the type expression is resolved eagerly in
-              // PreCheckExpression::simplifyTypeConstructionWithLiteralArg,
-              // letting unbound generics escape.
-              return unboundTy;
-            });
+      auto toType = expr->getCastType();
+      if (!toType) {
+        toType = resolveTypeReferenceInExpression(
+            repr, TypeResolverContext::ExplicitCastExpr,
+            // Introduce type variables for unbound generics.
+            OpenUnboundGenericType(CS, CS.getConstraintLocator(expr)));
       }
       // SWIFT_ENABLE_TENSORFLOW END
-      if (!type)
+      if (!toType)
         return nullptr;
 
-      // Open the type we're casting to.
-      const auto toType =
-          CS.openUnboundGenericTypes(type, CS.getConstraintLocator(expr));
+      // Cache the type we're casting to.
       if (repr) CS.setType(repr, toType);
 
       auto fromType = CS.getType(expr->getSubExpr());
@@ -3507,6 +3492,9 @@ namespace {
         }
         case KeyPathExpr::Component::Kind::Identity:
           continue;
+        case KeyPathExpr::Component::Kind::DictionaryKey:
+          llvm_unreachable("DictionaryKey only valid in #keyPath");
+          break;
         }
 
         // By now, `base` is the result type of this component. Set it in the

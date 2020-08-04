@@ -697,9 +697,9 @@ function(_compile_swift_files
   # need to work around this by avoiding long command line arguments. This can
   # be achieved by writing the list of file paths to a file, then reading that
   # list in the Python script.
-  string(RANDOM file_name)
-  set(file_path "${CMAKE_CURRENT_BINARY_DIR}/${file_name}.txt")
   string(REPLACE ";" "'\n'" source_files_quoted "${source_files}")
+  string(SHA1 file_name "'${source_files_quoted}'")
+  set(file_path "${CMAKE_CURRENT_BINARY_DIR}/${file_name}.txt")
   file(WRITE "${file_path}" "'${source_files_quoted}'")
 
   # If this platform/architecture combo supports backward deployment to old
@@ -726,7 +726,7 @@ function(_compile_swift_files
       OUTPUT ${standard_outputs}
       DEPENDS
         ${swift_compiler_tool_dep}
-        ${file_path} ${source_files} ${SWIFTFILE_DEPENDS}
+        ${source_files} ${SWIFTFILE_DEPENDS}
         ${swift_ide_test_dependency}
         ${create_dirs_dependency_target}
         ${copy_legacy_layouts_dep}

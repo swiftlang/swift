@@ -1118,6 +1118,8 @@ void IRGenerator::emitGlobalTopLevel(
     IRGenModule *IGM = Iter.second;
     IGM->finishEmitAfterTopLevel();
   }
+
+  emitEntryPointInfo();
 }
 
 void IRGenModule::finishEmitAfterTopLevel() {
@@ -1803,6 +1805,44 @@ void IRGenModule::emitVTableStubs() {
     else
       ApplyIRLinkage(IRLinkage::ExternalExport).to(alias);
   }
+}
+
+static std::string getEntryPointSection(IRGenModule &IGM) {
+  std::string sectionName;
+  switch (IGM.TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::UnknownObjectFormat:
+    llvm_unreachable("Don't know how to emit field records table for "
+                     "the selected object format.");
+  case llvm::Triple::MachO:
+    sectionName = "__TEXT, __swift5_entry, regular, no_dead_strip";
+    break;
+  case llvm::Triple::ELF:
+  case llvm::Triple::Wasm:
+    sectionName = "swift5_entry";
+    break;
+  case llvm::Triple::XCOFF:
+  case llvm::Triple::COFF:
+    sectionName = ".sw5entr$B";
+    break;
+  }
+  return sectionName;
+}
+
+void IRGenerator::emitEntryPointInfo() {
+  SILFunction *entrypoint = nullptr;
+  if (!(entrypoint = SIL.lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION))) {
+    return;
+  }
+  auto &IGM = *getGenModule(entrypoint);
+  ConstantInitBuilder builder(IGM);
+  auto entrypointInfo = builder.beginStruct();
+  entrypointInfo.addRelativeAddress(
+      IGM.getAddrOfSILFunction(entrypoint, NotForDefinition));
+  auto var = entrypointInfo.finishAndCreateGlobal(
+      "\x01l_entry_point", Alignment(4),
+      /*isConstant*/ true, llvm::GlobalValue::PrivateLinkage);
+  var->setSection(getEntryPointSection(IGM));
+  IGM.addUsedGlobal(var);
 }
 
 static IRLinkage

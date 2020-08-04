@@ -337,6 +337,10 @@ bool TypeBase::isObjCExistentialType() {
   return getCanonicalType().isObjCExistentialType();
 }
 
+bool TypeBase::isTypeErasedGenericClassType() {
+  return getCanonicalType().isTypeErasedGenericClassType();
+}
+
 bool CanType::isObjCExistentialTypeImpl(CanType type) {
   if (!type.isExistentialType())
     return false;
@@ -1243,9 +1247,7 @@ CanType TypeBase::computeCanonicalType() {
     getCanonicalParams(funcTy, genericSig, canParams);
     auto resultTy = funcTy->getResult()->getCanonicalType(genericSig);
 
-    bool useClangFunctionType =
-      resultTy->getASTContext().LangOpts.UseClangFunctionTypes;
-    auto extInfo = funcTy->getCanonicalExtInfo(useClangFunctionType);
+    auto extInfo = funcTy->getCanonicalExtInfo(useClangTypes(resultTy));
     if (genericSig) {
       Result = GenericFunctionType::get(genericSig, canParams, resultTy,
                                         extInfo);
@@ -1783,7 +1785,7 @@ public:
   CanType visitFunctionType(FunctionType *func, CanType subst,
                             ArchetypeType*, ArrayRef<ProtocolConformanceRef>) {
     if (auto substFunc = dyn_cast<FunctionType>(subst)) {
-      if (func->getExtInfo() != substFunc->getExtInfo())
+      if (!func->hasSameExtInfoAs(substFunc))
         return CanType();
       
       if (func->getParams().size() != substFunc->getParams().size())
@@ -1822,7 +1824,7 @@ public:
   CanType visitSILFunctionType(SILFunctionType *func, CanType subst,
                              ArchetypeType*, ArrayRef<ProtocolConformanceRef>) {
     if (auto substFunc = dyn_cast<SILFunctionType>(subst)) {
-      if (func->getExtInfo() != substFunc->getExtInfo())
+      if (!func->hasSameExtInfoAs(substFunc))
         return CanType();
 
       if (func->getInvocationGenericSignature()
@@ -2267,8 +2269,8 @@ getForeignRepresentable(Type type, ForeignLanguage language,
   // Function types.
   if (auto functionType = type->getAs<FunctionType>()) {
     // Cannot handle async or throwing functions.
-    if (functionType->getExtInfo().async() ||
-        functionType->getExtInfo().throws())
+    if (functionType->getExtInfo().isAsync() ||
+        functionType->getExtInfo().isThrowing())
       return failure();
 
     // Whether we have found any types that are bridged.
@@ -2605,7 +2607,7 @@ static bool matchesFunctionType(CanAnyFunctionType fn1, CanAnyFunctionType fn2,
   auto ext1 = fn1->getExtInfo();
   auto ext2 = fn2->getExtInfo();
   if (matchMode.contains(TypeMatchFlags::AllowOverride)) {
-    if (ext2.throws()) {
+    if (ext2.isThrowing()) {
       ext1 = ext1.withThrows(true);
     }
   }
@@ -2619,7 +2621,7 @@ static bool matchesFunctionType(CanAnyFunctionType fn1, CanAnyFunctionType fn2,
     if (!ext2.isNoEscape())
       ext1 = ext1.withNoEscape(false);
   }
-  if (ext1 != ext2)
+  if (!ext1.isEqualTo(ext2, useClangTypes(fn1)))
     return false;
 
   return paramsAndResultMatch();
@@ -3412,47 +3414,33 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   return build(C, CanTypes, HasExplicitAnyObject);
 }
 
-void AnyFunctionType::ExtInfo::ClangTypeInfo::printType(
-    ClangModuleLoader *cml, llvm::raw_ostream &os) const {
-  cml->printClangType(type, os);
-}
-
-void
-AnyFunctionType::ExtInfo::assertIsFunctionType(const clang::Type *type) {
-#ifndef NDEBUG
-  if (!(type->isFunctionPointerType() || type->isBlockPointerType() ||
-        type->isFunctionReferenceType())) {
-    SmallString<256> buf;
-    llvm::raw_svector_ostream os(buf);
-    os << "Expected a Clang function type wrapped in a pointer type or "
-       << "a block pointer type but found:\n";
-    type->dump(os);
-    llvm_unreachable(os.str().data());
-  }
-#endif
-  return;
-}
-
-const clang::Type *AnyFunctionType::getClangFunctionType() const {
+ClangTypeInfo AnyFunctionType::getClangTypeInfo() const {
   switch (getKind()) {
   case TypeKind::Function:
-    return cast<FunctionType>(this)->getClangFunctionType();
+    return cast<FunctionType>(this)->getClangTypeInfo();
   case TypeKind::GenericFunction:
     // Generic functions do not have C types.
-    return nullptr;
+    return ClangTypeInfo();
   default:
     llvm_unreachable("Illegal type kind for AnyFunctionType.");
   }
 }
 
-const clang::Type *AnyFunctionType::getCanonicalClangFunctionType() const {
-  auto *ty = getClangFunctionType();
-  return ty ? ty->getCanonicalTypeInternal().getTypePtr() : nullptr;
+ClangTypeInfo AnyFunctionType::getCanonicalClangTypeInfo() const {
+  return getClangTypeInfo().getCanonical();
+}
+
+bool AnyFunctionType::hasSameExtInfoAs(const AnyFunctionType *otherFn) {
+  return getExtInfo().isEqualTo(otherFn->getExtInfo(), useClangTypes(this));
 }
 
 // [TODO: Store-SIL-Clang-type]
-const clang::FunctionType *SILFunctionType::getClangFunctionType() const {
-  return nullptr;
+ClangTypeInfo SILFunctionType::getClangTypeInfo() const {
+  return ClangTypeInfo();
+}
+
+bool SILFunctionType::hasSameExtInfoAs(const SILFunctionType *otherFn) {
+  return getExtInfo().isEqualTo(otherFn->getExtInfo(), useClangTypes(this));
 }
 
 FunctionType *
@@ -4316,7 +4304,7 @@ case TypeKind::Id:
     bool changed = false;
     auto hasTypeErasedGenericClassType = [](Type ty) -> bool {
       return ty.findIf([](Type subType) -> bool {
-        if (subType->getCanonicalType().isTypeErasedGenericClassType())
+        if (subType->isTypeErasedGenericClassType())
           return true;
         else
           return false;
@@ -5106,8 +5094,11 @@ AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {
                    param.getParameterFlags().withNoDerivative(false));
     newParams.push_back(newParam);
   }
-  auto nonDiffExtInfo = getExtInfo()
-      .withDifferentiabilityKind(DifferentiabilityKind::NonDifferentiable);
+  auto nonDiffExtInfo =
+      getExtInfo()
+          .intoBuilder()
+          .withDifferentiabilityKind(DifferentiabilityKind::NonDifferentiable)
+          .build();
   if (isa<FunctionType>(this))
     return FunctionType::get(newParams, getResult(), nonDiffExtInfo);
   assert(isa<GenericFunctionType>(this));

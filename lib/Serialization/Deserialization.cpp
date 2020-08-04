@@ -5026,9 +5026,10 @@ public:
       clangFunctionType = loadedClangType.get();
     }
 
-    auto info = FunctionType::ExtInfo(*representation, noescape, throws,
-                                      *diffKind, clangFunctionType)
-                  .withAsync(async);
+    auto info = FunctionType::ExtInfoBuilder(*representation, noescape, throws,
+                                             *diffKind, clangFunctionType)
+                    .withAsync(async)
+                    .build();
 
     auto resultTy = MF.getTypeChecked(resultID);
     if (!resultTy)
@@ -5413,8 +5414,10 @@ public:
         MF.fatal();
     }
 
-    SILFunctionType::ExtInfo extInfo(*representation, pseudogeneric, noescape,
-                                     *diffKind, clangFunctionType);
+    auto extInfo =
+        SILFunctionType::ExtInfoBuilder(*representation, pseudogeneric,
+                                        noescape, *diffKind, clangFunctionType)
+            .build();
 
     // Process the coroutine kind.
     auto coroutineKind = getActualSILCoroutineKind(rawCoroutineKind);

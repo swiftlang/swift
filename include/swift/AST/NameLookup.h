@@ -513,6 +513,14 @@ void recordLookupOfTopLevelName(DeclContext *topLevelContext, DeclName name,
 } // end namespace namelookup
 
 /// Retrieve the set of nominal type declarations that are directly
+/// referenced in the given \c typeRepr, looking through typealiases.
+/// 
+/// \param dc The \c DeclContext from which to perform lookup.
+TinyPtrVector<NominalTypeDecl *>
+getDirectlyReferencedNominalTypeDecls(ASTContext &ctx, TypeRepr *typeRepr,
+                                      DeclContext *dc, bool &anyObject);
+
+/// Retrieve the set of nominal type declarations that are directly
 /// "inherited" by the given declaration at a particular position in the
 /// list of "inherited" types.
 ///
@@ -697,6 +705,31 @@ public:
   static Optional<bool>
   computeIsCascadingUse(ArrayRef<const ast_scope::ASTScopeImpl *> history,
                         Optional<bool> initialIsCascadingUse);
+
+  /// Entry point to record the visible statement labels from the given
+  /// point.
+  ///
+  /// This lookup only considers labels that are visible within the current
+  /// function, so it will not return any labels from lexical scopes that
+  /// are not reachable via labeled control flow.
+  ///
+  /// \returns the set of labeled statements visible from the given source
+  /// location, with the innermost labeled statement first and proceeding
+  /// to the outermost labeled statement.
+  static llvm::SmallVector<LabeledStmt *, 4>
+  lookupLabeledStmts(SourceFile *sourceFile, SourceLoc loc);
+
+  /// Look for the directly enclosing case statement and the next case
+  /// statement, which together act as the source and destination for a
+  /// 'fallthrough' statement within a switch case.
+  ///
+  /// \returns a pair (fallthrough source, fallthrough dest). If the location
+  /// is not within the body of a case statement at all, the fallthrough
+  /// source will be \c nullptr. If there is a fallthrough source that case is
+  /// the last one, the fallthrough destination will be \c nullptr. A
+  /// well-formed 'fallthrough' statement has both a source and destination.
+  static std::pair<CaseStmt *, CaseStmt *>
+  lookupFallthroughSourceAndDest(SourceFile *sourceFile, SourceLoc loc);
 
   SWIFT_DEBUG_DUMP;
   void print(llvm::raw_ostream &) const;

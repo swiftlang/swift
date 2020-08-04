@@ -1991,7 +1991,7 @@ void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {
 static bool hasThrowingFunctionParameter(CanType type) {
   // Only consider throwing function types.
   if (auto fnType = dyn_cast<AnyFunctionType>(type)) {
-    return fnType->getExtInfo().throws();
+    return fnType->getExtInfo().isThrowing();
   }
 
   // Look through tuples.

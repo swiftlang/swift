@@ -529,8 +529,8 @@ public:
 
   TupleTypeRepr *getArgsTypeRepr() const { return ArgsTy; }
   TypeRepr *getResultTypeRepr() const { return RetTy; }
-  bool async() const { return AsyncLoc.isValid(); }
-  bool throws() const { return ThrowsLoc.isValid(); }
+  bool isAsync() const { return AsyncLoc.isValid(); }
+  bool isThrowing() const { return ThrowsLoc.isValid(); }
 
   SourceLoc getAsyncLoc() const { return AsyncLoc; }
   SourceLoc getThrowsLoc() const { return ThrowsLoc; }

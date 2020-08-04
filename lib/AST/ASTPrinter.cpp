@@ -4183,10 +4183,10 @@ public:
     // If we're stripping argument labels from types, do it when printing.
     visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/false);
 
-    if (T->async())
+    if (T->isAsync())
       Printer << " " << "async";
 
-    if (T->throws())
+    if (T->isThrowing())
       Printer << " " << tok::kw_throws;
 
     Printer << " -> ";
@@ -4226,10 +4226,10 @@ public:
 
    visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/true);
 
-    if (T->async())
+    if (T->isAsync())
       Printer << " " << "async";
 
-    if (T->throws())
+    if (T->isThrowing())
       Printer << " " << tok::kw_throws;
 
     Printer << " -> ";

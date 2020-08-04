@@ -118,7 +118,9 @@ ModuleDecl *ClangImporter::Implementation::loadModuleDWARF(
   decl->addFile(*wrapperUnit);
 
   // Force load overlay modules for all imported modules.
-  (void) namelookup::getAllImports(decl);
+  assert(namelookup::getAllImports(decl).size() == 1 &&
+         namelookup::getAllImports(decl).front().importedModule == decl &&
+         "DWARF module depends on additional modules?");
 
   // Register the module with the ASTContext so it is available for lookups.
   if (!SwiftContext.getLoadedModule(name))
