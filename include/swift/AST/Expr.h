@@ -861,9 +861,6 @@ public:
     /// A UTF-8 string.
     UTF8,
 
-    /// A UTF-16 string.
-    UTF16,
-
     /// A single UnicodeScalar, passed as an integer.
     OneUnicodeScalar
   };

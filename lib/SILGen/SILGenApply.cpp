@@ -1628,11 +1628,6 @@ static PreparedArguments emitStringLiteral(SILGenFunction &SGF, Expr *E,
     Length = Str.size();
     break;
 
-  case StringLiteralExpr::UTF16: {
-    instEncoding = StringLiteralInst::Encoding::UTF16;
-    Length = unicode::getUTF16Length(Str);
-    break;
-  }
   case StringLiteralExpr::OneUnicodeScalar: {
     SILType Int32Ty = SILType::getBuiltinIntegerType(32, SGF.getASTContext());
     SILValue UnicodeScalarValue =
@@ -1674,11 +1669,6 @@ static PreparedArguments emitStringLiteral(SILGenFunction &SGF, Expr *E,
   ArrayRef<ManagedValue> Elts;
   ArrayRef<AnyFunctionType::Param> TypeElts;
   switch (instEncoding) {
-  case StringLiteralInst::Encoding::UTF16:
-    Elts = llvm::makeArrayRef(EltsArray).slice(0, 2);
-    TypeElts = llvm::makeArrayRef(TypeEltsArray).slice(0, 2);
-    break;
-
   case StringLiteralInst::Encoding::UTF8:
     Elts = EltsArray;
     TypeElts = TypeEltsArray;
