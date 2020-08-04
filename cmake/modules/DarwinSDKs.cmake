@@ -26,6 +26,23 @@ if(swift_build_osx)
   configure_target_variant(OSX-R  "OS X Release"         OSX R  "Release")
 endif()
 
+is_sdk_requested(GENERIC swift_build_generic)
+if(swift_build_generic)
+  set(SWIFT_GENERIC_SDK "" CACHE STRING
+      "Which SDK to use when building the GENERIC stdlib")
+  set(SWIFT_GENERIC_TRIPLE_NAME "" CACHE STRING
+      "Which triple name (e.g. 'macosx11.0') to use when building the GENERIC stdlib")
+  set(SWIFT_GENERIC_ARCHS "" CACHE STRING
+      "Which architectures to build when building the GENERIC stdlib")
+  configure_sdk_darwin(
+      GENERIC "GENERIC" ""
+      "${SWIFT_GENERIC_SDK}" generic "${SWIFT_GENERIC_TRIPLE_NAME}" generic "${SWIFT_GENERIC_ARCHS}")
+  set(SWIFT_SDK_GENERIC_LIB_SUBDIR "generic")
+  configure_target_variant(GENERIC-DA "GENERIC Debug+Asserts"   GENERIC DA "Debug+Asserts")
+  configure_target_variant(GENERIC-RA "GENERIC Release+Asserts" GENERIC RA "Release+Asserts")
+  configure_target_variant(GENERIC-R  "GENERIC Release"         GENERIC R  "Release")
+endif()
+
 # Compatible cross-compile SDKS for Darwin OSes: IOS, IOS_SIMULATOR, TVOS,
 #   TVOS_SIMULATOR, WATCHOS, WATCHOS_SIMULATOR (archs hardcoded below).
 

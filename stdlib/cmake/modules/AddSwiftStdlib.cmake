@@ -180,7 +180,12 @@ function(_add_target_variant_c_compile_flags)
 
   is_build_type_optimized("${CFLAGS_BUILD_TYPE}" optimized)
   if(optimized)
-    list(APPEND result "-O2")
+    is_build_type_optimized_for_size("${CFLAGS_BUILD_TYPE}" optimized_for_size)
+    if(optimized_for_size)
+      list(APPEND result "-Os")
+    else()
+      list(APPEND result "-O2")
+    endif()
 
     # Omit leaf frame pointers on x86 production builds (optimized, no debug
     # info, and no asserts).

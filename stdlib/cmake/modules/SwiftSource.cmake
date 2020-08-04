@@ -232,7 +232,12 @@ function(_add_target_variant_swift_compile_flags
 
   is_build_type_optimized("${build_type}" optimized)
   if(optimized)
-    list(APPEND result "-O")
+    is_build_type_optimized_for_size("${build_type}" optimized_for_size)
+    if(optimized_for_size)
+      list(APPEND result "-Osize")
+    else()
+      list(APPEND result "-O")
+    endif()
   else()
     list(APPEND result "-Onone")
   endif()

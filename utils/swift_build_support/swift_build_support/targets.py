@@ -179,6 +179,9 @@ class StdlibDeploymentTarget(object):
                                          sdk_name="WATCHOS_SIMULATOR",
                                          is_simulator=True)
 
+    Generic = Platform("generic", archs=["i386", "x86_64", "armv7", "armv7s",
+                                         "armv7k", "arm64", "arm64e"])
+
     Linux = Platform("linux", archs=[
         "x86_64",
         "i686",
@@ -207,6 +210,7 @@ class StdlibDeploymentTarget(object):
         iOS, iOSSimulator,
         AppleTV, AppleTVSimulator,
         AppleWatch, AppleWatchSimulator,
+        Generic,
         Linux,
         FreeBSD,
         OpenBSD,
