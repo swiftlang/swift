@@ -406,15 +406,6 @@ TypedPattern::TypedPattern(Pattern *pattern, TypeRepr *tr)
   Bits.TypedPattern.IsPropagatedType = false;
 }
 
-TypeLoc TypedPattern::getTypeLoc() const {
-  TypeLoc loc = TypeLoc(PatTypeRepr);
-
-  if (hasType())
-    loc.setType(getType());
-
-  return loc;
-}
-
 SourceLoc TypedPattern::getLoc() const {
   if (SubPattern->isImplicit() && PatTypeRepr)
     return PatTypeRepr->getSourceRange().Start;
