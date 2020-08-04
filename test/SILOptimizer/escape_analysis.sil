@@ -1983,3 +1983,39 @@ bb4:
   %z = tuple ()
   return %z : $()
 }
+
+sil @guaranteed_call : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int32>, Builtin.Int32) -> () {
+bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, %1 : $Builtin.Int32):
+  %proj = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
+  store  %1 to %proj : $*Builtin.Int32
+  %ret = tuple()
+  return %ret : $()
+}
+
+// Test to make sure guaranteed arg does not escape as release
+
+// CHECK-LABEL: CG of $test_guaranteed_arg
+// CHECK:   Val [ref] %1 Esc: , Succ: (%2)
+// CHECK:   Con [int] %2 Esc: %6,%7,%5, Succ: (%2.1)
+// CHECK:   Con %2.1 Esc: %6,%7,%5, Succ: (%2.2)
+// CHECK:   Con [int] %2.2 Esc: %6,%7,%5, Succ: (%2.3)
+// CHECK:   Con %2.3 Esc: %6,%7,%5, Succ: (%2.4)
+// CHECK:   Con %2.4 Esc: G, Succ: 
+// CHECK: End
+// CHECK: NoEscapeToRelease:   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
+// CHECK:  to   %5 = apply %3(%1, %0) : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int32>, Builtin.Int32) -> ()
+// CHECK: MayEscapeToAccess:   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
+// CHECK:  to   %5 = apply %3(%1, %0) : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int32>, Builtin.Int32) -> ()
+sil hidden [noinline] @$test_guaranteed_arg : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  %box = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
+  %proj = project_box %box : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
+  %funcref = function_ref @guaranteed_call : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int32>, Builtin.Int32) -> ()
+  strong_retain %box : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
+  apply %funcref (%box, %0) : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int32>, Builtin.Int32) -> ()
+  strong_release %box : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
+  strong_release %box : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
+  %tup = tuple ()
+  return %tup : $()
+}
+
