@@ -2753,6 +2753,15 @@ namespace {
     }
 
     Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
+      // If constraint solving resolved this to an UnresolvedType, then we're in
+      // an ambiguity tolerant mode used for diagnostic generation.  Just leave
+      // this as an unresolved member reference.
+      Type resultTy = simplifyType(cs.getType(expr));
+      if (resultTy->getRValueType()->is<UnresolvedType>()) {
+        cs.setType(expr, resultTy);
+        return expr;
+      }
+
       auto &ctx = cs.getASTContext();
       // Find the selected member and base type.
       auto memberLocator = cs.getConstraintLocator(
@@ -2762,6 +2771,7 @@ namespace {
       // Unresolved member lookup always happens in a metatype so dig out the
       // instance type.
       auto baseTy = selected.choice.getBaseType()->getMetatypeInstanceType();
+      baseTy = simplifyType(baseTy);
 
       // The base expression is simply the metatype of the base type.
       // FIXME: This location info is bogus.
@@ -2805,8 +2815,7 @@ namespace {
         diagnoseAmbiguousNominalMember(baseTy, result);
       }
 
-      return coerceToType(result, simplifyType(cs.getType(expr)),
-                          cs.getConstraintLocator(expr));
+      return coerceToType(result, resultTy, cs.getConstraintLocator(expr));
     }
     
     /// Diagnose if the base type is optional, we're referring to a nominal
