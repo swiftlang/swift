@@ -1781,6 +1781,9 @@ static std::string getEntryPointSection(IRGenModule &IGM) {
 }
 
 void IRGenerator::emitEntryPointInfo() {
+  if (Opts.IntegratedREPL) {
+    return;
+  }
   SILFunction *entrypoint = nullptr;
   if (!(entrypoint = SIL.lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION))) {
     return;
