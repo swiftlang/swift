@@ -3203,6 +3203,16 @@ Parser::parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
       if (!Tok.is(tok::code_complete))
         break;
 
+      // FIXME: Additional trailing closure completion on newline positions.
+      //   let foo = SomeThing {
+      //     ...
+      //   }
+      //   <HERE>
+      // This was previously enabled, but it failed to suggest 'foo' because
+      // the token was considered a part of the initializer.
+      if (Tok.isAtStartOfLine())
+        break;
+
       // If the current completion mode doesn't support trailing closure
       // completion, leave the token here and let "postfix completion" to
       // handle it.
