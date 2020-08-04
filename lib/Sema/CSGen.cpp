@@ -3485,9 +3485,6 @@ namespace {
         }
         case KeyPathExpr::Component::Kind::Identity:
           continue;
-        case KeyPathExpr::Component::Kind::DictionaryKey:
-          llvm_unreachable("DictionaryKey only valid in #keyPath");
-          break;
         }
 
         // By now, `base` is the result type of this component. Set it in the

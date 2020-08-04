@@ -8236,9 +8236,6 @@ ConstraintSystem::simplifyKeyPathConstraint(
     case KeyPathExpr::Component::Kind::TupleElement:
       llvm_unreachable("not implemented");
       break;
-    case KeyPathExpr::Component::Kind::DictionaryKey:
-      llvm_unreachable("DictionaryKey only valid in #keyPath");
-      break;
     }
   }
 
