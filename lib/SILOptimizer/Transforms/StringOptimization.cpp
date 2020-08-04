@@ -235,7 +235,7 @@ bool StringOptimization::optimizeStringConcat(ApplyInst *concatCall) {
 
   // Replace lhs + rhs with "lhs + rhs" if both lhs and rhs are constant.
   if (lhsString.isConstant() && rhsString.isConstant()) {
-    std::string concat = lhsString.str;
+    std::string concat = lhsString.str.str();
     concat += rhsString.str;
     if (ApplyInst *stringInit = createStringInit(concat, concatCall)) {
       concatCall->replaceAllUsesWith(stringInit);

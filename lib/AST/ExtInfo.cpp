@@ -43,9 +43,10 @@ void ClangTypeInfo::printType(ClangModuleLoader *cml,
   cml->printClangType(type, os);
 }
 
-void ClangTypeInfo::dump(llvm::raw_ostream &os) const {
+void ClangTypeInfo::dump(llvm::raw_ostream &os,
+                         const clang::ASTContext &ctx) const {
   if (type) {
-    type->dump(os);
+    type->dump(os, ctx);
   } else {
     os << "<nullptr>";
   }
