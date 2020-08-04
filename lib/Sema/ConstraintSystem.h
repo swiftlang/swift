@@ -3080,12 +3080,14 @@ public:
   /// supertype.
   ///
   /// Currently, a "join" is modeled by a set of conversion constraints to
-  /// a new type variable. At some point, we may want a new constraint kind
-  /// to cover the join.
+  /// a new type variable or a specified supertype. At some point, we may want
+  /// a new constraint kind to cover the join.
   ///
-  /// \returns the joined type, which is generally a new type variable.
+  /// \returns the joined type, which is generally a new type variable, unless there are
+  /// fewer than 2 input types or the \c supertype parameter is specified.
   Type addJoinConstraint(ConstraintLocator *locator,
-                         ArrayRef<std::pair<Type, ConstraintLocator *>> inputs);
+                         ArrayRef<std::pair<Type, ConstraintLocator *>> inputs,
+                         Optional<Type> supertype = None);
 
   /// Add a constraint to the constraint system with an associated fix.
   void addFixConstraint(ConstraintFix *fix, ConstraintKind kind,

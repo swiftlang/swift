@@ -32,6 +32,8 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Compiler.h"
 
+#include <unordered_set>
+
 using namespace swift;
 using namespace constraints;
 
@@ -10418,14 +10420,44 @@ void ConstraintSystem::addContextualConversionConstraint(
                 convertTypeLocator, /*isFavored*/ true);
 }
 
+/// Returns the \c ExprKind of the given type variable if it's the type of an
+/// atomic literal expression, meaning the literal can't be composed of subexpressions.
+/// Otherwise, returns \c None.
+static Optional<ExprKind> getAtomicLiteralKind(TypeVariableType *typeVar) {
+  const std::unordered_set<ExprKind> atomicLiteralKinds = {
+    ExprKind::IntegerLiteral,
+    ExprKind::FloatLiteral,
+    ExprKind::StringLiteral,
+    ExprKind::BooleanLiteral,
+    ExprKind::NilLiteral,
+  };
+
+  if (!typeVar)
+    return None;
+
+  auto *locator = typeVar->getImpl().getLocator();
+  if (!locator->directlyAt<LiteralExpr>())
+    return None;
+
+  auto literalKind = getAsExpr(locator->getAnchor())->getKind();
+  if (!atomicLiteralKinds.count(literalKind))
+    return None;
+
+  return literalKind;
+}
+
 Type ConstraintSystem::addJoinConstraint(
     ConstraintLocator *locator,
-    ArrayRef<std::pair<Type, ConstraintLocator *>> inputs) {
+    ArrayRef<std::pair<Type, ConstraintLocator *>> inputs,
+    Optional<Type> supertype) {
   switch (inputs.size()) {
   case 0:
     return Type();
 
   case 1:
+    if (supertype.hasValue())
+      break;
+
     return inputs.front().first;
 
   default:
@@ -10434,12 +10466,32 @@ Type ConstraintSystem::addJoinConstraint(
   }
 
   // Create a type variable to capture the result of the join.
-  Type resultTy = createTypeVariable(locator,
-                                     (TVO_PrefersSubtypeBinding |
-                                      TVO_CanBindToNoEscape));
+  Type resultTy = supertype.hasValue() ? supertype.getValue() :
+                  createTypeVariable(locator, (TVO_PrefersSubtypeBinding | TVO_CanBindToNoEscape));
 
-  // Introduce conversions from each input type to the type variable.
+  using RawExprKind = uint8_t;
+  llvm::SmallDenseMap<RawExprKind, TypeVariableType *> representativeForKind;
+
+  // Join the input types.
   for (const auto &input : inputs) {
+    // We can merge the type variables of same-kind atomic literal expressions because they
+    // will all have the same set of constraints and therefore can never resolve to anything
+    // different.
+    auto *typeVar = input.first->getAs<TypeVariableType>();
+    if (auto literalKind = getAtomicLiteralKind(typeVar)) {
+      auto *&originalRep = representativeForKind[RawExprKind(*literalKind)];
+      auto *currentRep = getRepresentative(typeVar);
+
+      if (originalRep) {
+        if (originalRep != currentRep)
+          mergeEquivalenceClasses(currentRep, originalRep);
+        continue;
+      }
+
+      originalRep = currentRep;
+    }
+
+    // Introduce conversions from each input type to the supertype.
     addConstraint(
       ConstraintKind::Conversion, input.first, resultTy, input.second);
   }
