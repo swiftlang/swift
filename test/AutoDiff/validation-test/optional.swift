@@ -109,6 +109,40 @@ OptionalTests.test("Generic") {
 
   expectEqual(gradient(at: 10, 20, in: optional6), (.init(1.0), 0.0))
   expectEqual(gradient(at: nil, 20, in: optional6), (.init(0.0), 1.0))
+
+  @differentiable
+  func optional7<T: Differentiable>(_ maybeX: T?, _ defaultValue: T) -> T {
+    if let x = maybeX {
+        return x
+    }
+    return defaultValue
+  }
+
+  expectEqual(gradient(at: 10, 20, in: optional7), (.init(1.0), 0.0))
+  expectEqual(gradient(at: nil, 20, in: optional7), (.init(0.0), 1.0))
+
+  @differentiable
+  func optional8<T: Differentiable>(_ maybeX: T?, _ defaultValue: T) -> T {
+    var maybeX = maybeX
+    if let x = maybeX {
+        return x
+    }
+    return defaultValue
+  }
+
+  expectEqual(gradient(at: 10, 20, in: optional8), (.init(1.0), 0.0))
+  expectEqual(gradient(at: nil, 20, in: optional8), (.init(0.0), 1.0))
+
+  @differentiable
+  func optional9<T: Differentiable>(_ maybeX: T?, _ defaultValue: T) -> T {
+    if var x = maybeX {
+      return x
+    }
+    return defaultValue
+  }
+
+  expectEqual(gradient(at: 10, 20, in: optional9), (.init(1.0), 0.0))
+  expectEqual(gradient(at: nil, 20, in: optional9), (.init(0.0), 1.0))
 }
 
 runAllTests()
