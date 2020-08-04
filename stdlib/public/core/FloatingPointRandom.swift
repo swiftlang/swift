@@ -327,8 +327,8 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
     var n: UInt64
     let isLowerBound: Bool
     
-    let w = Self._sectionBitCount &- 1
-    let z = eMax - max(1, e)   // Number of leading zeros before implicit bit
+    let w = Self._sectionBitCount - 1  // Subtract 1 to account for implicit bit
+    let z = eMax - max(1, e)           // Leading zeros before implicit bit
     
     if z < w {
       // We will need (w - z) significand bits.
