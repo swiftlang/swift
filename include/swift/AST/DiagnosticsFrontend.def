@@ -125,6 +125,8 @@ ERROR(error_mode_cannot_emit_module_source_info,none,
       "this mode does not support emitting module source info files", ())
 ERROR(error_mode_cannot_emit_interface,none,
       "this mode does not support emitting module interface files", ())
+ERROR(error_mode_cannot_emit_module_summary,none,
+      "this mode does not support emitting module summary files", ())
 ERROR(cannot_emit_ir_skipping_function_bodies,none,
       "-experimental-skip-non-inlinable-function-bodies does not support "
       "emitting IR", ())

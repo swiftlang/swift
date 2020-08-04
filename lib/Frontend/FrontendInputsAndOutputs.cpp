@@ -466,6 +466,12 @@ bool FrontendInputsAndOutputs::hasPrivateModuleInterfaceOutputPath() const {
         return outs.PrivateModuleInterfaceOutputPath;
       });
 }
+bool FrontendInputsAndOutputs::hasModuleSummaryOutputPath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.ModuleSummaryOutputPath;
+      });
+}
 bool FrontendInputsAndOutputs::hasTBDPath() const {
   return hasSupplementaryOutputPath(
       [](const SupplementaryOutputPaths &outs) -> const std::string & {

@@ -333,6 +333,7 @@ private:
   static bool canActionEmitLoadedModuleTrace(ActionType);
   static bool canActionEmitModule(ActionType);
   static bool canActionEmitModuleDoc(ActionType);
+  static bool canActionEmitModuleSummary(ActionType);
   static bool canActionEmitInterface(ActionType);
 
 public:

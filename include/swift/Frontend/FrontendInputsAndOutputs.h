@@ -239,6 +239,7 @@ public:
   bool hasModuleSourceInfoOutputPath() const;
   bool hasModuleInterfaceOutputPath() const;
   bool hasPrivateModuleInterfaceOutputPath() const;
+  bool hasModuleSummaryOutputPath() const;
   bool hasTBDPath() const;
 
   bool hasDependencyTrackerPath() const;

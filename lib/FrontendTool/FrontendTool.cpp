@@ -1899,6 +1899,17 @@ static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
   return Context.hadError();
 }
 
+static bool serializeModuleSummary(SILModule *SM,
+                                   const PrimarySpecificPaths &PSPs,
+                                   const ASTContext &Context) {
+  auto summaryOutputPath = PSPs.SupplementaryOutputs.ModuleSummaryOutputPath;
+  return withOutputFile(Context.Diags, summaryOutputPath,
+                        [&](llvm::raw_ostream &out) {
+                          out << "Some stuff";
+                          return false;
+                        });
+}
+
 static GeneratedModule
 generateIR(const IRGenOptions &IRGenOpts, const TBDGenOptions &TBDOpts,
            std::unique_ptr<SILModule> SM,
@@ -2122,6 +2133,12 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
   if (observer)
     observer->performedSILProcessing(*SM);
+
+  if (PSPs.haveModuleSummaryOutputPath()) {
+    if (serializeModuleSummary(SM.get(), PSPs, Context)) {
+      return true;
+    }
+  }
 
   if (Action == FrontendOptions::ActionType::EmitSIB)
     return serializeSIB(SM.get(), PSPs, Context, MSF);
