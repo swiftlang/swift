@@ -2994,6 +2994,11 @@ public:
   bool isDeclUnavailable(const Decl *D,
                          ConstraintLocator *locator = nullptr) const;
 
+  /// Returns the \c ExprKind of the given type variable if it's the type of an
+  /// atomic literal expression, meaning the literal can't be composed of subexpressions.
+  /// Otherwise, returns \c None.
+  Optional<ExprKind> getAtomicLiteralKind(TypeVariableType *typeVar) const;
+
 public:
 
   /// Whether we should attempt to fix problems.
@@ -3076,6 +3081,14 @@ public:
       Expr *expr, Type conversionType, ContextualTypePurpose purpose,
       bool isOpaqueReturnType);
 
+  /// Convenience function to pass an \c ArrayRef to \c addJoinConstraint
+  Type addJoinConstraint(ConstraintLocator *locator,
+                         ArrayRef<std::pair<Type, ConstraintLocator *>> inputs,
+                         Optional<Type> supertype = None) {
+    return addJoinConstraint<decltype(inputs)::iterator>(
+        locator, inputs.begin(), inputs.end(), supertype, [](auto it) { return *it; });
+  }
+
   /// Add a "join" constraint between a set of types, producing the common
   /// supertype.
   ///
@@ -3085,9 +3098,55 @@ public:
   ///
   /// \returns the joined type, which is generally a new type variable, unless there are
   /// fewer than 2 input types or the \c supertype parameter is specified.
+  template<typename Iterator>
   Type addJoinConstraint(ConstraintLocator *locator,
-                         ArrayRef<std::pair<Type, ConstraintLocator *>> inputs,
-                         Optional<Type> supertype = None);
+                         Iterator begin, Iterator end,
+                         Optional<Type> supertype,
+                         std::function<std::pair<Type, ConstraintLocator *>(Iterator)> getType) {
+    if (begin == end)
+      return Type();
+
+    // No need to generate a new type variable if there's only one type to join
+    if ((begin + 1 == end) && !supertype.hasValue())
+      return getType(begin).first;
+
+    // The type to capture the result of the join, which is either the specified supertype,
+    // or a new type variable.
+    Type resultTy = supertype.hasValue() ? supertype.getValue() :
+                    createTypeVariable(locator, (TVO_PrefersSubtypeBinding | TVO_CanBindToNoEscape));
+
+    using RawExprKind = uint8_t;
+    llvm::SmallDenseMap<RawExprKind, TypeVariableType *> representativeForKind;
+
+    // Join the input types.
+    while (begin != end) {
+      Type type;
+      ConstraintLocator *locator;
+      std::tie(type, locator) = getType(begin++);
+
+      // We can merge the type variables of same-kind atomic literal expressions because they
+      // will all have the same set of constraints and therefore can never resolve to anything
+      // different.
+      auto *typeVar = type->getAs<TypeVariableType>();
+      if (auto literalKind = getAtomicLiteralKind(typeVar)) {
+        auto *&originalRep = representativeForKind[RawExprKind(*literalKind)];
+        auto *currentRep = getRepresentative(typeVar);
+
+        if (originalRep) {
+          if (originalRep != currentRep)
+            mergeEquivalenceClasses(currentRep, originalRep);
+          continue;
+        }
+
+        originalRep = currentRep;
+      }
+
+      // Introduce conversions from each input type to the supertype.
+      addConstraint(ConstraintKind::Conversion, type, resultTy, locator);
+    }
+
+    return resultTy;
+  }
 
   /// Add a constraint to the constraint system with an associated fix.
   void addFixConstraint(ConstraintFix *fix, ConstraintKind kind,
