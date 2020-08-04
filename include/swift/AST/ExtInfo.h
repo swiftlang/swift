@@ -30,6 +30,7 @@
 
 namespace clang {
 class Type;
+class ASTContext;
 } // namespace clang
 
 namespace swift {
@@ -77,7 +78,7 @@ public:
   /// Use the ClangModuleLoader to print the Clang type as a string.
   void printType(ClangModuleLoader *cml, llvm::raw_ostream &os) const;
 
-  void dump(llvm::raw_ostream &os) const;
+  void dump(llvm::raw_ostream &os, const clang::ASTContext &ctx) const;
 };
 
 // MARK: - FunctionTypeRepresentation
