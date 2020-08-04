@@ -1236,8 +1236,7 @@ public:
         assert(parentKind == CaseParentKind::Switch &&
                "'@unknown' can only appear on switch cases");
         checkUnknownAttrRestrictions(
-            getASTContext(), caseBlock, FallthroughDest,
-            limitExhaustivityChecks);
+            getASTContext(), caseBlock, limitExhaustivityChecks);
       }
 
       Stmt *body = caseBlock->getBody();
@@ -2157,8 +2156,9 @@ void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
 }
 
 void swift::checkUnknownAttrRestrictions(
-    ASTContext &ctx, CaseStmt *caseBlock, CaseStmt *fallthroughDest,
+    ASTContext &ctx, CaseStmt *caseBlock,
     bool &limitExhaustivityChecks) {
+  CaseStmt *fallthroughDest = caseBlock->findNextCaseStmt();
   if (caseBlock->getCaseLabelItems().size() != 1) {
     assert(!caseBlock->getCaseLabelItems().empty() &&
            "parser should not produce case blocks with no items");
