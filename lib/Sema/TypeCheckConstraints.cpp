@@ -2023,7 +2023,6 @@ public:
     return {false, pattern};
   }
 
-  bool walkToTypeLocPre(TypeLoc &typeLoc) override { return false; }
   bool walkToTypeReprPre(TypeRepr *typeRepr) override { return false; }
   bool walkToParameterListPre(ParameterList *params) override { return false; }
 };
@@ -4004,7 +4003,6 @@ void swift::forEachExprInConstraintSystem(
     }
     bool walkToDeclPre(Decl *D) override { return false; }
     bool walkToTypeReprPre(TypeRepr *T) override { return false; }
-    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
   };
 
   expr->walk(ChildWalker(callback));

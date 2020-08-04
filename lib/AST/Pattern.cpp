@@ -187,7 +187,6 @@ namespace {
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
       return { false, S };
     }
-    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
     bool walkToTypeReprPre(TypeRepr *T) override { return false; }
     bool walkToParameterListPre(ParameterList *PL) override { return false; }
     bool walkToDeclPre(Decl *D) override { return false; }
