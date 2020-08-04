@@ -619,14 +619,6 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
           micro = firstMacARM64e.getSubminor().getValueOr(0);
         }
 
-        // Temporary hack: adjust macOS version passed to the linker from
-        // 11 down to 10.16, but only for x86.
-        if (triple.isX86() && major == 11) {
-          major = 10;
-          minor = 16;
-          micro = 0;
-        }
-
         break;
       case DarwinPlatformKind::IPhoneOS:
       case DarwinPlatformKind::IPhoneOSSimulator:
