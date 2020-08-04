@@ -173,8 +173,8 @@ namespace {
     /// A callback to be invoked every time a type was deserialized.
     std::function<void(Type)> ParsedTypeCallback;
 
-    Type performTypeLocChecking(TypeRepr *TyR, bool IsSILType,
-                                GenericEnvironment *GenericEnv = nullptr);
+    Type performTypeResolution(TypeRepr *TyR, bool IsSILType,
+                               GenericEnvironment *GenericEnv);
 
     void convertRequirements(SILFunction *F, ArrayRef<RequirementRepr> From,
                              SmallVectorImpl<Requirement> &To);
@@ -867,9 +867,10 @@ void SILParser::convertRequirements(SILFunction *F,
   IdentTypeReprLookup PerformLookup(P);
   // Use parser lexical scopes to resolve references
   // to the generic parameters.
-  auto ResolveToInterfaceType = [&](TypeRepr *Ty) -> Type {
-    Ty->walk(PerformLookup);
-    return performTypeLocChecking(Ty, /* IsSIL */ false)->mapTypeOutOfContext();
+  auto ResolveToInterfaceType = [&](TypeRepr *TyR) -> Type {
+    TyR->walk(PerformLookup);
+    return performTypeResolution(TyR, /*IsSILType=*/false, ContextGenericEnv)
+        ->mapTypeOutOfContext();
   };
 
   for (auto &Req : From) {
@@ -1091,16 +1092,14 @@ static bool parseDeclSILOptional(bool *isTransparent,
   return false;
 }
 
-Type SILParser::performTypeLocChecking(TypeRepr *T, bool IsSILType,
-                                       GenericEnvironment *GenericEnv) {
+Type SILParser::performTypeResolution(TypeRepr *TyR, bool IsSILType,
+                                      GenericEnvironment *GenericEnv) {
   if (GenericEnv == nullptr)
     GenericEnv = ContextGenericEnv;
 
-  TypeLoc loc(T);
-  (void) swift::performTypeLocChecking(P.Context, loc,
-                                       /*isSILMode=*/true, IsSILType,
-                                       GenericEnv, &P.SF);
-  return loc.getType();
+  return swift::performTypeResolution(TyR, P.Context,
+                                      /*isSILMode=*/true, IsSILType, GenericEnv,
+                                      &P.SF);
 }
 
 /// Find the top-level ValueDecl or Module given a name.
@@ -1154,7 +1153,8 @@ static ValueDecl *lookupMember(Parser &P, Type Ty, DeclBaseName Name,
 bool SILParser::parseASTType(CanType &result, GenericEnvironment *env) {
   ParserResult<TypeRepr> parsedType = P.parseType();
   if (parsedType.isNull()) return true;
-  auto resolvedType = performTypeLocChecking(parsedType.get(), /*IsSILType=*/ false, env);
+  const auto resolvedType =
+      performTypeResolution(parsedType.get(), /*isSILType=*/false, env);
   if (resolvedType->hasError())
     return true;
 
@@ -1243,8 +1243,10 @@ bool SILParser::parseSILType(SILType &Result,
       ParsedGenericEnv = env;
   
   // Apply attributes to the type.
-  auto *attrRepr = P.applyAttributeToType(TyR.get(), attrs, specifier, specifierLoc);
-  auto Ty = performTypeLocChecking(attrRepr, /*IsSILType=*/true, OuterGenericEnv);
+  auto *attrRepr =
+      P.applyAttributeToType(TyR.get(), attrs, specifier, specifierLoc);
+  const auto Ty =
+      performTypeResolution(attrRepr, /*IsSILType=*/true, OuterGenericEnv);
   if (Ty->hasError())
     return true;
 
@@ -1696,7 +1698,8 @@ bool SILParser::parseSubstitutions(SmallVectorImpl<ParsedSubstitution> &parsed,
     if (defaultForProto)
       bindProtocolSelfInTypeRepr(TyR.get(), defaultForProto);
 
-    auto Ty = performTypeLocChecking(TyR.get(), /*IsSILType=*/ false, GenericEnv);
+    const auto Ty =
+        performTypeResolution(TyR.get(), /*IsSILType=*/false, GenericEnv);
     if (Ty->hasError())
       return true;
     parsed.push_back({Loc, Ty});
@@ -2105,7 +2108,8 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired) {
       }
     }
 
-    auto Ty = performTypeLocChecking(TyR.get(), /*IsSILType=*/ false, genericEnv);
+    const auto Ty =
+        performTypeResolution(TyR.get(), /*IsSILType=*/false, genericEnv);
     if (Ty->hasError())
       return true;
 
@@ -6321,7 +6325,8 @@ ProtocolConformanceRef SILParser::parseProtocolConformanceHelper(
     bindProtocolSelfInTypeRepr(TyR.get(), defaultForProto);
   }
 
-  auto ConformingTy = performTypeLocChecking(TyR.get(), /*IsSILType=*/ false, witnessEnv);
+  const auto ConformingTy =
+      performTypeResolution(TyR.get(), /*IsSILType=*/false, witnessEnv);
   if (ConformingTy->hasError())
     return ProtocolConformanceRef();
 
@@ -6437,17 +6442,18 @@ static bool parseSILVTableEntry(
       ParserResult<TypeRepr> TyR = P.parseType();
       if (TyR.isNull())
         return true;
-      TypeLoc Ty = TyR.get();
+
       if (isDefaultWitnessTable)
         bindProtocolSelfInTypeRepr(TyR.get(), proto);
-      if (swift::performTypeLocChecking(P.Context, Ty,
-                                        /*isSILMode=*/false,
-                                        /*isSILType=*/false,
-                                        witnessEnv,
-                                        &P.SF))
+
+      const auto Ty =
+          swift::performTypeResolution(TyR.get(), P.Context,
+                                       /*isSILMode=*/false,
+                                       /*isSILType=*/false, witnessEnv, &P.SF);
+      if (Ty->hasError())
         return true;
 
-      assocOrSubject = Ty.getType()->getCanonicalType();
+      assocOrSubject = Ty->getCanonicalType();
     }
     if (!assocOrSubject)
       return true;
@@ -6498,19 +6504,19 @@ static bool parseSILVTableEntry(
     ParserResult<TypeRepr> TyR = P.parseType();
     if (TyR.isNull())
       return true;
-    TypeLoc Ty = TyR.get();
+
     if (isDefaultWitnessTable)
       bindProtocolSelfInTypeRepr(TyR.get(), proto);
-    if (swift::performTypeLocChecking(P.Context, Ty,
-                                      /*isSILMode=*/false,
-                                      /*isSILType=*/false,
-                                      witnessEnv,
-                                      &P.SF))
+
+    const auto Ty =
+        swift::performTypeResolution(TyR.get(), P.Context,
+                                     /*isSILMode=*/false,
+                                     /*isSILType=*/false, witnessEnv, &P.SF);
+    if (Ty->hasError())
       return true;
 
-    witnessEntries.push_back(SILWitnessTable::AssociatedTypeWitness{
-      assoc, Ty.getType()->getCanonicalType()
-    });
+    witnessEntries.push_back(
+        SILWitnessTable::AssociatedTypeWitness{assoc, Ty->getCanonicalType()});
     return false;
   }
 
