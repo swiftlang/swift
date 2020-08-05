@@ -346,13 +346,13 @@
             "aliases": ["tensorflow"],
             "repos": {
                 "llvm-project": "db8896f3f345af247bd2a23432f49c9dd01d8003",
-                "swift": "tensorflow",
+                "swift": "tensorflow-0.11updated",
                 "cmark": "swift-DEVELOPMENT-SNAPSHOT-2020-07-22-a",
                 "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2020-07-22-a",
                 "swift-tools-support-core": "0.1.8",
                 "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2020-07-22-a",
                 "swift-argument-parser": "0.2.0",
-                "swift-driver": "bf0026c636347b4c31aab21deb01943529b7e556",
+                "swift-driver": "e9aab7bd157f293a7964d8ab6c2e4af7d6d40363",
                 "swift-syntax": "swift-DEVELOPMENT-SNAPSHOT-2020-07-22-a",
                 "swift-stress-tester": "swift-DEVELOPMENT-SNAPSHOT-2020-07-22-a",
                 "swift-corelibs-xctest": "swift-DEVELOPMENT-SNAPSHOT-2020-07-22-a",
@@ -368,7 +368,7 @@
                 "PythonKit": "master",
                 "swift-format": "master",
                 "tensorflow": "v2.2.0-rc0",
-                "tensorflow-swift-apis": "master"
+                "tensorflow-swift-apis": "tensorflow-0.11updated"
             }
         }
     }
