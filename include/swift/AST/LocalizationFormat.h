@@ -21,12 +21,18 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Bitstream/BitstreamReader.h"
 #include "llvm/Support/DJB.h"
+#include "llvm/Support/EndianStream.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
+#include "llvm/Support/raw_ostream.h"
+#include <cstdint>
+#include <memory>
 #include <string>
 #include <type_traits>
+#include <utility>
+#include <vector>
 
 namespace swift {
 enum class DiagID : uint32_t;

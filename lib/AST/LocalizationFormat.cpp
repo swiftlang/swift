@@ -22,7 +22,9 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
+#include <cstdint>
 #include <string>
+#include <system_error>
 #include <type_traits>
 
 namespace {
