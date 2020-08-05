@@ -392,16 +392,16 @@ SourceLoc RepeatWhileStmt::getEndLoc() const { return Cond->getEndLoc(); }
 
 SourceRange CaseLabelItem::getSourceRange() const {
   if (auto *E = getGuardExpr())
-    return { CasePattern->getStartLoc(), E->getEndLoc() };
-  return CasePattern->getSourceRange();
+    return { getPattern()->getStartLoc(), E->getEndLoc() };
+  return getPattern()->getSourceRange();
 }
 SourceLoc CaseLabelItem::getStartLoc() const {
-  return CasePattern->getStartLoc();
+  return getPattern()->getStartLoc();
 }
 SourceLoc CaseLabelItem::getEndLoc() const {
   if (auto *E = getGuardExpr())
     return E->getEndLoc();
-  return CasePattern->getEndLoc();
+  return getPattern()->getEndLoc();
 }
 
 CaseStmt::CaseStmt(CaseParentKind parentKind, SourceLoc itemIntroducerLoc,
