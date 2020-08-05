@@ -2188,6 +2188,11 @@ bool ContextualFailure::diagnoseAsError() {
     return true;
   }
 
+  case ConstraintLocator::FunctionBuilderBodyResult: {
+    diagnostic = *getDiagnosticFor(CTP_Initialization, toType);
+    break;
+  }
+
   default:
     return false;
   }

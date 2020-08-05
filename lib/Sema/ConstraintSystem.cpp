@@ -3870,6 +3870,11 @@ void constraints::simplifyLocator(ASTNode &anchor,
       break;
     }
 
+    case ConstraintLocator::FunctionBuilderBodyResult: {
+      path = path.slice(1);
+      break;
+    }
+
     default:
       // FIXME: Lots of other cases to handle.
       break;
