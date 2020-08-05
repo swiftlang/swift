@@ -179,6 +179,8 @@ class StdlibDeploymentTarget(object):
                                          sdk_name="WATCHOS_SIMULATOR",
                                          is_simulator=True)
 
+    # A platform that's not tied to any particular OS, and it meant to be used
+    # to build the stdlib as standalone and/or statically linked.
     Generic = Platform("generic", archs=["i386", "x86_64", "armv7", "armv7s",
                                          "armv7k", "arm64", "arm64e"])
 
