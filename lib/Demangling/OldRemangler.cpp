@@ -2110,7 +2110,7 @@ void Remangler::mangleSugaredParen(Node *node) {
 }
 
 void Remangler::mangleOpaqueReturnType(Node *node) {
-  unreachable("unsupported");
+  Buffer << "Qu";
 }
 void Remangler::mangleOpaqueReturnTypeOf(Node *node, EntityContext &ctx) {
   unreachable("unsupported");

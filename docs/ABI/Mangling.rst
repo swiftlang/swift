@@ -655,6 +655,11 @@ implementation details of a function type.
     opaque-type-decl-name ::= entity 'QO' // opaque result type of specified decl
   #endif
 
+  #if SWIFT_VERSION >= 5.4
+    type ::= 'Qu'                         // opaque result type (of current decl)
+                                          // used for ObjC class runtime name purposes.
+  #endif
+
 Opaque return types have a special short representation in the mangling of
 their defining entity. In structural position, opaque types are fully qualified
 by mangling the defining entity for the opaque declaration and the substitutions
