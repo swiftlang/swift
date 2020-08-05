@@ -235,8 +235,25 @@ IndexSubset *SILFunctionType::getDifferentiabilityResultIndices() {
       resultIndices.push_back(resultAndIndex.index());
   // Check `inout` parameters.
   for (auto inoutParamAndIndex : enumerate(getIndirectMutatingParameters()))
-    if (inoutParamAndIndex.value().getDifferentiability() !=
-        SILParameterDifferentiability::NotDifferentiable)
+    // FIXME(TF-1305): The `getResults().empty()` condition is a hack.
+    //
+    // Currently, an `inout` parameter can either be:
+    // 1. Both a differentiability parameter and a differentiability result.
+    // 2. `@noDerivative`: neither a differentiability parameter nor a
+    //    differentiability result.
+    // However, there is no way to represent an `inout` parameter that:
+    // 3. Is a differentiability result but not a differentiability parameter.
+    // 4. Is a differentiability parameter but not a differentiability result.
+    //    This case is not currently expressible and does not yet have clear use
+    //    cases, so supporting it is a non-goal.
+    //
+    // See TF-1305 for solution ideas. For now, `@noDerivative` `inout`
+    // parameters are not treated as differentiability results, unless the
+    // original function has no formal results, in which case all `inout`
+    // parameters are treated as differentiability results.
+    if (getResults().empty() ||
+        inoutParamAndIndex.value().getDifferentiability() !=
+            SILParameterDifferentiability::NotDifferentiable)
       resultIndices.push_back(getNumResults() + inoutParamAndIndex.index());
   auto numSemanticResults =
       getNumResults() + getNumIndirectMutatingParameters();
@@ -432,8 +449,9 @@ static CanSILFunctionType getAutoDiffDifferentialType(
     }
   }
   SmallVector<SILResultInfo, 1> differentialResults;
-  if (inoutParamIndices->isEmpty()) {
-    for (auto resultIndex : resultIndices->getIndices()) {
+  for (auto resultIndex : resultIndices->getIndices()) {
+    // Handle formal original result.
+    if (resultIndex < originalFnTy->getNumResults()) {
       auto &result = originalResults[resultIndex];
       auto resultTan =
           result.getInterfaceType()->getAutoDiffTangentSpace(lookupConformance);
@@ -452,8 +470,27 @@ static CanSILFunctionType getAutoDiffDifferentialType(
         substReplacements.push_back(resultTanType);
         differentialResults.push_back({gpType, resultConv});
       }
+      continue;
     }
+    // Handle original `inout` parameter.
+    auto inoutParamIndex = resultIndex - originalFnTy->getNumResults();
+    auto inoutParamIt = std::next(
+        originalFnTy->getIndirectMutatingParameters().begin(), inoutParamIndex);
+    auto paramIndex =
+        std::distance(originalFnTy->getParameters().begin(), &*inoutParamIt);
+    // If the original `inout` parameter is a differentiability parameter, then
+    // it already has a corresponding differential parameter. Skip adding a
+    // corresponding differential result.
+    if (parameterIndices->contains(paramIndex))
+      continue;
+    auto inoutParam = originalFnTy->getParameters()[paramIndex];
+    auto paramTan = inoutParam.getInterfaceType()->getAutoDiffTangentSpace(
+        lookupConformance);
+    assert(paramTan && "Parameter type does not have a tangent space?");
+    differentialResults.push_back(
+        {paramTan->getCanonicalType(), ResultConvention::Indirect});
   }
+
   SubstitutionMap substitutions;
   if (!substGenericParams.empty()) {
     auto genericSig =
@@ -714,7 +751,9 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     CanGenericSignature derivativeFnInvocationGenSig,
     bool isReabstractionThunk) {
   assert(parameterIndices);
+  assert(!parameterIndices->isEmpty() && "Parameter indices must not be empty");
   assert(resultIndices);
+  assert(!resultIndices->isEmpty() && "Result indices must not be empty");
   auto &ctx = getASTContext();
 
   // Look up result in cache.

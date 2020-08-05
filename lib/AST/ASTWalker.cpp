@@ -1628,7 +1628,7 @@ Stmt *Traversal::visitSwitchStmt(SwitchStmt *S) {
 Stmt *Traversal::visitCaseStmt(CaseStmt *S) {
   for (auto &CLI : S->getMutableCaseLabelItems()) {
     if (auto *newPattern = doIt(CLI.getPattern()))
-      CLI.setPattern(newPattern);
+      CLI.setPattern(newPattern, /*resolved=*/CLI.isPatternResolved());
     else
       return nullptr;
     if (CLI.getGuardExpr()) {

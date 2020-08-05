@@ -2013,6 +2013,10 @@ private:
       }
     }
     if (c == 'Q') {
+      if (Mangled.nextIf('u')) {
+        // Special mangling for opaque return type.
+        return Factory.createNode(Node::Kind::OpaqueReturnType);
+      }
       return demangleArchetypeType();
     }
     if (c == 'q') {

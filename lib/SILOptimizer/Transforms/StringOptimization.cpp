@@ -257,12 +257,16 @@ static bool containsProblematicNode(Demangle::Node *node, bool qualified) {
       if (qualified)
         return true;
       break;
-    case Demangle::Node::Kind::Class:
+    case Demangle::Node::Kind::Class: {
       // ObjC class names are not derived from the mangling but from the
       // ObjC runtime. We cannot constant fold this.
-      if (node->getChild(0)->getText() == "__C")
+      Demangle::Node *context = node->getChild(0);
+      if (context->getKind() == Demangle::Node::Kind::Module &&
+          context->getText() == "__C") {
         return true;
+      }
       break;
+    }
     default:
       break;
   }
