@@ -2774,17 +2774,15 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
     // Resolve field types using the box type's generic environment, if it
     // has one. (TODO: Field types should never refer to generic parameters
     // outside the box's own environment; we should really validate that...)
-    Optional<TypeResolution> resolveSILBoxGenericParams;
-    Optional<llvm::SaveAndRestore<TypeResolution>>
-      useSILBoxGenericEnv;
+    TypeResolution fieldResolution{resolution};
     if (auto env = repr->getGenericEnvironment()) {
-      resolveSILBoxGenericParams = TypeResolution::forContextual(
+      fieldResolution = TypeResolution::forContextual(
           getDeclContext(), env, options, resolution.getUnboundTypeOpener());
-      useSILBoxGenericEnv.emplace(resolution, *resolveSILBoxGenericParams);
     }
-    
+
+    TypeResolver fieldResolver{fieldResolution};
     for (auto &fieldRepr : repr->getFields()) {
-      auto fieldTy = resolveType(fieldRepr.getFieldType(), options);
+      auto fieldTy = fieldResolver.resolveType(fieldRepr.getFieldType(), options);
       fields.push_back({fieldTy->getCanonicalType(), fieldRepr.isMutable()});
     }
   }
@@ -2853,15 +2851,11 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
       : genericEnv;
 
   {
-    Optional<TypeResolution> resolveSILFunctionGenericParams;
-    Optional<llvm::SaveAndRestore<TypeResolution>> useSILFunctionGenericEnv;
-
+    TypeResolution functionResolution{resolution};
     if (componentTypeEnv) {
-      resolveSILFunctionGenericParams = TypeResolution::forContextual(
+      functionResolution = TypeResolution::forContextual(
           getDeclContext(), componentTypeEnv, options,
           resolution.getUnboundTypeOpener());
-      useSILFunctionGenericEnv.emplace(resolution,
-                                       *resolveSILFunctionGenericParams);
     }
     
     auto argsTuple = repr->getArgsTypeRepr();
@@ -2875,10 +2869,11 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
         diagnose(element.UnderscoreLoc, diag::sil_function_input_label);
     }
 
+    TypeResolver silResolver{functionResolution};
     for (auto elt : argsTuple->getElements()) {
       auto elementOptions = options;
       elementOptions.setContext(TypeResolverContext::FunctionInput);
-      auto param = resolveSILParameter(elt.Type, elementOptions);
+      auto param = silResolver.resolveSILParameter(elt.Type, elementOptions);
       params.push_back(param);
 
       if (!param.getInterfaceType() || param.getInterfaceType()->hasError())
@@ -2887,8 +2882,9 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
 
     {
       // FIXME: Deal with unsatisfied dependencies.
-      if (resolveSILResults(repr->getResultTypeRepr(), options, yields,
-                            results, errorResult)) {
+      if (silResolver.resolveSILResults(repr->getResultTypeRepr(),
+                                        options, yields,
+                                        results, errorResult)) {
         hasError = true;
       }
 
@@ -2899,15 +2895,16 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
         hasError = true;
       }
     }
-  } // restore generic type resolution
+  }
 
   auto resolveSubstitutions = [&](GenericEnvironment *env,
-                                  ArrayRef<TypeRepr*> args) {
+                                  ArrayRef<TypeRepr*> args,
+                                  TypeResolver &&parameterResolver) {
     auto sig = env->getGenericSignature().getCanonicalSignature();
     TypeSubstitutionMap subsMap;
     auto params = sig->getGenericParams();
     for (unsigned i : indices(args)) {
-      auto resolved = resolveType(args[i], options);
+      auto resolved = parameterResolver.resolveType(args[i], options);
       subsMap.insert({params[i], resolved->getCanonicalType()});
     }
     return SubstitutionMap::get(
@@ -2920,25 +2917,26 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   // applicable.
   SubstitutionMap patternSubs;
   if (!repr->getPatternSubstitutions().empty()) {
-    Optional<TypeResolution> resolveSILFunctionGenericParams;
-    Optional<llvm::SaveAndRestore<TypeResolution>> useSILFunctionGenericEnv;
     if (genericEnv) {
-      resolveSILFunctionGenericParams =
+      auto resolveSILParameters =
           TypeResolution::forContextual(getDeclContext(), genericEnv, options,
                                         resolution.getUnboundTypeOpener());
-      useSILFunctionGenericEnv.emplace(resolution,
-                                       *resolveSILFunctionGenericParams);
+      patternSubs = resolveSubstitutions(repr->getPatternGenericEnvironment(),
+                                         repr->getPatternSubstitutions(),
+                                         TypeResolver{resolveSILParameters});
+    } else {
+      patternSubs = resolveSubstitutions(repr->getPatternGenericEnvironment(),
+                                         repr->getPatternSubstitutions(),
+                                         TypeResolver{resolution});
     }
-
-    patternSubs = resolveSubstitutions(repr->getPatternGenericEnvironment(),
-                                       repr->getPatternSubstitutions());
   }
 
   // Resolve invocation substitutions if we have them.
   SubstitutionMap invocationSubs;
   if (!repr->getInvocationSubstitutions().empty()) {
     invocationSubs = resolveSubstitutions(repr->getGenericEnvironment(),
-                                          repr->getInvocationSubstitutions());
+                                          repr->getInvocationSubstitutions(),
+                                          TypeResolver{resolution});
   }
 
   if (hasError) {
