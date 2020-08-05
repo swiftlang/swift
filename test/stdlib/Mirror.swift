@@ -150,6 +150,25 @@ mirrors.test("LabeledStructure") {
   expectEqual("[bark: 1, bite: Zee]", h.testDescription)
 }
 
+mirrors.test("ErasedChildren") {
+  let m1 = Mirror(reflecting: 1..<4)
+  let c1 = AnyRandomAccessCollection(m1.children)
+  expectNotNil(c1)
+  expectNil(c1?.first?.label)
+  expectTrue(c1?.first?.label as? Int == 1)
+  expectNil(c1?.last?.label)
+  expectTrue(c1?.last?.value as? Int == 3)
+
+  struct Foo { let i = 42; let s = "bar" }
+  let m2 = Mirror(reflecting: Foo())
+  let c2 = AnyRandomAccessCollection(m2.children)
+  expectNotNil(c2)
+  expectTrue(c2?.first?.label == "i")
+  expectTrue(c2?.first?.label as? Int == 42)
+  expectTrue(c2?.last?.label == "s")
+  expectTrue(c2?.last?.value as? String == "bar")
+}
+
 mirrors.test("Legacy") {
   let m = Mirror(reflecting: [1, 2, 3])
   expectTrue(m.subjectType == [Int].self)

@@ -137,7 +137,12 @@ public struct Mirror {
 
   /// A collection of `Child` elements describing the structure of the
   /// reflected subject.
-  public var children: Children { AnyCollection(_children) }
+  public var children: Children {
+    switch _children {
+      case let .left(l): return AnyCollection(l)
+      case let .right(r): return AnyCollection(r)
+    }
+  }
 
   /// A suggested display style for the reflected subject.
   public let displayStyle: DisplayStyle?
