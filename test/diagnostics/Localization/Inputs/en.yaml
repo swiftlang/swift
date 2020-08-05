@@ -17,6 +17,9 @@
 # 
 #===----------------------------------------------------------------------===#
 
+- id: "not_available_in_def"
+  msg: "Shouldn't be produced"
+
 - id: "lex_unterminated_string"
   msg: "unterminated string literal"
   

@@ -46,6 +46,10 @@ template <> struct ScalarEnumerationTraits<LocalDiagID> {
 #define DIAG(KIND, ID, Options, Text, Signature)                               \
   io.enumCase(value, #ID, LocalDiagID::ID);
 #include "swift/AST/DiagnosticsAll.def"
+    // Ignore diagnostic IDs that are available in the YAML file and not
+    // available in the `.def` file.
+    if (io.matchEnumFallback())
+      value = LocalDiagID::NumDiags;
   }
 };
 
@@ -101,12 +105,19 @@ readYAML(llvm::yaml::IO &io, T &Seq, bool, Context &Ctx) {
       DiagnosticNode current;
       yamlize(io, current, true, Ctx);
       io.postflightElement(SaveInfo);
-      // YAML file isn't guaranteed to have diagnostics in order of their
-      // declaration in `.def` files, to accommodate that we need to leave
-      // holes in diagnostic array for diagnostics which haven't yet been
-      // localized and for the ones that have `DiagnosticNode::id`
-      // indicates their position.
-      Seq[static_cast<unsigned>(current.id)] = std::move(current.msg);
+
+      // A diagnostic ID might be present in YAML and not in `.def` file,
+      // if that's the case ScalarEnumerationTraits will assign the diagnostic ID
+      // to `LocalDiagID::NumDiags`. Since the diagnostic ID isn't available
+      // in `.def` it shouldn't be stored in the diagnostics array.
+      if (current.id != LocalDiagID::NumDiags) {
+        // YAML file isn't guaranteed to have diagnostics in order of their
+        // declaration in `.def` files, to accommodate that we need to leave
+        // holes in diagnostic array for diagnostics which haven't yet been
+        // localized and for the ones that have `DiagnosticNode::id`
+        // indicates their position.
+        Seq[static_cast<unsigned>(current.id)] = std::move(current.msg);
+      }
     }
   }
   io.endSequence();
