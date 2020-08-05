@@ -1578,8 +1578,7 @@ static bool diagnoseAvailability(IdentTypeRepr *IdType,
 }
 
 // Hack to apply context-specific @escaping to an AST function type.
-static Type applyNonEscapingFromContext(DeclContext *DC,
-                                        Type ty,
+static Type applyNonEscapingIfNecessary(Type ty,
                                         TypeResolutionOptions options) {
   // Remember whether this is a function parameter.
   bool defaultNoEscape = options.is(TypeResolverContext::FunctionInput) &&
@@ -1890,7 +1889,7 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
       auto result =
           resolveASTFunctionType(cast<FunctionTypeRepr>(repr), options);
       if (result && result->is<FunctionType>())
-        return applyNonEscapingFromContext(getDeclContext(), result, options);
+        return applyNonEscapingIfNecessary(result, options);
       return result;
     }
     return resolveSILFunctionType(cast<FunctionTypeRepr>(repr), options);
@@ -2343,7 +2342,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       attrs.clearAttribute(TAK_escaping);
     } else {
       // No attribute; set the isNoEscape bit if we're in parameter context.
-      ty = applyNonEscapingFromContext(getDeclContext(), ty, options);
+      ty = applyNonEscapingIfNecessary(ty, options);
     }
   }
 
@@ -3254,7 +3253,7 @@ Type TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
   // Hack to apply context-specific @escaping to a typealias with an underlying
   // function type.
   if (result->is<FunctionType>())
-    result = applyNonEscapingFromContext(getDeclContext(), result, options);
+    result = applyNonEscapingIfNecessary(result, options);
 
   // Check the availability of the type.
 
