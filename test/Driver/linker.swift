@@ -110,7 +110,6 @@
 // RUN: %swiftc_driver -sdk "" -driver-print-jobs -target arm64-apple-macosx10.15.1 %s 2>&1 | %FileCheck -check-prefix MACOS_11_0 %s
 
 // Check x86 macOS 11 deployment version adjustment is gone.
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.16 %s 2>&1 | %FileCheck -check-prefix MACOS_11_0 %s
 // RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx11.0 %s 2>&1 | %FileCheck -check-prefix MACOS_11_0 %s
 // RUN: %swiftc_driver -sdk "" -driver-print-jobs -target arm64-apple-macosx11.0 %s 2>&1 | %FileCheck -check-prefix MACOS_11_0 %s
 
