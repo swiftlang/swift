@@ -55,7 +55,7 @@ OptionalTests.test("Let") {
   expectEqual(gradient(at: nil, 20, in: optional_let_generic), (.init(0.0), 1.0))
 
   // This test is failing
-  /* @differentiable
+  @differentiable
   func optional_let_nested_generic<T: Differentiable>(_ nestedMaybeX: T??, _ defaultValue: T) -> T {
     if let maybeX = nestedMaybeX {
       if let x = maybeX {
@@ -66,8 +66,8 @@ OptionalTests.test("Let") {
     return defaultValue
   }
 
-  expectEqual(gradient(at: 10, 20, in: optional_let_nested_generic), (.init(1.0), 0.0))
-  expectEqual(gradient(at: nil, 20, in: optional_let_nested_generic), (.init(0.0), 1.0)) */
+  expectEqual(gradient(at: 10.0, 20.0, in: optional_let_nested_generic), (.init(.init(1.0)), 0.0))
+  expectEqual(gradient(at: nil, 20, in: optional_let_nested_generic), (.init(.init(0.0)), 1.0))
 }
 
 OptionalTests.test("Switch") {
@@ -108,8 +108,7 @@ OptionalTests.test("Switch") {
   expectEqual(gradient(at: 10, 20, in: optional_switch_generic), (.init(1.0), 0.0))
   expectEqual(gradient(at: nil, 20, in: optional_switch_generic), (.init(0.0), 1.0))
 
-  // TODO: this test is failing
-  /* @differentiable
+  @differentiable
   func optional_switch_nested_generic<T: Differentiable>(_ nestedMaybeX: T??, _ defaultValue: T) -> T {
     switch nestedMaybeX {
     case nil: return defaultValue
@@ -121,8 +120,8 @@ OptionalTests.test("Switch") {
     }
   }
 
-  expectEqual(gradient(at: 10, 20, in: optional_switch_nested_generic), (.init(1.0), 0.0))
-  expectEqual(gradient(at: nil, 20, in: optional_switch_nested_generic), (.init(0.0), 1.0)) */
+  expectEqual(gradient(at: 10, 20, in: optional_switch_nested_generic), (.init(.init(1.0)), 0.0))
+  expectEqual(gradient(at: nil, 20, in: optional_switch_nested_generic), (.init(.init(0.0)), 1.0))
 }
 
 OptionalTests.test("Var1") {
@@ -139,6 +138,21 @@ OptionalTests.test("Var1") {
   expectEqual(gradient(at: nil, in: optional_var1), .init(0.0))
 
   @differentiable
+  func optional_var1_nested(_ nestedMaybeX: Float??) -> Float {
+    var nestedMaybeX = nestedMaybeX
+    if let maybeX = nestedMaybeX {
+      if var x = maybeX {
+        return x * x
+      }
+      return 10
+    }
+    return 10
+  }
+
+  expectEqual(gradient(at: 10, in: optional_var1_nested), .init(.init(20.0)))
+  expectEqual(gradient(at: nil, in: optional_var1_nested), .init(.init(0.0)))
+
+  @differentiable
   func optional_var1_generic<T: Differentiable>(_ maybeX: T?, _ defaultValue: T) -> T {
     var maybeX = maybeX
     if let x = maybeX {
@@ -149,6 +163,21 @@ OptionalTests.test("Var1") {
 
   expectEqual(gradient(at: 10, 20, in: optional_var1_generic), (.init(1.0), 0.0))
   expectEqual(gradient(at: nil, 20, in: optional_var1_generic), (.init(0.0), 1.0))
+
+  @differentiable
+  func optional_var1_nested_generic<T: Differentiable>(_ nestedMaybeX: T??, _ defaultValue: T) -> T {
+    var nestedMaybeX = nestedMaybeX
+    if let maybeX = nestedMaybeX {
+      if var x = maybeX {
+        return x
+      }
+      return defaultValue
+    }
+    return defaultValue
+  }
+
+  expectEqual(gradient(at: 10, 20, in: optional_var1_nested_generic), (.init(.init(1.0)), 0.0))
+  expectEqual(gradient(at: nil, 20, in: optional_var1_nested_generic), (.init(.init(0.0)), 1.0))
 }
 
 OptionalTests.test("Var2") {
@@ -164,6 +193,20 @@ OptionalTests.test("Var2") {
   expectEqual(gradient(at: nil, in: optional_var2), .init(0.0))
 
   @differentiable
+  func optional_var2_nested(_ nestedMaybeX: Float??) -> Float {
+    if var maybeX = nestedMaybeX {
+      if var x = maybeX {
+        return x * x
+      }
+      return 10
+    }
+    return 10
+  }
+
+  expectEqual(gradient(at: 10, in: optional_var2_nested), .init(.init(20.0)))
+  expectEqual(gradient(at: nil, in: optional_var2_nested), .init(.init(0.0)))
+
+  @differentiable
   func optional_var2_generic<T: Differentiable>(_ maybeX: T?, _ defaultValue: T) -> T {
     if var x = maybeX {
       return x
@@ -173,6 +216,20 @@ OptionalTests.test("Var2") {
 
   expectEqual(gradient(at: 10, 20, in: optional_var2_generic), (.init(1.0), 0.0))
   expectEqual(gradient(at: nil, 20, in: optional_var2_generic), (.init(0.0), 1.0))
+
+  @differentiable
+  func optional_var2_nested_generic<T: Differentiable>(_ nestedMaybeX: T??, _ defaultValue: T) -> T {
+    if var maybeX = nestedMaybeX {
+      if var x = maybeX {
+        return x
+      }
+      return defaultValue
+    }
+    return defaultValue
+  }
+
+  expectEqual(gradient(at: 10, 20, in: optional_var2_nested_generic), (.init(.init(1.0)), 0.0))
+  expectEqual(gradient(at: nil, 20, in: optional_var2_nested_generic), (.init(.init(0.0)), 1.0))
 }
 
 runAllTests()
