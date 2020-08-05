@@ -242,12 +242,14 @@ IndexSubset *SILFunctionType::getDifferentiabilityResultIndices() {
     // 2. `@noDerivative`: neither a differentiability parameter nor a
     //    differentiability result.
     // However, there is no way to represent an `inout` parameter that:
-    // 3. Is a differentiability parameter but not a differentiability result.
-    // 4. Is a differentiability result but not a differentiability parameter.
+    // 3. Is a differentiability result but not a differentiability parameter.
+    // 4. Is a differentiability parameter but not a differentiability result.
+    //    This case is not currently expressible and does not yet have clear use
+    //    cases, so supporting it is a non-goal.
     //
     // See TF-1305 for solution ideas. For now, `@noDerivative` `inout`
     // parameters are not treated as differentiability results, unless the
-    // original function has no formal results, which case all `inout`
+    // original function has no formal results, in which case all `inout`
     // parameters are treated as differentiability results.
     if (getResults().empty() ||
         inoutParamAndIndex.value().getDifferentiability() !=
