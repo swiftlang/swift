@@ -139,6 +139,12 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
   PointerAuthSchema ResilientClassStubInitCallbacks;
 };
 
+enum class JITDebugArtifact : unsigned {
+  None,   ///< None
+  LLVMIR, ///< LLVM IR
+  Object, ///< Object File
+};
+
 /// The set of options supported by IR generation.
 class IRGenOptions {
 public:
@@ -325,6 +331,8 @@ public:
   /// Pull in runtime compatibility shim libraries by autolinking.
   Optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityLibraryVersion;
   Optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion;
+
+  JITDebugArtifact DumpJIT = JITDebugArtifact::None;
 
   IRGenOptions()
       : DWARFVersion(2), OutputKind(IRGenOutputKind::LLVMAssembly),
