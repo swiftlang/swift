@@ -35,13 +35,6 @@
 using namespace swift;
 using namespace swift::diag;
 
-namespace {
-static constexpr const char *const diagnosticID[] = {
-#define DIAG(KIND, ID, Options, Text, Signature) #ID,
-#include "swift/AST/DiagnosticsAll.def"
-};
-} // namespace
-
 namespace options {
 
 static llvm::cl::OptionCategory Category("swift-serialize-diagnostics Options");
@@ -80,8 +73,8 @@ int main(int argc, char *argv[]) {
 
   SerializedLocalizationWriter Serializer;
   yaml.forEachAvailable(
-      [&Serializer](uint32_t id, llvm::StringRef translation) {
-        Serializer.insert(diagnosticID[id], translation);
+      [&Serializer](swift::DiagID id, llvm::StringRef translation) {
+        Serializer.insert(id, translation);
       });
 
   if (Serializer.emit(SerializedFilePath.str())) {

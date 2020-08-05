@@ -17,10 +17,10 @@
 #ifndef SWIFT_LOCALIZATIONFORMAT_H
 #define SWIFT_LOCALIZATIONFORMAT_H
 
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Bitstream/BitstreamReader.h"
-#include "llvm/Support/DJB.h"
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
@@ -42,27 +42,27 @@ using namespace llvm::support;
 
 class LocalizationWriterInfo {
 public:
-  using key_type = std::string;
-  using key_type_ref = key_type;
+  using key_type = uint32_t;
+  using key_type_ref = const uint32_t &;
   using data_type = std::string;
-  using data_type_ref = data_type;
+  using data_type_ref = llvm::StringRef;
   using hash_value_type = uint32_t;
   using offset_type = uint32_t;
 
-  hash_value_type ComputeHash(key_type_ref key) { return llvm::djbHash(key); }
+  hash_value_type ComputeHash(key_type_ref key) { return llvm::hash_code(key); }
 
   std::pair<offset_type, offset_type> EmitKeyDataLength(llvm::raw_ostream &out,
                                                         key_type_ref key,
                                                         data_type_ref data) {
-    offset_type keyLength = static_cast<offset_type>(key.size());
     offset_type dataLength = static_cast<offset_type>(data.size());
-    endian::write<offset_type>(out, keyLength, little);
     endian::write<offset_type>(out, dataLength, little);
-    return {keyLength, dataLength};
+    // No need to write the key length; it's constant.
+    return {sizeof(key_type), dataLength};
   }
 
   void EmitKey(llvm::raw_ostream &out, key_type_ref key, unsigned len) {
-    out << key;
+    assert(len == sizeof(key_type));
+    endian::write<key_type>(out, key, little);
   }
 
   void EmitData(llvm::raw_ostream &out, key_type_ref key, data_type_ref data,
@@ -73,38 +73,40 @@ public:
 
 class LocalizationReaderInfo {
 public:
-  using internal_key_type = llvm::StringRef;
-  using external_key_type = internal_key_type;
+  using internal_key_type = uint32_t;
+  using external_key_type = swift::DiagID;
   using data_type = llvm::StringRef;
   using hash_value_type = uint32_t;
   using offset_type = uint32_t;
 
-  internal_key_type GetInternalKey(external_key_type key) { return key; }
+  internal_key_type GetInternalKey(external_key_type key) {
+    return static_cast<internal_key_type>(key);
+  }
 
-  external_key_type GetExternalKey(internal_key_type key) { return key; }
+  external_key_type GetExternalKey(internal_key_type key) {
+    return static_cast<external_key_type>(key);
+  }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
     return lhs == rhs;
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::djbHash(key);
+    return llvm::hash_code(key);
   }
 
   static std::pair<offset_type, offset_type>
   ReadKeyDataLength(const unsigned char *&data) {
-    offset_type keyLength =
-        endian::readNext<offset_type, little, unaligned>(data);
     offset_type dataLength =
         endian::readNext<offset_type, little, unaligned>(data);
-    return {keyLength, dataLength};
+    return {sizeof(uint32_t), dataLength};
   }
 
   internal_key_type ReadKey(const unsigned char *data, offset_type length) {
-    return internal_key_type((const char *)data, length);
+    return endian::readNext<internal_key_type, little, unaligned>(data);
   }
 
-  data_type ReadData(llvm::StringRef Key, const unsigned char *data,
+  data_type ReadData(internal_key_type Key, const unsigned char *data,
                      offset_type length) {
     return data_type((const char *)data, length);
   }
@@ -119,10 +121,10 @@ public:
   /// file.
   ///
   /// \param id The identifier associated with the given diagnostic message e.g.
-  /// 'cannot_convert_argument'.
-  /// \param translation The localized diagnostic
-  /// message for the given identifier.
-  void insert(llvm::StringRef id, llvm::StringRef translation);
+  ///           'cannot_convert_argument'.
+  /// \param translation The localized diagnostic message for the given
+  ///                    identifier.
+  void insert(swift::DiagID id, llvm::StringRef translation);
 
   /// Write out previously inserted diagnostic translations into the given
   /// location.
@@ -158,7 +160,7 @@ public:
   /// maintained by this producer, callback gets each translation
   /// with its unique identifier.
   void forEachAvailable(
-      llvm::function_ref<void(uint32_t, llvm::StringRef)> callback) const;
+      llvm::function_ref<void(swift::DiagID, llvm::StringRef)> callback) const;
 };
 
 class SerializedLocalizationProducer final : public LocalizationProducer {

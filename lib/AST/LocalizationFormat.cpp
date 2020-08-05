@@ -34,11 +34,6 @@ enum LocalDiagID : uint32_t {
   NumDiags
 };
 
-static constexpr const char *const diagnosticID[] = {
-#define DIAG(KIND, ID, Options, Text, Signature) #ID,
-#include "swift/AST/DiagnosticsAll.def"
-};
-
 struct DiagnosticNode {
   uint32_t id;
   std::string msg;
@@ -75,9 +70,9 @@ template <> struct MappingTraits<DiagnosticNode> {
 namespace swift {
 namespace diag {
 
-void SerializedLocalizationWriter::insert(llvm::StringRef id,
+void SerializedLocalizationWriter::insert(swift::DiagID id,
                                           llvm::StringRef translation) {
-  generator.insert(id, translation);
+  generator.insert(static_cast<uint32_t>(id), translation);
 }
 
 bool SerializedLocalizationWriter::emit(llvm::StringRef filePath) {
@@ -112,7 +107,7 @@ SerializedLocalizationProducer::SerializedLocalizationProducer(
 
 llvm::StringRef SerializedLocalizationProducer::getMessageOr(
     swift::DiagID id, llvm::StringRef defaultMessage) const {
-  auto value = SerializedTable.get()->find(diagnosticID[(unsigned)id]);
+  auto value = SerializedTable.get()->find(id);
   llvm::StringRef diagnosticMessage((const char *)value.getDataPtr(),
                                     value.getDataLen());
   if (diagnosticMessage.empty())
@@ -140,11 +135,11 @@ YAMLLocalizationProducer::getMessageOr(swift::DiagID id,
 }
 
 void YAMLLocalizationProducer::forEachAvailable(
-    llvm::function_ref<void(uint32_t, llvm::StringRef)> callback) const {
+    llvm::function_ref<void(swift::DiagID, llvm::StringRef)> callback) const {
   for (uint32_t i = 0, n = diagnostics.size(); i != n; ++i) {
     auto translation = diagnostics[i];
     if (!translation.empty())
-      callback(i, translation);
+      callback(static_cast<swift::DiagID>(i), translation);
   }
 }
 
