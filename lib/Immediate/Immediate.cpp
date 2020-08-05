@@ -30,6 +30,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Config/config.h"
+#include "llvm/ExecutionEngine/Orc/DebugUtils.h"
 #include "llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h"
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
 #include "llvm/IR/LLVMContext.h"
@@ -73,6 +74,18 @@ static void *loadRuntimeLib(StringRef sharedLibName,
       return handle;
   }
   return nullptr;
+}
+
+static void DumpLLVMIR(const llvm::Module &M) {
+  std::string path = (M.getName() + ".ll").str();
+  for (size_t count = 0; llvm::sys::fs::exists(path); )
+    path = (M.getName() + llvm::utostr(count++) + ".ll").str();
+
+  std::error_code error;
+  llvm::raw_fd_ostream stream(path, error);
+  if (error)
+    return;
+  M.print(stream, /*AssemblyAnnotationWriter=*/nullptr);
 }
 
 void *swift::immediate::loadSwiftRuntime(ArrayRef<std::string>
@@ -290,6 +303,18 @@ int swift::RunImmediately(CompilerInstance &CI,
   }
 
   auto Module = GenModule.getModule();
+
+  switch (IRGenOpts.DumpJIT) {
+  case JITDebugArtifact::None:
+    break;
+  case JITDebugArtifact::LLVMIR:
+    DumpLLVMIR(*Module);
+    break;
+  case JITDebugArtifact::Object:
+    JIT->getObjTransformLayer().setTransform(llvm::orc::DumpObjects());
+    break;
+  }
+
   {
     // Get a generator for the process symbols and attach it to the main
     // JITDylib.
