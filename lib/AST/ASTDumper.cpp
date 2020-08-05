@@ -2829,11 +2829,6 @@ public:
         PrintWithColorRAII(OS, DiscriminatorColor)
           << "#" << component.getTupleIndex();
         break;
-      case KeyPathExpr::Component::Kind::DictionaryKey:
-        PrintWithColorRAII(OS, ASTNodeColor) << "dict_key";
-        PrintWithColorRAII(OS, IdentifierColor)
-          << "  key='" << component.getUnresolvedDeclName() << "'";
-        break;
       }
       PrintWithColorRAII(OS, TypeColor)
         << " type='" << GetTypeOfKeyPathComponent(E, i) << "'";

@@ -42,11 +42,9 @@ using namespace ide;
 // typeCheckContextAt(DeclContext, SourceLoc)
 //===----------------------------------------------------------------------===//
 
-namespace {
-void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
-  // Nothing to type check in module context.
-  if (DC->isModuleScopeContext())
-    return;
+void swift::ide::typeCheckContextAt(DeclContext *DC, SourceLoc Loc) {
+  while (isa<AbstractClosureExpr>(DC))
+    DC = DC->getParent();
 
   // Make sure the extension has been bound, in case it is in an inactive #if
   // or something weird like that.
@@ -67,6 +65,7 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
   switch (DC->getContextKind()) {
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::Module:
+  case DeclContextKind::FileUnit:
   case DeclContextKind::SerializedLocal:
   case DeclContextKind::EnumElementDecl:
   case DeclContextKind::GenericTypeDecl:
@@ -105,18 +104,7 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
     }
     break;
   }
-
-  case DeclContextKind::FileUnit:
-    llvm_unreachable("module scope context handled above");
   }
-}
-} // anonymous namespace
-
-void swift::ide::typeCheckContextAt(DeclContext *DC, SourceLoc Loc) {
-  while (isa<AbstractClosureExpr>(DC))
-    DC = DC->getParent();
-
-  typeCheckContextImpl(DC, Loc);
 }
 
 //===----------------------------------------------------------------------===//
@@ -177,7 +165,6 @@ public:
     return {isInterstingRange(S), S};
   }
 
-  bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
   bool walkToTypeReprPre(TypeRepr *T) override { return false; }
 };
 } // anonymous namespace

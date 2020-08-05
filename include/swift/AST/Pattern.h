@@ -34,7 +34,6 @@ namespace swift {
   class Expr;
   enum class CheckedCastKind : unsigned;
   class TypeExpr;
-  class TypeLoc;
 
 /// PatternKind - The classification of different kinds of
 /// value-matching pattern.
@@ -447,7 +446,6 @@ public:
 
   TypeRepr *getTypeRepr() const { return PatTypeRepr; }
 
-  TypeLoc getTypeLoc() const;
   SourceLoc getLoc() const;
   SourceRange getSourceRange() const;
 

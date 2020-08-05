@@ -5,6 +5,9 @@
 // Check the contents of the JSON output
 // RUN: %FileCheck %s < %t/deps.json
 
+// Check the contents of the JSON output
+// RUN: %FileCheck %s -check-prefix CHECK-NO-SEARCH-PATHS < %t/deps.json
+
 // Check the make-style dependencies file
 // RUN: %FileCheck %s -check-prefix CHECK-MAKE-DEPS < %t/deps.d
 
@@ -133,7 +136,6 @@ import SubE
 // CHECK: "commandLine": [
 // CHECK: "-compile-module-from-interface"
 // CHECK: "-target"
-// CHECK: "-sdk"
 // CHECK: "-module-name"
 // CHECK: "G"
 // CHECK: "-swift-version"
@@ -193,6 +195,10 @@ import SubE
 /// --------Clang module SwiftShims
 // CHECK-LABEL: "modulePath": "SwiftShims.pcm",
 
+// CHECK-NO-SEARCH-PATHS-NOT: "-I"
+// CHECK-NO-SEARCH-PATHS-NOT: "-sdk"
+// CHECK-NO-SEARCH-PATHS-NOT: "-F"
+// CHECK-NO-SEARCH-PATHS-NOT: "-prebuilt-module-cache-path"
 
 // Check make-style dependencies
 // CHECK-MAKE-DEPS: module_deps.swift

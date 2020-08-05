@@ -187,7 +187,6 @@ namespace {
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
       return { false, S };
     }
-    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
     bool walkToTypeReprPre(TypeRepr *T) override { return false; }
     bool walkToParameterListPre(ParameterList *PL) override { return false; }
     bool walkToDeclPre(Decl *D) override { return false; }
@@ -405,15 +404,6 @@ SourceRange TuplePattern::getSourceRange() const {
 TypedPattern::TypedPattern(Pattern *pattern, TypeRepr *tr)
   : Pattern(PatternKind::Typed), SubPattern(pattern), PatTypeRepr(tr) {
   Bits.TypedPattern.IsPropagatedType = false;
-}
-
-TypeLoc TypedPattern::getTypeLoc() const {
-  TypeLoc loc = TypeLoc(PatTypeRepr);
-
-  if (hasType())
-    loc.setType(getType());
-
-  return loc;
 }
 
 SourceLoc TypedPattern::getLoc() const {
