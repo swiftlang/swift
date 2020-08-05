@@ -2346,6 +2346,11 @@ void SILSerializer::writeIndexTables() {
                 DefaultWitnessTableOffset);
   }
 
+  if (!PropertyOffset.empty()) {
+    Offset.emit(ScratchRecord, sil_index_block::SIL_PROPERTY_OFFSETS,
+                PropertyOffset);
+  }
+
   if (!DifferentiabilityWitnessList.empty()) {
     writeIndexTable(S, List,
                     sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES,
@@ -2355,11 +2360,6 @@ void SILSerializer::writeIndexTables() {
                 DifferentiabilityWitnessOffset);
   }
 
-  if (!PropertyOffset.empty()) {
-    Offset.emit(ScratchRecord, sil_index_block::SIL_PROPERTY_OFFSETS,
-                PropertyOffset);
-  }
-  
 }
 
 void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
