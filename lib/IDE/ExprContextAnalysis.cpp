@@ -42,11 +42,9 @@ using namespace ide;
 // typeCheckContextAt(DeclContext, SourceLoc)
 //===----------------------------------------------------------------------===//
 
-namespace {
-void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
-  // Nothing to type check in module context.
-  if (DC->isModuleScopeContext())
-    return;
+void swift::ide::typeCheckContextAt(DeclContext *DC, SourceLoc Loc) {
+  while (isa<AbstractClosureExpr>(DC))
+    DC = DC->getParent();
 
   // Make sure the extension has been bound, in case it is in an inactive #if
   // or something weird like that.
@@ -67,6 +65,7 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
   switch (DC->getContextKind()) {
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::Module:
+  case DeclContextKind::FileUnit:
   case DeclContextKind::SerializedLocal:
   case DeclContextKind::EnumElementDecl:
   case DeclContextKind::GenericTypeDecl:
@@ -105,18 +104,7 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
     }
     break;
   }
-
-  case DeclContextKind::FileUnit:
-    llvm_unreachable("module scope context handled above");
   }
-}
-} // anonymous namespace
-
-void swift::ide::typeCheckContextAt(DeclContext *DC, SourceLoc Loc) {
-  while (isa<AbstractClosureExpr>(DC))
-    DC = DC->getParent();
-
-  typeCheckContextImpl(DC, Loc);
 }
 
 //===----------------------------------------------------------------------===//
@@ -177,7 +165,6 @@ public:
     return {isInterstingRange(S), S};
   }
 
-  bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
   bool walkToTypeReprPre(TypeRepr *T) override { return false; }
 };
 } // anonymous namespace
@@ -325,12 +312,14 @@ void swift::ide::collectPossibleReturnTypesFromContext(
           candidates.push_back(ty);
           return;
         } else {
-          auto typeLoc = TypeLoc{CE->getExplicitResultTypeRepr()};
-          if (!swift::performTypeLocChecking(
-                  DC->getASTContext(), typeLoc, /*isSILMode=*/false,
-                  /*isSILType=*/false, DC->getGenericEnvironmentOfContext(),
-                  const_cast<DeclContext *>(DC), /*diagnostics=*/false)) {
-            candidates.push_back(typeLoc.getType());
+          const auto type = swift::performTypeResolution(
+              CE->getExplicitResultTypeRepr(), DC->getASTContext(),
+              /*isSILMode=*/false, /*isSILType=*/false,
+              DC->getGenericEnvironmentOfContext(),
+              const_cast<DeclContext *>(DC), /*diagnostics=*/false);
+
+          if (!type->hasError()) {
+            candidates.push_back(type);
             return;
           }
         }
@@ -680,11 +669,9 @@ static bool collectPossibleCalleesForUnresolvedMember(
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   auto currModule = DC.getParentModule();
 
-  // Get the context of the expression itself.
-  ExprContextInfo contextInfo(&DC, unresolvedMemberExpr);
-  for (auto expectedTy : contextInfo.getPossibleTypes()) {
+  auto collectMembers = [&](Type expectedTy) {
     if (!expectedTy->mayHaveMembers())
-      continue;
+      return;
     SmallVector<FunctionTypeAndDecl, 2> members;
     collectPossibleCalleesByQualifiedLookup(DC, MetatypeType::get(expectedTy),
                                             unresolvedMemberExpr->getName(),
@@ -693,6 +680,16 @@ static bool collectPossibleCalleesForUnresolvedMember(
       if (isReferenceableByImplicitMemberExpr(currModule, &DC, expectedTy,
                                               member.Decl))
         candidates.push_back(member);
+    }
+  };
+
+  // Get the context of the expression itself.
+  ExprContextInfo contextInfo(&DC, unresolvedMemberExpr);
+  for (auto expectedTy : contextInfo.getPossibleTypes()) {
+    collectMembers(expectedTy);
+    // If this is an optional type, let's also check its base type.
+    if (auto baseTy = expectedTy->getOptionalObjectType()) {
+      collectMembers(baseTy->lookThroughAllOptionalTypes());
     }
   }
   return !candidates.empty();

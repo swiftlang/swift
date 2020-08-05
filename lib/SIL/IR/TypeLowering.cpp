@@ -1612,7 +1612,7 @@ namespace {
       if (handleResilience(structType, D, properties))
         return handleAddressOnly(structType, properties);
 
-      if (D->isCxxNotTriviallyCopyable()) {
+      if (D->isCxxNonTrivial()) {
         properties.setAddressOnly();
         properties.setNonTrivial();
       }

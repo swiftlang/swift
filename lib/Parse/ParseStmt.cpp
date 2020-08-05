@@ -2467,7 +2467,6 @@ struct FallthroughFinder : ASTWalker {
   }
 
   bool walkToDeclPre(Decl *d) override { return false; }
-  bool walkToTypeLocPre(TypeLoc &tl) override { return false; }
   bool walkToTypeReprPre(TypeRepr *t) override { return false; }
 
   static FallthroughStmt *findFallthrough(Stmt *s) {

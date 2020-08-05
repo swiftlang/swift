@@ -433,16 +433,27 @@ struct TestConstraintGenerationErrors {
 
 // Check @unknown
 func testUnknownInSwitchSwitch(e: E) {
-    tuplify(true) { c in
+  tuplify(true) { c in
     "testSwitch"
     switch e {
-    @unknown case .a: // expected-error{{'@unknown' is only supported for catch-all cases ("case _")}}
-      "a"
     case .b(let i, let s?):
       i * 2
       s + "!"
     default:
       "nothing"
+    @unknown case .a: // expected-error{{'@unknown' is only supported for catch-all cases ("case _")}}
+      // expected-error@-1{{'case' blocks cannot appear after the 'default' block of a 'switch'}}
+      "a"
+    }
+  }
+
+  tuplify(true) { c in
+    "testSwitch"
+    switch e {
+      @unknown case _: // expected-error{{'@unknown' can only be applied to the last case in a switch}}
+      "a"
+    default:
+      "default"
     }
   }
 }
@@ -466,6 +477,8 @@ func testCaseMutabilityMismatches(e: E3) {
             var x): // expected-error{{'var' pattern binding must match previous 'let' pattern binding}}
       x
       y += "a"
+    default:
+      "default"
     }
   }
 }
@@ -601,5 +614,9 @@ struct MyView {
     case .none: // expected-error {{'case' label in a 'switch' should have at least one executable statement}}
     case . // expected-error {{expected ':' after 'case'}}
     } // expected-error {{expected identifier after '.' expression}}
+  }
+
+  @TupleBuilder var invalidConversion: Int { // expected-error {{cannot convert value of type 'String' to specified type 'Int'}}
+    ""
   }
 }

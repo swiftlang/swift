@@ -650,6 +650,9 @@ function(_add_swift_target_library_single target name)
                         "${SWIFTLIB_SINGLE_multiple_parameter_options}"
                         ${ARGN})
 
+  translate_flag(${SWIFTLIB_SINGLE_STATIC} "STATIC"
+                 SWIFTLIB_SINGLE_STATIC_keyword)
+
   # Determine macCatalyst build flavor
   get_maccatalyst_build_flavor(maccatalyst_build_flavor
     "${SWIFTLIB_SINGLE_SDK}" "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}")
@@ -779,6 +782,7 @@ function(_add_swift_target_library_single target name)
       ${SWIFTLIB_SINGLE_IS_STDLIB_CORE_keyword}
       ${SWIFTLIB_SINGLE_IS_SDK_OVERLAY_keyword}
       ${embed_bitcode_arg}
+      ${SWIFTLIB_SINGLE_STATIC_keyword}
       INSTALL_IN_COMPONENT "${SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT}"
       MACCATALYST_BUILD_FLAVOR "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}")
   add_swift_source_group("${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}")

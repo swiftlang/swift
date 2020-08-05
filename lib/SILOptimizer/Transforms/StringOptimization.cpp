@@ -90,7 +90,7 @@ private:
   
   bool optimizeStringAppend(ApplyInst *appendCall,
                             llvm::DenseMap<SILValue, SILValue> &storedStrings);
-
+  bool optimizeStringConcat(ApplyInst *concatCall);
   bool optimizeTypeName(ApplyInst *typeNameCall);
 
   static ApplyInst *isSemanticCall(SILInstruction *inst, StringRef attr,
@@ -102,8 +102,8 @@ private:
   static StringInfo getStringFromStaticLet(SILValue value);
 
   static Optional<int> getIntConstant(SILValue value);
-  static void replaceAppendWith(ApplyInst *appendCall, SILValue newValue,
-                                bool copyNewValue);
+  static void replaceAppendWith(ApplyInst *appendCall, SILValue newValue);
+  static SILValue copyValue(SILValue value, SILInstruction *before);
   ApplyInst *createStringInit(StringRef str, SILInstruction *beforeInst);
 };
 
@@ -140,6 +140,12 @@ bool StringOptimization::optimizeBlock(SILBasicBlock &block) {
     }
     if (ApplyInst *append = isSemanticCall(inst, semantics::STRING_APPEND, 2)) {
       if (optimizeStringAppend(append, storedStrings)) {
+        changed = true;
+        continue;
+      }
+    }
+    if (ApplyInst *append = isSemanticCall(inst, semantics::STRING_CONCAT, 3)) {
+      if (optimizeStringConcat(append)) {
         changed = true;
         continue;
       }
@@ -184,7 +190,7 @@ bool StringOptimization::optimizeStringAppend(ApplyInst *appendCall,
 
   // Replace lhs.append(rhs) with 'lhs = rhs' if lhs is empty.
   if (lhsString.isEmpty()) {
-    replaceAppendWith(appendCall, rhs, /*copyNewValue*/ true);
+    replaceAppendWith(appendCall, copyValue(rhs, appendCall));
     storedStrings[lhsAddr] = rhs;
     return true;
   }
@@ -195,8 +201,45 @@ bool StringOptimization::optimizeStringAppend(ApplyInst *appendCall,
     std::string concat = lhsString.str;
     concat += rhsString.str;
     if (ApplyInst *stringInit = createStringInit(concat, appendCall)) {
-      replaceAppendWith(appendCall, stringInit, /*copyNewValue*/ false);
+      replaceAppendWith(appendCall, stringInit);
       storedStrings[lhsAddr] = stringInit;
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+/// Optimize String.+ in case anything is known about the parameters.
+bool StringOptimization::optimizeStringConcat(ApplyInst *concatCall) {
+  SILValue lhs = concatCall->getArgument(0);
+  SILValue rhs = concatCall->getArgument(1);
+  StringInfo rhsString = getStringInfo(rhs);
+  
+  // Replace lhs + "" with lhs
+  if (rhsString.isEmpty()) {
+    lhs = copyValue(lhs, concatCall);
+    concatCall->replaceAllUsesWith(lhs);
+    concatCall->eraseFromParent();
+    return true;
+  }
+  
+  // Replace "" + rhs with rhs
+  StringInfo lhsString = getStringInfo(lhs);
+  if (lhsString.isEmpty()) {
+    rhs = copyValue(rhs, concatCall);
+    concatCall->replaceAllUsesWith(rhs);
+    concatCall->eraseFromParent();
+    return true;
+  }
+
+  // Replace lhs + rhs with "lhs + rhs" if both lhs and rhs are constant.
+  if (lhsString.isConstant() && rhsString.isConstant()) {
+    std::string concat = lhsString.str;
+    concat += rhsString.str;
+    if (ApplyInst *stringInit = createStringInit(concat, concatCall)) {
+      concatCall->replaceAllUsesWith(stringInit);
+      concatCall->eraseFromParent();
       return true;
     }
   }
@@ -214,12 +257,16 @@ static bool containsProblematicNode(Demangle::Node *node, bool qualified) {
       if (qualified)
         return true;
       break;
-    case Demangle::Node::Kind::Class:
+    case Demangle::Node::Kind::Class: {
       // ObjC class names are not derived from the mangling but from the
       // ObjC runtime. We cannot constant fold this.
-      if (node->getChild(0)->getText() == "__C")
+      Demangle::Node *context = node->getChild(0);
+      if (context->getKind() == Demangle::Node::Kind::Module &&
+          context->getText() == "__C") {
         return true;
+      }
       break;
+    }
     default:
       break;
   }
@@ -499,23 +546,31 @@ Optional<int> StringOptimization::getIntConstant(SILValue value) {
 
 /// Replace a String.append() with a store of \p newValue to the destination.
 void StringOptimization::replaceAppendWith(ApplyInst *appendCall,
-                                      SILValue newValue, bool copyNewValue) {
+                                           SILValue newValue) {
   SILBuilder builder(appendCall);
   SILLocation loc = appendCall->getLoc();
   SILValue destAddr = appendCall->getArgument(1);
   if (appendCall->getFunction()->hasOwnership()) {
-    if (copyNewValue)
-      newValue = builder.createCopyValue(loc, newValue);
     builder.createStore(loc, newValue, destAddr,
                         StoreOwnershipQualifier::Assign);
   } else {
-    if (copyNewValue)
-      builder.createRetainValue(loc, newValue, builder.getDefaultAtomicity());
     builder.createDestroyAddr(loc, destAddr);
     builder.createStore(loc, newValue, destAddr,
                         StoreOwnershipQualifier::Unqualified);
   }
   appendCall->eraseFromParent();
+}
+
+/// Returns a copy of \p value. Depending if the function is in OSSA, insert
+/// either a copy_value or retain_value.
+SILValue StringOptimization::copyValue(SILValue value, SILInstruction *before) {
+  SILBuilder builder(before);
+  SILLocation loc = before->getLoc();
+  if (before->getFunction()->hasOwnership())
+    return builder.createCopyValue(loc, value);
+
+  builder.createRetainValue(loc, value, builder.getDefaultAtomicity());
+  return value;
 }
 
 /// Creates a call to a string initializer.

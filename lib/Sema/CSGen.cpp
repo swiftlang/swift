@@ -158,7 +158,7 @@ namespace {
     }
 
     /// Ignore types.
-    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
+     bool walkToTypeReprPre(TypeRepr *T) override { return false; }
   };
   
   /// Given a collection of "linked" expressions, analyzes them for
@@ -305,7 +305,7 @@ namespace {
     }
 
     /// Ignore types.
-    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
+    bool walkToTypeReprPre(TypeRepr *T) override { return false; }
   };
   
   /// For a given expression, given information that is global to the
@@ -2660,12 +2660,14 @@ namespace {
 
           // Okay, resolve the pattern.
           Pattern *pattern = LabelItem.getPattern();
-          pattern = TypeChecker::resolvePattern(pattern, CS.DC,
-                                         /*isStmtCondition*/false);
-          if (!pattern) return false;
+          if (!LabelItem.isPatternResolved()) {
+            pattern = TypeChecker::resolvePattern(pattern, CS.DC,
+                                           /*isStmtCondition*/false);
+            if (!pattern) return false;
 
-          // Save that aside while we explore the type.
-          LabelItem.setPattern(pattern);
+            // Save that aside while we explore the type.
+            LabelItem.setPattern(pattern, /*resolved=*/true);
+          }
 
           // Require the pattern to have a particular shape: a number
           // of is-patterns applied to an irrefutable pattern.
@@ -2704,7 +2706,7 @@ namespace {
           if (!pattern)
             return false;
 
-          LabelItem.setPattern(pattern);
+          LabelItem.setPattern(pattern, /*resolved=*/true);
           return LabelItem.isSyntacticallyExhaustive();
         }
 
@@ -3492,9 +3494,6 @@ namespace {
         }
         case KeyPathExpr::Component::Kind::Identity:
           continue;
-        case KeyPathExpr::Component::Kind::DictionaryKey:
-          llvm_unreachable("DictionaryKey only valid in #keyPath");
-          break;
         }
 
         // By now, `base` is the result type of this component. Set it in the
@@ -4239,14 +4238,17 @@ bool ConstraintSystem::generateConstraints(
     CaseStmt *caseStmt, DeclContext *dc, Type subjectType,
     ConstraintLocator *locator) {
   // Pre-bind all of the pattern variables within the case.
-  bindSwitchCasePatternVars(caseStmt);
+  bindSwitchCasePatternVars(dc, caseStmt);
 
   for (auto &caseLabelItem : caseStmt->getMutableCaseLabelItems()) {
     // Resolve the pattern.
-    auto *pattern = TypeChecker::resolvePattern(
-        caseLabelItem.getPattern(), dc, /*isStmtCondition=*/false);
-    if (!pattern)
-      return true;
+    auto *pattern = caseLabelItem.getPattern();
+    if (!caseLabelItem.isPatternResolved()) {
+      pattern = TypeChecker::resolvePattern(
+          pattern, dc, /*isStmtCondition=*/false);
+      if (!pattern)
+        return true;
+    }
 
     // Generate constraints for the pattern, including one-way bindings for
     // any variables that show up in this pattern, because those variables

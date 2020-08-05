@@ -13,6 +13,8 @@ import Foundation
 struct Outer {
   struct Inner { }
 
+  class InnerClass { }
+
   static let staticString = "static"
 }
 
@@ -45,6 +47,15 @@ public func testFoldCompleteInterpolation() -> String {
 @inline(never)
 public func testFoldStaticLet() -> String {
   return "-\(Outer.staticString)+"
+}
+
+// CHECK-LABEL: sil [noinline] @$s4test0A10FoldConcatSSyF
+// CHECK-NOT: apply
+// CHECK-NOT: bb1
+// CHECK: } // end sil function '$s4test0A10FoldConcatSSyF'
+@inline(never)
+public func testFoldConcat() -> String {
+  return "a" + "b" + "c"
 }
 
 // CHECK-LABEL: sil [noinline] @$s4test0A19UnqualifiedTypeNameSSyF 
@@ -85,12 +96,22 @@ public func testQualifiedLocalType() -> String {
   return _typeName(LocalStruct.self, qualified: true)
 }
 
+// CHECK-LABEL: sil [noinline] @$s4test0A10InnerClassSSyF
+// CHECK-NOT: apply
+// CHECK-NOT: bb1
+// CHECK: } // end sil function '$s4test0A10InnerClassSSyF'
+@inline(never)
+public func testInnerClass() -> String {
+  return _typeName(Outer.InnerClass.self, qualified: true)
+}
+
 #if _runtime(_ObjC)
 @inline(never)
 public func testObjcClassName(qualified: Bool) -> String {
   return _typeName(NSObject.self, qualified: qualified)
 }
 #endif
+
 
 @inline(never)
 func printEmbeeded(_ s: String) {
@@ -106,6 +127,9 @@ printEmbeeded(testFoldCompleteInterpolation())
 // CHECK-OUTPUT: <-static+>
 printEmbeeded(testFoldStaticLet())
 
+// CHECK-OUTPUT: <abc>
+printEmbeeded(testFoldConcat())
+
 // CHECK-OUTPUT: <Inner>
 printEmbeeded(testUnqualifiedTypeName())
 
@@ -117,6 +141,9 @@ printEmbeeded(testUnqualifiedLocalType())
 
 // CHECK-OUTPUT: <test.(unknown context at {{.*}}).LocalStruct>
 printEmbeeded(testQualifiedLocalType())
+
+// CHECK-OUTPUT: <test.Outer.InnerClass>
+printEmbeeded(testInnerClass())
 
 #if _runtime(_ObjC)
 
