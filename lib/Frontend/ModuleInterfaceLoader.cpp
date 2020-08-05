@@ -1137,28 +1137,14 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     .EffectiveLanguageVersion.asAPINotesVersionString()));
 
   genericSubInvocation.setImportSearchPaths(SearchPathOpts.ImportSearchPaths);
-  llvm::for_each(SearchPathOpts.ImportSearchPaths,
-                 [&](const std::string &path) {
-    GenericArgs.push_back("-I");
-    GenericArgs.push_back(path);
-  });
   genericSubInvocation.setFrameworkSearchPaths(SearchPathOpts.FrameworkSearchPaths);
-  llvm::for_each(SearchPathOpts.FrameworkSearchPaths,
-                 [&](const SearchPathOptions::FrameworkSearchPath &path) {
-    GenericArgs.push_back(path.IsSystem? "-Fsystem": "-F");
-    GenericArgs.push_back(path.Path);
-  });
   if (!SearchPathOpts.SDKPath.empty()) {
     genericSubInvocation.setSDKPath(SearchPathOpts.SDKPath);
-    GenericArgs.push_back("-sdk");
-    GenericArgs.push_back(SearchPathOpts.SDKPath);
   }
 
   genericSubInvocation.setInputKind(InputFileKind::SwiftModuleInterface);
   if (!SearchPathOpts.RuntimeResourcePath.empty()) {
     genericSubInvocation.setRuntimeResourcePath(SearchPathOpts.RuntimeResourcePath);
-    GenericArgs.push_back("-resource-dir");
-    GenericArgs.push_back(SearchPathOpts.RuntimeResourcePath);
   }
 
   // Inhibit warnings from the genericSubInvocation since we are assuming the user
@@ -1276,14 +1262,10 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   SubFEOpts.RequestedAction = FrontendOptions::ActionType::EmitModuleOnly;
   if (!moduleCachePath.empty()) {
     genericSubInvocation.setClangModuleCachePath(moduleCachePath);
-    GenericArgs.push_back("-module-cache-path");
-    GenericArgs.push_back(moduleCachePath);
   }
   if (!prebuiltCachePath.empty()) {
     genericSubInvocation.getFrontendOptions().PrebuiltModuleCachePath =
-        prebuiltCachePath.str();
-    GenericArgs.push_back("-prebuilt-module-cache-path");
-    GenericArgs.push_back(prebuiltCachePath);
+      prebuiltCachePath.str();
   }
   if (trackSystemDependencies) {
     genericSubInvocation.getFrontendOptions().IntermoduleDependencyTracking =
@@ -1300,22 +1282,11 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   }
   genericSubInvocation.getSearchPathOptions().ExplicitSwiftModules =
     searchPathOpts.ExplicitSwiftModules;
-  // Dependencies scanner shouldn't know any explict Swift modules to use.
-  // Adding these argumnets may not be necessary.
-  // FIXME: remove it?
-  for (auto EM: searchPathOpts.ExplicitSwiftModules) {
-    GenericArgs.push_back("-swift-module-file");
-    GenericArgs.push_back(ArgSaver.save(EM));
-  }
   // Pass down -explicit-swift-module-map-file
   // FIXME: we shouldn't need this. Remove it?
   StringRef explictSwiftModuleMap = searchPathOpts.ExplicitSwiftModuleMap;
   genericSubInvocation.getSearchPathOptions().ExplicitSwiftModuleMap =
     explictSwiftModuleMap;
-  if (!explictSwiftModuleMap.empty()) {
-    GenericArgs.push_back("-explicit-swift-module-map-file");
-    GenericArgs.push_back(explictSwiftModuleMap);
-  }
   if (clangImporter) {
     // We need to add these extra clang flags because explict module building
     // related flags are all there: -fno-implicit-modules, -fmodule-map-file=,
