@@ -1783,7 +1783,6 @@ void ScopeCreator::forEachClosureIn(
       return {false, P};
     }
     bool walkToDeclPre(Decl *D) override { return false; }
-    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
     bool walkToTypeReprPre(TypeRepr *T) override { return false; }
     bool walkToParameterListPre(ParameterList *PL) override { return false; }
   };

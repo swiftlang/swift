@@ -493,7 +493,6 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
     case ComponentKind::OptionalChain:
     case ComponentKind::OptionalWrap:
     case ComponentKind::Identity:
-    case ComponentKind::DictionaryKey:
       // These components don't have any callee associated, so just continue.
       break;
     }
@@ -3853,6 +3852,11 @@ void constraints::simplifyLocator(ASTNode &anchor,
       break;
     }
 
+    case ConstraintLocator::FunctionBuilderBodyResult: {
+      path = path.slice(1);
+      break;
+    }
+
     default:
       // FIXME: Lots of other cases to handle.
       break;
@@ -4648,8 +4652,10 @@ SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
     if (auto *typedPattern = dyn_cast<TypedPattern>(pattern)) {
       const Pattern *inner = typedPattern->getSemanticsProvidingPattern();
       if (isa<NamedPattern>(inner) || isa<AnyPattern>(inner)) {
-        contextualType = typedPattern->getTypeLoc();
-        if (!contextualType.getType())
+        contextualType = TypeLoc(typedPattern->getTypeRepr());
+        if (typedPattern->hasType())
+          contextualType.setType(typedPattern->getType());
+        else
           contextualType.setType(patternType);
       }
     }
