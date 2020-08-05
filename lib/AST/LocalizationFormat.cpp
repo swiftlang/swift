@@ -48,7 +48,7 @@ template <> struct ScalarEnumerationTraits<LocalDiagID> {
 #include "swift/AST/DiagnosticsAll.def"
     // Ignore diagnostic IDs that are available in the YAML file and not
     // available in the `.def` file.
-    if (!io.outputting() && io.matchEnumFallback())
+    if (io.matchEnumFallback())
       value = LocalDiagID::NumDiags;
   }
 };
@@ -106,6 +106,10 @@ readYAML(llvm::yaml::IO &io, T &Seq, bool, Context &Ctx) {
       yamlize(io, current, true, Ctx);
       io.postflightElement(SaveInfo);
 
+      // A diagnostic ID might be present in YAML and not in `.def` file,
+      // if that's the case ScalarEnumerationTraits will assign the diagnostic ID
+      // to `LocalDiagID::NumDiags`. Since the diagnostic ID isn't available
+      // in `.def` it shouldn't be stored in the diagnostics array.
       if (current.id != LocalDiagID::NumDiags) {
         // YAML file isn't guaranteed to have diagnostics in order of their
         // declaration in `.def` files, to accommodate that we need to leave
