@@ -26,21 +26,22 @@ if(swift_build_osx)
   configure_target_variant(OSX-R  "OS X Release"         OSX R  "Release")
 endif()
 
-is_sdk_requested(GENERIC swift_build_generic)
-if(swift_build_generic)
-  set(SWIFT_GENERIC_SDK "" CACHE STRING
-      "Which SDK to use when building the GENERIC stdlib")
-  set(SWIFT_GENERIC_TRIPLE_NAME "" CACHE STRING
-      "Which triple name (e.g. 'macosx11.0') to use when building the GENERIC stdlib")
-  set(SWIFT_GENERIC_ARCHS "" CACHE STRING
-      "Which architectures to build when building the GENERIC stdlib")
+is_sdk_requested(OS_INDEPENDENT swift_build_os_independent)
+if(swift_build_os_independent)
+  set(SWIFT_OS_INDEPENDENT_SDK "" CACHE STRING
+      "Which SDK to use when building the OS_INDEPENDENT stdlib")
+  set(SWIFT_OS_INDEPENDENT_TRIPLE_NAME "" CACHE STRING
+      "Which triple name (e.g. 'macosx11.0') to use when building the OS_INDEPENDENT stdlib")
+  set(SWIFT_OS_INDEPENDENT_ARCHS "" CACHE STRING
+      "Which architectures to build when building the OS_INDEPENDENT stdlib")
   configure_sdk_darwin(
-      GENERIC "GENERIC" ""
-      "${SWIFT_GENERIC_SDK}" generic "${SWIFT_GENERIC_TRIPLE_NAME}" generic "${SWIFT_GENERIC_ARCHS}")
-  set(SWIFT_SDK_GENERIC_LIB_SUBDIR "generic")
-  configure_target_variant(GENERIC-DA "GENERIC Debug+Asserts"   GENERIC DA "Debug+Asserts")
-  configure_target_variant(GENERIC-RA "GENERIC Release+Asserts" GENERIC RA "Release+Asserts")
-  configure_target_variant(GENERIC-R  "GENERIC Release"         GENERIC R  "Release")
+      OS_INDEPENDENT "OS_INDEPENDENT" ""
+      "${SWIFT_OS_INDEPENDENT_SDK}" os_independent "${SWIFT_OS_INDEPENDENT_TRIPLE_NAME}" os_independent "${SWIFT_OS_INDEPENDENT_ARCHS}")
+  set(SWIFT_SDK_OS_INDEPENDENT_LIB_SUBDIR "os_independent")
+  configure_target_variant(OS_INDEPENDENT-DA "OS_INDEPENDENT Debug+Asserts"   OS_INDEPENDENT DA "Debug+Asserts")
+  configure_target_variant(OS_INDEPENDENT-RA "OS_INDEPENDENT Release+Asserts" OS_INDEPENDENT RA "Release+Asserts")
+  configure_target_variant(OS_INDEPENDENT-R  "OS_INDEPENDENT Release"         OS_INDEPENDENT R  "Release")
+  configure_target_variant(OS_INDEPENDENT-S  "OS_INDEPENDENT MinSizeRelease"  OS_INDEPENDENT S  "MinSizeRelease")
 endif()
 
 # Compatible cross-compile SDKS for Darwin OSes: IOS, IOS_SIMULATOR, TVOS,

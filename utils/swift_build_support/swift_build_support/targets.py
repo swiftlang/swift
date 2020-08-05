@@ -181,8 +181,8 @@ class StdlibDeploymentTarget(object):
 
     # A platform that's not tied to any particular OS, and it meant to be used
     # to build the stdlib as standalone and/or statically linked.
-    Generic = Platform("generic", archs=["i386", "x86_64", "armv7", "armv7s",
-                                         "armv7k", "arm64", "arm64e"])
+    OSIndependent = Platform("os_independent", archs=["i386", "x86_64",
+        "armv7", "armv7s", "armv7k", "arm64", "arm64e"])
 
     Linux = Platform("linux", archs=[
         "x86_64",
@@ -212,7 +212,7 @@ class StdlibDeploymentTarget(object):
         iOS, iOSSimulator,
         AppleTV, AppleTVSimulator,
         AppleWatch, AppleWatchSimulator,
-        Generic,
+        OSIndependent,
         Linux,
         FreeBSD,
         OpenBSD,
