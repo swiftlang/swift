@@ -223,7 +223,12 @@ KNOWN_SETTINGS=(
     report-statistics                             "0"               "set to 1 to generate compilation statistics files for swift libraries"
     sil-verify-all                                "0"               "If enabled, run the SIL verifier after each transform when building Swift files during this build process"
     stdlib-deployment-targets                     ""                "space-separated list of targets to configure the Swift standard library to be compiled or cross-compiled for"
-    swift-sdks                                    ""                "semilocon-separated list of SDKs to build, or empty to auto-detect which SDKs are available"
+    swift-sdks                                    ""                "space-separated list of SDKs to build, or empty to auto-detect which SDKs are available"
+
+    ## OS_INDEPENDENT Stdlib Options
+    swift-os-independent-sdk                      ""                "which SDK to use when building the OS_INDEPENDENT stdlib"
+    swift-os-independent-triple-name              ""                "which triple name (e.g. 'none-macho') to use when building the OS_INDEPENDENT stdlib"
+    swift-os-independent-archs                    ""                "space-separated list of which architectures to build when building the OS_INDEPENDENT stdlib"
 
     ## Uncategorised
     install-prefix                                ""                "installation prefix"
@@ -1861,6 +1866,27 @@ for host in "${ALL_HOSTS[@]}"; do
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_INSTALL_COMPONENTS:STRING="${SWIFT_INSTALL_COMPONENTS}"
+                    )
+                fi
+
+                if [ "${SWIFT_OS_INDEPENDENT_SDK}" ] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_OS_INDEPENDENT_SDK:STRING="${SWIFT_OS_INDEPENDENT_SDK}"
+                    )
+                fi
+
+                if [ "${SWIFT_OS_INDEPENDENT_TRIPLE_NAME}" ] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_OS_INDEPENDENT_TRIPLE_NAME:STRING="${SWIFT_OS_INDEPENDENT_TRIPLE_NAME}"
+                    )
+                fi
+
+                if [[ "${SWIFT_OS_INDEPENDENT_ARCHS}" ]] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_OS_INDEPENDENT_ARCHS:STRING="$(join ";" ${SWIFT_OS_INDEPENDENT_ARCHS[@]})"
                     )
                 fi
 

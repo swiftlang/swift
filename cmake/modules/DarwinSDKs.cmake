@@ -31,7 +31,7 @@ if(swift_build_os_independent)
   set(SWIFT_OS_INDEPENDENT_SDK "" CACHE STRING
       "Which SDK to use when building the OS_INDEPENDENT stdlib")
   set(SWIFT_OS_INDEPENDENT_TRIPLE_NAME "" CACHE STRING
-      "Which triple name (e.g. 'macosx11.0') to use when building the OS_INDEPENDENT stdlib")
+      "Which triple name (e.g. 'none-macho') to use when building the OS_INDEPENDENT stdlib")
   set(SWIFT_OS_INDEPENDENT_ARCHS "" CACHE STRING
       "Which architectures to build when building the OS_INDEPENDENT stdlib")
   configure_sdk_darwin(
