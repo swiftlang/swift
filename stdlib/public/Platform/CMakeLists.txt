@@ -102,6 +102,8 @@ foreach(sdk ${SWIFT_SDKS})
             "-DGLIBC_INCLUDE_PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_LIBC_INCLUDE_DIRECTORY}"
             "-DGLIBC_ARCH_INCLUDE_PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_LIBC_ARCHITECTURE_INCLUDE_DIRECTORY}")
 
+    list(APPEND glibc_modulemap_target_list ${glibc_modulemap_target})
+
     if(SWIFT_BUILD_STATIC_STDLIB)
       add_custom_command_target(
         copy_glibc_modulemap_static
