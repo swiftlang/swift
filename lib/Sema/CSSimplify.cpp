@@ -32,8 +32,6 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Compiler.h"
 
-#include <unordered_set>
-
 using namespace swift;
 using namespace constraints;
 
@@ -10419,30 +10417,6 @@ void ConstraintSystem::addContextualConversionConstraint(
       expr, LocatorPathElt::ContextualType(isForSingleExprFunction));
   addConstraint(constraintKind, getType(expr), conversionType,
                 convertTypeLocator, /*isFavored*/ true);
-}
-
-Optional<ExprKind>
-ConstraintSystem::getAtomicLiteralKind(TypeVariableType *typeVar) const {
-  const std::unordered_set<ExprKind> atomicLiteralKinds = {
-    ExprKind::IntegerLiteral,
-    ExprKind::FloatLiteral,
-    ExprKind::StringLiteral,
-    ExprKind::BooleanLiteral,
-    ExprKind::NilLiteral,
-  };
-
-  if (!typeVar)
-    return None;
-
-  auto *locator = typeVar->getImpl().getLocator();
-  if (!locator->directlyAt<LiteralExpr>())
-    return None;
-
-  auto literalKind = getAsExpr(locator->getAnchor())->getKind();
-  if (!atomicLiteralKinds.count(literalKind))
-    return None;
-
-  return literalKind;
 }
 
 void ConstraintSystem::addFixConstraint(ConstraintFix *fix, ConstraintKind kind,

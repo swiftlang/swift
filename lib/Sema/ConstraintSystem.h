@@ -306,6 +306,11 @@ public:
   /// Retrieve the generic parameter opened by this type variable.
   GenericTypeParamType *getGenericParameter() const;
 
+  /// Returns the \c ExprKind of this type variable if it's the type of an
+  /// atomic literal expression, meaning the literal can't be composed of subexpressions.
+  /// Otherwise, returns \c None.
+  Optional<ExprKind> getAtomicLiteralKind() const;
+
   /// Determine whether this type variable represents a closure type.
   bool isClosureType() const;
 
@@ -2994,11 +2999,6 @@ public:
   bool isDeclUnavailable(const Decl *D,
                          ConstraintLocator *locator = nullptr) const;
 
-  /// Returns the \c ExprKind of the given type variable if it's the type of an
-  /// atomic literal expression, meaning the literal can't be composed of subexpressions.
-  /// Otherwise, returns \c None.
-  Optional<ExprKind> getAtomicLiteralKind(TypeVariableType *typeVar) const;
-
 public:
 
   /// Whether we should attempt to fix problems.
@@ -3127,18 +3127,19 @@ public:
       // We can merge the type variables of same-kind atomic literal expressions because they
       // will all have the same set of constraints and therefore can never resolve to anything
       // different.
-      auto *typeVar = type->getAs<TypeVariableType>();
-      if (auto literalKind = getAtomicLiteralKind(typeVar)) {
-        auto *&originalRep = representativeForKind[RawExprKind(*literalKind)];
-        auto *currentRep = getRepresentative(typeVar);
+      if (auto *typeVar = type->getAs<TypeVariableType>()) {
+        if (auto literalKind = typeVar->getImpl().getAtomicLiteralKind()) {
+          auto *&originalRep = representativeForKind[RawExprKind(*literalKind)];
+          auto *currentRep = getRepresentative(typeVar);
 
-        if (originalRep) {
-          if (originalRep != currentRep)
-            mergeEquivalenceClasses(currentRep, originalRep);
-          continue;
+          if (originalRep) {
+            if (originalRep != currentRep)
+              mergeEquivalenceClasses(currentRep, originalRep);
+            continue;
+          }
+
+          originalRep = currentRep;
         }
-
-        originalRep = currentRep;
       }
 
       // Introduce conversions from each input type to the supertype.

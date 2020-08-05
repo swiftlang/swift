@@ -82,6 +82,24 @@ TypeVariableType::Implementation::getGenericParameter() const {
   return locator ? locator->getGenericParameter() : nullptr;
 }
 
+Optional<ExprKind>
+TypeVariableType::Implementation::getAtomicLiteralKind() const {
+  if (!locator || !locator->directlyAt<LiteralExpr>())
+    return None;
+
+  auto kind = getAsExpr(locator->getAnchor())->getKind();
+  switch (kind) {
+  case ExprKind::IntegerLiteral:
+  case ExprKind::FloatLiteral:
+  case ExprKind::StringLiteral:
+  case ExprKind::BooleanLiteral:
+  case ExprKind::NilLiteral:
+    return kind;
+  default:
+    return None;
+  }
+}
+
 bool TypeVariableType::Implementation::isClosureType() const {
   if (!(locator && locator->getAnchor()))
     return false;
