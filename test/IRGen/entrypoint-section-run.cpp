@@ -1,10 +1,11 @@
 // RUN: %empty-directory(%t)
-// RUN: %clang %s -isysroot %sdk -o %t/main
+// RUN: %target-clang %s -std=c++11 -isysroot %sdk -o %t/main
 // RUN: %target-codesign %t/main
 // RUN: %target-build-swift %S/Inputs/at-main-struct-simple.swift -O -parse-as-library -emit-library -o %t/libHowdy.dylib -module-name Howdy
+// RUN: %target-codesign %t/libHowdy.dylib
 // RUN: %target-run %t/main %t/libHowdy.dylib | %FileCheck %s
 
-// REQUIRES: OS=macosx,CPU=x86_64
+// REQUIRES: VENDOR=apple
 // REQUIRES: executable_test
 // UNSUPPORTED: remote_run
 
@@ -13,6 +14,13 @@
 #include <mach-o/getsect.h>
 #include <stdio.h>
 #include <string.h>
+#include <ptrauth.h>
+
+#if __POINTER_WIDTH__ == 64
+using mach_header_platform = mach_header_64;
+#else
+using mach_header_platform = mach_header;
+#endif
 
 int main(int argc, char *argv[]) {
   if (argc != 2) {
@@ -35,12 +43,19 @@ int main(int argc, char *argv[]) {
       continue;
     }
     auto *header =
-        reinterpret_cast<const mach_header_64 *>(_dyld_get_image_header(index));
+        reinterpret_cast<const mach_header_platform *>(_dyld_get_image_header(index));
     size_t size;
     auto *data = getsectiondata(header, "__TEXT", "__swift5_entry", &size);
     int32_t offset = *reinterpret_cast<int32_t *>(data);
     mainFunction = reinterpret_cast<MainFunction *>(
-        reinterpret_cast<int64_t>(data) + offset);
+      ptrauth_sign_unauthenticated(
+          reinterpret_cast<void *>(
+              reinterpret_cast<long>(data) + offset
+          ),
+          ptrauth_key_function_pointer,
+          ptrauth_function_pointer_type_discriminator(MainFunction)
+      )
+    );
 
     break;
   }
