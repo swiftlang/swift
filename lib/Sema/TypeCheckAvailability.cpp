@@ -2067,6 +2067,7 @@ void swift::diagnoseUnavailableOverride(ValueDecl *override,
 
   diagnoseExplicitUnavailability(base, override->getLoc(),
                                  override->getDeclContext(),
+                                 /*Flags*/None,
                                  [&](InFlightDiagnostic &diag) {
     ParsedDeclName parsedName = parseDeclName(attr->Rename);
     if (!parsedName || parsedName.isPropertyAccessor() ||
@@ -2097,10 +2098,11 @@ void swift::diagnoseUnavailableOverride(ValueDecl *override,
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
 bool swift::diagnoseExplicitUnavailability(const ValueDecl *D,
-                                                 SourceRange R,
-                                                 const DeclContext *DC,
-                                                 const ApplyExpr *call) {
-  return diagnoseExplicitUnavailability(D, R, DC,
+                                           SourceRange R,
+                                           const DeclContext *DC,
+                                           const ApplyExpr *call,
+                                           DeclAvailabilityFlags Flags) {
+  return diagnoseExplicitUnavailability(D, R, DC, Flags,
                                         [=](InFlightDiagnostic &diag) {
     fixItAvailableAttrRename(diag, R, D, AvailableAttr::isUnavailable(D),
                              call);
@@ -2172,6 +2174,7 @@ bool swift::diagnoseExplicitUnavailability(
     const ValueDecl *D,
     SourceRange R,
     const DeclContext *DC,
+    DeclAvailabilityFlags Flags,
     llvm::function_ref<void(InFlightDiagnostic &)> attachRenameFixIts) {
   auto *Attr = AvailableAttr::isUnavailable(D);
   if (!Attr)
@@ -2229,6 +2232,14 @@ bool swift::diagnoseExplicitUnavailability(
     break;
   }
 
+  // TODO: Consider removing this.
+  // ObjC keypaths components weren't checked previously, so errors are demoted
+  // to warnings to avoid source breakage. In some cases unavailable or
+  // obsolete decls still map to valid ObjC runtime names, so behave correctly
+  // at runtime, even though their use would produce an error outside of a
+  // #keyPath expression.
+  bool warnInObjCKeyPath = Flags.contains(DeclAvailabilityFlag::ForObjCKeyPath);
+
   if (!Attr->Rename.empty()) {
     SmallString<32> newNameBuf;
     Optional<ReplacementDeclKind> replaceKind =
@@ -2238,7 +2249,9 @@ bool swift::diagnoseExplicitUnavailability(
     StringRef newName = replaceKind ? newNameBuf.str() : Attr->Rename;
       EncodedDiagnosticMessage EncodedMessage(Attr->Message);
       auto diag =
-          diags.diagnose(Loc, diag::availability_decl_unavailable_rename,
+          diags.diagnose(Loc, warnInObjCKeyPath
+                         ? diag::availability_decl_unavailable_rename_warn
+                         : diag::availability_decl_unavailable_rename,
                          RawAccessorKind, Name, replaceKind.hasValue(),
                          rawReplaceKind, newName, EncodedMessage.Message);
       attachRenameFixIts(diag);
@@ -2253,7 +2266,9 @@ bool swift::diagnoseExplicitUnavailability(
   } else {
     EncodedDiagnosticMessage EncodedMessage(Attr->Message);
     diags
-        .diagnose(Loc, diag::availability_decl_unavailable, RawAccessorKind,
+        .diagnose(Loc, warnInObjCKeyPath
+                  ? diag::availability_decl_unavailable_warn
+                  : diag::availability_decl_unavailable, RawAccessorKind,
                   Name, platform.empty(), platform, EncodedMessage.Message)
         .highlight(R);
   }
@@ -2501,6 +2516,10 @@ private:
   /// Walk a keypath expression, checking all of its components for
   /// availability.
   void maybeDiagKeyPath(KeyPathExpr *KP) {
+    auto flags = DeclAvailabilityFlags();
+    if (KP->isObjC())
+      flags = DeclAvailabilityFlag::ForObjCKeyPath;
+
     for (auto &component : KP->getComponents()) {
       switch (component.getKind()) {
       case KeyPathExpr::Component::Kind::Property:
@@ -2508,7 +2527,7 @@ private:
         auto *decl = component.getDeclRef().getDecl();
         auto loc = component.getLoc();
         SourceRange range(loc, loc);
-        diagAvailability(decl, range, nullptr);
+        diagAvailability(decl, range, nullptr, flags);
         break;
       }
 
@@ -2628,7 +2647,7 @@ AvailabilityWalker::diagAvailability(ConcreteDeclRef declRef, SourceRange R,
       if (TypeChecker::diagnoseInlinableDeclRef(R.Start, declRef, DC, FragileKind))
         return true;
 
-  if (diagnoseExplicitUnavailability(D, R, DC, call))
+  if (diagnoseExplicitUnavailability(D, R, DC, call, Flags))
     return true;
 
   // Make sure not to diagnose an accessor's deprecation if we already
