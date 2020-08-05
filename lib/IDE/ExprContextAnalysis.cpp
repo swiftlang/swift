@@ -669,11 +669,9 @@ static bool collectPossibleCalleesForUnresolvedMember(
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   auto currModule = DC.getParentModule();
 
-  // Get the context of the expression itself.
-  ExprContextInfo contextInfo(&DC, unresolvedMemberExpr);
-  for (auto expectedTy : contextInfo.getPossibleTypes()) {
+  auto collectMembers = [&](Type expectedTy) {
     if (!expectedTy->mayHaveMembers())
-      continue;
+      return;
     SmallVector<FunctionTypeAndDecl, 2> members;
     collectPossibleCalleesByQualifiedLookup(DC, MetatypeType::get(expectedTy),
                                             unresolvedMemberExpr->getName(),
@@ -682,6 +680,16 @@ static bool collectPossibleCalleesForUnresolvedMember(
       if (isReferenceableByImplicitMemberExpr(currModule, &DC, expectedTy,
                                               member.Decl))
         candidates.push_back(member);
+    }
+  };
+
+  // Get the context of the expression itself.
+  ExprContextInfo contextInfo(&DC, unresolvedMemberExpr);
+  for (auto expectedTy : contextInfo.getPossibleTypes()) {
+    collectMembers(expectedTy);
+    // If this is an optional type, let's also check its base type.
+    if (auto baseTy = expectedTy->getOptionalObjectType()) {
+      collectMembers(baseTy->lookThroughAllOptionalTypes());
     }
   }
   return !candidates.empty();
