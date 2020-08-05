@@ -95,13 +95,27 @@ function(is_build_type_optimized build_type result_var_name)
   endif()
 endfunction()
 
-function(is_build_type_optimized_for_size build_type result_var_name)
-  if("${build_type}" STREQUAL "Debug" OR
-     "${build_type}" STREQUAL "RelWithDebInfo" OR
-     "${build_type}" STREQUAL "Release")
-    set("${result_var_name}" FALSE PARENT_SCOPE)
+function(clang_optimize_flag_for_build_type build_type result_var_name)
+  if("${build_type}" STREQUAL "Debug")
+    set("${result_var_name}" "-O0" PARENT_SCOPE)
+  elseif("${build_type}" STREQUAL "RelWithDebInfo" OR
+         "${build_type}" STREQUAL "Release")
+    set("${result_var_name}" "-O2" PARENT_SCOPE)
   elseif("${build_type}" STREQUAL "MinSizeRel")
-    set("${result_var_name}" TRUE PARENT_SCOPE)
+    set("${result_var_name}" "-Os" PARENT_SCOPE)
+  else()
+    message(FATAL_ERROR "Unknown build type: ${build_type}")
+  endif()
+endfunction()
+
+function(swift_optimize_flag_for_build_type build_type result_var_name)
+  if("${build_type}" STREQUAL "Debug")
+    set("${result_var_name}" "-Onone" PARENT_SCOPE)
+  elseif("${build_type}" STREQUAL "RelWithDebInfo" OR
+         "${build_type}" STREQUAL "Release")
+    set("${result_var_name}" "-O" PARENT_SCOPE)
+  elseif("${build_type}" STREQUAL "MinSizeRel")
+    set("${result_var_name}" "-Osize" PARENT_SCOPE)
   else()
     message(FATAL_ERROR "Unknown build type: ${build_type}")
   endif()
