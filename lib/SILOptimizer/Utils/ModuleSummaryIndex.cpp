@@ -190,6 +190,11 @@ ModuleSummaryIndex swift::buildModuleSummaryIndex(SILModule &M,
       LLVM_DEBUG(llvm::dbgs() << "Preserve " << F.getName() << " due to ObjCMethod\n");
       FS->setPreserved(true);
     }
+    if (F.hasCReferences()) {
+      LLVM_DEBUG(llvm::dbgs() << "Preserve " << F.getName() << " due to @_silgen_name or @_cdecl\n");
+      FS->setPreserved(true);
+    }
+
     FS->setLive(false);
     index.addFunctionSummary(F.getName(), std::move(FS));
   }
