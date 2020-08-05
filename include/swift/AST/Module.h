@@ -367,7 +367,6 @@ public:
     return { Files.begin(), Files.size() };
   }
 
-  bool isClangModule() const;
   void addFile(FileUnit &newFile);
 
   /// Creates a map from \c #filePath strings to corresponding \c #fileID

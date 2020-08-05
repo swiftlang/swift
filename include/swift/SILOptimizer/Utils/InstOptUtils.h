@@ -299,11 +299,6 @@ TermInst *addArgumentToBranch(SILValue val, SILBasicBlock *dest,
 /// the given linkage.
 SILLinkage getSpecializedLinkage(SILFunction *f, SILLinkage linkage);
 
-/// Tries to optimize a given apply instruction if it is a concatenation of
-/// string literals. Returns a new instruction if optimization was possible.
-SingleValueInstruction *tryToConcatenateStrings(ApplyInst *ai,
-                                                SILBuilder &builder);
-
 /// Tries to perform jump-threading on all checked_cast_br instruction in
 /// function \p Fn.
 bool tryCheckedCastBrJumpThreading(

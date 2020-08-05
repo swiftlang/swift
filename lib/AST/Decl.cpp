@@ -2576,10 +2576,11 @@ mapSignatureExtInfo(AnyFunctionType::ExtInfo info,
                     bool topLevelFunction) {
   if (topLevelFunction)
     return AnyFunctionType::ExtInfo();
-  return AnyFunctionType::ExtInfo()
+  return AnyFunctionType::ExtInfoBuilder()
       .withRepresentation(info.getRepresentation())
-      .withAsync(info.async())
-      .withThrows(info.throws());
+      .withAsync(info.isAsync())
+      .withThrows(info.isThrowing())
+      .build();
 }
 
 /// Map a function's type to the type used for computing signatures,
@@ -4007,7 +4008,7 @@ StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
     StructLoc(StructLoc)
 {
   Bits.StructDecl.HasUnreferenceableStorage = false;
-  Bits.StructDecl.IsCxxNotTriviallyCopyable = false;
+  Bits.StructDecl.IsCxxNonTrivial = false;
 }
 
 bool NominalTypeDecl::hasMemberwiseInitializer() const {
@@ -4479,10 +4480,8 @@ bool ClassDecl::walkSuperclasses(
 EnumCaseDecl *EnumCaseDecl::create(SourceLoc CaseLoc,
                                    ArrayRef<EnumElementDecl *> Elements,
                                    DeclContext *DC) {
-  void *buf = DC->getASTContext()
-    .Allocate(sizeof(EnumCaseDecl) +
-                    sizeof(EnumElementDecl*) * Elements.size(),
-                  alignof(EnumCaseDecl));
+  size_t bytes = totalSizeToAlloc<EnumElementDecl *>(Elements.size());
+  void *buf = DC->getASTContext().Allocate(bytes, alignof(EnumCaseDecl));
   return ::new (buf) EnumCaseDecl(CaseLoc, Elements, DC);
 }
 

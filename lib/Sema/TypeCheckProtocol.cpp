@@ -695,14 +695,14 @@ swift::matchWitness(
     }
 
     // If the witness is 'async', the requirement must be.
-    if (witnessFnType->getExtInfo().async() !=
-          reqFnType->getExtInfo().async()) {
+    if (witnessFnType->getExtInfo().isAsync() !=
+          reqFnType->getExtInfo().isAsync()) {
       return RequirementMatch(witness, MatchKind::AsyncConflict);
     }
 
     // If the witness is 'throws', the requirement must be.
-    if (witnessFnType->getExtInfo().throws() &&
-        !reqFnType->getExtInfo().throws()) {
+    if (witnessFnType->getExtInfo().isThrowing() &&
+        !reqFnType->getExtInfo().isThrowing()) {
       return RequirementMatch(witness, MatchKind::ThrowsConflict);
     }
 

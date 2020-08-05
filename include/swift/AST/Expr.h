@@ -5259,6 +5259,7 @@ public:
       OptionalWrap,
       Identity,
       TupleElement,
+      DictionaryKey,
     };
   
   private:
@@ -5367,6 +5368,16 @@ public:
                        propertyType,
                        loc);
     }
+
+    /// Create a component for a dictionary key (#keyPath only).
+    static Component forDictionaryKey(DeclNameRef UnresolvedName,
+                                      Type valueType,
+                                      SourceLoc loc) {
+      return Component(nullptr, UnresolvedName, nullptr, {}, {},
+                       Kind::DictionaryKey,
+                       valueType,
+                       loc);
+    }
     
     /// Create a component for a subscript.
     static Component forSubscript(ASTContext &ctx,
@@ -5457,6 +5468,7 @@ public:
       case Kind::Property:
       case Kind::Identity:
       case Kind::TupleElement:
+      case Kind::DictionaryKey:
         return true;
 
       case Kind::UnresolvedSubscript:
@@ -5481,6 +5493,7 @@ public:
       case Kind::Property:
       case Kind::Identity:
       case Kind::TupleElement:
+      case Kind::DictionaryKey:
         return nullptr;
       }
       llvm_unreachable("unhandled kind");
@@ -5500,6 +5513,7 @@ public:
       case Kind::Property:
       case Kind::Identity:
       case Kind::TupleElement:
+      case Kind::DictionaryKey:
         llvm_unreachable("no subscript labels for this kind");
       }
       llvm_unreachable("unhandled kind");
@@ -5522,6 +5536,7 @@ public:
       case Kind::Property:
       case Kind::Identity:
       case Kind::TupleElement:
+      case Kind::DictionaryKey:
         return {};
       }
       llvm_unreachable("unhandled kind");
@@ -5533,6 +5548,7 @@ public:
     DeclNameRef getUnresolvedDeclName() const {
       switch (getKind()) {
       case Kind::UnresolvedProperty:
+      case Kind::DictionaryKey:
         return Decl.UnresolvedName;
 
       case Kind::Invalid:
@@ -5563,6 +5579,7 @@ public:
       case Kind::OptionalForce:
       case Kind::Identity:
       case Kind::TupleElement:
+      case Kind::DictionaryKey:
         llvm_unreachable("no decl ref for this kind");
       }
       llvm_unreachable("unhandled kind");
@@ -5582,6 +5599,7 @@ public:
         case Kind::Identity:
         case Kind::Property:
         case Kind::Subscript:
+        case Kind::DictionaryKey:
           llvm_unreachable("no field number for this kind");
       }
       llvm_unreachable("unhandled kind");

@@ -855,13 +855,9 @@ public:
     return FunctionMetadataConvention((Data&ConventionMask) >> ConventionShift);
   }
 
-  bool async() const {
-    return bool(Data & AsyncMask);
-  }
+  bool isAsync() const { return bool(Data & AsyncMask); }
 
-  bool throws() const {
-    return bool(Data & ThrowsMask);
-  }
+  bool isThrowing() const { return bool(Data & ThrowsMask); }
 
   bool isEscaping() const {
     return bool (Data & EscapingMask);

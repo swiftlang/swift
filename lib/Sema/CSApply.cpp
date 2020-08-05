@@ -237,6 +237,9 @@ static bool buildObjCKeyPathString(KeyPathExpr *E,
       // Don't bother building the key path string if the key path didn't even
       // resolve.
       return false;
+    case KeyPathExpr::Component::Kind::DictionaryKey:
+      llvm_unreachable("DictionaryKey only valid in #keyPath expressions.");
+      return false;
     }
   }
   
@@ -979,7 +982,7 @@ namespace {
       Expr *closureBody = closureCall;
       closureBody = coerceToType(closureCall, resultTy, locator);
 
-      if (selfFnTy->getExtInfo().throws()) {
+      if (selfFnTy->getExtInfo().isThrowing()) {
         closureBody = new (context) TryExpr(closureBody->getStartLoc(), closureBody,
                                             cs.getType(closureBody),
                                             /*implicit=*/true);
@@ -4690,6 +4693,10 @@ namespace {
         case KeyPathExpr::Component::Kind::OptionalWrap:
         case KeyPathExpr::Component::Kind::TupleElement:
           llvm_unreachable("already resolved");
+          break;
+        case KeyPathExpr::Component::Kind::DictionaryKey:
+          llvm_unreachable("DictionaryKey only valid in #keyPath");
+          break;
         }
 
         // Update "componentTy" with the result type of the last component.
@@ -6735,7 +6742,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       maybeDiagnoseUnsupportedDifferentiableConversion(cs, expr, toFunc);
       if (!isFromDifferentiable && isToDifferentiable) {
         auto newEI =
-            fromEI.withDifferentiabilityKind(toEI.getDifferentiabilityKind());
+            fromEI.intoBuilder()
+                .withDifferentiabilityKind(toEI.getDifferentiabilityKind())
+                .build();
         fromFunc = FunctionType::get(toFunc->getParams(), fromFunc->getResult())
             ->withExtInfo(newEI)
             ->castTo<FunctionType>();
@@ -7743,9 +7752,8 @@ namespace {
             componentType = solution.simplifyType(cs.getType(kp, i));
             assert(!componentType->hasTypeVariable() &&
                    "Should not write type variable into key-path component");
+            kp->getMutableComponents()[i].setComponentType(componentType);
           }
-
-          kp->getMutableComponents()[i].setComponentType(componentType);
         }
       }
 

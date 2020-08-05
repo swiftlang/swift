@@ -44,6 +44,7 @@ add_swift_host_library(swiftAST STATIC
   DocComment.cpp
   Evaluator.cpp
   Expr.cpp
+  ExtInfo.cpp
   FineGrainedDependencies.cpp
   FineGrainedDependencyFormat.cpp
   FrontendSourceFileDepGraphFactory.cpp
