@@ -4420,6 +4420,12 @@ bool ConstraintSystem::repairFailures(
                           getConstraintLocator(anchor, path));
   }
 
+  case ConstraintLocator::FunctionBuilderBodyResult: {
+    conversionsOrFixes.push_back(ContextualMismatch::create(
+        *this, lhs, rhs, getConstraintLocator(locator)));
+    break;
+  }
+
   default:
     break;
   }
