@@ -493,7 +493,6 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
     case ComponentKind::OptionalChain:
     case ComponentKind::OptionalWrap:
     case ComponentKind::Identity:
-    case ComponentKind::DictionaryKey:
       // These components don't have any callee associated, so just continue.
       break;
     }
@@ -3850,6 +3849,11 @@ void constraints::simplifyLocator(ASTNode &anchor,
       // At this point we should have already found argument expression
       // this attribute belogs to, so we can leave this element in place
       // because it points out exact location useful for diagnostics.
+      break;
+    }
+
+    case ConstraintLocator::FunctionBuilderBodyResult: {
+      path = path.slice(1);
       break;
     }
 

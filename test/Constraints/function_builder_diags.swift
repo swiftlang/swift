@@ -477,6 +477,8 @@ func testCaseMutabilityMismatches(e: E3) {
             var x): // expected-error{{'var' pattern binding must match previous 'let' pattern binding}}
       x
       y += "a"
+    default:
+      "default"
     }
   }
 }
@@ -612,5 +614,9 @@ struct MyView {
     case .none: // expected-error {{'case' label in a 'switch' should have at least one executable statement}}
     case . // expected-error {{expected ':' after 'case'}}
     } // expected-error {{expected identifier after '.' expression}}
+  }
+
+  @TupleBuilder var invalidConversion: Int { // expected-error {{cannot convert value of type 'String' to specified type 'Int'}}
+    ""
   }
 }
