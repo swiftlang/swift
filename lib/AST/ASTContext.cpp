@@ -2447,10 +2447,9 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
     }
   }
 
+  size_t bytes = totalSizeToAlloc<TupleTypeElt>(Fields.size());
   // TupleType will copy the fields list into ASTContext owned memory.
-  void *mem = C.Allocate(sizeof(TupleType) +
-                         sizeof(TupleTypeElt) * Fields.size(),
-                         alignof(TupleType), arena);
+  void *mem = C.Allocate(bytes, alignof(TupleType), arena);
   auto New = new (mem) TupleType(Fields, IsCanonical ? &C : nullptr, properties,
                                  hasElementWithOwnership);
   C.getImpl().getArena(arena).TupleTypes.InsertNode(New, InsertPos);
@@ -2653,7 +2652,7 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
     newType = new (mem) BoundGenericClassType(
         theClass, Parent, GenericArgs, IsCanonical ? &C : nullptr, properties);
   } else if (auto theStruct = dyn_cast<StructDecl>(TheDecl)) {
-    auto sz =BoundGenericStructType::totalSizeToAlloc<Type>(GenericArgs.size());
+    auto sz = BoundGenericStructType::totalSizeToAlloc<Type>(GenericArgs.size());
     auto mem = C.Allocate(sz, alignof(BoundGenericStructType), arena);
     newType = new (mem) BoundGenericStructType(
         theStruct, Parent, GenericArgs, IsCanonical ? &C : nullptr, properties);
@@ -3113,10 +3112,9 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
     return funcTy;
   }
 
-  Optional<ExtInfo::ClangTypeInfo> clangTypeInfo = info.getClangTypeInfo();
+  Optional<ClangTypeInfo> clangTypeInfo = info.getClangTypeInfo();
 
-  size_t allocSize =
-    totalSizeToAlloc<AnyFunctionType::Param, ExtInfo::ClangTypeInfo>(
+  size_t allocSize = totalSizeToAlloc<AnyFunctionType::Param, ClangTypeInfo>(
       params.size(), clangTypeInfo.hasValue() ? 1 : 0);
   void *mem = ctx.Allocate(allocSize, alignof(FunctionType), arena);
 
@@ -3146,7 +3144,7 @@ FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params,
                           getTrailingObjects<AnyFunctionType::Param>());
   auto clangTypeInfo = info.getClangTypeInfo();
   if (clangTypeInfo.hasValue())
-    *getTrailingObjects<ExtInfo::ClangTypeInfo>() = clangTypeInfo.getValue();
+    *getTrailingObjects<ClangTypeInfo>() = clangTypeInfo.getValue();
 }
 
 void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
@@ -3239,11 +3237,6 @@ ArrayRef<Requirement> GenericFunctionType::getRequirements() const {
   return Signature->getRequirements();
 }
 
-void SILFunctionType::ExtInfo::ClangTypeInfo::printType(
-    ClangModuleLoader *cml, llvm::raw_ostream &os) const {
-  cml->printClangType(ClangFunctionType, os);
-}
-
 void SILFunctionType::Profile(
     llvm::FoldingSetNodeID &id,
     GenericSignature genericParams,
@@ -3302,13 +3295,14 @@ SILFunctionType::SILFunctionType(
       WitnessMethodConformance(witnessMethodConformance) {
 
   Bits.SILFunctionType.HasErrorResult = errorResult.hasValue();
-  Bits.SILFunctionType.ExtInfoBits = ext.Bits;
+  Bits.SILFunctionType.ExtInfoBits = ext.getBits();
   Bits.SILFunctionType.HasClangTypeInfo = false;
   Bits.SILFunctionType.HasPatternSubs = (bool) patternSubs;
   Bits.SILFunctionType.HasInvocationSubs = (bool) invocationSubs;
   // The use of both assert() and static_assert() below is intentional.
-  assert(Bits.SILFunctionType.ExtInfoBits == ext.Bits && "Bits were dropped!");
-  static_assert(ExtInfo::NumMaskBits == NumSILExtInfoBits,
+  assert(Bits.SILFunctionType.ExtInfoBits == ext.getBits() &&
+         "Bits were dropped!");
+  static_assert(SILExtInfoBuilder::NumMaskBits == NumSILExtInfoBits,
                 "ExtInfo and SILFunctionTypeBitfields must agree on bit size");
   Bits.SILFunctionType.CoroutineKind = unsigned(coroutineKind);
   NumParameters = params.size();
@@ -4446,7 +4440,6 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
 const clang::Type *
 ASTContext::getClangFunctionType(ArrayRef<AnyFunctionType::Param> params,
                                  Type resultTy,
-                                 FunctionType::ExtInfo incompleteExtInfo,
                                  FunctionTypeRepresentation trueRep) {
   auto &impl = getImpl();
   if (!impl.Converter) {

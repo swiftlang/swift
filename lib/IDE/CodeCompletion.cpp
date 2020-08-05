@@ -1613,9 +1613,20 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   /// \returns true on success, false on failure.
   bool typecheckParsedType() {
     assert(ParsedTypeLoc.getTypeRepr() && "should have a TypeRepr");
-    if (!performTypeLocChecking(P.Context, ParsedTypeLoc,
-                                   CurDeclContext, false))
+    if (ParsedTypeLoc.wasValidated() && !ParsedTypeLoc.isError()) {
       return true;
+    }
+
+    const auto ty = swift::performTypeResolution(
+        ParsedTypeLoc.getTypeRepr(), P.Context,
+        /*isSILMode=*/false,
+        /*isSILType=*/false, CurDeclContext->getGenericEnvironmentOfContext(),
+        CurDeclContext,
+        /*ProduceDiagnostics=*/false);
+    ParsedTypeLoc.setType(ty);
+    if (!ParsedTypeLoc.isError()) {
+      return true;
+    }
 
     // It doesn't type check as a type, so see if it's a qualifying module name.
     if (auto *ITR = dyn_cast<IdentTypeRepr>(ParsedTypeLoc.getTypeRepr())) {
@@ -2669,7 +2680,7 @@ public:
                         const AbstractFunctionDecl *AFD) {
     if (AFD && AFD->getAttrs().hasAttribute<RethrowsAttr>())
       Builder.addAnnotatedRethrows();
-    else if (AFT->throws())
+    else if (AFT->isThrowing())
       Builder.addAnnotatedThrows();
   }
 

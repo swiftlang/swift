@@ -1634,8 +1634,8 @@ struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
   FunctionMetadataConvention getConvention() const {
     return Flags.getConvention();
   }
-  bool async() const { return Flags.async(); }
-  bool throws() const { return Flags.throws(); }
+  bool isAsync() const { return Flags.isAsync(); }
+  bool isThrowing() const { return Flags.isThrowing(); }
   bool hasParameterFlags() const { return Flags.hasParameterFlags(); }
   bool isEscaping() const { return Flags.isEscaping(); }
 

@@ -352,6 +352,50 @@ emitUnresolvedLabelDiagnostics(DiagnosticEngine &DE,
   }
 }
 
+/// Find the target of a break or continue statement without a label.
+///
+/// \returns the target, if one was found, or \c nullptr if no such target
+/// exists.
+static LabeledStmt *findUnlabeledBreakOrContinueStmtTarget(
+    ASTContext &ctx, SourceFile *sourceFile, SourceLoc loc,
+    bool isContinue, DeclContext *dc,
+    ArrayRef<LabeledStmt *> activeLabeledStmts) {
+  for (auto labeledStmt : activeLabeledStmts) {
+    // 'break' with no label looks through non-loop structures
+    // except 'switch'.
+    // 'continue' ignores non-loop structures.
+    if (!labeledStmt->requiresLabelOnJump() &&
+        (!isContinue || labeledStmt->isPossibleContinueTarget())) {
+      return labeledStmt;
+    }
+  }
+
+  // If we're in a defer, produce a tailored diagnostic.
+  if (isDefer(dc)) {
+    ctx.Diags.diagnose(
+        loc, diag::jump_out_of_defer, isContinue ? "continue": "break");
+    return nullptr;
+  }
+
+  // If we're dealing with an unlabeled break inside of an 'if' or 'do'
+  // statement, produce a more specific error.
+  if (!isContinue &&
+      llvm::any_of(activeLabeledStmts,
+                   [&](Stmt *S) -> bool {
+                     return isa<IfStmt>(S) || isa<DoStmt>(S);
+                   })) {
+    ctx.Diags.diagnose(
+        loc, diag::unlabeled_break_outside_loop);
+    return nullptr;
+  }
+
+  // Otherwise produce a generic error.
+  ctx.Diags.diagnose(
+      loc,
+      isContinue ? diag::continue_outside_loop : diag::break_outside_loop);
+  return nullptr;
+}
+
 /// Find the target of a break or continue statement.
 ///
 /// \returns the target, if one was found, or \c nullptr if no such target
@@ -361,7 +405,6 @@ static LabeledStmt *findBreakOrContinueStmtTarget(
     SourceLoc loc, Identifier targetName, SourceLoc targetLoc,
     bool isContinue, DeclContext *dc,
     ArrayRef<LabeledStmt *> oldActiveLabeledStmts) {
-  TopCollection<unsigned, LabeledStmt *> labelCorrections(3);
 
   // Retrieve the active set of labeled statements.
   // FIXME: Once everything uses ASTScope lookup, \c oldActiveLabeledStmts
@@ -375,43 +418,37 @@ static LabeledStmt *findBreakOrContinueStmtTarget(
         oldActiveLabeledStmts.rbegin(), oldActiveLabeledStmts.rend());
   }
 
-  // Pick the nearest break target that matches the specified name.
+  // Handle an unlabeled break separately; that's the easy case.
   if (targetName.empty()) {
-    for (auto labeledStmt : activeLabeledStmts) {
-      // 'break' with no label looks through non-loop structures
-      // except 'switch'.
-      // 'continue' ignores non-loop structures.
-      if (!labeledStmt->requiresLabelOnJump() &&
-          (!isContinue || labeledStmt->isPossibleContinueTarget())) {
-        return labeledStmt;
-      }
-    }
-  } else {
-    // Scan inside out until we find something with the right label.
-    for (auto labeledStmt : activeLabeledStmts) {
-      if (targetName == labeledStmt->getLabelInfo().Name) {
-        // Continue cannot be used to repeat switches, use fallthrough instead.
-        if (isContinue && !labeledStmt->isPossibleContinueTarget()) {
-          ctx.Diags.diagnose(
-              loc, diag::continue_not_in_this_stmt,
-              isa<SwitchStmt>(labeledStmt) ? "switch" : "if");
-          return nullptr;
-        }
-
-        return labeledStmt;
-      }
-
-      unsigned distance =
-        TypeChecker::getCallEditDistance(
-            DeclNameRef(targetName),
-            labeledStmt->getLabelInfo().Name,
-            TypeChecker::UnreasonableCallEditDistance);
-      if (distance < TypeChecker::UnreasonableCallEditDistance)
-        labelCorrections.insert(distance, std::move(labeledStmt));
-    }
-    labelCorrections.filterMaxScoreRange(
-      TypeChecker::MaxCallEditDistanceFromBestCandidate);
+    return findUnlabeledBreakOrContinueStmtTarget(
+        ctx, sourceFile, loc, isContinue, dc, activeLabeledStmts);
   }
+
+  // Scan inside out until we find something with the right label.
+  TopCollection<unsigned, LabeledStmt *> labelCorrections(3);
+  for (auto labeledStmt : activeLabeledStmts) {
+    if (targetName == labeledStmt->getLabelInfo().Name) {
+      // Continue cannot be used to repeat switches, use fallthrough instead.
+      if (isContinue && !labeledStmt->isPossibleContinueTarget()) {
+        ctx.Diags.diagnose(
+            loc, diag::continue_not_in_this_stmt,
+            isa<SwitchStmt>(labeledStmt) ? "switch" : "if");
+        return nullptr;
+      }
+
+      return labeledStmt;
+    }
+
+    unsigned distance =
+      TypeChecker::getCallEditDistance(
+          DeclNameRef(targetName),
+          labeledStmt->getLabelInfo().Name,
+          TypeChecker::UnreasonableCallEditDistance);
+    if (distance < TypeChecker::UnreasonableCallEditDistance)
+      labelCorrections.insert(distance, std::move(labeledStmt));
+  }
+  labelCorrections.filterMaxScoreRange(
+    TypeChecker::MaxCallEditDistanceFromBestCandidate);
 
   // If we're in a defer, produce a tailored diagnostic.
   if (isDefer(dc)) {
@@ -420,30 +457,107 @@ static LabeledStmt *findBreakOrContinueStmtTarget(
     return nullptr;
   }
 
-  if (targetName.empty()) {
-    // If we're dealing with an unlabeled break inside of an 'if' or 'do'
-    // statement, produce a more specific error.
-    if (!isContinue &&
-        llvm::any_of(activeLabeledStmts,
-                     [&](Stmt *S) -> bool {
-                       return isa<IfStmt>(S) || isa<DoStmt>(S);
-                     })) {
-      ctx.Diags.diagnose(
-          loc, diag::unlabeled_break_outside_loop);
-      return nullptr;
-    }
-
-    // Otherwise produce a generic error.
-    ctx.Diags.diagnose(
-        loc,
-        isContinue ? diag::continue_outside_loop : diag::break_outside_loop);
-    return nullptr;
-  }
-
   // Provide potential corrections for an incorrect label.
   emitUnresolvedLabelDiagnostics(
       ctx.Diags, targetLoc, targetName, labelCorrections);
   return nullptr;
+}
+
+/// Type check the given 'if', 'while', or 'guard' statement condition.
+///
+/// \param stmt The conditional statement to type-check, which will be modified
+/// in place.
+///
+/// \returns true if an error occurred, false otherwise.
+static bool typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
+                                           DeclContext *dc) {
+  auto &Context = dc->getASTContext();
+  bool hadError = false;
+  bool hadAnyFalsable = false;
+  auto cond = stmt->getCond();
+  for (auto &elt : cond) {
+    if (elt.getKind() == StmtConditionElement::CK_Availability) {
+      hadAnyFalsable = true;
+      continue;
+    }
+
+    if (auto E = elt.getBooleanOrNull()) {
+      assert(!E->getType() && "the bool condition is already type checked");
+      hadError |= TypeChecker::typeCheckCondition(E, dc);
+      elt.setBoolean(E);
+      hadAnyFalsable = true;
+      continue;
+    }
+    assert(elt.getKind() != StmtConditionElement::CK_Boolean);
+
+    // This is cleanup goop run on the various paths where type checking of the
+    // pattern binding fails.
+    auto typeCheckPatternFailed = [&] {
+      hadError = true;
+      elt.getPattern()->setType(ErrorType::get(Context));
+      elt.getInitializer()->setType(ErrorType::get(Context));
+
+      elt.getPattern()->forEachVariable([&](VarDecl *var) {
+        // Don't change the type of a variable that we've been able to
+        // compute a type for.
+        if (var->hasInterfaceType() && !var->isInvalid())
+          return;
+        var->setInvalid();
+      });
+    };
+
+    // Resolve the pattern.
+    assert(!elt.getPattern()->hasType() &&
+           "the pattern binding condition is already type checked");
+    auto *pattern = TypeChecker::resolvePattern(elt.getPattern(), dc,
+                                                /*isStmtCondition*/ true);
+    if (!pattern) {
+      typeCheckPatternFailed();
+      continue;
+    }
+    elt.setPattern(pattern);
+
+    // Check the pattern, it allows unspecified types because the pattern can
+    // provide type information.
+    auto contextualPattern = ContextualPattern::forRawPattern(pattern, dc);
+    Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
+    if (patternType->hasError()) {
+      typeCheckPatternFailed();
+      continue;
+    }
+
+    // If the pattern didn't get a type, it's because we ran into some
+    // unknown types along the way. We'll need to check the initializer.
+    auto init = elt.getInitializer();
+    hadError |= TypeChecker::typeCheckBinding(pattern, init, dc, patternType);
+    elt.setPattern(pattern);
+    elt.setInitializer(init);
+    hadAnyFalsable |= pattern->isRefutablePattern();
+  }
+
+  // If the binding is not refutable, and there *is* an else, reject it as
+  // unreachable.
+  if (!hadAnyFalsable && !hadError) {
+    auto &diags = dc->getASTContext().Diags;
+    Diag<> msg = diag::invalid_diagnostic;
+    switch (stmt->getKind()) {
+    case StmtKind::If:
+      msg = diag::if_always_true;
+      break;
+    case StmtKind::While:
+      msg = diag::while_always_true;
+      break;
+    case StmtKind::Guard:
+      msg = diag::guard_always_succeeds;
+      break;
+    default:
+      llvm_unreachable("unknown LabeledConditionalStmt kind");
+    }
+    diags.diagnose(cond[0].getStartLoc(), msg);
+  }
+
+  stmt->setCond(cond);
+  return false;
 }
 
 namespace {
@@ -785,7 +899,7 @@ public:
   }
   
   Stmt *visitIfStmt(IfStmt *IS) {
-    TypeChecker::typeCheckConditionForStatement(IS, DC);
+    typeCheckConditionForStatement(IS, DC);
 
     AddLabeledStmt ifNest(*this, IS);
 
@@ -802,7 +916,7 @@ public:
   }
   
   Stmt *visitGuardStmt(GuardStmt *GS) {
-    TypeChecker::typeCheckConditionForStatement(GS, DC);
+    typeCheckConditionForStatement(GS, DC);
 
     Stmt *S = GS->getBody();
     typeCheckStmt(S);
@@ -819,7 +933,7 @@ public:
   }
   
   Stmt *visitWhileStmt(WhileStmt *WS) {
-    TypeChecker::typeCheckConditionForStatement(WS, DC);
+    typeCheckConditionForStatement(WS, DC);
 
     AddLabeledStmt loopNest(*this, WS);
     Stmt *S = WS->getBody();
@@ -1219,8 +1333,7 @@ public:
         assert(parentKind == CaseParentKind::Switch &&
                "'@unknown' can only appear on switch cases");
         checkUnknownAttrRestrictions(
-            getASTContext(), caseBlock, FallthroughDest,
-            limitExhaustivityChecks);
+            getASTContext(), caseBlock, limitExhaustivityChecks);
       }
 
       Stmt *body = caseBlock->getBody();
@@ -2140,8 +2253,9 @@ void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
 }
 
 void swift::checkUnknownAttrRestrictions(
-    ASTContext &ctx, CaseStmt *caseBlock, CaseStmt *fallthroughDest,
+    ASTContext &ctx, CaseStmt *caseBlock,
     bool &limitExhaustivityChecks) {
+  CaseStmt *fallthroughDest = caseBlock->findNextCaseStmt();
   if (caseBlock->getCaseLabelItems().size() != 1) {
     assert(!caseBlock->getCaseLabelItems().empty() &&
            "parser should not produce case blocks with no items");

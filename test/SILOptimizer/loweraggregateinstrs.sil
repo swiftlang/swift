@@ -64,8 +64,8 @@ struct LargeStruct {
 // CHECK:   release_value [[ARG0]]
 // CHECK:   [[ALLOC_STACK:%.*]] = alloc_stack $LargeStruct
 // CHECK:   [[LOADED_ARG1:%.*]] = load [[ARG1]]
-// CHECK:   [[LOADED_OLD_VAL:%.*]] = load [[ALLOC_STACK]]
 // CHECK:   retain_value [[LOADED_ARG1]]
+// CHECK:   [[LOADED_OLD_VAL:%.*]] = load [[ALLOC_STACK]]
 // CHECK:   release_value [[LOADED_OLD_VAL]]
 // CHECK:   store [[LOADED_ARG1]] to [[ALLOC_STACK]]
 // CHECK:   [[LOADED_ARG1:%.*]] = load [[ARG1]]
@@ -97,11 +97,12 @@ bb0(%0 : $LargeStruct, %1 : $*LargeStruct):
 //
 // CHECK:   [[ALLOC_STACK:%.*]] = alloc_stack $S2
 // CHECK:   [[LOADED_ARG1:%.*]] = load [[ARG1]]
-// CHECK:   [[LOADED_OLDVALUE:%.*]] = load [[ALLOC_STACK]]
 // CHECK:   [[LOADED_ARG1cls1:%.*]] = struct_extract [[LOADED_ARG1]] : $S2, #S2.cls1
 // CHECK:   strong_retain [[LOADED_ARG1cls1]] : $C1
 // CHECK:   [[LOADED_ARG1cls2:%.*]] = struct_extract [[LOADED_ARG1]] : $S2, #S2.cls2
 // CHECK:   strong_retain [[LOADED_ARG1cls2]] : $C2
+
+// CHECK:   [[LOADED_OLDVALUE:%.*]] = load [[ALLOC_STACK]]
 // CHECK:   [[LOADED_OLDVALUEcls1:%.*]] = struct_extract [[LOADED_OLDVALUE]] : $S2, #S2.cls1
 // CHECK:   strong_release [[LOADED_OLDVALUEcls1]] : $C1
 // CHECK:   [[LOADED_OLDVALUEcls2:%.*]] = struct_extract [[LOADED_OLDVALUE]] : $S2, #S2.cls2

@@ -557,14 +557,14 @@ protected:
     IsIncompatibleWithWeakReferences : 1
   );
 
-  SWIFT_INLINE_BITFIELD(StructDecl, NominalTypeDecl, 1+1,
-    /// True if this struct has storage for fields that aren't accessible in
-    /// Swift.
-    HasUnreferenceableStorage : 1,
-    /// True if this struct is imported from C++ and not trivially copyable.
-    IsCxxNotTriviallyCopyable : 1
-  );
-  
+  SWIFT_INLINE_BITFIELD(
+      StructDecl, NominalTypeDecl, 1 + 1,
+      /// True if this struct has storage for fields that aren't accessible in
+      /// Swift.
+      HasUnreferenceableStorage : 1,
+      /// True if this struct is imported from C++ and does not have trivial value witness functions.
+      IsCxxNonTrivial : 1);
+
   SWIFT_INLINE_BITFIELD(EnumDecl, NominalTypeDecl, 2+1,
     /// True if the enum has cases and at least one case has associated values.
     HasAssociatedValues : 2,
@@ -3772,13 +3772,9 @@ public:
     Bits.StructDecl.HasUnreferenceableStorage = v;
   }
 
-  bool isCxxNotTriviallyCopyable() const {
-    return Bits.StructDecl.IsCxxNotTriviallyCopyable;
-  }
+  bool isCxxNonTrivial() const { return Bits.StructDecl.IsCxxNonTrivial; }
 
-  void setIsCxxNotTriviallyCopyable(bool v) {
-    Bits.StructDecl.IsCxxNotTriviallyCopyable = v;
-  }
+  void setIsCxxNonTrivial(bool v) { Bits.StructDecl.IsCxxNonTrivial = v; }
 };
 
 /// This is the base type for AncestryOptions. Each flag describes possible

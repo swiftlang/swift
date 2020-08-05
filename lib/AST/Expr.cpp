@@ -1205,9 +1205,8 @@ InOutExpr::InOutExpr(SourceLoc operLoc, Expr *subExpr, Type baseType,
 
 SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
   assert(elements.size() & 1 && "even number of elements in sequence");
-  void *Buffer = ctx.Allocate(sizeof(SequenceExpr) +
-                              elements.size() * sizeof(Expr*),
-                              alignof(SequenceExpr));
+  size_t bytes = totalSizeToAlloc<Expr *>(elements.size());
+  void *Buffer = ctx.Allocate(bytes, alignof(SequenceExpr));
   return ::new(Buffer) SequenceExpr(elements);
 }
 
@@ -1931,14 +1930,14 @@ bool AbstractClosureExpr::isBodyThrowing() const {
   if (getType()->hasError())
     return false;
   
-  return getType()->castTo<FunctionType>()->getExtInfo().throws();
+  return getType()->castTo<FunctionType>()->getExtInfo().isThrowing();
 }
 
 bool AbstractClosureExpr::isBodyAsync() const {
   if (getType()->hasError())
     return false;
 
-  return getType()->castTo<FunctionType>()->getExtInfo().async();
+  return getType()->castTo<FunctionType>()->getExtInfo().isAsync();
 }
 
 bool AbstractClosureExpr::hasSingleExpressionBody() const {
@@ -2385,6 +2384,7 @@ void KeyPathExpr::Component::setSubscriptIndexHashableConformances(
   case Kind::Property:
   case Kind::Identity:
   case Kind::TupleElement:
+  case Kind::DictionaryKey:
     llvm_unreachable("no hashable conformances for this kind");
   }
 }

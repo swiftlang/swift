@@ -44,17 +44,26 @@ swift::CompilerInvocation::CompilerInvocation() {
 }
 
 void CompilerInvocation::computeRuntimeResourcePathFromExecutablePath(
-    StringRef mainExecutablePath, llvm::SmallString<128> &runtimeResourcePath) {
-  runtimeResourcePath.assign(mainExecutablePath);
+    StringRef mainExecutablePath, bool shared,
+    llvm::SmallVectorImpl<char> &runtimeResourcePath) {
+  runtimeResourcePath.append(mainExecutablePath.begin(),
+                             mainExecutablePath.end());
+
   llvm::sys::path::remove_filename(runtimeResourcePath); // Remove /swift
   llvm::sys::path::remove_filename(runtimeResourcePath); // Remove /bin
-  llvm::sys::path::append(runtimeResourcePath, "lib", "swift");
+  appendSwiftLibDir(runtimeResourcePath, shared);
+}
+
+void CompilerInvocation::appendSwiftLibDir(llvm::SmallVectorImpl<char> &path,
+                                      bool shared) {
+  llvm::sys::path::append(path, "lib", shared ? "swift" : "swift_static");
 }
 
 void CompilerInvocation::setMainExecutablePath(StringRef Path) {
   FrontendOpts.MainExecutablePath = Path.str();
   llvm::SmallString<128> LibPath;
-  computeRuntimeResourcePathFromExecutablePath(Path, LibPath);
+  computeRuntimeResourcePathFromExecutablePath(
+      Path, FrontendOpts.UseSharedResourceFolder, LibPath);
   setRuntimeResourcePath(LibPath.str());
 
   llvm::SmallString<128> DiagnosticDocsPath(Path);
@@ -1728,11 +1737,10 @@ static bool ParseMigratorArgs(MigratorOptions &Opts,
 }
 
 bool CompilerInvocation::parseArgs(
-    ArrayRef<const char *> Args,
-    DiagnosticEngine &Diags,
+    ArrayRef<const char *> Args, DiagnosticEngine &Diags,
     SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>>
         *ConfigurationFileBuffers,
-    StringRef workingDirectory) {
+    StringRef workingDirectory, StringRef mainExecutablePath) {
   using namespace options;
 
   if (Args.empty())
@@ -1761,6 +1769,10 @@ bool CompilerInvocation::parseArgs(
   if (ParseFrontendArgs(FrontendOpts, ParsedArgs, Diags,
                         ConfigurationFileBuffers)) {
     return true;
+  }
+
+  if (!mainExecutablePath.empty()) {
+    setMainExecutablePath(mainExecutablePath);
   }
 
   ParseModuleInterfaceArgs(ModuleInterfaceOpts, ParsedArgs);

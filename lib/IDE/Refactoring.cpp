@@ -1846,11 +1846,7 @@ findConcatenatedExpressions(ResolvedRangeInfo Info, ASTContext &Ctx) {
 
   switch (Info.Kind) {
   case RangeKind::SingleExpression:
-    // FIXME: the range info kind should imply non-empty list.
-    if (!Info.ContainedNodes.empty())
-      E = Info.ContainedNodes[0].get<Expr*>();
-    else
-      return nullptr;
+    E = Info.ContainedNodes[0].get<Expr*>();
     break;
   case RangeKind::PartOfExpression:
     E = Info.CommonExprParent;

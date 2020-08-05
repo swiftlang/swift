@@ -359,7 +359,7 @@ private:
   llvm::BumpPtrAllocator Allocator;
   llvm::StringSaver ArgSaver;
   std::vector<StringRef> GenericArgs;
-  CompilerInvocation subInvocation;
+  CompilerInvocation genericSubInvocation;
 
   template<typename ...ArgTypes>
   InFlightDiagnostic diagnose(StringRef interfacePath,
@@ -375,7 +375,8 @@ private:
   }
   void inheritOptionsForBuildingInterface(const SearchPathOptions &SearchPathOpts,
                                           const LangOptions &LangOpts);
-  bool extractSwiftInterfaceVersionAndArgs(SmallVectorImpl<const char *> &SubArgs,
+  bool extractSwiftInterfaceVersionAndArgs(CompilerInvocation &subInvocation,
+                                           SmallVectorImpl<const char *> &SubArgs,
                                            std::string &CompilerVersion,
                                            StringRef interfacePath,
                                            SourceLoc diagnosticLoc);
@@ -395,7 +396,7 @@ public:
                        StringRef interfacePath,
                        StringRef outputPath,
                        SourceLoc diagLoc,
-    llvm::function_ref<bool(ASTContext&, ArrayRef<StringRef>,
+    llvm::function_ref<bool(ASTContext&, ModuleDecl*, ArrayRef<StringRef>,
                             ArrayRef<StringRef>, StringRef)> action) override;
   bool runInSubCompilerInstance(StringRef moduleName,
                                 StringRef interfacePath,

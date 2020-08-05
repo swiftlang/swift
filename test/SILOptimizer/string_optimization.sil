@@ -10,6 +10,7 @@ sil [readonly] [_semantics "string.makeUTF8"] @$sSS21_builtinStringLiteral17utf8
 sil [readonly] [_semantics "string.init_empty"] @empty_string : $@convention(method) (@thin String.Type) -> @owned String
 sil [_semantics "string.init_empty"] @empty_string_with_capacity : $@convention(method) (Int, @thin String.Type) -> @owned String
 sil [_semantics "string.append"] @string_append : $@convention(method) (@guaranteed String, @inout String) -> ()
+sil [_semantics "string.concat"] @string_concat : $@convention(method) (@guaranteed String, @guaranteed String, @thin String.Type) -> @owned String
 
 // CHECK-LABEL: sil @append_to_empty_string
 // CHECK:       [[S:%[0-9]+]] = alloc_stack $String
@@ -81,7 +82,7 @@ bb0(%0 : $String):
   return %28 : $String
 }
 
-// CHECK-LABEL: sil @concat_constant_strings
+// CHECK-LABEL: sil @append_constant_strings
 // CHECK:       [[S:%[0-9]+]] = alloc_stack $String
 // CHECK:       [[STR:%[0-9]+]] = string_literal utf8 "a🙂"
 // CHECK:       [[LENGTH:%[0-9]+]] = integer_literal $Builtin.Word, 5
@@ -93,8 +94,8 @@ bb0(%0 : $String):
 // CHECK-NEXT:  store [[A]] to [[S]]
 // CHECK-NEXT:  [[L:%[0-9]+]] = load [[S]]
 // CHECK:       return [[L]]
-// CHECK:     } // end sil function 'concat_constant_strings'
-sil @concat_constant_strings : $@convention(thin) (@guaranteed String) -> @owned String {
+// CHECK:     } // end sil function 'append_constant_strings'
+sil @append_constant_strings : $@convention(thin) (@guaranteed String) -> @owned String {
 bb0(%0 : $String):
   %2 = alloc_stack $String
   %3 = string_literal utf8 "a"
@@ -174,5 +175,60 @@ bb0(%0 : $String):
   %28 = load %2 : $*String
   dealloc_stack %2 : $*String
   return %28 : $String
+}
+
+// CHECK-LABEL: sil @concat_to_empty_string
+// CHECK:     bb0(%0 : $String):
+// CHECK-NEXT:  retain_value %0
+// CHECK-NEXT:  return %0
+// CHECK:     } // end sil function 'concat_to_empty_string'
+sil @concat_to_empty_string : $@convention(thin) (@guaranteed String) -> @owned String {
+bb0(%0 : $String):
+  %5 = metatype $@thin String.Type
+  %6 = function_ref @empty_string : $@convention(method) (@thin String.Type) -> @owned String
+  %7 = apply %6(%5) : $@convention(method) (@thin String.Type) -> @owned String
+  %8 = function_ref @string_concat : $@convention(method) (@guaranteed String, @guaranteed String, @thin String.Type) -> @owned String
+  %9 = apply %8(%7, %0, %5) : $@convention(method) (@guaranteed String, @guaranteed String, @thin String.Type) -> @owned String
+  return %9 : $String
+}
+
+// CHECK-LABEL: sil @concat_empty_string
+// CHECK:     bb0(%0 : $String):
+// CHECK-NEXT:  retain_value %0
+// CHECK-NEXT:  return %0
+// CHECK:     } // end sil function 'concat_empty_string'
+sil @concat_empty_string : $@convention(thin) (@owned String) -> @owned String {
+bb0(%0 : $String):
+  %5 = metatype $@thin String.Type
+  %6 = function_ref @empty_string : $@convention(method) (@thin String.Type) -> @owned String
+  %7 = apply %6(%5) : $@convention(method) (@thin String.Type) -> @owned String
+  %8 = function_ref @string_concat : $@convention(method) (@guaranteed String, @guaranteed String, @thin String.Type) -> @owned String
+  %9 = apply %8(%0, %7, %5) : $@convention(method) (@guaranteed String, @guaranteed String, @thin String.Type) -> @owned String
+  return %9 : $String
+}
+
+// CHECK-LABEL: sil @concat_constant_strings
+// CHECK:       [[STR:%[0-9]+]] = string_literal utf8 "a🙂"
+// CHECK:       [[LENGTH:%[0-9]+]] = integer_literal $Builtin.Word, 5
+// CHECK:       [[ASCII:%[0-9]+]] = integer_literal $Builtin.Int1, 0
+// CHECK:       [[MT:%[0-9]+]] = metatype $@thin String.Type
+// CHECK:       [[F:%[0-9]+]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
+// CHECK:       [[A:%[0-9]+]] = apply [[F]]([[STR]], [[LENGTH]], [[ASCII]], [[MT]])
+// CHECK:       return [[A]]
+// CHECK:     } // end sil function 'concat_constant_strings'
+sil @concat_constant_strings : $@convention(thin) (@guaranteed String) -> @owned String {
+bb0(%0 : $String):
+  %3 = string_literal utf8 "a"
+  %4 = integer_literal $Builtin.Word, 1
+  %5 = integer_literal $Builtin.Int1, -1
+  %6 = metatype $@thin String.Type
+  %7 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %8 = apply %7(%3, %4, %5, %6) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %9 = string_literal utf8 "🙂"
+  %10 = integer_literal $Builtin.Word, 4
+  %11 = apply %7(%9, %10, %5, %6) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %12 = function_ref @string_concat : $@convention(method) (@guaranteed String, @guaranteed String, @thin String.Type) -> @owned String
+  %13 = apply %12(%8, %11, %6) : $@convention(method) (@guaranteed String, @guaranteed String, @thin String.Type) -> @owned String
+  return %13 : $String
 }
 

@@ -15,6 +15,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
@@ -184,8 +185,10 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
                                               moduleInterfacePath.str(),
                                               StringRef(),
                                               SourceLoc(),
-                [&](ASTContext &Ctx, ArrayRef<StringRef> Args,
+                [&](ASTContext &Ctx, ModuleDecl *mainMod,
+                    ArrayRef<StringRef> Args,
                     ArrayRef<StringRef> PCMArgs, StringRef Hash) {
+    assert(mainMod);
     std::string InPath = moduleInterfacePath.str();
     auto compiledCandidates = getCompiledCandidates(Ctx, moduleName.str(),
                                                     InPath);
@@ -211,6 +214,13 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
     // Walk the source file to find the import declarations.
     llvm::StringSet<> alreadyAddedModules;
     Result->addModuleDependencies(*sourceFile, alreadyAddedModules);
+
+    // Collect implicitly imported modules in case they are not explicitly
+    // printed in the interface file, e.g. SwiftOnoneSupport.
+    auto &imInfo = mainMod->getImplicitImportInfo();
+    for (auto name: imInfo.ModuleNames) {
+      Result->addModuleDependency(name.str(), &alreadyAddedModules);
+    }
     return false;
   });
 

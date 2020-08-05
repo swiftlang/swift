@@ -131,8 +131,11 @@ getDynamicMethodLoweredType(SILModule &M,
                             SILDeclRef constant,
                             CanAnyFunctionType substMemberTy) {
   assert(constant.isForeign);
-  auto objcFormalTy = substMemberTy.withExtInfo(substMemberTy->getExtInfo()
-             .withSILRepresentation(SILFunctionTypeRepresentation::ObjCMethod));
+  auto objcFormalTy = substMemberTy.withExtInfo(
+      substMemberTy->getExtInfo()
+          .intoBuilder()
+          .withSILRepresentation(SILFunctionTypeRepresentation::ObjCMethod)
+          .build());
   return SILType::getPrimitiveObjectType(
       M.Types.getUncachedSILFunctionTypeForConstant(
           TypeExpansionContext::minimal(), constant, objcFormalTy));
@@ -315,7 +318,8 @@ private:
   CanFunctionType SubstFormalInterfaceType;
 
   /// The substitutions applied to OrigFormalInterfaceType to produce
-  /// SubstFormalInterfaceType.
+  /// SubstFormalInterfaceType, substituted into the current type expansion
+  /// context.
   SubstitutionMap Substitutions;
 
   /// The list of values captured by our callee.
@@ -351,14 +355,14 @@ private:
   /// Constructor for Callee::forDirect.
   Callee(SILGenFunction &SGF, SILDeclRef standaloneFunction,
          AbstractionPattern origFormalType, CanAnyFunctionType substFormalType,
-         SubstitutionMap subs, SILLocation l,
+         SubstitutionMap subs, SubstitutionMap formalSubs, SILLocation l,
          bool callDynamicallyReplaceableImpl = false)
       : kind(callDynamicallyReplaceableImpl
                  ? Kind::StandaloneFunctionDynamicallyReplaceableImpl
                  : Kind::StandaloneFunction),
         Constant(standaloneFunction), OrigFormalInterfaceType(origFormalType),
         SubstFormalInterfaceType(
-            getSubstFormalInterfaceType(substFormalType, subs)),
+            getSubstFormalInterfaceType(substFormalType, formalSubs)),
         Substitutions(subs), Loc(l) {}
 
   /// Constructor called by all for* factory methods except forDirect and
@@ -387,7 +391,9 @@ public:
     auto &ci = SGF.getConstantInfo(SGF.getTypeExpansionContext(), c);
     return Callee(
         SGF, c, ci.FormalPattern, ci.FormalType,
-        subs.mapIntoTypeExpansionContext(SGF.getTypeExpansionContext()), l,
+        subs.mapIntoTypeExpansionContext(SGF.getTypeExpansionContext()),
+        subs,
+        l,
         callPreviousDynamicReplaceableImpl);
   }
 
@@ -3857,7 +3863,7 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
     auto emitter = specializedEmitter.getEarlyEmitter();
 
     assert(uncurriedSites.size() == 1);
-    assert(!formalType->getExtInfo().throws());
+    assert(!formalType->getExtInfo().isThrowing());
     SILLocation uncurriedLoc = uncurriedSites[0].Loc;
 
     // We should be able to enforce that these arguments are
@@ -5438,7 +5444,7 @@ RValue SILGenFunction::emitGetAccessor(SILLocation loc, SILDeclRef get,
     subscriptIndices.emplace({});
 
   emission.addCallSite(loc, std::move(subscriptIndices),
-                       accessType->throws());
+                       accessType->isThrowing());
 
   // T
   return emission.apply(c);
@@ -5480,8 +5486,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
     }
   }
   assert(values.isValid());
-  emission.addCallSite(loc, std::move(values),
-                       accessType->throws());
+  emission.addCallSite(loc, std::move(values), accessType->isThrowing());
   // ()
   emission.apply();
 }
@@ -5515,7 +5520,7 @@ ManagedValue SILGenFunction::emitAddressorAccessor(
     subscriptIndices.emplace({});
 
   emission.addCallSite(loc, std::move(subscriptIndices),
-                       accessType->throws());
+                       accessType->isThrowing());
 
   // Unsafe{Mutable}Pointer<T> or
   // (Unsafe{Mutable}Pointer<T>, Builtin.UnknownPointer) or
@@ -5577,7 +5582,7 @@ SILGenFunction::emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
     subscriptIndices.emplace({});
 
   emission.addCallSite(loc, std::move(subscriptIndices),
-                       accessType->throws());
+                       accessType->isThrowing());
 
   auto endApplyHandle = emission.applyCoroutine(yields);
 

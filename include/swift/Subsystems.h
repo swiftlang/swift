@@ -66,8 +66,9 @@ namespace swift {
   struct TBDGenOptions;
   class Token;
   class TopLevelContext;
+  class Type;
   class TypeCheckerOptions;
-  class TypeLoc;
+  class TypeRepr;
   class UnifiedStatsReporter;
 
   namespace Lowering {
@@ -141,28 +142,15 @@ namespace swift {
   /// emitted.
   void performWholeModuleTypeChecking(SourceFile &SF);
 
-  /// Recursively validate the specified type.
+  /// Resolve the given \c TypeRepr to a contextual type.
   ///
   /// This is used when dealing with partial source files (e.g. SIL parsing,
   /// code completion).
   ///
-  /// \returns false on success, true on error.
-  bool performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
-                              DeclContext *DC,
-                              bool ProduceDiagnostics = true);
-
-  /// Recursively validate the specified type.
-  ///
-  /// This is used when dealing with partial source files (e.g. SIL parsing,
-  /// code completion).
-  ///
-  /// \returns false on success, true on error.
-  bool performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
-                              bool isSILMode,
-                              bool isSILType,
-                              GenericEnvironment *GenericEnv,
-                              DeclContext *DC,
-                              bool ProduceDiagnostics = true);
+  /// \returns A well-formed type on success, or an \c ErrorType.
+  Type performTypeResolution(TypeRepr *TyR, ASTContext &Ctx, bool isSILMode,
+                             bool isSILType, GenericEnvironment *GenericEnv,
+                             DeclContext *DC, bool ProduceDiagnostics = true);
 
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
   GenericEnvironment *handleSILGenericParams(GenericParamList *genericParams,

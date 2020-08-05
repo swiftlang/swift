@@ -2272,9 +2272,9 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
                                          const ValueDecl *forDecl) {
   appendFunctionResultType(fn->getResult(), forDecl);
   appendFunctionInputType(fn->getParams(), forDecl);
-  if (fn->async())
+  if (fn->isAsync())
     appendOperator("Y");
-  if (fn->throws())
+  if (fn->isThrowing())
     appendOperator("K");
 }
 

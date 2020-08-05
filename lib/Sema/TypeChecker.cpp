@@ -358,23 +358,10 @@ bool swift::isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF) {
   return isDifferentiableProgrammingEnabled(SF);
 }
 
-bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
-                                   DeclContext *DC,
-                                   bool ProduceDiagnostics) {
-  return performTypeLocChecking(
-                            Ctx, T,
-                            /*isSILMode=*/false,
-                            /*isSILType=*/false,
-                            /*GenericEnv=*/DC->getGenericEnvironmentOfContext(),
-                            DC, ProduceDiagnostics);
-}
-
-bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
-                                   bool isSILMode,
-                                   bool isSILType,
-                                   GenericEnvironment *GenericEnv,
-                                   DeclContext *DC,
-                                   bool ProduceDiagnostics) {
+Type swift::performTypeResolution(TypeRepr *TyR, ASTContext &Ctx,
+                                  bool isSILMode, bool isSILType,
+                                  GenericEnvironment *GenericEnv,
+                                  DeclContext *DC, bool ProduceDiagnostics) {
   TypeResolutionOptions options = None;
   if (isSILMode) {
     options |= TypeResolutionFlags::SILMode;
@@ -394,14 +381,7 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   if (!ProduceDiagnostics)
     suppression.emplace(Ctx.Diags);
 
-  // If we've already validated this type, don't do so again.
-  if (T.wasValidated()) {
-    return T.isError();
-  }
-
-  auto type = resolution.resolveType(T.getTypeRepr());
-  T.setType(type);
-  return type->hasError();
+  return resolution.resolveType(TyR);
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
