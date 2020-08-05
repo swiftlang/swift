@@ -223,6 +223,7 @@ KNOWN_SETTINGS=(
     report-statistics                             "0"               "set to 1 to generate compilation statistics files for swift libraries"
     sil-verify-all                                "0"               "If enabled, run the SIL verifier after each transform when building Swift files during this build process"
     stdlib-deployment-targets                     ""                "space-separated list of targets to configure the Swift standard library to be compiled or cross-compiled for"
+    swift-sdks                                    ""                "semilocon-separated list of SDKs to build, or empty to auto-detect which SDKs are available"
 
     ## Uncategorised
     install-prefix                                ""                "installation prefix"
