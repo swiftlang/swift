@@ -1314,6 +1314,11 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
   if (getContextualTypePurpose(diagExpr) == CTP_Condition)
     return false;
 
+  // If the failure happened at the end of an unresolved member chain, it should
+  // be diagnosed instead as though it happened at the last element.
+  if (auto chainExpr = dyn_cast<UnresolvedMemberChainResultExpr>(diagExpr))
+      diagExpr = chainExpr->getSubExpr();
+
   if (auto assignExpr = dyn_cast<AssignExpr>(diagExpr)) {
     // Let's check whether this is an attempt to assign
     // variable or property to itself.
@@ -1437,6 +1442,11 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
     }
   } else if (isa<SubscriptExpr>(diagExpr)) {
       subElementDiagID = diag::assignment_subscript_has_immutable_base;
+  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(diagExpr)) {
+    if (UME->hasArguments())
+      subElementDiagID = diag::assignment_lhs_is_apply_expression;
+    else
+      subElementDiagID = diag::assignment_lhs_is_immutable_property;
   } else {
     subElementDiagID = diag::assignment_lhs_is_immutable_variable;
   }
@@ -1901,6 +1911,18 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
     // If we weren't able to resolve a member or if it is mutable, then the
     // problem must be with the base, recurse.
     return resolveImmutableBase(MRE->getBase());
+  }
+
+  if (auto *UME = dyn_cast<UnresolvedMemberExpr>(expr)) {
+    auto loc = getConstraintLocator(UME, ConstraintLocator::UnresolvedMember);
+    auto member = getMemberRef(loc);
+
+    // If we can resolve a member, we can determine whether it is settable in
+    // this context.
+    if (member && member->isDecl() && isImmutable(member->getDecl()))
+      return {expr, member};
+    else
+      return {expr, None};
   }
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(expr))

@@ -4314,6 +4314,9 @@ bool ConstraintSystem::repairFailures(
                                 locator))
       break;
 
+    if (repairByTreatingRValueAsLValue(lhs, rhs))
+      break;
+
     // If there is a type mismatch here it's contextual e.g.,
     // `let x: E = .foo(42)`, where `.foo` is a member of `E`
     // but produces an incorrect type.

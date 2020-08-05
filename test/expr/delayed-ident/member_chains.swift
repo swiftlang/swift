@@ -15,6 +15,8 @@ struct ImplicitMembers: Equatable {
     }
 
     static var implicit = ImplicitMembers()
+    static let implicitLet = ImplicitMembers() // expected-note2 {{change 'let' to 'var' to make it mutable}}
+    static var implicitImmutable: ImplicitMembers { ImplicitMembers() }
     static func createImplicit() -> ImplicitMembers {
         ImplicitMembers()
     }
@@ -61,6 +63,7 @@ struct ImplicitMembers: Equatable {
         get { ImplicitMembers() }
         set {}
     }
+    subscript(immutable arg: Void) -> ImplicitMembers { ImplicitMembers() }
     subscript(func arg: Void) -> (() -> ImplicitMembers) { { ImplicitMembers() } }
     subscript(funcOptional arg: Void) -> (() -> ImplicitMembers?) { { ImplicitMembers() } }
     subscript(optionalFunc arg: Void) -> (() -> ImplicitMembers)? { { ImplicitMembers() } }
@@ -205,7 +208,22 @@ func testLValues() {
     .implicit.anotherOptionalMutable! = local;
     .implicit[()] = local;
     .implicit[()].anotherMutable = local;
-    .optional?[optional: ()]?.anotherOptionalMutable! = local
+    .optional?[optional: ()]?.anotherOptionalMutable! = local;
+
+    .implicitLet = local; // expected-error {{cannot assign to property: 'implicitLet' is a 'let' constant}}
+    .implicitImmutable = local; // expected-error {{cannot assign to property: 'implicitImmutable' is a get-only property}}
+    .createImplicit() = local; // expected-error {{cannot assign to value: 'createImplicit' is a method}}
+    .implicit.another = local; // expected-error {{cannot assign to property: 'another' is a get-only property}}
+    .implicit[immutable: ()] = local; // expected-error {{cannot assign through subscript: subscript is get-only}}
+    .implicit.getAnother() = local; // expected-error {{expression is not assignable: function call returns immutable value}}
+
+    .implicitLet.anotherMutable = local; // expected-error {{cannot assign to property: 'implicitLet' is a 'let' constant}}
+    .implicitImmutable.anotherMutable = local; // expected-error {{cannot assign to property: 'implicitImmutable' is a get-only property}}
+    .createImplicit().anotherMutable = local; // expected-error {{cannot assign to value: 'createImplicit' is a method}}
+    .implicit.another.anotherMutable = local; // expected-error {{cannot assign to property: 'another' is a get-only property}}
+    .implicit[immutable: ()].anotherMutable = local; // expected-error {{cannot assign to property: subscript is get-only}}
+    .implicit.getAnother().anotherMutable = local; // expected-error {{cannot assign to property: function call returns immutable value}}
+
 
     // FIXME: These should probably be allowed
     //.implicit.anotherOptionalMutable = local;
