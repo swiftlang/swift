@@ -8272,7 +8272,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
                                          target.getDeclContext());
     if (auto coercedPattern = TypeChecker::coercePatternToType(
             contextualPattern, patternType, patternOptions)) {
-      (*caseLabelItem)->setPattern(coercedPattern);
+      (*caseLabelItem)->setPattern(coercedPattern, /*resolved=*/true);
     } else {
       return None;
     }
@@ -8594,7 +8594,8 @@ SolutionApplicationTarget SolutionApplicationTarget::walk(ASTWalker &walker) {
   case Kind::caseLabelItem:
     if (auto newPattern =
             caseLabelItem.caseLabelItem->getPattern()->walk(walker)) {
-      caseLabelItem.caseLabelItem->setPattern(newPattern);
+      caseLabelItem.caseLabelItem->setPattern(
+          newPattern, caseLabelItem.caseLabelItem->isPatternResolved());
     }
     if (auto guardExpr = caseLabelItem.caseLabelItem->getGuardExpr()) {
       if (auto newGuardExpr = guardExpr->walk(walker))

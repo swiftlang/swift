@@ -50,6 +50,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/Timer.h"
+#include <iterator>
 
 using namespace swift;
 
@@ -560,6 +561,92 @@ static bool typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
   return false;
 }
 
+/// Verify that the pattern bindings for the cases that we're falling through
+/// from and to are equivalent.
+static void checkFallthroughPatternBindingsAndTypes(
+    ASTContext &ctx,
+    CaseStmt *caseBlock, CaseStmt *previousBlock,
+    FallthroughStmt *fallthrough) {
+  auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
+  SmallVector<VarDecl *, 4> vars;
+  firstPattern->collectVariables(vars);
+
+  // We know that the typechecker has already guaranteed that all of
+  // the case label items in the fallthrough have the same var
+  // decls. So if we match against the case body var decls,
+  // transitively we will match all of the other case label items in
+  // the fallthrough destination as well.
+  auto previousVars = previousBlock->getCaseBodyVariablesOrEmptyArray();
+  for (auto *expected : vars) {
+    bool matched = false;
+    if (!expected->hasName())
+      continue;
+
+    for (auto *previous : previousVars) {
+      if (!previous->hasName() ||
+          expected->getName() != previous->getName()) {
+        continue;
+      }
+
+      if (!previous->getType()->isEqual(expected->getType())) {
+        ctx.Diags.diagnose(
+            previous->getLoc(), diag::type_mismatch_fallthrough_pattern_list,
+            previous->getType(), expected->getType());
+        previous->setInvalid();
+        expected->setInvalid();
+      }
+
+      // Ok, we found our match. Make the previous fallthrough statement var
+      // decl our parent var decl.
+      expected->setParentVarDecl(previous);
+      matched = true;
+      break;
+    }
+
+    if (!matched) {
+      ctx.Diags.diagnose(
+          fallthrough->getLoc(), diag::fallthrough_into_case_with_var_binding,
+          expected->getName());
+    }
+  }
+}
+
+/// Check the correctness of a 'fallthrough' statement.
+///
+/// \returns true if an error occurred.
+static bool checkFallthroughStmt(
+    DeclContext *dc, FallthroughStmt *stmt,
+    CaseStmt *oldFallthroughSource, CaseStmt *oldFallthroughDest) {
+  CaseStmt *fallthroughSource;
+  CaseStmt *fallthroughDest;
+  ASTContext &ctx = dc->getASTContext();
+  if (ctx.LangOpts.EnableASTScopeLookup) {
+    auto sourceFile = dc->getParentSourceFile();
+    std::tie(fallthroughSource, fallthroughDest) =
+        ASTScope::lookupFallthroughSourceAndDest(sourceFile, stmt->getLoc());
+    assert(fallthroughSource == oldFallthroughSource);
+    assert(fallthroughDest == oldFallthroughDest);
+  } else {
+    fallthroughSource = oldFallthroughSource;
+    fallthroughDest = oldFallthroughDest;
+  }
+
+  if (!fallthroughSource) {
+    ctx.Diags.diagnose(stmt->getLoc(), diag::fallthrough_outside_switch);
+    return true;
+  }
+  if (!fallthroughDest) {
+    ctx.Diags.diagnose(stmt->getLoc(), diag::fallthrough_from_last_case);
+    return true;
+  }
+  stmt->setFallthroughSource(fallthroughSource);
+  stmt->setFallthroughDest(fallthroughDest);
+
+  checkFallthroughPatternBindingsAndTypes(
+      ctx, fallthroughDest, fallthroughSource, stmt);
+  return false;
+}
+
 namespace {
 class StmtChecker : public StmtVisitor<StmtChecker, Stmt*> {
 public:
@@ -992,53 +1079,23 @@ public:
   }
 
   Stmt *visitFallthroughStmt(FallthroughStmt *S) {
-    CaseStmt *fallthroughSource;
-    CaseStmt *fallthroughDest;
-    if (getASTContext().LangOpts.EnableASTScopeLookup) {
-      auto sourceFile = DC->getParentSourceFile();
-      std::tie(fallthroughSource, fallthroughDest) =
-          ASTScope::lookupFallthroughSourceAndDest(sourceFile, S->getLoc());
-      assert(fallthroughSource == FallthroughSource);
-      assert(fallthroughDest == FallthroughDest);
-    } else {
-      fallthroughSource = FallthroughSource;
-      fallthroughDest = FallthroughDest;
-    }
-
-    if (!fallthroughSource) {
-      getASTContext().Diags.diagnose(S->getLoc(),
-                                     diag::fallthrough_outside_switch);
+    if (checkFallthroughStmt(DC, S, FallthroughSource, FallthroughDest))
       return nullptr;
-    }
-    if (!fallthroughDest) {
-      getASTContext().Diags.diagnose(S->getLoc(),
-                                     diag::fallthrough_from_last_case);
-      return nullptr;
-    }
-    S->setFallthroughSource(fallthroughSource);
-    S->setFallthroughDest(fallthroughDest);
-
-    checkFallthroughPatternBindingsAndTypes(
-        fallthroughDest, fallthroughSource, S);
 
     return S;
   }
 
   void checkCaseLabelItemPattern(CaseStmt *caseBlock, CaseLabelItem &labelItem,
                                  bool &limitExhaustivityChecks,
-                                 Type subjectType,
-                                 SmallVectorImpl<VarDecl *> **prevCaseDecls,
-                                 SmallVectorImpl<VarDecl *> **nextCaseDecls) {
+                                 Type subjectType) {
     Pattern *pattern = labelItem.getPattern();
-    auto *newPattern = TypeChecker::resolvePattern(pattern, DC,
-                                                   /*isStmtCondition*/ false);
-    if (!newPattern) {
-      pattern->collectVariables(**nextCaseDecls);
-      std::swap(*prevCaseDecls, *nextCaseDecls);
-      return;
+    if (!labelItem.isPatternResolved()) {
+      pattern = TypeChecker::resolvePattern(
+          pattern, DC, /*isStmtCondition*/ false);
+      if (!pattern) {
+        return;
+      }
     }
-
-    pattern = newPattern;
 
     // Coerce the pattern to the subject's type.
     bool coercionError = false;
@@ -1062,15 +1119,7 @@ public:
         VD->setInvalid();
       });
     }
-    labelItem.setPattern(pattern);
-
-    // If we do not have decls from the previous case that we need to match,
-    // just return. This only happens with the first case label item.
-    if (!*prevCaseDecls) {
-      pattern->collectVariables(**nextCaseDecls);
-      std::swap(*prevCaseDecls, *nextCaseDecls);
-      return;
-    }
+    labelItem.setPattern(pattern, /*resolved=*/true);
 
     // Otherwise for each variable in the pattern, make sure its type is
     // identical to the initial case decl and stash the previous case decl as
@@ -1082,135 +1131,56 @@ public:
       // We know that prev var decls matches the initial var decl. So if we can
       // match prevVarDecls, we can also match initial var decl... So for each
       // decl in prevVarDecls...
-      for (auto *expected : **prevCaseDecls) {
-        // If we do not match the name of vd, continue.
-        if (!expected->hasName() || expected->getName() != vd->getName())
-          continue;
+      auto expected = vd->getParentVarDecl();
+      if (!expected)
+        return;
 
-        // Ok, we found a match! Before we leave, mark expected as the parent of
-        // vd and add vd to the next case decl list for the next iteration.
-        SWIFT_DEFER {
-          vd->setParentVarDecl(expected);
-          (*nextCaseDecls)->push_back(vd);
-        };
+      // Then we check for errors.
+      //
+      // NOTE: We emit the diagnostics against the initial case label item var
+      // decl associated with expected to ensure that we always emit
+      // diagnostics against a single reference var decl. If we used expected
+      // instead, we would emit confusing diagnostics since a correct var decl
+      // after an incorrect var decl will be marked as incorrect. For instance
+      // given the following case statement.
+      //
+      //   case .a(let x), .b(var x), .c(let x):
+      //
+      // if we use expected, we will emit errors saying that .b(var x) needs
+      // to be a let and .c(let x) needs to be a var. Thus if one
+      // automatically applied both fix-its, one would still get an error
+      // producing program:
+      //
+      //   case .a(let x), .b(let x), .c(var x):
+      //
+      // More complex case label item lists could cause even longer fixup
+      // sequences. Thus, we emit errors against the VarDecl associated with
+      // expected in the initial case label item list.
+      //
+      // Luckily, it is easy for us to compute this since we only change the
+      // parent field of the initial case label item's VarDecls /after/ we
+      // finish updating the parent pointers of the VarDecls associated with
+      // all other CaseLabelItems. So that initial group of VarDecls are
+      // guaranteed to still have a parent pointer pointing at our
+      // CaseStmt. Since we have setup the parent pointer VarDecl linked list
+      // for all other CaseLabelItem var decls that we have already processed,
+      // we can use our VarDecl linked list to find that initial case label
+      // item VarDecl.
+      auto *initialCaseVarDecl = expected;
+      while (auto *prev = initialCaseVarDecl->getParentVarDecl()) {
+        initialCaseVarDecl = prev;
+      }
+      assert(isa<CaseStmt>(initialCaseVarDecl->getParentPatternStmt()));
 
-        // Then we check for errors.
-        //
-        // NOTE: We emit the diagnostics against the initial case label item var
-        // decl associated with expected to ensure that we always emit
-        // diagnostics against a single reference var decl. If we used expected
-        // instead, we would emit confusing diagnostics since a correct var decl
-        // after an incorrect var decl will be marked as incorrect. For instance
-        // given the following case statement.
-        //
-        //   case .a(let x), .b(var x), .c(let x):
-        //
-        // if we use expected, we will emit errors saying that .b(var x) needs
-        // to be a let and .c(let x) needs to be a var. Thus if one
-        // automatically applied both fix-its, one would still get an error
-        // producing program:
-        //
-        //   case .a(let x), .b(let x), .c(var x):
-        //
-        // More complex case label item lists could cause even longer fixup
-        // sequences. Thus, we emit errors against the VarDecl associated with
-        // expected in the initial case label item list.
-        //
-        // Luckily, it is easy for us to compute this since we only change the
-        // parent field of the initial case label item's VarDecls /after/ we
-        // finish updating the parent pointers of the VarDecls associated with
-        // all other CaseLabelItems. So that initial group of VarDecls are
-        // guaranteed to still have a parent pointer pointing at our
-        // CaseStmt. Since we have setup the parent pointer VarDecl linked list
-        // for all other CaseLabelItem var decls that we have already processed,
-        // we can use our VarDecl linked list to find that initial case label
-        // item VarDecl.
-        auto *initialCaseVarDecl = expected;
-        while (auto *prev = initialCaseVarDecl->getParentVarDecl()) {
-          initialCaseVarDecl = prev;
-        }
-        assert(isa<CaseStmt>(initialCaseVarDecl->getParentPatternStmt()));
-
-        if (!initialCaseVarDecl->isInvalid() &&
-            !vd->getType()->isEqual(initialCaseVarDecl->getType())) {
-          getASTContext().Diags.diagnose(vd->getLoc(), diag::type_mismatch_multiple_pattern_list,
-                      vd->getType(), initialCaseVarDecl->getType());
-          vd->setInvalid();
-          initialCaseVarDecl->setInvalid();
-        }
-
-        if (initialCaseVarDecl->isLet() == vd->isLet()) {
-          return;
-        }
-
-        auto diag = vd->diagnose(diag::mutability_mismatch_multiple_pattern_list,
-                                 vd->isLet(), initialCaseVarDecl->isLet());
-
-        BindingPattern *foundVP = nullptr;
-        vd->getParentPattern()->forEachNode([&](Pattern *P) {
-          if (auto *VP = dyn_cast<BindingPattern>(P))
-            if (VP->getSingleVar() == vd)
-              foundVP = VP;
-        });
-        if (foundVP)
-          diag.fixItReplace(foundVP->getLoc(),
-                            initialCaseVarDecl->isLet() ? "let" : "var");
+      if (!initialCaseVarDecl->isInvalid() &&
+          !vd->getType()->isEqual(initialCaseVarDecl->getType())) {
+        getASTContext().Diags.diagnose(
+            vd->getLoc(), diag::type_mismatch_multiple_pattern_list,
+            vd->getType(), initialCaseVarDecl->getType());
         vd->setInvalid();
         initialCaseVarDecl->setInvalid();
       }
     });
-
-    // Clear our previous case decl list and the swap in the new decls for the
-    // next iteration.
-    (*prevCaseDecls)->clear();
-    std::swap(*prevCaseDecls, *nextCaseDecls);
-  }
-
-  void checkFallthroughPatternBindingsAndTypes(CaseStmt *caseBlock,
-                                               CaseStmt *previousBlock,
-                                               FallthroughStmt *fallthrough) {
-    auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
-    SmallVector<VarDecl *, 4> vars;
-    firstPattern->collectVariables(vars);
-
-    // We know that the typechecker has already guaranteed that all of
-    // the case label items in the fallthrough have the same var
-    // decls. So if we match against the case body var decls,
-    // transitively we will match all of the other case label items in
-    // the fallthrough destination as well.
-    auto previousVars = previousBlock->getCaseBodyVariablesOrEmptyArray();
-    for (auto *expected : vars) {
-      bool matched = false;
-      if (!expected->hasName())
-        continue;
-
-      for (auto *previous : previousVars) {
-        if (!previous->hasName() ||
-            expected->getName() != previous->getName()) {
-          continue;
-        }
-
-        if (!previous->getType()->isEqual(expected->getType())) {
-          getASTContext().Diags.diagnose(previous->getLoc(),
-                      diag::type_mismatch_fallthrough_pattern_list,
-                      previous->getType(), expected->getType());
-          previous->setInvalid();
-          expected->setInvalid();
-        }
-
-        // Ok, we found our match. Make the previous fallthrough statement var
-        // decl our parent var decl.
-        expected->setParentVarDecl(previous);
-        matched = true;
-        break;
-      }
-
-      if (!matched) {
-        getASTContext().Diags.diagnose(fallthrough->getLoc(),
-                    diag::fallthrough_into_case_with_var_binding,
-                    expected->getName());
-      }
-    }
   }
 
   template <typename Iterator>
@@ -1222,38 +1192,18 @@ public:
                      CaseStmt *>::value,
         "Expected an iterator over CaseStmt *");
 
-    SmallVector<VarDecl *, 8> scratchMemory1;
-    SmallVector<VarDecl *, 8> scratchMemory2;
-    CaseStmt *previousBlock = nullptr;
-
     // First pass: check all of the bindings.
-    for (auto i = casesBegin; i != casesEnd; ++i) {
-      auto *caseBlock = *i;
-
-      scratchMemory1.clear();
-      scratchMemory2.clear();
-
-      SmallVectorImpl<VarDecl *> *prevCaseDecls = nullptr;
-      SmallVectorImpl<VarDecl *> *nextCaseDecls = &scratchMemory1;
+    for (auto *caseBlock : make_range(casesBegin, casesEnd)) {
+      // Bind all of the pattern variables together so we can follow the
+      // "parent" pointers later on.
+      bindSwitchCasePatternVars(DC, caseBlock);
 
       auto caseLabelItemArray = caseBlock->getMutableCaseLabelItems();
-      {
-        // Peel off the first iteration so we handle the first case label
-        // especially since we use it to begin the validation chain.
-        auto &labelItem = caseLabelItemArray.front();
-
+      for (auto &labelItem : caseLabelItemArray) {
         // Resolve the pattern in our case label if it has not been resolved and
         // check that our var decls follow invariants.
         checkCaseLabelItemPattern(caseBlock, labelItem, limitExhaustivityChecks,
-                                  subjectType, &prevCaseDecls, &nextCaseDecls);
-
-        // After this is complete, prevCaseDecls will be pointing at
-        // scratchMemory1 which contains the initial case block's var decls and
-        // nextCaseDecls will be a nullptr. Set nextCaseDecls to point at
-        // scratchMemory2 for the next iterations.
-        assert(prevCaseDecls == &scratchMemory1);
-        assert(nextCaseDecls == nullptr);
-        nextCaseDecls = &scratchMemory2;
+                                  subjectType);
 
         // Check the guard expression, if present.
         if (auto *guard = labelItem.getGuardExpr()) {
@@ -1265,56 +1215,10 @@ public:
       // Setup the types of our case body var decls.
       for (auto *expected : caseBlock->getCaseBodyVariablesOrEmptyArray()) {
         assert(expected->hasName());
-        for (auto *prev : *prevCaseDecls) {
-          if (!prev->hasName() || expected->getName() != prev->getName()) {
-            continue;
-          }
-          if (prev->hasInterfaceType())
-            expected->setInterfaceType(prev->getInterfaceType());
-          break;
-        }
+        auto prev = expected->getParentVarDecl();
+        if (prev->hasInterfaceType())
+          expected->setInterfaceType(prev->getInterfaceType());
       }
-
-      // Then check the rest.
-      for (auto &labelItem : caseLabelItemArray.drop_front()) {
-        // Resolve the pattern in our case label if it has not been resolved
-        // and check that our var decls follow invariants.
-        checkCaseLabelItemPattern(caseBlock, labelItem, limitExhaustivityChecks,
-                                  subjectType, &prevCaseDecls, &nextCaseDecls);
-        // Check the guard expression, if present.
-        if (auto *guard = labelItem.getGuardExpr()) {
-          limitExhaustivityChecks |= TypeChecker::typeCheckCondition(guard, DC);
-          labelItem.setGuardExpr(guard);
-        }
-      }
-
-      // Our last CaseLabelItem's VarDecls are now in
-      // prevCaseDecls. Wire them up as parents of our case body var
-      // decls.
-      //
-      // NOTE: We know that the two lists of var decls must be in sync. Remember
-      // that we constructed our case body VarDecls from the first
-      // CaseLabelItems var decls. Just now we proved that all other
-      // CaseLabelItems have matching var decls of the first meaning
-      // transitively that our last case label item must have matching var decls
-      // for our case stmts CaseBodyVarDecls.
-      //
-      // NOTE: We do not check that we matched everything here. That is because
-      // the check has already been done by comparing the 1st CaseLabelItem var
-      // decls. If we insert a check here, we will emit the same error multiple
-      // times.
-      for (auto *expected : caseBlock->getCaseBodyVariablesOrEmptyArray()) {
-        assert(expected->hasName());
-        for (auto *prev : *prevCaseDecls) {
-          if (!prev->hasName() || expected->getName() != prev->getName()) {
-            continue;
-          }
-          expected->setParentVarDecl(prev);
-          break;
-        }
-      }
-
-      previousBlock = caseBlock;
     }
 
     // Second pass: type-check the body statements.
@@ -2295,9 +2199,9 @@ void swift::checkUnknownAttrRestrictions(
   }
 }
 
-void swift::bindSwitchCasePatternVars(CaseStmt *caseStmt) {
+void swift::bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *caseStmt) {
   llvm::SmallDenseMap<Identifier, std::pair<VarDecl *, bool>, 4> latestVars;
-  auto recordVar = [&](VarDecl *var) {
+  auto recordVar = [&](Pattern *pattern, VarDecl *var) {
     if (!var->hasName())
       return;
 
@@ -2310,7 +2214,7 @@ void swift::bindSwitchCasePatternVars(CaseStmt *caseStmt) {
       var->setParentVarDecl(entry.first);
 
       // Check for a mutability mismatch.
-      if (entry.second != var->isLet()) {
+      if (pattern && entry.second != var->isLet()) {
         // Find the original declaration.
         auto initialCaseVarDecl = entry.first;
         while (auto parentVar = initialCaseVarDecl->getParentVarDecl())
@@ -2320,7 +2224,7 @@ void swift::bindSwitchCasePatternVars(CaseStmt *caseStmt) {
                                   var->isLet(), initialCaseVarDecl->isLet());
 
         BindingPattern *foundVP = nullptr;
-        var->getParentPattern()->forEachNode([&](Pattern *P) {
+        pattern->forEachNode([&](Pattern *P) {
           if (auto *VP = dyn_cast<BindingPattern>(P))
             if (VP->getSingleVar() == var)
               foundVP = VP;
@@ -2328,6 +2232,9 @@ void swift::bindSwitchCasePatternVars(CaseStmt *caseStmt) {
         if (foundVP)
           diag.fixItReplace(foundVP->getLoc(),
                             initialCaseVarDecl->isLet() ? "let" : "var");
+
+        var->setInvalid();
+        initialCaseVarDecl->setInvalid();
       }
     } else {
       entry.second = var->isLet();
@@ -2339,12 +2246,24 @@ void swift::bindSwitchCasePatternVars(CaseStmt *caseStmt) {
 
   // Wire up the parent var decls for each variable that occurs within
   // the patterns of each case item. in source order.
-  for (const auto &caseItem : caseStmt->getCaseLabelItems()) {
-    caseItem.getPattern()->forEachVariable(recordVar);
+  for (auto &caseItem : caseStmt->getMutableCaseLabelItems()) {
+    // Resolve the pattern.
+    auto *pattern = caseItem.getPattern();
+    if (!caseItem.isPatternResolved()) {
+      pattern = TypeChecker::resolvePattern(
+          pattern, dc, /*isStmtCondition=*/false);
+      if (!pattern)
+        continue;
+    }
+
+    caseItem.setPattern(pattern, /*resolved=*/true);
+    pattern->forEachVariable( [&](VarDecl *var) {
+      recordVar(pattern, var);
+    });
   }
 
   // Wire up the case body variables to the latest patterns.
   for (auto bodyVar : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
-    recordVar(bodyVar);
+    recordVar(nullptr, bodyVar);
   }
 }
