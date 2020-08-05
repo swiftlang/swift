@@ -477,6 +477,8 @@ func testCaseMutabilityMismatches(e: E3) {
             var x): // expected-error{{'var' pattern binding must match previous 'let' pattern binding}}
       x
       y += "a"
+    default:
+      "default"
     }
   }
 }
