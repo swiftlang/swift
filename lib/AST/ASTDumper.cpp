@@ -3770,7 +3770,7 @@ namespace {
         llvm::raw_string_ostream os(s);
         auto &ctx = T->getASTContext().getClangModuleLoader()
           ->getClangASTContext();
-        T->getClangTypeInfo().dump(os);
+        T->getClangTypeInfo().dump(os, ctx);
         printField("clang_type", os.str());
       }
       printAnyFunctionParams(T->getParams(), "input");
