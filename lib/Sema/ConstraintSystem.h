@@ -3096,6 +3096,11 @@ public:
   /// a new type variable or a specified supertype. At some point, we may want
   /// a new constraint kind to cover the join.
   ///
+  /// \note This method will merge any input type variables for atomic literal
+  /// expressions of the same kind. It assumes that if same-kind literal type
+  /// variables are joined, there will be no differing constraints on those
+  /// type variables.
+  ///
   /// \returns the joined type, which is generally a new type variable, unless there are
   /// fewer than 2 input types or the \c supertype parameter is specified.
   template<typename Iterator>
