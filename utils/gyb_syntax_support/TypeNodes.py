@@ -167,8 +167,9 @@ TYPE_NODES = [
              Child('Arguments', kind='TupleTypeElementList',
                    collection_element_name='Argument'),
              Child('RightParen', kind='RightParenToken'),
-             Child('AsyncKeyword', kind='Token', text_choices=['async'],
-                   is_optional=True),
+             Child('AsyncKeyword', kind='IdentifierToken',
+                   classification='Keyword',
+                   text_choices=['async'], is_optional=True),
              Child('ThrowsOrRethrowsKeyword', kind='Token',
                    is_optional=True,
                    token_choices=[
