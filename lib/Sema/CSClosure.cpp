@@ -176,6 +176,23 @@ private:
   void visitContinueStmt(ContinueStmt *continueStmt) { }
   void visitDeferStmt(DeferStmt *deferStmt) { }
 
+  void visitThrowStmt(ThrowStmt *throwStmt) {
+    Type exnType =
+        cs.getASTContext().getErrorDecl()->getDeclaredInterfaceType();
+    if (!exnType) {
+      hadError = true;
+      return;
+    }
+
+    SolutionApplicationTarget target(
+        throwStmt->getSubExpr(), closure, CTP_ThrowStmt, exnType,
+        /*isDiscarded=*/false);
+    if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow))
+      hadError = true;
+
+    cs.setSolutionApplicationTarget(throwStmt, target);
+  }
+
 #define UNSUPPORTED_STMT(STMT) void visit##STMT##Stmt(STMT##Stmt *) { \
       llvm_unreachable("Unsupported statement kind " #STMT);          \
   }
@@ -185,7 +202,6 @@ private:
   UNSUPPORTED_STMT(Case)
   UNSUPPORTED_STMT(Fallthrough)
   UNSUPPORTED_STMT(Fail)
-  UNSUPPORTED_STMT(Throw)
   UNSUPPORTED_STMT(PoundAssert)
 #undef UNSUPPORTED_STMT
 };
@@ -450,6 +466,17 @@ private:
     return deferStmt;
   }
 
+  ASTNode visitThrowStmt(ThrowStmt *throwStmt) {
+    // Rewrite the condition.
+    auto target = *solution.getConstraintSystem()
+        .getSolutionApplicationTarget(throwStmt);
+    if (auto result = rewriteTarget(target))
+      throwStmt->setSubExpr(result->getAsExpr());
+    else
+      hadError = true;
+    return throwStmt;
+  }
+
 #define UNSUPPORTED_STMT(STMT) ASTNode visit##STMT##Stmt(STMT##Stmt *) { \
       llvm_unreachable("Unsupported statement kind " #STMT);          \
   }
@@ -459,7 +486,6 @@ private:
   UNSUPPORTED_STMT(Case)
   UNSUPPORTED_STMT(Fallthrough)
   UNSUPPORTED_STMT(Fail)
-  UNSUPPORTED_STMT(Throw)
   UNSUPPORTED_STMT(PoundAssert)
 #undef UNSUPPORTED_STMT
 

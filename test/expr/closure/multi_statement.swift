@@ -8,10 +8,14 @@ func maybeGetValue<T>(_ value: T) -> T? {
   return value
 }
 
+enum MyError: Error {
+  case featureIsTooCool
+}
+
 func random(_: Int) -> Bool { return false }
 
-func mapWithMoreStatements(ints: [Int]) {
-  let _ = ints.map { i in
+func mapWithMoreStatements(ints: [Int]) throws {
+  let _ = try ints.map { i in
     guard var actualValue = maybeGetValue(i) else {
       return String(0)
     }
@@ -46,7 +50,9 @@ func mapWithMoreStatements(ints: [Int]) {
       if j % 7 == 0 {
         continue
       }
+ 
       print("even")
+      throw MyError.featureIsTooCool
     }
 
     return String(value)
