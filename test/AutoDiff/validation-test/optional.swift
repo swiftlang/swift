@@ -31,6 +31,16 @@ OptionalTests.test("Let") {
   expectEqual(gradient(at: nil, in: optional_let), .init(0.0))
 
   @differentiable
+  func optional_let_tracked(_ maybeX: Tracked<Float>?) -> Tracked<Float> {
+    if let x = maybeX {
+        return x * x
+    }
+    return 10
+  }
+  expectEqual(gradient(at: 10, in: optional_let_tracked), .init(20.0))
+  expectEqual(gradient(at: nil, in: optional_let_tracked), .init(0.0))
+
+  @differentiable
   func optional_let_nested(_ nestedMaybeX: Float??) -> Float {
     if let maybeX = nestedMaybeX {
       if let x = maybeX {
@@ -50,7 +60,6 @@ OptionalTests.test("Let") {
     }
     return defaultValue
   }
-
   expectEqual(gradient(at: 10, 20, in: optional_let_generic), (.init(1.0), 0.0))
   expectEqual(gradient(at: nil, 20, in: optional_let_generic), (.init(0.0), 1.0))
 
@@ -77,7 +86,6 @@ OptionalTests.test("Switch") {
     case let .some(x): return x * x
     }
   }
-
   expectEqual(gradient(at: 10, in: optional_switch), .init(20.0))
   expectEqual(gradient(at: nil, in: optional_switch), .init(0.0))
 
@@ -92,7 +100,6 @@ OptionalTests.test("Switch") {
       }
     }
   }
-
   expectEqual(gradient(at: 10, in: optional_switch_nested), .init(.init(20.0)))
   expectEqual(gradient(at: nil, in: optional_switch_nested), .init(.init(0.0)))
 
@@ -103,7 +110,6 @@ OptionalTests.test("Switch") {
     case let .some(x): return x
     }
   }
-
   expectEqual(gradient(at: 10, 20, in: optional_switch_generic), (.init(1.0), 0.0))
   expectEqual(gradient(at: nil, 20, in: optional_switch_generic), (.init(0.0), 1.0))
 
@@ -118,7 +124,6 @@ OptionalTests.test("Switch") {
       }
     }
   }
-
   expectEqual(gradient(at: 10, 20, in: optional_switch_nested_generic), (.init(.init(1.0)), 0.0))
   expectEqual(gradient(at: nil, 20, in: optional_switch_nested_generic), (.init(.init(0.0)), 1.0))
 }
@@ -132,7 +137,6 @@ OptionalTests.test("Var1") {
     }
     return 10
   }
-
   expectEqual(gradient(at: 10, in: optional_var1), .init(20.0))
   expectEqual(gradient(at: nil, in: optional_var1), .init(0.0))
 
@@ -147,7 +151,6 @@ OptionalTests.test("Var1") {
     }
     return 10
   }
-
   expectEqual(gradient(at: 10, in: optional_var1_nested), .init(.init(20.0)))
   expectEqual(gradient(at: nil, in: optional_var1_nested), .init(.init(0.0)))
 
@@ -159,7 +162,6 @@ OptionalTests.test("Var1") {
     }
     return defaultValue
   }
-
   expectEqual(gradient(at: 10, 20, in: optional_var1_generic), (.init(1.0), 0.0))
   expectEqual(gradient(at: nil, 20, in: optional_var1_generic), (.init(0.0), 1.0))
 
@@ -174,7 +176,6 @@ OptionalTests.test("Var1") {
     }
     return defaultValue
   }
-
   expectEqual(gradient(at: 10, 20, in: optional_var1_nested_generic), (.init(.init(1.0)), 0.0))
   expectEqual(gradient(at: nil, 20, in: optional_var1_nested_generic), (.init(.init(0.0)), 1.0))
 }
@@ -187,7 +188,6 @@ OptionalTests.test("Var2") {
     }
     return 10
   }
-
   expectEqual(gradient(at: 10, in: optional_var2), .init(20.0))
   expectEqual(gradient(at: nil, in: optional_var2), .init(0.0))
 
@@ -201,7 +201,6 @@ OptionalTests.test("Var2") {
     }
     return 10
   }
-
   expectEqual(gradient(at: 10, in: optional_var2_nested), .init(.init(20.0)))
   expectEqual(gradient(at: nil, in: optional_var2_nested), .init(.init(0.0)))
 
@@ -212,7 +211,6 @@ OptionalTests.test("Var2") {
     }
     return defaultValue
   }
-
   expectEqual(gradient(at: 10, 20, in: optional_var2_generic), (.init(1.0), 0.0))
   expectEqual(gradient(at: nil, 20, in: optional_var2_generic), (.init(0.0), 1.0))
 
@@ -226,7 +224,6 @@ OptionalTests.test("Var2") {
     }
     return defaultValue
   }
-
   expectEqual(gradient(at: 10, 20, in: optional_var2_nested_generic), (.init(.init(1.0)), 0.0))
   expectEqual(gradient(at: nil, 20, in: optional_var2_nested_generic), (.init(.init(0.0)), 1.0))
 }
