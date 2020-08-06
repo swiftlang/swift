@@ -1,9 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %gyb %s > %t/main.swift
 
-// FIXME: <rdar://problem/66219627> Re-enable SILOptimizer/large_string_array.swift.gyb
-// REQUIRES: rdar66219627
-
 // The compiler should finish in less than 1 minute. To give some slack,
 // specify a timeout of 5 minutes.
 // If the compiler needs more than 5 minutes, there is probably a real problem.
