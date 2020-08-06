@@ -2444,13 +2444,15 @@ for host in "${ALL_HOSTS[@]}"; do
                 executable_target=
                 results_targets=
                 if ! [[ "${SKIP_TEST_SWIFT}" ]]; then
-                    executable_target=SwiftUnitTests
-                    results_targets=("${SWIFT_TEST_TARGETS[@]}")
-                    if [[ "${STRESS_TEST_SOURCEKIT}" ]]; then
-                        results_targets=(
-                            "${results_targets[@]}"
-                            stress-SourceKit
-                        )
+                    if ! [[ $(is_cross_tools_host ${host}) ]] ; then
+                       executable_target=SwiftUnitTests
+                       results_targets=("${SWIFT_TEST_TARGETS[@]}")
+                       if [[ "${STRESS_TEST_SOURCEKIT}" ]]; then
+                          results_targets=(
+                               "${results_targets[@]}"
+                               stress-SourceKit
+                          )
+                       fi
                     fi
                 fi
                 if ! [[ "${SKIP_TEST_BENCHMARKS}" ]]; then
