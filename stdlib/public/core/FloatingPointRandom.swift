@@ -385,6 +385,8 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
     maxExponent eMax: RawExponent,
     using generator: inout R
   ) -> Self {
+    _internalInvariant(eMax != 0)
+    
     let k = (section < 0) ? ~section : section
     let n = UInt64(bitPattern: k)
     let x: Self
@@ -432,7 +434,7 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
     allowNegative: Bool = false,
     using generator: inout R
   ) -> Self {
-    if eMax == 0 { return 0 }
+    _internalInvariant(eMax != 0)
     
     let e: RawExponent
     var bits: UInt64
@@ -491,7 +493,8 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
   ) -> (e: T, bits: UInt64, bitCount: Int)
     where R: RandomNumberGenerator, T: BinaryInteger
   {
-    if upperBound <= 1 { return (0, 0, 0) }
+    _internalInvariant(upperBound > 0)
+    if upperBound == 1 { return (0, 0, 0) }
     
     var e = upperBound - 1
     var bits: UInt64
