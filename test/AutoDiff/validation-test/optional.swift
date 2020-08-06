@@ -54,7 +54,6 @@ OptionalTests.test("Let") {
   expectEqual(gradient(at: 10, 20, in: optional_let_generic), (.init(1.0), 0.0))
   expectEqual(gradient(at: nil, 20, in: optional_let_generic), (.init(0.0), 1.0))
 
-  // This test is failing
   @differentiable
   func optional_let_nested_generic<T: Differentiable>(_ nestedMaybeX: T??, _ defaultValue: T) -> T {
     if let maybeX = nestedMaybeX {
