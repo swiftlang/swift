@@ -1,0 +1,29 @@
+module CoreFilesystem {
+  header "CoreFilesystem-Generated.h"
+  export *
+}
+
+module FilesystemKit {
+  header "FilesystemKit.h"
+  export *
+}
+
+module CoreDaemon {
+  header "CoreDaemon.h"
+  export *
+}
+
+module DaemonKit {
+  header "DaemonKit.h"
+  export *
+}
+
+module CoreMemory {
+  header "CoreMemory.h"
+  export *
+}
+
+module MemoryKit {
+  header "MemoryKit.h"
+  export *
+}
