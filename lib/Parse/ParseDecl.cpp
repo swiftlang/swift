@@ -25,6 +25,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
@@ -3929,43 +3930,43 @@ Parser::parseDecl(ParseDeclOptions Flags,
       bool IsProbablyFuncDecl = false;
 
       if (Tok.isIdentifierOrUnderscore() || Tok.isAnyOperator()) {
+
+        // This is a probe, so backtrack when we're done
+        // and don't emit diagnostics.
         BacktrackingScope backtrackingScope(*this);
+        DiagnosticSuppression diagnosticSuppression(Diags);
 
-        // need to see generic-params?, then signature after func ID
-        //
+        // TODO make sure we can't get these from the environment
+        SourceLoc staticLoc; 
+        StaticSpellingKind staticSpelling = StaticSpellingKind::None;
+        DeclAttributes attributes;
+        bool hasFuncKeyword = false;
 
-        // nb need to handle operator with < at end, splitting off
-        // the < to be generic params
+        ParserResult<FuncDecl> parserResult =
+          parseDeclFunc(staticLoc,
+            staticSpelling,
+            Flags,
+            attributes,
+            hasFuncKeyword);
 
-// if this is an operator with a left-angle at the end, 
-// split the token into operator and generic.
+        // it looks like we always get a good parse result.
+        // But if there are no parentheses
+        // the left and right parens will be at the beginning of
+        // the expression and will be equal so we use
+        // this to reject degenerate declarations.
 
-        Identifier SimpleName;
-        SourceLoc NameLoc;
-        handleOperatorWithGeneric(SimpleName, NameLoc);
-
-        consumeToken(); // eat up the identifier
-
-        auto GenericParamResult = maybeParseGenericParams();
-        auto GenericParams = GenericParamResult.getPtrOrNull();
-
-        DeclName FullName;
-        ParameterList *BodyParams;
-        DefaultArgumentInfo DefaultArgs;
-        SourceLoc throwsLoc;
-        bool rethrows;
-        TypeRepr *FuncRetTy = nullptr;
-
-        auto parsedSignatureOK = parseFunctionSignature(SimpleName,
-                FullName, BodyParams, DefaultArgs,
-                throwsLoc, rethrows, FuncRetTy);
-        if (parsedSignatureOK.isSuccess()) {
-          IsProbablyFuncDecl = true;
+        if (parserResult.isNonNull()) {
+          auto parameterList = parserResult.get()->getParameters();
+          if (parameterList->getLParenLoc() != parameterList->getRParenLoc()) {
+            IsProbablyFuncDecl = true;
+          }
         }
-        // backtrackingScope goes out of scope, returns to identifier
-
+        // backtrackingScope and diagnostic suppression are both RAII
+        // when they go out of scope, Tok returns to the beginning of
+        // the identifier, and diagnostics are unsuppressed.
       }
 
+      // if probe succeeded, then do it for real
       if (IsProbablyFuncDecl) {
 
         DescriptiveDeclKind DescriptiveKind;
@@ -6291,24 +6292,6 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
   }
 }
 
-
-void Parser::handleOperatorWithGeneric(Identifier & SimpleName, 
-                                        SourceLoc &NameLoc) {
-  if (Tok.isAnyOperator() || Tok.isAny(tok::exclaim_postfix, tok::amp_prefix)) {
-    // If the name is an operator token that ends in '<' and the following token
-    // is an identifier, split the '<' off as a separate token. This allows
-    // things like 'func ==<T>(x:T, y:T) {}' to parse as '==' with generic type
-    // variable '<T>' as expected.
-    auto NameStr = Tok.getText();
-    if (NameStr.size() > 1 && NameStr.back() == '<' &&
-        peekToken().is(tok::identifier)) {
-      NameStr = NameStr.slice(0, NameStr.size() - 1);
-    }
-    SimpleName = Context.getIdentifier(NameStr);
-    NameLoc = consumeStartingCharacterOfCurrentToken(tok::oper_binary_spaced,
-                                                     NameStr.size());
-}
-
 /// Parse a 'func' declaration, returning null on error.  The caller
 /// handles this case and does recovery as appropriate.
 ///
@@ -6353,20 +6336,19 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   // Parse function name.
   Identifier SimpleName;
   SourceLoc NameLoc;
-  handleOperatorWithGeneric(SimpleName, NameLoc);
-//   if (Tok.isAnyOperator() || Tok.isAny(tok::exclaim_postfix, tok::amp_prefix)) {
-//     // If the name is an operator token that ends in '<' and the following token
-//     // is an identifier, split the '<' off as a separate token. This allows
-//     // things like 'func ==<T>(x:T, y:T) {}' to parse as '==' with generic type
-//     // variable '<T>' as expected.
-//     auto NameStr = Tok.getText();
-//     if (NameStr.size() > 1 && NameStr.back() == '<' &&
-//         peekToken().is(tok::identifier)) {
-//       NameStr = NameStr.slice(0, NameStr.size() - 1);
-//     }
-//     SimpleName = Context.getIdentifier(NameStr);
-//     NameLoc = consumeStartingCharacterOfCurrentToken(tok::oper_binary_spaced,
-//                                                      NameStr.size());
+  if (Tok.isAnyOperator() || Tok.isAny(tok::exclaim_postfix, tok::amp_prefix)) {
+    // If the name is an operator token that ends in '<' and the following token
+    // is an identifier, split the '<' off as a separate token. This allows
+    // things like 'func ==<T>(x:T, y:T) {}' to parse as '==' with generic type
+    // variable '<T>' as expected.
+    auto NameStr = Tok.getText();
+    if (NameStr.size() > 1 && NameStr.back() == '<' &&
+        peekToken().is(tok::identifier)) {
+      NameStr = NameStr.slice(0, NameStr.size() - 1);
+    }
+    SimpleName = Context.getIdentifier(NameStr);
+    NameLoc = consumeStartingCharacterOfCurrentToken(tok::oper_binary_spaced,
+                                                     NameStr.size());
     // Within a protocol, recover from a missing 'static'.
     if (Flags & PD_InProtocol) {
       switch (StaticSpelling) {
