@@ -1048,8 +1048,8 @@ Conventions for foreign symbols
 Swift interoperates with multiple other languages - C, C++, Objective-C, and
 Objective-C++. Each of these languages defines their own mangling conventions,
 so Swift must take care to follow them. However, these conventions do not
-restrict Swift-specific constructs like Swift type metadata, so the Swift
-language may impose its own conventions in these cases.
+cover Swift-specific symbols like Swift type metadata for foreign types, so Swift uses
+its own mangling scheme for those symbols.
 
 Importing C and C++ structs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
