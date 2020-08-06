@@ -606,22 +606,17 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
   
   // MARK: Helpers
   
-  // We use only 60 bits for section numbers, not 64, to reduce the chance that
-  // the `Int64.random(in:)` call in the general-case will itself need to call
-  // `next()` more than once.
+  // If section numbers used 64 bits, then for ranges like `-1.0...1.0`, the
+  // `Int64.random(in:using:)` call in the general case would need to call
+  // `next()` twice on average. Each bit smaller than that halves the
+  // probability of a second `next()` call.
   //
-  // Ranges like -1.0...1.0 would otherwise span just over half of all sections,
-  // meaning `random(in:)` would call `next()` twice on average. Each bit we
-  // do not use effectively halves the probability of a 2nd call to `next()`.
+  // The tradeoff is wider sections, which means an increased probability of
+  // landing in a section which spans more than one representable value and
+  // thus requires a second random integer.
   //
-  // We choose to skip 4 bits in order to optimize for Double, which has 52
-  // significand bits. Ordinarily, without this optimization, there would be
-  // 2^61 section numbers for the 2nd-largest binade in a range, which leaves
-  // 9 bits of slack for Double.
-  //
-  // We take 4 of them here to make choosing a section faster and leave 5 of
-  // them to keep the sections small, because when each section in a raw binade
-  // contains only one value, then we do not need to generate a significand.
+  // We optimize for `Double` by using 60 bits. This gives worst-case ranges
+  // like `-1.0...64.0` a 1 in 32 chance of needing a second random integer.
   @_transparent
   @_alwaysEmitIntoClient
   internal static var _sectionBitCount: Int { UInt64.bitWidth - 4 }
