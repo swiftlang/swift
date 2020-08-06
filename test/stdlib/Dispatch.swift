@@ -278,7 +278,7 @@ DispatchAPI.test("DispatchTime.SchedulerTimeType.Stridable") {
 	    let time1 = DispatchQueue.SchedulerTimeType(.init(uptimeNanoseconds: 10000))
 	    let time2 = DispatchQueue.SchedulerTimeType(.init(uptimeNanoseconds: 10431))
 	    let addedTime = time2.distance(to: time1)
-	    expectEqual(addedTime.magnitude, (10000 - 10431))
+	    expectEqual((10000 - 10431), addedTime.magnitude)
 	}
 }
 
