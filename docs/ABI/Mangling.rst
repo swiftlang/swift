@@ -1058,11 +1058,10 @@ Swift generates them when C/C++ module is imported and stores them in the `__C`
 module. This can be observed when mangling a Swift function that accepts a C/C++
 struct as a parameter.
 
-Importing C++ template instantiations behind typedef
+Importing C++ class template instantiations
 ~~~~~~~~~~~~~~~~~~~
 
 The template instantiation is imported as a struct named `__CxxTemplateInst`
 plus Itanium mangled type of the instantiation. Double underscore (denoting a
 reserved C++ identifier) is used to discourage direct usage. The struct is
 stored in the `__C` module, similarly to plain C++ structs.
-
