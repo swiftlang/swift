@@ -53,7 +53,6 @@ static llvm::cl::opt<std::string>
 
 int main(int argc, char *argv[]) {
   PROGRAM_START(argc, argv);
-  INITIALIZE_LLVM();
 
   llvm::cl::HideUnrelatedOptions(options::Category);
   llvm::cl::ParseCommandLineOptions(argc, argv,
@@ -61,7 +60,7 @@ int main(int argc, char *argv[]) {
 
   if (!llvm::sys::fs::exists(options::InputFilePath)) {
     llvm::errs() << "YAML file not found\n";
-    return 1;
+    return EXIT_FAILURE;
   }
 
   YAMLLocalizationProducer yaml(options::InputFilePath);
@@ -80,8 +79,8 @@ int main(int argc, char *argv[]) {
   if (Serializer.emit(SerializedFilePath.str())) {
     llvm::errs() << "Cannot serialize diagnostic file "
                  << options::InputFilePath << '\n';
-    return 1;
+    return EXIT_FAILURE;
   }
 
-  return 0;
+  return EXIT_SUCCESS;
 }
