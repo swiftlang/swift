@@ -8,7 +8,6 @@ import StdlibUnittest
 var TemplatesTestSuite = TestSuite("TemplatesTestSuite")
 
 TemplatesTestSuite.test("explicit-specialization") {
-  // Specialization doubles the argument.
   let specializedInt = SpecializedIntWrapper(value: 7)
   var specializedMagicInt = WrapperWithSpecialization(t: specializedInt)
   expectEqual(specializedMagicInt.doubleIfSpecializedElseTripple(), 14)
