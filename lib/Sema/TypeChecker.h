@@ -1365,6 +1365,16 @@ bool areGenericRequirementsSatisfied(const DeclContext *DC,
                                      SubstitutionMap Substitutions,
                                      bool isExtension);
 
+/// Find the target of a break or continue statement.
+///
+/// \returns the target, if one was found, or \c nullptr if no such target
+/// exists.
+LabeledStmt *findBreakOrContinueStmtTarget(
+    ASTContext &ctx, SourceFile *sourceFile,
+    SourceLoc loc, Identifier targetName, SourceLoc targetLoc,
+    bool isContinue, DeclContext *dc,
+    ArrayRef<LabeledStmt *> oldActiveLabeledStmts);
+
 /// Check for restrictions on the use of the @unknown attribute on a
 /// case statement.
 void checkUnknownAttrRestrictions(

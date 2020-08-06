@@ -172,6 +172,9 @@ private:
     visit(whileStmt->getBody());
   }
 
+  void visitBreakStmt(BreakStmt *breakStmt) { }
+  void visitContinueStmt(ContinueStmt *continueStmt) { }
+
 #define UNSUPPORTED_STMT(STMT) void visit##STMT##Stmt(STMT##Stmt *) { \
       llvm_unreachable("Unsupported statement kind " #STMT);          \
   }
@@ -180,8 +183,6 @@ private:
   UNSUPPORTED_STMT(DoCatch)
   UNSUPPORTED_STMT(Switch)
   UNSUPPORTED_STMT(Case)
-  UNSUPPORTED_STMT(Break)
-  UNSUPPORTED_STMT(Continue)
   UNSUPPORTED_STMT(Fallthrough)
   UNSUPPORTED_STMT(Fail)
   UNSUPPORTED_STMT(Throw)
@@ -212,6 +213,10 @@ class ClosureConstraintApplication
   Type resultType;
   RewriteTargetFn rewriteTarget;
   bool isSingleExpression;
+
+  ASTContext &getASTContext() const {
+    return solution.getConstraintSystem().getASTContext();
+  }
 
 public:
   /// Whether an error was encountered while generating constraints.
@@ -412,6 +417,29 @@ private:
     return whileStmt;
   }
 
+  ASTNode visitBreakStmt(BreakStmt *breakStmt) {
+    if (auto target = findBreakOrContinueStmtTarget(
+            getASTContext(), closure->getParentSourceFile(), breakStmt->getLoc(),
+            breakStmt->getTargetName(), breakStmt->getTargetLoc(),
+            /*isContinue=*/false, closure, { })) {
+      breakStmt->setTarget(target);
+    }
+
+    return breakStmt;
+  }
+
+  ASTNode visitContinueStmt(ContinueStmt *continueStmt) {
+    if (auto target = findBreakOrContinueStmtTarget(
+            getASTContext(), closure->getParentSourceFile(),
+            continueStmt->getLoc(), continueStmt->getTargetName(),
+            continueStmt->getTargetLoc(), /*isContinue=*/true,
+            closure, { })) {
+      continueStmt->setTarget(target);
+    }
+
+    return continueStmt;
+  }
+
 #define UNSUPPORTED_STMT(STMT) ASTNode visit##STMT##Stmt(STMT##Stmt *) { \
       llvm_unreachable("Unsupported statement kind " #STMT);          \
   }
@@ -420,8 +448,6 @@ private:
   UNSUPPORTED_STMT(DoCatch)
   UNSUPPORTED_STMT(Switch)
   UNSUPPORTED_STMT(Case)
-  UNSUPPORTED_STMT(Break)
-  UNSUPPORTED_STMT(Continue)
   UNSUPPORTED_STMT(Fallthrough)
   UNSUPPORTED_STMT(Fail)
   UNSUPPORTED_STMT(Throw)

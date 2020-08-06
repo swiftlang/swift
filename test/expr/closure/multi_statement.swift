@@ -29,11 +29,19 @@ func mapWithMoreStatements(ints: [Int]) {
       actualValue += 1
     }
 
+  my_repeat:
     repeat {
       print("still here")
+
+      if i % 7 == 0 {
+        break my_repeat
+      }
     } while random(i)
 
     for j in 0..<i where j % 2 == 0 {
+      if j % 7 == 0 {
+        continue
+      }
       print("even")
     }
 
