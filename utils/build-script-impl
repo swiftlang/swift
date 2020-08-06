@@ -2792,7 +2792,11 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [[ "${LLVM_INSTALL_COMPONENTS}" == "all" ]] ; then
                     INSTALL_TARGETS=install
                 elif [[ -n "${LLVM_INSTALL_COMPONENTS}" ]] ; then
-                    INSTALL_TARGETS=install-$(echo ${LLVM_INSTALL_COMPONENTS} | sed -E 's/;/ install-/g')
+                    if [[ $(is_cross_tools_host ${host}) && "${LLVM_INSTALL_COMPONENTS}" == *"compiler-rt"* ]]; then
+                        INSTALL_TARGETS=install-$(echo ${LLVM_INSTALL_COMPONENTS} | sed -E 's/compiler-rt;//g' |sed -E 's/;/ install-/g')
+                    else
+                        INSTALL_TARGETS=install-$(echo ${LLVM_INSTALL_COMPONENTS} | sed -E 's/;/ install-/g')
+                    fi
                 fi
                 ;;
             libcxx)
