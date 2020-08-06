@@ -1545,6 +1545,9 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::Func:
   case DeclKind::Accessor:
     return true;
+
+  case DeclKind::Error:
+    return false;
   }
 
   llvm_unreachable("Unhandled DeclKind in switch.");
@@ -3725,6 +3728,10 @@ public:
 
   void visitMissingMemberDecl(const MissingMemberDecl *) {
     llvm_unreachable("member placeholders shouldn't be serialized");
+  }
+
+  void visitErrorDecl(const ErrorDecl *) {
+    llvm_unreachable("error decl should not be serialized");
   }
 };
 

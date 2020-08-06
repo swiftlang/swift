@@ -448,6 +448,7 @@ public:
   UNREACHABLE(Param, "does not have access control")
   UNREACHABLE(GenericTypeParam, "does not have access control")
   UNREACHABLE(MissingMember, "does not have access control")
+  UNREACHABLE(Error, "does not have access control")
 #undef UNREACHABLE
 
 #define UNINTERESTING(KIND) \
@@ -1038,6 +1039,7 @@ public:
   UNREACHABLE(Param, "does not have access control")
   UNREACHABLE(GenericTypeParam, "does not have access control")
   UNREACHABLE(MissingMember, "does not have access control")
+  UNREACHABLE(Error, "does not have access control")
 #undef UNREACHABLE
 
 #define UNINTERESTING(KIND) \
@@ -1781,6 +1783,7 @@ public:
   UNREACHABLE(Import, "not applicable")
   UNREACHABLE(TopLevelCode, "not applicable")
   UNREACHABLE(Module, "not applicable")
+  UNREACHABLE(Error, "not applicable")
 
   UNREACHABLE(Param, "handled by the enclosing declaration")
   UNREACHABLE(GenericTypeParam, "handled by the enclosing declaration")

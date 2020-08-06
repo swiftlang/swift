@@ -1080,6 +1080,7 @@ public:
   void visitAbstractTypeParamDecl(AbstractTypeParamDecl *tpd) {}
   void visitModuleDecl(ModuleDecl *md) {}
   void visitMissingMemberDecl(MissingMemberDecl *) {}
+  void visitErrorDecl(ErrorDecl *) {}
   void visitNominalTypeDecl(NominalTypeDecl *ntd) {
     SILGenType(SGM, ntd).emitType();
   }
@@ -1205,6 +1206,7 @@ public:
   void visitAbstractTypeParamDecl(AbstractTypeParamDecl *tpd) {}
   void visitModuleDecl(ModuleDecl *md) {}
   void visitMissingMemberDecl(MissingMemberDecl *) {}
+  void visitErrorDecl(ErrorDecl *) {}
   void visitNominalTypeDecl(NominalTypeDecl *ntd) {
     SILGenType(SGM, ntd).emitType();
   }

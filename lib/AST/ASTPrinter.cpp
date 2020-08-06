@@ -3367,6 +3367,8 @@ void PrintAST::visitMissingMemberDecl(MissingMemberDecl *decl) {
   Printer << " */";
 }
 
+void PrintAST::visitErrorDecl(ErrorDecl *decl) {}
+
 void PrintAST::visitBraceStmt(BraceStmt *stmt) {
   printBraceStmt(stmt);
 }

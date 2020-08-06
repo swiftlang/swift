@@ -491,6 +491,9 @@ class PropertyDelgate {
     var x = 1; x
   })
   var something
+
+  // CHECK: @<type>MyDelegate</type>(<int>12</int>)
+  @MyDelegate(12)
 }
 
 // CHECK: <kw>func</kw> acceptBuilder<T>(

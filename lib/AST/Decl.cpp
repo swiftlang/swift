@@ -163,6 +163,7 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(Param);
   TRIVIAL_KIND(Module);
   TRIVIAL_KIND(MissingMember);
+  TRIVIAL_KIND(Error);
 
    case DeclKind::Enum:
      return cast<EnumDecl>(this)->getGenericParams()
@@ -328,6 +329,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(Requirement, "requirement");
   ENTRY(OpaqueResultType, "result");
   ENTRY(OpaqueVarType, "type");
+  ENTRY(Error, "error");
   }
 #undef ENTRY
   llvm_unreachable("bad DescriptiveDeclKind");
@@ -1080,6 +1082,7 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
   case DeclKind::PoundDiagnostic:
   case DeclKind::PrecedenceGroup:
   case DeclKind::MissingMember:
+  case DeclKind::Error:
     llvm_unreachable("not a ValueDecl");
 
   case DeclKind::AssociatedType:
@@ -2346,6 +2349,7 @@ bool ValueDecl::isInstanceMember() const {
   case DeclKind::PoundDiagnostic:
   case DeclKind::PrecedenceGroup:
   case DeclKind::MissingMember:
+  case DeclKind::Error:
     llvm_unreachable("Not a ValueDecl");
 
   case DeclKind::Class:
@@ -7902,6 +7906,12 @@ void Decl::setClangNode(ClangNode Node) {
 #include "swift/AST/DeclNodes.def"
   }
   *(ptr - 1) = Node.getOpaqueValue();
+}
+
+ErrorDecl::ErrorDecl(DeclContext *DC, SourceLoc Loc)
+    : Decl(DeclKind::Error, DC), Loc(Loc) {
+  assert(DC->getASTContext().Diags.hadAnyError() &&
+         "'ErrorDecl' should not be constructed without errors");
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing Decls, is

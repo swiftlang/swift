@@ -250,6 +250,8 @@ public:
       Builder.CreateCall(class_replaceMethod, setterArgs);
     }
   }
+
+  void visitErrorDecl(ErrorDecl *d) { llvm_unreachable("not expected"); }
 };
 
 /// Create a descriptor for JITed @objc protocol using the ObjC runtime.
@@ -411,6 +413,8 @@ public:
       Builder.CreateCall(protocol_addMethodDescription, setterArgs);
     }
   }
+
+  void visitErrorDecl(ErrorDecl *d) { llvm_unreachable("not expected"); }
 };
 
 } // end anonymous namespace
@@ -2204,6 +2208,7 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   case DeclKind::AssociatedType:
   case DeclKind::IfConfig: 
   case DeclKind::PoundDiagnostic:
+  case DeclKind::Error:
     return;
 
   case DeclKind::Enum:
@@ -4447,6 +4452,7 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
 
     case DeclKind::IfConfig:
     case DeclKind::PoundDiagnostic:
+    case DeclKind::Error:
       continue;
 
     case DeclKind::Func:

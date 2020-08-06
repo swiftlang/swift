@@ -842,6 +842,7 @@ public:
   VISIT_AND_IGNORE(ParamDecl)
   VISIT_AND_IGNORE(PoundDiagnosticDecl)
   VISIT_AND_IGNORE(MissingMemberDecl)
+  VISIT_AND_IGNORE(ErrorDecl)
 
   // This declaration is handled from the PatternBindingDecl
   VISIT_AND_IGNORE(VarDecl)

@@ -3972,6 +3972,14 @@ Parser::parseDecl(ParseDeclOptions Flags,
         }
       }
     }
+
+    // If some attributes are parsed but not a decl, create an 'ErrorDecl'
+    // and attach the attributes to it. So they aren't discarded.
+    if (!Attributes.isEmpty()) {
+      auto decl = new (Context) ErrorDecl(CurDeclContext, PreviousLoc);
+      decl->getAttrs() = Attributes;
+      DeclResult = makeParserErrorResult(decl);
+    }
   }
 
   if (DeclResult.isParseError() && Tok.is(tok::code_complete)) {

@@ -173,7 +173,8 @@ enum class DescriptiveDeclKind : uint8_t {
   MissingMember,
   Requirement,
   OpaqueResultType,
-  OpaqueVarType
+  OpaqueVarType,
+  Error,
 };
 
 /// Describes which spelling was used in the source for the 'static' or 'class'
@@ -7309,6 +7310,17 @@ public:
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::MissingMember;
   }
+};
+
+class ErrorDecl : public Decl {
+  SourceLoc Loc;
+
+public:
+  ErrorDecl(DeclContext *DC, SourceLoc Loc);
+
+  SourceRange getSourceRange() const { return Loc; }
+  SourceLoc getLocFromSource() const { return Loc; }
+  static bool classof(const Decl *D) { return D->getKind() == DeclKind::Error; }
 };
 
 inline bool AbstractStorageDecl::isSettable(const DeclContext *UseDC,

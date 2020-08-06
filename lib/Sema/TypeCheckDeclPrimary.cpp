@@ -2659,6 +2659,10 @@ public:
       addDelayedFunction(DD);
     }
   }
+
+  void visitErrorDecl(ErrorDecl *ED) {
+    // TODO: Should we type check attributes?
+  }
 };
 } // end anonymous namespace
 

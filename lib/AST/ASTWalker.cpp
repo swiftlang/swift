@@ -455,6 +455,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return false;
   }
 
+  bool visitErrorDecl(ErrorDecl *ED) {
+    return false;
+  }
+
   //===--------------------------------------------------------------------===//
   //                                  Exprs
   //===--------------------------------------------------------------------===//

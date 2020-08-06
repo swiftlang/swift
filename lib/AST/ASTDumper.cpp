@@ -1284,6 +1284,11 @@ namespace {
           << '\"' << MMD->getName() << '\"';
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
+
+    void visitErrorDecl(ErrorDecl *ED) {
+      printCommon(ED, "error_decl");
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
   };
 } // end anonymous namespace
 

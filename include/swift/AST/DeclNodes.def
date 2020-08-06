@@ -191,7 +191,8 @@ ABSTRACT_DECL(Operator, Decl)
   OPERATOR_DECL(PostfixOperator, OperatorDecl)
   DECL_RANGE(Operator, InfixOperator, PostfixOperator)
 
-LAST_DECL(PostfixOperator)
+DECL(Error, Decl)
+LAST_DECL(Error)
 
 #undef NOMINAL_TYPE_DECL
 #undef CONTEXT_DECL

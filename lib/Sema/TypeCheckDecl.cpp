@@ -2179,6 +2179,9 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
     llvm_unreachable("should not get here");
     return Type();
 
+  case DeclKind::Error:
+    return ErrorType::get(Context);
+
   case DeclKind::AssociatedType: {
     auto assocType = cast<AssociatedTypeDecl>(D);
     auto interfaceTy = assocType->getDeclaredInterfaceType();

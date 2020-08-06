@@ -2101,6 +2101,8 @@ namespace {
       if (auto setter = subscript->getOpaqueAccessor(AccessorKind::Set))
         methods.push_back(setter);
     }
+
+    void visitErrorDecl(ErrorDecl *d) { llvm_unreachable("shouldn't be here"); }
   };
 } // end anonymous namespace
 
