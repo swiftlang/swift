@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5 -experimental-multi-statement-closures
+// RUN: %target-typecheck-verify-swift -swift-version 5 -experimental-multi-statement-closures -enable-experimental-static-assert
 
 func isInt<T>(_ value: T) -> Bool {
   return value is Int
@@ -50,10 +50,12 @@ func mapWithMoreStatements(ints: [Int]) throws {
       if j % 7 == 0 {
         continue
       }
- 
+
       print("even")
       throw MyError.featureIsTooCool
     }
+
+    #assert(true)
 
     return String(value)
   }

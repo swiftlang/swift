@@ -193,6 +193,22 @@ private:
     cs.setSolutionApplicationTarget(throwStmt, target);
   }
 
+  void visitPoundAssertStmt(PoundAssertStmt *poundAssertStmt) {
+    auto *boolDecl = cs.getASTContext().getBoolDecl();
+    if (!boolDecl) {
+      hadError = true;
+      return;
+    }
+
+    SolutionApplicationTarget target(
+        poundAssertStmt->getCondition(), closure, CTP_Condition,
+        boolDecl->getDeclaredInterfaceType(), /*isDiscarded=*/false);
+    if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow))
+      hadError = true;
+
+    cs.setSolutionApplicationTarget(poundAssertStmt, target);
+  }
+
 #define UNSUPPORTED_STMT(STMT) void visit##STMT##Stmt(STMT##Stmt *) { \
       llvm_unreachable("Unsupported statement kind " #STMT);          \
   }
@@ -202,7 +218,6 @@ private:
   UNSUPPORTED_STMT(Case)
   UNSUPPORTED_STMT(Fallthrough)
   UNSUPPORTED_STMT(Fail)
-  UNSUPPORTED_STMT(PoundAssert)
 #undef UNSUPPORTED_STMT
 };
 
@@ -467,7 +482,7 @@ private:
   }
 
   ASTNode visitThrowStmt(ThrowStmt *throwStmt) {
-    // Rewrite the condition.
+    // Rewrite the error.
     auto target = *solution.getConstraintSystem()
         .getSolutionApplicationTarget(throwStmt);
     if (auto result = rewriteTarget(target))
@@ -475,6 +490,17 @@ private:
     else
       hadError = true;
     return throwStmt;
+  }
+
+  ASTNode visitPoundAssertStmt(PoundAssertStmt *poundAssertStmt) {
+    // Rewrite the condition.
+    auto target = *solution.getConstraintSystem()
+        .getSolutionApplicationTarget(poundAssertStmt);
+    if (auto result = rewriteTarget(target))
+      poundAssertStmt->setCondition(result->getAsExpr());
+    else
+      hadError = true;
+    return poundAssertStmt;
   }
 
 #define UNSUPPORTED_STMT(STMT) ASTNode visit##STMT##Stmt(STMT##Stmt *) { \
@@ -486,7 +512,6 @@ private:
   UNSUPPORTED_STMT(Case)
   UNSUPPORTED_STMT(Fallthrough)
   UNSUPPORTED_STMT(Fail)
-  UNSUPPORTED_STMT(PoundAssert)
 #undef UNSUPPORTED_STMT
 
 };
