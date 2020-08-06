@@ -1512,6 +1512,7 @@ namespace {
       auto memberTy = CS.getType(tail);
       auto *base = TypeChecker::getUnresolvedMemberChainBase(tail);
 
+      // FIXME: This is a workaround for SR-13357, should not be necessary.
       // Copy any type variable options from the result of the tail member to
       // the result of the entire chain.
       unsigned additionalOptions = 0;
