@@ -521,17 +521,15 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
   
   // MARK: Small range
   
-  // If the range spans 0 or 1 raw binades and its bounds are close enough
-  // together, then the distance between them can be counted in terms of the
-  // smallest ulp in the range.
+  // If the range is very small and either fits within one section or spans from
+  // the end of a section to the beginning of the next, then for a type with a
+  // large significand, the general-case algorithm would spin many times before
+  // landing within the range.
   //
-  // For types with spare bits in the significand, this could be done for
-  // ranges that span a larger number of raw binades, but there is little
-  // benefit to doing so.
-  //
-  // The purpose here is to ensure that the large range path is only taken
-  // when there is a low probability of needing multiple attempts. Currently,
-  // that probability is less than 1 in 2^56 in the worst case.
+  // In order to prevent this, we handle small ranges separately. If the size of
+  // the range, divided by the smallest ulp in it, fits in significandBitCount
+  // bits, this function returns a random value from the range. Otherwise, for
+  // larger ranges, it returns nil.
   @_alwaysEmitIntoClient
   internal static func _smallRangeUniformRandom<R: RandomNumberGenerator>(
     in range: Range<Self>,
