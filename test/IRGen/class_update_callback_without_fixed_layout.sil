@@ -6,7 +6,7 @@
 
 // REQUIRES: objc_interop
 // UNSUPPORTED: OS=iosmac
-// UNSUPPORTED: CPU=arm64e
+// UNSUPPORTED: CPU=arm64 || CPU=arm64e
 
 // With the old deployment target, these classes use the 'singleton' metadata
 // initialization pattern. The class is not statically visible to Objective-C,
