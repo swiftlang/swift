@@ -50,6 +50,10 @@ enum class DeclAvailabilityFlag : uint8_t {
   /// Do not diagnose uses of declarations in versions before they were
   /// introduced. Used to work around availability-checker bugs.
   AllowPotentiallyUnavailable = 1 << 3,
+
+  /// If an error diagnostic would normally be emitted, demote the error to a
+  /// warning. Used for ObjC key path components.
+  ForObjCKeyPath = 1 << 4
 };
 using DeclAvailabilityFlags = OptionSet<DeclAvailabilityFlag>;
 
@@ -70,7 +74,8 @@ void diagnoseUnavailableOverride(ValueDecl *override,
 bool diagnoseExplicitUnavailability(const ValueDecl *D,
                                     SourceRange R,
                                     const DeclContext *DC,
-                                    const ApplyExpr *call);
+                                    const ApplyExpr *call,
+                                    DeclAvailabilityFlags Flags = None);
 
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
@@ -78,6 +83,7 @@ bool diagnoseExplicitUnavailability(
     const ValueDecl *D,
     SourceRange R,
     const DeclContext *DC,
+    DeclAvailabilityFlags Flags,
     llvm::function_ref<void(InFlightDiagnostic &)> attachRenameFixIts);
 
 /// Check if \p decl has a introduction version required by -require-explicit-availability
