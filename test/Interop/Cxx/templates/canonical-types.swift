@@ -8,8 +8,7 @@ import StdlibUnittest
 var TemplatesTestSuite = TestSuite("TemplatesTestSuite")
 
 TemplatesTestSuite.test("canonical-types") {
-  // multiple typedeffed types with the same canonical type are the same type
-  // from the typechecking perspective.
+  // Different typedefs with the same C++ canonical type must have the same type from Swift's perspective as well.
   expectEqualType(WrappedMagicNumberA.self, WrappedMagicNumberB.self)
 }
 
