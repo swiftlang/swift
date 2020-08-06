@@ -2599,6 +2599,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (isWithoutActuallyEscapingThunk())
     OS << "[without_actually_escaping] ";
 
+  if (isAsync())
+    OS << "[async] ";
+
   switch (getSpecialPurpose()) {
   case SILFunction::Purpose::None:
     break;

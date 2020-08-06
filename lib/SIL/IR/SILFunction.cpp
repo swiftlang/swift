@@ -107,7 +107,7 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
       ExactSelfClass(isExactSelfClass),
       Inlined(false), Zombie(false), HasOwnership(true),
       WasDeserializedCanonical(false), IsWithoutActuallyEscapingThunk(false),
-      OptMode(unsigned(OptimizationMode::NotSet)),
+      IsAsync(false), OptMode(unsigned(OptimizationMode::NotSet)),
       EffectsKindAttr(unsigned(E)) {
   assert(!Transparent || !IsDynamicReplaceable);
   validateSubclassScope(classSubclassScope, isThunk, nullptr);
