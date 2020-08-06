@@ -79,7 +79,7 @@ class ObjcDestructible: NSObject {
 // CHECK-macosx:     i8* bitcast (i8 (i8*, i8*, %4**)* @"$s12objc_methods3FooC4failyyKFTo" to i8*)
 // CHECK-ios:     i8* bitcast (i1 (i8*, i8*, %4**)* @"$s12objc_methods3FooC4failyyKFTo" to i8*)
 // CHECK:   }]
-// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK: }, section "__DATA, {{.*}}", align 8
 // CHECK: @_INSTANCE_METHODS__TtC12objc_methods16ObjcDestructible = internal constant { {{.*}}] } {
 // CHECK:   i32 24,
 // CHECK:   i32 2,
@@ -88,7 +88,7 @@ class ObjcDestructible: NSObject {
 // CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[NO_ARGS_SIGNATURE]], i64 0, i64 0),
 // CHECK:     i8* bitcast (void (%6*, i8*)* @"$s12objc_methods16ObjcDestructibleCfETo" to i8*) }]
 // CHECK:   }]
-// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK: }, section "__DATA, {{.*}}", align 8
 // CHECK: [[BLOCK_SIGNATURE_EXT_1:@.*]] = private unnamed_addr constant [18 x i8] c"v24@0:8@?<q@?q>16\00"
 // CHECK: [[BLOCK_SIGNATURE_EXT_2:@.*]] = private unnamed_addr constant [19 x i8] c"v24@0:8@?<q@?qq>16\00"
 // CHECK: [[STRING_SIGNATURE_EXT:@.*]] = private unnamed_addr constant [31 x i8] c"@\22NSString\2224@0:8@\22NSString\2216\00"

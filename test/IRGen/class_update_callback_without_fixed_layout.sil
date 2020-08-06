@@ -63,7 +63,7 @@ sil_vtable SubclassOfClassWithResilientField {}
 // -- the update callback
 // CHECK-NEW-SAME: @"$s42class_update_callback_without_fixed_layout23ClassWithResilientFieldCMU{{(\.ptrauth)?}}"
 
-// CHECK-SAME: }, section "__DATA, __objc_const"
+// CHECK-SAME: }, section "__DATA, {{.*}}"
 
 // Class has static metadata:
 // CHECK-LABEL: @"$s42class_update_callback_without_fixed_layout23ClassWithResilientFieldCMf"

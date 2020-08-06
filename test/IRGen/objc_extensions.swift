@@ -27,7 +27,7 @@ import objc_extension_base
 // CHECK-SAME:   @"_CATEGORY_CLASS_METHODS_Gizmo_$_objc_extensions",
 // CHECK-SAME:   @"_CATEGORY_PROTOCOLS_Gizmo_$_objc_extensions",
 // CHECK-SAME:   i8* null
-// CHECK-SAME: }, section "__DATA, __objc_const", align 8
+// CHECK-SAME: }, section "__DATA, {{.*}}", align 8
 
 @objc protocol NewProtocol {
   func brandNewInstanceMethod()
@@ -67,7 +67,7 @@ extension Gizmo: NewProtocol {
 // CHECK:   {{.*}} @"_CATEGORY_CLASS_METHODS_Gizmo_$_objc_extensions1",
 // CHECK:   i8* null,
 // CHECK:   i8* null
-// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK: }, section "__DATA, {{.*}}", align 8
 
 extension Gizmo {
   @objc func brandSpankingNewInstanceMethod() {
@@ -92,7 +92,7 @@ class Hoozit : NSObject {
 // CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[STR:@.*]], i64 0, i64 0),
 // CHECK:     i8* bitcast (void ([[OPAQUE:%.*]]*, i8*)* @"$s15objc_extensions6HoozitC7blibbleyyFTo" to i8*)
 // CHECK:   }]
-// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK: }, section "__DATA, {{.*}}", align 8
 
 // CHECK-LABEL: @"_CATEGORY_CLASS_METHODS__TtC15objc_extensions6Hoozit_$_objc_extensions" = internal constant
 // CHECK:   i32 24,
@@ -102,7 +102,7 @@ class Hoozit : NSObject {
 // CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[STR]], i64 0, i64 0),
 // CHECK:     i8* bitcast (void (i8*, i8*)* @"$s15objc_extensions6HoozitC7blobbleyyFZTo" to i8*)
 // CHECK:   }]
-// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK: }, section "__DATA, {{.*}}", align 8
 
 // CHECK-LABEL: @"_CATEGORY__TtC15objc_extensions6Hoozit_$_objc_extensions" = internal constant
 // CHECK:   i8* getelementptr inbounds ([16 x i8], [16 x i8]* [[CATEGORY_NAME]], i64 0, i64 0),
@@ -111,7 +111,7 @@ class Hoozit : NSObject {
 // CHECK:   {{.*}} @"_CATEGORY_CLASS_METHODS__TtC15objc_extensions6Hoozit_$_objc_extensions",
 // CHECK:   i8* null,
 // CHECK:   i8* null
-// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK: }, section "__DATA, {{.*}}", align 8
 
 extension Hoozit {
   @objc func blibble() { }
@@ -127,7 +127,7 @@ class SwiftOnly { }
 // CHECK:     i8* getelementptr inbounds ([7 x i8], [7 x i8]* @"\01L_selector_data(wibble)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[STR]], i64 0, i64 0),
 // CHECK:     i8* bitcast (void (i8*, i8*)* @"$s15objc_extensions9SwiftOnlyC6wibbleyyFTo" to i8*)
-// CHECK:   }] }, section "__DATA, __objc_const", align 8
+// CHECK:   }] }, section "__DATA, {{.*}}", align 8
 extension SwiftOnly {
   @objc func wibble() { }
 }
@@ -157,7 +157,7 @@ extension NSObject {
 // CHECK-SAME:   i8* getelementptr inbounds ([16 x i8], [16 x i8]* [[CATEGORY_NAME]], i64 0, i64 0),
 // CHECK-SAME:   @"_CATEGORY_INSTANCE_METHODS__TtCC15objc_extensions5Outer5Inner_$_objc_extensions",
 // CHECK-SAME:   i8* null
-// CHECK-SAME: }, section "__DATA, __objc_const", align 8
+// CHECK-SAME: }, section "__DATA, {{.*}}", align 8
 
 class Outer : NSObject {
   class Inner : NSObject {}
@@ -175,7 +175,7 @@ class NSDogcow : NSObject {}
 
 // CHECK: [[NAME:@.*]] = private unnamed_addr constant [5 x i8] c"woof\00"
 // CHECK: [[ATTR:@.*]] = private unnamed_addr constant [7 x i8] c"Tq,N,D\00"
-// CHECK: @"_CATEGORY_PROPERTIES__TtC15objc_extensions8NSDogcow_$_objc_extensions" = internal constant {{.*}} [[NAME]], {{.*}} [[ATTR]], {{.*}}, section "__DATA, __objc_const", align 8
+// CHECK: @"_CATEGORY_PROPERTIES__TtC15objc_extensions8NSDogcow_$_objc_extensions" = internal constant {{.*}} [[NAME]], {{.*}} [[ATTR]], {{.*}}, section "__DATA, {{.*}}", align 8
 extension NSDogcow {
   @NSManaged var woof: Int
 }
