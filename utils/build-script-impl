@@ -2493,6 +2493,10 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [[ "${SKIP_TEST_LLDB}" ]]; then
                     continue
                 fi
+                if [[ $(is_cross_tools_host ${host}) ]]; then
+                    echo "--- Can't execute tests for ${host}, skipping... ---"
+                    continue
+                fi
                 llvm_build_dir=$(build_directory ${host} llvm)
                 lldb_build_dir=$(build_directory ${host} lldb)
                 results_dir="${lldb_build_dir}/test-results"
