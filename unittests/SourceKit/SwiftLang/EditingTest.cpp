@@ -388,13 +388,9 @@ TEST_F(EditTest, AnnotationsAfterOpen) {
   TestConsumer Consumer;
   open(DocName, Contents, Args, Consumer);
   ASSERT_FALSE(waitForDocUpdate()) << "timed out";
-  if (Consumer.DiagStage == SemaDiagStage) {
-    // AST already built, annotations are on Consumer.
-  } else {
-    // Re-query.
-    reset(Consumer);
-    replaceText(DocName, 0, 0, "", Consumer);
-  }
+  ASSERT_EQ(ParseDiagStage, Consumer.DiagStage);
+  reset(Consumer);
+  replaceText(DocName, 0, 0, "", Consumer);
 
   ASSERT_EQ(0u, Consumer.Diags.size());
   checkTokens(Consumer.Annotations, {
@@ -424,13 +420,9 @@ TEST_F(EditTest, AnnotationsAfterEdit) {
   TestConsumer Consumer;
   open(DocName, Contents, Args, Consumer);
   ASSERT_FALSE(waitForDocUpdate()) << "timed out";
-  if (Consumer.DiagStage == SemaDiagStage) {
-    // AST already built, annotations are on Consumer.
-  } else {
-    // Re-query.
-    reset(Consumer);
-    replaceText(DocName, 0, 0, "", Consumer);
-  }
+  ASSERT_EQ(ParseDiagStage, Consumer.DiagStage);
+  reset(Consumer);
+  replaceText(DocName, 0, 0, "", Consumer);
   checkTokens(Consumer.Annotations, {
     "[off=22 len=3 source.lang.swift.ref.struct system]",
   });

@@ -75,10 +75,6 @@ public:
       return;
     }
 
-    // FIXME: This pass should be able to support ownership.
-    if (F->hasOwnership())
-      return;
-
     /// Get CallerAnalysis information handy.
     CA = PM->getAnalysis<CallerAnalysis>();
 
@@ -218,13 +214,6 @@ bool ExistentialSpecializer::canSpecializeCalleeFunction(FullApplySite &Apply) {
 
   /// External function definitions.
   if (!Callee->isDefinition())
-    return false;
-
-  // If the callee has ownership enabled, bail.
-  //
-  // FIXME: We should be able to handle callees that have ownership, but the
-  // pass has not been updated yet.
-  if (Callee->hasOwnership())
     return false;
 
   // Ignore generic functions. Generic functions should be fully specialized

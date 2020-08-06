@@ -337,6 +337,10 @@ bool TypeBase::isObjCExistentialType() {
   return getCanonicalType().isObjCExistentialType();
 }
 
+bool TypeBase::isTypeErasedGenericClassType() {
+  return getCanonicalType().isTypeErasedGenericClassType();
+}
+
 bool CanType::isObjCExistentialTypeImpl(CanType type) {
   if (!type.isExistentialType())
     return false;
@@ -832,6 +836,32 @@ Type TypeBase::replaceCovariantResultType(Type newResultType,
   return FunctionType::get(inputType, resultType, fnType->getExtInfo());
 }
 
+/// Whether this parameter accepts an unlabeled trailing closure argument
+/// using the more-restrictive forward-scan rule.
+static bool allowsUnlabeledTrailingClosureParameter(const ParamDecl *param) {
+  // inout parameters never allow an unlabeled trailing closure.
+  if (param->isInOut())
+    return false;
+
+  Type paramType = param->isVariadic() ? param->getVarargBaseTy()
+                                       : param->getInterfaceType();
+  paramType = paramType->getRValueType()->lookThroughAllOptionalTypes();
+
+  // For autoclosure parameters, look through the autoclosure result type
+  // to get the actual argument type.
+  if (param->isAutoClosure()) {
+    auto fnType = paramType->getAs<AnyFunctionType>();
+    if (!fnType)
+      return false;
+
+    paramType = fnType->getResult()->lookThroughAllOptionalTypes();
+  }
+
+  // After lookup through all optional types, this parameter allows an
+  // unlabeled trailing closure if it is (structurally) a function type.
+  return paramType->is<AnyFunctionType>();
+}
+
 ParameterListInfo::ParameterListInfo(
     ArrayRef<AnyFunctionType::Param> params,
     const ValueDecl *paramOwner,
@@ -841,7 +871,7 @@ ParameterListInfo::ParameterListInfo(
   // No parameter owner means no parameter list means no default arguments
   // - hand back the zeroed bitvector.
   //
-  // FIXME: We ought to not request default argument info in this case.
+  // FIXME: We ought to not request paramer list info in this case.
   if (!paramOwner)
     return;
 
@@ -869,11 +899,20 @@ ParameterListInfo::ParameterListInfo(
   if (params.size() != paramList->size())
     return;
 
-  // Note which parameters have default arguments and/or function builders.
+  // Now we have enough information to determine which parameters accept
+  // unlabled trailing closures.
+  acceptsUnlabeledTrailingClosures.resize(params.size());
+
+  // Note which parameters have default arguments and/or accept unlabeled
+  // trailing closure arguments with the forward-scan rule.
   for (auto i : range(0, params.size())) {
     auto param = paramList->get(i);
     if (param->isDefaultArgument()) {
       defaultArguments.set(i);
+    }
+
+    if (allowsUnlabeledTrailingClosureParameter(param)) {
+      acceptsUnlabeledTrailingClosures.set(i);
     }
   }
 }
@@ -881,6 +920,12 @@ ParameterListInfo::ParameterListInfo(
 bool ParameterListInfo::hasDefaultArgument(unsigned paramIdx) const {
   return paramIdx < defaultArguments.size() ? defaultArguments[paramIdx]
       : false;
+}
+
+bool ParameterListInfo::acceptsUnlabeledTrailingClosureArgument(
+    unsigned paramIdx) const {
+  return paramIdx >= acceptsUnlabeledTrailingClosures.size() ||
+      acceptsUnlabeledTrailingClosures[paramIdx];
 }
 
 /// Turn a param list into a symbolic and printable representation that does not
@@ -990,8 +1035,8 @@ addMinimumProtocols(Type T, SmallVectorImpl<ProtocolDecl *> &Protocols,
     if (Visited.insert(Proto->getDecl()).second) {
       Stack.push_back(Proto->getDecl());
       for (auto Inherited : Proto->getDecl()->getInheritedProtocols())
-        addMinimumProtocols(Inherited->getDeclaredType(), Protocols, Known,
-                            Visited, Stack, ZappedAny);
+        addMinimumProtocols(Inherited->getDeclaredInterfaceType(),
+                            Protocols, Known, Visited, Stack, ZappedAny);
     }
     return;
   }
@@ -1067,8 +1112,8 @@ void ProtocolType::canonicalizeProtocols(
     
     // Add the protocols we inherited.
     for (auto Inherited : Current->getInheritedProtocols()) {
-      addMinimumProtocols(Inherited->getDeclaredType(), protocols, known,
-                          visited, stack, zappedAny);
+      addMinimumProtocols(Inherited->getDeclaredInterfaceType(),
+                          protocols, known, visited, stack, zappedAny);
     }
   }
   
@@ -1202,9 +1247,7 @@ CanType TypeBase::computeCanonicalType() {
     getCanonicalParams(funcTy, genericSig, canParams);
     auto resultTy = funcTy->getResult()->getCanonicalType(genericSig);
 
-    bool useClangFunctionType =
-      resultTy->getASTContext().LangOpts.UseClangFunctionTypes;
-    auto extInfo = funcTy->getCanonicalExtInfo(useClangFunctionType);
+    auto extInfo = funcTy->getCanonicalExtInfo(useClangTypes(resultTy));
     if (genericSig) {
       Result = GenericFunctionType::get(genericSig, canParams, resultTy,
                                         extInfo);
@@ -1742,7 +1785,7 @@ public:
   CanType visitFunctionType(FunctionType *func, CanType subst,
                             ArchetypeType*, ArrayRef<ProtocolConformanceRef>) {
     if (auto substFunc = dyn_cast<FunctionType>(subst)) {
-      if (func->getExtInfo() != substFunc->getExtInfo())
+      if (!func->hasSameExtInfoAs(substFunc))
         return CanType();
       
       if (func->getParams().size() != substFunc->getParams().size())
@@ -1781,7 +1824,7 @@ public:
   CanType visitSILFunctionType(SILFunctionType *func, CanType subst,
                              ArchetypeType*, ArrayRef<ProtocolConformanceRef>) {
     if (auto substFunc = dyn_cast<SILFunctionType>(subst)) {
-      if (func->getExtInfo() != substFunc->getExtInfo())
+      if (!func->hasSameExtInfoAs(substFunc))
         return CanType();
 
       if (func->getInvocationGenericSignature()
@@ -2225,8 +2268,9 @@ getForeignRepresentable(Type type, ForeignLanguage language,
 
   // Function types.
   if (auto functionType = type->getAs<FunctionType>()) {
-    // Cannot handle throwing functions.
-    if (functionType->getExtInfo().throws())
+    // Cannot handle async or throwing functions.
+    if (functionType->getExtInfo().isAsync() ||
+        functionType->getExtInfo().isThrowing())
       return failure();
 
     // Whether we have found any types that are bridged.
@@ -2349,7 +2393,8 @@ getForeignRepresentable(Type type, ForeignLanguage language,
         if (wasOptional) {
           if (nominal->hasClangNode()) {
             Type underlyingType =
-                nominal->getDeclaredType()->getSwiftNewtypeUnderlyingType();
+                nominal->getDeclaredInterfaceType()
+                       ->getSwiftNewtypeUnderlyingType();
             if (underlyingType) {
               return getForeignRepresentable(OptionalType::get(underlyingType),
                                              language, dc);
@@ -2562,7 +2607,7 @@ static bool matchesFunctionType(CanAnyFunctionType fn1, CanAnyFunctionType fn2,
   auto ext1 = fn1->getExtInfo();
   auto ext2 = fn2->getExtInfo();
   if (matchMode.contains(TypeMatchFlags::AllowOverride)) {
-    if (ext2.throws()) {
+    if (ext2.isThrowing()) {
       ext1 = ext1.withThrows(true);
     }
   }
@@ -2576,7 +2621,7 @@ static bool matchesFunctionType(CanAnyFunctionType fn1, CanAnyFunctionType fn2,
     if (!ext2.isNoEscape())
       ext1 = ext1.withNoEscape(false);
   }
-  if (ext1 != ext2)
+  if (!ext1.isEqualTo(ext2, useClangTypes(fn1)))
     return false;
 
   return paramsAndResultMatch();
@@ -2799,7 +2844,7 @@ Type ArchetypeType::getExistentialType() const {
     constraintTypes.push_back(super);
   }
   for (auto proto : getConformsTo()) {
-    constraintTypes.push_back(proto->getDeclaredType());
+    constraintTypes.push_back(proto->getDeclaredInterfaceType());
   }
   return ProtocolCompositionType::get(
      const_cast<ArchetypeType*>(this)->getASTContext(), constraintTypes, false);
@@ -3351,7 +3396,7 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   // If one protocol remains with no further constraints, its nominal
   // type is the canonical type.
   if (Protocols.size() == 1 && !Superclass && !HasExplicitAnyObject)
-    return Protocols.front()->getDeclaredType();
+    return Protocols.front()->getDeclaredInterfaceType();
 
   // Form the set of canonical protocol types from the protocol
   // declarations, and use that to build the canonical composition type.
@@ -3361,7 +3406,7 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   std::transform(Protocols.begin(), Protocols.end(),
                  std::back_inserter(CanTypes),
                  [](ProtocolDecl *Proto) {
-                   return Proto->getDeclaredType();
+                   return Proto->getDeclaredInterfaceType();
                  });
 
   // TODO: Canonicalize away HasExplicitAnyObject if it is implied
@@ -3369,47 +3414,33 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   return build(C, CanTypes, HasExplicitAnyObject);
 }
 
-void AnyFunctionType::ExtInfo::ClangTypeInfo::printType(
-    ClangModuleLoader *cml, llvm::raw_ostream &os) const {
-  cml->printClangType(type, os);
-}
-
-void
-AnyFunctionType::ExtInfo::assertIsFunctionType(const clang::Type *type) {
-#ifndef NDEBUG
-  if (!(type->isFunctionPointerType() || type->isBlockPointerType() ||
-        type->isFunctionReferenceType())) {
-    SmallString<256> buf;
-    llvm::raw_svector_ostream os(buf);
-    os << "Expected a Clang function type wrapped in a pointer type or "
-       << "a block pointer type but found:\n";
-    type->dump(os);
-    llvm_unreachable(os.str().data());
-  }
-#endif
-  return;
-}
-
-const clang::Type *AnyFunctionType::getClangFunctionType() const {
+ClangTypeInfo AnyFunctionType::getClangTypeInfo() const {
   switch (getKind()) {
   case TypeKind::Function:
-    return cast<FunctionType>(this)->getClangFunctionType();
+    return cast<FunctionType>(this)->getClangTypeInfo();
   case TypeKind::GenericFunction:
     // Generic functions do not have C types.
-    return nullptr;
+    return ClangTypeInfo();
   default:
     llvm_unreachable("Illegal type kind for AnyFunctionType.");
   }
 }
 
-const clang::Type *AnyFunctionType::getCanonicalClangFunctionType() const {
-  auto *ty = getClangFunctionType();
-  return ty ? ty->getCanonicalTypeInternal().getTypePtr() : nullptr;
+ClangTypeInfo AnyFunctionType::getCanonicalClangTypeInfo() const {
+  return getClangTypeInfo().getCanonical();
+}
+
+bool AnyFunctionType::hasSameExtInfoAs(const AnyFunctionType *otherFn) {
+  return getExtInfo().isEqualTo(otherFn->getExtInfo(), useClangTypes(this));
 }
 
 // [TODO: Store-SIL-Clang-type]
-const clang::FunctionType *SILFunctionType::getClangFunctionType() const {
-  return nullptr;
+ClangTypeInfo SILFunctionType::getClangTypeInfo() const {
+  return ClangTypeInfo();
+}
+
+bool SILFunctionType::hasSameExtInfoAs(const SILFunctionType *otherFn) {
+  return getExtInfo().isEqualTo(otherFn->getExtInfo(), useClangTypes(this));
 }
 
 FunctionType *
@@ -4271,7 +4302,14 @@ case TypeKind::Id:
   case TypeKind::SILFunction: {
     auto fnTy = cast<SILFunctionType>(base);
     bool changed = false;
-
+    auto hasTypeErasedGenericClassType = [](Type ty) -> bool {
+      return ty.findIf([](Type subType) -> bool {
+        if (subType->isTypeErasedGenericClassType())
+          return true;
+        else
+          return false;
+      });
+    };
     auto updateSubs = [&](SubstitutionMap &subs) -> bool {
       // This interface isn't suitable for updating the substitution map in a
       // substituted SILFunctionType.
@@ -4281,9 +4319,8 @@ case TypeKind::Id:
         auto transformed = type.transformRec(fn);
         assert((type->isEqual(transformed) ||
                 (type->hasTypeParameter() && transformed->hasTypeParameter()) ||
-                (type->getCanonicalType().isTypeErasedGenericClassType() &&
-                 transformed->getCanonicalType()
-                     .isTypeErasedGenericClassType())) &&
+                (hasTypeErasedGenericClassType(type) &&
+                 hasTypeErasedGenericClassType(transformed))) &&
                "Substituted SILFunctionType can't be transformed into a "
                "concrete type");
         newReplacements.push_back(transformed->getCanonicalType());
@@ -5057,8 +5094,11 @@ AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {
                    param.getParameterFlags().withNoDerivative(false));
     newParams.push_back(newParam);
   }
-  auto nonDiffExtInfo = getExtInfo()
-      .withDifferentiabilityKind(DifferentiabilityKind::NonDifferentiable);
+  auto nonDiffExtInfo =
+      getExtInfo()
+          .intoBuilder()
+          .withDifferentiabilityKind(DifferentiabilityKind::NonDifferentiable)
+          .build();
   if (isa<FunctionType>(this))
     return FunctionType::get(newParams, getResult(), nonDiffExtInfo);
   assert(isa<GenericFunctionType>(this));

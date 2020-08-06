@@ -95,8 +95,8 @@ private:
   CanType ResultType;
 
   ForeignErrorConvention(Kind kind, unsigned parameterIndex, IsOwned_t isOwned,
-                         IsReplaced_t isReplaced, Type parameterType,
-                         Type resultType = Type())
+                         IsReplaced_t isReplaced, CanType parameterType,
+                         CanType resultType = CanType())
       : info(kind, parameterIndex, isOwned, isReplaced),
         ErrorParameterType(parameterType), ResultType(resultType) {}
 

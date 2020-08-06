@@ -45,6 +45,7 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -2276,7 +2277,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
     auto sig = AFD->getGenericSignature();
     bool hasSelf = AFD->hasImplicitSelfDecl();
 
-    AnyFunctionType::ExtInfo info;
+    AnyFunctionType::ExtInfoBuilder infoBuilder;
 
     // Result
     Type resultTy;
@@ -2296,11 +2297,13 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       SmallVector<AnyFunctionType::Param, 4> argTy;
       AFD->getParameters()->getParams(argTy);
 
+      infoBuilder = infoBuilder.withAsync(AFD->hasAsync());
       // 'throws' only applies to the innermost function.
-      info = info.withThrows(AFD->hasThrows());
+      infoBuilder = infoBuilder.withThrows(AFD->hasThrows());
       // Defer bodies must not escape.
       if (auto fd = dyn_cast<FuncDecl>(D))
-        info = info.withNoEscape(fd->isDeferBody());
+        infoBuilder = infoBuilder.withNoEscape(fd->isDeferBody());
+      auto info = infoBuilder.build();
 
       if (sig && !hasSelf) {
         funcTy = GenericFunctionType::get(sig, argTy, resultTy, info);
@@ -2402,12 +2405,14 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
   }
 
   if (!namingPattern) {
-    // Try type checking parent conditional statement.
+    // Try type checking parent control statement.
     if (auto parentStmt = VD->getParentPatternStmt()) {
-      if (auto LCS = dyn_cast<LabeledConditionalStmt>(parentStmt)) {
-        TypeChecker::typeCheckConditionForStatement(LCS, VD->getDeclContext());
-        namingPattern = VD->NamingPattern;
-      }
+      if (auto CS = dyn_cast<CaseStmt>(parentStmt))
+        parentStmt = CS->getParentStmt();
+      ASTNode node(parentStmt);
+      TypeChecker::typeCheckASTNode(node, VD->getDeclContext(),
+                                    /*LeaveBodyUnchecked=*/true);
+      namingPattern = VD->getCanonicalVarDecl()->NamingPattern;
     }
   }
 

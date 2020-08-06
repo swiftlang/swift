@@ -249,7 +249,8 @@ void OptRemarkGeneratorInstructionVisitor::visitStrongRetainInst(
     // Retains begin a lifetime scope so we infer scan forward.
     auto remark = RemarkMissed("memory", *sri,
                                SourceLocInferenceBehavior::ForwardScanOnly)
-                  << "retain";
+                  << "retain of type '"
+                  << NV("ValueType", sri->getOperand()->getType()) << "'";
     for (auto arg : inferredArgs) {
       remark << arg;
     }
@@ -269,7 +270,8 @@ void OptRemarkGeneratorInstructionVisitor::visitStrongReleaseInst(
 
     auto remark = RemarkMissed("memory", *sri,
                                SourceLocInferenceBehavior::BackwardScanOnly)
-                  << "release";
+                  << "release of type '"
+                  << NV("ValueType", sri->getOperand()->getType()) << "'";
     for (auto arg : inferredArgs) {
       remark << arg;
     }
@@ -288,7 +290,8 @@ void OptRemarkGeneratorInstructionVisitor::visitRetainValueInst(
     // Retains begin a lifetime scope, so we infer scan forwards.
     auto remark = RemarkMissed("memory", *rvi,
                                SourceLocInferenceBehavior::ForwardScanOnly)
-                  << "retain";
+                  << "retain of type '"
+                  << NV("ValueType", rvi->getOperand()->getType()) << "'";
     for (auto arg : inferredArgs) {
       remark << arg;
     }
@@ -308,7 +311,8 @@ void OptRemarkGeneratorInstructionVisitor::visitReleaseValueInst(
     // Releases end a lifetime scope so we infer scan backward.
     auto remark = RemarkMissed("memory", *rvi,
                                SourceLocInferenceBehavior::BackwardScanOnly)
-                  << "release";
+                  << "release of type '"
+                  << NV("ValueType", rvi->getOperand()->getType()) << "'";
     for (auto arg : inferredArgs) {
       remark << arg;
     }

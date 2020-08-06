@@ -866,6 +866,7 @@ public:
   VISIT_AND_CREATE(IfStmt, IfStmtScope)
   VISIT_AND_CREATE(WhileStmt, WhileStmtScope)
   VISIT_AND_CREATE(RepeatWhileStmt, RepeatWhileScope)
+  VISIT_AND_CREATE(DoStmt, DoStmtScope)
   VISIT_AND_CREATE(DoCatchStmt, DoCatchStmtScope)
   VISIT_AND_CREATE(SwitchStmt, SwitchStmtScope)
   VISIT_AND_CREATE(ForEachStmt, ForEachStmtScope)
@@ -907,11 +908,6 @@ public:
   NullablePtr<ASTScopeImpl> visitGuardStmt(GuardStmt *e, ASTScopeImpl *p,
                                            ScopeCreator &scopeCreator) {
     return scopeCreator.ifUniqueConstructExpandAndInsert<GuardStmtScope>(p, e);
-  }
-  NullablePtr<ASTScopeImpl> visitDoStmt(DoStmt *ds, ASTScopeImpl *p,
-                                        ScopeCreator &scopeCreator) {
-    scopeCreator.addToScopeTreeAndReturnInsertionPoint(ds->getBody(), p);
-    return p; // Don't put subsequent decls inside the "do"
   }
   NullablePtr<ASTScopeImpl> visitTopLevelCodeDecl(TopLevelCodeDecl *d,
                                                   ASTScopeImpl *p,
@@ -1204,6 +1200,7 @@ NO_NEW_INSERTION_POINT(CaptureListScope)
 NO_NEW_INSERTION_POINT(CaseStmtScope)
 NO_NEW_INSERTION_POINT(ClosureBodyScope)
 NO_NEW_INSERTION_POINT(DefaultArgumentInitializerScope)
+NO_NEW_INSERTION_POINT(DoStmtScope)
 NO_NEW_INSERTION_POINT(DoCatchStmtScope)
 NO_NEW_INSERTION_POINT(ForEachPatternScope)
 NO_NEW_INSERTION_POINT(ForEachStmtScope)
@@ -1470,6 +1467,11 @@ void RepeatWhileScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
   scopeCreator.addToScopeTree(stmt->getCond(), this);
 }
 
+void DoStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
+    ScopeCreator &scopeCreator) {
+  scopeCreator.addToScopeTree(stmt->getBody(), this);
+}
+
 void DoCatchStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   scopeCreator.addToScopeTree(stmt->getBody(), this);
@@ -1599,9 +1601,13 @@ ASTScopeImpl *GenericTypeOrExtensionWholePortion::expandScope(
   if (scope->shouldHaveABody() && !scope->doesDeclHaveABody())
     return ip;
 
+  auto *context = scope->getGenericContext();
+  auto *genericParams = (isa<TypeAliasDecl>(context)
+                         ? context->getParsedGenericParams()
+                         : context->getGenericParams());
   auto *deepestScope = scopeCreator.addNestedGenericParamScopesToTree(
-      scope->getDecl(), scope->getGenericContext()->getGenericParams(), scope);
-  if (scope->getGenericContext()->getTrailingWhereClause())
+      scope->getDecl(), genericParams, scope);
+  if (context->getTrailingWhereClause())
     scope->createTrailingWhereClauseScope(deepestScope, scopeCreator);
   scope->createBodyScope(deepestScope, scopeCreator);
   return ip;
@@ -1777,7 +1783,6 @@ void ScopeCreator::forEachClosureIn(
       return {false, P};
     }
     bool walkToDeclPre(Decl *D) override { return false; }
-    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
     bool walkToTypeReprPre(TypeRepr *T) override { return false; }
     bool walkToParameterListPre(ParameterList *PL) override { return false; }
   };

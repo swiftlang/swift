@@ -1351,9 +1351,23 @@ public:
                                       DeclName &fullName,
                                       ParameterList *&bodyParams,
                                       DefaultArgumentInfo &defaultArgs,
+                                      SourceLoc &asyncLoc,
                                       SourceLoc &throws,
                                       bool &rethrows,
                                       TypeRepr *&retType);
+
+  /// Parse 'async' and 'throws', if present, putting the locations of the
+  /// keywords into the \c SourceLoc parameters.
+  ///
+  /// \param existingArrowLoc The location of an existing '->', if there is
+  /// one. Parsing 'async' or 'throws' after the `->` is an error we
+  /// correct for.
+  ///
+  /// \param rethrows If non-NULL, will also parse the 'rethrows' keyword in
+  /// lieu of 'throws'.
+  void parseAsyncThrows(
+      SourceLoc existingArrowLoc, SourceLoc &asyncLoc, SourceLoc &throwsLoc,
+      bool *rethrows);
 
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
@@ -1650,9 +1664,7 @@ public:
   diagnoseWhereClauseInGenericParamList(const GenericParamList *GenericParams);
 
   ParserStatus
-  parseFreestandingGenericWhereClause(GenericContext *genCtx,
-                                      GenericParamList *&GPList,
-                                      ParseDeclOptions flags);
+  parseFreestandingGenericWhereClause(GenericContext *genCtx);
 
   ParserStatus parseGenericWhereClause(
       SourceLoc &WhereLoc, SmallVectorImpl<RequirementRepr> &Requirements,

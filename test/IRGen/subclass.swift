@@ -10,7 +10,7 @@
 // CHECK-DAG: [[INT:%TSi]] = type <{ i64 }>
 // CHECK-DAG: [[B:%T8subclass1BC]] = type <{ [[REF]], [[INT]], [[INT]], [[INT]] }>
 
-// CHECK: @_DATA__TtC8subclass1A = private constant {{.* } }}{
+// CHECK: @_DATA__TtC8subclass1A = internal constant {{.* } }}{
 // CHECK: @"$s8subclass1ACMf" = internal global [[A_METADATA:<{.* }>]] <{
 // CHECK-SAME:   void ([[A]]*)* @"$s8subclass1ACfD",
 // CHECK-DIRECT-SAME:   i8** @"$sBoWV",
@@ -24,7 +24,7 @@
 // CHECK-SAME:   i64 ([[A]]*)* @"$s8subclass1AC1fSiyF",
 // CHECK-SAME:   [[A]]* ([[TYPE]]*)* @"$s8subclass1AC1gACyFZ"
 // CHECK-SAME: }>
-// CHECK: @_DATA__TtC8subclass1B = private constant {{.* } }}{
+// CHECK: @_DATA__TtC8subclass1B = internal constant {{.* } }}{
 // CHECK: @"$s8subclass1BCMf" = internal global <{ {{.*}} }> <{
 // CHECK-SAME:   void ([[B]]*)* @"$s8subclass1BCfD",
 // CHECK-DIRECT-SAME:   i8** @"$sBoWV",

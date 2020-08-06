@@ -156,6 +156,13 @@ module WinSDK [system] {
     link "DbgHelp.Lib"
   }
 
+  module DWM {
+    header "dwmapi.h"
+    export *
+
+    link "dwmapi.lib"
+  }
+
   module FCI {
     header "fci.h"
     export *

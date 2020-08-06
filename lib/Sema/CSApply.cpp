@@ -979,7 +979,7 @@ namespace {
       Expr *closureBody = closureCall;
       closureBody = coerceToType(closureCall, resultTy, locator);
 
-      if (selfFnTy->getExtInfo().throws()) {
+      if (selfFnTy->getExtInfo().isThrowing()) {
         closureBody = new (context) TryExpr(closureBody->getStartLoc(), closureBody,
                                             cs.getType(closureBody),
                                             /*implicit=*/true);
@@ -1529,8 +1529,6 @@ namespace {
     /// \param callee The callee for the function being applied.
     /// \param apply The ApplyExpr that forms the call.
     /// \param argLabels The argument labels provided for the call.
-    /// \param hasTrailingClosure Whether the last argument is a trailing
-    /// closure.
     /// \param locator Locator used to describe where in this expression we are.
     ///
     /// \returns the coerced expression, which will have type \c ToType.
@@ -1538,7 +1536,6 @@ namespace {
     coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
                         ConcreteDeclRef callee, ApplyExpr *apply,
                         ArrayRef<Identifier> argLabels,
-                        bool hasTrailingClosure,
                         ConstraintLocatorBuilder locator);
 
     /// Coerce the given object argument (e.g., for the base of a
@@ -1749,7 +1746,7 @@ namespace {
       auto fullSubscriptTy = openedFullFnType->getResult()
                                   ->castTo<FunctionType>();
       index = coerceCallArguments(index, fullSubscriptTy, subscriptRef, nullptr,
-                                  argLabels, hasTrailingClosure,
+                                  argLabels,
                                   locator.withPathElement(
                                     ConstraintLocator::ApplyArgument));
       if (!index)
@@ -2573,7 +2570,6 @@ namespace {
       auto newArg = coerceCallArguments(
           expr->getArg(), fnType, witness,
           /*applyExpr=*/nullptr, expr->getArgumentLabels(),
-          expr->hasTrailingClosure(),
           cs.getConstraintLocator(expr, ConstraintLocator::ApplyArgument));
 
       expr->setInitializer(witness);
@@ -3598,7 +3594,10 @@ namespace {
           ctx.Diags.diagnose(SourceLoc(), diag::broken_bool);
         }
 
-        cs.setType(isSomeExpr, boolDecl ? boolDecl->getDeclaredType() : Type());
+        cs.setType(isSomeExpr,
+                   boolDecl
+                   ? boolDecl->getDeclaredInterfaceType()
+                   : Type());
         return isSomeExpr;
       }
 
@@ -4143,6 +4142,10 @@ namespace {
       // If we end up here, we should have diagnosed somewhere else
       // already.
       Expr *simplified = simplifyExprType(expr);
+      // Invalidate 'VarDecl's inside the pattern.
+      expr->getSubPattern()->forEachVariable([](VarDecl *VD) {
+        VD->setInvalid();
+      });
       if (!SuppressDiagnostics
           && !cs.getType(simplified)->is<UnresolvedType>()) {
         auto &de = cs.getASTContext().Diags;
@@ -4936,7 +4939,7 @@ namespace {
       auto *newIndexExpr =
           coerceCallArguments(indexExpr, subscriptType, ref,
                               /*applyExpr*/ nullptr, labels,
-                              /*hasTrailingClosure*/ false, locator);
+                              locator);
 
       // We need to be able to hash the captured index values in order for
       // KeyPath itself to be hashable, so check that all of the subscript
@@ -5469,12 +5472,130 @@ static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
   return false;
 }
 
-Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
-                                        ConcreteDeclRef callee,
-                                        ApplyExpr *apply,
-                                        ArrayRef<Identifier> argLabels,
-                                        bool hasTrailingClosure,
-                                        ConstraintLocatorBuilder locator) {
+/// Attach a Fix-It to the given diagnostic to give the trailing closure
+/// argument a label.
+static void labelTrailingClosureArgument(
+    ASTContext &ctx, Expr *fn, Expr *arg, Identifier paramName,
+    Expr *trailingClosure, InFlightDiagnostic &diag) {
+  // Dig out source locations.
+  SourceLoc existingRParenLoc;
+  SourceLoc leadingCommaLoc;
+  if (auto tupleExpr = dyn_cast<TupleExpr>(arg)) {
+    existingRParenLoc = tupleExpr->getRParenLoc();
+    assert(tupleExpr->getNumElements() >= 2 && "Should be a ParenExpr?");
+    leadingCommaLoc = Lexer::getLocForEndOfToken(
+        ctx.SourceMgr,
+        tupleExpr->getElements()[tupleExpr->getNumElements()-2]->getEndLoc());
+  } else {
+    auto parenExpr = cast<ParenExpr>(arg);
+    existingRParenLoc = parenExpr->getRParenLoc();
+  }
+
+  // Figure out the text to be inserted before the trailing closure.
+  SmallString<16> insertionText;
+  SourceLoc insertionLoc;
+  if (leadingCommaLoc.isValid()) {
+    insertionText += ", ";
+    assert(existingRParenLoc.isValid());
+    insertionLoc = leadingCommaLoc;
+  } else if (existingRParenLoc.isInvalid()) {
+    insertionText += "(";
+    insertionLoc = Lexer::getLocForEndOfToken(
+        ctx.SourceMgr, fn->getEndLoc());
+  } else {
+    insertionLoc = existingRParenLoc;
+  }
+
+  // Add the label, if there is one.
+  if (!paramName.empty()) {
+    insertionText += paramName.str();
+    insertionText += ": ";
+  }
+
+  // If there is an existing right parentheses, remove it while we
+  // insert the new text.
+  if (existingRParenLoc.isValid()) {
+    SourceLoc afterExistingRParenLoc = Lexer::getLocForEndOfToken(
+        ctx.SourceMgr, existingRParenLoc);
+    diag.fixItReplaceChars(
+        insertionLoc, afterExistingRParenLoc, insertionText);
+  } else {
+    // Insert the appropriate prefix.
+    diag.fixItInsert(insertionLoc, insertionText);
+  }
+
+  // Insert a right parenthesis after the closing '}' of the trailing closure;
+  SourceLoc newRParenLoc = Lexer::getLocForEndOfToken(
+      ctx.SourceMgr, trailingClosure->getEndLoc());
+  diag.fixItInsert(newRParenLoc, ")");
+}
+
+/// Find the trailing closure argument of a tuple or parenthesized expression.
+///
+/// Due to a quirk of the backward scan that could allow reordering of
+/// arguments in the presence of a trailing closure, it might not be the last
+/// argument in the tuple.
+static Expr *findTrailingClosureArgument(Expr *arg) {
+  if (auto parenExpr = dyn_cast<ParenExpr>(arg)) {
+    return parenExpr->getSubExpr();
+  }
+
+  auto tupleExpr = cast<TupleExpr>(arg);
+  SourceLoc endLoc = tupleExpr->getEndLoc();
+  for (Expr *elt : llvm::reverse(tupleExpr->getElements())) {
+    if (elt->getEndLoc() == endLoc)
+      return elt;
+  }
+
+  return tupleExpr->getElements().back();
+}
+
+/// Find the index of the parameter that binds the given argument.
+static unsigned findParamBindingArgument(
+    ArrayRef<ParamBinding> parameterBindings, unsigned argIndex) {
+  for (unsigned paramIdx : indices(parameterBindings)) {
+    if (llvm::find(parameterBindings[paramIdx], argIndex)
+          != parameterBindings[paramIdx].end())
+      return paramIdx;
+  }
+
+  llvm_unreachable("No parameter binds the argument?");
+}
+
+/// Warn about the use of the deprecated "backward" scan for matching the
+/// unlabeled trailing closure. It was needed to properly type check, but
+/// this code will break with a future version of Swift.
+static void warnAboutTrailingClosureBackwardScan(
+    ConcreteDeclRef callee, Expr *fn, Expr *arg,
+    ArrayRef<AnyFunctionType::Param> params,
+    Optional<unsigned> unlabeledTrailingClosureIndex,
+    ArrayRef<ParamBinding> parameterBindings) {
+
+  Expr *trailingClosure = findTrailingClosureArgument(arg);
+  unsigned paramIdx = findParamBindingArgument(
+      parameterBindings, *unlabeledTrailingClosureIndex);
+  ASTContext &ctx = params[paramIdx].getPlainType()->getASTContext();
+  Identifier paramName = params[paramIdx].getLabel();
+
+  {
+    auto diag = ctx.Diags.diagnose(
+        trailingClosure->getStartLoc(),
+        diag::unlabeled_trailing_closure_deprecated, paramName);
+    labelTrailingClosureArgument(
+        ctx, fn, arg, paramName, trailingClosure, diag);
+  }
+
+  if (auto decl = callee.getDecl()) {
+    ctx.Diags.diagnose(decl, diag::decl_declared_here, decl->getName());
+  }
+}
+
+Expr *ExprRewriter::coerceCallArguments(
+    Expr *arg, AnyFunctionType *funcType,
+    ConcreteDeclRef callee,
+    ApplyExpr *apply,
+    ArrayRef<Identifier> argLabels,
+    ConstraintLocatorBuilder locator) {
   auto &ctx = getConstraintSystem().getASTContext();
   auto params = funcType->getParams();
 
@@ -5526,22 +5647,46 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
   AnyFunctionType::relabelParams(args, argLabels);
 
   MatchCallArgumentListener listener;
-  SmallVector<ParamBinding, 4> parameterBindings;
-  bool failed = constraints::matchCallArguments(args, params,
-                                                paramInfo,
-                       arg->getUnlabeledTrailingClosureIndexOfPackedArgument(),
-                                                /*allowFixes=*/false, listener,
-                                                parameterBindings);
+  auto unlabeledTrailingClosureIndex =
+      arg->getUnlabeledTrailingClosureIndexOfPackedArgument();
 
-  assert((matchCanFail || !failed) && "Call arguments did not match up?");
-  (void)failed;
+  // Determine the trailing closure matching rule that was applied. This
+  // is only relevant for explicit calls and subscripts.
+  auto trailingClosureMatching = TrailingClosureMatching::Forward;
+  {
+    SmallVector<LocatorPathElt, 4> path;
+    auto anchor = locator.getLocatorParts(path);
+    if (!path.empty() && path.back().is<LocatorPathElt::ApplyArgument>() &&
+        (anchor.isExpr(ExprKind::Call) || anchor.isExpr(ExprKind::Subscript))) {
+      auto locatorPtr = cs.getConstraintLocator(locator);
+      assert(solution.trailingClosureMatchingChoices.count(locatorPtr) == 1);
+      trailingClosureMatching = solution.trailingClosureMatchingChoices.find(
+          locatorPtr)->second;
+    }
+  }
+
+  auto callArgumentMatch = constraints::matchCallArguments(
+      args, params, paramInfo, unlabeledTrailingClosureIndex,
+      /*allowFixes=*/false, listener, trailingClosureMatching);
+
+  assert((matchCanFail || callArgumentMatch) &&
+         "Call arguments did not match up?");
   (void)matchCanFail;
+
+  auto parameterBindings = std::move(callArgumentMatch->parameterBindings);
 
   // We should either have parentheses or a tuple.
   auto *argTuple = dyn_cast<TupleExpr>(arg);
   auto *argParen = dyn_cast<ParenExpr>(arg);
   // FIXME: Eventually, we want to enforce that we have either argTuple or
   // argParen here.
+
+  // Warn about the backward scan being deprecated.
+  if (trailingClosureMatching == TrailingClosureMatching::Backward) {
+    warnAboutTrailingClosureBackwardScan(
+        callee, apply ? apply->getFn() : nullptr, arg, params,
+        unlabeledTrailingClosureIndex, parameterBindings);
+  }
 
   SourceLoc lParenLoc, rParenLoc;
   if (argTuple) {
@@ -5758,7 +5903,7 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
       (params[0].getValueOwnership() == ValueOwnership::Default ||
        params[0].getValueOwnership() == ValueOwnership::InOut)) {
     assert(newArgs.size() == 1);
-    assert(!hasTrailingClosure);
+    assert(!unlabeledTrailingClosureIndex);
     return newArgs[0];
   }
 
@@ -5771,8 +5916,9 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
       argParen->setSubExpr(newArgs[0]);
     } else {
       bool isImplicit = arg->isImplicit();
-      arg = new (ctx)
-          ParenExpr(lParenLoc, newArgs[0], rParenLoc, hasTrailingClosure);
+      arg = new (ctx) ParenExpr(
+          lParenLoc, newArgs[0], rParenLoc,
+          static_cast<bool>(unlabeledTrailingClosureIndex));
       arg->setImplicit(isImplicit);
     }
   } else {
@@ -5786,8 +5932,8 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
       }
     } else {
       // Build a new TupleExpr, re-using source location information.
-      arg = TupleExpr::create(ctx, lParenLoc, newArgs, newLabels, newLabelLocs,
-                              rParenLoc, hasTrailingClosure,
+      arg = TupleExpr::create(ctx, lParenLoc, rParenLoc, newArgs, newLabels,
+                              newLabelLocs, unlabeledTrailingClosureIndex,
                               /*implicit=*/arg->isImplicit());
     }
   }
@@ -6599,7 +6745,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       maybeDiagnoseUnsupportedDifferentiableConversion(cs, expr, toFunc);
       if (!isFromDifferentiable && isToDifferentiable) {
         auto newEI =
-            fromEI.withDifferentiabilityKind(toEI.getDifferentiabilityKind());
+            fromEI.intoBuilder()
+                .withDifferentiabilityKind(toEI.getDifferentiabilityKind())
+                .build();
         fromFunc = FunctionType::get(toFunc->getParams(), fromFunc->getResult())
             ->withExtInfo(newEI)
             ->castTo<FunctionType>();
@@ -7138,9 +7286,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   auto *arg = apply->getArg();
   auto *fn = apply->getFn();
 
-  bool hasTrailingClosure =
-    isa<CallExpr>(apply) && cast<CallExpr>(apply)->hasTrailingClosure();
-
   auto finishApplyOfDeclWithSpecialTypeCheckingSemantics
     = [&](ApplyExpr *apply,
           ConcreteDeclRef declRef,
@@ -7156,7 +7301,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         arg = coerceCallArguments(arg, fnType, declRef,
                                   apply,
                                   apply->getArgumentLabels(argLabelsScratch),
-                                  hasTrailingClosure,
                                   locator.withPathElement(
                                     ConstraintLocator::ApplyArgument));
         if (!arg) {
@@ -7360,7 +7504,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   if (auto fnType = cs.getType(fn)->getAs<FunctionType>()) {
     arg = coerceCallArguments(arg, fnType, callee, apply,
                               apply->getArgumentLabels(argLabelsScratch),
-                              hasTrailingClosure,
                               locator.withPathElement(
                                   ConstraintLocator::ApplyArgument));
     if (!arg) {
@@ -7710,8 +7853,11 @@ namespace {
         return true;
 
       case SolutionApplicationToFunctionResult::Delay: {
-        auto closure = cast<ClosureExpr>(fn.getAbstractClosureExpr());
-        ClosuresToTypeCheck.push_back(closure);
+        if (!Rewriter.cs.Options
+                .contains(ConstraintSystemFlags::LeaveClosureBodyUnchecked)) {
+          auto closure = cast<ClosureExpr>(fn.getAbstractClosureExpr());
+          ClosuresToTypeCheck.push_back(closure);
+        }
         return false;
       }
       }
@@ -7937,7 +8083,7 @@ static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
   if (forEachStmtInfo.whereExpr) {
     auto *boolDecl = dc->getASTContext().getBoolDecl();
     assert(boolDecl);
-    Type boolType = boolDecl->getDeclaredType();
+    Type boolType = boolDecl->getDeclaredInterfaceType();
     assert(boolType);
 
     SolutionApplicationTarget whereTarget(
@@ -8126,7 +8272,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
                                          target.getDeclContext());
     if (auto coercedPattern = TypeChecker::coercePatternToType(
             contextualPattern, patternType, patternOptions)) {
-      (*caseLabelItem)->setPattern(coercedPattern);
+      (*caseLabelItem)->setPattern(coercedPattern, /*resolved=*/true);
     } else {
       return None;
     }
@@ -8138,7 +8284,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
         return None;
 
       // FIXME: Feels like we could leverage existing code more.
-      Type boolType = cs.getASTContext().getBoolDecl()->getDeclaredType();
+      Type boolType = cs.getASTContext().getBoolDecl()->getDeclaredInterfaceType();
       guardExpr = solution.coerceToType(
           guardExpr, boolType, cs.getConstraintLocator(info.guardExpr));
       if (!guardExpr)
@@ -8290,6 +8436,7 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
 
   // Visit closures that have non-single expression bodies.
   bool hadError = false;
+
   for (auto *closure : walker.getClosuresToTypeCheck())
     hadError |= TypeChecker::typeCheckClosureBody(closure);
 
@@ -8447,7 +8594,8 @@ SolutionApplicationTarget SolutionApplicationTarget::walk(ASTWalker &walker) {
   case Kind::caseLabelItem:
     if (auto newPattern =
             caseLabelItem.caseLabelItem->getPattern()->walk(walker)) {
-      caseLabelItem.caseLabelItem->setPattern(newPattern);
+      caseLabelItem.caseLabelItem->setPattern(
+          newPattern, caseLabelItem.caseLabelItem->isPatternResolved());
     }
     if (auto guardExpr = caseLabelItem.caseLabelItem->getGuardExpr()) {
       if (auto newGuardExpr = guardExpr->walk(walker))

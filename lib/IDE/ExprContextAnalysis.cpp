@@ -42,23 +42,35 @@ using namespace ide;
 // typeCheckContextAt(DeclContext, SourceLoc)
 //===----------------------------------------------------------------------===//
 
-namespace {
-void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
-  // Nothing to type check in module context.
-  if (DC->isModuleScopeContext())
-    return;
+void swift::ide::typeCheckContextAt(DeclContext *DC, SourceLoc Loc) {
+  while (isa<AbstractClosureExpr>(DC))
+    DC = DC->getParent();
 
-  typeCheckContextImpl(DC->getParent(), Loc);
+  // Make sure the extension has been bound, in case it is in an inactive #if
+  // or something weird like that.
+  {
+    SmallVector<ExtensionDecl *, 1> extensions;
+    for (auto typeCtx = DC->getInnermostTypeContext(); typeCtx != nullptr;
+         typeCtx = typeCtx->getParent()->getInnermostTypeContext()) {
+      if (auto *ext = dyn_cast<ExtensionDecl>(typeCtx))
+        extensions.push_back(ext);
+    }
+    while (!extensions.empty()) {
+      extensions.back()->computeExtendedNominal();
+      extensions.pop_back();
+    }
+  }
 
   // Type-check this context.
   switch (DC->getContextKind()) {
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::Module:
+  case DeclContextKind::FileUnit:
   case DeclContextKind::SerializedLocal:
-  case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::EnumElementDecl:
   case DeclContextKind::GenericTypeDecl:
   case DeclContextKind::SubscriptDecl:
+  case DeclContextKind::ExtensionDecl:
     // Nothing to do for these.
     break;
 
@@ -76,39 +88,22 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
     }
     break;
 
+  case DeclContextKind::TopLevelCodeDecl:
+    swift::typeCheckASTNodeAtLoc(DC, Loc);
+    break;
+
   case DeclContextKind::AbstractFunctionDecl: {
     auto *AFD = cast<AbstractFunctionDecl>(DC);
     auto &SM = DC->getASTContext().SourceMgr;
     auto bodyRange = AFD->getBodySourceRange();
     if (SM.rangeContainsTokenLoc(bodyRange, Loc)) {
-      swift::typeCheckAbstractFunctionBodyAtLoc(AFD, Loc);
+      swift::typeCheckASTNodeAtLoc(DC, Loc);
     } else {
       assert(bodyRange.isInvalid() && "The body should not be parsed if the "
                                       "completion happens in the signature");
     }
     break;
   }
-
-  case DeclContextKind::ExtensionDecl:
-    // Make sure the extension has been bound, in case it is in an
-    // inactive #if or something weird like that.
-    cast<ExtensionDecl>(DC)->computeExtendedNominal();
-    break;
-
-  case DeclContextKind::FileUnit:
-    llvm_unreachable("module scope context handled above");
-  }
-}
-} // anonymous namespace
-
-void swift::ide::typeCheckContextAt(DeclContext *DC, SourceLoc Loc) {
-  while (isa<AbstractClosureExpr>(DC))
-    DC = DC->getParent();
-
-  if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(DC)) {
-    typeCheckTopLevelCodeDecl(TLCD);
-  } else {
-    typeCheckContextImpl(DC, Loc);
   }
 }
 
@@ -170,7 +165,6 @@ public:
     return {isInterstingRange(S), S};
   }
 
-  bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
   bool walkToTypeReprPre(TypeRepr *T) override { return false; }
 };
 } // anonymous namespace
@@ -300,6 +294,10 @@ void swift::ide::collectPossibleReturnTypesFromContext(
   }
 
   if (auto ACE = dyn_cast<AbstractClosureExpr>(DC)) {
+    // Try type checking the closure signature if it hasn't.
+    if (!ACE->getType())
+      swift::typeCheckASTNodeAtLoc(ACE->getParent(), ACE->getLoc());
+
     // Use the type checked type if it has.
     if (ACE->getType() && !ACE->getType()->hasError() &&
         !ACE->getResultType()->hasUnresolvedType()) {
@@ -314,12 +312,14 @@ void swift::ide::collectPossibleReturnTypesFromContext(
           candidates.push_back(ty);
           return;
         } else {
-          auto typeLoc = TypeLoc{CE->getExplicitResultTypeRepr()};
-          if (!swift::performTypeLocChecking(
-                  DC->getASTContext(), typeLoc, /*isSILMode=*/false,
-                  /*isSILType=*/false, DC->getGenericEnvironmentOfContext(),
-                  const_cast<DeclContext *>(DC), /*diagnostics=*/false)) {
-            candidates.push_back(typeLoc.getType());
+          const auto type = swift::performTypeResolution(
+              CE->getExplicitResultTypeRepr(), DC->getASTContext(),
+              /*isSILMode=*/false, /*isSILType=*/false,
+              DC->getGenericEnvironmentOfContext(),
+              const_cast<DeclContext *>(DC), /*diagnostics=*/false);
+
+          if (!type->hasError()) {
+            candidates.push_back(type);
             return;
           }
         }
@@ -669,11 +669,9 @@ static bool collectPossibleCalleesForUnresolvedMember(
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   auto currModule = DC.getParentModule();
 
-  // Get the context of the expression itself.
-  ExprContextInfo contextInfo(&DC, unresolvedMemberExpr);
-  for (auto expectedTy : contextInfo.getPossibleTypes()) {
+  auto collectMembers = [&](Type expectedTy) {
     if (!expectedTy->mayHaveMembers())
-      continue;
+      return;
     SmallVector<FunctionTypeAndDecl, 2> members;
     collectPossibleCalleesByQualifiedLookup(DC, MetatypeType::get(expectedTy),
                                             unresolvedMemberExpr->getName(),
@@ -682,6 +680,16 @@ static bool collectPossibleCalleesForUnresolvedMember(
       if (isReferenceableByImplicitMemberExpr(currModule, &DC, expectedTy,
                                               member.Decl))
         candidates.push_back(member);
+    }
+  };
+
+  // Get the context of the expression itself.
+  ExprContextInfo contextInfo(&DC, unresolvedMemberExpr);
+  for (auto expectedTy : contextInfo.getPossibleTypes()) {
+    collectMembers(expectedTy);
+    // If this is an optional type, let's also check its base type.
+    if (auto baseTy = expectedTy->getOptionalObjectType()) {
+      collectMembers(baseTy->lookThroughAllOptionalTypes());
     }
   }
   return !candidates.empty();
@@ -808,6 +816,8 @@ class ExprContextAnalyzer {
             auto argTy = ty;
             if (paramType.isInOut())
               argTy = InOutType::get(argTy);
+            else if (paramType.isAutoClosure() && argTy->is<AnyFunctionType>())
+              argTy = argTy->castTo<AnyFunctionType>()->getResult();
             if (seenTypes.insert(argTy.getPointer()).second)
               recordPossibleType(argTy);
           }

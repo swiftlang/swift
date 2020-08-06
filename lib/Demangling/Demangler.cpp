@@ -776,6 +776,7 @@ recur:
     case 'V': return demangleAnyGenericType(Node::Kind::Structure);
     case 'W': return demangleWitness();
     case 'X': return demangleSpecialType();
+    case 'Y': return createNode(Node::Kind::AsyncAnnotation);
     case 'Z': return createWithChild(Node::Kind::Static, popNode(isEntity));
     case 'a': return demangleAnyGenericType(Node::Kind::TypeAlias);
     case 'c': return popFunctionType(Node::Kind::FunctionType);
@@ -1230,6 +1231,7 @@ NodePointer Demangler::demanglePlainFunction() {
 NodePointer Demangler::popFunctionType(Node::Kind kind) {
   NodePointer FuncType = createNode(kind);
   addChild(FuncType, popNode(Node::Kind::ThrowsAnnotation));
+  addChild(FuncType, popNode(Node::Kind::AsyncAnnotation));
 
   FuncType = addChild(FuncType, popFunctionParams(Node::Kind::ArgumentTuple));
   FuncType = addChild(FuncType, popFunctionParams(Node::Kind::ReturnType));
@@ -1261,9 +1263,14 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
       FuncType->getKind() != Node::Kind::NoEscapeFunctionType)
     return nullptr;
 
-  auto ParameterType = FuncType->getFirstChild();
-  if (ParameterType->getKind() == Node::Kind::ThrowsAnnotation)
-    ParameterType = FuncType->getChild(1);
+  unsigned FirstChildIdx = 0;
+  if (FuncType->getChild(FirstChildIdx)->getKind()
+        == Node::Kind::ThrowsAnnotation)
+    ++FirstChildIdx;
+  if (FuncType->getChild(FirstChildIdx)->getKind()
+        == Node::Kind::AsyncAnnotation)
+    ++FirstChildIdx;
+  auto ParameterType = FuncType->getChild(FirstChildIdx);
 
   assert(ParameterType->getKind() == Node::Kind::ArgumentTuple);
 

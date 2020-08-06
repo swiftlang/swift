@@ -11,7 +11,7 @@ import Foundation
 // CHECK: [[SETTER_SIGNATURE:@.*]] = private unnamed_addr constant [11 x i8] c"v24@0:8@16\00"
 // CHECK: [[DEALLOC_SIGNATURE:@.*]] = private unnamed_addr constant [8 x i8] c"v16@0:8\00"
 
-// CHECK: @_INSTANCE_METHODS__TtC11objc_bridge3Bas = private constant { i32, i32, [17 x { i8*, i8*, i8* }] } {
+// CHECK: @_INSTANCE_METHODS__TtC11objc_bridge3Bas = internal constant { i32, i32, [17 x { i8*, i8*, i8* }] } {
 // CHECK:   i32 24,
 // CHECK:   i32 17,
 // CHECK:   [17 x { i8*, i8*, i8* }] [
@@ -98,10 +98,10 @@ import Foundation
 // CHECK:   ]
 // CHECK: }, section "__DATA, __objc_const", align 8
 
-// CHECK: @_PROPERTIES__TtC11objc_bridge3Bas = private constant { i32, i32, [5 x { i8*, i8* }] } {
+// CHECK: @_PROPERTIES__TtC11objc_bridge3Bas = internal constant { i32, i32, [5 x { i8*, i8* }] } {
 
 // CHECK: [[OBJC_BLOCK_PROPERTY:@.*]] = private unnamed_addr constant [8 x i8] c"T@?,N,C\00"
-// CHECK: @_PROPERTIES__TtC11objc_bridge21OptionalBlockProperty = private constant {{.*}} [[OBJC_BLOCK_PROPERTY]]
+// CHECK: @_PROPERTIES__TtC11objc_bridge21OptionalBlockProperty = internal constant {{.*}} [[OBJC_BLOCK_PROPERTY]]
 
 func getDescription(_ o: NSObject) -> String {
   return o.description

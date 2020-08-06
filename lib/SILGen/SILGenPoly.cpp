@@ -3099,12 +3099,12 @@ CanSILFunctionType SILGenFunction::buildThunkType(
 
   // This may inherit @noescape from the expectedType. The @noescape attribute
   // is only stripped when using this type to materialize a new decl.
-  auto extInfo = expectedType->getExtInfo()
-    .withRepresentation(SILFunctionType::Representation::Thin)
-    .withDifferentiabilityKind(DifferentiabilityKind::NonDifferentiable);
+  auto extInfoBuilder =
+      expectedType->getExtInfo().intoBuilder().withRepresentation(
+          SILFunctionType::Representation::Thin);
 
   if (withoutActuallyEscaping)
-    extInfo = extInfo.withNoEscape(false);
+    extInfoBuilder = extInfoBuilder.withNoEscape(false);
 
   // Does the thunk type involve archetypes other than opened existentials?
   bool hasArchetypes = false;
@@ -3186,7 +3186,7 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   // pseudogeneric, since we have no way to pass generic parameters.
   if (genericSig)
     if (F.getLoweredFunctionType()->isPseudogeneric())
-      extInfo = extInfo.withIsPseudogeneric();
+      extInfoBuilder = extInfoBuilder.withIsPseudogeneric();
 
   // Add the function type as the parameter.
   auto contextConvention =
@@ -3244,14 +3244,12 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   }
   
   // The type of the thunk function.
-  return SILFunctionType::get(genericSig, extInfo,
-                              expectedType->getCoroutineKind(),
-                              ParameterConvention::Direct_Unowned,
-                              interfaceParams, interfaceYields,
-                              interfaceResults, interfaceErrorResult,
-                              expectedType->getPatternSubstitutions(),
-                              SubstitutionMap(),
-                              getASTContext());
+  return SILFunctionType::get(
+      genericSig, extInfoBuilder.build(), expectedType->getCoroutineKind(),
+      ParameterConvention::Direct_Unowned, interfaceParams, interfaceYields,
+      interfaceResults, interfaceErrorResult,
+      expectedType->getPatternSubstitutions(), SubstitutionMap(),
+      getASTContext());
 }
 
 static ManagedValue createPartialApplyOfThunk(SILGenFunction &SGF,
@@ -3478,8 +3476,9 @@ static CanSILFunctionType buildWithoutActuallyEscapingThunkType(
     CanSILFunctionType &escapingType, GenericEnvironment *&genericEnv,
     SubstitutionMap &interfaceSubs, CanType &dynamicSelfType) {
 
-  assert(escapingType->getExtInfo() ==
-         noEscapingType->getExtInfo().withNoEscape(false));
+  assert(escapingType->getExtInfo().isEqualTo(
+      noEscapingType->getExtInfo().withNoEscape(false),
+      useClangTypes(escapingType)));
 
   CanType inputSubstType, outputSubstType;
   auto type = SGF.buildThunkType(noEscapingType, escapingType,
@@ -3541,8 +3540,9 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
   auto noEscapingFnSubstTy = noEscapingFunctionValue.getType()
     .castTo<SILFunctionType>();
   // TODO: maybe this should use a more explicit instruction.
-  assert(escapingFnSubstTy->getExtInfo() == noEscapingFnSubstTy->getExtInfo()
-                                                         .withNoEscape(false));
+  assert(escapingFnSubstTy->getExtInfo().isEqualTo(
+      noEscapingFnSubstTy->getExtInfo().withNoEscape(false),
+      useClangTypes(escapingFnSubstTy)));
 
   // Apply function type substitutions, since the code sequence for a thunk
   // doesn't vary with function representation.
@@ -4132,12 +4132,13 @@ ManagedValue Transform::transformFunction(ManagedValue fn,
   }
 
   // We do not, conversion is trivial.
-  auto expectedEI = expectedFnType->getExtInfo();
+  auto expectedEI = expectedFnType->getExtInfo().intoBuilder();
   auto newEI = expectedEI.withRepresentation(fnType->getRepresentation())
                    .withNoEscape(fnType->getRepresentation() ==
                                          SILFunctionType::Representation::Thick
                                      ? fnType->isNoEscape()
-                                     : expectedFnType->isNoEscape());
+                                     : expectedFnType->isNoEscape())
+                   .build();
   auto newFnType =
       adjustFunctionType(expectedFnType, newEI, fnType->getCalleeConvention(),
                          fnType->getWitnessMethodConformanceOrInvalid());

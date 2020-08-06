@@ -1561,8 +1561,9 @@ static TypeInfo swift_getTypeByMangledNameImpl(
   } else {
     // Demangle the type name.
     node = demangler.demangleTypeRef(typeName);
-    if (!node)
+    if (!node) {
       return TypeInfo();
+    }
   }
 
   return swift_getTypeByMangledNode(request, demangler, node,

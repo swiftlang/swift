@@ -196,6 +196,7 @@ static ValueDecl *deriveVectorProtocol_method(
   DeclName declName(C, methodBaseName, params);
   auto funcDecl = FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None,
                                    SourceLoc(), declName, SourceLoc(),
+				   /*Async*/ false, SourceLoc(),
                                    /*Throws*/ false, SourceLoc(),
                                    /*GenericParams*/ nullptr, params,
                                    TypeLoc::withoutLoc(returnType), parentDC);

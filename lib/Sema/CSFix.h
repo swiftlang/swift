@@ -225,8 +225,6 @@ enum class FixKind : uint8_t {
   /// a variable, a property etc.
   RemoveCall,
 
-  AllowInvalidUseOfTrailingClosure,
-
   /// Allow an ephemeral argument conversion for a parameter marked as being
   /// non-ephemeral.
   TreatEphemeralAsNonEphemeral,
@@ -579,7 +577,7 @@ class DropThrowsAttribute final : public ContextualMismatch {
   DropThrowsAttribute(ConstraintSystem &cs, FunctionType *fromType,
                       FunctionType *toType, ConstraintLocator *locator)
       : ContextualMismatch(cs, fromType, toType, locator) {
-    assert(fromType->throws() != toType->throws());
+    assert(fromType->isThrowing() != toType->isThrowing());
   }
 
 public:
@@ -1713,24 +1711,6 @@ public:
 
   static RemoveInvalidCall *create(ConstraintSystem &cs,
                                    ConstraintLocator *locator);
-};
-
-class AllowInvalidUseOfTrailingClosure final : public AllowArgumentMismatch {
-  AllowInvalidUseOfTrailingClosure(ConstraintSystem &cs, Type argType,
-                                   Type paramType, ConstraintLocator *locator)
-      : AllowArgumentMismatch(cs, FixKind::AllowInvalidUseOfTrailingClosure,
-                              argType, paramType, locator) {}
-
-public:
-  std::string getName() const {
-    return "allow invalid use of trailing closure";
-  }
-
-  bool diagnose(const Solution &solution, bool asNote = false) const;
-
-  static AllowInvalidUseOfTrailingClosure *create(ConstraintSystem &cs,
-                                                  Type argType, Type paramType,
-                                                  ConstraintLocator *locator);
 };
 
 class TreatEphemeralAsNonEphemeral final : public AllowArgumentMismatch {

@@ -2394,7 +2394,7 @@ for host in "${ALL_HOSTS[@]}"; do
                             HOST_SIM_LIB_PATH="$HOST_CXX_BUILTINS_DIR/$SIM_LIB_NAME"
                             if [[ -f "${HOST_SIM_LIB_PATH}" ]]; then
                                 call cp "${HOST_SIM_LIB_PATH}" "${DEST_BUILTINS_DIR}/${SIM_LIB_NAME}"
-                            elif [[ "${HOST_LIB_PATH}" ]]; then
+                            elif [[ -f "${HOST_LIB_PATH}" ]]; then
                                 # The simulator .a might not exist if the host
                                 # Xcode is old. In that case, copy over the
                                 # device library to the simulator location to allow

@@ -86,7 +86,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
     bool walkToDeclPre(Decl *D) override {
       if (auto *closure = dyn_cast<ClosureExpr>(D->getDeclContext()))
-        return !closure->wasSeparatelyTypeChecked();
+        return !closure->isSeparatelyTypeChecked();
       return false;
     }
 
@@ -1501,7 +1501,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
     // Don't walk into nested decls.
     bool walkToDeclPre(Decl *D) override {
       if (auto *closure = dyn_cast<ClosureExpr>(D->getDeclContext()))
-        return !closure->wasSeparatelyTypeChecked();
+        return !closure->isSeparatelyTypeChecked();
       return false;
     }
 
@@ -1733,7 +1733,7 @@ bool TypeChecker::getDefaultGenericArgumentsString(
       }
 
       for (auto proto : archetypeTy->getConformsTo()) {
-        members.push_back(proto->getDeclaredType());
+        members.push_back(proto->getDeclaredInterfaceType());
         if (proto->requiresClass())
           hasExplicitAnyObject = false;
       }
@@ -1803,7 +1803,8 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
       newName = newNames[i];
 
     if (oldName == newName ||
-        (argList.hasTrailingClosure && i == argList.args.size()-1))
+        (argList.hasTrailingClosure && i == argList.args.size()-1 &&
+         (numMissing > 0 || numExtra > 0 || numWrong > 0)))
       continue;
 
     if (oldName.empty()) {

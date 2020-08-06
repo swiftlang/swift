@@ -35,7 +35,7 @@ static void adjustFunctionTypeForOverride(Type &type) {
   auto fnType = type->castTo<AnyFunctionType>();
   auto extInfo = fnType->getExtInfo();
   extInfo = extInfo.withThrows(false);
-  if (fnType->getExtInfo() != extInfo)
+  if (!fnType->getExtInfo().isEqualTo(extInfo, useClangTypes(fnType)))
     type = fnType->withExtInfo(extInfo);
 }
 

@@ -575,7 +575,7 @@ class LinkEntity {
   static bool isValidResilientMethodRef(SILDeclRef declRef) {
     if (declRef.isForeign)
       return false;
-
+    
     auto *decl = declRef.getDecl();
     return (isa<ClassDecl>(decl->getDeclContext()) ||
             isa<ProtocolDecl>(decl->getDeclContext()));

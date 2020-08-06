@@ -400,9 +400,9 @@ class ParseContext(object):
     def __init__(self, filename, template=None):
         self.filename = os.path.abspath(filename)
         if sys.platform == 'win32':
-            self.filename = self.filename.replace('\\', '/')
+            self.filename = '/'.join(self.filename.split(os.sep))
         if template is None:
-            with io.open(filename, encoding='utf-8') as f:
+            with io.open(os.path.normpath(filename), encoding='utf-8') as f:
                 self.template = f.read()
         else:
             self.template = template
@@ -1251,7 +1251,7 @@ def main():
     if args.file == '-':
         ast = parse_template('stdin', sys.stdin.read())
     else:
-        with io.open(args.file, 'r', encoding='utf-8') as f:
+        with io.open(os.path.normpath(args.file), 'r', encoding='utf-8') as f:
             ast = parse_template(args.file, f.read())
     if args.dump:
         print(ast)

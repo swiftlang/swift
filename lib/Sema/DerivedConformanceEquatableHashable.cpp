@@ -393,7 +393,7 @@ deriveEquatable_eq(
     getParamDecl("b")
   });
 
-  auto boolTy = C.getBoolDecl()->getDeclaredType();
+  auto boolTy = C.getBoolDecl()->getDeclaredInterfaceType();
 
   Identifier generatedIdentifier;
   if (parentDC->getParentModule()->isResilient()) {
@@ -410,6 +410,7 @@ deriveEquatable_eq(
     FuncDecl::create(C, /*StaticLoc=*/SourceLoc(),
                      StaticSpellingKind::KeywordStatic,
                      /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
+                     /*Async*/ false, SourceLoc(),
                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr,
                      params,
@@ -421,7 +422,7 @@ deriveEquatable_eq(
   // Add the @_implements(Equatable, ==(_:_:)) attribute
   if (generatedIdentifier != C.Id_EqualsOperator) {
     auto equatableProto = C.getProtocol(KnownProtocolKind::Equatable);
-    auto equatableTy = equatableProto->getDeclaredType();
+    auto equatableTy = equatableProto->getDeclaredInterfaceType();
     auto equatableTyExpr = TypeExpr::createImplicit(equatableTy, C);
     SmallVector<Identifier, 2> argumentLabels = { Identifier(), Identifier() };
     auto equalsDeclName = DeclName(C, DeclBaseName(C.Id_EqualsOperator),
@@ -532,7 +533,7 @@ deriveHashable_hashInto(
     hashableProto->diagnose(diag::broken_hashable_no_hasher);
     return nullptr;
   }
-  Type hasherType = hasherDecl->getDeclaredType();
+  Type hasherType = hasherDecl->getDeclaredInterfaceType();
 
   // Params: self (implicit), hasher
   auto *hasherParamDecl = new (C) ParamDecl(SourceLoc(),
@@ -551,6 +552,7 @@ deriveHashable_hashInto(
   auto *hashDecl = FuncDecl::create(C,
                                     SourceLoc(), StaticSpellingKind::None,
                                     SourceLoc(), name, SourceLoc(),
+                                    /*Async*/ false, SourceLoc(),
                                     /*Throws=*/false, SourceLoc(),
                                     nullptr, params,
                                     TypeLoc::withoutLoc(returnType),
@@ -863,7 +865,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   ASTContext &C = derived.Context;
 
   auto parentDC = derived.getConformanceContext();
-  Type intType = C.getIntDecl()->getDeclaredType();
+  Type intType = C.getIntDecl()->getDeclaredInterfaceType();
 
   // We can't form a Hashable conformance if Int isn't Hashable or
   // ExpressibleByIntegerLiteral.
@@ -1003,7 +1005,7 @@ ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
                                 hashableProto)) {
         ConformanceDecl->diagnose(diag::type_does_not_conform,
                                   Nominal->getDeclaredType(),
-                                  hashableProto->getDeclaredType());
+                                  hashableProto->getDeclaredInterfaceType());
         // Ideally, this would be diagnosed in
         // ConformanceChecker::resolveWitnessViaLookup. That doesn't work for
         // Hashable because DerivedConformance::canDeriveHashable returns true

@@ -1613,9 +1613,20 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   /// \returns true on success, false on failure.
   bool typecheckParsedType() {
     assert(ParsedTypeLoc.getTypeRepr() && "should have a TypeRepr");
-    if (!performTypeLocChecking(P.Context, ParsedTypeLoc,
-                                   CurDeclContext, false))
+    if (ParsedTypeLoc.wasValidated() && !ParsedTypeLoc.isError()) {
       return true;
+    }
+
+    const auto ty = swift::performTypeResolution(
+        ParsedTypeLoc.getTypeRepr(), P.Context,
+        /*isSILMode=*/false,
+        /*isSILType=*/false, CurDeclContext->getGenericEnvironmentOfContext(),
+        CurDeclContext,
+        /*ProduceDiagnostics=*/false);
+    ParsedTypeLoc.setType(ty);
+    if (!ParsedTypeLoc.isError()) {
+      return true;
+    }
 
     // It doesn't type check as a type, so see if it's a qualifying module name.
     if (auto *ITR = dyn_cast<IdentTypeRepr>(ParsedTypeLoc.getTypeRepr())) {
@@ -1749,11 +1760,11 @@ static Type
 defaultTypeLiteralKind(CodeCompletionLiteralKind kind, ASTContext &Ctx) {
   switch (kind) {
   case CodeCompletionLiteralKind::BooleanLiteral:
-    return Ctx.getBoolDecl()->getDeclaredType();
+    return Ctx.getBoolDecl()->getDeclaredInterfaceType();
   case CodeCompletionLiteralKind::IntegerLiteral:
-    return Ctx.getIntDecl()->getDeclaredType();
+    return Ctx.getIntDecl()->getDeclaredInterfaceType();
   case CodeCompletionLiteralKind::StringLiteral:
-    return Ctx.getStringDecl()->getDeclaredType();
+    return Ctx.getStringDecl()->getDeclaredInterfaceType();
   case CodeCompletionLiteralKind::ArrayLiteral:
     return Ctx.getArrayDecl()->getDeclaredType();
   case CodeCompletionLiteralKind::DictionaryLiteral:
@@ -2669,7 +2680,7 @@ public:
                         const AbstractFunctionDecl *AFD) {
     if (AFD && AFD->getAttrs().hasAttribute<RethrowsAttr>())
       Builder.addAnnotatedRethrows();
-    else if (AFT->throws())
+    else if (AFT->isThrowing())
       Builder.addAnnotatedThrows();
   }
 
@@ -4136,7 +4147,7 @@ public:
       builder.addRightBracket();
     });
 
-    auto floatType = context.getFloatDecl()->getDeclaredType();
+    auto floatType = context.getFloatDecl()->getDeclaredInterfaceType();
     addFromProto(LK::ColorLiteral, [&](Builder &builder) {
       builder.addBaseName("#colorLiteral");
       builder.addLeftParen();
@@ -4150,7 +4161,7 @@ public:
       builder.addRightParen();
     });
 
-    auto stringType = context.getStringDecl()->getDeclaredType();
+    auto stringType = context.getStringDecl()->getDeclaredInterfaceType();
     addFromProto(LK::ImageLiteral, [&](Builder &builder) {
       builder.addBaseName("#imageLiteral");
       builder.addLeftParen();

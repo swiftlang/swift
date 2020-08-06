@@ -1461,7 +1461,8 @@ namespace {
       auto flagsVal = FunctionTypeFlags()
                           .withNumParameters(numParams)
                           .withConvention(metadataConvention)
-                          .withThrows(type->throws())
+                          .withAsync(type->isAsync())
+                          .withThrows(type->isThrowing())
                           .withParameterFlags(hasFlags)
                           .withEscaping(isEscaping)
                           .withDifferentiabilityKind(

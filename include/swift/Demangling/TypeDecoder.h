@@ -604,16 +604,29 @@ class TypeDecoder {
             FunctionMetadataDifferentiabilityKind::Linear);
       }
 
-      bool isThrow =
-        Node->getChild(0)->getKind() == NodeKind::ThrowsAnnotation;
-      flags = flags.withThrows(isThrow);
+      unsigned firstChildIdx = 0;
+      bool isThrow = false;
+      if (Node->getChild(firstChildIdx)->getKind()
+            == NodeKind::ThrowsAnnotation) {
+        isThrow = true;
+        ++firstChildIdx;
+      }
 
-      if (isThrow && Node->getNumChildren() < 3)
+      bool isAsync = false;
+      if (Node->getChild(firstChildIdx)->getKind()
+            == NodeKind::AsyncAnnotation) {
+        isAsync = true;
+        ++firstChildIdx;
+      }
+
+      flags = flags.withAsync(isAsync).withThrows(isThrow);
+
+      if (Node->getNumChildren() < firstChildIdx + 2)
         return BuiltType();
 
       bool hasParamFlags = false;
       llvm::SmallVector<FunctionParam<BuiltType>, 8> parameters;
-      if (!decodeMangledFunctionInputType(Node->getChild(isThrow ? 1 : 0),
+      if (!decodeMangledFunctionInputType(Node->getChild(firstChildIdx),
                                           parameters, hasParamFlags))
         return BuiltType();
       flags =
@@ -628,7 +641,7 @@ class TypeDecoder {
                           Node->getKind() ==
                               NodeKind::EscapingLinearFunctionType);
 
-      auto result = decodeMangledType(Node->getChild(isThrow ? 2 : 1));
+      auto result = decodeMangledType(Node->getChild(firstChildIdx+1));
       if (!result) return BuiltType();
       return Builder.createFunctionType(parameters, result, flags);
     }

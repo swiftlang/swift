@@ -5068,7 +5068,7 @@ public:
       if (differentiableProtocol && fnTy->isDifferentiable()) {
         auto addConformanceConstraint = [&](Type type, ProtocolDecl *protocol) {
           Requirement req(RequirementKind::Conformance, type,
-                          protocol->getDeclaredType());
+                          protocol->getDeclaredInterfaceType());
           Builder.addRequirement(req, source, nullptr);
         };
         auto addSameTypeConstraint = [&](Type firstType,
@@ -7591,17 +7591,17 @@ InferredGenericSignatureRequest::evaluate(
         .visitRequirements(TypeResolutionStage::Structural,
                            visitRequirement);
     }
-  } else {
-    // The declaration has a where clause, but no generic parameters of its own.
-    const auto ctx = paramSource.get<GenericContext *>();
+  }
 
-    assert(ctx->getTrailingWhereClause() && "No params or where clause");
+  if (auto *ctx = paramSource.dyn_cast<GenericContext *>()) {
+    // The declaration might have a trailing where clause.
+    if (auto *where = ctx->getTrailingWhereClause()) {
+      // Determine where and how to perform name lookup.
+      lookupDC = ctx;
 
-    // Determine where and how to perform name lookup.
-    lookupDC = ctx;
-
-    WhereClauseOwner(ctx).visitRequirements(
-      TypeResolutionStage::Structural, visitRequirement);
+      WhereClauseOwner(lookupDC, where).visitRequirements(
+        TypeResolutionStage::Structural, visitRequirement);
+    }
   }
       
   /// Perform any remaining requirement inference.

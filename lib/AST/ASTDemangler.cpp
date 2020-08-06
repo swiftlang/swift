@@ -153,7 +153,7 @@ Type ASTBuilder::createNominalType(GenericTypeDecl *decl, Type parent) {
   bool isImported = nominalDecl->hasClangNode() ||
       nominalDecl->getAttrs().hasAttribute<ClangImporterSynthesizedTypeAttr>();
   if (isImported && !nominalDecl->isGenericContext())
-    return nominalDecl->getDeclaredType();
+    return nominalDecl->getDeclaredInterfaceType();
 
   // Validate the parent type.
   if (!validateParentType(nominalDecl, parent))
@@ -400,18 +400,16 @@ Type ASTBuilder::createFunctionType(
      || representation == FunctionTypeRepresentation::Block)
     && !flags.isEscaping();
 
-  FunctionType::ExtInfo incompleteExtInfo(
-    FunctionTypeRepresentation::Swift,
-    noescape, flags.throws(), diffKind, /*clangFunctionType*/nullptr);
-
   const clang::Type *clangFunctionType = nullptr;
   if (representation == FunctionTypeRepresentation::CFunctionPointer)
     clangFunctionType = Ctx.getClangFunctionType(funcParams, output,
-                                                 incompleteExtInfo,
                                                  representation);
 
-  auto einfo = incompleteExtInfo.withRepresentation(representation)
-                                .withClangFunctionType(clangFunctionType);
+  auto einfo =
+      FunctionType::ExtInfoBuilder(representation, noescape, flags.isThrowing(),
+                                   diffKind, clangFunctionType)
+          .withAsync(flags.isAsync())
+          .build();
 
   return FunctionType::get(funcParams, output, einfo);
 }
@@ -531,9 +529,10 @@ Type ASTBuilder::createImplFunctionType(
   }
 
   // [TODO: Store-SIL-Clang-type]
-  auto einfo = SILFunctionType::ExtInfo(representation, flags.isPseudogeneric(),
-                                        !flags.isEscaping(), diffKind,
-                                        /*clangFunctionType*/ nullptr);
+  auto einfo = SILExtInfoBuilder(representation, flags.isPseudogeneric(),
+                                 !flags.isEscaping(), diffKind,
+                                 /*clangFunctionType*/ nullptr)
+                   .build();
 
   llvm::SmallVector<SILParameterInfo, 8> funcParams;
   llvm::SmallVector<SILYieldInfo, 8> funcYields;
@@ -571,7 +570,7 @@ Type ASTBuilder::createProtocolCompositionType(
     bool isClassBound) {
   std::vector<Type> members;
   for (auto protocol : protocols)
-    members.push_back(protocol->getDeclaredType());
+    members.push_back(protocol->getDeclaredInterfaceType());
   if (superclass && superclass->getClassOrBoundGenericClass())
     members.push_back(superclass);
   return ProtocolCompositionType::get(Ctx, members, isClassBound);

@@ -49,6 +49,9 @@ class Swift(product.Product):
         self.cmake_options.extend(
             self._enable_experimental_differentiable_programming)
 
+        # Add experimental concurrency flag.
+        self.cmake_options.extend(self._enable_experimental_concurrency)
+
     @classmethod
     def is_build_script_impl_product(cls):
         """is_build_script_impl_product -> bool
@@ -133,6 +136,11 @@ updated without updating swift.py?")
     def _enable_experimental_differentiable_programming(self):
         return [('SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING:BOOL',
                  self.args.enable_experimental_differentiable_programming)]
+
+    @property
+    def _enable_experimental_concurrency(self):
+        return [('SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY:BOOL',
+                 self.args.enable_experimental_concurrency)]
 
     @classmethod
     def get_dependencies(cls):

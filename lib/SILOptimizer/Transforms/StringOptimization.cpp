@@ -19,6 +19,7 @@
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/ParameterList.h"
@@ -58,13 +59,15 @@ class StringOptimization {
     StringRef str;
     
     /// Negative means: not constant
-    int numCodeUnits = -1;
-    
-    /// Not 0 for the empty-string initializer which reserves a capacity.
     int reservedCapacity = 0;
     
-    bool isConstant() const { return numCodeUnits >= 0; }
+    StringInfo(StringRef str, int reservedCapacity = 0) :
+      str(str), reservedCapacity(reservedCapacity) { }
+    
+    bool isConstant() const { return reservedCapacity >= 0; }
     bool isEmpty() const { return isConstant() && str.empty(); }
+    
+    static StringInfo unknown() { return StringInfo(StringRef(), -1); }
   };
 
   /// The stdlib's String type.
@@ -87,7 +90,7 @@ private:
   
   bool optimizeStringAppend(ApplyInst *appendCall,
                             llvm::DenseMap<SILValue, SILValue> &storedStrings);
-
+  bool optimizeStringConcat(ApplyInst *concatCall);
   bool optimizeTypeName(ApplyInst *typeNameCall);
 
   static ApplyInst *isSemanticCall(SILInstruction *inst, StringRef attr,
@@ -96,9 +99,11 @@ private:
   static void invalidateModifiedObjects(SILInstruction *inst,
                             llvm::DenseMap<SILValue, SILValue> &storedStrings);
   static StringInfo getStringInfo(SILValue value);
+  static StringInfo getStringFromStaticLet(SILValue value);
+
   static Optional<int> getIntConstant(SILValue value);
-  static void replaceAppendWith(ApplyInst *appendCall, SILValue newValue,
-                                bool copyNewValue);
+  static void replaceAppendWith(ApplyInst *appendCall, SILValue newValue);
+  static SILValue copyValue(SILValue value, SILInstruction *before);
   ApplyInst *createStringInit(StringRef str, SILInstruction *beforeInst);
 };
 
@@ -108,7 +113,7 @@ bool StringOptimization::run(SILFunction *F) {
   if (!stringDecl)
     return false;
   stringType = SILType::getPrimitiveObjectType(
-                 CanType(stringDecl->getDeclaredType()));
+                 stringDecl->getDeclaredInterfaceType()->getCanonicalType());
 
   bool changed = false;
   
@@ -135,6 +140,12 @@ bool StringOptimization::optimizeBlock(SILBasicBlock &block) {
     }
     if (ApplyInst *append = isSemanticCall(inst, semantics::STRING_APPEND, 2)) {
       if (optimizeStringAppend(append, storedStrings)) {
+        changed = true;
+        continue;
+      }
+    }
+    if (ApplyInst *append = isSemanticCall(inst, semantics::STRING_CONCAT, 3)) {
+      if (optimizeStringConcat(append)) {
         changed = true;
         continue;
       }
@@ -179,7 +190,7 @@ bool StringOptimization::optimizeStringAppend(ApplyInst *appendCall,
 
   // Replace lhs.append(rhs) with 'lhs = rhs' if lhs is empty.
   if (lhsString.isEmpty()) {
-    replaceAppendWith(appendCall, rhs, /*copyNewValue*/ true);
+    replaceAppendWith(appendCall, copyValue(rhs, appendCall));
     storedStrings[lhsAddr] = rhs;
     return true;
   }
@@ -190,12 +201,79 @@ bool StringOptimization::optimizeStringAppend(ApplyInst *appendCall,
     std::string concat = lhsString.str;
     concat += rhsString.str;
     if (ApplyInst *stringInit = createStringInit(concat, appendCall)) {
-      replaceAppendWith(appendCall, stringInit, /*copyNewValue*/ false);
+      replaceAppendWith(appendCall, stringInit);
       storedStrings[lhsAddr] = stringInit;
       return true;
     }
   }
   
+  return false;
+}
+
+/// Optimize String.+ in case anything is known about the parameters.
+bool StringOptimization::optimizeStringConcat(ApplyInst *concatCall) {
+  SILValue lhs = concatCall->getArgument(0);
+  SILValue rhs = concatCall->getArgument(1);
+  StringInfo rhsString = getStringInfo(rhs);
+  
+  // Replace lhs + "" with lhs
+  if (rhsString.isEmpty()) {
+    lhs = copyValue(lhs, concatCall);
+    concatCall->replaceAllUsesWith(lhs);
+    concatCall->eraseFromParent();
+    return true;
+  }
+  
+  // Replace "" + rhs with rhs
+  StringInfo lhsString = getStringInfo(lhs);
+  if (lhsString.isEmpty()) {
+    rhs = copyValue(rhs, concatCall);
+    concatCall->replaceAllUsesWith(rhs);
+    concatCall->eraseFromParent();
+    return true;
+  }
+
+  // Replace lhs + rhs with "lhs + rhs" if both lhs and rhs are constant.
+  if (lhsString.isConstant() && rhsString.isConstant()) {
+    std::string concat = lhsString.str;
+    concat += rhsString.str;
+    if (ApplyInst *stringInit = createStringInit(concat, concatCall)) {
+      concatCall->replaceAllUsesWith(stringInit);
+      concatCall->eraseFromParent();
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+/// Checks if the demangling tree contains any node which prevents constant
+/// folding of the type name.
+static bool containsProblematicNode(Demangle::Node *node, bool qualified) {
+  switch (node->getKind()) {
+    case Demangle::Node::Kind::LocalDeclName:
+      // The printing of contexts for local types is completely different
+      // in the runtime. Don't constant fold if we need to print the context.
+      if (qualified)
+        return true;
+      break;
+    case Demangle::Node::Kind::Class: {
+      // ObjC class names are not derived from the mangling but from the
+      // ObjC runtime. We cannot constant fold this.
+      Demangle::Node *context = node->getChild(0);
+      if (context->getKind() == Demangle::Node::Kind::Module &&
+          context->getText() == "__C") {
+        return true;
+      }
+      break;
+    }
+    default:
+      break;
+  }
+  for (Demangle::Node *child : *node) {
+    if (containsProblematicNode(child, qualified))
+      return true;
+  }
   return false;
 }
 
@@ -217,9 +295,10 @@ bool StringOptimization::optimizeTypeName(ApplyInst *typeNameCall) {
     return false;
   
   // Usually the "qualified" parameter of _typeName() is a constant boolean.
-  Optional<int> isQualified = getIntConstant(typeNameCall->getArgument(1));
-  if (!isQualified)
+  Optional<int> isQualifiedOpt = getIntConstant(typeNameCall->getArgument(1));
+  if (!isQualifiedOpt)
     return false;
+  bool isQualified = isQualifiedOpt.getValue();
 
   // Create the constant type string by mangling + demangling.
   Mangle::ASTMangler mangler;
@@ -227,10 +306,18 @@ bool StringOptimization::optimizeTypeName(ApplyInst *typeNameCall) {
 
   Demangle::DemangleOptions options;
   options.PrintForTypeName = true;
-  options.QualifyEntities = (isQualified.getValue() != 0);
-  std::string typeStr = Demangle::demangleSymbolAsString(mangledTypeName,
-                                                         options);
-  
+  options.DisplayLocalNameContexts = false;
+  options.QualifyEntities = isQualified;
+
+  Demangle::Context ctx;
+  Demangle::NodePointer root = ctx.demangleTypeAsNode(mangledTypeName);
+  if (!root || containsProblematicNode(root, isQualified))
+    return false;
+
+  std::string typeStr = nodeToString(root, options);
+  if (typeStr.empty())
+    return false;
+
   ApplyInst *stringInit = createStringInit(typeStr, typeNameCall);
   if (!stringInit)
     return false;
@@ -333,32 +420,31 @@ void StringOptimization::invalidateModifiedObjects(SILInstruction *inst,
 
 /// Returns information about value if it's a constant string.
 StringOptimization::StringInfo StringOptimization::getStringInfo(SILValue value) {
-  // Start with a non-constant result.
-  StringInfo result;
+  if (!value)
+    return StringInfo::unknown();
   
-  auto *apply = dyn_cast_or_null<ApplyInst>(value);
-  if (!apply)
-    return result;
+  auto *apply = dyn_cast<ApplyInst>(value);
+  if (!apply) {
+    return getStringFromStaticLet(value);
+  }
 
   SILFunction *callee = apply->getReferencedFunctionOrNull();
   if (!callee)
-    return result;
+    return StringInfo::unknown();
     
   if (callee->hasSemanticsAttr(semantics::STRING_INIT_EMPTY)) {
     // An empty string initializer.
-    result.numCodeUnits = 0;
-    return result;
+    return StringInfo("");
   }
     
   if (callee->hasSemanticsAttr(semantics::STRING_INIT_EMPTY_WITH_CAPACITY)) {
     // An empty string initializer with initial capacity.
-    result.numCodeUnits = 0;
-    result.reservedCapacity = std::numeric_limits<int>::max();
+    int reservedCapacity = std::numeric_limits<int>::max();
     if (apply->getNumArguments() > 0) {
       if (Optional<int> capacity = getIntConstant(apply->getArgument(0)))
-        result.reservedCapacity = capacity.getValue();
+        reservedCapacity = capacity.getValue();
     }
-    return result;
+    return StringInfo("", reservedCapacity);
   }
     
   if (callee->hasSemanticsAttr(semantics::STRING_MAKE_UTF8)) {
@@ -369,13 +455,79 @@ StringOptimization::StringInfo StringOptimization::getStringInfo(SILValue value)
     auto *intLiteral = dyn_cast<IntegerLiteralInst>(lengthVal);
     if (intLiteral && stringLiteral &&
         // For simplicity, we only support UTF8 string literals.
-        stringLiteral->getEncoding() == StringLiteralInst::Encoding::UTF8) {
-      result.str = stringLiteral->getValue();
-      result.numCodeUnits = intLiteral->getValue().getSExtValue();
-      return result;
+        stringLiteral->getEncoding() == StringLiteralInst::Encoding::UTF8 &&
+        // This passed number of code units should always match the size of the
+        // string in the string literal. Just to be on the safe side, check it.
+        intLiteral->getValue() == stringLiteral->getValue().size()) {
+      return StringInfo(stringLiteral->getValue());
     }
   }
-  return result;
+  return StringInfo::unknown();
+}
+
+/// Return the string if \p value is a load from a global static let, which is
+/// initialized with a String constant.
+StringOptimization::StringInfo
+StringOptimization::getStringFromStaticLet(SILValue value) {
+  // Match the pattern
+  //   %ptr_to_global = apply %addressor()
+  //   %global_addr = pointer_to_address %ptr_to_global
+  //   %value = load %global_addr
+  auto *load = dyn_cast<LoadInst>(value);
+  if (!load)
+    return StringInfo::unknown();
+ 
+  auto *pta = dyn_cast<PointerToAddressInst>(load->getOperand());
+  if (!pta)
+    return StringInfo::unknown();
+    
+  auto *addressorCall = dyn_cast<ApplyInst>(pta->getOperand());
+  if (!addressorCall)
+    return StringInfo::unknown();
+    
+  SILFunction *addressorFunc = addressorCall->getReferencedFunctionOrNull();
+  if (!addressorFunc)
+    return StringInfo::unknown();
+    
+  // The addressor function has a builtin.once call to the initializer.
+  BuiltinInst *onceCall = nullptr;
+  SILFunction *initializer = findInitializer(addressorFunc, onceCall);
+  if (!initializer)
+    return StringInfo::unknown();
+  
+  if (initializer->size() != 1)
+    return StringInfo::unknown();
+
+  // Match the pattern
+  //   %addr = global_addr @staticStringLet
+  //   ...
+  //   %str = apply %stringInitializer(...)
+  //   store %str to %addr
+  GlobalAddrInst *gAddr = nullptr;
+  for (SILInstruction &inst : initializer->front()) {
+    if (auto *ga = dyn_cast<GlobalAddrInst>(&inst)) {
+      if (gAddr)
+        return StringInfo::unknown();
+      gAddr = ga;
+    }
+  }
+  if (!gAddr || !gAddr->getReferencedGlobal()->isLet())
+    return StringInfo::unknown();
+  
+  Operand *gUse = gAddr->getSingleUse();
+  auto *store = dyn_cast<StoreInst>(gUse->getUser());
+  if (!store || store->getDest() != gAddr)
+    return StringInfo::unknown();
+    
+  SILValue initVal = store->getSrc();
+  
+  // This check is probably not needed, but let's be on the safe side:
+  // it prevents an infinite recursion if the initializer of the global is
+  // itself a load of another global, and so on.
+  if (isa<LoadInst>(initVal))
+    return StringInfo::unknown();
+
+  return getStringInfo(initVal);
 }
 
 /// Returns the constant integer value if \a value is an Int or Bool struct with
@@ -394,23 +546,31 @@ Optional<int> StringOptimization::getIntConstant(SILValue value) {
 
 /// Replace a String.append() with a store of \p newValue to the destination.
 void StringOptimization::replaceAppendWith(ApplyInst *appendCall,
-                                      SILValue newValue, bool copyNewValue) {
+                                           SILValue newValue) {
   SILBuilder builder(appendCall);
   SILLocation loc = appendCall->getLoc();
   SILValue destAddr = appendCall->getArgument(1);
   if (appendCall->getFunction()->hasOwnership()) {
-    if (copyNewValue)
-      newValue = builder.createCopyValue(loc, newValue);
     builder.createStore(loc, newValue, destAddr,
                         StoreOwnershipQualifier::Assign);
   } else {
-    if (copyNewValue)
-      builder.createRetainValue(loc, newValue, builder.getDefaultAtomicity());
     builder.createDestroyAddr(loc, destAddr);
     builder.createStore(loc, newValue, destAddr,
                         StoreOwnershipQualifier::Unqualified);
   }
   appendCall->eraseFromParent();
+}
+
+/// Returns a copy of \p value. Depending if the function is in OSSA, insert
+/// either a copy_value or retain_value.
+SILValue StringOptimization::copyValue(SILValue value, SILInstruction *before) {
+  SILBuilder builder(before);
+  SILLocation loc = before->getLoc();
+  if (before->getFunction()->hasOwnership())
+    return builder.createCopyValue(loc, value);
+
+  builder.createRetainValue(loc, value, builder.getDefaultAtomicity());
+  return value;
 }
 
 /// Creates a call to a string initializer.

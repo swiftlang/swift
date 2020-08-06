@@ -237,6 +237,9 @@ namespace swift {
     /// Enable experimental #assert feature.
     bool EnableExperimentalStaticAssert = false;
 
+    /// Enable experimental concurrency model.
+    bool EnableExperimentalConcurrency = false;
+
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;
@@ -272,6 +275,14 @@ namespace swift {
     /// Whether to enable the new operator decl and precedencegroup lookup
     /// behavior. This is a staging flag, and will be removed in the future.
     bool EnableNewOperatorLookup = false;
+
+    /// Whether to enable the "fuzzy" forward-scanning behavior for trailing
+    /// closure matching, which skips over defaulted closure parameters
+    /// to match later (non-defaulted) closure parameters
+    ///
+    /// This is a backward-compatibility hack for unlabeled trailing closures,
+    /// to be disabled in Swift 6+.
+    bool EnableFuzzyForwardScanTrailingClosureMatching = true;
 
     /// Use Clang function types for computing canonical types.
     /// If this option is false, the clang function types will still be computed
@@ -511,7 +522,7 @@ namespace swift {
     /// Indicate that the type checker should skip type-checking non-inlinable
     /// function bodies.
     bool SkipNonInlinableFunctionBodies = false;
-    
+
     ///
     /// Flags for developers
     ///

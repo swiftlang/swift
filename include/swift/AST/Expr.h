@@ -1964,7 +1964,7 @@ public:
 /// ForceTryExpr - A 'try!' surrounding an expression, marking that
 /// the expression contains code which might throw, but that the code
 /// should dynamically assert if it does.
-class ForceTryExpr : public AnyTryExpr {
+class ForceTryExpr final : public AnyTryExpr {
   SourceLoc ExclaimLoc;
 
 public:
@@ -1983,7 +1983,7 @@ public:
 /// A 'try?' surrounding an expression, marking that the expression contains
 /// code which might throw, and that the result should be injected into an
 /// Optional. If the code does throw, \c nil is produced.
-class OptionalTryExpr : public AnyTryExpr {
+class OptionalTryExpr final : public AnyTryExpr {
   SourceLoc QuestionLoc;
 
 public:
@@ -2002,7 +2002,6 @@ public:
 /// An expression node that does not affect the evaluation of its subexpression.
 class IdentityExpr : public Expr {
   Expr *SubExpr;
-  
 public:
   IdentityExpr(ExprKind kind,
                Expr *subExpr, Type ty = Type(),
@@ -2092,6 +2091,32 @@ public:
 
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Paren; }
 };
+  
+/// AwaitExpr - An 'await' surrounding an expression, marking that the
+/// expression contains code which is a coroutine that may block.
+///
+/// getSemanticsProvidingExpr() looks through this because it doesn't
+/// provide the value and only very specific clients care where the
+/// 'await' was written.
+class AwaitExpr final : public IdentityExpr {
+  SourceLoc AwaitLoc;
+public:
+  AwaitExpr(SourceLoc awaitLoc, Expr *sub, Type type = Type(),
+            bool implicit = false)
+    : IdentityExpr(ExprKind::Await, sub, type, implicit), AwaitLoc(awaitLoc) {
+  }
+  
+  SourceLoc getLoc() const { return AwaitLoc; }
+  
+  SourceLoc getAwaitLoc() const { return AwaitLoc; }
+  SourceLoc getStartLoc() const { return AwaitLoc; }
+  SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
+
+  static bool classof(const Expr *e) {
+    return e->getKind() == ExprKind::Await;
+  }
+};
+
   
 /// TupleExpr - Parenthesized expressions like '(a: x+x)' and '(x, y, 4)'.  Also
 /// used to represent the operands to a binary operator.  Note that
@@ -3691,6 +3716,9 @@ public:
   /// Return whether this closure is throwing when fully applied.
   bool isBodyThrowing() const;
 
+  /// \brief Return whether this closure is async when fully applied.
+  bool isBodyAsync() const;
+
   /// Whether this closure consists of a single expression.
   bool hasSingleExpressionBody() const;
 
@@ -3759,7 +3787,25 @@ public:
 ///     { [weak c] (a : Int) -> Int in a + c!.getFoo() }
 /// \endcode
 class ClosureExpr : public AbstractClosureExpr {
+public:
+  enum class BodyState {
+    /// The body was parsed, but not ready for type checking because
+    /// the closure parameters haven't been type checked.
+    Parsed,
 
+    /// The type of the closure itself was type checked. But the body has not
+    /// been type checked yet.
+    ReadyForTypeChecking,
+
+    /// The body was typechecked with the enclosing closure.
+    /// i.e. single expression closure or function builder closure.
+    TypeCheckedWithSignature,
+
+    /// The body was type checked separately from the enclosing closure.
+    SeparatelyTypeChecked,
+  };
+
+private:
   /// The range of the brackets of the capture list, if present.
   SourceRange BracketRange;
     
@@ -3783,8 +3829,7 @@ class ClosureExpr : public AbstractClosureExpr {
   SourceLoc InLoc;
 
   /// The explicitly-specified result type.
-  llvm::PointerIntPair<TypeExpr *, 1, bool>
-    ExplicitResultTypeAndSeparatelyChecked;
+  llvm::PointerIntPair<TypeExpr *, 2, BodyState> ExplicitResultTypeAndBodyState;
 
   /// The body of the closure, along with a bit indicating whether it
   /// was originally just a single expression.
@@ -3799,7 +3844,7 @@ public:
       BracketRange(bracketRange),
       CapturedSelfDecl(capturedSelfDecl),
       ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc), InLoc(inLoc),
-      ExplicitResultTypeAndSeparatelyChecked(explicitResultType, false),
+      ExplicitResultTypeAndBodyState(explicitResultType, BodyState::Parsed),
       Body(nullptr) {
     setParameterList(params);
     Bits.ClosureExpr.HasAnonymousClosureVars = false;
@@ -3854,15 +3899,13 @@ public:
 
   Type getExplicitResultType() const {
     assert(hasExplicitResultType() && "No explicit result type");
-    return ExplicitResultTypeAndSeparatelyChecked.getPointer()
-        ->getInstanceType();
+    return ExplicitResultTypeAndBodyState.getPointer()->getInstanceType();
   }
   void setExplicitResultType(Type ty);
 
   TypeRepr *getExplicitResultTypeRepr() const {
     assert(hasExplicitResultType() && "No explicit result type");
-    return ExplicitResultTypeAndSeparatelyChecked.getPointer()
-        ->getTypeRepr();
+    return ExplicitResultTypeAndBodyState.getPointer()->getTypeRepr();
   }
 
   /// Determine whether the closure has a single expression for its
@@ -3904,14 +3947,20 @@ public:
   /// captured non-weakly).
   bool capturesSelfEnablingImplictSelf() const;
 
-  /// Whether this closure's body was type checked separately from its
-  /// enclosing expression.
-  bool wasSeparatelyTypeChecked() const {
-    return ExplicitResultTypeAndSeparatelyChecked.getInt();
+
+  /// Get the type checking state of this closure's body.
+  BodyState getBodyState() const {
+    return ExplicitResultTypeAndBodyState.getInt();
+  }
+  void setBodyState(BodyState v) {
+    ExplicitResultTypeAndBodyState.setInt(v);
   }
 
-  void setSeparatelyTypeChecked(bool flag = true) {
-    ExplicitResultTypeAndSeparatelyChecked.setInt(flag);
+  /// Whether this closure's body is/was type checked separately from its
+  /// enclosing expression.
+  bool isSeparatelyTypeChecked() const {
+    return getBodyState() == BodyState::SeparatelyTypeChecked ||
+           getBodyState() == BodyState::ReadyForTypeChecking;
   }
 
   static bool classof(const Expr *E) {
@@ -4791,25 +4840,30 @@ public:
 /// may be preceded by the 'throws' keyword. Currently this only exists to be
 /// transformed into a FunctionTypeRepr by simplifyTypeExpr() in Sema.
 class ArrowExpr : public Expr {
+  SourceLoc AsyncLoc;
   SourceLoc ThrowsLoc;
   SourceLoc ArrowLoc;
   Expr *Args;
   Expr *Result;
 public:
-  ArrowExpr(Expr *Args, SourceLoc ThrowsLoc, SourceLoc ArrowLoc, Expr *Result)
+  ArrowExpr(Expr *Args, SourceLoc AsyncLoc, SourceLoc ThrowsLoc,
+            SourceLoc ArrowLoc, Expr *Result)
     : Expr(ExprKind::Arrow, /*implicit=*/false, Type()),
-      ThrowsLoc(ThrowsLoc), ArrowLoc(ArrowLoc), Args(Args), Result(Result)
+      AsyncLoc(AsyncLoc), ThrowsLoc(ThrowsLoc), ArrowLoc(ArrowLoc), Args(Args),
+      Result(Result)
   { }
 
-  ArrowExpr(SourceLoc ThrowsLoc, SourceLoc ArrowLoc)
+  ArrowExpr(SourceLoc AsyncLoc, SourceLoc ThrowsLoc, SourceLoc ArrowLoc)
     : Expr(ExprKind::Arrow, /*implicit=*/false, Type()),
-      ThrowsLoc(ThrowsLoc), ArrowLoc(ArrowLoc), Args(nullptr), Result(nullptr)
+      AsyncLoc(AsyncLoc), ThrowsLoc(ThrowsLoc), ArrowLoc(ArrowLoc),
+      Args(nullptr), Result(nullptr)
   { }
 
   Expr *getArgsExpr() const { return Args; }
   void setArgsExpr(Expr *E) { Args = E; }
   Expr *getResultExpr() const { return Result; }
   void setResultExpr(Expr *E) { Result = E; }
+  SourceLoc getAsyncLoc() const { return AsyncLoc; }
   SourceLoc getThrowsLoc() const { return ThrowsLoc; }
   SourceLoc getArrowLoc() const { return ArrowLoc; }
   bool isFolded() const { return Args != nullptr && Result != nullptr; }
@@ -4817,6 +4871,7 @@ public:
   SourceLoc getSourceLoc() const { return ArrowLoc; }
   SourceLoc getStartLoc() const {
     return isFolded() ? Args->getStartLoc() :
+           AsyncLoc.isValid() ? AsyncLoc :
            ThrowsLoc.isValid() ? ThrowsLoc : ArrowLoc;
   }
   SourceLoc getEndLoc() const {

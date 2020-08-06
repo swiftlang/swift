@@ -1693,8 +1693,8 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     }
 
     auto NewTypeRepr = new (ctx)
-        FunctionTypeRepr(nullptr, ArgsTypeRepr, AE->getThrowsLoc(),
-                         AE->getArrowLoc(), ResultTypeRepr);
+        FunctionTypeRepr(nullptr, ArgsTypeRepr, AE->getAsyncLoc(),
+                         AE->getThrowsLoc(), AE->getArrowLoc(), ResultTypeRepr);
     return new (ctx) TypeExpr(NewTypeRepr);
   }
   
@@ -1981,24 +1981,6 @@ void ParentConditionalConformance::diagnoseConformanceStack(
   }
 }
 
-GenericRequirementsCheckListener::~GenericRequirementsCheckListener() {}
-
-bool GenericRequirementsCheckListener::shouldCheck(RequirementKind kind,
-                                                   Type first, Type second) {
-  return true;
-}
-
-void GenericRequirementsCheckListener::satisfiedConformance(
-                                          Type depTy, Type replacementTy,
-                                          ProtocolConformanceRef conformance) {
-}
-
-bool GenericRequirementsCheckListener::diagnoseUnsatisfiedRequirement(
-    const Requirement &req, Type first, Type second,
-    ArrayRef<ParentConditionalConformance> parents) {
-  return false;
-}
-
 namespace {
 /// Produce any additional syntactic diagnostics for the body of a function
 /// that had a function builder applied.
@@ -2012,7 +1994,7 @@ public:
     performSyntacticExprDiagnostics(expr, dcStack.back(), /*isExprStmt=*/false);
 
     if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-      if (closure->wasSeparatelyTypeChecked()) {
+      if (closure->isSeparatelyTypeChecked()) {
         dcStack.push_back(closure);
         return {true, expr};
       }
@@ -2023,7 +2005,7 @@ public:
 
   Expr *walkToExprPost(Expr *expr) override {
     if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-      if (closure->wasSeparatelyTypeChecked()) {
+      if (closure->isSeparatelyTypeChecked()) {
         assert(dcStack.back() == closure);
         dcStack.pop_back();
       }
@@ -2041,7 +2023,6 @@ public:
     return {false, pattern};
   }
 
-  bool walkToTypeLocPre(TypeLoc &typeLoc) override { return false; }
   bool walkToTypeReprPre(TypeRepr *typeRepr) override { return false; }
   bool walkToParameterListPre(ParameterList *params) override { return false; }
 };
@@ -2123,6 +2104,9 @@ TypeChecker::typeCheckExpression(
 
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))
     csOptions |= ConstraintSystemFlags::AllowUnresolvedTypeVariables;
+
+  if (options.contains(TypeCheckExprFlags::LeaveClosureBodyUnchecked))
+    csOptions |= ConstraintSystemFlags::LeaveClosureBodyUnchecked;
 
   ConstraintSystem cs(dc, csOptions);
 
@@ -2315,28 +2299,44 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
 }
 
 bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
+  auto &Context = dc->getASTContext();
+
+  auto failed = [&]() -> bool {
+    // Invalidate the pattern and the var decl.
+    stmt->getPattern()->setType(ErrorType::get(Context));
+    stmt->getPattern()->forEachVariable([&](VarDecl *var) {
+      if (var->hasInterfaceType() && !var->isInvalid())
+        return;
+      var->setInvalid();
+    });
+    return true;
+  };
+
   auto sequenceProto = TypeChecker::getProtocol(
       dc->getASTContext(), stmt->getForLoc(), KnownProtocolKind::Sequence);
   if (!sequenceProto)
-    return true;
+    return failed();
 
   // Precheck the sequence.
   Expr *sequence = stmt->getSequence();
   if (ConstraintSystem::preCheckExpression(sequence, dc))
-    return true;
+    return failed();
   stmt->setSequence(sequence);
 
   // Precheck the filtering condition.
   if (Expr *whereExpr = stmt->getWhere()) {
     if (ConstraintSystem::preCheckExpression(whereExpr, dc))
-      return true;
+      return failed();
 
     stmt->setWhere(whereExpr);
   }
 
   auto target = SolutionApplicationTarget::forForEachStmt(
       stmt, sequenceProto, dc, /*bindPatternVarsOneWay=*/false);
-  return !typeCheckExpression(target);
+  if (!typeCheckExpression(target))
+    return failed();
+
+  return false;
 }
 
 bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
@@ -2352,100 +2352,9 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
     return true;
 
   auto resultTy = TypeChecker::typeCheckExpression(
-      expr, dc, boolDecl->getDeclaredType(),
+      expr, dc, boolDecl->getDeclaredInterfaceType(),
       CTP_Condition);
   return !resultTy;
-}
-
-bool TypeChecker::typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
-                                                 DeclContext *dc) {
-  auto &Context = dc->getASTContext();
-  bool hadError = false;
-  bool hadAnyFalsable = false;
-  auto cond = stmt->getCond();
-  for (auto &elt : cond) {
-    if (elt.getKind() == StmtConditionElement::CK_Availability) {
-      hadAnyFalsable = true;
-      continue;
-    }
-
-    if (auto E = elt.getBooleanOrNull()) {
-      assert(!E->getType() && "the bool condition is already type checked");
-      hadError |= typeCheckCondition(E, dc);
-      elt.setBoolean(E);
-      hadAnyFalsable = true;
-      continue;
-    }
-    assert(elt.getKind() != StmtConditionElement::CK_Boolean);
-
-    // This is cleanup goop run on the various paths where type checking of the
-    // pattern binding fails.
-    auto typeCheckPatternFailed = [&] {
-      hadError = true;
-      elt.getPattern()->setType(ErrorType::get(Context));
-      elt.getInitializer()->setType(ErrorType::get(Context));
-
-      elt.getPattern()->forEachVariable([&](VarDecl *var) {
-        // Don't change the type of a variable that we've been able to
-        // compute a type for.
-        if (var->hasInterfaceType() && !var->getType()->hasError())
-          return;
-        var->setInvalid();
-      });
-    };
-
-    // Resolve the pattern.
-    assert(!elt.getPattern()->hasType() &&
-           "the pattern binding condition is already type checked");
-    auto *pattern = TypeChecker::resolvePattern(elt.getPattern(), dc,
-                                                /*isStmtCondition*/ true);
-    if (!pattern) {
-      typeCheckPatternFailed();
-      continue;
-    }
-    elt.setPattern(pattern);
-
-    // Check the pattern, it allows unspecified types because the pattern can
-    // provide type information.
-    auto contextualPattern = ContextualPattern::forRawPattern(pattern, dc);
-    Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
-    if (patternType->hasError()) {
-      typeCheckPatternFailed();
-      continue;
-    }
-
-    // If the pattern didn't get a type, it's because we ran into some
-    // unknown types along the way. We'll need to check the initializer.
-    auto init = elt.getInitializer();
-    hadError |= TypeChecker::typeCheckBinding(pattern, init, dc, patternType);
-    elt.setPattern(pattern);
-    elt.setInitializer(init);
-    hadAnyFalsable |= pattern->isRefutablePattern();
-  }
-
-  // If the binding is not refutable, and there *is* an else, reject it as
-  // unreachable.
-  if (!hadAnyFalsable && !hadError) {
-    auto &diags = dc->getASTContext().Diags;
-    Diag<> msg = diag::invalid_diagnostic;
-    switch (stmt->getKind()) {
-    case StmtKind::If:
-      msg = diag::if_always_true;
-      break;
-    case StmtKind::While:
-      msg = diag::while_always_true;
-      break;
-    case StmtKind::Guard:
-      msg = diag::guard_always_succeeds;
-      break;
-    default:
-      llvm_unreachable("unknown LabeledConditionalStmt kind");
-    }
-    diags.diagnose(cond[0].getStartLoc(), msg);
-  }
-
-  stmt->setCond(cond);
-  return false;
 }
 
 /// Find the '~=` operator that can compare an expression inside a pattern to a
@@ -2551,7 +2460,7 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
         }
         for (auto proto : archetypeType->getConformsTo()) {
           cs.addConstraint(ConstraintKind::ConformsTo, replacement,
-                           proto->getDeclaredType(), locator);
+                           proto->getDeclaredInterfaceType(), locator);
         }
         types[origType] = replacement;
         return replacement;
@@ -2846,6 +2755,22 @@ void Solution::dump(raw_ostream &out) const {
     out.indent(2) << restriction.first.first
                   << " to " << restriction.first.second
                   << " is " << getName(restriction.second) << "\n";
+  }
+
+  out << "\n";
+  out << "Trailing closure matching:\n";
+  for (auto &trailingClosureMatching : trailingClosureMatchingChoices) {
+    out.indent(2);
+    trailingClosureMatching.first->dump(sm, out);
+    switch (trailingClosureMatching.second) {
+    case TrailingClosureMatching::Forward:
+      out << ": forward\n";
+      break;
+
+    case TrailingClosureMatching::Backward:
+      out << ": backward\n";
+      break;
+    }
   }
 
   out << "\nDisjunction choices:\n";
@@ -3901,7 +3826,7 @@ static bool checkForDynamicAttribute(CanType ty,
   // (superclass or protocols) have the attribute.
   if (auto archetype = dyn_cast<ArchetypeType>(ty)) {
     for (auto proto : archetype->getConformsTo()) {
-      if (hasAttribute(proto->getDeclaredType()))
+      if (hasAttribute(proto->getDeclaredInterfaceType()))
         return true;
     }
     if (auto superclass = archetype->getSuperclass()) {
@@ -3932,7 +3857,7 @@ static bool checkForDynamicAttribute(CanType ty,
 
   // Check the protocols the type conforms to.
   for (auto proto : nominal->getAllProtocols()) {
-    if (hasAttribute(proto->getDeclaredType()))
+    if (hasAttribute(proto->getDeclaredInterfaceType()))
       return true;
   }
 
@@ -3987,7 +3912,6 @@ void swift::forEachExprInConstraintSystem(
     }
     bool walkToDeclPre(Decl *D) override { return false; }
     bool walkToTypeReprPre(TypeRepr *T) override { return false; }
-    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
   };
 
   expr->walk(ChildWalker(callback));

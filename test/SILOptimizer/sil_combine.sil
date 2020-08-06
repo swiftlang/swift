@@ -2995,6 +2995,292 @@ bb0(%0 : $*Array<Error>):
   return %52 : $()
 }
 
+struct TestError: Error {
+  var payload: AnyObject
+}
+
+struct OtherError: Error {
+  var payload: AnyObject
+}
+
+// CHECK-LABEL: sil @unconditional_existential_box_cast
+// CHECK:      [[E:%[0-9]+]] = alloc_stack $Error
+// CHECK:      [[T:%[0-9]+]] = alloc_stack $TestError
+// CHECK-NEXT: retain_value %0
+// CHECK-NEXT: destroy_addr [[E]]
+// CHECK-NEXT: store %0 to [[T]]
+// CHECK-NEXT: struct_element_addr
+// CHECK:   } // end sil function 'unconditional_existential_box_cast'
+sil @unconditional_existential_box_cast : $@convention(thin) (@guaranteed TestError) -> @owned AnyObject {
+bb0(%0 : $TestError):
+  %1 = alloc_existential_box $Error, $TestError
+  %2 = project_existential_box $TestError in %1 : $Error
+  store %0 to %2 : $*TestError
+  %4 = builtin "willThrow"(%1 : $Error) : $()
+  %5 = alloc_stack $Error
+  strong_retain %1 : $Error
+  store %1 to %5 : $*Error
+  %7 = alloc_stack $TestError
+  unconditional_checked_cast_addr Error in %5 : $*Error to TestError in %7 : $*TestError
+  %10 = struct_element_addr %7 : $*TestError, #TestError.payload
+  %11 = load %10 : $*AnyObject
+  strong_release %1 : $Error
+  dealloc_stack %7 : $*TestError
+  dealloc_stack %5 : $*Error
+  return %11 : $AnyObject
+}
+
+sil @unknown_use_of_TestError : $@convention(thin) (@inout TestError) -> ()
+
+// CHECK-LABEL: sil @unconditional_existential_box_cast_unknown_user1
+// CHECK:   unconditional_checked_cast_addr
+// CHECK: } // end sil function 'unconditional_existential_box_cast_unknown_user1'
+sil @unconditional_existential_box_cast_unknown_user1 : $@convention(thin) (@guaranteed TestError) -> @owned AnyObject {
+bb0(%0 : $TestError):
+  %1 = alloc_existential_box $Error, $TestError
+  %2 = project_existential_box $TestError in %1 : $Error
+  store %0 to %2 : $*TestError
+  %4 = builtin "willThrow"(%1 : $Error) : $()
+  %u = function_ref @unknown_use_of_TestError : $@convention(thin) (@inout TestError) -> ()
+  %r = apply %u(%2) : $@convention(thin) (@inout TestError) -> ()
+  %5 = alloc_stack $Error
+  strong_retain %1 : $Error
+  store %1 to %5 : $*Error
+  %7 = alloc_stack $TestError
+  unconditional_checked_cast_addr Error in %5 : $*Error to TestError in %7 : $*TestError
+  %10 = struct_element_addr %7 : $*TestError, #TestError.payload
+  %11 = load %10 : $*AnyObject
+  strong_release %1 : $Error
+  dealloc_stack %7 : $*TestError
+  dealloc_stack %5 : $*Error
+  return %11 : $AnyObject
+}
+
+sil @unknown_use_of_box : $@convention(thin) (Error) -> ()
+
+// CHECK-LABEL: sil @unconditional_existential_box_cast_unknown_user2
+// CHECK:   unconditional_checked_cast_addr
+// CHECK: } // end sil function 'unconditional_existential_box_cast_unknown_user2'
+sil @unconditional_existential_box_cast_unknown_user2 : $@convention(thin) (@guaranteed TestError) -> @owned AnyObject {
+bb0(%0 : $TestError):
+  %1 = alloc_existential_box $Error, $TestError
+  %2 = project_existential_box $TestError in %1 : $Error
+  store %0 to %2 : $*TestError
+  %4 = builtin "willThrow"(%1 : $Error) : $()
+  %u = function_ref @unknown_use_of_box : $@convention(thin) (Error) -> ()
+  %r = apply %u(%1) : $@convention(thin) (Error) -> ()
+  %5 = alloc_stack $Error
+  strong_retain %1 : $Error
+  store %1 to %5 : $*Error
+  %7 = alloc_stack $TestError
+  unconditional_checked_cast_addr Error in %5 : $*Error to TestError in %7 : $*TestError
+  %10 = struct_element_addr %7 : $*TestError, #TestError.payload
+  %11 = load %10 : $*AnyObject
+  strong_release %1 : $Error
+  dealloc_stack %7 : $*TestError
+  dealloc_stack %5 : $*Error
+  return %11 : $AnyObject
+}
+
+sil @unknown_use_of_Error : $@convention(thin) (@inout Error) -> ()
+
+// CHECK-LABEL: sil @unconditional_existential_box_cast_unknown_user3
+// CHECK:   unconditional_checked_cast_addr
+// CHECK: } // end sil function 'unconditional_existential_box_cast_unknown_user3'
+sil @unconditional_existential_box_cast_unknown_user3 : $@convention(thin) (@guaranteed TestError) -> @owned AnyObject {
+bb0(%0 : $TestError):
+  %1 = alloc_existential_box $Error, $TestError
+  %2 = project_existential_box $TestError in %1 : $Error
+  store %0 to %2 : $*TestError
+  %4 = builtin "willThrow"(%1 : $Error) : $()
+  %5 = alloc_stack $Error
+  strong_retain %1 : $Error
+  store %1 to %5 : $*Error
+  %u = function_ref @unknown_use_of_Error : $@convention(thin) (@inout Error) -> ()
+  %r = apply %u(%5) : $@convention(thin) (@inout Error) -> ()
+  %7 = alloc_stack $TestError
+  unconditional_checked_cast_addr Error in %5 : $*Error to TestError in %7 : $*TestError
+  %10 = struct_element_addr %7 : $*TestError, #TestError.payload
+  %11 = load %10 : $*AnyObject
+  strong_release %1 : $Error
+  dealloc_stack %7 : $*TestError
+  dealloc_stack %5 : $*Error
+  return %11 : $AnyObject
+}
+
+// CHECK-LABEL: sil @unconditional_existential_box_cast_multiple_stores1
+// CHECK:   unconditional_checked_cast_addr
+// CHECK: } // end sil function 'unconditional_existential_box_cast_multiple_stores1'
+sil @unconditional_existential_box_cast_multiple_stores1 : $@convention(thin) (@guaranteed TestError, @guaranteed TestError) -> @owned AnyObject {
+bb0(%0 : $TestError, %0a : $TestError):
+  %1 = alloc_existential_box $Error, $TestError
+  %2 = project_existential_box $TestError in %1 : $Error
+  store %0 to %2 : $*TestError
+  store %0a to %2 : $*TestError
+  %4 = builtin "willThrow"(%1 : $Error) : $()
+  %5 = alloc_stack $Error
+  strong_retain %1 : $Error
+  store %1 to %5 : $*Error
+  %7 = alloc_stack $TestError
+  unconditional_checked_cast_addr Error in %5 : $*Error to TestError in %7 : $*TestError
+  %10 = struct_element_addr %7 : $*TestError, #TestError.payload
+  %11 = load %10 : $*AnyObject
+  strong_release %1 : $Error
+  dealloc_stack %7 : $*TestError
+  dealloc_stack %5 : $*Error
+  return %11 : $AnyObject
+}
+
+// CHECK-LABEL: sil @unconditional_existential_box_cast_multiple_stores2
+// CHECK:   unconditional_checked_cast_addr
+// CHECK: } // end sil function 'unconditional_existential_box_cast_multiple_stores2'
+sil @unconditional_existential_box_cast_multiple_stores2 : $@convention(thin) (@guaranteed TestError, @owned Error) -> @owned AnyObject {
+bb0(%0 : $TestError, %0a : $Error):
+  %1 = alloc_existential_box $Error, $TestError
+  %2 = project_existential_box $TestError in %1 : $Error
+  store %0 to %2 : $*TestError
+  %4 = builtin "willThrow"(%1 : $Error) : $()
+  %5 = alloc_stack $Error
+  store %1 to %5 : $*Error
+  store %0a to %5 : $*Error
+  %7 = alloc_stack $TestError
+  unconditional_checked_cast_addr Error in %5 : $*Error to TestError in %7 : $*TestError
+  %10 = struct_element_addr %7 : $*TestError, #TestError.payload
+  %11 = load %10 : $*AnyObject
+  strong_release %1 : $Error
+  dealloc_stack %7 : $*TestError
+  dealloc_stack %5 : $*Error
+  return %11 : $AnyObject
+}
+
+// CHECK-LABEL: sil @unconditional_existential_box_cast_wrong_type
+// CHECK:   unconditional_checked_cast_addr
+// CHECK: } // end sil function 'unconditional_existential_box_cast_wrong_type'
+sil @unconditional_existential_box_cast_wrong_type : $@convention(thin) (@guaranteed TestError) -> @owned AnyObject {
+bb0(%0 : $TestError):
+  %1 = alloc_existential_box $Error, $TestError
+  %2 = project_existential_box $TestError in %1 : $Error
+  store %0 to %2 : $*TestError
+  %4 = builtin "willThrow"(%1 : $Error) : $()
+  %5 = alloc_stack $Error
+  strong_retain %1 : $Error
+  store %1 to %5 : $*Error
+  %7 = alloc_stack $OtherError
+  unconditional_checked_cast_addr Error in %5 : $*Error to OtherError in %7 : $*OtherError
+  %10 = struct_element_addr %7 : $*OtherError, #OtherError.payload
+  %11 = load %10 : $*AnyObject
+  strong_release %1 : $Error
+  dealloc_stack %7 : $*OtherError
+  dealloc_stack %5 : $*Error
+  return %11 : $AnyObject
+}
+
+// CHECK-LABEL: sil @unconditional_existential_box_cast_not_dominating
+// CHECK:      [[E:%[0-9]+]] = alloc_stack $Error
+// CHECK:      [[T:%[0-9]+]] = alloc_stack $TestError
+// CHECK-NEXT: retain_value %0
+// CHECK-NEXT: destroy_addr [[E]]
+// CHECK-NEXT: store %0 to [[T]]
+// CHECK-NEXT: struct_element_addr
+// CHECK:   } // end sil function 'unconditional_existential_box_cast_not_dominating'
+sil @unconditional_existential_box_cast_not_dominating : $@convention(thin) (@guaranteed TestError) -> @owned AnyObject {
+bb0(%0 : $TestError):
+  %1 = alloc_existential_box $Error, $TestError
+  %2 = project_existential_box $TestError in %1 : $Error
+  cond_br undef, bb1, bb2
+bb1:
+  store %0 to %2 : $*TestError
+  br bb2
+bb2:
+  cond_br undef, bb3, bb4
+bb3:
+  %4 = builtin "willThrow"(%1 : $Error) : $()
+  %5 = alloc_stack $Error
+  strong_retain %1 : $Error
+  store %1 to %5 : $*Error
+  %7 = alloc_stack $TestError
+  unconditional_checked_cast_addr Error in %5 : $*Error to TestError in %7 : $*TestError
+  %10 = struct_element_addr %7 : $*TestError, #TestError.payload
+  %11 = load %10 : $*AnyObject
+  strong_release %1 : $Error
+  dealloc_stack %7 : $*TestError
+  dealloc_stack %5 : $*Error
+  return %11 : $AnyObject
+bb4:
+  %20 = integer_literal $Builtin.Int1, -1
+  cond_fail %20 : $Builtin.Int1
+  unreachable
+}
+
+// CHECK-LABEL: sil @conditional_existential_box_cast
+// CHECK:      [[E:%[0-9]+]] = alloc_stack $Error
+// CHECK:      [[T:%[0-9]+]] = alloc_stack $TestError
+// CHECK-NEXT: retain_value %0
+// CHECK-NEXT: store %0 to [[T]]
+// CHECK-NEXT: [[I:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: cond_br [[I]], bb1, bb2
+// CHECK:   } // end sil function 'conditional_existential_box_cast'
+sil @conditional_existential_box_cast : $@convention(thin) (@guaranteed TestError) -> @owned AnyObject {
+bb0(%0 : $TestError):
+  %1 = alloc_existential_box $Error, $TestError
+  %2 = project_existential_box $TestError in %1 : $Error
+  store %0 to %2 : $*TestError
+  %4 = builtin "willThrow"(%1 : $Error) : $()
+  %5 = alloc_stack $Error
+  strong_retain %1 : $Error
+  store %1 to %5 : $*Error
+  %7 = alloc_stack $TestError
+  checked_cast_addr_br copy_on_success Error in %5 : $*Error to TestError in %7 : $*TestError, bb1, bb2
+
+bb1:
+  %10 = struct_element_addr %7 : $*TestError, #TestError.payload
+  %11 = load %10 : $*AnyObject
+  strong_release %1 : $Error
+  dealloc_stack %7 : $*TestError
+  dealloc_stack %5 : $*Error
+  return %11 : $AnyObject
+
+bb2:
+  %20 = integer_literal $Builtin.Int1, -1
+  cond_fail %20 : $Builtin.Int1
+  unreachable
+}
+
+// CHECK-LABEL: sil @taking_conditional_existential_box_cast
+// CHECK:      [[E:%[0-9]+]] = alloc_stack $Error
+// CHECK:      [[T:%[0-9]+]] = alloc_stack $TestError
+// CHECK-NEXT: retain_value %0
+// CHECK-NEXT: destroy_addr [[E]]
+// CHECK-NEXT: store %0 to [[T]]
+// CHECK-NEXT: [[I:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: cond_br [[I]], bb1, bb2
+// CHECK:   } // end sil function 'taking_conditional_existential_box_cast'
+sil @taking_conditional_existential_box_cast : $@convention(thin) (@guaranteed TestError) -> @owned AnyObject {
+bb0(%0 : $TestError):
+  %1 = alloc_existential_box $Error, $TestError
+  %2 = project_existential_box $TestError in %1 : $Error
+  store %0 to %2 : $*TestError
+  %4 = builtin "willThrow"(%1 : $Error) : $()
+  %5 = alloc_stack $Error
+  strong_retain %1 : $Error
+  store %1 to %5 : $*Error
+  %7 = alloc_stack $TestError
+  checked_cast_addr_br take_on_success Error in %5 : $*Error to TestError in %7 : $*TestError, bb1, bb2
+
+bb1:
+  %10 = struct_element_addr %7 : $*TestError, #TestError.payload
+  %11 = load %10 : $*AnyObject
+  strong_release %1 : $Error
+  dealloc_stack %7 : $*TestError
+  dealloc_stack %5 : $*Error
+  return %11 : $AnyObject
+
+bb2:
+  %20 = integer_literal $Builtin.Int1, -1
+  cond_fail %20 : $Builtin.Int1
+  unreachable
+}
+
 sil [reabstraction_thunk] @_TTRXFo_oSS_dSb_XFo_iSS_iSb_ : $@convention(thin) (@in String, @owned @callee_owned (@owned String) -> Bool) -> @out Bool
 sil [reabstraction_thunk] @_TTRXFo_iSS_iSb_XFo_oSS_dSb_ : $@convention(thin) (@owned String, @owned @callee_owned (@in String) -> @out Bool) -> Bool
 

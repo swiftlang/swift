@@ -49,7 +49,7 @@ class TestCache(unittest.TestCase):
             def func():
                 return None
 
-        mock_lru_cache.assert_called()
+        assert(mock_lru_cache.called)
 
     def test_call_with_no_args(self):
         # Increments the counter once per unique call.

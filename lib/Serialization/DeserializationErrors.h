@@ -352,6 +352,13 @@ public:
     this->numVTableEntries = numVTableEntries;
   }
 
+  template <typename UnderlyingErrorT>
+  bool underlyingReasonIsA() const {
+    if (!underlyingReason)
+      return false;
+    return underlyingReason->isA<UnderlyingErrorT>();
+  }
+
   void log(raw_ostream &OS) const override {
     OS << "could not deserialize type for '" << name << "'";
     if (underlyingReason) {

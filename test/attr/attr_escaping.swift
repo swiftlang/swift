@@ -44,6 +44,11 @@ struct StoresClosure {
     return ["ultimate answer": fn] // expected-error{{using non-escaping parameter 'fn' in a context expecting an @escaping closure}}
   }
 
+  func autoclosureDictPack(_ fn: @autoclosure () -> Int) -> [String: () -> Int] {
+    // expected-note@-1{{parameter 'fn' is implicitly non-escaping}} {{46-46= @escaping}}
+    return ["ultimate answer": fn] // expected-error{{using non-escaping parameter 'fn' in a context expecting an @escaping closure}}
+  }
+
   func arrayPack(_ fn: @escaping () -> Int, _ fn2 : () -> Int) -> [() -> Int] {
     // expected-note@-1{{parameter 'fn2' is implicitly non-escaping}} {{53-53=@escaping }}
 

@@ -1070,7 +1070,7 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
                                        { proto->getSelfInterfaceType() },
                                        sanitizedRequirements,
                                        QuerySubstitutionMap{substitutions},
-                                       nullptr, options);
+                                       options);
   switch (result) {
   case RequirementCheckResult::Failure:
     ++NumSolutionStatesFailedCheck;
@@ -1117,7 +1117,7 @@ bool AssociatedTypeInference::checkConstrainedExtension(ExtensionDecl *ext) {
                        ext->getGenericSignature()->getGenericParams(),
                        ext->getGenericSignature()->getRequirements(),
                        QueryTypeSubstitutionMap{subs},
-                       nullptr, options)) {
+                       options)) {
   case RequirementCheckResult::Success:
   case RequirementCheckResult::SubstitutionFailure:
     return false;
@@ -1698,7 +1698,7 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
                        diag::default_associated_type_req_fail,
                        failedDefaultedWitness,
                        failedDefaultedAssocType->getName(),
-                       proto->getDeclaredType(),
+                       proto->getDeclaredInterfaceType(),
                        failedDefaultedResult.getRequirement(),
                        failedDefaultedResult.isConformanceRequirement());
       });

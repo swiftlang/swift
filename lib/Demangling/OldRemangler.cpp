@@ -627,6 +627,10 @@ void Remangler::mangleValueWitnessTable(Node *node) {
   mangleSingleChildNode(node); // type
 }
 
+void Remangler::mangleAsyncAnnotation(Node *node) {
+  Buffer << "Z";
+}
+
 void Remangler::mangleThrowsAnnotation(Node *node) {
   Buffer << "z";
 }
@@ -2106,7 +2110,7 @@ void Remangler::mangleSugaredParen(Node *node) {
 }
 
 void Remangler::mangleOpaqueReturnType(Node *node) {
-  unreachable("unsupported");
+  Buffer << "Qu";
 }
 void Remangler::mangleOpaqueReturnTypeOf(Node *node, EntityContext &ctx) {
   unreachable("unsupported");

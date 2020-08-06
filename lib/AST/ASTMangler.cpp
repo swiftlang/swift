@@ -534,7 +534,7 @@ std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
 }
 
 std::string ASTMangler::mangleTypeForTypeName(Type type) {
-  beginMangling();
+  beginManglingWithoutPrefix();
   appendType(type);
   return finalize();
 }
@@ -2272,7 +2272,9 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
                                          const ValueDecl *forDecl) {
   appendFunctionResultType(fn->getResult(), forDecl);
   appendFunctionInputType(fn->getParams(), forDecl);
-  if (fn->throws())
+  if (fn->isAsync())
+    appendOperator("Y");
+  if (fn->isThrowing())
     appendOperator("K");
 }
 

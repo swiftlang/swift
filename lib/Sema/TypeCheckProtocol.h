@@ -234,6 +234,9 @@ enum class MatchKind : uint8_t {
   /// The witness would match if an additional requirement were met.
   MissingRequirement,
 
+  /// The witness and requirement disagree on 'async'.
+  AsyncConflict,
+
   /// The witness throws, but the requirement does not.
   ThrowsConflict,
 
@@ -493,6 +496,7 @@ struct RequirementMatch {
     case MatchKind::NonMutatingConflict:
     case MatchKind::ConsumingConflict:
     case MatchKind::RethrowsConflict:
+    case MatchKind::AsyncConflict:
     case MatchKind::ThrowsConflict:
     case MatchKind::NonObjC:
     case MatchKind::MissingDifferentiableAttr:
@@ -524,6 +528,7 @@ struct RequirementMatch {
     case MatchKind::NonMutatingConflict:
     case MatchKind::ConsumingConflict:
     case MatchKind::RethrowsConflict:
+    case MatchKind::AsyncConflict:
     case MatchKind::ThrowsConflict:
     case MatchKind::NonObjC:
     case MatchKind::MissingDifferentiableAttr:
