@@ -676,21 +676,12 @@ struct S40<E: Equatable>: P40c {
   typealias B = Self
 }
 
-// Self is not treated as a fixed type witness.
+// Fails to find the fixed type witness B == FIXME_S1<A>.
 protocol FIXME_P1a {
-  associatedtype A // expected-note {{protocol requires nested type 'A'}}
-}
-protocol FIXME_P1b: FIXME_P1a where A == Self {}
-// expected-error@+2 {{type 'FIXME_S1' does not conform to protocol 'FIXME_P1a'}}
-// expected-error@+1 {{type 'FIXME_S1' does not conform to protocol 'FIXME_P1b'}}
-struct FIXME_S1: FIXME_P1b {}
-
-// Fails to find the fixed type witness B == FIXME_S2<A>.
-protocol FIXME_P2a {
   associatedtype A: Equatable = Never // expected-note {{protocol requires nested type 'A'}}
-  associatedtype B: FIXME_P2a // expected-note {{protocol requires nested type 'B'}}
+  associatedtype B: FIXME_P1a // expected-note {{protocol requires nested type 'B'}}
 }
-protocol FIXME_P2b: FIXME_P2a where B == FIXME_S2<A> {}
-// expected-error@+2 {{type 'FIXME_S2<T>' does not conform to protocol 'FIXME_P2a'}}
-// expected-error@+1 {{type 'FIXME_S2<T>' does not conform to protocol 'FIXME_P2b'}}
-struct FIXME_S2<T: Equatable>: FIXME_P2b {}
+protocol FIXME_P1b: FIXME_P1a where B == FIXME_S1<A> {}
+// expected-error@+2 {{type 'FIXME_S1<T>' does not conform to protocol 'FIXME_P1a'}}
+// expected-error@+1 {{type 'FIXME_S1<T>' does not conform to protocol 'FIXME_P1b'}}
+struct FIXME_S1<T: Equatable>: FIXME_P1b {}
