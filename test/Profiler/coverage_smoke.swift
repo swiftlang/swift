@@ -134,8 +134,8 @@ var g2: Int = 0
 
 class Class3 {
   var m1 = g2 == 0     // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
-             ? "false" // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
-             : "true"; // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
+             ? "false" // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+             : "true"; // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
 }
 
 // rdar://34244637: Wrong coverage for do/catch sequence
