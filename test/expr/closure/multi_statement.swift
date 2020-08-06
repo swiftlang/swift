@@ -12,9 +12,15 @@ enum MyError: Error {
   case featureIsTooCool
 }
 
+enum State {
+  case suspended
+  case partial(Int, Int)
+  case finished
+}
+
 func random(_: Int) -> Bool { return false }
 
-func mapWithMoreStatements(ints: [Int]) throws {
+func mapWithMoreStatements(ints: [Int], state: State) throws {
   let _ = try ints.map { i in
     guard var actualValue = maybeGetValue(i) else {
       return String(0)
@@ -51,6 +57,19 @@ func mapWithMoreStatements(ints: [Int]) throws {
         continue
       }
 
+      switch (state, j) {
+      case (.suspended, 0):
+        print("something")
+        fallthrough
+      case (.finished, 0):
+        print("something else")
+
+      case (.partial(let current, let end), let j):
+        print("\(current) of \(end): \(j)")
+
+      default:
+        print("so, here we are")
+      }
       print("even")
       throw MyError.featureIsTooCool
     }

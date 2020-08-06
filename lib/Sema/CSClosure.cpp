@@ -209,14 +209,60 @@ private:
     cs.setSolutionApplicationTarget(poundAssertStmt, target);
   }
 
+  void visitSwitchStmt(SwitchStmt *switchStmt) {
+    // FIXME: Very similar to BuilderTransform's visitSwitchStmt. Unify them.
+
+    // Generate constraints for the subject expression, and capture its
+    // type for use in matching the various patterns.
+    Expr *subjectExpr = switchStmt->getSubjectExpr();
+    ASTContext &ctx = cs.getASTContext();
+
+    // Form a one-way constraint to prevent backward propagation.
+    subjectExpr = new (ctx) OneWayExpr(subjectExpr);
+
+    // FIXME: Add contextual type purpose for switch subjects?
+    SolutionApplicationTarget target(
+        subjectExpr, closure, CTP_Unused, Type(), /*isDiscarded=*/false);
+    if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
+      hadError = true;
+      return;
+    }
+
+    cs.setSolutionApplicationTarget(switchStmt, target);
+    subjectExpr = target.getAsExpr();
+    assert(subjectExpr && "Must have a subject expression here");
+
+    // Visit the raw cases.
+    for (auto rawCase : switchStmt->getRawCases()) {
+      if (auto decl = rawCase.dyn_cast<Decl *>())
+        visitDecl(decl);
+      else
+        visitCaseStmt(cast<CaseStmt>(rawCase.get<Stmt *>()), subjectExpr);
+    }
+  }
+
+  void visitCaseStmt(CaseStmt *caseStmt, Expr *subjectExpr) {
+    auto locator = cs.getConstraintLocator(
+        subjectExpr, LocatorPathElt::ContextualType());
+    Type subjectType = cs.getType(subjectExpr);
+
+    if (cs.generateConstraints(caseStmt, closure, subjectType, locator)) {
+      hadError = true;
+      return;
+    }
+
+    // Visit the body.
+    visit(caseStmt->getBody());
+  }
+
+  void visitFallthroughStmt(FallthroughStmt *fallthroughStmt) { }
+
 #define UNSUPPORTED_STMT(STMT) void visit##STMT##Stmt(STMT##Stmt *) { \
       llvm_unreachable("Unsupported statement kind " #STMT);          \
   }
   UNSUPPORTED_STMT(Yield)
   UNSUPPORTED_STMT(DoCatch)
-  UNSUPPORTED_STMT(Switch)
   UNSUPPORTED_STMT(Case)
-  UNSUPPORTED_STMT(Fallthrough)
   UNSUPPORTED_STMT(Fail)
 #undef UNSUPPORTED_STMT
 };
@@ -503,14 +549,68 @@ private:
     return poundAssertStmt;
   }
 
+  ASTNode visitSwitchStmt(SwitchStmt *switchStmt) {
+    ConstraintSystem &cs = solution.getConstraintSystem();
+
+    // Rewrite the switch subject.
+    auto subjectTarget =
+        rewriteTarget(*cs.getSolutionApplicationTarget(switchStmt));
+    if (subjectTarget) {
+      switchStmt->setSubjectExpr(subjectTarget->getAsExpr());
+    } else {
+      hadError = true;
+    }
+
+    // Visit the raw cases.
+    bool limitExhaustivityChecks = false;
+    for (auto rawCase : switchStmt->getRawCases()) {
+      if (auto decl = rawCase.dyn_cast<Decl *>()) {
+        visitDecl(decl);
+        continue;
+      }
+
+      auto caseStmt = cast<CaseStmt>(rawCase.get<Stmt *>());
+      visitCaseStmt(caseStmt);
+
+      // Check restrictions on '@unknown'.
+      if (caseStmt->hasUnknownAttr()) {
+        checkUnknownAttrRestrictions(
+            cs.getASTContext(), caseStmt, limitExhaustivityChecks);
+      }
+    }
+
+    TypeChecker::checkSwitchExhaustiveness(
+        switchStmt, closure, limitExhaustivityChecks);
+
+    return switchStmt;
+  }
+
+  ASTNode visitCaseStmt(CaseStmt *caseStmt) {
+    // Translate the patterns and guard expressions for each case label item.
+    for (auto &caseLabelItem : caseStmt->getMutableCaseLabelItems()) {
+      SolutionApplicationTarget caseLabelTarget(&caseLabelItem, closure);
+      if (!rewriteTarget(caseLabelTarget)) {
+        hadError = true;
+      }
+    }
+
+    // Translate the body.
+    auto newBody = visit(caseStmt->getBody());
+    caseStmt->setBody(newBody.get<Stmt *>());
+    return caseStmt;
+  }
+
+  ASTNode visitFallthroughStmt(FallthroughStmt *fallthroughStmt) {
+    if (checkFallthroughStmt(closure, fallthroughStmt))
+      hadError = true;
+    return fallthroughStmt;
+  }
+
 #define UNSUPPORTED_STMT(STMT) ASTNode visit##STMT##Stmt(STMT##Stmt *) { \
       llvm_unreachable("Unsupported statement kind " #STMT);          \
   }
   UNSUPPORTED_STMT(Yield)
   UNSUPPORTED_STMT(DoCatch)
-  UNSUPPORTED_STMT(Switch)
-  UNSUPPORTED_STMT(Case)
-  UNSUPPORTED_STMT(Fallthrough)
   UNSUPPORTED_STMT(Fail)
 #undef UNSUPPORTED_STMT
 

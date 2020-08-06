@@ -616,7 +616,8 @@ static void checkFallthroughPatternBindingsAndTypes(
 /// \returns true if an error occurred.
 static bool checkFallthroughStmt(
     DeclContext *dc, FallthroughStmt *stmt,
-    CaseStmt *oldFallthroughSource, CaseStmt *oldFallthroughDest) {
+    CaseStmt *oldFallthroughSource, CaseStmt *oldFallthroughDest,
+    bool allowOldInfo) {
   CaseStmt *fallthroughSource;
   CaseStmt *fallthroughDest;
   ASTContext &ctx = dc->getASTContext();
@@ -624,9 +625,12 @@ static bool checkFallthroughStmt(
     auto sourceFile = dc->getParentSourceFile();
     std::tie(fallthroughSource, fallthroughDest) =
         ASTScope::lookupFallthroughSourceAndDest(sourceFile, stmt->getLoc());
-    assert(fallthroughSource == oldFallthroughSource);
-    assert(fallthroughDest == oldFallthroughDest);
+    assert(!allowOldInfo || fallthroughSource == oldFallthroughSource);
+    assert(!allowOldInfo || fallthroughDest == oldFallthroughDest);
   } else {
+    if (!allowOldInfo)
+      return false;
+
     fallthroughSource = oldFallthroughSource;
     fallthroughDest = oldFallthroughDest;
   }
@@ -645,6 +649,11 @@ static bool checkFallthroughStmt(
   checkFallthroughPatternBindingsAndTypes(
       ctx, fallthroughDest, fallthroughSource, stmt);
   return false;
+}
+
+bool swift::checkFallthroughStmt(DeclContext *dc, FallthroughStmt *stmt) {
+  return ::checkFallthroughStmt(
+      dc, stmt, nullptr, nullptr, /*allowOldInfo=*/false);
 }
 
 namespace {
@@ -1079,7 +1088,8 @@ public:
   }
 
   Stmt *visitFallthroughStmt(FallthroughStmt *S) {
-    if (checkFallthroughStmt(DC, S, FallthroughSource, FallthroughDest))
+    if (::checkFallthroughStmt(DC, S, FallthroughSource, FallthroughDest,
+                               /*allowOldInfo=*/true))
       return nullptr;
 
     return S;

@@ -1375,6 +1375,11 @@ LabeledStmt *findBreakOrContinueStmtTarget(
     bool isContinue, DeclContext *dc,
     ArrayRef<LabeledStmt *> oldActiveLabeledStmts);
 
+/// Check the correctness of a 'fallthrough' statement.
+///
+/// \returns true if an error occurred.
+bool checkFallthroughStmt(DeclContext *dc, FallthroughStmt *stmt);
+
 /// Check for restrictions on the use of the @unknown attribute on a
 /// case statement.
 void checkUnknownAttrRestrictions(
