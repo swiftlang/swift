@@ -10,3 +10,7 @@ func testTypeExprs() {
   let _ = [() async -> ()]()
   let _ = [() async throws -> ()]()
 }
+
+func testAwaitOperator() async {
+  let _ = __await asyncGlobal1()
+}
