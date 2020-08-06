@@ -2257,11 +2257,11 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
     // an `Optional`-typed value. `switch_enum` instructions require
     // special-case adjoint value propagation for the operand.
     auto isSwitchEnumInstOnOptional =
-        [&Ctx = getASTContext()](TermInst *termInst) {
+        [&ctx = getASTContext()](TermInst *termInst) {
           if (!termInst)
             return false;
           if (auto *sei = dyn_cast<SwitchEnumInst>(termInst)) {
-            auto *optionalEnumDecl = Ctx.getOptionalDecl();
+            auto *optionalEnumDecl = ctx.getOptionalDecl();
             auto operandTy = sei->getOperand()->getType();
             return operandTy.getASTType().getEnumOrBoundGenericEnum() ==
                    optionalEnumDecl;
