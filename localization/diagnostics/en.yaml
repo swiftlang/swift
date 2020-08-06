@@ -9232,7 +9232,17 @@
     %select{getter for |setter for |}0%1 is unavailable%select{ in
     %3|}2%select{|: %4}4
 
+- id: availability_decl_unavailable_warn
+  msg: >-
+    %select{getter for |setter for |}0%1 is unavailable%select{ in
+    %3|}2%select{|: %4}4
+
 - id: availability_decl_unavailable_rename
+  msg: >-
+    %select{getter for |setter for |}0%1 has been %select{renamed to|replaced
+    by}2%select{| instance method| property}3 '%4'%select{|: %5}5
+
+- id: availability_decl_unavailable_rename_warn
   msg: >-
     %select{getter for |setter for |}0%1 has been %select{renamed to|replaced
     by}2%select{| instance method| property}3 '%4'%select{|: %5}5
