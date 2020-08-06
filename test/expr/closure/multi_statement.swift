@@ -38,6 +38,10 @@ func mapWithMoreStatements(ints: [Int]) {
       }
     } while random(i)
 
+    defer {
+      print("I am so done here")
+    }
+
     for j in 0..<i where j % 2 == 0 {
       if j % 7 == 0 {
         continue

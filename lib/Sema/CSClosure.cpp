@@ -174,12 +174,12 @@ private:
 
   void visitBreakStmt(BreakStmt *breakStmt) { }
   void visitContinueStmt(ContinueStmt *continueStmt) { }
+  void visitDeferStmt(DeferStmt *deferStmt) { }
 
 #define UNSUPPORTED_STMT(STMT) void visit##STMT##Stmt(STMT##Stmt *) { \
       llvm_unreachable("Unsupported statement kind " #STMT);          \
   }
   UNSUPPORTED_STMT(Yield)
-  UNSUPPORTED_STMT(Defer)
   UNSUPPORTED_STMT(DoCatch)
   UNSUPPORTED_STMT(Switch)
   UNSUPPORTED_STMT(Case)
@@ -440,11 +440,20 @@ private:
     return continueStmt;
   }
 
+  ASTNode visitDeferStmt(DeferStmt *deferStmt) {
+    TypeChecker::typeCheckDecl(deferStmt->getTempDecl());
+
+    Expr *theCall = deferStmt->getCallExpr();
+    TypeChecker::typeCheckExpression(theCall, closure);
+    deferStmt->setCallExpr(theCall);
+
+    return deferStmt;
+  }
+
 #define UNSUPPORTED_STMT(STMT) ASTNode visit##STMT##Stmt(STMT##Stmt *) { \
       llvm_unreachable("Unsupported statement kind " #STMT);          \
   }
   UNSUPPORTED_STMT(Yield)
-  UNSUPPORTED_STMT(Defer)
   UNSUPPORTED_STMT(DoCatch)
   UNSUPPORTED_STMT(Switch)
   UNSUPPORTED_STMT(Case)
