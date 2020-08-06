@@ -1061,7 +1061,7 @@ struct as a parameter.
 Importing C++ class template instantiations
 ~~~~~~~~~~~~~~~~~~~
 
-The template instantiation is imported as a struct named `__CxxTemplateInst`
-plus Itanium mangled type of the instantiation. Double underscore (denoting a
-reserved C++ identifier) is used to discourage direct usage. The struct is
+A class template instantiation is imported as a struct named ``__CxxTemplateInst``
+plus Itanium mangled type of the instantiation (see the ``type`` production in the Itanium specification). Note that Itanium mangling is used on all platforms, regardless of the ABI of the C++ toolchain, to ensure that the mangled name is a valid Swift type name (this is not the case for MSVC mangled names). A prefix with a double underscore (to ensure we have a
+reserved C++ identifier) is added to limit the possibility for conflicts with names of user-defined structs. The struct is
 notionally defined in the ``__C`` module, similarly to regular C and C++ structs and classes.
