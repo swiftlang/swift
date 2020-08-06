@@ -1449,8 +1449,22 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_disable_concrete_type_metadata_mangled_name_accessors))
     Opts.DisableConcreteTypeMetadataMangledNameAccessors = true;
 
-  if (Args.hasArg(OPT_use_jit))
+  if (Args.hasArg(OPT_use_jit)) {
     Opts.UseJIT = true;
+    if (const Arg *A = Args.getLastArg(OPT_dump_jit)) {
+      llvm::Optional<swift::JITDebugArtifact> artifact =
+          llvm::StringSwitch<llvm::Optional<swift::JITDebugArtifact>>(A->getValue())
+              .Case("llvm-ir", JITDebugArtifact::LLVMIR)
+              .Case("object", JITDebugArtifact::Object)
+              .Default(None);
+      if (!artifact) {
+        Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                       A->getOption().getName(), A->getValue());
+        return true;
+      }
+      Opts.DumpJIT = *artifact;
+    }
+  }
 
   for (const Arg *A : Args.filtered(OPT_verify_type_layout)) {
     Opts.VerifyTypeLayoutNames.push_back(A->getValue());
