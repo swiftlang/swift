@@ -655,8 +655,6 @@ private:
   //--------------------------------------------------------------------------//
 
   /// Given a `wrappedAdjoint` value of type `T.TangentVector`, creates an
-  ///
-  /// Given a `wrappedAdjoint` value of type `T.TangentVector`, creates an
   /// `Optional<T>.TangentVector` value from it and adds it to the adjoint value
   /// of `optionalValue`.
   ///
