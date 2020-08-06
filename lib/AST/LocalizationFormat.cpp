@@ -1,5 +1,4 @@
-//===--- LocalizationFormat.cpp - YAML format for Diagnostic Messages ---*-
-// C++ -*-===//
+//===-- LocalizationFormat.cpp - Format for Diagnostic Messages -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -18,11 +17,14 @@
 #include "swift/AST/LocalizationFormat.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Bitstream/BitstreamReader.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
+#include <cstdint>
 #include <string>
+#include <system_error>
 #include <type_traits>
 
 namespace {
@@ -68,15 +70,54 @@ template <> struct MappingTraits<DiagnosticNode> {
 namespace swift {
 namespace diag {
 
-YAMLLocalizationProducer::YAMLLocalizationProducer(std::string locale,
-                                                   std::string path) {
-  llvm::SmallString<128> DiagnosticsFilePath(path);
-  llvm::sys::path::append(DiagnosticsFilePath, locale);
-  llvm::sys::path::replace_extension(DiagnosticsFilePath, ".yaml");
-  auto FileBufOrErr = llvm::MemoryBuffer::getFileOrSTDIN(DiagnosticsFilePath);
-  // Absence of localizations shouldn't crash the compiler.
-  if (!FileBufOrErr)
-    return;
+void SerializedLocalizationWriter::insert(swift::DiagID id,
+                                          llvm::StringRef translation) {
+  generator.insert(static_cast<uint32_t>(id), translation);
+}
+
+bool SerializedLocalizationWriter::emit(llvm::StringRef filePath) {
+  assert(llvm::sys::path::extension(filePath) == ".db");
+  std::error_code error;
+  llvm::raw_fd_ostream OS(filePath, error, llvm::sys::fs::F_None);
+  if (OS.has_error()) {
+    return true;
+  }
+
+  offset_type offset;
+  {
+    llvm::support::endian::write<offset_type>(OS, 0, llvm::support::little);
+    offset = generator.Emit(OS);
+  }
+  OS.seek(0);
+  llvm::support::endian::write(OS, offset, llvm::support::little);
+  OS.close();
+
+  return OS.has_error();
+}
+
+SerializedLocalizationProducer::SerializedLocalizationProducer(
+    std::unique_ptr<llvm::MemoryBuffer> buffer)
+    : Buffer(std::move(buffer)) {
+  auto base =
+      reinterpret_cast<const unsigned char *>(Buffer.get()->getBufferStart());
+  auto tableOffset = endian::read<offset_type>(base, little);
+  SerializedTable.reset(SerializedLocalizationTable::Create(
+      base + tableOffset, base + sizeof(offset_type), base));
+}
+
+llvm::StringRef SerializedLocalizationProducer::getMessageOr(
+    swift::DiagID id, llvm::StringRef defaultMessage) const {
+  auto value = SerializedTable.get()->find(id);
+  llvm::StringRef diagnosticMessage((const char *)value.getDataPtr(),
+                                    value.getDataLen());
+  if (diagnosticMessage.empty())
+    return defaultMessage;
+
+  return diagnosticMessage;
+}
+
+YAMLLocalizationProducer::YAMLLocalizationProducer(llvm::StringRef filePath) {
+  auto FileBufOrErr = llvm::MemoryBuffer::getFileOrSTDIN(filePath);
   llvm::MemoryBuffer *document = FileBufOrErr->get();
   diag::LocalizationInput yin(document->getBuffer());
   yin >> diagnostics;
@@ -91,6 +132,15 @@ YAMLLocalizationProducer::getMessageOr(swift::DiagID id,
   if (diagnosticMessage.empty())
     return defaultMessage;
   return diagnosticMessage;
+}
+
+void YAMLLocalizationProducer::forEachAvailable(
+    llvm::function_ref<void(swift::DiagID, llvm::StringRef)> callback) const {
+  for (uint32_t i = 0, n = diagnostics.size(); i != n; ++i) {
+    auto translation = diagnostics[i];
+    if (!translation.empty())
+      callback(static_cast<swift::DiagID>(i), translation);
+  }
 }
 
 template <typename T, typename Context>
