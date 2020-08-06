@@ -217,6 +217,10 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
     }
     addFunctionAttributes(F, decl->getAttrs(), mod, getOrCreateDeclaration,
                           constant);
+
+    if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(decl)) {
+      F->setAsync(funcDecl->hasAsync());
+    }
   }
 
   return F;
