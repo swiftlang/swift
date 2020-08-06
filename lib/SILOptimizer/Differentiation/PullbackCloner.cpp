@@ -2108,7 +2108,8 @@ void PullbackCloner::Implementation::accumulateAdjointForOptional(
 
   // Accumulate adjoint for the incoming `Optional` value.
   addToAdjointBuffer(bb, optionalValue, optTanAdjBuf, pbLoc);
-  // TODO: investigate why enabling this produces a crash for `Tracked<Float>?` differentiation.
+  // TODO: Investigate why enabling this produces a crash for `Tracked<Float>?`
+  // differentiation.
   // builder.emitDestroyAddr(pbLoc, optTanAdjBuf);
   builder.createDeallocStack(pbLoc, optTanAdjBuf);
 }
