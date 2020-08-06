@@ -24,6 +24,7 @@
 #include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/VersionTuple.h"
 
