@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/LocalizationFormat.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Bitstream/BitstreamReader.h"
@@ -28,16 +29,13 @@
 #include <type_traits>
 
 namespace {
+
 enum LocalDiagID : uint32_t {
 #define DIAG(KIND, ID, Options, Text, Signature) ID,
 #include "swift/AST/DiagnosticsAll.def"
   NumDiags
 };
 
-struct DiagnosticNode {
-  uint32_t id;
-  std::string msg;
-};
 } // namespace
 
 namespace llvm {
@@ -52,15 +50,6 @@ template <> struct ScalarEnumerationTraits<LocalDiagID> {
     // available in the `.def` file.
     if (io.matchEnumFallback())
       value = LocalDiagID::NumDiags;
-  }
-};
-
-template <> struct MappingTraits<DiagnosticNode> {
-  static void mapping(IO &io, DiagnosticNode &node) {
-    LocalDiagID diagID;
-    io.mapRequired("id", diagID);
-    io.mapRequired("msg", node.msg);
-    node.id = static_cast<uint32_t>(diagID);
   }
 };
 
@@ -121,6 +110,7 @@ YAMLLocalizationProducer::YAMLLocalizationProducer(llvm::StringRef filePath) {
   llvm::MemoryBuffer *document = FileBufOrErr->get();
   diag::LocalizationInput yin(document->getBuffer());
   yin >> diagnostics;
+  unknownIDs = std::move(yin.unknownIDs);
 }
 
 llvm::StringRef
@@ -143,31 +133,45 @@ void YAMLLocalizationProducer::forEachAvailable(
   }
 }
 
+llvm::Optional<uint32_t> LocalizationInput::readID(llvm::yaml::IO &io) {
+  LocalDiagID diagID;
+  io.mapRequired("id", diagID);
+  if (diagID == LocalDiagID::NumDiags)
+    return llvm::None;
+  return static_cast<uint32_t>(diagID);
+}
+
 template <typename T, typename Context>
 typename std::enable_if<llvm::yaml::has_SequenceTraits<T>::value, void>::type
-readYAML(llvm::yaml::IO &io, T &Seq, bool, Context &Ctx) {
+readYAML(llvm::yaml::IO &io, T &Seq, T &unknownIDs, bool, Context &Ctx) {
   unsigned count = io.beginSequence();
-  if (count)
+  if (count) {
     Seq.resize(LocalDiagID::NumDiags);
+  }
+
   for (unsigned i = 0; i < count; ++i) {
     void *SaveInfo;
     if (io.preflightElement(i, SaveInfo)) {
-      DiagnosticNode current;
-      yamlize(io, current, true, Ctx);
-      io.postflightElement(SaveInfo);
+      io.beginMapping();
 
-      // A diagnostic ID might be present in YAML and not in `.def` file,
-      // if that's the case ScalarEnumerationTraits will assign the diagnostic ID
-      // to `LocalDiagID::NumDiags`. Since the diagnostic ID isn't available
-      // in `.def` it shouldn't be stored in the diagnostics array.
-      if (current.id != LocalDiagID::NumDiags) {
+      // If the current diagnostic ID is available in YAML and in `.def`, add it
+      // to the diagnostics array. Otherwise, re-parse the current diagnnostic
+      // id as a string and store it in `unknownIDs` array.
+      if (auto id = LocalizationInput::readID(io)) {
         // YAML file isn't guaranteed to have diagnostics in order of their
         // declaration in `.def` files, to accommodate that we need to leave
         // holes in diagnostic array for diagnostics which haven't yet been
-        // localized and for the ones that have `DiagnosticNode::id`
-        // indicates their position.
-        Seq[static_cast<unsigned>(current.id)] = std::move(current.msg);
+        // localized and for the ones that have `id` indicates their position.
+        io.mapRequired("msg", Seq[*id]);
+      } else {
+        std::string unknownID, message;
+        // Read "raw" id since it doesn't exist in `.def` file.
+        io.mapRequired("id", unknownID);
+        io.mapRequired("msg", message);
+        unknownIDs.push_back(unknownID);
       }
+      io.endMapping();
+      io.postflightElement(SaveInfo);
     }
   }
   io.endSequence();
@@ -181,7 +185,7 @@ operator>>(LocalizationInput &yin, T &diagnostics) {
   if (yin.setCurrentDocument()) {
     // If YAML file's format doesn't match the current format in
     // DiagnosticMessageFormat, will throw an error.
-    readYAML(yin, diagnostics, true, Ctx);
+    readYAML(yin, diagnostics, yin.unknownIDs, true, Ctx);
   }
   return yin;
 }

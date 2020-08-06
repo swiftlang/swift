@@ -16,6 +16,7 @@
 
 #include "swift/AST/LocalizationFormat.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
@@ -80,6 +81,16 @@ int main(int argc, char *argv[]) {
     llvm::errs() << "Cannot serialize diagnostic file "
                  << options::InputFilePath << '\n';
     return EXIT_FAILURE;
+  }
+
+  // Print out the diagnostics IDs that are available in YAML but not available
+  // in `.def`
+  if (!yaml.unknownIDs.empty()) {
+    llvm::errs() << "These diagnostic IDs are no longer availiable: '";
+    llvm::interleave(
+        yaml.unknownIDs, [&](std::string id) { llvm::errs() << id; },
+        [&] { llvm::errs() << ", "; });
+    llvm::errs() << "'\n";
   }
 
   return EXIT_SUCCESS;
