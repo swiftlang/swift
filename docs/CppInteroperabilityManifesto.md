@@ -2576,7 +2576,7 @@ We could ignore explicit specializations of function templates, because they
 don't affect the API. Explicit specializations of class templates can
 dramatically change the API of the type.
 
-### Class templates: importing instantiation behind typedef
+### Class templates: importing full specializations behind typedefs
 
 Typedefs having template instantiation as their underlying type could be
 imported as a non-generit struct with the given name.
