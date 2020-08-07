@@ -4,7 +4,7 @@
 
 // REQUIRES: objc_interop
 // UNSUPPORTED: OS=iosmac
-// UNSUPPORTED: CPU=arm64e
+// UNSUPPORTED: CPU=arm64 || CPU=arm64e
 
 // See also eager-class-initialization-stable-abi.swift, for the stable ABI
 // deployment target test.
