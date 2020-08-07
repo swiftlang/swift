@@ -1,5 +1,7 @@
 // RUN: %swift -typecheck -verify -parse-stdlib -module-name Swift -target x86_64-apple-macosx11.0 %s
 
+// REQUIRES: rdar66693249
+
 
 @available(OSX, introduced: 10.5, deprecated: 10.8, obsoleted: 11.0,
               message: "you don't want to do that anyway")
