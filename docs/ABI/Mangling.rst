@@ -1127,9 +1127,9 @@ module:
 
   typedef MagicWrapper<MagicNumber> WrappedMagicNumber;
 
-``WrappedMagicNumber`` will be imported as a typealias for
-a struct ``__CxxTemplateInst12MagicWrapperI11MagicNumberE``. Interface of the
-imported module will look as follows:
+``WrappedMagicNumber`` will be imported as a typealias for a struct
+``__CxxTemplateInst12MagicWrapperI11MagicNumberE``. Interface of the imported
+module will look as follows:
 
 .. code-block:: swift
 
