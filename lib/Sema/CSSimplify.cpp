@@ -6590,6 +6590,14 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       baseObjTy->is<AnyMetatypeType>() &&
       constraintKind == ConstraintKind::UnresolvedValueMember) {
     if (auto objectType = instanceTy->getOptionalObjectType()) {
+      // If we don't have a wrapped type yet, we can't look through the optional
+      // type.
+      if (objectType->getAs<TypeVariableType>()) {
+        MemberLookupResult result;
+        result.OverallResult = MemberLookupResult::Unsolved;
+        return result;
+      }
+
       if (objectType->mayHaveMembers()) {
         LookupResult &optionalLookup = lookupMember(objectType, memberName);
         for (auto result : optionalLookup)
