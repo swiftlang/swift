@@ -703,3 +703,39 @@ LookupResult
 swift::lookupSemanticMember(DeclContext *DC, Type ty, DeclName name) {
   return TypeChecker::lookupMember(DC, ty, DeclNameRef(name), None);
 }
+
+void DotExprLookup::sawSolution(const constraints::Solution &S) {
+  GotCallback = true;
+  auto &CS = S.getConstraintSystem();
+
+  auto GetType = [&](Expr *E) {
+    return S.simplifyType(S.getType(E));
+  };
+
+  auto *ParsedExpr = CompletionExpr->getBase();
+  auto *SemanticExpr = ParsedExpr->getSemanticsProvidingExpr();
+
+  if (Type BaseTy = GetType(ParsedExpr)) {
+    auto *Locator = CS.getConstraintLocator(SemanticExpr);
+    Type ExpectedTy = GetType(CompletionExpr);
+    if (!CS.getParentExpr(CompletionExpr))
+      ExpectedTy = CS.getContextualType(CompletionExpr);
+
+    auto *CalleeLocator = S.getCalleeLocator(Locator);
+    ValueDecl *ReferencedDecl = nullptr;
+    if (auto SelectedOverload = S.getOverloadChoiceIfAvailable(CalleeLocator))
+      ReferencedDecl = SelectedOverload->choice.getDeclOrNull();
+
+    bool ISDMT = CS.isStaticallyDerivedMetatype(ParsedExpr);
+    auto Key = std::make_pair(BaseTy, ReferencedDecl);
+    auto Ret = ResultToIndex.insert({Key, Solutions.size()});
+    if (!Ret.second && ExpectedTy)
+      Solutions[Ret.first->getSecond()].ExpectedTypes.push_back(ExpectedTy);
+    else
+      Solutions.push_back({BaseTy, ReferencedDecl, {ExpectedTy}, ISDMT});
+  }
+}
+
+void DotExprLookup::simple_display(llvm::raw_ostream &out) const {
+  out << "DotExprLookup(" << this << ")";
+}

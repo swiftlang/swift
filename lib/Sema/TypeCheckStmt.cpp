@@ -673,6 +673,7 @@ public:
   /// Skip type checking any elements inside 'BraceStmt', also this is
   /// propagated to ConstraintSystem.
   bool LeaveBraceStmtBodyUnchecked = false;
+  CompletionCollector *Collector = nullptr;
 
   ASTContext &getASTContext() const { return Ctx; };
   
@@ -1608,6 +1609,15 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
       options |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
     }
 
+    if (Collector) {
+      TypeChecker::typeCheckForCodeCompletion(E, DC, Type(), CTP_Unused,
+        [&](const constraints::Solution &solution) {
+          Collector->sawSolution(solution);
+        });
+      node = E;
+      return;
+    }
+
     auto resultTy =
         TypeChecker::typeCheckExpression(E, DC, Type(), CTP_Unused, options);
 
@@ -1673,12 +1683,14 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
 }
 
 void TypeChecker::typeCheckASTNode(ASTNode &node, DeclContext *DC,
-                                   bool LeaveBodyUnchecked) {
+                                   bool LeaveBodyUnchecked,
+                                   CompletionCollector *Collector) {
   StmtChecker stmtChecker(DC);
   // FIXME: 'ActiveLabeledStmts', etc. in StmtChecker are not
   // populated. Since they don't affect "type checking", it's doesn't cause
   // any issue for now. But it should be populated nonetheless.
   stmtChecker.LeaveBraceStmtBodyUnchecked = LeaveBodyUnchecked;
+  stmtChecker.Collector = Collector;
   stmtChecker.typeCheckASTNode(node);
 }
 
@@ -1901,7 +1913,8 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
 
 bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
                                             DeclContext *DC,
-                                            SourceLoc Loc) const {
+                                            SourceLoc Loc,
+                                            CompletionCollector *Collector) const {
   auto &ctx = DC->getASTContext();
   assert(DiagnosticSuppression::isEnabled(ctx.Diags) &&
          "Diagnosing and Single ASTNode type checknig don't mix");
@@ -2014,13 +2027,13 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
   // the closure itself. So we need to try type checking the enclosing closure
   // signature first.
   if (auto CE = dyn_cast<ClosureExpr>(DC)) {
-    swift::typeCheckASTNodeAtLoc(CE->getParent(), CE->getLoc());
+    swift::typeCheckASTNodeAtLoc(CE->getParent(), CE->getLoc(), Collector);
     if (CE->getBodyState() != ClosureExpr::BodyState::ReadyForTypeChecking)
       return false;
   }
 
   TypeChecker::typeCheckASTNode(finder.getRef(), DC,
-                                /*LeaveBodyUnchecked=*/true);
+                                /*LeaveBodyUnchecked=*/true, Collector);
   return false;
 }
 

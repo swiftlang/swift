@@ -210,7 +210,7 @@ SWIFT_REQUEST(TypeChecker, TangentStoredPropertyRequest,
 SWIFT_REQUEST(TypeChecker, TypeCheckFunctionBodyRequest,
               bool(AbstractFunctionDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeCheckASTNodeAtLocRequest,
-              bool(DeclContext *, SourceLoc),
+              bool(DeclContext *, SourceLoc, CompletionCollector *),
               Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, UnderlyingTypeRequest, Type(TypeAliasDecl *),
               SeparatelyCached, NoLocationInfo)

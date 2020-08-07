@@ -38,11 +38,13 @@
 using namespace swift;
 using namespace ide;
 
+
 //===----------------------------------------------------------------------===//
 // typeCheckContextAt(DeclContext, SourceLoc)
 //===----------------------------------------------------------------------===//
 
-void swift::ide::typeCheckContextAt(DeclContext *DC, SourceLoc Loc) {
+void swift::ide::typeCheckContextAt(DeclContext *DC, SourceLoc Loc,
+                                    CompletionCollector *CC) {
   while (isa<AbstractClosureExpr>(DC))
     DC = DC->getParent();
 
@@ -110,7 +112,7 @@ void swift::ide::typeCheckContextAt(DeclContext *DC, SourceLoc Loc) {
     break;
 
   case DeclContextKind::TopLevelCodeDecl:
-    swift::typeCheckASTNodeAtLoc(DC, Loc);
+    swift::typeCheckASTNodeAtLoc(DC, Loc, CC);
     break;
 
   case DeclContextKind::AbstractFunctionDecl: {
@@ -118,7 +120,7 @@ void swift::ide::typeCheckContextAt(DeclContext *DC, SourceLoc Loc) {
     auto &SM = DC->getASTContext().SourceMgr;
     auto bodyRange = AFD->getBodySourceRange();
     if (SM.rangeContainsTokenLoc(bodyRange, Loc)) {
-      swift::typeCheckASTNodeAtLoc(DC, Loc);
+      swift::typeCheckASTNodeAtLoc(DC, Loc, CC);
     } else {
       assert(bodyRange.isInvalid() && "The body should not be parsed if the "
                                       "completion happens in the signature");

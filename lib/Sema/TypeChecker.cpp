@@ -422,12 +422,18 @@ void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
   TypeChecker::typeCheckPatternBinding(PBD, bindingIndex);
 }
 
-bool swift::typeCheckASTNodeAtLoc(DeclContext *DC, SourceLoc TargetLoc) {
+bool swift::typeCheckASTNodeAtLoc(DeclContext *DC, SourceLoc TargetLoc,
+                                  CompletionCollector *Collector) {
   auto &Ctx = DC->getASTContext();
   DiagnosticSuppression suppression(Ctx.Diags);
   return !evaluateOrDefault(Ctx.evaluator,
-                            TypeCheckASTNodeAtLocRequest{DC, TargetLoc},
+                            TypeCheckASTNodeAtLocRequest{DC, TargetLoc, Collector},
                             true);
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           CompletionCollector *collector) {
+  collector->simple_display(out);
 }
 
 bool swift::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {

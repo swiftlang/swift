@@ -55,6 +55,11 @@ struct TypeWitnessAndDecl;
 class ValueDecl;
 enum class OpaqueReadOwnership: uint8_t;
 class StorageImplInfo;
+class CompletionCollector;
+
+namespace constraints {
+  class Solution;
+}
 
 /// Display a nominal type or extension thereof.
 void simple_display(
@@ -915,7 +920,7 @@ public:
 /// Produces true if an error occurred, false otherwise.
 class TypeCheckASTNodeAtLocRequest
     : public SimpleRequest<TypeCheckASTNodeAtLocRequest,
-                           bool(DeclContext *, SourceLoc),
+                           bool(DeclContext *, SourceLoc, CompletionCollector *),
                            RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -924,8 +929,11 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, DeclContext *DC, SourceLoc Loc) const;
+  bool evaluate(Evaluator &evaluator, DeclContext *DC, SourceLoc Loc,
+                CompletionCollector *Collector) const;
 };
+
+void simple_display(llvm::raw_ostream &out, CompletionCollector *collector);
 
 /// Request to obtain a list of stored properties in a nominal type.
 ///

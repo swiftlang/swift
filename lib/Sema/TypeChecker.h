@@ -42,6 +42,7 @@ class TypeResolution;
 class TypeResolutionOptions;
 class TypoCorrectionResults;
 class ExprPattern;
+class CompletionCollector;
 enum class TypeResolutionStage : uint8_t;
 
 namespace constraints {
@@ -471,7 +472,8 @@ bool typesSatisfyConstraint(Type t1, Type t2, bool openArchetypes,
 Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
 
 void typeCheckASTNode(ASTNode &node, DeclContext *DC,
-                      bool LeaveBodyUnchecked = false);
+                      bool LeaveBodyUnchecked = false,
+                      CompletionCollector *Collector = nullptr);
 
 bool typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);
 

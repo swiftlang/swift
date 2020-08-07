@@ -1709,6 +1709,7 @@ public:
 
 private:
   void addKeywords(CodeCompletionResultSink &Sink, bool MaybeFuncBody);
+  bool trySolverCompletion();
   void deliverCompletionResults();
 };
 } // end anonymous namespace
@@ -2040,8 +2041,8 @@ public:
     HaveLParen = Value;
   }
 
-  void setIsSuperRefExpr() {
-    IsSuperRefExpr = true;
+  void setIsSuperRefExpr(bool Value = true) {
+    IsSuperRefExpr = Value;
   }
 
   void setIsSelfRefExpr(bool value) { IsSelfRefExpr = value; }
@@ -5797,8 +5798,84 @@ static void addConditionalCompilationFlags(ASTContext &Ctx,
   }
 }
 
+void DotExprLookup::performLookup(ide::CodeCompletionContext &CompletionCtx) const {
+  ASTContext &Ctx = DC->getASTContext();
+  CompletionLookup Lookup(CompletionCtx.getResultSink(), Ctx, DC,
+                          &CompletionCtx);
+  if (DotLoc.isValid())
+    Lookup.setHaveDot(DotLoc);
+
+  Expr *BaseExpr = CompletionExpr->getBase();
+  Lookup.setIsSuperRefExpr(isa<SuperRefExpr>(BaseExpr));
+
+  if (auto *DRE = dyn_cast<DeclRefExpr>(BaseExpr))
+    Lookup.setIsSelfRefExpr(DRE->getDecl()->getName() == Ctx.Id_self);
+
+  for (auto &Solution: Solutions) {
+    Lookup.setIsStaticMetatype(Solution.BaseIsStaticMetaType);
+    Lookup.getPostfixKeywordCompletions(Solution.Ty, BaseExpr);
+    Lookup.setExpectedTypes(Solution.ExpectedTypes, true);
+    Lookup.getValueExprCompletions(Solution.Ty, Solution.ReferencedDecl);
+  }
+
+  // FIXME: There may be multiple of these now.
+  CompletionCtx.typeContextKind = Lookup.typeContextKind();
+}
+
+bool CodeCompletionCallbacksImpl::trySolverCompletion() {
+  CompletionContext.CodeCompletionKind = Kind;
+
+  if (Kind == CompletionKind::None)
+    return true;
+
+  bool MaybeFuncBody = true;
+  if (CurDeclContext) {
+    auto *CD = CurDeclContext->getLocalContext();
+    if (!CD || CD->getContextKind() == DeclContextKind::Initializer ||
+        CD->getContextKind() == DeclContextKind::TopLevelCodeDecl)
+      MaybeFuncBody = false;
+  }
+
+  if (auto *DC = dyn_cast_or_null<DeclContext>(ParsedDecl)) {
+    if (DC->isChildContextOf(CurDeclContext))
+      CurDeclContext = DC;
+  }
+
+  assert(ParsedExpr || CurDeclContext);
+
+  SourceLoc CompletionLoc = ParsedExpr
+    ? ParsedExpr->getLoc()
+    : CurDeclContext->getASTContext().SourceMgr.getCodeCompletionLoc();
+
+  switch (Kind) {
+  case CompletionKind::DotExpr: {
+    assert(CodeCompleteTokenExpr);
+    assert(CurDeclContext);
+
+    DotExprLookup Lookup(DotLoc, CurDeclContext, CodeCompleteTokenExpr);
+    typeCheckContextAt(CurDeclContext, CompletionLoc, &Lookup);
+
+    // FIXME: This should be an assertion.
+    // We're not propagating CompletionCollector everywhere we need to in
+    // typeCheckContextAt().
+    if (!Lookup.gotCallback())
+      return false;
+
+    Lookup.performLookup(CompletionContext);
+    addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
+    deliverCompletionResults();
+    return true;
+  }
+  default:
+    return false;
+  }
+}
+
 void CodeCompletionCallbacksImpl::doneParsing() {
   CompletionContext.CodeCompletionKind = Kind;
+
+  if (trySolverCompletion())
+    return;
 
   if (Kind == CompletionKind::None) {
     return;

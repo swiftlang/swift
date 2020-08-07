@@ -44,6 +44,52 @@ namespace swift {
   class Type;
   class ValueDecl;
   struct PrintOptions;
+  class CodeCompletionExpr;
+
+  namespace constraints {
+    class Solution;
+  }
+
+  namespace ide {
+    class CodeCompletionContext;
+  }
+
+  class CompletionCollector {
+  public:
+    virtual void sawSolution(const constraints::Solution &solution) = 0;
+    virtual void simple_display(llvm::raw_ostream &out) const = 0;
+    virtual ~CompletionCollector() {}
+  };
+
+
+  class DotExprLookup: public CompletionCollector {
+    struct SolutionInfo {
+      Type Ty;
+      ValueDecl* ReferencedDecl;
+      SmallVector<Type, 4> ExpectedTypes;
+      bool BaseIsStaticMetaType;
+    };
+
+    SourceLoc DotLoc;
+    DeclContext *DC;
+    CodeCompletionExpr *CompletionExpr;
+
+    llvm::DenseMap<std::pair<Type, Decl*>, size_t> ResultToIndex;
+    SmallVector<SolutionInfo, 4> Solutions;
+    bool GotCallback = false;
+
+  public:
+    DotExprLookup(SourceLoc DotLoc, DeclContext *DC,
+                  CodeCompletionExpr *CompletionExpr)
+      : DotLoc(DotLoc), DC(DC), CompletionExpr(CompletionExpr) {}
+
+    void performLookup(ide::CodeCompletionContext &CompletionCtx) const;
+    bool gotCallback() const { return GotCallback; }
+
+  private:
+    void sawSolution(const constraints::Solution &solution) override;
+    void simple_display(llvm::raw_ostream &out) const override;
+  };
 
   /// Typecheck binding initializer at \p bindingIndex.
   void typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned bindingIndex);
@@ -133,7 +179,8 @@ namespace swift {
   bool typeCheckExpression(DeclContext *DC, Expr *&parsedExpr);
 
   /// Type check a function body element which is at \p TagetLoc .
-  bool typeCheckASTNodeAtLoc(DeclContext *DC, SourceLoc TargetLoc);
+  bool typeCheckASTNodeAtLoc(DeclContext *DC, SourceLoc TargetLoc,
+                             CompletionCollector *Collector = nullptr);
 
   /// Typecheck top-level code parsed during code completion.
   ///
