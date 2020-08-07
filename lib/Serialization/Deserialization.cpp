@@ -2006,7 +2006,7 @@ ModuleDecl *ModuleFile::getModule(ModuleID MID) {
       llvm_unreachable("implementation detail only");
     }
   }
-  return getModule(getIdentifier(MID));
+  return getModule(getIdentifier(MID), /*AllowLoading*/true);
 }
 
 ModuleDecl *ModuleFile::getModule(ArrayRef<Identifier> name,
