@@ -24,6 +24,7 @@
 #include "llvm/Object/COFF.h"
 
 #include "swift/ABI/Enum.h"
+#include "swift/ABI/ObjectFile.h"
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Remote/MetadataReader.h"
 #include "swift/Reflection/Records.h"
@@ -210,12 +211,12 @@ public:
     auto SectBuf = this->getReader().readBytes(RemoteAddress(RangeStart),
                                                RangeEnd - RangeStart);
 
-    auto findMachOSectionByName = [&](std::string Name)
+    auto findMachOSectionByName = [&](llvm::StringRef Name)
         -> std::pair<RemoteRef<void>, uint64_t> {
       for (unsigned I = 0; I < NumSect; ++I) {
         auto S = reinterpret_cast<typename T::Section *>(
             SectionsBuf + (I * sizeof(typename T::Section)));
-        if (strncmp(S->sectname, Name.c_str(), strlen(Name.c_str())) != 0)
+        if (strncmp(S->sectname, Name.data(), strlen(Name.data())) != 0)
           continue;
         auto RemoteSecStart = S->addr + Slide;
         auto SectBufData = reinterpret_cast<const char *>(SectBuf.get());
@@ -228,12 +229,19 @@ public:
       return {nullptr, 0};
     };
 
-    auto FieldMdSec = findMachOSectionByName("__swift5_fieldmd");
-    auto AssocTySec = findMachOSectionByName("__swift5_assocty");
-    auto BuiltinTySec = findMachOSectionByName("__swift5_builtin");
-    auto CaptureSec = findMachOSectionByName("__swift5_capture");
-    auto TypeRefMdSec = findMachOSectionByName("__swift5_typeref");
-    auto ReflStrMdSec = findMachOSectionByName("__swift5_reflstr");
+    SwiftObjectFileFormatMachO ObjectFileFormat;
+    auto FieldMdSec = findMachOSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::fieldmd));
+    auto AssocTySec = findMachOSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::assocty));
+    auto BuiltinTySec = findMachOSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::builtin));
+    auto CaptureSec = findMachOSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::capture));
+    auto TypeRefMdSec = findMachOSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::typeref));
+    auto ReflStrMdSec = findMachOSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::reflstr));
 
     if (FieldMdSec.first == nullptr &&
         AssocTySec.first == nullptr &&
@@ -330,12 +338,19 @@ public:
       return {nullptr, 0};
     };
 
-    auto CaptureSec = findCOFFSectionByName(".sw5cptr");
-    auto TypeRefMdSec = findCOFFSectionByName(".sw5tyrf");
-    auto FieldMdSec = findCOFFSectionByName(".sw5flmd");
-    auto AssocTySec = findCOFFSectionByName(".sw5asty");
-    auto BuiltinTySec = findCOFFSectionByName(".sw5bltn");
-    auto ReflStrMdSec = findCOFFSectionByName(".sw5rfst");
+    SwiftObjectFileFormatCOFF ObjectFileFormat;
+    auto FieldMdSec = findCOFFSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::fieldmd));
+    auto AssocTySec = findCOFFSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::assocty));
+    auto BuiltinTySec = findCOFFSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::builtin));
+    auto CaptureSec = findCOFFSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::capture));
+    auto TypeRefMdSec = findCOFFSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::typeref));
+    auto ReflStrMdSec = findCOFFSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::reflstr));
 
     if (FieldMdSec.first == nullptr &&
         AssocTySec.first == nullptr &&
@@ -424,7 +439,7 @@ public:
     auto StrTabBuf = this->getReader().readBytes(StrTabStart, StrTabSize);
     auto StrTab = reinterpret_cast<const char *>(StrTabBuf.get());
 
-    auto findELFSectionByName = [&](std::string Name)
+    auto findELFSectionByName = [&](llvm::StringRef Name)
         -> std::pair<RemoteRef<void>, uint64_t> {
       // Now for all the sections, find their name.
       for (const typename T::Section *Hdr : SecHdrVec) {
@@ -444,12 +459,19 @@ public:
       return {nullptr, 0};
     };
 
-    auto FieldMdSec = findELFSectionByName("swift5_fieldmd");
-    auto AssocTySec = findELFSectionByName("swift5_assocty");
-    auto BuiltinTySec = findELFSectionByName("swift5_builtin");
-    auto CaptureSec = findELFSectionByName("swift5_capture");
-    auto TypeRefMdSec = findELFSectionByName("swift5_typeref");
-    auto ReflStrMdSec = findELFSectionByName("swift5_reflstr");
+    SwiftObjectFileFormatELF ObjectFileFormat;
+    auto FieldMdSec = findELFSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::fieldmd));
+    auto AssocTySec = findELFSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::assocty));
+    auto BuiltinTySec = findELFSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::builtin));
+    auto CaptureSec = findELFSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::capture));
+    auto TypeRefMdSec = findELFSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::typeref));
+    auto ReflStrMdSec = findELFSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::reflstr));
 
     // We succeed if at least one of the sections is present in the
     // ELF executable.
