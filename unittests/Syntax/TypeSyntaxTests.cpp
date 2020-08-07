@@ -471,7 +471,7 @@ TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
   auto Int = SyntaxFactory::makeTypeIdentifier("Int", {}, {});
   auto IntArg = SyntaxFactory::makeBlankTupleTypeElement()
     .withType(Int);
-  auto Async = SyntaxFactory::makeContextualKeyword(
+  auto Async = SyntaxFactory::makeIdentifier(
       "async", { }, { Trivia::spaces(1) });
   auto Throws = SyntaxFactory::makeThrowsKeyword({}, { Trivia::spaces(1) });
   auto Rethrows = SyntaxFactory::makeRethrowsKeyword({},
