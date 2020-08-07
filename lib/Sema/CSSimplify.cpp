@@ -4220,6 +4220,7 @@ bool ConstraintSystem::repairFailures(
 
       conversionsOrFixes.push_back(CollectionElementContextualMismatch::create(
           *this, lhs, rhs, getConstraintLocator(locator)));
+      break;
     }
 
     // Drop the `tuple element` locator element so that all tuple element
@@ -10433,35 +10434,6 @@ void ConstraintSystem::addContextualConversionConstraint(
       expr, LocatorPathElt::ContextualType(isForSingleExprFunction));
   addConstraint(constraintKind, getType(expr), conversionType,
                 convertTypeLocator, /*isFavored*/ true);
-}
-
-Type ConstraintSystem::addJoinConstraint(
-    ConstraintLocator *locator,
-    ArrayRef<std::pair<Type, ConstraintLocator *>> inputs) {
-  switch (inputs.size()) {
-  case 0:
-    return Type();
-
-  case 1:
-    return inputs.front().first;
-
-  default:
-    // Produce the join below.
-    break;
-  }
-
-  // Create a type variable to capture the result of the join.
-  Type resultTy = createTypeVariable(locator,
-                                     (TVO_PrefersSubtypeBinding |
-                                      TVO_CanBindToNoEscape));
-
-  // Introduce conversions from each input type to the type variable.
-  for (const auto &input : inputs) {
-    addConstraint(
-      ConstraintKind::Conversion, input.first, resultTy, input.second);
-  }
-
-  return resultTy;
 }
 
 void ConstraintSystem::addFixConstraint(ConstraintFix *fix, ConstraintKind kind,

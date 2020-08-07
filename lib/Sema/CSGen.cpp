@@ -1803,31 +1803,28 @@ namespace {
 
       auto locator = CS.getConstraintLocator(expr);
       auto contextualType = CS.getContextualType(expr);
-      Type contextualArrayType = nullptr;
-      Type contextualArrayElementType = nullptr;
-      
+
+      auto joinElementTypes = [&](Optional<Type> elementType) {
+        const auto elements = expr->getElements();
+        unsigned index = 0;
+
+        using Iterator = decltype(elements)::iterator;
+        CS.addJoinConstraint<Iterator>(locator, elements.begin(), elements.end(),
+                                       elementType, [&](const auto it) {
+          auto *locator = CS.getConstraintLocator(expr, LocatorPathElt::TupleElement(index++));
+          return std::make_pair(CS.getType(*it), locator);
+        });
+      };
+
       // If a contextual type exists for this expression, apply it directly.
       Optional<Type> arrayElementType;
       if (contextualType &&
           (arrayElementType = ConstraintSystem::isArrayType(contextualType))) {
-        // Is the array type a contextual type
-        contextualArrayType = contextualType;
-        contextualArrayElementType = *arrayElementType;
-
         CS.addConstraint(ConstraintKind::LiteralConformsTo, contextualType,
                          arrayProto->getDeclaredInterfaceType(),
                          locator);
-        
-        unsigned index = 0;
-        for (auto element : expr->getElements()) {
-          CS.addConstraint(ConstraintKind::Conversion,
-                           CS.getType(element),
-                           contextualArrayElementType,
-                           CS.getConstraintLocator(
-                               expr, LocatorPathElt::TupleElement(index++)));
-        }
-        
-        return contextualArrayType;
+        joinElementTypes(arrayElementType);
+        return contextualType;
       }
 
       // Produce a specialized diagnostic if this is an attempt to initialize
@@ -1893,14 +1890,7 @@ namespace {
 
       // Introduce conversions from each element to the element type of the
       // array.
-      unsigned index = 0;
-      for (auto element : expr->getElements()) {
-        CS.addConstraint(ConstraintKind::Conversion,
-                         CS.getType(element),
-                         arrayElementTy,
-                         CS.getConstraintLocator(
-                           expr, LocatorPathElt::TupleElement(index++)));
-      }
+      joinElementTypes(arrayElementTy);
 
       // The array element type defaults to 'Any'.
       CS.addConstraint(ConstraintKind::Defaultable, arrayElementTy,
