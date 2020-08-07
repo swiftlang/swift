@@ -44,6 +44,10 @@ static llvm::cl::opt<unsigned> MaxLocalApplyRecurDepth(
     "max-local-apply-recur-depth", llvm::cl::init(4),
     llvm::cl::desc("Max recursive depth for analyzing local functions"));
 
+static llvm::cl::opt<bool> AllocBoxToStackAnalyzeApply(
+    "allocbox-to-stack-analyze-apply", llvm::cl::init(true),
+    llvm::cl::desc("Analyze functions into while alloc_box is passed"));
+
 //===-----------------------------------------------------------------------===//
 //                 SIL Utilities for alloc_box Promotion
 //===----------------------------------------------------------------------===//
@@ -320,6 +324,10 @@ static bool checkLocalApplyBody(Operand *O,
 // AllocBoxToStack opt. We don't want to increase code size, so this is
 // restricted only for private local functions currently.
 static bool isOptimizableApplySite(ApplySite Apply) {
+  if (!AllocBoxToStackAnalyzeApply) {
+    // turned off explicitly
+    return false;
+  }
   auto callee = Apply.getReferencedFunctionOrNull();
   if (!callee) {
     return false;
