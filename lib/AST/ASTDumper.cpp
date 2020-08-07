@@ -368,7 +368,6 @@ static StringRef
 getStringLiteralExprEncodingString(StringLiteralExpr::Encoding value) {
   switch (value) {
     case StringLiteralExpr::UTF8: return "utf8";
-    case StringLiteralExpr::UTF16: return "utf16";
     case StringLiteralExpr::OneUnicodeScalar: return "unicodeScalar";
   }
 
