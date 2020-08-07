@@ -529,7 +529,11 @@ public struct PartialRangeThrough<Bound: Comparable> {
   public let upperBound: Bound
   
   @inlinable // trivial-implementation
-  public init(_ upperBound: Bound) { self.upperBound = upperBound }
+  public init(_ upperBound: Bound) {
+    _precondition(upperBound == upperBound,
+      "PartialRangeThrough requries that upperBound not be unordered.")
+    self.upperBound = upperBound
+  }
 }
 
 extension PartialRangeThrough: RangeExpression {
@@ -644,7 +648,11 @@ public struct PartialRangeFrom<Bound: Comparable> {
   public let lowerBound: Bound
 
   @inlinable // trivial-implementation
-  public init(_ lowerBound: Bound) { self.lowerBound = lowerBound }
+  public init(_ lowerBound: Bound) {
+    _precondition(lowerBound == lowerBound,
+      "PartialRangeFrom requries that lowerBound not be unordered.")
+    self.lowerBound = lowerBound
+  }
 }
 
 extension PartialRangeFrom: RangeExpression {
@@ -726,7 +734,7 @@ extension Comparable {
   @_transparent
   public static func ..< (minimum: Self, maximum: Self) -> Range<Self> {
     _precondition(minimum <= maximum,
-      "Can't form Range with upperBound < lowerBound")
+      "Range requires lowerBound <= upperBound")
     return Range(uncheckedBounds: (lower: minimum, upper: maximum))
   }
 
