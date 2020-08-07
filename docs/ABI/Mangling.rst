@@ -1059,7 +1059,7 @@ module, regardless of the actual Clang module that they are coming from. This
 can be observed when mangling a Swift function that accepts a C/C++ struct as a
 parameter:
 
-CxxStructModule:
+C++ module ``CxxStructModule``:
 
 .. code-block:: c++
 
@@ -1067,7 +1067,7 @@ CxxStructModule:
 
   inline void cxxFunction(CxxStruct s) {}
 
-Swift ``main`` module importing ``CxxStructModule``:
+Swift module ``main`` that imports ``CxxStructModule``:
 
 .. code-block:: swift
 
@@ -1082,12 +1082,21 @@ Resulting symbols (showing only Itanium-mangled C++ symbols for brevity):
   _Z11cxxFunction9CxxStruct // -> cxxFunction(CxxStruct)
   s4main13swiftFunctionyySo9CxxStructVF // -> main.swiftFunction(__C.CxxStruct) -> ()
 
+The reason for ignoring the Clang module and always putting C and C++ types into
+``__C`` at the Swift ABI level is that the Clang module is not a part of the C
+or C++ ABI. When owners of C and C++ Clang modules decide what changes are
+ABI-compatible or not, they will likely take into account C and C++ ABI, but not
+the Swift ABI. Therefore, Swift ABI can only encode information about a C or C++
+type that the C and C++ ABI already encodes in order to remain compatible with
+future versions of libraries that evolve according to C and C++ ABI
+compatibility principles.
+
 The C/C++ compiler does not generate Swift metadata symbols and value witness
 tables for C and C++ types. To make a foreign type usable in Swift in the same
 way as a native type, the Swift compiler must generate these symbols.
 Specifically, each Swift module that uses a given C or C++ type generates the
-necessary Swift symbols. For the example above Swift will generate following
-nominal type descriptor symbol for ``CxxStruct``:
+necessary Swift symbols. For the example above the Swift compiler will generate following
+nominal type descriptor symbol for ``CxxStruct`` while compiling the ``main`` module:
 
 .. code::
 
@@ -1104,4 +1113,28 @@ that the mangled name is a valid Swift type name (this is not the case for MSVC
 mangled names). A prefix with a double underscore (to ensure we have a reserved
 C++ identifier) is added to limit the possibility for conflicts with names of
 user-defined structs. The struct is notionally defined in the ``__C`` module,
-similarly to regular C and C++ structs and classes.
+similarly to regular C and C++ structs and classes. Consider the following C++
+module:
+
+.. code-block:: c++
+
+  template<class T>
+  struct MagicWrapper {
+    T t;
+  };
+
+  struct MagicNumber {};
+
+  typedef MagicWrapper<MagicNumber> WrappedMagicNumber;
+
+``WrappedMagicNumber`` will be imported as a typealias for
+a struct ``__CxxTemplateInst12MagicWrapperI11MagicNumberE``. Interface of the
+imported module will look as follows:
+
+.. code-block:: swift
+
+  struct __CxxTemplateInst12MagicWrapperI11MagicNumberE {
+    var t: MagicNumber
+  }
+  struct MagicNumber {}
+  typealias WrappedMagicNumber = __CxxTemplateInst12MagicWrapperI11MagicNumberE
