@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-
 // This file implements methods to generate random floating-point numbers, with
 // probability proportional to the distance between each representable value
 // and the next.
@@ -178,7 +177,6 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
     return random(in: range, using: &generator)
   }
   
-  
   // MARK: Implementation details
   
   // Generate a random floating-point value in the specified range, as if a real
@@ -290,7 +288,6 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
     }
   }
   
-  
   // MARK: General case
   
   // Convert a range of Self into a range of Int64 section numbers and the
@@ -367,7 +364,6 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
     return (Int64(bitPattern: n), isLowerBound)
   }
   
-  
   // Choose a random number in a single section.
   //
   // The number of leading zeros in the section number indicates the number of
@@ -422,7 +418,6 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
     
     return (section < 0) ? -x.nextUp : x
   }
-  
   
   // MARK: Fast path
   
@@ -479,7 +474,6 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
     return isNegative ? -x.nextUp : x
   }
   
-  
   // Choose a raw exponent less than upperBound, with probability proportional
   // to the width of the raw binade with that raw exponent. Also return any
   // additional random bits that were left over, and a count of how many.
@@ -517,7 +511,6 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
     // All the bits after the first "stop" are still random.
     return (e, bits, UInt64.bitWidth &- 1 &- z)
   }
-  
   
   // MARK: Small range
   
@@ -602,7 +595,6 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
       return nil
     }
   }
-  
   
   // MARK: Helpers
   
