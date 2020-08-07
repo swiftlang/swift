@@ -60,6 +60,7 @@
 #include "swift/Migrator/FixitFilter.h"
 #include "swift/Migrator/Migrator.h"
 #include "swift/PrintAsObjC/PrintAsObjC.h"
+#include "swift/Serialization/ModuleSummary.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -2072,11 +2073,9 @@ static bool serializeModuleSummary(SILModule *SM,
                                    const PrimarySpecificPaths &PSPs,
                                    const ASTContext &Context) {
   auto summaryOutputPath = PSPs.SupplementaryOutputs.ModuleSummaryOutputPath;
-  return withOutputFile(Context.Diags, summaryOutputPath,
-                        [&](llvm::raw_ostream &out) {
-                          out << "Some stuff";
-                          return false;
-                        });
+  auto summary = modulesummary::buildModuleSummaryIndex(*SM);
+  return modulesummary::writeModuleSummaryIndex(*summary.get(), Context.Diags,
+                                                summaryOutputPath);
 }
 
 static GeneratedModule
