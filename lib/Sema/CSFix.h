@@ -269,6 +269,10 @@ enum class FixKind : uint8_t {
   
   /// Unwrap optional base on key path application.
   UnwrapOptionalBaseKeyPathApplication,
+
+  /// Explicitly specify a label to match trailing closure to a certain
+  /// parameter in the call.
+  SpecifyLabelToAssociateTrailingClosure,
 };
 
 class ConstraintFix {
@@ -1924,6 +1928,34 @@ public:
   static UnwrapOptionalBaseKeyPathApplication *
   attempt(ConstraintSystem &cs, Type baseTy, Type rootTy,
           ConstraintLocator *locator);
+};
+
+/// Diagnose situations when solver used old (backward scan) rule
+/// to match trailing closure to a parameter.
+///
+/// \code
+/// func multiple_trailing_with_defaults(
+///   duration: Int,
+///   animations: (() -> Void)? = nil,
+///   completion: (() -> Void)? = nil) {}
+///
+/// multiple_trailing_with_defaults(duration: 42) {} // picks `completion:`
+/// \endcode
+class SpecifyLabelToAssociateTrailingClosure final : public ConstraintFix {
+  SpecifyLabelToAssociateTrailingClosure(ConstraintSystem &cs,
+                                         ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::SpecifyLabelToAssociateTrailingClosure,
+                      locator, /*isWarning=*/true) {}
+
+public:
+  std::string getName() const override {
+    return "specify a label to associate trailing closure with parameter";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static SpecifyLabelToAssociateTrailingClosure *
+  create(ConstraintSystem &cs, ConstraintLocator *locator);
 };
 
 } // end namespace constraints
