@@ -1067,7 +1067,7 @@ C++ module ``CxxStructModule``:
 
   inline void cxxFunction(CxxStruct s) {}
 
-Swift ``main`` module importing ``CxxStructModule``:
+Swift module ``main`` that imports ``CxxStructModule``:
 
 .. code-block:: swift
 
