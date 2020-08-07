@@ -4942,6 +4942,9 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
 
   Optional<InFlightDiagnostic> diagnostic;
   if (isExpr<ArrayExpr>(anchor)) {
+    if (diagnoseMergedLiteralElements())
+      return true;
+
     diagnostic.emplace(emitDiagnostic(diag::cannot_convert_array_element,
                                       eltType, contextualType));
   }
@@ -4989,6 +4992,30 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
     return false;
 
   (void)trySequenceSubsequenceFixIts(*diagnostic);
+  return true;
+}
+
+bool CollectionElementContextualFailure::diagnoseMergedLiteralElements() {
+  auto elementAnchor = simplifyLocatorToAnchor(getLocator());
+  if (!elementAnchor)
+    return false;
+
+  auto *typeVar = getRawType(elementAnchor)->getAs<TypeVariableType>();
+  if (!typeVar || !typeVar->getImpl().getAtomicLiteralKind())
+    return false;
+
+  // This element is a literal whose type variable could have been merged with others,
+  // but the conversion constraint to the array element type was only placed on one
+  // of them. So, we want to emit the error for each element whose type variable is in
+  // this equivalence class.
+  auto &cs = getConstraintSystem();
+  auto node = cs.getRepresentative(typeVar)->getImpl().getGraphNode();
+  for (const auto *typeVar : node->getEquivalenceClass()) {
+    auto anchor = typeVar->getImpl().getLocator()->getAnchor();
+    emitDiagnosticAt(constraints::getLoc(anchor), diag::cannot_convert_array_element,
+                     getFromType(), getToType());
+  }
+
   return true;
 }
 
