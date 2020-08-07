@@ -2657,7 +2657,7 @@ void PullbackCloner::Implementation::accumulateIndirect(SILValue resultAddress,
         CanMetatypeType::get(adjointASTTy, MetatypeRepresentation::Thick);
     auto metatypeSILType = SILType::getPrimitiveObjectType(metatypeType);
     auto metatype = builder.createMetatype(loc, metatypeSILType);
-    // %2 = apply $0(%result, %new, %old, %1)
+    // %2 = apply %0(%result, %new, %old, %1)
     builder.createApply(loc, witnessMethod, subMap,
                         {resultAddress, rhsAddress, lhsAddress, metatype},
                         /*isNonThrowing*/ false);

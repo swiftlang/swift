@@ -45,8 +45,8 @@ extension DispatchTime /* : Strideable */ {
     typealias Stride = DispatchTimeInterval
     
     public func distance(to other: DispatchTime) -> DispatchTimeInterval {
-        let lhs = other.rawValue
-        let rhs = rawValue
+        let lhs = other.uptimeNanoseconds
+        let rhs = uptimeNanoseconds
         if lhs >= rhs {
             return DispatchTimeInterval.nanoseconds(Int(lhs - rhs))
         } else {
