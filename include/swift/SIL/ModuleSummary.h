@@ -133,6 +133,7 @@ public:
 private:
   FlagsTy Flags;
   CallGraphEdgeListTy CallGraphEdgeList;
+  std::string Name;
 
 public:
   FunctionSummary(std::vector<EdgeTy> CGEdges)
@@ -150,15 +151,12 @@ public:
 
   bool isPreserved() const { return Flags.Preserved; }
   void setPreserved(bool Preserved) { Flags.Preserved = Preserved; }
-};
-
-struct FunctionSummaryInfo {
-  std::string Name;
-  std::unique_ptr<FunctionSummary> TheSummary;
+  std::string getName() const { return Name; }
+  void setName(std::string name) { this->Name = name; }
 };
 
 class ModuleSummaryIndex {
-  using FunctionSummaryInfoMapTy = std::map<GUID, FunctionSummaryInfo>;
+  using FunctionSummaryInfoMapTy = std::map<GUID, std::unique_ptr<FunctionSummary>>;
   using VirtualMethodInfoMapTy = std::map<VirtualMethodSlot, std::vector<GUID>>;
 
   FunctionSummaryInfoMapTy FunctionSummaryInfoMap;
@@ -174,21 +172,19 @@ public:
     this->ModuleName = name;
   }
 
-  void addFunctionSummary(std::string name,
-                          std::unique_ptr<FunctionSummary> summary) {
-    auto guid = getGUID(name);
+  void addFunctionSummary(std::unique_ptr<FunctionSummary> summary) {
+    auto guid = getGUID(summary->getName());
     FunctionSummaryInfoMap.insert(
-        std::make_pair(guid, FunctionSummaryInfo{name, std::move(summary)}));
+        std::make_pair(guid, std::move(summary)));
   }
 
-  const llvm::Optional<std::pair<FunctionSummary *, StringRef>>
+  const llvm::Optional<FunctionSummary *>
   getFunctionInfo(GUID guid) const {
     auto found = FunctionSummaryInfoMap.find(guid);
     if (found == FunctionSummaryInfoMap.end()) {
       return None;
     }
-    auto &entry = found->second;
-    return std::make_pair(entry.TheSummary.get(), StringRef(entry.Name));
+    return found->second.get();
   }
   
   void addImplementation(VirtualMethodSlot slot, GUID funcGUID) {

@@ -108,12 +108,11 @@ void Serializer::emitModuleSummary(const ModuleSummaryIndex &index) {
   {
     for (const auto &pair : index) {
       llvm::BCBlockRAII restoreBlock(Out, FUNCTION_SUMMARY_ID, 32);
-      auto &info = pair.second;
-      auto &summary = info.TheSummary;
+      auto &summary = pair.second;
       using namespace function_summary;
       function_summary::MetadataLayout MDlayout(Out);
 
-      MDlayout.emit(ScratchRecord, pair.first, summary->isLive(), summary->isPreserved(), info.Name);
+      MDlayout.emit(ScratchRecord, pair.first, summary->isLive(), summary->isPreserved(), summary->getName());
 
       for (auto call : summary->calls()) {
         CallGraphEdgeLayout edgeLayout(Out);
@@ -251,13 +250,14 @@ bool Deserializer::readFunctionSummary() {
       function_summary::MetadataLayout::readRecord(Scratch, guid, isLive, isPreserved);
       Name = BlobData.str();
       if (auto info = moduleSummary.getFunctionInfo(guid)) {
-        FS = info.getValue().first;
+        FS = info.getValue();
       } else {
         NewFSOwner = std::make_unique<FunctionSummary>();
         FS = NewFSOwner.get();
       }
       FS->setLive(isLive);
       FS->setPreserved(isPreserved);
+      FS->setName(Name);
       break;
     }
     case function_summary::CALL_GRAPH_EDGE: {
@@ -284,7 +284,7 @@ bool Deserializer::readFunctionSummary() {
   }
 
   if (auto &FS = NewFSOwner) {
-    moduleSummary.addFunctionSummary(Name, std::move(FS));
+    moduleSummary.addFunctionSummary(std::move(FS));
   }
   return false;
 }
