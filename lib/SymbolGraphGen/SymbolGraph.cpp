@@ -558,7 +558,7 @@ void
 SymbolGraph::serializeDeclarationFragments(StringRef Key,
                                            const Symbol &S,
                                            llvm::json::OStream &OS) {
-  DeclarationFragmentPrinter Printer(OS, Key);
+  DeclarationFragmentPrinter Printer(this, OS, Key);
   auto Options = getDeclarationFragmentsPrintOptions();
   if (S.getSynthesizedBaseType()) {
     Options.setBaseType(S.getSynthesizedBaseType());
@@ -570,7 +570,7 @@ void
 SymbolGraph::serializeNavigatorDeclarationFragments(StringRef Key,
                                                     const Symbol &S,
                                                     llvm::json::OStream &OS) {
-  DeclarationFragmentPrinter Printer(OS, Key);
+  DeclarationFragmentPrinter Printer(this, OS, Key);
 
   if (const auto *TD = dyn_cast<GenericTypeDecl>(S.getSymbolDecl())) {
     Printer.printAbridgedType(TD, /*PrintKeyword=*/false);
@@ -587,7 +587,7 @@ void
 SymbolGraph::serializeSubheadingDeclarationFragments(StringRef Key,
                                                      const Symbol &S,
                                                      llvm::json::OStream &OS) {
-  DeclarationFragmentPrinter Printer(OS, Key);
+  DeclarationFragmentPrinter Printer(this, OS, Key);
 
   if (const auto *TD = dyn_cast<GenericTypeDecl>(S.getSymbolDecl())) {
     Printer.printAbridgedType(TD, /*PrintKeyword=*/true);
@@ -603,7 +603,7 @@ SymbolGraph::serializeSubheadingDeclarationFragments(StringRef Key,
 void
 SymbolGraph::serializeDeclarationFragments(StringRef Key, Type T,
                                             llvm::json::OStream &OS) {
-  DeclarationFragmentPrinter Printer(OS, Key);
+  DeclarationFragmentPrinter Printer(this, OS, Key);
   T->print(Printer, getDeclarationFragmentsPrintOptions());
 }
 
