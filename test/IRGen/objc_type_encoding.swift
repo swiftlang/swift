@@ -188,4 +188,4 @@ class C: P {
 }
 
 // CHECK-macosx: [[ENC5:@.*]] = private unnamed_addr constant [9 x i8] c"Vv16@0:8\00"
-// CHECK-macosx: @_PROTOCOL_INSTANCE_METHODS_P = {{.*}}@"\01L_selector_data(stuff)"{{.*}}[[ENC5]]{{.*}}, section "__DATA, __objc_const", align 8
+// CHECK-macosx: @_PROTOCOL_INSTANCE_METHODS_P = {{.*}}@"\01L_selector_data(stuff)"{{.*}}[[ENC5]]{{.*}}
