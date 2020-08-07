@@ -12,4 +12,6 @@
 // RUN: %llvm-nm --defined-only --extern-only %t/main-jitted-objectbuffer.o | %FileCheck -check-prefix CHECK-OBJ %s
 // CHECK-OBJ: T {{_?}}main
 
+// REQUIRES: rdar66644853
+
 let zero = 0
