@@ -1,3 +1,15 @@
+//===--- StringUTF8Validation.swift ---------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2018 - 2020 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
 private func _isUTF8MultiByteLeading(_ x: UInt8) -> Bool {
   return (0xC2...0xF4).contains(x)
 }
@@ -180,21 +192,17 @@ internal func repairUTF8(_ input: UnsafeBufferPointer<UInt8>, firstKnownBrokenRa
     _internalInvariant(!remainingInput.isEmpty, "empty remaining input doesn't need to be repaired")
     let goodChunk = remainingInput[..<brokenRange.startIndex]
 
-    // very likely this capacity reservation does not actually do anything because we reserved space for the entire
-    // input plus up to five replacement characters up front
-    result.reserveCapacity(result.count + remainingInput.count + replacementCharacterCount)
-
     // we can now safely append the next known good bytes and a replacement character
-    result.appendInPlace(UnsafeBufferPointer(rebasing: goodChunk),
-                         isASCII: false /* appending replacement character anyway, so let's not bother */)
+    result.append(UnsafeBufferPointer(rebasing: goodChunk),
+                  isASCII: false /* appending replacement character anyway, so let's not bother */)
     Unicode.Scalar._replacementCharacter.withUTF8CodeUnits {
-      result.appendInPlace($0, isASCII: false)
+      result.append($0, isASCII: false)
     }
 
     remainingInput = UnsafeBufferPointer(rebasing: remainingInput[brokenRange.endIndex...])
     switch validateUTF8(remainingInput) {
     case .success:
-      result.appendInPlace(remainingInput, isASCII: false)
+      result.append(remainingInput, isASCII: false)
       return String(result)
     case .error(let newBrokenRange):
       brokenRange = newBrokenRange

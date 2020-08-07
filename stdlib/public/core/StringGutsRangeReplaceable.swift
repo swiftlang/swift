@@ -111,7 +111,7 @@ extension _StringGuts {
 
   // Ensure unique native storage with sufficient capacity for the following
   // append.
-  private mutating func prepareForAppendInPlace(
+  private mutating func _prepareForAppendInPlace(
     totalCount: Int,
     otherUTF8Count otherCount: Int
   ) {
@@ -227,12 +227,12 @@ extension _StringGuts {
       return
     }
 
-    prepareForAppendInPlace(totalCount: totalCount, otherUTF8Count: otherCount)
+    _prepareForAppendInPlace(totalCount: totalCount, otherUTF8Count: otherCount)
 
     if slicedOther.isFastUTF8 {
       let otherIsASCII = slicedOther.isASCII
       slicedOther.withFastUTF8 { otherUTF8 in
-        self.appendInPlace(otherUTF8, isASCII: otherIsASCII)
+        _appendInPlace(otherUTF8, isASCII: otherIsASCII)
       }
       return
     }
@@ -240,8 +240,24 @@ extension _StringGuts {
     _foreignAppendInPlace(slicedOther)
   }
 
-  internal mutating func appendInPlace(
-    _ other: UnsafeBufferPointer<UInt8>, isASCII: Bool
+  internal mutating func append(
+    _ other: UnsafeBufferPointer<UInt8>,
+    isASCII: Bool
+  ) {
+    if let smol = _SmallString(other) {
+      append(_StringGuts(smol))
+    } else {
+      _prepareForAppendInPlace(
+        totalCount: utf8Count + other.count,
+        otherUTF8Count: other.count
+      )
+      _appendInPlace(other, isASCII: isASCII)
+    }
+  }
+
+  private mutating func _appendInPlace(
+    _ other: UnsafeBufferPointer<UInt8>,
+    isASCII: Bool
   ) {
     self._object.nativeStorage.appendInPlace(other, isASCII: isASCII)
 

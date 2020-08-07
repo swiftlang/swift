@@ -545,12 +545,7 @@ extension String: TextOutputStream {
   }
 
   public mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>) {
-    if let smol = _SmallString(buffer) {
-      _guts.append(_StringGuts(smol))
-    } else {
-      _guts.reserveCapacity(_guts.utf8Count + buffer.count)
-      _guts.appendInPlace(buffer, isASCII: true)
-    }
+    _guts.append(buffer, isASCII: true)
   }
 }
 
