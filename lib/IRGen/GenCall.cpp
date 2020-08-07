@@ -1204,6 +1204,8 @@ void SignatureExpansion::expandExternalSignatureTypes() {
       ParamIRTypes.append(types.begin(), types.end());
       break;
     }
+    case clang::CodeGen::ABIArgInfo::IndirectAliased:
+      llvm_unreachable("not implemented");
     case clang::CodeGen::ABIArgInfo::Indirect: {
       assert(i >= clangToSwiftParamOffset &&
              "Unexpected index for indirect byval argument");
@@ -2377,6 +2379,8 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
       emitDirectExternalArgument(IGF, paramType, AI, in, out, isOutlined);
       break;
     }
+    case clang::CodeGen::ABIArgInfo::IndirectAliased:
+      llvm_unreachable("not implemented");
     case clang::CodeGen::ABIArgInfo::Indirect: {
       auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfo(paramType));
 
@@ -2567,6 +2571,8 @@ void irgen::emitForeignParameter(IRGenFunction &IGF, Explosion &params,
     emitDirectForeignParameter(IGF, params, AI, paramExplosion, paramTy,
                                paramTI);
     return;
+  case clang::CodeGen::ABIArgInfo::IndirectAliased:
+      llvm_unreachable("not implemented");
   case clang::CodeGen::ABIArgInfo::Indirect: {
     Address address = paramTI.getAddressForPointer(params.claimNext());
     paramTI.loadAsTake(IGF, address, paramExplosion);
