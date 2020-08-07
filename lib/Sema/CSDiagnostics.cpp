@@ -6571,3 +6571,95 @@ SourceLoc MissingOptionalUnwrapKeyPathFailure::getLoc() const {
   auto *SE = castToExpr<SubscriptExpr>(getAnchor());
   return SE->getBase()->getEndLoc();
 }
+
+bool TrailingClosureRequiresExplicitLabel::diagnoseAsError() {
+  auto argInfo = *getFunctionArgApplyInfo(getLocator());
+
+  {
+    auto diagnostic = emitDiagnostic(
+        diag::unlabeled_trailing_closure_deprecated, argInfo.getParamLabel());
+    fixIt(diagnostic, argInfo);
+  }
+
+  if (auto *callee = argInfo.getCallee()) {
+    emitDiagnosticAt(callee, diag::decl_declared_here, callee->getName());
+  }
+
+  return true;
+}
+
+void TrailingClosureRequiresExplicitLabel::fixIt(
+    InFlightDiagnostic &diagnostic, const FunctionArgApplyInfo &info) const {
+  auto &ctx = getASTContext();
+
+  // Dig out source locations.
+  SourceLoc existingRParenLoc;
+  SourceLoc leadingCommaLoc;
+
+  auto anchor = getRawAnchor();
+  auto *arg = info.getArgListExpr();
+  Expr *fn = nullptr;
+
+  if (auto *applyExpr = getAsExpr<ApplyExpr>(anchor)) {
+    fn = applyExpr->getFn();
+  } else {
+    // Covers subscripts, unresolved members etc.
+    fn = getAsExpr(anchor);
+  }
+
+  if (!fn)
+    return;
+
+  auto *trailingClosure = info.getArgExpr();
+
+  if (auto tupleExpr = dyn_cast<TupleExpr>(arg)) {
+    existingRParenLoc = tupleExpr->getRParenLoc();
+    assert(tupleExpr->getNumElements() >= 2 && "Should be a ParenExpr?");
+    leadingCommaLoc = Lexer::getLocForEndOfToken(
+        ctx.SourceMgr,
+        tupleExpr->getElements()[tupleExpr->getNumElements() - 2]->getEndLoc());
+  } else {
+    auto parenExpr = cast<ParenExpr>(arg);
+    existingRParenLoc = parenExpr->getRParenLoc();
+  }
+
+  // Figure out the text to be inserted before the trailing closure.
+  SmallString<16> insertionText;
+  SourceLoc insertionLoc;
+  if (leadingCommaLoc.isValid()) {
+    insertionText += ", ";
+    assert(existingRParenLoc.isValid());
+    insertionLoc = leadingCommaLoc;
+  } else if (existingRParenLoc.isInvalid()) {
+    insertionText += "(";
+    insertionLoc = Lexer::getLocForEndOfToken(ctx.SourceMgr, fn->getEndLoc());
+  } else {
+    insertionLoc = existingRParenLoc;
+  }
+
+  // Add the label, if there is one.
+  auto paramName = info.getParamLabel();
+  if (!paramName.empty()) {
+    insertionText += paramName.str();
+    insertionText += ": ";
+  }
+
+  // If there is an existing right parentheses/brace, remove it while we
+  // insert the new text.
+  if (existingRParenLoc.isValid()) {
+    SourceLoc afterExistingRParenLoc =
+        Lexer::getLocForEndOfToken(ctx.SourceMgr, existingRParenLoc);
+    diagnostic.fixItReplaceChars(insertionLoc, afterExistingRParenLoc,
+                                 insertionText);
+  } else {
+    // Insert the appropriate prefix.
+    diagnostic.fixItInsert(insertionLoc, insertionText);
+  }
+
+  // Insert a right parenthesis/brace after the closing '}' of the trailing
+  // closure;
+  SourceLoc newRParenLoc =
+      Lexer::getLocForEndOfToken(ctx.SourceMgr, trailingClosure->getEndLoc());
+  diagnostic.fixItInsert(newRParenLoc,
+                         isExpr<SubscriptExpr>(anchor) ? "]" : ")");
+}
