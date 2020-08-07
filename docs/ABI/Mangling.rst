@@ -1047,22 +1047,16 @@ Conventions for foreign symbols
 
 Swift interoperates with multiple other languages - C, C++, Objective-C, and
 Objective-C++. Each of these languages defines their own mangling conventions,
-so Swift must take care to follow them. However, these conventions do not
-cover Swift-specific symbols like Swift type metadata for foreign types, so Swift uses
+so Swift must take care to follow them. However, these conventions do not cover
+Swift-specific symbols like Swift type metadata for foreign types, so Swift uses
 its own mangling scheme for those symbols.
 
 Importing C and C++ structs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Types imported from C and C++ are imported as if they are located in the ``__C`` module, regardless of the actual Clang module that they are coming from. This can be observed ...
-
-<add the mangling example here>
-
-The C/C++ compiler does not generate Swift metadata symbols and value witness tables for C and C++ types. To make a foreign type usable in Swift in the same way as a native type, the Swift compiler must generate these symbols. Specifically, each Swift module that uses a given C or C++ type generates the necessary Swift symbols.
-
-<show the symbols here>
-
-be observed when mangling a Swift function that accepts a C/C++ struct as a
+Types imported from C and C++ are imported as if they are located in the ``__C``
+module, regardless of the actual Clang module that they are coming from. This
+can be observed when mangling a Swift function that accepts a C/C++ struct as a
 parameter:
 
 CxxStructModule:
@@ -1073,7 +1067,7 @@ CxxStructModule:
 
   inline void cxxFunction(CxxStruct s) {}
 
-Swift `main` module importing ``CxxStructModule``:
+Swift ``main`` module importing ``CxxStructModule``:
 
 .. code-block:: swift
 
@@ -1081,11 +1075,20 @@ Swift `main` module importing ``CxxStructModule``:
 
   public func swiftFunction(_ s: CxxStruct) {}
 
-
 Resulting symbols (showing only Itanium-mangled C++ symbols for brevity):
 
 .. code::
 
   _Z11cxxFunction9CxxStruct // -> cxxFunction(CxxStruct)
   s4main13swiftFunctionyySo9CxxStructVF // -> main.swiftFunction(__C.CxxStruct) -> ()
+
+The C/C++ compiler does not generate Swift metadata symbols and value witness
+tables for C and C++ types. To make a foreign type usable in Swift in the same
+way as a native type, the Swift compiler must generate these symbols.
+Specifically, each Swift module that uses a given C or C++ type generates the
+necessary Swift symbols. For the example above Swift will generate following
+nominal type descriptor symbol for ``CxxStruct``:
+
+.. code::
+
   sSo9CxxStructVMn // -> nominal type descriptor for __C.CxxStruct
