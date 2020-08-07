@@ -142,60 +142,56 @@ extension DataProtocol {
         return self.copyBytes(to: UnsafeMutableRawBufferPointer(start: ptr.baseAddress, count: ptr.count * MemoryLayout<DestinationType>.stride), from: range)
     }
 
+    private func matches<D: DataProtocol>(_ data: D, from index: Index) -> Bool {
+        var haystackIndex = index
+        var needleIndex = data.startIndex
+        
+        while true {
+            guard self[haystackIndex] == data[needleIndex] else { return false }
+            
+            haystackIndex = self.index(after: haystackIndex)
+            needleIndex = data.index(after: needleIndex)
+            if needleIndex == data.endIndex {
+                // i.e. needle is found.
+                return true
+            } else if haystackIndex == endIndex {
+                return false
+            }
+        }
+    }
+    
     public func firstRange<D: DataProtocol, R: RangeExpression>(of data: D, in range: R) -> Range<Index>? where R.Bound == Index {
         let r = range.relative(to: self)
-        let rangeCount = distance(from: r.lowerBound, to: r.upperBound)
-        if rangeCount < data.count {
+        let length = data.count
+        
+        if length == 0 || length > distance(from: r.lowerBound, to: r.upperBound) {
             return nil
         }
-        var haystackIndex = r.lowerBound
-        let haystackEnd = index(r.upperBound, offsetBy: -data.count)
-        while haystackIndex < haystackEnd {
-            var compareIndex = haystackIndex
-            var needleIndex = data.startIndex
-            let needleEnd = data.endIndex
-            var matched = true
-            while compareIndex < haystackEnd && needleIndex < needleEnd {
-                if self[compareIndex] != data[needleIndex] {
-                    matched = false
-                    break
-                }
-                needleIndex = data.index(after: needleIndex)
-                compareIndex = index(after: compareIndex)
+        
+        var position = r.lowerBound
+        while position < r.upperBound && distance(from: position, to: r.upperBound) >= length {
+            if matches(data, from: position) {
+                return position..<index(position, offsetBy: length)
             }
-            if matched {
-                return haystackIndex..<compareIndex
-            }
-            haystackIndex = index(after: haystackIndex)
+            position = index(after: position)
         }
         return nil
     }
-
+    
     public func lastRange<D: DataProtocol, R: RangeExpression>(of data: D, in range: R) -> Range<Index>? where R.Bound == Index {
         let r = range.relative(to: self)
-        let rangeCount = distance(from: r.lowerBound, to: r.upperBound)
-        if rangeCount < data.count {
+        let length = data.count
+        
+        if length == 0 || length > distance(from: r.lowerBound, to: r.upperBound) {
             return nil
         }
-        var haystackIndex = r.upperBound
-        let haystackStart = index(r.lowerBound, offsetBy: data.count)
-        while haystackIndex > haystackStart {
-            var compareIndex = haystackIndex
-            var needleIndex = data.endIndex
-            let needleStart = data.startIndex
-            var matched = true
-            while compareIndex > haystackStart && needleIndex > needleStart {
-                if self[compareIndex] != data[needleIndex] {
-                    matched = false
-                    break
-                }
-                needleIndex = data.index(before: needleIndex)
-                compareIndex = index(before: compareIndex)
+        
+        var position = index(r.upperBound, offsetBy: -length)
+        while position >= r.lowerBound {
+            if matches(data, from: position) {
+                return position..<index(position, offsetBy: length)
             }
-            if matched {
-                return compareIndex..<haystackIndex
-            }
-            haystackIndex = index(before: haystackIndex)
+            position = index(before: position)
         }
         return nil
     }
