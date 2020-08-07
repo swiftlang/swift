@@ -34,7 +34,7 @@
 // CHECK-SAME:   i8* null,
 // CHECK-SAME:   i8* null,
 // CHECK-SAME:   i8* null
-// CHECK-SAME: }, section "__DATA, __objc_const", align 8
+// CHECK-SAME: }, section "__DATA, {{.*}}", align 8
 // CHECK: @_DATA__TtC17objc_class_export3Foo = internal constant {{.*\*}} } {
 // CHECK-SAME:   i32 128,
 // CHECK-SAME:   i32 16,
@@ -47,7 +47,7 @@
 // CHECK-SAME:   @_IVARS__TtC17objc_class_export3Foo,
 // CHECK-SAME:   i8* null,
 // CHECK-SAME:   _PROPERTIES__TtC17objc_class_export3Foo
-// CHECK-SAME: }, section "__DATA, __objc_const", align 8
+// CHECK-SAME: }, section "__DATA, {{.*}}", align 8
 // CHECK: @"$s17objc_class_export3FooCMf" = internal global <{{.*}} }> <{
 // CHECK-SAME:   void ([[FOO]]*)* @"$s17objc_class_export3FooCfD",
 // CHECK-SAME:   i8** @"$sBOWV",
