@@ -11,6 +11,21 @@ function(compute_library_subdir result_var_name sdk arch)
   endif()
 endfunction()
 
+# Return a swiftc flag (e.g. -O or -Onone) to control optimization level based
+# on the build type.
+function(swift_optimize_flag_for_build_type build_type result_var_name)
+  if("${build_type}" STREQUAL "Debug")
+    set("${result_var_name}" "-Onone" PARENT_SCOPE)
+  elseif("${build_type}" STREQUAL "RelWithDebInfo" OR
+         "${build_type}" STREQUAL "Release")
+    set("${result_var_name}" "-O" PARENT_SCOPE)
+  elseif("${build_type}" STREQUAL "MinSizeRel")
+    set("${result_var_name}" "-Osize" PARENT_SCOPE)
+  else()
+    message(FATAL_ERROR "Unknown build type: ${build_type}")
+  endif()
+endfunction()
+
 # Process the sources within the given variable, pulling out any Swift
 # sources to be compiled with 'swift' directly. This updates
 # ${sourcesvar} in place with the resulting list and ${externalvar} with the
