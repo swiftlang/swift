@@ -616,7 +616,7 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
   // thus requires a second random integer.
   //
   // We optimize for `Double` by using 60 bits. This gives worst-case ranges
-  // like `-1.0...64.0` a 1 in 32 chance of needing a second random integer.
+  // like `-1.0...64.0` a 3% chance of needing a second random integer.
   @_transparent
   @_alwaysEmitIntoClient
   internal static var _sectionBitCount: Int { UInt64.bitWidth - 4 }
