@@ -2215,7 +2215,7 @@ public:
 };
 
 /// Diagnose situations when trailing closure has been matched to a specific
-/// parameter via deprecated backward scan.
+/// parameter via a deprecated backward scan.
 ///
 /// \code
 /// func multiple_trailing_with_defaults(

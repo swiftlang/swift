@@ -1529,7 +1529,8 @@ UnwrapOptionalBaseKeyPathApplication::attempt(ConstraintSystem &cs, Type baseTy,
 
 bool SpecifyLabelToAssociateTrailingClosure::diagnose(const Solution &solution,
                                                       bool asNote) const {
-  return false;
+  TrailingClosureRequiresExplicitLabel failure(solution, getLocator());
+  return failure.diagnose(asNote);
 }
 
 SpecifyLabelToAssociateTrailingClosure *
