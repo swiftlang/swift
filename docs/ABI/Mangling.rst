@@ -1086,8 +1086,8 @@ The C/C++ compiler does not generate Swift metadata symbols and value witness
 tables for C and C++ types. To make a foreign type usable in Swift in the same
 way as a native type, the Swift compiler must generate these symbols.
 Specifically, each Swift module that uses a given C or C++ type generates the
-necessary Swift symbols. For the example above Swift will generate following
-nominal type descriptor symbol for ``CxxStruct``:
+necessary Swift symbols. For the example above the Swift compiler will generate following
+nominal type descriptor symbol for ``CxxStruct`` while compiling the ``main`` module:
 
 .. code::
 
