@@ -30,9 +30,14 @@
 
 Func _prespecialize() is a new API without @available attribute
 Func _stdlib_isOSVersionAtLeastOrVariantVersionAtLeast(_:_:_:_:_:_:) is a new API without @available attribute
-Constructor _StringGuts.init(_:isASCII:) has been removed
 
 // These reflection APIs are exposed to facilitate building SwiftReflectionTest.swift when testing Release builds.
 Func _getMetadataSection(_:) is a new API without @available attribute
 Func _getMetadataSectionCount() is a new API without @available attribute
 Func _getMetadataSectionName(_:) is a new API without @available attribute
+
+// `@available(*, unavailable, ...)` in LegacyABI.swift
+Constructor _StringGuts.init(_:isASCII:) has been removed
+Func String._nativeCopyUTF16CodeUnits(into:range:) has been removed
+Func _branchHint(_:expected:) has been removed
+Var String.UTF16View._shortHeuristic has been removed
