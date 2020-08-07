@@ -2,6 +2,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -swift-version 4.2 %s -o %t/main
+// RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
 // REQUIRES: executable_test
