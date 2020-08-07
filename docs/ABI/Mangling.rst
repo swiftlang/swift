@@ -1059,7 +1059,7 @@ module, regardless of the actual Clang module that they are coming from. This
 can be observed when mangling a Swift function that accepts a C/C++ struct as a
 parameter:
 
-CxxStructModule:
+C++ module ``CxxStructModule``:
 
 .. code-block:: c++
 
