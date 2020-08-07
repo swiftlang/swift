@@ -44,16 +44,26 @@ swift::CompilerInvocation::CompilerInvocation() {
 }
 
 void CompilerInvocation::computeRuntimeResourcePathFromExecutablePath(
-    StringRef mainExecutablePath, llvm::SmallString<128> &runtimeResourcePath) {
-  runtimeResourcePath.assign(mainExecutablePath);
+    StringRef mainExecutablePath, bool shared,
+    llvm::SmallVectorImpl<char> &runtimeResourcePath) {
+  runtimeResourcePath.append(mainExecutablePath.begin(),
+                             mainExecutablePath.end());
+
   llvm::sys::path::remove_filename(runtimeResourcePath); // Remove /swift
   llvm::sys::path::remove_filename(runtimeResourcePath); // Remove /bin
-  llvm::sys::path::append(runtimeResourcePath, "lib", "swift");
+  appendSwiftLibDir(runtimeResourcePath, shared);
+}
+
+void CompilerInvocation::appendSwiftLibDir(llvm::SmallVectorImpl<char> &path,
+                                      bool shared) {
+  llvm::sys::path::append(path, "lib", shared ? "swift" : "swift_static");
 }
 
 void CompilerInvocation::setMainExecutablePath(StringRef Path) {
+  FrontendOpts.MainExecutablePath = Path.str();
   llvm::SmallString<128> LibPath;
-  computeRuntimeResourcePathFromExecutablePath(Path, LibPath);
+  computeRuntimeResourcePathFromExecutablePath(
+      Path, FrontendOpts.UseSharedResourceFolder, LibPath);
   setRuntimeResourcePath(LibPath.str());
 
   llvm::SmallString<128> DiagnosticDocsPath(Path);
@@ -63,12 +73,11 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
                           "diagnostics");
   DiagnosticOpts.DiagnosticDocumentationPath = std::string(DiagnosticDocsPath.str());
 
-  // Compute the path of the YAML diagnostic messages directory files
-  // in the toolchain.
+  // Compute the path to the diagnostic translations in the toolchain/build.
   llvm::SmallString<128> DiagnosticMessagesDir(Path);
   llvm::sys::path::remove_filename(DiagnosticMessagesDir); // Remove /swift
   llvm::sys::path::remove_filename(DiagnosticMessagesDir); // Remove /bin
-  llvm::sys::path::append(DiagnosticMessagesDir, "share", "swift");
+  llvm::sys::path::append(DiagnosticMessagesDir, "share", "swift", "diagnostics");
   DiagnosticOpts.LocalizationPath = std::string(DiagnosticMessagesDir.str());
 }
 
@@ -89,6 +98,20 @@ void CompilerInvocation::setDefaultPrebuiltCacheIfNecessary() {
     platform = getPlatformNameForTriple(LangOpts.Target);
   }
   llvm::sys::path::append(defaultPrebuiltPath, platform, "prebuilt-modules");
+
+  // If the SDK version is given, we should check if SDK-versioned prebuilt
+  // module cache is available and use it if so.
+  if (auto ver = LangOpts.SDKVersion) {
+    // "../macosx/prebuilt-modules"
+    SmallString<64> defaultPrebuiltPathWithSDKVer = defaultPrebuiltPath;
+    // "../macosx/prebuilt-modules/10.15"
+    llvm::sys::path::append(defaultPrebuiltPathWithSDKVer, ver->getAsString());
+    // If the versioned prebuilt module cache exists in the disk, use it.
+    if (llvm::sys::fs::exists(defaultPrebuiltPathWithSDKVer)) {
+      FrontendOpts.PrebuiltModuleCachePath = defaultPrebuiltPathWithSDKVer.str();
+      return;
+    }
+  }
   FrontendOpts.PrebuiltModuleCachePath = defaultPrebuiltPath.str();
 }
 
@@ -300,6 +323,8 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
     Args.hasArg(OPT_module_interface_preserve_types_as_written);
   Opts.PrintFullConvention |=
     Args.hasArg(OPT_experimental_print_full_convention);
+  Opts.ExperimentalSPIImports |=
+    Args.hasArg(OPT_experimental_spi_imports);
 }
 
 /// Save a copy of any flags marked as ModuleInterfaceOption, if running
@@ -359,6 +384,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableExperimentalStaticAssert |=
     Args.hasArg(OPT_enable_experimental_static_assert);
+
+  Opts.EnableExperimentalConcurrency |=
+    Args.hasArg(OPT_enable_experimental_concurrency);
 
   Opts.EnableSubstSILFunctionTypesForFunctionValues |=
     Args.hasArg(OPT_enable_subst_sil_function_types_for_function_values);
@@ -559,6 +587,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableConcisePoundFile =
       Args.hasArg(OPT_enable_experimental_concise_pound_file);
+  Opts.EnableFuzzyForwardScanTrailingClosureMatching =
+      Args.hasFlag(OPT_enable_fuzzy_forward_scan_trailing_closure_matching,
+                   OPT_disable_fuzzy_forward_scan_trailing_closure_matching,
+                   true);
 
   Opts.EnableCrossImportOverlays =
       Args.hasFlag(OPT_enable_cross_import_overlays,
@@ -585,6 +617,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableSILOpaqueValues |= Args.hasArg(OPT_enable_sil_opaque_values);
 
   Opts.VerifyAllSubstitutionMaps |= Args.hasArg(OPT_verify_all_substitution_maps);
+
+  Opts.EnableVolatileModules |= Args.hasArg(OPT_enable_volatile_modules);
 
   Opts.UseDarwinPreStableABIBit =
     (Target.isMacOSX() && Target.isMacOSXVersionLT(10, 14, 4)) ||
@@ -874,6 +908,12 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   }
   if (const Arg *A = Args.getLastArg(OPT_explict_swift_module_map))
     Opts.ExplicitSwiftModuleMap = A->getValue();
+  for (auto A: Args.filtered(OPT_candidate_module_file)) {
+    Opts.CandidateCompiledModules.push_back(resolveSearchPath(A->getValue()));
+  }
+  if (const Arg *A = Args.getLastArg(OPT_placeholder_dependency_module_map))
+    Opts.PlaceholderDependencyModuleMap = A->getValue();
+
   // Opts.RuntimeIncludePath is set by calls to
   // setRuntimeIncludePath() or setMainExecutablePath().
   // Opts.RuntimeImportPath is set by calls to
@@ -1395,9 +1435,23 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_disable_concrete_type_metadata_mangled_name_accessors))
     Opts.DisableConcreteTypeMetadataMangledNameAccessors = true;
 
-  if (Args.hasArg(OPT_use_jit))
+  if (Args.hasArg(OPT_use_jit)) {
     Opts.UseJIT = true;
-  
+    if (const Arg *A = Args.getLastArg(OPT_dump_jit)) {
+      llvm::Optional<swift::JITDebugArtifact> artifact =
+          llvm::StringSwitch<llvm::Optional<swift::JITDebugArtifact>>(A->getValue())
+              .Case("llvm-ir", JITDebugArtifact::LLVMIR)
+              .Case("object", JITDebugArtifact::Object)
+              .Default(None);
+      if (!artifact) {
+        Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                       A->getOption().getName(), A->getValue());
+        return true;
+      }
+      Opts.DumpJIT = *artifact;
+    }
+  }
+
   for (const Arg *A : Args.filtered(OPT_verify_type_layout)) {
     Opts.VerifyTypeLayoutNames.push_back(A->getValue());
   }
@@ -1683,11 +1737,10 @@ static bool ParseMigratorArgs(MigratorOptions &Opts,
 }
 
 bool CompilerInvocation::parseArgs(
-    ArrayRef<const char *> Args,
-    DiagnosticEngine &Diags,
+    ArrayRef<const char *> Args, DiagnosticEngine &Diags,
     SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>>
         *ConfigurationFileBuffers,
-    StringRef workingDirectory) {
+    StringRef workingDirectory, StringRef mainExecutablePath) {
   using namespace options;
 
   if (Args.empty())
@@ -1716,6 +1769,10 @@ bool CompilerInvocation::parseArgs(
   if (ParseFrontendArgs(FrontendOpts, ParsedArgs, Diags,
                         ConfigurationFileBuffers)) {
     return true;
+  }
+
+  if (!mainExecutablePath.empty()) {
+    setMainExecutablePath(mainExecutablePath);
   }
 
   ParseModuleInterfaceArgs(ModuleInterfaceOpts, ParsedArgs);

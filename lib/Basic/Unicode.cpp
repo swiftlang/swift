@@ -123,22 +123,3 @@ unsigned swift::unicode::extractFirstUnicodeScalar(StringRef S) {
   (void)Result;
   return Scalar;
 }
-
-uint64_t swift::unicode::getUTF16Length(StringRef Str) {
-  uint64_t Length;
-  // Transcode the string to UTF-16 to get its length.
-  SmallVector<llvm::UTF16, 128> buffer(Str.size() + 1); // +1 for ending nulls.
-  const llvm::UTF8 *fromPtr = (const llvm::UTF8 *) Str.data();
-  llvm::UTF16 *toPtr = &buffer[0];
-  llvm::ConversionResult Result =
-    ConvertUTF8toUTF16(&fromPtr, fromPtr + Str.size(),
-                       &toPtr, toPtr + Str.size(),
-                       llvm::strictConversion);
-  assert(Result == llvm::conversionOK &&
-         "UTF-8 encoded string cannot be converted into UTF-16 encoding");
-  (void)Result;
-
-  // The length of the transcoded string in UTF-16 code points.
-  Length = toPtr - &buffer[0];
-  return Length;
-}

@@ -36,18 +36,6 @@ enum class DefaultArgumentKind : uint8_t {
   /// The default argument is inherited from the corresponding argument of the
   /// overridden declaration.
   Inherited,
-  /// The #file default argument, which is expanded at the call site.
-  File,
-  /// The #filePath default argument, which is expanded at the call site.
-  FilePath,
-  /// The #line default argument, which is expanded at the call site.
-  Line,
-  /// The #column default argument, which is expanded at the call site.
-  Column,
-  /// The #function default argument, which is expanded at the call site.
-  Function,
-  /// The #dsohandle default argument, which is expanded at the call site.
-  DSOHandle,
   /// The "nil" literal.
   NilLiteral,
   /// An empty array literal.
@@ -56,8 +44,11 @@ enum class DefaultArgumentKind : uint8_t {
   EmptyDictionary,
   /// A reference to the stored property. This is a special default argument
   /// kind for the synthesized memberwise constructor to emit a call to the
-  // property's initializer.
+  /// property's initializer.
   StoredProperty,
+  // Magic identifier literals expanded at the call site:
+#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) NAME,
+#include "swift/AST/MagicIdentifierKinds.def"
 };
 enum { NumDefaultArgumentKindBits = 4 };
 

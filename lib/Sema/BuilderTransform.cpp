@@ -19,6 +19,7 @@
 #include "MiscDiagnostics.h"
 #include "SolutionResult.h"
 #include "TypeChecker.h"
+#include "TypeCheckAvailability.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
@@ -37,6 +38,24 @@ using namespace swift;
 using namespace constraints;
 
 namespace {
+
+/// Find the first #available condition within the statement condition,
+/// or return NULL if there isn't one.
+const StmtConditionElement *findAvailabilityCondition(StmtCondition stmtCond) {
+  for (const auto &cond : stmtCond) {
+    switch (cond.getKind()) {
+    case StmtConditionElement::CK_Boolean:
+    case StmtConditionElement::CK_PatternBinding:
+      continue;
+
+    case StmtConditionElement::CK_Availability:
+      return &cond;
+      break;
+    }
+  }
+
+  return nullptr;
+}
 
 /// Visitor to classify the contents of the given closure.
 class BuilderClosureVisitor
@@ -80,10 +99,21 @@ class BuilderClosureVisitor
     auto simplifiedTy = cs->simplifyType(builderType);
     if (!simplifiedTy->hasTypeVariable()) {
       typeExpr = TypeExpr::createImplicitHack(loc, simplifiedTy, ctx);
+    } else if (auto *decl = simplifiedTy->getAnyGeneric()) {
+      // HACK: If there's not enough information to completely resolve the
+      // builder type, but we have the base available to us, form an *explicit*
+      // TypeExpr pointing at it. We cannot form an implicit base without
+      // a fully-resolved concrete type. Really, whatever we put here has no
+      // bearing on the generated solution because we're going to use this node
+      // to stash the builder type and hand it back to the ambient
+      // constraint system.
+      typeExpr = TypeExpr::createForDecl(DeclNameLoc(loc), decl, dc);
     } else {
       // HACK: If there's not enough information in the constraint system,
       // create a garbage base type to force it to diagnose
       // this as an ambiguous expression.
+      // FIXME: We can also construct an UnresolvedMemberExpr here instead of
+      // an UnresolvedDotExpr and get a slightly better diagnostic.
       typeExpr = TypeExpr::createImplicitHack(loc, ErrorType::get(ctx), ctx);
     }
     cs->setType(typeExpr, MetatypeType::get(builderType));
@@ -197,9 +227,6 @@ public:
                         DeclContext *dc, Type builderType,
                         Type bodyResultType)
       : cs(cs), dc(dc), ctx(ctx), builderType(builderType) {
-    assert((cs || !builderType->hasTypeVariable()) &&
-           "cannot handle builder type with type variables without "
-           "constraint system");
     builder = builderType->getAnyNominal();
     applied.builderType = builderType;
     applied.bodyResultType = bodyResultType;
@@ -487,10 +514,20 @@ protected:
     if (!cs || !thenVar || (elseChainVar && !*elseChainVar))
       return nullptr;
 
+    // If there is a #available in the condition, the 'then' will need to
+    // be wrapped in a call to buildLimitedAvailability(_:), if available.
+    Expr *thenVarRefExpr = buildVarRef(
+        thenVar, ifStmt->getThenStmt()->getEndLoc());
+    if (findAvailabilityCondition(ifStmt->getCond()) &&
+        builderSupports(ctx.Id_buildLimitedAvailability)) {
+      thenVarRefExpr = buildCallIfWanted(
+          ifStmt->getThenStmt()->getEndLoc(), ctx.Id_buildLimitedAvailability,
+          { thenVarRefExpr }, { Identifier() });
+    }
+
     // Prepare the `then` operand by wrapping it to produce a chain result.
     Expr *thenExpr = buildWrappedChainPayload(
-        buildVarRef(thenVar, ifStmt->getThenStmt()->getEndLoc()),
-        payloadIndex, numPayloads, isOptional);
+        thenVarRefExpr, payloadIndex, numPayloads, isOptional);
 
     // Prepare the `else operand:
     Expr *elseExpr;
@@ -662,6 +699,18 @@ protected:
     if (!cs)
       return nullptr;
 
+    // If there are no 'case' statements in the body let's try
+    // to diagnose this situation via limited exhaustiveness check
+    // before failing a builder transform, otherwise type-checker
+    // might end up without any diagnostics which leads to crashes
+    // in SILGen.
+    if (capturedCaseVars.empty()) {
+      TypeChecker::checkSwitchExhaustiveness(switchStmt, dc,
+                                             /*limitChecking=*/true);
+      hadError = true;
+      return nullptr;
+    }
+
     // Form the expressions that inject the result of each case into the
     // appropriate
     llvm::TinyPtrVector<Expr *> injectedCaseExprs;
@@ -710,6 +759,18 @@ protected:
   }
 
   VarDecl *visitCaseStmt(CaseStmt *caseStmt, Expr *subjectExpr) {
+    auto *body = caseStmt->getBody();
+
+    // Explicitly disallow `case` statements with empty bodies
+    // since that helps to diagnose other issues with switch
+    // statements by excluding invalid cases.
+    if (auto *BS = dyn_cast<BraceStmt>(body)) {
+      if (BS->getNumElements() == 0) {
+        hadError = true;
+        return nullptr;
+      }
+    }
+
     // If needed, generate constraints for everything in the case statement.
     if (cs) {
       auto locator = cs->getConstraintLocator(
@@ -1164,6 +1225,36 @@ public:
             capturedThen.first, {capturedThen.second.front()}));
     ifStmt->setThenStmt(newThen);
 
+    // Look for a #available condition. If there is one, we need to check
+    // that the resulting type of the "then" doesn't refer to any types that
+    // are unavailable in the enclosing context.
+    //
+    // Note that this is for staging in support for buildLimitedAvailability();
+    // the diagnostic is currently a warning, so that existing code that
+    // compiles today will continue to compile. Once function builder types
+    // have had the chance to adopt buildLimitedAvailability(), we'll upgrade
+    // this warning to an error.
+    if (auto availabilityCond = findAvailabilityCondition(ifStmt->getCond())) {
+      SourceLoc loc = availabilityCond->getStartLoc();
+      Type thenBodyType = solution.simplifyType(
+          solution.getType(target.captured.second[0]));
+      thenBodyType.findIf([&](Type type) {
+        auto nominal = type->getAnyNominal();
+        if (!nominal)
+          return false;
+
+        if (auto reason = TypeChecker::checkDeclarationAvailability(
+                              nominal, loc, dc)) {
+          ctx.Diags.diagnose(
+              loc, diag::function_builder_missing_limited_availability,
+              builderTransform.builderType);
+          return true;
+        }
+
+        return false;
+      });
+    }
+
     if (auto elseBraceStmt =
             dyn_cast_or_null<BraceStmt>(ifStmt->getElseStmt())) {
       // Translate the "else" branch when it's a stmt-brace.
@@ -1257,8 +1348,7 @@ public:
       // Check restrictions on '@unknown'.
       if (caseStmt->hasUnknownAttr()) {
         checkUnknownAttrRestrictions(
-            cs.getASTContext(), caseStmt, /*fallthroughDest=*/nullptr,
-            limitExhaustivityChecks);
+            cs.getASTContext(), caseStmt, limitExhaustivityChecks);
       }
 
       ++caseIndex;
@@ -1387,64 +1477,6 @@ BraceStmt *swift::applyFunctionBuilderTransform(
         captured.first, captured.second)));
 }
 
-/// Produce any additional syntactic diagnostics for the body of a function
-/// that had a function builder applied.
-static void performAddOnDiagnostics(BraceStmt *stmt, DeclContext *dc) {
-  class AddOnDiagnosticWalker : public ASTWalker {
-    SmallVector<DeclContext *, 4> dcStack;
-
-  public:
-    AddOnDiagnosticWalker(DeclContext *dc) {
-      dcStack.push_back(dc);
-    }
-
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      performSyntacticExprDiagnostics(
-          expr, dcStack.back(), /*isExprStmt=*/false);
-
-      if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-        if (closure->wasSeparatelyTypeChecked()) {
-          dcStack.push_back(closure);
-          return { true, expr };
-        }
-      }
-
-      return { false, expr };
-    }
-
-    Expr *walkToExprPost(Expr *expr) override {
-      if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-        if (closure->wasSeparatelyTypeChecked()) {
-          assert(dcStack.back() == closure);
-          dcStack.pop_back();
-        }
-      }
-
-      return expr;
-    }
-
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
-      performStmtDiagnostics(dcStack.back()->getASTContext(), stmt);
-      return { true, stmt };
-    }
-
-    std::pair<bool, Pattern*> walkToPatternPre(Pattern *pattern) override {
-      return { false, pattern };
-    }
-
-    bool walkToTypeLocPre(TypeLoc &typeLoc) override { return false; }
-
-    bool walkToTypeReprPre(TypeRepr *typeRepr) override { return false; }
-
-    bool walkToParameterListPre(ParameterList *params) override {
-      return false;
-    }
-  };
-
-  AddOnDiagnosticWalker walker(dc);
-  stmt->walk(walker);
-}
-
 Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
     FuncDecl *func, Type builderType) {
   // Pre-check the body: pre-check any expressions in it and look
@@ -1453,7 +1485,7 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
   // If we encountered an error or there was an explicit result type,
   // bail out and report that to the caller.
   auto &ctx = func->getASTContext();
-  auto request = PreCheckFunctionBuilderRequest{func};
+  auto request = PreCheckFunctionBuilderRequest{AnyFunctionRef(func)};
   switch (evaluateOrDefault(
               ctx.evaluator, request, FunctionBuilderBodyPreCheck::Error)) {
   case FunctionBuilderBodyPreCheck::Okay:
@@ -1520,7 +1552,6 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
 
   if (auto result = cs.matchFunctionBuilder(
           func, builderType, resultContextType, resultConstraintKind,
-          cs.getConstraintLocator(func->getBody()),
           cs.getConstraintLocator(func->getBody()))) {
     if (result->isFailure())
       return nullptr;
@@ -1556,6 +1587,13 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
     // The system was salvaged; continue on as if nothing happened.
   }
 
+  if (cs.isDebugMode()) {
+    auto &log = llvm::errs();
+    log << "--- Applying Solution ---\n";
+    solutions.front().dump(log);
+    log << '\n';
+  }
+
   // FIXME: Shouldn't need to do this.
   cs.applySolution(solutions.front());
 
@@ -1563,7 +1601,7 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
   if (auto result = cs.applySolution(
           solutions.front(),
           SolutionApplicationTarget(func))) {
-    performAddOnDiagnostics(result->getFunctionBody(), func);
+    performSyntacticDiagnosticsForTarget(*result, /*isExprStmt*/ false);
     return result->getFunctionBody();
   }
 
@@ -1574,7 +1612,7 @@ Optional<ConstraintSystem::TypeMatchResult>
 ConstraintSystem::matchFunctionBuilder(
     AnyFunctionRef fn, Type builderType, Type bodyResultType,
     ConstraintKind bodyResultConstraintKind,
-    ConstraintLocator *calleeLocator, ConstraintLocatorBuilder locator) {
+    ConstraintLocatorBuilder locator) {
   auto builder = builderType->getAnyNominal();
   assert(builder && "Bad function builder type");
   assert(builder->getAttrs().hasAttribute<FunctionBuilderAttr>());
@@ -1624,22 +1662,6 @@ ConstraintSystem::matchFunctionBuilder(
     }
   }
 
-  // If the builder type has a type parameter, substitute in the type
-  // variables.
-  if (builderType->hasTypeParameter()) {
-    // Find the opened type for this callee and substitute in the type
-    // parametes.
-    for (const auto &opened : OpenedTypes) {
-      if (opened.first == calleeLocator) {
-        OpenedTypeMap replacements(opened.second.begin(),
-                                   opened.second.end());
-        builderType = openType(builderType, replacements);
-        break;
-      }
-    }
-    assert(!builderType->hasTypeParameter());
-  }
-
   BuilderClosureVisitor visitor(getASTContext(), this, dc, builderType,
                                 bodyResultType);
 
@@ -1664,8 +1686,12 @@ ConstraintSystem::matchFunctionBuilder(
   // If builder is applied to the closure expression then
   // `closure body` to `closure result` matching should
   // use special locator.
-  if (auto *closure = fn.getAbstractClosureExpr())
+  if (auto *closure = fn.getAbstractClosureExpr()) {
     locator = getConstraintLocator(closure, ConstraintLocator::ClosureResult);
+  } else {
+    locator = getConstraintLocator(fn.getAbstractFunctionDecl(),
+                                   ConstraintLocator::FunctionBuilderBodyResult);
+  }
 
   // Bind the body result type to the type of the transformed expression.
   addConstraint(bodyResultConstraintKind, transformedType, bodyResultType,
@@ -1701,10 +1727,10 @@ public:
     if (HasError)
       return FunctionBuilderBodyPreCheck::Error;
 
+    assert(oldBody == newBody && "pre-check walk wasn't in-place?");
+
     if (hasReturnStmt())
       return FunctionBuilderBodyPreCheck::HasReturnStmt;
-
-    assert(oldBody == newBody && "pre-check walk wasn't in-place?");
 
     return FunctionBuilderBodyPreCheck::Okay;
   }
@@ -1743,17 +1769,16 @@ public:
 
 }
 
-FunctionBuilderBodyPreCheck
-PreCheckFunctionBuilderRequest::evaluate(Evaluator &eval,
-                                         AnyFunctionRef fn) const {
+FunctionBuilderBodyPreCheck PreCheckFunctionBuilderRequest::evaluate(
+    Evaluator &evaluator, PreCheckFunctionBuilderDescriptor owner) const {
   // We don't want to do the precheck if it will already have happened in
   // the enclosing expression.
   bool skipPrecheck = false;
   if (auto closure = dyn_cast_or_null<ClosureExpr>(
-          fn.getAbstractClosureExpr()))
+          owner.Fn.getAbstractClosureExpr()))
     skipPrecheck = shouldTypeCheckInEnclosingExpression(closure);
 
-  return PreCheckFunctionBuilderApplication(fn, false).run();
+  return PreCheckFunctionBuilderApplication(owner.Fn, false).run();
 }
 
 std::vector<ReturnStmt *> TypeChecker::findReturnStatements(AnyFunctionRef fn) {

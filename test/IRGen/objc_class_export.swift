@@ -22,7 +22,7 @@
 // CHECK-SAME:   i64 ptrtoint ({{.*}}* @_METACLASS_DATA__TtC17objc_class_export3Foo to i64)
 // CHECK-SAME: }
 // CHECK: [[FOO_NAME:@.*]] = private unnamed_addr constant [28 x i8] c"_TtC17objc_class_export3Foo\00"
-// CHECK: @_METACLASS_DATA__TtC17objc_class_export3Foo = private constant {{.*\*}} } {
+// CHECK: @_METACLASS_DATA__TtC17objc_class_export3Foo = internal constant {{.*\*}} } {
 // CHECK-SAME:   i32 129,
 // CHECK-SAME:   i32 40,
 // CHECK-SAME:   i32 40,
@@ -35,7 +35,7 @@
 // CHECK-SAME:   i8* null,
 // CHECK-SAME:   i8* null
 // CHECK-SAME: }, section "__DATA, __objc_const", align 8
-// CHECK: @_DATA__TtC17objc_class_export3Foo = private constant {{.*\*}} } {
+// CHECK: @_DATA__TtC17objc_class_export3Foo = internal constant {{.*\*}} } {
 // CHECK-SAME:   i32 128,
 // CHECK-SAME:   i32 16,
 // CHECK-SAME:   i32 24,

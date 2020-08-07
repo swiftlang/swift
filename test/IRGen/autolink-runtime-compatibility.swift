@@ -1,4 +1,4 @@
-// REQUIRES: OS=macosx
+// REQUIRES: OS=macosx,CPU=x86_64
 
 // Doesn't autolink compatibility library because autolinking is disabled
 // RUN: %target-swift-frontend -disable-autolinking-runtime-compatibility-dynamic-replacements -target %target-cpu-apple-macosx10.9 -disable-autolinking-runtime-compatibility -emit-ir -parse-stdlib %s | %FileCheck -check-prefix=NO-FORCE-LOAD %s

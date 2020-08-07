@@ -88,28 +88,21 @@ TEST(TypeRefTest, UniqueTupleTypeRef) {
   auto N2 = Builder.createNominalType(XYZ, nullptr);
 
   std::vector<const TypeRef *> Void;
-  auto Void1 = Builder.createTupleType(Void, "", false);
-  auto Void2 = Builder.createTupleType(Void, "", false);
+  auto Void1 = Builder.createTupleType(Void, "");
+  auto Void2 = Builder.createTupleType(Void, "");
 
   EXPECT_EQ(Void1, Void2);
 
   std::vector<const TypeRef *> Elements1 { N1, N2 };
   std::vector<const TypeRef *> Elements2 { N1, N2, N2 };
 
-  auto T1 = Builder.createTupleType(Elements1, "", false);
-  auto T2 = Builder.createTupleType(Elements1, "", false);
-  auto T3 = Builder.createTupleType(Elements2, "", false);
+  auto T1 = Builder.createTupleType(Elements1, "");
+  auto T2 = Builder.createTupleType(Elements1, "");
+  auto T3 = Builder.createTupleType(Elements2, "");
 
   EXPECT_EQ(T1, T2);
   EXPECT_NE(T2, T3);
   EXPECT_NE(T1, Void1);
-
-  auto T4 = Builder.createTupleType(Elements1, "", true);
-  auto T5 = Builder.createTupleType(Elements1, "", true);
-  auto T6 = Builder.createTupleType(Elements1, "", false);
-
-  EXPECT_EQ(T4, T5);
-  EXPECT_NE(T5, T6);
 }
 
 TEST(TypeRefTest, UniqueFunctionTypeRef) {
@@ -117,7 +110,7 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
   TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   std::vector<const TypeRef *> Void;
-  auto VoidResult = Builder.createTupleType(Void, "", false);
+  auto VoidResult = Builder.createTupleType(Void, "");
   Param Param1 = Builder.createNominalType(ABC, nullptr);
   Param Param2 = Builder.createNominalType(XYZ, nullptr);
 
@@ -126,7 +119,7 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
   std::vector<Param> Parameters2{Param1, Param1};
 
   auto Result =
-      Builder.createTupleType({Param1.getType(), Param2.getType()}, "", false);
+      Builder.createTupleType({Param1.getType(), Param2.getType()}, "");
 
   auto F1 =
       Builder.createFunctionType(Parameters1, Result, FunctionTypeFlags());
@@ -449,7 +442,7 @@ TEST(TypeRefTest, DeriveSubstitutions) {
   auto Nominal = Builder.createBoundGenericType(NominalName, NominalArgs,
                                                /*parent*/ nullptr);
 
-  auto Result = Builder.createTupleType({GTP00, GTP01}, "", false);
+  auto Result = Builder.createTupleType({GTP00, GTP01}, "");
   auto Func =
       Builder.createFunctionType({Nominal}, Result, FunctionTypeFlags());
 

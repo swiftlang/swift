@@ -1,0 +1,151 @@
+// RUN: %target-sil-opt %s -accessed-storage-dump -enable-sil-verify-all -o /dev/null | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+struct MyStruct {
+  @_hasStorage @_hasInitialValue var i: Int64 { get set }
+  @_hasStorage @_hasInitialValue var j: Int64 { get set }
+}
+
+// CHECK-LABEL: @testStructPhiCommon
+// CHECK: store
+// CHECK: Argument %0 = argument of bb0 : $*MyStruct
+sil hidden @testStructPhiCommon : $@convention(thin) (@inout MyStruct) -> () {
+bb0(%0 : $*MyStruct):
+  %2 = struct_element_addr %0 : $*MyStruct, #MyStruct.i
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = address_to_pointer %2 : $*Int64 to $Builtin.RawPointer
+  br bb3(%3 : $Builtin.RawPointer)
+
+bb2:
+  %5 = address_to_pointer %2 : $*Int64 to $Builtin.RawPointer
+  br bb3(%5 : $Builtin.RawPointer)
+
+bb3(%6 : $Builtin.RawPointer) :
+  %7 = pointer_to_address %6 : $Builtin.RawPointer to $*Int64
+  %8 = integer_literal $Builtin.Int64, 2
+  %9 = struct $Int64 (%8 : $Builtin.Int64)
+  store %9 to %7 : $*Int64
+  %22 = tuple ()
+  return %22 : $()
+}
+
+// A pointer phi leading to different access paths should be
+// considered illegal, but we don't have a way to verify it yet.
+//
+// CHECK-LABEL: @testStructPhiDivergent
+// CHECK: store
+// CHECK: INVALID
+sil hidden @testStructPhiDivergent : $@convention(thin) (@inout MyStruct) -> () {
+bb0(%0 : $*MyStruct):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = struct_element_addr %0 : $*MyStruct, #MyStruct.i
+  %3 = address_to_pointer %2 : $*Int64 to $Builtin.RawPointer
+  br bb3(%3 : $Builtin.RawPointer)
+
+bb2:
+  %4 = struct_element_addr %0 : $*MyStruct, #MyStruct.j
+  %5 = address_to_pointer %4 : $*Int64 to $Builtin.RawPointer
+  br bb3(%5 : $Builtin.RawPointer)
+
+bb3(%6 : $Builtin.RawPointer) :
+  %7 = pointer_to_address %6 : $Builtin.RawPointer to $*Int64
+  %8 = integer_literal $Builtin.Int64, 2
+  %9 = struct $Int64 (%8 : $Builtin.Int64)
+  store %9 to %7 : $*Int64
+  %22 = tuple ()
+  return %22 : $()
+}
+
+// Test FindPhiStorageVisitor with a combination of
+// - valid storage for address_to_pointer %1
+// - invalid common definition between #MyStruct.i and #MyStruct.j
+//
+// Make sure that visiting the invalid common definition also
+// invalidates storage.
+//
+// CHECK-LABEL: @testStructPhiChained
+// CHECK:   store
+// CHECK: INVALID
+sil hidden @testStructPhiChained : $@convention(thin) (@inout MyStruct, @inout Int64) -> () {
+bb0(%0 : $*MyStruct, %1 : $*Int64):
+  cond_br undef, bb1, bb5
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  %2 = address_to_pointer %1 : $*Int64 to $Builtin.RawPointer
+  br bb4(%2 : $Builtin.RawPointer)
+
+bb3:
+  %3 = struct_element_addr %0 : $*MyStruct, #MyStruct.i
+  %4 = address_to_pointer %3 : $*Int64 to $Builtin.RawPointer
+  br bb4(%4 : $Builtin.RawPointer)
+
+bb4(%6 : $Builtin.RawPointer) :
+  br bb6(%6 : $Builtin.RawPointer)
+
+bb5:
+  %7 = struct_element_addr %0 : $*MyStruct, #MyStruct.j
+  %8 = address_to_pointer %7 : $*Int64 to $Builtin.RawPointer
+  br bb6(%8 : $Builtin.RawPointer)
+
+bb6(%9 : $Builtin.RawPointer) :
+  %10 = pointer_to_address %9 : $Builtin.RawPointer to $*Int64
+  %11 = integer_literal $Builtin.Int64, 2
+  %12 = struct $Int64 (%11 : $Builtin.Int64)
+  store %12 to %10 : $*Int64
+  %22 = tuple ()
+  return %22 : $()
+}
+
+struct _MyBridgeStorage {
+  @_hasStorage var rawValue : Builtin.BridgeObject
+}
+
+struct _MyArrayBuffer<T> {
+  @_hasStorage var _storage : _MyBridgeStorage
+}
+
+
+struct MyArray<T> {
+  @_hasStorage var _buffer : _MyArrayBuffer<T>
+}
+
+// CHECK-LABEL: @arrayValue
+// CHECK:   load [trivial] %{{.*}} : $*Builtin.Int64
+// CHECK: Tail  %{{.*}} = unchecked_ref_cast [[REF:%[0-9]+]] : $Builtin.BridgeObject to $__ContiguousArrayStorageBase
+// CHECK:   load [trivial] %{{.*}} : $*Builtin.Int64
+// CHECK: Tail  %{{.*}} = unchecked_ref_cast [[REF:%[0-9]+]] : $Builtin.BridgeObject to $__ContiguousArrayStorageBase
+sil [ossa] @arrayValue : $@convention(thin) (@guaranteed MyArray<Int64>) -> Int64 {
+bb0(%0 : @guaranteed $MyArray<Int64>):
+  %1 = integer_literal $Builtin.Word, 3
+  %2 = integer_literal $Builtin.Word, 4
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = struct_extract %0 : $MyArray<Int64>, #MyArray._buffer
+  %5 = struct_extract %4 : $_MyArrayBuffer<Int64>, #_MyArrayBuffer._storage
+  %6 = struct_extract %5 : $_MyBridgeStorage, #_MyBridgeStorage.rawValue
+  %7 = unchecked_ref_cast %6 : $Builtin.BridgeObject to $__ContiguousArrayStorageBase
+  %8 = ref_tail_addr [immutable] %7 : $__ContiguousArrayStorageBase, $Int64
+  %9 = index_addr %8 : $*Int64, %1 : $Builtin.Word
+  %10 = struct_element_addr %9 : $*Int64, #Int64._value
+  %11 = load [trivial] %10 : $*Builtin.Int64
+  %12 = index_addr %8 : $*Int64, %2 : $Builtin.Word
+  %13 = struct_element_addr %12 : $*Int64, #Int64._value
+  %14 = load [trivial] %13 : $*Builtin.Int64
+  %15 = builtin "sadd_with_overflow_Int64"(%11 : $Builtin.Int64, %14 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %16 = tuple_extract %15 : $(Builtin.Int64, Builtin.Int1), 0
+  %17 = tuple_extract %15 : $(Builtin.Int64, Builtin.Int1), 1
+  cond_fail %17 : $Builtin.Int1, "arithmetic overflow"
+  %19 = struct $Int64 (%16 : $Builtin.Int64)
+  return %19 : $Int64
+}

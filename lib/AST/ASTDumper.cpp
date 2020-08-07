@@ -323,13 +323,10 @@ getForeignErrorConventionKindString(ForeignErrorConvention::Kind value) {
 static StringRef getDefaultArgumentKindString(DefaultArgumentKind value) {
   switch (value) {
     case DefaultArgumentKind::None: return "none";
-    case DefaultArgumentKind::Column: return "#column";
-    case DefaultArgumentKind::DSOHandle: return "#dsohandle";
-    case DefaultArgumentKind::File: return "#file";
-    case DefaultArgumentKind::FilePath: return "#filePath";
-    case DefaultArgumentKind::Function: return "#function";
+#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+    case DefaultArgumentKind::NAME: return STRING;
+#include "swift/AST/MagicIdentifierKinds.def"
     case DefaultArgumentKind::Inherited: return "inherited";
-    case DefaultArgumentKind::Line: return "#line";
     case DefaultArgumentKind::NilLiteral: return "nil";
     case DefaultArgumentKind::EmptyArray: return "[]";
     case DefaultArgumentKind::EmptyDictionary: return "[:]";
@@ -371,7 +368,6 @@ static StringRef
 getStringLiteralExprEncodingString(StringLiteralExpr::Encoding value) {
   switch (value) {
     case StringLiteralExpr::UTF8: return "utf8";
-    case StringLiteralExpr::UTF16: return "utf16";
     case StringLiteralExpr::OneUnicodeScalar: return "unicodeScalar";
   }
 
@@ -507,7 +503,7 @@ namespace {
         printRec(P->getSubExpr());
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
-    void visitVarPattern(VarPattern *P) {
+    void visitBindingPattern(BindingPattern *P) {
       printCommon(P, P->isLet() ? "pattern_let" : "pattern_var");
       OS << '\n';
       printRec(P->getSubPattern());
@@ -564,8 +560,7 @@ namespace {
       };
 
       if (const auto GC = Owner.dyn_cast<const GenericContext *>()) {
-        if (!GC->isGeneric() || isa<ProtocolDecl>(GC))
-          printWhere(GC->getTrailingWhereClause());
+        printWhere(GC->getTrailingWhereClause());
       } else {
         const auto ATD = Owner.get<const AssociatedTypeDecl *>();
         printWhere(ATD->getTrailingWhereClause());
@@ -733,9 +728,9 @@ namespace {
       OS << ' ';
       printDeclName(VD);
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
-        printGenericParameters(OS, AFD->getGenericParams());
+        printGenericParameters(OS, AFD->getParsedGenericParams());
       if (auto *GTD = dyn_cast<GenericTypeDecl>(VD))
-        printGenericParameters(OS, GTD->getGenericParams());
+        printGenericParameters(OS, GTD->getParsedGenericParams());
 
       if (auto *var = dyn_cast<VarDecl>(VD)) {
         PrintWithColorRAII(OS, TypeColor) << " type='";
@@ -2134,6 +2129,13 @@ public:
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+  void visitAwaitExpr(AwaitExpr *E) {
+    printCommon(E, "await_expr");
+    OS << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitTupleExpr(TupleExpr *E) {
     printCommon(E, "tuple_expr");
     if (E->hasTrailingClosure())
@@ -2640,7 +2642,12 @@ public:
     printExplicitCastExpr(E, "coerce_expr");
   }
   void visitArrowExpr(ArrowExpr *E) {
-    printCommon(E, "arrow") << '\n';
+    printCommon(E, "arrow");
+    if (E->getAsyncLoc().isValid())
+      OS << " async";
+    if (E->getThrowsLoc().isValid())
+      OS << " throws";
+    OS << '\n';
     printRec(E->getArgsExpr());
     OS << '\n';
     printRec(E->getResultExpr());
@@ -2821,6 +2828,11 @@ public:
         PrintWithColorRAII(OS, DiscriminatorColor)
           << "#" << component.getTupleIndex();
         break;
+      case KeyPathExpr::Component::Kind::DictionaryKey:
+        PrintWithColorRAII(OS, ASTNodeColor) << "dict_key";
+        PrintWithColorRAII(OS, IdentifierColor)
+          << "  key='" << component.getUnresolvedDeclName() << "'";
+        break;
       }
       PrintWithColorRAII(OS, TypeColor)
         << " type='" << GetTypeOfKeyPathComponent(E, i) << "'";
@@ -2975,7 +2987,9 @@ public:
   void visitFunctionTypeRepr(FunctionTypeRepr *T) {
     printCommon("type_function");
     OS << '\n'; printRec(T->getArgsTypeRepr());
-    if (T->throws())
+    if (T->isAsync())
+      OS << " async ";
+    if (T->isThrowing())
       OS << " throws ";
     OS << '\n'; printRec(T->getResultTypeRepr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
@@ -3745,14 +3759,15 @@ namespace {
                    getSILFunctionTypeRepresentationString(representation));
 
       printFlag(!T->isNoEscape(), "escaping");
-      printFlag(T->throws(), "throws");
+      printFlag(T->isAsync(), "async");
+      printFlag(T->isThrowing(), "throws");
 
       OS << "\n";
       Indent += 2;
-      if (auto *cty = T->getClangFunctionType()) {
+      if (!T->getClangTypeInfo().empty()) {
         std::string s;
         llvm::raw_string_ostream os(s);
-        cty->dump(os);
+        T->getClangTypeInfo().dump(os);
         printField("clang_type", os.str());
       }
       printAnyFunctionParams(T->getParams(), "input");

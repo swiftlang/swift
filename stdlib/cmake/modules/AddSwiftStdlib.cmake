@@ -654,6 +654,9 @@ function(_add_swift_target_library_single target name)
                         "${SWIFTLIB_SINGLE_multiple_parameter_options}"
                         ${ARGN})
 
+  translate_flag(${SWIFTLIB_SINGLE_STATIC} "STATIC"
+                 SWIFTLIB_SINGLE_STATIC_keyword)
+
   # Determine macCatalyst build flavor
   get_maccatalyst_build_flavor(maccatalyst_build_flavor
     "${SWIFTLIB_SINGLE_SDK}" "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}")
@@ -783,6 +786,7 @@ function(_add_swift_target_library_single target name)
       ${SWIFTLIB_SINGLE_IS_STDLIB_CORE_keyword}
       ${SWIFTLIB_SINGLE_IS_SDK_OVERLAY_keyword}
       ${embed_bitcode_arg}
+      ${SWIFTLIB_SINGLE_STATIC_keyword}
       INSTALL_IN_COMPONENT "${SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT}"
       MACCATALYST_BUILD_FLAVOR "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}")
   add_swift_source_group("${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}")
@@ -1255,7 +1259,9 @@ function(_add_swift_target_library_single target name)
     endif()
     # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
     if(SWIFT_EMBED_BITCODE_SECTION AND NOT SWIFTLIB_SINGLE_DONT_EMBED_BITCODE)
-      if(${SWIFTLIB_SINGLE_SDK} MATCHES "(I|TV|WATCH)OS")
+      if(${SWIFTLIB_SINGLE_SDK} STREQUAL "IOS" OR
+         ${SWIFTLIB_SINGLE_SDK} STREQUAL "TVOS" OR
+         ${SWIFTLIB_SINGLE_SDK} STREQUAL "WATCHOS")
         # Please note that using a generator expression to fit
         # this in a single target_link_options does not work
         # (at least in CMake 3.15 and 3.16),

@@ -171,6 +171,11 @@ Globals
   global ::= entity 'Wvd'                // field offset
   global ::= entity 'WC'                 // resilient enum tag index
 
+  global ::= global 'MK'                 // instantiation cache associated with global
+
+  global ::= global 'MJ'                 // noncanonical specialized generic type metadata instantiation cache associated with global
+  global ::= global 'MN'                 // noncanonical specialized generic type metadata for global
+
 A direct symbol resolves directly to the address of an object.  An
 indirect symbol resolves to the address of a pointer to the object.
 They are distinct manglings to make a certain class of bugs
@@ -522,13 +527,14 @@ Types
   FUNCTION-KIND ::= 'H'                      // @differentiable(linear) function type
   FUNCTION-KIND ::= 'I'                      // @differentiable(linear) function type (escaping)
 
-  function-signature ::= params-type params-type throws? // results and parameters
+  function-signature ::= params-type params-type async? throws? // results and parameters
 
   params-type ::= type 'z'? 'h'?              // tuple in case of multiple parameters or a single parameter with a single tuple type
                                              // with optional inout convention, shared convention. parameters don't have labels,
                                              // they are mangled separately as part of the entity.
   params-type ::= empty-list                  // shortcut for no parameters
 
+  async ::= 'Y'                              // 'async' annotation on function types
   throws ::= 'K'                             // 'throws' annotation on function types
 
   type-list ::= list-type '_' list-type*     // list of types
@@ -647,6 +653,11 @@ implementation details of a function type.
     type ::= opaque-type-decl-name bound-generic-args 'Qo' INDEX // opaque type
 
     opaque-type-decl-name ::= entity 'QO' // opaque result type of specified decl
+  #endif
+
+  #if SWIFT_VERSION >= 5.4
+    type ::= 'Qu'                         // opaque result type (of current decl)
+                                          // used for ObjC class runtime name purposes.
   #endif
 
 Opaque return types have a special short representation in the mangling of

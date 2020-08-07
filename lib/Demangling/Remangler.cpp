@@ -2314,6 +2314,10 @@ void Remangler::mangleFullObjCResilientClassStub(Node *node) {
   Buffer << "Mt";
 }
 
+void Remangler::mangleAsyncAnnotation(Node *node) {
+  Buffer << 'Y';
+}
+
 void Remangler::mangleThrowsAnnotation(Node *node) {
   Buffer << 'K';
 }
@@ -2545,6 +2549,21 @@ void Remangler::mangleCanonicalSpecializedGenericTypeMetadataAccessFunction(
     Node *node) {
   mangleSingleChildNode(node);
   Buffer << "Mb";
+}
+
+void Remangler::mangleMetadataInstantiationCache(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "MK";
+}
+
+void Remangler::mangleNoncanonicalSpecializedGenericTypeMetadata(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "MN";
+}
+
+void Remangler::mangleNoncanonicalSpecializedGenericTypeMetadataCache(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "MJ";
 }
 
 } // anonymous namespace

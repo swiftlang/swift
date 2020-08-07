@@ -41,6 +41,11 @@ struct MetadataAllocation {
   unsigned Size;
 };
 
+template <typename Runtime> struct MetadataCacheNode {
+  typename Runtime::StoredPointer Left;
+  typename Runtime::StoredPointer Right;
+};
+
 } // end namespace reflection
 } // end namespace swift
 

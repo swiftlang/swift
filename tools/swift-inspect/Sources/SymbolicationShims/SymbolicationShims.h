@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include <stdint.h>
+#include <ptrauth.h>
 
 struct CSTypeRef {
   uintptr_t a, b;
@@ -19,3 +20,11 @@ struct CSTypeRef {
 struct Range {
   uintptr_t location, length;
 };
+
+uintptr_t GetPtrauthMask(void) {
+#if __has_feature(ptrauth_calls)
+  return (uintptr_t)ptrauth_strip((void*)0x0007ffffffffffff, 0);
+#else
+  return (uintptr_t)~0ull;
+#endif
+}

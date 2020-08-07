@@ -165,6 +165,8 @@ ModuleDependencies::collectCrossImportOverlayNames(ASTContext &ctx,
   using namespace llvm::sys;
   using namespace file_types;
   Optional<std::string> modulePath;
+  // A map from secondary module name to a vector of overlay names.
+  llvm::StringMap<llvm::SmallSetVector<Identifier, 4>> result;
   // Mimic getModuleDefiningPath() for Swift and Clang module.
   if (auto *swiftDep = dyn_cast<SwiftModuleDependenciesStorage>(storage.get())) {
     // Prefer interface path to binary module path if we have it.
@@ -176,12 +178,12 @@ ModuleDependencies::collectCrossImportOverlayNames(ASTContext &ctx,
     if (llvm::sys::path::extension(parentDir) == ".swiftmodule") {
       modulePath = parentDir.str();
     }
-  } else {
-    modulePath = cast<ClangModuleDependenciesStorage>(storage.get())->moduleMapFile;
+  } else if (auto *clangDep = dyn_cast<ClangModuleDependenciesStorage>(storage.get())){
+    modulePath = clangDep->moduleMapFile;
     assert(modulePath.hasValue());
+  } else { // PlaceholderSwiftModuleDependencies
+    return result;
   }
-  // A map from secondary module name to a vector of overlay names.
-  llvm::StringMap<llvm::SmallSetVector<Identifier, 4>> result;
   findOverlayFilesInternal(ctx, *modulePath, moduleName, SourceLoc(),
                            [&](StringRef file) {
     StringRef bystandingModule;

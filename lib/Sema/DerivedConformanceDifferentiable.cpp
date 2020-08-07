@@ -546,6 +546,7 @@ static ValueDecl *deriveDifferentiable_method(
   DeclName declName(C, methodName, params);
   auto *funcDecl = FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None,
                                     SourceLoc(), declName, SourceLoc(),
+                                    /*Async*/ false, SourceLoc(),
                                     /*Throws*/ false, SourceLoc(),
                                     /*GenericParams=*/nullptr, params,
                                     TypeLoc::withoutLoc(returnType), parentDC);
@@ -620,9 +621,9 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
 
   // Otherwise, synthesize a new struct.
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
-  auto diffableType = TypeLoc::withoutLoc(diffableProto->getDeclaredType());
+  auto diffableType = TypeLoc::withoutLoc(diffableProto->getDeclaredInterfaceType());
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
-  auto addArithType = TypeLoc::withoutLoc(addArithProto->getDeclaredType());
+  auto addArithType = TypeLoc::withoutLoc(addArithProto->getDeclaredInterfaceType());
 
   // By definition, `TangentVector` must conform to `Differentiable` and
   // `AdditiveArithmetic`.
@@ -894,9 +895,6 @@ DerivedConformance::deriveDifferentiable(AssociatedTypeDecl *requirement) {
                            diag::broken_differentiable_requirement);
     return std::make_pair(nullptr, nullptr);
   }
-  // Diagnose conformances in disallowed contexts.
-  if (checkAndDiagnoseDisallowedContext(requirement))
-    return std::make_pair(nullptr, nullptr);
 
   // Start an error diagnostic before attempting derivation.
   // If derivation succeeds, cancel the diagnostic.

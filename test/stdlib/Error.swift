@@ -122,7 +122,7 @@ ErrorTests.test("try!/location")
   .skip(.custom({ _isFastAssertConfiguration() },
                 reason: "trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches(_isDebugAssertConfiguration()
-                        ? "test/stdlib/Error.swift, line 128"
+                        ? "main/Error.swift, line 128"
                         : "")
   .code {
     expectCrashLater()
@@ -195,6 +195,17 @@ ErrorTests.test("test dealloc empty error box") {
 
 #if !os(WASI)
 var errors: [Error] = []
+
+@inline(never)
+func throwNegativeOne() throws {
+  throw UnsignedError.negativeOne
+}
+
+@inline(never)
+func throwJazzHands() throws {
+  throw SillyError.JazzHands
+}
+
 ErrorTests.test("willThrow") {
   if #available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *) {
     // Error isn't allowed in a @convention(c) function when ObjC interop is
@@ -207,12 +218,12 @@ ErrorTests.test("willThrow") {
     willThrow.storeBytes(of: callback, as: WillThrow.self)
     expectTrue(errors.isEmpty)
     do {
-      throw UnsignedError.negativeOne
+      try throwNegativeOne()
     } catch {}
     expectEqual(UnsignedError.self, type(of: errors.last!))
 
     do {
-      throw SillyError.JazzHands
+      try throwJazzHands()
     } catch {}
     expectEqual(2, errors.count)
     expectEqual(SillyError.self, type(of: errors.last!))

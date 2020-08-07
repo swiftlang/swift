@@ -572,17 +572,17 @@ If you're specifically testing the autoreleasing behavior of code, or do not
 expect code to interact with the Objective-C runtime, it may be OK to use ``if
 true {}``, but those assumptions should be commented in the test.
 
-#### Enabling/disabling the lldb test whitelist
+#### Enabling/disabling the lldb test allowlist
 
-It's possible to enable a whitelist of swift-specific lldb tests to run during
+It's possible to enable a allowlist of swift-specific lldb tests to run during
 PR smoke testing. Note that the default set of tests which run (which includes
-tests not in the whitelist) already only includes swift-specific tests.
+tests not in the allowlist) already only includes swift-specific tests.
 
-Enabling the whitelist is an option of last-resort to unblock swift PR testing
+Enabling the allowlist is an option of last-resort to unblock swift PR testing
 in the event that lldb test failures cannot be resolved in a timely way. If
-this becomes necessary, be sure to double-check that enabling the whitelist
+this becomes necessary, be sure to double-check that enabling the allowlist
 actually unblocks PR testing by running the smoke test build preset locally.
 
-To enable the lldb test whitelist, add `-G swiftpr` to the
+To enable the lldb test allowlist, add `-G swiftpr` to the
 `LLDB_TEST_CATEGORIES` variable in `utils/build-script-impl`. Disable it by
 removing that option.

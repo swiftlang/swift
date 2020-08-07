@@ -423,8 +423,8 @@ func test_force_unwrap_not_being_too_eager() {
 
 // rdar://problem/57097401
 func invalidOptionalChaining(a: Any) {
-  a == "="? // expected-error {{cannot use optional chaining on non-optional value of type 'String'}}
-  // expected-error@-1 {{cannot convert value of type 'Any' to expected argument type 'Any.Type?'}}
+  a == "="? // expected-error {{binary operator '==' cannot be applied to operands of type 'Any' and 'String?'}}
+  // expected-note@-1 {{overloads for '==' exist with these partially matching parameter lists: (CodingUserInfoKey, CodingUserInfoKey), (FloatingPointSign, FloatingPointSign), (String, String), (Unicode.CanonicalCombiningClass, Unicode.CanonicalCombiningClass)}}
 }
 
 // SR-12309 - Force unwrapping 'nil' compiles without warning

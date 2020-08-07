@@ -1,7 +1,13 @@
 // RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-experimental-concise-pound-file
+
+// The test cases in this file work the same in both Swift 5 and "Swift 6" mode.
+// See the _swift5 and _swift6 files for version-specific test cases.
 
 func callee(file: String = #file) {} // expected-note {{'file' declared here}}
 func callee(optFile: String? = #file) {} // expected-note {{'optFile' declared here}}
+func callee(fileID: String = #fileID) {} // expected-note {{'fileID' declared here}}
+func callee(filePath: String = #filePath) {} // expected-note {{'filePath' declared here}}
 func callee(arbitrary: String) {}
 
 class SomeClass {
@@ -22,6 +28,9 @@ class SomeClass {
 // `#file`-defaulted argument.
 func bad(function: String = #function) {
   // expected-note@-1 3{{did you mean for parameter 'function' to default to '#file'?}} {{29-38=#file}}
+  // expected-note@-2 {{did you mean for parameter 'function' to default to '#fileID'?}} {{29-38=#fileID}}
+  // expected-note@-3 {{did you mean for parameter 'function' to default to '#filePath'?}} {{29-38=#filePath}}
+
   callee(file: function)
   // expected-warning@-1 {{parameter 'function' with default argument '#function' passed to parameter 'file', whose default argument is '#file'}}
   // expected-note@-2 {{add parentheses to silence this warning}} {{16-16=(}} {{24-24=)}}
@@ -33,16 +42,28 @@ func bad(function: String = #function) {
   SomeClass().callee(file: function)
   // expected-warning@-1 {{parameter 'function' with default argument '#function' passed to parameter 'file', whose default argument is '#file'}}
   // expected-note@-2 {{add parentheses to silence this warning}} {{28-28=(}} {{36-36=)}}
+
+  callee(fileID: function)
+  // expected-warning@-1 {{parameter 'function' with default argument '#function' passed to parameter 'fileID', whose default argument is '#fileID'}}
+  // expected-note@-2 {{add parentheses to silence this warning}} {{18-18=(}} {{26-26=)}}
+
+  callee(filePath: function)
+  // expected-warning@-1 {{parameter 'function' with default argument '#function' passed to parameter 'filePath', whose default argument is '#filePath'}}
+  // expected-note@-2 {{add parentheses to silence this warning}} {{20-20=(}} {{28-28=)}}
 }
 
 // We should not warn when we pass a `#file`-defaulted argument to a
 // `#file`-defaulted argument.
-func good(file: String = #file) {
+func good(file: String = #file, fileID: String = #fileID, filePath: String = #filePath) {
   callee(file: file)
 
   SomeClass.callee(file: file)
 
   SomeClass().callee(file: file)
+
+  callee(fileID: fileID)
+
+  callee(filePath: filePath)
 }
 
 // We should not warn when we surround the `#function`-defaulted argument
@@ -53,6 +74,10 @@ func disabled(function: String = #function) {
   SomeClass.callee(file: (function))
 
   SomeClass().callee(file: (function))
+
+  callee(fileID: (function))
+
+  callee(filePath: (function))
 }
 
 //

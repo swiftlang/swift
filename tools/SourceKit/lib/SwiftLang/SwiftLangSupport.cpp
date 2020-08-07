@@ -915,12 +915,10 @@ void SwiftLangSupport::printMemberDeclDescription(const swift::ValueDecl *VD,
     }
     OS << ')';
   };
-  if (auto EED = dyn_cast<EnumElementDecl>(VD)) {
-    if (auto params = EED->getParameterList())
-      printParams(params);
-  } else if (auto *FD = dyn_cast<FuncDecl>(VD)) {
-    if (auto params = FD->getParameters())
-      printParams(params);
+  if (isa<EnumElementDecl>(VD) || isa<FuncDecl>(VD)) {
+    if (const auto ParamList = getParameterList(const_cast<ValueDecl *>(VD))) {
+      printParams(ParamList);
+    }
   } else if (isa<VarDecl>(VD)) {
     // Var decl doesn't have parameters.
   } else {

@@ -198,18 +198,9 @@ static id _getClassDescription(Class cls) {
 
 @implementation SwiftObject
 + (void)initialize {
-#if SWIFT_HAS_ISA_MASKING && !NDEBUG
-  // Older OSes may not have this variable, or it may not match. This code only
-  // runs on older OSes in certain testing scenarios, so that doesn't matter.
-  // Only perform the check on newer OSes where the value should definitely
-  // match.
-#  if SWIFT_BUILD_HAS_BACK_DEPLOYMENT
-  if (!_swift_isBackDeploying())
-#  endif
-  {
-    assert(&objc_debug_isa_class_mask);
-    assert(objc_debug_isa_class_mask == SWIFT_ISA_MASK);
-  }
+#if SWIFT_HAS_ISA_MASKING && !TARGET_OS_SIMULATOR && !NDEBUG
+  assert(&objc_absolute_packed_isa_class_mask);
+  assert((uintptr_t)&objc_absolute_packed_isa_class_mask == SWIFT_ISA_MASK);
 #endif
 }
 

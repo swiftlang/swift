@@ -126,6 +126,10 @@ private func QueryDataLayoutFn(context: UnsafeMutableRawPointer?,
     let size = UInt8(MemoryLayout<UnsafeRawPointer>.stride)
     outBuffer!.storeBytes(of: size, toByteOffset: 0, as: UInt8.self)
     return 1
+  case DLQ_GetPtrAuthMask:
+    let mask = GetPtrauthMask()
+    outBuffer!.storeBytes(of: mask, toByteOffset: 0, as: UInt.self)
+    return 1
   default:
     return 0
   }

@@ -52,7 +52,7 @@ using namespace irgen;
 enum class StructTypeInfoKind {
   LoadableStructTypeInfo,
   FixedStructTypeInfo,
-  ClangRecordTypeInfo,
+  LoadableClangRecordTypeInfo,
   NonFixedStructTypeInfo,
   ResilientStructTypeInfo
 };
@@ -292,17 +292,17 @@ namespace {
   };
   
   /// A type implementation for loadable record types imported from Clang.
-  class ClangRecordTypeInfo final :
-    public StructTypeInfoBase<ClangRecordTypeInfo, LoadableTypeInfo,
+  class LoadableClangRecordTypeInfo final :
+    public StructTypeInfoBase<LoadableClangRecordTypeInfo, LoadableTypeInfo,
                               ClangFieldInfo> {
     const clang::RecordDecl *ClangDecl;
   public:
-    ClangRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
+    LoadableClangRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
                         unsigned explosionSize,
                         llvm::Type *storageType, Size size,
                         SpareBitVector &&spareBits, Alignment align,
                         const clang::RecordDecl *clangDecl)
-      : StructTypeInfoBase(StructTypeInfoKind::ClangRecordTypeInfo,
+      : StructTypeInfoBase(StructTypeInfoKind::LoadableClangRecordTypeInfo,
                            fields, explosionSize,
                            storageType, size, std::move(spareBits),
                            align, IsPOD, IsFixedSize),
@@ -318,7 +318,7 @@ namespace {
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
                               Address addr, SILType T,
                               bool isOutlined) const override {
-      ClangRecordTypeInfo::initialize(IGF, params, addr, isOutlined);
+      LoadableClangRecordTypeInfo::initialize(IGF, params, addr, isOutlined);
     }
 
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
@@ -680,7 +680,7 @@ public:
 
   const TypeInfo *createTypeInfo(llvm::StructType *llvmType) {
     llvmType->setBody(LLVMFields, /*packed*/ true);
-    return ClangRecordTypeInfo::create(FieldInfos, NextExplosionIndex,
+    return LoadableClangRecordTypeInfo::create(FieldInfos, NextExplosionIndex,
                                        llvmType, TotalStride,
                                        std::move(SpareBits), TotalAlignment,
                                        ClangDecl);
@@ -865,8 +865,8 @@ private:
 #define FOR_STRUCT_IMPL(IGF, type, op, ...) do {                       \
   auto &structTI = IGF.getTypeInfo(type);                              \
   switch (getStructTypeInfoKind(structTI)) {                           \
-  case StructTypeInfoKind::ClangRecordTypeInfo:                        \
-    return structTI.as<ClangRecordTypeInfo>().op(IGF, __VA_ARGS__);    \
+  case StructTypeInfoKind::LoadableClangRecordTypeInfo:                        \
+    return structTI.as<LoadableClangRecordTypeInfo>().op(IGF, __VA_ARGS__);    \
   case StructTypeInfoKind::LoadableStructTypeInfo:                     \
     return structTI.as<LoadableStructTypeInfo>().op(IGF, __VA_ARGS__); \
   case StructTypeInfoKind::FixedStructTypeInfo:                        \

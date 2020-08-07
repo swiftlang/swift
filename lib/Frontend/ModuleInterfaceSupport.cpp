@@ -100,11 +100,28 @@ static void printImports(raw_ostream &out,
                          ModuleDecl *M) {
   // FIXME: This is very similar to what's in Serializer::writeInputBlock, but
   // it's not obvious what higher-level optimization would be factored out here.
+  ModuleDecl::ImportFilter allImportFilter = {
+      ModuleDecl::ImportFilterKind::Public,
+      ModuleDecl::ImportFilterKind::Private,
+      ModuleDecl::ImportFilterKind::SPIAccessControl};
+
+  // With -experimental-spi-imports:
+  // When printing the private swiftinterface file, print implementation-only
+  // imports only if they are also SPI. First, list all implementation-only
+  // imports and filter them later.
+  llvm::SmallSet<ModuleDecl::ImportedModule, 4,
+                 ModuleDecl::OrderImportedModules> ioiImportSet;
+  if (Opts.PrintSPIs && Opts.ExperimentalSPIImports) {
+    allImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+
+    SmallVector<ModuleDecl::ImportedModule, 4> ioiImport;
+    M->getImportedModules(ioiImport,
+                          ModuleDecl::ImportFilterKind::ImplementationOnly);
+    ioiImportSet.insert(ioiImport.begin(), ioiImport.end());
+  }
+
   SmallVector<ModuleDecl::ImportedModule, 8> allImports;
-  M->getImportedModules(allImports,
-                        {ModuleDecl::ImportFilterKind::Public,
-                         ModuleDecl::ImportFilterKind::Private,
-                         ModuleDecl::ImportFilterKind::SPIAccessControl});
+  M->getImportedModules(allImports, allImportFilter);
   ModuleDecl::removeDuplicateImports(allImports);
   diagnoseScopedImports(M->getASTContext().Diags, allImports);
 
@@ -124,13 +141,21 @@ static void printImports(raw_ostream &out,
       continue;
     }
 
+    llvm::SmallSetVector<Identifier, 4> spis;
+    M->lookupImportedSPIGroups(importedModule, spis);
+
+    // Only print implementation-only imports which have an SPI import.
+    if (ioiImportSet.count(import)) {
+      if (spis.empty())
+        continue;
+      out << "@_implementationOnly ";
+    }
+
     if (publicImportSet.count(import))
       out << "@_exported ";
 
     // SPI attribute on imports
     if (Opts.PrintSPIs) {
-      llvm::SmallSetVector<Identifier, 4> spis;
-      M->lookupImportedSPIGroups(importedModule, spis);
       for (auto spiName : spis)
         out << "@_spi(" << spiName << ") ";
     }
@@ -440,7 +465,7 @@ public:
       printer << " : ";
 
       ProtocolDecl *proto = protoAndAvailability.first;
-      proto->getDeclaredType()->print(printer, printOptions);
+      proto->getDeclaredInterfaceType()->print(printer, printOptions);
 
       printer << " {}\n";
     }

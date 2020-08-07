@@ -37,9 +37,9 @@ Sequences = [
   ('AnyCollection', 'AnyCollection(0..<sequenceCount)'),
   ('Array', 'array'),
 ]
-def lazy ((Name, Expr)) : return (Name + 'Lazy', '(' + Expr + ').lazy')
+def lazy (NameExpr) : return (NameExpr[0] + 'Lazy', '(' + NameExpr[1] + ').lazy')
 
-Sequences = Sequences + map(lazy, Sequences)
+Sequences = Sequences + list(map(lazy, Sequences))
 }%
 
 public let PrefixWhile = [

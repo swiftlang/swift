@@ -240,6 +240,16 @@ bool SILCombiner::runOnFunction(SILFunction &F) {
   return Changed;
 }
 
+void SILCombiner::eraseInstIncludingUsers(SILInstruction *inst) {
+  for (SILValue result : inst->getResults()) {
+    while (!result->use_empty()) {
+      eraseInstIncludingUsers(result->use_begin()->getUser());
+    }
+  }
+  eraseInstFromFunction(*inst);
+}
+
+
 //===----------------------------------------------------------------------===//
 //                                Entry Points
 //===----------------------------------------------------------------------===//

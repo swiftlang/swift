@@ -54,7 +54,7 @@ class HostSpecificConfiguration(object):
         platforms_to_skip_build = self.__platforms_to_skip_build(args)
         platforms_to_skip_test = self.__platforms_to_skip_test(args)
         platforms_archs_to_skip_test = \
-            self.__platforms_archs_to_skip_test(args)
+            self.__platforms_archs_to_skip_test(args, host_target)
         platforms_to_skip_test_host = self.__platforms_to_skip_test_host(args)
 
         # Compute the lists of **CMake** targets for each use case (configure
@@ -258,11 +258,28 @@ class HostSpecificConfiguration(object):
 
         return platforms_to_skip_test
 
-    def __platforms_archs_to_skip_test(self, args):
+    def __platforms_archs_to_skip_test(self, args, host_target):
         platforms_archs_to_skip_test = set()
         if not args.test_ios_32bit_simulator:
             platforms_archs_to_skip_test.add(
                 StdlibDeploymentTarget.iOSSimulator.i386)
+        if host_target == StdlibDeploymentTarget.OSX.x86_64.name:
+            platforms_archs_to_skip_test.add(
+                StdlibDeploymentTarget.iOSSimulator.arm64)
+            platforms_archs_to_skip_test.add(
+                StdlibDeploymentTarget.AppleTVSimulator.arm64)
+            platforms_archs_to_skip_test.add(
+                StdlibDeploymentTarget.AppleWatchSimulator.arm64)
+        if host_target == StdlibDeploymentTarget.OSX.arm64.name:
+            platforms_archs_to_skip_test.add(
+                StdlibDeploymentTarget.iOSSimulator.i386)
+            platforms_archs_to_skip_test.add(
+                StdlibDeploymentTarget.iOSSimulator.x86_64)
+            platforms_archs_to_skip_test.add(
+                StdlibDeploymentTarget.AppleTVSimulator.x86_64)
+            platforms_archs_to_skip_test.add(
+                StdlibDeploymentTarget.AppleWatchSimulator.i386)
+
         return platforms_archs_to_skip_test
 
     def __platforms_to_skip_test_host(self, args):

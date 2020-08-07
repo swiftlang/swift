@@ -493,9 +493,6 @@ ArrayRef<ImplicitImport> ModuleDecl::getImplicitImports() const {
                            {});
 }
 
-bool ModuleDecl::isClangModule() const {
-  return findUnderlyingClangModule() != nullptr;
-}
 
 void ModuleDecl::addFile(FileUnit &newFile) {
   // If this is a LoadedFile, make sure it loaded without error.
@@ -1459,9 +1456,10 @@ SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
   llvm::SmallDenseSet<ModuleDecl *, 32> visited;
   SmallVector<ModuleDecl::ImportedModule, 32> stack;
 
-  ModuleDecl::ImportFilter filter = ModuleDecl::ImportFilterKind::Public;
-  filter |= ModuleDecl::ImportFilterKind::Private;
-  filter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
+  ModuleDecl::ImportFilter filter = {
+      ModuleDecl::ImportFilterKind::Public,
+      ModuleDecl::ImportFilterKind::Private,
+      ModuleDecl::ImportFilterKind::SPIAccessControl};
 
   auto *topLevel = getParentModule();
 
@@ -2053,7 +2051,15 @@ SPIGroupsRequest::evaluate(Evaluator &evaluator, const Decl *decl) const {
     for (auto spi : attr->getSPIGroups())
       spiGroups.insert(spi);
 
-  auto &ctx = decl->getASTContext();
+  // Backing storage for a wrapped property gets the SPI groups from the
+  // original property.
+  if (auto varDecl = dyn_cast<VarDecl>(decl))
+    if (auto originalDecl = varDecl->getOriginalWrappedProperty()) {
+      auto originalSPIs = originalDecl->getSPIGroups();
+      spiGroups.insert(originalSPIs.begin(), originalSPIs.end());
+    }
+
+  // If there is no local SPI information, look at the context.
   if (spiGroups.empty()) {
 
     // Then in the extended nominal type.
@@ -2073,6 +2079,7 @@ SPIGroupsRequest::evaluate(Evaluator &evaluator, const Decl *decl) const {
     }
   }
 
+  auto &ctx = decl->getASTContext();
   return ctx.AllocateCopy(spiGroups.getArrayRef());
 }
 
@@ -2141,20 +2148,18 @@ getInfoForUsedFileNames(const ModuleDecl *module) {
   return result;
 }
 
-static void
-computeMagicFileString(const ModuleDecl *module, StringRef name,
-                       SmallVectorImpl<char> &result) {
+static void computeFileID(const ModuleDecl *module, StringRef name,
+                          SmallVectorImpl<char> &result) {
   result.assign(module->getNameStr().begin(), module->getNameStr().end());
   result.push_back('/');
   result.append(name.begin(), name.end());
 }
 
 static StringRef
-resolveMagicNameConflicts(const ModuleDecl *module, StringRef fileString,
-                          const llvm::StringMap<SourceFilePathInfo> &paths,
-                          bool shouldDiagnose) {
+resolveFileIDConflicts(const ModuleDecl *module, StringRef fileString,
+                       const llvm::StringMap<SourceFilePathInfo> &paths,
+                       bool shouldDiagnose) {
   assert(paths.size() > 1);
-  assert(module->getASTContext().LangOpts.EnableConcisePoundFile);
 
   /// The path we consider to be "correct"; we will emit fix-its changing the
   /// other paths to match this one.
@@ -2191,13 +2196,20 @@ resolveMagicNameConflicts(const ModuleDecl *module, StringRef fileString,
 
     // Don't diagnose #sourceLocations that match the physical file.
     if (pathPair.second.physicalFileLoc.isValid()) {
-      assert(isWinner && "physical files should always win; duplicate name?");
+      if (!isWinner) {
+        // The driver is responsible for diagnosing this, but naughty people who
+        // have directly invoked the frontend could make it happen here instead.
+        StringRef filename = llvm::sys::path::filename(winner);
+        diags.diagnose(SourceLoc(), diag::error_two_files_same_name,
+                       filename, winner, pathPair.first());
+        diags.diagnose(SourceLoc(), diag::note_explain_two_files_same_name);
+      }
       continue;
     }
 
     for (auto loc : pathPair.second.virtualFileLocs) {
       diags.diagnose(loc,
-                     diag::pound_source_location_creates_pound_file_conflicts,
+                     diag::source_location_creates_file_id_conflicts,
                      fileString);
 
       // Offer a fix-it unless it would be tautological.
@@ -2211,26 +2223,23 @@ resolveMagicNameConflicts(const ModuleDecl *module, StringRef fileString,
 }
 
 llvm::StringMap<std::pair<std::string, bool>>
-ModuleDecl::computeMagicFileStringMap(bool shouldDiagnose) const {
+ModuleDecl::computeFileIDMap(bool shouldDiagnose) const {
   llvm::StringMap<std::pair<std::string, bool>> result;
   SmallString<64> scratch;
 
-  if (!getASTContext().LangOpts.EnableConcisePoundFile)
-    return result;
-
   for (auto &namePair : getInfoForUsedFileNames(this)) {
-    computeMagicFileString(this, namePair.first(), scratch);
+    computeFileID(this, namePair.first(), scratch);
     auto &infoForPaths = namePair.second;
 
     assert(!infoForPaths.empty());
 
     // TODO: In the future, we'd like to handle these conflicts gracefully by
-    // generating a unique `#file` string for each conflicting name. For now, we
-    // will simply warn about conflicts.
+    // generating a unique `#fileID` string for each conflicting name. For now,
+    // we will simply warn about conflicts.
     StringRef winner = infoForPaths.begin()->first();
     if (infoForPaths.size() > 1)
-      winner = resolveMagicNameConflicts(this, scratch, infoForPaths,
-                                         shouldDiagnose);
+      winner = resolveFileIDConflicts(this, scratch, infoForPaths,
+                                      shouldDiagnose);
 
     for (auto &pathPair : infoForPaths) {
       result[pathPair.first()] =

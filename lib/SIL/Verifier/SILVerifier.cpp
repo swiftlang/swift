@@ -909,7 +909,7 @@ public:
     return InstNumbers[a] < InstNumbers[b];
   }
 
-  // FIXME: For sanity, address-type block args should be prohibited at all SIL
+  // FIXME: For sanity, address-type phis should be prohibited at all SIL
   // stages. However, the optimizer currently breaks the invariant in three
   // places:
   // 1. Normal Simplify CFG during conditional branch simplification
@@ -917,17 +917,14 @@ public:
   // 2. Simplify CFG via Jump Threading.
   // 3. Loop Rotation.
   //
+  // BasicBlockCloner::canCloneInstruction and sinkAddressProjections is
+  // designed to avoid this issue, we just need to make sure all passes use it
+  // correctly.
   //
-  bool prohibitAddressBlockArgs() {
-    // If this function was deserialized from canonical SIL, this invariant may
-    // already have been violated regardless of this module's SIL stage or
-    // exclusivity enforcement level. Presumably, access markers were already
-    // removed prior to serialization.
-    if (F.wasDeserializedCanonical())
-      return false;
-
-    SILModule &M = F.getModule();
-    return M.getStage() == SILStage::Raw;
+  // Minimally, we must prevent address-type phis as long as access markers are
+  // preserved. A goal is to preserve access markers in OSSA.
+  bool prohibitAddressPhis() {
+    return F.hasOwnership();
   }
 
   void visitSILPhiArgument(SILPhiArgument *arg) {
@@ -943,9 +940,9 @@ public:
       }
     } else {
     }
-    if (arg->isPhiArgument() && prohibitAddressBlockArgs()) {
-      // As a property of well-formed SIL, we disallow address-type block
-      // arguments. Supporting them would prevent reliably reasoning about the
+    if (arg->isPhiArgument() && prohibitAddressPhis()) {
+      // As a property of well-formed SIL, we disallow address-type
+      // phis. Supporting them would prevent reliably reasoning about the
       // underlying storage of memory access. This reasoning is important for
       // diagnosing violations of memory access rules and supporting future
       // optimizations such as bitfield packing. Address-type block arguments
@@ -1939,29 +1936,29 @@ public:
     }
 
     // Verify that all formal accesses patterns are recognized as part of a
-    // whitelist. The presence of an unknown pattern means that analysis will
+    // allowlist. The presence of an unknown pattern means that analysis will
     // silently fail, and the compiler may be introducing undefined behavior
     // with no other way to detect it.
     //
     // For example, AccessEnforcementWMO runs very late in the
     // pipeline and assumes valid storage for all dynamic Read/Modify access. It
-    // also requires that Unidentified access fit a whitelist on known
+    // also requires that Unidentified access fit a allowlist on known
     // non-internal globals or class properties.
     //
-    // First check that findAccessedStorage returns without asserting. For
+    // First check that identifyFormalAccess returns without asserting. For
     // Unsafe enforcement, that is sufficient. For any other enforcement
     // level also require that it returns a valid AccessedStorage object.
     // Unsafe enforcement is used for some unrecognizable access patterns,
     // like debugger variables. The compiler never cares about the source of
     // those accesses.
-    findAccessedStorage(BAI->getSource());
+    identifyFormalAccess(BAI);
     // FIXME: rdar://57291811 - the following check for valid storage will be
     // reenabled shortly. A fix is planned. In the meantime, the possiblity that
     // a real miscompilation could be caused by this failure is insignificant.
     // I will probably enable a much broader SILVerification of address-type
     // block arguments first to ensure we never hit this check again.
     /*
-    AccessedStorage storage = findAccessedStorage(BAI->getSource());
+    AccessedStorage storage = identifyFormalAccess(BAI);
     if (BAI->getEnforcement() != SILAccessEnforcement::Unsafe)
       require(storage, "Unknown formal access pattern");
     */
@@ -2000,8 +1997,8 @@ public:
       break;
     }
 
-    // First check that findAccessedStorage never asserts.
-    AccessedStorage storage = findAccessedStorage(BUAI->getSource());
+    // First check that identifyFormalAccess never asserts.
+    AccessedStorage storage = identifyFormalAccess(BUAI);
     // Only allow Unsafe and Builtin access to have invalid storage.
     if (BUAI->getEnforcement() != SILAccessEnforcement::Unsafe
         && !BUAI->isFromBuiltin()) {
@@ -3717,10 +3714,14 @@ public:
 
     auto adjustedOperandExtInfo =
         opFTy->getExtInfo()
+            .intoBuilder()
             .withRepresentation(SILFunctionType::Representation::Thick)
-            .withNoEscape(resFTy->isNoEscape());
-    require(adjustedOperandExtInfo == resFTy->getExtInfo(),
-            "operand and result of thin_to_think_function must agree in particulars");
+            .withNoEscape(resFTy->isNoEscape())
+            .build();
+    require(adjustedOperandExtInfo.isEqualTo(resFTy->getExtInfo(),
+                                             useClangTypes(opFTy)),
+            "operand and result of thin_to_think_function must agree in "
+            "particulars");
   }
 
   void checkThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCI) {
@@ -5383,6 +5384,10 @@ void SILVTable::verify(const SILModule &M) const {
   
   for (unsigned i : indices(getEntries())) {
     auto &entry = getEntries()[i];
+    
+    // Make sure the module's lookup cache is consistent.
+    assert(entry == *getEntry(const_cast<SILModule &>(M), entry.getMethod())
+           && "vtable entry is out of sync with method's vtable cache");
     
     // All vtable entries must be decls in a class context.
     assert(entry.getMethod().hasDecl() && "vtable entry is not a decl");

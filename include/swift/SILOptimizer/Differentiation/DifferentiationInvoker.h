@@ -25,6 +25,7 @@ namespace swift {
 
 class ApplyInst;
 class DifferentiableFunctionInst;
+class LinearFunctionInst;
 class SILDifferentiabilityWitness;
 
 namespace autodiff {
@@ -41,6 +42,10 @@ public:
     // be linked to a Swift AST node (e.g. an `DifferentiableFunctionExpr`
     // expression).
     DifferentiableFunctionInst,
+
+    // Invoked by an `linear_function` instruction, which may or may not
+    // be linked to a Swift AST node (e.g. an `LinearFunctionExpr` expression).
+    LinearFunctionInst,
 
     // Invoked by the indirect application of differentiation. This case has an
     // associated original `apply` instruction and
@@ -59,6 +64,10 @@ private:
     /// The instruction associated with the `DifferentiableFunctionInst` case.
     DifferentiableFunctionInst *diffFuncInst;
     Value(DifferentiableFunctionInst *inst) : diffFuncInst(inst) {}
+
+    /// The instruction associated with the `LinearFunctionInst` case.
+    LinearFunctionInst *linearFuncInst;
+    Value(LinearFunctionInst *inst) : linearFuncInst(inst) {}
 
     /// The parent `apply` instruction and the witness associated with the
     /// `IndirectDifferentiation` case.
@@ -79,6 +88,8 @@ private:
 public:
   DifferentiationInvoker(DifferentiableFunctionInst *inst)
       : kind(Kind::DifferentiableFunctionInst), value(inst) {}
+  DifferentiationInvoker(LinearFunctionInst *inst)
+      : kind(Kind::LinearFunctionInst), value(inst) {}
   DifferentiationInvoker(ApplyInst *applyInst,
                          SILDifferentiabilityWitness *witness)
       : kind(Kind::IndirectDifferentiation), value({applyInst, witness}) {}
@@ -90,6 +101,11 @@ public:
   DifferentiableFunctionInst *getDifferentiableFunctionInst() const {
     assert(kind == Kind::DifferentiableFunctionInst);
     return value.diffFuncInst;
+  }
+
+  LinearFunctionInst *getLinearFunctionInst() const {
+    assert(kind == Kind::LinearFunctionInst);
+    return value.linearFuncInst;
   }
 
   std::pair<ApplyInst *, SILDifferentiabilityWitness *>

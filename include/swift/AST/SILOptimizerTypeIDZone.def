@@ -17,3 +17,6 @@
 SWIFT_REQUEST(SILOptimizer, ExecuteSILPipelineRequest,
               evaluator::SideEffect(SILPipelineExecutionDescriptor),
               Uncached, NoLocationInfo)
+SWIFT_REQUEST(SILOptimizer, LoweredSILRequest,
+              std::unique_ptr<SILModule>(ASTLoweringDescriptor),
+              Uncached, NoLocationInfo)

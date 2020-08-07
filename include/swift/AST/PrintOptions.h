@@ -327,8 +327,7 @@ struct PrintOptions {
   };
 
   /// Whether to print function @convention attribute on function types.
-  // FIXME: [clang-function-type-serialization] Once we start serializing Clang
-  // types, we should also start printing the full type in the swiftinterface.
+  // [TODO: Clang-type-plumbing] Print the full type in the swiftinterface.
   FunctionRepresentationMode PrintFunctionRepresentationAttrs =
     FunctionRepresentationMode::NameOnly;
 

@@ -21,7 +21,6 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/Timer.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseSILSupport.h"
@@ -174,8 +173,8 @@ namespace {
     /// A callback to be invoked every time a type was deserialized.
     std::function<void(Type)> ParsedTypeCallback;
 
-    Type performTypeLocChecking(TypeRepr *TyR, bool IsSILType,
-                                GenericEnvironment *GenericEnv = nullptr);
+    Type performTypeResolution(TypeRepr *TyR, bool IsSILType,
+                               GenericEnvironment *GenericEnv);
 
     void convertRequirements(SILFunction *F, ArrayRef<RequirementRepr> From,
                              SmallVectorImpl<Requirement> &To);
@@ -868,9 +867,10 @@ void SILParser::convertRequirements(SILFunction *F,
   IdentTypeReprLookup PerformLookup(P);
   // Use parser lexical scopes to resolve references
   // to the generic parameters.
-  auto ResolveToInterfaceType = [&](TypeRepr *Ty) -> Type {
-    Ty->walk(PerformLookup);
-    return performTypeLocChecking(Ty, /* IsSIL */ false)->mapTypeOutOfContext();
+  auto ResolveToInterfaceType = [&](TypeRepr *TyR) -> Type {
+    TyR->walk(PerformLookup);
+    return performTypeResolution(TyR, /*IsSILType=*/false, ContextGenericEnv)
+        ->mapTypeOutOfContext();
   };
 
   for (auto &Req : From) {
@@ -919,6 +919,7 @@ static bool parseDeclSILOptional(bool *isTransparent,
                                  bool *isWeakImported,
                                  AvailabilityContext *availability,
                                  bool *isWithoutActuallyEscapingThunk,
+                                 bool *isAsync,
                                  SmallVectorImpl<std::string> *Semantics,
                                  SmallVectorImpl<ParsedSpecAttr> *SpecAttrs,
                                  ValueDecl **ClangDecl,
@@ -957,6 +958,8 @@ static bool parseDeclSILOptional(bool *isTransparent,
     else if (isWithoutActuallyEscapingThunk
              && SP.P.Tok.getText() == "without_actually_escaping")
       *isWithoutActuallyEscapingThunk = true;
+    else if (isAsync && SP.P.Tok.getText() == "async")
+      *isAsync = true;
     else if (specialPurpose && SP.P.Tok.getText() == "global_init")
       *specialPurpose = SILFunction::Purpose::GlobalInit;
     else if (specialPurpose && SP.P.Tok.getText() == "lazy_getter")
@@ -1092,16 +1095,14 @@ static bool parseDeclSILOptional(bool *isTransparent,
   return false;
 }
 
-Type SILParser::performTypeLocChecking(TypeRepr *T, bool IsSILType,
-                                       GenericEnvironment *GenericEnv) {
+Type SILParser::performTypeResolution(TypeRepr *TyR, bool IsSILType,
+                                      GenericEnvironment *GenericEnv) {
   if (GenericEnv == nullptr)
     GenericEnv = ContextGenericEnv;
 
-  TypeLoc loc(T);
-  (void) swift::performTypeLocChecking(P.Context, loc,
-                                       /*isSILMode=*/true, IsSILType,
-                                       GenericEnv, &P.SF);
-  return loc.getType();
+  return swift::performTypeResolution(TyR, P.Context,
+                                      /*isSILMode=*/true, IsSILType, GenericEnv,
+                                      &P.SF);
 }
 
 /// Find the top-level ValueDecl or Module given a name.
@@ -1155,7 +1156,8 @@ static ValueDecl *lookupMember(Parser &P, Type Ty, DeclBaseName Name,
 bool SILParser::parseASTType(CanType &result, GenericEnvironment *env) {
   ParserResult<TypeRepr> parsedType = P.parseType();
   if (parsedType.isNull()) return true;
-  auto resolvedType = performTypeLocChecking(parsedType.get(), /*IsSILType=*/ false, env);
+  const auto resolvedType =
+      performTypeResolution(parsedType.get(), /*isSILType=*/false, env);
   if (resolvedType->hasError())
     return true;
 
@@ -1244,8 +1246,10 @@ bool SILParser::parseSILType(SILType &Result,
       ParsedGenericEnv = env;
   
   // Apply attributes to the type.
-  auto *attrRepr = P.applyAttributeToType(TyR.get(), attrs, specifier, specifierLoc);
-  auto Ty = performTypeLocChecking(attrRepr, /*IsSILType=*/true, OuterGenericEnv);
+  auto *attrRepr =
+      P.applyAttributeToType(TyR.get(), attrs, specifier, specifierLoc);
+  const auto Ty =
+      performTypeResolution(attrRepr, /*IsSILType=*/true, OuterGenericEnv);
   if (Ty->hasError())
     return true;
 
@@ -1697,7 +1701,8 @@ bool SILParser::parseSubstitutions(SmallVectorImpl<ParsedSubstitution> &parsed,
     if (defaultForProto)
       bindProtocolSelfInTypeRepr(TyR.get(), defaultForProto);
 
-    auto Ty = performTypeLocChecking(TyR.get(), /*IsSILType=*/ false, GenericEnv);
+    const auto Ty =
+        performTypeResolution(TyR.get(), /*IsSILType=*/false, GenericEnv);
     if (Ty->hasError())
       return true;
     parsed.push_back({Loc, Ty});
@@ -1781,7 +1786,7 @@ SubstitutionMap getApplySubstitutionsFromParsed(
           return conformance;
 
         SP.P.diagnose(loc, diag::sil_substitution_mismatch, replacementType,
-                      proto->getDeclaredType());
+                      proto->getDeclaredInterfaceType());
         failed = true;
 
         return ProtocolConformanceRef(proto);
@@ -2106,7 +2111,8 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired) {
       }
     }
 
-    auto Ty = performTypeLocChecking(TyR.get(), /*IsSILType=*/ false, genericEnv);
+    const auto Ty =
+        performTypeResolution(TyR.get(), /*IsSILType=*/false, genericEnv);
     if (Ty->hasError())
       return true;
 
@@ -2613,8 +2619,6 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     StringLiteralInst::Encoding encoding;
     if (P.Tok.getText() == "utf8") {
       encoding = StringLiteralInst::Encoding::UTF8;
-    } else if (P.Tok.getText() == "utf16") {
-      encoding = StringLiteralInst::Encoding::UTF16;
     } else if (P.Tok.getText() == "objc_selector") {
       encoding = StringLiteralInst::Encoding::ObjCSelector;
     } else if (P.Tok.getText() == "bytes") {
@@ -5678,6 +5682,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   bool isWeakImported = false;
   AvailabilityContext availability = AvailabilityContext::alwaysAvailable();
   bool isWithoutActuallyEscapingThunk = false;
+  bool isAsync = false;
   Inline_t inlineStrategy = InlineDefault;
   OptimizationMode optimizationMode = OptimizationMode::NotSet;
   SmallVector<std::string, 1> Semantics;
@@ -5692,8 +5697,8 @@ bool SILParserState::parseDeclSIL(Parser &P) {
           &isThunk, &isDynamic, &isExactSelfClass, &DynamicallyReplacedFunction,
           &objCReplacementFor, &specialPurpose, &inlineStrategy,
           &optimizationMode, nullptr, &isWeakImported, &availability,
-          &isWithoutActuallyEscapingThunk, &Semantics,
-          &SpecAttrs, &ClangDecl, &MRK, FunctionState, M) ||
+          &isWithoutActuallyEscapingThunk, &isAsync, &Semantics, &SpecAttrs,
+          &ClangDecl, &MRK, FunctionState, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       P.parseIdentifier(FnName, FnNameLoc, diag::expected_sil_function_name) ||
       P.parseToken(tok::colon, diag::expected_sil_type))
@@ -5731,6 +5736,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
     FunctionState.F->setAvailabilityForLinkage(availability);
     FunctionState.F->setWithoutActuallyEscapingThunk(
       isWithoutActuallyEscapingThunk);
+    FunctionState.F->setAsync(isAsync);
     FunctionState.F->setInlineStrategy(inlineStrategy);
     FunctionState.F->setOptimizationMode(optimizationMode);
     FunctionState.F->setEffectsKind(MRK);
@@ -5916,10 +5922,9 @@ bool SILParserState::parseSILGlobal(Parser &P) {
   SILParser State(P);
   if (parseSILLinkage(GlobalLinkage, P) ||
       parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr,
-                           &isLet, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, State, M) ||
+                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, &isLet, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, nullptr, nullptr, State, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
       P.parseIdentifier(GlobalName, NameLoc, diag::expected_sil_value_name) ||
       P.parseToken(tok::colon, diag::expected_sil_type))
@@ -5968,7 +5973,7 @@ bool SILParserState::parseSILProperty(Parser &P) {
   if (parseDeclSILOptional(nullptr, &Serialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, SP, M))
+                           nullptr, nullptr, nullptr, nullptr, SP, M))
     return true;
   
   ValueDecl *VD;
@@ -6038,8 +6043,7 @@ bool SILParserState::parseSILVTable(Parser &P) {
   if (parseDeclSILOptional(nullptr, &Serialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr,
-                           VTableState, M))
+                           nullptr, nullptr, nullptr, nullptr, VTableState, M))
     return true;
 
   // Parse the class name.
@@ -6322,7 +6326,8 @@ ProtocolConformanceRef SILParser::parseProtocolConformanceHelper(
     bindProtocolSelfInTypeRepr(TyR.get(), defaultForProto);
   }
 
-  auto ConformingTy = performTypeLocChecking(TyR.get(), /*IsSILType=*/ false, witnessEnv);
+  const auto ConformingTy =
+      performTypeResolution(TyR.get(), /*IsSILType=*/false, witnessEnv);
   if (ConformingTy->hasError())
     return ProtocolConformanceRef();
 
@@ -6438,17 +6443,18 @@ static bool parseSILVTableEntry(
       ParserResult<TypeRepr> TyR = P.parseType();
       if (TyR.isNull())
         return true;
-      TypeLoc Ty = TyR.get();
+
       if (isDefaultWitnessTable)
         bindProtocolSelfInTypeRepr(TyR.get(), proto);
-      if (swift::performTypeLocChecking(P.Context, Ty,
-                                        /*isSILMode=*/false,
-                                        /*isSILType=*/false,
-                                        witnessEnv,
-                                        &P.SF))
+
+      const auto Ty =
+          swift::performTypeResolution(TyR.get(), P.Context,
+                                       /*isSILMode=*/false,
+                                       /*isSILType=*/false, witnessEnv, &P.SF);
+      if (Ty->hasError())
         return true;
 
-      assocOrSubject = Ty.getType()->getCanonicalType();
+      assocOrSubject = Ty->getCanonicalType();
     }
     if (!assocOrSubject)
       return true;
@@ -6499,19 +6505,19 @@ static bool parseSILVTableEntry(
     ParserResult<TypeRepr> TyR = P.parseType();
     if (TyR.isNull())
       return true;
-    TypeLoc Ty = TyR.get();
+
     if (isDefaultWitnessTable)
       bindProtocolSelfInTypeRepr(TyR.get(), proto);
-    if (swift::performTypeLocChecking(P.Context, Ty,
-                                      /*isSILMode=*/false,
-                                      /*isSILType=*/false,
-                                      witnessEnv,
-                                      &P.SF))
+
+    const auto Ty =
+        swift::performTypeResolution(TyR.get(), P.Context,
+                                     /*isSILMode=*/false,
+                                     /*isSILType=*/false, witnessEnv, &P.SF);
+    if (Ty->hasError())
       return true;
 
-    witnessEntries.push_back(SILWitnessTable::AssociatedTypeWitness{
-      assoc, Ty.getType()->getCanonicalType()
-    });
+    witnessEntries.push_back(
+        SILWitnessTable::AssociatedTypeWitness{assoc, Ty->getCanonicalType()});
     return false;
   }
 
@@ -6573,8 +6579,7 @@ bool SILParserState::parseSILWitnessTable(Parser &P) {
   if (parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr,
-                           WitnessState, M))
+                           nullptr, nullptr, nullptr, nullptr, WitnessState, M))
     return true;
 
   Scope S(&P, ScopeKind::TopLevel);

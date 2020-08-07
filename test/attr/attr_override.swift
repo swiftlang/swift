@@ -211,7 +211,7 @@ struct S {
   override func f() { } // expected-error{{'override' can only be specified on class members}} {{3-12=}}
 }
 extension S {
-  override func ef() {} // expected-error{{method does not override any method from its superclass}}
+  override func ef() {} // expected-error{{'override' can only be specified on class members}} {{3-12=}}
 }
 
 enum E {
@@ -219,7 +219,10 @@ enum E {
 }
 
 protocol P {
-  override func f() // FIXME wording: expected-error{{method does not override any method from its superclass}}
+  override func f() // expected-error{{method does not override any method from its parent protocol}}
+  override var g: Int { get } // expected-error{{property does not override any property from its parent protocol}}
+  override subscript(h: Int) -> Bool { get } // expected-error{{subscript does not override any subscript from its parent protocol}}
+  override init(i: Int) // expected-error{{initializer does not override a designated initializer from its parent protocol}}
 }
 
 override func f() { } // expected-error{{'override' can only be specified on class members}} {{1-10=}}

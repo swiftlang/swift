@@ -1068,10 +1068,7 @@ ConstraintGraph::computeConnectedComponents(
 /// edge in the graph.
 static bool shouldContractEdge(ConstraintKind kind) {
   switch (kind) {
-  case ConstraintKind::Bind:
   case ConstraintKind::BindParam:
-  case ConstraintKind::BindToPointerType:
-  case ConstraintKind::Equal:
     return true;
 
   default:
@@ -1103,8 +1100,6 @@ bool ConstraintGraph::contractEdges() {
     if (!(tyvar1 && tyvar2))
       continue;
 
-    auto isParamBindingConstraint = kind == ConstraintKind::BindParam;
-
     // If the argument is allowed to bind to `inout`, in general,
     // it's invalid to contract the edge between argument and parameter,
     // but if we can prove that there are no possible bindings
@@ -1114,9 +1109,9 @@ bool ConstraintGraph::contractEdges() {
     // Such action is valid because argument type variable can
     // only get its bindings from related overload, which gives
     // us enough information to decided on l-valueness.
-    if (isParamBindingConstraint && tyvar1->getImpl().canBindToInOut()) {
+    if (tyvar1->getImpl().canBindToInOut()) {
       bool isNotContractable = true;
-      if (auto bindings = CS.getPotentialBindings(tyvar1)) {
+      if (auto bindings = CS.inferBindingsFor(tyvar1)) {
         // Holes can't be contracted.
         if (bindings.IsHole)
           continue;
@@ -1146,26 +1141,21 @@ bool ConstraintGraph::contractEdges() {
     auto rep1 = CS.getRepresentative(tyvar1);
     auto rep2 = CS.getRepresentative(tyvar2);
 
-    if (((rep1->getImpl().canBindToLValue() ==
-          rep2->getImpl().canBindToLValue()) ||
-         // Allow l-value contractions when binding parameter types.
-         isParamBindingConstraint)) {
-      if (CS.isDebugMode()) {
-        auto &log = llvm::errs();
-        if (CS.solverState)
-          log.indent(CS.solverState->depth * 2);
+    if (CS.isDebugMode()) {
+      auto &log = llvm::errs();
+      if (CS.solverState)
+        log.indent(CS.solverState->depth * 2);
 
-        log << "Contracting constraint ";
-        constraint->print(log, &CS.getASTContext().SourceMgr);
-        log << "\n";
-      }
-
-      // Merge the edges and retire the constraint.
-      CS.retireConstraint(constraint);
-      if (rep1 != rep2)
-        CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
-      didContractEdges = true;
+      log << "Contracting constraint ";
+      constraint->print(log, &CS.getASTContext().SourceMgr);
+      log << "\n";
     }
+
+    // Merge the edges and retire the constraint.
+    CS.retireConstraint(constraint);
+    if (rep1 != rep2)
+      CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
+    didContractEdges = true;
   }
   return didContractEdges;
 }

@@ -1397,8 +1397,7 @@ public:
   }
 
   BuiltType createTupleType(llvm::ArrayRef<BuiltType> elements,
-                            std::string labels, bool variadic) const {
-    // TODO: 'variadic' should no longer exist
+                            std::string labels) const {
     auto flags = TupleTypeFlags().withNumElements(elements.size());
     if (!labels.empty())
       flags = flags.withNonConstantLabels(true);
@@ -1562,8 +1561,9 @@ static TypeInfo swift_getTypeByMangledNameImpl(
   } else {
     // Demangle the type name.
     node = demangler.demangleTypeRef(typeName);
-    if (!node)
+    if (!node) {
       return TypeInfo();
+    }
   }
 
   return swift_getTypeByMangledNode(request, demangler, node,

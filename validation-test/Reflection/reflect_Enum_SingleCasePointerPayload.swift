@@ -2,9 +2,9 @@
 // RUN: %target-build-swift -g -lswiftSwiftReflectionTest %s -o %t/reflect_Enum_SingleCasePointerPayload
 // RUN: %target-codesign %t/reflect_Enum_SingleCasePointerPayload
 
-// RUN: %target-run %target-swift-reflection-test %t/reflect_Enum_SingleCasePointerPayload | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-run %target-swift-reflection-test %t/reflect_Enum_SingleCasePointerPayload | %FileCheck %s --check-prefix=CHECK-%target-ptrsize %add_num_extra_inhabitants
 
-// REQUIRES: objc_interop
+// REQUIRES: reflection_test_support
 // REQUIRES: executable_test
 // UNSUPPORTED: use_os_stdlib
 
@@ -35,21 +35,21 @@ reflect(object: ClassWithSingleCasePointerPayloadEnum())
 // CHECK-64: Type info:
 // CHECK-64: (class_instance size=48 alignment=8 stride=48 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64:   (field name=e1 offset=16
-// CHECK-64:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483646 bitwise_takable=1
+// CHECK-64:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit-1]] bitwise_takable=1
 // CHECK-64:       (case name=some index=0 offset=0
 // CHECK-64:         (reference kind=strong refcounting=native))
 // CHECK-64:       (case name=none index=1)))
 // CHECK-64:   (field name=e2 offset=24
 // CHECK-64:     (reference kind=strong refcounting=native))
 // CHECK-64:   (field name=e3 offset=32
-// CHECK-64:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483646 bitwise_takable=1
+// CHECK-64:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit-1]] bitwise_takable=1
 // CHECK-64:       (case name=some index=0 offset=0
 // CHECK-64:         (reference kind=strong refcounting=native))
 // CHECK-64:       (case name=none index=1)))
 // CHECK-64:   (field name=e4 offset=40
-// CHECK-64:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483645 bitwise_takable=1
+// CHECK-64:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit-2]] bitwise_takable=1
 // CHECK-64:       (case name=some index=0 offset=0
-// CHECK-64:         (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483646 bitwise_takable=1
+// CHECK-64:         (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit-1]] bitwise_takable=1
 // CHECK-64:           (case name=some index=0 offset=0
 // CHECK-64:             (reference kind=strong refcounting=native))
 // CHECK-64:           (case name=none index=1)))

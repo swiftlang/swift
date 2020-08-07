@@ -24,6 +24,10 @@ bool ModuleDependencies::isSwiftModule() const {
   return isa<SwiftModuleDependenciesStorage>(storage.get());
 }
 
+bool ModuleDependencies::isPlaceholderSwiftModule() const {
+  return isa<PlaceholderSwiftModuleDependencyStorage>(storage.get());
+}
+
 /// Retrieve the dependencies for a Swift module.
 const SwiftModuleDependenciesStorage *
 ModuleDependencies::getAsSwiftModule() const {
@@ -36,9 +40,15 @@ ModuleDependencies::getAsClangModule() const {
   return dyn_cast<ClangModuleDependenciesStorage>(storage.get());
 }
 
+/// Retrieve the dependencies for a placeholder dependency module stub.
+const PlaceholderSwiftModuleDependencyStorage *
+ModuleDependencies::getAsPlaceholderDependencyModule() const {
+  return dyn_cast<PlaceholderSwiftModuleDependencyStorage>(storage.get());
+}
+
 void ModuleDependencies::addModuleDependency(
-    StringRef module, llvm::StringSet<> &alreadyAddedModules) {
-  if (alreadyAddedModules.insert(module).second)
+    StringRef module, llvm::StringSet<> *alreadyAddedModules) {
+  if (!alreadyAddedModules || alreadyAddedModules->insert(module).second)
     storage->moduleDependencies.push_back(module.str());
 }
 
@@ -53,7 +63,7 @@ void ModuleDependencies::addModuleDependencies(
       continue;
 
     addModuleDependency(importDecl->getModulePath().front().Item.str(),
-                        alreadyAddedModules);
+                        &alreadyAddedModules);
   }
 
   auto fileName = sf.getFilename();
@@ -102,7 +112,8 @@ ModuleDependenciesCache::getDependenciesMap(ModuleDependenciesKind kind) {
   switch (kind) {
   case ModuleDependenciesKind::Swift:
     return SwiftModuleDependencies;
-
+  case ModuleDependenciesKind::SwiftPlaceholder:
+    return PlaceholderSwiftModuleDependencies;
   case ModuleDependenciesKind::Clang:
     return ClangModuleDependencies;
   }
@@ -114,7 +125,8 @@ ModuleDependenciesCache::getDependenciesMap(ModuleDependenciesKind kind) const {
   switch (kind) {
   case ModuleDependenciesKind::Swift:
     return SwiftModuleDependencies;
-
+  case ModuleDependenciesKind::SwiftPlaceholder:
+    return PlaceholderSwiftModuleDependencies;
   case ModuleDependenciesKind::Clang:
     return ClangModuleDependencies;
   }
@@ -126,6 +138,7 @@ bool ModuleDependenciesCache::hasDependencies(
     Optional<ModuleDependenciesKind> kind) const {
   if (!kind) {
     return hasDependencies(moduleName, ModuleDependenciesKind::Swift) ||
+        hasDependencies(moduleName, ModuleDependenciesKind::SwiftPlaceholder) ||
         hasDependencies(moduleName, ModuleDependenciesKind::Clang);
   }
 
@@ -140,8 +153,11 @@ Optional<ModuleDependencies> ModuleDependenciesCache::findDependencies(
     if (auto swiftDep = findDependencies(
             moduleName, ModuleDependenciesKind::Swift))
       return swiftDep;
-
-    return findDependencies(moduleName, ModuleDependenciesKind::Clang);
+    else if (auto swiftPlaceholderDep = findDependencies(
+            moduleName, ModuleDependenciesKind::SwiftPlaceholder))
+      return swiftPlaceholderDep;
+    else
+      return findDependencies(moduleName, ModuleDependenciesKind::Clang);
   }
 
   const auto &map = getDependenciesMap(*kind);

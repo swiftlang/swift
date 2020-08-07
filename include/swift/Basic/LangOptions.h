@@ -235,6 +235,9 @@ namespace swift {
     /// Enable experimental #assert feature.
     bool EnableExperimentalStaticAssert = false;
 
+    /// Enable experimental concurrency model.
+    bool EnableExperimentalConcurrency = false;
+
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;
@@ -271,11 +274,18 @@ namespace swift {
     /// behavior. This is a staging flag, and will be removed in the future.
     bool EnableNewOperatorLookup = false;
 
+    /// Whether to enable the "fuzzy" forward-scanning behavior for trailing
+    /// closure matching, which skips over defaulted closure parameters
+    /// to match later (non-defaulted) closure parameters
+    ///
+    /// This is a backward-compatibility hack for unlabeled trailing closures,
+    /// to be disabled in Swift 6+.
+    bool EnableFuzzyForwardScanTrailingClosureMatching = true;
+
     /// Use Clang function types for computing canonical types.
     /// If this option is false, the clang function types will still be computed
     /// but will not be used for checking type equality.
-    /// FIXME: [clang-function-type-serialization] This option should be turned
-    /// on once we start serializing clang function types.
+    /// [TODO: Clang-type-plumbing] Turn on for feature rollout.
     bool UseClangFunctionTypes = false;
 
     /// Whether to use the import as member inference system
@@ -371,6 +381,9 @@ namespace swift {
 
     /// Enable verification when every SubstitutionMap is constructed.
     bool VerifyAllSubstitutionMaps = false;
+
+    /// Load swiftmodule files in memory as volatile and avoid mmap.
+    bool EnableVolatileModules = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.
@@ -504,7 +517,7 @@ namespace swift {
     /// Indicate that the type checker should skip type-checking non-inlinable
     /// function bodies.
     bool SkipNonInlinableFunctionBodies = false;
-    
+
     ///
     /// Flags for developers
     ///

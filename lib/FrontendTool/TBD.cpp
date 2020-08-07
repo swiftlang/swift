@@ -73,10 +73,13 @@ bool swift::inputFileKindCanHaveTBDValidated(InputFileKind kind) {
   llvm_unreachable("unhandled kind");
 }
 
-static bool validateSymbolSet(DiagnosticEngine &diags,
-                              llvm::StringSet<> symbols,
-                              const llvm::Module &IRModule,
-                              bool diagnoseExtraSymbolsInTBD) {
+static bool validateSymbols(DiagnosticEngine &diags,
+                            const std::vector<std::string> &symbols,
+                            const llvm::Module &IRModule,
+                            bool diagnoseExtraSymbolsInTBD) {
+  llvm::StringSet<> symbolSet;
+  symbolSet.insert(symbols.begin(), symbols.end());
+
   auto error = false;
 
   // Diff the two sets of symbols, flagging anything outside their intersection.
@@ -101,13 +104,13 @@ static bool validateSymbolSet(DiagnosticEngine &diags,
           GV->hasExternalLinkage() && !GV->hasHiddenVisibility();
       if (!GV->isDeclaration() && externallyVisible) {
         // Is it listed?
-        if (!symbols.erase(name))
+        if (!symbolSet.erase(name))
           // Note: Add the unmangled name to the irNotTBD list, which is owned
           //       by the IRModule, instead of the mangled name.
           irNotTBD.push_back(unmangledName);
       }
     } else {
-      assert(symbols.find(name) == symbols.end() &&
+      assert(symbolSet.find(name) == symbolSet.end() &&
              "non-global value in value symbol table");
     }
   }
@@ -121,7 +124,7 @@ static bool validateSymbolSet(DiagnosticEngine &diags,
 
   if (diagnoseExtraSymbolsInTBD) {
     // Look for any extra symbols.
-    for (auto &name : sortSymbols(symbols)) {
+    for (auto &name : sortSymbols(symbolSet)) {
       diags.diagnose(SourceLoc(), diag::symbol_in_tbd_not_in_ir, name,
                      Demangle::demangleSymbolAsString(name));
       error = true;
@@ -139,21 +142,16 @@ bool swift::validateTBD(ModuleDecl *M,
                         const llvm::Module &IRModule,
                         const TBDGenOptions &opts,
                         bool diagnoseExtraSymbolsInTBD) {
-  llvm::StringSet<> symbols;
-  enumeratePublicSymbols(M, symbols, opts);
-
-  return validateSymbolSet(M->getASTContext().Diags, symbols, IRModule,
-                           diagnoseExtraSymbolsInTBD);
+  auto symbols = getPublicSymbols(TBDGenDescriptor::forModule(M, opts));
+  return validateSymbols(M->getASTContext().Diags, symbols, IRModule,
+                         diagnoseExtraSymbolsInTBD);
 }
 
 bool swift::validateTBD(FileUnit *file,
                         const llvm::Module &IRModule,
                         const TBDGenOptions &opts,
                         bool diagnoseExtraSymbolsInTBD) {
-  llvm::StringSet<> symbols;
-  enumeratePublicSymbols(file, symbols, opts);
-
-  return validateSymbolSet(file->getParentModule()->getASTContext().Diags,
-                           symbols, IRModule,
-                           diagnoseExtraSymbolsInTBD);
+  auto symbols = getPublicSymbols(TBDGenDescriptor::forFile(file, opts));
+  return validateSymbols(file->getParentModule()->getASTContext().Diags,
+                         symbols, IRModule, diagnoseExtraSymbolsInTBD);
 }

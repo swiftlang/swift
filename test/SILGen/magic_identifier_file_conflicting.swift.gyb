@@ -33,12 +33,12 @@ def fixit_loc(start_col, orig_suffix):
 #sourceLocation(file: "${TEMPDIR_ESC}/magic_identifier_file_conflicting.swift", line: 10)
 #sourceLocation()
 
-// expected-warning@+2 {{'#sourceLocation' directive produces '#file' string of 'Foo/magic_identifier_file_conflicting.swift', which conflicts with '#file' strings produced by other paths in the module}}
+// expected-warning@+2 {{'#sourceLocation' directive produces '#fileID' string of 'Foo/magic_identifier_file_conflicting.swift', which conflicts with '#fileID' strings produced by other paths in the module}}
 // expected-note@+1 {{change file in '#sourceLocation' to '${TEMPDIR_ESC}/magic_identifier_file_conflicting.swift'}} {{${fixit_loc(23, "other_path_b/magic_identifier_file_conflicting.swift")}="${TEMPDIR_ESC}/magic_identifier_file_conflicting.swift"}}
 #sourceLocation(file: "${TEMPDIR_ESC}/other_path_b/magic_identifier_file_conflicting.swift", line: 20)
 #sourceLocation()
 
-// expected-warning@+2 {{'#sourceLocation' directive produces '#file' string of 'Foo/magic_identifier_file_conflicting.swift', which conflicts with '#file' strings produced by other paths in the module}}
+// expected-warning@+2 {{'#sourceLocation' directive produces '#fileID' string of 'Foo/magic_identifier_file_conflicting.swift', which conflicts with '#fileID' strings produced by other paths in the module}}
 // expected-note@+1 {{change file in '#sourceLocation' to '${TEMPDIR_ESC}/magic_identifier_file_conflicting.swift'}} {{23-64="${TEMPDIR_ESC}/magic_identifier_file_conflicting.swift"}}
 #sourceLocation(file: "magic_identifier_file_conflicting.swift", line: 30)
 #sourceLocation()
@@ -60,38 +60,38 @@ def fixit_loc(start_col, orig_suffix):
 // But there should be warnings for different-path, same-name virtual files.
 // The lexicographically first path should be treated as canonical--we diagnose
 // but don't offer a fix-it.
-// expected-warning@+1 {{'#sourceLocation' directive produces '#file' string of 'Foo/other_file_b.swift', which conflicts with '#file' strings produced by other paths in the module}}
+// expected-warning@+1 {{'#sourceLocation' directive produces '#fileID' string of 'Foo/other_file_b.swift', which conflicts with '#fileID' strings produced by other paths in the module}}
 #sourceLocation(file: "first/other_file_b.swift", line: 60)
 #sourceLocation()
 
 // Subsequent paths should fix-it to the first one.
-// expected-warning@+2 {{'#sourceLocation' directive produces '#file' string of 'Foo/other_file_b.swift', which conflicts with '#file' strings produced by other paths in the module}}
+// expected-warning@+2 {{'#sourceLocation' directive produces '#fileID' string of 'Foo/other_file_b.swift', which conflicts with '#fileID' strings produced by other paths in the module}}
 // expected-note@+1 {{change file in '#sourceLocation' to 'first/other_file_b.swift'}} {{23-50="first/other_file_b.swift"}}
 #sourceLocation(file: "second/other_file_b.swift", line: 70)
 #sourceLocation()
 
 // Even if there's more than one.
-// expected-warning@+2 {{'#sourceLocation' directive produces '#file' string of 'Foo/other_file_b.swift', which conflicts with '#file' strings produced by other paths in the module}}
+// expected-warning@+2 {{'#sourceLocation' directive produces '#fileID' string of 'Foo/other_file_b.swift', which conflicts with '#fileID' strings produced by other paths in the module}}
 // expected-note@+1 {{change file in '#sourceLocation' to 'first/other_file_b.swift'}} {{23-49="first/other_file_b.swift"}}
 #sourceLocation(file: "third/other_file_b.swift", line: 80)
 #sourceLocation()
 
 // Even if one is duplicated.
-// expected-warning@+2 {{'#sourceLocation' directive produces '#file' string of 'Foo/other_file_b.swift', which conflicts with '#file' strings produced by other paths in the module}}
+// expected-warning@+2 {{'#sourceLocation' directive produces '#fileID' string of 'Foo/other_file_b.swift', which conflicts with '#fileID' strings produced by other paths in the module}}
 // expected-note@+1 {{change file in '#sourceLocation' to 'first/other_file_b.swift'}} {{23-49="first/other_file_b.swift"}}
 #sourceLocation(file: "third/other_file_b.swift", line: 90)
 #sourceLocation()
 
 // We should diagnose cross-file conflicts.
-// expected-warning@+1 {{'#sourceLocation' directive produces '#file' string of 'Foo/other_file_c.swift', which conflicts with '#file' strings produced by other paths in the module}}
+// expected-warning@+1 {{'#sourceLocation' directive produces '#fileID' string of 'Foo/other_file_c.swift', which conflicts with '#fileID' strings produced by other paths in the module}}
 #sourceLocation(file: "first/other_file_c.swift", line: 100)
 #sourceLocation()
 
 //
-// Check '#file' => '#filePath' mapping table
+// Check '#fileID' => '#filePath' mapping table
 //
 
-// CHECK-LABEL: // Mappings from '#file' to '#filePath':
+// CHECK-LABEL: // Mappings from '#fileID' to '#filePath':
 // CHECK-NEXT:  //   'Foo/magic_identifier_file_conflicting.swift' => 'BUILD_DIR{{[/\\]}}test-{{[^/]+}}{{[/\\]}}SILGen{{[/\\]}}Output{{[/\\]}}magic_identifier_file_conflicting.swift.gyb.tmp{{[/\\]}}magic_identifier_file_conflicting.swift'
 // CHECK-NEXT:  //   'Foo/magic_identifier_file_conflicting.swift' => 'BUILD_DIR{{[/\\]}}test-{{[^/]+}}{{[/\\]}}SILGen{{[/\\]}}Output{{[/\\]}}magic_identifier_file_conflicting.swift.gyb.tmp{{[/\\]}}other_path_b{{[/\\]}}magic_identifier_file_conflicting.swift' (alternate)
 // CHECK-NEXT:  //   'Foo/magic_identifier_file_conflicting.swift' => 'magic_identifier_file_conflicting.swift' (alternate)

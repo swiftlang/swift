@@ -497,7 +497,8 @@ public:
     if (!anyVar)
       return;
 
-    checkTypeAccess(TP->getTypeLoc(), anyVar, /*mayBeInferred*/true,
+    checkTypeAccess(TP->hasType() ? TP->getType() : Type(),
+                    TP->getTypeRepr(), anyVar, /*mayBeInferred*/true,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeToWarning) {
@@ -1117,7 +1118,8 @@ public:
       return;
 
     checkTypeAccess(
-        TP->getTypeLoc(),
+        TP->hasType() ? TP->getType() : Type(),
+        TP->getTypeRepr(),
         fixedLayoutStructContext ? fixedLayoutStructContext : anyVar,
         /*mayBeInferred*/ true,
         [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
@@ -1467,14 +1469,25 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
 
   // If there's an exportability problem with \p typeDecl, get its origin kind.
   static DisallowedOriginKind getDisallowedOriginKind(
-      const TypeDecl *typeDecl, const SourceFile &SF, const Decl *context) {
+      const TypeDecl *typeDecl, const SourceFile &SF, const Decl *context,
+      DowngradeToWarning &downgradeToWarning) {
+    downgradeToWarning = DowngradeToWarning::No;
     ModuleDecl *M = typeDecl->getModuleContext();
-    if (SF.isImportedImplementationOnly(M))
+    if (SF.isImportedImplementationOnly(M)) {
+      // Temporarily downgrade implementation-only exportability in SPI to
+      // a warning.
+      if (context->isSPI())
+        downgradeToWarning = DowngradeToWarning::Yes;
+
+      // Implementation-only imported, cannot be reexported.
       return DisallowedOriginKind::ImplementationOnly;
-    else if (typeDecl->isSPI() && !context->isSPI())
+    } else if (typeDecl->isSPI() && !context->isSPI()) {
+      // SPI can only be exported in SPI.
       return context->getModuleContext() == M ?
         DisallowedOriginKind::SPILocal :
         DisallowedOriginKind::SPIImported;
+    }
+
     return DisallowedOriginKind::None;
   };
 
@@ -1494,9 +1507,10 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
       const_cast<TypeRepr *>(typeRepr)->walk(TypeReprIdentFinder(
           [&](const ComponentIdentTypeRepr *component) {
         TypeDecl *typeDecl = component->getBoundDecl();
-        auto originKind = getDisallowedOriginKind(typeDecl, SF, context);
+        auto downgradeToWarning = DowngradeToWarning::No;
+        auto originKind = getDisallowedOriginKind(typeDecl, SF, context, downgradeToWarning);
         if (originKind != DisallowedOriginKind::None) {
-          diagnoser.diagnoseType(typeDecl, component, originKind);
+          diagnoser.diagnoseType(typeDecl, component, originKind, downgradeToWarning);
           foundAnyIssues = true;
         }
 
@@ -1524,9 +1538,10 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
         : SF(SF), context(context), diagnoser(diagnoser) {}
 
       void visitTypeDecl(const TypeDecl *typeDecl) {
-        auto originKind = getDisallowedOriginKind(typeDecl, SF, context);
+        auto downgradeToWarning = DowngradeToWarning::No;
+        auto originKind = getDisallowedOriginKind(typeDecl, SF, context, downgradeToWarning);
         if (originKind != DisallowedOriginKind::None)
-          diagnoser.diagnoseType(typeDecl, /*typeRepr*/nullptr, originKind);
+          diagnoser.diagnoseType(typeDecl, /*typeRepr*/nullptr, originKind, downgradeToWarning);
       }
 
       void visitSubstitutionMap(SubstitutionMap subs) {
@@ -1572,7 +1587,7 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
       // types first.
       Action walkToTypePost(Type T) override {
         if (auto fnType = T->getAs<AnyFunctionType>()) {
-          if (auto clangType = fnType->getClangFunctionType()) {
+          if (auto clangType = fnType->getClangTypeInfo().getType()) {
             auto loader = T->getASTContext().getClangModuleLoader();
             // Serialization will serialize the sugared type if it can,
             // but we need the canonical type to be serializable or else
@@ -1641,9 +1656,13 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
 
     void diagnoseType(const TypeDecl *offendingType,
                       const TypeRepr *complainRepr,
-                      DisallowedOriginKind originKind) const {
+                      DisallowedOriginKind originKind,
+                      DowngradeToWarning downgradeToWarning) const {
       ModuleDecl *M = offendingType->getModuleContext();
-      auto diag = D->diagnose(diag::decl_from_hidden_module,
+      auto errorOrWarning = downgradeToWarning == DowngradeToWarning::Yes?
+                            diag::decl_from_hidden_module_warn:
+                            diag::decl_from_hidden_module;
+      auto diag = D->diagnose(errorOrWarning,
                               offendingType->getDescriptiveKind(),
                               offendingType->getName(),
                               static_cast<unsigned>(reason), M->getName(),
@@ -1818,7 +1837,8 @@ public:
     if (shouldSkipChecking(anyVar))
       return;
 
-    checkType(TP->getTypeLoc(), anyVar, getDiagnoser(anyVar));
+    checkType(TP->hasType() ? TP->getType() : Type(),
+              TP->getTypeRepr(), anyVar, getDiagnoser(anyVar));
 
     // Check the property wrapper types.
     for (auto attr : anyVar->getAttachedPropertyWrappers())

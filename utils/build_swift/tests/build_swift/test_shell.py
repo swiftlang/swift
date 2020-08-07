@@ -118,7 +118,7 @@ class TestHelpers(unittest.TestCase):
 
         mock_stream.write.assert_called_with(
             '>>> {}\n'.format(shell.quote(test_command)))
-        mock_stream.flush.assert_called()
+        assert(mock_stream.flush.called)
 
     @utils.requires_module('unittest.mock')
     def test_echo_command_custom_prefix(self):
@@ -127,7 +127,7 @@ class TestHelpers(unittest.TestCase):
         shell._echo_command('ls', mock_stream, prefix='$ ')
 
         mock_stream.write.assert_called_with('$ ls\n')
-        mock_stream.flush.assert_called()
+        assert(mock_stream.flush.called)
 
     # -------------------------------------------------------------------------
     # _normalize_args
@@ -208,8 +208,8 @@ class TestDecorators(unittest.TestCase):
             self.assertEqual(kwargs['stdout'], mock_file)
 
         func('', stdout=shell.DEVNULL)
-        mock_open.return_value.__enter__.assert_called()
-        mock_open.return_value.__exit__.assert_called()
+        assert(mock_open.return_value.__enter__.called)
+        assert(mock_open.return_value.__exit__.called)
 
     @utils.requires_module('unittest.mock')
     @patch(_OPEN_NAME, new_callable=mock_open)
@@ -223,8 +223,8 @@ class TestDecorators(unittest.TestCase):
             self.assertEqual(kwargs['stderr'], mock_file)
 
         func('', stderr=shell.DEVNULL)
-        mock_open.return_value.__enter__.assert_called()
-        mock_open.return_value.__exit__.assert_called()
+        assert(mock_open.return_value.__enter__.called)
+        assert(mock_open.return_value.__exit__.called)
 
     @utils.requires_module('unittest.mock')
     @patch(_OPEN_NAME, new_callable=mock_open)

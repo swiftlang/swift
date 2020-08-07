@@ -69,4 +69,5 @@ target_link_libraries(swiftIRGen PRIVATE
   swiftLLVMPasses
   swiftSIL
   swiftSILGen
-  swiftSILOptimizer)
+  swiftSILOptimizer
+  swiftTBDGen)

@@ -345,11 +345,13 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
     ClosureConstraintApplication application(
         solution, closure, closureFnType->getResult(), rewriteTarget);
     application.visit(fn.getBody());
+    closure->setBodyState(ClosureExpr::BodyState::TypeCheckedWithSignature);
 
     return SolutionApplicationToFunctionResult::Success;
   }
 
   // Otherwise, we need to delay type checking of the closure until later.
   solution.setExprTypes(closure);
+  closure->setBodyState(ClosureExpr::BodyState::ReadyForTypeChecking);
   return SolutionApplicationToFunctionResult::Delay;
 }

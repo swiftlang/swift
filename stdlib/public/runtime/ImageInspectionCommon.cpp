@@ -45,14 +45,13 @@ void record(swift::MetadataSections *sections) {
 
 SWIFT_RUNTIME_EXPORT
 void swift_addNewDSOImage(const void *addr) {
-  const swift::MetadataSections *sections =
-      static_cast<const swift::MetadataSections *>(addr);
-
   // We cast off the const in order to update the linked list
   // data structure. This is safe to do since we don't touch 
   // any other fields.
-  auto casted_sections = const_cast<swift::MetadataSections *>(sections);
-  record(casted_sections);
+  swift::MetadataSections *sections =
+      static_cast<swift::MetadataSections *>(const_cast<void *>(addr));
+
+  record(sections);
 
   const auto &protocols_section = sections->swift5_protocols;
   const void *protocols = reinterpret_cast<void *>(protocols_section.start);
@@ -138,6 +137,55 @@ void *swift::lookupSection(const char *segment, const char *section, size_t *out
   return nullptr;
 }
 
+SWIFT_RUNTIME_EXPORT
+const swift::MetadataSections *swift_getMetadataSection(size_t index) {
+  #ifndef NDEBUG
+  if (swift::registered == nullptr) {
+    return nullptr;
+  }
+
+  auto selected = swift::registered;
+  while (index > 0) {
+    selected = selected->next;
+    if (selected == swift::registered) {
+      return nullptr;
+    }
+    --index;
+  }
+  return selected;
+  #else // NDEBUG
+  return nullptr;
+  #endif // else NDEBUG
+}
+
+SWIFT_RUNTIME_EXPORT
+const char *swift_getMetadataSectionName(void *metadata_section) {
+  #ifndef NDEBUG
+  swift::SymbolInfo info;
+  if (lookupSymbol(metadata_section, &info)) {
+    if (info.fileName) {
+      return info.fileName;
+    }
+  }
+  #endif // NDEBUG
+  return "";
+}
+
+SWIFT_RUNTIME_EXPORT
+size_t swift_getMetadataSectionCount() {
+  #ifndef NDEBUG
+  if (swift::registered == nullptr)
+    return 0;
+
+  size_t count = 1;
+  for (const auto *current = swift::registered->next;
+       current != swift::registered; current = current->next, ++count);
+
+  return count;
+  #else // NDEBUG
+  return 0;
+  #endif // else NDEBUG
+}
 #endif // !defined(__MACH__)
 
 #endif // SWIFT_RUNTIME_IMAGEINSPECTIONCOMMON_H

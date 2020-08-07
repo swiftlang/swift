@@ -161,8 +161,13 @@ func takesUnownedStruct(_ z: Unowned<C>) {}
 // Make sure we don't crash here
 struct UnownedGenericCapture<T : AnyObject> {
   var object: T
+  var optionalObject: T?
 
   func f() -> () -> () {
     return { [unowned object] in _ = object }
+  }
+
+  func g() -> () -> () {
+    return { [unowned optionalObject] in _ = optionalObject }
   }
 }

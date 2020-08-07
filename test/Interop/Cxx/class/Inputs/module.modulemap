@@ -25,3 +25,7 @@ module ProtocolConformance {
 module SynthesizedInitializers {
   header "synthesized-initializers.h"
 }
+
+module DebugInfo {
+  header "debug-info.h"
+}

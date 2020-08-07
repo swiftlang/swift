@@ -468,16 +468,6 @@ Expr *NameMatcher::walkToExprPost(Expr *E) {
   return E;
 }
 
-bool NameMatcher::walkToTypeLocPre(TypeLoc &TL) {
-  if (isDone() || shouldSkip(TL.getSourceRange()))
-    return false;
-  return true;
-}
-
-bool NameMatcher::walkToTypeLocPost(TypeLoc &TL) {
-  return !isDone();
-}
-
 bool NameMatcher::walkToTypeReprPre(TypeRepr *T) {
   if (isDone() || shouldSkip(T->getSourceRange()))
     return false;

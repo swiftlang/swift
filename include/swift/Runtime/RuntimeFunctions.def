@@ -645,6 +645,14 @@ FUNCTION(GetGenericMetadata, swift_getGenericMetadata,
          ARGS(SizeTy, Int8PtrTy, TypeContextDescriptorPtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
+// MetadataResponse swift_getCanonicalSpecializedMetadata(MetadataRequest request,
+//                                                        Metadata *candidate);
+FUNCTION(GetCanonicalSpecializedMetadata, swift_getCanonicalSpecializedMetadata,
+         SwiftCC, GetCanonicalSpecializedMetadataAvailability,
+         RETURNS(TypeMetadataResponseTy),
+         ARGS(SizeTy, TypeMetadataPtrTy, TypeMetadataPtrPtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
 // MetadataResponse swift_getOpaqueTypeMetadata(MetadataRequest request,
 //                                     const void * const *arguments,
 //                                     const OpaqueTypeDescriptor *descriptor,

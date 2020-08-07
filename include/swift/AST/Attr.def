@@ -244,7 +244,7 @@ SIMPLE_DECL_ATTR(nonobjc, NonObjC,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   30)
 SIMPLE_DECL_ATTR(_fixed_layout, FixedLayout,
-  OnVar | OnClass | OnStruct |
+  OnVar | OnClass | OnStruct | OnProtocol |
   UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove |
   APIStableToAdd | APIStableToRemove,
   31)

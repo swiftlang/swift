@@ -65,6 +65,7 @@ bb0:
 
 bb1:
   %f = function_ref @callee : $@convention(thin) () -> ()
+  // REMARKS_PASSED: {{.*}}inliner_coldblocks.sil:[[# @LINE + 1]]:8: remark: Pure call. Always profitable to inline "callee"
   %a = apply %f() : $@convention(thin) () -> ()
   br bb2
 
@@ -193,13 +194,13 @@ bb0:
   %c30 = builtin "assert_configuration"() : $Builtin.Int32
 
   %f = function_ref @update_global: $@convention(thin) () -> ()
-  // REMARKS_PASSED: inliner_coldblocks.sil:223:3: remark: "update_global" inlined into "regular_large_callee" (cost = {{.*}}, benefit = {{.*}})
+  // REMARKS_PASSED: inliner_coldblocks.sil:[[# @LINE + 27]]:3: remark: "update_global" inlined into "regular_large_callee" (cost = {{.*}}, benefit = {{.*}})
   // YAML:      --- !Passed
   // YAML-NEXT: Pass:            sil-inliner
-  // YAML-NEXT: Name:            sil.Inlined
+  // YAML-NEXT: Name:            sil.Inline
   // YAML-NEXT: DebugLoc:
   // YAML:        File:            {{.*}}inliner_coldblocks.sil
-  // YAML:        Line:            223
+  // YAML:        Line:            [[#@LINE + 21]]
   // YAML:        Column:          3
   // YAML-NEXT: Function:        regular_large_callee
   // YAML-NEXT: Args:
@@ -212,7 +213,7 @@ bb0:
   // YAML-NEXT:   - Caller:          '"regular_large_callee"'
   // YAML-NEXT:     DebugLoc:
   // YAML:            File:            {{.*}}inliner_coldblocks.sil
-  // YAML:            Line:            162
+  // YAML:            Line:            [[# @LINE - 53]]
   // YAML:            Column:          6
   // YAML-NEXT:   - String:          ' (cost = '
   // YAML-NEXT:   - Cost:            '{{.*}}'
@@ -233,13 +234,13 @@ bb0:
 sil @dont_inline_regular_large_callee : $@convention(thin) () -> () {
 bb0:
   %f = function_ref @regular_large_callee : $@convention(thin) () -> ()
-  // REMARKS_MISSED: inliner_coldblocks.sil:258:8: remark: Not profitable to inline function "regular_large_callee" (cost = {{.*}}, benefit = {{.*}})
+  // REMARKS_MISSED: inliner_coldblocks.sil:[[# @LINE + 22]]:8: remark: Not profitable to inline function "regular_large_callee" (cost = {{.*}}, benefit = {{.*}})
   // YAML:      --- !Missed
   // YAML-NEXT: Pass:            sil-inliner
-  // YAML-NEXT: Name:            sil.NoInlinedCost
+  // YAML-NEXT: Name:            sil.Inline
   // YAML-NEXT: DebugLoc:
   // YAML:        File:            {{.*}}inliner_coldblocks.sil
-  // YAML:        Line:            258
+  // YAML:        Line:            [[# @LINE + 16]]
   // YAML:        Column:          8
   // YAML-NEXT: Function:        dont_inline_regular_large_callee
   // YAML-NEXT: Args:
@@ -247,7 +248,7 @@ bb0:
   // YAML-NEXT:   - Callee:          '"regular_large_callee"'
   // YAML-NEXT:     DebugLoc:
   // YAML:       File:            {{.*}}inliner_coldblocks.sil
-  // YAML:       Line:            162
+  // YAML:       Line:            [[# @LINE - 88]]
   // YAML:       Column:          6
   // YAML-NEXT:   - String:          ' (cost = '
   // YAML-NEXT:   - Cost:            '{{.*}}'
@@ -304,6 +305,7 @@ bb0:
 sil @inline_large_callee_on_fast_path : $@convention(thin) () -> () {
 bb0:
   %f = function_ref @large_callee_on_fast_path : $@convention(thin) () -> ()
+  // REMARKS_PASSED: inliner_coldblocks.sil:[[# @LINE + 1]]:8: remark: Pure call. Always profitable to inline "large_callee_on_fast_path"
   %a = apply %f() : $@convention(thin) () -> ()
   %r = tuple ()
   return %r : $()

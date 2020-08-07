@@ -24,6 +24,8 @@
 #include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/VersionTuple.h"
 
 namespace swift {
@@ -742,8 +744,26 @@ namespace swift {
     void setLocalization(std::string locale, std::string path) {
       assert(!locale.empty());
       assert(!path.empty());
-      localization =
-          std::make_unique<diag::YAMLLocalizationProducer>(locale, path);
+      llvm::SmallString<128> filePath(path);
+      llvm::sys::path::append(filePath, locale);
+      llvm::sys::path::replace_extension(filePath, ".db");
+
+      // If the serialized diagnostics file not available,
+      // fallback to the `YAML` file.
+      if (llvm::sys::fs::exists(filePath)) {
+        if (auto file = llvm::MemoryBuffer::getFile(filePath)) {
+          localization = std::make_unique<diag::SerializedLocalizationProducer>(
+              std::move(file.get()));
+        }
+      } else {
+        llvm::sys::path::replace_extension(filePath, ".yaml");
+        // In case of missing localization files, we should fallback to messages
+        // from `.def` files.
+        if (llvm::sys::fs::exists(filePath)) {
+          localization =
+              std::make_unique<diag::YAMLLocalizationProducer>(filePath.str());
+        }
+      }
     }
 
     void ignoreDiagnostic(DiagID id) {

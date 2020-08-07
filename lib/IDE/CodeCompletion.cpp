@@ -1613,9 +1613,20 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   /// \returns true on success, false on failure.
   bool typecheckParsedType() {
     assert(ParsedTypeLoc.getTypeRepr() && "should have a TypeRepr");
-    if (!performTypeLocChecking(P.Context, ParsedTypeLoc,
-                                   CurDeclContext, false))
+    if (ParsedTypeLoc.wasValidated() && !ParsedTypeLoc.isError()) {
       return true;
+    }
+
+    const auto ty = swift::performTypeResolution(
+        ParsedTypeLoc.getTypeRepr(), P.Context,
+        /*isSILMode=*/false,
+        /*isSILType=*/false, CurDeclContext->getGenericEnvironmentOfContext(),
+        CurDeclContext,
+        /*ProduceDiagnostics=*/false);
+    ParsedTypeLoc.setType(ty);
+    if (!ParsedTypeLoc.isError()) {
+      return true;
+    }
 
     // It doesn't type check as a type, so see if it's a qualifying module name.
     if (auto *ITR = dyn_cast<IdentTypeRepr>(ParsedTypeLoc.getTypeRepr())) {
@@ -1749,11 +1760,11 @@ static Type
 defaultTypeLiteralKind(CodeCompletionLiteralKind kind, ASTContext &Ctx) {
   switch (kind) {
   case CodeCompletionLiteralKind::BooleanLiteral:
-    return Ctx.getBoolDecl()->getDeclaredType();
+    return Ctx.getBoolDecl()->getDeclaredInterfaceType();
   case CodeCompletionLiteralKind::IntegerLiteral:
-    return Ctx.getIntDecl()->getDeclaredType();
+    return Ctx.getIntDecl()->getDeclaredInterfaceType();
   case CodeCompletionLiteralKind::StringLiteral:
-    return Ctx.getStringDecl()->getDeclaredType();
+    return Ctx.getStringDecl()->getDeclaredInterfaceType();
   case CodeCompletionLiteralKind::ArrayLiteral:
     return Ctx.getArrayDecl()->getDeclaredType();
   case CodeCompletionLiteralKind::DictionaryLiteral:
@@ -2594,12 +2605,9 @@ public:
       case DefaultArgumentKind::EmptyDictionary:
         return !includeDefaultArgs;
 
-      case DefaultArgumentKind::File:
-      case DefaultArgumentKind::FilePath:
-      case DefaultArgumentKind::Line:
-      case DefaultArgumentKind::Column:
-      case DefaultArgumentKind::Function:
-      case DefaultArgumentKind::DSOHandle:
+#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+      case DefaultArgumentKind::NAME:
+#include "swift/AST/MagicIdentifierKinds.def"
         // Skip parameters that are defaulted to source location or other
         // caller context information.  Users typically don't want to specify
         // these parameters.
@@ -2672,7 +2680,7 @@ public:
                         const AbstractFunctionDecl *AFD) {
     if (AFD && AFD->getAttrs().hasAttribute<RethrowsAttr>())
       Builder.addAnnotatedRethrows();
-    else if (AFT->throws())
+    else if (AFT->isThrowing())
       Builder.addAnnotatedThrows();
   }
 
@@ -4032,35 +4040,53 @@ public:
 
   /// Add '#file', '#line', et at.
   void addPoundLiteralCompletions(bool needPound) {
-    auto addFromProto = [&](StringRef name, CodeCompletionKeywordKind kwKind,
-                            CodeCompletionLiteralKind literalKind) {
+    auto addFromProto = [&](MagicIdentifierLiteralExpr::Kind magicKind,
+                            Optional<CodeCompletionLiteralKind> literalKind) {
+      CodeCompletionKeywordKind kwKind;
+      switch (magicKind) {
+      case MagicIdentifierLiteralExpr::FileIDSpelledAsFile:
+        kwKind = CodeCompletionKeywordKind::pound_file;
+        break;
+      case MagicIdentifierLiteralExpr::FilePathSpelledAsFile:
+        // Already handled by above case.
+        return;
+#define MAGIC_IDENTIFIER_TOKEN(NAME, TOKEN) \
+      case MagicIdentifierLiteralExpr::NAME: \
+        kwKind = CodeCompletionKeywordKind::TOKEN; \
+        break;
+#define MAGIC_IDENTIFIER_DEPRECATED_TOKEN(NAME, TOKEN)
+#include "swift/AST/MagicIdentifierKinds.def"
+      }
+
+      StringRef name = MagicIdentifierLiteralExpr::getKindString(magicKind);
       if (!needPound)
         name = name.substr(1);
+
+      if (!literalKind) {
+        // Pointer type
+        addKeyword(name, "UnsafeRawPointer", kwKind);
+        return;
+      }
 
       CodeCompletionResultBuilder builder(
           Sink, CodeCompletionResult::ResultKind::Keyword,
           SemanticContextKind::None, {});
-      builder.setLiteralKind(literalKind);
+      builder.setLiteralKind(literalKind.getValue());
       builder.setKeywordKind(kwKind);
       builder.addBaseName(name);
-      addTypeRelationFromProtocol(builder, literalKind);
+      addTypeRelationFromProtocol(builder, literalKind.getValue());
     };
 
-    addFromProto("#function", CodeCompletionKeywordKind::pound_function,
+#define MAGIC_STRING_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+    addFromProto(MagicIdentifierLiteralExpr::NAME, \
                  CodeCompletionLiteralKind::StringLiteral);
-    addFromProto("#file", CodeCompletionKeywordKind::pound_file,
-                 CodeCompletionLiteralKind::StringLiteral);
-    if (Ctx.LangOpts.EnableConcisePoundFile) {
-      addFromProto("#filePath", CodeCompletionKeywordKind::pound_file,
-                   CodeCompletionLiteralKind::StringLiteral);
-    }
-    addFromProto("#line", CodeCompletionKeywordKind::pound_line,
+#define MAGIC_INT_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+    addFromProto(MagicIdentifierLiteralExpr::NAME, \
                  CodeCompletionLiteralKind::IntegerLiteral);
-    addFromProto("#column", CodeCompletionKeywordKind::pound_column,
-                 CodeCompletionLiteralKind::IntegerLiteral);
-
-    addKeyword(needPound ? "#dsohandle" : "dsohandle", "UnsafeRawPointer",
-               CodeCompletionKeywordKind::pound_dsohandle);
+#define MAGIC_POINTER_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+    addFromProto(MagicIdentifierLiteralExpr::NAME, \
+                 None);
+#include "swift/AST/MagicIdentifierKinds.def"
   }
 
   void addValueLiteralCompletions() {
@@ -4115,7 +4141,7 @@ public:
       builder.addRightBracket();
     });
 
-    auto floatType = context.getFloatDecl()->getDeclaredType();
+    auto floatType = context.getFloatDecl()->getDeclaredInterfaceType();
     addFromProto(LK::ColorLiteral, [&](Builder &builder) {
       builder.addBaseName("#colorLiteral");
       builder.addLeftParen();
@@ -4129,7 +4155,7 @@ public:
       builder.addRightParen();
     });
 
-    auto stringType = context.getStringDecl()->getDeclaredType();
+    auto stringType = context.getStringDecl()->getDeclaredInterfaceType();
     addFromProto(LK::ImageLiteral, [&](Builder &builder) {
       builder.addBaseName("#imageLiteral");
       builder.addLeftParen();
@@ -6226,7 +6252,9 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::ReturnStmtExpr : {
     SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
-    Lookup.setExpectedTypes(getReturnTypeFromContext(CurDeclContext),
+    SmallVector<Type, 2> possibleReturnTypes;
+    collectPossibleReturnTypesFromContext(CurDeclContext, possibleReturnTypes);
+    Lookup.setExpectedTypes(possibleReturnTypes,
                             /*isSingleExpressionBody*/ false);
     Lookup.getValueCompletionsInDeclContext(Loc);
     break;

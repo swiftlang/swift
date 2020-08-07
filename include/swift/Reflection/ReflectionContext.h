@@ -38,6 +38,8 @@
 #include <utility>
 #include <vector>
 
+#include <inttypes.h>
+
 namespace {
 
 template <unsigned PointerSize> struct MachOTraits;
@@ -848,6 +850,36 @@ public:
     }
   }
 
+  llvm::Optional<MetadataCacheNode<Runtime>>
+  metadataAllocationCacheNode(MetadataAllocation<Runtime> Allocation) {
+    switch (Allocation.Tag) {
+    case BoxesTag:
+    case ObjCClassWrappersTag:
+    case FunctionTypesTag:
+    case MetatypeTypesTag:
+    case ExistentialMetatypeValueWitnessTablesTag:
+    case ExistentialMetatypesTag:
+    case ExistentialTypesTag:
+    case OpaqueExistentialValueWitnessTablesTag:
+    case ClassExistentialValueWitnessTablesTag:
+    case ForeignWitnessTablesTag:
+    case TupleCacheTag:
+    case GenericMetadataCacheTag:
+    case ForeignMetadataCacheTag:
+    case GenericWitnessTableCacheTag: {
+      auto NodeBytes = getReader().readBytes(
+          RemoteAddress(Allocation.Ptr), sizeof(MetadataCacheNode<Runtime>));
+      auto Node =
+          reinterpret_cast<const MetadataCacheNode<Runtime> *>(NodeBytes.get());
+      if (!Node)
+        return llvm::None;
+      return *Node;
+    }
+    default:
+      return llvm::None;
+    }
+  }
+
   /// Iterate the metadata allocations in the target process, calling Call with
   /// each allocation found. Returns None on success, and a string describing
   /// the error on failure.
@@ -958,7 +990,8 @@ public:
         // FIXME: std::stringstream would be better, but LLVM's standard library
         // introduces a vtable and we don't want that.
         char result[128];
-        std::snprintf(result, sizeof(result), "unable to read Next pointer %p",
+        std::snprintf(result, sizeof(result),
+            "unable to read Next pointer %#" PRIx64,
             BacktraceListNext.getAddressData());
         return std::string(result);
       }

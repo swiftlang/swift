@@ -393,6 +393,16 @@ class LinkEntity {
     /// An access function for prespecialized type metadata.
     /// The pointer is a canonical TypeBase*.
     CanonicalSpecializedGenericTypeMetadataAccessFunction,
+
+    /// Metadata for a specialized generic type which cannot be statically
+    /// guaranteed to be canonical and so must be canonicalized.
+    /// The pointer is a canonical TypeBase*.
+    NoncanonicalSpecializedGenericTypeMetadata,
+
+    /// A cache variable for noncanonical specialized type metadata, to be 
+    /// passed to swift_getCanonicalSpecializedMetadata.
+    /// The pointer is a canonical TypeBase*.
+    NoncanonicalSpecializedGenericTypeMetadataCacheVariable,
   };
   friend struct llvm::DenseMapInfo<LinkEntity>;
 
@@ -565,7 +575,7 @@ class LinkEntity {
   static bool isValidResilientMethodRef(SILDeclRef declRef) {
     if (declRef.isForeign)
       return false;
-
+    
     auto *decl = declRef.getDecl();
     return (isa<ClassDecl>(decl->getDeclContext()) ||
             isa<ProtocolDecl>(decl->getDeclContext()));
@@ -1045,6 +1055,24 @@ public:
     return entity;
   }
 
+  static LinkEntity
+  forNoncanonicalSpecializedGenericTypeMetadata(CanType theType) {
+    LinkEntity entity;
+    entity.setForType(Kind::NoncanonicalSpecializedGenericTypeMetadata,
+                      theType);
+    entity.Data |= LINKENTITY_SET_FIELD(
+        MetadataAddress, unsigned(TypeMetadataAddress::FullMetadata));
+    return entity;
+  }
+
+
+  static LinkEntity
+  forNoncanonicalSpecializedGenericTypeMetadataCacheVariable(CanType theType) {
+    LinkEntity entity;
+    entity.setForType(Kind::NoncanonicalSpecializedGenericTypeMetadataCacheVariable, theType);
+    return entity;
+  }
+
   void mangle(llvm::raw_ostream &out) const;
   void mangle(SmallVectorImpl<char> &buffer) const;
   std::string mangleAsString() const;
@@ -1152,6 +1180,7 @@ public:
   }
   TypeMetadataAddress getMetadataAddress() const {
     assert(getKind() == Kind::TypeMetadata ||
+           getKind() == Kind::NoncanonicalSpecializedGenericTypeMetadata ||
            getKind() == Kind::ObjCResilientClassStub);
     return (TypeMetadataAddress)LINKENTITY_GET_FIELD(Data, MetadataAddress);
   }

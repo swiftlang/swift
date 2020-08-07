@@ -85,7 +85,8 @@ private:
       bool IsHashBased);
 
   bool buildSwiftModuleInternal(StringRef OutPath, bool ShouldSerializeDeps,
-                                std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer);
+                                std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+                                ArrayRef<std::string> CandidateModules);
 public:
   ModuleInterfaceBuilder(SourceManager &sourceMgr, DiagnosticEngine &diags,
                             InterfaceSubContextDelegate &subASTDelegate,
@@ -111,7 +112,8 @@ public:
 
   bool buildSwiftModule(StringRef OutPath, bool ShouldSerializeDeps,
                         std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-                        llvm::function_ref<void()> RemarkRebuild = nullptr);
+                        llvm::function_ref<void()> RemarkRebuild = nullptr,
+                        ArrayRef<std::string> CandidateModules = {});
 };
 
 } // end namespace swift

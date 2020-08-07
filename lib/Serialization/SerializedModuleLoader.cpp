@@ -115,7 +115,7 @@ SerializedModuleLoaderBase::SerializedModuleLoaderBase(
       IgnoreSwiftSourceInfoFile(IgnoreSwiftSourceInfoFile) {}
 
 SerializedModuleLoaderBase::~SerializedModuleLoaderBase() = default;
-SerializedModuleLoader::~SerializedModuleLoader() = default;
+ImplicitSerializedModuleLoader::~ImplicitSerializedModuleLoader() = default;
 MemoryBufferSerializedModuleLoader::~MemoryBufferSerializedModuleLoader() =
     default;
 
@@ -243,7 +243,7 @@ void SerializedModuleLoaderBase::collectVisibleTopLevelModuleNamesImpl(
   });
 }
 
-void SerializedModuleLoader::collectVisibleTopLevelModuleNames(
+void ImplicitSerializedModuleLoader::collectVisibleTopLevelModuleNames(
     SmallVectorImpl<Identifier> &names) const {
   collectVisibleTopLevelModuleNamesImpl(
       names, file_types::getExtension(file_types::TY_SwiftModuleFile));
@@ -347,8 +347,27 @@ std::error_code SerializedModuleLoaderBase::openModuleFile(
   }
 
   // Actually load the file and error out if necessary.
+  //
+  // Use the default arguments except for IsVolatile that is set by the
+  // frontend option -enable-volatile-modules. If set, we avoid the use of
+  // mmap to workaround issues on NFS when the swiftmodule file loaded changes
+  // on disk while it's in use.
+  //
+  // In practice, a swiftmodule file can chane when a client uses a
+  // swiftmodule file from a framework while the framework is recompiled and
+  // installed over existing files. Or when many processes rebuild the same
+  // module interface.
+  //
+  // We have seen these scenarios leading to deserialization errors that on
+  // the surface look like memory corruption.
+  //
+  // rdar://63755989
+  bool enableVolatileModules = Ctx.LangOpts.EnableVolatileModules;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleOrErr =
-      FS.getBufferForFile(ModulePath);
+      FS.getBufferForFile(ModulePath,
+                          /*FileSize=*/-1,
+                          /*RequiresNullTerminator=*/true,
+                          /*IsVolatile=*/enableVolatileModules);
   if (!ModuleOrErr)
     return ModuleOrErr.getError();
 
@@ -391,13 +410,13 @@ llvm::ErrorOr<ModuleDependencies> SerializedModuleLoaderBase::scanModuleFile(
     if (dotPos != std::string::npos)
       moduleName = moduleName.slice(0, dotPos);
 
-    dependencies.addModuleDependency(moduleName, addedModuleNames);
+    dependencies.addModuleDependency(moduleName, &addedModuleNames);
   }
 
   return std::move(dependencies);
 }
 
-std::error_code SerializedModuleLoader::findModuleFilesInDirectory(
+std::error_code ImplicitSerializedModuleLoader::findModuleFilesInDirectory(
     AccessPathElem ModuleID,
     const SerializedModuleBaseName &BaseName,
     SmallVectorImpl<char> *ModuleInterfacePath,
@@ -434,7 +453,7 @@ std::error_code SerializedModuleLoader::findModuleFilesInDirectory(
   return std::error_code();
 }
 
-bool SerializedModuleLoader::maybeDiagnoseTargetMismatch(
+bool ImplicitSerializedModuleLoader::maybeDiagnoseTargetMismatch(
     SourceLoc sourceLocation, StringRef moduleName,
     const SerializedModuleBaseName &absoluteBaseName) {
   llvm::vfs::FileSystem &fs = *Ctx.SourceMgr.getFileSystem();

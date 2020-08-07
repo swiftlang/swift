@@ -193,6 +193,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.EnableSourceImport |= Args.hasArg(OPT_enable_source_import);
   Opts.ImportUnderlyingModule |= Args.hasArg(OPT_import_underlying_module);
   Opts.EnableIncrementalDependencyVerifier |= Args.hasArg(OPT_verify_incremental_dependencies);
+  Opts.UseSharedResourceFolder = !Args.hasArg(OPT_use_static_resource_dir);
 
   computeImportObjCHeaderOptions();
   computeImplicitImportModuleNames();
@@ -234,8 +235,6 @@ void ArgsToFrontendOptionsConverter::computePrintStatsOptions() {
 
 void ArgsToFrontendOptionsConverter::computeDebugTimeOptions() {
   using namespace options;
-  Opts.DebugTimeCompilation |= Args.hasArg(OPT_debug_time_compilation);
-
   if (const Arg *A = Args.getLastArg(OPT_stats_output_dir)) {
     Opts.StatsOutputDir = A->getValue();
     if (Args.getLastArg(OPT_trace_stats_events)) {

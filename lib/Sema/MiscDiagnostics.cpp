@@ -86,7 +86,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
     bool walkToDeclPre(Decl *D) override {
       if (auto *closure = dyn_cast<ClosureExpr>(D->getDeclContext()))
-        return !closure->wasSeparatelyTypeChecked();
+        return !closure->isSeparatelyTypeChecked();
       return false;
     }
 
@@ -95,6 +95,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
       return false;
     }
+
+    bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
     bool shouldWalkIntoTapExpression() override { return false; }
 
@@ -436,10 +438,10 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       auto calleeDefaultArg = getMagicIdentifierDefaultArgKind(calleeParam);
       auto callerDefaultArg = getMagicIdentifierDefaultArgKind(callerParam);
 
-      // If one of the parameters doesn't have a default arg, or they both have
-      // the same one, everything's fine.
+      // If one of the parameters doesn't have a default arg, or they're both
+      // compatible, everything's fine.
       if (!calleeDefaultArg || !callerDefaultArg ||
-          *calleeDefaultArg == *callerDefaultArg)
+          areMagicIdentifiersCompatible(*calleeDefaultArg, *callerDefaultArg))
         return;
 
       StringRef calleeDefaultArgString =
@@ -474,18 +476,10 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     Optional<MagicIdentifierLiteralExpr::Kind>
     getMagicIdentifierDefaultArgKind(const ParamDecl *param) {
       switch (param->getDefaultArgumentKind()) {
-      case DefaultArgumentKind::Column:
-        return MagicIdentifierLiteralExpr::Kind::Column;
-      case DefaultArgumentKind::DSOHandle:
-        return MagicIdentifierLiteralExpr::Kind::DSOHandle;
-      case DefaultArgumentKind::File:
-        return MagicIdentifierLiteralExpr::Kind::File;
-      case DefaultArgumentKind::FilePath:
-        return MagicIdentifierLiteralExpr::Kind::FilePath;
-      case DefaultArgumentKind::Function:
-        return MagicIdentifierLiteralExpr::Kind::Function;
-      case DefaultArgumentKind::Line:
-        return MagicIdentifierLiteralExpr::Kind::Line;
+#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+      case DefaultArgumentKind::NAME: \
+        return MagicIdentifierLiteralExpr::Kind::NAME;
+#include "swift/AST/MagicIdentifierKinds.def"
 
       case DefaultArgumentKind::None:
       case DefaultArgumentKind::Normal:
@@ -499,6 +493,52 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
       llvm_unreachable("Unhandled DefaultArgumentKind in "
                        "getMagicIdentifierDefaultArgKind");
+    }
+
+    static bool
+    areMagicIdentifiersCompatible(MagicIdentifierLiteralExpr::Kind a,
+                                  MagicIdentifierLiteralExpr::Kind b) {
+      if (a == b)
+        return true;
+
+      // The rest of this handles special compatibility rules between the
+      // `*SpelledAsFile` cases and various other File-related cases.
+      //
+      // The way we're going to do this is a bit magical. We will arrange the
+      // cases in MagicIdentifierLiteralExpr::Kind so that that they sort in
+      // this order:
+      //
+      //     #fileID < Swift 6 #file < #filePath < Swift 5 #file < others
+      //
+      // Before we continue, let's verify that this holds.
+
+      using Kind = MagicIdentifierLiteralExpr::Kind;
+
+      static_assert(Kind::FileID < Kind::FileIDSpelledAsFile,
+                    "#fileID < Swift 6 #file");
+      static_assert(Kind::FileIDSpelledAsFile < Kind::FilePath,
+                    "Swift 6 #file < #filePath");
+      static_assert(Kind::FilePath < Kind::FilePathSpelledAsFile,
+                    "#filePath < Swift 5 #file");
+
+      static_assert(Kind::FilePathSpelledAsFile < Kind::Line,
+                    "Swift 5 #file < #line");
+      static_assert(Kind::FilePathSpelledAsFile < Kind::Column,
+                    "Swift 5 #file < #column");
+      static_assert(Kind::FilePathSpelledAsFile < Kind::Function,
+                    "Swift 5 #file < #function");
+      static_assert(Kind::FilePathSpelledAsFile < Kind::DSOHandle,
+                    "Swift 5 #file < #dsohandle");
+
+      // The rules are all commutative, so we will take the greater of the two
+      // kinds.
+      auto maxKind = std::max(a, b);
+
+      // Both Swift 6 #file and Swift 5 #file are greater than all of the cases
+      // they're compatible with. So if `maxCase` is one of those two, the other
+      // case must have been compatible with it!
+      return maxKind == Kind::FileIDSpelledAsFile ||
+             maxKind == Kind::FilePathSpelledAsFile;
     }
 
     void checkUseOfModule(DeclRefExpr *E) {
@@ -1294,6 +1334,8 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
       return false;
     }
 
+    bool shouldWalkCaptureInitializerExpressions() override { return true; }
+
     bool shouldWalkIntoTapExpression() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
@@ -1459,13 +1501,15 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
     // Don't walk into nested decls.
     bool walkToDeclPre(Decl *D) override {
       if (auto *closure = dyn_cast<ClosureExpr>(D->getDeclContext()))
-        return !closure->wasSeparatelyTypeChecked();
+        return !closure->isSeparatelyTypeChecked();
       return false;
     }
 
     bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
       return false;
     }
+
+    bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
     bool shouldWalkIntoTapExpression() override { return false; }
 
@@ -1476,7 +1520,6 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         if (isClosureRequiringSelfQualification(CE))
           Closures.push_back(CE);
       }
-
 
       // If we aren't in a closure, no diagnostics will be produced.
       if (Closures.size() == 0)
@@ -1690,7 +1733,7 @@ bool TypeChecker::getDefaultGenericArgumentsString(
       }
 
       for (auto proto : archetypeTy->getConformsTo()) {
-        members.push_back(proto->getDeclaredType());
+        members.push_back(proto->getDeclaredInterfaceType());
         if (proto->requiresClass())
           hasExplicitAnyObject = false;
       }
@@ -1760,7 +1803,8 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
       newName = newNames[i];
 
     if (oldName == newName ||
-        (argList.hasTrailingClosure && i == argList.args.size()-1))
+        (argList.hasTrailingClosure && i == argList.args.size()-1 &&
+         (numMissing > 0 || numExtra > 0 || numWrong > 0)))
       continue;
 
     if (oldName.empty()) {
@@ -2705,7 +2749,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       //    let x = foo()
       //  ->
       //    _ = foo()
-      if (auto *pbd = var->getParentPatternBinding())
+      if (auto *pbd = var->getParentPatternBinding()) {
         if (pbd->getSingleVar() == var && pbd->getInit(0) != nullptr &&
             !isa<TypedPattern>(pbd->getPattern(0))) {
           unsigned varKind = var->isLet();
@@ -2717,7 +2761,8 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
             .fixItReplace(replaceRange, "_");
           continue;
         }
-      
+      }
+
       // If the variable is defined in a pattern in an if/while/guard statement,
       // see if we can produce a tuned fixit.  When we have something like:
       //
@@ -2733,7 +2778,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
         if (SC->getCond().size() == 1) {
           auto pattern = SC->getCond()[0].getPattern();
           if (auto OSP = dyn_cast<OptionalSomePattern>(pattern))
-            if (auto LP = dyn_cast<VarPattern>(OSP->getSubPattern()))
+            if (auto LP = dyn_cast<BindingPattern>(OSP->getSubPattern()))
               if (isa<NamedPattern>(LP->getSubPattern())) {
                 auto initExpr = SC->getCond()[0].getInitializer();
                 if (initExpr->getStartLoc().isValid()) {
@@ -2770,6 +2815,30 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
               }
         }
       }
+
+      // If the variable is defined in a pattern that isn't one of the usual
+      // conditional statements, try to detect and rewrite "simple" binding
+      // patterns:
+      //    case .pattern(let x):
+      //  ->
+      //    case .pattern(_):
+      if (auto *pattern = var->getParentPattern()) {
+        BindingPattern *foundVP = nullptr;
+        pattern->forEachNode([&](Pattern *P) {
+          if (auto *VP = dyn_cast<BindingPattern>(P))
+            if (VP->getSingleVar() == var)
+              foundVP = VP;
+        });
+
+        if (foundVP) {
+          unsigned varKind = var->isLet();
+          Diags
+              .diagnose(var->getLoc(), diag::variable_never_used,
+                        var->getName(), varKind)
+              .fixItReplace(foundVP->getSourceRange(), "_");
+          continue;
+        }
+      }
       
       // Otherwise, this is something more complex, perhaps
       //    let (a,b) = foo()
@@ -2801,13 +2870,13 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
         if (PBD->getSingleVar() == var)
           FixItLoc = PBD->getLoc();
       } else if (auto *pattern = var->getParentPattern()) {
-        VarPattern *foundVP = nullptr;
+        BindingPattern *foundVP = nullptr;
         pattern->forEachNode([&](Pattern *P) {
-          if (auto *VP = dyn_cast<VarPattern>(P))
+          if (auto *VP = dyn_cast<BindingPattern>(P))
             if (VP->getSingleVar() == var)
               foundVP = VP;
         });
-        
+
         if (foundVP && !foundVP->isLet())
           FixItLoc = foundVP->getLoc();
       }
@@ -3269,6 +3338,8 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
       return false;
     }
 
+    bool shouldWalkCaptureInitializerExpressions() override { return true; }
+
     bool shouldWalkIntoTapExpression() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
@@ -3418,6 +3489,8 @@ public:
   bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
     return false;
   }
+
+  bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
   bool shouldWalkIntoTapExpression() override { return false; }
 
@@ -3734,7 +3807,7 @@ static void diagDeprecatedObjCSelectors(const DeclContext *dc,
 static Pattern *skipNonTypeSyntacticPatterns(Pattern *pattern) {
   if (auto *pp = dyn_cast<ParenPattern>(pattern))
     return skipNonTypeSyntacticPatterns(pp->getSubPattern());
-  if (auto *vp = dyn_cast<VarPattern>(pattern))
+  if (auto *vp = dyn_cast<BindingPattern>(pattern))
     return skipNonTypeSyntacticPatterns(vp->getSubPattern());
   return pattern;
 }
@@ -4159,6 +4232,8 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
       return false;
     }
 
+    bool shouldWalkCaptureInitializerExpressions() override { return true; }
+
     bool shouldWalkIntoTapExpression() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
@@ -4234,6 +4309,8 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
     bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
       return false;
     }
+
+    bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
     bool shouldWalkIntoTapExpression() override { return false; }
 
@@ -4314,6 +4391,53 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
   const_cast<Expr *>(E)->walk(Walker);
 }
 
+static void diagnoseExplicitUseOfLazyVariableStorage(const Expr *E,
+                                                     const DeclContext *DC) {
+
+  class ExplicitLazyVarStorageAccessFinder : public ASTWalker {
+    const ASTContext &C;
+
+  public:
+    ExplicitLazyVarStorageAccessFinder(ASTContext &ctx) : C(ctx) {}
+
+    void tryDiagnoseExplicitLazyStorageVariableUse(MemberRefExpr *MRE) {
+      if (MRE->isImplicit()) {
+        return;
+      }
+      auto VD = dyn_cast<VarDecl>(MRE->getMember().getDecl());
+      if (!VD) {
+        return;
+      }
+      auto sourceFileKind = VD->getDeclContext()->getParentSourceFile();
+      if (!sourceFileKind) {
+        return;
+      }
+      if (sourceFileKind->Kind != SourceFileKind::Library &&
+          sourceFileKind->Kind != SourceFileKind::Main) {
+        return;
+      }
+      if (VD->isLazyStorageProperty()) {
+        C.Diags.diagnose(MRE->getLoc(), diag::lazy_var_storage_access);
+      }
+    }
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (!E || isa<ErrorExpr>(E) || !E->getType())
+        return {false, E};
+
+      if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
+        tryDiagnoseExplicitLazyStorageVariableUse(MRE);
+        return {false, E};
+      }
+
+      return {true, E};
+    }
+  };
+
+  ExplicitLazyVarStorageAccessFinder Walker(DC->getASTContext());
+  const_cast<Expr *>(E)->walk(Walker);
+}
+
 //===----------------------------------------------------------------------===//
 // High-level entry points.
 //===----------------------------------------------------------------------===//
@@ -4329,6 +4453,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   diagnoseImplicitSelfUseInClosure(E, DC);
   diagnoseUnintendedOptionalBehavior(E, DC);
   maybeDiagnoseCallToKeyValueObserveMethod(E, DC);
+  diagnoseExplicitUseOfLazyVariableStorage(E, DC);
   if (!ctx.isSwiftVersionAtLeast(5))
     diagnoseDeprecatedWritableKeyPath(E, DC);
   if (!ctx.LangOpts.DisableAvailabilityChecking)

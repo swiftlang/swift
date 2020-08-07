@@ -471,7 +471,11 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     // We want to visit the protocols of any normal conformances we see, but
     // we have to avoid doing this to self-conformances or we can end up with
     // a cycle.  Otherwise this is cycle-proof on valid code.
+    // We also want to ignore inherited conformances. Members from these will
+    // be included in the class they were inherited from.
     auto addConformance = [&](ProtocolConformance *Conf) {
+      if (isa<InheritedProtocolConformance>(Conf))
+        return;
       auto RootConf = Conf->getRootConformance();
       if (isa<NormalProtocolConformance>(RootConf))
         Unhandled.push_back(RootConf->getProtocol());
@@ -479,10 +483,6 @@ struct SynthesizedExtensionAnalyzer::Implementation {
 
     for (auto *Conf : Target->getLocalConformances()) {
       addConformance(Conf);
-    }
-    if (auto *CD = dyn_cast<ClassDecl>(Target)) {
-      if (auto Super = CD->getSuperclassDecl())
-        Unhandled.push_back(Super);
     }
     while (!Unhandled.empty()) {
       NominalTypeDecl* Back = Unhandled.back();
@@ -492,10 +492,6 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       }
       for (auto *Conf : Back->getLocalConformances()) {
         addConformance(Conf);
-      }
-      if (auto *CD = dyn_cast<ClassDecl>(Back)) {
-        if (auto Super = CD->getSuperclass())
-          Unhandled.push_back(Super->getAnyNominal());
       }
     }
 

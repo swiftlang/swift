@@ -493,6 +493,7 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
     case ComponentKind::OptionalChain:
     case ComponentKind::OptionalWrap:
     case ComponentKind::Identity:
+    case ComponentKind::DictionaryKey:
       // These components don't have any callee associated, so just continue.
       break;
     }
@@ -676,8 +677,11 @@ Type ConstraintSystem::openUnboundGenericType(
     for (auto pair : subs) {
       auto found = replacements.find(
         cast<GenericTypeParamType>(pair.first));
-      assert(found != replacements.end() &&
-             "Missing generic parameter?");
+      if (found == replacements.end()) {
+        // Can happen with invalid generic code.
+        continue;
+      }
+
       addConstraint(ConstraintKind::Bind, found->second, pair.second,
                     locator);
     }
@@ -1903,23 +1907,27 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
         TVO_CanBindToNoEscape);
     FunctionType::Param arg(escapeClosure);
-    auto bodyClosure = FunctionType::get(arg, result,
-        FunctionType::ExtInfo(FunctionType::Representation::Swift,
-                              /*noescape*/ true,
-                              /*throws*/ true,
-                              DifferentiabilityKind::NonDifferentiable,
-                              /*clangFunctionType*/ nullptr));
+    auto bodyClosure = FunctionType::get(
+        arg, result,
+        FunctionType::ExtInfoBuilder(FunctionType::Representation::Swift,
+                                     /*noescape*/ true,
+                                     /*throws*/ true,
+                                     DifferentiabilityKind::NonDifferentiable,
+                                     /*clangFunctionType*/ nullptr)
+            .build());
     FunctionType::Param args[] = {
       FunctionType::Param(noescapeClosure),
       FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
     };
 
-    auto refType = FunctionType::get(args, result,
-      FunctionType::ExtInfo(FunctionType::Representation::Swift,
-                            /*noescape*/ false,
-                            /*throws*/ true,
-                            DifferentiabilityKind::NonDifferentiable,
-                            /*clangFunctionType*/ nullptr));
+    auto refType = FunctionType::get(
+        args, result,
+        FunctionType::ExtInfoBuilder(FunctionType::Representation::Swift,
+                                     /*noescape*/ false,
+                                     /*throws*/ true,
+                                     DifferentiabilityKind::NonDifferentiable,
+                                     /*clangFunctionType*/ nullptr)
+            .build());
     return {refType, refType};
   }
   case DeclTypeCheckingSemantics::OpenExistential: {
@@ -1938,22 +1946,26 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
         TVO_CanBindToNoEscape);
     FunctionType::Param bodyArgs[] = {FunctionType::Param(openedTy)};
-    auto bodyClosure = FunctionType::get(bodyArgs, result,
-        FunctionType::ExtInfo(FunctionType::Representation::Swift,
-                              /*noescape*/ true,
-                              /*throws*/ true,
-                              DifferentiabilityKind::NonDifferentiable,
-                              /*clangFunctionType*/ nullptr));
+    auto bodyClosure = FunctionType::get(
+        bodyArgs, result,
+        FunctionType::ExtInfoBuilder(FunctionType::Representation::Swift,
+                                     /*noescape*/ true,
+                                     /*throws*/ true,
+                                     DifferentiabilityKind::NonDifferentiable,
+                                     /*clangFunctionType*/ nullptr)
+            .build());
     FunctionType::Param args[] = {
       FunctionType::Param(existentialTy),
       FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
     };
-    auto refType = FunctionType::get(args, result,
-      FunctionType::ExtInfo(FunctionType::Representation::Swift,
-                            /*noescape*/ false,
-                            /*throws*/ true,
-                            DifferentiabilityKind::NonDifferentiable,
-                            /*clangFunctionType*/ nullptr));
+    auto refType = FunctionType::get(
+        args, result,
+        FunctionType::ExtInfoBuilder(FunctionType::Representation::Swift,
+                                     /*noescape*/ false,
+                                     /*throws*/ true,
+                                     DifferentiabilityKind::NonDifferentiable,
+                                     /*clangFunctionType*/ nullptr)
+            .build());
     return {refType, refType};
   }
   }
@@ -2199,7 +2211,7 @@ void ConstraintSystem::bindOverloadType(
       return;
 
     addConstraint(ConstraintKind::LiteralConformsTo, argType,
-                  stringLiteral->getDeclaredType(), locator);
+                  stringLiteral->getDeclaredInterfaceType(), locator);
 
     // If this is used inside of the keypath expression, we need to make
     // sure that argument is Hashable.
@@ -2352,7 +2364,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
             argType->getASTContext(), choice.getDecl()->getLoc(),
             KnownProtocolKind::Hashable)) {
       addConstraint(ConstraintKind::ConformsTo, argType,
-                    hashable->getDeclaredType(),
+                    hashable->getDeclaredInterfaceType(),
                     getConstraintLocator(
                         locator, LocatorPathElt::TupleElement(index)));
     }
@@ -2483,7 +2495,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       auto boundFunctionType = boundType->getAs<AnyFunctionType>();
 
       if (boundFunctionType &&
-          CD->hasThrows() != boundFunctionType->throws()) {
+          CD->hasThrows() != boundFunctionType->isThrowing()) {
         boundType = boundFunctionType->withExtInfo(
             boundFunctionType->getExtInfo().withThrows());
       }
@@ -3841,6 +3853,11 @@ void constraints::simplifyLocator(ASTNode &anchor,
       break;
     }
 
+    case ConstraintLocator::FunctionBuilderBodyResult: {
+      path = path.slice(1);
+      break;
+    }
+
     default:
       // FIXME: Lots of other cases to handle.
       break;
@@ -4432,12 +4449,16 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
 }
 
 Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
-                                             FunctionType *closureType) {
+                                             FunctionType *closureType,
+                                             bool isDefaultWrappedValue) {
   auto &Context = DC->getASTContext();
   bool isInDefaultArgumentContext = false;
-  if (auto *init = dyn_cast<Initializer>(DC))
+  if (auto *init = dyn_cast<Initializer>(DC)) {
+    auto initKind = init->getInitializerKind();
     isInDefaultArgumentContext =
-        init->getInitializerKind() == InitializerKind::DefaultArgument;
+        initKind == InitializerKind::DefaultArgument ||
+        (initKind == InitializerKind::PatternBinding && isDefaultWrappedValue);
+  }
 
   auto info = closureType->getExtInfo();
   auto newClosureType = closureType;
@@ -4539,8 +4560,9 @@ SolutionApplicationTarget::SolutionApplicationTarget(
   expression.contextualPurpose = contextualPurpose;
   expression.convertType = convertType;
   expression.pattern = nullptr;
-  expression.wrappedVar = nullptr;
-  expression.innermostWrappedValueInit = nullptr;
+  expression.propertyWrapper.wrappedVar = nullptr;
+  expression.propertyWrapper.innermostWrappedValueInit = nullptr;
+  expression.propertyWrapper.hasInitialWrappedValue = false;
   expression.isDiscarded = isDiscarded;
   expression.bindPatternVarsOneWay = false;
   expression.initialization.patternBinding = nullptr;
@@ -4564,11 +4586,14 @@ void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
   auto outermostWrapperAttr = wrapperAttrs.front();
   Expr *backingInitializer;
   if (Expr *initializer = expression.expression) {
+    if (!isa<PropertyWrapperValuePlaceholderExpr>(initializer)) {
+      expression.propertyWrapper.hasInitialWrappedValue = true;
+    }
     // Form init(wrappedValue:) call(s).
     Expr *wrappedInitializer = buildPropertyWrapperWrappedValueCall(
         singleVar, Type(), initializer, /*ignoreAttributeArgs=*/false,
         [&](ApplyExpr *innermostInit) {
-          expression.innermostWrappedValueInit = innermostInit;
+          expression.propertyWrapper.innermostWrappedValueInit = innermostInit;
         });
     if (!wrappedInitializer)
       return;
@@ -4609,7 +4634,7 @@ void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
 
   // Note that we have applied to property wrapper, so we can adjust
   // the initializer type later.
-  expression.wrappedVar = singleVar;
+  expression.propertyWrapper.wrappedVar = singleVar;
   expression.expression = backingInitializer;
   expression.convertType = {outermostWrapperAttr->getTypeRepr(),
                             outermostWrapperAttr->getType()};
@@ -4628,8 +4653,10 @@ SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
     if (auto *typedPattern = dyn_cast<TypedPattern>(pattern)) {
       const Pattern *inner = typedPattern->getSemanticsProvidingPattern();
       if (isa<NamedPattern>(inner) || isa<AnyPattern>(inner)) {
-        contextualType = typedPattern->getTypeLoc();
-        if (!contextualType.getType())
+        contextualType = TypeLoc(typedPattern->getTypeRepr());
+        if (typedPattern->hasType())
+          contextualType.setType(typedPattern->getType());
+        else
           contextualType.setType(patternType);
       }
     }
@@ -4661,7 +4688,7 @@ SolutionApplicationTarget SolutionApplicationTarget::forForEachStmt(
     bool bindPatternVarsOneWay) {
   SolutionApplicationTarget target(
       stmt->getSequence(), dc, CTP_ForEachStmt,
-      sequenceProto->getDeclaredType(), /*isDiscarded=*/false);
+      sequenceProto->getDeclaredInterfaceType(), /*isDiscarded=*/false);
   target.expression.pattern = stmt->getPattern();
   target.expression.bindPatternVarsOneWay =
     bindPatternVarsOneWay || (stmt->getWhere() != nullptr);

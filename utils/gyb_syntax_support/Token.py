@@ -196,6 +196,7 @@ SYNTAX_TOKENS = [
     ExprKeyword('True', 'true', serialization_code=51),
     ExprKeyword('Try', 'try', serialization_code=52),
     ExprKeyword('Throws', 'throws', serialization_code=53),
+    ExprKeyword('Await', '__await', serialization_code=123),
 
     Keyword('__FILE__', '__FILE__', serialization_code=54),
     Keyword('__LINE__', '__LINE__', serialization_code=55),
@@ -265,6 +266,8 @@ SYNTAX_TOKENS = [
                  serialization_code=73),
     PoundKeyword('PoundFile', 'file', text='#file',
                  serialization_code=68),
+    PoundKeyword('PoundFileID', 'fileID', text='#fileID',
+                 serialization_code=122),
     PoundKeyword('PoundFilePath', 'filePath', text='#filePath',
                  serialization_code=121),
     PoundKeyword('PoundColumn', 'column', text='#column',

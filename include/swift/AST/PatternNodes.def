@@ -32,13 +32,13 @@
 #define LAST_PATTERN(Id)
 #endif
 
-// Metavars: x (variable), pat (pattern), e (expression)
-PATTERN(Paren, Pattern) // (pat)
-PATTERN(Tuple, Pattern) // (pat1, ..., patN), N >= 1
-PATTERN(Named, Pattern) // let pat, var pat
-PATTERN(Any, Pattern)   // _
-PATTERN(Typed, Pattern) // pat : type
-PATTERN(Var, Pattern)   // x
+// Metavars: x (variable binding), pat (pattern), e (expression)
+PATTERN(Paren, Pattern)   // (pat)
+PATTERN(Tuple, Pattern)   // (pat1, ..., patN), N >= 1
+PATTERN(Named, Pattern)   // let pat, var pat
+PATTERN(Any, Pattern)     // _
+PATTERN(Typed, Pattern)   // pat : type
+PATTERN(Binding, Pattern) // x
 REFUTABLE_PATTERN(Is, Pattern)           // x is myclass
 REFUTABLE_PATTERN(EnumElement, Pattern)  // .mycase(pat1, ..., patN)
                                          // MyType.mycase(pat1, ..., patN)

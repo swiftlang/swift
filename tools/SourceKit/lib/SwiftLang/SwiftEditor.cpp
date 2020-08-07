@@ -659,7 +659,7 @@ public:
   }
 
 private:
-  std::vector<SwiftSemanticToken> getSemanticTokens(
+  std::vector<SwiftSemanticToken> takeSemanticTokens(
       ImmutableTextSnapshotRef NewSnapshot);
 
   Optional<std::vector<DiagnosticEntryInfo>> getSemanticDiagnostics(
@@ -760,12 +760,12 @@ void SwiftDocumentSemanticInfo::readSemanticInfo(
 
   llvm::sys::ScopedLock L(Mtx);
 
-  Tokens = getSemanticTokens(NewSnapshot);
+  Tokens = takeSemanticTokens(NewSnapshot);
   Diags = getSemanticDiagnostics(NewSnapshot, ParserDiags);
 }
 
 std::vector<SwiftSemanticToken>
-SwiftDocumentSemanticInfo::getSemanticTokens(
+SwiftDocumentSemanticInfo::takeSemanticTokens(
     ImmutableTextSnapshotRef NewSnapshot) {
 
   llvm::sys::ScopedLock L(Mtx);
@@ -773,25 +773,25 @@ SwiftDocumentSemanticInfo::getSemanticTokens(
   if (SemaToks.empty())
     return {};
 
-  auto result = SemaToks;
-
   // Adjust the position of the tokens.
   TokSnapshot->foreachReplaceUntil(NewSnapshot,
     [&](ReplaceImmutableTextUpdateRef Upd) -> bool {
-      if (result.empty())
+      if (SemaToks.empty())
         return false;
 
-      auto ReplaceBegin = std::lower_bound(result.begin(), result.end(),
+      auto ReplaceBegin = std::lower_bound(SemaToks.begin(), SemaToks.end(),
           Upd->getByteOffset(),
           [&](const SwiftSemanticToken &Tok, unsigned StartOffset) -> bool {
             return Tok.ByteOffset+Tok.Length < StartOffset;
           });
 
       std::vector<SwiftSemanticToken>::iterator ReplaceEnd;
-      if (Upd->getLength() == 0) {
+      if (ReplaceBegin == SemaToks.end()) {
         ReplaceEnd = ReplaceBegin;
+      } else if (Upd->getLength() == 0) {
+        ReplaceEnd = ReplaceBegin + 1;
       } else {
-        ReplaceEnd = std::upper_bound(ReplaceBegin, result.end(),
+        ReplaceEnd = std::upper_bound(ReplaceBegin, SemaToks.end(),
             Upd->getByteOffset() + Upd->getLength(),
             [&](unsigned EndOffset, const SwiftSemanticToken &Tok) -> bool {
               return EndOffset < Tok.ByteOffset;
@@ -802,14 +802,14 @@ SwiftDocumentSemanticInfo::getSemanticTokens(
       int Delta = InsertLen - Upd->getLength();
       if (Delta != 0) {
         for (std::vector<SwiftSemanticToken>::iterator
-               I = ReplaceEnd, E = result.end(); I != E; ++I)
+               I = ReplaceEnd, E = SemaToks.end(); I != E; ++I)
           I->ByteOffset += Delta;
       }
-      result.erase(ReplaceBegin, ReplaceEnd);
+      SemaToks.erase(ReplaceBegin, ReplaceEnd);
       return true;
     });
 
-  return result;
+  return std::move(SemaToks);
 }
 
 Optional<std::vector<DiagnosticEntryInfo>>
@@ -1989,10 +1989,18 @@ void SwiftEditorDocument::parse(ImmutableTextSnapshotRef Snapshot,
   Impl.SyntaxInfo->parse();
 }
 
-void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
+static UIdent SemaDiagStage("source.diagnostic.stage.swift.sema");
+static UIdent ParseDiagStage("source.diagnostic.stage.swift.parse");
+
+void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer, bool ReportDiags) {
   llvm::sys::ScopedLock L(Impl.AccessMtx);
 
   Impl.ParserDiagnostics = Impl.SyntaxInfo->getDiagnostics();
+  if (ReportDiags) {
+    Consumer.setDiagnosticStage(ParseDiagStage);
+    for (auto &Diag : Impl.ParserDiagnostics)
+      Consumer.handleDiagnostic(Diag, ParseDiagStage);
+  }
 
   SwiftSyntaxMap NewMap = SwiftSyntaxMap(Impl.SyntaxMap.Tokens.size() + 16);
 
@@ -2058,9 +2066,6 @@ void SwiftEditorDocument::readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
     if (Kind.isValid())
       Consumer.handleSemanticAnnotation(Offset, Length, Kind, IsSystem);
   }
-
-  static UIdent SemaDiagStage("source.diagnostic.stage.swift.sema");
-  static UIdent ParseDiagStage("source.diagnostic.stage.swift.parse");
 
   // If there's no value returned for diagnostics it means they are out-of-date
   // (based on a different snapshot).
@@ -2304,7 +2309,6 @@ void SwiftEditorDocument::reportDocumentStructure(SourceFile &SrcFile,
 //===----------------------------------------------------------------------===//
 // EditorOpen
 //===----------------------------------------------------------------------===//
-
 void SwiftLangSupport::editorOpen(
     StringRef Name, llvm::MemoryBuffer *Buf, EditorConsumer &Consumer,
     ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions) {
@@ -2343,8 +2347,7 @@ void SwiftLangSupport::editorOpen(
     EditorDoc->updateSemaInfo();
   }
 
-  EditorDoc->readSyntaxInfo(Consumer);
-  EditorDoc->readSemanticInfo(Snapshot, Consumer);
+  EditorDoc->readSyntaxInfo(Consumer, /*ReportDiags=*/true);
 
   if (Consumer.syntaxTreeEnabled()) {
     assert(EditorDoc->getSyntaxTree().hasValue());
@@ -2506,7 +2509,8 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
     }
     EditorDoc->parse(Snapshot, *this, Consumer.syntaxTreeEnabled(),
                      SyntaxCachePtr);
-    EditorDoc->readSyntaxInfo(Consumer);
+    // Do not report syntactic diagnostics; will be handled in readSemanticInfo.
+    EditorDoc->readSyntaxInfo(Consumer, /*ReportDiags=*/false);
 
     // Log reuse information
     if (SyntaxCache.hasValue() && LogReuseRegions) {

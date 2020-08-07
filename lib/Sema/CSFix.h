@@ -225,8 +225,6 @@ enum class FixKind : uint8_t {
   /// a variable, a property etc.
   RemoveCall,
 
-  AllowInvalidUseOfTrailingClosure,
-
   /// Allow an ephemeral argument conversion for a parameter marked as being
   /// non-ephemeral.
   TreatEphemeralAsNonEphemeral,
@@ -268,7 +266,9 @@ enum class FixKind : uint8_t {
 
   /// Specify key path root type when it cannot be infered from context.
   SpecifyKeyPathRootType,
-
+  
+  /// Unwrap optional base on key path application.
+  UnwrapOptionalBaseKeyPathApplication,
 };
 
 class ConstraintFix {
@@ -577,7 +577,7 @@ class DropThrowsAttribute final : public ContextualMismatch {
   DropThrowsAttribute(ConstraintSystem &cs, FunctionType *fromType,
                       FunctionType *toType, ConstraintLocator *locator)
       : ContextualMismatch(cs, fromType, toType, locator) {
-    assert(fromType->throws() != toType->throws());
+    assert(fromType->isThrowing() != toType->isThrowing());
   }
 
 public:
@@ -1713,24 +1713,6 @@ public:
                                    ConstraintLocator *locator);
 };
 
-class AllowInvalidUseOfTrailingClosure final : public AllowArgumentMismatch {
-  AllowInvalidUseOfTrailingClosure(ConstraintSystem &cs, Type argType,
-                                   Type paramType, ConstraintLocator *locator)
-      : AllowArgumentMismatch(cs, FixKind::AllowInvalidUseOfTrailingClosure,
-                              argType, paramType, locator) {}
-
-public:
-  std::string getName() const {
-    return "allow invalid use of trailing closure";
-  }
-
-  bool diagnose(const Solution &solution, bool asNote = false) const;
-
-  static AllowInvalidUseOfTrailingClosure *create(ConstraintSystem &cs,
-                                                  Type argType, Type paramType,
-                                                  ConstraintLocator *locator);
-};
-
 class TreatEphemeralAsNonEphemeral final : public AllowArgumentMismatch {
   ConversionRestrictionKind ConversionKind;
 
@@ -1916,6 +1898,32 @@ class SpecifyKeyPathRootType final : public ConstraintFix {
 
     static SpecifyKeyPathRootType *create(ConstraintSystem &cs,
                                           ConstraintLocator *locator);
+};
+
+/// Diagnose missing unwrap of optional base type on key path application.
+///
+/// \code
+/// func f(_ bar: Bar? , keyPath: KeyPath<Bar, Int>) {
+///   bar[keyPath: keyPath]
+/// }
+/// \endcode
+class UnwrapOptionalBaseKeyPathApplication final : public ContextualMismatch {
+protected:
+  UnwrapOptionalBaseKeyPathApplication(ConstraintSystem &cs, Type lhs, Type rhs,
+                                       ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::UnwrapOptionalBaseKeyPathApplication,
+                           lhs, rhs, locator) {}
+
+public:
+  std::string getName() const override {
+    return "force unwrap base on key path application";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static UnwrapOptionalBaseKeyPathApplication *
+  attempt(ConstraintSystem &cs, Type baseTy, Type rootTy,
+          ConstraintLocator *locator);
 };
 
 } // end namespace constraints

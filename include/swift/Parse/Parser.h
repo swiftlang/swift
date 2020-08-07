@@ -660,7 +660,7 @@ public:
   /// \returns true if there is an instance of \c T1 on the current line (this
   /// avoids the foot-gun of not considering T1 starting the next line for a
   /// plain Tok.is(T1) check).
-  bool skipUntilTokenOrEndOfLine(tok T1);
+  bool skipUntilTokenOrEndOfLine(tok T1, tok T2 = tok::NUM_TOKENS);
 
   /// Skip a braced block (e.g. function body). The current token must be '{'.
   /// Returns \c true if the parser hit the eof before finding matched '}'.
@@ -1351,9 +1351,23 @@ public:
                                       DeclName &fullName,
                                       ParameterList *&bodyParams,
                                       DefaultArgumentInfo &defaultArgs,
+                                      SourceLoc &asyncLoc,
                                       SourceLoc &throws,
                                       bool &rethrows,
                                       TypeRepr *&retType);
+
+  /// Parse 'async' and 'throws', if present, putting the locations of the
+  /// keywords into the \c SourceLoc parameters.
+  ///
+  /// \param existingArrowLoc The location of an existing '->', if there is
+  /// one. Parsing 'async' or 'throws' after the `->` is an error we
+  /// correct for.
+  ///
+  /// \param rethrows If non-NULL, will also parse the 'rethrows' keyword in
+  /// lieu of 'throws'.
+  void parseAsyncThrows(
+      SourceLoc existingArrowLoc, SourceLoc &asyncLoc, SourceLoc &throwsLoc,
+      bool *rethrows);
 
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
@@ -1647,9 +1661,7 @@ public:
   diagnoseWhereClauseInGenericParamList(const GenericParamList *GenericParams);
 
   ParserStatus
-  parseFreestandingGenericWhereClause(GenericContext *genCtx,
-                                      GenericParamList *&GPList,
-                                      ParseDeclOptions flags);
+  parseFreestandingGenericWhereClause(GenericContext *genCtx);
 
   ParserStatus parseGenericWhereClause(
       SourceLoc &WhereLoc, SmallVectorImpl<RequirementRepr> &Requirements,
