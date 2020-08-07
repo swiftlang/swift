@@ -1660,7 +1660,7 @@ public:
       AttTargetDK = DK;
   }
 
-  void completeDotExpr(Expr *E, SourceLoc DotLoc) override;
+  void completeDotExpr(CodeCompletionExpr *E, SourceLoc DotLoc) override;
   void completeStmtOrExpr(CodeCompletionExpr *E) override;
   void completePostfixExprBeginning(CodeCompletionExpr *E) override;
   void completeForEachSequenceBeginning(CodeCompletionExpr *E) override;
@@ -5153,7 +5153,8 @@ static void addSelectorModifierKeywords(CodeCompletionResultSink &sink) {
   addKeyword("setter", CodeCompletionKeywordKind::None);
 }
 
-void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E, SourceLoc DotLoc) {
+void CodeCompletionCallbacksImpl::completeDotExpr(CodeCompletionExpr *E,
+                                                  SourceLoc DotLoc) {
   assert(P.Tok.is(tok::code_complete));
 
   // Don't produce any results in an enum element.
@@ -5166,9 +5167,10 @@ void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E, SourceLoc DotLoc) {
     CompleteExprSelectorContext = ParseExprSelectorContext;
   }
 
-  ParsedExpr = E;
+  ParsedExpr = E->getBase();
   this->DotLoc = DotLoc;
   CurDeclContext = P.CurDeclContext;
+  CodeCompleteTokenExpr = E;
 }
 
 void CodeCompletionCallbacksImpl::completeStmtOrExpr(CodeCompletionExpr *E) {

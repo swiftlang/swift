@@ -1157,11 +1157,12 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       // Handle "x.<tab>" for code completion.
       if (Tok.is(tok::code_complete)) {
         assert(!InSwiftKeyPath);
-        if (CodeCompletion) {
-          CodeCompletion->completeDotExpr(Result.get(), /*DotLoc=*/TokLoc);
-        }
         auto CCExpr = new (Context) CodeCompletionExpr(Result.get(),
-                                                       consumeToken(tok::code_complete));
+                                                       Tok.getLoc());
+        if (CodeCompletion) {
+          CodeCompletion->completeDotExpr(CCExpr, /*DotLoc=*/TokLoc);
+        }
+        consumeToken(tok::code_complete);
         return makeParserCodeCompletionResult(CCExpr);
       }
 
