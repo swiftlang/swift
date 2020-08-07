@@ -1637,6 +1637,8 @@ public:
       : ContextualFailure(solution, eltType, contextualType, locator) {}
 
   bool diagnoseAsError() override;
+
+  bool diagnoseMergedLiteralElements();
 };
 
 class MissingContextualConformanceFailure final : public ContextualFailure {
