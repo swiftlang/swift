@@ -1850,7 +1850,7 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.RawPointer):
 //CHECK: return
 sil @remove_pointer_compare_to_zero : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
-  %1 = string_literal utf16 "ss"
+  %1 = string_literal utf8 "ss"
   %2 = integer_literal $Builtin.Word, 0
   %4 = builtin "inttoptr_Word"(%2 : $Builtin.Word) : $Builtin.RawPointer
   %6 = builtin "cmp_eq_RawPointer"(%1 : $Builtin.RawPointer, %4 : $Builtin.RawPointer) : $Builtin.Int1
@@ -1865,7 +1865,7 @@ bb0(%0 : $Int):
 //CHECK: unreachable
 sil @remove_pointer_compare_to_zero_NE : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
-  %1 = string_literal utf16 "ss"
+  %1 = string_literal utf8 "ss"
   %2 = integer_literal $Builtin.Word, 0
   %4 = builtin "inttoptr_Word"(%2 : $Builtin.Word) : $Builtin.RawPointer
   %6 = builtin "cmp_ne_RawPointer"(%1 : $Builtin.RawPointer, %4 : $Builtin.RawPointer) : $Builtin.Int1
@@ -1881,7 +1881,7 @@ bb0(%0 : $Int):
 //CHECK: return
 sil @remove_pointer_compare_to_zero_arith : $@convention(thin) (Builtin.Word) -> () {
 bb0(%0 : $Builtin.Word):
-  %1 = string_literal utf16 "ss"
+  %1 = string_literal utf8 "ss"
   %2 = integer_literal $Builtin.Word, 0
   %3 = integer_literal $Builtin.Word, 4
   %4 = integer_literal $Builtin.Int1, -1
