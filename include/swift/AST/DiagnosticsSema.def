@@ -88,6 +88,14 @@ ERROR(could_not_find_subscript_member_did_you_mean,none,
       "did you mean to use the subscript operator?",
       (Type))
 
+ERROR(could_not_find_subscript_member_tuple, none,
+      "tuple type %0 element cannot be accessed using subscript",
+      (Type))
+ERROR(could_not_find_subscript_member_tuple_did_you_mean_use_dot, none,
+      "tuple type %0 element cannot be accessed using subscript; "
+      "did you mean to use '.' to access element?",
+      (Type))
+
 ERROR(could_not_find_enum_case,none,
       "enum type %0 has no case %1; did you mean %2?",
       (Type, DeclNameRef, DeclName))

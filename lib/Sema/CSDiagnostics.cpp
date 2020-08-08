@@ -3212,6 +3212,9 @@ bool MissingMemberFailure::diagnoseAsError() {
   if (diagnoseInLiteralCollectionContext())
     return true;
 
+  if (diagnoseForSubscriptMemberWithTupleBase())
+    return true;
+
   auto baseType = resolveType(getBaseType())->getWithoutSpecifierType();
 
   DeclNameLoc nameLoc(::getLoc(anchor));
@@ -3426,6 +3429,42 @@ bool MissingMemberFailure::diagnoseInLiteralCollectionContext() const {
     }
   }
   return false;
+}
+
+bool MissingMemberFailure::diagnoseForSubscriptMemberWithTupleBase() const {
+  auto locator = getLocator();
+  auto baseType = resolveType(getBaseType())->getWithoutSpecifierType();
+
+  if (!locator->isLastElement<LocatorPathElt::SubscriptMember>())
+    return false;
+
+  auto tupleType = baseType->getAs<TupleType>();
+  // For non-tuple type or empty tuples, let's fallback to the general
+  // diagnostic logic.
+  if (!tupleType || tupleType->getNumElements() == 0)
+    return false;
+
+  auto *SE = castToExpr<SubscriptExpr>(locator->getAnchor());
+  auto *index = SE->getIndex();
+
+  if (SE->getNumArguments() == 1) {
+    auto *literal =
+        dyn_cast<IntegerLiteralExpr>(index->getSemanticsProvidingExpr());
+    if (literal && !literal->isNegative()) {
+      llvm::SmallString<4> dotAccess;
+      llvm::raw_svector_ostream OS(dotAccess);
+      OS << "." << literal->getDigitsText();
+
+      emitDiagnostic(
+          diag::could_not_find_subscript_member_tuple_did_you_mean_use_dot,
+          baseType)
+          .fixItReplace(index->getSourceRange(), OS.str());
+      return true;
+    }
+  }
+
+  emitDiagnostic(diag::could_not_find_subscript_member_tuple, baseType);
+  return true;
 }
 
 bool UnintendedExtraGenericParamMemberFailure::diagnoseAsError() {
