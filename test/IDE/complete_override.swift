@@ -896,11 +896,10 @@ struct SynthesizedConformance3: Hashable {
 enum SynthesizedConformance4: CaseIterable {
   case a, b, c, d
   #^OVERRIDE_SYNTHESIZED_4^#
-// OVERRIDE_SYNTHESIZED_4: Begin completions, 4 items
+// OVERRIDE_SYNTHESIZED_4: Begin completions, 3 items
 // OVERRIDE_SYNTHESIZED_4-DAG: Decl[InstanceVar]/Super/IsSystem:       var hashValue: Int
 // OVERRIDE_SYNTHESIZED_4-DAG: Decl[InstanceMethod]/Super/IsSystem:    func hash(into hasher: inout Hasher) {|};
 // OVERRIDE_SYNTHESIZED_4-DAG: Decl[StaticVar]/Super/IsSystem:         static var allCases: [SynthesizedConformance4];
-// OVERRIDE_SYNTHESIZED_4-DAG: Decl[AssociatedType]/Super/IsSystem:    typealias AllCases = {#(Type)#};
 }
 
 class SynthesizedConformance5: SynthesizedConformance2 {
