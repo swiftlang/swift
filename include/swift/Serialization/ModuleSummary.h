@@ -15,6 +15,7 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/SIL/SILFunction.h"
+#include "llvm/Support/YAMLTraits.h"
 
 namespace swift {
 
@@ -55,6 +56,7 @@ public:
     KindTy Kind;
 
   public:
+    friend ::llvm::yaml::MappingTraits<Call>;
     Call() = default;
     Call(GUID callee, std::string name, KindTy kind)
         : Callee(callee), Name(name), Kind(kind) {}
@@ -172,6 +174,7 @@ class ModuleSummaryIndex {
   }
 
 public:
+  friend ::llvm::yaml::MappingTraits<ModuleSummaryIndex>;
   ModuleSummaryIndex() = default;
 
   std::string getName() const { return this->Name; }
