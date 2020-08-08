@@ -244,7 +244,7 @@ static void extendLifetimeToEndOfFunction(SILFunction &fn,
   // lifetime respecting loops.
   SmallVector<SILPhiArgument *, 8> insertedPhis;
   SILSSAUpdater updater(&insertedPhis);
-  updater.Initialize(optionalEscapingClosureTy);
+  updater.initialize(optionalEscapingClosureTy);
 
   // Create an Optional<() -> ()>.none in the entry block of the function and
   // add it as an available value to the SSAUpdater.
@@ -256,7 +256,7 @@ static void extendLifetimeToEndOfFunction(SILFunction &fn,
     SILBuilderWithScope b(fn.getEntryBlock()->begin());
     return b.createOptionalNone(loc, optionalEscapingClosureTy);
   }();
-  updater.AddAvailableValue(fn.getEntryBlock(), entryBlockOptionalNone);
+  updater.addAvailableValue(fn.getEntryBlock(), entryBlockOptionalNone);
 
   // Create a copy of the convert_escape_to_no_escape and add it as an available
   // value to the SSA updater.
@@ -270,7 +270,7 @@ static void extendLifetimeToEndOfFunction(SILFunction &fn,
     cvt->setLifetimeGuaranteed();
     cvt->setOperand(innerCVI);
     SILBuilderWithScope b(std::next(cvt->getIterator()));
-    updater.AddAvailableValue(
+    updater.addAvailableValue(
         cvt->getParent(),
         b.createOptionalSome(loc, innerCVI, optionalEscapingClosureTy));
     return innerCVI;
@@ -284,13 +284,13 @@ static void extendLifetimeToEndOfFunction(SILFunction &fn,
   {
     // Before the copy value, insert an extra destroy_value to handle
     // loops. Since we used our enum value this is safe.
-    SILValue v = updater.GetValueInMiddleOfBlock(cvi->getParent());
+    SILValue v = updater.getValueInMiddleOfBlock(cvi->getParent());
     SILBuilderWithScope(cvi).createDestroyValue(loc, v);
   }
 
   for (auto *block : exitingBlocks) {
     auto *safeDestructionPt = getDeinitSafeClosureDestructionPoint(block);
-    SILValue v = updater.GetValueAtEndOfBlock(block);
+    SILValue v = updater.getValueAtEndOfBlock(block);
     SILBuilderWithScope(safeDestructionPt).createDestroyValue(loc, v);
   }
 
@@ -849,7 +849,7 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
 
   SmallVector<SILPhiArgument *, 8> insertedPhis;
   SILSSAUpdater updater(&insertedPhis);
-  updater.Initialize(optionalEscapingClosureTy);
+  updater.initialize(optionalEscapingClosureTy);
 
   // Create the Optional.none as the beginning available value.
   SILValue entryBlockOptionalNone;
@@ -857,7 +857,7 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
     SILBuilderWithScope b(fn.getEntryBlock()->begin());
     entryBlockOptionalNone =
         b.createOptionalNone(autoGenLoc, optionalEscapingClosureTy);
-    updater.AddAvailableValue(fn.getEntryBlock(), entryBlockOptionalNone);
+    updater.addAvailableValue(fn.getEntryBlock(), entryBlockOptionalNone);
   }
   assert(entryBlockOptionalNone);
 
@@ -872,7 +872,7 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
     // operand consumed at +1, so we don't need a copy) to it.
     auto *result = b.createOptionalSome(autoGenLoc, sentinelClosure,
                                         optionalEscapingClosureTy);
-    updater.AddAvailableValue(result->getParent(), result);
+    updater.addAvailableValue(result->getParent(), result);
     return result;
   }();
 
@@ -881,14 +881,14 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
   if (singleDestroy) {
     SILBuilderWithScope b(std::next(singleDestroy->getIterator()));
     auto *result = b.createOptionalNone(autoGenLoc, optionalEscapingClosureTy);
-    updater.AddAvailableValue(result->getParent(), result);
+    updater.addAvailableValue(result->getParent(), result);
   }
 
   // Now that we have all of our available values, insert a destroy_value before
   // the initial Optional.some value using the SSA updater to ensure that we
   // handle loops correctly.
   {
-    SILValue v = updater.GetValueInMiddleOfBlock(initialValue->getParent());
+    SILValue v = updater.getValueInMiddleOfBlock(initialValue->getParent());
     SILBuilderWithScope(initialValue).createDestroyValue(autoGenLoc, v);
   }
 
@@ -896,7 +896,7 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
   // lifetime end points. This ensures we do not expand our lifetime too much.
   if (singleDestroy) {
     SILBuilderWithScope b(std::next(singleDestroy->getIterator()));
-    SILValue v = updater.GetValueInMiddleOfBlock(singleDestroy->getParent());
+    SILValue v = updater.getValueInMiddleOfBlock(singleDestroy->getParent());
     SILValue isEscaping =
         b.createIsEscapingClosure(loc, v, IsEscapingClosureInst::ObjCEscaping);
     b.createCondFail(loc, isEscaping, "non-escaping closure has escaped");
@@ -911,7 +911,7 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
 
     for (auto *block : exitingBlocks) {
       auto *safeDestructionPt = getDeinitSafeClosureDestructionPoint(block);
-      SILValue v = updater.GetValueAtEndOfBlock(block);
+      SILValue v = updater.getValueAtEndOfBlock(block);
       SILBuilderWithScope(safeDestructionPt).createDestroyValue(autoGenLoc, v);
     }
   }
