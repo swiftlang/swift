@@ -252,7 +252,7 @@ foreach(SDK ${SWIFT_SDKS})
     set(test_dependencies)
     get_test_dependencies("${SDK}" test_dependencies)
 
-    if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS AND NOT ${SDK} STREQUAL "WASI")
+    if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS AND NOT SWIFTWASM_DISABLE_REFLECTION_TEST)
       # NOTE create a stub BlocksRuntime library that can be used for the
       # reflection tests
       file(WRITE ${test_bin_dir}/Inputs/BlocksRuntime.c
@@ -288,7 +288,7 @@ _Block_release(void) { }\n")
 
       endif()
 
-      if(NOT "${SDK}" STREQUAL "WASI")
+      if(NOT SWIFTWASM_DISABLE_REFLECTION_TEST)
         # wasm: Avoid to build swift-reflection-test because it uses unsupported linker flags for wasm-ld
         list(APPEND test_dependencies
             "swift-reflection-test${VARIANT_SUFFIX}_signed")

@@ -369,6 +369,11 @@ option(SWIFT_REPORT_STATISTICS
     "Create json files which contain internal compilation statistics"
     FALSE)
 
+# FIXME(wasm) Reflection tests are temporalily disabled due to lack of linker features
+option(SWIFTWASM_DISABLE_REFLECTION_TEST
+    "Disable building swift-reflection-test for WebAssembly build"
+    FALSE)
+
 #
 # User-configurable experimental options.  Do not use in production builds.
 #
