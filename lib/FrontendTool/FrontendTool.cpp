@@ -328,9 +328,6 @@ class ABIDependencyEvaluator {
 
   llvm::DenseSet<ModuleDecl *> visited;
 
-  /// Cache to avoid recomputing public imports of Swift modules repeatedly.
-  llvm::DenseMap<ModuleDecl *, bool> isOverlayCache;
-
   /// Helper function to handle invariant violations as crashes in debug mode.
   void crashOnInvariantViolation(
     llvm::function_ref<void (llvm::raw_string_ostream &)> f) const;
@@ -484,10 +481,6 @@ void ABIDependencyEvaluator::reexposeImportedABI(
 bool ABIDependencyEvaluator::isOverlayOfClangModule(ModuleDecl *swiftModule) {
   assert(!swiftModule->isNonSwiftModule());
 
-  auto cacheEntry = isOverlayCache.find(swiftModule);
-  if (cacheEntry != isOverlayCache.end())
-    return cacheEntry->second;
-
   llvm::SmallPtrSet<ModuleDecl *, 8> importList;
   ::getImmediateImports(swiftModule, importList,
                         {ModuleDecl::ImportFilterKind::Public});
@@ -495,7 +488,6 @@ bool ABIDependencyEvaluator::isOverlayOfClangModule(ModuleDecl *swiftModule) {
       llvm::any_of(importList, [&](ModuleDecl *importedModule) -> bool {
         return isClangOverlayOf(swiftModule, importedModule);
       });
-  isOverlayCache[swiftModule] = isOverlay;
   return isOverlay;
 }
 
