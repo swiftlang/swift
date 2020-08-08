@@ -92,3 +92,33 @@ func notAmbiguous3(
 func testNotAmbiguous3() {
   notAmbiguous3 { $0 }
 }
+
+// Ambiguous subscript
+struct S {
+  subscript( // expected-note {{'subscript(a:_:_:)' declared here}}
+    a a: Int,
+    fn1: (() -> Void)? = nil,
+    fn2: (() -> Void)? = nil) -> Bool {
+    get { return true }
+  }
+
+  subscript( // expected-note {{'subscript(b:_:fn2:)' declared here}}
+    b b: Int,
+    fn1: (() -> Void)? = nil,
+    fn2 fn2: (() -> Void)? = nil) -> Bool {
+    get { return true }
+  }
+
+  static func foo( // expected-note {{'foo(c:fn1:fn2:)' declared here}}
+    c: Int,
+    fn1: (() -> Void)? = nil,
+    fn2: (() -> Void)? = nil) -> S {
+    return S()
+  }
+}
+
+func test_ambiguous_subscript_unresolved_member(s: S) {
+  _ = s[a: 42] {} // expected-warning {{backward matching of the unlabeled trailing closure is deprecated; label the argument with '_' to suppress this warning}} {{14-15=, }} {{18-18=]}}
+  _ = s[b: 42] {} // expected-warning {{backward matching of the unlabeled trailing closure is deprecated; label the argument with 'fn2' to suppress this warning}} {{14-15=, fn2: }} {{18-18=]}}
+  let _: S = .foo(c: 42) {} // expected-warning {{backward matching of the unlabeled trailing closure is deprecated; label the argument with 'fn2' to suppress this warning}} {{24-25=, fn2: }} {{28-28=)}}
+}

@@ -35,7 +35,7 @@
 // CHECK-32:   i8* null,
 // CHECK-32:   i8* null,
 // CHECK-32:   i8* null
-// CHECK-32: }, section "__DATA, __objc_const", align 4
+// CHECK-32: }, section "__DATA, {{.*}}", align 4
 
 // CHECK-64: @_METACLASS_DATA__TtC13objc_subclass10SwiftGizmo = internal constant { {{.*}}* } {
 // CHECK-64:   i32 129,
@@ -49,7 +49,7 @@
 // CHECK-64:   i8* null,
 // CHECK-64:   i8* null,
 // CHECK-64:   i8* null
-// CHECK-64: }, section "__DATA, __objc_const", align 8
+// CHECK-64: }, section "__DATA, {{.*}}", align 8
 
 // CHECK-32: [[METHOD_TYPE_ENCODING1:@.*]] = private unnamed_addr constant [7 x i8] c"l8@0:4\00"
 // CHECK-64: [[METHOD_TYPE_ENCODING1:@.*]] = private unnamed_addr constant [8 x i8] c"q16@0:8\00"
@@ -110,7 +110,7 @@
 // CHECK-32:     i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* {{@[0-9]+}}, i32 0, i32 0),
 // CHECK-32:     i8* bitcast ({{.*}}* @"$s13objc_subclass10SwiftGizmoCfeTo{{(\.ptrauth)?}}" to i8*)
 // CHECK-32:   }]
-// CHECK-32: }, section "__DATA, __objc_const", align 4
+// CHECK-32: }, section "__DATA, {{.*}}", align 4
 
 // CHECK-64: @_INSTANCE_METHODS__TtC13objc_subclass10SwiftGizmo = internal constant { {{.*}}] } {
 // CHECK-64:   i32 24,
@@ -160,7 +160,7 @@
 // CHECK-64:     i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* {{@[0-9]+}}, i64 0, i64 0),
 // CHECK-64:     i8* bitcast ({{.*}}* @"$s13objc_subclass10SwiftGizmoCfeTo{{(\.ptrauth)?}}" to i8*)
 // CHECK-64:   }]
-// CHECK-64: }, section "__DATA, __objc_const", align 8
+// CHECK-64: }, section "__DATA, {{.*}}", align 8
 
 // CHECK: [[STRING_X:@.*]] = private unnamed_addr constant [2 x i8] c"x\00"
 // CHECK-64: [[STRING_EMPTY:@.*]] = private unnamed_addr constant [1 x i8] zeroinitializer
@@ -174,7 +174,7 @@
 // CHECK-32:     i8* getelementptr inbounds ([1 x i8], [1 x i8]* {{.*}}, i32 0, i32 0),
 // CHECK-32:     i32 2,
 // CHECK-32:     i32 4 }]
-// CHECK-32: }, section "__DATA, __objc_const", align 4
+// CHECK-32: }, section "__DATA, {{.*}}", align 4
 
 // CHECK-64: @_IVARS__TtC13objc_subclass10SwiftGizmo = internal constant { {{.*}}] } {
 // CHECK-64:   i32 32,
@@ -185,7 +185,7 @@
 // CHECK-64:     i8* getelementptr inbounds ([1 x i8], [1 x i8]* [[STRING_EMPTY]], i64 0, i64 0),
 // CHECK-64:     i32 3,
 // CHECK-64:     i32 8 }]
-// CHECK-64: }, section "__DATA, __objc_const", align 8
+// CHECK-64: }, section "__DATA, {{.*}}", align 8
 
 // CHECK-32: @_DATA__TtC13objc_subclass10SwiftGizmo = internal constant { {{.*}}* } {
 // CHECK-32:   i32 132,
@@ -198,7 +198,7 @@
 // CHECK-32:   @_IVARS__TtC13objc_subclass10SwiftGizmo,
 // CHECK-32:   i8* null,
 // CHECK-32:   @_PROPERTIES__TtC13objc_subclass10SwiftGizmo
-// CHECK-32: }, section "__DATA, __objc_const", align 4
+// CHECK-32: }, section "__DATA, {{.*}}", align 4
 
 // CHECK-64: @_DATA__TtC13objc_subclass10SwiftGizmo = internal constant { {{.*}}* } {
 // CHECK-64:    i32 132,
@@ -212,7 +212,7 @@
 // CHECK-64:    @_IVARS__TtC13objc_subclass10SwiftGizmo,
 // CHECK-64:    i8* null,
 // CHECK-64:    @_PROPERTIES__TtC13objc_subclass10SwiftGizmo
-// CHECK-64:  }, section "__DATA, __objc_const", align 8
+// CHECK-64:  }, section "__DATA, {{.*}}", align 8
 
 // CHECK-NOT: @_TMCSo13SwiftGizmo = {{.*NSObject}}
 
@@ -247,7 +247,7 @@
 // CHECK-32:       i8* bitcast ({{.*}}* @"$s13objc_subclass11SwiftGizmo2CfETo{{(\.ptrauth)?}}" to i8*)
 // CHECK-32:     }
 // CHECK-32:   ]
-// CHECK-32: }, section "__DATA, __objc_const", align 4
+// CHECK-32: }, section "__DATA, {{.*}}", align 4
 
 // CHECK-64: @_INSTANCE_METHODS__TtC13objc_subclass11SwiftGizmo2 = internal constant { i32, {{.*}}] } {
 // CHECK-64:   i32 24,

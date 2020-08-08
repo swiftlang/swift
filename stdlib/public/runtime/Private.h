@@ -103,9 +103,11 @@ public:
 // value here.
 #    define SWIFT_ISA_MASK 0xfffffffffffffff8ULL
 #  elif __arm64__
+// The ISA mask used when ptrauth is available.
+#  define SWIFT_ISA_MASK_PTRAUTH 0x007ffffffffffff8ULL
 // ARM64 simulators always use the ARM64e mask.
 #    if __has_feature(ptrauth_calls) || TARGET_OS_SIMULATOR
-#      define SWIFT_ISA_MASK 0x007ffffffffffff8ULL
+#      define SWIFT_ISA_MASK SWIFT_ISA_MASK_PTRAUTH
 #    else
 #      if TARGET_OS_OSX
 #      define SWIFT_ISA_MASK 0x00007ffffffffff8ULL

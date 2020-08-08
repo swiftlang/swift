@@ -200,7 +200,7 @@ func checked_cast_addr_nonactive_result<T: Differentiable>(_ x: T) -> T {
 @differentiable
 // expected-note @+1 {{when differentiating this function definition}}
 func checked_cast_addr_active_result<T: Differentiable>(x: T) -> T {
-  // expected-note @+1 {{differentiating enum values is not yet supported}}
+  // expected-note @+1 {{expression is not differentiable}}
   if let y = x as? Float {
     // Use `y: Float?` value in an active way.
     return y as! T
@@ -744,8 +744,8 @@ func testClassModifyAccessor(_ c: inout C) {
 @differentiable
 // expected-note @+1 {{when differentiating this function definition}}
 func testActiveOptional(_ x: Float) -> Float {
-  // expected-note @+1 {{differentiating enum values is not yet supported}}
   var maybe: Float? = 10
+  // expected-note @+1 {{expression is not differentiable}}
   maybe = x
   return maybe!
 }

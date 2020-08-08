@@ -397,7 +397,7 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
     SourceLoc awaitLoc = consumeToken(tok::kw___await);
     ParserResult<Expr> sub = parseExprUnary(message, isExprBasic);
     if (!sub.hasCodeCompletion() && !sub.isNull()) {
-      ElementContext.setCreateSyntax(SyntaxKind::TryExpr);
+      ElementContext.setCreateSyntax(SyntaxKind::AwaitExpr);
       sub = makeParserResult(new (Context) AwaitExpr(awaitLoc, sub.get()));
     }
 

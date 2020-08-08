@@ -222,12 +222,6 @@ public:
   bool runOnModule(Module &M) override;
 
 private:
-  enum {
-    /// The maximum number of parameters added to a merged functions. This
-    /// roughly corresponds to the number of differing constants.
-    maxAddedParams = 4
-  };
-
   struct FunctionEntry;
 
   /// Describes the set of functions which are considered as "equivalent" (i.e.
@@ -359,7 +353,7 @@ private:
     }
   };
 
-  using ParamInfos = SmallVector<ParamInfo, maxAddedParams>;
+  using ParamInfos = SmallVector<ParamInfo, 16>;
 
   GlobalNumberState GlobalNumbers;
 
@@ -398,14 +392,15 @@ private:
 
   FunctionInfo removeFuncWithMostParams(FunctionInfos &FInfos);
 
-  bool deriveParams(ParamInfos &Params, FunctionInfos &FInfos);
+  bool deriveParams(ParamInfos &Params, FunctionInfos &FInfos,
+                    unsigned maxParams);
 
   bool numOperandsDiffer(FunctionInfos &FInfos);
 
   bool constsDiffer(const FunctionInfos &FInfos, unsigned OpIdx);
 
   bool tryMapToParameter(FunctionInfos &FInfos, unsigned OpIdx,
-                         ParamInfos &Params);
+                         ParamInfos &Params, unsigned maxParams);
 
   void mergeWithParams(const FunctionInfos &FInfos, ParamInfos &Params);
 
@@ -524,6 +519,31 @@ static bool mayMergeCallsToFunction(Function &F) {
   return true;
 }
 
+/// Returns the benefit, which is approximately the size of the function.
+/// Return 0, if the function should not be merged.
+static unsigned getBenefit(Function *F) {
+  unsigned Benefit = 0;
+
+  // We don't want to merge very small functions, because the overhead of
+  // adding creating thunks and/or adding parameters to the call sites
+  // outweighs the benefit.
+  for (BasicBlock &BB : *F) {
+    for (Instruction &I : BB) {
+      if (CallBase *CB = dyn_cast<CallBase>(&I)) {
+        Function *Callee = CB->getCalledFunction();
+        if (Callee && !mayMergeCallsToFunction(*Callee))
+          return 0;
+        if (!Callee || !Callee->isIntrinsic()) {
+          Benefit += 5;
+          continue;
+        }
+      }
+      Benefit += 1;
+    }
+  }
+  return Benefit;
+}
+
 /// Returns true if function \p F is eligible for merging.
 static bool isEligibleFunction(Function *F) {
   if (F->isDeclaration())
@@ -535,25 +555,7 @@ static bool isEligibleFunction(Function *F) {
   if (F->getFunctionType()->isVarArg())
     return false;
   
-  unsigned Benefit = 0;
-
-  // We don't want to merge very small functions, because the overhead of
-  // adding creating thunks and/or adding parameters to the call sites
-  // outweighs the benefit.
-  for (BasicBlock &BB : *F) {
-    for (Instruction &I : BB) {
-      if (CallBase *CB = dyn_cast<CallBase>(&I)) {
-        Function *Callee = CB->getCalledFunction();
-        if (Callee && !mayMergeCallsToFunction(*Callee))
-          return false;
-        if (!Callee || !Callee->isIntrinsic()) {
-          Benefit += 5;
-          continue;
-        }
-      }
-      Benefit += 1;
-    }
-  }
+  unsigned Benefit = getBenefit(F);
   if (Benefit < FunctionMergeThreshold)
     return false;
   
@@ -723,12 +725,17 @@ bool SwiftMergeFunctions::tryMergeEquivalenceClass(FunctionEntry *FirstInClass) 
   bool Changed = false;
   int Try = 0;
 
+  unsigned Benefit = getBenefit(FirstInClass->F);
+  
+  // The bigger the function, the more parameters are allowed.
+  unsigned maxParams = std::max(4u, Benefit / 100);
+
   // We need multiple tries if there are some functions in FInfos which differ
   // too much from the first function in FInfos. But we limit the number of
   // tries to a small number, because this is quadratic.
   while (FInfos.size() >= 2 && Try++ < 4) {
     ParamInfos Params;
-    bool Merged = deriveParams(Params, FInfos);
+    bool Merged = deriveParams(Params, FInfos, maxParams);
     if (Merged) {
       mergeWithParams(FInfos, Params);
       Changed = true;
@@ -767,7 +774,8 @@ removeFuncWithMostParams(FunctionInfos &FInfos) {
 /// Returns true on success, i.e. the functions in \p FInfos can be merged with
 /// the parameters returned in \p Params.
 bool SwiftMergeFunctions::deriveParams(ParamInfos &Params,
-                                       FunctionInfos &FInfos) {
+                                       FunctionInfos &FInfos,
+                                       unsigned maxParams) {
   for (FunctionInfo &FI : FInfos)
     FI.init();
 
@@ -796,7 +804,7 @@ bool SwiftMergeFunctions::deriveParams(ParamInfos &Params,
         if (constsDiffer(FInfos, OpIdx)) {
           // This instruction has operands which differ in at least some
           // functions. So we need to parameterize it.
-          if (!tryMapToParameter(FInfos, OpIdx, Params)) {
+          if (!tryMapToParameter(FInfos, OpIdx, Params, maxParams)) {
             // We ran out of parameters.
             return false;
           }
@@ -845,7 +853,8 @@ bool SwiftMergeFunctions::constsDiffer(const FunctionInfos &FInfos,
 /// Returns true if a parameter could be created or found without exceeding the
 /// maximum number of parameters.
 bool SwiftMergeFunctions::tryMapToParameter(FunctionInfos &FInfos,
-                                            unsigned OpIdx, ParamInfos &Params) {
+                                            unsigned OpIdx, ParamInfos &Params,
+                                            unsigned maxParams) {
   ParamInfo *Matching = nullptr;
   // Try to find an existing parameter which exactly matches the differing
   // operands of the current instruction.
@@ -858,7 +867,7 @@ bool SwiftMergeFunctions::tryMapToParameter(FunctionInfos &FInfos,
   if (!Matching) {
     // We need a new parameter.
     // Check if we are within the limit.
-    if (Params.size() >= maxAddedParams)
+    if (Params.size() >= maxParams)
       return false;
 
     Params.resize(Params.size() + 1);

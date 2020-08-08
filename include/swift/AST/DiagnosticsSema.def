@@ -4716,12 +4716,23 @@ ERROR(availability_decl_unavailable, none,
       "%select{ in %3|}2%select{|: %4}4",
       (unsigned, DeclName, bool, StringRef, StringRef))
 
+WARNING(availability_decl_unavailable_warn, none,
+        "%select{getter for |setter for |}0%1 is unavailable"
+        "%select{ in %3|}2%select{|: %4}4",
+        (unsigned, DeclName, bool, StringRef, StringRef))
+
 #define REPLACEMENT_DECL_KIND_SELECT "select{| instance method| property}"
 ERROR(availability_decl_unavailable_rename, none,
       "%select{getter for |setter for |}0%1 has been "
       "%select{renamed to|replaced by}2%" REPLACEMENT_DECL_KIND_SELECT "3 "
       "'%4'%select{|: %5}5",
       (unsigned, DeclName, bool, unsigned, StringRef, StringRef))
+
+WARNING(availability_decl_unavailable_rename_warn, none,
+        "%select{getter for |setter for |}0%1 has been "
+        "%select{renamed to|replaced by}2%" REPLACEMENT_DECL_KIND_SELECT "3 "
+        "'%4'%select{|: %5}5",
+        (unsigned, DeclName, bool, unsigned, StringRef, StringRef))
 
 NOTE(availability_marked_unavailable, none,
      "%select{getter for |setter for |}0%1 has been explicitly marked "

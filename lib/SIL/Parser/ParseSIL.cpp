@@ -2618,8 +2618,6 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     StringLiteralInst::Encoding encoding;
     if (P.Tok.getText() == "utf8") {
       encoding = StringLiteralInst::Encoding::UTF8;
-    } else if (P.Tok.getText() == "utf16") {
-      encoding = StringLiteralInst::Encoding::UTF16;
     } else if (P.Tok.getText() == "objc_selector") {
       encoding = StringLiteralInst::Encoding::ObjCSelector;
     } else if (P.Tok.getText() == "bytes") {
