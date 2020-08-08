@@ -334,13 +334,13 @@ updateSSA(SILModule &M, SILLoop *Loop,
       if (!Loop->contains(Use->getUser()->getParent()))
         UseList.push_back(UseWrapper(Use));
     // Update SSA of use with the available values.
-    SSAUp.Initialize(OrigValue->getType());
-    SSAUp.AddAvailableValue(OrigValue->getParentBlock(), OrigValue);
+    SSAUp.initialize(OrigValue->getType());
+    SSAUp.addAvailableValue(OrigValue->getParentBlock(), OrigValue);
     for (auto NewValue : MapEntry.second)
-      SSAUp.AddAvailableValue(NewValue->getParentBlock(), NewValue);
+      SSAUp.addAvailableValue(NewValue->getParentBlock(), NewValue);
     for (auto U : UseList) {
       Operand *Use = U;
-      SSAUp.RewriteUse(*Use);
+      SSAUp.rewriteUse(*Use);
     }
   }
 }
