@@ -2256,66 +2256,57 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
     // Factor out the buffer shuffling for metadata accessors that take their
     // arguments directly, so that the accessor function itself only needs to
     // materialize the nominal type descriptor and call this thunk.
-    auto thunkFn = cast<llvm::Function>(
-      IGM.getModule()
-        ->getOrInsertFunction("__swift_instantiateGenericMetadata",
-                IGM.TypeMetadataResponseTy,
-                IGM.SizeTy, // request
-                IGM.Int8PtrTy, // arg 0
-                IGM.Int8PtrTy, // arg 1
-                IGM.Int8PtrTy, // arg 2
-                IGM.TypeContextDescriptorPtrTy) // type context descriptor
-        .getCallee()
-        ->stripPointerCasts());
+    auto generateThunkFn = [&IGM](IRGenFunction &subIGF) {
+      subIGF.CurFn->setDoesNotAccessMemory();
+      subIGF.CurFn->setCallingConv(IGM.SwiftCC);
+      IGM.setHasNoFramePointer(subIGF.CurFn);
 
-    if (thunkFn->empty()) {
-      ApplyIRLinkage(IRLinkage::InternalLinkOnceODR)
-          .to(thunkFn);
-      thunkFn->setDoesNotAccessMemory();
-      thunkFn->setDoesNotThrow();
-      thunkFn->setCallingConv(IGM.SwiftCC);
-      thunkFn->addAttribute(llvm::AttributeList::FunctionIndex,
-                            llvm::Attribute::NoInline);
-      IGM.setHasNoFramePointer(thunkFn);
+      auto params = subIGF.collectParameters();
+      auto request = params.claimNext();
+      auto arg0 = params.claimNext();
+      auto arg1 = params.claimNext();
+      auto arg2 = params.claimNext();
+      auto descriptor = params.claimNext();
 
-      [&IGM, thunkFn]{
-        IRGenFunction subIGF(IGM, thunkFn);
-    
-        auto params = subIGF.collectParameters();
-        auto request = params.claimNext();
-        auto arg0 = params.claimNext();
-        auto arg1 = params.claimNext();
-        auto arg2 = params.claimNext();
-        auto descriptor = params.claimNext();
-        
-        // Allocate a buffer with enough storage for the arguments.
-        auto argsBufferTy =
-          llvm::ArrayType::get(IGM.Int8PtrTy,
-                               NumDirectGenericTypeMetadataAccessFunctionArgs);
-        auto argsBuffer = subIGF.createAlloca(argsBufferTy,
-                                           IGM.getPointerAlignment(),
-                                           "generic.arguments");
-        subIGF.Builder.CreateLifetimeStart(argsBuffer,
-         IGM.getPointerSize() * NumDirectGenericTypeMetadataAccessFunctionArgs);
-        
-        auto arg0Buf = subIGF.Builder.CreateConstInBoundsGEP2_32(argsBufferTy,
-                                                 argsBuffer.getAddress(), 0, 0);
-        subIGF.Builder.CreateStore(arg0, arg0Buf, IGM.getPointerAlignment());
-        auto arg1Buf = subIGF.Builder.CreateConstInBoundsGEP2_32(argsBufferTy,
-                                                 argsBuffer.getAddress(), 0, 1);
-        subIGF.Builder.CreateStore(arg1, arg1Buf, IGM.getPointerAlignment());
-        auto arg2Buf = subIGF.Builder.CreateConstInBoundsGEP2_32(argsBufferTy,
-                                                 argsBuffer.getAddress(), 0, 2);
-        subIGF.Builder.CreateStore(arg2, arg2Buf, IGM.getPointerAlignment());
-        
-        // Make the call.
-        auto argsAddr = subIGF.Builder.CreateBitCast(argsBuffer.getAddress(),
-                                                     IGM.Int8PtrTy);
-        auto result = subIGF.Builder.CreateCall(IGM.getGetGenericMetadataFn(),
-                                               {request, argsAddr, descriptor});
-        subIGF.Builder.CreateRet(result);
-      }();
-    }
+      // Allocate a buffer with enough storage for the arguments.
+      auto argsBufferTy =
+        llvm::ArrayType::get(IGM.Int8PtrTy,
+                             NumDirectGenericTypeMetadataAccessFunctionArgs);
+      auto argsBuffer = subIGF.createAlloca(argsBufferTy,
+                                         IGM.getPointerAlignment(),
+                                         "generic.arguments");
+      subIGF.Builder.CreateLifetimeStart(argsBuffer,
+       IGM.getPointerSize() * NumDirectGenericTypeMetadataAccessFunctionArgs);
+
+      auto arg0Buf = subIGF.Builder.CreateConstInBoundsGEP2_32(argsBufferTy,
+                                               argsBuffer.getAddress(), 0, 0);
+      subIGF.Builder.CreateStore(arg0, arg0Buf, IGM.getPointerAlignment());
+      auto arg1Buf = subIGF.Builder.CreateConstInBoundsGEP2_32(argsBufferTy,
+                                               argsBuffer.getAddress(), 0, 1);
+      subIGF.Builder.CreateStore(arg1, arg1Buf, IGM.getPointerAlignment());
+      auto arg2Buf = subIGF.Builder.CreateConstInBoundsGEP2_32(argsBufferTy,
+                                               argsBuffer.getAddress(), 0, 2);
+      subIGF.Builder.CreateStore(arg2, arg2Buf, IGM.getPointerAlignment());
+
+      // Make the call.
+      auto argsAddr = subIGF.Builder.CreateBitCast(argsBuffer.getAddress(),
+                                                   IGM.Int8PtrTy);
+      auto result = subIGF.Builder.CreateCall(IGM.getGetGenericMetadataFn(),
+                                             {request, argsAddr, descriptor});
+      subIGF.Builder.CreateRet(result);
+    };
+    auto thunkFn = IGM.getOrCreateHelperFunction(
+        "__swift_instantiateGenericMetadata",
+        IGM.TypeMetadataResponseTy,
+        {
+          IGM.SizeTy, // request
+          IGM.Int8PtrTy, // arg 0
+          IGM.Int8PtrTy, // arg 1
+          IGM.Int8PtrTy, // arg 2
+          IGM.TypeContextDescriptorPtrTy // type context descriptor
+        },
+        generateThunkFn,
+        /*noinline*/true);
     
     // Call out to the helper.
     auto arg0 = numArguments >= 1
@@ -2805,136 +2796,127 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
       request.isStaticallyAbstract()
           ? "__swift_instantiateConcreteTypeFromMangledNameAbstract"
           : "__swift_instantiateConcreteTypeFromMangledName";
-  auto instantiationFn = cast<llvm::Function>(
-      IGM.getModule()
-          ->getOrInsertFunction(instantiationFnName, IGF.IGM.TypeMetadataPtrTy,
-                                cache->getType())
-          .getCallee()
-          ->stripPointerCasts());
-  if (instantiationFn->empty()) {
-    ApplyIRLinkage(IRLinkage::InternalLinkOnceODR)
-      .to(instantiationFn);
-    instantiationFn->setDoesNotAccessMemory();
-    instantiationFn->setDoesNotThrow();
-    instantiationFn->addAttribute(llvm::AttributeList::FunctionIndex,
-                                  llvm::Attribute::NoInline);
-    IGM.setHasNoFramePointer(instantiationFn);
+  auto generateInstantiationFn = [&IGM, request](IRGenFunction &subIGF) {
+    subIGF.CurFn->setDoesNotAccessMemory();
+    IGM.setHasNoFramePointer(subIGF.CurFn);
 
-    [&IGM, instantiationFn, request]{
-      IRGenFunction subIGF(IGM, instantiationFn);
-      
-      auto params = subIGF.collectParameters();
-      auto cache = params.claimNext();
-      
-      // Load the existing cache value.
-      // Conceptually, this needs to establish memory ordering with the
-      // store we do later in the function: if the metadata value is
-      // non-null, we must be able to see any stores performed by the
-      // initialization of the metadata.  However, any attempt to read
-      // from the metadata will be address-dependent on the loaded
-      // metadata pointer, which is sufficient to provide adequate
-      // memory ordering guarantees on all the platforms we care about:
-      // ARM has special rules about address dependencies, and x86's
-      // memory ordering is strong enough to guarantee the visibility
-      // even without the address dependency.
-      //
-      // And we do not need to worry about the compiler because the
-      // address dependency naturally forces an order to the memory
-      // accesses.
-      //
-      // Therefore, we can perform a completely naked load here.
-      // FIXME: Technically should be "consume", but that introduces barriers
-      // in the current LLVM ARM backend.
-      auto cacheWordAddr = subIGF.Builder.CreateBitCast(cache,
-                                                   IGM.Int64Ty->getPointerTo());
-      auto load = subIGF.Builder.CreateLoad(cacheWordAddr, Alignment(8));
-      // Make this barrier explicit when building for TSan to avoid false positives.
-      if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread)
-        load->setOrdering(llvm::AtomicOrdering::Acquire);
-      else
-        load->setOrdering(llvm::AtomicOrdering::Monotonic);
+    auto params = subIGF.collectParameters();
+    auto cache = params.claimNext();
 
-      // Compare the load result to see if it's negative.
-      auto isUnfilledBB = subIGF.createBasicBlock("");
-      auto contBB = subIGF.createBasicBlock("");
-      llvm::Value *comparison = subIGF.Builder.CreateICmpSLT(load,
-                                        llvm::ConstantInt::get(IGM.Int64Ty, 0));
-      comparison = subIGF.Builder.CreateExpect(comparison,
-                                         llvm::ConstantInt::get(IGM.Int1Ty, 0));
-      subIGF.Builder.CreateCondBr(comparison, isUnfilledBB, contBB);
-      auto loadBB = subIGF.Builder.GetInsertBlock();
+    // Load the existing cache value.
+    // Conceptually, this needs to establish memory ordering with the
+    // store we do later in the function: if the metadata value is
+    // non-null, we must be able to see any stores performed by the
+    // initialization of the metadata.  However, any attempt to read
+    // from the metadata will be address-dependent on the loaded
+    // metadata pointer, which is sufficient to provide adequate
+    // memory ordering guarantees on all the platforms we care about:
+    // ARM has special rules about address dependencies, and x86's
+    // memory ordering is strong enough to guarantee the visibility
+    // even without the address dependency.
+    //
+    // And we do not need to worry about the compiler because the
+    // address dependency naturally forces an order to the memory
+    // accesses.
+    //
+    // Therefore, we can perform a completely naked load here.
+    // FIXME: Technically should be "consume", but that introduces barriers
+    // in the current LLVM ARM backend.
+    auto cacheWordAddr = subIGF.Builder.CreateBitCast(cache,
+                                                 IGM.Int64Ty->getPointerTo());
+    auto load = subIGF.Builder.CreateLoad(cacheWordAddr, Alignment(8));
+    // Make this barrier explicit when building for TSan to avoid false positives.
+    if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread)
+      load->setOrdering(llvm::AtomicOrdering::Acquire);
+    else
+      load->setOrdering(llvm::AtomicOrdering::Monotonic);
 
-      // If the load is negative, emit the call to instantiate the type
-      // metadata.
-      subIGF.Builder.SetInsertPoint(&subIGF.CurFn->back());
-      subIGF.Builder.emitBlock(isUnfilledBB);
-      
-      // Break up the loaded value into size and relative address to the
-      // string.
-      auto size = subIGF.Builder.CreateAShr(load, 32);
-      size = subIGF.Builder.CreateTruncOrBitCast(size, IGM.SizeTy);
-      size = subIGF.Builder.CreateNeg(size);
-      
-      auto stringAddrOffset = subIGF.Builder.CreateTrunc(load,
-                                                         IGM.Int32Ty);
-      stringAddrOffset = subIGF.Builder.CreateSExtOrBitCast(stringAddrOffset,
-                                                            IGM.SizeTy);
-      auto stringAddrBase = subIGF.Builder.CreatePtrToInt(cache, IGM.SizeTy);
-      if (IGM.getModule()->getDataLayout().isBigEndian()) {
-        stringAddrBase = subIGF.Builder.CreateAdd(stringAddrBase,
-                                        llvm::ConstantInt::get(IGM.SizeTy, 4));
-      }
-      auto stringAddr = subIGF.Builder.CreateAdd(stringAddrBase,
-                                                 stringAddrOffset);
-      stringAddr = subIGF.Builder.CreateIntToPtr(stringAddr, IGM.Int8PtrTy);
+    // Compare the load result to see if it's negative.
+    auto isUnfilledBB = subIGF.createBasicBlock("");
+    auto contBB = subIGF.createBasicBlock("");
+    llvm::Value *comparison = subIGF.Builder.CreateICmpSLT(load,
+                                      llvm::ConstantInt::get(IGM.Int64Ty, 0));
+    comparison = subIGF.Builder.CreateExpect(comparison,
+                                       llvm::ConstantInt::get(IGM.Int1Ty, 0));
+    subIGF.Builder.CreateCondBr(comparison, isUnfilledBB, contBB);
+    auto loadBB = subIGF.Builder.GetInsertBlock();
 
-      llvm::CallInst *call;
-      if (request.isStaticallyAbstract()) {
-        call = subIGF.Builder.CreateCall(
-            IGM.getGetTypeByMangledNameInContextInMetadataStateFn(),
-            {llvm::ConstantInt::get(IGM.SizeTy, (size_t)MetadataState::Abstract),
-             stringAddr, size,
-             // TODO: Use mangled name lookup in generic
-             // contexts?
-             llvm::ConstantPointerNull::get(IGM.TypeContextDescriptorPtrTy),
-             llvm::ConstantPointerNull::get(IGM.Int8PtrPtrTy)});
-      } else {
-        call = subIGF.Builder.CreateCall(
-            IGM.getGetTypeByMangledNameInContextFn(),
-            {stringAddr, size,
-             // TODO: Use mangled name lookup in generic
-             // contexts?
-             llvm::ConstantPointerNull::get(IGM.TypeContextDescriptorPtrTy),
-             llvm::ConstantPointerNull::get(IGM.Int8PtrPtrTy)});
-      }
-      call->setDoesNotThrow();
-      call->setDoesNotAccessMemory();
-      call->setCallingConv(IGM.SwiftCC);
+    // If the load is negative, emit the call to instantiate the type
+    // metadata.
+    subIGF.Builder.SetInsertPoint(&subIGF.CurFn->back());
+    subIGF.Builder.emitBlock(isUnfilledBB);
 
-      // Store the result back to the cache. Metadata instantatiation should
-      // already have emitted the necessary barriers to publish the instantiated
-      // metadata to other threads, so we only need to expose the pointer.
-      // Worst case, another thread might race with us and reinstantiate the
-      // exact same metadata pointer.
-      auto resultWord = subIGF.Builder.CreatePtrToInt(call, IGM.SizeTy);
-      resultWord = subIGF.Builder.CreateZExtOrBitCast(resultWord, IGM.Int64Ty);
-      auto store = subIGF.Builder.CreateStore(resultWord, cacheWordAddr,
-                                              Alignment(8));
-      store->setOrdering(llvm::AtomicOrdering::Monotonic);
-      subIGF.Builder.CreateBr(contBB);
-      
-      subIGF.Builder.SetInsertPoint(loadBB);
-      subIGF.Builder.emitBlock(contBB);
-      auto phi = subIGF.Builder.CreatePHI(IGM.Int64Ty, 2);
-      phi->addIncoming(load, loadBB);
-      phi->addIncoming(resultWord, isUnfilledBB);
-      
-      auto resultAddr = subIGF.Builder.CreateTruncOrBitCast(phi, IGM.SizeTy);
-      resultAddr = subIGF.Builder.CreateIntToPtr(resultAddr,
-                                                 IGM.TypeMetadataPtrTy);
-      subIGF.Builder.CreateRet(resultAddr);
-    }();
-  }
+    // Break up the loaded value into size and relative address to the
+    // string.
+    auto size = subIGF.Builder.CreateAShr(load, 32);
+    size = subIGF.Builder.CreateTruncOrBitCast(size, IGM.SizeTy);
+    size = subIGF.Builder.CreateNeg(size);
+
+    auto stringAddrOffset = subIGF.Builder.CreateTrunc(load,
+                                                       IGM.Int32Ty);
+    stringAddrOffset = subIGF.Builder.CreateSExtOrBitCast(stringAddrOffset,
+                                                          IGM.SizeTy);
+    auto stringAddrBase = subIGF.Builder.CreatePtrToInt(cache, IGM.SizeTy);
+    if (IGM.getModule()->getDataLayout().isBigEndian()) {
+      stringAddrBase = subIGF.Builder.CreateAdd(stringAddrBase,
+                                      llvm::ConstantInt::get(IGM.SizeTy, 4));
+    }
+    auto stringAddr = subIGF.Builder.CreateAdd(stringAddrBase,
+                                               stringAddrOffset);
+    stringAddr = subIGF.Builder.CreateIntToPtr(stringAddr, IGM.Int8PtrTy);
+
+    llvm::CallInst *call;
+    if (request.isStaticallyAbstract()) {
+      call = subIGF.Builder.CreateCall(
+          IGM.getGetTypeByMangledNameInContextInMetadataStateFn(),
+          {llvm::ConstantInt::get(IGM.SizeTy, (size_t)MetadataState::Abstract),
+           stringAddr, size,
+           // TODO: Use mangled name lookup in generic
+           // contexts?
+           llvm::ConstantPointerNull::get(IGM.TypeContextDescriptorPtrTy),
+           llvm::ConstantPointerNull::get(IGM.Int8PtrPtrTy)});
+    } else {
+      call = subIGF.Builder.CreateCall(
+          IGM.getGetTypeByMangledNameInContextFn(),
+          {stringAddr, size,
+           // TODO: Use mangled name lookup in generic
+           // contexts?
+           llvm::ConstantPointerNull::get(IGM.TypeContextDescriptorPtrTy),
+           llvm::ConstantPointerNull::get(IGM.Int8PtrPtrTy)});
+    }
+    call->setDoesNotThrow();
+    call->setDoesNotAccessMemory();
+    call->setCallingConv(IGM.SwiftCC);
+
+    // Store the result back to the cache. Metadata instantatiation should
+    // already have emitted the necessary barriers to publish the instantiated
+    // metadata to other threads, so we only need to expose the pointer.
+    // Worst case, another thread might race with us and reinstantiate the
+    // exact same metadata pointer.
+    auto resultWord = subIGF.Builder.CreatePtrToInt(call, IGM.SizeTy);
+    resultWord = subIGF.Builder.CreateZExtOrBitCast(resultWord, IGM.Int64Ty);
+    auto store = subIGF.Builder.CreateStore(resultWord, cacheWordAddr,
+                                            Alignment(8));
+    store->setOrdering(llvm::AtomicOrdering::Monotonic);
+    subIGF.Builder.CreateBr(contBB);
+
+    subIGF.Builder.SetInsertPoint(loadBB);
+    subIGF.Builder.emitBlock(contBB);
+    auto phi = subIGF.Builder.CreatePHI(IGM.Int64Ty, 2);
+    phi->addIncoming(load, loadBB);
+    phi->addIncoming(resultWord, isUnfilledBB);
+
+    auto resultAddr = subIGF.Builder.CreateTruncOrBitCast(phi, IGM.SizeTy);
+    resultAddr = subIGF.Builder.CreateIntToPtr(resultAddr,
+                                               IGM.TypeMetadataPtrTy);
+    subIGF.Builder.CreateRet(resultAddr);
+  };
+  auto instantiationFn =
+    IGM.getOrCreateHelperFunction(instantiationFnName,
+                                  IGF.IGM.TypeMetadataPtrTy,
+                                  cache->getType(),
+                                  generateInstantiationFn,
+                                  /*noinline*/true);
   
   auto call = IGF.Builder.CreateCall(instantiationFn, cache);
   call->setDoesNotThrow();
