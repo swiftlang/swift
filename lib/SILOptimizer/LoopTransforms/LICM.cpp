@@ -1062,8 +1062,8 @@ void LoopTreeOptimization::hoistLoadsAndStores(SILValue addr, SILLoop *loop, Ins
   LLVM_DEBUG(llvm::dbgs() << "Creating preload " << *initialLoad);
 
   SILSSAUpdater ssaUpdater;
-  ssaUpdater.Initialize(initialLoad->getType());
-  ssaUpdater.AddAvailableValue(preheader, initialLoad);
+  ssaUpdater.initialize(initialLoad->getType());
+  ssaUpdater.addAvailableValue(preheader, initialLoad);
 
   // Set all stored values as available values in the ssaUpdater.
   // If there are multiple stores in a block, only the last one counts.
@@ -1078,7 +1078,7 @@ void LoopTreeOptimization::hoistLoadsAndStores(SILValue addr, SILLoop *loop, Ins
       if (isLoadFromAddr(dyn_cast<LoadInst>(SI->getSrc()), addr))
         return;
 
-      ssaUpdater.AddAvailableValue(SI->getParent(), SI->getSrc());
+      ssaUpdater.addAvailableValue(SI->getParent(), SI->getSrc());
     }
   }
 
@@ -1099,7 +1099,7 @@ void LoopTreeOptimization::hoistLoadsAndStores(SILValue addr, SILLoop *loop, Ins
       // If we didn't see a store in this block yet, get the current value from
       // the ssaUpdater.
       if (!currentVal)
-        currentVal = ssaUpdater.GetValueInMiddleOfBlock(block);
+        currentVal = ssaUpdater.getValueInMiddleOfBlock(block);
       SILValue projectedValue = projectLoadValue(LI->getOperand(), addr,
                                                  currentVal, LI);
       LLVM_DEBUG(llvm::dbgs() << "Replacing stored load " << *LI << " with "
@@ -1117,8 +1117,8 @@ void LoopTreeOptimization::hoistLoadsAndStores(SILValue addr, SILLoop *loop, Ins
                "should have split critical edges");
         SILBuilder B(succ->begin());
         auto *SI = B.createStore(loc.getValue(),
-                                 ssaUpdater.GetValueInMiddleOfBlock(succ),
-                                 addr, StoreOwnershipQualifier::Unqualified);
+                                 ssaUpdater.getValueInMiddleOfBlock(succ), addr,
+                                 StoreOwnershipQualifier::Unqualified);
         (void)SI;
         LLVM_DEBUG(llvm::dbgs() << "Creating loop-exit store " << *SI);
       }

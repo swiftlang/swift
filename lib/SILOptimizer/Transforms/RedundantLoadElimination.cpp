@@ -1337,14 +1337,14 @@ SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
 
   // Finally, collect all the values for the SILArgument, materialize it using
   // the SSAUpdater.
-  Updater.Initialize(
+  Updater.initialize(
       L.getType(&BB->getModule(), TypeExpansionContext(*BB->getParent()))
           .getObjectType());
   for (auto V : Values) {
-    Updater.AddAvailableValue(V.first, V.second);
+    Updater.addAvailableValue(V.first, V.second);
   }
 
-  return Updater.GetValueInMiddleOfBlock(BB);
+  return Updater.getValueInMiddleOfBlock(BB);
 }
 
 bool RLEContext::collectLocationValues(SILBasicBlock *BB, LSLocation &L,
