@@ -2209,7 +2209,11 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     TopLevelActions.append(AllLinkerInputs.begin(), AllLinkerInputs.end());
   }
 
+#ifdef NDEBUG
   bool verifyInterfacesByDefault = false;
+#else
+  bool verifyInterfacesByDefault = true;
+#endif
 
   if (MergeModuleAction
       && Args.hasFlag(options::OPT_verify_emitted_module_interface,
