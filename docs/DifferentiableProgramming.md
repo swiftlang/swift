@@ -893,8 +893,15 @@ extension Perceptron {
 
 ### `@differentiable` function types
 
-A subtype of normal function types with a different runtime representation,
-which stores metadata that allows their values to be differentiated anywhere.
+Differentiable functions are first-class values, identified by a
+`@differentiable` attribute in the function type. A `@differentiable` function
+type is a subtype of its corresponding normal function type (i.e. without a
+`@differentiable` attribute) with an extended ABI, which stores metadata that
+allows their values to be differentiated anywhere the function is passed. A
+`@differentiable(linear)` function type is a subtype of its corresponding
+`@differentiable` function type. A normal function can be implicitly converted
+to a `@differentiable` or `@differentiable(linear)` function with appropriate
+compile-time checks.
 
 ```swift
 func addOne(_ x: Float) -> Float { x + 1 }
@@ -920,8 +927,9 @@ func _(_ x: Float) -> (value: Float,
 
 ### Differential operators
 
-Standard library differentiation APIs that take `@differentiable` functions and
-return derivative functions or compute derivative values.
+Differential operators are APIs defined in the standard library that take
+`@differentiable` functions and return derivative functions or compute
+derivative values.
 
 ```swift
 // In the standard library:
@@ -2318,7 +2326,7 @@ As shown in the
 subsection, a `@differentiable` function value's runtime representation contains
 the original function along with extra information that allows the function to
 be differentiated (or transposed, if it is `@differentiable(linear)`). A
-@differentiable or `@differentiable(linear)` function value can be called like a
+`@differentiable` or `@differentiable(linear)` function value can be called like a
 non-`@differentiable` function. A `@differentiable(linear)` function value can
 be implicitly converted to a `@differentiable` one, which can be implicitly
 converted to a non-`@differentiable` one.
