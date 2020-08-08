@@ -69,15 +69,6 @@ static ArraySliceType *computeAllCasesType(NominalTypeDecl *enumDecl) {
   return ArraySliceType::get(enumType);
 }
 
-static Type deriveCaseIterable_AllCases(DerivedConformance &derived) {
-  // enum SomeEnum : CaseIterable {
-  //   @derived
-  //   typealias AllCases = [SomeEnum]
-  // }
-  auto *rawInterfaceType = computeAllCasesType(cast<EnumDecl>(derived.Nominal));
-  return derived.getConformanceContext()->mapTypeIntoContext(rawInterfaceType);
-}
-
 ValueDecl *DerivedConformance::deriveCaseIterable(ValueDecl *requirement) {
   // Conformance can't be synthesized in an extension.
   if (checkAndDiagnoseDisallowedContext(requirement))
@@ -111,18 +102,3 @@ ValueDecl *DerivedConformance::deriveCaseIterable(ValueDecl *requirement) {
 
   return propDecl;
 }
-
-Type DerivedConformance::deriveCaseIterable(AssociatedTypeDecl *assocType) {
-  // Check that we can actually derive CaseIterable for this type.
-  if (!canDeriveConformance(Nominal))
-    return nullptr;
-
-  if (assocType->getName() == Context.Id_AllCases) {
-    return deriveCaseIterable_AllCases(*this);
-  }
-
-  Context.Diags.diagnose(assocType->getLoc(),
-                         diag::broken_case_iterable_requirement);
-  return nullptr;
-}
-
