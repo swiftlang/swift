@@ -51,4 +51,5 @@
 // RUN: %FileCheck -match-full-lines -check-prefix=CHECK-COMPARE-DISABLED-NO-BUILD-RECORD %s < %t/output1
 // CHECK-COMPARE-DISABLED-NO-BUILD-RECORD: *** Incremental build disabled because could not read build record, cannot compare ***
 
+// RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | tee run1 | grep Any > /dev/null && rm %t/main

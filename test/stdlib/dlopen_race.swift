@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -emit-library -o %t/dlopen_race.dylib %S/Inputs/dlopen_race_dylib.swift
 // RUN: %target-build-swift -o %t/dlopen_race %s
+// RUN: %target-codesign %t/dlopen_race %t/dlopen_race.dylib
 // RUN: %target-run %t/dlopen_race %t/dlopen_race.dylib
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
