@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t) 
 // RUN: %target-build-swift %S/Inputs/licm_and_global_addr/test.swift -parse-as-library -wmo -enable-library-evolution -module-name=Test -emit-module -emit-module-path=%t/Test.swiftmodule -c -o %t/test.o
 // RUN: %target-build-swift -O %S/Inputs/licm_and_global_addr/main.swift %s -I%t %t/test.o -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: executable_test
