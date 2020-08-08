@@ -460,6 +460,15 @@ def emit_private_module_interface_path :
          DoesNotAffectIncrementalBuild, ArgumentIsPath, SupplementaryOutput]>,
   MetaVarName<"<path>">, HelpText<"Output private module interface file to <path>">;
 
+def verify_emitted_module_interface :
+  Flag<["-"], "verify-emitted-module-interface">,
+  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Check that module interfaces emitted during compilation typecheck">;
+def no_verify_emitted_module_interface :
+  Flag<["-"], "no-verify-emitted-module-interface">,
+  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Don't check that module interfaces emitted during compilation typecheck">;
+
 def avoid_emit_module_source_info :
   Flag<["-"], "avoid-emit-module-source-info">,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
