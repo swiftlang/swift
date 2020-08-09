@@ -265,7 +265,7 @@ void ClangImporter::recordModuleDependencies(
         swiftArgs,
         fileDeps);
     for (const auto &moduleName : clangModuleDep.ClangModuleDeps) {
-      dependencies.addModuleDependency(moduleName.ModuleName, alreadyAddedModules);
+      dependencies.addModuleDependency(moduleName.ModuleName, &alreadyAddedModules);
     }
 
     cache.recordDependencies(clangModuleDep.ModuleName,

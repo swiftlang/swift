@@ -45,6 +45,14 @@ EXPR_NODES = [
              Child('Expression', kind='Expr'),
          ]),
 
+    # The await operator.
+    # await foo()
+    Node('AwaitExpr', kind='Expr',
+         children=[
+             Child('AwaitKeyword', kind='AwaitToken'),
+             Child('Expression', kind='Expr'),
+         ]),
+
     # declname-arguments -> '(' declname-argument-list ')'
     # declname-argument-list -> declname-argument*
     # declname-argument -> identifier ':'
@@ -130,6 +138,12 @@ EXPR_NODES = [
              Child('PoundFile', kind='PoundFileToken'),
          ]),
 
+    # A #fileID expression.
+    Node('PoundFileIDExpr', kind='Expr',
+         children=[
+             Child('PoundFileID', kind='PoundFileIDToken'),
+         ]),
+
     # A #filePath expression.
     Node('PoundFilePathExpr', kind='Expr',
          children=[
@@ -173,10 +187,13 @@ EXPR_NODES = [
              Child('OperatorToken', kind='BinaryOperatorToken'),
          ]),
 
-    # arrow-expr -> 'throws'? '->'
+    # arrow-expr -> 'async'? 'throws'? '->'
     # NOTE: This appears only in SequenceExpr.
     Node('ArrowExpr', kind='Expr',
          children=[
+             Child('AsyncKeyword', kind='IdentifierToken',
+                   classification='Keyword',
+                   text_choices=['async'], is_optional=True),
              Child('ThrowsToken', kind='ThrowsToken',
                    is_optional=True),
              Child('ArrowToken', kind='ArrowToken'),

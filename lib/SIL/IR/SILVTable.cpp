@@ -55,6 +55,11 @@ void SILVTable::removeFromVTableCache(Entry &entry) {
   M.VTableEntryCache.erase({this, entry.getMethod()});
 }
 
+void SILVTable::updateVTableCache(const Entry &entry) {
+  SILModule &M = entry.getImplementation()->getModule();
+  M.VTableEntryCache[{this, entry.getMethod()}] = entry;
+}
+
 SILVTable::SILVTable(ClassDecl *c, IsSerialized_t serialized,
                      ArrayRef<Entry> entries)
   : Class(c), Serialized(serialized), NumEntries(entries.size()) {

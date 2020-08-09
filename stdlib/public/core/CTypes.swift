@@ -57,7 +57,9 @@ public typealias CLong = Int
 public typealias CLongLong = Int64
 
 /// The C '_Float16' type.
-@available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+@available(iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+@available(macOS, unavailable)
+@available(macCatalyst, unavailable)
 public typealias CFloat16 = Float16
 
 /// The C 'float' type.

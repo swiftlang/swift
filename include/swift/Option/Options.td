@@ -197,7 +197,7 @@ HelpText<"Include within-file dependencies.">;
 
 def emit_fine_grained_dependency_sourcefile_dot_files :
 Flag<["-"], "emit-fine-grained-dependency-sourcefile-dot-files">,
-InternalDebugOpt,
+Flags<[FrontendOption, HelpHidden]>,
 HelpText<"Emit dot files for every source file.">;
 
 def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
@@ -543,8 +543,18 @@ def enable_experimental_additive_arithmetic_derivation :
 
 def enable_experimental_concise_pound_file : Flag<["-"],
     "enable-experimental-concise-pound-file">,
-  Flags<[FrontendOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Enable experimental concise '#file' identifier">;
+
+def disable_fuzzy_forward_scan_trailing_closure_matching : Flag<["-"],
+    "disable-fuzzy-forward-scan-trailing-closure-matching">,
+  Flags<[FrontendOption]>,
+  HelpText<"Disable fuzzy forward-scan trailing closure matching">;
+
+def enable_fuzzy_forward_scan_trailing_closure_matching : Flag<["-"],
+    "enable-fuzzy-forward-scan-trailing-closure-matching">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable fuzzy forward-scan trailing closure matching">;
 
 def enable_direct_intramodule_dependencies : Flag<["-"],
     "enable-direct-intramodule-dependencies">,

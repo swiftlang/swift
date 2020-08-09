@@ -1041,7 +1041,7 @@ struct InitializationForPattern
   InitializationPtr visitTypedPattern(TypedPattern *P) {
     return visit(P->getSubPattern());
   }
-  InitializationPtr visitVarPattern(VarPattern *P) {
+  InitializationPtr visitBindingPattern(BindingPattern *P) {
     return visit(P->getSubPattern());
   }
 

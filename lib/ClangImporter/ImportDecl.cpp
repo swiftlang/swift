@@ -180,6 +180,7 @@ static FuncDecl *createFuncOrAccessor(ASTContext &ctx, SourceLoc funcLoc,
     return FuncDecl::create(ctx, /*StaticLoc=*/SourceLoc(),
                             StaticSpellingKind::None,
                             funcLoc, name, nameLoc,
+                            /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                             throws, /*ThrowsLoc=*/SourceLoc(),
                             /*GenericParams=*/nullptr,
                             bodyParams,
@@ -551,7 +552,7 @@ synthesizeEnumRawValueGetterBody(AbstractFunctionDecl *afd, void *context) {
   auto getterDecl = cast<AccessorDecl>(afd);
   auto enumDecl = static_cast<EnumDecl *>(context);
   auto rawTy = enumDecl->getRawType();
-  auto enumTy = enumDecl->getDeclaredType();
+  auto enumTy = enumDecl->getDeclaredInterfaceType();
 
   ASTContext &ctx = getterDecl->getASTContext();
   auto *selfDecl = getterDecl->getImplicitSelfDecl();
@@ -1634,10 +1635,10 @@ static void makeStructRawValuedWithBridge(
   makeComputed(computedVar, computedVarGetter, nullptr);
 
   // Create a pattern binding to describe the variable.
-  Pattern *computedVarPattern = createTypedNamedPattern(computedVar);
+  Pattern *computedBindingPattern = createTypedNamedPattern(computedVar);
   auto *computedPatternBinding = PatternBindingDecl::createImplicit(
-      ctx, StaticSpellingKind::None, computedVarPattern, /*InitExpr*/ nullptr,
-      structDecl);
+      ctx, StaticSpellingKind::None, computedBindingPattern,
+      /*InitExpr*/ nullptr, structDecl);
 
   auto init = createRawValueBridgingConstructor(Impl, structDecl, computedVar,
                                                 storedVar,
@@ -1891,7 +1892,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   auto &C = importer.SwiftContext;
   auto swiftValueDecl = dyn_cast_or_null<ValueDecl>(
       importer.importDecl(errorDomainDecl, importer.CurrentVersion));
-  auto stringTy = C.getStringDecl()->getDeclaredType();
+  auto stringTy = C.getStringDecl()->getDeclaredInterfaceType();
   assert(stringTy && "no string type available");
   if (!swiftValueDecl || !swiftValueDecl->getInterfaceType()->isEqual(stringTy)) {
     // Couldn't actually import it as an error enum, fall back to enum
@@ -3454,20 +3455,19 @@ namespace {
       result->setHasUnreferenceableStorage(hasUnreferenceableStorage);
 
       if (auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(decl)) {
-        result->setIsCxxNotTriviallyCopyable(
-            !cxxRecordDecl->isTriviallyCopyable());
+        result->setIsCxxNonTrivial(!cxxRecordDecl->isTriviallyCopyable());
 
         for (auto ctor : cxxRecordDecl->ctors()) {
           if (ctor->isCopyConstructor() &&
               (ctor->isDeleted() || ctor->getAccess() != clang::AS_public)) {
-            result->setIsCxxNotTriviallyCopyable(true);
+            result->setIsCxxNonTrivial(true);
             break;
           }
         }
 
         if (auto dtor = cxxRecordDecl->getDestructor()) {
           if (dtor->isDeleted() || dtor->getAccess() != clang::AS_public) {
-            result->setIsCxxNotTriviallyCopyable(true);
+            result->setIsCxxNonTrivial(true);
           }
         }
       }
@@ -6961,7 +6961,8 @@ void SwiftDeclConverter::importObjCProtocols(
     if (auto proto = castIgnoringCompatibilityAlias<ProtocolDecl>(
             Impl.importDecl(*cp, getActiveSwiftVersion()))) {
       addProtocols(proto, protocols, knownProtocols);
-      inheritedTypes.push_back(TypeLoc::withoutLoc(proto->getDeclaredType()));
+      inheritedTypes.push_back(
+        TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()));
     }
   }
 
@@ -7012,7 +7013,8 @@ Optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
         if (!proto) {
           return None;
         }
-        inherited.push_back(TypeLoc::withoutLoc(proto->getDeclaredType()));
+        inherited.push_back(
+          TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()));
       }
     }
     if (inherited.empty()) {

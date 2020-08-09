@@ -1,4 +1,4 @@
-# REQUIRES: standalone_test
+# REQUIRES: standalone_build
 
 # RUN: %empty-directory(%t)
 # RUN: mkdir -p %t
@@ -20,7 +20,7 @@
 # SKIP-CMARK-CHECK: --- Installing swift ---
 
 # SKIP-LLVM-CHECK: cmake --build {{.*}}cmark-
-# SKIP-LLVM-CHECK-NOT: cmake --build {{.*}}llvm-
+# SKIP-LLVM-CHECK: cmake --build {{.*}}llvm-tblgen
 # SKIP-LLVM-CHECK: cmake --build {{.*}}swift-
 # SKIP-LLVM-CHECK: --- Installing cmark ---
 # SKIP-LLVM-CHECK-NOT: --- Installing llvm ---

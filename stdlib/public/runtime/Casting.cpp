@@ -1828,7 +1828,7 @@ static bool _dynamicCastToFunction(OpaqueValue *dest,
       return _fail(src, srcType, targetType, flags);
     
     // If the target type can't throw, neither can the source.
-    if (srcFn->throws() && !targetFn->throws())
+    if (srcFn->isThrowing() && !targetFn->isThrowing())
       return _fail(src, srcType, targetType, flags);
     
     // The result and argument types must match.
@@ -3199,7 +3199,7 @@ const Metadata *swift::_swift_class_getSuperclass(const Metadata *theClass) {
 }
 
 // Called by compiler-generated cast code.
-SWIFT_RUNTIME_STDLIB_API
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 bool swift_isClassType(const Metadata *type) {
   return Metadata::isAnyKindOfClass(type->getKind());
 }

@@ -41,9 +41,10 @@ Expr *findParsedExpr(const DeclContext *DC, SourceRange TargetRange);
 ///       position.
 bool removeCodeCompletionExpr(ASTContext &Ctx, Expr *&expr);
 
-/// Returns expected return type of the given decl context.
+/// Collects possible expected return types of the given decl context.
 /// \p DC should be an \c AbstractFunctionDecl or an \c AbstractClosureExpr.
-Type getReturnTypeFromContext(const DeclContext *DC);
+void collectPossibleReturnTypesFromContext(DeclContext *DC,
+                                           SmallVectorImpl<Type> &candidates);
 
 struct FunctionTypeAndDecl {
   AnyFunctionType *Type;

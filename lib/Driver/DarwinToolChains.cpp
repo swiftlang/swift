@@ -89,12 +89,9 @@ toolchains::Darwin::constructInvocation(const InterpretJobAction &job,
 }
 
 static StringRef
-getDarwinLibraryNameSuffixForTriple(const llvm::Triple &triple,
-                                    bool distinguishSimulator = true) {
+getDarwinLibraryNameSuffixForTriple(const llvm::Triple &triple) {
   const DarwinPlatformKind kind = getDarwinPlatformKind(triple);
-  const DarwinPlatformKind effectiveKind =
-      distinguishSimulator ? kind : getNonSimulatorPlatform(kind);
-  switch (effectiveKind) {
+  switch (kind) {
   case DarwinPlatformKind::MacOS:
     return "osx";
   case DarwinPlatformKind::IPhoneOS:
@@ -501,60 +498,11 @@ toolchains::Darwin::addProfileGenerationArgs(ArgStringList &Arguments,
   }
 }
 
-/// Remap the given version number via the version map, or produce \c None if
-/// there is no mapping for this version.
-static Optional<llvm::VersionTuple> remapVersion(
-    const llvm::StringMap<llvm::VersionTuple> &versionMap,
-    llvm::VersionTuple version) {
-  // The build number is never used in the lookup.
-  version = version.withoutBuild();
-
-  // Look for this specific version.
-  auto known = versionMap.find(version.getAsString());
-  if (known != versionMap.end())
-    return known->second;
-
-  // If an extra ".0" was specified (in the subminor version), drop that
-  // and look again.
-  if (!version.getSubminor() || *version.getSubminor() != 0)
-    return None;
-
-  version = llvm::VersionTuple(version.getMajor(), *version.getMinor());
-  known = versionMap.find(version.getAsString());
-  if (known != versionMap.end())
-    return known->second;
-
-  // If another extra ".0" wa specified (in the minor version), drop that
-  // and look again.
-  if (!version.getMinor() || *version.getMinor() != 0)
-    return None;
-
-  version = llvm::VersionTuple(version.getMajor());
-  known = versionMap.find(version.getAsString());
-  if (known != versionMap.end())
-    return known->second;
-
-  return None;
-}
-
 Optional<llvm::VersionTuple>
 toolchains::Darwin::getTargetSDKVersion(const llvm::Triple &triple) const {
   if (!SDKInfo)
     return None;
-
-  // Retrieve the SDK version.
-  auto SDKVersion = SDKInfo->getVersion();
-
-  // For the Mac Catalyst environment, we have a macOS SDK with a macOS
-  // SDK version. Map that to the corresponding iOS version number to pass
-  // down to the linker.
-  if (tripleIsMacCatalystEnvironment(triple)) {
-    return remapVersion(
-        SDKInfo->getVersionMap().MacOS2iOSMacMapping, SDKVersion)
-          .getValueOr(llvm::VersionTuple(0, 0, 0));
-  }
-
-  return SDKVersion;
+  return swift::getTargetSDKVersion(*SDKInfo, triple);
 }
 
 void
@@ -624,14 +572,6 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
           major = firstMacARM64e.getMajor();
           minor = firstMacARM64e.getMinor().getValueOr(0);
           micro = firstMacARM64e.getSubminor().getValueOr(0);
-        }
-
-        // Temporary hack: adjust macOS version passed to the linker from
-        // 11 down to 10.16, but only for x86.
-        if (triple.isX86() && major == 11) {
-          major = 10;
-          minor = 16;
-          micro = 0;
         }
 
         break;
@@ -758,7 +698,7 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
   llvm::sys::path::append(
       CompilerRTPath,
       Twine("libclang_rt.") +
-        getDarwinLibraryNameSuffixForTriple(Triple, /*simulator*/false) +
+        getDarwinLibraryNameSuffixForTriple(Triple) +
         ".a");
   if (llvm::sys::fs::exists(CompilerRTPath))
     Arguments.push_back(context.Args.MakeArgString(CompilerRTPath));

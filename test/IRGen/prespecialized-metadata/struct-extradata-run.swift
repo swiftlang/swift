@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %clang -c -v %target-cc-options -g -O0 -isysroot %sdk %S/Inputs/extraDataFields.cpp -o %t/extraDataFields.o -I %clang-include-dir -I %swift_src_root/include/ -I %swift_src_root/../llvm-project/llvm/include -I %clang-include-dir/../../llvm-macosx-x86_64/include -L %clang-include-dir/../lib/swift/macosx
+// RUN: %clang -c -v %target-cc-options -g -O0 -isysroot %sdk %S/Inputs/extraDataFields.cpp -o %t/extraDataFields.o -I %clang-include-dir -I %swift_src_root/include/ -I %llvm_src_root/include -I %llvm_obj_root/include -L %clang-include-dir/../lib/swift/macosx
 
-// RUN: %target-build-swift -c %S/Inputs/struct-extra-data-fields.swift -emit-library -emit-module -module-name ExtraDataFieldsNoTrailingFlags -target %module-target-future -Xfrontend -disable-generic-metadata-prespecialization -emit-module-path %t/ExtraDataFieldsNoTrailingFlags.swiftmodule -o %t/libExtraDataFieldsNoTrailingFlags.dylib
-// RUN: %target-build-swift -c %S/Inputs/struct-extra-data-fields.swift -emit-library -emit-module -module-name ExtraDataFieldsTrailingFlags -target %module-target-future -Xfrontend -prespecialize-generic-metadata -emit-module-path %t/ExtraDataFieldsTrailingFlags.swiftmodule -o %t/libExtraDataFieldsTrailingFlags.dylib
+// RUN: %target-build-swift -c %S/Inputs/struct-extra-data-fields.swift -emit-library -emit-module -module-name ExtraDataFieldsNoTrailingFlags -target %module-target-future -Xfrontend -disable-generic-metadata-prespecialization -emit-module-path %t/ExtraDataFieldsNoTrailingFlags.swiftmodule -o %t/%target-library-name(ExtraDataFieldsNoTrailingFlags)
+// RUN: %target-build-swift -c %S/Inputs/struct-extra-data-fields.swift -emit-library -emit-module -module-name ExtraDataFieldsTrailingFlags -target %module-target-future -Xfrontend -prespecialize-generic-metadata -emit-module-path %t/ExtraDataFieldsTrailingFlags.swiftmodule -o %t/%target-library-name(ExtraDataFieldsTrailingFlags)
 // RUN: %target-build-swift -v %mcp_opt %s %t/extraDataFields.o -import-objc-header %S/Inputs/extraDataFields.h -Xfrontend -disable-generic-metadata-prespecialization -target %module-target-future -lc++ -L %clang-include-dir/../lib/swift/macosx -sdk %sdk -o %t/main -I %t -L %t -lExtraDataFieldsTrailingFlags -lExtraDataFieldsNoTrailingFlags -module-name main
 
 // RUN: %target-codesign %t/main

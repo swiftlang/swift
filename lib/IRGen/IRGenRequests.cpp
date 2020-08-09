@@ -17,6 +17,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/Subsystems.h"
+#include "swift/TBDGen/TBDGen.h"
 #include "llvm/IR/Module.h"
 #include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
 
@@ -38,13 +39,12 @@ llvm::orc::ThreadSafeModule GeneratedModule::intoThreadSafeContext() && {
 void swift::simple_display(llvm::raw_ostream &out,
                            const IRGenDescriptor &desc) {
   auto *MD = desc.Ctx.dyn_cast<ModuleDecl *>();
-  auto *SF = desc.Ctx.dyn_cast<SourceFile *>();
   if (MD) {
     out << "IR Generation for module " << MD->getName();
   } else {
-    assert(SF);
+    auto *file = desc.Ctx.get<FileUnit *>();
     out << "IR Generation for file ";
-    out << '\"' << SF->getFilename() << '\"';
+    simple_display(out, file);
   }
 }
 
@@ -57,22 +57,34 @@ TinyPtrVector<FileUnit *> IRGenDescriptor::getFiles() const {
   if (auto *mod = Ctx.dyn_cast<ModuleDecl *>())
     return TinyPtrVector<FileUnit *>(mod->getFiles());
 
-  // For a primary source file, we emit IR for both it and potentially its
+  // For a primary file, we emit IR for both it and potentially its
   // SynthesizedFileUnit.
-  auto *SF = Ctx.get<SourceFile *>();
+  auto *primary = Ctx.get<FileUnit *>();
   TinyPtrVector<FileUnit *> files;
-  files.push_back(SF);
+  files.push_back(primary);
 
-  if (auto *synthesizedFile = SF->getSynthesizedFile())
-    files.push_back(synthesizedFile);
-
+  if (auto *SF = dyn_cast<SourceFile>(primary)) {
+    if (auto *synthesizedFile = SF->getSynthesizedFile())
+      files.push_back(synthesizedFile);
+  }
   return files;
 }
 
 ModuleDecl *IRGenDescriptor::getParentModule() const {
-  if (auto *SF = Ctx.dyn_cast<SourceFile *>())
-    return SF->getParentModule();
+  if (auto *file = Ctx.dyn_cast<FileUnit *>())
+    return file->getParentModule();
   return Ctx.get<ModuleDecl *>();
+}
+
+std::vector<std::string> IRGenDescriptor::getLinkerDirectives() const {
+  auto opts = TBDOpts;
+  opts.LinkerDirectivesOnly = true;
+  if (auto *file = Ctx.dyn_cast<FileUnit *>()) {
+    return getPublicSymbols(TBDGenDescriptor::forFile(file, opts));
+  } else {
+    auto *M = Ctx.get<ModuleDecl *>();
+    return getPublicSymbols(TBDGenDescriptor::forModule(M, opts));
+  }
 }
 
 evaluator::DependencySource IRGenRequest::readDependencySource(
@@ -84,8 +96,8 @@ evaluator::DependencySource IRGenRequest::readDependencySource(
     return {nullptr, e.getActiveSourceScope()};
   }
 
-  auto *SF = desc.Ctx.get<SourceFile *>();
-  return {SF, evaluator::DependencyScope::Cascading};
+  auto *primary = desc.Ctx.get<FileUnit *>();
+  return {dyn_cast<SourceFile>(primary), evaluator::DependencyScope::Cascading};
 }
 
 // Define request evaluation functions for each of the IRGen requests.

@@ -24,8 +24,10 @@ if(SWIFT_BUILD_SDK_OVERLAY)
   list_intersect("${SWIFT_APPLE_PLATFORMS}" "${SWIFT_SDKS}" building_darwin_sdks)
   if(building_darwin_sdks)
     add_subdirectory(StdlibUnittestFoundationExtras)
-    if (SWIFT_INCLUDE_TESTS)
-      add_subdirectory(SwiftReflectionTest)
-    endif()
+  endif()
+  # Currently SwiftReflectionTest cannot be built on Windows, due to 
+  # dependencies on POSIX symbols 
+  if (SWIFT_INCLUDE_TESTS AND (NOT CMAKE_SYSTEM_NAME STREQUAL "Windows") AND NOT SWIFTWASM_DISABLE_REFLECTION_TEST)
+    add_subdirectory(SwiftReflectionTest)
   endif()
 endif()

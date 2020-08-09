@@ -289,6 +289,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
                ->getSubExpr()->getReferencedDecl(stopAtParenExpr);
 
   PASS_THROUGH_REFERENCE(DotSelf, getSubExpr);
+  PASS_THROUGH_REFERENCE(Await, getSubExpr);
   PASS_THROUGH_REFERENCE(Try, getSubExpr);
   PASS_THROUGH_REFERENCE(ForceTry, getSubExpr);
   PASS_THROUGH_REFERENCE(OptionalTry, getSubExpr);
@@ -422,7 +423,6 @@ forEachImmediateChildExpr(llvm::function_ref<Expr *(Expr *)> callback) {
     }
     bool walkToDeclPre(Decl *D) override { return false; }
     bool walkToTypeReprPre(TypeRepr *T) override { return false; }
-    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
   };
   
   this->walk(ChildWalker(callback, this));
@@ -452,7 +452,6 @@ void Expr::forEachChildExpr(llvm::function_ref<Expr *(Expr *)> callback) {
     }
     bool walkToDeclPre(Decl *D) override { return false; }
     bool walkToTypeReprPre(TypeRepr *T) override { return false; }
-    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
   };
 
   this->walk(ChildWalker(callback));
@@ -623,6 +622,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::DynamicType:
     return true;
 
+  case ExprKind::Await:
   case ExprKind::Try:
   case ExprKind::ForceTry:
   case ExprKind::OptionalTry:
@@ -1204,9 +1204,8 @@ InOutExpr::InOutExpr(SourceLoc operLoc, Expr *subExpr, Type baseType,
 
 SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
   assert(elements.size() & 1 && "even number of elements in sequence");
-  void *Buffer = ctx.Allocate(sizeof(SequenceExpr) +
-                              elements.size() * sizeof(Expr*),
-                              alignof(SequenceExpr));
+  size_t bytes = totalSizeToAlloc<Expr *>(elements.size());
+  void *Buffer = ctx.Allocate(bytes, alignof(SequenceExpr));
   return ::new(Buffer) SequenceExpr(elements);
 }
 
@@ -1278,15 +1277,29 @@ SourceRange TupleExpr::getSourceRange() const {
       return { SourceLoc(), SourceLoc() };
     } else {
       // Scan backwards for a valid source loc.
+      bool hasSingleTrailingClosure = hasTrailingClosure();
       for (Expr *expr : llvm::reverse(getElements())) {
         // Default arguments are located at the start of their parent tuple, so
         // skip over them.
         if (isa<DefaultArgumentExpr>(expr))
           continue;
-        end = expr->getEndLoc();
-        if (end.isValid()) {
-          break;
+
+        SourceLoc newEnd = expr->getEndLoc();
+        if (newEnd.isInvalid())
+          continue;
+
+        // There is a quirk with the backward scan logic for trailing
+        // closures that can cause arguments to be flipped. If there is a
+        // single trailing closure, only stop when the "end" point we hit comes
+        // after the close parenthesis (if there is one).
+        if (end.isInvalid() ||
+            end.getOpaquePointerValue() < newEnd.getOpaquePointerValue()) {
+          end = newEnd;
         }
+
+        if (!hasSingleTrailingClosure || RParenLoc.isInvalid() ||
+            RParenLoc.getOpaquePointerValue() < end.getOpaquePointerValue())
+          break;
       }
     }
   } else {
@@ -1463,13 +1476,13 @@ static ValueDecl *getCalledValue(Expr *E) {
 
 PropertyWrapperValuePlaceholderExpr *
 PropertyWrapperValuePlaceholderExpr::create(ASTContext &ctx, SourceRange range,
-                                            Type ty, Expr *wrappedValue) {
+                                            Type ty, Expr *wrappedValue,
+                                            bool isAutoClosure) {
   auto *placeholder =
       new (ctx) OpaqueValueExpr(range, ty, /*isPlaceholder=*/true);
 
-  return new (ctx) PropertyWrapperValuePlaceholderExpr(range, ty,
-                                                       placeholder,
-                                                       wrappedValue);
+  return new (ctx) PropertyWrapperValuePlaceholderExpr(
+      range, ty, placeholder, wrappedValue, isAutoClosure);
 }
 
 const ParamDecl *DefaultArgumentExpr::getParamDecl() const {
@@ -1808,17 +1821,6 @@ ConditionalCheckedCastExpr::createImplicit(ASTContext &ctx, Expr *sub,
   return expr;
 }
 
-ConditionalCheckedCastExpr *
-ConditionalCheckedCastExpr::createImplicit(ASTContext &ctx, Expr *sub,
-                                           TypeRepr *tyRepr, Type castTy) {
-  auto *const expr = new (ctx) ConditionalCheckedCastExpr(
-      sub, SourceLoc(), SourceLoc(), new (ctx) TypeExpr(tyRepr));
-  expr->setType(OptionalType::get(castTy));
-  expr->setImplicit();
-  expr->setCastType(castTy);
-  return expr;
-}
-
 IsExpr *IsExpr::create(ASTContext &ctx, SourceLoc isLoc, TypeRepr *tyRepr) {
   return new (ctx) IsExpr(nullptr, isLoc, new (ctx) TypeExpr(tyRepr));
 }
@@ -1926,8 +1928,15 @@ Type AbstractClosureExpr::getResultType(
 bool AbstractClosureExpr::isBodyThrowing() const {
   if (getType()->hasError())
     return false;
+  
+  return getType()->castTo<FunctionType>()->getExtInfo().isThrowing();
+}
 
-  return getType()->castTo<FunctionType>()->getExtInfo().throws();
+bool AbstractClosureExpr::isBodyAsync() const {
+  if (getType()->hasError())
+    return false;
+
+  return getType()->castTo<FunctionType>()->getExtInfo().isAsync();
 }
 
 bool AbstractClosureExpr::hasSingleExpressionBody() const {
@@ -1979,14 +1988,21 @@ bool ClosureExpr::hasEmptyBody() const {
 }
 
 bool ClosureExpr::capturesSelfEnablingImplictSelf() const {
-  if (auto *VD = getCapturedSelfDecl())
-    return VD->isSelfParamCapture() && !VD->getType()->is<WeakStorageType>();
+  if (auto *VD = getCapturedSelfDecl()) {
+    if (!VD->isSelfParamCapture())
+      return false;
+
+    if (auto *attr = VD->getAttrs().getAttribute<ReferenceOwnershipAttr>())
+      return attr->get() != ReferenceOwnership::Weak;
+
+    return true;
+  }
   return false;
 }
 
 void ClosureExpr::setExplicitResultType(Type ty) {
   assert(ty && !ty->hasTypeVariable());
-  ExplicitResultTypeAndSeparatelyChecked.getPointer()
+  ExplicitResultTypeAndBodyState.getPointer()
       ->setType(MetatypeType::get(ty));
 }
 
@@ -2367,6 +2383,7 @@ void KeyPathExpr::Component::setSubscriptIndexHashableConformances(
   case Kind::Property:
   case Kind::Identity:
   case Kind::TupleElement:
+  case Kind::DictionaryKey:
     llvm_unreachable("no hashable conformances for this kind");
   }
 }
@@ -2475,3 +2492,4 @@ const UnifiedStatsReporter::TraceFormatter*
 FrontendStatsTracer::getTraceFormatter<const Expr *>() {
   return &TF;
 }
+

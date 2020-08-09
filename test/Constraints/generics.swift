@@ -846,3 +846,15 @@ func test_dictionary_with_generic_mismatch_in_key_or_value() {
   let _: [S<Bool>: Int] = [S<Int>(): 42]
   // expected-error@-1 {{cannot convert value of type 'S<Int>' to expected dictionary key type 'S<Bool>'}}
 }
+
+
+// rdar://problem/56212087 - unable to infer type for generic parameter `T`
+func rdar56212087() {
+  func setValue(_: Any?, forKey: String) {}
+
+  func foo<T: ExpressibleByStringLiteral>(_: String, _: T) -> T {
+    fatalError()
+  }
+
+  setValue(foo("", ""), forKey: "") // Ok (T is inferred as a `String` instead of `Any?`)
+}

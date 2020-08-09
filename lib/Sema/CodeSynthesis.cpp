@@ -253,8 +253,9 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
         // type.
         if (var->isPropertyMemberwiseInitializedWithWrappedType()) {
           varInterfaceType = var->getPropertyWrapperInitValueInterfaceType();
-          isAutoClosure =
-            var->isInnermostPropertyWrapperInitUsesEscapingAutoClosure();
+
+          auto wrapperInfo = var->getPropertyWrapperBackingPropertyInfo();
+          isAutoClosure = wrapperInfo.wrappedValuePlaceholder->isAutoClosure();
         } else {
           varInterfaceType = backingPropertyType;
         }
@@ -322,11 +323,11 @@ synthesizeStubBody(AbstractFunctionDecl *fn, void *) {
   }
 
   auto *staticStringDecl = ctx.getStaticStringDecl();
-  auto staticStringType = staticStringDecl->getDeclaredType();
+  auto staticStringType = staticStringDecl->getDeclaredInterfaceType();
   auto staticStringInit = ctx.getStringBuiltinInitDecl(staticStringDecl);
 
   auto *uintDecl = ctx.getUIntDecl();
-  auto uintType = uintDecl->getDeclaredType();
+  auto uintType = uintDecl->getDeclaredInterfaceType();
   auto uintInit = ctx.getIntBuiltinInitDecl(uintDecl);
 
   // Create a call to Swift._unimplementedInitializer
@@ -355,7 +356,7 @@ synthesizeStubBody(AbstractFunctionDecl *fn, void *) {
   initName->setBuiltinInitializer(staticStringInit);
 
   auto *file = new (ctx) MagicIdentifierLiteralExpr(
-    MagicIdentifierLiteralExpr::File, loc, /*Implicit=*/true);
+    MagicIdentifierLiteralExpr::FileID, loc, /*Implicit=*/true);
   file->setType(staticStringType);
   file->setBuiltinInitializer(staticStringInit);
 

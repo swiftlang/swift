@@ -1113,27 +1113,29 @@ extension Unicode.Scalar.Properties {
   internal func _scalarName(
     _ choice: __swift_stdlib_UCharNameChoice
   ) -> String? {
-    var err = __swift_stdlib_U_ZERO_ERROR
-    let count = Int(__swift_stdlib_u_charName(icuValue, choice, nil, 0, &err))
+    var error = __swift_stdlib_U_ZERO_ERROR
+    let count = Int(__swift_stdlib_u_charName(icuValue, choice, nil, 0, &error))
     guard count > 0 else { return nil }
 
     // ICU writes a trailing null, so we have to save room for it as well.
-    var array = Array<UInt8>(repeating: 0, count: count + 1)
-    return array.withUnsafeMutableBufferPointer { bufPtr in
-      var err = __swift_stdlib_U_ZERO_ERROR
+    let array = Array<UInt8>(unsafeUninitializedCapacity: count + 1) {
+      buffer, initializedCount in
+      var error = __swift_stdlib_U_ZERO_ERROR
       let correctSize = __swift_stdlib_u_charName(
         icuValue,
         choice,
-        UnsafeMutableRawPointer(bufPtr.baseAddress._unsafelyUnwrappedUnchecked)
+        UnsafeMutableRawPointer(buffer.baseAddress._unsafelyUnwrappedUnchecked)
           .assumingMemoryBound(to: Int8.self),
-        Int32(bufPtr.count),
-        &err)
-      guard err.isSuccess else {
+        Int32(buffer.count),
+        &error)
+      guard error.isSuccess else {
         fatalError("Unexpected error case-converting Unicode scalar.")
       }
       _internalInvariant(count == correctSize, "inconsistent ICU behavior")
-      return String._fromASCII(
-        UnsafeBufferPointer(rebasing: bufPtr[..<count]))
+      initializedCount = count + 1
+    }
+    return array.withUnsafeBufferPointer { buffer in
+      String._fromASCII(UnsafeBufferPointer(rebasing: buffer[..<count]))
     }
   }
 

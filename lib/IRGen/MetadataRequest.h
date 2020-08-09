@@ -500,32 +500,55 @@ static inline bool isAccessorLazilyGenerated(MetadataAccessStrategy strategy) {
   llvm_unreachable("bad kind");
 }
 
-/// Is complete metadata for the given type available at a fixed address?
-bool isCompleteTypeMetadataStaticallyAddressable(IRGenModule &IGM, CanType type);
+/// Is non-canonical complete metadata for the given type available at a fixed
+/// address?
+bool isNoncanonicalCompleteTypeMetadataStaticallyAddressable(IRGenModule &IGM,
+                                                             CanType type);
+/// Is canonical complete metadata for the given type available at a fixed
+/// address?
+bool isCanonicalCompleteTypeMetadataStaticallyAddressable(IRGenModule &IGM,
+                                                          CanType type);
 /// Should requests for the given type's metadata be cached?
 bool shouldCacheTypeMetadataAccess(IRGenModule &IGM, CanType type);
 
-bool isInitializableTypeMetadataStaticallyAddressable(IRGenModule &IGM,
-                                                      CanType type);
-
-enum CanonicalSpecializedMetadataUsageIsOnlyFromAccessor : bool {
+enum SpecializedMetadataUsageIsOnlyFromAccessor : bool {
+  /// The metadata must be accessed through an accessor function so that it can
+  /// be initialized.
   ForUseOnlyFromAccessor = true,
+  /// The metadata may be accessed directly.
   NotForUseOnlyFromAccessor = false
 };
 
-/// Is the address of the canonical specialization of a generic metadata
-/// statically known?
-///
-/// In other words, can a canonical specialization be formed for the specified
-/// type. If onlyFromAccess is ForUseOnlyFromAccessor, then metadata's address
-/// is known, but access to the metadata must go through the canonical
-/// specialized accessor so that initialization of the metadata can occur.
-bool isCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
-    IRGenModule &IGM, NominalTypeDecl &nominal, CanType type,
-    CanonicalSpecializedMetadataUsageIsOnlyFromAccessor onlyFromAccessor);
+enum SpecializedMetadataCanonicality : bool {
+  /// The metadata is canonical and can be used directly (subject to
+  /// initialization).
+  CanonicalSpecializedMetadata = true,
+  /// The metadata is not canonical and must be canonicalized before usage.
+  NoncanonicalSpecializedMetadata = false
+};
 
-bool isCompleteCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
-    IRGenModule &IGM, NominalTypeDecl &nominal, CanType type);
+/// Is the address of a specialization of the generic metadata statically known?
+///
+/// In other words, can a specialization be formed for the specified type.
+///
+/// If onlyFromAccessor is ForUseOnlyFromAccessor, then metadata's address is
+/// known, but access to the metadata must go through the canonical specialized
+/// accessor so that initialization of the metadata can occur.
+bool isSpecializedNominalTypeMetadataStaticallyAddressable(
+    IRGenModule &IGM, NominalTypeDecl &nominal, CanType type,
+    SpecializedMetadataCanonicality canonicality,
+    SpecializedMetadataUsageIsOnlyFromAccessor onlyFromAccessor);
+
+/// Is the address of a specialization of the generic metadata which does not
+/// require runtime initialization statically known?
+bool isCompleteSpecializedNominalTypeMetadataStaticallyAddressable(
+    IRGenModule &IGM, NominalTypeDecl &nominal, CanType type,
+    SpecializedMetadataCanonicality canonicality);
+
+/// Is the address of canonical metadata which may need to be initialized (e.g.
+/// by registering it with the Objective-C runtime) statically known?
+bool isCanonicalInitializableTypeMetadataStaticallyAddressable(IRGenModule &IGM,
+                                                               CanType type);
 
 /// Determine how the given type metadata should be accessed.
 MetadataAccessStrategy getTypeMetadataAccessStrategy(CanType type);

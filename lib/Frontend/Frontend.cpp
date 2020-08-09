@@ -424,14 +424,17 @@ void CompilerInstance::setUpDiagnosticOptions() {
 //    Ideally, we'd get rid of it.
 // 2. MemoryBufferSerializedModuleLoader: This is used by LLDB, because it might
 //    already have the module available in memory.
-// 3. ModuleInterfaceLoader: Tries to find an up-to-date swiftmodule. If it
+// 3. ExplicitSwiftModuleLoader: Loads a serialized module if it can, provided
+//    this modules was specified as an explicit input to the compiler.
+// 4. ModuleInterfaceLoader: Tries to find an up-to-date swiftmodule. If it
 //    succeeds, it issues a particular "error" (see
-//    [Note: ModuleInterfaceLoader-defer-to-SerializedModuleLoader]), which
-//    is interpreted by the overarching loader as a command to use the
-//    SerializedModuleLoader. If we failed to find a .swiftmodule, this falls
-//    back to using an interface. Actual errors lead to diagnostics.
-// 4. SerializedModuleLoader: Loads a serialized module if it can.
-// 5. ClangImporter: This must come after all the Swift module loaders because
+//    [NOTE: ModuleInterfaceLoader-defer-to-ImplicitSerializedModuleLoader]),
+//    which is interpreted by the overarching loader as a command to use the
+//    ImplicitSerializedModuleLoader. If we failed to find a .swiftmodule,
+//    this falls back to using an interface. Actual errors lead to diagnostics.
+// 5. ImplicitSerializedModuleLoader: Loads a serialized module if it can.
+//    Used for implicit loading of modules from the compiler's search paths.
+// 6. ClangImporter: This must come after all the Swift module loaders because
 //    in the presence of overlays and mixed-source frameworks, we want to prefer
 //    the overlay or framework module over the underlying Clang module.
 bool CompilerInstance::setUpModuleLoaders() {
@@ -484,15 +487,18 @@ bool CompilerInstance::setUpModuleLoaders() {
 
   // If implicit modules are disabled, we need to install an explicit module
   // loader.
-  if (Invocation.getFrontendOptions().DisableImplicitModules) {
+  bool ExplicitModuleBuild = Invocation.getFrontendOptions().DisableImplicitModules;
+  if (ExplicitModuleBuild) {
     auto ESML = ExplicitSwiftModuleLoader::create(
         *Context,
         getDependencyTracker(), MLM,
         Invocation.getSearchPathOptions().ExplicitSwiftModules,
         Invocation.getSearchPathOptions().ExplicitSwiftModuleMap,
         IgnoreSourceInfoFile);
+    this->DefaultSerializedLoader = ESML.get();
     Context->addModuleLoader(std::move(ESML));
   }
+
   if (MLM != ModuleLoadingMode::OnlySerialized) {
     auto const &Clang = clangImporter->getClangInstance();
     std::string ModuleCachePath = getModuleCachePathFromClang(Clang);
@@ -507,12 +513,14 @@ bool CompilerInstance::setUpModuleLoaders() {
     Context->addModuleLoader(std::move(PIML), false, false, true);
   }
 
-  std::unique_ptr<SerializedModuleLoader> SML =
-    SerializedModuleLoader::create(*Context, getDependencyTracker(), MLM,
+  if (!ExplicitModuleBuild) {
+    std::unique_ptr<ImplicitSerializedModuleLoader> ISML =
+    ImplicitSerializedModuleLoader::create(*Context, getDependencyTracker(), MLM,
                                    IgnoreSourceInfoFile);
-  this->SML = SML.get();
-  Context->addModuleLoader(std::move(SML));
-
+    this->DefaultSerializedLoader = ISML.get();
+    Context->addModuleLoader(std::move(ISML));
+  }
+  
   Context->addModuleLoader(std::move(clangImporter), /*isClang*/ true);
 
   return false;
@@ -868,6 +876,7 @@ bool CompilerInstance::loadStdlibIfNeeded() {
 
 bool CompilerInstance::loadPartialModulesAndImplicitImports(
     ModuleDecl *mod, SmallVectorImpl<FileUnit *> &partialModules) const {
+  assert(DefaultSerializedLoader && "Expected module loader in Compiler Instance");
   FrontendStatsTracer tracer(getStatsReporter(),
                              "load-partial-modules-and-implicit-imports");
   // Force loading implicit imports. This is currently needed to allow
@@ -881,7 +890,7 @@ bool CompilerInstance::loadPartialModulesAndImplicitImports(
   for (auto &PM : PartialModules) {
     assert(PM.ModuleBuffer);
     auto *file =
-        SML->loadAST(*mod, /*diagLoc*/ SourceLoc(), /*moduleInterfacePath*/ "",
+      DefaultSerializedLoader->loadAST(*mod, /*diagLoc*/ SourceLoc(), /*moduleInterfacePath*/ "",
                      std::move(PM.ModuleBuffer), std::move(PM.ModuleDocBuffer),
                      std::move(PM.ModuleSourceInfoBuffer),
                      /*isFramework*/ false);
@@ -974,7 +983,7 @@ void CompilerInstance::freeASTContext() {
   TheSILTypes.reset();
   Context.reset();
   MainModule = nullptr;
-  SML = nullptr;
+  DefaultSerializedLoader = nullptr;
   MemoryBufferLoader = nullptr;
   PrimaryBufferIDs.clear();
 }

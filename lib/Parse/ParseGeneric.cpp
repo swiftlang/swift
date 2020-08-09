@@ -389,13 +389,9 @@ ParserStatus Parser::parseGenericWhereClause(
 }
 
 
-/// Parse a free-standing where clause attached to a declaration,
-/// adding it to a generic parameter list, if any, or to the given
-/// generic context representing the declaration.
+/// Parse a free-standing where clause attached to a declaration.
 ParserStatus Parser::
-parseFreestandingGenericWhereClause(GenericContext *genCtx,
-                                    GenericParamList *&genericParams,
-                                    ParseDeclOptions flags) {
+parseFreestandingGenericWhereClause(GenericContext *genCtx) {
   assert(Tok.is(tok::kw_where) && "Shouldn't call this without a where");
 
   SmallVector<RequirementRepr, 4> Requirements;
@@ -406,20 +402,8 @@ parseFreestandingGenericWhereClause(GenericContext *genCtx,
   if (result.shouldStopParsing() || Requirements.empty())
     return result;
 
-  if (genericParams) {
-    // Push the generic arguments back into a local scope so that references will
-    // find them.
-    Scope S(this, ScopeKind::Generics);
-    for (auto pd : genericParams->getParams())
-      addToScope(pd);
-
-    genericParams->addTrailingWhereClause(Context, WhereLoc, Requirements);
-
-  } else {
-    // A where clause against outer generic parameters.
-    genCtx->setTrailingWhereClause(
-        TrailingWhereClause::create(Context, WhereLoc, Requirements));
-  }
+  genCtx->setTrailingWhereClause(
+      TrailingWhereClause::create(Context, WhereLoc, Requirements));
 
   return ParserStatus();
 }

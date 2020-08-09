@@ -919,6 +919,12 @@ def parse_args(args):
         help="optimization level to use: {O,Onone,Osize}, (default: O)",
         default="O",
     )
+    shared_benchmarks_parser.add_argument(
+        "--architecture",
+        metavar="architecture",
+        help="current architecture (e.g., x86_64, arm64, etc)",
+        default=None,
+    )
 
     run_parser = subparsers.add_parser(
         "run",

@@ -1013,6 +1013,7 @@ ANY_OWNERSHIP_BUILTIN(Swift3ImplicitObjCEntrypoint)
 ANY_OWNERSHIP_BUILTIN(PoundAssert)
 ANY_OWNERSHIP_BUILTIN(GlobalStringTablePointer)
 ANY_OWNERSHIP_BUILTIN(TypePtrAuthDiscriminator)
+ANY_OWNERSHIP_BUILTIN(IntInstrprofIncrement)
 #undef ANY_OWNERSHIP_BUILTIN
 
 // This is correct today since we do not have any builtins which return

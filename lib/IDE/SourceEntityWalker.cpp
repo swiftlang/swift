@@ -140,12 +140,9 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
       return false;
     };
 
-    if (auto AF = dyn_cast<AbstractFunctionDecl>(VD)) {
-      if (ReportParamList(AF->getParameters()))
-        return false;
-    }
-    if (auto SD = dyn_cast<SubscriptDecl>(VD)) {
-      if (ReportParamList(SD->getIndices()))
+    if (isa<AbstractFunctionDecl>(VD) || isa<SubscriptDecl>(VD)) {
+      auto ParamList = getParameterList(VD);
+      if (ReportParamList(ParamList))
         return false;
     }
   } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
@@ -415,6 +412,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       case KeyPathExpr::Component::Kind::OptionalWrap:
       case KeyPathExpr::Component::Kind::OptionalForce:
       case KeyPathExpr::Component::Kind::Identity:
+      case KeyPathExpr::Component::Kind::DictionaryKey:
         break;
       }
     }

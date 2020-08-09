@@ -1257,7 +1257,7 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
 
   auto *Named = NamedPattern::createImplicit(Ctx, Tmp1VD);
   Named->setType(Tmp1VD->getType());
-  auto *Let = VarPattern::createImplicit(Ctx, /*let*/true, Named);
+  auto *Let = BindingPattern::createImplicit(Ctx, /*let*/ true, Named);
   Let->setType(Named->getType());
   auto *Some = new (Ctx) OptionalSomePattern(Let, SourceLoc());
   Some->setImplicit();
@@ -2478,7 +2478,14 @@ static void typeCheckSynthesizedWrapperInitializer(
   }
 
   // Type-check the initialization.
-  TypeChecker::typeCheckExpression(initializer, originalDC);
+  {
+    auto *wrappedVar = backingVar->getOriginalWrappedProperty();
+    auto i = parentPBD->getPatternEntryIndexForVarDecl(wrappedVar);
+    auto *pattern = parentPBD->getPattern(i);
+    TypeChecker::typeCheckBinding(pattern, initializer, originalDC,
+                                  wrappedVar->getType(), parentPBD, i);
+  }
+
   const auto i = pbd->getPatternEntryIndexForVarDecl(backingVar);
   if (auto initializerContext =
           dyn_cast_or_null<Initializer>(pbd->getInitContext(i))) {
@@ -2729,8 +2736,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
     if (!parentPBD->isInitialized(patternNumber) && wrapperInfo.defaultInit) {
       // FIXME: Record this expression somewhere so that DI can perform the
       // initialization itself.
-      auto typeExpr = TypeExpr::createImplicit(storageType, ctx);
-      Expr *initializer = CallExpr::createImplicit(ctx, typeExpr, {}, { });
+      Expr *initializer = nullptr;
       typeCheckSynthesizedWrapperInitializer(pbd, backingVar, parentPBD,
                                              initializer);
       pbd->setInit(0, initializer);
@@ -2759,27 +2765,21 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   if (!wrappedValue && (!var->allAttachedPropertyWrappersHaveWrappedValueInit() ||
                         initializer)) {
     return PropertyWrapperBackingPropertyInfo(
-        backingVar, storageVar, nullptr, nullptr, nullptr);
+        backingVar, storageVar, nullptr, nullptr);
   }
 
   // Form the initialization of the backing property from a value of the
   // original property's type.
   if (!initializer) {
-    Type origValueInterfaceType = var->getPropertyWrapperInitValueInterfaceType();
-    Type origValueType =
-      var->getDeclContext()->mapTypeIntoContext(origValueInterfaceType);
-    wrappedValue = PropertyWrapperValuePlaceholderExpr::create(
-        ctx, var->getSourceRange(), origValueType, /*wrappedValue=*/nullptr);
-    initializer = buildPropertyWrapperWrappedValueCall(
-        var, storageType, wrappedValue, /*ignoreAttributeArgs=*/true);
+    initializer = PropertyWrapperValuePlaceholderExpr::create(
+        ctx, var->getSourceRange(), var->getType(), /*wrappedValue=*/nullptr);
     typeCheckSynthesizedWrapperInitializer(
         pbd, backingVar, parentPBD, initializer);
+    wrappedValue = findWrappedValuePlaceholder(initializer);
   }
 
   return PropertyWrapperBackingPropertyInfo(backingVar, storageVar,
-                                            wrappedValue->getOriginalWrappedValue(),
-                                            initializer,
-                                            wrappedValue->getOpaqueValuePlaceholder());
+                                            initializer, wrappedValue);
 }
 
 /// Given a storage declaration in a protocol, set it up with the right

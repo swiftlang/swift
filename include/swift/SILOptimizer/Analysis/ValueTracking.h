@@ -36,8 +36,13 @@ bool isExclusiveArgument(SILValue V);
 /// does not look through init/open_existential_addr.
 bool pointsToLocalObject(SILValue V);
 
-/// Returns true if \p V is a uniquely identified address or reference. It may
-/// be any of:
+/// Returns true if \p V is a uniquely identified address or reference. Two
+/// uniquely identified pointers with distinct roots cannot alias. However, a
+/// uniquely identified pointer may alias with unidentified pointers. For
+/// example, the uniquely identified pointer may escape to a call that returns an
+/// alias of that pointer.
+///
+/// It may be any of:
 ///
 /// - an address projection based on a locally allocated address with no
 /// indirection

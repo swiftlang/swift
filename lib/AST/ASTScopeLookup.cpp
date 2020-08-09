@@ -292,7 +292,10 @@ NullablePtr<const GenericParamList> GenericTypeScope::genericParams() const {
   // Sigh... These must be here so that from body, we search generics before
   // members. But they also must be on the Decl scope for lookups starting from
   // generic parameters, where clauses, etc.
-  return getGenericContext()->getGenericParams();
+  auto *context = getGenericContext();
+  if (isa<TypeAliasDecl>(context))
+    return context->getParsedGenericParams();
+  return context->getGenericParams();
 }
 NullablePtr<const GenericParamList> ExtensionScope::genericParams() const {
   return decl->getGenericParams();
@@ -365,6 +368,22 @@ bool GenericTypeOrExtensionWhereOrBodyPortion::lookupMembersOf(
                                              history, initialIsCascadingUse)
                                       .getValueOr(true);
                                 });
+}
+
+bool GenericTypeOrExtensionWherePortion::lookupMembersOf(
+    const GenericTypeOrExtensionScope *scope,
+    ArrayRef<const ASTScopeImpl *> history,
+    ASTScopeImpl::DeclConsumer consumer) const {
+  if (!scope->areMembersVisibleFromWhereClause())
+    return false;
+
+  return GenericTypeOrExtensionWhereOrBodyPortion::lookupMembersOf(
+    scope, history, consumer);
+}
+
+bool GenericTypeOrExtensionScope::areMembersVisibleFromWhereClause() const {
+  auto *decl = getDecl();
+  return isa<ProtocolDecl>(decl) || isa<ExtensionDecl>(decl);
 }
 
 #pragma mark looking in locals or members - locals
@@ -832,4 +851,85 @@ bool isLocWithinAnInactiveClause(const SourceLoc loc, SourceFile *SF) {
   InactiveClauseTester tester(loc, SF->getASTContext().SourceMgr);
   SF->walk(tester);
   return tester.wasFoundWithinInactiveClause;
+}
+
+#pragma mark isLabeledStmtLookupTerminator implementations
+bool ASTScopeImpl::isLabeledStmtLookupTerminator() const {
+  return true;
+}
+
+bool LookupParentDiversionScope::isLabeledStmtLookupTerminator() const {
+  return false;
+}
+
+bool ConditionalClauseScope::isLabeledStmtLookupTerminator() const {
+  return false;
+}
+
+bool ConditionalClausePatternUseScope::isLabeledStmtLookupTerminator() const {
+  return false;
+}
+
+bool AbstractStmtScope::isLabeledStmtLookupTerminator() const {
+  return false;
+}
+
+bool ForEachPatternScope::isLabeledStmtLookupTerminator() const {
+  return false;
+}
+
+llvm::SmallVector<LabeledStmt *, 4>
+ASTScopeImpl::lookupLabeledStmts(SourceFile *sourceFile, SourceLoc loc) {
+  // Find the innermost scope from which to start our search.
+  auto *const fileScope = sourceFile->getScope().impl;
+  const auto *innermost = fileScope->findInnermostEnclosingScope(loc, nullptr);
+  ASTScopeAssert(innermost->getWasExpanded(),
+                 "If looking in a scope, it must have been expanded.");
+
+  llvm::SmallVector<LabeledStmt *, 4> labeledStmts;
+  for (auto scope = innermost; scope && !scope->isLabeledStmtLookupTerminator();
+       scope = scope->getParent().getPtrOrNull()) {
+    // If we have a labeled statement, record it.
+    auto stmt = scope->getStmtIfAny();
+    if (!stmt) continue;
+
+    auto labeledStmt = dyn_cast<LabeledStmt>(stmt.get());
+    if (!labeledStmt) continue;
+
+    // Skip guard statements; they aren't actually targets for break or
+    // continue.
+    if (isa<GuardStmt>(labeledStmt)) continue;
+
+    labeledStmts.push_back(labeledStmt);
+  }
+
+  return labeledStmts;
+}
+
+std::pair<CaseStmt *, CaseStmt *> ASTScopeImpl::lookupFallthroughSourceAndDest(
+    SourceFile *sourceFile, SourceLoc loc) {
+  // Find the innermost scope from which to start our search.
+  auto *const fileScope = sourceFile->getScope().impl;
+  const auto *innermost = fileScope->findInnermostEnclosingScope(loc, nullptr);
+  ASTScopeAssert(innermost->getWasExpanded(),
+                 "If looking in a scope, it must have been expanded.");
+
+  // Look for the enclosing case statement of a 'switch'.
+  for (auto scope = innermost; scope && !scope->isLabeledStmtLookupTerminator();
+       scope = scope->getParent().getPtrOrNull()) {
+    // If we have a case statement, record it.
+    auto stmt = scope->getStmtIfAny();
+    if (!stmt) continue;
+
+    // If we've found the first case statement of a switch, record it as the
+    // fallthrough source. do-catch statements don't support fallthrough.
+    if (auto caseStmt = dyn_cast<CaseStmt>(stmt.get())) {
+      if (caseStmt->getParentKind() == CaseParentKind::Switch)
+        return { caseStmt, caseStmt->findNextCaseStmt() };
+
+      continue;
+    }
+  }
+
+  return { nullptr, nullptr };
 }

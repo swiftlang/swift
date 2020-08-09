@@ -147,7 +147,8 @@ bool ModuleInterfaceBuilder::collectDepsForSerialization(
 
 bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     StringRef OutPath, bool ShouldSerializeDeps,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer) {
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+    ArrayRef<std::string> CompiledCandidates) {
 
   auto outerPrettyStackState = llvm::SavePrettyStackState();
 
@@ -167,6 +168,13 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
                                            [&](SubCompilerInstanceInfo &info) {
     auto &SubInstance = *info.Instance;
     auto subInvocation = SubInstance.getInvocation();
+    // Try building forwarding module first. If succeed, return.
+    if (static_cast<ModuleInterfaceLoader*>(SubInstance.getASTContext()
+        .getModuleInterfaceLoader())->tryEmitForwardingModule(moduleName,
+                                                              interfacePath,
+                                                  CompiledCandidates, OutPath)) {
+      return false;
+    }
     FrontendOptions &FEOpts = subInvocation.getFrontendOptions();
     const auto &InputInfo = FEOpts.InputsAndOutputs.firstInput();
     StringRef InPath = InputInfo.file();
@@ -256,12 +264,14 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
 bool ModuleInterfaceBuilder::buildSwiftModule(StringRef OutPath,
                                               bool ShouldSerializeDeps,
                           std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-                          llvm::function_ref<void()> RemarkRebuild) {
+                          llvm::function_ref<void()> RemarkRebuild,
+                          ArrayRef<std::string> CompiledCandidates) {
   auto build = [&]() {
     if (RemarkRebuild) {
       RemarkRebuild();
     }
-    return buildSwiftModuleInternal(OutPath, ShouldSerializeDeps, ModuleBuffer);
+    return buildSwiftModuleInternal(OutPath, ShouldSerializeDeps, ModuleBuffer,
+                                    CompiledCandidates);
   };
   if (disableInterfaceFileLock) {
     return build();

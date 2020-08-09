@@ -21,6 +21,10 @@
 #include "swift/AST/SimpleRequest.h"
 
 namespace llvm {
+
+class DataLayout;
+class Triple;
+
 namespace MachO {
 class InterfaceFile;
 } // end namespace MachO
@@ -59,6 +63,9 @@ public:
   /// Returns the TBDGen options.
   const TBDGenOptions &getOptions() const { return Opts; }
 
+  const llvm::DataLayout &getDataLayout() const;
+  const llvm::Triple &getTarget() const;
+
   bool operator==(const TBDGenDescriptor &other) const;
   bool operator!=(const TBDGenDescriptor &other) const {
     return !(*this == other);
@@ -77,13 +84,12 @@ llvm::hash_code hash_value(const TBDGenDescriptor &desc);
 void simple_display(llvm::raw_ostream &out, const TBDGenDescriptor &desc);
 SourceLoc extractNearestSourceLoc(const TBDGenDescriptor &desc);
 
-using TBDFileAndSymbols =
-    std::pair<llvm::MachO::InterfaceFile, llvm::StringSet<>>;
+using TBDFile = llvm::MachO::InterfaceFile;
 
-/// Computes the TBD file and public symbols for a given module or file.
+/// Computes the TBD file for a given Swift module or file.
 class GenerateTBDRequest
     : public SimpleRequest<GenerateTBDRequest,
-                           TBDFileAndSymbols(TBDGenDescriptor),
+                           TBDFile(TBDGenDescriptor),
                            RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -92,7 +98,23 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  TBDFileAndSymbols evaluate(Evaluator &evaluator, TBDGenDescriptor desc) const;
+  TBDFile evaluate(Evaluator &evaluator, TBDGenDescriptor desc) const;
+};
+
+/// Retrieve the public symbols for a file or module.
+class PublicSymbolsRequest
+    : public SimpleRequest<PublicSymbolsRequest,
+                           std::vector<std::string>(TBDGenDescriptor),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  std::vector<std::string>
+  evaluate(Evaluator &evaluator, TBDGenDescriptor desc) const;
 };
 
 /// Report that a request of the given kind is being evaluated, so it

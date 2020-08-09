@@ -419,7 +419,7 @@ bool TempRValueOptPass::checkTempObjectDestroy(
       return false;
 
     // Look for a known destroy point as described in the function level
-    // comment. This whitelist can be expanded as more cases are handled in
+    // comment. This allowlist can be expanded as more cases are handled in
     // tryOptimizeCopyIntoTemp during copy replacement.
     SILInstruction *lastUser = &*std::prev(pos);
     if (isa<DestroyAddrInst>(lastUser))

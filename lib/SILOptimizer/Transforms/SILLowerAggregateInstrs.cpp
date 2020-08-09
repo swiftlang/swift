@@ -28,12 +28,30 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
 using namespace swift::Lowering;
 
 STATISTIC(NumExpand, "Number of instructions expanded");
+
+static llvm::cl::opt<bool> EnableExpandAll("sil-lower-agg-instrs-expand-all",
+                                           llvm::cl::init(false));
+
+//===----------------------------------------------------------------------===//
+//                                  Utility
+//===----------------------------------------------------------------------===//
+
+/// We only expand if we are not in ownership and shouldExpand is true. The
+/// reason why is that this was originally done to help the low level ARC
+/// optimizer. To the high level ARC optimizer, this is just noise and
+/// unnecessary IR. At the same time for testing purposes, we want to provide a
+/// way even with ownership enabled to expand so we can check correctness.
+static bool shouldExpandShim(SILFunction *fn, SILType type) {
+  return EnableExpandAll ||
+         (!fn->hasOwnership() && shouldExpand(fn->getModule(), type));
+}
 
 //===----------------------------------------------------------------------===//
 //                      Higher Level Operation Expansion
@@ -43,25 +61,36 @@ STATISTIC(NumExpand, "Number of instructions expanded");
 /// non-address only type. We do this here so we can process the resulting
 /// loads/stores.
 ///
-/// This peephole implements the following optimizations:
+/// This peephole implements the following optimizations with the ossa version
+/// of the optimization first.
 ///
 /// copy_addr %0 to %1 : $*T
 /// ->
+///     %new = load [copy] %0 : $*T
+///     store %new to [assign] %1 : $*T
+/// ->
 ///     %new = load %0 : $*T        // Load the new value from the source
-///     %old = load %1 : $*T        // Load the old value from the destination
 ///     strong_retain %new : $T     // Retain the new value
+///     %old = load %1 : $*T        // Load the old value from the destination
 ///     strong_release %old : $T    // Release the old
 ///     store %new to %1 : $*T      // Store the new value to the destination
 ///
 /// copy_addr [take] %0 to %1 : $*T
 /// ->
+///     // load [take], not load [copy]!
+///     %new = load [take] %0 : $*T
+///     store %new to [assign] %1 : $*T
+/// ->
 ///     %new = load %0 : $*T
-///     %old = load %1 : $*T
 ///     // no retain of %new!
+///     %old = load %1 : $*T
 ///     strong_release %old : $T
 ///     store %new to %1 : $*T
 ///
 /// copy_addr %0 to [initialization] %1 : $*T
+/// ->
+///     %new = load [copy] %0 : $*T
+///     store %new to [init] %1 : $*T
 /// ->
 ///     %new = load %0 : $*T
 ///     strong_retain %new : $T
@@ -70,13 +99,15 @@ STATISTIC(NumExpand, "Number of instructions expanded");
 ///
 /// copy_addr [take] %0 to [initialization] %1 : $*T
 /// ->
+///     %new = load [take] %0 : $*T
+///     store %new to [init] %1 : $*T
+/// ->
 ///     %new = load %0 : $*T
 ///     // no retain of %new!
 ///     // no load/release of %old!
 ///     store %new to %1 : $*T
 static bool expandCopyAddr(CopyAddrInst *cai) {
   SILFunction *fn = cai->getFunction();
-  SILModule &module = cai->getModule();
   SILValue source = cai->getSrc();
 
   // If we have an address only type don't do anything.
@@ -84,57 +115,49 @@ static bool expandCopyAddr(CopyAddrInst *cai) {
   if (srcType.isAddressOnly(*fn))
     return false;
 
-  bool expand = shouldExpand(module, srcType.getObjectType());
+  bool expand = shouldExpandShim(fn, srcType.getObjectType());
   using TypeExpansionKind = Lowering::TypeLowering::TypeExpansionKind;
   auto expansionKind = expand ? TypeExpansionKind::MostDerivedDescendents
                               : TypeExpansionKind::None;
 
   SILBuilderWithScope builder(cai);
 
-  // %new = load %0 : $*T
-  LoadInst *newValue = builder.createLoad(cai->getLoc(), source,
-                                          LoadOwnershipQualifier::Unqualified);
-
-  SILValue destAddr = cai->getDest();
-
-  // If our object type is not trivial, we may need to release the old value and
-  // retain the new one.
-
-  auto &typeLowering = fn->getTypeLowering(srcType);
-
-  // If we have a non-trivial type...
-  if (!typeLowering.isTrivial()) {
-    // If we are not initializing:
-    // %old = load %1 : $*T
-    auto isInit = cai->isInitializationOfDest();
-    LoadInst *oldValue = nullptr;
-    if (IsInitialization_t::IsNotInitialization == isInit) {
-      oldValue = builder.createLoad(cai->getLoc(), destAddr,
-                                    LoadOwnershipQualifier::Unqualified);
-    }
-
-    // If we are not taking and have a reference type:
-    //   strong_retain %new : $*T
-    // or if we have a non-trivial non-reference type.
-    //   retain_value %new : $*T
-    if (IsTake_t::IsNotTake == cai->isTakeOfSrc()) {
-      typeLowering.emitLoweredCopyValue(builder, cai->getLoc(), newValue,
-                                        expansionKind);
-    }
-
-    // If we are not initializing:
-    // strong_release %old : $*T
-    //   *or*
-    // release_value %old : $*T
-    if (oldValue) {
-      typeLowering.emitLoweredDestroyValue(builder, cai->getLoc(), oldValue,
-                                           expansionKind);
-    }
+  // If our object type is not trivial, we may need to destroy the old value and
+  // copy the new one. Handle the trivial case quickly and return.
+  if (srcType.isTrivial(*fn)) {
+    SILValue newValue = builder.emitLoadValueOperation(
+        cai->getLoc(), source, LoadOwnershipQualifier::Trivial);
+    SILValue destAddr = cai->getDest();
+    // Create the store.
+    builder.emitStoreValueOperation(cai->getLoc(), newValue, destAddr,
+                                    StoreOwnershipQualifier::Trivial);
+    ++NumExpand;
+    return true;
   }
 
-  // Create the store.
-  builder.createStore(cai->getLoc(), newValue, destAddr,
-                      StoreOwnershipQualifier::Unqualified);
+  // %new = load [copy|take] %0 : $*T
+  auto loadQual = [&]() -> LoadOwnershipQualifier {
+    if (IsTake_t::IsTake == cai->isTakeOfSrc())
+      return LoadOwnershipQualifier::Take;
+    return LoadOwnershipQualifier::Copy;
+  }();
+  SILValue newValue = builder.emitLoweredLoadValueOperation(
+      cai->getLoc(), source, loadQual, expansionKind);
+  SILValue destAddr = cai->getDest();
+
+  // Create the store in the guaranteed uninitialized memory.
+  //
+  // store %new to [init|assign] %1
+  //
+  // If we are not initializing the destination, we need to destroy what is
+  // currently there before we re-initialize the memory.
+  auto storeQualifier = [&]() -> StoreOwnershipQualifier {
+    if (IsInitialization_t::IsInitialization != cai->isInitializationOfDest())
+      return StoreOwnershipQualifier::Assign;
+    return StoreOwnershipQualifier::Init;
+  }();
+  builder.emitLoweredStoreValueOperation(cai->getLoc(), newValue, destAddr,
+                                         storeQualifier, expansionKind);
 
   ++NumExpand;
   return true;
@@ -142,7 +165,6 @@ static bool expandCopyAddr(CopyAddrInst *cai) {
 
 static bool expandDestroyAddr(DestroyAddrInst *dai) {
   SILFunction *fn = dai->getFunction();
-  SILModule &module = dai->getModule();
   SILBuilderWithScope builder(dai);
 
   // Strength reduce destroy_addr inst into release/store if
@@ -154,13 +176,16 @@ static bool expandDestroyAddr(DestroyAddrInst *dai) {
   if (type.isAddressOnly(*fn))
     return false;
 
-  bool expand = shouldExpand(module, type.getObjectType());
+  // We only expand if ownership is not enabled and we do not have a large
+  // type. This was something that was only really beneficial for the low level
+  // ARC optimizer which runs without ownership enabled.
+  bool expand = shouldExpandShim(fn, type.getObjectType());
 
   // If we have a non-trivial type...
   if (!type.isTrivial(*fn)) {
-    // If we have a type with reference semantics, emit a load/strong release.
-    LoadInst *li = builder.createLoad(dai->getLoc(), addr,
-                                      LoadOwnershipQualifier::Unqualified);
+    // If we have a type with reference semantics, emit a load/destroy.
+    SILValue li = builder.emitLoadValueOperation(dai->getLoc(), addr,
+                                                 LoadOwnershipQualifier::Take);
     auto &typeLowering = fn->getTypeLowering(type);
     using TypeExpansionKind = Lowering::TypeLowering::TypeExpansionKind;
     auto expansionKind = expand ? TypeExpansionKind::MostDerivedDescendents
@@ -175,7 +200,6 @@ static bool expandDestroyAddr(DestroyAddrInst *dai) {
 
 static bool expandReleaseValue(ReleaseValueInst *rvi) {
   SILFunction *fn = rvi->getFunction();
-  SILModule &module = rvi->getModule();
   SILBuilderWithScope builder(rvi);
 
   // Strength reduce destroy_addr inst into release/store if
@@ -184,11 +208,11 @@ static bool expandReleaseValue(ReleaseValueInst *rvi) {
 
   // If we have an address only type, do nothing.
   SILType type = value->getType();
-  assert(!SILModuleConventions(module).useLoweredAddresses() ||
+  assert(!SILModuleConventions(fn->getModule()).useLoweredAddresses() ||
          type.isLoadable(*fn) &&
              "release_value should never be called on a non-loadable type.");
 
-  if (!shouldExpand(module, type.getObjectType()))
+  if (!shouldExpandShim(fn, type.getObjectType()))
     return false;
 
   auto &TL = fn->getTypeLowering(type);
@@ -203,7 +227,6 @@ static bool expandReleaseValue(ReleaseValueInst *rvi) {
 
 static bool expandRetainValue(RetainValueInst *rvi) {
   SILFunction *fn = rvi->getFunction();
-  SILModule &module = rvi->getModule();
   SILBuilderWithScope builder(rvi);
 
   // Strength reduce destroy_addr inst into release/store if
@@ -212,11 +235,11 @@ static bool expandRetainValue(RetainValueInst *rvi) {
 
   // If we have an address only type, do nothing.
   SILType type = value->getType();
-  assert(!SILModuleConventions(module).useLoweredAddresses() ||
+  assert(!SILModuleConventions(fn->getModule()).useLoweredAddresses() ||
          type.isLoadable(*fn) &&
              "Copy Value can only be called on loadable types.");
 
-  if (!shouldExpand(module, type.getObjectType()))
+  if (!shouldExpandShim(fn, type.getObjectType()))
     return false;
 
   auto &typeLowering = fn->getTypeLowering(type);
@@ -291,9 +314,6 @@ class SILLowerAggregate : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     SILFunction *f = getFunction();
-    // FIXME: Can we support ownership?
-    if (f->hasOwnership())
-      return;
     LLVM_DEBUG(llvm::dbgs() << "***** LowerAggregate on function: "
                             << f->getName() << " *****\n");
     bool changed = processFunction(*f);

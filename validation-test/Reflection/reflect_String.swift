@@ -2,9 +2,9 @@
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/reflect_String
 // RUN: %target-codesign %t/reflect_String
 
-// RUN: %target-run %target-swift-reflection-test %t/reflect_String | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-run %target-swift-reflection-test %t/reflect_String | %FileCheck %s --check-prefix=CHECK-%target-ptrsize %add_num_extra_inhabitants
 
-// REQUIRES: objc_interop
+// REQUIRES: reflection_test_support
 // REQUIRES: executable_test
 // UNSUPPORTED: use_os_stdlib
 
@@ -29,7 +29,7 @@ reflect(object: obj)
 // CHECK-64: Type info:
 // CHECK-64-NEXT: (class_instance size=32 alignment=8 stride=32 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:   (field name=t offset=16
-// CHECK-64-NEXT:     (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:     (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // (unstable implementation details omitted)
 
 // CHECK-32: Reflecting an object.

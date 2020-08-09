@@ -327,6 +327,21 @@ bool swift::isSanitizerInstrumentation(SILInstruction *Instruction) {
   return false;
 }
 
+// Instrumentation instructions should not affect the correctness of the
+// program. That is, they should not affect the observable program state.
+// The constant evaluator relies on this property to skip instructions.
+bool swift::isInstrumentation(SILInstruction *Instruction) {
+  if (isSanitizerInstrumentation(Instruction))
+    return true;
+
+  if (BuiltinInst *bi = dyn_cast<BuiltinInst>(Instruction)) {
+    if (bi->getBuiltinKind() == BuiltinValueKind::IntInstrprofIncrement)
+      return true;
+  }
+
+  return false;
+}
+
 SILValue swift::isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI) {
   // A partial_apply of a reabstraction thunk either has a single capture
   // (a function) or two captures (function and dynamic Self type).

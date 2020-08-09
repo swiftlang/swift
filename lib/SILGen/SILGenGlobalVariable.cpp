@@ -141,7 +141,7 @@ struct GenGlobalAccessors : public PatternVisitor<GenGlobalAccessors>
   void visitTypedPattern(TypedPattern *P) {
     return visit(P->getSubPattern());
   }
-  void visitVarPattern(VarPattern *P) {
+  void visitBindingPattern(BindingPattern *P) {
     return visit(P->getSubPattern());
   }
   void visitTuplePattern(TuplePattern *P) {

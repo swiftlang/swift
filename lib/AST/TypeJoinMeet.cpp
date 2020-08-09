@@ -314,7 +314,7 @@ CanType TypeJoin::visitFunctionType(CanType second) {
   auto secondExtInfo = secondFnTy->getExtInfo();
 
   // FIXME: Properly handle these attributes.
-  if (firstExtInfo != secondExtInfo)
+  if (!firstExtInfo.isEqualTo(secondExtInfo, useClangTypes(First)))
     return Unimplemented;
 
   if (!AnyFunctionType::equalParams(firstFnTy->getParams(),

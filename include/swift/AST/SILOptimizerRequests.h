@@ -19,6 +19,7 @@
 
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/EvaluatorDependencies.h"
+#include "swift/AST/SILGenRequests.h"
 #include "swift/AST/SimpleRequest.h"
 
 namespace swift {
@@ -68,6 +69,23 @@ void simple_display(llvm::raw_ostream &out,
                     const SILPipelineExecutionDescriptor &desc);
 
 SourceLoc extractNearestSourceLoc(const SILPipelineExecutionDescriptor &desc);
+
+/// Produces lowered SIL from a Swift file or module, ready for IRGen. This runs
+/// the diagnostic, optimization, and lowering SIL passes.
+class LoweredSILRequest
+    : public SimpleRequest<LoweredSILRequest,
+                           std::unique_ptr<SILModule>(ASTLoweringDescriptor),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  std::unique_ptr<SILModule> evaluate(Evaluator &evaluator,
+                                      ASTLoweringDescriptor desc) const;
+};
 
 /// Report that a request of the given kind is being evaluated, so it
 /// can be recorded by the stats reporter.

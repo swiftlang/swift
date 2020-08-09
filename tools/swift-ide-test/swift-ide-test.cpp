@@ -756,6 +756,12 @@ static llvm::cl::opt<std::string>
 ExplicitSwiftModuleMap("explicit-swift-module-map-file",
                        llvm::cl::desc("JSON file to include explicit Swift modules"),
                        llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
+EnableExperimentalConcurrency("enable-experimental-concurrency",
+                              llvm::cl::desc("Enable experimental concurrency model"),
+                              llvm::cl::init(false));
+
 } // namespace options
 
 static std::unique_ptr<llvm::MemoryBuffer>
@@ -3185,7 +3191,7 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
     SmallVector<ModuleDecl::ImportedModule, 16> scratch;
     for (auto next : namelookup::getAllImports(M)) {
       llvm::outs() << next.importedModule->getName();
-      if (next.importedModule->isClangModule())
+      if (next.importedModule->isNonSwiftModule())
         llvm::outs() << " (Clang)";
       llvm::outs() << ":\n";
 
@@ -3199,7 +3205,7 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
           llvm::outs() << "." << accessPathPiece.Item;
         }
 
-        if (import.importedModule->isClangModule())
+        if (import.importedModule->isNonSwiftModule())
           llvm::outs() << " (Clang)";
         llvm::outs() << "\n";
       }
@@ -3819,6 +3825,9 @@ int main(int argc, char *argv[]) {
   }
   if (options::EnableCxxInterop) {
     InitInvok.getLangOptions().EnableCXXInterop = true;
+  }
+  if (options::EnableExperimentalConcurrency) {
+    InitInvok.getLangOptions().EnableExperimentalConcurrency = true;
   }
 
   // We disable source location resolutions from .swiftsourceinfo files by

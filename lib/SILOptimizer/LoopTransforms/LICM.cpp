@@ -700,19 +700,18 @@ static bool analyzeBeginAccess(BeginAccessInst *BI,
                                InstSet &SideEffectInsts,
                                AccessedStorageAnalysis *ASA,
                                DominanceInfo *DT) {
-  const AccessedStorage &storage =
-      findAccessedStorageNonNested(BI->getSource());
+  const AccessedStorage &storage = findAccessedStorage(BI->getSource());
   if (!storage) {
     return false;
   }
 
-  auto BIAccessedStorageNonNested = findAccessedStorageNonNested(BI);
+  auto BIAccessedStorageNonNested = findAccessedStorage(BI);
   auto safeBeginPred = [&](BeginAccessInst *OtherBI) {
     if (BI == OtherBI) {
       return true;
     }
     return BIAccessedStorageNonNested.isDistinctFrom(
-        findAccessedStorageNonNested(OtherBI));
+        findAccessedStorage(OtherBI));
   };
 
   if (!std::all_of(BeginAccesses.begin(), BeginAccesses.end(), safeBeginPred))

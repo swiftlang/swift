@@ -33,7 +33,7 @@ struct ModuleInterfaceOptions {
   bool PreserveTypesAsWritten = false;
 
   /// Should we emit the cType when printing @convention(c) or no?
-  /// FIXME: [clang-function-type-serialization] This check should go away.
+  /// [TODO: Clang-type-plumbing] This check should go away.
   bool PrintFullConvention = false;
 
   /// Copy of all the command-line flags passed at .swiftinterface
@@ -43,6 +43,10 @@ struct ModuleInterfaceOptions {
 
   // Print SPI decls and attributes.
   bool PrintSPIs = false;
+
+  /// Print imports with both @_implementationOnly and @_spi, only applies
+  /// when PrintSPIs is true.
+  bool ExperimentalSPIImports = false;
 };
 
 extern version::Version InterfaceFormatVersion;

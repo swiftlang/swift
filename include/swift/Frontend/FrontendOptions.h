@@ -161,12 +161,6 @@ public:
   /// If set, dumps wall time taken to check each expression.
   bool DebugTimeExpressionTypeChecking = false;
 
-  /// If set, prints the time taken in each major compilation phase to 
-  /// llvm::errs().
-  ///
-  /// \sa swift::SharedTimer
-  bool DebugTimeCompilation = false;
-
   /// The path to which we should output statistics files.
   std::string StatsOutputDir;
 
@@ -256,6 +250,9 @@ public:
   /// Should we enable the dependency verifier for all primary files known to this frontend?
   bool EnableIncrementalDependencyVerifier = false;
 
+  /// The path of the swift-frontend executable.
+  std::string MainExecutablePath;
+
   /// The directory path we should use when print #include for the bridging header.
   /// By default, we include ImplicitObjCHeaderPath directly.
   llvm::Optional<std::string> BridgingHeaderDirForPrint;
@@ -288,6 +285,11 @@ public:
   /// Line and column for each of the locations to be probed by
   /// -dump-scope-maps.
   SmallVector<std::pair<unsigned, unsigned>, 2> DumpScopeMapLocations;
+
+  /// Determines whether the static or shared resource folder is used.
+  /// When set to `true`, the default resource folder will be set to
+  /// '.../lib/swift', otherwise '.../lib/swift_static'.
+  bool UseSharedResourceFolder = true;
 
   /// \return true if action only parses without doing other compilation steps.
   static bool shouldActionOnlyParse(ActionType);

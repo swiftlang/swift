@@ -1459,8 +1459,21 @@ public:
     assert(getRemappedTangentType(urci->getOperand()->getType()) ==
                getRemappedTangentType(urci->getType()) &&
            "Operand/result must have the same `TangentVector` type");
-    auto adj = getAdjointValue(bb, urci);
-    addAdjointValue(bb, urci->getOperand(), adj, urci->getLoc());
+    switch (getTangentValueCategory(urci)) {
+    case SILValueCategory::Object: {
+      auto adj = getAdjointValue(bb, urci);
+      addAdjointValue(bb, urci->getOperand(), adj, urci->getLoc());
+      break;
+    }
+    case SILValueCategory::Address: {
+      auto &adjDest = getAdjointBuffer(bb, urci);
+      auto destType = remapType(adjDest->getType());
+      addToAdjointBuffer(bb, urci->getOperand(), adjDest, urci->getLoc());
+      builder.emitDestroyAddrAndFold(urci->getLoc(), adjDest);
+      emitZeroIndirect(destType.getASTType(), adjDest, urci->getLoc());
+      break;
+    }
+    }
   }
 
   /// Handle `upcast` instruction.
@@ -1473,8 +1486,21 @@ public:
     assert(getRemappedTangentType(ui->getOperand()->getType()) ==
                getRemappedTangentType(ui->getType()) &&
            "Operand/result must have the same `TangentVector` type");
-    auto adj = getAdjointValue(bb, ui);
-    addAdjointValue(bb, ui->getOperand(), adj, ui->getLoc());
+    switch (getTangentValueCategory(ui)) {
+    case SILValueCategory::Object: {
+      auto adj = getAdjointValue(bb, ui);
+      addAdjointValue(bb, ui->getOperand(), adj, ui->getLoc());
+      break;
+    }
+    case SILValueCategory::Address: {
+      auto &adjDest = getAdjointBuffer(bb, ui);
+      auto destType = remapType(adjDest->getType());
+      addToAdjointBuffer(bb, ui->getOperand(), adjDest, ui->getLoc());
+      builder.emitDestroyAddrAndFold(ui->getLoc(), adjDest);
+      emitZeroIndirect(destType.getASTType(), adjDest, ui->getLoc());
+      break;
+    }
+    }
   }
 
 #define NOT_DIFFERENTIABLE(INST, DIAG) void visit##INST##Inst(INST##Inst *inst);
@@ -2797,7 +2823,7 @@ AllocStackInst *PullbackCloner::Implementation::getArrayAdjointElementBuffer(
   auto *eltIndexLiteral =
       builder.createIntegerLiteral(loc, builtinIntType, eltIndex);
   auto intType = SILType::getPrimitiveObjectType(
-      ctx.getIntDecl()->getDeclaredType()->getCanonicalType());
+      ctx.getIntDecl()->getDeclaredInterfaceType()->getCanonicalType());
   // %index_int = struct $Int (%index_literal)
   auto *eltIndexInt = builder.createStruct(loc, intType, {eltIndexLiteral});
   auto *swiftModule = getModule().getSwiftModule();

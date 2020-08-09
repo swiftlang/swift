@@ -105,7 +105,7 @@ func crash_on_dealloc(_ dict : [Int : [Int]] = [:]) {
 func use_unwrapped(_: Int) {}
 
 // CHECK-LABEL: sil hidden [ossa] @$s8optional15explicit_unwrap{{[_0-9a-zA-Z]*}}F
-// CHECK:         [[FILESTR:%.*]] = string_literal utf8 "{{.*}}optional.swift"
+// CHECK:         [[FILESTR:%.*]] = string_literal utf8 "optional/optional.swift"
 // CHECK-NEXT:         [[FILESIZ:%.*]] = integer_literal $Builtin.Word, 
 // CHECK-NEXT:         [[FILEASC:%.*]] = integer_literal $Builtin.Int1, 
 // CHECK-NEXT:         [[LINE:%.*]] = integer_literal $Builtin.Word, 
@@ -118,7 +118,7 @@ func explicit_unwrap(_ value: Int?) {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8optional19explicit_iuo_unwrap{{[_0-9a-zA-Z]*}}F
-// CHECK:         [[FILESTR:%.*]] = string_literal utf8 "{{.*}}optional.swift"
+// CHECK:         [[FILESTR:%.*]] = string_literal utf8 "optional/optional.swift"
 // CHECK-NEXT:         [[FILESIZ:%.*]] = integer_literal $Builtin.Word, 
 // CHECK-NEXT:         [[FILEASC:%.*]] = integer_literal $Builtin.Int1, 
 // CHECK-NEXT:         [[LINE:%.*]] = integer_literal $Builtin.Word, 
@@ -131,7 +131,7 @@ func explicit_iuo_unwrap(_ value: Int!) {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8optional19implicit_iuo_unwrap{{[_0-9a-zA-Z]*}}F
-// CHECK:         [[FILESTR:%.*]] = string_literal utf8 "{{.*}}optional.swift"
+// CHECK:         [[FILESTR:%.*]] = string_literal utf8 "optional/optional.swift"
 // CHECK-NEXT:         [[FILESIZ:%.*]] = integer_literal $Builtin.Word, 
 // CHECK-NEXT:         [[FILEASC:%.*]] = integer_literal $Builtin.Int1, 
 // CHECK-NEXT:         [[LINE:%.*]] = integer_literal $Builtin.Word, 
@@ -144,7 +144,7 @@ func implicit_iuo_unwrap(_ value: Int!) {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8optional34implicit_iuo_unwrap_sourceLocation{{[_0-9a-zA-Z]*}}F
-// CHECK:         [[FILESTR:%.*]] = string_literal utf8 "custom.swuft"
+// CHECK:         [[FILESTR:%.*]] = string_literal utf8 "optional/custom.swuft"
 // CHECK-NEXT:         [[FILESIZ:%.*]] = integer_literal $Builtin.Word, 
 // CHECK-NEXT:         [[FILEASC:%.*]] = integer_literal $Builtin.Int1, 
 // CHECK-NEXT:         [[LINE:%.*]] = integer_literal $Builtin.Word, 2000

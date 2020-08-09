@@ -251,7 +251,7 @@ void DominatedAccessAnalysis::analyzeAccess(BeginAccessInst *BAI,
   // Only track dynamic access in the result. Static accesses still need to be
   // tracked by data flow, but they can't be optimized as "dominating".
   if (BAI->getEnforcement() == SILAccessEnforcement::Dynamic) {
-    AccessedStorage storage = findAccessedStorageNonNested(BAI->getSource());
+    AccessedStorage storage = findAccessedStorage(BAI->getSource());
     // Copy the AccessStorage into DomAccessedStorage. All pass-specific bits
     // are initialized to zero.
     domStorage = DomAccessedStorage(storage);
@@ -381,7 +381,7 @@ void DominatedAccessRemoval::visitBeginAccess(BeginAccessInst *BAI) {
     return;
 
   // Only track "identifiable" storage.
-  if (currDomStorage.isUniquelyIdentifiedOrClass()) {
+  if (currDomStorage.isFormalAccessBase()) {
     if (checkDominatedAccess(BAI, currDomStorage))
       return;
   }
@@ -569,7 +569,7 @@ void DominatedAccessRemoval::tryInsertLoopPreheaderAccess(
 
   // Insert the new dominating instruction in both DominatedAccessAnalysis and
   // storageToDomMap if it has uniquely identifiable storage.
-  if (!currAccessInfo.isUniquelyIdentifiedOrClass())
+  if (!currAccessInfo.isFormalAccessBase())
     return;
 
   AccessedStorage storage = static_cast<AccessedStorage>(currAccessInfo);

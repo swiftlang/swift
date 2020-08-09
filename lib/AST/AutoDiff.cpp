@@ -282,7 +282,7 @@ GenericSignature autodiff::getConstrainedDerivativeGenericSignature(
     // Require differentiability parameters to conform to `Differentiable`.
     auto paramType = originalFnTy->getParameters()[paramIdx].getInterfaceType();
     Requirement req(RequirementKind::Conformance, paramType,
-                    diffableProto->getDeclaredType());
+                    diffableProto->getDeclaredInterfaceType());
     requirements.push_back(req);
     if (isTranspose) {
       // Require linearity parameters to additionally satisfy
@@ -370,6 +370,23 @@ bool autodiff::getBuiltinDifferentiableOrLinearFunctionConfig(
     return false;
   parseAutoDiffBuiltinCommonConfig(operationName, arity, throws);
   return operationName.empty();
+}
+
+GenericSignature autodiff::getDifferentiabilityWitnessGenericSignature(
+    GenericSignature origGenSig, GenericSignature derivativeGenSig) {
+  // If there is no derivative generic signature, return the original generic
+  // signature.
+  if (!derivativeGenSig)
+    return origGenSig;
+  // If derivative generic signature has all concrete generic parameters and is
+  // equal to the original generic signature, return `nullptr`.
+  auto derivativeCanGenSig = derivativeGenSig.getCanonicalSignature();
+  auto origCanGenSig = origGenSig.getCanonicalSignature();
+  if (origCanGenSig == derivativeCanGenSig &&
+      derivativeCanGenSig->areAllParamsConcrete())
+    return GenericSignature();
+  // Otherwise, return the derivative generic signature.
+  return derivativeGenSig;
 }
 
 Type TangentSpace::getType() const {

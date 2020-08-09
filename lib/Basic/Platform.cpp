@@ -131,23 +131,6 @@ DarwinPlatformKind swift::getDarwinPlatformKind(const llvm::Triple &triple) {
   llvm_unreachable("Unsupported Darwin platform");
 }
 
-DarwinPlatformKind swift::getNonSimulatorPlatform(DarwinPlatformKind platform) {
-  switch (platform) {
-  case DarwinPlatformKind::MacOS:
-    return DarwinPlatformKind::MacOS;
-  case DarwinPlatformKind::IPhoneOS:
-  case DarwinPlatformKind::IPhoneOSSimulator:
-    return DarwinPlatformKind::IPhoneOS;
-  case DarwinPlatformKind::TvOS:
-  case DarwinPlatformKind::TvOSSimulator:
-    return DarwinPlatformKind::TvOS;
-  case DarwinPlatformKind::WatchOS:
-  case DarwinPlatformKind::WatchOSSimulator:
-    return DarwinPlatformKind::WatchOS;
-  }
-  llvm_unreachable("Unsupported Darwin platform");
-}
-
 static StringRef getPlatformNameForDarwin(const DarwinPlatformKind platform) {
   switch (platform) {
   case DarwinPlatformKind::MacOS:
@@ -450,4 +433,59 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
   }
 
   return None;
+}
+
+
+/// Remap the given version number via the version map, or produce \c None if
+/// there is no mapping for this version.
+static Optional<llvm::VersionTuple> remapVersion(
+    const llvm::StringMap<llvm::VersionTuple> &versionMap,
+    llvm::VersionTuple version) {
+  // The build number is never used in the lookup.
+  version = version.withoutBuild();
+
+  // Look for this specific version.
+  auto known = versionMap.find(version.getAsString());
+  if (known != versionMap.end())
+    return known->second;
+
+  // If an extra ".0" was specified (in the subminor version), drop that
+  // and look again.
+  if (!version.getSubminor() || *version.getSubminor() != 0)
+    return None;
+
+  version = llvm::VersionTuple(version.getMajor(), *version.getMinor());
+  known = versionMap.find(version.getAsString());
+  if (known != versionMap.end())
+    return known->second;
+
+  // If another extra ".0" wa specified (in the minor version), drop that
+  // and look again.
+  if (!version.getMinor() || *version.getMinor() != 0)
+    return None;
+
+  version = llvm::VersionTuple(version.getMajor());
+  known = versionMap.find(version.getAsString());
+  if (known != versionMap.end())
+    return known->second;
+
+  return None;
+}
+
+llvm::VersionTuple
+swift::getTargetSDKVersion(clang::driver::DarwinSDKInfo &SDKInfo,
+                           const llvm::Triple &triple) {
+  // Retrieve the SDK version.
+  auto SDKVersion = SDKInfo.getVersion();
+
+  // For the Mac Catalyst environment, we have a macOS SDK with a macOS
+  // SDK version. Map that to the corresponding iOS version number to pass
+  // down to the linker.
+  if (tripleIsMacCatalystEnvironment(triple)) {
+    return remapVersion(
+        SDKInfo.getVersionMap().MacOS2iOSMacMapping, SDKVersion)
+          .getValueOr(llvm::VersionTuple(0, 0, 0));
+  }
+
+  return SDKVersion;
 }

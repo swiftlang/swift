@@ -773,7 +773,7 @@ public:
     std::vector<sma::TypeName> Result;
     Result.reserve(AllProtocols.size());
     for (const auto *PD : AllProtocols) {
-      Result.emplace_back(convertToTypeName(PD->getDeclaredType()));
+      Result.emplace_back(convertToTypeName(PD->getDeclaredInterfaceType()));
     }
     return Result;
   }

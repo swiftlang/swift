@@ -3,6 +3,8 @@
 // REQUIRES: CPU=x86_64
 
 sil_stage canonical
+import Builtin
+import Swift
 
 sil private @foo : $@convention(thin) () -> () {
 bb0:
@@ -43,12 +45,23 @@ bb0:
   return %1 : $()
 }
 
-// CHECK-macho: @llvm.used = appending global [2 x i8*] [i8* bitcast (void ()* @frieda to i8*), i8* bitcast (i16* @__swift_reflection_version to i8*)], section "llvm.metadata"
-// CHECK-elf: @llvm.used = appending global [3 x i8*] [i8* bitcast (void ()* @frieda to i8*), i8* bitcast (i16* @__swift_reflection_version to i8*), i8* getelementptr inbounds ([0 x i8], [0 x i8]* @_swift1_autolink_entries, i32 0, i32 0)], section "llvm.metadata"
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+  %2 = integer_literal $Builtin.Int32, 0          // user: %3
+  %3 = struct $Int32 (%2 : $Builtin.Int32)        // user: %4
+  return %3 : $Int32                              // id: %4
+}
+
+// CHECK-macho: @"\01l_entry_point" = private constant { i32 } { i32 trunc (i64 sub (i64 ptrtoint (i32 (i32, i8**)* @main to i64), i64 ptrtoint ({ i32 }* @"\01l_entry_point" to i64)) to i32) }, section "__TEXT, __swift5_entry, regular, no_dead_strip", align 4
+// CHECK-elf: @"\01l_entry_point" = private constant { i32 } { i32 trunc (i64 sub (i64 ptrtoint (i32 (i32, i8**)* @main to i64), i64 ptrtoint ({ i32 }* @"\01l_entry_point" to i64)) to i32) }, section "swift5_entry", align 4
+
+// CHECK-macho: @llvm.used = appending global [4 x i8*] [i8* bitcast (void ()* @frieda to i8*), i8* bitcast (i32 (i32, i8**)* @main to i8*), i8* bitcast ({ i32 }* @"\01l_entry_point" to i8*), i8* bitcast (i16* @__swift_reflection_version to i8*)], section "llvm.metadata", align 8
+// CHECK-elf: @llvm.used = appending global [5 x i8*] [i8* bitcast (void ()* @frieda to i8*), i8* bitcast (i32 (i32, i8**)* @main to i8*), i8* bitcast ({ i32 }* @"\01l_entry_point" to i8*), i8* bitcast (i16* @__swift_reflection_version to i8*), i8* getelementptr inbounds ([12 x i8], [12 x i8]* @_swift1_autolink_entries, i32 0, i32 0)], section "llvm.metadata", align 8
 
 // CHECK: define linkonce_odr hidden swiftcc void @qux()
 // CHECK: define hidden swiftcc void @fred()
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @frieda()
+// CHECK: define{{( dllexport)?}}{{( protected)?}} i32 @main
 
 // NEGATIVE-NOT: @foo
 // NEGATIVE-NOT: @bar

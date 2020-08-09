@@ -392,16 +392,16 @@ SourceLoc RepeatWhileStmt::getEndLoc() const { return Cond->getEndLoc(); }
 
 SourceRange CaseLabelItem::getSourceRange() const {
   if (auto *E = getGuardExpr())
-    return { CasePattern->getStartLoc(), E->getEndLoc() };
-  return CasePattern->getSourceRange();
+    return { getPattern()->getStartLoc(), E->getEndLoc() };
+  return getPattern()->getSourceRange();
 }
 SourceLoc CaseLabelItem::getStartLoc() const {
-  return CasePattern->getStartLoc();
+  return getPattern()->getStartLoc();
 }
 SourceLoc CaseLabelItem::getEndLoc() const {
   if (auto *E = getGuardExpr())
     return E->getEndLoc();
-  return CasePattern->getEndLoc();
+  return getPattern()->getEndLoc();
 }
 
 CaseStmt::CaseStmt(CaseParentKind parentKind, SourceLoc itemIntroducerLoc,
@@ -456,6 +456,40 @@ CaseStmt *CaseStmt::create(ASTContext &ctx, CaseParentKind ParentKind,
   return ::new (mem)
       CaseStmt(ParentKind, caseLoc, caseLabelItems, unknownAttrLoc, colonLoc,
                body, caseVarDecls, implicit, fallthroughStmt);
+}
+
+namespace {
+
+template<typename CaseIterator>
+CaseStmt *findNextCaseStmt(
+    CaseIterator first, CaseIterator last, const CaseStmt *caseStmt) {
+  for(auto caseIter = first; caseIter != last; ++caseIter) {
+    if (*caseIter == caseStmt) {
+      ++caseIter;
+      return caseIter == last ? nullptr : *caseIter;
+    }
+  }
+
+  return nullptr;
+}
+
+}
+
+CaseStmt *CaseStmt::findNextCaseStmt() const {
+  auto parent = getParentStmt();
+  if (!parent)
+    return nullptr;
+
+  if (auto switchParent = dyn_cast<SwitchStmt>(parent)) {
+    return ::findNextCaseStmt(
+        switchParent->getCases().begin(), switchParent->getCases().end(),
+        this);
+  }
+
+  auto doCatchParent = cast<DoCatchStmt>(parent);
+  return ::findNextCaseStmt(
+      doCatchParent->getCatches().begin(), doCatchParent->getCatches().end(),
+      this);
 }
 
 SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,

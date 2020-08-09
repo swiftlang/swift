@@ -492,6 +492,8 @@ template <typename Runtime> class TargetEnumDescriptor;
 template <typename Runtime> class TargetStructDescriptor;
 template <typename Runtime> struct TargetGenericMetadataPattern;
 
+using TypeContextDescriptor = TargetTypeContextDescriptor<InProcess>;
+
 // FIXME: https://bugs.swift.org/browse/SR-1155
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Winvalid-offsetof"
@@ -722,6 +724,10 @@ public:
   }
 
   bool satisfiesClassConstraint() const;
+
+  const TypeContextDescriptor *getDescription() const;
+
+  bool isStaticallySpecializedGenericMetadata() const;
 
   bool isCanonicalStaticallySpecializedGenericMetadata() const;
 
@@ -1304,6 +1310,14 @@ public:
   }
 #endif
 
+  bool isStaticallySpecializedGenericMetadata() const {
+    auto *description = getDescription();
+    if (!description->isGeneric())
+      return false;
+
+    return this->Flags & ClassFlags::IsStaticSpecialization;
+  }
+
   bool isCanonicalStaticallySpecializedGenericMetadata() const {
     auto *description = getDescription();
     if (!description->isGeneric())
@@ -1449,6 +1463,18 @@ struct TargetStructMetadata : public TargetValueMetadata<Runtime> {
     return reinterpret_cast<const uint32_t *>(asWords + offset);
   }
 
+  bool isStaticallySpecializedGenericMetadata() const {
+    auto *description = getDescription();
+    if (!description->isGeneric())
+      return false;
+
+    auto *trailingFlags = getTrailingFlags();
+    if (trailingFlags == nullptr)
+      return false;
+
+    return trailingFlags->isStaticSpecialization();
+  }
+
   bool isCanonicalStaticallySpecializedGenericMetadata() const {
     auto *description = getDescription();
     if (!description->isGeneric())
@@ -1525,6 +1551,18 @@ struct TargetEnumMetadata : public TargetValueMetadata<Runtime> {
     return *asWords;
   }
 
+  bool isStaticallySpecializedGenericMetadata() const {
+    auto *description = getDescription();
+    if (!description->isGeneric())
+      return false;
+
+    auto *trailingFlags = getTrailingFlags();
+    if (trailingFlags == nullptr)
+      return false;
+
+    return trailingFlags->isStaticSpecialization();
+  }
+
   bool isCanonicalStaticallySpecializedGenericMetadata() const {
     auto *description = getDescription();
     if (!description->isGeneric())
@@ -1596,7 +1634,8 @@ struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
   FunctionMetadataConvention getConvention() const {
     return Flags.getConvention();
   }
-  bool throws() const { return Flags.throws(); }
+  bool isAsync() const { return Flags.isAsync(); }
+  bool isThrowing() const { return Flags.isThrowing(); }
   bool hasParameterFlags() const { return Flags.hasParameterFlags(); }
   bool isEscaping() const { return Flags.isEscaping(); }
 
@@ -3819,8 +3858,6 @@ public:
         && cd->getKind() <= ContextDescriptorKind::Type_Last;
   }
 };
-
-using TypeContextDescriptor = TargetTypeContextDescriptor<InProcess>;
 
 /// Storage for class metadata bounds.  This is the variable returned
 /// by getAddrOfClassMetadataBounds in the compiler.

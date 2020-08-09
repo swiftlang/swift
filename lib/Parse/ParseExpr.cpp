@@ -122,23 +122,25 @@ ParserResult<Expr> Parser::parseExprAs() {
 /// parseExprArrow
 ///
 ///   expr-arrow:
-///     '->'
-///     'throws' '->'
+///     'async'? 'throws'? '->'
 ParserResult<Expr> Parser::parseExprArrow() {
-  SourceLoc throwsLoc, arrowLoc;
-  if (Tok.is(tok::kw_throws)) {
-    throwsLoc = consumeToken(tok::kw_throws);
-    if (!Tok.is(tok::arrow)) {
-      diagnose(throwsLoc, diag::throws_in_wrong_position);
-      return nullptr;
-    }
+  SourceLoc asyncLoc, throwsLoc, arrowLoc;
+
+  parseAsyncThrows(SourceLoc(), asyncLoc, throwsLoc, /*rethrows=*/nullptr);
+
+  if (Tok.isNot(tok::arrow)) {
+    assert(throwsLoc.isValid() || asyncLoc.isValid());
+    diagnose(throwsLoc.isValid() ? throwsLoc : asyncLoc,
+             diag::async_or_throws_in_wrong_position,
+             throwsLoc.isValid() ? 0 : 2);
+    return nullptr;
   }
+
   arrowLoc = consumeToken(tok::arrow);
-  if (Tok.is(tok::kw_throws)) {
-    diagnose(Tok.getLoc(), diag::throws_in_wrong_position);
-    throwsLoc = consumeToken(tok::kw_throws);
-  }
-  auto arrow = new (Context) ArrowExpr(throwsLoc, arrowLoc);
+
+  parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, /*rethrows=*/nullptr);
+
+  auto arrow = new (Context) ArrowExpr(asyncLoc, throwsLoc, arrowLoc);
   return makeParserResult(arrow);
 }
 
@@ -325,6 +327,17 @@ parse_operator:
       goto parse_operator;
     }
 
+    case tok::identifier: {
+      // 'async' followed by 'throws' or '->' implies that we have an arrow
+      // expression.
+      if (!(Context.LangOpts.EnableExperimentalConcurrency &&
+            Tok.isContextualKeyword("async") &&
+            peekToken().isAny(tok::arrow, tok::kw_throws)))
+        goto done;
+
+      LLVM_FALLTHROUGH;
+    }
+
     case tok::arrow:
     case tok::kw_throws: {
       SyntaxParsingContext ArrowContext(SyntaxContext, SyntaxKind::ArrowExpr);
@@ -366,9 +379,10 @@ done:
 /// parseExprSequenceElement
 ///
 ///   expr-sequence-element(Mode):
-///     'try' expr-unary(Mode)
-///     'try' '?' expr-unary(Mode)
-///     'try' '!' expr-unary(Mode)
+///     '__await' expr-sequence-element(Mode)
+///     'try' expr-sequence-element(Mode)
+///     'try' '?' expr-sequence-element(Mode)
+///     'try' '!' expr-sequence-element(Mode)
 ///     expr-unary(Mode)
 ///
 /// 'try' is not actually allowed at an arbitrary position of a
@@ -377,6 +391,19 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
                                                     bool isExprBasic) {
   SyntaxParsingContext ElementContext(SyntaxContext,
                                       SyntaxContextKind::Expr);
+
+  if (Context.LangOpts.EnableExperimentalConcurrency &&
+      Tok.is(tok::kw___await)) {
+    SourceLoc awaitLoc = consumeToken(tok::kw___await);
+    ParserResult<Expr> sub = parseExprUnary(message, isExprBasic);
+    if (!sub.hasCodeCompletion() && !sub.isNull()) {
+      ElementContext.setCreateSyntax(SyntaxKind::AwaitExpr);
+      sub = makeParserResult(new (Context) AwaitExpr(awaitLoc, sub.get()));
+    }
+
+    return sub;
+  }
+
   SourceLoc tryLoc;
   bool hadTry = consumeIf(tok::kw_try, tryLoc);
   Optional<Token> trySuffix;
@@ -1019,29 +1046,32 @@ static bool isValidTrailingClosure(bool isExprBasic, Parser &P){
 /// Map magic literal tokens such as #file to their
 /// MagicIdentifierLiteralExpr kind.
 static MagicIdentifierLiteralExpr::Kind
-getMagicIdentifierLiteralKind(tok Kind) {
+getMagicIdentifierLiteralKind(tok Kind, const LangOptions &Opts) {
   switch (Kind) {
-  case tok::kw___COLUMN__:
-  case tok::pound_column:
-    return MagicIdentifierLiteralExpr::Kind::Column;
-  case tok::kw___FILE__:
   case tok::pound_file:
-    return MagicIdentifierLiteralExpr::Kind::File;
-  case tok::pound_filePath:
-    return MagicIdentifierLiteralExpr::Kind::FilePath;
-  case tok::kw___FUNCTION__:
-  case tok::pound_function:
-    return MagicIdentifierLiteralExpr::Kind::Function;
-  case tok::kw___LINE__:
-  case tok::pound_line:
-    return MagicIdentifierLiteralExpr::Kind::Line;
-  case tok::kw___DSO_HANDLE__:
-  case tok::pound_dsohandle:
-    return MagicIdentifierLiteralExpr::Kind::DSOHandle;
-
+    // TODO: Enable by default at the next source break. (SR-13199)
+    return Opts.EnableConcisePoundFile
+         ? MagicIdentifierLiteralExpr::FileIDSpelledAsFile
+         : MagicIdentifierLiteralExpr::FilePathSpelledAsFile;
+#define MAGIC_IDENTIFIER_TOKEN(NAME, TOKEN) \
+  case tok::TOKEN: \
+    return MagicIdentifierLiteralExpr::Kind::NAME;
+#include "swift/AST/MagicIdentifierKinds.def"
   default:
     llvm_unreachable("not a magic literal");
   }
+}
+
+/// Map magic literal kinds such as #file to their SyntaxKind.
+static SyntaxKind
+getMagicIdentifierSyntaxKind(MagicIdentifierLiteralExpr::Kind LiteralKind) {
+  switch (LiteralKind) {
+#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+  case MagicIdentifierLiteralExpr::NAME: \
+    return SyntaxKind::SYNTAX_KIND;
+#include "swift/AST/MagicIdentifierKinds.def"
+  }
+  llvm_unreachable("not a magic literal kind");
 }
 
 ParserResult<Expr>
@@ -1448,20 +1478,12 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
                                 BooleanLiteralExpr(isTrue, consumeToken()));
   }
 
-  case tok::kw___FILE__:
-  case tok::kw___LINE__:
-  case tok::kw___COLUMN__:
-  case tok::kw___FUNCTION__:
-  case tok::kw___DSO_HANDLE__: {
-    StringRef replacement = "";
-    switch (Tok.getKind()) {
-    default: llvm_unreachable("can't get here");
-    case tok::kw___FILE__: replacement = "#file"; break;
-    case tok::kw___LINE__: replacement = "#line"; break;
-    case tok::kw___COLUMN__: replacement = "#column"; break;
-    case tok::kw___FUNCTION__:  replacement = "#function"; break;
-    case tok::kw___DSO_HANDLE__: replacement = "#dsohandle"; break;
-    }
+  // Cases for deprecated magic identifier tokens
+#define MAGIC_IDENTIFIER_DEPRECATED_TOKEN(NAME, TOKEN) case tok::TOKEN:
+#include "swift/AST/MagicIdentifierKinds.def"
+  {
+    auto Kind = getMagicIdentifierLiteralKind(Tok.getKind(), Context.LangOpts);
+    auto replacement = MagicIdentifierLiteralExpr::getKindString(Kind);
 
     diagnose(Tok.getLoc(), diag::snake_case_deprecated,
              Tok.getText(), replacement)
@@ -1469,26 +1491,18 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     LLVM_FALLTHROUGH;
   }
 
-  case tok::pound_column:
+  // Cases for non-deprecated magic identifier tokens
   case tok::pound_file:
-  case tok::pound_filePath:
-  case tok::pound_function:
-  case tok::pound_line:
-  case tok::pound_dsohandle: {
-    SyntaxKind SKind = SyntaxKind::UnknownExpr;
-    switch (Tok.getKind()) {
-    case tok::pound_column: SKind = SyntaxKind::PoundColumnExpr; break;
-    case tok::pound_file: SKind = SyntaxKind::PoundFileExpr; break;
-    case tok::pound_filePath: SKind = SyntaxKind::PoundFilePathExpr; break;
-    case tok::pound_function: SKind = SyntaxKind::PoundFunctionExpr; break;
-    // FIXME: #line was renamed to #sourceLocation
-    case tok::pound_line: SKind = SyntaxKind::PoundLineExpr; break;
-    case tok::pound_dsohandle: SKind = SyntaxKind::PoundDsohandleExpr; break;
-    default: break;
-    }
+#define MAGIC_IDENTIFIER_DEPRECATED_TOKEN(NAME, TOKEN)
+#define MAGIC_IDENTIFIER_TOKEN(NAME, TOKEN) case tok::TOKEN:
+#include "swift/AST/MagicIdentifierKinds.def"
+  {
+    auto Kind = getMagicIdentifierLiteralKind(Tok.getKind(), Context.LangOpts);
+    SyntaxKind SKind = getMagicIdentifierSyntaxKind(Kind);
+
     ExprContext.setCreateSyntax(SKind);
-    auto Kind = getMagicIdentifierLiteralKind(Tok.getKind());
     SourceLoc Loc = consumeToken();
+
     return makeParserResult(new (Context) MagicIdentifierLiteralExpr(
         Kind, Loc, /*implicit=*/false));
   }
@@ -3211,6 +3225,16 @@ Parser::parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
   while (true) {
     if (!isStartOfLabelledTrailingClosure(*this)) {
       if (!Tok.is(tok::code_complete))
+        break;
+
+      // FIXME: Additional trailing closure completion on newline positions.
+      //   let foo = SomeThing {
+      //     ...
+      //   }
+      //   <HERE>
+      // This was previously enabled, but it failed to suggest 'foo' because
+      // the token was considered a part of the initializer.
+      if (Tok.isAtStartOfLine())
         break;
 
       // If the current completion mode doesn't support trailing closure

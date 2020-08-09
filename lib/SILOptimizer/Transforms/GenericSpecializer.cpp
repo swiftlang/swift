@@ -61,7 +61,7 @@ bool GenericSpecializer::specializeAppliesInFunction(SILFunction &F) {
   SILOptFunctionBuilder FunctionBuilder(*this);
   DeadInstructionSet DeadApplies;
   llvm::SmallSetVector<SILInstruction *, 8> Applies;
-  OptRemark::Emitter ORE(DEBUG_TYPE, F.getModule());
+  OptRemark::Emitter ORE(DEBUG_TYPE, F);
 
   bool Changed = false;
   for (auto &BB : F) {

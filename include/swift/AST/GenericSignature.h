@@ -124,7 +124,10 @@ public:
 
   bool isNull() const { return Ptr == 0; }
 
-  const GenericSignatureImpl *operator->() const { return Ptr; }
+  const GenericSignatureImpl *operator->() const {
+    assert(Ptr && "Cannot dereference a null GenericSignature!");
+    return Ptr;
+  }
 
   explicit operator bool() const { return Ptr != 0; }
 

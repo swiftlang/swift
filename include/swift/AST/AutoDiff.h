@@ -649,6 +649,29 @@ bool getBuiltinDifferentiableOrLinearFunctionConfig(
 bool getBuiltinDifferentiableOrLinearFunctionConfig(
     StringRef operationName, unsigned &arity, bool &throws);
 
+/// Returns the SIL differentiability witness generic signature given the
+/// original declaration's generic signature and the derivative generic
+/// signature.
+///
+/// In general, the differentiability witness generic signature is equal to the
+/// derivative generic signature.
+///
+/// Edge case, if two conditions are satisfied:
+/// 1. The derivative generic signature is equal to the original generic
+///    signature.
+/// 2. The derivative generic signature has *all concrete* generic parameters
+///    (i.e. all generic parameters are bound to concrete types via same-type
+///    requirements).
+///
+/// Then the differentiability witness generic signature is `nullptr`.
+///
+/// Both the original and derivative declarations are lowered to SIL functions
+/// with a fully concrete type and no generic signature, so the
+/// differentiability witness should similarly have no generic signature.
+GenericSignature
+getDifferentiabilityWitnessGenericSignature(GenericSignature origGenSig,
+                                            GenericSignature derivativeGenSig);
+
 } // end namespace autodiff
 
 } // end namespace swift

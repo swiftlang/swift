@@ -88,6 +88,45 @@ private class PrivateClassLocal {}
   // CHECK-PUBLIC-NOT: extensionSPIMethod
 }
 
+@propertyWrapper
+public struct Wrapper<T> {
+  public var value: T
+
+  public var wrappedValue: T {
+    get { value }
+    set { value = newValue }
+  }
+}
+
+@propertyWrapper
+public struct WrapperWithInitialValue<T> {
+  private var value: T
+
+  public var wrappedValue: T {
+    get { value }
+    set { value = newValue }
+  }
+
+  public var projectedValue: Wrapper<T> {
+    get { Wrapper(value: value) }
+    set { value = newValue.value }
+  }
+}
+
+public class SomeClass {
+}
+
+public struct PublicStruct {
+  @_spi(S) @Wrapper public var spiWrappedSimple: SomeClass
+  // CHECK-PRIVATE: @_spi(S) @{{.*}}.Wrapper public var spiWrappedSimple: {{.*}}.SomeClass
+  // CHECK-PUBLIC-NOT: spiWrappedSimple
+
+  @_spi(S) @WrapperWithInitialValue public var spiWrappedDefault: SomeClass
+  // CHECK-PRIVATE: @_spi(S) @{{.*}}.WrapperWithInitialValue @_projectedValueProperty($spiWrappedDefault) public var spiWrappedDefault: {{.*}}.SomeClass
+  // CHECK-PRIVATE: @_spi(S) public var $spiWrappedDefault: {{.*}}.Wrapper<{{.*}}.SomeClass>
+  // CHECK-PUBLIC-NOT: spiWrappedDefault
+}
+
 @_spi(LocalSPI) public protocol SPIProto3 {
 // CHECK-PRIVATE: @_spi(LocalSPI) public protocol SPIProto3
 // CHECK-PUBLIC-NOT: SPIProto3

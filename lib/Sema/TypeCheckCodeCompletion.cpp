@@ -39,7 +39,6 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/STLExtras.h"
-#include "swift/Basic/Timer.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Strings.h"
@@ -622,9 +621,21 @@ static Optional<Type> getTypeOfCompletionContextExpr(
 
   case CompletionTypeCheckKind::KeyPath:
     referencedDecl = nullptr;
-    if (auto keyPath = dyn_cast<KeyPathExpr>(parsedExpr))
-      return TypeChecker::checkObjCKeyPathExpr(DC, keyPath,
-                                               /*requireResultType=*/true);
+    if (auto keyPath = dyn_cast<KeyPathExpr>(parsedExpr)) {
+      auto components = keyPath->getComponents();
+      if (!components.empty()) {
+        auto &last = components.back();
+        if (last.isResolved()) {
+          if (last.getKind() == KeyPathExpr::Component::Kind::Property)
+            referencedDecl = last.getDeclRef();
+          Type lookupTy = last.getComponentType();
+          ASTContext &Ctx = DC->getASTContext();
+          if (auto bridgedClass = Ctx.getBridgedToObjC(DC, lookupTy))
+            return bridgedClass;
+          return lookupTy;
+        }
+      }
+    }
 
     return None;
   }

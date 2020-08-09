@@ -9,6 +9,13 @@ import os
 import sys
 
 
+# Python 2 `unicode` was renamed `str` in Python 3.  To consistently support
+# both, define `unicode` to be `str` when using Python 3.  Once we can drop
+# Python 2 support, delete this and change all uses of `unicode` to `str`.
+if sys.version_info[0] >= 3:
+    unicode = str
+
+
 def fatal(msg):
     print(msg, file=sys.stderr)
     sys.exit(1)
@@ -62,22 +69,14 @@ def main(arguments):
         'swift-dependencies': './main-buildrecord.swiftdeps'
     }
 
-    # TODO: this is for python 2 and python 3 compatibility.  Once Python 2 is
-    # removed, this function can be removed.
-    def to_unicode(r):
-        import sys
-        if sys.version_info[0] < 3:
-            return unicode(r)
-        return str(r)
-
     with io.open(output_path, 'w', encoding='utf-8', newline='\n') as f:
-        f.write(to_unicode(json.dumps(all_records, ensure_ascii=False)))
+        f.write(unicode(json.dumps(all_records, ensure_ascii=False)))
 
     if args.response_output_file is not None:
         with io.open(args.response_output_file, 'w',
                      encoding='utf-8', newline='\n') as f:
             for line in response_file_contents:
-                f.write(to_unicode(line + " "))
+                f.write(unicode(line + " "))
 
 
 if __name__ == '__main__':

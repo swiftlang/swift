@@ -179,7 +179,7 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
 
       if (!PD->isObjC()) {
         diags.diagnose(TypeRange.Start, diag::not_objc_protocol,
-                       PD->getDeclaredType());
+                       PD->getDeclaredInterfaceType());
         return;
       }
     }
@@ -200,7 +200,13 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   }
 
   if (auto fnTy = T->getAs<FunctionType>()) {
-    if (fnTy->getExtInfo().throws() ) {
+    if (fnTy->getExtInfo().isAsync()) {
+      diags.diagnose(TypeRange.Start, diag::not_objc_function_type_async)
+        .highlight(TypeRange);
+      return;
+    }
+
+    if (fnTy->getExtInfo().isThrowing()) {
       diags.diagnose(TypeRange.Start, diag::not_objc_function_type_throwing)
         .highlight(TypeRange);
       return;
@@ -607,6 +613,16 @@ bool swift::isRepresentableInObjC(
     }
   }
 
+  // Async functions cannot be mapped into Objective-C.
+  if (AFD->hasAsync()) {
+    if (Diagnose) {
+      AFD->diagnose(diag::not_objc_function_async)
+        .highlight(AFD->getAsyncLoc());
+      describeObjCReason(AFD, Reason);
+    }
+    return false;
+  }
+
   // Throwing functions must map to a particular error convention.
   if (AFD->hasThrows()) {
     DeclContext *dc = const_cast<AbstractFunctionDecl *>(AFD);
@@ -656,7 +672,7 @@ bool swift::isRepresentableInObjC(
         return false;
       }
 
-      errorResultType = boolDecl->getDeclaredType()->getCanonicalType();
+      errorResultType = boolDecl->getDeclaredInterfaceType()->getCanonicalType();
     } else if (!resultType->getOptionalObjectType() &&
                isValidObjectiveCErrorResultType(dc, resultType)) {
       // Functions that return a (non-optional) type bridged to Objective-C
@@ -1329,8 +1345,8 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
       for (auto inherited : proto->getInheritedProtocols()) {
         if (!inherited->isObjC()) {
           proto->diagnose(diag::objc_protocol_inherits_non_objc_protocol,
-                          proto->getDeclaredType(),
-                          inherited->getDeclaredType());
+                          proto->getDeclaredInterfaceType(),
+                          inherited->getDeclaredInterfaceType());
           inherited->diagnose(diag::kind_declname_declared_here,
                               DescriptiveDeclKind::Protocol,
                               inherited->getName());

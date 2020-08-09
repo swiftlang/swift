@@ -193,6 +193,7 @@ static ValueDecl *deriveMathOperator(DerivedConformance &derived,
   auto operatorDecl =
       FuncDecl::create(C, SourceLoc(), StaticSpellingKind::KeywordStatic,
                        SourceLoc(), operatorDeclName, SourceLoc(),
+                       /*Async*/ false, SourceLoc(),
                        /*Throws*/ false, SourceLoc(),
                        /*GenericParams=*/nullptr, params,
                        TypeLoc::withoutLoc(selfInterfaceType), parentDC);

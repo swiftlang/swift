@@ -31,7 +31,6 @@ using SILTypeCategoryField = BCFixed<2>;
 
 enum SILStringEncoding : uint8_t {
   SIL_UTF8,
-  SIL_UTF16,
   SIL_OBJC_SELECTOR,
   SIL_BYTES
 };
@@ -278,6 +277,7 @@ namespace sil_block {
                      BCFixed<2>,  // serialized
                      BCFixed<2>,  // thunks: signature optimized/reabstraction
                      BCFixed<1>,  // without_actually_escaping
+                     BCFixed<1>,  // async
                      BCFixed<3>,  // specialPurpose
                      BCFixed<2>,  // inlineStrategy
                      BCFixed<2>,  // optimizationMode

@@ -79,6 +79,7 @@ foreach(sdk ${SWIFT_SDKS})
   foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
     set(arch_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}")
     set(module_dir "${SWIFTLIB_DIR}/${arch_subdir}")
+    set(module_dir_static "${SWIFTSTATICLIB_DIR}/${arch_subdir}")
 
     if(${sdk} STREQUAL ANDROID)
       set(glibc_modulemap_source "bionic.modulemap.gyb")
@@ -88,6 +89,7 @@ foreach(sdk ${SWIFT_SDKS})
       set(glibc_modulemap_source "glibc.modulemap.gyb")
     endif()
     set(glibc_modulemap_out "${module_dir}/glibc.modulemap")
+    set(glibc_modulemap_out_static "${module_dir_static}/glibc.modulemap")
 
     # Configure the module map based on the target. Each platform needs to
     # reference different headers, based on what's available in their glibc.
@@ -102,6 +104,21 @@ foreach(sdk ${SWIFT_SDKS})
             "-DGLIBC_ARCH_INCLUDE_PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_LIBC_ARCHITECTURE_INCLUDE_DIRECTORY}")
 
     list(APPEND glibc_modulemap_target_list ${glibc_modulemap_target})
+
+    if(SWIFT_BUILD_STATIC_STDLIB)
+      add_custom_command_target(
+        copy_glibc_modulemap_static
+        COMMAND
+          "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir_static}
+        COMMAND
+          "${CMAKE_COMMAND}" "-E" "copy" ${glibc_modulemap_out} ${glibc_modulemap_out_static}
+        OUTPUT ${glibc_modulemap_out_static}
+        DEPENDS
+          "${glibc_modulemap_target}"
+        COMMENT "Copying Glibc modulemap to static resources")
+
+      list(APPEND glibc_modulemap_target_list ${copy_glibc_modulemap_static})
+    endif()
 
     # If this SDK is a target for a non-native host, except if it's for Android
     # with its own native sysroot, create a native modulemap without a sysroot
@@ -135,6 +152,11 @@ foreach(sdk ${SWIFT_SDKS})
                                DESTINATION "lib/swift/${arch_subdir}"
                                COMPONENT sdk-overlay)
 
+    if(SWIFT_BUILD_STATIC_STDLIB)
+      swift_install_in_component(FILES "${glibc_modulemap_out}"
+                                 DESTINATION "lib/swift_static/${arch_subdir}"
+                                 COMPONENT sdk-overlay)
+    endif()
   endforeach()
 endforeach()
 add_custom_target(glibc_modulemap DEPENDS ${glibc_modulemap_target_list})

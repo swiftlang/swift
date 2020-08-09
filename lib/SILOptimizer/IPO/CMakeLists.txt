@@ -4,7 +4,6 @@ target_sources(swiftSILOptimizer PRIVATE
   ClosureSpecializer.cpp
   CrossModuleSerializationSetup.cpp
   DeadFunctionElimination.cpp
-  EagerSpecializer.cpp
   GlobalOpt.cpp
   GlobalPropertyOpt.cpp
   LetPropertiesOpts.cpp

@@ -115,15 +115,10 @@ function(get_test_dependencies SDK result_var_name)
     message(FATAL_ERROR "Unknown SDK: ${SDK}")
   endif()
 
-  if(XCODE)
-    # Xcode's build paths have a configuration variable in them,
-    # so CMake can't match them at compile time. Just use target names.
-    list(APPEND deps ${deps_binaries})
-  else()
-    foreach(binary ${deps_binaries})
-      list(APPEND deps "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/${binary}${CMAKE_EXECUTABLE_SUFFIX}")
-    endforeach()
-  endif()
+  # Just use target names for dependency generation. This works for both Xcode
+  # and non-Xcode build systems. In the case of Xcode, its build paths have a
+  # configuration variable in them, so CMake can't match them at compile time.
+  list(APPEND deps ${deps_binaries})
 
   set("${result_var_name}" "${deps}" PARENT_SCOPE)
 endfunction()
@@ -169,6 +164,7 @@ normalize_boolean_spelling(SWIFT_ASAN_BUILD)
 normalize_boolean_spelling(SWIFT_BUILD_SYNTAXPARSERLIB)
 normalize_boolean_spelling(SWIFT_ENABLE_SOURCEKIT_TESTS)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
+normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
 
 set(profdata_merge_worker
@@ -256,7 +252,7 @@ foreach(SDK ${SWIFT_SDKS})
     set(test_dependencies)
     get_test_dependencies("${SDK}" test_dependencies)
 
-    if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS AND NOT ${SDK} STREQUAL "WASI")
+    if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS AND NOT SWIFTWASM_DISABLE_REFLECTION_TEST)
       # NOTE create a stub BlocksRuntime library that can be used for the
       # reflection tests
       file(WRITE ${test_bin_dir}/Inputs/BlocksRuntime.c
@@ -292,7 +288,7 @@ _Block_release(void) { }\n")
 
       endif()
 
-      if(NOT "${SDK}" STREQUAL "WASI")
+      if(NOT SWIFTWASM_DISABLE_REFLECTION_TEST)
         # wasm: Avoid to build swift-reflection-test because it uses unsupported linker flags for wasm-ld
         list(APPEND test_dependencies
             "swift-reflection-test${VARIANT_SUFFIX}_signed")
@@ -371,6 +367,10 @@ _Block_release(void) { }\n")
 
       if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
         list(APPEND LIT_ARGS "--param" "differentiable_programming")
+      endif()
+
+      if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
+        list(APPEND LIT_ARGS "--param" "concurrency")
       endif()
 
       foreach(test_subset ${TEST_SUBSETS})

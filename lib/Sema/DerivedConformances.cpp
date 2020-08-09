@@ -24,6 +24,8 @@
 
 using namespace swift;
 
+enum NonconformingMemberKind { AssociatedValue, StoredProperty };
+
 DerivedConformance::DerivedConformance(ASTContext &ctx, Decl *conformanceDecl,
                                        NominalTypeDecl *nominal,
                                        ProtocolDecl *protocol)
@@ -48,7 +50,7 @@ void DerivedConformance::addMembersToConformanceContext(
 }
 
 Type DerivedConformance::getProtocolType() const {
-  return Protocol->getDeclaredType();
+  return Protocol->getDeclaredInterfaceType();
 }
 
 bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
@@ -159,6 +161,27 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
   return false;
 }
 
+SmallVector<VarDecl *, 3>
+DerivedConformance::storedPropertiesNotConformingToProtocol(
+    DeclContext *DC, StructDecl *theStruct, ProtocolDecl *protocol) {
+  auto storedProperties = theStruct->getStoredProperties();
+  SmallVector<VarDecl *, 3> nonconformingProperties;
+  for (auto propertyDecl : storedProperties) {
+    if (!propertyDecl->isUserAccessible())
+      continue;
+
+    auto type = propertyDecl->getValueInterfaceType();
+    if (!type)
+      nonconformingProperties.push_back(propertyDecl);
+
+    if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type), protocol,
+                                         DC)) {
+      nonconformingProperties.push_back(propertyDecl);
+    }
+  }
+  return nonconformingProperties;
+}
+
 void DerivedConformance::tryDiagnoseFailedDerivation(DeclContext *DC,
                                                      NominalTypeDecl *nominal,
                                                      ProtocolDecl *protocol) {
@@ -166,14 +189,72 @@ void DerivedConformance::tryDiagnoseFailedDerivation(DeclContext *DC,
   if (!knownProtocol)
     return;
   
-  // Comparable on eligible type kinds should never fail
-   
   if (*knownProtocol == KnownProtocolKind::Equatable) {
     tryDiagnoseFailedEquatableDerivation(DC, nominal);
   }
 
   if (*knownProtocol == KnownProtocolKind::Hashable) {
     tryDiagnoseFailedHashableDerivation(DC, nominal);
+  }
+
+  if (*knownProtocol == KnownProtocolKind::Comparable) {
+    tryDiagnoseFailedComparableDerivation(DC, nominal);
+  }
+}
+
+void DerivedConformance::diagnoseAnyNonConformingMemberTypes(
+    DeclContext *DC, NominalTypeDecl *nominal, ProtocolDecl *protocol) {
+  ASTContext &ctx = DC->getASTContext();
+
+  if (auto *enumDecl = dyn_cast<EnumDecl>(nominal)) {
+    auto nonconformingAssociatedTypes =
+        associatedValuesNotConformingToProtocol(DC, enumDecl, protocol);
+    for (auto *typeToDiagnose : nonconformingAssociatedTypes) {
+      SourceLoc reprLoc;
+      if (auto *repr = typeToDiagnose->getTypeRepr())
+        reprLoc = repr->getStartLoc();
+      ctx.Diags.diagnose(
+          reprLoc, diag::missing_member_type_conformance_prevents_synthesis,
+          NonconformingMemberKind::AssociatedValue,
+          typeToDiagnose->getInterfaceType(),
+          protocol->getDeclaredInterfaceType(),
+          nominal->getDeclaredInterfaceType());
+    }
+  }
+
+  if (auto *structDecl = dyn_cast<StructDecl>(nominal)) {
+    auto nonconformingStoredProperties =
+        storedPropertiesNotConformingToProtocol(DC, structDecl, protocol);
+    for (auto *propertyToDiagnose : nonconformingStoredProperties) {
+      ctx.Diags.diagnose(
+          propertyToDiagnose->getLoc(),
+          diag::missing_member_type_conformance_prevents_synthesis,
+          NonconformingMemberKind::StoredProperty,
+          propertyToDiagnose->getInterfaceType(),
+          protocol->getDeclaredInterfaceType(),
+          nominal->getDeclaredInterfaceType());
+    }
+  }
+}
+
+void DerivedConformance::diagnoseIfSynthesisUnsupportedForDecl(
+    NominalTypeDecl *nominal, ProtocolDecl *protocol) {
+  auto shouldDiagnose = false;
+
+  if (protocol->isSpecificProtocol(KnownProtocolKind::Equatable) ||
+      protocol->isSpecificProtocol(KnownProtocolKind::Hashable)) {
+    shouldDiagnose = isa<ClassDecl>(nominal);
+  }
+
+  if (protocol->isSpecificProtocol(KnownProtocolKind::Comparable)) {
+    shouldDiagnose = !isa<EnumDecl>(nominal);
+  }
+
+  if (shouldDiagnose) {
+    auto &ctx = nominal->getASTContext();
+    ctx.Diags.diagnose(nominal->getLoc(),
+                       diag::automatic_protocol_synthesis_unsupported,
+                       protocol->getName().str(), isa<StructDecl>(nominal));
   }
 }
 
@@ -502,7 +583,7 @@ GuardStmt *DerivedConformance::returnComparisonIfNotEqualGuard(ASTContext &C,
 
 /// Build a type-checked integer literal.
 static IntegerLiteralExpr *buildIntegerLiteral(ASTContext &C, unsigned index) {
-  Type intType = C.getIntDecl()->getDeclaredType();
+  Type intType = C.getIntDecl()->getDeclaredInterfaceType();
 
   auto literal = IntegerLiteralExpr::createFromUnsigned(C, index);
   literal->setType(intType);
@@ -527,7 +608,7 @@ DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &st
                                        const char *indexName) {
   ASTContext &C = enumDecl->getASTContext();
   Type enumType = enumVarDecl->getType();
-  Type intType = C.getIntDecl()->getDeclaredType();
+  Type intType = C.getIntDecl()->getDeclaredInterfaceType();
 
   auto indexVar = new (C) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
                                   /*IsCaptureList*/false, SourceLoc(),
@@ -658,8 +739,8 @@ DerivedConformance::enumElementPayloadSubpattern(EnumElementDecl *enumElementDec
 
       auto namedPattern = new (C) NamedPattern(payloadVar);
       namedPattern->setImplicit();
-      auto letPattern = VarPattern::createImplicit(C, /*isLet*/ true,
-                                                   namedPattern);
+      auto letPattern =
+          BindingPattern::createImplicit(C, /*isLet*/ true, namedPattern);
       elementPatterns.push_back(TuplePatternElt(tupleElement.getName(),
                                                 SourceLoc(), letPattern));
     }
@@ -678,8 +759,8 @@ DerivedConformance::enumElementPayloadSubpattern(EnumElementDecl *enumElementDec
 
   auto namedPattern = new (C) NamedPattern(payloadVar);
   namedPattern->setImplicit();
-  auto letPattern = new (C) VarPattern(SourceLoc(), /*isLet*/ true,
-                                       namedPattern);
+  auto letPattern =
+      new (C) BindingPattern(SourceLoc(), /*isLet*/ true, namedPattern);
   return ParenPattern::createImplicit(C, letPattern);
 }
 

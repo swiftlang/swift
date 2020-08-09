@@ -785,7 +785,7 @@ public:
       : ContextualFailure(solution, fromType, toType, locator) {
     auto fnType1 = fromType->castTo<FunctionType>();
     auto fnType2 = toType->castTo<FunctionType>();
-    assert(fnType1->throws() != fnType2->throws());
+    assert(fnType1->isThrowing() != fnType2->isThrowing());
   }
 
   bool diagnoseAsError() override;
@@ -1293,9 +1293,10 @@ private:
   bool isPropertyWrapperInitialization() const;
 
   /// Gather information associated with expression that represents
-  /// a call - function, arguments, # of arguments and whether it has
-  /// a trailing closure.
-  std::tuple<Expr *, Expr *, unsigned, bool> getCallInfo(ASTNode anchor) const;
+  /// a call - function, arguments, # of arguments and the position of
+  /// the first trailing closure.
+  std::tuple<Expr *, Expr *, unsigned, Optional<unsigned>>
+      getCallInfo(ASTNode anchor) const;
 
   /// Transform given argument into format suitable for a fix-it
   /// text e.g. `[<label>:]? <#<type#>`
@@ -1636,6 +1637,8 @@ public:
       : ContextualFailure(solution, eltType, contextualType, locator) {}
 
   bool diagnoseAsError() override;
+
+  bool diagnoseMergedLiteralElements();
 };
 
 class MissingContextualConformanceFailure final : public ContextualFailure {
@@ -1814,6 +1817,10 @@ public:
   /// property wrapper initialization via implicit `init(wrappedValue:)`
   /// or now deprecated `init(initialValue:)`.
   bool diagnosePropertyWrapperMismatch() const;
+
+  /// Tailored diagnostics for argument mismatches associated with trailing
+  /// closures being passed to non-closure parameters.
+  bool diagnoseTrailingClosureMismatch() const;
 
 protected:
   /// \returns The position of the argument being diagnosed, starting at 1.
@@ -2189,6 +2196,24 @@ public:
 
 private:
   void fixIt(InFlightDiagnostic &diagnostic) const override;
+};
+
+/// Diagnose a key path optional base that should be unwraped in order to 
+/// apply key path subscript.
+///
+/// \code
+/// func f(_ bar: Bar? , keyPath: KeyPath<Bar, Int>) {
+///   bar[keyPath: keyPath]
+/// }
+/// \endcode
+class MissingOptionalUnwrapKeyPathFailure final : public ContextualFailure {
+public:
+  MissingOptionalUnwrapKeyPathFailure(const Solution &solution, Type lhs,
+                                      Type rhs, ConstraintLocator *locator)
+      : ContextualFailure(solution, lhs, rhs, locator) {}
+
+  bool diagnoseAsError() override;
+  SourceLoc getLoc() const override;
 };
 
 } // end namespace constraints

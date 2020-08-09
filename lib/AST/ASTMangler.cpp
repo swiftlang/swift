@@ -533,6 +533,12 @@ std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
   return finalize();
 }
 
+std::string ASTMangler::mangleTypeForTypeName(Type type) {
+  beginManglingWithoutPrefix();
+  appendType(type);
+  return finalize();
+}
+
 std::string ASTMangler::mangleDeclType(const ValueDecl *decl) {
   DWARFMangling = true;
   beginMangling();
@@ -735,23 +741,12 @@ static bool getUnnamedParamIndex(const ParameterList *ParamList,
 }
 
 static unsigned getUnnamedParamIndex(const ParamDecl *D) {
-  if (auto SD = dyn_cast<SubscriptDecl>(D->getDeclContext())) {
-    unsigned UnnamedIndex = 0;
-    auto *ParamList = SD->getIndices();
-    if (getUnnamedParamIndex(ParamList, D, UnnamedIndex))
-      return UnnamedIndex;
-    llvm_unreachable("param not found");
-  }
-
   ParameterList *ParamList;
-
-  if (auto AFD = dyn_cast<AbstractFunctionDecl>(D->getDeclContext())) {
-    ParamList = AFD->getParameters();
-  } else if (auto EED = dyn_cast<EnumElementDecl>(D->getDeclContext())) {
-    ParamList = EED->getParameterList();
+  auto *DC = D->getDeclContext();
+  if (isa<AbstractClosureExpr>(DC)) {
+    ParamList = cast<AbstractClosureExpr>(DC)->getParameters();
   } else {
-    auto ACE = cast<AbstractClosureExpr>(D->getDeclContext());
-    ParamList = ACE->getParameters();
+    ParamList = getParameterList(cast<ValueDecl>(DC->getAsDecl()));
   }
 
   unsigned UnnamedIndex = 0;
@@ -1834,7 +1829,7 @@ namespace {
     VarDecl *visitParenPattern(ParenPattern *P) {
       return visit(P->getSubPattern());
     }
-    VarDecl *visitVarPattern(VarPattern *P) {
+    VarDecl *visitBindingPattern(BindingPattern *P) {
       return visit(P->getSubPattern());
     }
     VarDecl *visitTypedPattern(TypedPattern *P) {
@@ -2277,7 +2272,9 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
                                          const ValueDecl *forDecl) {
   appendFunctionResultType(fn->getResult(), forDecl);
   appendFunctionInputType(fn->getParams(), forDecl);
-  if (fn->throws())
+  if (fn->isAsync())
+    appendOperator("Y");
+  if (fn->isThrowing())
     appendOperator("K");
 }
 

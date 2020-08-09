@@ -38,7 +38,6 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/STLExtras.h"
-#include "swift/Basic/Timer.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Strings.h"
@@ -121,21 +120,23 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(ASTContext &Context, Expr *expr) {
 
   if (auto E = dyn_cast<MagicIdentifierLiteralExpr>(expr)) {
     switch (E->getKind()) {
-    case MagicIdentifierLiteralExpr::File:
-    case MagicIdentifierLiteralExpr::FilePath:
-    case MagicIdentifierLiteralExpr::Function:
-      return TypeChecker::getProtocol(
-          Context, expr->getLoc(),
+#define MAGIC_STRING_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+    case MagicIdentifierLiteralExpr::NAME: \
+      return TypeChecker::getProtocol( \
+          Context, expr->getLoc(), \
           KnownProtocolKind::ExpressibleByStringLiteral);
 
-    case MagicIdentifierLiteralExpr::Line:
-    case MagicIdentifierLiteralExpr::Column:
-      return TypeChecker::getProtocol(
-          Context, expr->getLoc(),
+#define MAGIC_INT_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+    case MagicIdentifierLiteralExpr::NAME: \
+      return TypeChecker::getProtocol( \
+          Context, expr->getLoc(), \
           KnownProtocolKind::ExpressibleByIntegerLiteral);
 
-    case MagicIdentifierLiteralExpr::DSOHandle:
+#define MAGIC_POINTER_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+    case MagicIdentifierLiteralExpr::NAME: \
       return nullptr;
+
+#include "swift/AST/MagicIdentifierKinds.def"
     }
   }
 
@@ -357,23 +358,10 @@ bool swift::isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF) {
   return isDifferentiableProgrammingEnabled(SF);
 }
 
-bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
-                                   DeclContext *DC,
-                                   bool ProduceDiagnostics) {
-  return performTypeLocChecking(
-                            Ctx, T,
-                            /*isSILMode=*/false,
-                            /*isSILType=*/false,
-                            /*GenericEnv=*/DC->getGenericEnvironmentOfContext(),
-                            DC, ProduceDiagnostics);
-}
-
-bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
-                                   bool isSILMode,
-                                   bool isSILType,
-                                   GenericEnvironment *GenericEnv,
-                                   DeclContext *DC,
-                                   bool ProduceDiagnostics) {
+Type swift::performTypeResolution(TypeRepr *TyR, ASTContext &Ctx,
+                                  bool isSILMode, bool isSILType,
+                                  GenericEnvironment *GenericEnv,
+                                  DeclContext *DC, bool ProduceDiagnostics) {
   TypeResolutionOptions options = None;
   if (isSILMode) {
     options |= TypeResolutionFlags::SILMode;
@@ -393,14 +381,7 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   if (!ProduceDiagnostics)
     suppression.emplace(Ctx.Diags);
 
-  // If we've already validated this type, don't do so again.
-  if (T.wasValidated()) {
-    return T.isError();
-  }
-
-  auto type = resolution.resolveType(T.getTypeRepr());
-  T.setType(type);
-  return type->hasError();
+  return resolution.resolveType(TyR);
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
@@ -441,12 +422,11 @@ void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
   TypeChecker::typeCheckPatternBinding(PBD, bindingIndex);
 }
 
-bool swift::typeCheckAbstractFunctionBodyAtLoc(AbstractFunctionDecl *AFD,
-                                               SourceLoc TargetLoc) {
-  auto &Ctx = AFD->getASTContext();
+bool swift::typeCheckASTNodeAtLoc(DeclContext *DC, SourceLoc TargetLoc) {
+  auto &Ctx = DC->getASTContext();
   DiagnosticSuppression suppression(Ctx.Diags);
   return !evaluateOrDefault(Ctx.evaluator,
-                            TypeCheckFunctionBodyAtLocRequest{AFD, TargetLoc},
+                            TypeCheckASTNodeAtLocRequest{DC, TargetLoc},
                             true);
 }
 

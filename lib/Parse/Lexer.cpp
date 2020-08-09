@@ -921,15 +921,15 @@ void Lexer::lexDollarIdent() {
     return formToken(tok::sil_dollar, tokStart);
 
   bool isAllDigits = true;
-  for (;; ++CurPtr) {
+  while (true) {
     if (isDigit(*CurPtr)) {
-      // continue
-    } else if (clang::isIdentifierHead(*CurPtr, /*dollar*/true)) {
+      ++CurPtr;
+      continue;
+    } else if (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd)) {
       isAllDigits = false;
-      // continue
-    } else {
-      break;
+      continue;
     }
+    break;
   }
 
   if (CurPtr == tokStart + 1) {
@@ -2097,8 +2097,9 @@ bool Lexer::lexUnknown(bool EmitDiagnosticsIfToken) {
     EncodeToUTF8(Codepoint, ConfusedChar);
     llvm::SmallString<1> ExpectedChar;
     ExpectedChar += ExpectedCodepoint;
+    auto charNames = confusable::getConfusableAndBaseCodepointNames(Codepoint);
     diagnose(CurPtr - 1, diag::lex_confusable_character, ConfusedChar,
-             ExpectedChar)
+             charNames.first, ExpectedChar, charNames.second)
         .fixItReplaceChars(getSourceLoc(CurPtr - 1), getSourceLoc(Tmp),
                            ExpectedChar);
   }

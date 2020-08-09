@@ -55,7 +55,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 564; // `@derivative` attribute accessor kind
+const uint16_t SWIFTMODULE_VERSION_MINOR = 568; // removed UTF16
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -481,8 +481,10 @@ using ValueOwnershipField = BCFixed<2>;
 enum class DefaultArgumentKind : uint8_t {
   None = 0,
   Normal,
-  File,
+  FileID,
+  FileIDSpelledAsFile,
   FilePath,
+  FilePathSpelledAsFile,
   Line,
   Column,
   Function,
@@ -961,6 +963,7 @@ namespace decls_block {
     FunctionTypeRepresentationField, // representation
     ClangTypeIDField, // type
     BCFixed<1>,  // noescape?
+    BCFixed<1>,   // async?
     BCFixed<1>,   // throws?
     DifferentiabilityKindField // differentiability kind
 
@@ -1036,6 +1039,7 @@ namespace decls_block {
     GENERIC_FUNCTION_TYPE,
     TypeIDField,         // output
     FunctionTypeRepresentationField, // representation
+    BCFixed<1>,          // async?
     BCFixed<1>,          // throws?
     DifferentiabilityKindField, // differentiability kind
     GenericSignatureIDField // generic signture
@@ -1290,6 +1294,7 @@ namespace decls_block {
     BCFixed<1>,   // isObjC?
     SelfAccessKindField,   // self access kind
     BCFixed<1>,   // has forced static dispatch?
+    BCFixed<1>,   // async?
     BCFixed<1>,   // throws?
     GenericSignatureIDField, // generic environment
     TypeIDField,  // result interface type
@@ -1510,7 +1515,7 @@ namespace decls_block {
     // The sub-pattern trails the record.
   >;
 
-  using VarPatternLayout = BCRecordLayout<
+  using BindingPatternLayout = BCRecordLayout<
     VAR_PATTERN,
     BCFixed<1>  // isLet?
     // The sub-pattern trails the record.

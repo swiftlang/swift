@@ -43,7 +43,7 @@ sil_vtable SubclassOfClassWithResilientField {}
 
 
 // RO-data for ClassWithResilientField:
-// CHECK-LABEL: @_DATA__TtC39class_update_callback_with_fixed_layout23ClassWithResilientField = private constant {
+// CHECK-LABEL: @_DATA__TtC39class_update_callback_with_fixed_layout23ClassWithResilientField = internal constant {
 
 // -- flags: compiled with ARC, has update callback
 // CHECK-SAME: i32 192,

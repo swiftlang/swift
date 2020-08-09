@@ -222,7 +222,7 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   // Perform classic SSA optimizations for cleanup.
   P.addLowerAggregateInstrs();
   P.addSILCombine();
-  P.addSROA();
+  P.addEarlySROA();
   P.addMem2Reg();
   P.addDCE();
   P.addSILCombine();
@@ -290,7 +290,11 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   P.addLowerAggregateInstrs();
 
   // Split up operations on stack-allocated aggregates (struct, tuple).
-  P.addSROA();
+  if (OpLevel == OptimizationLevelKind::HighLevel) {
+    P.addEarlySROA();
+  } else {
+    P.addSROA();
+  }
 
   // Promote stack allocations to values.
   P.addMem2Reg();
@@ -489,6 +493,8 @@ static void addHighLevelFunctionPipeline(SILPassPipelinePlan &P) {
   addFunctionPasses(P, OptimizationLevelKind::HighLevel);
 
   addHighLevelLoopOptPasses(P);
+  
+  P.addStringOptimization();
 }
 
 // After "high-level" function passes have processed the entire call tree, run
@@ -524,6 +530,7 @@ static void addSerializePipeline(SILPassPipelinePlan &P) {
 
 static void addMidLevelFunctionPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("MidLevel,Function", true /*isFunctionPassPipeline*/);
+
   addFunctionPasses(P, OptimizationLevelKind::MidLevel);
 
   // Specialize partially applied functions with dead arguments as a preparation
@@ -660,6 +667,11 @@ static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
 
   // Only has an effect if the -assume-single-thread option is specified.
   P.addAssumeSingleThreaded();
+
+  // Only has an effect if opt-remark is enabled.
+  P.addOptRemarkGenerator();
+
+  P.addPruneVTables();
 }
 
 static void addSILDebugInfoGeneratorPipeline(SILPassPipelinePlan &P) {

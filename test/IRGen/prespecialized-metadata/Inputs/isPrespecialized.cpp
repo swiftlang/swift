@@ -27,6 +27,25 @@ bool isCanonicalStaticallySpecializedGenericMetadata(void *ptr) {
   return isCanonical;
 }
 
+bool isStaticallySpecializedGenericMetadata(Metadata *self) {
+  if (auto *metadata = dyn_cast<StructMetadata>(self)) {
+    return metadata->isStaticallySpecializedGenericMetadata();
+  }
+  if (auto *metadata = dyn_cast<EnumMetadata>(self))
+    return metadata->isStaticallySpecializedGenericMetadata();
+  if (auto *metadata = dyn_cast<ClassMetadata>(self))
+    return metadata->isStaticallySpecializedGenericMetadata();
+
+  return false;
+}
+
+bool isStaticallySpecializedGenericMetadata(void *ptr) {
+  auto metadata = static_cast<Metadata *>(ptr);
+  auto isStatic =
+      isStaticallySpecializedGenericMetadata(metadata);
+  return isStatic;
+}
+
 void allocateDirtyAndFreeChunk(void) {
   uintptr_t ChunkSize = 16 * 1024;
 

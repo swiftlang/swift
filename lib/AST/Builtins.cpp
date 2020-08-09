@@ -20,6 +20,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/Types.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -171,6 +172,7 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType) {
                              StaticSpellingKind::None,
                              /*FuncLoc=*/SourceLoc(),
                              Name, /*NameLoc=*/SourceLoc(),
+                             /*Async-*/false, /*AsyncLoc=*/SourceLoc(),
                              /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                              /*GenericParams=*/nullptr,
                              paramList,
@@ -216,6 +218,7 @@ getBuiltinGenericFunction(Identifier Id,
                                StaticSpellingKind::None,
                                /*FuncLoc=*/SourceLoc(),
                                Name, /*NameLoc=*/SourceLoc(),
+                               /*Async-*/false, /*AsyncLoc=*/SourceLoc(),
                                /*Throws=*/ Rethrows, /*ThrowsLoc=*/SourceLoc(),
                                GenericParams,
                                paramList,
@@ -493,7 +496,7 @@ namespace {
     void addConformanceRequirement(const G &generator, ProtocolDecl *proto) {
       Requirement req(RequirementKind::Conformance,
                       generator.build(*this),
-                      proto->getDeclaredType());
+                      proto->getDeclaredInterfaceType());
       addedRequirements.push_back(req);
     }
 
@@ -950,6 +953,15 @@ static ValueDecl *getUnsafeGuaranteedEnd(ASTContext &C, Identifier Id) {
   return getBuiltinFunction(Id, { Int8Ty }, TupleType::getEmpty(C));
 }
 
+static ValueDecl *getIntInstrprofIncrement(ASTContext &C, Identifier Id) {
+  // (Builtin.RawPointer, Builtin.Int64, Builtin.Int32, Builtin.Int32) -> ()
+  Type Int64Ty = BuiltinIntegerType::get(64, C);
+  Type Int32Ty = BuiltinIntegerType::get(32, C);
+  return getBuiltinFunction(Id,
+                            {C.TheRawPointerType, Int64Ty, Int32Ty, Int32Ty},
+                            TupleType::getEmpty(C));
+}
+
 static ValueDecl *getTypePtrAuthDiscriminator(ASTContext &C, Identifier Id) {
   // <T : AnyObject> (T.Type) -> Int64
   BuiltinFunctionBuilder builder(C);
@@ -1024,22 +1036,23 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
     fnParamGens.push_back(T);
   }
   // Generator for the first argument, i.e. the `@differentiable` function.
-  BuiltinFunctionBuilder::LambdaGenerator firstArgGen {
-    // Generator for the function type at the argument position, i.e. the
-    // function being differentiated.
-    [=, &fnParamGens](BuiltinFunctionBuilder &builder) -> Type {
-      FunctionType::ExtInfo ext;
-      auto extInfo = FunctionType::ExtInfo()
-          .withDifferentiabilityKind(DifferentiabilityKind::Normal)
-          .withNoEscape().withThrows(throws);
-      SmallVector<FunctionType::Param, 2> params;
-      for (auto &paramGen : fnParamGens)
-        params.push_back(FunctionType::Param(paramGen.build(builder)));
-      auto innerFunction = FunctionType::get(params,
-                                             fnResultGen.build(builder));
-      return innerFunction->withExtInfo(extInfo);
-    }
-  };
+  BuiltinFunctionBuilder::LambdaGenerator firstArgGen{
+      // Generator for the function type at the argument position, i.e. the
+      // function being differentiated.
+      [=, &fnParamGens](BuiltinFunctionBuilder &builder) -> Type {
+        auto extInfo =
+            FunctionType::ExtInfoBuilder()
+                .withDifferentiabilityKind(DifferentiabilityKind::Normal)
+                .withNoEscape()
+                .withThrows(throws)
+                .build();
+        SmallVector<FunctionType::Param, 2> params;
+        for (auto &paramGen : fnParamGens)
+          params.push_back(FunctionType::Param(paramGen.build(builder)));
+        auto innerFunction =
+            FunctionType::get(params, fnResultGen.build(builder));
+        return innerFunction->withExtInfo(extInfo);
+      }};
   // Eagerly build the type of the first arg, then use that to compute the type
   // of the result.
   auto *diffFnType =
@@ -1094,9 +1107,12 @@ static ValueDecl *getAutoDiffApplyTransposeFunction(
     // function being differentiated.
     [=, &linearFnParamGens](BuiltinFunctionBuilder &builder) -> Type {
       FunctionType::ExtInfo ext;
-      auto extInfo = FunctionType::ExtInfo()
-          .withDifferentiabilityKind(DifferentiabilityKind::Linear)
-          .withNoEscape().withThrows(throws);
+      auto extInfo =
+          FunctionType::ExtInfoBuilder()
+              .withDifferentiabilityKind(DifferentiabilityKind::Linear)
+              .withNoEscape()
+              .withThrows(throws)
+              .build();
       SmallVector<FunctionType::Param, 2> params;
       for (auto &paramGen : linearFnParamGens)
         params.push_back(FunctionType::Param(paramGen.build(builder)));
@@ -1152,8 +1168,9 @@ static ValueDecl *getDifferentiableFunctionConstructor(
       for (auto &paramGen : fnArgGens)
         params.push_back(FunctionType::Param(paramGen.build(builder)));
       return FunctionType::get(params, origResultGen.build(builder))
-          ->withExtInfo(
-              FunctionType::ExtInfo(FunctionTypeRepresentation::Swift, throws));
+          ->withExtInfo(FunctionType::ExtInfoBuilder(
+                            FunctionTypeRepresentation::Swift, throws)
+                            .build());
     }
   };
 
@@ -1177,8 +1194,9 @@ static ValueDecl *getDifferentiableFunctionConstructor(
           {TupleTypeElt(origResultType, Context.Id_value),
            TupleTypeElt(differentialType, Context.Id_differential)}, Context);
       return FunctionType::get(params, jvpResultType)
-          ->withExtInfo(
-              FunctionType::ExtInfo(FunctionTypeRepresentation::Swift, throws));
+          ->withExtInfo(FunctionType::ExtInfoBuilder(
+                            FunctionTypeRepresentation::Swift, throws)
+                            .build());
     }
   };
 
@@ -1205,8 +1223,9 @@ static ValueDecl *getDifferentiableFunctionConstructor(
           {TupleTypeElt(origResultType, Context.Id_value),
            TupleTypeElt(pullbackType, Context.Id_pullback)}, Context);
       return FunctionType::get(params, vjpResultType)
-          ->withExtInfo(
-              FunctionType::ExtInfo(FunctionTypeRepresentation::Swift, throws));
+          ->withExtInfo(FunctionType::ExtInfoBuilder(
+                            FunctionTypeRepresentation::Swift, throws)
+                            .build());
     }
   };
 
@@ -1215,7 +1234,9 @@ static ValueDecl *getDifferentiableFunctionConstructor(
       auto origFnType = origFnGen.build(builder)->castTo<FunctionType>();
       return origFnType->withExtInfo(
           origFnType->getExtInfo()
-              .withDifferentiabilityKind(DifferentiabilityKind::Normal));
+              .intoBuilder()
+              .withDifferentiabilityKind(DifferentiabilityKind::Normal)
+              .build());
     }
   };
 
@@ -1254,8 +1275,9 @@ static ValueDecl *getLinearFunctionConstructor(
       for (auto &paramGen : fnArgGens)
         params.push_back(FunctionType::Param(paramGen.build(builder)));
       return FunctionType::get(params, origResultGen.build(builder))
-          ->withExtInfo(
-              FunctionType::ExtInfo(FunctionTypeRepresentation::Swift, throws));
+          ->withExtInfo(FunctionType::ExtInfoBuilder(
+                            FunctionTypeRepresentation::Swift, throws)
+                            .build());
     }
   };
 
@@ -1278,7 +1300,9 @@ static ValueDecl *getLinearFunctionConstructor(
       auto origFnType = origFnGen.build(builder)->castTo<FunctionType>();
       return origFnType->withExtInfo(
           origFnType->getExtInfo()
-              .withDifferentiabilityKind(DifferentiabilityKind::Linear));
+              .intoBuilder()
+              .withDifferentiabilityKind(DifferentiabilityKind::Linear)
+              .build());
     }
   };
 
@@ -1528,8 +1552,10 @@ static ValueDecl *getOnceOperation(ASTContext &Context,
   
   auto HandleTy = Context.TheRawPointerType;
   auto VoidTy = Context.TheEmptyTupleType;
-  auto Thin = FunctionType::ExtInfo(FunctionTypeRepresentation::CFunctionPointer,
-                                    /*throws*/ false);
+  auto Thin =
+      FunctionType::ExtInfoBuilder(FunctionTypeRepresentation::CFunctionPointer,
+                                   /*throws*/ false)
+          .build();
   if (withContext) {
     auto ContextTy = Context.TheRawPointerType;
     auto ContextArg = FunctionType::Param(ContextTy);
@@ -2457,6 +2483,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getBuiltinFunction(Id,
                               {},
                               TupleType::getEmpty(Context));
+
+  case BuiltinValueKind::IntInstrprofIncrement:
+    return getIntInstrprofIncrement(Context, Id);
 
   case BuiltinValueKind::TypePtrAuthDiscriminator:
     return getTypePtrAuthDiscriminator(Context, Id);

@@ -131,7 +131,7 @@ default:
 
 // <rdar://problem/19382878> Introduce new x? pattern
 switch Optional(42) {
-case let x?: break // expected-warning{{immutable value 'x' was never used; consider replacing with '_' or removing it}}
+case let x?: break // expected-warning{{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{10-11=_}}
 case nil: break
 }
 
@@ -343,10 +343,14 @@ func rdar32241441() {
 
 // SR-6100
 struct One<Two> { // expected-note{{'Two' declared as parameter to type 'One'}}
-    public enum E: Error {
-        // if you remove associated value, everything works
-        case SomeError(String)
+  public enum E: Error {
+    // if you remove associated value, everything works
+    case SomeError(String)
+
+    static func foo(error: Error) {
+      if case SomeError = error {}
     }
+  }
 }
 
 func testOne() {
