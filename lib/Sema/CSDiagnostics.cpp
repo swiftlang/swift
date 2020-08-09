@@ -3457,7 +3457,7 @@ bool MissingMemberFailure::diagnoseForSubscriptMemberWithTupleBase() const {
 
       emitDiagnostic(
           diag::could_not_find_subscript_member_tuple_did_you_mean_use_dot,
-          baseType)
+          baseType, literal->getDigitsText())
           .fixItReplace(index->getSourceRange(), OS.str());
       return true;
     }

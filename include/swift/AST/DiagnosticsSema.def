@@ -89,12 +89,11 @@ ERROR(could_not_find_subscript_member_did_you_mean,none,
       (Type))
 
 ERROR(could_not_find_subscript_member_tuple, none,
-      "tuple type %0 element cannot be accessed using subscript",
-      (Type))
+      "cannot access element using subscript for tuple type %0; "
+      "use '.' notation instead", (Type))
 ERROR(could_not_find_subscript_member_tuple_did_you_mean_use_dot, none,
-      "tuple type %0 element cannot be accessed using subscript; "
-      "did you mean to use '.' to access element?",
-      (Type))
+      "cannot access element using subscript for tuple type %0; "
+      "did you mean to use '.%1'?", (Type, StringRef))
 
 ERROR(could_not_find_enum_case,none,
       "enum type %0 has no case %1; did you mean %2?",
