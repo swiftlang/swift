@@ -529,11 +529,7 @@ public struct PartialRangeThrough<Bound: Comparable> {
   public let upperBound: Bound
   
   @inlinable // trivial-implementation
-  public init(_ upperBound: Bound) {
-    _precondition(upperBound == upperBound,
-      "PartialRangeThrough requries that upperBound not be unordered.")
-    self.upperBound = upperBound
-  }
+  public init(_ upperBound: Bound) { self.upperBound = upperBound }
 }
 
 extension PartialRangeThrough: RangeExpression {
@@ -648,11 +644,7 @@ public struct PartialRangeFrom<Bound: Comparable> {
   public let lowerBound: Bound
 
   @inlinable // trivial-implementation
-  public init(_ lowerBound: Bound) {
-    _precondition(lowerBound == lowerBound,
-      "PartialRangeFrom requries that lowerBound not be unordered.")
-    self.lowerBound = lowerBound
-  }
+  public init(_ lowerBound: Bound) { self.lowerBound = lowerBound }
 }
 
 extension PartialRangeFrom: RangeExpression {
@@ -731,6 +723,8 @@ extension Comparable {
   /// - Parameters:
   ///   - minimum: The lower bound for the range.
   ///   - maximum: The upper bound for the range.
+  ///
+  /// - Precondition: `minimum <= maximum`.
   @_transparent
   public static func ..< (minimum: Self, maximum: Self) -> Range<Self> {
     _precondition(minimum <= maximum,
@@ -760,8 +754,12 @@ extension Comparable {
   ///     // Prints "[10, 20, 30]"
   ///
   /// - Parameter maximum: The upper bound for the range.
+  ///
+  /// - Precondition: `maximum` must compare equal to itself (i.e. cannot be NaN).
   @_transparent
   public static prefix func ..< (maximum: Self) -> PartialRangeUpTo<Self> {
+    _precondition(maximum == maximum,
+      "Range cannot have an unordered upper bound.")
     return PartialRangeUpTo(maximum)
   }
 
@@ -787,8 +785,12 @@ extension Comparable {
   ///     // Prints "[10, 20, 30, 40]"
   ///
   /// - Parameter maximum: The upper bound for the range.
+  ///
+  /// - Precondition: `maximum` must compare equal to itself (i.e. cannot be NaN).
   @_transparent
   public static prefix func ... (maximum: Self) -> PartialRangeThrough<Self> {
+    _precondition(maximum == maximum,
+      "Range cannot have an unordered upper bound.")
     return PartialRangeThrough(maximum)
   }
 
@@ -814,8 +816,12 @@ extension Comparable {
   ///     // Prints "[40, 50, 60, 70]"
   ///
   /// - Parameter minimum: The lower bound for the range.
+  ///
+  /// - Precondition: `minimum` must compare equal to itself (i.e. cannot be NaN).
   @_transparent
   public static postfix func ... (minimum: Self) -> PartialRangeFrom<Self> {
+    _precondition(minimum == minimum,
+      "Range cannot have an unordered lower bound.")
     return PartialRangeFrom(minimum)
   }
 }
