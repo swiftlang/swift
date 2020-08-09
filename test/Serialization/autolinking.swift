@@ -40,10 +40,10 @@ import someModule
 // NO-FORCE-LOAD-NOT: FORCE_LOAD
 // NO-FORCE-LOAD-NOT -lmodule
 // NO-FORCE-LOAD-NOT -lmagic
-// FORCE-LOAD: define{{( dllexport)?}} void @"_swift_FORCE_LOAD_$_module"() {{(#[0-9]+ )?(comdat )?}}{
+// FORCE-LOAD: define{{( dllexport)?}} void @"_swift_FORCE_LOAD_$_module"() {{(#[0-9]+)?( comdat)?}} {
 // FORCE-LOAD:   ret void
 // FORCE-LOAD: }
-// FORCE-LOAD-HEX: define{{( dllexport)?}} void @"_swift_FORCE_LOAD_$306d6f64756c65"() {{(comdat )?(#[0-9]+ )?}}{
+// FORCE-LOAD-HEX: define{{( dllexport)?}} void @"_swift_FORCE_LOAD_$306d6f64756c65"() {{(#[0-9]+)?( comdat)?}} {
 // FORCE-LOAD-HEX:   ret void
 // FORCE-LOAD-HEX: }
 
