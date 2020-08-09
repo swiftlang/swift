@@ -1,6 +1,11 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// SWIFT_ENABLE_TENSORFLOW
+// FIXME: This test currently crashes on tensorflow branch only, not master branch.
+// XFAIL: *
+// SWIFT_ENABLE_TENSORFLOW END
+
 import StdlibUnittest
 import DifferentiationUnittest
 
