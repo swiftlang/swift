@@ -3286,32 +3286,22 @@ static void checkIfSuperCallIsRequired(FuncDecl *FD) {
   SmallString<128> scratch;
 
   for (auto baseDecl : FD->getOverriddenDecls()) {
-    auto baseHasRequiresSuperAttr =
-        baseDecl->getAttrs().hasAttribute<RequiresSuperAttr>();
-    auto ignoresSuperAttr = FD->getAttrs().getAttribute<IgnoresSuperAttr>();
-    if (ignoresSuperAttr) {
-      if (!baseHasRequiresSuperAttr) {
-        Diags
-            .diagnose(ignoresSuperAttr->getLocation(),
-                      diag::ignores_super_attr_no_effect)
-            .fixItRemove(ignoresSuperAttr->getRangeWithAt());
-      }
-      continue;
-    }
-
-    if (!baseHasRequiresSuperAttr) {
+    auto requiresSuperAttr =
+        baseDecl->getAttrs().getAttribute<RequiresSuperAttr>();
+    if (!requiresSuperAttr) {
       continue;
     }
 
     if (!hasSuperCall(baseDecl, FD)) {
       scratch.clear();
       auto baseMethodName = baseDecl->getName().getString(scratch);
-      auto attr = baseDecl->getAttrs().getAttribute<RequiresSuperAttr>();
-      auto msg = attr->Message.hasValue() ? attr->Message.getValue() : "";
-      Diags.diagnose(FD, diag::requires_super_call_override, baseMethodName,
-                     msg, !msg.empty());
-      Diags.diagnose(FD, diag::silence_super_call_override)
-          .fixItInsert(FD->getAttributeInsertionLoc(false), "@ignoresSuper ");
+      auto diag = baseDecl->hasClangNode()
+                      ? diag::requires_super_call_override_warn
+                      : diag::requires_super_call_override;
+      auto msg = requiresSuperAttr->Message.hasValue()
+                     ? requiresSuperAttr->Message.getValue()
+                     : "";
+      Diags.diagnose(FD, diag, baseMethodName, msg, !msg.empty());
     }
   }
 }

@@ -642,11 +642,6 @@ DECL_ATTR(requiresSuper, RequiresSuper,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   113)
 
-SIMPLE_DECL_ATTR(ignoresSuper, IgnoresSuper,
-  OnFunc |
-  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  114)
-
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

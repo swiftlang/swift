@@ -5,9 +5,7 @@
 // and errors are correctly emitted and supressed.
 
 class MyCustomViewControllerSubclass1: MyCustomViewController {
-  override func customViewDidLoad() {}
-  // expected-error@-1 {{method override is missing 'super.customViewDidLoad()' call}}
-  // expected-note@-2 {{annotate method with '@ignoresSuper' if this is intentional}} {{3-3=@ignoresSuper }}
+  override func customViewDidLoad() {} // expected-warning {{method override is missing 'super.customViewDidLoad()' call}}
 }
 
 class MyCustomViewControllerSubclass2: MyCustomViewController {
@@ -16,7 +14,3 @@ class MyCustomViewControllerSubclass2: MyCustomViewController {
   }
 }
 
-class MyCustomViewControllerSubclass3: MyCustomViewController {
-  @ignoresSuper 
-  override func customViewDidLoad() {} // Okay
-}

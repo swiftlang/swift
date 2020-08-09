@@ -14,7 +14,6 @@ class Invalid1A {
 class Invalid1B: Invalid1A {
   override func foo(bar: Int) {}
   // expected-error@-1 {{method override is missing 'super.foo(bar:)' call}}
-  // expected-note@-2 {{annotate method with '@ignoresSuper' if this is intentional}} {{3-3=@ignoresSuper }}
 }
 
 // MARK: Incorrect 'super' call
@@ -29,7 +28,6 @@ class Invalid2A {
 class Invalid2B: Invalid2A {
   override func foo(bar: Int) { 
     // expected-error@-1 {{method override is missing 'super.foo(bar:)' call}}
-    // expected-note@-2 {{annotate method with '@ignoresSuper' if this is intentional}}
     super.foo(baz: bar)
   }
 }
@@ -42,16 +40,6 @@ final class Invalid3A {
   func foo(bar: Int) {}
 }
 
-class Invalid4A {
-  func foo(bar: Int) {}
-}
-
-class Invalid4B: Invalid4A {
-  @ignoresSuper
-  // expected-error@-1 {{'@ignoresSuper' has no effect because base method does not require 'super' call}} {{3-16=}}
-  override func foo(bar: Int) {}
-}
-
 // MARK: Inherits '@requiresSuper'
 class BaseRequiresSuper {
   @requiresSuper
@@ -62,22 +50,9 @@ class OverrideWhichCallsSuperInBody: BaseRequiresSuper {
   override func foo() { super.foo() }
 }
 
-class OverrideWhichSkipsSuperInBody1: OverrideWhichCallsSuperInBody {
+class OverrideWhichSkipsSuperInBody: OverrideWhichCallsSuperInBody {
   override func foo() { } 
   // expected-error@-1 {{method override is missing 'super.foo()' call}}
-  // expected-note @-2 {{annotate method with '@ignoresSuper' if this is intentional}}
-}
-
-class OverrideWhichHasBothRequiresAndIgnoresSuperAttrs: BaseRequiresSuper {
-  @ignoresSuper
-  @requiresSuper
-  override func foo() { }
-}
-
-class OverrideWhichSkipsSuperInBody2: OverrideWhichHasBothRequiresAndIgnoresSuperAttrs {
-  override func foo() { }
-  // expected-error@-1 {{method override is missing 'super.foo()' call}}
-  // expected-note @-2 {{annotate method with '@ignoresSuper' if this is intentional}}
 }
 
 
@@ -97,17 +72,6 @@ class Valid1B: Valid1A {
   }
 }
 
-// MARK: 'super' call can be skipped
-class Valid2A {
-  @requiresSuper
-  func foo(bar: Int) {}
-}
-
-class Valid2B: Valid2A {
-  @ignoresSuper
-  override func foo(bar: Int) {}
-}
-
 // MARK: Shows optional message on attribute
 class Valid3A {
   @requiresSuper("call super as final step in your implementation")
@@ -117,15 +81,10 @@ class Valid3A {
 class Valid3B: Valid3A {
   override func foo(bar: Int) {}
   // expected-error@-1 {{method override is missing 'super.foo(bar:)' call: call super as final step in your implementation}}
-  // expected-note@-2 {{annotate method with '@ignoresSuper' if this is intentional}}
 }
 
 // MARK: Valid behavior of inherited attributes
-class OverrideWhichHasIgnoresSuperAttr: BaseRequiresSuper {
-  @ignoresSuper
-  override func foo() { }
+class OverrideWhichCallsSuperInBody2: OverrideWhichCallsSuperInBody {
+  override func foo() { super.foo() } // Okay
 }
 
-class OverrideWhichSkipsSuperInBody3: OverrideWhichHasIgnoresSuperAttr {
-  override func foo() {} // Okay, because this doesn't inherit '@requiresSuper'
-}
