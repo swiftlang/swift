@@ -45,7 +45,7 @@ entry(%0 : $@objc_metatype C.Type):
   unreachable
 }
 
-// CHECK: define private i8* [[SELECTOR_FN]]
+// CHECK: define linkonce_odr hidden i8* [[SELECTOR_FN]]
 // CHECK-NEXT: entry:
 // CHECK-NEXT:   %1 = load {{.*}}selector(x)
 // CHECK-NEXT:   ret i8* %1

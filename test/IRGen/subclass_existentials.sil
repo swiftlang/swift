@@ -109,7 +109,7 @@ bb0(%0 : @owned $C, %1 : @owned $C & P):
   return %result : $()
 }
 
-// CHECK-LABEL: define private { i8*, i8** } @dynamic_cast_existential_1_superclass_unconditional(i8* %0, %swift.type* %1, %swift.type*
+// CHECK-LABEL: define linkonce_odr hidden { i8*, i8** } @dynamic_cast_existential_1_superclass_unconditional(i8* %0, %swift.type* %1, %swift.type*
 // CHECK:     entry:
 // CHECK-NEXT:  [[RESULT:%.*]] = call %swift.type* @swift_dynamicCastMetatype(%swift.type* %1, %swift.type* %2)
 // CHECK-NEXT:  [[IS_SUBCLASS:%.*]] = icmp ne %swift.type* [[RESULT]], null
@@ -150,7 +150,7 @@ bb0(%0 : @owned $C):
   return %result : $()
 }
 
-// CHECK-LABEL: define private { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* %0, %swift.type*
+// CHECK-LABEL: define linkonce_odr hidden { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* %0, %swift.type*
 // CHECK:     entry:
 // CHECK-NEXT:  [[WTABLE:%.*]] = call i8** @swift_conformsToProtocol(%swift.type* %1, {{.*}} %2)
 // CHECK-NEXT:  [[IS_NOT_CONFORMING:%.*]] = icmp eq i8** [[WTABLE]], null
