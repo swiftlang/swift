@@ -715,8 +715,7 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
 
   // Make sure we aren't trying to equate type variables with different
   // lvalue-binding rules.
-  if (auto otherTypeVar =
-          type->lookThroughAllOptionalTypes()->getAs<TypeVariableType>()) {
+  if (auto otherTypeVar = type->getAs<TypeVariableType>()) {
     if (typeVar->getImpl().canBindToLValue() !=
         otherTypeVar->getImpl().canBindToLValue())
       return None;
