@@ -674,3 +674,18 @@ _ = [.e: 1] // expected-error {{reference to member 'e' cannot be resolved witho
 let _ : [Int: Any] = [1 : .e] // expected-error {{type 'Any' has no member 'e'}}
 let _ : (Int, Any) = (1, .e) // expected-error {{type 'Any' has no member 'e'}}
 _ = (1, .e) // expected-error {{cannot infer contextual base in reference to member 'e'}}
+
+// SR-13359
+typealias Pair = (Int, Int)
+func testSR13359(_ pair: (Int, Int), _ alias: Pair, _ void: Void) {
+  _ = pair[0] // expected-error {{tuple type '(Int, Int)' element cannot be accessed using subscript; did you mean to use '.' to access element?}} {{11-14=.0}}
+  _ = pair["strting"] // expected-error {{tuple type '(Int, Int)' element cannot be accessed using subscript}} {{none}}
+  _ = pair[-1] // expected-error {{tuple type '(Int, Int)' element cannot be accessed using subscript}} {{none}}
+  _ = pair[1, 1] // expected-error {{tuple type '(Int, Int)' element cannot be accessed using subscript}} {{none}}
+  _ = void[0] // expected-error {{value of type 'Void' has no subscripts}}
+
+  _ = alias[0] // expected-error {{tuple type 'Pair' (aka '(Int, Int)') element cannot be accessed using subscript; did you mean to use '.' to access element?}} {{12-15=.0}}
+  _ = alias["strting"] // expected-error {{tuple type 'Pair' (aka '(Int, Int)') element cannot be accessed using subscript}} {{none}}
+  _ = alias[-1] // expected-error {{tuple type 'Pair' (aka '(Int, Int)') element cannot be accessed using subscript}} {{none}}
+  _ = alias[1, 1] // expected-error {{tuple type 'Pair' (aka '(Int, Int)') element cannot be accessed using subscript}} {{none}}
+}
