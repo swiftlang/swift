@@ -143,7 +143,7 @@ static bool validateCodingKeysEnum(DerivedConformance &derived,
 
   // Here we'll hold on to properties by name -- when we've validated a property
   // against its CodingKey entry, it will get removed.
-  llvm::SmallDenseMap<Identifier, VarDecl *, 8> properties;
+  llvm::SmallMapVector<Identifier, VarDecl *, 8> properties;
   for (auto *varDecl : derived.Nominal->getStoredProperties()) {
     if (!varDecl->isUserAccessible())
       continue;
