@@ -14,13 +14,13 @@ struct NonSpecializedIntWrapper {
 template <class T>
 struct MagicWrapper {
   T t;
-  int doubleIfSpecializedElseTripple() const { return 3 * t.getValue(); }
+  int doubleIfSpecializedElseTriple() const { return 3 * t.getValue(); }
 };
 
 template <>
 struct MagicWrapper<SpecializedIntWrapper> {
   SpecializedIntWrapper t;
-  int doubleIfSpecializedElseTripple() const { return 2 * t.getValue(); }
+  int doubleIfSpecializedElseTriple() const { return 2 * t.getValue(); }
 };
 
 typedef MagicWrapper<SpecializedIntWrapper> WrapperWithSpecialization;
