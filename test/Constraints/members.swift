@@ -676,8 +676,6 @@ let _ : (Int, Any) = (1, .e) // expected-error {{type 'Any' has no member 'e'}}
 _ = (1, .e) // expected-error {{cannot infer contextual base in reference to member 'e'}}
 
 // SR-13359
-
-// SR-13359
 typealias Pair = (Int, Int)
 func testSR13359(_ pair: (Int, Int), _ alias: Pair, _ void: Void, labeled: (a: Int, b: Int)) {
   _ = pair[0] // expected-error {{cannot access element using subscript for tuple type '(Int, Int)'; did you mean to use '.0'?}} {{11-14=.0}}
@@ -712,5 +710,11 @@ func testSR13359(_ pair: (Int, Int), _ alias: Pair, _ void: Void, labeled: (a: I
   _ = labeled[1, 1] // expected-error {{cannot access element using subscript for tuple type '(a: Int, b: Int)'; use '.' notation instead}} {{none}}
   _ = labeled[0x00] // expected-error {{cannot access element using subscript for tuple type '(a: Int, b: Int)'; use '.' notation instead}} {{none}}
   _ = labeled[0b00] // expected-error {{cannot access element using subscript for tuple type '(a: Int, b: Int)'; use '.' notation instead}} {{none}}
+
+  // Suggesting use label access
+  _ = labeled["a"] // expected-error {{cannot access element using subscript for tuple type '(a: Int, b: Int)'; did you mean to use '.a'?}} {{14-19=.a}}
+  _ = labeled["b"] // expected-error {{cannot access element using subscript for tuple type '(a: Int, b: Int)'; did you mean to use '.b'?}} {{14-19=.b}}
+  _ = labeled["c"] // expected-error {{cannot access element using subscript for tuple type '(a: Int, b: Int)'; use '.' notation instead}} {{none}}
+  _ = labeled[""] // expected-error {{cannot access element using subscript for tuple type '(a: Int, b: Int)'; use '.' notation instead}} {{none}}
 
 }

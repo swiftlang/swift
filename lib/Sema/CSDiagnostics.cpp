@@ -3457,7 +3457,7 @@ bool MissingMemberFailure::diagnoseForSubscriptMemberWithTupleBase() const {
     // number only literals.
     if (literal && NumericRegex.match(literal->getDigitsText())) {
       unsigned int literalValue = 0;
-      literal->getDigitsText().getAsInteger(/*Radix*/ 0, literalValue);
+      literal->getDigitsText().getAsInteger(/*Radix=*/0, literalValue);
 
       // Verify if the literal value is within the bounds of tuple elements.
       if (!literal->isNegative() &&
@@ -3472,6 +3472,27 @@ bool MissingMemberFailure::diagnoseForSubscriptMemberWithTupleBase() const {
             .fixItReplace(index->getSourceRange(), OS.str());
         return true;
       }
+    }
+
+    // For subscript access on tuple base types where the subscript index is a
+    // string literal expression which value matches a tuple element label,
+    // let's suggest tuple label access.
+    auto stringLiteral =
+        dyn_cast<StringLiteralExpr>(index->getSemanticsProvidingExpr());
+    if (stringLiteral && !stringLiteral->getValue().empty() &&
+        llvm::any_of(tupleType->getElements(), [&](TupleTypeElt element) {
+          return !element.getName().empty() &&
+                 element.getName().str() == stringLiteral->getValue();
+        })) {
+      llvm::SmallString<16> dotAccess;
+      llvm::raw_svector_ostream OS(dotAccess);
+      OS << "." << stringLiteral->getValue();
+
+      emitDiagnostic(
+          diag::could_not_find_subscript_member_tuple_did_you_mean_use_dot,
+          baseType, stringLiteral->getValue())
+          .fixItReplace(index->getSourceRange(), OS.str());
+      return true;
     }
   }
 
