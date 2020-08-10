@@ -1,10 +1,9 @@
 // RUN: %target-typecheck-verify-swift
 
 protocol P1 where A == Never {
-  associatedtype A // expected-note {{protocol requires nested type 'A'}}
+  associatedtype A
 }
-// FIXME: Should this infer A := Never?
-struct S1: P1 {} // expected-error {{type 'S1' does not conform to protocol 'P1'}}
+struct S1: P1 {} // OK, A := Never
 
 protocol P2a {
   associatedtype A
@@ -54,22 +53,19 @@ protocol P7b: P7a where A == Bool {}
 struct S7: P7b {}
 
 protocol P8 where A == Bool {
-  associatedtype A // expected-note {{protocol requires nested type 'A'}}
+  associatedtype A
 }
-// expected-error@+2 {{type 'S8' does not conform to protocol 'P7a'}}
-// expected-error@+1 {{type 'S8' does not conform to protocol 'P8'}}
+// expected-error@+2 {{'P7a' requires the types 'S8.A' (aka 'Bool') and 'Never' be equivalent}}
+// expected-note@+1 {{requirement specified as 'Self.A' == 'Never' [with Self = S8]}}
 struct S8: P8, P7a {}
 
 protocol P9a where A == Never {
   associatedtype A
 }
 protocol P9b: P9a {
-  associatedtype A // expected-note {{protocol requires nested type 'A'}}
+  associatedtype A
 }
-// FIXME: Associated type restatement sabotages the conformance.
-// expected-error@+2 {{type 'S9a' does not conform to protocol 'P9a'}}
-// expected-error@+1 {{type 'S9a' does not conform to protocol 'P9b'}}
-struct S9a: P9b {}
+struct S9a: P9b {} // OK, A := Never
 // expected-error@+2 {{'P9a' requires the types 'S9b.A' (aka 'Bool') and 'Never' be equivalent}}
 // expected-note@+1 {{requirement specified as 'Self.A' == 'Never' [with Self = S9b]}}
 struct S9b: P9b {
