@@ -32,7 +32,7 @@ class Foo : NSRuncing, NSFunging, Ansible {
 // CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(funge)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @"$s14objc_protocols3FooC5fungeyyFTo" to i8*) },
 // CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @"$s14objc_protocols3FooC3fooyyFTo" to i8*)
 // CHECK:   }]
-// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK: }, section "__DATA, {{.*}}", align 8
 
 class Bar {
   func bar() {}
@@ -57,7 +57,7 @@ extension Bar : NSRuncing, NSFunging {
 // CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(funge)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @"$s14objc_protocols3BarC5fungeyyFTo" to i8*) },
 // CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @"$s14objc_protocols3BarC3fooyyFTo" to i8*) }
 // CHECK:   ]
-// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK: }, section "__DATA, {{.*}}", align 8
 
 // class Bas from objc_protocols_Bas module
 extension Bas : NSRuncing {
@@ -71,7 +71,7 @@ extension Bas : NSRuncing {
 // CHECK:   [1 x { i8*, i8*, i8* }] [
 // CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @"$s18objc_protocols_Bas0C0C0a1_B0E3fooyyFTo" to i8*) }
 // CHECK:   ]
-// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK: }, section "__DATA, {{.*}}", align 8
 
 // -- Swift protocol refinement of ObjC protocols.
 protocol Frungible : NSRuncing, NSFunging {
@@ -93,7 +93,7 @@ class Zim : Frungible {
 // CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(funge)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @"$s14objc_protocols3ZimC5fungeyyFTo" to i8*) },
 // CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @"$s14objc_protocols3ZimC3fooyyFTo" to i8*) }
 // CHECK:   ]
-// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK: }, section "__DATA, {{.*}}", align 8
 
 // class Zang from objc_protocols_Bas module
 extension Zang : Frungible {
@@ -112,7 +112,7 @@ extension Zang : Frungible {
 // CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(runce)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @"$s18objc_protocols_Bas4ZangC0a1_B0E5runceyyFTo" to i8*) },
 // CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @"$s18objc_protocols_Bas4ZangC0a1_B0E3fooyyFTo" to i8*) }
 // CHECK:   ]
-// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK: }, section "__DATA, {{.*}}", align 8
 
 @objc protocol BaseProtocol { }
 protocol InheritingProtocol : BaseProtocol { }
