@@ -18,6 +18,7 @@
 #define SWIFT_LOCALIZATIONFORMAT_H
 
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Bitstream/BitstreamReader.h"
@@ -38,6 +39,7 @@ namespace swift {
 enum class DiagID : uint32_t;
 
 namespace diag {
+
 using namespace llvm::support;
 
 class LocalizationWriterInfo {
@@ -152,6 +154,8 @@ class YAMLLocalizationProducer final : public LocalizationProducer {
   std::vector<std::string> diagnostics;
 
 public:
+  /// The diagnostics IDs that are no longer available in `.def`
+  std::vector<std::string> unknownIDs;
   explicit YAMLLocalizationProducer(llvm::StringRef filePath);
   llvm::StringRef getMessageOr(swift::DiagID id,
                                llvm::StringRef defaultMessage) const override;
@@ -185,12 +189,23 @@ class LocalizationInput : public llvm::yaml::Input {
   template <typename T, typename Context>
   friend typename std::enable_if<llvm::yaml::has_SequenceTraits<T>::value,
                                  void>::type
-  readYAML(llvm::yaml::IO &io, T &Seq, bool, Context &Ctx);
+  readYAML(llvm::yaml::IO &io, T &Seq, T &unknownIDs, bool, Context &Ctx);
 
   template <typename T>
   friend typename std::enable_if<llvm::yaml::has_SequenceTraits<T>::value,
                                  LocalizationInput &>::type
   operator>>(LocalizationInput &yin, T &diagnostics);
+
+public:
+  /// A vector that keeps track of the diagnostics IDs that are available in
+  /// YAML and not available in `.def` files.
+  std::vector<std::string> unknownIDs;
+  
+  /// A diagnostic ID might be present in YAML and not in `.def` file, if that's
+  /// the case the `id` won't have a `DiagID` value.
+  /// If the `id` is available in `.def` file this method will return the `id`'s
+  /// value, otherwise this method won't return a value.
+  static llvm::Optional<uint32_t> readID(llvm::yaml::IO &io);
 };
 
 } // namespace diag
