@@ -75,7 +75,7 @@ static Identifier getVarNameForCoding(VarDecl *var) {
 /// match with the stored vars of the given type.
 ///
 /// \param codingKeysDecl The \c CodingKeys enum decl to validate.
-static bool validateCodingKeysEnum(DerivedConformance &derived,
+static bool validateCodingKeysEnum(const DerivedConformance &derived,
                                    EnumDecl *codingKeysDecl) {
   auto conformanceDC = derived.getConformanceContext();
 
@@ -160,11 +160,14 @@ static bool validateCodingKeysEnum(DerivedConformance &derived,
 }
 
 /// A type which has information about the validity of an encountered
-/// CodingKeys type.
-struct CodingKeysValidity {
-  bool hasType;
-  bool isValid;
-  CodingKeysValidity(bool ht, bool iv) : hasType(ht), isValid(iv) {}
+/// \c CodingKeys type.
+enum class CodingKeysClassification {
+  /// A \c CodingKeys declaration was found, but it is invalid.
+  Invalid,
+  /// No \c CodingKeys declaration was found, so it must be synthesized.
+  NeedsSynthesizedCodingKeys,
+  /// A valid \c CodingKeys declaration was found.
+  Valid,
 };
 
 /// Returns whether the given type has a valid nested \c CodingKeys enum.
@@ -176,12 +179,14 @@ struct CodingKeysValidity {
 /// enum.
 ///
 /// \returns A \c CodingKeysValidity value representing the result of the check.
-static CodingKeysValidity hasValidCodingKeysEnum(DerivedConformance &derived) {
+static CodingKeysClassification
+classifyCodingKeys(const DerivedConformance &derived) {
   auto &C = derived.Context;
   auto codingKeysDecls =
       derived.Nominal->lookupDirect(DeclName(C.Id_CodingKeys));
-  if (codingKeysDecls.empty())
-    return CodingKeysValidity(/*hasType=*/false, /*isValid=*/true);
+  if (codingKeysDecls.empty()) {
+    return CodingKeysClassification::NeedsSynthesizedCodingKeys;
+  }
 
   // Only ill-formed code would produce multiple results for this lookup.
   // This would get diagnosed later anyway, so we're free to only look at the
@@ -192,7 +197,7 @@ static CodingKeysValidity hasValidCodingKeysEnum(DerivedConformance &derived) {
   if (!codingKeysTypeDecl) {
     result->diagnose(diag::codable_codingkeys_type_is_not_an_enum_here,
                      derived.getProtocolType());
-    return CodingKeysValidity(/*hasType=*/true, /*isValid=*/false);
+    return CodingKeysClassification::Invalid;
   }
 
   // CodingKeys may be a typealias. If so, follow the alias to its canonical
@@ -216,7 +221,7 @@ static CodingKeysValidity hasValidCodingKeysEnum(DerivedConformance &derived) {
     C.Diags.diagnose(loc, diag::codable_codingkeys_type_does_not_conform_here,
                      derived.getProtocolType());
 
-    return CodingKeysValidity(/*hasType=*/true, /*isValid=*/false);
+    return CodingKeysClassification::Invalid;
   }
 
   // CodingKeys must be an enum for synthesized conformance.
@@ -225,11 +230,12 @@ static CodingKeysValidity hasValidCodingKeysEnum(DerivedConformance &derived) {
     codingKeysTypeDecl->diagnose(
         diag::codable_codingkeys_type_is_not_an_enum_here,
         derived.getProtocolType());
-    return CodingKeysValidity(/*hasType=*/true, /*isValid=*/false);
+    return CodingKeysClassification::Invalid;
   }
 
-  bool valid = validateCodingKeysEnum(derived, codingKeysEnum);
-  return CodingKeysValidity(/*hasType=*/true, /*isValid=*/valid);
+  return validateCodingKeysEnum(derived, codingKeysEnum)
+             ? CodingKeysClassification::Valid
+             : CodingKeysClassification::Invalid;
 }
 
 /// Synthesizes a new \c CodingKeys enum based on the {En,De}codable members of
@@ -1071,19 +1077,18 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement) {
 
   // If the target already has a valid CodingKeys enum, we won't need to
   // synthesize one.
-  auto validity = hasValidCodingKeysEnum(derived);
-
-  // We found a type, but it wasn't valid.
-  if (!validity.isValid)
+  switch (classifyCodingKeys(derived)) {
+  case CodingKeysClassification::Invalid:
     return false;
-
-  // We can try to synthesize a type here.
-  if (!validity.hasType) {
+  case CodingKeysClassification::NeedsSynthesizedCodingKeys: {
     auto *synthesizedEnum = synthesizeCodingKeysEnum(derived);
     if (!synthesizedEnum)
       return false;
+    }
+    LLVM_FALLTHROUGH;
+  case CodingKeysClassification::Valid:
+    return true;
   }
-
   return true;
 }
 
