@@ -2491,22 +2491,30 @@ namespace {
         if (enumPattern->getParentType() || enumPattern->getParentTypeRepr()) {
           // Resolve the parent type.
           Type parentType = [&]() -> Type {
-            if (const auto resolvedTy = enumPattern->getParentType()) {
-              assert(resolvedTy->hasUnboundGenericType() == false &&
-                     "A pre-resolved type must be fully bound");
-              return resolvedTy;
+            if (auto preTy = enumPattern->getParentType()) {
+              return preTy;
             }
             return resolveTypeReferenceInExpression(
                 enumPattern->getParentTypeRepr(),
-                TypeResolverContext::InExpression,
-                OpenUnboundGenericType(
-                    CS, CS.getConstraintLocator(
-                            locator, {LocatorPathElt::PatternMatch(pattern),
-                                      ConstraintLocator::ParentType})));
+                TypeResolverContext::InExpression, [](auto unboundTy) {
+                  // FIXME: We ought to pass an OpenUnboundGenericType object
+                  // rather than calling CS.openUnboundGenericType below, but
+                  // sometimes the parent type is resolved eagerly in
+                  // ResolvePattern::visitUnresolvedDotExpr, letting unbound
+                  // generics escape.
+                  return unboundTy;
+                });
           }();
 
           if (!parentType)
             return Type();
+
+          parentType = CS.openUnboundGenericTypes(
+              parentType, CS.getConstraintLocator(
+                              locator, {LocatorPathElt::PatternMatch(pattern),
+                                        ConstraintLocator::ParentType}));
+
+          assert(parentType);
 
           // Perform member lookup into the parent's metatype.
           Type parentMetaType = MetatypeType::get(parentType);
