@@ -131,8 +131,11 @@ function(_add_host_variant_c_compile_flags target)
 
   is_build_type_optimized("${CMAKE_BUILD_TYPE}" optimized)
   if(optimized)
-    clang_optimize_flag_for_build_type("${CMAKE_BUILD_TYPE}" optimize_flag)
-    target_compile_options(${target} PRIVATE "${optimize_flag}")
+    if("${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel")
+      target_compile_options(${target} PRIVATE -Os)
+    else()
+      target_compile_options(${target} PRIVATE -O2)
+    endif()
 
     # Omit leaf frame pointers on x86 production builds (optimized, no debug
     # info, and no asserts).
