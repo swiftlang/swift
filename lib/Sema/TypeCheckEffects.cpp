@@ -1,4 +1,4 @@
-//===--- TypeCheckError.cpp - Type Checking for Error Coverage ------------===//
+//===--- TypeCheckEffects.cpp - Type Checking for Effects Coverage --------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements semantic analysis to ensure that errors are
-// caught.
+// This file implements semantic analysis to ensure that various effects (such
+// as throwing and async) are properly handled.
 //
 //===----------------------------------------------------------------------===//
 
@@ -184,9 +184,9 @@ enum ShouldRecurse_t : bool {
 };
 
 /// A CRTP ASTWalker implementation that looks for interesting
-/// nodes for error handling.
+/// nodes for effects handling.
 template <class Impl>
-class ErrorHandlingWalker : public ASTWalker {
+class EffectsHandlingWalker : public ASTWalker {
   Impl &asImpl() { return *static_cast<Impl*>(this); }
 public:
   bool walkToDeclPre(Decl *D) override {
@@ -221,7 +221,7 @@ public:
     } else if (auto interpolated = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
       recurse = asImpl().checkInterpolatedStringLiteral(interpolated);
     }
-    // Error handling validation (via checkTopLevelErrorHandling) happens after
+    // Error handling validation (via checkTopLevelEffects) happens after
     // type checking. If an unchecked expression is still around, the code was
     // invalid.
 #define UNCHECKED_EXPR(KIND, BASE) \
@@ -580,7 +580,7 @@ private:
   }
 
   class FunctionBodyClassifier
-      : public ErrorHandlingWalker<FunctionBodyClassifier> {
+      : public EffectsHandlingWalker<FunctionBodyClassifier> {
     ApplyClassifier &Self;
   public:
     bool IsInvalid = false;
@@ -1221,8 +1221,8 @@ public:
 
 /// A class to walk over a local context and validate the correctness
 /// of its error coverage.
-class CheckErrorCoverage : public ErrorHandlingWalker<CheckErrorCoverage> {
-  friend class ErrorHandlingWalker<CheckErrorCoverage>;
+class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> {
+  friend class EffectsHandlingWalker<CheckEffectsCoverage>;
 
   ASTContext &Ctx;
 
@@ -1288,13 +1288,13 @@ class CheckErrorCoverage : public ErrorHandlingWalker<CheckErrorCoverage> {
   /// An RAII object for restoring all the interesting state in an
   /// error-coverage.
   class ContextScope {
-    CheckErrorCoverage &Self;
+  CheckEffectsCoverage &Self;
     Context OldContext;
     DeclContext *OldRethrowsDC;
     ContextFlags OldFlags;
     ThrowingKind OldMaxThrowingKind;
   public:
-    ContextScope(CheckErrorCoverage &self, Optional<Context> newContext)
+    ContextScope(CheckEffectsCoverage &self, Optional<Context> newContext)
       : Self(self), OldContext(self.CurContext),
         OldRethrowsDC(self.Classifier.RethrowsDC),
         OldFlags(self.Flags),
@@ -1379,7 +1379,7 @@ class CheckErrorCoverage : public ErrorHandlingWalker<CheckErrorCoverage> {
   };
 
 public:
-  CheckErrorCoverage(ASTContext &ctx, Context initialContext)
+  CheckEffectsCoverage(ASTContext &ctx, Context initialContext)
     : Ctx(ctx), CurContext(initialContext),
       MaxThrowingKind(ThrowingKind::None) {
 
@@ -1528,8 +1528,8 @@ private:
     // Check the inactive regions of a #if block to disable warnings that may
     // be due to platform specific code.
     struct ConservativeThrowChecker : public ASTWalker {
-      CheckErrorCoverage &CEC;
-      ConservativeThrowChecker(CheckErrorCoverage &CEC) : CEC(CEC) {}
+      CheckEffectsCoverage &CEC;
+      ConservativeThrowChecker(CheckEffectsCoverage &CEC) : CEC(CEC) {}
       
       Expr *walkToExprPost(Expr *E) override {
         if (isa<TryExpr>(E))
@@ -1694,9 +1694,9 @@ private:
 
 } // end anonymous namespace
 
-void TypeChecker::checkTopLevelErrorHandling(TopLevelCodeDecl *code) {
+void TypeChecker::checkTopLevelEffects(TopLevelCodeDecl *code) {
   auto &ctx = code->getDeclContext()->getASTContext();
-  CheckErrorCoverage checker(ctx, Context::forTopLevelCode(code));
+  CheckEffectsCoverage checker(ctx, Context::forTopLevelCode(code));
 
   // In some language modes, we allow top-level code to omit 'try' marking.
   if (ctx.LangOpts.EnableThrowWithoutTry)
@@ -1705,16 +1705,16 @@ void TypeChecker::checkTopLevelErrorHandling(TopLevelCodeDecl *code) {
   code->getBody()->walk(checker);
 }
 
-void TypeChecker::checkFunctionErrorHandling(AbstractFunctionDecl *fn) {
+void TypeChecker::checkFunctionEffects(AbstractFunctionDecl *fn) {
 #ifndef NDEBUG
-  PrettyStackTraceDecl debugStack("checking error handling for", fn);
+  PrettyStackTraceDecl debugStack("checking effects handling for", fn);
 #endif
 
   auto isDeferBody = isa<FuncDecl>(fn) && cast<FuncDecl>(fn)->isDeferBody();
   auto context =
       isDeferBody ? Context::forDeferBody() : Context::forFunction(fn);
   auto &ctx = fn->getASTContext();
-  CheckErrorCoverage checker(ctx, context);
+  CheckEffectsCoverage checker(ctx, context);
 
   // If this is a debugger function, suppress 'try' marking at the top level.
   if (fn->getAttrs().hasAttribute<LLDBDebuggerFunctionAttr>())
@@ -1728,14 +1728,14 @@ void TypeChecker::checkFunctionErrorHandling(AbstractFunctionDecl *fn) {
       superInit->walk(checker);
 }
 
-void TypeChecker::checkInitializerErrorHandling(Initializer *initCtx,
+void TypeChecker::checkInitializerEffects(Initializer *initCtx,
                                                 Expr *init) {
   auto &ctx = initCtx->getASTContext();
-  CheckErrorCoverage checker(ctx, Context::forInitializer(initCtx));
+  CheckEffectsCoverage checker(ctx, Context::forInitializer(initCtx));
   init->walk(checker);
 }
 
-/// Check the correctness of error handling within the given enum
+/// Check the correctness of effects within the given enum
 /// element's raw value expression.
 ///
 /// The syntactic restrictions on such expressions should make it
@@ -1743,15 +1743,15 @@ void TypeChecker::checkInitializerErrorHandling(Initializer *initCtx,
 /// ensures correctness if those restrictions are ever loosened,
 /// perhaps accidentally, and (2) allows the verifier to assert that
 /// all calls have been checked.
-void TypeChecker::checkEnumElementErrorHandling(EnumElementDecl *elt, Expr *E) {
+void TypeChecker::checkEnumElementEffects(EnumElementDecl *elt, Expr *E) {
   auto &ctx = elt->getASTContext();
-  CheckErrorCoverage checker(ctx, Context::forEnumElementInitializer(elt));
+  CheckEffectsCoverage checker(ctx, Context::forEnumElementInitializer(elt));
   E->walk(checker);
 }
 
-void TypeChecker::checkPropertyWrapperErrorHandling(
+void TypeChecker::checkPropertyWrapperEffects(
     PatternBindingDecl *binding, Expr *expr) {
   auto &ctx = binding->getASTContext();
-  CheckErrorCoverage checker(ctx, Context::forPatternBinding(binding));
+  CheckEffectsCoverage checker(ctx, Context::forPatternBinding(binding));
   expr->walk(checker);
 }
