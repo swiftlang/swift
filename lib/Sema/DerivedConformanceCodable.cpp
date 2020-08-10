@@ -29,38 +29,15 @@ using namespace swift;
 
 /// Returns whether the type represented by the given ClassDecl inherits from a
 /// type which conforms to the given protocol.
-///
-/// \param target The \c ClassDecl whose superclass to look up.
-///
-/// \param proto The protocol to check conformance for.
-static bool inheritsConformanceTo(ClassDecl *target, ProtocolDecl *proto) {
-  if (!target->hasSuperclass())
+static bool superclassConformsTo(ClassDecl *target, KnownProtocolKind kpk) {
+  if (!target || !target->getSuperclass() || target->hasCircularInheritance()) {
     return false;
-
-  auto *superclassDecl = target->getSuperclassDecl();
-  auto *superclassModule = superclassDecl->getModuleContext();
-  return (bool)superclassModule->lookupConformance(target->getSuperclass(),
-                                                   proto);
-}
-
-/// Returns whether the superclass of the given class conforms to Encodable.
-///
-/// \param target The \c ClassDecl whose superclass to check.
-static bool superclassIsEncodable(ClassDecl *target) {
-  auto &C = target->getASTContext();
-  return inheritsConformanceTo(target,
-                               C.getProtocol(KnownProtocolKind::Encodable));
-}
-
-/// Returns whether the superclass of the given class conforms to Decodable.
-///
-/// \param target The \c ClassDecl whose superclass to check.
-static bool superclassIsDecodable(ClassDecl *target) {
-  auto &C = target->getASTContext();
-  return inheritsConformanceTo(target,
-                               C.getProtocol(KnownProtocolKind::Decodable));
-}
-
+  }
+  return !target->getSuperclassDecl()
+              ->getModuleContext()
+              ->lookupConformance(target->getSuperclass(),
+                                  target->getASTContext().getProtocol(kpk))
+              .isInvalid();
 }
 
 /// Retrieve the variable name for the purposes of encoding/decoding.
@@ -134,25 +111,22 @@ static bool validateCodingKeysEnum(const DerivedConformance &derived,
   // If there are any remaining properties which the CodingKeys did not cover,
   // we can skip them on encode. On decode, though, we can only skip them if
   // they have a default value.
-  if (!properties.empty() &&
-      derived.Protocol->isSpecificProtocol(KnownProtocolKind::Decodable)) {
-    for (auto it = properties.begin(); it != properties.end(); ++it) {
-      // If the var is default initializable, then it need not have an explicit
-      // initial value.
-      auto *varDecl = it->second;
-      if (auto pbd = varDecl->getParentPatternBinding()) {
-        if (pbd->isDefaultInitializable())
-          continue;
+  if (derived.Protocol->isSpecificProtocol(KnownProtocolKind::Decodable)) {
+    for (auto &entry : properties) {
+      const auto *pbd = entry.second->getParentPatternBinding();
+      if (pbd && pbd->isDefaultInitializable()) {
+        continue;
       }
 
-      if (varDecl->isParentInitialized())
+      if (entry.second->isParentInitialized()) {
         continue;
+      }
 
       // The var was not default initializable, and did not have an explicit
       // initial value.
       propertiesAreValid = false;
-      it->second->diagnose(diag::codable_non_decoded_property_here,
-                           derived.getProtocolType(), it->first);
+      entry.second->diagnose(diag::codable_non_decoded_property_here,
+                             derived.getProtocolType(), entry.first);
     }
   }
 
@@ -265,8 +239,8 @@ static EnumDecl *synthesizeCodingKeysEnum(DerivedConformance &derived) {
   // For classes which inherit from something Encodable or Decodable, we
   // provide case `super` as the first key (to be used in encoding super).
   auto *classDecl = dyn_cast<ClassDecl>(target);
-  if (classDecl &&
-      (superclassIsEncodable(classDecl) || superclassIsDecodable(classDecl))) {
+  if (superclassConformsTo(classDecl, KnownProtocolKind::Encodable) ||
+      superclassConformsTo(classDecl, KnownProtocolKind::Decodable)) {
     // TODO: Ensure the class doesn't already have or inherit a variable named
     // "`super`"; otherwise we will generate an invalid enum. In that case,
     // diagnose and bail.
@@ -279,9 +253,11 @@ static EnumDecl *synthesizeCodingKeysEnum(DerivedConformance &derived) {
   // Each of these vars needs a case in the enum. For each var decl, if the type
   // conforms to {En,De}codable, add it to the enum.
   bool allConform = true;
+  auto *conformanceDC = derived.getConformanceContext();
   for (auto *varDecl : target->getStoredProperties()) {
-    if (!varDecl->isUserAccessible())
+    if (!varDecl->isUserAccessible()) {
       continue;
+    }
 
     auto target =
         conformanceDC->mapTypeIntoContext(varDecl->getValueInterfaceType());
@@ -578,8 +554,8 @@ deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *) {
   }
 
   // Classes which inherit from something Codable should encode super as well.
-  auto *classDecl = dyn_cast<ClassDecl>(targetDecl);
-  if (classDecl && superclassIsEncodable(classDecl)) {
+  if (superclassConformsTo(dyn_cast<ClassDecl>(targetDecl),
+                           KnownProtocolKind::Encodable)) {
     // Need to generate `try super.encode(to: container.superEncoder())`
 
     // superEncoder()
@@ -661,8 +637,8 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
 
   // This method should be marked as 'override' for classes inheriting Encodable
   // conformance from a parent class.
-  auto *classDecl = dyn_cast<ClassDecl>(derived.Nominal);
-  if (classDecl && superclassIsEncodable(classDecl)) {
+  if (superclassConformsTo(dyn_cast<ClassDecl>(derived.Nominal),
+                           KnownProtocolKind::Encodable)) {
     auto *attr = new (C) OverrideAttr(/*IsImplicit=*/true);
     encodeDecl->getAttrs().add(attr);
   }
@@ -869,7 +845,7 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
   // superclass is Decodable, or super.init() if it is not.
   if (auto *classDecl = dyn_cast<ClassDecl>(targetDecl)) {
     if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
-      if (superclassIsDecodable(classDecl)) {
+      if (superclassConformsTo(classDecl, KnownProtocolKind::Decodable)) {
         // Need to generate `try super.init(from: container.superDecoder())`
 
         // container.superDecoder
@@ -903,7 +879,8 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
         statements.push_back(tryExpr);
       } else {
         // The explicit constructor name is a compound name taking no arguments.
-        DeclName initName(C, DeclBaseName::createConstructor(), ArrayRef<Identifier>());
+        DeclName initName(C, DeclBaseName::createConstructor(),
+                          ArrayRef<Identifier>());
 
         // We need to look this up in the superclass to see if it throws.
         auto result = superclassDecl->lookupDirect(initName);
@@ -1075,8 +1052,6 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement) {
     }
   }
 
-  // If the target already has a valid CodingKeys enum, we won't need to
-  // synthesize one.
   switch (classifyCodingKeys(derived)) {
   case CodingKeysClassification::Invalid:
     return false;
@@ -1084,7 +1059,7 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement) {
     auto *synthesizedEnum = synthesizeCodingKeysEnum(derived);
     if (!synthesizedEnum)
       return false;
-    }
+  }
     LLVM_FALLTHROUGH;
   case CodingKeysClassification::Valid:
     return true;
