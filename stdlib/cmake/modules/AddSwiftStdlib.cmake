@@ -179,6 +179,11 @@ function(_add_target_variant_c_compile_flags)
     MACCATALYST_BUILD_FLAVOR "${CFLAGS_MACCATALYST_BUILD_FLAVOR}")
 
   is_build_type_optimized("${CFLAGS_BUILD_TYPE}" optimized)
+  is_build_type_with_debuginfo("${CFLAGS_BUILD_TYPE}" debuginfo)
+
+  # Add -O0/-O2/-O3/-Os based on CFLAGS_BUILD_TYPE.
+  list(APPEND result "${CMAKE_CXX_FLAGS_${CFLAGS_BUILD_TYPE}}")
+
   if(optimized)
     if("${CFLAGS_BUILD_TYPE}" STREQUAL "MinSizeRel")
       list(APPEND result "-Os")
@@ -188,8 +193,7 @@ function(_add_target_variant_c_compile_flags)
 
     # Omit leaf frame pointers on x86 production builds (optimized, no debug
     # info, and no asserts).
-    is_build_type_with_debuginfo("${CFLAGS_BUILD_TYPE}" debug)
-    if(NOT debug AND NOT CFLAGS_ENABLE_ASSERTIONS)
+    if(NOT debuginfo AND NOT CFLAGS_ENABLE_ASSERTIONS)
       if("${CFLAGS_ARCH}" STREQUAL "i386" OR "${CFLAGS_ARCH}" STREQUAL "i686")
         if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
           list(APPEND result "-momit-leaf-frame-pointer")
@@ -198,26 +202,15 @@ function(_add_target_variant_c_compile_flags)
         endif()
       endif()
     endif()
-  else()
-    if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-      list(APPEND result "-O0")
-    else()
-      list(APPEND result "/Od")
-    endif()
   endif()
 
   # CMake automatically adds the flags for debug info if we use MSVC/clang-cl.
   if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-    is_build_type_with_debuginfo("${CFLAGS_BUILD_TYPE}" debuginfo)
     if(debuginfo)
       _compute_lto_flag("${CFLAGS_ENABLE_LTO}" _lto_flag_out)
       if(_lto_flag_out)
         list(APPEND result "-gline-tables-only")
-      else()
-        list(APPEND result "-g")
       endif()
-    else()
-      list(APPEND result "-g0")
     endif()
   endif()
 
