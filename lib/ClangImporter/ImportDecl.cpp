@@ -3477,7 +3477,7 @@ namespace {
 
     Decl *VisitClassTemplateSpecializationDecl(
                  const clang::ClassTemplateSpecializationDecl *decl) {
-      // `sema.isCompleteType` will try to instantiate the class template as a
+      // `Sema::isCompleteType` will try to instantiate the class template as a
       // side-effect and we rely on this here. `decl->getDefinition()` can
       // return nullptr before the call to sema and return its definition
       // afterwards.
