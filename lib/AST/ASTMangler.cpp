@@ -2129,7 +2129,7 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
     } else if (UseObjCRuntimeNames && protocol) {
       appendIdentifier(protocol->getObjCRuntimeNameAsString());
     } else if (auto ctsd = dyn_cast<clang::ClassTemplateSpecializationDecl>(namedDecl)) {
-      // If this is a `ClassTemplateSpecializationDecl` it means the decl was
+      // If this is a `ClassTemplateSpecializationDecl`, it was
       // imported as a Swift decl with `__CxxTemplateInst...` name.
       // `ClassTemplateSpecializationDecl`'s name does not include names of
       // template arguments, and in order to prevent name clashes we use the
