@@ -117,7 +117,7 @@ documentation, please create a thread on the Swift forums under the
     Provides an overview of the implementation of SIL in the compiler.
   - [OptimizerDesign.md](/docs/OptimizerDesign.md):
     Describes the design of the optimizer pipeline.
-  - [HighLevelSILOptimizations.rst](docs/HighLevelSILOptimizations.rst):
+  - [HighLevelSILOptimizations.rst](/docs/HighLevelSILOptimizations.rst):
     Describes how the optimizer understands the semantics of high-level
     operations on currency data types and optimizes accordingly.
     Includes a thorough discussion of the `@_semantics` attribute.
