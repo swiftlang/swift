@@ -559,6 +559,9 @@ public:
         ArgType(argType), ParamIdx(paramIdx), FnInterfaceType(fnInterfaceType),
         FnType(fnType), Callee(callee) {}
 
+  /// \returns The list of the arguments used for this application.
+  Expr *getArgListExpr() const { return ArgListExpr; }
+
   /// \returns The argument being applied.
   Expr *getArgExpr() const { return ArgExpr; }
 
@@ -584,6 +587,11 @@ public:
 
     assert(isa<ParenExpr>(ArgListExpr));
     return Identifier();
+  }
+
+  Identifier getParamLabel() const {
+    auto param = FnType->getParams()[ParamIdx];
+    return param.getLabel();
   }
 
   /// \returns A textual description of the argument suitable for diagnostics.

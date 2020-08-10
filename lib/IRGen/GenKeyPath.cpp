@@ -278,6 +278,7 @@ getLayoutFunctionForComputedComponent(IRGenModule &IGM,
     
   auto layoutFn = llvm::Function::Create(fnTy,
     llvm::GlobalValue::PrivateLinkage, "keypath_get_arg_layout", IGM.getModule());
+  layoutFn->setAttributes(IGM.constructInitialAttributes());
   layoutFn->setCallingConv(IGM.SwiftCC);
 
   {
@@ -381,6 +382,7 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
         llvm::GlobalValue::PrivateLinkage, "keypath_destroy", IGM.getModule());
       destroyFn->setCallingConv(IGM.SwiftCC);
       destroy = destroyFn;
+      destroyFn->setAttributes(IGM.constructInitialAttributes());
       
       IRGenFunction IGF(IGM, destroyFn);
       if (IGM.DebugInfo)
@@ -430,6 +432,7 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
         llvm::GlobalValue::PrivateLinkage, "keypath_copy", IGM.getModule());
       copyFn->setCallingConv(IGM.SwiftCC);
       copy = copyFn;
+      copyFn->setAttributes(IGM.constructInitialAttributes());
       
       IRGenFunction IGF(IGM, copyFn);
       if (IGM.DebugInfo)
@@ -542,8 +545,8 @@ getInitializerForComputedComponent(IRGenModule &IGM,
       
   auto initFn = llvm::Function::Create(fnTy,
     llvm::GlobalValue::PrivateLinkage, "keypath_arg_init", IGM.getModule());
+  initFn->setAttributes(IGM.constructInitialAttributes());
   initFn->setCallingConv(IGM.SwiftCC);
-
     
   {
     IRGenFunction IGF(IGM, initFn);
@@ -951,23 +954,16 @@ emitKeyPathComponent(IRGenModule &IGM,
         // Note that we'd need to do this anyway in JIT mode because we would
         // need to unique the selector at runtime anyway.
         auto selectorName = IGM.getObjCSelectorName(declRef);
-        llvm::Type *fnParams[] = {IGM.Int8PtrTy};
-        auto fnTy = llvm::FunctionType::get(IGM.Int8PtrTy, fnParams, false);
         SmallString<32> fnName;
         fnName.append("keypath_get_selector_");
         fnName.append(selectorName);
-        auto fn = cast<llvm::Function>(
-          IGM.Module.getOrInsertFunction(fnName, fnTy).getCallee());
-        if (fn->empty()) {
-          fn->setLinkage(llvm::Function::PrivateLinkage);
-          IRGenFunction subIGF(IGM, fn);
-          if (IGM.DebugInfo)
-            IGM.DebugInfo->emitArtificialFunction(subIGF, fn);
-          
+        auto fn = IGM.getOrCreateHelperFunction(fnName, IGM.Int8PtrTy,
+                                                {IGM.Int8PtrTy},
+                                      [&selectorName](IRGenFunction &subIGF) {
           auto selectorValue = subIGF.emitObjCSelectorRefLoad(selectorName);
           subIGF.Builder.CreateRet(selectorValue);
-        }
-        
+        });
+
         idValue = fn;
         idResolution = KeyPathComponentHeader::FunctionCall;
       } else {

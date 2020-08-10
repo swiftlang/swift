@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-clang %S/Inputs/enum-error.m -c -o %t/enum-error.o
 // RUN: %target-build-swift -import-objc-header %S/Inputs/enum-error.h -Xlinker %t/enum-error.o %s -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: executable_test

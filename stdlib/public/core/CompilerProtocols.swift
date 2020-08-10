@@ -249,7 +249,7 @@ extension RawRepresentable where RawValue: Hashable, Self: Hashable {
 /// demonstrates this automatic implementation.
 public protocol CaseIterable {
   /// A type that can represent a collection of all values of this type.
-  associatedtype AllCases: Collection
+  associatedtype AllCases: Collection = [Self]
     where AllCases.Element == Self
   
   /// A collection of all values of this type.

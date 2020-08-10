@@ -2699,7 +2699,7 @@ namespace {
       // then we're in an ambiguity tolerant mode used for diagnostic
       // generation.  Just leave this as an unresolved member reference.
       Type resultTy = simplifyType(cs.getType(expr));
-      if (resultTy->getRValueType()->is<UnresolvedType>()) {
+      if (resultTy->hasUnresolvedType()) {
         cs.setType(expr, resultTy);
         return expr;
       }
@@ -5469,124 +5469,6 @@ static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
   return false;
 }
 
-/// Attach a Fix-It to the given diagnostic to give the trailing closure
-/// argument a label.
-static void labelTrailingClosureArgument(
-    ASTContext &ctx, Expr *fn, Expr *arg, Identifier paramName,
-    Expr *trailingClosure, InFlightDiagnostic &diag) {
-  // Dig out source locations.
-  SourceLoc existingRParenLoc;
-  SourceLoc leadingCommaLoc;
-  if (auto tupleExpr = dyn_cast<TupleExpr>(arg)) {
-    existingRParenLoc = tupleExpr->getRParenLoc();
-    assert(tupleExpr->getNumElements() >= 2 && "Should be a ParenExpr?");
-    leadingCommaLoc = Lexer::getLocForEndOfToken(
-        ctx.SourceMgr,
-        tupleExpr->getElements()[tupleExpr->getNumElements()-2]->getEndLoc());
-  } else {
-    auto parenExpr = cast<ParenExpr>(arg);
-    existingRParenLoc = parenExpr->getRParenLoc();
-  }
-
-  // Figure out the text to be inserted before the trailing closure.
-  SmallString<16> insertionText;
-  SourceLoc insertionLoc;
-  if (leadingCommaLoc.isValid()) {
-    insertionText += ", ";
-    assert(existingRParenLoc.isValid());
-    insertionLoc = leadingCommaLoc;
-  } else if (existingRParenLoc.isInvalid()) {
-    insertionText += "(";
-    insertionLoc = Lexer::getLocForEndOfToken(
-        ctx.SourceMgr, fn->getEndLoc());
-  } else {
-    insertionLoc = existingRParenLoc;
-  }
-
-  // Add the label, if there is one.
-  if (!paramName.empty()) {
-    insertionText += paramName.str();
-    insertionText += ": ";
-  }
-
-  // If there is an existing right parentheses, remove it while we
-  // insert the new text.
-  if (existingRParenLoc.isValid()) {
-    SourceLoc afterExistingRParenLoc = Lexer::getLocForEndOfToken(
-        ctx.SourceMgr, existingRParenLoc);
-    diag.fixItReplaceChars(
-        insertionLoc, afterExistingRParenLoc, insertionText);
-  } else {
-    // Insert the appropriate prefix.
-    diag.fixItInsert(insertionLoc, insertionText);
-  }
-
-  // Insert a right parenthesis after the closing '}' of the trailing closure;
-  SourceLoc newRParenLoc = Lexer::getLocForEndOfToken(
-      ctx.SourceMgr, trailingClosure->getEndLoc());
-  diag.fixItInsert(newRParenLoc, ")");
-}
-
-/// Find the trailing closure argument of a tuple or parenthesized expression.
-///
-/// Due to a quirk of the backward scan that could allow reordering of
-/// arguments in the presence of a trailing closure, it might not be the last
-/// argument in the tuple.
-static Expr *findTrailingClosureArgument(Expr *arg) {
-  if (auto parenExpr = dyn_cast<ParenExpr>(arg)) {
-    return parenExpr->getSubExpr();
-  }
-
-  auto tupleExpr = cast<TupleExpr>(arg);
-  SourceLoc endLoc = tupleExpr->getEndLoc();
-  for (Expr *elt : llvm::reverse(tupleExpr->getElements())) {
-    if (elt->getEndLoc() == endLoc)
-      return elt;
-  }
-
-  return tupleExpr->getElements().back();
-}
-
-/// Find the index of the parameter that binds the given argument.
-static unsigned findParamBindingArgument(
-    ArrayRef<ParamBinding> parameterBindings, unsigned argIndex) {
-  for (unsigned paramIdx : indices(parameterBindings)) {
-    if (llvm::find(parameterBindings[paramIdx], argIndex)
-          != parameterBindings[paramIdx].end())
-      return paramIdx;
-  }
-
-  llvm_unreachable("No parameter binds the argument?");
-}
-
-/// Warn about the use of the deprecated "backward" scan for matching the
-/// unlabeled trailing closure. It was needed to properly type check, but
-/// this code will break with a future version of Swift.
-static void warnAboutTrailingClosureBackwardScan(
-    ConcreteDeclRef callee, Expr *fn, Expr *arg,
-    ArrayRef<AnyFunctionType::Param> params,
-    Optional<unsigned> unlabeledTrailingClosureIndex,
-    ArrayRef<ParamBinding> parameterBindings) {
-
-  Expr *trailingClosure = findTrailingClosureArgument(arg);
-  unsigned paramIdx = findParamBindingArgument(
-      parameterBindings, *unlabeledTrailingClosureIndex);
-  ASTContext &ctx = params[paramIdx].getPlainType()->getASTContext();
-  Identifier paramName = params[paramIdx].getLabel();
-
-  {
-    auto diag = ctx.Diags.diagnose(
-        trailingClosure->getStartLoc(),
-        diag::unlabeled_trailing_closure_deprecated, paramName);
-    labelTrailingClosureArgument(
-        ctx, fn, arg, paramName, trailingClosure, diag);
-  }
-
-  if (auto decl = callee.getDecl()) {
-    ctx.Diags.diagnose(decl, diag::decl_declared_here, decl->getName());
-  }
-}
-
 Expr *ExprRewriter::coerceCallArguments(
     Expr *arg, AnyFunctionType *funcType,
     ConcreteDeclRef callee,
@@ -5677,13 +5559,6 @@ Expr *ExprRewriter::coerceCallArguments(
   auto *argParen = dyn_cast<ParenExpr>(arg);
   // FIXME: Eventually, we want to enforce that we have either argTuple or
   // argParen here.
-
-  // Warn about the backward scan being deprecated.
-  if (trailingClosureMatching == TrailingClosureMatching::Backward) {
-    warnAboutTrailingClosureBackwardScan(
-        callee, apply ? apply->getFn() : nullptr, arg, params,
-        unlabeledTrailingClosureIndex, parameterBindings);
-  }
 
   SourceLoc lParenLoc, rParenLoc;
   if (argTuple) {

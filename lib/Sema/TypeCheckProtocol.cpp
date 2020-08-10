@@ -5691,8 +5691,6 @@ TypeChecker::deriveTypeWitness(DeclContext *DC,
   switch (*knownKind) {
   case KnownProtocolKind::RawRepresentable:
     return std::make_pair(derived.deriveRawRepresentable(AssocType), nullptr);
-  case KnownProtocolKind::CaseIterable:
-    return std::make_pair(derived.deriveCaseIterable(AssocType), nullptr);
   case KnownProtocolKind::Differentiable:
     return derived.deriveDifferentiable(AssocType);
   default:

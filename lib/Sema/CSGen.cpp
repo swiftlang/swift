@@ -3999,6 +3999,9 @@ generateForEachStmtConstraints(
     if (cs.generateConstraints(whereTarget, FreeTypeVariableBinding::Disallow))
       return None;
 
+    cs.setContextualType(forEachStmtInfo.whereExpr,
+                         TypeLoc::withoutLoc(boolType), CTP_Condition);
+
     forEachStmtInfo.whereExpr = whereTarget.getAsExpr();
   }
 
