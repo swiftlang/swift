@@ -61,59 +61,6 @@ static bool superclassIsDecodable(ClassDecl *target) {
                                C.getProtocol(KnownProtocolKind::Decodable));
 }
 
-/// Represents the possible outcomes of checking whether a decl conforms to
-/// Encodable or Decodable.
-enum CodableConformanceType {
-  TypeNotValidated,
-  DoesNotConform,
-  Conforms
-};
-
-/// Returns whether the given type conforms to the given {En,De}codable
-/// protocol.
-///
-/// \param context The \c DeclContext the var declarations belong to.
-///
-/// \param target The \c Type to validate.
-///
-/// \param proto The \c ProtocolDecl to check conformance to.
-static CodableConformanceType typeConformsToCodable(DeclContext *context,
-                                                    Type target, bool isIUO,
-                                                    ProtocolDecl *proto) {
-  target = context->mapTypeIntoContext(target);
-
-  if (isIUO)
-    target = target->lookThroughSingleOptionalType();
-
-  auto conf = TypeChecker::conformsToProtocol(target, proto, context);
-  return conf.isInvalid() ? DoesNotConform : Conforms;
-}
-
-/// Returns whether the given variable conforms to the given {En,De}codable
-/// protocol.
-///
-/// \param DC The \c DeclContext in which to check conformance.
-///
-/// \param varDecl The \c VarDecl to validate.
-///
-/// \param proto The \c ProtocolDecl to check conformance to.
-static CodableConformanceType
-varConformsToCodable(DeclContext *DC, VarDecl *varDecl, ProtocolDecl *proto) {
-  // If the decl doesn't yet have a type, we may be seeing it before the type
-  // checker has gotten around to evaluating its type. For example:
-  //
-  // func foo() {
-  //   let b = Bar(from: decoder) // <- evaluates Bar conformance to Codable,
-  //                              //    forcing derivation
-  // }
-  //
-  // struct Bar : Codable {
-  //   var x: Int // <- we get to valuate x's var decl here, but its type
-  //              //    hasn't yet been evaluated
-  // }
-  bool isIUO = varDecl->isImplicitlyUnwrappedOptional();
-  return typeConformsToCodable(DC, varDecl->getValueInterfaceType(), isIUO,
-                               proto);
 }
 
 /// Retrieve the variable name for the purposes of encoding/decoding.
@@ -164,34 +111,20 @@ static bool validateCodingKeysEnum(DerivedConformance &derived,
     }
 
     // We have a property to map to. Ensure it's {En,De}codable.
-    auto conformance =
-        varConformsToCodable(conformanceDC, it->second, derived.Protocol);
-    switch (conformance) {
-      case Conforms:
-        // The property was valid. Remove it from the list.
-        properties.erase(it);
-        break;
-
-      case DoesNotConform: {
-        // We use a TypeLoc here so diagnostics can show the type
-        // as written by the user in source if possible. This is useful
-        // when the user has written an IUO type for example, since
-        // diagnostics would show the type as 'T?' instead of 'T!' if
-        // we use a Type instead.
-        TypeLoc typeLoc = {
-            it->second->getTypeReprOrParentPatternTypeRepr(),
-            it->second->getType(),
-        };
-        it->second->diagnose(diag::codable_non_conforming_property_here,
-                             derived.getProtocolType(), typeLoc);
-        LLVM_FALLTHROUGH;
-      }
-
-      case TypeNotValidated:
-        // We don't produce a diagnostic for a type which failed to validate.
-        // This will produce a diagnostic elsewhere anyway.
-        propertiesAreValid = false;
-        continue;
+    auto target =
+        conformanceDC->mapTypeIntoContext(it->second->getValueInterfaceType());
+    if (TypeChecker::conformsToProtocol(target, derived.Protocol, conformanceDC)
+            .isInvalid()) {
+      TypeLoc typeLoc = {
+          it->second->getTypeReprOrParentPatternTypeRepr(),
+          it->second->getType(),
+      };
+      it->second->diagnose(diag::codable_non_conforming_property_here,
+                           derived.getProtocolType(), typeLoc);
+      propertiesAreValid = false;
+    } else {
+      // The property was valid. Remove it from the list.
+      properties.erase(it);
     }
   }
 
@@ -344,44 +277,23 @@ static EnumDecl *synthesizeCodingKeysEnum(DerivedConformance &derived) {
     if (!varDecl->isUserAccessible())
       continue;
 
-    // Despite creating the enum in the context of the type, we're
-    // concurrently checking the variables for the current protocol
-    // conformance being synthesized, for which we use the conformance
-    // context, not the type.
-    auto conformance = varConformsToCodable(derived.getConformanceContext(),
-                                            varDecl, derived.Protocol);
-    switch (conformance) {
-      case Conforms:
-      {
-        auto *elt = new (C) EnumElementDecl(SourceLoc(),
-                                            getVarNameForCoding(varDecl),
-                                            nullptr, SourceLoc(), nullptr,
-                                            enumDecl);
-        elt->setImplicit();
-        enumDecl->addMember(elt);
-        break;
-      }
-
-      case DoesNotConform: {
-        // We use a TypeLoc here so diagnostics can show the type
-        // as written by the user in source if possible. This is useful
-        // when the user has written an IUO type for example, since
-        // diagnostics would show the type as 'T?' instead of 'T!' if
-        // we use a Type instead.
-        TypeLoc typeLoc = {
-            varDecl->getTypeReprOrParentPatternTypeRepr(),
-            varDecl->getType(),
-        };
-        varDecl->diagnose(diag::codable_non_conforming_property_here,
-                          derived.getProtocolType(), typeLoc);
-        LLVM_FALLTHROUGH;
-      }
-
-      case TypeNotValidated:
-        // We don't produce a diagnostic for a type which failed to validate.
-        // This will produce a diagnostic elsewhere anyway.
-        allConform = false;
-        continue;
+    auto target =
+        conformanceDC->mapTypeIntoContext(varDecl->getValueInterfaceType());
+    if (TypeChecker::conformsToProtocol(target, derived.Protocol, conformanceDC)
+            .isInvalid()) {
+      TypeLoc typeLoc = {
+          varDecl->getTypeReprOrParentPatternTypeRepr(),
+          varDecl->getType(),
+      };
+      varDecl->diagnose(diag::codable_non_conforming_property_here,
+                        derived.getProtocolType(), typeLoc);
+      allConform = false;
+    } else {
+      auto *elt =
+          new (C) EnumElementDecl(SourceLoc(), getVarNameForCoding(varDecl),
+                                  nullptr, SourceLoc(), nullptr, enumDecl);
+      elt->setImplicit();
+      enumDecl->addMember(elt);
     }
   }
 
