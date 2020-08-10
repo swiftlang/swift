@@ -28,29 +28,52 @@ using StaticInfixWitness = SWIFT_CC(swift) bool(OpaqueValue *, OpaqueValue *,
                                                 const Metadata *,
                                                 const WitnessTable *);
 
+// Elf indirect symbol references.
 #if defined(__ELF__)
 #define INDIRECT_RELREF_GOTPCREL(SYMBOL) SYMBOL "@GOTPCREL + 1"
-#elif defined(__MACH__)
+#endif
+
+// MachO indirect symbol references.
+#if defined(__MACH__)
+
+// 64 bit arm MachO
 #if defined(__aarch64__)
 #define INDIRECT_RELREF_GOTPCREL(SYMBOL) SYMBOL "@GOT - . + 1"
+
+// 32 bit arm MachO
 #elif defined(__arm__)
-// Darwin doesn't support @GOT like syntax for 32 bit ARM.
+// MachO doesn't support @GOT like relocations for 32 bit arm.
 #define INDIRECT_RELREF_GOTPCREL(SYMBOL) "L" SYMBOL "$non_lazy_ptr - . + 1"
-#else
-#define INDIRECT_RELREF_GOTPCREL(SYMBOL) SYMBOL "@GOTPCREL + 5"
 #endif
+
+// 64 bit x86_64 MachO
+#if defined(__x86_64__)
+// The + 4 is required for all x86_64 MachO GOTPC relocations.
+#define INDIRECT_RELREF_GOTPCREL(SYMBOL) SYMBOL "@GOTPCREL + 4 + 1"
+
+// 32 bit x86 MachO
+#elif defined(__i386__)
+// MachO doesn't support @GOT like relocations for 32 bit x86.
+#define INDIRECT_RELREF_GOTPCREL(SYMBOL) "L" SYMBOL "$non_lazy_ptr - . + 1"
+#endif
+
 #endif
 
 //===----------------------------------------------------------------------===//
 // Tuple Equatable Conformance
 //===----------------------------------------------------------------------===//
 
-// For 32 bit ARM (specifically armv7 and armv7s for iphoneos), emit non-lazy
-// pointer stubs to indirectly reference. Darwin doesn't support @GOT syntax for
-// ARM.
-#if defined(__MACH__) && defined(__arm__) && !defined(__aarch64__)
+// For 32 bit ARM and i386 (specifically armv7, armv7s, and armv7k), emit
+// non-lazy pointer stubs to indirectly reference. Darwin doesn't support @GOT
+// syntax for those archs.
+#if defined(__MACH__) && \
+  ((defined(__arm__) && !defined(__aarch64__)) || defined(__i386__))
 __asm(
+#if defined(__arm__)
   "  .section __DATA, __nl_symbol_ptr, non_lazy_symbol_pointers\n"
+#elif defined(__i386__)
+  "  .section __IMPORT, __pointers, non_lazy_symbol_pointers\n"
+#endif
   "  .p2align 2\n"
   "L" EQUATABLE_DESCRIPTOR_SYMBOL "$non_lazy_ptr:\n"
   "  .indirect_symbol " EQUATABLE_DESCRIPTOR_SYMBOL "\n"
@@ -156,12 +179,17 @@ bool swift::_swift_tupleEquatable_equals(OpaqueValue *tuple1,
 // Tuple Comparable Conformance
 //===----------------------------------------------------------------------===//
 
-// For 32 bit ARM (specifically armv7 and armv7s for iphoneos), emit non-lazy
-// pointer stubs to indirectly reference. Darwin doesn't support @GOT syntax for
-// ARM.
-#if defined(__MACH__) && defined(__arm__) && !defined(__aarch64__)
+// For 32 bit ARM and i386 (specifically armv7, armv7s, and armv7k), emit
+// non-lazy pointer stubs to indirectly reference. Darwin doesn't support @GOT
+// syntax for those archs.
+#if defined(__MACH__) && \
+  ((defined(__arm__) && !defined(__aarch64__)) || defined(__i386__))
 __asm(
+#if defined(__arm__)
   "  .section __DATA, __nl_symbol_ptr, non_lazy_symbol_pointers\n"
+#elif defined(__i386__)
+  "  .section __IMPORT, __pointers, non_lazy_symbol_pointers\n"
+#endif
   "  .p2align 2\n"
   "L" COMPARABLE_DESCRIPTOR_SYMBOL "$non_lazy_ptr:\n"
   "  .indirect_symbol " COMPARABLE_DESCRIPTOR_SYMBOL "\n"
@@ -544,12 +572,17 @@ bool swift::_swift_tupleComparable_greaterThan(OpaqueValue *tuple1,
 // Tuple Hashable Conformance
 //===----------------------------------------------------------------------===//
 
-// For 32 bit ARM (specifically armv7 and armv7s for iphoneos), emit non-lazy
-// pointer stubs to indirectly reference. Darwin doesn't support @GOT syntax for
-// ARM.
-#if defined(__MACH__) && defined(__arm__) && !defined(__aarch64__)
+// For 32 bit ARM and i386 (specifically armv7, armv7s, and armv7k), emit
+// non-lazy pointer stubs to indirectly reference. Darwin doesn't support @GOT
+// syntax for those archs.
+#if defined(__MACH__) && \
+  ((defined(__arm__) && !defined(__aarch64__)) || defined(__i386__))
 __asm(
+#if defined(__arm__)
   "  .section __DATA, __nl_symbol_ptr, non_lazy_symbol_pointers\n"
+#elif defined(__i386__)
+  "  .section __IMPORT, __pointers, non_lazy_symbol_pointers\n"
+#endif
   "  .p2align 2\n"
   "L" HASHABLE_DESCRIPTOR_SYMBOL "$non_lazy_ptr:\n"
   "  .indirect_symbol " HASHABLE_DESCRIPTOR_SYMBOL "\n"
