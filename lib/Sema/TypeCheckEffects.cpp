@@ -816,7 +816,7 @@ private:
   }
 };
 
-/// An error-handling context.
+/// An context in which effects might be handled.
 class Context {
 public:
   enum class Kind : uint8_t {
@@ -831,9 +831,6 @@ public:
 
     /// A non-throwing autoclosure.
     NonThrowingAutoClosure,
-
-    /// A non-exhaustive catch within a non-throwing function.
-    NonExhaustiveCatch,
 
     /// A default argument expression.
     DefaultArgument,
@@ -887,6 +884,7 @@ private:
   }
 
   Kind TheKind;
+  bool IsNonExhaustiveCatch = false;
   bool DiagnoseErrorOnTry = false;
   DeclContext *RethrowsDC = nullptr;
   InterpolatedStringLiteralExpr *InterpolatedString = nullptr;
@@ -956,10 +954,6 @@ public:
     return Context(kind);
   }
 
-  static Context forNonExhaustiveCatch(DoCatchStmt *S) {
-    return Context(Kind::NonExhaustiveCatch);
-  }
-
   static Context forCatchPattern(CaseStmt *S) {
     return Context(Kind::CatchPattern);
   }
@@ -1004,6 +998,10 @@ public:
   DeclContext *getRethrowsDC() const { return RethrowsDC; }
   InterpolatedStringLiteralExpr * getInterpolatedString() const {
     return InterpolatedString;
+  }
+
+  void setNonExhaustiveCatch(bool value) {
+    IsNonExhaustiveCatch = value;
   }
 
   static void diagnoseThrowInIllegalContext(DiagnosticEngine &Diags,
@@ -1103,8 +1101,7 @@ public:
     // Allow the diagnostic to fire on the 'try' if we don't have
     // anything else to say.
     if (isTryCovered && !reason.isRethrowsCall() &&
-        (getKind() == Kind::NonThrowingFunction ||
-         getKind() == Kind::NonExhaustiveCatch)) {
+        getKind() == Kind::NonThrowingFunction) {
       DiagnoseErrorOnTry = true;
       return;
     }
@@ -1136,6 +1133,14 @@ public:
       return;
 
     case Kind::NonThrowingFunction:
+      if (IsNonExhaustiveCatch) {
+        diagnoseThrowInLegalContext(Diags, E, isTryCovered, reason,
+                                    diag::throw_in_nonexhaustive_catch,
+                                    diag::throwing_call_in_nonexhaustive_catch,
+                            diag::tryless_throwing_call_in_nonexhaustive_catch);
+        return;
+      }
+
       diagnoseThrowInLegalContext(Diags, E, isTryCovered, reason,
                                   diag::throw_in_nonthrowing_function,
                                   diag::throwing_call_unhandled,
@@ -1147,13 +1152,6 @@ public:
                                   diag::throw_in_nonthrowing_autoclosure,
                             diag::throwing_call_in_nonthrowing_autoclosure,
                     diag::tryless_throwing_call_in_nonthrowing_autoclosure);
-      return;
-
-    case Kind::NonExhaustiveCatch:
-      diagnoseThrowInLegalContext(Diags, E, isTryCovered, reason,
-                                  diag::throw_in_nonexhaustive_catch,
-                                  diag::throwing_call_in_nonexhaustive_catch,
-                          diag::tryless_throwing_call_in_nonexhaustive_catch);
       return;
 
     case Kind::EnumElementInitializer:
@@ -1193,14 +1191,12 @@ public:
       llvm_unreachable("try is handled!");
 
     case Kind::NonThrowingFunction:
-      if (DiagnoseErrorOnTry)
-        Diags.diagnose(E->getTryLoc(), diag::try_unhandled);
-      return;
-
-    case Kind::NonExhaustiveCatch:
-      if (DiagnoseErrorOnTry)
-        Diags.diagnose(E->getTryLoc(),
-                       diag::try_unhandled_in_nonexhaustive_catch);
+      if (DiagnoseErrorOnTry) {
+        Diags.diagnose(
+            E->getTryLoc(),
+            IsNonExhaustiveCatch ? diag::try_unhandled_in_nonexhaustive_catch
+                                 : diag::try_unhandled);
+      }
       return;
 
     case Kind::NonThrowingAutoClosure:
@@ -1441,7 +1437,7 @@ private:
     // If the enclosing context doesn't handle anything, use a
     // specialized diagnostic about non-exhaustive catches.
     if (CurContext.handlesNothing()) {
-      scope.refineLocalContext(Context::forNonExhaustiveCatch(S));
+      CurContext.setNonExhaustiveCatch(true);
     }
 
     S->getBody()->walk(*this);
