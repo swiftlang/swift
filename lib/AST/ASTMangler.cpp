@@ -2131,9 +2131,9 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
     } else if (auto ctsd = dyn_cast<clang::ClassTemplateSpecializationDecl>(namedDecl)) {
       // If this is a `ClassTemplateSpecializationDecl`, it was
       // imported as a Swift decl with `__CxxTemplateInst...` name.
-      // `ClassTemplateSpecializationDecl`'s name does not include names of
+      // `ClassTemplateSpecializationDecl`'s name does not include information about
       // template arguments, and in order to prevent name clashes we use the
-      // name of the Swift decl which does includes template argument names.
+      // name of the Swift decl which does include template arguments.
       appendIdentifier(nominal->getName().str());
     } else {
       appendIdentifier(namedDecl->getName());
