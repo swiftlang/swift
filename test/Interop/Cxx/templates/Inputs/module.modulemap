@@ -34,6 +34,6 @@ module Mangling {
   header "mangling.h"
 }
 
-module Linkage {
-  header "linkage.h"
+module LinkageOfSwiftSymbolsForImportedTypes {
+  header "linkage-of-swift-symbols-for-imported-types.h"
 }

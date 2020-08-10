@@ -1,6 +1,6 @@
 // RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-cxx-interop | %FileCheck %s
 
-import Linkage
+import LinkageOfSwiftSymbolsForImportedTypes
 
 public func forceValueWitnessTableCreation() -> Any {
   let magicNumber = MagicNumber()

@@ -1109,7 +1109,7 @@ nominal type descriptor symbol for ``CxxStruct`` while compiling the ``main`` mo
   sSo9CxxStructVMn // -> nominal type descriptor for __C.CxxStruct
 
 Importing C++ class template instantiations
-~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A class template instantiation is imported as a struct named
 ``__CxxTemplateInst`` plus Itanium mangled type of the instantiation (see the
