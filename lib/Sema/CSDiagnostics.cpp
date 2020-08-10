@@ -3435,7 +3435,8 @@ bool MissingMemberFailure::diagnoseForSubscriptMemberWithTupleBase() const {
   auto locator = getLocator();
   auto baseType = resolveType(getBaseType())->getWithoutSpecifierType();
 
-  if (!locator->isLastElement<LocatorPathElt::SubscriptMember>())
+  auto *SE = getAsExpr<SubscriptExpr>(locator->getAnchor());
+  if (!SE)
     return false;
 
   auto tupleType = baseType->getAs<TupleType>();
@@ -3444,9 +3445,7 @@ bool MissingMemberFailure::diagnoseForSubscriptMemberWithTupleBase() const {
   if (!tupleType || tupleType->getNumElements() == 0)
     return false;
 
-  auto *SE = castToExpr<SubscriptExpr>(locator->getAnchor());
   auto *index = SE->getIndex();
-
   if (SE->getNumArguments() == 1) {
     auto *literal =
         dyn_cast<IntegerLiteralExpr>(index->getSemanticsProvidingExpr());
@@ -3481,8 +3480,7 @@ bool MissingMemberFailure::diagnoseForSubscriptMemberWithTupleBase() const {
         dyn_cast<StringLiteralExpr>(index->getSemanticsProvidingExpr());
     if (stringLiteral && !stringLiteral->getValue().empty() &&
         llvm::any_of(tupleType->getElements(), [&](TupleTypeElt element) {
-          return !element.getName().empty() &&
-                 element.getName().str() == stringLiteral->getValue();
+          return element.getName().is(stringLiteral->getValue());
         })) {
       llvm::SmallString<16> dotAccess;
       llvm::raw_svector_ostream OS(dotAccess);
