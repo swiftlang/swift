@@ -1047,3 +1047,63 @@ Some kinds need arguments, which precede ``Tf``.
 If the first character of the string literal is a digit ``[0-9]`` or an
 underscore ``_``, the identifier for the string literal is prefixed with an
 additional underscore ``_``.
+
+Conventions for foreign symbols
+-------------------------------
+
+Swift interoperates with multiple other languages - C, C++, Objective-C, and
+Objective-C++. Each of these languages defines their own mangling conventions,
+so Swift must take care to follow them. However, these conventions do not cover
+Swift-specific symbols like Swift type metadata for foreign types, so Swift uses
+its own mangling scheme for those symbols.
+
+Importing C and C++ structs
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Types imported from C and C++ are imported as if they are located in the ``__C``
+module, regardless of the actual Clang module that they are coming from. This
+can be observed when mangling a Swift function that accepts a C/C++ struct as a
+parameter:
+
+C++ module ``CxxStructModule``:
+
+.. code-block:: c++
+
+  struct CxxStruct {};
+
+  inline void cxxFunction(CxxStruct s) {}
+
+Swift module ``main`` that imports ``CxxStructModule``:
+
+.. code-block:: swift
+
+  import CxxStructModule
+
+  public func swiftFunction(_ s: CxxStruct) {}
+
+Resulting symbols (showing only Itanium-mangled C++ symbols for brevity):
+
+.. code::
+
+  _Z11cxxFunction9CxxStruct // -> cxxFunction(CxxStruct)
+  s4main13swiftFunctionyySo9CxxStructVF // -> main.swiftFunction(__C.CxxStruct) -> ()
+
+The reason for ignoring the Clang module and always putting C and C++ types into
+``__C`` at the Swift ABI level is that the Clang module is not a part of the C
+or C++ ABI. When owners of C and C++ Clang modules decide what changes are
+ABI-compatible or not, they will likely take into account C and C++ ABI, but not
+the Swift ABI. Therefore, Swift ABI can only encode information about a C or C++
+type that the C and C++ ABI already encodes in order to remain compatible with
+future versions of libraries that evolve according to C and C++ ABI
+compatibility principles.
+
+The C/C++ compiler does not generate Swift metadata symbols and value witness
+tables for C and C++ types. To make a foreign type usable in Swift in the same
+way as a native type, the Swift compiler must generate these symbols.
+Specifically, each Swift module that uses a given C or C++ type generates the
+necessary Swift symbols. For the example above the Swift compiler will generate following
+nominal type descriptor symbol for ``CxxStruct`` while compiling the ``main`` module:
+
+.. code::
+
+  sSo9CxxStructVMn // -> nominal type descriptor for __C.CxxStruct
