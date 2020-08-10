@@ -195,7 +195,7 @@ protected:
 
   /// Get ride of descendants and remove them from scopedNodes so the scopes
   /// can be recreated. Needed because typechecking inserts a return statment
-  /// into intiailizers.
+  /// into initializers.
   void disownDescendants(ScopeCreator &);
 
 public: // for addReusedBodyScopes
@@ -415,9 +415,16 @@ public:
   unqualifiedLookup(SourceFile *, DeclNameRef, SourceLoc,
                     const DeclContext *startingContext, DeclConsumer);
 
+  /// Entry point into ASTScopeImpl-land for labeled statement lookups.
+  static llvm::SmallVector<LabeledStmt *, 4>
+  lookupLabeledStmts(SourceFile *sourceFile, SourceLoc loc);
+
   static Optional<bool>
   computeIsCascadingUse(ArrayRef<const ASTScopeImpl *> history,
                         Optional<bool> initialIsCascadingUse);
+
+  static std::pair<CaseStmt *, CaseStmt *>
+  lookupFallthroughSourceAndDest(SourceFile *sourceFile, SourceLoc loc);
 
 #pragma mark - - lookup- starting point
 private:
@@ -538,6 +545,12 @@ protected:
 
   NullablePtr<const ASTScopeImpl>
   ancestorWithDeclSatisfying(function_ref<bool(const Decl *)> predicate) const;
+
+  /// Whether this scope terminates lookup of labeled statements in the
+  /// children below it, because one cannot perform a "break" or a "continue"
+  /// in a child that goes outside of this scope.
+  virtual bool isLabeledStmtLookupTerminator() const;
+
 }; // end of ASTScopeImpl
 
 #pragma mark - specific scope classes
@@ -715,6 +728,10 @@ public:
   GenericTypeOrExtensionWherePortion()
       : GenericTypeOrExtensionWhereOrBodyPortion("Where") {}
 
+  bool lookupMembersOf(const GenericTypeOrExtensionScope *scope,
+                       ArrayRef<const ASTScopeImpl *>,
+                       ASTScopeImpl::DeclConsumer consumer) const override;
+
   ASTScopeImpl *expandScope(GenericTypeOrExtensionScope *,
                             ScopeCreator &) const override;
 
@@ -814,6 +831,8 @@ public:
   virtual NullablePtr<NominalTypeDecl> getCorrespondingNominalTypeDecl() const {
     return nullptr;
   }
+
+  bool areMembersVisibleFromWhereClause() const;
 
   virtual void createBodyScope(ASTScopeImpl *leaf, ScopeCreator &) {}
 
@@ -1351,6 +1370,9 @@ public:
 private:
   ArrayRef<StmtConditionElement> getCond() const;
   const StmtConditionElement &getStmtConditionElement() const;
+
+protected:
+  bool isLabeledStmtLookupTerminator() const override;
 };
 
 /// If, while, & guard statements all start with a conditional clause, then some
@@ -1374,6 +1396,7 @@ protected:
   bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
                              DeclConsumer) const override;
   void printSpecifics(llvm::raw_ostream &out) const override;
+  bool isLabeledStmtLookupTerminator() const override;
 };
 
 
@@ -1707,16 +1730,15 @@ public:
   virtual Stmt *getStmt() const = 0;
   NullablePtr<Stmt> getStmtIfAny() const override { return getStmt(); }
   NullablePtr<const void> getReferrent() const override;
+
+protected:
+  bool isLabeledStmtLookupTerminator() const override;
 };
 
 class LabeledConditionalStmtScope : public AbstractStmtScope {
 public:
   Stmt *getStmt() const override;
   virtual LabeledConditionalStmt *getLabeledConditionalStmt() const = 0;
-
-  /// If a condition is present, create the martuska.
-  /// Return the lookupParent for the use scope.
-  ASTScopeImpl *createCondScopes();
 
 protected:
   /// Return the lookupParent required to search these.
@@ -1801,6 +1823,7 @@ protected:
   NullablePtr<const ASTScopeImpl> getLookupParent() const override {
     return lookupParent;
   }
+  bool isLabeledStmtLookupTerminator() const override;
 };
 
 class RepeatWhileScope final : public AbstractStmtScope {
@@ -1808,6 +1831,23 @@ public:
   RepeatWhileStmt *const stmt;
   RepeatWhileScope(RepeatWhileStmt *e) : stmt(e) {}
   virtual ~RepeatWhileScope() {}
+
+protected:
+  ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
+  std::string getClassName() const override;
+  Stmt *getStmt() const override { return stmt; }
+};
+
+class DoStmtScope final : public AbstractStmtScope {
+public:
+  DoStmt *const stmt;
+  DoStmtScope(DoStmt *e) : stmt(e) {}
+  virtual ~DoStmtScope() {}
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
@@ -1891,6 +1931,7 @@ public:
 protected:
   bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
                              DeclConsumer) const override;
+  bool isLabeledStmtLookupTerminator() const override;
 };
 
 class CaseStmtScope final : public AbstractStmtScope {

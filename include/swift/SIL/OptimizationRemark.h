@@ -19,6 +19,7 @@
 #ifndef SWIFT_SIL_OPTIMIZATIONREMARKEMITTER_H
 #define SWIFT_SIL_OPTIMIZATIONREMARKEMITTER_H
 
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/SIL/SILArgument.h"
@@ -119,19 +120,6 @@ struct Argument {
       : Argument(ArgumentKey(ArgumentKeyKind::Default, key), msg, decl) {}
   Argument(ArgumentKey key, StringRef msg, const ValueDecl *decl)
       : key(key), val(msg), loc(decl->getLoc()) {}
-
-  /// Given a value, call \p funcPassedInferredArgs for each associated
-  /// ValueDecl that is associated with \p value. All created Arguments are
-  /// passed the same StringRef. To stop iteration, return false in \p
-  /// funcPassedInferedArgs.
-  ///
-  /// NOTE: the function may be called multiple times if the optimizer joined
-  /// two live ranges and thus when iterating over value's users we see multiple
-  /// debug_value operations.
-  static bool
-  inferArgumentsForValue(ArgumentKeyKind keyKind, StringRef message,
-                         SILValue value,
-                         function_ref<bool(Argument)> funcPassedInferedArgs);
 };
 
 /// Shorthand to insert named-value pairs.
@@ -250,7 +238,7 @@ struct RemarkMissed : public Remark<RemarkMissed> {
 /// Used to emit the remarks.  Passes reporting remarks should create an
 /// instance of this.
 class Emitter {
-  SILModule &module;
+  SILFunction &fn;
   std::string passName;
   bool passedEnabled;
   bool missedEnabled;
@@ -264,7 +252,7 @@ class Emitter {
   template <typename RemarkT> bool isEnabled();
 
 public:
-  Emitter(StringRef passName, SILModule &m);
+  Emitter(StringRef passName, SILFunction &fn);
 
   /// Take a lambda that returns a remark which will be emitted.  The
   /// lambda is not evaluated unless remarks are enabled.  Second argument is
@@ -273,7 +261,7 @@ public:
   void emit(T remarkBuilder, decltype(remarkBuilder()) * = nullptr) {
     using RemarkT = decltype(remarkBuilder());
     // Avoid building the remark unless remarks are enabled.
-    if (isEnabled<RemarkT>() || module.getSILRemarkStreamer()) {
+    if (isEnabled<RemarkT>() || fn.getModule().getSILRemarkStreamer()) {
       auto rb = remarkBuilder();
       rb.setPassName(passName);
       emit(rb);
@@ -287,8 +275,9 @@ public:
                           decltype(remarkBuilder()) * = nullptr) {
     using RemarkT = decltype(remarkBuilder());
     // Avoid building the remark unless remarks are enabled.
-    bool emitRemark = emitter && (emitter->isEnabled<RemarkT>() ||
-                                  emitter->module.getSILRemarkStreamer());
+    bool emitRemark =
+        emitter && (emitter->isEnabled<RemarkT>() ||
+                    emitter->fn.getModule().getSILRemarkStreamer());
     // Same for DEBUG.
     bool shouldEmitDebug = false;
 #ifndef NDEBUG

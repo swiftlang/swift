@@ -226,6 +226,36 @@ void eraseUsesOfInstruction(
 /// value itself)
 void eraseUsesOfValue(SILValue value);
 
+/// Gets the concrete value which is stored in an existential box.
+/// Returns %value in following pattern:
+///
+///    %existentialBox = alloc_existential_box $Error, $ConcreteError
+///    %a = project_existential_box $ConcreteError in %existentialBox : $Error
+///    store %value to %a : $*ConcreteError
+///
+/// Returns an invalid SILValue in case there are multiple stores or any unknown
+/// users of \p existentialBox.
+/// The \p ignoreUser is ignored in the user list of \p existentialBox.
+SILValue
+getConcreteValueOfExistentialBox(AllocExistentialBoxInst *existentialBox,
+                                 SILInstruction *ignoreUser);
+
+/// Gets the concrete value which is stored in an existential box, which itself
+/// is stored in \p addr.
+/// Returns %value in following pattern:
+///
+///    %b = alloc_existential_box $Error, $ConcreteError
+///    %a = project_existential_box $ConcreteError in %b : $Error
+///    store %value to %a : $*ConcreteError
+///    %addr = alloc_stack $Error
+///    store %b to %addr : $*Error
+///
+/// Returns an invalid SILValue in case there are multiple stores or any unknown
+/// users of \p addr or the existential box.
+/// The \p ignoreUser is ignored in the user list of \p addr.
+SILValue getConcreteValueOfExistentialBoxAddr(SILValue addr,
+                                              SILInstruction *ignoreUser);
+
 FullApplySite findApplyFromDevirtualizedResult(SILValue value);
 
 /// Cast a value into the expected, ABI compatible type if necessary.
@@ -268,11 +298,6 @@ TermInst *addArgumentToBranch(SILValue val, SILBasicBlock *dest,
 /// Get the linkage to be used for specializations of a function with
 /// the given linkage.
 SILLinkage getSpecializedLinkage(SILFunction *f, SILLinkage linkage);
-
-/// Tries to optimize a given apply instruction if it is a concatenation of
-/// string literals. Returns a new instruction if optimization was possible.
-SingleValueInstruction *tryToConcatenateStrings(ApplyInst *ai,
-                                                SILBuilder &builder);
 
 /// Tries to perform jump-threading on all checked_cast_br instruction in
 /// function \p Fn.

@@ -1,0 +1,8 @@
+// RUN: %target-sil-opt -enable-sil-verify-all=true %s | %target-sil-opt -enable-sil-verify-all=true | %FileCheck %s
+
+// CHECK: sil [async] @async_test
+sil [async] @async_test : $() -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}

@@ -1418,7 +1418,7 @@ struct RelabelAndTrailingClosure {
   func f2(aa: Int, bb: Int, _ cc: () -> Void = {}) {}
 
   func test() {
-    f1(aax: 1, bbx: 2) {} // expected-error {{incorrect argument labels in call (have 'aax:bbx:_:', expected 'aa:bb:cc:')}} {{8-11=aa}} {{16-19=bb}} {{none}}
+    f1(aax: 1, bbx: 2) {} // expected-error {{incorrect argument labels in call (have 'aax:bbx:_:', expected 'aa:bb:_:')}} {{8-11=aa}} {{16-19=bb}} {{none}}
     f2(aax: 1, bbx: 2) {} // expected-error {{incorrect argument labels in call (have 'aax:bbx:_:', expected 'aa:bb:_:')}} {{8-11=aa}} {{16-19=bb}} {{none}}
 
     f1(aax: 1, bbx: 2) // expected-error {{incorrect argument labels in call (have 'aax:bbx:', expected 'aa:bb:')}} {{8-11=aa}} {{16-19=bb}} {{none}}
@@ -1623,3 +1623,18 @@ func sr13135() {
 
   foo(Foo().bar, [baz])
 }
+
+// SR-13240
+func twoargs(_ x: String, _ y: String) {}
+
+func test() {
+  let x = 1
+  twoargs(x, x) // expected-error 2 {{cannot convert value of type 'Int' to expected argument type 'String'}}
+}
+
+infix operator ---
+
+func --- (_ lhs: String, _ rhs: String) -> Bool { true }
+
+let x = 1
+x --- x // expected-error 2 {{cannot convert value of type 'Int' to expected argument type 'String'}}

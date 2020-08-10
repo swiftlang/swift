@@ -354,7 +354,7 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
 ///     attribute-list type-function
 ///
 ///   type-function:
-///     type-composition 'throws'? '->' type
+///     type-composition 'async'? 'throws'? '->' type
 ///
 ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
                                          bool HandleCodeCompletion,
@@ -410,13 +410,22 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   auto tyR = ty.get();
   auto status = ParserStatus(ty);
 
+  // Parse an async specifier.
+  SourceLoc asyncLoc;
+  if (Context.LangOpts.EnableExperimentalConcurrency &&
+      Tok.isContextualKeyword("async")) {
+    asyncLoc = consumeToken();
+  }
+
   // Parse a throws specifier.
-  // Don't consume 'throws', if the next token is not '->', so we can emit a
-  // more useful diagnostic when parsing a function decl.
+  // Don't consume 'throws', if the next token is not '->' or 'async', so we
+  // can emit a more useful diagnostic when parsing a function decl.
   SourceLoc throwsLoc;
   if (Tok.isAny(tok::kw_throws, tok::kw_rethrows, tok::kw_throw, tok::kw_try) &&
-      peekToken().is(tok::arrow)) {
-    if (Tok.isNot(tok::kw_throws)) {
+      (peekToken().is(tok::arrow) ||
+       (Context.LangOpts.EnableExperimentalConcurrency &&
+        peekToken().isContextualKeyword("async")))) {
+    if (Tok.isAny(tok::kw_rethrows, tok::kw_throw, tok::kw_try)) {
       // 'rethrows' is only allowed on function declarations for now.
       // 'throw' or 'try' are probably typos for 'throws'.
       Diag<> DiagID = Tok.is(tok::kw_rethrows) ?
@@ -425,18 +434,25 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
         .fixItReplace(Tok.getLoc(), "throws");
     }
     throwsLoc = consumeToken();
+
+    // 'async' must preceed 'throws'; accept this but complain.
+    if (Context.LangOpts.EnableExperimentalConcurrency &&
+        Tok.isContextualKeyword("async")) {
+      asyncLoc = consumeToken();
+
+      diagnose(asyncLoc, diag::async_after_throws, false)
+        .fixItRemove(asyncLoc)
+        .fixItInsert(throwsLoc, "async ");
+    }
   }
 
   if (Tok.is(tok::arrow)) {
     // Handle type-function if we have an arrow.
     SourceLoc arrowLoc = consumeToken();
-    if (Tok.is(tok::kw_throws)) {
-      Diag<> DiagID = diag::throws_in_wrong_position;
-      diagnose(Tok.getLoc(), DiagID)
-          .fixItInsert(arrowLoc, "throws ")
-          .fixItRemove(Tok.getLoc());
-      throwsLoc = consumeToken();
-    }
+
+    // Handle async/throws in the wrong place.
+    parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, /*rethrows=*/nullptr);
+
     ParserResult<TypeRepr> SecondHalf =
         parseType(diag::expected_type_function_result);
     if (SecondHalf.isNull()) {
@@ -451,6 +467,8 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       Builder.useArrow(SyntaxContext->popToken());
       if (throwsLoc.isValid())
         Builder.useThrowsOrRethrowsKeyword(SyntaxContext->popToken());
+      if (asyncLoc.isValid())
+        Builder.useAsyncKeyword(SyntaxContext->popToken());
 
       auto InputNode(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
       if (auto TupleTypeNode = InputNode.getAs<ParsedTupleTypeSyntax>()) {
@@ -560,8 +578,8 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       }
     }
 
-    tyR = new (Context) FunctionTypeRepr(generics, argsTyR, throwsLoc, arrowLoc,
-                                         SecondHalf.get(),
+    tyR = new (Context) FunctionTypeRepr(generics, argsTyR, asyncLoc, throwsLoc,
+                                         arrowLoc, SecondHalf.get(),
                                          patternGenerics, patternSubsTypes,
                                          invocationSubsTypes);
   } else if (auto firstGenerics = generics ? generics : patternGenerics) {
@@ -1569,12 +1587,31 @@ bool Parser::canParseType() {
     }
     break;
   }
-  
+
+  // Handle type-function if we have an 'async'.
+  if (Context.LangOpts.EnableExperimentalConcurrency &&
+      Tok.isContextualKeyword("async")) {
+    consumeToken();
+
+    // 'async' isn't a valid type without being followed by throws/rethrows
+    // or a return.
+    if (!Tok.isAny(tok::kw_throws, tok::kw_rethrows, tok::arrow))
+      return false;
+  }
+
   // Handle type-function if we have an arrow or 'throws'/'rethrows' modifier.
   if (Tok.isAny(tok::kw_throws, tok::kw_rethrows)) {
     consumeToken();
+
+    // Allow 'async' here even though it is ill-formed, so we can provide
+    // a better error.
+    if (Context.LangOpts.EnableExperimentalConcurrency &&
+        Tok.isContextualKeyword("async"))
+      consumeToken();
+
     // "throws" or "rethrows" isn't a valid type without being followed by
-    // a return.
+    // a return. We also accept 'async' here so we can provide a better
+    // error.
     if (!Tok.is(tok::arrow))
       return false;
   }

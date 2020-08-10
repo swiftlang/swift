@@ -23,8 +23,10 @@ if(SWIFT_BUILD_SDK_OVERLAY)
 
   if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     add_subdirectory(StdlibUnittestFoundationExtras)
-    if (SWIFT_INCLUDE_TESTS)
-      add_subdirectory(SwiftReflectionTest)
-    endif()
+  endif()
+  # Currently SwiftReflectionTest cannot be built on Windows, due to 
+  # dependencies on POSIX symbols 
+  if (SWIFT_INCLUDE_TESTS AND (NOT CMAKE_SYSTEM_NAME STREQUAL "Windows"))
+    add_subdirectory(SwiftReflectionTest)
   endif()
 endif()

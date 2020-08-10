@@ -195,11 +195,14 @@ public:
   void doubleOpenWithDelay(std::chrono::microseconds delay, bool close);
 
   void setupThreeAnnotations(const char *DocName, TestConsumer &Consumer) {
+    // The following is engineered so that the references to `mem` are at
+    // offsets 60, 70, and 80 for convenience. They're on the same line so
+    // that tests do not accidentally depend on line separation.
     const char *Contents =
     "struct S {\n"
     "  var mem: Int = 0\n"
     "  func test() {\n"
-    "    _ = (self.mem, self.mem, self.mem)\n"
+    "          _ = mem;  _ = mem;  _ = mem\n"
     "  }\n"
     "}\n";
     const char *Args[] = { "-parse-as-library" };
@@ -385,6 +388,7 @@ TEST_F(EditTest, AnnotationsAfterOpen) {
   TestConsumer Consumer;
   open(DocName, Contents, Args, Consumer);
   ASSERT_FALSE(waitForDocUpdate()) << "timed out";
+  ASSERT_EQ(ParseDiagStage, Consumer.DiagStage);
   reset(Consumer);
   replaceText(DocName, 0, 0, "", Consumer);
 
@@ -416,6 +420,7 @@ TEST_F(EditTest, AnnotationsAfterEdit) {
   TestConsumer Consumer;
   open(DocName, Contents, Args, Consumer);
   ASSERT_FALSE(waitForDocUpdate()) << "timed out";
+  ASSERT_EQ(ParseDiagStage, Consumer.DiagStage);
   reset(Consumer);
   replaceText(DocName, 0, 0, "", Consumer);
   checkTokens(Consumer.Annotations, {
@@ -426,8 +431,14 @@ TEST_F(EditTest, AnnotationsAfterEdit) {
   replaceText(DocName, 61, 0, "m", Consumer);
   ASSERT_FALSE(waitForDocUpdate()) << "timed out";
 
-  reset(Consumer);
-  replaceText(DocName, 0, 0, "", Consumer);
+  if (Consumer.DiagStage == SemaDiagStage) {
+    // AST already built, annotations are on Consumer.
+  } else {
+    // Re-query.
+    reset(Consumer);
+    replaceText(DocName, 0, 0, "", Consumer);
+  }
+
   ASSERT_EQ(0u, Consumer.Diags.size());
   checkTokens(Consumer.Annotations, {
     "[off=22 len=3 source.lang.swift.ref.struct system]",
@@ -550,8 +561,6 @@ TEST_F(EditTest, AnnotationsRangeShiftingAfterEditInsertEnd) {
   ASSERT_FALSE(waitForDocUpdate()) << "timed out";
   close(DocName);
 }
-// rdar://65934938 Failing in CI with ASan
-#if defined(__has_feature) && !__has_feature(address_sanitizer)
 TEST_F(EditTest, AnnotationsRangeShiftingAfterEditReplaceEnd) {
   const char *DocName = "test.swift";
   TestConsumer Consumer;
@@ -570,7 +579,6 @@ TEST_F(EditTest, AnnotationsRangeShiftingAfterEditReplaceEnd) {
   ASSERT_FALSE(waitForDocUpdate()) << "timed out";
   close(DocName);
 }
-#endif
 TEST_F(EditTest, AnnotationsRangeShiftingAfterEditDeleteEnd) {
   const char *DocName = "test.swift";
   TestConsumer Consumer;

@@ -70,13 +70,13 @@ using namespace swift;
 /// given type or extension. It need only be called within the primary source
 /// file.
 static void checkInheritanceClause(
-                    llvm::PointerUnion<TypeDecl *, ExtensionDecl *> declUnion) {
-  DeclContext *DC;
-  MutableArrayRef<TypeLoc> inheritedClause;
-  ExtensionDecl *ext = nullptr;
-  TypeDecl *typeDecl = nullptr;
-  Decl *decl;
-  if ((ext = declUnion.dyn_cast<ExtensionDecl *>())) {
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> declUnion) {
+  const DeclContext *DC;
+  ArrayRef<TypeLoc> inheritedClause;
+  const ExtensionDecl *ext = nullptr;
+  const TypeDecl *typeDecl = nullptr;
+  const Decl *decl;
+  if ((ext = declUnion.dyn_cast<const ExtensionDecl *>())) {
     decl = ext;
     DC = ext;
 
@@ -93,7 +93,7 @@ static void checkInheritanceClause(
       }
     }
   } else {
-    typeDecl = declUnion.get<TypeDecl *>();
+    typeDecl = declUnion.get<const TypeDecl *>();
     decl = typeDecl;
     if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
       DC = nominal;
@@ -704,7 +704,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
           // If both declarations are implicit, we do not diagnose anything
           // as it would lead to misleading diagnostics and it's likely that
           // there's nothing actionable about it due to its implicit nature.
-          // One special case for this is property wrappers.
+          // Special case for this is property wrappers or lazy variables.
           //
           // Otherwise, if 'current' is implicit, then we diagnose 'other'
           // since 'other' is a redeclaration of 'current'. Similarly, if
@@ -718,6 +718,22 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
               if (auto originalWrappedProperty =
                       VD->getOriginalWrappedProperty()) {
                 declToDiagnose = originalWrappedProperty;
+              }
+
+              // If 'current' is a synthesized lazy storage variable and
+              // 'other' is synthesized projected value variable, then
+              // diagnose the wrapped property.
+              //
+              // TODO: We should probably emit a diagnostic note on the lazy
+              // variable as well, but there is currently no way to grab the
+              // lazy property from its backing storage.
+              if (VD->isLazyStorageProperty()) {
+                if (auto otherVar = dyn_cast<VarDecl>(other)) {
+                  if (auto originalWrappedProperty =
+                          otherVar->getOriginalWrappedProperty()) {
+                    declToDiagnose = originalWrappedProperty;
+                  }
+                }
               }
             }
           } else {
@@ -1452,8 +1468,18 @@ public:
       auto overridden = VD->getOverriddenDecl();
       if (auto *OA = VD->getAttrs().getAttribute<OverrideAttr>()) {
         if (!overridden) {
-          VD->diagnose(diag::property_does_not_override)
-              .highlight(OA->getLocation());
+          auto DC = VD->getDeclContext();
+          auto isClassContext = DC->getSelfClassDecl() != nullptr;
+          auto isStructOrEnumContext = DC->getSelfEnumDecl() != nullptr ||
+                                       DC->getSelfStructDecl() != nullptr;
+          if (isStructOrEnumContext) {
+            VD->diagnose(diag::override_nonclass_decl)
+                .highlight(OA->getLocation())
+                .fixItRemove(OA->getRange());
+          } else {
+            VD->diagnose(diag::property_does_not_override, isClassContext)
+                .highlight(OA->getLocation());
+          }
           OA->setInvalid();
         }
       }
@@ -1659,8 +1685,18 @@ public:
       // anything, complain.
       if (auto *OA = SD->getAttrs().getAttribute<OverrideAttr>()) {
         if (!SD->getOverriddenDecl()) {
-          SD->diagnose(diag::subscript_does_not_override)
-              .highlight(OA->getLocation());
+          auto DC = SD->getDeclContext();
+          auto isClassContext = DC->getSelfClassDecl() != nullptr;
+          auto isStructOrEnumContext = DC->getSelfEnumDecl() != nullptr ||
+                                       DC->getSelfStructDecl() != nullptr;
+          if (isStructOrEnumContext) {
+            SD->diagnose(diag::override_nonclass_decl)
+                .highlight(OA->getLocation())
+                .fixItRemove(OA->getRange());
+          } else {
+            SD->diagnose(diag::subscript_does_not_override, isClassContext)
+                .highlight(OA->getLocation());
+          }
           OA->setInvalid();
         }
       }
@@ -1762,19 +1798,19 @@ public:
       return;
     }
 
-    // We don't support nested types in generics yet.
-    if (NTD->isGenericContext()) {
-      auto DC = NTD->getDeclContext();
-      if (auto proto = DC->getSelfProtocolDecl()) {
-        if (DC->getExtendedProtocolDecl()) {
-          NTD->diagnose(diag::unsupported_type_nested_in_protocol_extension,
-                        NTD->getName(), proto->getName());
-        } else {
-          NTD->diagnose(diag::unsupported_type_nested_in_protocol,
-                        NTD->getName(), proto->getName());
-        }
+    // We don't support nested types in protocols.
+    if (auto proto = DC->getSelfProtocolDecl()) {
+      if (DC->getExtendedProtocolDecl()) {
+        NTD->diagnose(diag::unsupported_type_nested_in_protocol_extension,
+                      NTD->getName(), proto->getName());
+      } else {
+        NTD->diagnose(diag::unsupported_type_nested_in_protocol,
+                      NTD->getName(), proto->getName());
       }
+    }
 
+    // We don't support nested types in generic functions yet.
+    if (NTD->isGenericContext()) {
       if (DC->isLocalContext() && DC->isGenericContext()) {
         // A local generic context is a generic function.
         if (auto AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
@@ -2236,8 +2272,18 @@ public:
       // override anything, complain.
       if (auto *OA = FD->getAttrs().getAttribute<OverrideAttr>()) {
         if (!FD->getOverriddenDecl()) {
-          FD->diagnose(diag::method_does_not_override)
-              .highlight(OA->getLocation());
+          auto DC = FD->getDeclContext();
+          auto isClassContext = DC->getSelfClassDecl() != nullptr;
+          auto isStructOrEnumContext = DC->getSelfEnumDecl() != nullptr ||
+                                       DC->getSelfStructDecl() != nullptr;
+          if (isStructOrEnumContext) {
+            FD->diagnose(diag::override_nonclass_decl)
+                .highlight(OA->getLocation())
+                .fixItRemove(OA->getRange());
+          } else {
+            FD->diagnose(diag::method_does_not_override, isClassContext)
+                .highlight(OA->getLocation());
+          }
           OA->setInvalid();
         }
       }
@@ -2482,14 +2528,24 @@ public:
     // Check whether this initializer overrides an initializer in its
     // superclass.
     if (!checkOverrides(CD)) {
+      auto DC = CD->getDeclContext();
+      auto isClassContext = DC->getSelfClassDecl() != nullptr;
+      auto isStructOrEnumContext = DC->getSelfEnumDecl() != nullptr ||
+                                   DC->getSelfStructDecl() != nullptr;
       // If an initializer has an override attribute but does not override
       // anything or overrides something that doesn't need an 'override'
       // keyword (e.g., a convenience initializer), complain.
       // anything, or overrides something that complain.
       if (auto *attr = CD->getAttrs().getAttribute<OverrideAttr>()) {
         if (!CD->getOverriddenDecl()) {
-          CD->diagnose(diag::initializer_does_not_override)
-              .highlight(attr->getLocation());
+          if (isStructOrEnumContext) {
+            CD->diagnose(diag::override_nonclass_decl)
+                .highlight(attr->getLocation())
+                .fixItRemove(attr->getRange());
+          } else {
+            CD->diagnose(diag::initializer_does_not_override, isClassContext)
+                .highlight(attr->getLocation());
+          }
           attr->setInvalid();
         } else if (attr->isImplicit()) {
           // Don't diagnose implicit attributes.
@@ -2513,7 +2569,7 @@ public:
             reqInit->diagnose(diag::overridden_required_initializer_here);
           } else {
             // We tried to override a convenience initializer.
-            CD->diagnose(diag::initializer_does_not_override)
+            CD->diagnose(diag::initializer_does_not_override, isClassContext)
                 .highlight(attr->getLocation());
             CD->getOverriddenDecl()->diagnose(
                 diag::convenience_init_override_here);

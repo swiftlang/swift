@@ -377,6 +377,28 @@ ConstraintSystem::determineBestBindings() {
       cache.insert({typeVar, getPotentialBindings(typeVar)});
   }
 
+  // Determine whether given type variable with its set of bindings is
+  // viable to be attempted on the next step of the solver. If type variable
+  // has no "direct" bindings of any kind e.g. direct bindings to concrete
+  // types, default types from "defaultable" constraints or literal
+  // conformances, such type variable is not viable to be evaluated to be
+  // attempted next.
+  auto isViableForRanking =
+      [this](const ConstraintSystem::PotentialBindings &bindings) -> bool {
+    auto *typeVar = bindings.TypeVar;
+
+    // If type variable is marked as a potential hole there is always going
+    // to be at least one binding available for it.
+    if (shouldAttemptFixes() && typeVar->getImpl().canBindToHole())
+      return true;
+
+    return !bindings.Bindings.empty() || !bindings.Defaults.empty() ||
+           llvm::any_of(bindings.Protocols, [&](Constraint *constraint) {
+             return bool(
+                 TypeChecker::getDefaultType(constraint->getProtocol(), DC));
+           });
+  };
+
   // Now let's see if we could infer something for related type
   // variables based on other bindings.
   for (auto *typeVar : getTypeVariables()) {
@@ -386,9 +408,21 @@ ConstraintSystem::determineBestBindings() {
 
     auto &bindings = cachedBindings->getSecond();
 
+    // Before attempting to infer transitive bindings let's check
+    // whether there are any viable "direct" bindings associated with
+    // current type variable, if there are none - it means that this type
+    // variable could only be used to transitively infer bindings for
+    // other type variables and can't participate in ranking.
+    //
+    // Viable bindings include - any types inferred from constraints
+    // associated with given type variable, any default constraints,
+    // or any conformance requirements to literal protocols with can
+    // produce a default type.
+    bool isViable = isViableForRanking(bindings);
+
     bindings.finalize(*this, cache);
 
-    if (!bindings)
+    if (!bindings || !isViable)
       continue;
 
     if (isDebugMode()) {
@@ -681,8 +715,7 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
 
   // Make sure we aren't trying to equate type variables with different
   // lvalue-binding rules.
-  if (auto otherTypeVar =
-          type->lookThroughAllOptionalTypes()->getAs<TypeVariableType>()) {
+  if (auto otherTypeVar = type->getAs<TypeVariableType>()) {
     if (typeVar->getImpl().canBindToLValue() !=
         otherTypeVar->getImpl().canBindToLValue())
       return None;

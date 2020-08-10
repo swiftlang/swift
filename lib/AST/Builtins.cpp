@@ -172,6 +172,7 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType) {
                              StaticSpellingKind::None,
                              /*FuncLoc=*/SourceLoc(),
                              Name, /*NameLoc=*/SourceLoc(),
+                             /*Async-*/false, /*AsyncLoc=*/SourceLoc(),
                              /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                              /*GenericParams=*/nullptr,
                              paramList,
@@ -217,6 +218,7 @@ getBuiltinGenericFunction(Identifier Id,
                                StaticSpellingKind::None,
                                /*FuncLoc=*/SourceLoc(),
                                Name, /*NameLoc=*/SourceLoc(),
+                               /*Async-*/false, /*AsyncLoc=*/SourceLoc(),
                                /*Throws=*/ Rethrows, /*ThrowsLoc=*/SourceLoc(),
                                GenericParams,
                                paramList,
@@ -494,7 +496,7 @@ namespace {
     void addConformanceRequirement(const G &generator, ProtocolDecl *proto) {
       Requirement req(RequirementKind::Conformance,
                       generator.build(*this),
-                      proto->getDeclaredType());
+                      proto->getDeclaredInterfaceType());
       addedRequirements.push_back(req);
     }
 
@@ -1034,22 +1036,23 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
     fnParamGens.push_back(T);
   }
   // Generator for the first argument, i.e. the `@differentiable` function.
-  BuiltinFunctionBuilder::LambdaGenerator firstArgGen {
-    // Generator for the function type at the argument position, i.e. the
-    // function being differentiated.
-    [=, &fnParamGens](BuiltinFunctionBuilder &builder) -> Type {
-      FunctionType::ExtInfo ext;
-      auto extInfo = FunctionType::ExtInfo()
-          .withDifferentiabilityKind(DifferentiabilityKind::Normal)
-          .withNoEscape().withThrows(throws);
-      SmallVector<FunctionType::Param, 2> params;
-      for (auto &paramGen : fnParamGens)
-        params.push_back(FunctionType::Param(paramGen.build(builder)));
-      auto innerFunction = FunctionType::get(params,
-                                             fnResultGen.build(builder));
-      return innerFunction->withExtInfo(extInfo);
-    }
-  };
+  BuiltinFunctionBuilder::LambdaGenerator firstArgGen{
+      // Generator for the function type at the argument position, i.e. the
+      // function being differentiated.
+      [=, &fnParamGens](BuiltinFunctionBuilder &builder) -> Type {
+        auto extInfo =
+            FunctionType::ExtInfoBuilder()
+                .withDifferentiabilityKind(DifferentiabilityKind::Normal)
+                .withNoEscape()
+                .withThrows(throws)
+                .build();
+        SmallVector<FunctionType::Param, 2> params;
+        for (auto &paramGen : fnParamGens)
+          params.push_back(FunctionType::Param(paramGen.build(builder)));
+        auto innerFunction =
+            FunctionType::get(params, fnResultGen.build(builder));
+        return innerFunction->withExtInfo(extInfo);
+      }};
   // Eagerly build the type of the first arg, then use that to compute the type
   // of the result.
   auto *diffFnType =
@@ -1104,9 +1107,12 @@ static ValueDecl *getAutoDiffApplyTransposeFunction(
     // function being differentiated.
     [=, &linearFnParamGens](BuiltinFunctionBuilder &builder) -> Type {
       FunctionType::ExtInfo ext;
-      auto extInfo = FunctionType::ExtInfo()
-          .withDifferentiabilityKind(DifferentiabilityKind::Linear)
-          .withNoEscape().withThrows(throws);
+      auto extInfo =
+          FunctionType::ExtInfoBuilder()
+              .withDifferentiabilityKind(DifferentiabilityKind::Linear)
+              .withNoEscape()
+              .withThrows(throws)
+              .build();
       SmallVector<FunctionType::Param, 2> params;
       for (auto &paramGen : linearFnParamGens)
         params.push_back(FunctionType::Param(paramGen.build(builder)));
@@ -1162,8 +1168,9 @@ static ValueDecl *getDifferentiableFunctionConstructor(
       for (auto &paramGen : fnArgGens)
         params.push_back(FunctionType::Param(paramGen.build(builder)));
       return FunctionType::get(params, origResultGen.build(builder))
-          ->withExtInfo(
-              FunctionType::ExtInfo(FunctionTypeRepresentation::Swift, throws));
+          ->withExtInfo(FunctionType::ExtInfoBuilder(
+                            FunctionTypeRepresentation::Swift, throws)
+                            .build());
     }
   };
 
@@ -1187,8 +1194,9 @@ static ValueDecl *getDifferentiableFunctionConstructor(
           {TupleTypeElt(origResultType, Context.Id_value),
            TupleTypeElt(differentialType, Context.Id_differential)}, Context);
       return FunctionType::get(params, jvpResultType)
-          ->withExtInfo(
-              FunctionType::ExtInfo(FunctionTypeRepresentation::Swift, throws));
+          ->withExtInfo(FunctionType::ExtInfoBuilder(
+                            FunctionTypeRepresentation::Swift, throws)
+                            .build());
     }
   };
 
@@ -1215,8 +1223,9 @@ static ValueDecl *getDifferentiableFunctionConstructor(
           {TupleTypeElt(origResultType, Context.Id_value),
            TupleTypeElt(pullbackType, Context.Id_pullback)}, Context);
       return FunctionType::get(params, vjpResultType)
-          ->withExtInfo(
-              FunctionType::ExtInfo(FunctionTypeRepresentation::Swift, throws));
+          ->withExtInfo(FunctionType::ExtInfoBuilder(
+                            FunctionTypeRepresentation::Swift, throws)
+                            .build());
     }
   };
 
@@ -1225,7 +1234,9 @@ static ValueDecl *getDifferentiableFunctionConstructor(
       auto origFnType = origFnGen.build(builder)->castTo<FunctionType>();
       return origFnType->withExtInfo(
           origFnType->getExtInfo()
-              .withDifferentiabilityKind(DifferentiabilityKind::Normal));
+              .intoBuilder()
+              .withDifferentiabilityKind(DifferentiabilityKind::Normal)
+              .build());
     }
   };
 
@@ -1264,8 +1275,9 @@ static ValueDecl *getLinearFunctionConstructor(
       for (auto &paramGen : fnArgGens)
         params.push_back(FunctionType::Param(paramGen.build(builder)));
       return FunctionType::get(params, origResultGen.build(builder))
-          ->withExtInfo(
-              FunctionType::ExtInfo(FunctionTypeRepresentation::Swift, throws));
+          ->withExtInfo(FunctionType::ExtInfoBuilder(
+                            FunctionTypeRepresentation::Swift, throws)
+                            .build());
     }
   };
 
@@ -1288,7 +1300,9 @@ static ValueDecl *getLinearFunctionConstructor(
       auto origFnType = origFnGen.build(builder)->castTo<FunctionType>();
       return origFnType->withExtInfo(
           origFnType->getExtInfo()
-              .withDifferentiabilityKind(DifferentiabilityKind::Linear));
+              .intoBuilder()
+              .withDifferentiabilityKind(DifferentiabilityKind::Linear)
+              .build());
     }
   };
 
@@ -1538,8 +1552,10 @@ static ValueDecl *getOnceOperation(ASTContext &Context,
   
   auto HandleTy = Context.TheRawPointerType;
   auto VoidTy = Context.TheEmptyTupleType;
-  auto Thin = FunctionType::ExtInfo(FunctionTypeRepresentation::CFunctionPointer,
-                                    /*throws*/ false);
+  auto Thin =
+      FunctionType::ExtInfoBuilder(FunctionTypeRepresentation::CFunctionPointer,
+                                   /*throws*/ false)
+          .build();
   if (withContext) {
     auto ContextTy = Context.TheRawPointerType;
     auto ContextArg = FunctionType::Param(ContextTy);

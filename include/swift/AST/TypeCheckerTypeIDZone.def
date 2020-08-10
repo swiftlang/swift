@@ -105,8 +105,8 @@ SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequest,
                                  SmallVector<TypeLoc, 2>, bool),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InheritedTypeRequest,
-              Type(llvm::PointerUnion<TypeDecl *, ExtensionDecl *>, unsigned,
-                   TypeResolutionStage),
+              Type(llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *>,
+                   unsigned, TypeResolutionStage),
               SeparatelyCached, HasNearestLocation)
 SWIFT_REQUEST(TypeChecker, InheritsSuperclassInitializersRequest,
               bool(ClassDecl *), SeparatelyCached, NoLocationInfo)
@@ -207,8 +207,8 @@ SWIFT_REQUEST(TypeChecker, TangentStoredPropertyRequest,
               llvm::Expected<VarDecl *>(VarDecl *, CanType), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeCheckFunctionBodyRequest,
               bool(AbstractFunctionDecl *), Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, TypeCheckFunctionBodyAtLocRequest,
-              bool(AbstractFunctionDecl *, SourceLoc),
+SWIFT_REQUEST(TypeChecker, TypeCheckASTNodeAtLocRequest,
+              bool(DeclContext *, SourceLoc),
               Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, UnderlyingTypeRequest, Type(TypeAliasDecl *),
               SeparatelyCached, NoLocationInfo)

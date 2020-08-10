@@ -400,7 +400,7 @@ ConcreteExistentialInfo::ConcreteExistentialInfo(SILValue existential,
   // There is no ConcreteValue in this case.
 
   /// Determine the ExistentialConformances and SubstitutionMap.
-  ExistentialType = Protocol->getDeclaredType()->getCanonicalType();
+  ExistentialType = Protocol->getDeclaredInterfaceType()->getCanonicalType();
   initializeSubstitutionMap(ProtocolConformanceRef(ConcreteConformance), M);
 
   assert(isValid());

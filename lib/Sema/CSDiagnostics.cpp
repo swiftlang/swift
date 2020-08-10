@@ -240,6 +240,13 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     return type->getAnyGeneric();
   };
 
+  // If the locator is for a function builder body result type, the requirement
+  // came from the function's return type.
+  if (getLocator()->isForFunctionBuilderBodyResult()) {
+    auto *func = getAsDecl<FuncDecl>(getAnchor());
+    return getAffectedDeclFromType(func->getResultInterfaceType());
+  }
+
   if (isFromContextualType())
     return getAffectedDeclFromType(getContextualType(getRawAnchor()));
 
@@ -908,12 +915,21 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
   // Give a note and fix-it
   auto note = emitDiagnosticAt(PD, diag::noescape_parameter, PD->getName());
 
+  SourceLoc reprLoc;
+  SourceLoc autoclosureEndLoc;
+  if (auto *repr = PD->getTypeRepr()) {
+    reprLoc = repr->getStartLoc();
+    if (auto *attrRepr = dyn_cast<AttributedTypeRepr>(repr)) {
+      autoclosureEndLoc = Lexer::getLocForEndOfToken(
+          getASTContext().SourceMgr,
+          attrRepr->getAttrs().getLoc(TAK_autoclosure));
+    }
+  }
   if (!PD->isAutoClosure()) {
-    SourceLoc reprLoc;
-    if (auto *repr = PD->getTypeRepr())
-      reprLoc = repr->getStartLoc();
     note.fixItInsert(reprLoc, "@escaping ");
-  } // TODO: add in a fixit for autoclosure
+  } else {
+    note.fixItInsertAfter(autoclosureEndLoc, " @escaping");
+  }
 
   return true;
 }
@@ -972,8 +988,6 @@ bool MissingExplicitConversionFailure::diagnoseAsError() {
     return false;
 
   bool useAs = TypeChecker::isExplicitlyConvertibleTo(fromType, toType, DC);
-  if (!useAs && !TypeChecker::checkedCastMaySucceed(fromType, toType, DC))
-    return false;
 
   auto *expr = findParentExpr(anchor);
   if (!expr)
@@ -2170,6 +2184,11 @@ bool ContextualFailure::diagnoseAsError() {
     }
 
     return true;
+  }
+
+  case ConstraintLocator::FunctionBuilderBodyResult: {
+    diagnostic = *getDiagnosticFor(CTP_Initialization, toType);
+    break;
   }
 
   default:
@@ -3915,9 +3934,9 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   Expr *fnExpr = nullptr;
   Expr *argExpr = nullptr;
   unsigned numArguments = 0;
-  bool hasTrailingClosure = false;
+  Optional<unsigned> firstTrailingClosure = None;
 
-  std::tie(fnExpr, argExpr, numArguments, hasTrailingClosure) =
+  std::tie(fnExpr, argExpr, numArguments, firstTrailingClosure) =
       getCallInfo(getRawAnchor());
 
   // TODO(diagnostics): We should be able to suggest this fix-it
@@ -3980,46 +3999,66 @@ bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
   auto position = argument.first;
   auto label = argument.second.getLabel();
 
+  Expr *fnExpr = nullptr;
+  Expr *argExpr = nullptr;
+  unsigned numArgs = 0;
+  Optional<unsigned> firstTrailingClosure = None;
+
+  std::tie(fnExpr, argExpr, numArgs, firstTrailingClosure) =
+      getCallInfo(anchor);
+
+  if (!argExpr) {
+    return false;
+  }
+
+  // Will the parameter accept a trailing closure?
+  Type paramType = resolveType(argument.second.getPlainType());
+  bool paramAcceptsTrailingClosure = paramType
+      ->lookThroughAllOptionalTypes()->is<AnyFunctionType>();
+
+  // Determine whether we're inserting as a trailing closure.
+  bool insertingTrailingClosure =
+    firstTrailingClosure && position > *firstTrailingClosure;
+
   SmallString<32> insertBuf;
   llvm::raw_svector_ostream insertText(insertBuf);
 
-  if (position != 0)
+  if (insertingTrailingClosure)
+    insertText << " ";
+  else if (position != 0)
     insertText << ", ";
 
   forFixIt(insertText, argument.second);
 
-  Expr *fnExpr = nullptr;
-  Expr *argExpr = nullptr;
-  unsigned insertableEndIdx = 0;
-  bool hasTrailingClosure = false;
-
-  std::tie(fnExpr, argExpr, insertableEndIdx, hasTrailingClosure) =
-      getCallInfo(anchor);
-
-  if (!argExpr)
-    return false;
-
-  if (hasTrailingClosure)
-    insertableEndIdx -= 1;
-
-  if (position == 0 && insertableEndIdx != 0)
+  if (position == 0 && numArgs > 0 &&
+      (!firstTrailingClosure || position < *firstTrailingClosure))
     insertText << ", ";
 
   SourceLoc insertLoc;
-  if (auto *TE = dyn_cast<TupleExpr>(argExpr)) {
-    // fn():
-    //   fn([argMissing])
+
+  if (position >= numArgs && insertingTrailingClosure) {
+    // Add a trailing closure to the end.
+
+    // fn { closure }:
+    //   fn {closure} label: [argMissing]
+    // fn() { closure }:
+    //   fn() {closure} label: [argMissing]
+    // fn(argX) { closure }:
+    //   fn(argX) { closure } label: [argMissing]
+    insertLoc = Lexer::getLocForEndOfToken(
+        ctx.SourceMgr, argExpr->getEndLoc());
+  } else if (auto *TE = dyn_cast<TupleExpr>(argExpr)) {
     // fn(argX, argY):
     //   fn([argMissing, ]argX, argY)
     //   fn(argX[, argMissing], argY)
-    //   fn(argX, argY[, argMissing])
     // fn(argX) { closure }:
     //   fn([argMissing, ]argX) { closure }
     //   fn(argX[, argMissing]) { closure }
-    //   fn(argX[, closureLabel: ]{closure}[, argMissing)] // Not impl.
-    if (insertableEndIdx == 0)
+    // fn(argX, argY):
+    //   fn(argX, argY[, argMissing])
+    if (numArgs == 0) {
       insertLoc = TE->getRParenLoc();
-    else if (position != 0) {
+    } else if (position != 0) {
       auto argPos = std::min(TE->getNumElements(), position) - 1;
       insertLoc = Lexer::getLocForEndOfToken(
           ctx.SourceMgr, TE->getElement(argPos)->getEndLoc());
@@ -4031,25 +4070,25 @@ bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
   } else {
     auto *PE = cast<ParenExpr>(argExpr);
     if (PE->getRParenLoc().isValid()) {
+      // fn():
+      //   fn([argMissing])
       // fn(argX):
-      //   fn([argMissing, ]argX)
       //   fn(argX[, argMissing])
+      //   fn([argMissing, ]argX)
       // fn() { closure }:
       //   fn([argMissing]) {closure}
-      //   fn([closureLabel: ]{closure}[, argMissing]) // Not impl.
-      if (insertableEndIdx == 0)
-        insertLoc = PE->getRParenLoc();
-      else if (position == 0)
-        insertLoc = PE->getSubExpr()->getStartLoc();
-      else
+      if (position == 0) {
         insertLoc = Lexer::getLocForEndOfToken(ctx.SourceMgr,
-                                               PE->getSubExpr()->getEndLoc());
+                                               PE->getLParenLoc());
+      } else {
+        insertLoc = Lexer::getLocForEndOfToken(
+            ctx.SourceMgr, PE->getSubExpr()->getEndLoc());
+      }
     } else {
       // fn { closure }:
       //   fn[(argMissing)] { closure }
-      //   fn[(closureLabel:] { closure }[, missingArg)]  // Not impl.
       assert(!isExpr<SubscriptExpr>(anchor) && "bracket less subscript");
-      assert(PE->hasTrailingClosure() &&
+      assert(firstTrailingClosure &&
              "paren less ParenExpr without trailing closure");
       insertBuf.insert(insertBuf.begin(), '(');
       insertBuf.insert(insertBuf.end(), ')');
@@ -4061,16 +4100,28 @@ bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
   if (insertLoc.isInvalid())
     return false;
 
+  // If we are trying to insert a trailing closure but the parameter
+  // corresponding to the missing argument doesn't support a trailing closure,
+  // don't provide a Fix-It.
+  // FIXME: It's possible to parenthesize and relabel the argument list to
+  // accomodate this, but it's tricky.
+  bool shouldEmitFixIt =
+    !(insertingTrailingClosure && !paramAcceptsTrailingClosure);
+
   if (label.empty()) {
-    emitDiagnosticAt(insertLoc, diag::missing_argument_positional, position + 1)
-        .fixItInsert(insertLoc, insertText.str());
+    auto diag = emitDiagnosticAt(
+        insertLoc, diag::missing_argument_positional, position + 1);
+    if (shouldEmitFixIt)
+      diag.fixItInsert(insertLoc, insertText.str());
   } else if (isPropertyWrapperInitialization()) {
     auto *TE = cast<TypeExpr>(fnExpr);
     emitDiagnosticAt(TE->getLoc(), diag::property_wrapper_missing_arg_init,
                      label, resolveType(TE->getInstanceType())->getString());
   } else {
-    emitDiagnosticAt(insertLoc, diag::missing_argument_named, label)
-        .fixItInsert(insertLoc, insertText.str());
+    auto diag = emitDiagnosticAt(
+        insertLoc, diag::missing_argument_named, label);
+    if (shouldEmitFixIt)
+      diag.fixItInsert(insertLoc, insertText.str());
   }
 
   if (auto selectedOverload =
@@ -4298,23 +4349,24 @@ bool MissingArgumentsFailure::isMisplacedMissingArgument(
   return TypeChecker::isConvertibleTo(argType, paramType, solution.getDC());
 }
 
-std::tuple<Expr *, Expr *, unsigned, bool>
+std::tuple<Expr *, Expr *, unsigned, Optional<unsigned>>
 MissingArgumentsFailure::getCallInfo(ASTNode anchor) const {
   if (auto *call = getAsExpr<CallExpr>(anchor)) {
     return std::make_tuple(call->getFn(), call->getArg(),
-                           call->getNumArguments(), call->hasTrailingClosure());
+                           call->getNumArguments(),
+                           call->getUnlabeledTrailingClosureIndex());
   } else if (auto *UME = getAsExpr<UnresolvedMemberExpr>(anchor)) {
     return std::make_tuple(UME, UME->getArgument(), UME->getNumArguments(),
-                           UME->hasTrailingClosure());
+                           UME->getUnlabeledTrailingClosureIndex());
   } else if (auto *SE = getAsExpr<SubscriptExpr>(anchor)) {
     return std::make_tuple(SE, SE->getIndex(), SE->getNumArguments(),
-                           SE->hasTrailingClosure());
+                           SE->getUnlabeledTrailingClosureIndex());
   } else if (auto *OLE = getAsExpr<ObjectLiteralExpr>(anchor)) {
     return std::make_tuple(OLE, OLE->getArg(), OLE->getNumArguments(),
-                           OLE->hasTrailingClosure());
+                           OLE->getUnlabeledTrailingClosureIndex());
   }
 
-  return std::make_tuple(nullptr, nullptr, 0, false);
+  return std::make_tuple(nullptr, nullptr, 0, None);
 }
 
 void MissingArgumentsFailure::forFixIt(
@@ -4902,6 +4954,9 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
 
   Optional<InFlightDiagnostic> diagnostic;
   if (isExpr<ArrayExpr>(anchor)) {
+    if (diagnoseMergedLiteralElements())
+      return true;
+
     diagnostic.emplace(emitDiagnostic(diag::cannot_convert_array_element,
                                       eltType, contextualType));
   }
@@ -4949,6 +5004,30 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
     return false;
 
   (void)trySequenceSubsequenceFixIts(*diagnostic);
+  return true;
+}
+
+bool CollectionElementContextualFailure::diagnoseMergedLiteralElements() {
+  auto elementAnchor = simplifyLocatorToAnchor(getLocator());
+  if (!elementAnchor)
+    return false;
+
+  auto *typeVar = getRawType(elementAnchor)->getAs<TypeVariableType>();
+  if (!typeVar || !typeVar->getImpl().getAtomicLiteralKind())
+    return false;
+
+  // This element is a literal whose type variable could have been merged with others,
+  // but the conversion constraint to the array element type was only placed on one
+  // of them. So, we want to emit the error for each element whose type variable is in
+  // this equivalence class.
+  auto &cs = getConstraintSystem();
+  auto node = cs.getRepresentative(typeVar)->getImpl().getGraphNode();
+  for (const auto *typeVar : node->getEquivalenceClass()) {
+    auto anchor = typeVar->getImpl().getLocator()->getAnchor();
+    emitDiagnosticAt(constraints::getLoc(anchor), diag::cannot_convert_array_element,
+                     getFromType(), getToType());
+  }
+
   return true;
 }
 
@@ -5509,6 +5588,9 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
   if (diagnosePropertyWrapperMismatch())
     return true;
 
+  if (diagnoseTrailingClosureMismatch())
+    return true;
+
   auto argType = getFromType();
   auto paramType = getToType();
 
@@ -5743,6 +5825,26 @@ bool ArgumentMismatchFailure::diagnosePropertyWrapperMismatch() const {
   return true;
 }
 
+bool ArgumentMismatchFailure::diagnoseTrailingClosureMismatch() const {
+  if (!Info.isTrailingClosure())
+    return false;
+
+  auto paramType = getToType();
+  if (paramType->lookThroughAllOptionalTypes()->is<AnyFunctionType>())
+    return false;
+
+  emitDiagnostic(diag::trailing_closure_bad_param, paramType)
+      .highlight(getSourceRange());
+
+  if (auto overload = getCalleeOverloadChoiceIfAvailable(getLocator())) {
+    if (auto *decl = overload->choice.getDeclOrNull()) {
+      emitDiagnosticAt(decl, diag::decl_declared_here, decl->getName());
+    }
+  }
+
+  return true;
+}
+
 void ExpandArrayIntoVarargsFailure::tryDropArrayBracketsFixIt(
     const Expr *anchor) const {
   // If this is an array literal, offer to remove the brackets and pass the
@@ -5829,19 +5931,6 @@ bool ExtraneousCallFailure::diagnoseAsError() {
   auto diagnostic =
       emitDiagnostic(diag::cannot_call_non_function_value, getType(anchor));
   removeParensFixIt(diagnostic);
-  return true;
-}
-
-bool InvalidUseOfTrailingClosure::diagnoseAsError() {
-  emitDiagnostic(diag::trailing_closure_bad_param, getToType())
-      .highlight(getSourceRange());
-
-  if (auto overload = getCalleeOverloadChoiceIfAvailable(getLocator())) {
-    if (auto *decl = overload->choice.getDeclOrNull()) {
-      emitDiagnosticAt(decl, diag::decl_declared_here, decl->getName());
-    }
-  }
-
   return true;
 }
 
@@ -6508,4 +6597,96 @@ bool MissingOptionalUnwrapKeyPathFailure::diagnoseAsError() {
 SourceLoc MissingOptionalUnwrapKeyPathFailure::getLoc() const {
   auto *SE = castToExpr<SubscriptExpr>(getAnchor());
   return SE->getBase()->getEndLoc();
+}
+
+bool TrailingClosureRequiresExplicitLabel::diagnoseAsError() {
+  auto argInfo = *getFunctionArgApplyInfo(getLocator());
+
+  {
+    auto diagnostic = emitDiagnostic(
+        diag::unlabeled_trailing_closure_deprecated, argInfo.getParamLabel());
+    fixIt(diagnostic, argInfo);
+  }
+
+  if (auto *callee = argInfo.getCallee()) {
+    emitDiagnosticAt(callee, diag::decl_declared_here, callee->getName());
+  }
+
+  return true;
+}
+
+void TrailingClosureRequiresExplicitLabel::fixIt(
+    InFlightDiagnostic &diagnostic, const FunctionArgApplyInfo &info) const {
+  auto &ctx = getASTContext();
+
+  // Dig out source locations.
+  SourceLoc existingRParenLoc;
+  SourceLoc leadingCommaLoc;
+
+  auto anchor = getRawAnchor();
+  auto *arg = info.getArgListExpr();
+  Expr *fn = nullptr;
+
+  if (auto *applyExpr = getAsExpr<ApplyExpr>(anchor)) {
+    fn = applyExpr->getFn();
+  } else {
+    // Covers subscripts, unresolved members etc.
+    fn = getAsExpr(anchor);
+  }
+
+  if (!fn)
+    return;
+
+  auto *trailingClosure = info.getArgExpr();
+
+  if (auto tupleExpr = dyn_cast<TupleExpr>(arg)) {
+    existingRParenLoc = tupleExpr->getRParenLoc();
+    assert(tupleExpr->getNumElements() >= 2 && "Should be a ParenExpr?");
+    leadingCommaLoc = Lexer::getLocForEndOfToken(
+        ctx.SourceMgr,
+        tupleExpr->getElements()[tupleExpr->getNumElements() - 2]->getEndLoc());
+  } else {
+    auto parenExpr = cast<ParenExpr>(arg);
+    existingRParenLoc = parenExpr->getRParenLoc();
+  }
+
+  // Figure out the text to be inserted before the trailing closure.
+  SmallString<16> insertionText;
+  SourceLoc insertionLoc;
+  if (leadingCommaLoc.isValid()) {
+    insertionText += ", ";
+    assert(existingRParenLoc.isValid());
+    insertionLoc = leadingCommaLoc;
+  } else if (existingRParenLoc.isInvalid()) {
+    insertionText += "(";
+    insertionLoc = Lexer::getLocForEndOfToken(ctx.SourceMgr, fn->getEndLoc());
+  } else {
+    insertionLoc = existingRParenLoc;
+  }
+
+  // Add the label, if there is one.
+  auto paramName = info.getParamLabel();
+  if (!paramName.empty()) {
+    insertionText += paramName.str();
+    insertionText += ": ";
+  }
+
+  // If there is an existing right parentheses/brace, remove it while we
+  // insert the new text.
+  if (existingRParenLoc.isValid()) {
+    SourceLoc afterExistingRParenLoc =
+        Lexer::getLocForEndOfToken(ctx.SourceMgr, existingRParenLoc);
+    diagnostic.fixItReplaceChars(insertionLoc, afterExistingRParenLoc,
+                                 insertionText);
+  } else {
+    // Insert the appropriate prefix.
+    diagnostic.fixItInsert(insertionLoc, insertionText);
+  }
+
+  // Insert a right parenthesis/brace after the closing '}' of the trailing
+  // closure;
+  SourceLoc newRParenLoc =
+      Lexer::getLocForEndOfToken(ctx.SourceMgr, trailingClosure->getEndLoc());
+  diagnostic.fixItInsert(newRParenLoc,
+                         isExpr<SubscriptExpr>(anchor) ? "]" : ")");
 }

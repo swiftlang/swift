@@ -529,7 +529,7 @@ public:
           getBuilder(), loc, indices.parameters, indices.results, origCallee);
 
       // Record the `differentiable_function` instruction.
-      context.addDifferentiableFunctionInstToWorklist(diffFuncInst);
+      context.getDifferentiableFunctionInstWorklist().push_back(diffFuncInst);
 
       auto borrowedADFunc = builder.emitBeginBorrowOperation(loc, diffFuncInst);
       auto extractedVJP = getBuilder().createDifferentiableFunctionExtract(
@@ -623,7 +623,15 @@ public:
     // instruction to the `differentiable_function` worklist.
     TypeSubstCloner::visitDifferentiableFunctionInst(dfi);
     auto *newDFI = cast<DifferentiableFunctionInst>(getOpValue(dfi));
-    context.addDifferentiableFunctionInstToWorklist(newDFI);
+    context.getDifferentiableFunctionInstWorklist().push_back(newDFI);
+  }
+
+  void visitLinearFunctionInst(LinearFunctionInst *lfi) {
+    // Clone `linear_function` from original to VJP, then add the cloned
+    // instruction to the `linear_function` worklist.
+    TypeSubstCloner::visitLinearFunctionInst(lfi);
+    auto *newLFI = cast<LinearFunctionInst>(getOpValue(lfi));
+    context.getLinearFunctionInstWorklist().push_back(newLFI);
   }
 };
 

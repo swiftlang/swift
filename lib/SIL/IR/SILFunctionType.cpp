@@ -235,8 +235,25 @@ IndexSubset *SILFunctionType::getDifferentiabilityResultIndices() {
       resultIndices.push_back(resultAndIndex.index());
   // Check `inout` parameters.
   for (auto inoutParamAndIndex : enumerate(getIndirectMutatingParameters()))
-    if (inoutParamAndIndex.value().getDifferentiability() !=
-        SILParameterDifferentiability::NotDifferentiable)
+    // FIXME(TF-1305): The `getResults().empty()` condition is a hack.
+    //
+    // Currently, an `inout` parameter can either be:
+    // 1. Both a differentiability parameter and a differentiability result.
+    // 2. `@noDerivative`: neither a differentiability parameter nor a
+    //    differentiability result.
+    // However, there is no way to represent an `inout` parameter that:
+    // 3. Is a differentiability result but not a differentiability parameter.
+    // 4. Is a differentiability parameter but not a differentiability result.
+    //    This case is not currently expressible and does not yet have clear use
+    //    cases, so supporting it is a non-goal.
+    //
+    // See TF-1305 for solution ideas. For now, `@noDerivative` `inout`
+    // parameters are not treated as differentiability results, unless the
+    // original function has no formal results, in which case all `inout`
+    // parameters are treated as differentiability results.
+    if (getResults().empty() ||
+        inoutParamAndIndex.value().getDifferentiability() !=
+            SILParameterDifferentiability::NotDifferentiable)
       resultIndices.push_back(getNumResults() + inoutParamAndIndex.index());
   auto numSemanticResults =
       getNumResults() + getNumIndirectMutatingParameters();
@@ -268,7 +285,8 @@ SILFunctionType::getWithDifferentiability(DifferentiabilityKind kind,
             ? SILResultDifferentiability::DifferentiableOrNotApplicable
             : SILResultDifferentiability::NotDifferentiable));
   }
-  auto newExtInfo = getExtInfo().withDifferentiabilityKind(kind);
+  auto newExtInfo =
+      getExtInfo().intoBuilder().withDifferentiabilityKind(kind).build();
   return get(getInvocationGenericSignature(), newExtInfo, getCoroutineKind(),
              getCalleeConvention(), newParameters, getYields(), newResults,
              getOptionalErrorResult(), getPatternSubstitutions(),
@@ -279,8 +297,11 @@ SILFunctionType::getWithDifferentiability(DifferentiabilityKind kind,
 CanSILFunctionType SILFunctionType::getWithoutDifferentiability() {
   if (!isDifferentiable())
     return CanSILFunctionType(this);
-  auto nondiffExtInfo = getExtInfo().withDifferentiabilityKind(
-      DifferentiabilityKind::NonDifferentiable);
+  auto nondiffExtInfo =
+      getExtInfo()
+          .intoBuilder()
+          .withDifferentiabilityKind(DifferentiabilityKind::NonDifferentiable)
+          .build();
   SmallVector<SILParameterInfo, 8> newParams;
   for (auto &param : getParameters())
     newParams.push_back(param.getWithDifferentiability(
@@ -428,8 +449,9 @@ static CanSILFunctionType getAutoDiffDifferentialType(
     }
   }
   SmallVector<SILResultInfo, 1> differentialResults;
-  if (inoutParamIndices->isEmpty()) {
-    for (auto resultIndex : resultIndices->getIndices()) {
+  for (auto resultIndex : resultIndices->getIndices()) {
+    // Handle formal original result.
+    if (resultIndex < originalFnTy->getNumResults()) {
       auto &result = originalResults[resultIndex];
       auto resultTan =
           result.getInterfaceType()->getAutoDiffTangentSpace(lookupConformance);
@@ -448,8 +470,27 @@ static CanSILFunctionType getAutoDiffDifferentialType(
         substReplacements.push_back(resultTanType);
         differentialResults.push_back({gpType, resultConv});
       }
+      continue;
     }
+    // Handle original `inout` parameter.
+    auto inoutParamIndex = resultIndex - originalFnTy->getNumResults();
+    auto inoutParamIt = std::next(
+        originalFnTy->getIndirectMutatingParameters().begin(), inoutParamIndex);
+    auto paramIndex =
+        std::distance(originalFnTy->getParameters().begin(), &*inoutParamIt);
+    // If the original `inout` parameter is a differentiability parameter, then
+    // it already has a corresponding differential parameter. Skip adding a
+    // corresponding differential result.
+    if (parameterIndices->contains(paramIndex))
+      continue;
+    auto inoutParam = originalFnTy->getParameters()[paramIndex];
+    auto paramTan = inoutParam.getInterfaceType()->getAutoDiffTangentSpace(
+        lookupConformance);
+    assert(paramTan && "Parameter type does not have a tangent space?");
+    differentialResults.push_back(
+        {paramTan->getCanonicalType(), ResultConvention::Indirect});
   }
+
   SubstitutionMap substitutions;
   if (!substGenericParams.empty()) {
     auto genericSig =
@@ -710,7 +751,9 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     CanGenericSignature derivativeFnInvocationGenSig,
     bool isReabstractionThunk) {
   assert(parameterIndices);
+  assert(!parameterIndices->isEmpty() && "Parameter indices must not be empty");
   assert(resultIndices);
+  assert(!resultIndices->isEmpty() && "Result indices must not be empty");
   auto &ctx = getASTContext();
 
   // Look up result in cache.
@@ -928,7 +971,7 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
 CanAnyFunctionType
 Lowering::adjustFunctionType(CanAnyFunctionType t,
                              AnyFunctionType::ExtInfo extInfo) {
-  if (t->getExtInfo() == extInfo)
+  if (t->getExtInfo().isEqualTo(extInfo, useClangTypes(t)))
     return t;
   return CanAnyFunctionType(t->withExtInfo(extInfo));
 }
@@ -939,7 +982,8 @@ Lowering::adjustFunctionType(CanSILFunctionType type,
                              SILFunctionType::ExtInfo extInfo,
                              ParameterConvention callee,
                              ProtocolConformanceRef witnessMethodConformance) {
-  if (type->getExtInfo() == extInfo && type->getCalleeConvention() == callee &&
+  if (type->getExtInfo().isEqualTo(extInfo, useClangTypes(type)) &&
+      type->getCalleeConvention() == callee &&
       type->getWitnessMethodConformanceOrInvalid() == witnessMethodConformance)
     return type;
 
@@ -961,7 +1005,7 @@ SILFunctionType::getWithRepresentation(Representation repr) {
 
 CanSILFunctionType SILFunctionType::getWithExtInfo(ExtInfo newExt) {
   auto oldExt = getExtInfo();
-  if (newExt == oldExt)
+  if (newExt.isEqualTo(oldExt, useClangTypes(this)))
     return CanSILFunctionType(this);
 
   auto calleeConvention =
@@ -1177,8 +1221,8 @@ public:
     for (unsigned i : indices(upperBoundConformances)) {
       auto proto = upperBoundConformances[i];
       auto conformance = substTypeConformances[i];
-      substRequirements.push_back(Requirement(RequirementKind::Conformance,
-                                              param, proto->getDeclaredType()));
+      substRequirements.push_back(Requirement(RequirementKind::Conformance, param,
+                                              proto->getDeclaredInterfaceType()));
       substConformances.push_back(conformance);
     }
     
@@ -2011,9 +2055,10 @@ static CanSILFunctionType getSILFunctionType(
 
   // Map 'throws' to the appropriate error convention.
   Optional<SILResultInfo> errorResult;
-  assert((!foreignInfo.Error || substFnInterfaceType->getExtInfo().throws()) &&
-         "foreignError was set but function type does not throw?");
-  if (substFnInterfaceType->getExtInfo().throws() && !foreignInfo.Error) {
+  assert(
+      (!foreignInfo.Error || substFnInterfaceType->getExtInfo().isThrowing()) &&
+      "foreignError was set but function type does not throw?");
+  if (substFnInterfaceType->getExtInfo().isThrowing() && !foreignInfo.Error) {
     assert(!origType.isForeign() &&
            "using native Swift error convention for foreign type!");
     SILType exnType = SILType::getExceptionType(TC.Context);
@@ -2106,11 +2151,13 @@ static CanSILFunctionType getSILFunctionType(
 
   // NOTE: SILFunctionType::ExtInfo doesn't track everything that
   // AnyFunctionType::ExtInfo tracks. For example: 'throws' or 'auto-closure'
-  auto silExtInfo = SILFunctionType::ExtInfo()
-    .withRepresentation(extInfo.getSILRepresentation())
-    .withIsPseudogeneric(pseudogeneric)
-    .withNoEscape(extInfo.isNoEscape())
-    .withDifferentiabilityKind(extInfo.getDifferentiabilityKind());
+  auto silExtInfo =
+      SILFunctionType::ExtInfoBuilder()
+          .withRepresentation(extInfo.getSILRepresentation())
+          .withIsPseudogeneric(pseudogeneric)
+          .withNoEscape(extInfo.isNoEscape())
+          .withDifferentiabilityKind(extInfo.getDifferentiabilityKind())
+          .build();
   
   // Build the substituted generic signature we extracted.
   SubstitutionMap substitutions;
@@ -3716,7 +3763,7 @@ public:
     // pseudogeneric.
     auto extInfo = origType->getExtInfo();
     if (!shouldSubstituteOpaqueArchetypes)
-      extInfo = extInfo.withIsPseudogeneric(false);
+      extInfo = extInfo.intoBuilder().withIsPseudogeneric(false).build();
 
     auto genericSig = shouldSubstituteOpaqueArchetypes
                         ? origType->getInvocationGenericSignature()
@@ -3962,7 +4009,7 @@ TypeConverter::getBridgedFunctionType(AbstractionPattern pattern,
   case SILFunctionTypeRepresentation::Closure:
   case SILFunctionTypeRepresentation::WitnessMethod: {
     // No bridging needed for native functions.
-    if (t->getExtInfo() == extInfo)
+    if (t->getExtInfo().isEqualTo(extInfo, useClangTypes(t)))
       return t;
     return CanAnyFunctionType::get(genericSig, t.getParams(), t.getResult(),
                                    extInfo);
@@ -4171,7 +4218,7 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
   bridgingFnPattern.rewriteType(genericSig, curried);
 
   // Build the uncurried function type.
-  if (innerExtInfo.throws())
+  if (innerExtInfo.isThrowing())
     extInfo = extInfo.withThrows(true);
 
   bridgedParams.push_back(selfParam);

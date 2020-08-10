@@ -221,7 +221,7 @@ void FunctionTypeRepr::printImpl(ASTPrinter &Printer,
                                  const PrintOptions &Opts) const {
   Printer.callPrintStructurePre(PrintStructureKind::FunctionType);
   printTypeRepr(ArgsTy, Printer, Opts);
-  if (throws()) {
+  if (isThrowing()) {
     Printer << " ";
     Printer.printKeyword("throws", Opts);
   }

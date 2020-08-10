@@ -200,7 +200,7 @@ public:
 
 /// Gather all instructions that use the given `address`
 ///
-/// "Normal" uses are a whitelisted set of uses that guarantees the address is
+/// "Normal" uses are a allowlisted set of uses that guarantees the address is
 /// only used as if it refers to a single value and all uses are accounted for
 /// (no address projections).
 ///
@@ -1506,10 +1506,6 @@ class CopyForwardingPass : public SILFunctionTransform
 {
   void run() override {
     if (!EnableCopyForwarding && !EnableDestroyHoisting)
-      return;
-
-    // FIXME: We should be able to support [ossa].
-    if (getFunction()->hasOwnership())
       return;
 
     LLVM_DEBUG(llvm::dbgs() << "Copy Forwarding in Func "

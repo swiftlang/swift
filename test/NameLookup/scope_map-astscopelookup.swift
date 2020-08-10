@@ -194,6 +194,17 @@ class LazyProperties {
   lazy var prop: Int = self.value
 }
 
+func HasLabeledDo() {
+  label:
+  do {
+    for x in 0..<100 {
+      if x % 3 == 0 {
+        break label
+      }
+    }
+  }
+}
+
 // RUN: not %target-swift-frontend -dump-scope-maps expanded %s 2> %t.expanded
 // RUN: %FileCheck -check-prefix CHECK-EXPANDED %s < %t.expanded
 

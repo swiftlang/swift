@@ -80,6 +80,11 @@ void
 swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
                                    swift_reflection_info_t Info);
 
+/// Add reflection sections from a loaded Swift image.
+SWIFT_REMOTE_MIRROR_LINKAGE
+void swift_reflection_addReflectionMappingInfo(
+    SwiftReflectionContextRef ContextRef, swift_reflection_mapping_info_t Info);
+
 /// Add reflection information from a loaded Swift image.
 /// Returns true on success, false if the image's memory couldn't be read.
 SWIFT_REMOTE_MIRROR_LINKAGE
@@ -338,6 +343,12 @@ SWIFT_REMOTE_MIRROR_LINKAGE
 const char *
 swift_reflection_metadataAllocationTagName(SwiftReflectionContextRef ContextRef,
                                            swift_metadata_allocation_tag_t Tag);
+
+SWIFT_REMOTE_MIRROR_LINKAGE
+int swift_reflection_metadataAllocationCacheNode(
+    SwiftReflectionContextRef ContextRef,
+    swift_metadata_allocation_t Allocation,
+    swift_metadata_cache_node_t *OutNode);
 
 /// Backtrace iterator callback passed to
 /// swift_reflection_iterateMetadataAllocationBacktraces

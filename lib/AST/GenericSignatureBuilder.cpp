@@ -3768,8 +3768,8 @@ void GenericSignatureBuilder::addGenericParameter(GenericTypeParamType *GenericP
 /// Visit all of the types that show up in the list of inherited
 /// types.
 static ConstraintResult visitInherited(
-         llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-         llvm::function_ref<ConstraintResult(Type, const TypeRepr *)> visitType) {
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
+    llvm::function_ref<ConstraintResult(Type, const TypeRepr *)> visitType) {
   // Local function that (recursively) adds inherited types.
   ConstraintResult result = ConstraintResult::Resolved;
   std::function<void(Type, const TypeRepr *)> visitInherited;
@@ -3795,8 +3795,8 @@ static ConstraintResult visitInherited(
   };
 
   // Visit all of the inherited types.
-  auto typeDecl = decl.dyn_cast<TypeDecl *>();
-  auto extDecl = decl.dyn_cast<ExtensionDecl *>();
+  auto typeDecl = decl.dyn_cast<const TypeDecl *>();
+  auto extDecl = decl.dyn_cast<const ExtensionDecl *>();
   ASTContext &ctx = typeDecl ? typeDecl->getASTContext()
                              : extDecl->getASTContext();
   auto &evaluator = ctx.evaluator;
@@ -5068,7 +5068,7 @@ public:
       if (differentiableProtocol && fnTy->isDifferentiable()) {
         auto addConformanceConstraint = [&](Type type, ProtocolDecl *protocol) {
           Requirement req(RequirementKind::Conformance, type,
-                          protocol->getDeclaredType());
+                          protocol->getDeclaredInterfaceType());
           Builder.addRequirement(req, source, nullptr);
         };
         auto addSameTypeConstraint = [&](Type firstType,
@@ -6218,7 +6218,7 @@ static bool removalDisconnectsEquivalenceClass(
   // derived edges).
   if (fromComponentIndex == toComponentIndex) return false;
 
-  /// Describes the parents in the equivalance classes we're forming.
+  /// Describes the parents in the equivalence classes we're forming.
   SmallVector<unsigned, 4> parents;
   for (unsigned i : range(equivClass->derivedSameTypeComponents.size())) {
     parents.push_back(i);
@@ -7591,17 +7591,17 @@ InferredGenericSignatureRequest::evaluate(
         .visitRequirements(TypeResolutionStage::Structural,
                            visitRequirement);
     }
-  } else {
-    // The declaration has a where clause, but no generic parameters of its own.
-    const auto ctx = paramSource.get<GenericContext *>();
+  }
 
-    assert(ctx->getTrailingWhereClause() && "No params or where clause");
+  if (auto *ctx = paramSource.dyn_cast<GenericContext *>()) {
+    // The declaration might have a trailing where clause.
+    if (auto *where = ctx->getTrailingWhereClause()) {
+      // Determine where and how to perform name lookup.
+      lookupDC = ctx;
 
-    // Determine where and how to perform name lookup.
-    lookupDC = ctx;
-
-    WhereClauseOwner(ctx).visitRequirements(
-      TypeResolutionStage::Structural, visitRequirement);
+      WhereClauseOwner(lookupDC, where).visitRequirements(
+        TypeResolutionStage::Structural, visitRequirement);
+    }
   }
       
   /// Perform any remaining requirement inference.

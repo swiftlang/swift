@@ -805,25 +805,30 @@ Type AssociatedTypeInference::computeFixedTypeWitness(
                                             AssociatedTypeDecl *assocType) {
   // Look at all of the inherited protocols to determine whether they
   // require a fixed type for this associated type.
-  Type dependentType = assocType->getDeclaredInterfaceType();
   Type resultType;
   for (auto conformedProto : adoptee->getAnyNominal()->getAllProtocols()) {
     if (!conformedProto->inheritsFrom(assocType->getProtocol()))
       continue;
 
-    auto genericSig = conformedProto->getGenericSignature();
+    const auto genericSig = conformedProto->getGenericSignature();
     if (!genericSig) return Type();
 
-    Type concreteType = genericSig->getConcreteType(dependentType);
-    if (!concreteType) continue;
+    const auto nestedType = genericSig->getCanonicalTypeInContext(
+        DependentMemberType::get(conformedProto->getSelfInterfaceType(),
+                                 assocType->getName()));
+    if (nestedType->isEqual(conformedProto->getSelfInterfaceType())) {
+      // Self is a valid fixed type witness.
+    } else if (nestedType->isTypeParameter()) {
+      continue;
+    }
 
     if (!resultType) {
-      resultType = concreteType;
+      resultType = nestedType;
       continue;
     }
 
     // FIXME: Bailing out on ambiguity.
-    if (!resultType->isEqual(concreteType))
+    if (!resultType->isEqual(nestedType))
       return Type();
   }
 
@@ -887,7 +892,7 @@ AssociatedTypeInference::computeAbstractTypeWitness(
     return AbstractTypeWitness::forFixed(assocType, concreteType);
 
   // If we can form a default type, do so.
-  if (auto typeWitness = computeDefaultTypeWitness(assocType))
+  if (const auto &typeWitness = computeDefaultTypeWitness(assocType))
     return typeWitness;
 
   // If there is a generic parameter of the named type, use that.
@@ -1070,7 +1075,7 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
                                        { proto->getSelfInterfaceType() },
                                        sanitizedRequirements,
                                        QuerySubstitutionMap{substitutions},
-                                       nullptr, options);
+                                       options);
   switch (result) {
   case RequirementCheckResult::Failure:
     ++NumSolutionStatesFailedCheck;
@@ -1117,7 +1122,7 @@ bool AssociatedTypeInference::checkConstrainedExtension(ExtensionDecl *ext) {
                        ext->getGenericSignature()->getGenericParams(),
                        ext->getGenericSignature()->getRequirements(),
                        QueryTypeSubstitutionMap{subs},
-                       nullptr, options)) {
+                       options)) {
   case RequirementCheckResult::Success:
   case RequirementCheckResult::SubstitutionFailure:
     return false;
@@ -1698,7 +1703,7 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
                        diag::default_associated_type_req_fail,
                        failedDefaultedWitness,
                        failedDefaultedAssocType->getName(),
-                       proto->getDeclaredType(),
+                       proto->getDeclaredInterfaceType(),
                        failedDefaultedResult.getRequirement(),
                        failedDefaultedResult.isConformanceRequirement());
       });

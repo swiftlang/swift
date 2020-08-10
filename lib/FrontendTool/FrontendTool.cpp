@@ -207,6 +207,8 @@ static void emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
       });
 }
 
+// MARK: - Module Trace
+
 namespace {
 struct SwiftModuleTraceInfo {
   Identifier Name;
@@ -261,6 +263,318 @@ template <> struct ObjectTraits<LoadedModuleTraceFormat> {
 }
 }
 
+static bool isClangOverlayOf(ModuleDecl *potentialOverlay,
+                             ModuleDecl *potentialUnderlying) {
+  return !potentialOverlay->isNonSwiftModule()
+      && potentialUnderlying->isNonSwiftModule()
+      && potentialOverlay->getName() == potentialUnderlying->getName();
+}
+
+// TODO: Delete this once changes from https://reviews.llvm.org/D83449 land on
+// apple/llvm-project's swift/master branch.
+template <typename SetLike, typename Item>
+static bool contains(const SetLike &setLike, Item item) {
+  return setLike.find(item) != setLike.end();
+}
+
+/// Get a set of modules imported by \p module.
+///
+/// By default, all imports are included.
+static void getImmediateImports(
+    ModuleDecl *module,
+    SmallPtrSetImpl<ModuleDecl *> &imports,
+    ModuleDecl::ImportFilter importFilter = {
+      ModuleDecl::ImportFilterKind::Public,
+      ModuleDecl::ImportFilterKind::Private,
+      ModuleDecl::ImportFilterKind::ImplementationOnly,
+      ModuleDecl::ImportFilterKind::SPIAccessControl,
+      ModuleDecl::ImportFilterKind::ShadowedBySeparateOverlay
+    }) {
+  SmallVector<ModuleDecl::ImportedModule, 8> importList;
+  module->getImportedModules(importList, importFilter);
+
+  for (ModuleDecl::ImportedModule &import : importList)
+    imports.insert(import.importedModule);
+}
+
+namespace {
+/// Helper type for computing (approximate) information about ABI-dependencies.
+///
+/// This misses out on details such as typealiases and more.
+/// See the "isImportedDirectly" field above for more details.
+class ABIDependencyEvaluator {
+  /// Map of ABIs exported by a particular module, excluding itself.
+  ///
+  /// For example, consider (primed letters represent Clang modules):
+  /// \code
+  /// - A is @_exported-imported by B
+  /// - B is #imported by C' (via a compiler-generated umbrella header)
+  /// - C' is @_exported-imported by C (Swift overlay)
+  /// - D' is #imported by E'
+  /// - D' is @_exported-imported by D (Swift overlay)
+  /// - E' is @_exported-imported by E (Swift overlay)
+  /// \endcode
+  ///
+  /// Then the \c abiExportMap will be
+  /// \code
+  /// { A: {}, B: {A}, C: {B}, C': {B}, D: {}, D': {}, E: {D}, E': {D'} }
+  /// \endcode
+  ///
+  /// \b WARNING: Use \c reexposeImportedABI instead of inserting directly.
+  llvm::DenseMap<ModuleDecl *, llvm::DenseSet<ModuleDecl *>> abiExportMap;
+
+  /// Stack for depth-first traversal.
+  SmallVector<ModuleDecl *, 32> searchStack;
+
+  llvm::DenseSet<ModuleDecl *> visited;
+
+  /// Helper function to handle invariant violations as crashes in debug mode.
+  void crashOnInvariantViolation(
+    llvm::function_ref<void (llvm::raw_string_ostream &)> f) const;
+
+  /// Computes the ABI exports for \p importedModule and adds them to
+  /// \p module's ABI exports.
+  ///
+  /// If \p includeImportedModule is true, also adds \p importedModule to
+  /// \p module's ABI exports.
+  ///
+  /// Correct way to add entries to \c abiExportMap.
+  void reexposeImportedABI(ModuleDecl *module, ModuleDecl *importedModule,
+                           bool includeImportedModule = true);
+
+  /// Recursive step in computing ABI dependencies.
+  ///
+  /// Use this method instead of using the \c forClangModule/\c forSwiftModule
+  /// methods.
+  void computeABIDependenciesForModule(ModuleDecl *module);
+  void computeABIDependenciesForSwiftModule(ModuleDecl *module);
+  void computeABIDependenciesForClangModule(ModuleDecl *module);
+
+  static void printModule(const ModuleDecl *module, llvm::raw_ostream &os);
+
+  template<typename SetLike>
+  static void printModuleSet(const SetLike &set, llvm::raw_ostream &os);
+
+public:
+  ABIDependencyEvaluator() = default;
+  ABIDependencyEvaluator(const ABIDependencyEvaluator &) = delete;
+  ABIDependencyEvaluator(ABIDependencyEvaluator &&) = default;
+
+  void getABIDependenciesForSwiftModule(
+    ModuleDecl *module, SmallPtrSetImpl<ModuleDecl *> &abiDependencies);
+
+  void printABIExportMap(llvm::raw_ostream &os) const;
+};
+} // end anonymous namespace
+
+// See [NOTE: Bailing-vs-crashing-in-trace-emission].
+// TODO: Use PrettyStackTrace instead?
+void ABIDependencyEvaluator::crashOnInvariantViolation(
+  llvm::function_ref<void (llvm::raw_string_ostream &)> f) const {
+#ifndef NDEBUG
+  std::string msg;
+  llvm::raw_string_ostream os(msg);
+  os << "error: invariant violation: ";
+  f(os);
+  llvm::report_fatal_error(os.str());
+#endif
+}
+
+// [NOTE: Trace-Clang-submodule-complexity]
+//
+// A Clang module may have zero or more submodules. In practice, when traversing
+// the imports of a module, we observe that different submodules of the same
+// top-level module (almost) freely import each other. Despite this, we still
+// need to conceptually traverse the tree formed by the submodule relationship
+// (with the top-level module being the root).
+//
+// This needs to be taken care of in two ways:
+// 1. We need to make sure we only go towards the leaves. It's okay if we "jump"
+//    branches, so long as we don't try to visit an ancestor when one of its
+//    descendants is still on the traversal stack, so that we don't end up with
+//    arbitrarily complex intra-module cycles.
+//    See also: [NOTE: Intra-module-leafwards-traversal].
+// 2. When adding entries to the ABI export map, we need to avoid marking
+//    dependencies within the same top-level module. This step is needed in
+//    addition to step 1 to avoid creating cycles like
+//    Overlay -> Underlying -> Submodule -> Overlay.
+
+void ABIDependencyEvaluator::reexposeImportedABI(
+    ModuleDecl *module, ModuleDecl *importedModule,
+    bool includeImportedModule) {
+  if (module == importedModule) {
+    crashOnInvariantViolation([&](llvm::raw_string_ostream &os) {
+      os << "module "; printModule(module, os); os << " imports itself!\n";
+    });
+    return;
+  }
+
+  auto addToABIExportMap = [this](ModuleDecl *module, ModuleDecl *reexport) {
+    if (module == reexport) {
+      crashOnInvariantViolation([&](llvm::raw_string_ostream &os){
+        os << "expected module "; printModule(reexport, os);
+        os << "  to not re-export itself\n";
+      });
+      return;
+    }
+    if (reexport->isNonSwiftModule()
+        && module->isNonSwiftModule()
+        && module->getTopLevelModule() == reexport->getTopLevelModule()) {
+      // Dependencies within the same top-level Clang module are not useful.
+      // See also: [NOTE: Trace-Clang-submodule-complexity].
+      return;
+    }
+
+    // We only care about dependencies across top-level modules and we want to
+    // avoid exploding abiExportMap with submodules. So we only insert entries
+    // after calling getTopLevelModule().
+
+    if (::isClangOverlayOf(module, reexport)) {
+      // For overlays, we need to have a dependency on the underlying module.
+      // Otherwise, we might accidentally create a Swift -> Swift cycle.
+      abiExportMap[module].insert(
+        reexport->getTopLevelModule(/*preferOverlay*/false));
+      return;
+    }
+    abiExportMap[module].insert(
+        reexport->getTopLevelModule(/*preferOverlay*/true));
+  };
+
+  computeABIDependenciesForModule(importedModule);
+  if (includeImportedModule) {
+    addToABIExportMap(module, importedModule);
+  }
+  // Force creation of default value if missing. This prevents abiExportMap from
+  // growing (and moving) when calling addToABIExportMap. If abiExportMap gets
+  // moved, then abiExportMap[importedModule] will be moved, forcing us to
+  // create a defensive copy to avoid iterator invalidation on move.
+  (void)abiExportMap[module];
+  for (auto reexportedModule: abiExportMap[importedModule])
+    addToABIExportMap(module, reexportedModule);
+}
+
+void ABIDependencyEvaluator::computeABIDependenciesForModule(
+    ModuleDecl *module) {
+  if (llvm::find(searchStack, module) != searchStack.end()) {
+    crashOnInvariantViolation([&](llvm::raw_string_ostream &os) {
+      os << "unexpected cycle in import graph!\n";
+      for (auto m: searchStack) {
+        printModule(m, os); os << "\ndepends on ";
+      }
+      printModule(module, os); os << '\n';
+    });
+    return;
+  }
+  if (::contains(visited, module))
+    return;
+  searchStack.push_back(module);
+  if (module->isNonSwiftModule())
+    computeABIDependenciesForClangModule(module);
+  else
+    computeABIDependenciesForSwiftModule(module);
+  searchStack.pop_back();
+  visited.insert(module);
+}
+
+void ABIDependencyEvaluator::computeABIDependenciesForSwiftModule(
+    ModuleDecl *module) {
+  SmallPtrSet<ModuleDecl *, 32> allImports;
+  ::getImmediateImports(module, allImports);
+  for (auto import: allImports) {
+    computeABIDependenciesForModule(import);
+    if (::isClangOverlayOf(module, import)) {
+      reexposeImportedABI(module, import,
+                          /*includeImportedModule=*/false);
+    }
+  }
+
+  SmallPtrSet<ModuleDecl *, 32> reexportedImports;
+  ::getImmediateImports(module, reexportedImports,
+                        {ModuleDecl::ImportFilterKind::Public});
+  for (auto reexportedImport: reexportedImports) {
+    reexposeImportedABI(module, reexportedImport);
+  }
+}
+
+void ABIDependencyEvaluator::computeABIDependenciesForClangModule(
+    ModuleDecl *module) {
+  SmallPtrSet<ModuleDecl *, 32> imports;
+  ::getImmediateImports(module, imports);
+  for (auto import: imports) {
+    // There are three cases here which can potentially create cycles:
+    //
+    // 1. Clang modules importing the stdlib.
+    //    See [NOTE: Pure-Clang-modules-privately-import-stdlib].
+    // 2. Overlay S @_exported-imports underlying module S' and another Clang
+    //    module C'. C' (transitively) #imports S' but it gets treated as if
+    //    C' imports S. This creates a cycle: S -> C' -> ... -> S.
+    //    In practice, this case is hit for
+    //      Darwin (Swift) -> SwiftOverlayShims (Clang) -> Darwin (Swift).
+    // 3. [NOTE: Intra-module-leafwards-traversal]
+    //    Cycles within the same top-level module.
+    //    These don't matter for us, since we only care about the dependency
+    //    graph at the granularity of top-level modules. So we ignore these
+    //    by only considering parent -> submodule dependencies.
+    //    See also [NOTE: Trace-Clang-submodule-complexity].
+    if (import->isStdlibModule()) {
+      continue;
+    }
+    if (!import->isNonSwiftModule()
+        && import->findUnderlyingClangModule() != nullptr
+        && llvm::find(searchStack, import) != searchStack.end()) {
+      continue;
+    }
+    if (import->isNonSwiftModule()
+        && module->getTopLevelModule() == import->getTopLevelModule()
+        && !import->findUnderlyingClangModule()
+                  ->isSubModuleOf(module->findUnderlyingClangModule())) {
+      continue;
+    }
+    computeABIDependenciesForModule(import);
+    reexposeImportedABI(module, import);
+  }
+}
+
+void ABIDependencyEvaluator::getABIDependenciesForSwiftModule(
+    ModuleDecl *module, SmallPtrSetImpl<ModuleDecl *> &abiDependencies) {
+  computeABIDependenciesForModule(module);
+  SmallPtrSet<ModuleDecl *, 32> allImports;
+  ::getImmediateImports(module, allImports);
+  for (auto directDependency: allImports) {
+    abiDependencies.insert(directDependency);
+    for (auto exposedDependency: abiExportMap[directDependency]) {
+      abiDependencies.insert(exposedDependency);
+    }
+  }
+}
+
+void ABIDependencyEvaluator::printModule(
+    const ModuleDecl *module, llvm::raw_ostream &os) {
+  module->getReverseFullModuleName().printForward(os);
+  os << (module->isNonSwiftModule() ? " (Clang)" : " (Swift)");
+  os << " @ " << llvm::format("0x%llx", reinterpret_cast<uintptr_t>(module));
+}
+
+template<typename SetLike>
+void ABIDependencyEvaluator::printModuleSet(
+    const SetLike &set, llvm::raw_ostream &os) {
+  os << "{ ";
+  for (auto module: set) {
+    printModule(module, os); os << ", ";
+  }
+  os << "}";
+}
+
+void ABIDependencyEvaluator::printABIExportMap(llvm::raw_ostream &os) const {
+  os << "ABI Export Map {{\n";
+  for (auto &entry: abiExportMap) {
+    printModule(entry.first, os); os << " : ";
+    printModuleSet(entry.second, os);
+    os << "\n";
+  }
+  os << "}}\n";
+}
+
 /// Compute the per-module information to be recorded in the trace file.
 //
 // The most interesting/tricky thing here is _which_ paths get recorded in
@@ -275,7 +589,7 @@ template <> struct ObjectTraits<LoadedModuleTraceFormat> {
 // FIXME: Use the VFS instead of handling paths directly. We are particularly
 // sloppy about handling relative paths in the dependency tracker.
 static void computeSwiftModuleTraceInfo(
-    const SmallPtrSetImpl<ModuleDecl *> &importedModules,
+    const SmallPtrSetImpl<ModuleDecl *> &abiDependencies,
     const llvm::DenseMap<StringRef, ModuleDecl *> &pathToModuleDecl,
     const DependencyTracker &depTracker,
     StringRef prebuiltCachePath,
@@ -336,6 +650,8 @@ static void computeSwiftModuleTraceInfo(
                              // this is good enough.
         : buffer.str();
 
+      bool isImportedDirectly = ::contains(abiDependencies, depMod);
+
       traceInfo.push_back(
           {/*Name=*/
            depMod->getName(),
@@ -346,8 +662,10 @@ static void computeSwiftModuleTraceInfo(
            // app/test using -import-objc-header, we should look at the direct
            // imports of the bridging modules, and mark those as our direct
            // imports.
+           // TODO: Add negative test cases for the comment above.
+           // TODO: Describe precise semantics of "isImportedDirectly".
            /*IsImportedDirectly=*/
-           importedModules.find(depMod) != importedModules.end(),
+           isImportedDirectly,
            /*SupportsLibraryEvolution=*/
            depMod->isResilient()});
       buffer.clear();
@@ -375,8 +693,7 @@ static void computeSwiftModuleTraceInfo(
     // be saved (not checked), so don't save the path to this swiftmodule.
     SmallString<256> moduleAdjacentInterfacePath(depPath);
     computeAdjacentInterfacePath(moduleAdjacentInterfacePath);
-    if (pathToModuleDecl.find(moduleAdjacentInterfacePath)
-        != pathToModuleDecl.end())
+    if (::contains(pathToModuleDecl, moduleAdjacentInterfacePath))
       continue;
 
     // FIXME: The behavior of fs::exists for relative paths is undocumented.
@@ -403,6 +720,18 @@ static void computeSwiftModuleTraceInfo(
   });
 }
 
+// [NOTE: Bailing-vs-crashing-in-trace-emission] There are certain edge cases
+// in trace emission where an invariant that you think should hold does not hold
+// in practice. For example, sometimes we have seen modules without any
+// corresponding filename.
+//
+// Since the trace is a supplementary output for build system consumption, it
+// it better to emit it on a best-effort basis instead of crashing and failing
+// the build.
+//
+// Moreover, going forward, it would be nice if trace emission were more robust
+// so we could emit the trace on a best-effort basis even if the dependency
+// graph is ill-formed, so that the trace can be used as a debugging aid.
 static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
                                           DependencyTracker *depTracker,
                                           StringRef prebuiltCachePath,
@@ -423,17 +752,12 @@ static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
     return true;
   }
 
-  ModuleDecl::ImportFilter filter = ModuleDecl::ImportFilterKind::Public;
-  filter |= ModuleDecl::ImportFilterKind::Private;
-  filter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-  filter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
-  filter |= ModuleDecl::ImportFilterKind::ShadowedBySeparateOverlay;
-  SmallVector<ModuleDecl::ImportedModule, 8> imports;
-  mainModule->getImportedModules(imports, filter);
-
-  SmallPtrSet<ModuleDecl *, 8> importedModules;
-  for (ModuleDecl::ImportedModule &import : imports)
-    importedModules.insert(import.importedModule);
+  SmallPtrSet<ModuleDecl *, 32> abiDependencies;
+  {
+    ABIDependencyEvaluator evaluator{};
+    evaluator.getABIDependenciesForSwiftModule(mainModule,
+                                               abiDependencies);
+  }
 
   llvm::DenseMap<StringRef, ModuleDecl *> pathToModuleDecl;
   for (const auto &module : ctxt.getLoadedModules()) {
@@ -457,7 +781,8 @@ static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   }
 
   std::vector<SwiftModuleTraceInfo> swiftModules;
-  computeSwiftModuleTraceInfo(importedModules, pathToModuleDecl, *depTracker,
+  computeSwiftModuleTraceInfo(abiDependencies,
+                              pathToModuleDecl, *depTracker,
                               prebuiltCachePath, swiftModules);
 
   LoadedModuleTraceFormat trace = {
@@ -1651,6 +1976,10 @@ static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
   // Free up some compiler resources now that we have an IRModule.
   freeASTContextIfPossible(Instance);
 
+  // If we emitted any errors while perfoming the end-of-pipeline actions, bail.
+  if (Instance.getDiags().hadAnyError())
+    return true;
+
   // Now that we have a single IR Module, hand it over to performLLVM.
   return performLLVM(opts, Instance.getDiags(), nullptr, HashGlobal, IRModule,
                      TargetMachine.get(), OutputFilename,
@@ -1772,21 +2101,17 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
       IRGenOpts, Invocation.getTBDGenOptions(), std::move(SM), PSPs,
       OutputFilename, MSF, HashGlobal, ParallelOutputFilenames);
 
-  // Just because we had an AST error it doesn't mean we can't performLLVM.
-  bool HadError = Instance.getASTContext().hadError();
-
-  // If the AST Context has no errors but no IRModule is available,
-  // parallelIRGen happened correctly, since parallel IRGen produces multiple
-  // modules.
+  // If no IRModule is available, bail. This can either happen if IR generation
+  // fails, or if parallelIRGen happened correctly (in which case it would have
+  // already performed LLVM).
   if (!IRModule)
-    return HadError;
+    return Instance.getDiags().hadAnyError();
 
   if (validateTBDIfNeeded(Invocation, MSF, *IRModule.getModule()))
     return true;
 
   return generateCode(Instance, OutputFilename, IRModule.getModule(),
-                      HashGlobal) ||
-         HadError;
+                      HashGlobal);
 }
 
 static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,
@@ -2137,17 +2462,18 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   }
 
   CompilerInvocation Invocation;
-  std::string MainExecutablePath = llvm::sys::fs::getMainExecutable(Argv0,
-                                                                    MainAddr);
-  Invocation.setMainExecutablePath(MainExecutablePath);
 
   SmallString<128> workingDirectory;
   llvm::sys::fs::current_path(workingDirectory);
 
+  std::string MainExecutablePath =
+      llvm::sys::fs::getMainExecutable(Argv0, MainAddr);
+
   // Parse arguments.
   SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 4> configurationFileBuffers;
   if (Invocation.parseArgs(Args, Instance->getDiags(),
-                           &configurationFileBuffers, workingDirectory)) {
+                           &configurationFileBuffers, workingDirectory,
+                           MainExecutablePath)) {
     return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
 

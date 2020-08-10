@@ -21,6 +21,7 @@
 #ifndef SWIFT_SIL_APPLYSITE_H
 #define SWIFT_SIL_APPLYSITE_H
 
+#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
@@ -28,6 +29,8 @@
 #include "llvm/ADT/ArrayRef.h"
 
 namespace swift {
+
+class FullApplySite;
 
 //===----------------------------------------------------------------------===//
 //                                 ApplySite
@@ -396,6 +399,10 @@ public:
     llvm_unreachable("covered switch");
   }
 
+  /// Returns true if \p op is an operand that passes an indirect
+  /// result argument to the apply site.
+  bool isIndirectResultOperand(const Operand &op) const;
+
   /// Return whether the given apply is of a formally-throwing function
   /// which is statically known not to throw.
   bool isNonThrowing() const {
@@ -425,6 +432,10 @@ public:
   }
 
   void dump() const LLVM_ATTRIBUTE_USED { getInstruction()->dump(); }
+
+  /// Attempt to cast this apply site to a full apply site, returning None on
+  /// failure.
+  Optional<FullApplySite> asFullApplySite() const;
 };
 
 //===----------------------------------------------------------------------===//
@@ -562,12 +573,6 @@ public:
     return op.getOperandNumber() < getOperandIndexOfFirstArgument();
   }
 
-  /// Returns true if \p op is an operand that passes an indirect
-  /// result argument to the apply site.
-  bool isIndirectResultOperand(const Operand &op) const {
-    return getCalleeArgIndex(op) < getNumIndirectSILResults();
-  }
-
   /// Is this an ApplySite that begins the evaluation of a coroutine.
   bool beginsCoroutineEvaluation() const {
     switch (getKind()) {
@@ -635,6 +640,12 @@ public:
     }
 
     llvm_unreachable("covered switch isn't covered");
+  }
+
+  /// Returns true if \p op is an operand that passes an indirect
+  /// result argument to the apply site.
+  bool isIndirectResultOperand(const Operand &op) const {
+    return getCalleeArgIndex(op) < getNumIndirectSILResults();
   }
 
   static FullApplySite getFromOpaqueValue(void *p) { return FullApplySite(p); }
@@ -728,5 +739,24 @@ template <> struct DenseMapInfo<::swift::FullApplySite> {
 };
 
 } // namespace llvm
+
+//===----------------------------------------------------------------------===//
+//           Inline Definitions to work around Forward Declaration
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+
+inline Optional<FullApplySite> ApplySite::asFullApplySite() const {
+  return FullApplySite::isa(getInstruction());
+}
+
+inline bool ApplySite::isIndirectResultOperand(const Operand &op) const {
+  auto fas = asFullApplySite();
+  if (!fas)
+    return false;
+  return fas->isIndirectResultOperand(op);
+}
+
+} // namespace swift
 
 #endif

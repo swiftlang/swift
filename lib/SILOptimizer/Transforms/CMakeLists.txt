@@ -19,6 +19,7 @@ target_sources(swiftSILOptimizer PRIVATE
   DestroyHoisting.cpp
   Devirtualizer.cpp
   DifferentiabilityWitnessDevirtualizer.cpp
+  EagerSpecializer.cpp
   GenericSpecializer.cpp
   MergeCondFail.cpp
   Outliner.cpp
@@ -39,6 +40,7 @@ target_sources(swiftSILOptimizer PRIVATE
   Sink.cpp
   SpeculativeDevirtualizer.cpp
   StackPromotion.cpp
+  StringOptimization.cpp
   TempLValueOpt.cpp
   TempRValueElimination.cpp
   UnsafeGuaranteedPeephole.cpp)

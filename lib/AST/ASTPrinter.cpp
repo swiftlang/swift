@@ -1079,7 +1079,9 @@ void PrintAST::printTypedPattern(const TypedPattern *TP) {
     if (auto decl = named->getDecl())
       isIUO = decl->isImplicitlyUnwrappedOptional();
 
-  printTypeLocForImplicitlyUnwrappedOptional(TP->getTypeLoc(), isIUO);
+  const auto TyLoc = TypeLoc(TP->getTypeRepr(),
+                             TP->hasType() ? TP->getType() : Type());
+  printTypeLocForImplicitlyUnwrappedOptional(TyLoc, isIUO);
 }
 
 /// Determines if we are required to print the name of a property declaration,
@@ -2856,6 +2858,9 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
   printParameterList(BodyParams, parameterListTypes,
                      AFD->argumentNameIsAPIByDefault());
 
+  if (AFD->hasAsync())
+    Printer << " " << "async";
+
   if (AFD->hasThrows()) {
     if (AFD->getAttrs().hasAttribute<RethrowsAttr>())
       Printer << " " << tok::kw_rethrows;
@@ -3598,7 +3603,7 @@ void printCType(ASTContext &Ctx, ASTPrinter &Printer, ExtInfo &info) {
   auto *cml = Ctx.getClangModuleLoader();
   SmallString<64> buf;
   llvm::raw_svector_ostream os(buf);
-  info.getUncommonInfo().getValue().printClangFunctionType(cml, os);
+  info.getClangTypeInfo().getValue().printType(cml, os);
   Printer << ", cType: " << QuotedString(os.str());
 }
 
@@ -4019,9 +4024,8 @@ public:
         break;
       case SILFunctionType::Representation::CFunctionPointer:
         Printer << "c";
-        // FIXME: [clang-function-type-serialization] Once we start serializing
-        // Clang function types, we should be able to remove the second check.
-        if (printNameOnly || !info.getUncommonInfo().hasValue())
+        // [TODO: Clang-type-plumbing] Remove the second check.
+        if (printNameOnly || !info.getClangTypeInfo().hasValue())
           break;
         printCType(Ctx, Printer, info);
         break;
@@ -4086,9 +4090,8 @@ public:
         break;
       case SILFunctionType::Representation::CFunctionPointer:
         Printer << "c";
-        // FIXME: [clang-function-type-serialization] Once we start serializing
-        // Clang function types, we should be able to remove the second check.
-        if (printNameOnly || !info.getUncommonInfo().hasValue())
+        // [TODO: Clang-type-plumbing] Remove the second check.
+        if (printNameOnly || !info.getClangTypeInfo().hasValue())
           break;
         printCType(Ctx, Printer, info);
         break;
@@ -4101,7 +4104,8 @@ public:
       case SILFunctionType::Representation::WitnessMethod:
         Printer << "witness_method: ";
         printTypeDeclName(
-            witnessMethodConformance.getRequirement()->getDeclaredType());
+            witnessMethodConformance.getRequirement()->getDeclaredType()
+                ->castTo<ProtocolType>());
         break;
       case SILFunctionType::Representation::Closure:
         Printer << "closure";
@@ -4165,7 +4169,10 @@ public:
     // If we're stripping argument labels from types, do it when printing.
     visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/false);
 
-    if (T->throws())
+    if (T->isAsync())
+      Printer << " " << "async";
+
+    if (T->isThrowing())
       Printer << " " << tok::kw_throws;
 
     Printer << " -> ";
@@ -4205,7 +4212,10 @@ public:
 
    visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/true);
 
-    if (T->throws())
+    if (T->isAsync())
+      Printer << " " << "async";
+
+    if (T->isThrowing())
       Printer << " " << tok::kw_throws;
 
     Printer << " -> ";
@@ -5038,7 +5048,7 @@ swift::getInheritedForPrinting(const Decl *decl, const PrintOptions &options,
           isa<EnumDecl>(decl) &&
           cast<EnumDecl>(decl)->hasRawType())
         continue;
-      Results.push_back(TypeLoc::withoutLoc(proto->getDeclaredType()));
+      Results.push_back(TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()));
     }
   }
 }

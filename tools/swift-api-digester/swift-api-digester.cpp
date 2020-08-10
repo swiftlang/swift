@@ -1180,7 +1180,7 @@ public:
           if (ShouldComplain &&
               ProtocolReqWhitelist.count(getParentProtocolName(D))) {
             // Ignore protocol requirement additions if the protocol has been added
-            // to the whitelist.
+            // to the allowlist.
             ShouldComplain = false;
           }
           if (ShouldComplain)

@@ -1,0 +1,22 @@
+module CoreShip {
+  header "CoreShip.h"
+  export *
+}
+
+module CoreFuel {
+  umbrella header "CoreFuel/CoreFuel.h"
+  explicit module CoreFuelHydrogen {
+    header "CoreFuel/CoreFuelHydrogen.h"
+    export *
+  }
+  explicit module CoreFuelMethane {
+    header "CoreFuel/CoreFuelMethane.h"
+    export *
+  }
+  export *
+}
+
+module LaunchKit {
+  header "LaunchKit.h"
+  export *
+}

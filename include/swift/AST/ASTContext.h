@@ -553,6 +553,9 @@ public:
   /// Array.reserveCapacityForAppend(newElementsCount: Int)
   FuncDecl *getArrayReserveCapacityDecl() const;
 
+  /// Retrieve the declaration of String.init(_builtinStringLiteral ...)
+  ConstructorDecl *getMakeUTF8StringDecl() const;
+
   // Retrieve the declaration of Swift._stdlib_isOSVersionAtLeast.
   FuncDecl *getIsOSVersionAtLeastDecl() const;
   
@@ -587,13 +590,9 @@ public:
   ///
   /// \param params The function parameters.
   /// \param resultTy The Swift result type.
-  /// \param incompleteExtInfo Used to convey escaping and throwing
-  ///                          information, in case it is needed.
   /// \param trueRep The actual calling convention, which must be C-compatible.
-  ///                The calling convention in \p incompleteExtInfo is ignored.
   const clang::Type *
   getClangFunctionType(ArrayRef<AnyFunctionType::Param> params, Type resultTy,
-                       const FunctionType::ExtInfo incompleteExtInfo,
                        FunctionTypeRepresentation trueRep);
 
   /// Get the Swift declaration that a Clang declaration was exported from,

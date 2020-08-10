@@ -1407,6 +1407,7 @@ void IRGenModule::emitAutolinkInfo() {
         llvm::Function::Create(llvm::FunctionType::get(VoidTy, false),
                                llvm::GlobalValue::ExternalLinkage, buf,
                                &Module);
+    ForceImportThunk->setAttributes(constructInitialAttributes());
     ApplyIRLinkage(IRLinkage::ExternalExport).to(ForceImportThunk);
     if (Triple.supportsCOMDAT())
       if (auto *GO = cast<llvm::GlobalObject>(ForceImportThunk))

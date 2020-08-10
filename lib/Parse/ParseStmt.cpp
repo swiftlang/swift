@@ -71,7 +71,7 @@ bool Parser::isStartOfStmt() {
 
   case tok::kw_try: {
     // "try" cannot actually start any statements, but we parse it there for
-    // better recovery.
+    // better recovery in cases like 'try return'.
     Parser::BacktrackingScope backtrack(*this);
     consumeToken(tok::kw_try);
     return isStartOfStmt();
@@ -950,6 +950,7 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
                        /*FuncLoc=*/ SourceLoc(),
                        name,
                        /*NameLoc=*/ PreviousLoc,
+                       /*Async=*/ false, /*AsyncLoc=*/ SourceLoc(),
                        /*Throws=*/ false, /*ThrowsLoc=*/ SourceLoc(),
                        /*generic params*/ nullptr,
                        params,
@@ -2466,7 +2467,6 @@ struct FallthroughFinder : ASTWalker {
   }
 
   bool walkToDeclPre(Decl *d) override { return false; }
-  bool walkToTypeLocPre(TypeLoc &tl) override { return false; }
   bool walkToTypeReprPre(TypeRepr *t) override { return false; }
 
   static FallthroughStmt *findFallthrough(Stmt *s) {

@@ -104,7 +104,7 @@ public:
 
   /// If this initializes a single @lazy variable, lazily create a self
   /// declaration for it to refer to.
-  ParamDecl *getImplicitSelfDecl();
+  ParamDecl *getImplicitSelfDecl() const;
 
   static bool classof(const DeclContext *DC) {
     if (auto init = dyn_cast<Initializer>(DC))

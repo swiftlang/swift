@@ -147,10 +147,10 @@
   msg: >-
     unrecognized accessor kind '%0' in SDK node
 
-- id: pound_source_location_creates_pound_file_conflicts
+- id: source_location_creates_file_id_conflicts
   msg: >-
-    '#sourceLocation' directive produces '#file' string of '%0', which
-    conflicts with '#file' strings produced by other paths in the module
+    '#sourceLocation' directive produces '#fileID' string of '%0', which
+    conflicts with '#fileID' strings produced by other paths in the module
 
 - id: fixit_correct_source_location_file
   msg: >-
@@ -344,7 +344,7 @@
 
 - id: lex_confusable_character
   msg: >-
-    unicode character '%0' looks similar to '%1'; did you mean to use '%1'?
+    unicode character '%0' (%1) looks similar to '%2' (%3); did you mean to use '%2' (%3)?
 
 - id: lex_nonbreaking_space
   msg: >-
@@ -1343,13 +1343,9 @@
     only function declarations may be marked 'rethrows'; did you mean
     'throws'?
 
-- id: throws_in_wrong_position
+- id: async_or_throws_in_wrong_position
   msg: >-
-    'throws' may only occur before '->'
-
-- id: rethrows_in_wrong_position
-  msg: >-
-    'rethrows' may only occur before '->'
+    %select{'throws'|'rethrows'|'async'}0 may only occur before '->'
 
 - id: throw_in_function_type
   msg: >-
@@ -1993,6 +1989,9 @@
   msg: >-
     cannot declare entity named %0; the '$' prefix is reserved for
     implicitly-synthesized declarations
+- id: lazy_var_storage_access
+  msg: >-
+    access to the underlying storage of a lazy property is not allowed
 
 - id: anon_closure_arg_not_in_closure
   msg: >-
@@ -3943,6 +3942,9 @@
   msg: >-
     %select{identifier|operator}0 '%1' contains possibly confused characters;
     did you mean to use '%2'?
+- id: single_confusable_character
+  msg: >-
+    %select{identifier|operator}0 '%1' (%2) looks similar to '%3' (%4); did you mean '%3' (%4)?"
 
 - id: cannot_find_type_in_scope
   msg: >-
@@ -6081,6 +6083,10 @@
   msg: >-
     cannot override %0 which has been marked unavailable%select{|: %1}1
 
+- id: suggest_removing_override
+  msg: >-
+    remove 'override' modifier to declare a new %0
+
 - id: override_less_available
   msg: >-
     overriding %0 must be as available as declaration it overrides
@@ -6104,20 +6110,20 @@
 
 - id: method_does_not_override
   msg: >-
-    method does not override any method from its superclass
+    method does not override any method from its %select{parent protocol|superclass}0
 
 - id: property_does_not_override
   msg: >-
-    property does not override any property from its superclass
+    property does not override any property from its %select{parent protocol|superclass}0
 
 - id: subscript_does_not_override
   msg: >-
-    subscript does not override any subscript from its superclass
+    subscript does not override any subscript from its %select{parent protocol|superclass}0
 
 - id: initializer_does_not_override
   msg: >-
     initializer does not override a designated initializer from its
-    superclass
+    %select{parent protocol|superclass}0
 
 - id: failable_initializer_override
   msg: >-
@@ -7121,14 +7127,6 @@
   msg: >-
     %0 is not a 'func', 'init', 'subscript', or 'var' computed property
     declaration
-
-- id: autodiff_attr_accessor_not_found
-  msg: >-
-    %0 does not have a '%1' accessor
-
-- id: autodiff_attr_original_decl_none_valid_found
-  msg: >-
-    could not find function %0 with expected type %1
 
 - id: autodiff_attr_original_decl_not_same_type_context
   msg: >-
@@ -9234,7 +9232,17 @@
     %select{getter for |setter for |}0%1 is unavailable%select{ in
     %3|}2%select{|: %4}4
 
+- id: availability_decl_unavailable_warn
+  msg: >-
+    %select{getter for |setter for |}0%1 is unavailable%select{ in
+    %3|}2%select{|: %4}4
+
 - id: availability_decl_unavailable_rename
+  msg: >-
+    %select{getter for |setter for |}0%1 has been %select{renamed to|replaced
+    by}2%select{| instance method| property}3 '%4'%select{|: %5}5
+
+- id: availability_decl_unavailable_rename_warn
   msg: >-
     %select{getter for |setter for |}0%1 has been %select{renamed to|replaced
     by}2%select{| instance method| property}3 '%4'%select{|: %5}5

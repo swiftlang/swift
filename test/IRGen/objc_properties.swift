@@ -105,16 +105,16 @@ class SomeWrapperTests {
 // CHECK-NEW: [[SHARED_NAME:@.*]] = private unnamed_addr constant [11 x i8] c"sharedProp\00"
 // CHECK-NEW: [[SHARED_ATTRS:@.*]] = private unnamed_addr constant [5 x i8] c"Tq,N\00"
 
-// CHECK-NEW: @_CLASS_PROPERTIES__TtC15objc_properties10SomeObject = private constant { {{.*}}] } {
+// CHECK-NEW: @_CLASS_PROPERTIES__TtC15objc_properties10SomeObject = internal constant { {{.*}}] } {
 // CHECK-NEW:   i32 16,
 // CHECK-NEW:   i32 1,
 // CHECK-NEW:   [1 x { i8*, i8* }] [{
 // CHECK-NEW:     i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SHARED_NAME]], i64 0, i64 0),
 // CHECK-NEW:     i8* getelementptr inbounds ([5 x i8], [5 x i8]* [[SHARED_ATTRS]], i64 0, i64 0)
 // CHECK-NEW:   }]
-// CHECK-NEW: }, section "__DATA, __objc_const", align 8
+// CHECK-NEW: }, section "__DATA, {{.*}}", align 8
 
-// CHECK: @_METACLASS_DATA__TtC15objc_properties10SomeObject = private constant { {{.*}} } {
+// CHECK: @_METACLASS_DATA__TtC15objc_properties10SomeObject = internal constant { {{.*}} } {
 // CHECK-SAME:   i32 {{[0-9]+}}, i32 {{[0-9]+}}, i32 {{[0-9]+}}, i32 {{[0-9]+}},
 // CHECK-SAME:   i8* null,
 // CHECK-SAME:   i8* getelementptr inbounds ([{{.+}} x i8], [{{.+}} x i8]* {{@.+}}, i64 0, i64 0),
@@ -122,12 +122,12 @@ class SomeWrapperTests {
 // CHECK-SAME:   i8* null, i8* null, i8* null,
 // CHECK-NEW-SAME:   { {{.+}} }* @_CLASS_PROPERTIES__TtC15objc_properties10SomeObject
 // CHECK-OLD-SAME:   i8* null
-// CHECK-SAME: }, section "__DATA, __objc_const", align 8
+// CHECK-SAME: }, section "__DATA, {{.*}}", align 8
 
 // CHECK: [[GETTER_SIGNATURE:@.*]] = private unnamed_addr constant [8 x i8] c"@16@0:8\00"
 // CHECK: [[SETTER_SIGNATURE:@.*]] = private unnamed_addr constant [11 x i8] c"v24@0:8@16\00"
 
-// CHECK: @_INSTANCE_METHODS__TtC15objc_properties10SomeObject = private constant { {{.*}}] } {
+// CHECK: @_INSTANCE_METHODS__TtC15objc_properties10SomeObject = internal constant { {{.*}}] } {
 // CHECK:   i32 24,
 // CHECK:   i32 8,
 // CHECK:   [8 x { i8*, i8*, i8* }] [{
@@ -163,7 +163,7 @@ class SomeWrapperTests {
 // CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
 // CHECK:     @"$s15objc_properties10SomeObjectCACycfcTo{{(.ptrauth)?}}"
 // CHECK:   }]
-// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK: }, section "__DATA, {{.*}}", align 8
 
 // This appears earlier because it's also used in an ivar description.
 // CHECK: [[BAREIVAR_NAME:@.*]] = private unnamed_addr constant [9 x i8] c"bareIvar\00"
@@ -179,7 +179,7 @@ class SomeWrapperTests {
 // CHECK: [[WIBBLE_NAME:@.*]] = private unnamed_addr constant [7 x i8] c"wobble\00"
 // CHECK: [[WIBBLE_ATTRS:@.*]] = private unnamed_addr constant [50 x i8] c"T@\22_TtC15objc_properties10SomeObject\22,N,&,Vwibble\00"
 
-// CHECK: @_PROPERTIES__TtC15objc_properties10SomeObject = private constant { {{.*}}] } {
+// CHECK: @_PROPERTIES__TtC15objc_properties10SomeObject = internal constant { {{.*}}] } {
 // CHECK:   i32 16,
 // CHECK:   i32 4,
 // CHECK:   [4 x { i8*, i8* }] [{
@@ -195,9 +195,9 @@ class SomeWrapperTests {
 // CHECK:     i8* getelementptr inbounds ([7 x i8], [7 x i8]* [[WIBBLE_NAME]], i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([50 x i8], [50 x i8]* [[WIBBLE_ATTRS]], i64 0, i64 0)
 // CHECK:   }]
-// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK: }, section "__DATA, {{.*}}", align 8
 
-// CHECK: @_DATA__TtC15objc_properties10SomeObject = private constant { {{.+}} } {
+// CHECK: @_DATA__TtC15objc_properties10SomeObject = internal constant { {{.+}} } {
 // CHECK:   i32 {{[0-9]+}}, i32 {{[0-9]+}}, i32 {{[0-9]+}}, i32 {{[0-9]+}},
 // CHECK:   i8* null,
 // CHECK:   i8* getelementptr inbounds ([{{.+}} x i8], [{{.+}} x i8]* {{@.+}}, i64 0, i64 0),
@@ -206,9 +206,9 @@ class SomeWrapperTests {
 // CHECK:   { {{.+}} }* @_IVARS__TtC15objc_properties10SomeObject,
 // CHECK:   i8* null,
 // CHECK:   { {{.+}} }* @_PROPERTIES__TtC15objc_properties10SomeObject
-// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK: }, section "__DATA, {{.*}}", align 8
 
-// CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC15objc_properties10SomeObject_$_objc_properties" = private constant { {{.*}}] } {
+// CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC15objc_properties10SomeObject_$_objc_properties" = internal constant { {{.*}}] } {
 // CHECK:   i32 24,
 // CHECK:   i32 2,
 // CHECK:   [2 x { i8*, i8*, i8* }] [{
@@ -220,24 +220,24 @@ class SomeWrapperTests {
 // CHECK:     i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
 // CHECK:     @"$s15objc_properties10SomeObjectC17extensionPropertyACvsTo{{(.ptrauth)?}}"
 // CHECK:   }]
-// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK: }, section "__DATA, {{.*}}", align 8
 
 // CHECK: [[EXTENSIONPROPERTY_NAME:@.*]] = private unnamed_addr constant [18 x i8] c"extensionProperty\00"
 
-// CHECK: @"_CATEGORY_PROPERTIES__TtC15objc_properties10SomeObject_$_objc_properties" = private constant { {{.*}}] } {
+// CHECK: @"_CATEGORY_PROPERTIES__TtC15objc_properties10SomeObject_$_objc_properties" = internal constant { {{.*}}] } {
 // CHECK:   i32 16,
 // CHECK:   i32 1,
 // CHECK:   [1 x { i8*, i8* }] [{
 // CHECK:     i8* getelementptr inbounds ([18 x i8], [18 x i8]* [[EXTENSIONPROPERTY_NAME]], i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([42 x i8], [42 x i8]* [[READWRITE_ATTRS]], i64 0, i64 0)
 // CHECK:   }]
-// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK: }, section "__DATA, {{.*}}", align 8
 
 // CHECK-NEW: [[EXTENSIONCLASSPROPERTY_NAME:@.*]] = private unnamed_addr constant [19 x i8] c"extensionClassProp\00"
 // CHECK-NEW: [[EXTENSIONCLASSPROPERTY_ATTRS:@.*]] = private unnamed_addr constant [7 x i8] c"T#,N,R\00"
 // CHECK-NEW: [[EXTENSIONSTATICPROPERTY_NAME:@.*]] = private unnamed_addr constant [26 x i8] c"extensionStoredStaticProp\00"
 
-// CHECK-NEW: @"_CATEGORY_CLASS_PROPERTIES__TtC15objc_properties10SomeObject_$_objc_properties" = private constant { {{.*}}] } {
+// CHECK-NEW: @"_CATEGORY_CLASS_PROPERTIES__TtC15objc_properties10SomeObject_$_objc_properties" = internal constant { {{.*}}] } {
 // CHECK-NEW:   i32 16,
 // CHECK-NEW:   i32 2,
 // CHECK-NEW:   [2 x { i8*, i8* }] [{
@@ -246,9 +246,9 @@ class SomeWrapperTests {
 // CHECK-NEW:   }, {
 // CHECK-NEW:	  i8* getelementptr inbounds ([26 x i8], [26 x i8]* [[EXTENSIONSTATICPROPERTY_NAME]], i64 0, i64 0),
 // CHECK-NEW:	  i8* getelementptr inbounds ([5 x i8], [5 x i8]* [[SHARED_ATTRS]], i64 0, i64 0) }]
-// CHECK-NEW: }, section "__DATA, __objc_const", align 8
+// CHECK-NEW: }, section "__DATA, {{.*}}", align 8
 
-// CHECK: @"_CATEGORY__TtC15objc_properties10SomeObject_$_objc_properties" = private constant { {{.+}} } {
+// CHECK: @"_CATEGORY__TtC15objc_properties10SomeObject_$_objc_properties" = internal constant { {{.+}} } {
 // CHECK:   i8* getelementptr inbounds ([{{.+}} x i8], [{{.+}} x i8]* {{@.+}}, i64 0, i64 0),
 // CHECK:   @"$s15objc_properties10SomeObjectCMf", i32 0, i32 2
 // CHECK:   { {{.+}} }* @"_CATEGORY_INSTANCE_METHODS__TtC15objc_properties10SomeObject_$_objc_properties{{(\.ptrauth)?}}"
@@ -258,7 +258,7 @@ class SomeWrapperTests {
 // CHECK-NEW:   { {{.+}} }* @"_CATEGORY_CLASS_PROPERTIES__TtC15objc_properties10SomeObject_$_objc_properties",
 // CHECK-OLD:   i8* null,
 // CHECK:   i32 60
-// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK: }, section "__DATA, {{.*}}", align 8
 
 
 // CHECK: @_INSTANCE_METHODS__TtC15objc_properties4Tree =
@@ -269,7 +269,7 @@ class SomeWrapperTests {
 // CHECK:    i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
 // CHECK:    @"$s15objc_properties4TreeC6parentACSgvsTo{{(.ptrauth)?}}"
 
-// CHECK: @_PROTOCOL__TtP15objc_properties5Proto_ = private constant { {{.+}} } {
+// CHECK: @_PROTOCOL__TtP15objc_properties5Proto_ = internal constant { {{.+}} } {
 // CHECK:   i8* null,
 // CHECK:   i8* getelementptr inbounds ([{{.+}} x i8], [{{.+}} x i8]* {{@.+}}, i64 0, i64 0),
 // CHECK:   i8* null,
@@ -283,29 +283,29 @@ class SomeWrapperTests {
 // CHECK:   i8* null,
 // CHECK-NEW:   { {{.+}} }* @_PROTOCOL_CLASS_PROPERTIES__TtP15objc_properties5Proto_
 // CHECK-OLD:   i8* null
-// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK: }, section "__DATA, {{.*}}", align 8
 
 
 // CHECK: [[PROTOCOLPROPERTY_NAME:@.+]] = private unnamed_addr constant [6 x i8] c"value\00"
 // CHECK: [[PROTOCOLPROPERTY_ATTRS:@.+]] = private unnamed_addr constant [7 x i8] c"Tq,N,R\00"
 
-// CHECK: @_PROTOCOL_PROPERTIES__TtP15objc_properties5Proto_ = private constant { {{.*}}] } {
+// CHECK: @_PROTOCOL_PROPERTIES__TtP15objc_properties5Proto_ = internal constant { {{.*}}] } {
 // CHECK:   i32 16,
 // CHECK:   i32 1,
 // CHECK:   [1 x { i8*, i8* }] [{
 // CHECK:     i8* getelementptr inbounds ([6 x i8], [6 x i8]* [[PROTOCOLPROPERTY_NAME]], i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([7 x i8], [7 x i8]* [[PROTOCOLPROPERTY_ATTRS]], i64 0, i64 0)
 // CHECK:   }]
-// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK: }, section "__DATA, {{.*}}", align 8
 
 // CHECK-NEW: [[PROTOCOLCLASSPROPERTY_NAME:@.+]] = private unnamed_addr constant [15 x i8] c"sharedInstance\00"
 // CHECK-NEW: [[PROTOCOLCLASSPROPERTY_ATTRS:@.+]] = private unnamed_addr constant [7 x i8] c"T@,N,&\00"
 
-// CHECK-NEW: @_PROTOCOL_CLASS_PROPERTIES__TtP15objc_properties5Proto_ = private constant { {{.*}}] } {
+// CHECK-NEW: @_PROTOCOL_CLASS_PROPERTIES__TtP15objc_properties5Proto_ = internal constant { {{.*}}] } {
 // CHECK-NEW:   i32 16,
 // CHECK-NEW:   i32 1,
 // CHECK-NEW:   [1 x { i8*, i8* }] [{
 // CHECK-NEW:     i8* getelementptr inbounds ([15 x i8], [15 x i8]* [[PROTOCOLCLASSPROPERTY_NAME]], i64 0, i64 0),
 // CHECK-NEW:     i8* getelementptr inbounds ([7 x i8], [7 x i8]* [[PROTOCOLCLASSPROPERTY_ATTRS]], i64 0, i64 0)
 // CHECK-NEW:   }]
-// CHECK-NEW: }, section "__DATA, __objc_const", align 8
+// CHECK-NEW: }, section "__DATA, {{.*}}", align 8

@@ -1898,7 +1898,9 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
       /*FuncLoc*/ SourceLoc(),
       DeclName(context, DeclBaseName(context.Id_MainEntryPoint),
                ParameterList::createEmpty(context)),
-      /*NameLoc*/ SourceLoc(), /*Throws=*/mainFunction->hasThrows(),
+      /*NameLoc*/ SourceLoc(),
+      /*Async*/ false, SourceLoc(),
+      /*Throws=*/mainFunction->hasThrows(),
       /*ThrowsLoc=*/SourceLoc(),
       /*GenericParams=*/nullptr, ParameterList::createEmpty(context),
       /*FnRetType=*/TypeLoc::withoutLoc(TupleType::getEmpty(context)),
@@ -1986,7 +1988,7 @@ void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {
 static bool hasThrowingFunctionParameter(CanType type) {
   // Only consider throwing function types.
   if (auto fnType = dyn_cast<AnyFunctionType>(type)) {
-    return fnType->getExtInfo().throws();
+    return fnType->getExtInfo().isThrowing();
   }
 
   // Look through tuples.
@@ -2652,7 +2654,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
   auto &ctx = protocol->getASTContext();
   auto &diags = ctx.Diags;
   DeclContext *dc = protocol->getDeclContext();
-  Type protocolType = protocol->getDeclaredType();
+  Type protocolType = protocol->getDeclaredInterfaceType();
 
   // Get the NominalTypeDecl for the type eraser.
   Type typeEraser = attr->getResolvedType(protocol);

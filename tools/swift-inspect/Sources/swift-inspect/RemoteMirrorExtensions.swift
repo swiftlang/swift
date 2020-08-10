@@ -83,6 +83,23 @@ extension SwiftReflectionContextRef {
     swift_reflection_allocationMetadataPointer(self, allocation)
   }
 
+  func metadataTagName(_ tag: swift_metadata_allocation_tag_t) -> String? {
+    swift_reflection_metadataAllocationTagName(self, tag)
+      .map(String.init)
+  }
+
+  func metadataAllocationCacheNode(
+    _ allocation: swift_metadata_allocation_t
+  ) -> swift_metadata_cache_node_t? {
+    var node = swift_metadata_cache_node_t();
+    let success = swift_reflection_metadataAllocationCacheNode(
+      self, allocation, &node)
+    if success == 0 {
+      return nil
+    }
+    return node
+  }
+
   private func throwError(str: UnsafePointer<CChar>?) throws {
     if let str = str {
       throw Error(cString: str)

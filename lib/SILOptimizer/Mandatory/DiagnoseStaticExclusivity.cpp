@@ -1019,7 +1019,7 @@ static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
 
   const AccessedStorage &storage = findAccessedStorage(address);
   // findAccessedStorage may return an invalid storage object if the address
-  // producer is not recognized by its whitelist. For the purpose of
+  // producer is not recognized by its allowlist. For the purpose of
   // verification, we assume that this can only happen for local
   // initialization, not a formal memory access. The strength of
   // verification rests on the completeness of the opcode list inside

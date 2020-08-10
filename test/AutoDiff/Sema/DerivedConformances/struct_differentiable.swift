@@ -383,10 +383,8 @@ struct WrappedProperties: Differentiable {
 
 // Verify that cross-file derived conformances are disallowed.
 
-// expected-error @+2 {{type 'OtherFileNonconforming' does not conform to protocol 'Differentiable'}}
-// expected-error @+1 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
+// expected-error @+1 2 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
 extension OtherFileNonconforming: Differentiable {}
 
-// expected-error @+2 {{type 'GenericOtherFileNonconforming<T>' does not conform to protocol 'Differentiable'}}
-// expected-error @+1 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
+// expected-error @+1 2 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
 extension GenericOtherFileNonconforming: Differentiable {}

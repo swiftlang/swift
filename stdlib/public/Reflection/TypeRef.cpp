@@ -458,12 +458,6 @@ public:
 
   Demangle::NodePointer visitTupleTypeRef(const TupleTypeRef *T) {
     auto tuple = Dem.createNode(Node::Kind::Tuple);
-    if (T->isVariadic()) {
-      auto tupleElt = Dem.createNode(Node::Kind::TupleElement);
-      tupleElt->addChild(Dem.createNode(Node::Kind::VariadicMarker), Dem);
-      tuple->addChild(tupleElt, Dem);
-      return tuple;
-    }
 
     for (auto element : T->getElements()) {
       auto tupleElt = Dem.createNode(Node::Kind::TupleElement);
@@ -579,8 +573,10 @@ public:
     result->addChild(resultTy, Dem);
 
     auto funcNode = Dem.createNode(kind);
-    if (F->getFlags().throws())
+    if (F->getFlags().isThrowing())
       funcNode->addChild(Dem.createNode(Node::Kind::ThrowsAnnotation), Dem);
+    if (F->getFlags().isAsync())
+      funcNode->addChild(Dem.createNode(Node::Kind::AsyncAnnotation), Dem);
     funcNode->addChild(parameters, Dem);
     funcNode->addChild(result, Dem);
     return funcNode;

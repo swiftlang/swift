@@ -1284,7 +1284,7 @@ namespace {
       // };
 
       assert(fields.getNextOffsetFromGlobal() == size);
-      return buildGlobalVariable(fields, "_CATEGORY_");
+      return buildGlobalVariable(fields, "_CATEGORY_", /*const*/ true);
     }
     
     llvm::Constant *emitProtocol() {
@@ -1336,7 +1336,7 @@ namespace {
       // };
 
       assert(fields.getNextOffsetFromGlobal() == size);
-      return buildGlobalVariable(fields, "_PROTOCOL_");
+      return buildGlobalVariable(fields, "_PROTOCOL_", /*const*/ true);
     }
 
     void emitRODataFields(ConstantStructBuilder &b,
@@ -1439,7 +1439,7 @@ namespace {
       emitRODataFields(fields, forMeta, hasUpdater);
       
       auto dataSuffix = forMeta ? "_METACLASS_DATA_" : "_DATA_";
-      return buildGlobalVariable(fields, dataSuffix);
+      return buildGlobalVariable(fields, dataSuffix, /*const*/ true);
     }
 
   private:
@@ -1673,7 +1673,8 @@ namespace {
         return null();
       }
 
-      return buildGlobalVariable(array, "_PROTOCOL_METHOD_TYPES_");
+      return buildGlobalVariable(array, "_PROTOCOL_METHOD_TYPES_",
+                                 /*const*/ true);
     }
 
     void buildExtMethodTypes(ConstantArrayBuilder &array,
@@ -1698,6 +1699,7 @@ namespace {
     llvm::Constant *buildMethodList(ArrayRef<MethodDescriptor> methods,
                                     StringRef name) {
       return buildOptionalList(methods, 3 * IGM.getPointerSize(), name,
+                               /*isConst*/ false,
                                [&](ConstantArrayBuilder &descriptors,
                                    MethodDescriptor descriptor) {
         buildMethod(descriptors, descriptor);
@@ -1723,6 +1725,7 @@ namespace {
                                chooseNamePrefix("_PROTOCOLS_",
                                                 "_CATEGORY_PROTOCOLS_",
                                                 "_PROTOCOL_PROTOCOLS_"),
+                               /*isConst*/ true,
                                [&](ConstantArrayBuilder &descriptors,
                                    ProtocolDecl *protocol) {
         buildProtocol(descriptors, protocol);
@@ -1836,6 +1839,7 @@ namespace {
     llvm::Constant *buildIvarList() {
       Size eltSize = 3 * IGM.getPointerSize() + Size(8);
       return buildOptionalList(Ivars, eltSize, "_IVARS_",
+                               /*constant*/ true,
                                [&](ConstantArrayBuilder &descriptors,
                                    VarDecl *ivar) {
         buildIvar(descriptors, ivar);
@@ -1971,6 +1975,7 @@ namespace {
                                       StringRef namePrefix) {
       Size eltSize = 2 * IGM.getPointerSize();
       return buildOptionalList(properties, eltSize, namePrefix,
+                               /*constant*/ true,
                                [&](ConstantArrayBuilder &descriptors,
                                    VarDecl *property) {
         buildProperty(descriptors, property);
@@ -1989,6 +1994,7 @@ namespace {
     llvm::Constant *buildOptionalList(const C &objects,
                                       Size optionalEltSize,
                                       StringRef nameBase,
+                                      bool isConst,
                                       Fn &&buildElement) {
       if (objects.empty())
         return null();
@@ -2027,7 +2033,7 @@ namespace {
 
       fields.fillPlaceholderWithInt(countPosition, countType, count);
 
-      return buildGlobalVariable(fields, nameBase);
+      return buildGlobalVariable(fields, nameBase, isConst);
     }
     
     /// Get the name of the class or protocol to mangle into the ObjC symbol
@@ -2047,7 +2053,8 @@ namespace {
     /// Build a private global variable as a structure containing the
     /// given fields.
     template <class B>
-    llvm::Constant *buildGlobalVariable(B &fields, StringRef nameBase) {
+    llvm::Constant *buildGlobalVariable(B &fields, StringRef nameBase,
+                                        bool isConst) {
       llvm::SmallString<64> nameBuffer;
       auto var =
         fields.finishAndCreateGlobal(Twine(nameBase) 
@@ -2057,11 +2064,12 @@ namespace {
                                            : Twine()),
                                      IGM.getPointerAlignment(),
                                      /*constant*/ true,
-                                     llvm::GlobalVariable::PrivateLinkage);
+                                     llvm::GlobalVariable::InternalLinkage);
 
       switch (IGM.TargetInfo.OutputObjectFormat) {
       case llvm::Triple::MachO:
-        var->setSection("__DATA, __objc_const");
+        var->setSection(isConst ? "__DATA, __objc_const"
+                                : "__DATA, __objc_data");
         break;
       case llvm::Triple::XCOFF:
       case llvm::Triple::COFF:
@@ -2512,18 +2520,26 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
   // Find the vtable entry we're interested in.
   auto methodInfo =
     IGF.IGM.getClassMetadataLayout(classDecl).getMethodInfo(IGF, method);
-  auto offset = methodInfo.getOffset();
+  switch (methodInfo.getKind()) {
+  case ClassMetadataLayout::MethodInfo::Kind::Offset: {
+    auto offset = methodInfo.getOffsett();
 
-  auto slot = IGF.emitAddressAtOffset(metadata, offset,
-                                      signature.getType()->getPointerTo(),
-                                      IGF.IGM.getPointerAlignment());
-  auto fnPtr = IGF.emitInvariantLoad(slot);
-
-  auto &schema = IGF.getOptions().PointerAuth.SwiftClassMethods;
-  auto authInfo =
-    PointerAuthInfo::emit(IGF, schema, slot.getAddress(), method);
-
-  return FunctionPointer(fnPtr, authInfo, signature);
+    auto slot = IGF.emitAddressAtOffset(metadata, offset,
+                                        signature.getType()->getPointerTo(),
+                                        IGF.IGM.getPointerAlignment());
+    auto fnPtr = IGF.emitInvariantLoad(slot);
+    auto &schema = IGF.getOptions().PointerAuth.SwiftClassMethods;
+    auto authInfo =
+      PointerAuthInfo::emit(IGF, schema, slot.getAddress(), method);
+    return FunctionPointer(fnPtr, authInfo, signature);
+  }
+  case ClassMetadataLayout::MethodInfo::Kind::DirectImpl: {
+    auto fnPtr = llvm::ConstantExpr::getBitCast(methodInfo.getDirectImpl(),
+                                           signature.getType()->getPointerTo());
+    return FunctionPointer::forDirect(fnPtr, signature);
+  }
+  }
+  
 }
 
 FunctionPointer

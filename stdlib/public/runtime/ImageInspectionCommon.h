@@ -12,7 +12,7 @@
 ///
 /// \file
 ///
-/// This file unifies common ELF and COFF image inspection routines
+/// This file unifies common ELF and COFF image inspection routines.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -27,6 +27,7 @@
 
 #include "../SwiftShims/Visibility.h"
 #include <cstdint>
+#include <cstddef>
 
 namespace swift {
 struct MetadataSections;
@@ -41,6 +42,16 @@ struct SectionInfo {
 // Called by injected constructors when a dynamic library is loaded.
 SWIFT_RUNTIME_EXPORT
 void swift_addNewDSOImage(const void *addr);
+
+#ifndef NDEBUG
+
+SWIFT_RUNTIME_EXPORT
+const char *swift_getMetadataSectionName(void *metadata_section);
+
+SWIFT_RUNTIME_EXPORT
+size_t swift_getMetadataSectionCount();
+
+#endif // NDEBUG
 
 #endif // !defined(__MACH__)
 

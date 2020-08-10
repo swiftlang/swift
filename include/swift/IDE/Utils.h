@@ -280,8 +280,6 @@ class NameMatcher: public ASTWalker {
   bool walkToDeclPost(Decl *D) override;
   std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) override;
   Stmt* walkToStmtPost(Stmt *S) override;
-  bool walkToTypeLocPre(TypeLoc &TL) override;
-  bool walkToTypeLocPost(TypeLoc &TL) override;
   bool walkToTypeReprPre(TypeRepr *T) override;
   bool walkToTypeReprPost(TypeRepr *T) override;
   std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override;

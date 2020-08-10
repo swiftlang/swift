@@ -103,6 +103,10 @@ public:
   /// of a generic-layout class.
   void noteEndOfFieldOffsets(ClassDecl *whichClass) {}
 
+  /// Notes the existence of a formally virtual method that has been elided from the
+  /// reified vtable because it has no overrides.
+  void noteNonoverriddenMethod(SILDeclRef method) {}
+        
 private:
   /// Add fields associated with the given class and its bases.
   void addClassMembers(ClassDecl *theClass) {
@@ -173,8 +177,11 @@ private:
     // Does this method require a reified runtime vtable entry?
     if (!VTable || methodRequiresReifiedVTableEntry(IGM, VTable, declRef)) {
       asImpl().addReifiedVTableEntry(declRef);
+    } else {
+      asImpl().noteNonoverriddenMethod(declRef);
     }
   }
+  
         
   void addFieldEntries(Decl *field) {
     if (auto var = dyn_cast<VarDecl>(field)) {

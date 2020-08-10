@@ -375,15 +375,15 @@ static void replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
 
 static void replaceDestroy(DestroyAddrInst *DAI, SILValue NewValue) {
   SILFunction *F = DAI->getFunction();
+  auto Ty = DAI->getOperand()->getType();
 
-  assert(DAI->getOperand()->getType().isLoadable(*F) &&
+  assert(Ty.isLoadable(*F) &&
          "Unexpected promotion of address-only type!");
 
-  assert(NewValue && "Expected a value to release!");
+  assert(NewValue || (Ty.is<TupleType>() && Ty.getAs<TupleType>()->getNumElements() == 0));
 
   SILBuilderWithScope Builder(DAI);
 
-  auto Ty = DAI->getOperand()->getType();
   auto &TL = F->getTypeLowering(Ty);
 
   bool expand = shouldExpand(DAI->getModule(),

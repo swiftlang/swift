@@ -1118,6 +1118,8 @@ void IRGenerator::emitGlobalTopLevel(
     IRGenModule *IGM = Iter.second;
     IGM->finishEmitAfterTopLevel();
   }
+
+  emitEntryPointInfo();
 }
 
 void IRGenModule::finishEmitAfterTopLevel() {
@@ -1805,6 +1807,44 @@ void IRGenModule::emitVTableStubs() {
   }
 }
 
+static std::string getEntryPointSection(IRGenModule &IGM) {
+  std::string sectionName;
+  switch (IGM.TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::UnknownObjectFormat:
+    llvm_unreachable("Don't know how to emit field records table for "
+                     "the selected object format.");
+  case llvm::Triple::MachO:
+    sectionName = "__TEXT, __swift5_entry, regular, no_dead_strip";
+    break;
+  case llvm::Triple::ELF:
+  case llvm::Triple::Wasm:
+    sectionName = "swift5_entry";
+    break;
+  case llvm::Triple::XCOFF:
+  case llvm::Triple::COFF:
+    sectionName = ".sw5entr$B";
+    break;
+  }
+  return sectionName;
+}
+
+void IRGenerator::emitEntryPointInfo() {
+  SILFunction *entrypoint = nullptr;
+  if (!(entrypoint = SIL.lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION))) {
+    return;
+  }
+  auto &IGM = *getGenModule(entrypoint);
+  ConstantInitBuilder builder(IGM);
+  auto entrypointInfo = builder.beginStruct();
+  entrypointInfo.addRelativeAddress(
+      IGM.getAddrOfSILFunction(entrypoint, NotForDefinition));
+  auto var = entrypointInfo.finishAndCreateGlobal(
+      "\x01l_entry_point", Alignment(4),
+      /*isConstant*/ true, llvm::GlobalValue::PrivateLinkage);
+  var->setSection(getEntryPointSection(IGM));
+  IGM.addUsedGlobal(var);
+}
+
 static IRLinkage
 getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
              ForDefinition_t isDefinition, bool isWeakImported,
@@ -1908,11 +1948,7 @@ void irgen::updateLinkageForDefinition(IRGenModule &IGM,
 
   // Everything externally visible is considered used in Swift.
   // That mostly means we need to be good at not marking things external.
-  //
-  // Exclude "main", because it should naturally be used, and because adding it
-  // to llvm.used leaves a dangling use when the REPL attempts to discard
-  // intermediate mains.
-  if (LinkInfo::isUsed(IRL) && global->getName() != SWIFT_ENTRY_POINT_FUNCTION)
+  if (LinkInfo::isUsed(IRL))
     IGM.addUsedGlobal(global);
 }
 
@@ -2003,11 +2039,7 @@ llvm::Function *irgen::createFunction(IRGenModule &IGM,
 
   // Everything externally visible is considered used in Swift.
   // That mostly means we need to be good at not marking things external.
-  //
-  // Exclude "main", because it should naturally be used, and because adding it
-  // to llvm.used leaves a dangling use when the REPL attempts to discard
-  // intermediate mains.
-  if (linkInfo.isUsed() && name != SWIFT_ENTRY_POINT_FUNCTION) {
+  if (linkInfo.isUsed()) {
     IGM.addUsedGlobal(fn);
   }
 
@@ -2111,9 +2143,9 @@ swift::irgen::createLinkerDirectiveVariable(IRGenModule &IGM, StringRef name) {
 }
 
 void swift::irgen::disableAddressSanitizer(IRGenModule &IGM, llvm::GlobalVariable *var) {
-  // Add an operand to llvm.asan.globals blacklisting this global variable.
+  // Add an operand to llvm.asan.globals denylisting this global variable.
   llvm::Metadata *metadata[] = {
-    // The global variable to blacklist.
+    // The global variable to denylist.
     llvm::ConstantAsMetadata::get(var),
     
     // Source location. Optional, unnecessary here.
@@ -2126,7 +2158,7 @@ void swift::irgen::disableAddressSanitizer(IRGenModule &IGM, llvm::GlobalVariabl
     llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(
       llvm::Type::getInt1Ty(IGM.Module.getContext()), false)),
     
-    // Whether the global is blacklisted.
+    // Whether the global is denylisted.
     llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(
       llvm::Type::getInt1Ty(IGM.Module.getContext()), true))};
   
@@ -4830,6 +4862,7 @@ static llvm::Function *shouldDefineHelper(IRGenModule &IGM,
   if (!def) return nullptr;
   if (!def->empty()) return nullptr;
 
+  def->setAttributes(IGM.constructInitialAttributes());
   ApplyIRLinkage(IRLinkage::InternalLinkOnceODR).to(def);
   def->setDoesNotThrow();
   def->setCallingConv(IGM.DefaultCC);

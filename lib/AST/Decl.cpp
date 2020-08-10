@@ -888,8 +888,7 @@ GenericParamList::GenericParamList(SourceLoc LAngleLoc,
                                    SourceLoc RAngleLoc)
   : Brackets(LAngleLoc, RAngleLoc), NumParams(Params.size()),
     WhereLoc(WhereLoc), Requirements(Requirements),
-    OuterParameters(nullptr),
-    FirstTrailingWhereArg(Requirements.size())
+    OuterParameters(nullptr)
 {
   std::uninitialized_copy(Params.begin(), Params.end(),
                           getTrailingObjects<GenericTypeParamDecl *>());
@@ -928,44 +927,24 @@ GenericParamList::clone(DeclContext *dc) const {
   SmallVector<GenericTypeParamDecl *, 2> params;
   for (auto param : getParams()) {
     auto *newParam = new (ctx) GenericTypeParamDecl(
-      dc, param->getName(), param->getNameLoc(),
+      dc, param->getName(), SourceLoc(),
       GenericTypeParamDecl::InvalidDepth,
       param->getIndex());
+    newParam->setImplicit(true);
     params.push_back(newParam);
   }
 
-  return GenericParamList::create(ctx,
-                                  getLAngleLoc(),
-                                  params,
-                                  getWhereLoc(),
-                                  /*requirements=*/{},
-                                  getRAngleLoc());
-}
-
-void GenericParamList::addTrailingWhereClause(
-       ASTContext &ctx,
-       SourceLoc trailingWhereLoc,
-       ArrayRef<RequirementRepr> trailingRequirements) {
-  assert(TrailingWhereLoc.isInvalid() &&
-         "Already have a trailing where clause?");
-  TrailingWhereLoc = trailingWhereLoc;
-  FirstTrailingWhereArg = Requirements.size();
-
-  // Create a unified set of requirements.
-  auto newRequirements = ctx.AllocateUninitialized<RequirementRepr>(
-                           Requirements.size() + trailingRequirements.size());
-  std::memcpy(newRequirements.data(), Requirements.data(),
-              Requirements.size() * sizeof(RequirementRepr));
-  std::memcpy(newRequirements.data() + Requirements.size(),
-              trailingRequirements.data(),
-              trailingRequirements.size() * sizeof(RequirementRepr));
-
-  Requirements = newRequirements;
+  return GenericParamList::create(ctx, SourceLoc(), params, SourceLoc());
 }
 
 void GenericParamList::setDepth(unsigned depth) {
   for (auto param : *this)
     param->setDepth(depth);
+}
+
+void GenericParamList::setDeclContext(DeclContext *dc) {
+  for (auto param : *this)
+    param->setDeclContext(dc);
 }
 
 TrailingWhereClause::TrailingWhereClause(
@@ -991,9 +970,8 @@ GenericContext::GenericContext(DeclContextKind Kind, DeclContext *Parent,
                                GenericParamList *Params)
     : _GenericContext(), DeclContext(Kind, Parent) {
   if (Params) {
-    Parent->getASTContext().evaluator.cacheOutput(
-          GenericParamListRequest{const_cast<GenericContext *>(this)},
-          std::move(Params));
+    Params->setDeclContext(this);
+    GenericParamsAndBit.setPointerAndInt(Params, false);
   }
 }
 
@@ -1017,6 +995,12 @@ GenericParamList *GenericContext::getGenericParams() const {
   return evaluateOrDefault(getASTContext().evaluator,
                            GenericParamListRequest{
                                const_cast<GenericContext *>(this)}, nullptr);
+}
+
+GenericParamList *GenericContext::getParsedGenericParams() const {
+  if (GenericParamsAndBit.getInt())
+    return nullptr;
+  return GenericParamsAndBit.getPointer();
 }
 
 bool GenericContext::hasComputedGenericSignature() const {
@@ -1048,9 +1032,7 @@ void GenericContext::setGenericSignature(GenericSignature genericSig) {
 }
 
 SourceRange GenericContext::getGenericTrailingWhereClauseSourceRange() const {
-  if (isGeneric())
-    return getGenericParams()->getTrailingWhereClauseSourceRange();
-  else if (const auto *where = getTrailingWhereClause())
+  if (const auto *where = getTrailingWhereClause())
     return where->getSourceRange();
 
   return SourceRange();
@@ -1345,114 +1327,6 @@ Type ExtensionDecl::getExtendedType() const {
   return ErrorType::get(ctx);
 }
 
-/// Clone the given generic parameters in the given list. We don't need any
-/// of the requirements, because they will be inferred.
-static GenericParamList *cloneGenericParams(ASTContext &ctx,
-                                            ExtensionDecl *ext,
-                                            GenericParamList *fromParams) {
-  // Clone generic parameters.
-  SmallVector<GenericTypeParamDecl *, 2> toGenericParams;
-  for (auto fromGP : *fromParams) {
-    // Create the new generic parameter.
-    auto toGP = new (ctx) GenericTypeParamDecl(ext, fromGP->getName(),
-                                               SourceLoc(),
-                                               fromGP->getDepth(),
-                                               fromGP->getIndex());
-    toGP->setImplicit(true);
-
-    // Record new generic parameter.
-    toGenericParams.push_back(toGP);
-  }
-
-  return GenericParamList::create(ctx, SourceLoc(), toGenericParams,
-                                  SourceLoc());
-}
-
-static GenericParamList *
-createExtensionGenericParams(ASTContext &ctx,
-                             ExtensionDecl *ext,
-                             NominalTypeDecl *nominal) {
-  // Collect generic parameters from all outer contexts.
-  SmallVector<GenericParamList *, 2> allGenericParams;
-  nominal->forEachGenericContext([&](GenericParamList *gpList) {
-    allGenericParams.push_back(
-      cloneGenericParams(ctx, ext, gpList));
-  });
-
-  GenericParamList *toParams = nullptr;
-  for (auto *gpList : llvm::reverse(allGenericParams)) {
-    gpList->setOuterParameters(toParams);
-    toParams = gpList;
-  }
-
-  return toParams;
-}
-
-GenericParamList *
-GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) const {
-  if (auto *ext = dyn_cast<ExtensionDecl>(value)) {
-    // Create the generic parameter list for the extension by cloning the
-    // generic parameter lists of the nominal and any of its parent types.
-    auto &ctx = value->getASTContext();
-    auto *nominal = ext->getExtendedNominal();
-    if (!nominal) {
-      return nullptr;
-    }
-    auto *genericParams = createExtensionGenericParams(ctx, ext, nominal);
-
-    // Protocol extensions need an inheritance clause due to how name lookup
-    // is implemented.
-    if (auto *proto = ext->getExtendedProtocolDecl()) {
-      auto protoType = proto->getDeclaredType();
-      TypeLoc selfInherited[1] = { TypeLoc::withoutLoc(protoType) };
-      genericParams->getParams().front()->setInherited(
-        ctx.AllocateCopy(selfInherited));
-    }
-
-    // Set the depth of every generic parameter.
-    unsigned depth = nominal->getGenericContextDepth();
-    for (auto *outerParams = genericParams;
-         outerParams != nullptr;
-         outerParams = outerParams->getOuterParameters())
-      outerParams->setDepth(depth--);
-
-    // If we have a trailing where clause, deal with it now.
-    // For now, trailing where clauses are only permitted on protocol extensions.
-    if (auto trailingWhereClause = ext->getTrailingWhereClause()) {
-      if (genericParams) {
-        // Merge the trailing where clause into the generic parameter list.
-        // FIXME: Long-term, we'd like clients to deal with the trailing where
-        // clause explicitly, but for now it's far more direct to represent
-        // the trailing where clause as part of the requirements.
-        genericParams->addTrailingWhereClause(
-          ext->getASTContext(),
-          trailingWhereClause->getWhereLoc(),
-          trailingWhereClause->getRequirements());
-      }
-
-      // If there's no generic parameter list, the where clause is diagnosed
-      // in typeCheckDecl().
-    }
-    return genericParams;
-  } else if (auto *proto = dyn_cast<ProtocolDecl>(value)) {
-    // The generic parameter 'Self'.
-    auto &ctx = value->getASTContext();
-    auto selfId = ctx.Id_Self;
-    auto selfDecl = new (ctx) GenericTypeParamDecl(
-        proto, selfId, SourceLoc(), /*depth=*/0, /*index=*/0);
-    auto protoType = proto->getDeclaredType();
-    TypeLoc selfInherited[1] = { TypeLoc::withoutLoc(protoType) };
-    selfDecl->setInherited(ctx.AllocateCopy(selfInherited));
-    selfDecl->setImplicit();
-
-    // The generic parameter list itself.
-    auto result = GenericParamList::create(ctx, SourceLoc(), selfDecl,
-                                           SourceLoc());
-    return result;
-  }
-  return nullptr;
-}
-
 PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
                                        StaticSpellingKind StaticSpelling,
                                        SourceLoc VarLoc,
@@ -1543,7 +1417,7 @@ PatternBindingDecl *PatternBindingDecl::createDeserialized(
   return PBD;
 }
 
-ParamDecl *PatternBindingInitializer::getImplicitSelfDecl() {
+ParamDecl *PatternBindingInitializer::getImplicitSelfDecl() const {
   if (SelfParam)
     return SelfParam;
 
@@ -1555,12 +1429,14 @@ ParamDecl *PatternBindingInitializer::getImplicitSelfDecl() {
                         : ParamSpecifier::InOut);
 
       ASTContext &C = DC->getASTContext();
-      SelfParam = new (C) ParamDecl(SourceLoc(), SourceLoc(),
+      auto *mutableThis = const_cast<PatternBindingInitializer *>(this);
+      auto *LazySelfParam = new (C) ParamDecl(SourceLoc(), SourceLoc(),
                                     Identifier(), singleVar->getLoc(),
-                                    C.Id_self, this);
-      SelfParam->setImplicit();
-      SelfParam->setSpecifier(specifier);
-      SelfParam->setInterfaceType(DC->getSelfInterfaceType());
+                                    C.Id_self, mutableThis);
+      LazySelfParam->setImplicit();
+      LazySelfParam->setSpecifier(specifier);
+      LazySelfParam->setInterfaceType(DC->getSelfInterfaceType());
+      mutableThis->SelfParam = LazySelfParam;
     }
   }
 
@@ -2700,9 +2576,11 @@ mapSignatureExtInfo(AnyFunctionType::ExtInfo info,
                     bool topLevelFunction) {
   if (topLevelFunction)
     return AnyFunctionType::ExtInfo();
-  return AnyFunctionType::ExtInfo()
+  return AnyFunctionType::ExtInfoBuilder()
       .withRepresentation(info.getRepresentation())
-      .withThrows(info.throws());
+      .withAsync(info.isAsync())
+      .withThrows(info.isThrowing())
+      .build();
 }
 
 /// Map a function's type to the type used for computing signatures,
@@ -4130,7 +4008,7 @@ StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
     StructLoc(StructLoc)
 {
   Bits.StructDecl.HasUnreferenceableStorage = false;
-  Bits.StructDecl.IsCxxNotTriviallyCopyable = false;
+  Bits.StructDecl.IsCxxNonTrivial = false;
 }
 
 bool NominalTypeDecl::hasMemberwiseInitializer() const {
@@ -4602,10 +4480,8 @@ bool ClassDecl::walkSuperclasses(
 EnumCaseDecl *EnumCaseDecl::create(SourceLoc CaseLoc,
                                    ArrayRef<EnumElementDecl *> Elements,
                                    DeclContext *DC) {
-  void *buf = DC->getASTContext()
-    .Allocate(sizeof(EnumCaseDecl) +
-                    sizeof(EnumElementDecl*) * Elements.size(),
-                  alignof(EnumCaseDecl));
+  size_t bytes = totalSizeToAlloc<EnumElementDecl *>(Elements.size());
+  void *buf = DC->getASTContext().Allocate(bytes, alignof(EnumCaseDecl));
   return ::new (buf) EnumCaseDecl(CaseLoc, Elements, DC);
 }
 
@@ -7217,6 +7093,7 @@ FuncDecl *FuncDecl::createImpl(ASTContext &Context,
                                StaticSpellingKind StaticSpelling,
                                SourceLoc FuncLoc,
                                DeclName Name, SourceLoc NameLoc,
+                               bool Async, SourceLoc AsyncLoc,
                                bool Throws, SourceLoc ThrowsLoc,
                                GenericParamList *GenericParams,
                                DeclContext *Parent,
@@ -7229,7 +7106,7 @@ FuncDecl *FuncDecl::createImpl(ASTContext &Context,
                                                   !ClangN.isNull());
   auto D = ::new (DeclPtr)
       FuncDecl(DeclKind::Func, StaticLoc, StaticSpelling, FuncLoc,
-               Name, NameLoc, Throws, ThrowsLoc,
+               Name, NameLoc, Async, AsyncLoc, Throws, ThrowsLoc,
                HasImplicitSelfDecl, GenericParams, Parent);
   if (ClangN)
     D->setClangNode(ClangN);
@@ -7244,11 +7121,12 @@ FuncDecl *FuncDecl::createDeserialized(ASTContext &Context,
                                        StaticSpellingKind StaticSpelling,
                                        SourceLoc FuncLoc,
                                        DeclName Name, SourceLoc NameLoc,
+                                       bool Async, SourceLoc AsyncLoc,
                                        bool Throws, SourceLoc ThrowsLoc,
                                        GenericParamList *GenericParams,
                                        DeclContext *Parent) {
   return createImpl(Context, StaticLoc, StaticSpelling, FuncLoc,
-                    Name, NameLoc, Throws, ThrowsLoc,
+                    Name, NameLoc, Async, AsyncLoc, Throws, ThrowsLoc,
                     GenericParams, Parent,
                     ClangNode());
 }
@@ -7257,6 +7135,7 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
                            StaticSpellingKind StaticSpelling,
                            SourceLoc FuncLoc,
                            DeclName Name, SourceLoc NameLoc,
+                           bool Async, SourceLoc AsyncLoc,
                            bool Throws, SourceLoc ThrowsLoc,
                            GenericParamList *GenericParams,
                            ParameterList *BodyParams,
@@ -7264,7 +7143,7 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
                            ClangNode ClangN) {
   auto *FD = FuncDecl::createImpl(
       Context, StaticLoc, StaticSpelling, FuncLoc,
-      Name, NameLoc, Throws, ThrowsLoc,
+      Name, NameLoc, Async, AsyncLoc, Throws, ThrowsLoc,
       GenericParams, Parent, ClangN);
   FD->setParameters(BodyParams);
   FD->getBodyResultTypeLoc() = FnRetType;
@@ -7451,7 +7330,8 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
                                  GenericParamList *GenericParams,
                                  DeclContext *Parent)
   : AbstractFunctionDecl(DeclKind::Constructor, Parent, Name, ConstructorLoc,
-                         Throws, ThrowsLoc, /*HasImplicitSelfDecl=*/true,
+                         /*Async=*/false, SourceLoc(), Throws, ThrowsLoc,
+                         /*HasImplicitSelfDecl=*/true,
                          GenericParams),
     FailabilityLoc(FailabilityLoc),
     SelfDecl(nullptr)
@@ -7482,8 +7362,8 @@ bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
 DestructorDecl::DestructorDecl(SourceLoc DestructorLoc, DeclContext *Parent)
   : AbstractFunctionDecl(DeclKind::Destructor, Parent,
                          DeclBaseName::createDestructor(), DestructorLoc,
-                         /*Throws=*/false,
-                         /*ThrowsLoc=*/SourceLoc(),
+                         /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
+                         /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                          /*HasImplicitSelfDecl=*/true,
                          /*GenericParams=*/nullptr),
     SelfDecl(nullptr) {
@@ -7527,6 +7407,9 @@ SourceRange FuncDecl::getSourceRange() const {
 
   if (hasThrows())
     return { StartLoc, getThrowsLoc() };
+
+  if (hasAsync())
+    return { StartLoc, getAsyncLoc() };
 
   auto LastParamListEndLoc = getParameters()->getSourceRange().End;
   if (LastParamListEndLoc.isValid())

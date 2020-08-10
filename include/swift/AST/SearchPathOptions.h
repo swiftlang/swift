@@ -90,6 +90,9 @@ public:
 
   /// A map of explict Swift module information.
   std::string ExplicitSwiftModuleMap;
+
+  /// A map of placeholder Swift module dependency information.
+  std::string PlaceholderDependencyModuleMap;
 private:
   static StringRef
   pathStringFromFrameworkSearchPath(const FrameworkSearchPath &next) {

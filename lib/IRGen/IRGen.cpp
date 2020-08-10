@@ -22,6 +22,7 @@
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SILGenRequests.h"
+#include "swift/AST/SILOptimizerRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Platform.h"
@@ -221,7 +222,7 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
                            addSwiftContractPass);
   }
 
-  if (RunSwiftSpecificLLVMOptzns)
+  if (!Opts.DisableSwiftSpecificLLVMOptzns)
     addCoroutinePassesToExtensionPoints(PMBuilder);
 
   if (Opts.Sanitizers & SanitizerKind::Address) {
@@ -912,15 +913,26 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
                                        IRGenDescriptor desc) const {
   const auto &Opts = desc.Opts;
   const auto &PSPs = desc.PSPs;
-
-  auto SILMod = std::unique_ptr<SILModule>(desc.SILMod);
   auto *M = desc.getParentModule();
+  auto &Ctx = M->getASTContext();
+  assert(!Ctx.hadError());
+
+  // If we've been provided a SILModule, use it. Otherwise request the lowered
+  // SIL for the file or module.
+  auto SILMod = std::unique_ptr<SILModule>(desc.SILMod);
+  if (!SILMod) {
+    auto loweringDesc =
+        ASTLoweringDescriptor{desc.Ctx, desc.Conv, desc.SILOpts};
+    SILMod = llvm::cantFail(Ctx.evaluator(LoweredSILRequest{loweringDesc}));
+
+    // If there was an error, bail.
+    if (Ctx.hadError())
+      return GeneratedModule::null();
+  }
+
   auto filesToEmit = desc.getFiles();
   auto *primaryFile =
       dyn_cast_or_null<SourceFile>(desc.Ctx.dyn_cast<FileUnit *>());
-
-  auto &Ctx = M->getASTContext();
-  assert(!Ctx.hadError());
 
   IRGenerator irgen(Opts, *SILMod);
 
@@ -1429,9 +1441,8 @@ GeneratedModule OptimizedIRRequest::evaluate(Evaluator &evaluator,
 
   bindExtensions(*parentMod);
 
-  // Type-check the files that need lowering to SIL.
-  auto loweringDesc = ASTLoweringDescriptor{desc.Ctx, desc.Conv, desc.SILOpts};
-  for (auto *file : loweringDesc.getFiles()) {
+  // Type-check the files that need emitting.
+  for (auto *file : desc.getFiles()) {
     if (auto *SF = dyn_cast<SourceFile>(file))
       performTypeChecking(*SF);
   }
@@ -1439,25 +1450,6 @@ GeneratedModule OptimizedIRRequest::evaluate(Evaluator &evaluator,
   if (ctx.hadError())
     return GeneratedModule::null();
 
-  auto silMod = llvm::cantFail(evaluator(ASTLoweringRequest{loweringDesc}));
-  silMod->installSILRemarkStreamer();
-  silMod->setSerializeSILAction([](){});
-
-  // Run SIL passes.
-  runSILDiagnosticPasses(*silMod);
-  runSILOptimizationPasses(*silMod);
-  silMod->verify();
-
-  if (ctx.hadError())
-    return GeneratedModule::null();
-
-  runSILLoweringPasses(*silMod);
-
-  if (ctx.hadError())
-    return GeneratedModule::null();
-
-  // Perform IRGen with the generated SILModule.
-  desc.SILMod = silMod.release();
   auto irMod = llvm::cantFail(evaluator(IRGenRequest{desc}));
   if (!irMod)
     return irMod;

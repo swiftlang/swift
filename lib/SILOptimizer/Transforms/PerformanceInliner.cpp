@@ -298,6 +298,13 @@ bool SILPerformanceInliner::isProfitableToInline(
   // It is always OK to inline a simple call.
   // TODO: May be consider also the size of the callee?
   if (isPureCall(AI, SEA)) {
+    OptRemark::Emitter::emitOrDebug(DEBUG_TYPE, &ORE, [&]() {
+      using namespace OptRemark;
+      return RemarkPassed("Inline", *AI.getInstruction())
+             << "Pure call. Always profitable to inline "
+             << NV("Callee", Callee);
+    });
+
     LLVM_DEBUG(dumpCaller(AI.getFunction());
                llvm::dbgs() << "    pure-call decision " << Callee->getName()
                             << '\n');
@@ -487,9 +494,24 @@ bool SILPerformanceInliner::isProfitableToInline(
   auto *bb = AI.getInstruction()->getParent();
   auto bbIt = BBToWeightMap.find(bb);
   if (bbIt != BBToWeightMap.end()) {
-    return profileBasedDecision(AI, Benefit, Callee, CalleeCost,
-                                NumCallerBlocks, bbIt);
+    if (profileBasedDecision(AI, Benefit, Callee, CalleeCost, NumCallerBlocks,
+                             bbIt)) {
+      OptRemark::Emitter::emitOrDebug(DEBUG_TYPE, &ORE, [&]() {
+        using namespace OptRemark;
+        return RemarkPassed("Inline", *AI.getInstruction())
+               << "Profitable due to provided profile";
+      });
+      return true;
+    }
+
+    OptRemark::Emitter::emitOrDebug(DEBUG_TYPE, &ORE, [&]() {
+      using namespace OptRemark;
+      return RemarkMissed("Inline", *AI.getInstruction())
+             << "Not profitable due to provided profile";
+    });
+    return false;
   }
+
   if (isClassMethodAtOsize && Benefit > OSizeClassMethodBenefit) {
     Benefit = OSizeClassMethodBenefit;
   }
@@ -498,7 +520,7 @@ bool SILPerformanceInliner::isProfitableToInline(
   if (CalleeCost > Benefit) {
     OptRemark::Emitter::emitOrDebug(DEBUG_TYPE, &ORE, [&]() {
       using namespace OptRemark;
-      return RemarkMissed("NoInlinedCost", *AI.getInstruction())
+      return RemarkMissed("Inline", *AI.getInstruction())
              << "Not profitable to inline function " << NV("Callee", Callee)
              << " (cost = " << NV("Cost", CalleeCost)
              << ", benefit = " << NV("Benefit", Benefit) << ")";
@@ -1008,7 +1030,7 @@ public:
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
     SideEffectAnalysis *SEA = PM->getAnalysis<SideEffectAnalysis>();
-    OptRemark::Emitter ORE(DEBUG_TYPE, getFunction()->getModule());
+    OptRemark::Emitter ORE(DEBUG_TYPE, *getFunction());
 
     if (getOptions().InlineThreshold == 0) {
       return;

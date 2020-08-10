@@ -1102,13 +1102,10 @@ func rdar17170728() {
   }
 
   let _ = [i, j, k].reduce(0 as Int?) {
-    // expected-error@-1 3 {{cannot convert value of type 'Int?' to expected element type 'Int'}}
+    // expected-error@-1{{missing argument label 'into:' in call}}
+    // expected-error@-2{{cannot convert value of type 'Int?' to expected argument type}}
     $0 && $1 ? $0 + $1 : ($0 ? $0 : ($1 ? $1 : nil))
-    // expected-error@-1 2 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
-    // expected-error@-2   {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
-    // expected-error@-3 2 {{optional type 'Int?' cannot be used as a boolean; test for '!= nil' instead}}
-    // expected-note@-4:16 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
-    // expected-note@-5:16 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+    // expected-error@-1 {{binary operator '+' cannot be applied to two 'Bool' operands}}
   }
 }
 

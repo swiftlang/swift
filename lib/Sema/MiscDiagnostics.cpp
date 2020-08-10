@@ -86,7 +86,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
     bool walkToDeclPre(Decl *D) override {
       if (auto *closure = dyn_cast<ClosureExpr>(D->getDeclContext()))
-        return !closure->wasSeparatelyTypeChecked();
+        return !closure->isSeparatelyTypeChecked();
       return false;
     }
 
@@ -95,6 +95,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
       return false;
     }
+
+    bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
     bool shouldWalkIntoTapExpression() override { return false; }
 
@@ -1332,6 +1334,8 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
       return false;
     }
 
+    bool shouldWalkCaptureInitializerExpressions() override { return true; }
+
     bool shouldWalkIntoTapExpression() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
@@ -1497,13 +1501,15 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
     // Don't walk into nested decls.
     bool walkToDeclPre(Decl *D) override {
       if (auto *closure = dyn_cast<ClosureExpr>(D->getDeclContext()))
-        return !closure->wasSeparatelyTypeChecked();
+        return !closure->isSeparatelyTypeChecked();
       return false;
     }
 
     bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
       return false;
     }
+
+    bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
     bool shouldWalkIntoTapExpression() override { return false; }
 
@@ -1514,7 +1520,6 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         if (isClosureRequiringSelfQualification(CE))
           Closures.push_back(CE);
       }
-
 
       // If we aren't in a closure, no diagnostics will be produced.
       if (Closures.size() == 0)
@@ -1728,7 +1733,7 @@ bool TypeChecker::getDefaultGenericArgumentsString(
       }
 
       for (auto proto : archetypeTy->getConformsTo()) {
-        members.push_back(proto->getDeclaredType());
+        members.push_back(proto->getDeclaredInterfaceType());
         if (proto->requiresClass())
           hasExplicitAnyObject = false;
       }
@@ -1798,7 +1803,8 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
       newName = newNames[i];
 
     if (oldName == newName ||
-        (argList.hasTrailingClosure && i == argList.args.size()-1))
+        (argList.hasTrailingClosure && i == argList.args.size()-1 &&
+         (numMissing > 0 || numExtra > 0 || numWrong > 0)))
       continue;
 
     if (oldName.empty()) {
@@ -3332,6 +3338,8 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
       return false;
     }
 
+    bool shouldWalkCaptureInitializerExpressions() override { return true; }
+
     bool shouldWalkIntoTapExpression() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
@@ -3481,6 +3489,8 @@ public:
   bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
     return false;
   }
+
+  bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
   bool shouldWalkIntoTapExpression() override { return false; }
 
@@ -4222,6 +4232,8 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
       return false;
     }
 
+    bool shouldWalkCaptureInitializerExpressions() override { return true; }
+
     bool shouldWalkIntoTapExpression() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
@@ -4297,6 +4309,8 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
     bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
       return false;
     }
+
+    bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
     bool shouldWalkIntoTapExpression() override { return false; }
 
@@ -4377,6 +4391,53 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
   const_cast<Expr *>(E)->walk(Walker);
 }
 
+static void diagnoseExplicitUseOfLazyVariableStorage(const Expr *E,
+                                                     const DeclContext *DC) {
+
+  class ExplicitLazyVarStorageAccessFinder : public ASTWalker {
+    const ASTContext &C;
+
+  public:
+    ExplicitLazyVarStorageAccessFinder(ASTContext &ctx) : C(ctx) {}
+
+    void tryDiagnoseExplicitLazyStorageVariableUse(MemberRefExpr *MRE) {
+      if (MRE->isImplicit()) {
+        return;
+      }
+      auto VD = dyn_cast<VarDecl>(MRE->getMember().getDecl());
+      if (!VD) {
+        return;
+      }
+      auto sourceFileKind = VD->getDeclContext()->getParentSourceFile();
+      if (!sourceFileKind) {
+        return;
+      }
+      if (sourceFileKind->Kind != SourceFileKind::Library &&
+          sourceFileKind->Kind != SourceFileKind::Main) {
+        return;
+      }
+      if (VD->isLazyStorageProperty()) {
+        C.Diags.diagnose(MRE->getLoc(), diag::lazy_var_storage_access);
+      }
+    }
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (!E || isa<ErrorExpr>(E) || !E->getType())
+        return {false, E};
+
+      if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
+        tryDiagnoseExplicitLazyStorageVariableUse(MRE);
+        return {false, E};
+      }
+
+      return {true, E};
+    }
+  };
+
+  ExplicitLazyVarStorageAccessFinder Walker(DC->getASTContext());
+  const_cast<Expr *>(E)->walk(Walker);
+}
+
 //===----------------------------------------------------------------------===//
 // High-level entry points.
 //===----------------------------------------------------------------------===//
@@ -4392,6 +4453,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   diagnoseImplicitSelfUseInClosure(E, DC);
   diagnoseUnintendedOptionalBehavior(E, DC);
   maybeDiagnoseCallToKeyValueObserveMethod(E, DC);
+  diagnoseExplicitUseOfLazyVariableStorage(E, DC);
   if (!ctx.isSwiftVersionAtLeast(5))
     diagnoseDeprecatedWritableKeyPath(E, DC);
   if (!ctx.LangOpts.DisableAvailabilityChecking)

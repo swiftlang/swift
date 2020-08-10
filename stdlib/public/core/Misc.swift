@@ -71,6 +71,7 @@ public func _getTypeName(_ type: Any.Type, qualified: Bool)
   -> (UnsafePointer<UInt8>, Int)
 
 /// Returns the demangled qualified name of a metatype.
+@_semantics("typeName")
 public // @testable
 func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
   let (stringPtr, count) = _getTypeName(type, qualified: qualified)
@@ -132,3 +133,17 @@ public func _getTypeByMangledNameInContext(
   genericContext: UnsafeRawPointer?,
   genericArguments: UnsafeRawPointer?)
   -> Any.Type?
+
+@_silgen_name("swift_getMetadataSection")
+public func _getMetadataSection(
+  _ index: UInt)
+  -> UnsafeRawPointer?
+
+@_silgen_name("swift_getMetadataSectionCount")
+public func _getMetadataSectionCount()
+  -> UInt
+
+@_silgen_name("swift_getMetadataSectionName")
+public func _getMetadataSectionName(
+  _ metadata_section: UnsafeRawPointer)
+  -> UnsafePointer<CChar>

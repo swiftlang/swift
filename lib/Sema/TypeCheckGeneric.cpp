@@ -585,7 +585,8 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
   if (auto PD = dyn_cast<ProtocolDecl>(GC)) {
     auto self = PD->getSelfInterfaceType()->castTo<GenericTypeParamType>();
     auto req =
-        Requirement(RequirementKind::Conformance, self, PD->getDeclaredType());
+        Requirement(RequirementKind::Conformance, self,
+                    PD->getDeclaredInterfaceType());
     auto sig = GenericSignature::get({self}, {req});
 
     // Debugging of the generic signature builder and generic signature
@@ -605,6 +606,8 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
 
   bool allowConcreteGenericParams = false;
   const auto *genericParams = GC->getGenericParams();
+  const auto *where = GC->getTrailingWhereClause();
+
   if (genericParams) {
     // Setup the depth of the generic parameters.
     const_cast<GenericParamList *>(genericParams)
@@ -619,9 +622,10 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     if (auto accessor = dyn_cast<AccessorDecl>(GC->getAsDecl())) {
       return cast<SubscriptDecl>(accessor->getStorage())->getGenericSignature();
     }
+  }
 
   // ...or we may only have a contextual where clause.
-  } else if (const auto *where = GC->getTrailingWhereClause()) {
+  if (where) {
     // If there is no generic context for the where clause to
     // rely on, diagnose that now and bail out.
     if (!GC->isGenericContext()) {
@@ -631,19 +635,22 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
                                              : diag::where_nongeneric_ctx);
       return nullptr;
     }
+  }
 
+  if (!genericParams && where)
     allowConcreteGenericParams = true;
-  } else {
+
+  if (!genericParams && !where) {
     // We can fast-path computing the generic signature of non-generic
     // declarations by re-using the parent context's signature.
     if (auto accessor = dyn_cast<AccessorDecl>(GC->getAsDecl()))
       if (auto subscript = dyn_cast<SubscriptDecl>(accessor->getStorage()))
          return subscript->getGenericSignature();
 
-    return GC->getParent()->getGenericSignatureOfContext();
+    return GC->getParentForLookup()->getGenericSignatureOfContext();
   }
 
-  auto parentSig = GC->getParent()->getGenericSignatureOfContext();
+  auto parentSig = GC->getParentForLookup()->getGenericSignatureOfContext();
   SmallVector<TypeLoc, 2> inferenceSources;
   SmallVector<Requirement, 2> sameTypeReqs;
   if (auto VD = dyn_cast_or_null<ValueDecl>(GC->getAsDecl())) {
@@ -725,19 +732,10 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
 
     // Allow parameters to be equated with concrete types.
     allowConcreteGenericParams = true;
-    // Extensions must occur at the top level, they have no
-    // (valid) parent signature.
-    parentSig = nullptr;
+
     inferenceSources.emplace_back(nullptr, extInterfaceType);
   }
 
-  // EGREGIOUS HACK: The GSB cannot handle the addition of parent signatures
-  // from malformed decls in many cases.  Check the invalid bit and null out the
-  // parent signature.
-  if (auto *DD = GC->getParent()->getAsDecl()) {
-    parentSig = DD->isInvalid() ? nullptr : parentSig;
-  }
-  
   return TypeChecker::checkGenericSignature(
       GC, GC, parentSig,
       allowConcreteGenericParams,
@@ -753,7 +751,6 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
     TypeArrayView<GenericTypeParamType> genericParams,
     ArrayRef<Requirement> requirements,
     TypeSubstitutionFn substitutions,
-    GenericRequirementsCheckListener *listener,
     SubstOptions options) {
   bool valid = true;
 
@@ -808,8 +805,6 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
       }
 
       bool requirementFailure = false;
-      if (listener && !listener->shouldCheck(kind, firstType, secondType))
-        continue;
 
       Diag<Type, Type, Type> diagnostic;
       Diag<Type, Type, StringRef> diagnosticNote;
@@ -821,12 +816,6 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
         auto conformance = module->lookupConformance(firstType, proto->getDecl());
 
         if (conformance) {
-          // Report the conformance.
-          if (listener && valid && current.Parents.empty()) {
-            listener->satisfiedConformance(rawFirstType, firstType,
-                                           conformance);
-          }
-
           auto conditionalReqs = conformance.getConditionalRequirements();
           if (!conditionalReqs.empty()) {
             auto history = current.Parents;
@@ -881,11 +870,6 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
 
       if (!requirementFailure)
         continue;
-
-      if (listener &&
-          listener->diagnoseUnsatisfiedRequirement(rawReq, firstType,
-                                                   secondType, current.Parents))
-        return RequirementCheckResult::Failure;
 
       if (loc.isValid()) {
         // FIXME: Poor source-location information.

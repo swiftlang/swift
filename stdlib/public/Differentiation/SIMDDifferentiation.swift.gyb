@@ -189,7 +189,7 @@ where
     )
   {
     return (lhs * rhs, { ltan, rtan in
-      return lhs * ltan + rtan * rhs
+      return lhs * rtan + ltan * rhs
     })
   }
 

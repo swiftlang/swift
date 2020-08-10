@@ -5,7 +5,7 @@ from __future__ import print_function
 import os
 import sys
 
-blacklist = [
+denylist = [
     "Kernel", "Ruby", "Tk",
     "DriverKit", "HIDDriverKit", "SkywalkDriverKit",  # has C++ code
     "NetworkingDriverKit", "USBSerialDriverKit",  # has C++ code
@@ -29,7 +29,7 @@ def collect_catalyst_frameworks(frameworks_path):
                              'Modules', name + '.swiftmodule',
                              'x86_64-apple-ios-macabi.swiftinterface')
             if os.path.exists(macabi_interface_path):
-                if name not in blacklist:
+                if name not in denylist:
                     names.append(name)
     return names
 
@@ -56,7 +56,7 @@ def get_frameworks(sdk_path, swift_frameworks_only):
                 '/module_private.map'
 
             if os.path.exists(swiftmodule_path):
-                if name not in blacklist:
+                if name not in denylist:
                     names.append(name)
                 continue
             # We only care about Swift frameworks then we are done.
@@ -81,7 +81,7 @@ def get_frameworks(sdk_path, swift_frameworks_only):
             if should_exclude_framework(frameworks_path + '/' + frame):
                 continue
 
-            if name in blacklist:
+            if name in denylist:
                 continue
             names.append(name)
     return names
@@ -93,7 +93,7 @@ def get_overlays(sdk_path):
     for overlay in os.listdir(overlay_path):
         if overlay.endswith(".swiftmodule"):
             overlay = overlay[:-len(".swiftmodule")]
-            if overlay in blacklist:
+            if overlay in denylist:
                 continue
             names.append(overlay)
     return names

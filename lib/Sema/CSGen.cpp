@@ -84,11 +84,6 @@ namespace {
     unsigned haveStringLiteral : 1;
 
     llvm::SmallSet<TypeBase*, 16> collectedTypes;
-
-    llvm::SmallVector<TypeVariableType *, 16> intLiteralTyvars;
-    llvm::SmallVector<TypeVariableType *, 16> floatLiteralTyvars;
-    llvm::SmallVector<TypeVariableType *, 16> stringLiteralTyvars;
-
     llvm::SmallVector<BinaryExpr *, 4> binaryExprs;
 
     LinkedTypeInfo() {
@@ -163,7 +158,7 @@ namespace {
     }
 
     /// Ignore types.
-    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
+     bool walkToTypeReprPre(TypeRepr *T) override { return false; }
   };
   
   /// Given a collection of "linked" expressions, analyzes them for
@@ -188,35 +183,16 @@ namespace {
       
       if (isa<IntegerLiteralExpr>(expr)) {
         LTI.haveIntLiteral = true;
-        auto tyvar = CS.getType(expr)->getAs<TypeVariableType>();
-
-        if (tyvar) {
-          LTI.intLiteralTyvars.push_back(tyvar);
-        }
-        
         return { false, expr };
       }
       
       if (isa<FloatLiteralExpr>(expr)) {
         LTI.haveFloatLiteral = true;
-        auto tyvar = CS.getType(expr)->getAs<TypeVariableType>();
-
-        if (tyvar) {
-          LTI.floatLiteralTyvars.push_back(tyvar);
-        }
-
         return { false, expr };
       }
       
       if (isa<StringLiteralExpr>(expr)) {
         LTI.haveStringLiteral = true;
-
-        auto tyvar = CS.getType(expr)->getAs<TypeVariableType>();
-
-        if (tyvar) {
-          LTI.stringLiteralTyvars.push_back(tyvar);
-        }
-
         return { false, expr };
       }
 
@@ -329,7 +305,7 @@ namespace {
     }
 
     /// Ignore types.
-    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
+    bool walkToTypeReprPre(TypeRepr *T) override { return false; }
   };
   
   /// For a given expression, given information that is global to the
@@ -338,22 +314,6 @@ namespace {
     LinkedTypeInfo lti;
 
     expr->walk(LinkedExprAnalyzer(lti, CS));
-
-    auto mergeTypeVariables = [&](ArrayRef<TypeVariableType *> typeVars) {
-      if (typeVars.size() < 2)
-        return;
-
-      auto rep1 = CS.getRepresentative(typeVars.front());
-      for (unsigned i = 1, n = typeVars.size(); i != n; ++i) {
-        auto rep2 = CS.getRepresentative(typeVars[i]);
-        if (rep1 != rep2)
-          CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
-      }
-    };
-
-    mergeTypeVariables(lti.intLiteralTyvars);
-    mergeTypeVariables(lti.floatLiteralTyvars);
-    mergeTypeVariables(lti.stringLiteralTyvars);
 
     if (lti.collectedTypes.size() == 1) {
       // TODO: Compute the BCT.
@@ -1199,7 +1159,7 @@ namespace {
                                       TVO_PrefersSubtypeBinding |
                                       TVO_CanBindToNoEscape);
       CS.addConstraint(ConstraintKind::LiteralConformsTo, tv,
-                       protocol->getDeclaredType(),
+                       protocol->getDeclaredInterfaceType(),
                        CS.getConstraintLocator(expr));
       return tv;
     }
@@ -1224,7 +1184,7 @@ namespace {
                                       TVO_PrefersSubtypeBinding |
                                       TVO_CanBindToNoEscape);
       CS.addConstraint(ConstraintKind::LiteralConformsTo, tv,
-                       interpolationProto->getDeclaredType(),
+                       interpolationProto->getDeclaredInterfaceType(),
                        locator);
 
       if (auto appendingExpr = expr->getAppendingExpr()) {
@@ -1262,7 +1222,7 @@ namespace {
           return nullptr;
 
         auto unsafeRawPointer = ctx.getUnsafeRawPointerDecl();
-        return unsafeRawPointer->getDeclaredType();
+        return unsafeRawPointer->getDeclaredInterfaceType();
       }
 
       default:
@@ -1297,7 +1257,7 @@ namespace {
                        TVO_CanBindToHole);
 
       CS.addConstraint(ConstraintKind::LiteralConformsTo, witnessType,
-                       protocol->getDeclaredType(), exprLoc);
+                       protocol->getDeclaredInterfaceType(), exprLoc);
 
       // The arguments are required to be argument-convertible to the
       // idealized parameter type of the initializer, which generally
@@ -1843,31 +1803,28 @@ namespace {
 
       auto locator = CS.getConstraintLocator(expr);
       auto contextualType = CS.getContextualType(expr);
-      Type contextualArrayType = nullptr;
-      Type contextualArrayElementType = nullptr;
-      
+
+      auto joinElementTypes = [&](Optional<Type> elementType) {
+        const auto elements = expr->getElements();
+        unsigned index = 0;
+
+        using Iterator = decltype(elements)::iterator;
+        CS.addJoinConstraint<Iterator>(locator, elements.begin(), elements.end(),
+                                       elementType, [&](const auto it) {
+          auto *locator = CS.getConstraintLocator(expr, LocatorPathElt::TupleElement(index++));
+          return std::make_pair(CS.getType(*it), locator);
+        });
+      };
+
       // If a contextual type exists for this expression, apply it directly.
       Optional<Type> arrayElementType;
       if (contextualType &&
           (arrayElementType = ConstraintSystem::isArrayType(contextualType))) {
-        // Is the array type a contextual type
-        contextualArrayType = contextualType;
-        contextualArrayElementType = *arrayElementType;
-
         CS.addConstraint(ConstraintKind::LiteralConformsTo, contextualType,
-                         arrayProto->getDeclaredType(),
+                         arrayProto->getDeclaredInterfaceType(),
                          locator);
-        
-        unsigned index = 0;
-        for (auto element : expr->getElements()) {
-          CS.addConstraint(ConstraintKind::Conversion,
-                           CS.getType(element),
-                           contextualArrayElementType,
-                           CS.getConstraintLocator(
-                               expr, LocatorPathElt::TupleElement(index++)));
-        }
-        
-        return contextualArrayType;
+        joinElementTypes(arrayElementType);
+        return contextualType;
       }
 
       // Produce a specialized diagnostic if this is an attempt to initialize
@@ -1925,7 +1882,7 @@ namespace {
 
       // The array must be an array literal type.
       CS.addConstraint(ConstraintKind::LiteralConformsTo, arrayTy,
-                       arrayProto->getDeclaredType(),
+                       arrayProto->getDeclaredInterfaceType(),
                        locator);
       
       // Its subexpression should be convertible to a tuple (T.Element...).
@@ -1933,14 +1890,7 @@ namespace {
 
       // Introduce conversions from each element to the element type of the
       // array.
-      unsigned index = 0;
-      for (auto element : expr->getElements()) {
-        CS.addConstraint(ConstraintKind::Conversion,
-                         CS.getType(element),
-                         arrayElementTy,
-                         CS.getConstraintLocator(
-                           expr, LocatorPathElt::TupleElement(index++)));
-      }
+      joinElementTypes(arrayElementTy);
 
       // The array element type defaults to 'Any'.
       CS.addConstraint(ConstraintKind::Defaultable, arrayElementTy,
@@ -1990,7 +1940,7 @@ namespace {
         Type contextualDictionaryElementType = TupleType::get(tupleElts, C);
         
         CS.addConstraint(ConstraintKind::LiteralConformsTo, contextualType,
-                         dictionaryProto->getDeclaredType(),
+                         dictionaryProto->getDeclaredInterfaceType(),
                          locator);
         
         unsigned index = 0;
@@ -2011,7 +1961,7 @@ namespace {
 
       // The dictionary must be a dictionary literal type.
       CS.addConstraint(ConstraintKind::LiteralConformsTo, dictionaryTy,
-                       dictionaryProto->getDeclaredType(),
+                       dictionaryProto->getDeclaredInterfaceType(),
                        locator);
 
 
@@ -2521,7 +2471,7 @@ namespace {
       }
 
       case PatternKind::Bool:
-        return setType(CS.getASTContext().getBoolDecl()->getDeclaredType());
+        return setType(CS.getASTContext().getBoolDecl()->getDeclaredInterfaceType());
 
       case PatternKind::EnumElement: {
         auto enumPattern = cast<EnumElementPattern>(pattern);
@@ -2541,30 +2491,22 @@ namespace {
         if (enumPattern->getParentType() || enumPattern->getParentTypeRepr()) {
           // Resolve the parent type.
           Type parentType = [&]() -> Type {
-            if (auto preTy = enumPattern->getParentType()) {
-              return preTy;
+            if (const auto resolvedTy = enumPattern->getParentType()) {
+              assert(resolvedTy->hasUnboundGenericType() == false &&
+                     "A pre-resolved type must be fully bound");
+              return resolvedTy;
             }
             return resolveTypeReferenceInExpression(
                 enumPattern->getParentTypeRepr(),
-                TypeResolverContext::InExpression, [](auto unboundTy) {
-                  // FIXME: We ought to pass an OpenUnboundGenericType object
-                  // rather than calling CS.openUnboundGenericType below, but
-                  // sometimes the parent type is resolved eagerly in
-                  // ResolvePattern::visitUnresolvedDotExpr, letting unbound
-                  // generics escape.
-                  return unboundTy;
-                });
+                TypeResolverContext::InExpression,
+                OpenUnboundGenericType(
+                    CS, CS.getConstraintLocator(
+                            locator, {LocatorPathElt::PatternMatch(pattern),
+                                      ConstraintLocator::ParentType})));
           }();
 
           if (!parentType)
             return Type();
-
-          parentType = CS.openUnboundGenericTypes(
-              parentType, CS.getConstraintLocator(
-                              locator, {LocatorPathElt::PatternMatch(pattern),
-                                        ConstraintLocator::ParentType}));
-
-          assert(parentType);
 
           // Perform member lookup into the parent's metatype.
           Type parentMetaType = MetatypeType::get(parentType);
@@ -2708,12 +2650,14 @@ namespace {
 
           // Okay, resolve the pattern.
           Pattern *pattern = LabelItem.getPattern();
-          pattern = TypeChecker::resolvePattern(pattern, CS.DC,
-                                         /*isStmtCondition*/false);
-          if (!pattern) return false;
+          if (!LabelItem.isPatternResolved()) {
+            pattern = TypeChecker::resolvePattern(pattern, CS.DC,
+                                           /*isStmtCondition*/false);
+            if (!pattern) return false;
 
-          // Save that aside while we explore the type.
-          LabelItem.setPattern(pattern);
+            // Save that aside while we explore the type.
+            LabelItem.setPattern(pattern, /*resolved=*/true);
+          }
 
           // Require the pattern to have a particular shape: a number
           // of is-patterns applied to an irrefutable pattern.
@@ -2741,7 +2685,7 @@ namespace {
           // Okay, now it should be safe to coerce the pattern.
           // Pull the top-level pattern back out.
           pattern = LabelItem.getPattern();
-          Type exnType = CS.getASTContext().getErrorDecl()->getDeclaredType();
+          Type exnType = CS.getASTContext().getErrorDecl()->getDeclaredInterfaceType();
 
           if (!exnType)
             return false;
@@ -2752,7 +2696,7 @@ namespace {
           if (!pattern)
             return false;
 
-          LabelItem.setPattern(pattern);
+          LabelItem.setPattern(pattern, /*resolved=*/true);
           return LabelItem.isSyntacticallyExhaustive();
         }
 
@@ -2822,6 +2766,8 @@ namespace {
         bool hasErrorExprs = false;
 
         CollectVarRefs(ConstraintSystem &cs) : cs(cs) { }
+
+        bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
         std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
           // If there are any error expressions in this closure
@@ -2994,6 +2940,9 @@ namespace {
         typeContext->getDeclaredInterfaceType());
       auto superclassTy = selfTy->getSuperclass();
 
+      if (!superclassTy)
+        return Type();
+
       if (selfDecl->getInterfaceType()->is<MetatypeType>())
         superclassTy = MetatypeType::get(superclassTy);
 
@@ -3013,7 +2962,7 @@ namespace {
 
       CS.addConstraint(
           ConstraintKind::Conversion, CS.getType(expr->getCondExpr()),
-          boolDecl->getDeclaredType(),
+          boolDecl->getDeclaredInterfaceType(),
           CS.getConstraintLocator(expr, ConstraintLocator::Condition));
 
       // The branches must be convertible to a common type.
@@ -3073,21 +3022,14 @@ namespace {
     Type visitCoerceExpr(CoerceExpr *expr) {
       // Validate the resulting type.
       auto *const repr = expr->getCastTypeRepr();
-      const auto type = resolveTypeReferenceInExpression(
-          repr, TypeResolverContext::ExplicitCastExpr, [](auto unboundTy) {
-            // FIXME: We ought to pass an OpenUnboundGenericType object rather
-            // than calling CS.openUnboundGenericType after resolving, but
-            // sometimes the type expression is resolved eagerly in
-            // PreCheckExpression::simplifyTypeConstructionWithLiteralArg,
-            // letting unbound generics escape.
-            return unboundTy;
-          });
-      if (!type)
+      const auto toType = resolveTypeReferenceInExpression(
+          repr, TypeResolverContext::ExplicitCastExpr,
+          // Introduce type variables for unbound generics.
+          OpenUnboundGenericType(CS, CS.getConstraintLocator(expr)));
+      if (!toType)
         return nullptr;
 
-      // Open the type we're casting to.
-      const auto toType =
-          CS.openUnboundGenericTypes(type, CS.getConstraintLocator(expr));
+      // Cache the type we're casting to.
       if (repr) CS.setType(repr, toType);
 
       auto fromType = CS.getType(expr->getSubExpr());
@@ -3165,7 +3107,7 @@ namespace {
         return Type();
       }
 
-      return boolDecl->getDeclaredType();
+      return boolDecl->getDeclaredInterfaceType();
     }
 
     Type visitDiscardAssignmentExpr(DiscardAssignmentExpr *expr) {
@@ -3342,7 +3284,7 @@ namespace {
     }
     
     Type visitEnumIsCaseExpr(EnumIsCaseExpr *expr) {
-      return CS.getASTContext().getBoolDecl()->getDeclaredType();
+      return CS.getASTContext().getBoolDecl()->getDeclaredInterfaceType();
     }
 
     Type visitLazyInitializerExpr(LazyInitializerExpr *expr) {
@@ -3535,6 +3477,9 @@ namespace {
         }
         case KeyPathExpr::Component::Kind::Identity:
           continue;
+        case KeyPathExpr::Component::Kind::DictionaryKey:
+          llvm_unreachable("DictionaryKey only valid in #keyPath");
+          break;
         }
 
         // By now, `base` is the result type of this component. Set it in the
@@ -3766,6 +3711,16 @@ namespace {
         }
       }
 
+      // Generate constraints for each of the entries in the capture list.
+      if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
+        auto &CS = CG.getConstraintSystem();
+        for (const auto &capture : captureList->getCaptureList()) {
+          SolutionApplicationTarget target(capture.Init);
+          if (CS.generateConstraints(target, FreeTypeVariableBinding::Disallow))
+            return {false, nullptr};
+        }
+      }
+
       // Both multi- and single-statement closures now behave the same way
       // when it comes to constraint generation.
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
@@ -3972,7 +3927,8 @@ generateForEachStmtConstraints(
   cs.addConstraint(ConstraintKind::Conversion, cs.getType(sequence),
                    sequenceType, locator);
   cs.addConstraint(ConstraintKind::ConformsTo, sequenceType,
-                   sequenceProto->getDeclaredType(), contextualLocator);
+                   sequenceProto->getDeclaredInterfaceType(),
+                   contextualLocator);
 
   // Check the element pattern.
   ASTContext &ctx = cs.getASTContext();
@@ -4033,7 +3989,7 @@ generateForEachStmtConstraints(
     if (!boolDecl)
       return None;
 
-    Type boolType = boolDecl->getDeclaredType();
+    Type boolType = boolDecl->getDeclaredInterfaceType();
     if (!boolType)
       return None;
 
@@ -4042,6 +3998,9 @@ generateForEachStmtConstraints(
         /*isDiscarded=*/false);
     if (cs.generateConstraints(whereTarget, FreeTypeVariableBinding::Disallow))
       return None;
+
+    cs.setContextualType(forEachStmtInfo.whereExpr,
+                         TypeLoc::withoutLoc(boolType), CTP_Condition);
 
     forEachStmtInfo.whereExpr = whereTarget.getAsExpr();
   }
@@ -4219,7 +4178,7 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
     return true;
   }
 
-  Type boolTy = boolDecl->getDeclaredType();
+  Type boolTy = boolDecl->getDeclaredInterfaceType();
   for (const auto &condElement : condition) {
     switch (condElement.getKind()) {
     case StmtConditionElement::CK_Availability:
@@ -4268,14 +4227,17 @@ bool ConstraintSystem::generateConstraints(
     CaseStmt *caseStmt, DeclContext *dc, Type subjectType,
     ConstraintLocator *locator) {
   // Pre-bind all of the pattern variables within the case.
-  bindSwitchCasePatternVars(caseStmt);
+  bindSwitchCasePatternVars(dc, caseStmt);
 
   for (auto &caseLabelItem : caseStmt->getMutableCaseLabelItems()) {
     // Resolve the pattern.
-    auto *pattern = TypeChecker::resolvePattern(
-        caseLabelItem.getPattern(), dc, /*isStmtCondition=*/false);
-    if (!pattern)
-      return true;
+    auto *pattern = caseLabelItem.getPattern();
+    if (!caseLabelItem.isPatternResolved()) {
+      pattern = TypeChecker::resolvePattern(
+          pattern, dc, /*isStmtCondition=*/false);
+      if (!pattern)
+        return true;
+    }
 
     // Generate constraints for the pattern, including one-way bindings for
     // any variables that show up in this pattern, because those variables

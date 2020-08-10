@@ -780,8 +780,8 @@ private:
     auto *PD = dyn_cast<ProtocolDecl>(NTD);
     if (CD && CD->getSuperclass()) {
       addTypeRef(CD->getSuperclass(), CD->getGenericSignature());
-    } else if (PD && PD->getDeclaredType()->getSuperclass()) {
-      addTypeRef(PD->getDeclaredType()->getSuperclass(),
+    } else if (PD && PD->getDeclaredInterfaceType()->getSuperclass()) {
+      addTypeRef(PD->getDeclaredInterfaceType()->getSuperclass(),
                  PD->getGenericSignature());
     } else {
       B.addInt32(0);

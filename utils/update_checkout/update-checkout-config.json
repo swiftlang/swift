@@ -43,12 +43,6 @@
             "remote": { "id": "KitWare/CMake" },
             "platforms": [ "Linux" ]
         },
-        "pythonkit": {
-            "remote": { "id": "pvieito/PythonKit" }
-        },
-        "tensorflow-swift-apis": {
-            "remote": { "id": "tensorflow/swift-apis" }
-        },
        "indexstore-db": {
             "remote": { "id": "apple/indexstore-db" } },
         "sourcekit-lsp": {
@@ -84,9 +78,7 @@
                 "cmake": "v3.16.5",
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master",
-                "swift-format": "master",
-                "pythonkit": "master",
-                "tensorflow-swift-apis": "master"
+                "swift-format": "master"
             }
         },
         "next" : {
@@ -116,9 +108,7 @@
                 "cmake": "v3.16.5",
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master",
-                "swift-format": "master",
-                "pythonkit": "master",
-                "tensorflow-swift-apis": "master"
+                "swift-format": "master"
             }
         },
        "swift-3.0-branch" : {
@@ -314,9 +304,7 @@
                 "cmake": "v3.16.5",
                 "indexstore-db": "release/5.3",
                 "sourcekit-lsp": "release/5.3",
-                "swift-format": "master",
-                "pythonkit": "master",
-                "tensorflow-swift-apis": "master"
+                "swift-format": "master"
             }
         },
        "master-rebranch": {

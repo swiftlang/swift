@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %clang -c -v %target-cc-options -g -O0 -isysroot %sdk %S/Inputs/isPrespecialized.cpp -o %t/isPrespecialized.o -I %clang-include-dir -I %swift_src_root/include/ -I %swift_src_root/../llvm-project/llvm/include -I %clang-include-dir/../../llvm-macosx-x86_64/include -L %clang-include-dir/../lib/swift/macosx
+// RUN: %clang -c -v %target-cc-options -g -O0 -isysroot %sdk %S/Inputs/isPrespecialized.cpp -o %t/isPrespecialized.o -I %clang-include-dir -I %swift_src_root/include/ -I %llvm_src_root/include -I %llvm_obj_root/include -L %clang-include-dir/../lib/swift/macosx
 
 // RUN: %target-build-swift %S/Inputs/struct-public-nonfrozen-1argument.swift -emit-module -emit-library -module-name Module -Xfrontend -prespecialize-generic-metadata -target %module-target-future -emit-module-path %t/Module.swiftmodule -o %t/%target-library-name(Module)
 
@@ -13,6 +13,7 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: swift_test_mode_optimize
 // UNSUPPORTED: swift_test_mode_optimize_size
+// UNSUPPORTED: remote_run
 
 import Module
 
@@ -50,27 +51,27 @@ func consumeType_OneArgumentAtFirstUsageDynamic_Dynamic(line: UInt = #line) {
 
 @inline(never)
 func doit() {
-  // CHECK: [[STATIC_METADATA_ADDRESS:[0-9a-f]+]] @ 54
+  // CHECK: [[STATIC_METADATA_ADDRESS:[0-9a-f]+]] @ 55
   consumeType_OneArgumentAtFirstUsageStatic_Static()
-  // CHECK: [[STATIC_METADATA_ADDRESS]] @ 56
+  // CHECK: [[STATIC_METADATA_ADDRESS]] @ 57
   consumeType_OneArgumentAtFirstUsageStatic_Dynamic()
-  // CHECK: [[STATIC_METADATA_ADDRESS]] @ 58
+  // CHECK: [[STATIC_METADATA_ADDRESS]] @ 59
   consumeType_OneArgumentAtFirstUsageStatic_Dynamic()
-  // CHECK: [[DYNAMIC_METADATA_ADDRESS:[0-9a-f]+]] @ 60
+  // CHECK: [[DYNAMIC_METADATA_ADDRESS:[0-9a-f]+]] @ 61
   consumeType_OneArgumentAtFirstUsageDynamic_Dynamic()
-  // CHECK: [[DYNAMIC_METADATA_ADDRESS:[0-9a-f]+]] @ 62
+  // CHECK: [[DYNAMIC_METADATA_ADDRESS:[0-9a-f]+]] @ 63
   consumeType_OneArgumentAtFirstUsageDynamic_Dynamic()
-  // CHECK: [[DYNAMIC_METADATA_ADDRESS]] @ 64
+  // CHECK: [[DYNAMIC_METADATA_ADDRESS]] @ 65
   consumeType_OneArgumentAtFirstUsageDynamic_Static()
 
   let staticMetadata = ptr(to: OneArgument<FirstUsageStatic>.self)
-  // CHECK: [[STATIC_METADATA_ADDRESS]] @ 68
+  // CHECK: [[STATIC_METADATA_ADDRESS]] @ 69
   print(staticMetadata, "@", #line)
   assert(isStaticallySpecializedGenericMetadata(staticMetadata))
   assert(!isCanonicalStaticallySpecializedGenericMetadata(staticMetadata))
 
   let dynamicMetadata = ptr(to: OneArgument<FirstUsageDynamic>.self)
-  // CHECK: [[DYNAMIC_METADATA_ADDRESS]] @ 74
+  // CHECK: [[DYNAMIC_METADATA_ADDRESS]] @ 75
   print(dynamicMetadata, "@", #line)
   assert(!isStaticallySpecializedGenericMetadata(dynamicMetadata))
   assert(!isCanonicalStaticallySpecializedGenericMetadata(dynamicMetadata))
