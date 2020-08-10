@@ -388,7 +388,6 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // Perform retain/release code motion and run the first ARC optimizer.
   P.addEarlyCodeMotion();
   P.addReleaseHoisting();
-  P.addARCSequenceOpts();
 
   P.addSimplifyCFG();
   if (OpLevel == OptimizationLevelKind::LowLevel) {
@@ -406,7 +405,6 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // retains in one go.
   P.addRetainSinking();
   P.addReleaseHoisting();
-  P.addARCSequenceOpts();
 }
 
 static void addPerfDebugSerializationPipeline(SILPassPipelinePlan &P) {
