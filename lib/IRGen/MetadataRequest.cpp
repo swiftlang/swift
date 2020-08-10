@@ -2859,7 +2859,7 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
 
     llvm::Value *stringAddr;
     if (IGM.TargetInfo.OutputObjectFormat == llvm::Triple::Wasm) {
-        stringAddr = subIGF.Builder.CreateIntToPtr(stringAddrOffset, IGM.Int8PtrTy);
+      stringAddr = subIGF.Builder.CreateIntToPtr(stringAddrOffset, IGM.Int8PtrTy);
     } else {
       auto stringAddrBase = subIGF.Builder.CreatePtrToInt(cache, IGM.SizeTy);
       if (IGM.getModule()->getDataLayout().isBigEndian()) {
