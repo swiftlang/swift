@@ -1226,8 +1226,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
 
   ASTContext &Ctx;
 
-  ApplyClassifier Classifier;
-
+  DeclContext *RethrowsDC = nullptr;
   Context CurContext;
 
   class ContextFlags {
@@ -1296,7 +1295,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
   public:
     ContextScope(CheckEffectsCoverage &self, Optional<Context> newContext)
       : Self(self), OldContext(self.CurContext),
-        OldRethrowsDC(self.Classifier.RethrowsDC),
+        OldRethrowsDC(self.RethrowsDC),
         OldFlags(self.Flags),
         OldMaxThrowingKind(self.MaxThrowingKind) {
       if (newContext) self.CurContext = *newContext;
@@ -1306,7 +1305,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
     ContextScope &operator=(const ContextScope &) = delete;
 
     void enterSubFunction() {
-      Self.Classifier.RethrowsDC = nullptr;
+      Self.RethrowsDC = nullptr;
     }
 
     void enterTry() {
@@ -1372,7 +1371,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
 
     ~ContextScope() {
       Self.CurContext = OldContext;
-      Self.Classifier.RethrowsDC = OldRethrowsDC;
+      Self.RethrowsDC = OldRethrowsDC;
       Self.Flags = OldFlags;
       Self.MaxThrowingKind = OldMaxThrowingKind;
     }
@@ -1384,7 +1383,7 @@ public:
       MaxThrowingKind(ThrowingKind::None) {
 
     if (auto rethrowsDC = initialContext.getRethrowsDC()) {
-      Classifier.RethrowsDC = rethrowsDC;
+      RethrowsDC = rethrowsDC;
     }
   }
 
@@ -1494,7 +1493,9 @@ private:
   ShouldRecurse_t checkApply(ApplyExpr *E) {
     // An apply expression is a potential throw site if the function throws.
     // But if the expression didn't type-check, suppress diagnostics.
-    auto classification = Classifier.classifyApply(E);
+    ApplyClassifier classifier;
+    classifier.RethrowsDC = RethrowsDC;
+    auto classification = classifier.classifyApply(E);
 
     checkThrowAsyncSite(E, /*requiresTry*/ true, classification);
 
