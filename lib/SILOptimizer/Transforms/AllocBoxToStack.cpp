@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "allocbox-to-stack"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/BlotMapVector.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILArgument.h"
@@ -42,6 +43,10 @@ STATISTIC(NumStackPromoted, "Number of alloc_box's promoted to the stack");
 static llvm::cl::opt<unsigned> MaxLocalApplyRecurDepth(
     "max-local-apply-recur-depth", llvm::cl::init(4),
     llvm::cl::desc("Max recursive depth for analyzing local functions"));
+
+static llvm::cl::opt<bool> AllocBoxToStackAnalyzeApply(
+    "allocbox-to-stack-analyze-apply", llvm::cl::init(true),
+    llvm::cl::desc("Analyze functions into while alloc_box is passed"));
 
 //===-----------------------------------------------------------------------===//
 //                 SIL Utilities for alloc_box Promotion
@@ -319,6 +324,10 @@ static bool checkLocalApplyBody(Operand *O,
 // AllocBoxToStack opt. We don't want to increase code size, so this is
 // restricted only for private local functions currently.
 static bool isOptimizableApplySite(ApplySite Apply) {
+  if (!AllocBoxToStackAnalyzeApply) {
+    // turned off explicitly
+    return false;
+  }
   auto callee = Apply.getReferencedFunctionOrNull();
   if (!callee) {
     return false;
@@ -978,8 +987,7 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
 }
 
 static void rewriteApplySites(AllocBoxToStackState &pass) {
-  llvm::DenseMap<ApplySite, ArgIndexList> IndexMap;
-  llvm::SmallVector<ApplySite, 8> AppliesToSpecialize;
+  swift::SmallBlotMapVector<ApplySite, ArgIndexList, 8> AppliesToSpecialize;
   ArgIndexList Indices;
 
   // Build a map from the ApplySite to the indices of the operands
@@ -993,17 +1001,26 @@ static void rewriteApplySites(AllocBoxToStackState &pass) {
     Indices.clear();
     Indices.push_back(CalleeArgIndexNumber);
 
-    auto iterAndSuccess = IndexMap.try_emplace(Apply, Indices);
     // AllocBoxStack opt promotes boxes passed to a chain of applies when it is
     // safe to do so. All such applies have to be specialized to take pointer
     // arguments instead of box arguments. This has to be done in dfs order.
-    // Since PromotedOperands is already populated in dfs order by
-    // `recursivelyFindBoxOperandsPromotableToAddress`. Build
-    // `AppliesToSpecialize` in the same order.
-    if (iterAndSuccess.second) {
-      AppliesToSpecialize.push_back(Apply);
-    } else {
-      iterAndSuccess.first->second.push_back(CalleeArgIndexNumber);
+
+    // PromotedOperands is already populated in dfs order by
+    // `recursivelyFindBoxOperandsPromotableToAddress` w.r.t a single alloc_box.
+    // AppliesToSpecialize is then populated in the order of PromotedOperands.
+    // If multiple alloc_boxes are passed to the same apply instruction, then
+    // the apply instruction can appear multiple times in AppliesToSpecialize.
+    // Only its last appearance is maintained and previous appearances are
+    // blotted.
+    auto iterAndSuccess =
+        AppliesToSpecialize.insert(std::make_pair(Apply, Indices));
+    if (!iterAndSuccess.second) {
+      // Blot the previously inserted apply and insert at the end with updated
+      // indices
+      auto OldIndices = iterAndSuccess.first->getValue().second;
+      OldIndices.push_back(CalleeArgIndexNumber);
+      AppliesToSpecialize.erase(iterAndSuccess.first);
+      AppliesToSpecialize.insert(std::make_pair(Apply, OldIndices));
     }
   }
 
@@ -1011,11 +1028,12 @@ static void rewriteApplySites(AllocBoxToStackState &pass) {
   // operands that we will not need, and remove the existing
   // ApplySite.
   SILOptFunctionBuilder FuncBuilder(*pass.T);
-  for (auto &Apply : AppliesToSpecialize) {
-    auto It = IndexMap.find(Apply);
-    assert(It != IndexMap.end());
-    auto &Indices = It->second;
-
+  for (auto &It : AppliesToSpecialize) {
+    if (!It.hasValue()) {
+      continue;
+    }
+    auto Apply = It.getValue().first;
+    auto Indices = It.getValue().second;
     // Sort the indices and unique them.
     sortUnique(Indices);
 
