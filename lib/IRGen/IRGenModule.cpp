@@ -102,6 +102,10 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
 
   auto &CGO = Importer->getClangCodeGenOpts();
   CGO.OptimizationLevel = Opts.shouldOptimize() ? 3 : 0;
+#if defined(_MSC_VER) && _MSC_VER < 1920
+  // For VS2017 and below use frame pointers to get stack traces
+  CGO.setFramePointer(clang::CodeGenOptions::FramePointerKind::NonLeaf);
+#endif
 
   CGO.DiscardValueNames = !Opts.shouldProvideValueNames();
   switch (Opts.DebugInfoLevel) {
