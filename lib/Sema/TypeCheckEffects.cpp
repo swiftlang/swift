@@ -829,9 +829,6 @@ public:
     /// A rethrowing function.
     RethrowingFunction,
 
-    /// A non-throwing autoclosure.
-    NonThrowingAutoClosure,
-
     /// A default argument expression.
     DefaultArgument,
 
@@ -864,12 +861,26 @@ private:
   }
 
   Kind TheKind;
+  Optional<AnyFunctionRef> Function;
   bool IsNonExhaustiveCatch = false;
   bool DiagnoseErrorOnTry = false;
   DeclContext *RethrowsDC = nullptr;
   InterpolatedStringLiteralExpr *InterpolatedString = nullptr;
 
-  explicit Context(Kind kind) : TheKind(kind) {}
+  explicit Context(Kind kind, Optional<AnyFunctionRef> function = None)
+    : TheKind(kind), Function(function) {}
+
+  /// Whether this is an autoclosure.
+  bool isAutoClosure() const {
+    if (!Function)
+      return false;
+
+    auto closure = Function->getAbstractClosureExpr();
+    if (!closure)
+      return false;
+
+    return isa<AutoClosureExpr>(closure);
+  }
 
 public:
   static Context getHandled() {
@@ -883,7 +894,7 @@ public:
 
   static Context forFunction(AbstractFunctionDecl *D) {
     if (D->getAttrs().hasAttribute<RethrowsAttr>()) {
-      Context result(Kind::RethrowingFunction);
+      Context result(Kind::RethrowingFunction, AnyFunctionRef(D));
       result.RethrowsDC = D;
       return result;
     }
@@ -904,7 +915,8 @@ public:
       }
     }
 
-    return Context(D->hasThrows() ? Kind::Handled : Kind::NonThrowingFunction);
+    return Context(D->hasThrows() ? Kind::Handled : Kind::NonThrowingFunction,
+                   AnyFunctionRef(D));
   }
 
   static Context forDeferBody() {
@@ -935,8 +947,8 @@ public:
     }
 
     return Context(closureTypeThrows ? Kind::Handled
-                   : isa<AutoClosureExpr>(E) ? Kind::NonThrowingAutoClosure
-                   : Kind::NonThrowingFunction);
+                                     : Kind::NonThrowingFunction,
+                   AnyFunctionRef(E));
   }
 
   static Context forCatchPattern(CaseStmt *S) {
@@ -1086,7 +1098,8 @@ public:
     // Allow the diagnostic to fire on the 'try' if we don't have
     // anything else to say.
     if (isTryCovered && !reason.isRethrowsCall() &&
-        getKind() == Kind::NonThrowingFunction) {
+        getKind() == Kind::NonThrowingFunction &&
+        !isAutoClosure()) {
       DiagnoseErrorOnTry = true;
       return;
     }
@@ -1126,17 +1139,18 @@ public:
         return;
       }
 
+      if (isAutoClosure()) {
+        diagnoseThrowInLegalContext(Diags, E, isTryCovered, reason,
+                                    diag::throw_in_nonthrowing_autoclosure,
+                              diag::throwing_call_in_nonthrowing_autoclosure,
+                      diag::tryless_throwing_call_in_nonthrowing_autoclosure);
+        return;
+      }
+
       diagnoseThrowInLegalContext(Diags, E, isTryCovered, reason,
                                   diag::throw_in_nonthrowing_function,
                                   diag::throwing_call_unhandled,
                                   diag::tryless_throwing_call_unhandled);
-      return;
-
-    case Kind::NonThrowingAutoClosure:
-      diagnoseThrowInLegalContext(Diags, E, isTryCovered, reason,
-                                  diag::throw_in_nonthrowing_autoclosure,
-                            diag::throwing_call_in_nonthrowing_autoclosure,
-                    diag::tryless_throwing_call_in_nonthrowing_autoclosure);
       return;
 
     case Kind::EnumElementInitializer:
@@ -1184,7 +1198,6 @@ public:
       }
       return;
 
-    case Kind::NonThrowingAutoClosure:
     case Kind::EnumElementInitializer:
     case Kind::GlobalVarInitializer:
     case Kind::IVarInitializer:
