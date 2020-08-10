@@ -12,7 +12,7 @@ struct IntWrapper {
   int getValue() const { return value; }
 };
 
-// MagicWrapper<IntWrapper> ClassTemplateSpecializationDecl doesn't have a
+// The ClassTemplateSpecializationDecl node for MagicWrapper<IntWrapper> doesn't have a
 // definition in Clang because nothing in this header required the
 // instantiation. Therefore we have to construct the definition on the swift
 // side.
