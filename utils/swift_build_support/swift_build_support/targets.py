@@ -181,7 +181,7 @@ class StdlibDeploymentTarget(object):
 
     # A platform that's not tied to any particular OS, and it meant to be used
     # to build the stdlib as standalone and/or statically linked.
-    OSIndependent = Platform("os_independent",
+    Freestanding = Platform("freestanding",
                              archs=["i386", "x86_64", "armv7", "armv7s", "armv7k",
                                     "arm64", "arm64e"])
 
@@ -213,7 +213,7 @@ class StdlibDeploymentTarget(object):
         iOS, iOSSimulator,
         AppleTV, AppleTVSimulator,
         AppleWatch, AppleWatchSimulator,
-        OSIndependent,
+        Freestanding,
         Linux,
         FreeBSD,
         OpenBSD,
