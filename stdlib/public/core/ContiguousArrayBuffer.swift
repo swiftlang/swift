@@ -12,20 +12,6 @@
 
 import SwiftShims
 
-#if INTERNAL_CHECKS_ENABLED
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-@_silgen_name("swift_COWSanityChecksEnabled")
-public func _COWSanityChecksEnabled() -> Bool
-
-@_alwaysEmitIntoClient
-internal func doCOWSanityChecks() -> Bool {
-  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
-    return _COWSanityChecksEnabled()
-  }
-  return false
-}
-#endif
-
 /// Class used whose sole instance is used as storage for empty
 /// arrays.  The instance is defined in the runtime and statically
 /// initialized.  See stdlib/runtime/GlobalObjects.cpp for details.
@@ -468,13 +454,13 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   @_alwaysEmitIntoClient
   internal var isImmutable: Bool {
     get {
-      if doCOWSanityChecks() {
+      if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
         return capacity == 0 || _swift_isImmutableCOWBuffer(_storage)
       }
       return true
     }
     nonmutating set {
-      if doCOWSanityChecks() {
+      if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
         if newValue {
           if capacity > 0 {
             let wasImmutable = _swift_setImmutableCOWBuffer(_storage, true)
@@ -494,7 +480,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   
   @_alwaysEmitIntoClient
   internal var isMutable: Bool {
-    if doCOWSanityChecks() {
+    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
       return !_swift_isImmutableCOWBuffer(_storage)
     }
     return true
