@@ -2006,7 +2006,8 @@ ModuleDecl *ModuleFile::getModule(ModuleID MID) {
       llvm_unreachable("implementation detail only");
     }
   }
-  return getModule(getIdentifier(MID));
+  return getModule(getIdentifier(MID),
+                   getContext().LangOpts.AllowDeserializingImplementationOnly);
 }
 
 ModuleDecl *ModuleFile::getModule(ArrayRef<Identifier> name,
