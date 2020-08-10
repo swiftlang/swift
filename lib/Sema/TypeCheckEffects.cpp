@@ -253,7 +253,7 @@ public:
 };
 
 /// A potential reason why something might throw.
-class PotentialReason {
+class PotentialThrowReason {
 public:
   enum class Kind : uint8_t {
     /// The function throws unconditionally.
@@ -275,21 +275,21 @@ private:
   Expr *TheExpression;
   Kind TheKind;
 
-  explicit PotentialReason(Kind kind) : TheKind(kind) {}
+  explicit PotentialThrowReason(Kind kind) : TheKind(kind) {}
 public:
-  static PotentialReason forRethrowsArgument(Expr *E) {
-    PotentialReason result(Kind::CallRethrowsWithExplicitThrowingArgument);
+  static PotentialThrowReason forRethrowsArgument(Expr *E) {
+    PotentialThrowReason result(Kind::CallRethrowsWithExplicitThrowingArgument);
     result.TheExpression = E;
     return result;
   }
-  static PotentialReason forDefaultArgument() {
-    return PotentialReason(Kind::CallRethrowsWithDefaultThrowingArgument);
+  static PotentialThrowReason forDefaultArgument() {
+    return PotentialThrowReason(Kind::CallRethrowsWithDefaultThrowingArgument);
   }
-  static PotentialReason forThrowingApply() {
-    return PotentialReason(Kind::CallThrows);
+  static PotentialThrowReason forThrowingApply() {
+    return PotentialThrowReason(Kind::CallThrows);
   }
-  static PotentialReason forThrow() {
-    return PotentialReason(Kind::Throw);
+  static PotentialThrowReason forThrow() {
+    return PotentialThrowReason(Kind::Throw);
   }
 
   Kind getKind() const { return TheKind; }
@@ -321,16 +321,16 @@ enum class ThrowingKind {
 };
 
 /// A type expressing the result of classifying whether a call or function
-/// throws.
+/// throws or is async.
 class Classification {
   bool IsInvalid = false;  // The AST is malformed.  Don't diagnose.
   bool IsAsync = false;
   ThrowingKind Result = ThrowingKind::None;
-  Optional<PotentialReason> Reason;
+  Optional<PotentialThrowReason> Reason;
   
 public:
   Classification() : Result(ThrowingKind::None) {}
-  explicit Classification(ThrowingKind result, PotentialReason reason,
+  explicit Classification(ThrowingKind result, PotentialThrowReason reason,
                           bool isAsync)
       : IsAsync(isAsync), Result(result) {
     if (result == ThrowingKind::Throws ||
@@ -341,7 +341,7 @@ public:
 
   /// Return a classification saying that there's an unconditional
   /// throw site.
-  static Classification forThrow(PotentialReason reason, bool isAsync) {
+  static Classification forThrow(PotentialThrowReason reason, bool isAsync) {
     Classification result;
     result.Result = ThrowingKind::Throws;
     result.Reason = reason;
@@ -363,7 +363,7 @@ public:
     return result;
   }
 
-  static Classification forRethrowingOnly(PotentialReason reason) {
+  static Classification forRethrowingOnly(PotentialThrowReason reason) {
     Classification result;
     result.Result = ThrowingKind::RethrowingOnly;
     result.Reason = reason;
@@ -378,7 +378,7 @@ public:
 
   bool isInvalid() const { return IsInvalid; }
   ThrowingKind getResult() const { return Result; }
-  PotentialReason getThrowsReason() const {
+  PotentialThrowReason getThrowsReason() const {
     assert(getResult() == ThrowingKind::Throws ||
            getResult() == ThrowingKind::RethrowingOnly);
     return *Reason;
@@ -446,7 +446,7 @@ public:
 
       assert(args.size() > fnRef.getNumArgumentsForFullApply() &&
              "partial application was throwing?");
-      return Classification::forThrow(PotentialReason::forThrowingApply(),
+      return Classification::forThrow(PotentialThrowReason::forThrowingApply(),
                                       isAsync);
     }
 
@@ -476,7 +476,7 @@ public:
     // Try to classify the implementation of functions that we have
     // local knowledge of.
     Classification result =
-      classifyThrowingFunctionBody(fnRef, PotentialReason::forThrowingApply());
+      classifyThrowingFunctionBody(fnRef, PotentialThrowReason::forThrowingApply());
     assert(result.getResult() != ThrowingKind::None &&
            "body classification decided function was no-throw");
     
@@ -496,7 +496,7 @@ private:
   /// if the function is an autoclosure that simply doesn't throw at all.
   Classification
   classifyThrowingFunctionBody(const AbstractFunction &fn,
-                               PotentialReason reason) {
+                               PotentialThrowReason reason) {
     // If we're not checking a 'rethrows' context, we don't need to
     // distinguish between 'throws' and 'rethrows'.  But don't even
     // trust 'throws' for autoclosures.
@@ -517,7 +517,7 @@ private:
   }
 
   Classification classifyThrowingParameterBody(ParamDecl *param,
-                                               PotentialReason reason) {
+                                               PotentialThrowReason reason) {
     assert(param->getType()
                ->lookThroughAllOptionalTypes()
                ->castTo<AnyFunctionType>()
@@ -542,7 +542,7 @@ private:
   }
 
   Classification classifyThrowingFunctionBody(AbstractFunctionDecl *fn,
-                                              PotentialReason reason) {
+                                              PotentialThrowReason reason) {
     // Functions can't be rethrowing-only unless they're defined
     // within the rethrows context.
     if (!isLocallyDefinedInRethrowsContext(fn) || !fn->hasBody())
@@ -556,7 +556,7 @@ private:
   }
 
   Classification classifyThrowingFunctionBody(AbstractClosureExpr *closure,
-                                              PotentialReason reason) {
+                                              PotentialThrowReason reason) {
     bool isAutoClosure = isa<AutoClosureExpr>(closure);
 
     // Closures can't be rethrowing-only unless they're defined
@@ -705,7 +705,7 @@ private:
 
     if (isa<DefaultArgumentExpr>(arg)) {
       return classifyArgumentByType(arg->getType(),
-                                    PotentialReason::forDefaultArgument());
+                                    PotentialThrowReason::forDefaultArgument());
     }
 
     // If this argument is `nil` literal, it doesn't cause the call to throw.
@@ -736,7 +736,7 @@ private:
         // parameter type included a throwing function type.
         return classifyArgumentByType(
                                     paramType,
-                                    PotentialReason::forRethrowsArgument(arg));
+                                    PotentialThrowReason::forRethrowsArgument(arg));
       }
 
       // FIXME: There's a case where we can end up with an ApplyExpr that
@@ -751,7 +751,7 @@ private:
     if (!paramFnType || !paramFnType->isThrowing())
       return Classification();
 
-    PotentialReason reason = PotentialReason::forRethrowsArgument(arg);
+    PotentialThrowReason reason = PotentialThrowReason::forRethrowsArgument(arg);
 
     // TODO: partial applications?
 
@@ -793,7 +793,7 @@ private:
   /// a throwing function in a way that is permitted to cause a
   /// 'rethrows' function to throw.
   static Classification classifyArgumentByType(Type paramType,
-                                               PotentialReason reason) {
+                                               PotentialThrowReason reason) {
     if (!paramType || paramType->hasError())
       return Classification::forInvalidCode();
     if (auto fnType = paramType->getAs<AnyFunctionType>()) {
@@ -1022,18 +1022,18 @@ public:
   }
 
   static void maybeAddRethrowsNote(DiagnosticEngine &Diags, SourceLoc loc,
-                                   const PotentialReason &reason) {
+                                   const PotentialThrowReason &reason) {
     switch (reason.getKind()) {
-    case PotentialReason::Kind::Throw:
+    case PotentialThrowReason::Kind::Throw:
       llvm_unreachable("should already have been covered");
-    case PotentialReason::Kind::CallThrows:
+    case PotentialThrowReason::Kind::CallThrows:
       // Already fully diagnosed.
       return;
-    case PotentialReason::Kind::CallRethrowsWithExplicitThrowingArgument:
+    case PotentialThrowReason::Kind::CallRethrowsWithExplicitThrowingArgument:
       Diags.diagnose(reason.getThrowingArgument()->getLoc(),
                      diag::because_rethrows_argument_throws);
       return;
-    case PotentialReason::Kind::CallRethrowsWithDefaultThrowingArgument:
+    case PotentialThrowReason::Kind::CallRethrowsWithDefaultThrowingArgument:
       Diags.diagnose(loc, diag::because_rethrows_default_argument_throws);
       return;
     }
@@ -1041,7 +1041,7 @@ public:
   }
 
   void diagnoseUncoveredThrowSite(ASTContext &ctx, ASTNode E,
-                                  const PotentialReason &reason) {
+                                  const PotentialThrowReason &reason) {
     auto &Diags = ctx.Diags;
     auto message = diag::throwing_call_without_try;
     auto loc = E.getStartLoc();
@@ -1077,7 +1077,7 @@ public:
     //
     // Let's suggest couple of alternative fix-its
     // because complete context is unavailable.
-    if (reason.getKind() != PotentialReason::Kind::CallThrows)
+    if (reason.getKind() != PotentialThrowReason::Kind::CallThrows)
       return;
 
     Diags.diagnose(loc, diag::note_forgot_try)
@@ -1090,7 +1090,7 @@ public:
 
   void diagnoseThrowInLegalContext(DiagnosticEngine &Diags, ASTNode node,
                                    bool isTryCovered,
-                                   const PotentialReason &reason,
+                                   const PotentialThrowReason &reason,
                                    Diag<> diagForThrow,
                                    Diag<> diagForThrowingCall,
                                    Diag<> diagForTrylessThrowingCall) {
@@ -1119,7 +1119,7 @@ public:
 
   void diagnoseUnhandledThrowSite(DiagnosticEngine &Diags, ASTNode E,
                                   bool isTryCovered,
-                                  const PotentialReason &reason) {
+                                  const PotentialThrowReason &reason) {
     switch (getKind()) {
     case Kind::Handled:
       llvm_unreachable("throw site is handled!");
@@ -1558,7 +1558,7 @@ private:
 
   ShouldRecurse_t checkThrow(ThrowStmt *S) {
     checkThrowAsyncSite(S, /*requiresTry*/ false,
-                        Classification::forThrow(PotentialReason::forThrow(),
+                        Classification::forThrow(PotentialThrowReason::forThrow(),
                                                  /*async*/false));
     return ShouldRecurse;
   }
