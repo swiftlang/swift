@@ -385,6 +385,12 @@ namespace swift {
     /// Load swiftmodule files in memory as volatile and avoid mmap.
     bool EnableVolatileModules = false;
 
+    /// Allow deserializing implementation only dependencies. This should only
+    /// be set true by lldb and other tooling, so that deserilization
+    /// recovery issues won't bring down the debugger.
+    /// TODO: remove this when @_implementationOnly modules are robust enough.
+    bool AllowDeserializingImplementationOnly = false;
+
     /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///
