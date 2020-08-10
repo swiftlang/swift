@@ -2579,7 +2579,7 @@ dramatically change the API of the type.
 ### Class templates: importing full specializations behind typedefs
 
 C++ typedefs for full specializations of class templates could be
-imported as a non-generit struct with the given name.
+imported as non-generic structs with the name of the typedef.
 
 ```c++
 // C++ header.
