@@ -2578,7 +2578,7 @@ dramatically change the API of the type.
 
 ### Class templates: importing full specializations behind typedefs
 
-Typedefs having template instantiation as their underlying type could be
+C++ typedefs for full specializations of class templates could be
 imported as a non-generit struct with the given name.
 
 ```c++
