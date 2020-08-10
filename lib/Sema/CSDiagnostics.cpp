@@ -3450,16 +3450,28 @@ bool MissingMemberFailure::diagnoseForSubscriptMemberWithTupleBase() const {
   if (SE->getNumArguments() == 1) {
     auto *literal =
         dyn_cast<IntegerLiteralExpr>(index->getSemanticsProvidingExpr());
-    if (literal && !literal->isNegative()) {
-      llvm::SmallString<4> dotAccess;
-      llvm::raw_svector_ostream OS(dotAccess);
-      OS << "." << literal->getDigitsText();
 
-      emitDiagnostic(
-          diag::could_not_find_subscript_member_tuple_did_you_mean_use_dot,
-          baseType, literal->getDigitsText())
-          .fixItReplace(index->getSourceRange(), OS.str());
-      return true;
+    llvm::Regex NumericRegex("^[0-9]+$");
+    // Literal expressions may have other types of representations e.g. 0x01,
+    // 0b01. So let's make sure to only suggest this tailored literal fix-it for
+    // number only literals.
+    if (literal && NumericRegex.match(literal->getDigitsText())) {
+      unsigned int literalValue = 0;
+      literal->getDigitsText().getAsInteger(/*Radix*/ 0, literalValue);
+
+      // Verify if the literal value is within the bounds of tuple elements.
+      if (!literal->isNegative() &&
+          literalValue < tupleType->getNumElements()) {
+        llvm::SmallString<4> dotAccess;
+        llvm::raw_svector_ostream OS(dotAccess);
+        OS << "." << literalValue;
+
+        emitDiagnostic(
+            diag::could_not_find_subscript_member_tuple_did_you_mean_use_dot,
+            baseType, literal->getDigitsText())
+            .fixItReplace(index->getSourceRange(), OS.str());
+        return true;
+      }
     }
   }
 
