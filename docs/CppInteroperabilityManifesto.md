@@ -2576,40 +2576,43 @@ We could ignore explicit specializations of function templates, because they
 don't affect the API. Explicit specializations of class templates can
 dramatically change the API of the type.
 
-### Class templates: importing full specializations behind typedefs
+### Class templates: Importing full class template instantiations
 
-C++ typedefs for full specializations of class templates could be
-imported as non-generic structs with the name of the typedef.
+A class template instantiation could be imported as a struct named
+`__CxxTemplateInst` plus Itanium mangled type of the instantiation (see the
+`type` production in the Itanium specification). Note that Itanium mangling is
+used on all platforms, regardless of the ABI of the C++ toolchain, to ensure
+that the mangled name is a valid Swift type name (this is not the case for MSVC
+mangled names). A prefix with a double underscore (to ensure we have a reserved
+C++ identifier) is added to limit the possibility for conflicts with names of
+user-defined structs. The struct is notionally defined in the `__C` module,
+similarly to regular C and C++ structs and classes. Consider the following C++
+module:
 
 ```c++
 // C++ header.
 
-template<typename T>
-class ClassTemplate {};
+template<class T>
+struct MagicWrapper {
+  T t;
+};
+struct MagicNumber {};
 
-typedef ClassTemplate<int> ClassTemplateOfInt;
+typedef MagicWrapper<MagicNumber> WrappedMagicNumber;
 ```
+
+`WrappedMagicNumber` will be imported as a typealias for a struct
+`__CxxTemplateInst12MagicWrapperI11MagicNumberE`. Interface of the imported
+module will look as follows:
 
 ```swift
 // C++ header imported to Swift.
 
-struct ClassTemplateOfInt {}
-```
-
-In C++, multiple distinct typedeffed instantiations must resolve to the same
-canonical type. We could implement this by creating a hidden intermediate struct
-that typedef aliasses.
-
-The struct could be named as `__CxxTemplateInst` plus Itanium mangled type of
-the instantiation. For the example above the name of the hidden struct is
-`__CxxTemplateInst13ClassTemplateIiE`. Double underscore (denoting a reserved
-C++ identifier) is used to discourage direct usage. We chose Itanium mangling
-scheme because it produces valid Swift identifiers and covers all C++ edge
-cases. The example above will therefore be imported as follows:
-
-```swift
-struct __CxxTemplateInst13ClassTemplateIiE {}
-typealias ClassTemplateOfInt = __CxxTemplateInst13ClassTemplateIiE
+struct __CxxTemplateInst12MagicWrapperI11MagicNumberE {
+    var t: MagicNumber
+}
+struct MagicNumber {}
+typealias WrappedMagicNumber = __CxxTemplateInst12MagicWrapperI11MagicNumberE
 ```
 
 ### Class templates: importing specific specilalizations
