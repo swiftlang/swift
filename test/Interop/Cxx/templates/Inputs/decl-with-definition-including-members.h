@@ -17,7 +17,7 @@ inline int forceInstantiation() {
   return t.getValuePlusArg(14);
 }
 
-// MagicWrapper<IntWrapper> ClassTemplateSpecializationDecl has a definition
+// The ClassTemplateSpecializationDecl node for MagicWrapper<IntWrapper> already has a definition
 // because function above forced the instantiation. Its members are fully
 // instantiated, so nothing needs to be explicitly instantiated by the Swift
 // compiler.
