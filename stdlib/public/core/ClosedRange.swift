@@ -330,10 +330,12 @@ extension Comparable {
   /// - Parameters:
   ///   - minimum: The lower bound for the range.
   ///   - maximum: The upper bound for the range.
+  ///
+  /// - Precondition: `minimum <= maximum`.
   @_transparent
   public static func ... (minimum: Self, maximum: Self) -> ClosedRange<Self> {
     _precondition(
-      minimum <= maximum, "Can't form Range with upperBound < lowerBound")
+      minimum <= maximum, "Range requires lowerBound <= upperBound")
     return ClosedRange(uncheckedBounds: (lower: minimum, upper: maximum))
   }
 }
