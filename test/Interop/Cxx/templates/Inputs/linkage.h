@@ -10,7 +10,7 @@ struct MagicWrapper {
 };
 
 struct MagicNumber {
-  // Swift runtime defines many value witness tables for common types.
+  // Swift runtime defines many value witness tables for types with some common layouts.
   // This struct's uncommon size forces the compiler to define a new value witness table instead of reusing one from the runtime.
   char forceVWTableCreation[57];
   int getInt() const { return 12; }
