@@ -855,26 +855,6 @@ public:
   };
 
 private:
-  static Kind getKindForFunctionBody(Type type, unsigned numArgs) {
-    /// Determine whether calling a function of the specified type with the
-    /// specified number of arguments would throw.
-    if (!type) return Kind::Handled;
-    
-    assert(numArgs > 0);
-    while (true) {
-      auto fnType = type->getAs<AnyFunctionType>();
-      if (!fnType) return Kind::Handled;
-      
-      if (fnType->getExtInfo().isThrowing())
-        return Kind::Handled;
-      
-      if (--numArgs == 0)
-        return Kind::NonThrowingFunction;
-      
-      type = fnType->getResult();
-    }
-  }
-
   static Context getContextForPatternBinding(PatternBindingDecl *pbd) {
     if (!pbd->isStatic() && pbd->getDeclContext()->isTypeContext()) {
       return Context(Kind::IVarInitializer);
@@ -924,8 +904,7 @@ public:
       }
     }
 
-    return Context(getKindForFunctionBody(
-        D->getInterfaceType(), D->getNumCurryLevels()));
+    return Context(D->hasThrows() ? Kind::Handled : Kind::NonThrowingFunction);
   }
 
   static Context forDeferBody() {
@@ -948,10 +927,16 @@ public:
   }
 
   static Context forClosure(AbstractClosureExpr *E) {
-    auto kind = getKindForFunctionBody(E->getType(), 1);
-    if (kind != Kind::Handled && isa<AutoClosureExpr>(E))
-      kind = Kind::NonThrowingAutoClosure;
-    return Context(kind);
+    // Determine whether the closure has throwing function type.
+    bool closureTypeThrows = true;
+    if (auto closureType = E->getType()) {
+      if (auto fnType = closureType->getAs<AnyFunctionType>())
+        closureTypeThrows = fnType->isThrowing();
+    }
+
+    return Context(closureTypeThrows ? Kind::Handled
+                   : isa<AutoClosureExpr>(E) ? Kind::NonThrowingAutoClosure
+                   : Kind::NonThrowingFunction);
   }
 
   static Context forCatchPattern(CaseStmt *S) {
