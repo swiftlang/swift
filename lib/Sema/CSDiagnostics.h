@@ -1079,7 +1079,7 @@ private:
   /// e.g
   /// ```swift
   ///   let tuple: (Int, Int) = (0, 0)
-  ///   _ = tuple[0]
+  ///   _ = tuple[0] // -> tuple.0.
   ///  ```
   bool diagnoseForSubscriptMemberWithTupleBase() const;
 
