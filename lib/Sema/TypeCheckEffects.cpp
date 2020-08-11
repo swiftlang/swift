@@ -857,6 +857,10 @@ private:
   Kind TheKind;
   Optional<AnyFunctionRef> Function;
   bool HandlesErrors = false;
+
+  /// Whether error-handling queries should ignore the function context, e.g.,
+  /// for autoclosure and rethrows checks.
+  bool ErrorHandlingIgnoresFunction = false;
   bool IsNonExhaustiveCatch = false;
   bool DiagnoseErrorOnTry = false;
   InterpolatedStringLiteralExpr *InterpolatedString = nullptr;
@@ -876,6 +880,9 @@ public:
     if (!HandlesErrors)
       return false;
 
+    if (ErrorHandlingIgnoresFunction)
+      return false;
+
     if (!Function)
       return false;
 
@@ -891,15 +898,14 @@ public:
     if (!Function)
       return false;
 
+    if (ErrorHandlingIgnoresFunction)
+      return false;
+
     auto closure = Function->getAbstractClosureExpr();
     if (!closure)
       return false;
 
     return isa<AutoClosureExpr>(closure);
-  }
-
-  static Context getHandled() {
-    return Context(/*handlesErrors=*/true, None);
   }
 
   static Context forTopLevelCode(TopLevelCodeDecl *D) {
@@ -973,6 +979,15 @@ public:
   Context withInterpolatedString(InterpolatedStringLiteralExpr *E) const {
     Context copy = *this;
     copy.InterpolatedString = E;
+    return copy;
+  }
+
+  /// Form a subcontext that handles all errors, e.g., for the body of a
+  /// do-catch with exhaustive catch clauses.
+  Context withHandlesErrors() const {
+    Context copy = *this;
+    copy.HandlesErrors = true;
+    copy.ErrorHandlingIgnoresFunction = true;
     return copy;
   }
 
@@ -1416,8 +1431,8 @@ private:
   }
 
   ThrowingKind checkExhaustiveDoBody(DoCatchStmt *S) {
-    // This is a handled context.
-    ContextScope scope(*this, Context::getHandled());
+    // This is a context where errors are handled.
+    ContextScope scope(*this, CurContext.withHandlesErrors());
     assert(!Flags.has(ContextFlags::IsInTry) && "do/catch within try?");
     scope.resetCoverageForDoCatch();
 
@@ -1474,9 +1489,9 @@ private:
     if (doThrowingKind != ThrowingKind::Throws &&
         CurContext.isRethrows()) {
       // If this catch clause is reachable at all, it's because a function
-      // parameter throws. So let's temporarily set our context to Handled so
-      // the catch body is allowed to throw.
-      CurContext = Context::getHandled();
+      // parameter throws. So let's temporarily state that the body is allowed
+      // to throw.
+      CurContext = CurContext.withHandlesErrors();
     }
 
     // The catch body just happens in the enclosing context.
@@ -1661,7 +1676,7 @@ private:
 
   ShouldRecurse_t checkForceTry(ForceTryExpr *E) {
     // Walk the operand.  'try!' handles errors.
-    ContextScope scope(*this, Context::getHandled());
+    ContextScope scope(*this, CurContext.withHandlesErrors());
     scope.enterTry();
 
     E->getSubExpr()->walk(*this);
@@ -1675,7 +1690,7 @@ private:
 
   ShouldRecurse_t checkOptionalTry(OptionalTryExpr *E) {
     // Walk the operand.  'try?' handles errors.
-    ContextScope scope(*this, Context::getHandled());
+    ContextScope scope(*this, CurContext.withHandlesErrors());
     scope.enterTry();
 
     E->getSubExpr()->walk(*this);
