@@ -1030,17 +1030,17 @@ public:
 
   static void diagnoseThrowInIllegalContext(DiagnosticEngine &Diags,
                                             ASTNode node,
-                                            StringRef description) {
+                                            Kind kind) {
     if (auto *e = node.dyn_cast<Expr*>()) {
       if (isa<ApplyExpr>(e)) {
         Diags.diagnose(e->getLoc(), diag::throwing_call_in_illegal_context,
-                       description);
+                       static_cast<unsigned>(kind));
         return;
       }
     }
 
     Diags.diagnose(node.getStartLoc(), diag::throw_in_illegal_context,
-                   description);
+                   static_cast<unsigned>(kind));
   }
 
   static void maybeAddRethrowsNote(DiagnosticEngine &Diags, SourceLoc loc,
@@ -1174,31 +1174,15 @@ public:
       return;
 
     case Kind::EnumElementInitializer:
-      diagnoseThrowInIllegalContext(Diags, E, "an enum case raw value");
-      return;
-
     case Kind::GlobalVarInitializer:
-      diagnoseThrowInIllegalContext(Diags, E, "a global variable initializer");
-      return;
-
     case Kind::IVarInitializer:
-      diagnoseThrowInIllegalContext(Diags, E, "a property initializer");
-      return;
-
     case Kind::DefaultArgument:
-      diagnoseThrowInIllegalContext(Diags, E, "a default argument");
-      return;
-
     case Kind::CatchPattern:
-      diagnoseThrowInIllegalContext(Diags, E, "a catch pattern");
+    case Kind::CatchGuard:
+    case Kind::DeferBody:
+      diagnoseThrowInIllegalContext(Diags, E, getKind());
       return;
 
-    case Kind::CatchGuard:
-      diagnoseThrowInIllegalContext(Diags, E, "a catch guard expression");
-      return;
-    case Kind::DeferBody:
-      diagnoseThrowInIllegalContext(Diags, E, "a defer body");
-      return;
     }
     llvm_unreachable("bad context kind");
   }

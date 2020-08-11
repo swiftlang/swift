@@ -4008,10 +4008,13 @@ ERROR(throw_in_nonexhaustive_catch,none,
       "error is not handled because the enclosing catch is not exhaustive", ())
 
 ERROR(throwing_call_in_illegal_context,none,
-      "call can throw, but errors cannot be thrown out of %0",
-      (StringRef))
+      "call can throw, but errors cannot be thrown out of "
+      "%select{<<ERROR>>|a default argument|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
+      (unsigned))
 ERROR(throw_in_illegal_context,none,
-      "errors cannot be thrown out of %0", (StringRef))
+      "errors cannot be thrown out of "
+      "%select{<<ERROR>>|a default argument|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
+      (unsigned))
 
 ERROR(throwing_operator_without_try,none,
       "operator can throw but expression is not marked with 'try'", ())
