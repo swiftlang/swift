@@ -176,7 +176,41 @@ bool ConstraintSystem::isTypeReference(Expr *E) {
       });
 }
 
+bool Solution::isTypeReference(Expr *E) const {
+  return E->isTypeReference(
+      [&](Expr *expr) -> Type { return simplifyType(getType(expr)); },
+      [&](Expr *expr) -> Decl * {
+        ConstraintLocator *locator = nullptr;
+        if (auto *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
+          locator = getConstraintLocator(UDE, {ConstraintLocator::Member});
+        }
+
+        if (auto *UME = dyn_cast<UnresolvedMemberExpr>(E)) {
+          locator =
+              getConstraintLocator(UME, {ConstraintLocator::UnresolvedMember});
+        }
+
+        if (isa<OverloadSetRefExpr>(E))
+          locator = getConstraintLocator(const_cast<Expr *>(E));
+
+        if (locator) {
+          if (auto selectedOverload = getOverloadChoiceIfAvailable(locator)) {
+            const auto &choice = selectedOverload->choice;
+            return choice.getDeclOrNull();
+          }
+        }
+
+        return nullptr;
+      });
+}
+
 bool ConstraintSystem::isStaticallyDerivedMetatype(Expr *E) {
+  return E->isStaticallyDerivedMetatype(
+      [&](Expr *E) -> Type { return simplifyType(getType(E)); },
+      [&](Expr *E) -> bool { return isTypeReference(E); });
+}
+
+bool Solution::isStaticallyDerivedMetatype(Expr *E) const {
   return E->isStaticallyDerivedMetatype(
       [&](Expr *E) -> Type { return simplifyType(getType(E)); },
       [&](Expr *E) -> bool { return isTypeReference(E); });
@@ -8379,6 +8413,10 @@ Type Solution::getType(ASTNode node) const {
 
   auto &cs = getConstraintSystem();
   return cs.getType(node);
+}
+
+Type Solution::getResolvedType(ASTNode node) const {
+  return simplifyType(getType(node));
 }
 
 void Solution::setExprTypes(Expr *expr) const {
