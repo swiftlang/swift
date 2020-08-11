@@ -1,4 +1,4 @@
-//===--- TypeCheckError.cpp - Type Checking for Error Coverage ------------===//
+//===--- TypeCheckEffects.cpp - Type Checking for Effects Coverage --------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements semantic analysis to ensure that errors are
-// caught.
+// This file implements semantic analysis to ensure that various effects (such
+// as throwing and async) are properly handled.
 //
 //===----------------------------------------------------------------------===//
 
@@ -184,9 +184,9 @@ enum ShouldRecurse_t : bool {
 };
 
 /// A CRTP ASTWalker implementation that looks for interesting
-/// nodes for error handling.
+/// nodes for effects handling.
 template <class Impl>
-class ErrorHandlingWalker : public ASTWalker {
+class EffectsHandlingWalker : public ASTWalker {
   Impl &asImpl() { return *static_cast<Impl*>(this); }
 public:
   bool walkToDeclPre(Decl *D) override {
@@ -221,7 +221,7 @@ public:
     } else if (auto interpolated = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
       recurse = asImpl().checkInterpolatedStringLiteral(interpolated);
     }
-    // Error handling validation (via checkTopLevelErrorHandling) happens after
+    // Error handling validation (via checkTopLevelEffects) happens after
     // type checking. If an unchecked expression is still around, the code was
     // invalid.
 #define UNCHECKED_EXPR(KIND, BASE) \
@@ -253,7 +253,7 @@ public:
 };
 
 /// A potential reason why something might throw.
-class PotentialReason {
+class PotentialThrowReason {
 public:
   enum class Kind : uint8_t {
     /// The function throws unconditionally.
@@ -275,21 +275,21 @@ private:
   Expr *TheExpression;
   Kind TheKind;
 
-  explicit PotentialReason(Kind kind) : TheKind(kind) {}
+  explicit PotentialThrowReason(Kind kind) : TheKind(kind) {}
 public:
-  static PotentialReason forRethrowsArgument(Expr *E) {
-    PotentialReason result(Kind::CallRethrowsWithExplicitThrowingArgument);
+  static PotentialThrowReason forRethrowsArgument(Expr *E) {
+    PotentialThrowReason result(Kind::CallRethrowsWithExplicitThrowingArgument);
     result.TheExpression = E;
     return result;
   }
-  static PotentialReason forDefaultArgument() {
-    return PotentialReason(Kind::CallRethrowsWithDefaultThrowingArgument);
+  static PotentialThrowReason forDefaultArgument() {
+    return PotentialThrowReason(Kind::CallRethrowsWithDefaultThrowingArgument);
   }
-  static PotentialReason forThrowingApply() {
-    return PotentialReason(Kind::CallThrows);
+  static PotentialThrowReason forThrowingApply() {
+    return PotentialThrowReason(Kind::CallThrows);
   }
-  static PotentialReason forThrow() {
-    return PotentialReason(Kind::Throw);
+  static PotentialThrowReason forThrow() {
+    return PotentialThrowReason(Kind::Throw);
   }
 
   Kind getKind() const { return TheKind; }
@@ -321,16 +321,16 @@ enum class ThrowingKind {
 };
 
 /// A type expressing the result of classifying whether a call or function
-/// throws.
+/// throws or is async.
 class Classification {
   bool IsInvalid = false;  // The AST is malformed.  Don't diagnose.
   bool IsAsync = false;
   ThrowingKind Result = ThrowingKind::None;
-  Optional<PotentialReason> Reason;
+  Optional<PotentialThrowReason> Reason;
   
 public:
   Classification() : Result(ThrowingKind::None) {}
-  explicit Classification(ThrowingKind result, PotentialReason reason,
+  explicit Classification(ThrowingKind result, PotentialThrowReason reason,
                           bool isAsync)
       : IsAsync(isAsync), Result(result) {
     if (result == ThrowingKind::Throws ||
@@ -341,7 +341,7 @@ public:
 
   /// Return a classification saying that there's an unconditional
   /// throw site.
-  static Classification forThrow(PotentialReason reason, bool isAsync) {
+  static Classification forThrow(PotentialThrowReason reason, bool isAsync) {
     Classification result;
     result.Result = ThrowingKind::Throws;
     result.Reason = reason;
@@ -363,7 +363,7 @@ public:
     return result;
   }
 
-  static Classification forRethrowingOnly(PotentialReason reason) {
+  static Classification forRethrowingOnly(PotentialThrowReason reason) {
     Classification result;
     result.Result = ThrowingKind::RethrowingOnly;
     result.Reason = reason;
@@ -378,7 +378,7 @@ public:
 
   bool isInvalid() const { return IsInvalid; }
   ThrowingKind getResult() const { return Result; }
-  PotentialReason getThrowsReason() const {
+  PotentialThrowReason getThrowsReason() const {
     assert(getResult() == ThrowingKind::Throws ||
            getResult() == ThrowingKind::RethrowingOnly);
     return *Reason;
@@ -446,7 +446,7 @@ public:
 
       assert(args.size() > fnRef.getNumArgumentsForFullApply() &&
              "partial application was throwing?");
-      return Classification::forThrow(PotentialReason::forThrowingApply(),
+      return Classification::forThrow(PotentialThrowReason::forThrowingApply(),
                                       isAsync);
     }
 
@@ -476,7 +476,7 @@ public:
     // Try to classify the implementation of functions that we have
     // local knowledge of.
     Classification result =
-      classifyThrowingFunctionBody(fnRef, PotentialReason::forThrowingApply());
+      classifyThrowingFunctionBody(fnRef, PotentialThrowReason::forThrowingApply());
     assert(result.getResult() != ThrowingKind::None &&
            "body classification decided function was no-throw");
     
@@ -496,7 +496,7 @@ private:
   /// if the function is an autoclosure that simply doesn't throw at all.
   Classification
   classifyThrowingFunctionBody(const AbstractFunction &fn,
-                               PotentialReason reason) {
+                               PotentialThrowReason reason) {
     // If we're not checking a 'rethrows' context, we don't need to
     // distinguish between 'throws' and 'rethrows'.  But don't even
     // trust 'throws' for autoclosures.
@@ -517,7 +517,7 @@ private:
   }
 
   Classification classifyThrowingParameterBody(ParamDecl *param,
-                                               PotentialReason reason) {
+                                               PotentialThrowReason reason) {
     assert(param->getType()
                ->lookThroughAllOptionalTypes()
                ->castTo<AnyFunctionType>()
@@ -542,7 +542,7 @@ private:
   }
 
   Classification classifyThrowingFunctionBody(AbstractFunctionDecl *fn,
-                                              PotentialReason reason) {
+                                              PotentialThrowReason reason) {
     // Functions can't be rethrowing-only unless they're defined
     // within the rethrows context.
     if (!isLocallyDefinedInRethrowsContext(fn) || !fn->hasBody())
@@ -556,7 +556,7 @@ private:
   }
 
   Classification classifyThrowingFunctionBody(AbstractClosureExpr *closure,
-                                              PotentialReason reason) {
+                                              PotentialThrowReason reason) {
     bool isAutoClosure = isa<AutoClosureExpr>(closure);
 
     // Closures can't be rethrowing-only unless they're defined
@@ -580,7 +580,7 @@ private:
   }
 
   class FunctionBodyClassifier
-      : public ErrorHandlingWalker<FunctionBodyClassifier> {
+      : public EffectsHandlingWalker<FunctionBodyClassifier> {
     ApplyClassifier &Self;
   public:
     bool IsInvalid = false;
@@ -705,7 +705,7 @@ private:
 
     if (isa<DefaultArgumentExpr>(arg)) {
       return classifyArgumentByType(arg->getType(),
-                                    PotentialReason::forDefaultArgument());
+                                    PotentialThrowReason::forDefaultArgument());
     }
 
     // If this argument is `nil` literal, it doesn't cause the call to throw.
@@ -736,7 +736,7 @@ private:
         // parameter type included a throwing function type.
         return classifyArgumentByType(
                                     paramType,
-                                    PotentialReason::forRethrowsArgument(arg));
+                                    PotentialThrowReason::forRethrowsArgument(arg));
       }
 
       // FIXME: There's a case where we can end up with an ApplyExpr that
@@ -751,7 +751,7 @@ private:
     if (!paramFnType || !paramFnType->isThrowing())
       return Classification();
 
-    PotentialReason reason = PotentialReason::forRethrowsArgument(arg);
+    PotentialThrowReason reason = PotentialThrowReason::forRethrowsArgument(arg);
 
     // TODO: partial applications?
 
@@ -793,7 +793,7 @@ private:
   /// a throwing function in a way that is permitted to cause a
   /// 'rethrows' function to throw.
   static Classification classifyArgumentByType(Type paramType,
-                                               PotentialReason reason) {
+                                               PotentialThrowReason reason) {
     if (!paramType || paramType->hasError())
       return Classification::forInvalidCode();
     if (auto fnType = paramType->getAs<AnyFunctionType>()) {
@@ -816,24 +816,12 @@ private:
   }
 };
 
-/// An error-handling context.
+/// An context in which effects might be handled.
 class Context {
 public:
   enum class Kind : uint8_t {
-    /// A context that handles errors.
-    Handled,
-
-    /// A non-throwing function.
-    NonThrowingFunction,
-
-    /// A rethrowing function.
-    RethrowingFunction,
-
-    /// A non-throwing autoclosure.
-    NonThrowingAutoClosure,
-
-    /// A non-exhaustive catch within a non-throwing function.
-    NonExhaustiveCatch,
+    /// A context that potentially handles errors or async calls.
+    PotentiallyHandled,
 
     /// A default argument expression.
     DefaultArgument,
@@ -858,26 +846,6 @@ public:
   };
 
 private:
-  static Kind getKindForFunctionBody(Type type, unsigned numArgs) {
-    /// Determine whether calling a function of the specified type with the
-    /// specified number of arguments would throw.
-    if (!type) return Kind::Handled;
-    
-    assert(numArgs > 0);
-    while (true) {
-      auto fnType = type->getAs<AnyFunctionType>();
-      if (!fnType) return Kind::Handled;
-      
-      if (fnType->getExtInfo().isThrowing())
-        return Kind::Handled;
-      
-      if (--numArgs == 0)
-        return Kind::NonThrowingFunction;
-      
-      type = fnType->getResult();
-    }
-  }
-
   static Context getContextForPatternBinding(PatternBindingDecl *pbd) {
     if (!pbd->isStatic() && pbd->getDeclContext()->isTypeContext()) {
       return Context(Kind::IVarInitializer);
@@ -887,29 +855,65 @@ private:
   }
 
   Kind TheKind;
+  Optional<AnyFunctionRef> Function;
+  bool HandlesErrors = false;
+
+  /// Whether error-handling queries should ignore the function context, e.g.,
+  /// for autoclosure and rethrows checks.
+  bool ErrorHandlingIgnoresFunction = false;
+  bool IsNonExhaustiveCatch = false;
   bool DiagnoseErrorOnTry = false;
-  DeclContext *RethrowsDC = nullptr;
   InterpolatedStringLiteralExpr *InterpolatedString = nullptr;
 
-  explicit Context(Kind kind) : TheKind(kind) {}
+  explicit Context(Kind kind)
+      : TheKind(kind), Function(None), HandlesErrors(false) {
+    assert(TheKind != Kind::PotentiallyHandled);
+  }
+
+  explicit Context(bool handlesErrors, Optional<AnyFunctionRef> function)
+    : TheKind(Kind::PotentiallyHandled), Function(function),
+      HandlesErrors(handlesErrors) { }
 
 public:
-  static Context getHandled() {
-    return Context(Kind::Handled);
+  /// Whether this is a function that rethrows.
+  bool isRethrows() const {
+    if (!HandlesErrors)
+      return false;
+
+    if (ErrorHandlingIgnoresFunction)
+      return false;
+
+    if (!Function)
+      return false;
+
+    auto fn = Function->getAbstractFunctionDecl();
+    if (!fn)
+      return false;
+
+    return fn->getAttrs().hasAttribute<RethrowsAttr>();
+  }
+
+  /// Whether this is an autoclosure.
+  bool isAutoClosure() const {
+    if (!Function)
+      return false;
+
+    if (ErrorHandlingIgnoresFunction)
+      return false;
+
+    auto closure = Function->getAbstractClosureExpr();
+    if (!closure)
+      return false;
+
+    return isa<AutoClosureExpr>(closure);
   }
 
   static Context forTopLevelCode(TopLevelCodeDecl *D) {
-    // Top-level code implicitly handles errors.
-    return Context(Kind::Handled);
+    // Top-level code implicitly handles errors and 'async' calls.
+    return Context(/*handlesErrors=*/true, None);
   }
 
   static Context forFunction(AbstractFunctionDecl *D) {
-    if (D->getAttrs().hasAttribute<RethrowsAttr>()) {
-      Context result(Kind::RethrowingFunction);
-      result.RethrowsDC = D;
-      return result;
-    }
-
     // HACK: If the decl is the synthesized getter for a 'lazy' property, then
     // treat the context as a property initializer in order to produce a better
     // diagnostic; the only code we should be diagnosing on is within the
@@ -926,8 +930,8 @@ public:
       }
     }
 
-    return Context(getKindForFunctionBody(
-        D->getInterfaceType(), D->getNumCurryLevels()));
+    bool handlesErrors = D->hasThrows();
+    return Context(handlesErrors, AnyFunctionRef(D));
   }
 
   static Context forDeferBody() {
@@ -950,14 +954,14 @@ public:
   }
 
   static Context forClosure(AbstractClosureExpr *E) {
-    auto kind = getKindForFunctionBody(E->getType(), 1);
-    if (kind != Kind::Handled && isa<AutoClosureExpr>(E))
-      kind = Kind::NonThrowingAutoClosure;
-    return Context(kind);
-  }
+    // Determine whether the closure has throwing function type.
+    bool closureTypeThrows = true;
+    if (auto closureType = E->getType()) {
+      if (auto fnType = closureType->getAs<AnyFunctionType>())
+        closureTypeThrows = fnType->isThrowing();
+    }
 
-  static Context forNonExhaustiveCatch(DoCatchStmt *S) {
-    return Context(Kind::NonExhaustiveCatch);
+    return Context(closureTypeThrows, AnyFunctionRef(E));
   }
 
   static Context forCatchPattern(CaseStmt *S) {
@@ -978,11 +982,19 @@ public:
     return copy;
   }
 
+  /// Form a subcontext that handles all errors, e.g., for the body of a
+  /// do-catch with exhaustive catch clauses.
+  Context withHandlesErrors() const {
+    Context copy = *this;
+    copy.HandlesErrors = true;
+    copy.ErrorHandlingIgnoresFunction = true;
+    return copy;
+  }
+
   Kind getKind() const { return TheKind; }
 
   bool handlesNothing() const {
-    return getKind() != Kind::Handled &&
-           getKind() != Kind::RethrowingFunction;
+    return !HandlesErrors;
   }
   bool handles(ThrowingKind errorKind) const {
     switch (errorKind) {
@@ -991,49 +1003,59 @@ public:
 
     // A call that's rethrowing-only can be handled by 'rethrows'.
     case ThrowingKind::RethrowingOnly:
-      return !handlesNothing();
+      return HandlesErrors;
 
     // An operation that always throws can only be handled by an
     // all-handling context.
     case ThrowingKind::Throws:
-      return getKind() == Kind::Handled;
+      return HandlesErrors && !isRethrows();
     }
     llvm_unreachable("bad error kind");
   }
 
-  DeclContext *getRethrowsDC() const { return RethrowsDC; }
+  DeclContext *getRethrowsDC() const {
+    if (!isRethrows())
+      return nullptr;
+
+    return Function->getAbstractFunctionDecl();
+  }
+
   InterpolatedStringLiteralExpr * getInterpolatedString() const {
     return InterpolatedString;
   }
 
+  void setNonExhaustiveCatch(bool value) {
+    IsNonExhaustiveCatch = value;
+  }
+
   static void diagnoseThrowInIllegalContext(DiagnosticEngine &Diags,
                                             ASTNode node,
-                                            StringRef description) {
+                                            Kind kind) {
     if (auto *e = node.dyn_cast<Expr*>()) {
       if (isa<ApplyExpr>(e)) {
         Diags.diagnose(e->getLoc(), diag::throwing_call_in_illegal_context,
-                       description);
+                       static_cast<unsigned>(kind));
         return;
       }
     }
 
     Diags.diagnose(node.getStartLoc(), diag::throw_in_illegal_context,
-                   description);
+                   static_cast<unsigned>(kind));
   }
 
   static void maybeAddRethrowsNote(DiagnosticEngine &Diags, SourceLoc loc,
-                                   const PotentialReason &reason) {
+                                   const PotentialThrowReason &reason) {
     switch (reason.getKind()) {
-    case PotentialReason::Kind::Throw:
+    case PotentialThrowReason::Kind::Throw:
       llvm_unreachable("should already have been covered");
-    case PotentialReason::Kind::CallThrows:
+    case PotentialThrowReason::Kind::CallThrows:
       // Already fully diagnosed.
       return;
-    case PotentialReason::Kind::CallRethrowsWithExplicitThrowingArgument:
+    case PotentialThrowReason::Kind::CallRethrowsWithExplicitThrowingArgument:
       Diags.diagnose(reason.getThrowingArgument()->getLoc(),
                      diag::because_rethrows_argument_throws);
       return;
-    case PotentialReason::Kind::CallRethrowsWithDefaultThrowingArgument:
+    case PotentialThrowReason::Kind::CallRethrowsWithDefaultThrowingArgument:
       Diags.diagnose(loc, diag::because_rethrows_default_argument_throws);
       return;
     }
@@ -1041,7 +1063,7 @@ public:
   }
 
   void diagnoseUncoveredThrowSite(ASTContext &ctx, ASTNode E,
-                                  const PotentialReason &reason) {
+                                  const PotentialThrowReason &reason) {
     auto &Diags = ctx.Diags;
     auto message = diag::throwing_call_without_try;
     auto loc = E.getStartLoc();
@@ -1077,7 +1099,7 @@ public:
     //
     // Let's suggest couple of alternative fix-its
     // because complete context is unavailable.
-    if (reason.getKind() != PotentialReason::Kind::CallThrows)
+    if (reason.getKind() != PotentialThrowReason::Kind::CallThrows)
       return;
 
     Diags.diagnose(loc, diag::note_forgot_try)
@@ -1090,7 +1112,7 @@ public:
 
   void diagnoseThrowInLegalContext(DiagnosticEngine &Diags, ASTNode node,
                                    bool isTryCovered,
-                                   const PotentialReason &reason,
+                                   const PotentialThrowReason &reason,
                                    Diag<> diagForThrow,
                                    Diag<> diagForThrowingCall,
                                    Diag<> diagForTrylessThrowingCall) {
@@ -1103,8 +1125,7 @@ public:
     // Allow the diagnostic to fire on the 'try' if we don't have
     // anything else to say.
     if (isTryCovered && !reason.isRethrowsCall() &&
-        (getKind() == Kind::NonThrowingFunction ||
-         getKind() == Kind::NonExhaustiveCatch)) {
+        !isRethrows() && !isAutoClosure()) {
       DiagnoseErrorOnTry = true;
       return;
     }
@@ -1119,91 +1140,64 @@ public:
 
   void diagnoseUnhandledThrowSite(DiagnosticEngine &Diags, ASTNode E,
                                   bool isTryCovered,
-                                  const PotentialReason &reason) {
+                                  const PotentialThrowReason &reason) {
     switch (getKind()) {
-    case Kind::Handled:
-      llvm_unreachable("throw site is handled!");
+    case Kind::PotentiallyHandled:
+      if (IsNonExhaustiveCatch) {
+        diagnoseThrowInLegalContext(Diags, E, isTryCovered, reason,
+                                    diag::throw_in_nonexhaustive_catch,
+                                    diag::throwing_call_in_nonexhaustive_catch,
+                            diag::tryless_throwing_call_in_nonexhaustive_catch);
+        return;
+      }
 
-    // TODO: Doug suggested that we could generate one error per
-    // non-throwing function with throw sites within it, possibly with
-    // notes for the throw sites.
+      if (isAutoClosure()) {
+        diagnoseThrowInLegalContext(Diags, E, isTryCovered, reason,
+                                    diag::throw_in_nonthrowing_autoclosure,
+                              diag::throwing_call_in_nonthrowing_autoclosure,
+                      diag::tryless_throwing_call_in_nonthrowing_autoclosure);
+        return;
+      }
 
-    case Kind::RethrowingFunction:
-      diagnoseThrowInLegalContext(Diags, E, isTryCovered, reason,
-                                  diag::throw_in_rethrows_function,
-                                  diag::throwing_call_in_rethrows_function,
-                          diag::tryless_throwing_call_in_rethrows_function);
-      return;
+      if (isRethrows()) {
+        diagnoseThrowInLegalContext(Diags, E, isTryCovered, reason,
+                                    diag::throw_in_rethrows_function,
+                                    diag::throwing_call_in_rethrows_function,
+                            diag::tryless_throwing_call_in_rethrows_function);
+        return;
+      }
 
-    case Kind::NonThrowingFunction:
       diagnoseThrowInLegalContext(Diags, E, isTryCovered, reason,
                                   diag::throw_in_nonthrowing_function,
                                   diag::throwing_call_unhandled,
                                   diag::tryless_throwing_call_unhandled);
       return;
 
-    case Kind::NonThrowingAutoClosure:
-      diagnoseThrowInLegalContext(Diags, E, isTryCovered, reason,
-                                  diag::throw_in_nonthrowing_autoclosure,
-                            diag::throwing_call_in_nonthrowing_autoclosure,
-                    diag::tryless_throwing_call_in_nonthrowing_autoclosure);
-      return;
-
-    case Kind::NonExhaustiveCatch:
-      diagnoseThrowInLegalContext(Diags, E, isTryCovered, reason,
-                                  diag::throw_in_nonexhaustive_catch,
-                                  diag::throwing_call_in_nonexhaustive_catch,
-                          diag::tryless_throwing_call_in_nonexhaustive_catch);
-      return;
-
     case Kind::EnumElementInitializer:
-      diagnoseThrowInIllegalContext(Diags, E, "an enum case raw value");
-      return;
-
     case Kind::GlobalVarInitializer:
-      diagnoseThrowInIllegalContext(Diags, E, "a global variable initializer");
-      return;
-
     case Kind::IVarInitializer:
-      diagnoseThrowInIllegalContext(Diags, E, "a property initializer");
-      return;
-
     case Kind::DefaultArgument:
-      diagnoseThrowInIllegalContext(Diags, E, "a default argument");
-      return;
-
     case Kind::CatchPattern:
-      diagnoseThrowInIllegalContext(Diags, E, "a catch pattern");
+    case Kind::CatchGuard:
+    case Kind::DeferBody:
+      diagnoseThrowInIllegalContext(Diags, E, getKind());
       return;
 
-    case Kind::CatchGuard:
-      diagnoseThrowInIllegalContext(Diags, E, "a catch guard expression");
-      return;
-    case Kind::DeferBody:
-      diagnoseThrowInIllegalContext(Diags, E, "a defer body");
-      return;
     }
     llvm_unreachable("bad context kind");
   }
 
   void diagnoseUnhandledTry(DiagnosticEngine &Diags, TryExpr *E) {
     switch (getKind()) {
-    case Kind::Handled:
-    case Kind::RethrowingFunction:
-      llvm_unreachable("try is handled!");
-
-    case Kind::NonThrowingFunction:
-      if (DiagnoseErrorOnTry)
-        Diags.diagnose(E->getTryLoc(), diag::try_unhandled);
+    case Kind::PotentiallyHandled:
+      if (DiagnoseErrorOnTry) {
+        Diags.diagnose(
+            E->getTryLoc(),
+            IsNonExhaustiveCatch ? diag::try_unhandled_in_nonexhaustive_catch
+                                 : diag::try_unhandled);
+      }
       return;
 
-    case Kind::NonExhaustiveCatch:
-      if (DiagnoseErrorOnTry)
-        Diags.diagnose(E->getTryLoc(),
-                       diag::try_unhandled_in_nonexhaustive_catch);
-      return;
-
-    case Kind::NonThrowingAutoClosure:
     case Kind::EnumElementInitializer:
     case Kind::GlobalVarInitializer:
     case Kind::IVarInitializer:
@@ -1221,13 +1215,12 @@ public:
 
 /// A class to walk over a local context and validate the correctness
 /// of its error coverage.
-class CheckErrorCoverage : public ErrorHandlingWalker<CheckErrorCoverage> {
-  friend class ErrorHandlingWalker<CheckErrorCoverage>;
+class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> {
+  friend class EffectsHandlingWalker<CheckEffectsCoverage>;
 
   ASTContext &Ctx;
 
-  ApplyClassifier Classifier;
-
+  DeclContext *RethrowsDC = nullptr;
   Context CurContext;
 
   class ContextFlags {
@@ -1288,15 +1281,15 @@ class CheckErrorCoverage : public ErrorHandlingWalker<CheckErrorCoverage> {
   /// An RAII object for restoring all the interesting state in an
   /// error-coverage.
   class ContextScope {
-    CheckErrorCoverage &Self;
+  CheckEffectsCoverage &Self;
     Context OldContext;
     DeclContext *OldRethrowsDC;
     ContextFlags OldFlags;
     ThrowingKind OldMaxThrowingKind;
   public:
-    ContextScope(CheckErrorCoverage &self, Optional<Context> newContext)
+    ContextScope(CheckEffectsCoverage &self, Optional<Context> newContext)
       : Self(self), OldContext(self.CurContext),
-        OldRethrowsDC(self.Classifier.RethrowsDC),
+        OldRethrowsDC(self.RethrowsDC),
         OldFlags(self.Flags),
         OldMaxThrowingKind(self.MaxThrowingKind) {
       if (newContext) self.CurContext = *newContext;
@@ -1306,7 +1299,7 @@ class CheckErrorCoverage : public ErrorHandlingWalker<CheckErrorCoverage> {
     ContextScope &operator=(const ContextScope &) = delete;
 
     void enterSubFunction() {
-      Self.Classifier.RethrowsDC = nullptr;
+      Self.RethrowsDC = nullptr;
     }
 
     void enterTry() {
@@ -1372,19 +1365,19 @@ class CheckErrorCoverage : public ErrorHandlingWalker<CheckErrorCoverage> {
 
     ~ContextScope() {
       Self.CurContext = OldContext;
-      Self.Classifier.RethrowsDC = OldRethrowsDC;
+      Self.RethrowsDC = OldRethrowsDC;
       Self.Flags = OldFlags;
       Self.MaxThrowingKind = OldMaxThrowingKind;
     }
   };
 
 public:
-  CheckErrorCoverage(ASTContext &ctx, Context initialContext)
+  CheckEffectsCoverage(ASTContext &ctx, Context initialContext)
     : Ctx(ctx), CurContext(initialContext),
       MaxThrowingKind(ThrowingKind::None) {
 
     if (auto rethrowsDC = initialContext.getRethrowsDC()) {
-      Classifier.RethrowsDC = rethrowsDC;
+      RethrowsDC = rethrowsDC;
     }
   }
 
@@ -1422,8 +1415,8 @@ private:
   }
 
   ThrowingKind checkExhaustiveDoBody(DoCatchStmt *S) {
-    // This is a handled context.
-    ContextScope scope(*this, Context::getHandled());
+    // This is a context where errors are handled.
+    ContextScope scope(*this, CurContext.withHandlesErrors());
     assert(!Flags.has(ContextFlags::IsInTry) && "do/catch within try?");
     scope.resetCoverageForDoCatch();
 
@@ -1442,7 +1435,7 @@ private:
     // If the enclosing context doesn't handle anything, use a
     // specialized diagnostic about non-exhaustive catches.
     if (CurContext.handlesNothing()) {
-      scope.refineLocalContext(Context::forNonExhaustiveCatch(S));
+      CurContext.setNonExhaustiveCatch(true);
     }
 
     S->getBody()->walk(*this);
@@ -1478,11 +1471,11 @@ private:
 
     auto savedContext = CurContext;
     if (doThrowingKind != ThrowingKind::Throws &&
-        CurContext.getKind() == Context::Kind::RethrowingFunction) {
+        CurContext.isRethrows()) {
       // If this catch clause is reachable at all, it's because a function
-      // parameter throws. So let's temporarily set our context to Handled so
-      // the catch body is allowed to throw.
-      CurContext = Context::getHandled();
+      // parameter throws. So let's temporarily state that the body is allowed
+      // to throw.
+      CurContext = CurContext.withHandlesErrors();
     }
 
     // The catch body just happens in the enclosing context.
@@ -1494,7 +1487,9 @@ private:
   ShouldRecurse_t checkApply(ApplyExpr *E) {
     // An apply expression is a potential throw site if the function throws.
     // But if the expression didn't type-check, suppress diagnostics.
-    auto classification = Classifier.classifyApply(E);
+    ApplyClassifier classifier;
+    classifier.RethrowsDC = RethrowsDC;
+    auto classification = classifier.classifyApply(E);
 
     checkThrowAsyncSite(E, /*requiresTry*/ true, classification);
 
@@ -1528,8 +1523,8 @@ private:
     // Check the inactive regions of a #if block to disable warnings that may
     // be due to platform specific code.
     struct ConservativeThrowChecker : public ASTWalker {
-      CheckErrorCoverage &CEC;
-      ConservativeThrowChecker(CheckErrorCoverage &CEC) : CEC(CEC) {}
+      CheckEffectsCoverage &CEC;
+      ConservativeThrowChecker(CheckEffectsCoverage &CEC) : CEC(CEC) {}
       
       Expr *walkToExprPost(Expr *E) override {
         if (isa<TryExpr>(E))
@@ -1557,7 +1552,7 @@ private:
 
   ShouldRecurse_t checkThrow(ThrowStmt *S) {
     checkThrowAsyncSite(S, /*requiresTry*/ false,
-                        Classification::forThrow(PotentialReason::forThrow(),
+                        Classification::forThrow(PotentialThrowReason::forThrow(),
                                                  /*async*/false));
     return ShouldRecurse;
   }
@@ -1665,7 +1660,7 @@ private:
 
   ShouldRecurse_t checkForceTry(ForceTryExpr *E) {
     // Walk the operand.  'try!' handles errors.
-    ContextScope scope(*this, Context::getHandled());
+    ContextScope scope(*this, CurContext.withHandlesErrors());
     scope.enterTry();
 
     E->getSubExpr()->walk(*this);
@@ -1679,7 +1674,7 @@ private:
 
   ShouldRecurse_t checkOptionalTry(OptionalTryExpr *E) {
     // Walk the operand.  'try?' handles errors.
-    ContextScope scope(*this, Context::getHandled());
+    ContextScope scope(*this, CurContext.withHandlesErrors());
     scope.enterTry();
 
     E->getSubExpr()->walk(*this);
@@ -1694,9 +1689,9 @@ private:
 
 } // end anonymous namespace
 
-void TypeChecker::checkTopLevelErrorHandling(TopLevelCodeDecl *code) {
+void TypeChecker::checkTopLevelEffects(TopLevelCodeDecl *code) {
   auto &ctx = code->getDeclContext()->getASTContext();
-  CheckErrorCoverage checker(ctx, Context::forTopLevelCode(code));
+  CheckEffectsCoverage checker(ctx, Context::forTopLevelCode(code));
 
   // In some language modes, we allow top-level code to omit 'try' marking.
   if (ctx.LangOpts.EnableThrowWithoutTry)
@@ -1705,16 +1700,16 @@ void TypeChecker::checkTopLevelErrorHandling(TopLevelCodeDecl *code) {
   code->getBody()->walk(checker);
 }
 
-void TypeChecker::checkFunctionErrorHandling(AbstractFunctionDecl *fn) {
+void TypeChecker::checkFunctionEffects(AbstractFunctionDecl *fn) {
 #ifndef NDEBUG
-  PrettyStackTraceDecl debugStack("checking error handling for", fn);
+  PrettyStackTraceDecl debugStack("checking effects handling for", fn);
 #endif
 
   auto isDeferBody = isa<FuncDecl>(fn) && cast<FuncDecl>(fn)->isDeferBody();
   auto context =
       isDeferBody ? Context::forDeferBody() : Context::forFunction(fn);
   auto &ctx = fn->getASTContext();
-  CheckErrorCoverage checker(ctx, context);
+  CheckEffectsCoverage checker(ctx, context);
 
   // If this is a debugger function, suppress 'try' marking at the top level.
   if (fn->getAttrs().hasAttribute<LLDBDebuggerFunctionAttr>())
@@ -1728,14 +1723,14 @@ void TypeChecker::checkFunctionErrorHandling(AbstractFunctionDecl *fn) {
       superInit->walk(checker);
 }
 
-void TypeChecker::checkInitializerErrorHandling(Initializer *initCtx,
+void TypeChecker::checkInitializerEffects(Initializer *initCtx,
                                                 Expr *init) {
   auto &ctx = initCtx->getASTContext();
-  CheckErrorCoverage checker(ctx, Context::forInitializer(initCtx));
+  CheckEffectsCoverage checker(ctx, Context::forInitializer(initCtx));
   init->walk(checker);
 }
 
-/// Check the correctness of error handling within the given enum
+/// Check the correctness of effects within the given enum
 /// element's raw value expression.
 ///
 /// The syntactic restrictions on such expressions should make it
@@ -1743,15 +1738,15 @@ void TypeChecker::checkInitializerErrorHandling(Initializer *initCtx,
 /// ensures correctness if those restrictions are ever loosened,
 /// perhaps accidentally, and (2) allows the verifier to assert that
 /// all calls have been checked.
-void TypeChecker::checkEnumElementErrorHandling(EnumElementDecl *elt, Expr *E) {
+void TypeChecker::checkEnumElementEffects(EnumElementDecl *elt, Expr *E) {
   auto &ctx = elt->getASTContext();
-  CheckErrorCoverage checker(ctx, Context::forEnumElementInitializer(elt));
+  CheckEffectsCoverage checker(ctx, Context::forEnumElementInitializer(elt));
   E->walk(checker);
 }
 
-void TypeChecker::checkPropertyWrapperErrorHandling(
+void TypeChecker::checkPropertyWrapperEffects(
     PatternBindingDecl *binding, Expr *expr) {
   auto &ctx = binding->getASTContext();
-  CheckErrorCoverage checker(ctx, Context::forPatternBinding(binding));
+  CheckEffectsCoverage checker(ctx, Context::forPatternBinding(binding));
   expr->walk(checker);
 }
