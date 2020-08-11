@@ -3212,6 +3212,9 @@ bool MissingMemberFailure::diagnoseAsError() {
   if (diagnoseInLiteralCollectionContext())
     return true;
 
+  if (diagnoseForSubscriptMemberWithTupleBase())
+    return true;
+
   auto baseType = resolveType(getBaseType())->getWithoutSpecifierType();
 
   DeclNameLoc nameLoc(::getLoc(anchor));
@@ -3426,6 +3429,73 @@ bool MissingMemberFailure::diagnoseInLiteralCollectionContext() const {
     }
   }
   return false;
+}
+
+bool MissingMemberFailure::diagnoseForSubscriptMemberWithTupleBase() const {
+  auto locator = getLocator();
+  auto baseType = resolveType(getBaseType())->getWithoutSpecifierType();
+
+  auto *SE = getAsExpr<SubscriptExpr>(locator->getAnchor());
+  if (!SE)
+    return false;
+
+  auto tupleType = baseType->getAs<TupleType>();
+  // For non-tuple type or empty tuples, let's fallback to the general
+  // diagnostic logic.
+  if (!tupleType || tupleType->getNumElements() == 0)
+    return false;
+
+  auto *index = SE->getIndex();
+  if (SE->getNumArguments() == 1) {
+    auto *literal =
+        dyn_cast<IntegerLiteralExpr>(index->getSemanticsProvidingExpr());
+
+    llvm::Regex NumericRegex("^[0-9]+$");
+    // Literal expressions may have other types of representations e.g. 0x01,
+    // 0b01. So let's make sure to only suggest this tailored literal fix-it for
+    // number only literals.
+    if (literal && NumericRegex.match(literal->getDigitsText())) {
+      unsigned int literalValue = 0;
+      literal->getDigitsText().getAsInteger(/*Radix=*/0, literalValue);
+
+      // Verify if the literal value is within the bounds of tuple elements.
+      if (!literal->isNegative() &&
+          literalValue < tupleType->getNumElements()) {
+        llvm::SmallString<4> dotAccess;
+        llvm::raw_svector_ostream OS(dotAccess);
+        OS << "." << literalValue;
+
+        emitDiagnostic(
+            diag::could_not_find_subscript_member_tuple_did_you_mean_use_dot,
+            baseType, literal->getDigitsText())
+            .fixItReplace(index->getSourceRange(), OS.str());
+        return true;
+      }
+    }
+
+    // For subscript access on tuple base types where the subscript index is a
+    // string literal expression which value matches a tuple element label,
+    // let's suggest tuple label access.
+    auto stringLiteral =
+        dyn_cast<StringLiteralExpr>(index->getSemanticsProvidingExpr());
+    if (stringLiteral && !stringLiteral->getValue().empty() &&
+        llvm::any_of(tupleType->getElements(), [&](TupleTypeElt element) {
+          return element.getName().is(stringLiteral->getValue());
+        })) {
+      llvm::SmallString<16> dotAccess;
+      llvm::raw_svector_ostream OS(dotAccess);
+      OS << "." << stringLiteral->getValue();
+
+      emitDiagnostic(
+          diag::could_not_find_subscript_member_tuple_did_you_mean_use_dot,
+          baseType, stringLiteral->getValue())
+          .fixItReplace(index->getSourceRange(), OS.str());
+      return true;
+    }
+  }
+
+  emitDiagnostic(diag::could_not_find_subscript_member_tuple, baseType);
+  return true;
 }
 
 bool UnintendedExtraGenericParamMemberFailure::diagnoseAsError() {

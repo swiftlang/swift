@@ -349,3 +349,142 @@ bb2:
   unwind
 }
 
+struct Int {
+  var _value: Builtin.Int64
+}
+
+// Test to make sure AppliesToSpecialize in AllocBoxToStack is populated correctly when there are common function calls for mutiple allox_boxes.
+// Order of function calls constructed in PromotedOperands: bar common bas common.
+// AppliesToSpecialize should have the order: bar bas common.
+// Only then, the functions get specialized correctly, and we won't see an assert in checkNoPromotedBoxInApply.
+// CHECK-LABEL: sil [noinline] [ossa] @$testdfs1 :
+// CHECK-NOT : alloc_box ${ var Int64 }, var, name "x"
+// CHECK-NOT : alloc_box ${ var Int64 }, var, name "y"
+// CHECK-LABEL:} // end sil function '$testdfs1'
+sil [noinline] [ossa] @$testdfs1 : $@convention(thin) () -> Int64 {
+bb0:
+  %0 = alloc_box ${ var Int64 }, var, name "x"
+  %1 = project_box %0 : ${ var Int64 }, 0
+  %2 = integer_literal $Builtin.Int64, 0
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  store %3 to [trivial] %1 : $*Int64
+  %5 = alloc_box ${ var Int64 }, var, name "y"
+  %6 = project_box %5 : ${ var Int64 }, 0
+  %7 = integer_literal $Builtin.Int64, 0
+  %8 = struct $Int64 (%7 : $Builtin.Int64)
+  store %8 to [trivial] %6 : $*Int64
+  %10 = function_ref @$testdfs1common : $@convention(thin) (@guaranteed { var Int64 }, @guaranteed { var Int64 }) -> Int64
+  %11 = apply %10(%0, %5) : $@convention(thin) (@guaranteed { var Int64 }, @guaranteed { var Int64 }) -> Int64
+  destroy_value %5 : ${ var Int64 }
+  destroy_value %0 : ${ var Int64 }
+  return %11 : $Int64
+}
+
+sil private [noinline] [ossa] @$testdfs1common : $@convention(thin) (@guaranteed { var Int64 }, @guaranteed { var Int64 }) -> Int64 {
+bb0(%0 : @guaranteed ${ var Int64 }, %1 : @guaranteed ${ var Int64 }):
+  %proj1 = project_box %0 : ${ var Int64 }, 0
+  %proj2 = project_box %1 : ${ var Int64 }, 0
+  %barfunc = function_ref @$testdfs1bar : $@convention(thin) (@guaranteed { var Int64 }) -> Int64
+  %res1 = apply %barfunc(%0) : $@convention(thin) (@guaranteed { var Int64 }) -> Int64
+  %basfunc = function_ref @$testdfs1bas : $@convention(thin) (@guaranteed { var Int64 }) -> Int64
+  %res2 = apply %basfunc(%1) : $@convention(thin) (@guaranteed { var Int64 }) -> Int64
+  %func = function_ref @$blackhole : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %tmp1 = apply %func<Int64>(%proj1) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %tmp2 = apply %func<Int64>(%proj2) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %res = load [trivial] %proj1 : $*Int64
+  return %res : $Int64
+}
+
+sil private [noinline] [ossa] @$testdfs1bar : $@convention(thin) (@guaranteed { var Int64 }) -> Int64 {
+bb0(%0 : @guaranteed ${ var Int64 }):
+  %1 = project_box %0 : ${ var Int64 }, 0
+  %4 = load [trivial] %1 : $*Int64
+  return %4 : $Int64
+}
+
+sil private [noinline] [ossa] @$testdfs1bas : $@convention(thin) (@guaranteed { var Int64 }) -> Int64 {
+bb0(%0 : @guaranteed ${ var Int64 }):
+  %1 = project_box %0 : ${ var Int64 }, 0
+  %4 = load [trivial] %1 : $*Int64
+  return %4 : $Int64
+}
+
+// Test to make sure we don't optimize the case when we have an inner common function call for multiple boxes.
+// We don't optimize this case now, because we don't have additional logic to correctly construct AppliesToSpecialize
+// Order of function calls constructed in PromotedOperands: bar innercommon local1 bas innercommon local2
+// AppliesToSpecialize should have the order: bar bas innercommon local1 local2
+// Since we don't maintain any tree like data structure with more info on the call tree, this is not possible to contruct today 
+// CHECK-LABEL: sil [noinline] [ossa] @$testdfs2 :
+// CHECK: alloc_box ${ var Int }, var, name "x"
+// CHECK: alloc_box ${ var Int }, var, name "y"
+// CHECK-LABEL:} // end sil function '$testdfs2'
+sil [noinline] [ossa] @$testdfs2 : $@convention(thin) () -> Int {
+bb0:
+  %0 = alloc_box ${ var Int }, var, name "x"
+  %1 = project_box %0 : ${ var Int }, 0
+  %2 = integer_literal $Builtin.Int64, 0
+  %3 = struct $Int (%2 : $Builtin.Int64)
+  store %3 to [trivial] %1 : $*Int
+  %5 = alloc_box ${ var Int }, var, name "y"
+  %6 = project_box %5 : ${ var Int }, 0
+  %7 = integer_literal $Builtin.Int64, 0
+  %8 = struct $Int (%7 : $Builtin.Int64)
+  store %8 to [trivial] %6 : $*Int
+  %10 = function_ref @$testdfs2local1 : $@convention(thin) (@guaranteed { var Int }, @guaranteed { var Int }) -> Int
+  %11 = apply %10(%0, %5) : $@convention(thin) (@guaranteed { var Int }, @guaranteed { var Int }) -> Int
+  %12 = function_ref @$testdfs2local2 : $@convention(thin) (@guaranteed { var Int }, @guaranteed { var Int }) -> Int
+  %13 = apply %12(%0, %5) : $@convention(thin) (@guaranteed { var Int }, @guaranteed { var Int }) -> Int
+  %14 = struct_extract %11 : $Int, #Int._value
+  %15 = struct_extract %13 : $Int, #Int._value
+  %16 = integer_literal $Builtin.Int1, -1
+  %17 = builtin "sadd_with_overflow_Int64"(%14 : $Builtin.Int64, %15 : $Builtin.Int64, %16 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  (%18, %19) = destructure_tuple %17 : $(Builtin.Int64, Builtin.Int1)
+  cond_fail %19 : $Builtin.Int1, "arithmetic overflow"
+  %21 = struct $Int (%18 : $Builtin.Int64)
+  destroy_value %5 : ${ var Int }
+  destroy_value %0 : ${ var Int }
+  return %21 : $Int
+}
+
+sil private [noinline] [ossa] @$testdfs2bar : $@convention(thin) (@guaranteed { var Int }) -> Int {
+bb0(%0 : @guaranteed ${ var Int }):
+  %1 = project_box %0 : ${ var Int }, 0
+  %4 = load [trivial] %1 : $*Int
+  return %4 : $Int
+}
+
+sil private [noinline] [ossa] @$testdfs2bas : $@convention(thin) (@guaranteed { var Int }) -> Int {
+bb0(%0 : @guaranteed ${ var Int }):
+  %1 = project_box %0 : ${ var Int }, 0
+  %4 = load [trivial] %1 : $*Int
+  return %4 : $Int
+}
+
+sil private [noinline] [ossa] @$testdfs2innercommon : $@convention(thin) (@guaranteed { var Int }, @guaranteed { var Int }) -> Int {
+bb0(%0 : @guaranteed ${ var Int }, %1 : @guaranteed ${ var Int }):
+  %2 = project_box %0 : ${ var Int }, 0
+  %4 = project_box %1 : ${ var Int }, 0
+  %8 = function_ref @$testdfs2bar : $@convention(thin) (@guaranteed { var Int }) -> Int
+  %9 = apply %8(%0) : $@convention(thin) (@guaranteed { var Int }) -> Int
+  %11 = function_ref @$testdfs2bas : $@convention(thin) (@guaranteed { var Int }) -> Int
+  %12 = apply %11(%1) : $@convention(thin) (@guaranteed { var Int }) -> Int
+  return %12 : $Int
+}
+
+sil private [noinline] [ossa] @$testdfs2local1 : $@convention(thin) (@guaranteed { var Int }, @guaranteed { var Int }) -> Int {
+bb0(%0 : @guaranteed ${ var Int }, %1 : @guaranteed ${ var Int }):
+  %2 = project_box %0 : ${ var Int }, 0
+  %4 = project_box %1 : ${ var Int }, 0
+  %7 = function_ref @$testdfs2innercommon : $@convention(thin) (@guaranteed { var Int }, @guaranteed { var Int }) -> Int
+  %8 = apply %7(%0, %1) : $@convention(thin) (@guaranteed { var Int }, @guaranteed { var Int }) -> Int
+  return %8 : $Int
+}
+
+sil private [noinline] [ossa] @$testdfs2local2 : $@convention(thin) (@guaranteed { var Int }, @guaranteed { var Int }) -> Int {
+bb0(%0 : @guaranteed ${ var Int }, %1 : @guaranteed ${ var Int }):
+  %2 = project_box %0 : ${ var Int }, 0
+  %4 = project_box %1 : ${ var Int }, 0
+  %7 = function_ref @$testdfs2innercommon : $@convention(thin) (@guaranteed { var Int }, @guaranteed { var Int }) -> Int
+  %8 = apply %7(%0, %1) : $@convention(thin) (@guaranteed { var Int }, @guaranteed { var Int }) -> Int
+  return %8 : $Int
+}

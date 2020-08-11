@@ -12,6 +12,8 @@
 // REQUIRES: long_test
 // REQUIRES: CPU=arm64 || CPU=x86_64
 
+// REQUIRES: rdar66807959
+
 // Check if the optimizer can optimize the whole array into a statically
 // initialized global
 

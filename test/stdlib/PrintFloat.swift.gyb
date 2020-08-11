@@ -442,21 +442,20 @@ fileprivate func expectNaN<T>(_ expected: String, _ object: T,
     message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 
-  // debugDescription prints full details about NaNs, which is tricky to test
-  // because NaNs often get truncated: various implementations force all NaNs
-  // quiet, discard payloads, or clear sign bits.  In some cases, just passing a
-  // NaN into a function (via an FP register) is enough to mangle the value.
+  // debugDescription tries to print details about NaNs, which is tricky to test.
 
-#if arch(x86_64)
-  // Verify the exact debugDescription value only on x86_64, where we
-  // know the exact expected String:
+/*
+  // We cannot reliably test the exact expected string, because various
+  // implementations force all NaNs quiet, discard payloads, or clear sign bits.
+  // In some cases, just passing a NaN into a function (via an FP register) is
+  // enough to mangle the value.
   expectEqual(expected, object.debugDescription,
     message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
-#endif
+*/
 
-  // On all platforms, we verify that the generated debugDescription text
-  // follows the expected format, even when we can't verify the exact value.
+  // We can verify that the generated debugDescription text
+  // follows the expected general format, even when we can't verify the exact value.
   var actual = object.debugDescription
 
   // Optional leading "-"

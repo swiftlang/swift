@@ -88,6 +88,13 @@ ERROR(could_not_find_subscript_member_did_you_mean,none,
       "did you mean to use the subscript operator?",
       (Type))
 
+ERROR(could_not_find_subscript_member_tuple, none,
+      "cannot access element using subscript for tuple type %0; "
+      "use '.' notation instead", (Type))
+ERROR(could_not_find_subscript_member_tuple_did_you_mean_use_dot, none,
+      "cannot access element using subscript for tuple type %0; "
+      "did you mean to use '.%1'?", (Type, StringRef))
+
 ERROR(could_not_find_enum_case,none,
       "enum type %0 has no case %1; did you mean %2?",
       (Type, DeclNameRef, DeclName))
@@ -2818,7 +2825,8 @@ NOTE(codable_extraneous_codingkey_case_here,none,
 NOTE(codable_non_conforming_property_here,none,
      "cannot automatically synthesize %0 because %1 does not conform to %0", (Type, TypeLoc))
 NOTE(codable_non_decoded_property_here,none,
-     "cannot automatically synthesize %0 because %1 does not have a matching CodingKey and does not have a default value", (Type, Identifier))
+     "cannot automatically synthesize %0 because %1 does not have a matching "
+     "CodingKey and does not have a default value", (Type, Identifier))
 NOTE(codable_codingkeys_type_is_not_an_enum_here,none,
      "cannot automatically synthesize %0 because 'CodingKeys' is not an enum", (Type))
 NOTE(codable_codingkeys_type_does_not_conform_here,none,

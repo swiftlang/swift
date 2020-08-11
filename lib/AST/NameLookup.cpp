@@ -861,13 +861,18 @@ SelfBounds SelfBoundsFromWhereClauseRequest::evaluate(
       continue;
 
     // Resolve the right-hand side.
-    if (auto *const typeRepr = req.getConstraintRepr()) {
-      const auto rhsNominals = getDirectlyReferencedNominalTypeDecls(
-          ctx, typeRepr, lookupDC, result.anyObject);
-
-      result.decls.insert(result.decls.end(), rhsNominals.begin(),
-                          rhsNominals.end());
+    DirectlyReferencedTypeDecls rhsDecls;
+    if (auto typeRepr = req.getConstraintRepr()) {
+      rhsDecls = directReferencesForTypeRepr(evaluator, ctx, typeRepr, lookupDC);
     }
+
+    SmallVector<ModuleDecl *, 2> modulesFound;
+    auto rhsNominals = resolveTypeDeclsToNominal(evaluator, ctx, rhsDecls,
+                                                 modulesFound,
+                                                 result.anyObject);
+    result.decls.insert(result.decls.end(),
+                        rhsNominals.begin(),
+                        rhsNominals.end());
   }
 
   return result;
@@ -2134,17 +2139,6 @@ static DirectlyReferencedTypeDecls directReferencesForType(Type type) {
   return { };
 }
 
-TinyPtrVector<NominalTypeDecl *> swift::getDirectlyReferencedNominalTypeDecls(
-    ASTContext &ctx, TypeRepr *typeRepr, DeclContext *dc, bool &anyObject) {
-  const auto referenced =
-      directReferencesForTypeRepr(ctx.evaluator, ctx, typeRepr, dc);
-
-  // Resolve those type declarations to nominal type declarations.
-  SmallVector<ModuleDecl *, 2> modulesFound;
-  return resolveTypeDeclsToNominal(ctx.evaluator, ctx, referenced, modulesFound,
-                                   anyObject);
-}
-
 DirectlyReferencedTypeDecls InheritedDeclsReferencedRequest::evaluate(
     Evaluator &evaluator,
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
@@ -2266,10 +2260,16 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
     // We must've seen 'extension { ... }' during parsing.
     return nullptr;
 
+  ASTContext &ctx = ext->getASTContext();
+  DirectlyReferencedTypeDecls referenced =
+    directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext->getParent());
+
   // Resolve those type declarations to nominal type declarations.
+  SmallVector<ModuleDecl *, 2> modulesFound;
   bool anyObject = false;
-  const auto nominalTypes = getDirectlyReferencedNominalTypeDecls(
-      ext->getASTContext(), typeRepr, ext->getParent(), anyObject);
+  auto nominalTypes
+    = resolveTypeDeclsToNominal(evaluator, ctx, referenced, modulesFound,
+                                anyObject);
 
   // If there is more than 1 element, we will emit a warning or an error
   // elsewhere, so don't handle that case here.
