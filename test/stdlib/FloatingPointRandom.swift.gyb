@@ -40,11 +40,11 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
   // This is not a robust statistical test of randomness. It is only intended
   // to distinguish between 1:1 odds (desired) and 2:1 odds (previous version)
   static func isSmallRangeRandomUnbiased() -> Bool {
-    func randomWalk(_ steps: Int) -> Int {
+    func randomWalk(_ n: Int) -> Int {
       let mid = 3 as Self
       let range = mid.nextDown ..< mid.nextUp
       var result = 0
-      for _ in 0 ..< steps {
+      for _ in 0 ..< n {
         let x = Self.random(in: range)
         result += (x == mid) ? 1 : -1
       }
