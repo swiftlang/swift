@@ -3147,7 +3147,7 @@ public:
 
           if (originalRep) {
             if (originalRep != currentRep)
-              mergeEquivalenceClasses(currentRep, originalRep);
+              mergeEquivalenceClasses(currentRep, originalRep, /*updateWorkList=*/false);
             continue;
           }
 
