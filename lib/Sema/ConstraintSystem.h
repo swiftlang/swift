@@ -1190,6 +1190,11 @@ public:
   /// Retrieve the type of the given node, as recorded in this solution.
   Type getType(ASTNode node) const;
 
+  /// Retrieve the type of the given node as recorded in this solution
+  /// and resolve all of the type variables in contains to form a fully
+  /// "resolved" concrete type.
+  Type getResolvedType(ASTNode node) const;
+
   /// Resolve type variables present in the raw type, using generic parameter
   /// types where possible.
   Type resolveInterfaceType(Type type) const;

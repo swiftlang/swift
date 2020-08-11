@@ -8415,6 +8415,10 @@ Type Solution::getType(ASTNode node) const {
   return cs.getType(node);
 }
 
+Type Solution::getResolvedType(ASTNode node) const {
+  return simplifyType(getType(node));
+}
+
 void Solution::setExprTypes(Expr *expr) const {
   if (!expr)
     return;
