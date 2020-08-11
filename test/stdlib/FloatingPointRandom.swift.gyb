@@ -93,9 +93,9 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
 }
 
 
-% for Self in [`Float`, `Double`, `Float80`]:
+% for Self in ['Float', 'Double', 'Float80']:
 
-%   if Self == `Float80`:
+%   if Self == 'Float80':
 #if !os(Windows) && (arch(i386) || arch(x86_64))
 %   end
 
@@ -132,7 +132,7 @@ FloatingPointRandom.test("${Self}/random/smallRange") {
   expectTrue(${Self}.isSmallRangeRandomUnbiased())
 }
 
-%   if Self == `Float80`:
+%   if Self == 'Float80':
 #endif
 %   end
 
