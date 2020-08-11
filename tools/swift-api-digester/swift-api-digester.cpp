@@ -2548,6 +2548,8 @@ static int prepareForDump(const char *Main,
     InitInvok.getLangOptions().Target.isOSDarwin();
   InitInvok.getClangImporterOptions().ModuleCachePath =
   options::ModuleCachePath;
+  // Module recovery issue shouldn't bring down the tool.
+  InitInvok.getLangOptions().AllowDeserializingImplementationOnly = true;
 
   if (!options::SwiftVersion.empty()) {
     using version::Version;
