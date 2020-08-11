@@ -2056,8 +2056,8 @@ void PullbackCloner::Implementation::accumulateAdjointForOptional(
   // Find `Optional<T.TangentVector>.some` EnumElementDecl.
   auto someEltDecl = builder.getASTContext().getOptionalSomeDecl();
 
-  // Initialize a `Optional<T.TangentVector>` buffer from `wrappedAdjoint`as the
-  // input for `Optional<T>.TangentVector.init`.
+  // Initialize an `Optional<T.TangentVector>` buffer from `wrappedAdjoint` as
+  // the input for `Optional<T>.TangentVector.init`.
   auto *optArgBuf = builder.createAllocStack(pbLoc, optionalOfWrappedTanType);
   if (optionalOfWrappedTanType.isLoadableOrOpaque(builder.getFunction())) {
     // %enum = enum $Optional<T.TangentVector>, #Optional.some!enumelt,
@@ -2066,7 +2066,7 @@ void PullbackCloner::Implementation::accumulateAdjointForOptional(
                                         optionalOfWrappedTanType);
     // store %enum to %optArgBuf
     builder.emitStoreValueOperation(pbLoc, enumInst, optArgBuf,
-                                    StoreOwnershipQualifier::Trivial);
+                                    StoreOwnershipQualifier::Init);
   } else {
     // %enumAddr = init_enum_data_addr %optArgBuf $Optional<T.TangentVector>,
     //                                 #Optional.some!enumelt
@@ -2279,14 +2279,15 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
       for (auto pair : incomingValues) {
         auto *predBB = std::get<0>(pair);
         auto incomingValue = std::get<1>(pair);
-        blockTemporaries[getPullbackBlock(predBB)].insert(concreteBBArgAdjCopy);
         // Handle `switch_enum` on `Optional`.
         auto termInst = bbArg->getSingleTerminator();
-        if (isSwitchEnumInstOnOptional(termInst))
+        if (isSwitchEnumInstOnOptional(termInst)) {
           accumulateAdjointForOptional(bb, incomingValue, concreteBBArgAdjCopy);
-        else
+        } else {
+          blockTemporaries[getPullbackBlock(predBB)].insert(concreteBBArgAdjCopy);
           setAdjointValue(predBB, incomingValue,
                           makeConcreteAdjointValue(concreteBBArgAdjCopy));
+        }
       }
       break;
     }
