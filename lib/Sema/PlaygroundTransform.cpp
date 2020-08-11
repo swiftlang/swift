@@ -294,7 +294,7 @@ public:
         BraceStmt *NB = transformBraceStmt(B);
         if (NB != B) {
           FD->setBody(NB);
-          TypeChecker::checkFunctionErrorHandling(FD);
+          TypeChecker::checkFunctionEffects(FD);
         }
       }
     } else if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
@@ -893,7 +893,7 @@ void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
             BraceStmt *NewBody = I.transformBraceStmt(Body);
             if (NewBody != Body) {
               FD->setBody(NewBody);
-              TypeChecker::checkFunctionErrorHandling(FD);
+              TypeChecker::checkFunctionEffects(FD);
             }
             return false;
           }
@@ -905,7 +905,7 @@ void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
             BraceStmt *NewBody = I.transformBraceStmt(Body, true);
             if (NewBody != Body) {
               TLCD->setBody(NewBody);
-              TypeChecker::checkTopLevelErrorHandling(TLCD);
+              TypeChecker::checkTopLevelEffects(TLCD);
             }
             return false;
           }

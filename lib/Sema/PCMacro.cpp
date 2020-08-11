@@ -354,7 +354,7 @@ public:
 
         if (NB != B) {
           FD->setBody(NB);
-          TypeChecker::checkFunctionErrorHandling(FD);
+          TypeChecker::checkFunctionEffects(FD);
         }
       }
     } else if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
@@ -695,7 +695,7 @@ void swift::performPCMacro(SourceFile &SF) {
             BraceStmt *NewBody = I.transformBraceStmt(Body, true);
             if (NewBody != Body) {
               TLCD->setBody(NewBody);
-              TypeChecker::checkTopLevelErrorHandling(TLCD);
+              TypeChecker::checkTopLevelEffects(TLCD);
               TypeChecker::contextualizeTopLevelCode(TLCD);
             }
             return false;
