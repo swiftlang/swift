@@ -40,16 +40,18 @@ extension String {
 
     var repeatedValue = repeatedValue
     self = repeatedValue.withUTF8 { repeatedUTF8 in
-      String(_uninitializedCapacity: repeatedUTF8.count * count) { buffer in
-        var total = 0
+      let uninitializedCapacity = repeatedUTF8.count * count
+      return String(_uninitializedCapacity: uninitializedCapacity) { buffer in
+        var initialized = 0
         for i in 0..<count {
           let offset = i &* repeatedUTF8.count
           let range = offset ..< offset + repeatedUTF8.count
           _ = UnsafeMutableBufferPointer(rebasing: buffer[range])
             .initialize(from: repeatedUTF8)
-          total += range.count
+          initialized += range.count
         }
-        return total
+        _internalInvariant(initialized == uninitializedCapacity)
+        return initialized
       }
     }
   }
