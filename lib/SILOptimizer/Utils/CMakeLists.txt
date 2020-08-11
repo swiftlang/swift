@@ -14,7 +14,6 @@ target_sources(swiftSILOptimizer PRIVATE
   KeyPathProjector.cpp
   LoadStoreOptUtils.cpp
   LoopUtils.cpp
-  ModuleSummaryIndex.cpp
   OptimizerStatsUtils.cpp
   PartialApplyCombiner.cpp
   PerformanceInlinerUtils.cpp

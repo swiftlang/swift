@@ -66,7 +66,7 @@
 #include "swift/Syntax/SyntaxNodes.h"
 #include "swift/TBDGen/TBDGen.h"
 #include "swift/SIL/ModuleSummary.h"
-#include "swift/Serialization/ModuleSummaryFile.h"
+#include "swift/Serialization/ModuleSummary.h"
 
 #include "clang/AST/ASTContext.h"
 
@@ -1829,10 +1829,9 @@ static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
 static bool emitModuleSummary(SILModule *SM,
                               const std::string &ModuleSummaryOutputPath,
                               const ASTContext &Context) {
-  BasicCalleeAnalysis BCA(SM);
-  auto Summary = buildModuleSummaryIndex(*SM, BCA);
-  return modulesummary::emitModuleSummaryIndex(Summary, Context.Diags,
-                                               ModuleSummaryOutputPath);
+  auto Summary = modulesummary::buildModuleSummaryIndex(*SM);
+  return modulesummary::writeModuleSummaryIndex(*Summary.get(), Context.Diags,
+                                                ModuleSummaryOutputPath);
 }
 
 static GeneratedModule

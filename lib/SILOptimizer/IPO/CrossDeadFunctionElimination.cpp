@@ -7,7 +7,7 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/Serialization/ModuleSummaryFile.h"
+#include "swift/Serialization/ModuleSummary.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -23,6 +23,8 @@ STATISTIC(NumDeadFunc, "Number of dead functions eliminated");
 
 namespace {
 
+using namespace modulesummary;
+
 class SILCrossDeadFuncElimination : public SILModuleTransform {
 private:
   ModuleSummaryIndex TheSummary;
@@ -35,11 +37,11 @@ public:
     for (auto VT : M.getVTables()) {
       VT->removeEntries_if([&] (SILVTable::Entry &entry) -> bool {
         auto Impl = entry.getImplementation();
-        auto &maybePair = TheSummary.getFunctionInfo(getGUID(Impl->getName()));
-        if (!maybePair)
+        GUID guid = getGUIDFromUniqueName(Impl->getName());
+        auto maybeSummary = TheSummary.getFunctionSummary(guid);
+        if (!maybeSummary)
           return false;
-        auto info = maybePair.getValue().first;
-        return !info->isLive();
+        return !maybeSummary->isLive();
       });
     }
   
@@ -49,11 +51,11 @@ public:
       ++WI;
       WT->clearMethods_if([&] (const SILWitnessTable::MethodWitness &MW) -> bool {
         auto Impl = MW.Witness;
-        auto &maybePair = TheSummary.getFunctionInfo(getGUID(Impl->getName()));
-        if (!maybePair)
+        GUID guid = getGUIDFromUniqueName(Impl->getName());
+        auto maybeSummary = TheSummary.getFunctionSummary(guid);
+        if (!maybeSummary)
           return false;
-        auto info = maybePair.getValue().first;
-        return !info->isLive();
+        return !maybeSummary->isLive();
       });
     }
 
@@ -66,79 +68,25 @@ public:
       WT->clearMethods_if([&](SILFunction *MW) -> bool {
         if (!MW)
           return false;
-        auto &maybePair = TheSummary.getFunctionInfo(getGUID(MW->getName()));
-        if (!maybePair)
+        GUID guid = getGUIDFromUniqueName(MW->getName());
+        auto maybeSummary = TheSummary.getFunctionSummary(guid);
+        if (!maybeSummary)
           return false;
-        auto info = maybePair.getValue().first;
-        return !info->isLive();
+        return !maybeSummary->isLive();
       });
     }
   }
   
   void eliminateDeadFunctions(SILModule &M, std::vector<SILFunction *> &DeadFunctions) {
-    for (auto &pair : TheSummary) {
-      auto &info = pair.second;
-      if (info.TheSummary->isLive()) {
+    for (SILFunction &F : M) {
+      auto guid = getGUIDFromUniqueName(F.getName());
+      auto summary = TheSummary.getFunctionSummary(guid);
+      if (summary->isLive()) {
         continue;
       }
-
-      auto F = M.lookUpFunction(info.Name);
-      if (!F) {
-        continue;
-      }
-      F->dropAllReferences();
-      DeadFunctions.push_back(F);
-      LLVM_DEBUG(llvm::dbgs() << "Eliminate " << info.Name << "\n");
-    }
-  }
-  
-  void ensureLive(SILFunction *F) {
-    ensureLive(getGUID(F->getName()));
-  }
-  
-  void ensureLive(GUID guid) {
-    auto maybePair = this->TheSummary.getFunctionInfo(guid);
-    if (maybePair) {
-      auto pair = maybePair.getValue();
-      pair.first->setLive(true);
-    }
-  }
-  
-  void ensureLive(VirtualMethodSlot slot) {
-    auto Impls = this->TheSummary.getImplementations(slot);
-    if (!Impls) return;
-    for (auto Impl : Impls.getValue()) {
-      ensureLive(Impl);
-    }
-  }
-
-  void
-  ensureKeyPathComponentIsAlive(const KeyPathPatternComponent &component) {
-    component.visitReferencedFunctionsAndMethods(
-      [this](SILFunction *F) {
-        this->ensureLive(F);
-      },
-      [this](SILDeclRef method) {
-        auto decl = cast<AbstractFunctionDecl>(method.getDecl());
-        if (auto clas = dyn_cast<ClassDecl>(decl->getDeclContext())) {
-          VirtualMethodSlot slot(method, VirtualMethodSlot::KindTy::VTable);
-          this->ensureLive(slot);
-        } else if (isa<ProtocolDecl>(decl->getDeclContext())) {
-          VirtualMethodSlot slot(method, VirtualMethodSlot::KindTy::Witness);
-          this->ensureLive(slot);
-        } else {
-          llvm_unreachable("key path keyed by a non-class, non-protocol method");
-        }
-      }
-    );
-  }
-  
-  void ensurePreserved(SILModule &M) {
-    // Check property descriptor implementations.
-    for (SILProperty &P : M.getPropertyList()) {
-      if (auto component = P.getComponent()) {
-        ensureKeyPathComponentIsAlive(*component);
-      }
+      F.dropAllReferences();
+      DeadFunctions.push_back(&F);
+      LLVM_DEBUG(llvm::dbgs() << "Eliminate " << F.getName() << "\n");
     }
   }
 
@@ -160,7 +108,6 @@ public:
     }
 
     auto &M = *getModule();
-    this->ensurePreserved(M);
     this->eliminateDeadEntriesFromTables(M);
     std::vector<SILFunction *> DeadFunctions;
     this->eliminateDeadFunctions(M, DeadFunctions);

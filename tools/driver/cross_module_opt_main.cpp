@@ -7,7 +7,7 @@
 #include "swift/Option/Options.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/Serialization/ModuleSummaryFile.h"
+#include "swift/Serialization/ModuleSummary.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -24,6 +24,7 @@
 
 using namespace llvm::opt;
 using namespace swift;
+using namespace modulesummary;
 
 static llvm::cl::opt<std::string>
     LTOPrintLiveTrace("lto-print-live-trace", llvm::cl::init(""),
@@ -36,11 +37,12 @@ static llvm::cl::opt<std::string>
 
 static llvm::DenseSet<GUID> computePreservedGUIDs(ModuleSummaryIndex *summary) {
   llvm::DenseSet<GUID> Set(1);
-  Set.insert(getGUID("main"));
-  for (auto &pair : *summary) {
-    auto &info = pair.second;
-    if (info.TheSummary->isPreserved()) {
-      Set.insert(pair.first);
+  Set.insert(getGUIDFromUniqueName("main"));
+  for (auto FI = summary->functions_begin(), FE = summary->functions_end();
+       FI != FE; ++FI) {
+    auto summary = FI->second.get();
+    if (summary->isPreserved()) {
+      Set.insert(FI->first);
     }
   }
   return Set;
@@ -85,6 +87,27 @@ public:
   }
 };
 
+VFuncSlot createVFuncSlot(FunctionSummary::Call call) {
+  VFuncSlot::KindTy slotKind;
+  switch (call.getKind()) {
+    case FunctionSummary::Call::Witness: {
+      slotKind = VFuncSlot::Witness;
+      break;
+    }
+    case FunctionSummary::Call::VTable: {
+      slotKind = VFuncSlot::VTable;
+      break;
+    }
+    case FunctionSummary::Call::Direct: {
+      llvm_unreachable("Can't get slot for static call");
+    }
+    case FunctionSummary::Call::kindCount: {
+      llvm_unreachable("impossible");
+    }
+  }
+  return VFuncSlot(slotKind, call.getCallee());
+}
+
 void markDeadSymbols(ModuleSummaryIndex &summary, llvm::DenseSet<GUID> &PreservedGUIDs) {
 
   SmallVector<std::shared_ptr<LivenessTrace>, 8> Worklist;
@@ -98,42 +121,45 @@ void markDeadSymbols(ModuleSummaryIndex &summary, llvm::DenseSet<GUID> &Preserve
   while (!Worklist.empty()) {
     auto trace = Worklist.pop_back_val();
 
-    auto maybePair = summary.getFunctionInfo(trace->guid);
-    if (!maybePair) {
+    auto maybeSummary = summary.getFunctionSummary(trace->guid);
+    if (!maybeSummary) {
       llvm_unreachable("Bad GUID");
     }
-    auto pair = maybePair.getValue();
-    auto FS = pair.first;
-    trace->setName(pair.second);
-    if (LTOPrintLiveTrace == pair.second) {
-      dumpTarget = trace;
+    auto FS = maybeSummary;
+    if (!FS->getName().empty()) {
+      trace->setName(FS->getName());
+      if (LTOPrintLiveTrace == FS->getName()) {
+        dumpTarget = trace;
+      }
     }
     if (FS->isLive()) continue;
 
-    LLVM_DEBUG(llvm::dbgs() << "Mark " << pair.second << " as live\n");
+    if (!FS->getName().empty()) {
+      LLVM_DEBUG(llvm::dbgs() << "Mark " << FS->getName() << " as live\n");
+    } else {
+      LLVM_DEBUG(llvm::dbgs() << "Mark (" << FS->getGUID() << ") as live\n");
+    }
     FS->setLive(true);
     LiveSymbols++;
     
     for (auto Call : FS->calls()) {
       switch (Call.getKind()) {
-      case FunctionSummary::EdgeTy::Kind::Static: {
+      case FunctionSummary::Call::Direct: {
         Worklist.push_back(std::make_shared<LivenessTrace>(
             trace, Call.getCallee(), LivenessTrace::StaticReferenced));
         continue;
       }
-      case FunctionSummary::EdgeTy::Kind::Witness:
-      case FunctionSummary::EdgeTy::Kind::VTable: {
-        auto Impls = summary.getImplementations(Call.slot());
-        if (!Impls) {
-          continue;
-        }
-        for (auto Impl : Impls.getValue()) {
+      case FunctionSummary::Call::Witness:
+      case FunctionSummary::Call::VTable: {
+        VFuncSlot slot = createVFuncSlot(Call);
+        auto Impls = summary.getImplementations(slot);
+        for (auto Impl : Impls) {
           Worklist.push_back(std::make_shared<LivenessTrace>(
               trace, Impl, LivenessTrace::IndirectReferenced));
         }
         break;
       }
-      case FunctionSummary::EdgeTy::Kind::kindCount:
+      case FunctionSummary::Call::kindCount:
         llvm_unreachable("impossible");
       }
     }
@@ -177,12 +203,12 @@ int cross_module_opt_main(ArrayRef<const char *> Args, const char *Argv0,
       llvm::report_fatal_error("Invalid module summary");
   }
 
-  TheSummary->setModuleName("combined");
+  TheSummary->setName("combined");
   
   auto PreservedGUIDs = computePreservedGUIDs(TheSummary.get());
   markDeadSymbols(*TheSummary.get(), PreservedGUIDs);
 
-  modulesummary::emitModuleSummaryIndex(*TheSummary, Instance.getDiags(),
-                                        OutputFilename);
+  modulesummary::writeModuleSummaryIndex(*TheSummary, Instance.getDiags(),
+                                         OutputFilename);
   return 0;
 }
