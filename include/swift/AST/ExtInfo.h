@@ -436,6 +436,14 @@ public:
     return builder.withThrows(throws).build();
   }
 
+  /// Helper method for changing only the async field.
+  ///
+  /// Prefer using \c ASTExtInfoBuilder::withAsync for chaining.
+  LLVM_NODISCARD
+  ASTExtInfo withAsync(bool async = true) const {
+    return builder.withAsync(async).build();
+  }
+
   bool isEqualTo(ASTExtInfo other, bool useClangTypes) const {
     return builder.isEqualTo(other.builder, useClangTypes);
   }

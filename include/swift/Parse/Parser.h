@@ -1572,6 +1572,7 @@ public:
           SmallVectorImpl<CaptureListEntry> &captureList,
           VarDecl *&capturedSelfParamDecl,
           ParameterList *&params,
+          SourceLoc &asyncLoc,
           SourceLoc &throwsLoc,
           SourceLoc &arrowLoc,
           TypeExpr *&explicitResultType,

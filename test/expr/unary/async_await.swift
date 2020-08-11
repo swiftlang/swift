@@ -48,3 +48,19 @@ func testAutoclosure() async {
   __await acceptAutoclosureNonAsync(getInt()) // expected-error{{'async' in an autoclosure that does not support concurrency}}
   // expected-warning@-1{{no calls to 'async' functions occur within 'await' expression}}
 }
+
+// Test inference of 'async' from the body of a closure.
+func testClosure() {
+  let closure = {
+     __await getInt()
+  }
+
+  let _: () -> Int = closure // expected-error{{cannot convert value of type '() async -> Int' to specified type '() -> Int'}}
+
+  let closure2 = { () async -> Int in
+    print("here")
+    return __await getInt()
+  }
+
+  let _: () -> Int = closure2 // expected-error{{cannot convert value of type '() async -> Int' to specified type '() -> Int'}}
+}
