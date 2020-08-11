@@ -3443,7 +3443,7 @@ public:
   /// distinct.
   void mergeEquivalenceClasses(TypeVariableType *typeVar1,
                                TypeVariableType *typeVar2,
-                               bool updateWorkList = true);
+                               bool updateWorkList);
 
   /// Flags that direct type matching.
   enum TypeMatchFlags {
