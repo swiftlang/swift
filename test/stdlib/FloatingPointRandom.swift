@@ -1,4 +1,4 @@
-// RUN: %target-run-stdlib-swift
+// RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -93,142 +93,47 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
 }
 
 
-// Range contains random value
+% for Self in [`Float`, `Double`, `Float80`]:
 
-FloatingPointRandom.test("Float/random/rangeContains") {
-  for a in Float.testValues {
-    for b in Float.testValues where b >= a {
-      expectTrue(Float.isRandomInRange(a...b))
+%   if Self == `Float80`:
+#if !os(Windows) && (arch(i386) || arch(x86_64))
+%   end
+
+FloatingPointRandom.test("${Self}/random/rangeContains") {
+  for a in ${Self}.testValues {
+    for b in ${Self}.testValues where b >= a {
+      expectTrue(${Self}.isRandomInRange(a...b))
       if b != a {
-        expectTrue(Float.isRandomInRange(a..<b))
+        expectTrue(${Self}.isRandomInRange(a..<b))
       }
     }
   }
 }
 
-FloatingPointRandom.test("Double/random/rangeContains") {
-  for a in Double.testValues {
-    for b in Double.testValues where b >= a {
-      expectTrue(Double.isRandomInRange(a...b))
-      if b != a {
-        expectTrue(Double.isRandomInRange(a..<b))
-      }
-    }
-  }
-}
-
-#if !os(Windows) && (arch(i386) || arch(x86_64))
-
-FloatingPointRandom.test("Float80/random/rangeContains") {
-  for a in Float80.testValues {
-    for b in Float80.testValues where b >= a {
-      expectTrue(Float80.isRandomInRange(a...b))
-      if b != a {
-        expectTrue(Float80.isRandomInRange(a..<b))
-      }
-    }
-  }
-}
-
-#endif
-
-
-// Infinite range
-
-FloatingPointRandom.test("Float/random/infiniteRange") {
+FloatingPointRandom.test("${Self}/random/infiniteRange") {
   expectCrashLater()
-  _ = Float.random(in: 0 ..< .infinity)
+  _ = ${Self}.random(in: 0 ..< .infinity)
 }
 
-FloatingPointRandom.test("Double/random/infiniteRange") {
+FloatingPointRandom.test("${Self}/random/emptyRange") {
   expectCrashLater()
-  _ = Double.random(in: 0 ..< .infinity)
+  _ = ${Self}.random(in: 0..<0)
 }
 
-#if !os(Windows) && (arch(i386) || arch(x86_64))
-
-FloatingPointRandom.test("Float80/random/infiniteRange") {
-  expectCrashLater()
-  _ = Float80.random(in: 0 ..< .infinity)
+FloatingPointRandom.test("${Self}/random/fullRange") {
+  expectTrue(${Self}.isFullRangeRandomFinite())
 }
 
+FloatingPointRandom.test("${Self}/random/lowBit") {
+  expectTrue(${Self}.isRandomLowBitEverSet())
+}
+
+FloatingPointRandom.test("${Self}/random/smallRange") {
+  expectTrue(${Self}.isSmallRangeRandomUnbiased())
+}
+
+%   if Self == `Float80`:
 #endif
+%   end
 
-
-// Empty range
-
-FloatingPointRandom.test("Float/random/emptyRange") {
-  expectCrashLater()
-  _ = Float.random(in: 0..<0)
-}
-
-FloatingPointRandom.test("Double/random/emptyRange") {
-  expectCrashLater()
-  _ = Double.random(in: 0..<0)
-}
-
-#if !os(Windows) && (arch(i386) || arch(x86_64))
-
-FloatingPointRandom.test("Float80/random/emptyRange") {
-  expectCrashLater()
-  _ = Float80.random(in: 0..<0)
-}
-
-#endif
-
-
-// Full range
-
-FloatingPointRandom.test("Float/random/fullRange") {
-  expectTrue(Float.isFullRangeRandomFinite())
-}
-
-FloatingPointRandom.test("Double/random/fullRange") {
-  expectTrue(Double.isFullRangeRandomFinite())
-}
-
-#if !os(Windows) && (arch(i386) || arch(x86_64))
-
-FloatingPointRandom.test("Float80/random/fullRange") {
-  expectTrue(Float80.isFullRangeRandomFinite())
-}
-
-#endif
-
-
-// Low bit
-
-FloatingPointRandom.test("Float/random/lowBit") {
-  expectTrue(Float.isRandomLowBitEverSet())
-}
-
-FloatingPointRandom.test("Double/random/lowBit") {
-  expectTrue(Double.isRandomLowBitEverSet())
-}
-
-#if !os(Windows) && (arch(i386) || arch(x86_64))
-
-FloatingPointRandom.test("Float80/random/lowBit") {
-  expectTrue(Float80.isRandomLowBitEverSet())
-}
-
-#endif
-
-
-// Small range
-
-FloatingPointRandom.test("Float/random/smallRange") {
-  expectTrue(Float.isSmallRangeRandomUnbiased())
-}
-
-FloatingPointRandom.test("Double/random/smallRange") {
-  expectTrue(Double.isSmallRangeRandomUnbiased())
-}
-
-#if !os(Windows) && (arch(i386) || arch(x86_64))
-
-FloatingPointRandom.test("Float80/random/smallRange") {
-  expectTrue(Float80.isSmallRangeRandomUnbiased())
-}
-
-#endif
+% end
