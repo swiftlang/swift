@@ -96,7 +96,7 @@ import Foundation
 // CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*)* @"$s11objc_bridge3BasCfETo" to i8*)
 // CHECK:     }
 // CHECK:   ]
-// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK: }, section "__DATA, {{.*}}", align 8
 
 // CHECK: @_PROPERTIES__TtC11objc_bridge3Bas = internal constant { i32, i32, [5 x { i8*, i8* }] } {
 

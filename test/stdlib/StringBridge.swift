@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
 // RUN: %target-build-swift -Xfrontend -disable-access-control -module-name a %t/main.swift %S/../Inputs/SmallStringTestUtilities.swift -o %t.out -O
+// RUN: %target-codesign %t.out
 // RUN: %target-run %t.out
 
 // REQUIRES: executable_test
