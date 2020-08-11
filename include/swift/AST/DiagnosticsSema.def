@@ -4038,8 +4038,24 @@ NOTE(note_disable_error_propagation,none,
       "did you mean to disable error propagation?", ())
 ERROR(async_call_without_await,none,
       "call is 'async' but is not marked with 'await'", ())
+ERROR(async_call_without_await_in_autoclosure,none,
+      "call is 'async' in an autoclosure argument is not marked with 'await'", ())
 WARNING(no_async_in_await,none,
         "no calls to 'async' functions occur within 'await' expression", ())
+ERROR(async_call_in_illegal_context,none,
+      "'async' call cannot occur in "
+      "%select{<<ERROR>>|a default argument|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
+      (unsigned))
+ERROR(await_in_illegal_context,none,
+      "'await' operation cannot occur in "
+      "%select{<<ERROR>>|a default argument|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
+      (unsigned))
+ERROR(async_in_nonasync_function,none,
+      "%select{'async'|'await'}0 in %select{a function|an autoclosure}1 that "
+      "does not support concurrency",
+      (bool, bool))
+NOTE(note_add_async_to_function,none,
+     "add 'async' to function %0 to make it asynchronous", (DeclName))
 
 WARNING(no_throw_in_try,none,
         "no calls to throwing functions occur within 'try' expression", ())
