@@ -1210,6 +1210,16 @@ public:
         : nullptr;
   }
 
+  /// This method implements functionality of `Expr::isTypeReference`
+  /// with data provided by a given solution.
+  bool isTypeReference(Expr *E) const;
+
+  /// Call Expr::isIsStaticallyDerivedMetatype on the given
+  /// expression, using a custom accessor for the type on the
+  /// expression that reads the type from the Solution
+  /// expression type map.
+  bool isStaticallyDerivedMetatype(Expr *E) const;
+
   SWIFT_DEBUG_DUMP;
 
   /// Dump this solution.
