@@ -132,7 +132,7 @@ function(_add_host_variant_c_compile_flags target)
   is_build_type_optimized("${CMAKE_BUILD_TYPE}" optimized)
   is_build_type_with_debuginfo("${CMAKE_BUILD_TYPE}" debuginfo)
 
-  # Add -O0/-O2/-O3/-Os based on CMAKE_BUILD_TYPE.
+  # Add -O0/-O2/-O3/-Os/-g/-momit-leaf-frame-pointer/... based on CMAKE_BUILD_TYPE.
   target_compile_options(${target} PRIVATE "${CMAKE_CXX_FLAGS_${CMAKE_BUILD_TYPE}}")
 
   if(optimized)
@@ -145,16 +145,6 @@ function(_add_host_variant_c_compile_flags target)
         else()
           target_compile_options(${target} PRIVATE /Oy)
         endif()
-      endif()
-    endif()
-  endif()
-
-  # CMake automatically adds the flags for debug info if we use MSVC/clang-cl.
-  if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-    if(debuginfo)
-      _compute_lto_flag("${SWIFT_TOOLS_ENABLE_LTO}" _lto_flag_out)
-      if(_lto_flag_out)
-        target_compile_options(${target} PRIVATE -gline-tables-only)
       endif()
     endif()
   endif()

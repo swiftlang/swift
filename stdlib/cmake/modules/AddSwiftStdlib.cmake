@@ -204,16 +204,6 @@ function(_add_target_variant_c_compile_flags)
     endif()
   endif()
 
-  # CMake automatically adds the flags for debug info if we use MSVC/clang-cl.
-  if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-    if(debuginfo)
-      _compute_lto_flag("${CFLAGS_ENABLE_LTO}" _lto_flag_out)
-      if(_lto_flag_out)
-        list(APPEND result "-gline-tables-only")
-      endif()
-    endif()
-  endif()
-
   if("${CFLAGS_SDK}" STREQUAL "WINDOWS")
     # MSVC/clang-cl don't support -fno-pic or -fms-compatibility-version.
     if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
