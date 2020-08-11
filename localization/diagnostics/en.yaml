@@ -2967,6 +2967,14 @@
     value of type %0 has no property or method named 'subscript'; did you
     mean to use the subscript operator?
 
+- id: could_not_find_subscript_member_tuple
+  msg: >-
+    cannot access element using subscript for tuple type %0; use '.' notation instead
+
+- id: could_not_find_subscript_member_tuple_did_you_mean_use_dot
+  msg: >-
+    cannot access element using subscript for tuple type %0; did you mean to use '.%1'?
+
 - id: could_not_find_enum_case
   msg: >-
     enum type %0 has no case %1; did you mean %2?
