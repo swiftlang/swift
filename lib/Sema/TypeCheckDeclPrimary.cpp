@@ -881,7 +881,7 @@ Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
     return new (ctx) ErrorExpr(initExpr->getSourceRange(), ErrorType::get(ctx));
   }
 
-  TypeChecker::checkInitializerErrorHandling(dc, initExpr);
+  TypeChecker::checkInitializerEffects(dc, initExpr);
 
   // Walk the checked initializer and contextualize any closures
   // we saw there.
@@ -1657,7 +1657,7 @@ public:
               PBD->getInitContext(i));
           if (initContext) {
             // Check safety of error-handling in the declaration, too.
-            TypeChecker::checkInitializerErrorHandling(initContext, init);
+            TypeChecker::checkInitializerEffects(initContext, init);
             TypeChecker::contextualizeInitializer(initContext, init);
           }
         }
