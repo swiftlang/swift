@@ -820,11 +820,8 @@ private:
 class Context {
 public:
   enum class Kind : uint8_t {
-    /// A context that handles errors.
-    Handled,
-
-    /// A non-throwing function.
-    NonThrowingFunction,
+    /// A context that potentially handles errors or async calls.
+    PotentiallyHandled,
 
     /// A default argument expression.
     DefaultArgument,
@@ -859,17 +856,24 @@ private:
 
   Kind TheKind;
   Optional<AnyFunctionRef> Function;
+  bool HandlesErrors = false;
   bool IsNonExhaustiveCatch = false;
   bool DiagnoseErrorOnTry = false;
   InterpolatedStringLiteralExpr *InterpolatedString = nullptr;
 
-  explicit Context(Kind kind, Optional<AnyFunctionRef> function = None)
-    : TheKind(kind), Function(function) {}
+  explicit Context(Kind kind)
+      : TheKind(kind), Function(None), HandlesErrors(false) {
+    assert(TheKind != Kind::PotentiallyHandled);
+  }
+
+  explicit Context(bool handlesErrors, Optional<AnyFunctionRef> function)
+    : TheKind(Kind::PotentiallyHandled), Function(function),
+      HandlesErrors(handlesErrors) { }
 
 public:
   /// Whether this is a function that rethrows.
   bool isRethrows() const {
-    if (getKind() != Kind::Handled)
+    if (!HandlesErrors)
       return false;
 
     if (!Function)
@@ -895,12 +899,12 @@ public:
   }
 
   static Context getHandled() {
-    return Context(Kind::Handled);
+    return Context(/*handlesErrors=*/true, None);
   }
 
   static Context forTopLevelCode(TopLevelCodeDecl *D) {
-    // Top-level code implicitly handles errors.
-    return Context(Kind::Handled);
+    // Top-level code implicitly handles errors and 'async' calls.
+    return Context(/*handlesErrors=*/true, None);
   }
 
   static Context forFunction(AbstractFunctionDecl *D) {
@@ -920,8 +924,8 @@ public:
       }
     }
 
-    return Context(D->hasThrows() ? Kind::Handled : Kind::NonThrowingFunction,
-                   AnyFunctionRef(D));
+    bool handlesErrors = D->hasThrows();
+    return Context(handlesErrors, AnyFunctionRef(D));
   }
 
   static Context forDeferBody() {
@@ -951,9 +955,7 @@ public:
         closureTypeThrows = fnType->isThrowing();
     }
 
-    return Context(closureTypeThrows ? Kind::Handled
-                                     : Kind::NonThrowingFunction,
-                   AnyFunctionRef(E));
+    return Context(closureTypeThrows, AnyFunctionRef(E));
   }
 
   static Context forCatchPattern(CaseStmt *S) {
@@ -977,7 +979,7 @@ public:
   Kind getKind() const { return TheKind; }
 
   bool handlesNothing() const {
-    return getKind() != Kind::Handled;
+    return !HandlesErrors;
   }
   bool handles(ThrowingKind errorKind) const {
     switch (errorKind) {
@@ -986,12 +988,12 @@ public:
 
     // A call that's rethrowing-only can be handled by 'rethrows'.
     case ThrowingKind::RethrowingOnly:
-      return getKind() == Kind::Handled;
+      return HandlesErrors;
 
     // An operation that always throws can only be handled by an
     // all-handling context.
     case ThrowingKind::Throws:
-      return getKind() == Kind::Handled && !isRethrows();
+      return HandlesErrors && !isRethrows();
     }
     llvm_unreachable("bad error kind");
   }
@@ -1125,18 +1127,7 @@ public:
                                   bool isTryCovered,
                                   const PotentialThrowReason &reason) {
     switch (getKind()) {
-    case Kind::Handled:
-      if (isRethrows()) {
-        diagnoseThrowInLegalContext(Diags, E, isTryCovered, reason,
-                                    diag::throw_in_rethrows_function,
-                                    diag::throwing_call_in_rethrows_function,
-                            diag::tryless_throwing_call_in_rethrows_function);
-        return;
-      }
-
-      llvm_unreachable("throw site is handled!");
-
-    case Kind::NonThrowingFunction:
+    case Kind::PotentiallyHandled:
       if (IsNonExhaustiveCatch) {
         diagnoseThrowInLegalContext(Diags, E, isTryCovered, reason,
                                     diag::throw_in_nonexhaustive_catch,
@@ -1150,6 +1141,14 @@ public:
                                     diag::throw_in_nonthrowing_autoclosure,
                               diag::throwing_call_in_nonthrowing_autoclosure,
                       diag::tryless_throwing_call_in_nonthrowing_autoclosure);
+        return;
+      }
+
+      if (isRethrows()) {
+        diagnoseThrowInLegalContext(Diags, E, isTryCovered, reason,
+                                    diag::throw_in_rethrows_function,
+                                    diag::throwing_call_in_rethrows_function,
+                            diag::tryless_throwing_call_in_rethrows_function);
         return;
       }
 
@@ -1191,10 +1190,7 @@ public:
 
   void diagnoseUnhandledTry(DiagnosticEngine &Diags, TryExpr *E) {
     switch (getKind()) {
-    case Kind::Handled:
-      llvm_unreachable("try is handled!");
-
-    case Kind::NonThrowingFunction:
+    case Kind::PotentiallyHandled:
       if (DiagnoseErrorOnTry) {
         Diags.diagnose(
             E->getTryLoc(),
