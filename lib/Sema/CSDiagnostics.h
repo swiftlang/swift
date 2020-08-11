@@ -1075,6 +1075,14 @@ private:
   /// that defaults the element type. e.g. _ = [.e]
   bool diagnoseInLiteralCollectionContext() const;
 
+  /// Tailored diagnostics for missing subscript member on a tuple base type.
+  /// e.g
+  /// ```swift
+  ///   let tuple: (Int, Int) = (0, 0)
+  ///   _ = tuple[0] // -> tuple.0.
+  ///  ```
+  bool diagnoseForSubscriptMemberWithTupleBase() const;
+
   static DeclName findCorrectEnumCaseName(Type Ty,
                                           TypoCorrectionResults &corrections,
                                           DeclNameRef memberName);
