@@ -96,7 +96,7 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
 // Range contains random value
 
 FloatingPointRandom.test("Float/random/rangeContains") {
-  for a = Float.testValues {
+  for a in Float.testValues {
     for b in Float.testValues where b >= a {
       expectTrue(Float.isRandomInRange(a...b))
       if b != a {
@@ -107,7 +107,7 @@ FloatingPointRandom.test("Float/random/rangeContains") {
 }
 
 FloatingPointRandom.test("Double/random/rangeContains") {
-  for a = Double.testValues {
+  for a in Double.testValues {
     for b in Double.testValues where b >= a {
       expectTrue(Double.isRandomInRange(a...b))
       if b != a {
@@ -120,7 +120,7 @@ FloatingPointRandom.test("Double/random/rangeContains") {
 #if !os(Windows) && (arch(i386) || arch(x86_64))
 
 FloatingPointRandom.test("Float80/random/rangeContains") {
-  for a = Float80.testValues {
+  for a in Float80.testValues {
     for b in Float80.testValues where b >= a {
       expectTrue(Float80.isRandomInRange(a...b))
       if b != a {
