@@ -5234,9 +5234,6 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
                                      EndLoc);
   }
 
-  // The typechecker will always fill this in.
-  TypeLoc ReturnType;
-
   // Start the function.
   auto *D = AccessorDecl::create(P->Context,
                                  /*FIXME FuncLoc=*/DeclLoc,
@@ -5247,7 +5244,7 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
                                  (GenericParams
                                   ? GenericParams->clone(P->CurDeclContext)
                                   : nullptr),
-                                 ValueArg, ReturnType,
+                                 ValueArg, Type(),
                                  P->CurDeclContext);
 
   return D;

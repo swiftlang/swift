@@ -899,7 +899,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       /*GenericParams=*/nullptr, params,
-      TypeLoc::withoutLoc(intType), parentDC);
+      intType, parentDC);
   getterDecl->setImplicit();
   getterDecl->setBodySynthesizer(&deriveBodyHashable_hashValue);
   getterDecl->setIsTransparent(false);

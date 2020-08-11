@@ -7249,7 +7249,7 @@ AccessorDecl *AccessorDecl::create(ASTContext &ctx,
                                    bool throws, SourceLoc throwsLoc,
                                    GenericParamList *genericParams,
                                    ParameterList * bodyParams,
-                                   TypeLoc fnRetType,
+                                   Type fnRetType,
                                    DeclContext *parent,
                                    ClangNode clangNode) {
   auto *D = AccessorDecl::createImpl(
@@ -7257,7 +7257,7 @@ AccessorDecl *AccessorDecl::create(ASTContext &ctx,
       staticLoc, staticSpelling, throws, throwsLoc,
       genericParams, parent, clangNode);
   D->setParameters(bodyParams);
-  D->getBodyResultTypeLoc() = fnRetType;
+  D->getBodyResultTypeLoc() = TypeLoc::withoutLoc(fnRetType);
   return D;
 }
 

@@ -6410,7 +6410,7 @@ public:
                               bool throws, SourceLoc throwsLoc,
                               GenericParamList *genericParams,
                               ParameterList *parameterList,
-                              TypeLoc fnRetType, DeclContext *parent,
+                              Type fnRetType, DeclContext *parent,
                               ClangNode clangNode = ClangNode());
 
   SourceLoc getAccessorKeywordLoc() const { return AccessorKeywordLoc; }

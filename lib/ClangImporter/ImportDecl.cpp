@@ -163,7 +163,6 @@ static FuncDecl *createFuncOrAccessor(ASTContext &ctx, SourceLoc funcLoc,
                                       bool throws,
                                       DeclContext *dc,
                                       ClangNode clangNode) {
-  TypeLoc resultTypeLoc = resultTy ? TypeLoc::withoutLoc(resultTy) : TypeLoc();
   if (accessorInfo) {
     return AccessorDecl::create(ctx, funcLoc,
                                 /*accessorKeywordLoc*/ SourceLoc(),
@@ -175,8 +174,9 @@ static FuncDecl *createFuncOrAccessor(ASTContext &ctx, SourceLoc funcLoc,
                                 /*ThrowsLoc=*/SourceLoc(),
                                 /*GenericParams=*/nullptr,
                                 bodyParams,
-                                resultTypeLoc, dc, clangNode);
+                                resultTy, dc, clangNode);
   } else {
+    TypeLoc resultTypeLoc = resultTy ? TypeLoc::withoutLoc(resultTy) : TypeLoc();
     return FuncDecl::create(ctx, /*StaticLoc=*/SourceLoc(),
                             StaticSpellingKind::None,
                             funcLoc, name, nameLoc,
@@ -611,7 +611,7 @@ static void makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr, params,
-                     TypeLoc::withoutLoc(rawTy), enumDecl);
+                     rawTy, enumDecl);
   getterDecl->setImplicit();
   getterDecl->setIsObjC(false);
   getterDecl->setIsDynamic(false);
@@ -687,7 +687,7 @@ static AccessorDecl *makeStructRawValueGetter(
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr, params,
-                     TypeLoc::withoutLoc(computedType), structDecl);
+                     computedType, structDecl);
   getterDecl->setImplicit();
   getterDecl->setIsObjC(false);
   getterDecl->setIsDynamic(false);
@@ -717,7 +717,7 @@ static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr, params,
-                     TypeLoc::withoutLoc(getterType), importedDecl, clangNode);
+                     getterType, importedDecl, clangNode);
   getterDecl->setAccess(AccessLevel::Public);
   getterDecl->setIsObjC(false);
   getterDecl->setIsDynamic(false);
@@ -750,7 +750,7 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr, params,
-                     TypeLoc::withoutLoc(voidTy), importedDecl, clangNode);
+                     voidTy, importedDecl, clangNode);
   setterDecl->setIsObjC(false);
   setterDecl->setIsDynamic(false);
   setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
@@ -1684,8 +1684,7 @@ buildSubscriptGetterDecl(ClangImporter::Implementation &Impl,
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr,
-                     params,
-                     TypeLoc::withoutLoc(elementTy), dc,
+                     params, elementTy, dc,
                      getter->getClangNode());
 
   thunk->setAccess(getOverridableAccessLevel(dc));
@@ -1737,7 +1736,7 @@ buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
                      /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr,
                      valueIndicesPL,
-                     TypeLoc::withoutLoc(TupleType::getEmpty(C)), dc,
+                     TupleType::getEmpty(C), dc,
                      setter->getClangNode());
 
   thunk->setAccess(getOverridableAccessLevel(dc));
@@ -1922,7 +1921,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
                      /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr,
                      params,
-                     TypeLoc::withoutLoc(stringTy), swiftDecl);
+                     stringTy, swiftDecl);
   getterDecl->setIsObjC(false);
   getterDecl->setIsDynamic(false);
   getterDecl->setIsTransparent(false);
@@ -8557,8 +8556,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr,
-                     params,
-                     TypeLoc::withoutLoc(type), dc);
+                     params, type, dc);
   func->setStatic(isStatic);
   func->setAccess(getOverridableAccessLevel(dc));
   func->setIsObjC(false);
