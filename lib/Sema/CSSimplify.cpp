@@ -4529,7 +4529,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           return formUnsolvedResult();
 
         // Merge the equivalence classes corresponding to these two variables.
-        mergeEquivalenceClasses(rep1, rep2);
+        mergeEquivalenceClasses(rep1, rep2, /*updateWorkList=*/true);
         return getTypeMatchSuccess();
       }
 
@@ -4581,7 +4581,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         if (!rep1->getImpl().canBindToInOut() ||
             !rep2->getImpl().canBindToLValue()) {
           // Merge the equivalence classes corresponding to these two variables.
-          mergeEquivalenceClasses(rep1, rep2);
+          mergeEquivalenceClasses(rep1, rep2, /*updateWorkList=*/true);
           return getTypeMatchSuccess();
         }
       }
