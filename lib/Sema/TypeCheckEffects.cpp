@@ -826,9 +826,6 @@ public:
     /// A non-throwing function.
     NonThrowingFunction,
 
-    /// A rethrowing function.
-    RethrowingFunction,
-
     /// A default argument expression.
     DefaultArgument,
 
@@ -864,11 +861,26 @@ private:
   Optional<AnyFunctionRef> Function;
   bool IsNonExhaustiveCatch = false;
   bool DiagnoseErrorOnTry = false;
-  DeclContext *RethrowsDC = nullptr;
   InterpolatedStringLiteralExpr *InterpolatedString = nullptr;
 
   explicit Context(Kind kind, Optional<AnyFunctionRef> function = None)
     : TheKind(kind), Function(function) {}
+
+public:
+  /// Whether this is a function that rethrows.
+  bool isRethrows() const {
+    if (getKind() != Kind::Handled)
+      return false;
+
+    if (!Function)
+      return false;
+
+    auto fn = Function->getAbstractFunctionDecl();
+    if (!fn)
+      return false;
+
+    return fn->getAttrs().hasAttribute<RethrowsAttr>();
+  }
 
   /// Whether this is an autoclosure.
   bool isAutoClosure() const {
@@ -882,7 +894,6 @@ private:
     return isa<AutoClosureExpr>(closure);
   }
 
-public:
   static Context getHandled() {
     return Context(Kind::Handled);
   }
@@ -893,12 +904,6 @@ public:
   }
 
   static Context forFunction(AbstractFunctionDecl *D) {
-    if (D->getAttrs().hasAttribute<RethrowsAttr>()) {
-      Context result(Kind::RethrowingFunction, AnyFunctionRef(D));
-      result.RethrowsDC = D;
-      return result;
-    }
-
     // HACK: If the decl is the synthesized getter for a 'lazy' property, then
     // treat the context as a property initializer in order to produce a better
     // diagnostic; the only code we should be diagnosing on is within the
@@ -972,8 +977,7 @@ public:
   Kind getKind() const { return TheKind; }
 
   bool handlesNothing() const {
-    return getKind() != Kind::Handled &&
-           getKind() != Kind::RethrowingFunction;
+    return getKind() != Kind::Handled;
   }
   bool handles(ThrowingKind errorKind) const {
     switch (errorKind) {
@@ -982,17 +986,23 @@ public:
 
     // A call that's rethrowing-only can be handled by 'rethrows'.
     case ThrowingKind::RethrowingOnly:
-      return !handlesNothing();
+      return getKind() == Kind::Handled;
 
     // An operation that always throws can only be handled by an
     // all-handling context.
     case ThrowingKind::Throws:
-      return getKind() == Kind::Handled;
+      return getKind() == Kind::Handled && !isRethrows();
     }
     llvm_unreachable("bad error kind");
   }
 
-  DeclContext *getRethrowsDC() const { return RethrowsDC; }
+  DeclContext *getRethrowsDC() const {
+    if (!isRethrows())
+      return nullptr;
+
+    return Function->getAbstractFunctionDecl();
+  }
+
   InterpolatedStringLiteralExpr * getInterpolatedString() const {
     return InterpolatedString;
   }
@@ -1098,8 +1108,7 @@ public:
     // Allow the diagnostic to fire on the 'try' if we don't have
     // anything else to say.
     if (isTryCovered && !reason.isRethrowsCall() &&
-        getKind() == Kind::NonThrowingFunction &&
-        !isAutoClosure()) {
+        !isRethrows() && !isAutoClosure()) {
       DiagnoseErrorOnTry = true;
       return;
     }
@@ -1117,18 +1126,15 @@ public:
                                   const PotentialThrowReason &reason) {
     switch (getKind()) {
     case Kind::Handled:
+      if (isRethrows()) {
+        diagnoseThrowInLegalContext(Diags, E, isTryCovered, reason,
+                                    diag::throw_in_rethrows_function,
+                                    diag::throwing_call_in_rethrows_function,
+                            diag::tryless_throwing_call_in_rethrows_function);
+        return;
+      }
+
       llvm_unreachable("throw site is handled!");
-
-    // TODO: Doug suggested that we could generate one error per
-    // non-throwing function with throw sites within it, possibly with
-    // notes for the throw sites.
-
-    case Kind::RethrowingFunction:
-      diagnoseThrowInLegalContext(Diags, E, isTryCovered, reason,
-                                  diag::throw_in_rethrows_function,
-                                  diag::throwing_call_in_rethrows_function,
-                          diag::tryless_throwing_call_in_rethrows_function);
-      return;
 
     case Kind::NonThrowingFunction:
       if (IsNonExhaustiveCatch) {
@@ -1186,7 +1192,6 @@ public:
   void diagnoseUnhandledTry(DiagnosticEngine &Diags, TryExpr *E) {
     switch (getKind()) {
     case Kind::Handled:
-    case Kind::RethrowingFunction:
       llvm_unreachable("try is handled!");
 
     case Kind::NonThrowingFunction:
@@ -1471,7 +1476,7 @@ private:
 
     auto savedContext = CurContext;
     if (doThrowingKind != ThrowingKind::Throws &&
-        CurContext.getKind() == Context::Kind::RethrowingFunction) {
+        CurContext.isRethrows()) {
       // If this catch clause is reachable at all, it's because a function
       // parameter throws. So let's temporarily set our context to Handled so
       // the catch body is allowed to throw.
