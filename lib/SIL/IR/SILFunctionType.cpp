@@ -1304,7 +1304,7 @@ public:
     if (origContextType->hasTypeParameter()) {
       origContextType = origSig->getGenericEnvironment()
         ->mapTypeIntoContext(origContextType)
-        ->getCanonicalType(origSig);
+        ->getCanonicalType();
     }
 
     auto result = origContextType
