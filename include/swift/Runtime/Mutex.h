@@ -20,12 +20,14 @@
 
 #include <type_traits>
 
-#if (defined(__APPLE__) || defined(__linux__) || defined(__CYGWIN__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__HAIKU__))
+#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+#include "swift/Runtime/MutexSingleThreaded.h"
+#elif (defined(__APPLE__) || defined(__linux__) || defined(__CYGWIN__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__HAIKU__))
 #include "swift/Runtime/MutexPThread.h"
 #elif defined(_WIN32)
 #include "swift/Runtime/MutexWin32.h"
 #elif defined(__wasi__)
-#include "swift/Runtime/MutexWASI.h"
+#include "swift/Runtime/MutexSingleThreaded.h"
 #else
 #error "Implement equivalent of MutexPThread.h/cpp for your platform."
 #endif
