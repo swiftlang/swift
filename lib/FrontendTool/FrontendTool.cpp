@@ -342,6 +342,31 @@ class ABIDependencyEvaluator {
   void reexposeImportedABI(ModuleDecl *module, ModuleDecl *importedModule,
                            bool includeImportedModule = true);
 
+  /// Check if a Swift module is an overlay for some Clang module.
+  ///
+  /// FIXME: Delete this hack once SR-13363 is fixed and ModuleDecl has the
+  /// right API which we can use directly.
+  bool isOverlayOfClangModule(ModuleDecl *swiftModule);
+
+  /// Check for cases where we have a fake cycle through an overlay.
+  ///
+  /// \code
+  /// Actual stack:
+  ///    sandwichedModule -> Overlay (Swift) -> ... -> sandwichedModule
+  ///                     ^^--- wrong!
+  /// Ideal stack:
+  ///    sandwichedModule -> Underlying (Clang)
+  /// \endcode
+  ///
+  /// This happens when we have a dependency like:
+  /// \code
+  ///     Overlay (Swift) -> sandwichedModule -> Underlying (Clang)
+  /// \endcode
+  ///
+  /// We check this lazily because eagerly detecting if the dependency on an
+  /// overlay is correct or not is difficult.
+  bool isFakeCycleThroughOverlay(ModuleDecl **sandwichedModuleIter);
+
   /// Recursive step in computing ABI dependencies.
   ///
   /// Use this method instead of using the \c forClangModule/\c forSwiftModule
@@ -453,9 +478,42 @@ void ABIDependencyEvaluator::reexposeImportedABI(
     addToABIExportMap(module, reexportedModule);
 }
 
+bool ABIDependencyEvaluator::isOverlayOfClangModule(ModuleDecl *swiftModule) {
+  assert(!swiftModule->isNonSwiftModule());
+
+  llvm::SmallPtrSet<ModuleDecl *, 8> importList;
+  ::getImmediateImports(swiftModule, importList,
+                        {ModuleDecl::ImportFilterKind::Public});
+  bool isOverlay =
+      llvm::any_of(importList, [&](ModuleDecl *importedModule) -> bool {
+        return isClangOverlayOf(swiftModule, importedModule);
+      });
+  return isOverlay;
+}
+
+bool ABIDependencyEvaluator::isFakeCycleThroughOverlay(
+    ModuleDecl **sandwichModuleIter) {
+  assert(sandwichModuleIter >= searchStack.begin()
+         && sandwichModuleIter < searchStack.end()
+         && "sandwichModuleIter points to an element in searchStack");
+  // The sandwichedModule must be a Clang module.
+  if (!(*sandwichModuleIter)->isNonSwiftModule())
+    return false;
+  auto nextModuleIter = sandwichModuleIter + 1;
+  if (nextModuleIter == searchStack.end())
+    return false;
+  // The next module must be a Swift overlay for a Clang module
+  if ((*nextModuleIter)->isNonSwiftModule())
+    return false;
+  return isOverlayOfClangModule(*nextModuleIter);
+}
+
 void ABIDependencyEvaluator::computeABIDependenciesForModule(
     ModuleDecl *module) {
-  if (llvm::find(searchStack, module) != searchStack.end()) {
+  auto moduleIter = llvm::find(searchStack, module);
+  if (moduleIter != searchStack.end()) {
+    if (isFakeCycleThroughOverlay(moduleIter))
+      return;
     crashOnInvariantViolation([&](llvm::raw_string_ostream &os) {
       os << "unexpected cycle in import graph!\n";
       for (auto m: searchStack) {
@@ -510,6 +568,10 @@ void ABIDependencyEvaluator::computeABIDependenciesForClangModule(
     //    C' imports S. This creates a cycle: S -> C' -> ... -> S.
     //    In practice, this case is hit for
     //      Darwin (Swift) -> SwiftOverlayShims (Clang) -> Darwin (Swift).
+    //    We may also hit this in a slightly different direction, in case
+    //    the module directly imports SwiftOverlayShims:
+    //      SwiftOverlayShims -> Darwin (Swift) -> SwiftOverlayShims
+    //    The latter is handled later by isFakeCycleThroughOverlay.
     // 3. [NOTE: Intra-module-leafwards-traversal]
     //    Cycles within the same top-level module.
     //    These don't matter for us, since we only care about the dependency
@@ -519,9 +581,8 @@ void ABIDependencyEvaluator::computeABIDependenciesForClangModule(
     if (import->isStdlibModule()) {
       continue;
     }
-    if (!import->isNonSwiftModule()
-        && import->findUnderlyingClangModule() != nullptr
-        && llvm::find(searchStack, import) != searchStack.end()) {
+    if (!import->isNonSwiftModule() && isOverlayOfClangModule(import) &&
+        llvm::find(searchStack, import) != searchStack.end()) {
       continue;
     }
     if (import->isNonSwiftModule()
