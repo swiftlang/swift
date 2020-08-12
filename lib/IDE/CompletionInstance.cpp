@@ -417,6 +417,7 @@ bool CompletionInstance::performCachedOperationIfPossible(
 
     auto *AFD = cast<AbstractFunctionDecl>(DC);
     AFD->setBodyToBeReparsed(newBodyRange);
+    SM.setReplacedRange({AFD->getOriginalBodySourceRange(), newBodyRange});
 
     traceDC = AFD;
     break;
