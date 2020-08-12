@@ -481,71 +481,50 @@ bool DependencyVerifier::verifyObligations(
   auto &diags = SF->getASTContext().Diags;
   for (auto &expectation : ExpectedDependencies) {
     const bool wantsCascade = expectation.isCascading();
-    switch (expectation.Info.Kind) {
-    case Expectation::Kind::Negative:
+    if (expectation.Info.Kind == Expectation::Kind::Negative) {
       // We'll verify negative expectations separately.
       NegativeExpectations.insert({expectation.MessageRange, expectation});
-      break;
-    case Expectation::Kind::Member:
-      matchExpectationOrFail(
-          OM, expectation,
-          [&](Obligation &p) {
-            const auto haveCascade = p.getCascades();
+      continue;
+    }
+
+    matchExpectationOrFail(
+        OM, expectation,
+        [&](Obligation &O) {
+          const auto haveCascade = O.getCascades();
+          switch (expectation.Info.Kind) {
+          case Expectation::Kind::Negative:
+            llvm_unreachable("Should have been handled above!");
+          case Expectation::Kind::Member:
             if (haveCascade != wantsCascade) {
               diagnose(diags, expectation.MessageRange.begin(),
                        diag::dependency_cascading_mismatch, wantsCascade,
                        haveCascade);
-              return p.fail();
+              return O.fail();
+            } else {
+              return O.fullfill();
             }
-
-            return p.fullfill();
-          },
-          [&](const Expectation &e) {
-            diagnose(
-                diags, e.MessageRange.begin(), diag::missing_member_dependency,
-                static_cast<uint8_t>(expectation.Info.Kind), e.MessageRange);
-          });
-      break;
-    case Expectation::Kind::PotentialMember:
-      matchExpectationOrFail(
-          OM, expectation,
-          [&](Obligation &p) {
-            assert(p.getName().empty());
-            const auto haveCascade = p.getCascades();
+          case Expectation::Kind::PotentialMember:
+            assert(O.getName().empty());
             if (haveCascade != wantsCascade) {
               diagnose(diags, expectation.MessageRange.begin(),
                        diag::potential_dependency_cascading_mismatch,
                        wantsCascade, haveCascade);
-              return p.fail();
+              return O.fail();
+            } else {
+              return O.fullfill();
             }
+          case Expectation::Kind::Provides:
+          case Expectation::Kind::DynamicMember:
+            return O.fullfill();
+          }
 
-            return p.fullfill();
-          },
-          [&](const Expectation &e) {
-            diagnose(
-                diags, e.MessageRange.begin(), diag::missing_member_dependency,
-                static_cast<uint8_t>(expectation.Info.Kind), e.MessageRange);
-          });
-      break;
-    case Expectation::Kind::Provides:
-      matchExpectationOrFail(
-          OM, expectation, [](Obligation &O) { return O.fullfill(); },
-          [&](const Expectation &e) {
-            diagnose(
-                diags, e.MessageRange.begin(), diag::missing_member_dependency,
-                static_cast<uint8_t>(expectation.Info.Kind), e.MessageRange);
-          });
-      break;
-    case Expectation::Kind::DynamicMember:
-      matchExpectationOrFail(
-          OM, expectation, [](Obligation &O) { return O.fullfill(); },
-          [&](const Expectation &e) {
-            diagnose(
-                diags, e.MessageRange.begin(), diag::missing_member_dependency,
-                static_cast<uint8_t>(expectation.Info.Kind), e.MessageRange);
-          });
-      break;
-    }
+          llvm_unreachable("Unhandled expectation kind!");
+        },
+        [&](const Expectation &e) {
+          diagnose(diags, e.MessageRange.begin(),
+                   diag::missing_member_dependency,
+                   static_cast<uint8_t>(expectation.Info.Kind), e.MessageRange);
+        });
   }
 
   return false;
