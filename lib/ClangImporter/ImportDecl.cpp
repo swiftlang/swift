@@ -3482,14 +3482,33 @@ namespace {
 
     Decl *VisitClassTemplateSpecializationDecl(
                  const clang::ClassTemplateSpecializationDecl *decl) {
-      // FIXME: We could import specializations, but perhaps only as unnamed
-      // structural types.
-      return nullptr;
+      // `Sema::isCompleteType` will try to instantiate the class template as a
+      // side-effect and we rely on this here. `decl->getDefinition()` can
+      // return nullptr before the call to sema and return its definition
+      // afterwards.
+      if (!Impl.getClangSema().isCompleteType(
+              decl->getLocation(),
+              Impl.getClangASTContext().getRecordType(decl))) {
+        // If we got nullptr definition now it means the type is not complete.
+        // We don't import incomplete types.
+        return nullptr;
+      }
+      auto def = dyn_cast<clang::ClassTemplateSpecializationDecl>(
+          decl->getDefinition());
+      assert(def && "Class template instantiation didn't have definition");
+      // FIXME: This will instantiate all members of the specialization (and detect
+      // instantiation failures in them), which can be more than is necessary
+      // and is more than what Clang does. As a result we reject some C++
+      // programs that Clang accepts.
+      Impl.getClangSema().InstantiateClassTemplateSpecializationMembers(
+          def->getLocation(), def, clang::TSK_ExplicitInstantiationDefinition);
+
+      return VisitRecordDecl(def);
     }
 
     Decl *VisitClassTemplatePartialSpecializationDecl(
-                 const clang::ClassTemplatePartialSpecializationDecl *decl) {
-      // Note: templates are not imported.
+        const clang::ClassTemplatePartialSpecializationDecl *decl) {
+      // Note: partial template specializations are not imported.
       return nullptr;
     }
 

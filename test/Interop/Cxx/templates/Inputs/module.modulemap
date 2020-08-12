@@ -1,0 +1,39 @@
+module DeclWithPrimitiveArgument {
+  header "decl-with-primitive-argument.h"
+}
+
+module DeclWithoutDefinition {
+  header "decl-without-definition.h"
+}
+
+module DeclWithDefinition {
+  header "decl-with-definition.h"
+}
+
+module DeclWithDefinitionIncludingMembers {
+  header "decl-with-definition-including-members.h"
+}
+
+module CanonicalTypes {
+  header "canonical-types.h"
+}
+
+module ExplicitSpecialization {
+  header "explicit-specialization.h"
+}
+
+module UsingDirective {
+  header "using-directive.h"
+}
+
+module EagerInstantiationProblems {
+  header "eager-instantiation-problems.h"
+}
+
+module Mangling {
+  header "mangling.h"
+}
+
+module LinkageOfSwiftSymbolsForImportedTypes {
+  header "linkage-of-swift-symbols-for-imported-types.h"
+}

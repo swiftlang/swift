@@ -22,6 +22,7 @@
 #include "llvm/BinaryFormat/MachO.h"
 #include "llvm/BinaryFormat/ELF.h"
 #include "llvm/Object/COFF.h"
+#include "llvm/Support/Memory.h"
 
 #include "swift/ABI/Enum.h"
 #include "swift/ABI/ObjectFile.h"
@@ -393,29 +394,60 @@ public:
     return readPECOFFSections(ImageStart);
   }
 
-  template <typename T> bool readELFSections(RemoteAddress ImageStart) {
-    auto Buf =
-        this->getReader().readBytes(ImageStart, sizeof(typename T::Header));
+  template <typename T>
+  bool readELFSections(RemoteAddress ImageStart,
+                       llvm::Optional<llvm::sys::MemoryBlock> FileBuffer) {
+    // When reading from the FileBuffer we can simply return a pointer to
+    // the underlying data.
+    // When reading from the process, we need to keep the memory around
+    // until the end of the function, so we store it inside ReadDataBuffer.
+    // We do this so in both cases we can return a simple pointer.
+    std::vector<MemoryReader::ReadBytesResult> ReadDataBuffer;
+    auto readData = [&](uint64_t Offset, uint64_t Size) -> const void * {
+      if (FileBuffer.hasValue()) {
+        auto Buffer = FileBuffer.getValue();
+        if (Offset + Size > Buffer.allocatedSize())
+          return nullptr;
+        return (const void *)((uint64_t)Buffer.base() + Offset);
+      } else {
+        MemoryReader::ReadBytesResult Buf =
+            this->getReader().readBytes(ImageStart + Offset, Size);
+        if (!Buf)
+          return nullptr;
+        ReadDataBuffer.push_back(std::move(Buf));
+        return ReadDataBuffer.back().get();
+      }
+    };
 
-    auto Hdr = reinterpret_cast<const typename T::Header *>(Buf.get());
+    const void *Buf = readData(0, sizeof(typename T::Header));
+    if (!Buf)
+      return false;
+    auto Hdr = reinterpret_cast<const typename T::Header *>(Buf);
     assert(Hdr->getFileClass() == T::ELFClass && "invalid ELF file class");
 
-    // From the header, grab informations about the section header table.
-    auto SectionHdrAddress = ImageStart.getAddressData() + Hdr->e_shoff;
-    auto SectionHdrNumEntries = Hdr->e_shnum;
-    auto SectionEntrySize = Hdr->e_shentsize;
+    // From the header, grab information about the section header table.
+    uint64_t SectionHdrAddress = Hdr->e_shoff;
+    uint16_t SectionHdrNumEntries = Hdr->e_shnum;
+    uint16_t SectionEntrySize = Hdr->e_shentsize;
+
+    if (sizeof(typename T::Section) > SectionEntrySize)
+      return false;
+    if (SectionHdrNumEntries == 0)
+      return false;
 
     // Collect all the section headers, we need them to look up the
     // reflection sections (by name) and the string table.
+    // We read the section headers from the FileBuffer, since they are
+    // not mapped in the child process.
     std::vector<const typename T::Section *> SecHdrVec;
     for (unsigned I = 0; I < SectionHdrNumEntries; ++I) {
-      auto SecBuf = this->getReader().readBytes(
-          RemoteAddress(SectionHdrAddress + (I * SectionEntrySize)),
-          SectionEntrySize);
+      uint64_t Offset = SectionHdrAddress + (I * SectionEntrySize);
+      auto SecBuf = readData(Offset, sizeof(typename T::Section));
       if (!SecBuf)
         return false;
-      auto SecHdr =
-          reinterpret_cast<const typename T::Section *>(SecBuf.get());
+      const typename T::Section *SecHdr =
+          reinterpret_cast<const typename T::Section *>(SecBuf);
+
       SecHdrVec.push_back(SecHdr);
     }
 
@@ -434,30 +466,54 @@ public:
     typename T::Offset StrTabOffset = SecHdrStrTab->sh_offset;
     typename T::Size StrTabSize = SecHdrStrTab->sh_size;
 
-    auto StrTabStart =
-        RemoteAddress(ImageStart.getAddressData() + StrTabOffset);
-    auto StrTabBuf = this->getReader().readBytes(StrTabStart, StrTabSize);
-    auto StrTab = reinterpret_cast<const char *>(StrTabBuf.get());
-
-    auto findELFSectionByName = [&](llvm::StringRef Name)
-        -> std::pair<RemoteRef<void>, uint64_t> {
-      // Now for all the sections, find their name.
-      for (const typename T::Section *Hdr : SecHdrVec) {
-        uint32_t Offset = Hdr->sh_name;
-        auto SecName = std::string(StrTab + Offset);
-        if (SecName != Name)
-          continue;
-        auto SecStart =
-            RemoteAddress(ImageStart.getAddressData() + Hdr->sh_addr);
-        auto SecSize = Hdr->sh_size;
-        auto SecBuf = this->getReader().readBytes(SecStart, SecSize);
-        auto SecContents = RemoteRef<void>(SecStart.getAddressData(),
-                                           SecBuf.get());
-        savedBuffers.push_back(std::move(SecBuf));
-        return {SecContents, SecSize};
-      }
-      return {nullptr, 0};
-    };
+    auto StrTabBuf = readData(StrTabOffset, StrTabSize);
+    if (!StrTabBuf)
+      return false;
+    auto StrTab = reinterpret_cast<const char *>(StrTabBuf);
+    bool Error = false;
+    auto findELFSectionByName =
+        [&](llvm::StringRef Name) -> std::pair<RemoteRef<void>, uint64_t> {
+          if (Error)
+            return {nullptr, 0};
+          // Now for all the sections, find their name.
+          for (const typename T::Section *Hdr : SecHdrVec) {
+            uint32_t Offset = Hdr->sh_name;
+            const char *Start = (const char *)StrTab + Offset;
+            uint64_t Size = strnlen(Start, StrTabSize - Offset);
+            if (Size > StrTabSize - Offset) {
+              Error = true;
+              break;
+            }
+            std::string SecName(Start, Size);
+            if (SecName != Name)
+              continue;
+            RemoteAddress SecStart =
+                RemoteAddress(ImageStart.getAddressData() + Hdr->sh_addr);
+            auto SecSize = Hdr->sh_size;
+            MemoryReader::ReadBytesResult SecBuf;
+            if (FileBuffer.hasValue()) {
+              // sh_offset gives us the offset to the section in the file,
+              // while sh_addr gives us the offset in the process.
+              auto Offset = Hdr->sh_offset;
+              if (FileBuffer->allocatedSize() > Offset + Size) {
+                Error = true;
+                break;
+              }
+              auto *Buf = malloc(SecSize);
+              SecBuf = MemoryReader::ReadBytesResult(
+                  Buf, [](const void *ptr) { free(const_cast<void *>(ptr)); });
+              memcpy((void *)Buf,
+                     (const void *)((uint64_t)FileBuffer->base() + Offset), Size);
+            } else {
+              SecBuf = this->getReader().readBytes(SecStart, SecSize);
+            }
+            auto SecContents =
+                RemoteRef<void>(SecStart.getAddressData(), SecBuf.get());
+            savedBuffers.push_back(std::move(SecBuf));
+            return {SecContents, SecSize};
+          }
+          return {nullptr, 0};
+        };
 
     SwiftObjectFileFormatELF ObjectFileFormat;
     auto FieldMdSec = findELFSectionByName(
@@ -472,6 +528,9 @@ public:
         ObjectFileFormat.getSectionName(ReflectionSectionKind::typeref));
     auto ReflStrMdSec = findELFSectionByName(
         ObjectFileFormat.getSectionName(ReflectionSectionKind::reflstr));
+
+    if (Error)
+      return false;
 
     // We succeed if at least one of the sections is present in the
     // ELF executable.
@@ -492,12 +551,28 @@ public:
         {ReflStrMdSec.first, ReflStrMdSec.second}};
 
     this->addReflectionInfo(info);
-
-    savedBuffers.push_back(std::move(Buf));
     return true;
   }
-         
-  bool readELF(RemoteAddress ImageStart) {
+
+  /// Parses metadata information from an ELF image. Because the Section
+  /// Header Table maybe be missing (for example, when reading from a 
+  /// process) this method optionally receives a buffer with the contents
+  /// of the image's file, from where it will the necessary information.
+  ///
+  ///
+  /// \param[in] ImageStart
+  ///     A remote address pointing to the start of the image in the running
+  ///     process.
+  ///
+  /// \param[in] FileBuffer
+  ///     A buffer which contains the contents of the image's file
+  ///     in disk. If missing, all the information will be read using the
+  ///     instance's memory reader.
+  ///
+  /// \return
+  ///     /b True if the metadata information was parsed successfully,
+  ///     /b false otherwise.
+  bool readELF(RemoteAddress ImageStart, llvm::Optional<llvm::sys::MemoryBlock> FileBuffer) {
     auto Buf =
         this->getReader().readBytes(ImageStart, sizeof(llvm::ELF::Elf64_Ehdr));
 
@@ -510,9 +585,11 @@ public:
     // Check if we have a ELFCLASS32 or ELFCLASS64
     unsigned char FileClass = Hdr->getFileClass();
     if (FileClass == llvm::ELF::ELFCLASS64) {
-      return readELFSections<ELFTraits<llvm::ELF::ELFCLASS64>>(ImageStart);
+      return readELFSections<ELFTraits<llvm::ELF::ELFCLASS64>>(
+          ImageStart, FileBuffer);
     } else if (FileClass == llvm::ELF::ELFCLASS32) {
-      return readELFSections<ELFTraits<llvm::ELF::ELFCLASS32>>(ImageStart);
+      return readELFSections<ELFTraits<llvm::ELF::ELFCLASS32>>(
+          ImageStart, FileBuffer);
     } else {
       return false;
     }
@@ -542,15 +619,16 @@ public:
     if (MagicBytes[0] == 'M' && MagicBytes[1] == 'Z') {
       return readPECOFF(ImageStart);
     }
-    
+
+
     // ELF.
     if (MagicBytes[0] == llvm::ELF::ElfMagic[0]
         && MagicBytes[1] == llvm::ELF::ElfMagic[1]
         && MagicBytes[2] == llvm::ELF::ElfMagic[2]
         && MagicBytes[3] == llvm::ELF::ElfMagic[3]) {
-      return readELF(ImageStart);
+      return readELF(ImageStart, llvm::Optional<llvm::sys::MemoryBlock>());
     }
-    
+
     // We don't recognize the format.
     return false;
   }
