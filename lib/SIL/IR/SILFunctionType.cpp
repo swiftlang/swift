@@ -4477,19 +4477,9 @@ StringRef SILFunctionType::ABICompatibilityCheckResult::getMessage() const {
   llvm_unreachable("Covered switch isn't completely covered?!");
 }
 
-static DeclContext *getDeclContextForExpansion(const SILFunction &f) {
-  auto *dc = f.getDeclContext();
-  if (!dc)
-    dc = f.getModule().getSwiftModule();
-  auto *currentModule = f.getModule().getSwiftModule();
-  if (!dc || !dc->isChildContextOf(currentModule))
-    dc = currentModule;
-  return dc;
-}
-
 TypeExpansionContext::TypeExpansionContext(const SILFunction &f)
     : expansion(f.getResilienceExpansion()),
-      inContext(getDeclContextForExpansion(f)),
+      inContext(f.getModule().getAssociatedContext()),
       isContextWholeModule(f.getModule().isWholeModule()) {}
 
 CanSILFunctionType SILFunction::getLoweredFunctionTypeInContext(
