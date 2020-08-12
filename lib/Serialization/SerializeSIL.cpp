@@ -2240,8 +2240,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::LinearFunctionExtractInst: {
     auto *lfei = cast<LinearFunctionExtractInst>(&SI);
-    auto operandRef = addValueRef(lfei->getFunctionOperand());
-    auto operandType = lfei->getFunctionOperand()->getType();
+    auto operandRef = addValueRef(lfei->getOperand());
+    auto operandType = lfei->getOperand()->getType();
     auto operandTypeRef = S.addTypeRef(operandType.getASTType());
     auto rawExtractee = (unsigned)lfei->getExtractee();
     SILInstLinearFunctionExtractLayout::emitRecord(Out, ScratchRecord,

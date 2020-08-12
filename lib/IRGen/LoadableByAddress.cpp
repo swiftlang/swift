@@ -2862,7 +2862,7 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
   case SILInstructionKind::LinearFunctionExtractInst: {
     auto instr = cast<LinearFunctionExtractInst>(convInstr);
     newInstr = convBuilder.createLinearFunctionExtract(
-        instr->getLoc(), instr->getExtractee(), instr->getFunctionOperand());
+        instr->getLoc(), instr->getExtractee(), instr->getOperand());
     break;
   }
   default:

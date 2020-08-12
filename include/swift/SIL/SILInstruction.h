@@ -8364,14 +8364,11 @@ public:
 /// representing a bundle of the original function and the transpose function,
 /// extract the specified function.
 class LinearFunctionExtractInst
-    : public InstructionBase<
-          SILInstructionKind::LinearFunctionExtractInst,
-          SingleValueInstruction> {
+    : public UnaryInstructionBase<SILInstructionKind::LinearFunctionExtractInst,
+                                  SingleValueInstruction> {
 private:
   /// The extractee.
   LinearDifferentiableFunctionTypeComponent extractee;
-  /// The list containing the `@differentiable(linear)` function operand.
-  FixedOperandList<1> operands;
 
   static SILType
   getExtracteeType(SILValue function,
@@ -8387,10 +8384,6 @@ public:
   LinearDifferentiableFunctionTypeComponent getExtractee() const {
     return extractee;
   }
-
-  SILValue getFunctionOperand() const { return operands[0].get(); }
-  ArrayRef<Operand> getAllOperands() const { return operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return operands.asArray(); }
 };
 
 /// DifferentiabilityWitnessFunctionInst - Looks up a differentiability witness

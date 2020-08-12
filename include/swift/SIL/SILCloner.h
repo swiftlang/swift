@@ -2905,10 +2905,10 @@ template<typename ImplClass>
 void SILCloner<ImplClass>::
 visitLinearFunctionExtractInst(LinearFunctionExtractInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(
-      Inst, getBuilder().createLinearFunctionExtract(
-                getOpLocation(Inst->getLoc()), Inst->getExtractee(),
-                getOpValue(Inst->getFunctionOperand())));
+  recordClonedInstruction(Inst, getBuilder().createLinearFunctionExtract(
+                                    getOpLocation(Inst->getLoc()),
+                                    Inst->getExtractee(),
+                                    getOpValue(Inst->getOperand())));
 }
 
 template <typename ImplClass>
