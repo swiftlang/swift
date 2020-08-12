@@ -634,16 +634,14 @@ public:
                     const std::string &Member,
                     StringRef Protocol);
 
-  const TypeRef *
-  lookupSuperclass(const TypeRef *TR);
+  const TypeRef *lookupSuperclass(const TypeRef *TR);
 
   /// Load unsubstituted field types for a nominal type.
-  RemoteRef<FieldDescriptor>
-  getFieldTypeInfo(const TypeRef *TR);
+  RemoteRef<FieldDescriptor> getFieldTypeInfo(const TypeRef *TR);
 
   /// Get the parsed and substituted field types for a nominal type.
-  bool getFieldTypeRefs(const TypeRef *TR,
-                        RemoteRef<FieldDescriptor> FD,
+  bool getFieldTypeRefs(const TypeRef *TR, RemoteRef<FieldDescriptor> FD,
+                        remote::TypeInfoProvider *ExternalTypeInfo,
                         std::vector<FieldTypeInfo> &Fields);
 
   /// Get the primitive type lowering for a builtin type.

@@ -22,6 +22,7 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/Casting.h"
 #include "swift/Remote/MetadataReader.h"
+#include "swift/Remote/TypeInfoProvider.h"
 
 #include <memory>
 
@@ -347,14 +348,16 @@ public:
   ///
   /// The type must either be concrete, or at least fixed-size, as
   /// determined by the isFixedSize() predicate.
-  const TypeInfo *getTypeInfo(const TypeRef *TR);
+  const TypeInfo *getTypeInfo(const TypeRef *TR,
+                              remote::TypeInfoProvider *externalInfo);
 
   /// Returns layout information for an instance of the given
   /// class.
   ///
   /// Not cached.
-  const TypeInfo *getClassInstanceTypeInfo(const TypeRef *TR,
-                                           unsigned start);
+  const TypeInfo *
+  getClassInstanceTypeInfo(const TypeRef *TR, unsigned start,
+                           remote::TypeInfoProvider *ExternalTypeInfo);
 
 private:
   friend class swift::reflection::LowerType;
@@ -415,7 +418,8 @@ public:
                     bool bitwiseTakable);
 
   // Add a field of a record type, such as a struct.
-  void addField(const std::string &Name, const TypeRef *TR);
+  void addField(const std::string &Name, const TypeRef *TR,
+                remote::TypeInfoProvider *ExternalTypeInfo);
 
   const RecordTypeInfo *build();
 

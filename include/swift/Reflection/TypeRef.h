@@ -156,8 +156,8 @@ public:
   bool isConcrete() const;
   bool isConcreteAfterSubstitutions(const GenericArgumentMap &Subs) const;
 
-  const TypeRef *
-  subst(TypeRefBuilder &Builder, const GenericArgumentMap &Subs) const;
+  const TypeRef *subst(TypeRefBuilder &Builder,
+                       const GenericArgumentMap &Subs) const;
 
   llvm::Optional<GenericArgumentMap> getSubstMap() const;
 

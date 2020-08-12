@@ -901,7 +901,7 @@ public:
   using TypeRefVisitor<TypeRefSubstitution, const TypeRef *>::visit;
 
   TypeRefSubstitution(TypeRefBuilder &Builder, GenericArgumentMap Substitutions)
-    : Builder(Builder), Substitutions(Substitutions) {}
+      : Builder(Builder), Substitutions(Substitutions) {}
 
   const TypeRef *visitBuiltinTypeRef(const BuiltinTypeRef *B) {
     return B;
@@ -1081,8 +1081,8 @@ public:
   }
 };
 
-const TypeRef *
-TypeRef::subst(TypeRefBuilder &Builder, const GenericArgumentMap &Subs) const {
+const TypeRef *TypeRef::subst(TypeRefBuilder &Builder,
+                              const GenericArgumentMap &Subs) const {
   return TypeRefSubstitution(Builder, Subs).visit(this);
 }
 
