@@ -1107,3 +1107,40 @@ nominal type descriptor symbol for ``CxxStruct`` while compiling the ``main`` mo
 .. code::
 
   sSo9CxxStructVMn // -> nominal type descriptor for __C.CxxStruct
+
+Importing C++ class template instantiations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A class template instantiation is imported as a struct named
+``__CxxTemplateInst`` plus Itanium mangled type of the instantiation (see the
+``type`` production in the Itanium specification). Note that Itanium mangling is
+used on all platforms, regardless of the ABI of the C++ toolchain, to ensure
+that the mangled name is a valid Swift type name (this is not the case for MSVC
+mangled names). A prefix with a double underscore (to ensure we have a reserved
+C++ identifier) is added to limit the possibility for conflicts with names of
+user-defined structs. The struct is notionally defined in the ``__C`` module,
+similarly to regular C and C++ structs and classes. Consider the following C++
+module:
+
+.. code-block:: c++
+
+  template<class T>
+  struct MagicWrapper {
+    T t;
+  };
+
+  struct MagicNumber {};
+
+  typedef MagicWrapper<MagicNumber> WrappedMagicNumber;
+
+``WrappedMagicNumber`` is imported as a typealias for struct
+``__CxxTemplateInst12MagicWrapperI11MagicNumberE``. Interface of the imported
+module looks as follows:
+
+.. code-block:: swift
+
+  struct __CxxTemplateInst12MagicWrapperI11MagicNumberE {
+    var t: MagicNumber
+  }
+  struct MagicNumber {}
+  typealias WrappedMagicNumber = __CxxTemplateInst12MagicWrapperI11MagicNumberE
