@@ -134,9 +134,9 @@ extension NoMemberwiseInitializerExtended : VectorProtocol
 // Test derived conformances in disallowed contexts.
 
 // expected-error @+2 {{type 'OtherFileNonconforming' does not conform to protocol 'VectorProtocol'}}
-// expected-error @+1 {{implementation of 'VectorProtocol' cannot be automatically synthesized in an extension in a different file to the type}}
+// expected-error @+1 {{extension outside of file declaring struct 'OtherFileNonconforming' prevents automatic synthesis of 'VectorSpaceScalar' for protocol 'VectorProtocol'}}
 extension OtherFileNonconforming : VectorProtocol {}
 
 // expected-error @+2 {{type 'GenericOtherFileNonconforming<T>' does not conform to protocol 'VectorProtocol'}}
-// expected-error @+1 {{implementation of 'VectorProtocol' cannot be automatically synthesized in an extension in a different file to the type}}
+// expected-error @+1 {{extension outside of file declaring generic struct 'GenericOtherFileNonconforming' prevents automatic synthesis of 'VectorSpaceScalar' for protocol 'VectorProtocol'}}
 extension GenericOtherFileNonconforming : VectorProtocol {}

@@ -84,8 +84,8 @@ extension NoMemberwiseInitializerExtended: ElementaryFunctions
 
 // Test derived conformances in disallowed contexts.
 
-// expected-error @+1 24 {{implementation of 'ElementaryFunctions' cannot be automatically synthesized in an extension in a different file to the type}}
+// expected-error @+1 24 {{extension outside of file declaring struct 'OtherFileNonconforming' prevents automatic synthesis of}}
 extension OtherFileNonconforming : ElementaryFunctions {}
 
-// expected-error @+1 24 {{implementation of 'ElementaryFunctions' cannot be automatically synthesized in an extension in a different file to the type}}
+// expected-error @+1 24 {{extension outside of file declaring generic struct 'GenericOtherFileNonconforming' prevents automatic synthesis of}}
 extension GenericOtherFileNonconforming : ElementaryFunctions {}
