@@ -6728,8 +6728,7 @@ void AbstractFunctionDecl::setBody(BraceStmt *S, BodyKind NewBodyKind) {
 
 void AbstractFunctionDecl::setBodyToBeReparsed(SourceRange bodyRange) {
   assert(bodyRange.isValid());
-  assert(getBodyKind() == BodyKind::None ||
-         getBodyKind() == BodyKind::Skipped ||
+  assert(getBodyKind() == BodyKind::Unparsed ||
          getBodyKind() == BodyKind::Parsed ||
          getBodyKind() == BodyKind::TypeChecked);
   assert(getASTContext().SourceMgr.rangeContainsTokenLoc(

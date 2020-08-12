@@ -5935,8 +5935,7 @@ public:
 
   /// Note that parsing for the body was delayed.
   void setBodyDelayed(SourceRange bodyRange) {
-    assert(getBodyKind() == BodyKind::None ||
-           getBodyKind() == BodyKind::Skipped);
+    assert(getBodyKind() == BodyKind::None);
     assert(bodyRange.isValid());
     BodyRange = bodyRange;
     setBodyKind(BodyKind::Unparsed);

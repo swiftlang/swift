@@ -6248,15 +6248,12 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
 
   AFD->setBodyDelayed(BodyRange);
 
-  if (isCodeCompletionFirstPass()) {
-    if (SourceMgr.rangeContainsCodeCompletionLoc(BodyRange)) {
-      State->setCodeCompletionDelayedDeclState(
-          SourceMgr, L->getBufferID(),
-          CodeCompletionDelayedDeclKind::FunctionBody,
-          PD_Default, AFD, BodyRange, BeginParserPosition.PreviousLoc);
-    } else {
-      AFD->setBodySkipped(BodyRange);
-    }
+  if (isCodeCompletionFirstPass() &&
+      SourceMgr.rangeContainsCodeCompletionLoc(BodyRange)) {
+    State->setCodeCompletionDelayedDeclState(
+        SourceMgr, L->getBufferID(),
+        CodeCompletionDelayedDeclKind::FunctionBody,
+        PD_Default, AFD, BodyRange, BeginParserPosition.PreviousLoc);
   }
 }
 
