@@ -122,23 +122,19 @@ public:
   class PathElement {
     /// Describes the kind of data stored here.
     enum StoredKind : unsigned char {
-      StoredGenericParameter,
-      StoredProtocolRequirement,
-      StoredWitness,
-      StoredGenericSignature,
-      StoredKeyPathDynamicMemberBase,
-      StoredPattern,
-      StoredKindAndValue
+      StoredPointer,
+      StoredInteger,
     };
 
+    PathElementKind kind;
+
     /// The actual storage for the path element, which involves both a
-    /// kind and (potentially) a value.
+    /// storage kind and a value.
     ///
-    /// The current storage involves a two-bit "storage kind", which selects
-    /// among the possible value stores. The value stores can either be an
-    /// archetype (for archetype path elements) or an unsigned value that
-    /// stores both the specific kind and the (optional) numeric value of that
-    /// kind. Use \c encodeStorage and \c decodeStorage to work with this value.
+    /// The current storage involves a three-bit "storage kind", which selects
+    /// among the possible value stores. The value stores can either be a
+    /// pointer or an unsigned int. Use \c getValue or \c getStoredPointer
+    /// to work with this value.
     ///
     /// \note The "storage kind" is stored in the  \c storedKind field.
     uint64_t storage : 61;
@@ -146,17 +142,6 @@ public:
     /// The kind of value stored in \c storage. Valid values are those
     /// from the StoredKind enum.
     uint64_t storedKind : 3;
-
-    /// Encode a path element kind and a value into the storage format.
-    static uint64_t encodeStorage(PathElementKind kind, uint64_t value) {
-      return (value << 8) | kind;
-    }
-
-    /// Decode a storage value into path element kind and value.
-    static std::pair<PathElementKind, uint64_t>
-    decodeStorage(uint64_t storage) {
-      return { (PathElementKind)((unsigned)storage & 0xFF), storage >> 8 };
-    }
 
     /// Retrieve a value associated with the path element.
     unsigned getValue(unsigned index) const {
@@ -167,12 +152,12 @@ public:
       // being stored in the upper bits, valueN in the lower bits. Therefore we
       // need to shift out any extra values in the lower bits.
       auto extraValues = numValues - index - 1;
-      auto value = decodeStorage(storage).second >> (extraValues * 16);
+      auto value = storage >> (extraValues * 16);
       return value & 0xFFFF;
     }
 
     PathElement(PathElementKind kind, unsigned value)
-      : storage(encodeStorage(kind, value)), storedKind(StoredKindAndValue)
+      : kind(kind), storage(value), storedKind(StoredInteger)
     {
       assert(numNumericValuesInPathElement(kind) == 1 &&
              "Path element kind does not require 1 value");
@@ -180,8 +165,8 @@ public:
     }
 
     PathElement(PathElementKind kind, unsigned value0, unsigned value1)
-      : storage(encodeStorage(kind, value0 << 16 | value1)),
-        storedKind(StoredKindAndValue)
+      : kind(kind), storage(value0 << 16 | value1),
+        storedKind(StoredInteger)
     {
       assert(numNumericValuesInPathElement(kind) == 2 &&
              "Path element kind does not require 2 values");
@@ -189,10 +174,9 @@ public:
       assert(value1 == getValue(1) && "value1 truncated");
     }
 
-    PathElement(PathElementKind kind, uint64_t value0, uint64_t value1,
-                uint64_t value2)
-        : storage(encodeStorage(kind, value0 << 32 | value1 << 16 | value2)),
-          storedKind(StoredKindAndValue) {
+    PathElement(PathElementKind kind, uint64_t value0, uint64_t value1, uint64_t value2)
+        : kind(kind), storage(value0 << 32 | value1 << 16 | value2),
+          storedKind(StoredInteger) {
       assert(numNumericValuesInPathElement(kind) == 3 &&
              "Path element kind does not require 3 values");
       assert(value0 == getValue(0) && "value0 truncated");
@@ -203,9 +187,9 @@ public:
     /// Store a path element with an associated pointer, accessible using
     /// \c getStoredPointer.
     template <typename T>
-    PathElement(StoredKind storedKind, T *ptr)
-        : storage((reinterpret_cast<uintptr_t>(ptr) >> 3)),
-          storedKind(storedKind) {
+    PathElement(PathElementKind kind, T *ptr)
+        : kind(kind), storage((reinterpret_cast<uintptr_t>(ptr) >> 3)),
+          storedKind(StoredPointer) {
       assert(ptr == getStoredPointer<T>());
     }
 
@@ -213,7 +197,7 @@ public:
     /// the type used when creating the path element.
     template <typename T>
     T *getStoredPointer() const {
-      assert(storedKind != StoredKindAndValue);
+      assert(storedKind == StoredPointer);
       return reinterpret_cast<T *>(storage << 3);
     }
 
@@ -224,39 +208,14 @@ public:
 #include "ConstraintLocatorPathElts.def"
 
     PathElement(PathElementKind kind)
-      : storage(encodeStorage(kind, 0)), storedKind(StoredKindAndValue)
+      : kind(kind), storage(0), storedKind(StoredInteger)
     {
       assert(numNumericValuesInPathElement(kind) == 0 &&
              "Path element requires value");
     }
 
     /// Retrieve the kind of path element.
-    PathElementKind getKind() const {
-      switch (static_cast<StoredKind>(storedKind)) {
-      case StoredGenericParameter:
-        return PathElementKind::GenericParameter;
-
-      case StoredProtocolRequirement:
-        return PathElementKind::ProtocolRequirement;
-
-      case StoredWitness:
-        return PathElementKind::Witness;
-
-      case StoredGenericSignature:
-        return PathElementKind::OpenedGeneric;
-
-      case StoredKeyPathDynamicMemberBase:
-        return PathElementKind::KeyPathDynamicMember;
-
-      case StoredPattern:
-        return PathElementKind::PatternMatch;
-
-      case StoredKindAndValue:
-        return decodeStorage(storage).first;
-      }
-
-      llvm_unreachable("Unhandled StoredKind in switch.");
-    }
+    PathElementKind getKind() const { return kind; }
 
     /// Attempts to cast the path element to a specific \c LocatorPathElt
     /// subclass, returning \c None if unsuccessful.
@@ -765,31 +724,31 @@ public:
 class LocatorPathElt::Witness final : public LocatorPathElt {
 public:
   Witness(ValueDecl *witness)
-      : LocatorPathElt(LocatorPathElt::StoredWitness, witness) {}
+      : LocatorPathElt(PathElementKind::Witness, witness) {}
 
   ValueDecl *getDecl() const { return getStoredPointer<ValueDecl>(); }
 
   static bool classof(const LocatorPathElt *elt) {
-    return elt->getKind() == ConstraintLocator::Witness;
+    return elt->getKind() == PathElementKind::Witness;
   }
 };
 
 class LocatorPathElt::ProtocolRequirement final : public LocatorPathElt {
 public:
   ProtocolRequirement(ValueDecl *decl)
-      : LocatorPathElt(LocatorPathElt::StoredProtocolRequirement, decl) {}
+      : LocatorPathElt(PathElementKind::ProtocolRequirement, decl) {}
 
   ValueDecl *getDecl() const { return getStoredPointer<ValueDecl>(); }
 
   static bool classof(const LocatorPathElt *elt) {
-    return elt->getKind() == ConstraintLocator::ProtocolRequirement;
+    return elt->getKind() == PathElementKind::ProtocolRequirement;
   }
 };
 
 class LocatorPathElt::GenericParameter final : public LocatorPathElt {
 public:
   GenericParameter(GenericTypeParamType *type)
-      : LocatorPathElt(LocatorPathElt::StoredGenericParameter, type) {
+      : LocatorPathElt(PathElementKind::GenericParameter, type) {
     static_assert(alignof(GenericTypeParamType) >= 4,
                   "archetypes insufficiently aligned");
   }
@@ -799,15 +758,14 @@ public:
   }
 
   static bool classof(const LocatorPathElt *elt) {
-    return elt->getKind() == ConstraintLocator::GenericParameter;
+    return elt->getKind() == PathElementKind::GenericParameter;
   }
 };
 
 class LocatorPathElt::OpenedGeneric final : public LocatorPathElt {
 public:
   OpenedGeneric(GenericSignature sig)
-      : LocatorPathElt(LocatorPathElt::StoredGenericSignature,
-                       sig.getPointer()) {}
+      : LocatorPathElt(PathElementKind::OpenedGeneric, sig.getPointer()) {}
 
   GenericSignature getSignature() const {
     return getStoredPointer<GenericSignatureImpl>();
@@ -821,8 +779,7 @@ public:
 class LocatorPathElt::KeyPathDynamicMember final : public LocatorPathElt {
 public:
   KeyPathDynamicMember(NominalTypeDecl *keyPathDecl)
-      : LocatorPathElt(LocatorPathElt::StoredKeyPathDynamicMemberBase,
-                       keyPathDecl) {}
+      : LocatorPathElt(PathElementKind::KeyPathDynamicMember, keyPathDecl) {}
 
   NominalTypeDecl *getKeyPathDecl() const {
     return getStoredPointer<NominalTypeDecl>();
@@ -850,7 +807,7 @@ public:
 class LocatorPathElt::PatternMatch final : public LocatorPathElt {
 public:
   PatternMatch(Pattern *pattern)
-      : LocatorPathElt(LocatorPathElt::StoredPattern, pattern) {}
+      : LocatorPathElt(PathElementKind::PatternMatch, pattern) {}
 
   Pattern *getPattern() const { return getStoredPointer<Pattern>(); }
 
