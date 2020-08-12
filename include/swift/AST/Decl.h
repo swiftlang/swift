@@ -5647,7 +5647,10 @@ public:
   /// operation.
   Type getElementInterfaceType() const;
   TypeLoc &getElementTypeLoc() { return ElementTy; }
-  const TypeLoc &getElementTypeLoc() const { return ElementTy; }
+  TypeRepr *getElementTypeRepr() const { return ElementTy.getTypeRepr(); }
+  SourceRange getElementTypeSourceRange() const {
+    return ElementTy.getSourceRange();
+  }
 
   /// Determine the kind of Objective-C subscripting this declaration
   /// implies.

@@ -2761,7 +2761,7 @@ OpaqueReturnTypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
   } else if (auto *FD = dyn_cast<FuncDecl>(this)) {
     returnRepr = FD->getResultTypeRepr();
   } else if (auto *SD = dyn_cast<SubscriptDecl>(this)) {
-    returnRepr = SD->getElementTypeLoc().getTypeRepr();
+    returnRepr = SD->getElementTypeRepr();
   }
 
   return dyn_cast_or_null<OpaqueReturnTypeRepr>(returnRepr);

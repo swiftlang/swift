@@ -927,7 +927,7 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   if (!IndexResult)
     TypeRange = SD->getIndices()->getSourceRange();
   else
-    TypeRange = SD->getElementTypeLoc().getSourceRange();
+    TypeRange = SD->getElementTypeSourceRange();
   SD->diagnose(diag::objc_invalid_on_subscript,
                getObjCDiagnosticAttrKind(Reason))
     .highlight(TypeRange);
