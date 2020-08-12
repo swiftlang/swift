@@ -410,6 +410,10 @@ option(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
   "Enable experimental Swift concurrency model"
   FALSE)
 
+option(SWIFT_ENABLE_COMPATIBILITY_OVERRIDES
+  "Support back-deploying compatibility fixes for newer apps running on older runtimes."
+  TRUE)
+
 #
 # End of user-configurable options.
 #
