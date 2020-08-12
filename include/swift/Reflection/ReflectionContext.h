@@ -479,12 +479,12 @@ public:
           for (const typename T::Section *Hdr : SecHdrVec) {
             uint32_t Offset = Hdr->sh_name;
             const char *Start = (const char *)StrTab + Offset;
-            uint64_t Size = strnlen(Start, StrTabSize - Offset);
-            if (Size > StrTabSize - Offset) {
+            uint64_t StringSize = strnlen(Start, StrTabSize - Offset);
+            if (StringSize > StrTabSize - Offset) {
               Error = true;
               break;
             }
-            std::string SecName(Start, Size);
+            std::string SecName(Start, StringSize);
             if (SecName != Name)
               continue;
             RemoteAddress SecStart =
@@ -495,7 +495,7 @@ public:
               // sh_offset gives us the offset to the section in the file,
               // while sh_addr gives us the offset in the process.
               auto Offset = Hdr->sh_offset;
-              if (FileBuffer->allocatedSize() > Offset + Size) {
+              if (FileBuffer->allocatedSize() < Offset + SecSize) {
                 Error = true;
                 break;
               }
@@ -503,7 +503,8 @@ public:
               SecBuf = MemoryReader::ReadBytesResult(
                   Buf, [](const void *ptr) { free(const_cast<void *>(ptr)); });
               memcpy((void *)Buf,
-                     (const void *)((uint64_t)FileBuffer->base() + Offset), Size);
+                     (const void *)((uint64_t)FileBuffer->base() + Offset),
+                     SecSize);
             } else {
               SecBuf = this->getReader().readBytes(SecStart, SecSize);
             }
