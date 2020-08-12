@@ -1449,8 +1449,6 @@ public:
 private:
   friend SimpleRequest;
 
-  TypeLoc &getResultTypeLoc() const;
-
   // Evaluation.
   Type evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 

@@ -693,7 +693,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
         if (subscr) {
           return subscr->getElementTypeLoc().getTypeRepr();
         } else if (auto *FD = dyn_cast<FuncDecl>(func)) {
-          return FD->getBodyResultTypeLoc().getTypeRepr();
+          return FD->getResultTypeRepr();
         } else {
           return nullptr;
         }

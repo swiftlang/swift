@@ -394,7 +394,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
     if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
       if (!isa<AccessorDecl>(FD))
-        if (auto *const TyR = FD->getBodyResultTypeLoc().getTypeRepr())
+        if (auto *const TyR = FD->getResultTypeRepr())
           if (doIt(TyR))
             return true;
     }
