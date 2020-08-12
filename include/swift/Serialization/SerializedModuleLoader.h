@@ -73,12 +73,12 @@ protected:
                                              StringRef extension) const;
 
   using AccessPathElem = Located<Identifier>;
-  bool findModule(AccessPathElem moduleID,
-                  SmallVectorImpl<char> *moduleInterfacePath,
-                  std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
-                  std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
-                  std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-                  bool &isFramework, bool &isSystemModule);
+  virtual bool findModule(AccessPathElem moduleID,
+                          SmallVectorImpl<char> *moduleInterfacePath,
+                          std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
+                          std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
+                          std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
+                          bool &isFramework, bool &isSystemModule);
 
   /// Attempts to search the provided directory for a loadable serialized
   /// .swiftmodule with the provided `ModuleFilename`. Subclasses must

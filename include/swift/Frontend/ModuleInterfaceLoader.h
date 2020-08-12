@@ -112,6 +112,7 @@
 #include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "llvm/Support/StringSaver.h"
+#include <sstream>
 
 namespace clang {
 class CompilerInstance;
@@ -133,14 +134,22 @@ class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
   explicit ExplicitSwiftModuleLoader(ASTContext &ctx, DependencyTracker *tracker,
                                      ModuleLoadingMode loadMode,
                                      bool IgnoreSwiftSourceInfoFile);
+
+  bool findModule(AccessPathElem moduleID,
+                  SmallVectorImpl<char> *moduleInterfacePath,
+                  std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
+                  std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
+                  std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
+                  bool &isFramework, bool &isSystemModule) override;
+
   std::error_code findModuleFilesInDirectory(
-    AccessPathElem ModuleID,
-    const SerializedModuleBaseName &BaseName,
-    SmallVectorImpl<char> *ModuleInterfacePath,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-    bool IsFramework) override;
+                  AccessPathElem ModuleID,
+                  const SerializedModuleBaseName &BaseName,
+                  SmallVectorImpl<char> *ModuleInterfacePath,
+                  std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+                  std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+                  std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+                  bool IsFramework) override;
 
   bool canImportModule(Located<Identifier> mID) override;
 
@@ -173,6 +182,8 @@ struct ExplicitModuleInfo {
   std::string moduleSourceInfoPath;
   // Opened buffer for the .swiftmodule file.
   std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
+  // A flag that indicates whether this module is a framework
+  bool isFramework;
 };
 
 /// Parser of explicit module maps passed into the compiler.
@@ -182,12 +193,14 @@ struct ExplicitModuleInfo {
 //      "modulePath": "A.swiftmodule",
 //      "docPath": "A.swiftdoc",
 //      "sourceInfoPath": "A.swiftsourceinfo"
+//      "isFramework": false
 //    },
 //    {
 //      "moduleName": "B",
 //      "modulePath": "B.swiftmodule",
 //      "docPath": "B.swiftdoc",
 //      "sourceInfoPath": "B.swiftsourceinfo"
+//      "isFramework": false
 //    }
 //  ]
 class ExplicitModuleMapParser {
@@ -249,6 +262,9 @@ private:
         result.moduleDocPath = val.str();
       } else if (key == "sourceInfoPath") {
         result.moduleSourceInfoPath = val.str();
+      } else if (key == "isFramework") {
+        std::istringstream is(val.str());
+        is >> std::boolalpha >> result.isFramework;
       } else {
         // Being forgiving for future fields.
         continue;

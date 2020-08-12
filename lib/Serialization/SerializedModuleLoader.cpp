@@ -682,7 +682,6 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
     std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
     bool isFramework) {
   assert(moduleInputBuffer);
-
   StringRef moduleBufferID = moduleInputBuffer->getBufferIdentifier();
   StringRef moduleDocBufferID;
   if (moduleDocInputBuffer)
@@ -993,7 +992,6 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
 
   StringRef moduleInterfacePathStr =
     Ctx.AllocateCopy(moduleInterfacePath.str());
-
   auto *file =
       loadAST(*M, moduleID.Loc, moduleInterfacePathStr,
               std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
