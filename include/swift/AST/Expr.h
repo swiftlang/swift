@@ -2094,10 +2094,18 @@ public:
 /// to give the result type of such a chain representation in the AST. This
 /// expression type is always implicit.
 class UnresolvedMemberChainResultExpr : public IdentityExpr {
+  /// The base of this chain of member accesses.
+  UnresolvedMemberExpr *ChainBase;
 public:
-  UnresolvedMemberChainResultExpr(Expr *subExpr, Type ty = Type())
+  UnresolvedMemberChainResultExpr(Expr *subExpr, UnresolvedMemberExpr *base,
+                                  Type ty = Type())
     : IdentityExpr(ExprKind::UnresolvedMemberChainResult, subExpr, ty,
-                   /*isImplicit=*/true) {}
+                   /*isImplicit=*/true),
+      ChainBase(base) {
+    assert(base);
+  }
+
+  UnresolvedMemberExpr *getChainBase() const { return ChainBase; }
 
   SWIFT_FORWARD_SOURCE_LOCS_TO(getSubExpr())
 

@@ -113,7 +113,8 @@ ERROR(expected_argument_in_contextual_member,none,
 ERROR(expected_parens_in_contextual_member,none,
       "member %0 is a function; did you mean to call it?", (DeclName))
 ERROR(expected_parens_in_contextual_member_type,none,
-      "member %0 is a function that produces expected type %1; did you mean to call it?", (DeclName, Type))
+      "member %0 is a function that produces expected type %1; did you mean to "
+      "call it?", (DeclName, Type))
 
 ERROR(expected_result_in_contextual_member,none,
       "member %0 in %2 produces result of type %1, but context expects %2",
@@ -456,7 +457,8 @@ ERROR(cannot_convert_parent_type,none,
       "cannot convert parent type %0 to expected type %1",
       (Type, Type))
 ERROR(cannot_convert_chain_result_type,none,
-      "member chain produces result of type %0 but contextual base was inferred as %1",
+      "member chain produces result of type %0 but contextual base was "
+      "inferred as %1",
       (Type, Type))
 
 NOTE(generic_argument_mismatch,none,

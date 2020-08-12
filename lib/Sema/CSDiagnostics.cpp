@@ -2160,17 +2160,9 @@ bool ContextualFailure::diagnoseAsError() {
 
   case ConstraintLocator::UnresolvedMemberChainResult: {
     auto &solution = getSolution();
-    auto member = anchor;
-    if (auto *CE = getAsExpr<CallExpr>(anchor))
-      member = CE->getFn();
 
-    auto kind = ConstraintLocator::Member;
-    if (isExpr<UnresolvedMemberExpr>(anchor))
-      kind = ConstraintLocator::UnresolvedMember;
-    else if (isExpr<SubscriptExpr>(anchor))
-      kind = ConstraintLocator::SubscriptMember;
-    auto overload = getOverloadChoiceIfAvailable(getConstraintLocator(member,
-                                                                      kind));
+    auto overload =
+        getCalleeOverloadChoiceIfAvailable(getConstraintLocator(anchor));
     if (!(overload && overload->choice.isDecl()))
       return false;
 

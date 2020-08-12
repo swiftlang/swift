@@ -1503,32 +1503,20 @@ namespace {
     Type visitUnresolvedMemberChainResultExpr(
         UnresolvedMemberChainResultExpr *expr) {
       auto *tail = expr->getSubExpr();
-      assert(isa<UnresolvedMemberExpr>(tail) || isa<UnresolvedDotExpr>(tail) ||
-             isa<CallExpr>(tail) || isa<BindOptionalExpr>(tail) ||
-             isa<ForceValueExpr>(tail) ||
-             isa<SubscriptExpr>(tail) &&
-                 "Unexpected expression at end of unresolved member chain");
-
       auto memberTy = CS.getType(tail);
-      auto *base = TypeChecker::getUnresolvedMemberChainBase(tail);
+      auto *base = expr->getChainBase();
+      assert(base == TypeChecker::getUnresolvedMemberChainBase(tail));
 
-      // FIXME: This is a workaround for SR-13357, should not be necessary.
-      // Copy any type variable options from the result of the tail member to
-      // the result of the entire chain.
-      unsigned additionalOptions = 0;
-      if (auto *tvt = memberTy->getAs<TypeVariableType>())
-        additionalOptions = tvt->getImpl().getRawOptions();
-
-      // The contextual type (represented with a new type variable) must equal
-      // the base type.
+      // The result type of the chain is is represented by a new type variable.
       auto locator = CS.getConstraintLocator(
           expr, ConstraintLocator::UnresolvedMemberChainResult);
-      auto tvo = additionalOptions | TVO_CanBindToHole | TVO_CanBindToNoEscape;
-      auto chainResultTy = CS.createTypeVariable(locator, tvo);
-      auto chainBaseTy = UnresolvedBaseTypes.find(base)->second;
+      auto chainResultTy = CS.createTypeVariable(
+          locator,
+          TVO_CanBindToLValue | TVO_CanBindToHole | TVO_CanBindToNoEscape);
+      auto chainBaseTy = getUnresolvedBaseType(base);
 
-      // The result of this element of the chain must be convertible to the
-      // contextual type, and the contextual type must be equal to the base.
+      // The result of the last element of the chain must be convertible to the
+      // whole chain, and the type of the whole chain must be equal to the base.
       CS.addConstraint(
           ConstraintKind::Conversion, memberTy, chainBaseTy,
           CS.getConstraintLocator(tail, ConstraintLocator::RValueAdjustment));
@@ -3828,7 +3816,6 @@ namespace {
       }
 
       if (auto type = CG.visit(expr)) {
-
         auto simplifiedType = CS.simplifyType(type);
 
         CS.setType(expr, simplifiedType);

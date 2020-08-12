@@ -1370,7 +1370,7 @@ namespace {
       if (isMemberChainTail(expr, parent))
         if (auto *UME = TypeChecker::getUnresolvedMemberChainBase(expr))
           if (!parent || !isa<UnresolvedMemberChainResultExpr>(parent))
-            return new (ctx) UnresolvedMemberChainResultExpr(expr);
+            return new (ctx) UnresolvedMemberChainResultExpr(expr, UME);
 
       return expr;
     }
