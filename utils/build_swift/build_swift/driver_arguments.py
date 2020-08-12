@@ -680,6 +680,11 @@ def create_argument_parser():
                help='build the Release variant of everything (default is '
                     '%(default)s)')
 
+        option(['--min-size-release'], store('build_variant'),
+               const='MinSizeRel',
+               help='build the MinSizeRel variant of everything (default is '
+                    '%(default)s)')
+
     # -------------------------------------------------------------------------
     in_group('Override build variant for a specific project')
 

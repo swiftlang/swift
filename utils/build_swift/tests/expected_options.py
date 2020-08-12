@@ -412,6 +412,8 @@ EXPECTED_OPTIONS = [
     SetOption('--release', dest='build_variant', value='Release'),
     SetOption('--release-debuginfo',
               dest='build_variant', value='RelWithDebInfo'),
+    SetOption('--min-size-release',
+              dest='build_variant', value='MinSizeRel'),
     SetOption('--xcode', dest='cmake_generator', value='Xcode'),
     SetOption('-R', dest='build_variant', value='Release'),
     SetOption('-d', dest='build_variant', value='Debug'),

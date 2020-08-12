@@ -2240,8 +2240,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::LinearFunctionExtractInst: {
     auto *lfei = cast<LinearFunctionExtractInst>(&SI);
-    auto operandRef = addValueRef(lfei->getFunctionOperand());
-    auto operandType = lfei->getFunctionOperand()->getType();
+    auto operandRef = addValueRef(lfei->getOperand());
+    auto operandType = lfei->getOperand()->getType();
     auto operandTypeRef = S.addTypeRef(operandType.getASTType());
     auto rawExtractee = (unsigned)lfei->getExtractee();
     SILInstLinearFunctionExtractLayout::emitRecord(Out, ScratchRecord,
@@ -2345,6 +2345,11 @@ void SILSerializer::writeIndexTables() {
                 DefaultWitnessTableOffset);
   }
 
+  if (!PropertyOffset.empty()) {
+    Offset.emit(ScratchRecord, sil_index_block::SIL_PROPERTY_OFFSETS,
+                PropertyOffset);
+  }
+
   if (!DifferentiabilityWitnessList.empty()) {
     writeIndexTable(S, List,
                     sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES,
@@ -2354,11 +2359,6 @@ void SILSerializer::writeIndexTables() {
                 DifferentiabilityWitnessOffset);
   }
 
-  if (!PropertyOffset.empty()) {
-    Offset.emit(ScratchRecord, sil_index_block::SIL_PROPERTY_OFFSETS,
-                PropertyOffset);
-  }
-  
 }
 
 void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
