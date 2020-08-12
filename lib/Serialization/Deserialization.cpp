@@ -3846,11 +3846,12 @@ public:
     if (!staticSpelling.hasValue())
       MF.fatal();
 
-    auto subscript = MF.createDecl<SubscriptDecl>(name,
-                                                  SourceLoc(), *staticSpelling,
-                                                  SourceLoc(), nullptr,
-                                                  SourceLoc(), TypeLoc(),
-                                                  parent, genericParams);
+    const auto elemInterfaceType = MF.getType(elemInterfaceTypeID);
+    if (declOrOffset.isComplete())
+      return declOrOffset;
+
+    auto *const subscript = SubscriptDecl::createDeserialized(
+        ctx, name, *staticSpelling, elemInterfaceType, parent, genericParams);
     subscript->setIsGetterMutating(isGetterMutating);
     subscript->setIsSetterMutating(isSetterMutating);
     declOrOffset = subscript;
@@ -3874,8 +3875,6 @@ public:
         MF.fatal();
     }
 
-    auto elemInterfaceType = MF.getType(elemInterfaceTypeID);
-    subscript->getElementTypeLoc().setType(elemInterfaceType);
     subscript->setImplicitlyUnwrappedOptional(isIUO);
 
     if (isImplicit)

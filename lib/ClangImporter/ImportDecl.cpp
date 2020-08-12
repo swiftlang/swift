@@ -6879,12 +6879,14 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   auto &C = Impl.SwiftContext;
   auto bodyParams = ParameterList::create(C, getterIndex);
   DeclName name(C, DeclBaseName::createSubscript(), {Identifier()});
-  auto subscript = Impl.createDeclWithClangNode<SubscriptDecl>(
-      getter->getClangNode(), getOverridableAccessLevel(dc), name,
-      /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
-      decl->getLoc(), bodyParams, decl->getLoc(),
-      TypeLoc::withoutLoc(elementTy), dc,
-      /*GenericParams=*/nullptr);
+  auto *const subscript = SubscriptDecl::createImported(C,
+                                                        name, decl->getLoc(),
+                                                        bodyParams, decl->getLoc(),
+                                                        elementTy, dc,
+                                                        getter->getClangNode());
+  const auto access = getOverridableAccessLevel(dc);
+  subscript->setAccess(access);
+  subscript->setSetterAccess(access);
 
   // Build the thunks.
   AccessorDecl *getterThunk =

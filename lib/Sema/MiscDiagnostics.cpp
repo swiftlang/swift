@@ -2246,7 +2246,7 @@ static bool fixItOverrideDeclarationTypesImpl(
         baseSubscript->getElementInterfaceType());
     fixedAny |= checkType(resultType, ParamDecl::Specifier::Default,
                           baseResultType, ParamDecl::Specifier::Default,
-                          subscript->getElementTypeLoc().getSourceRange());
+                          subscript->getElementTypeSourceRange());
     return fixedAny;
   }
 

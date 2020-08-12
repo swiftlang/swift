@@ -5598,13 +5598,16 @@ enum class ObjCSubscriptKind {
 /// signatures (indices and element type) are distinct.
 ///
 class SubscriptDecl : public GenericContext, public AbstractStorageDecl {
+  friend class ResultTypeRequest;
+
   SourceLoc StaticLoc;
   SourceLoc ArrowLoc;
   SourceLoc EndLoc;
   ParameterList *Indices;
   TypeLoc ElementTy;
 
-public:
+  void setElementInterfaceType(Type type);
+
   SubscriptDecl(DeclName Name,
                 SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
                 SourceLoc SubscriptLoc, ParameterList *Indices,
@@ -5620,6 +5623,27 @@ public:
     Bits.SubscriptDecl.StaticSpelling = static_cast<unsigned>(StaticSpelling);
     setIndices(Indices);
   }
+
+public:
+  /// Factory function only for use by deserialization.
+  static SubscriptDecl *createDeserialized(ASTContext &Context, DeclName Name,
+                                           StaticSpellingKind StaticSpelling,
+                                           Type ElementTy, DeclContext *Parent,
+                                           GenericParamList *GenericParams);
+
+  static SubscriptDecl *create(ASTContext &Context, DeclName Name,
+                               SourceLoc StaticLoc,
+                               StaticSpellingKind StaticSpelling,
+                               SourceLoc SubscriptLoc, ParameterList *Indices,
+                               SourceLoc ArrowLoc, TypeLoc ElementTy,
+                               DeclContext *Parent,
+                               GenericParamList *GenericParams);
+
+  static SubscriptDecl *createImported(ASTContext &Context, DeclName Name,
+                                       SourceLoc SubscriptLoc,
+                                       ParameterList *Indices,
+                                       SourceLoc ArrowLoc, Type ElementTy,
+                                       DeclContext *Parent, ClangNode ClangN);
   
   /// \returns the way 'static'/'class' was spelled in the source.
   StaticSpellingKind getStaticSpelling() const {
@@ -5646,7 +5670,7 @@ public:
   /// Retrieve the type of the element referenced by a subscript
   /// operation.
   Type getElementInterfaceType() const;
-  TypeLoc &getElementTypeLoc() { return ElementTy; }
+
   TypeRepr *getElementTypeRepr() const { return ElementTy.getTypeRepr(); }
   SourceRange getElementTypeSourceRange() const {
     return ElementTy.getSourceRange();

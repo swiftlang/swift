@@ -6584,6 +6584,56 @@ ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind() const {
   return ObjCSubscriptKind::Keyed;
 }
 
+void SubscriptDecl::setElementInterfaceType(Type type) {
+  getASTContext().evaluator.cacheOutput(ResultTypeRequest{this},
+                                        std::move(type));
+}
+
+SubscriptDecl *
+SubscriptDecl::createDeserialized(ASTContext &Context, DeclName Name,
+                                  StaticSpellingKind StaticSpelling,
+                                  Type ElementTy, DeclContext *Parent,
+                                  GenericParamList *GenericParams) {
+  assert(ElementTy && "Deserialized element type must not be null");
+  auto *const SD = new (Context)
+      SubscriptDecl(Name, SourceLoc(), StaticSpelling, SourceLoc(), nullptr,
+                    SourceLoc(), TypeLoc(), Parent, GenericParams);
+  SD->setElementInterfaceType(ElementTy);
+  return SD;
+}
+
+SubscriptDecl *SubscriptDecl::create(ASTContext &Context, DeclName Name,
+                                     SourceLoc StaticLoc,
+                                     StaticSpellingKind StaticSpelling,
+                                     SourceLoc SubscriptLoc,
+                                     ParameterList *Indices, SourceLoc ArrowLoc,
+                                     TypeLoc ElementTy, DeclContext *Parent,
+                                     GenericParamList *GenericParams) {
+  auto *const SD = new (Context)
+      SubscriptDecl(Name, StaticLoc, StaticSpelling, SubscriptLoc, Indices,
+                    ArrowLoc, ElementTy, Parent, GenericParams);
+  return SD;
+}
+
+SubscriptDecl *SubscriptDecl::createImported(ASTContext &Context, DeclName Name,
+                                             SourceLoc SubscriptLoc,
+                                             ParameterList *Indices,
+                                             SourceLoc ArrowLoc, Type ElementTy,
+                                             DeclContext *Parent,
+                                             ClangNode ClangN) {
+  assert(ClangN && ElementTy);
+  auto *DeclPtr = allocateMemoryForDecl<SubscriptDecl>(
+      Context, sizeof(SubscriptDecl), /*includeSpaceForClangNode=*/true);
+
+  auto *const SD = ::new (DeclPtr)
+      SubscriptDecl(Name, SourceLoc(), StaticSpellingKind::None, SubscriptLoc,
+                    Indices, ArrowLoc, TypeLoc(), Parent,
+                    /*GenericParams=*/nullptr);
+  SD->setElementInterfaceType(ElementTy);
+  SD->setClangNode(ClangN);
+  return SD;
+}
+
 SourceRange SubscriptDecl::getSourceRange() const {
   return {getSubscriptLoc(), getEndLoc()};
 }

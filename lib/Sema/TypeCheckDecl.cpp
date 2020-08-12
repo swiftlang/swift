@@ -1693,14 +1693,14 @@ IsImplicitlyUnwrappedOptionalRequest::evaluate(Evaluator &evaluator,
 
     auto *storage = accessor->getStorage();
     if (auto *subscript = dyn_cast<SubscriptDecl>(storage))
-      TyR = subscript->getElementTypeLoc().getTypeRepr();
+      TyR = subscript->getElementTypeRepr();
     else
       TyR = cast<VarDecl>(storage)->getTypeReprOrParentPatternTypeRepr();
     break;
   }
 
   case DeclKind::Subscript:
-    TyR = cast<SubscriptDecl>(decl)->getElementTypeLoc().getTypeRepr();
+    TyR = cast<SubscriptDecl>(decl)->getElementTypeRepr();
     break;
 
   case DeclKind::Param: {

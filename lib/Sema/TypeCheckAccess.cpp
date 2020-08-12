@@ -873,7 +873,8 @@ public:
           });
     }
 
-    checkTypeAccess(SD->getElementTypeLoc(), SD, /*mayBeInferred*/false,
+    checkTypeAccess(SD->getElementInterfaceType(), SD->getElementTypeRepr(),
+                    SD, /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *thisComplainRepr,
                         DowngradeToWarning downgradeDiag) {
@@ -1376,7 +1377,8 @@ public:
           });
     }
 
-    checkTypeAccess(SD->getElementTypeLoc(), SD, /*mayBeInferred*/false,
+    checkTypeAccess(SD->getElementInterfaceType(), SD->getElementTypeRepr(),
+                    SD, /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeDiag) {
@@ -1918,7 +1920,8 @@ public:
       checkType(P->getInterfaceType(), P->getTypeRepr(), SD,
                 getDiagnoser(SD));
     }
-    checkType(SD->getElementTypeLoc(), SD, getDiagnoser(SD));
+    checkType(SD->getElementInterfaceType(), SD->getElementTypeRepr(), SD,
+              getDiagnoser(SD));
   }
 
   void visitAbstractFunctionDecl(AbstractFunctionDecl *fn) {

@@ -941,7 +941,7 @@ Optional<Type> ResultTypeRequest::getCachedResult() const {
   if (const auto *const funcDecl = dyn_cast<FuncDecl>(decl)) {
     type = funcDecl->FnRetType.getType();
   } else {
-    type = cast<SubscriptDecl>(decl)->getElementTypeLoc().getType();
+    type = cast<SubscriptDecl>(decl)->ElementTy.getType();
   }
 
   if (type.isNull())
@@ -955,7 +955,7 @@ void ResultTypeRequest::cacheResult(Type type) const {
   if (auto *const funcDecl = dyn_cast<FuncDecl>(decl)) {
     funcDecl->FnRetType.setType(type);
   } else {
-    cast<SubscriptDecl>(decl)->getElementTypeLoc().setType(type);
+    cast<SubscriptDecl>(decl)->ElementTy.setType(type);
   }
 }
 

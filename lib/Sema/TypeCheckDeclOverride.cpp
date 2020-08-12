@@ -1198,9 +1198,11 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
       emittedMatchError = true;
 
     } else if (mayHaveMismatchedOptionals) {
+      TypeLoc elementTL(subscript->getElementTypeRepr(),
+                        subscript->getElementInterfaceType());
       emittedMatchError |= diagnoseMismatchedOptionals(
           subscript, subscript->getIndices(),
-          subscript->getElementTypeLoc(), baseDecl,
+          elementTL, baseDecl,
           cast<SubscriptDecl>(baseDecl)->getIndices(), owningTy,
           mayHaveMismatchedOptionals);
     }

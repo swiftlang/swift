@@ -2091,8 +2091,7 @@ SourceLoc OptionalAdjustment::getOptionalityLoc(ValueDecl *witness) const {
 
     // For a subscript, use the element type.
     if (auto subscript = dyn_cast<SubscriptDecl>(witness)) {
-      return getOptionalityLoc(
-               subscript->getElementTypeLoc().getTypeRepr());
+      return getOptionalityLoc(subscript->getElementTypeRepr());
     }
 
     // Otherwise, we have a variable.

@@ -358,7 +358,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     bool WalkGenerics = visitGenericParamListIfNeeded(SD);
 
     visit(SD->getIndices());
-    if (auto *const TyR = SD->getElementTypeLoc().getTypeRepr())
+    if (auto *const TyR = SD->getElementTypeRepr())
       if (doIt(TyR))
         return true;
 
