@@ -708,9 +708,7 @@ void DotExprLookup::sawSolution(const constraints::Solution &S) {
   GotCallback = true;
   auto &CS = S.getConstraintSystem();
 
-  auto GetType = [&](Expr *E) {
-    return S.simplifyType(S.getType(E));
-  };
+  auto GetType = [&](Expr *E) { return S.getResolvedType(E); };
 
   auto *ParsedExpr = CompletionExpr->getBase();
   auto *SemanticExpr = ParsedExpr->getSemanticsProvidingExpr();
@@ -726,7 +724,7 @@ void DotExprLookup::sawSolution(const constraints::Solution &S) {
     if (auto SelectedOverload = S.getOverloadChoiceIfAvailable(CalleeLocator))
       ReferencedDecl = SelectedOverload->choice.getDeclOrNull();
 
-    bool ISDMT = CS.isStaticallyDerivedMetatype(ParsedExpr);
+    bool ISDMT = S.isStaticallyDerivedMetatype(ParsedExpr);
     auto Key = std::make_pair(BaseTy, ReferencedDecl);
     auto Ret = ResultToIndex.insert({Key, Solutions.size()});
     if (!Ret.second && ExpectedTy)
