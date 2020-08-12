@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Expr.h"
@@ -726,8 +727,27 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
       Nominal->getModuleScopeContext() !=
           getConformanceContext()->getModuleScopeContext()) {
     ConformanceDecl->diagnose(diag::cannot_synthesize_in_crossfile_extension,
+                              Nominal->getDescriptiveKind(), Nominal->getName(),
+                              synthesizing->getName(),
                               getProtocolType());
     Nominal->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
+
+    // In editor mode, try to insert a stub.
+    if (Context.LangOpts.DiagnosticsEditorMode) {
+      auto Extension = cast<ExtensionDecl>(getConformanceContext());
+      auto FixitLocation = Extension->getBraces().Start;
+      llvm::SmallString<128> Text;
+      {
+        llvm::raw_svector_ostream SS(Text);
+        swift::printRequirementStub(synthesizing, Nominal,
+                                    Nominal->getDeclaredType(),
+                                    Extension->getStartLoc(), SS);
+        if (!Text.empty()) {
+          ConformanceDecl->diagnose(diag::missing_witnesses_general)
+            .fixItInsertAfter(FixitLocation, Text.str());
+        }
+      }
+    }
     return true;
   }
 
