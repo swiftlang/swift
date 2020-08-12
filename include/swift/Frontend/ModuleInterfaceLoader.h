@@ -139,7 +139,8 @@ class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
     SmallVectorImpl<char> *ModuleInterfacePath,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) override;
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+    bool IsFramework) override;
 
   bool canImportModule(Located<Identifier> mID) override;
 
@@ -298,12 +299,13 @@ class ModuleInterfaceLoader : public SerializedModuleLoaderBase {
   ModuleInterfaceLoaderOptions Opts;
 
   std::error_code findModuleFilesInDirectory(
-    AccessPathElem ModuleID,
-    const SerializedModuleBaseName &BaseName,
-    SmallVectorImpl<char> *ModuleInterfacePath,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) override;
+     AccessPathElem ModuleID,
+     const SerializedModuleBaseName &BaseName,
+     SmallVectorImpl<char> *ModuleInterfacePath,
+     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+     bool IsFramework) override;
 
   bool isCached(StringRef DepPath) override;
 public:

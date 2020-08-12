@@ -116,7 +116,7 @@ protected:
       loader->findModuleFilesInDirectory({moduleName, SourceLoc()},
         SerializedModuleBaseName(tempDir, SerializedModuleBaseName("Library")),
         /*ModuleInterfacePath*/nullptr,
-        &moduleBuffer, &moduleDocBuffer, &moduleSourceInfoBuffer);
+        &moduleBuffer, &moduleDocBuffer, &moduleSourceInfoBuffer, /*IsFramework*/false);
     ASSERT_FALSE(error);
     ASSERT_FALSE(diags.hadAnyError());
 

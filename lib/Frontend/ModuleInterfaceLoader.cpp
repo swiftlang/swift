@@ -950,7 +950,8 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   SmallVectorImpl<char> *ModuleInterfacePath,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-  std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) {
+  std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+  bool IsFramework) {
 
   // If running in OnlySerialized mode, ModuleInterfaceLoader
   // should not have been constructed at all.
@@ -1527,7 +1528,8 @@ std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
     SmallVectorImpl<char> *ModuleInterfacePath,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) {
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+    bool IsFramework) {
   StringRef moduleName = ModuleID.Item.str();
   auto it = Impl.ExplicitModuleMap.find(moduleName);
   // If no explicit module path is given matches the name, return with an
