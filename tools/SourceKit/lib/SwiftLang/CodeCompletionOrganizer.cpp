@@ -11,10 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "CodeCompletionOrganizer.h"
-#include "SourceKit/Support/FuzzyStringMatcher.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
 #include "swift/IDE/CodeCompletionResultPrinter.h"
+#include "swift/IDE/FuzzyStringMatcher.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Markup/XMLUtils.h"
 #include "clang/Basic/CharInfo.h"
