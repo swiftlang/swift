@@ -2765,8 +2765,9 @@ ERROR(cannot_synthesize_init_in_extension_of_nonfinal,none,
       "be satisfied by a 'required' initializer in the class definition",
       (Type, DeclName))
 ERROR(cannot_synthesize_in_crossfile_extension,none,
-      "implementation of %0 cannot be automatically synthesized in an extension "
-      "in a different file to the type", (Type))
+      "extension outside of file declaring %0 %1 prevents automatic synthesis "
+      "of %2 for protocol %3",
+      (DescriptiveDeclKind, DeclName, DeclName, Type))
 
 ERROR(broken_additive_arithmetic_requirement,none,
       "AdditiveArithmetic protocol is broken: unexpected requirement", ())
