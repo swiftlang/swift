@@ -411,9 +411,12 @@ bool CompletionInstance::performCachedOperationIfPossible(
     oldInfo.PrevOffset = newInfo.PrevOffset;
     oldState->restoreCodeCompletionDelayedDeclState(oldInfo);
 
+    auto newBufferStart = SM.getRangeForBuffer(newBufferID).getStart();
+    SourceRange newBodyRange(newBufferStart.getAdvancedLoc(newInfo.StartOffset),
+                             newBufferStart.getAdvancedLoc(newInfo.EndOffset));
+
     auto *AFD = cast<AbstractFunctionDecl>(DC);
-    if (AFD->isBodySkipped())
-      AFD->setBodyDelayed(AFD->getBodySourceRange());
+    AFD->setBodyToBeReparsed(newBodyRange);
 
     traceDC = AFD;
     break;

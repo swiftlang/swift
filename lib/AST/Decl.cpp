@@ -6726,6 +6726,20 @@ void AbstractFunctionDecl::setBody(BraceStmt *S, BodyKind NewBodyKind) {
   }
 }
 
+void AbstractFunctionDecl::setBodyToBeReparsed(SourceRange bodyRange) {
+  assert(bodyRange.isValid());
+  assert(getBodyKind() == BodyKind::Unparsed ||
+         getBodyKind() == BodyKind::Parsed ||
+         getBodyKind() == BodyKind::TypeChecked);
+  assert(getASTContext().SourceMgr.rangeContainsTokenLoc(
+             bodyRange, getASTContext().SourceMgr.getCodeCompletionLoc()) &&
+         "This function is only intended to be used for code completion");
+
+  keepOriginalBodySourceRange();
+  BodyRange = bodyRange;
+  setBodyKind(BodyKind::Unparsed);
+}
+
 SourceRange AbstractFunctionDecl::getBodySourceRange() const {
   switch (getBodyKind()) {
   case BodyKind::None:
@@ -7386,7 +7400,7 @@ SourceRange FuncDecl::getSourceRange() const {
       getBodyKind() == BodyKind::Skipped)
     return { StartLoc, BodyRange.End };
 
-  SourceLoc RBraceLoc = getBodySourceRange().End;
+  SourceLoc RBraceLoc = getOriginalBodySourceRange().End;
   if (RBraceLoc.isValid()) {
     return { StartLoc, RBraceLoc };
   }
@@ -7507,7 +7521,7 @@ SourceRange ConstructorDecl::getSourceRange() const {
   if (isImplicit())
     return getConstructorLoc();
 
-  SourceLoc End = getBodySourceRange().End;
+  SourceLoc End = getOriginalBodySourceRange().End;
   if (End.isInvalid())
     End = getGenericTrailingWhereClauseSourceRange().End;
   if (End.isInvalid())
@@ -7733,7 +7747,7 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
 }
 
 SourceRange DestructorDecl::getSourceRange() const {
-  SourceLoc End = getBodySourceRange().End;
+  SourceLoc End = getOriginalBodySourceRange().End;
   if (End.isInvalid()) {
     End = getDestructorLoc();
   }
