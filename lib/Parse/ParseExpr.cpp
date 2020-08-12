@@ -330,7 +330,7 @@ parse_operator:
     case tok::identifier: {
       // 'async' followed by 'throws' or '->' implies that we have an arrow
       // expression.
-      if (!(Context.LangOpts.EnableExperimentalConcurrency &&
+      if (!(shouldParseExperimentalConcurrency() &&
             Tok.isContextualKeyword("async") &&
             peekToken().isAny(tok::arrow, tok::kw_throws)))
         goto done;
@@ -392,8 +392,7 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
   SyntaxParsingContext ElementContext(SyntaxContext,
                                       SyntaxContextKind::Expr);
 
-  if (Context.LangOpts.EnableExperimentalConcurrency &&
-      Tok.is(tok::kw___await)) {
+  if (shouldParseExperimentalConcurrency() && Tok.is(tok::kw___await)) {
     SourceLoc awaitLoc = consumeToken(tok::kw___await);
     ParserResult<Expr> sub = parseExprUnary(message, isExprBasic);
     if (!sub.hasCodeCompletion() && !sub.isNull()) {
@@ -2448,7 +2447,7 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
   // Consume 'async', 'throws', and 'rethrows', but in any order.
   auto consumeAsyncThrows = [&] {
     bool hadAsync = false;
-    if (Context.LangOpts.EnableExperimentalConcurrency &&
+    if (shouldParseExperimentalConcurrency() &&
         Tok.isContextualKeyword("async")) {
       consumeToken();
       hadAsync = true;
@@ -2457,7 +2456,7 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
     if (!consumeIf(tok::kw_throws) && !consumeIf(tok::kw_rethrows))
       return;
 
-    if (Context.LangOpts.EnableExperimentalConcurrency && !hadAsync &&
+    if (shouldParseExperimentalConcurrency() && !hadAsync &&
         Tok.isContextualKeyword("async")) {
       consumeToken();
     }
