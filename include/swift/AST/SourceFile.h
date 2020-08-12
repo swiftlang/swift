@@ -172,7 +172,7 @@ private:
   bool IsPrimary;
 
   /// The scope map that describes this source file.
-  std::unique_ptr<ASTScope> Scope;
+  NullablePtr<ASTScope> Scope = nullptr;
 
   /// The set of validated opaque return type decls in the source file.
   llvm::SmallVector<OpaqueTypeDecl *, 4> OpaqueReturnTypes;
@@ -467,6 +467,10 @@ public:
 
   /// Retrieve the scope that describes this source file.
   ASTScope &getScope();
+
+  void clearScope() {
+    Scope = nullptr;
+  }
 
   /// Retrieves the previously set delayed parser state, asserting that it
   /// exists.
