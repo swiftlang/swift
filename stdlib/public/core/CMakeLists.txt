@@ -287,8 +287,6 @@ if(SWIFT_STDLIB_SIL_DEBUGGING)
   list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-gsil")
 endif()
 
-list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-inline-generics")
-list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
 if(SWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING)
   list(APPEND swift_stdlib_compile_flags "-enforce-exclusivity=checked")
 endif()
