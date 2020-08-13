@@ -60,6 +60,7 @@ class Requirement;
 enum class ResilienceExpansion : unsigned;
 struct FragileFunctionKind;
 class SourceFile;
+class SymbolSourceMap;
 struct TangentPropertyInfo;
 class Type;
 class TypeAliasDecl;
