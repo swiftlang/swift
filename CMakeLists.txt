@@ -375,6 +375,10 @@ option(SWIFT_REPORT_STATISTICS
     "Create json files which contain internal compilation statistics"
     FALSE)
 
+option(SWIFT_DISABLE_OBJC_INTEROP
+    "Disable Objective-C interoperability even on platforms what would normally have it"
+    FALSE)
+
 #
 # User-configurable TensorFlow specific options.
 #
