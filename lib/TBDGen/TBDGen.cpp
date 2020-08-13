@@ -61,7 +61,7 @@ static bool isGlobalOrStaticVar(VarDecl *VD) {
   return VD->isStatic() || VD->getDeclContext()->isModuleScopeContext();
 }
 
-TBDGenVisitor::TBDGenVisitor(TBDGenDescriptor desc,
+TBDGenVisitor::TBDGenVisitor(const TBDGenDescriptor &desc,
                              SymbolCallbackFn symbolCallback)
     : TBDGenVisitor(desc.getTarget(), desc.getDataLayout(),
                     desc.getParentModule(), desc.getOptions(),

@@ -150,7 +150,7 @@ public:
 
   /// Create a new visitor using the target and layout information from a
   /// TBDGenDescriptor.
-  TBDGenVisitor(TBDGenDescriptor desc, SymbolCallbackFn symbolCallback);
+  TBDGenVisitor(const TBDGenDescriptor &desc, SymbolCallbackFn symbolCallback);
 
   ~TBDGenVisitor() { assert(DeclStack.empty()); }
   void addMainIfNecessary(FileUnit *file) {

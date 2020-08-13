@@ -19,6 +19,7 @@
 
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/SimpleRequest.h"
+#include "swift/TBDGen/TBDGen.h"
 
 namespace llvm {
 
@@ -37,12 +38,11 @@ namespace swift {
 
 class FileUnit;
 class ModuleDecl;
-struct TBDGenOptions;
 
 class TBDGenDescriptor final {
   using FileOrModule = llvm::PointerUnion<FileUnit *, ModuleDecl *>;
   FileOrModule Input;
-  const TBDGenOptions &Opts;
+  TBDGenOptions Opts;
 
   TBDGenDescriptor(FileOrModule input, const TBDGenOptions &opts)
       : Input(input), Opts(opts) {
@@ -62,6 +62,7 @@ public:
 
   /// Returns the TBDGen options.
   const TBDGenOptions &getOptions() const { return Opts; }
+  TBDGenOptions &getOptions() { return Opts; }
 
   const llvm::DataLayout &getDataLayout() const;
   const llvm::Triple &getTarget() const;

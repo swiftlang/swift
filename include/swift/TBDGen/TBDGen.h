@@ -14,7 +14,6 @@
 
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringSet.h"
-#include "swift/AST/TBDGenRequests.h"
 #include "swift/Basic/Version.h"
 #include <vector>
 
@@ -25,6 +24,7 @@ class raw_ostream;
 namespace swift {
 class FileUnit;
 class ModuleDecl;
+class TBDGenDescriptor;
 
 /// Options for controlling the exact set of symbols included in the TBD
 /// output.
