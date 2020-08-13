@@ -2148,9 +2148,22 @@ static Type validateParameterType(ParamDecl *decl) {
       decl->setInvalid();
       return ErrorType::get(ctx);
     }
-
-    return Ty;
   }
+
+  // async autoclosures can only occur as parameters to async functions.
+  if (decl->isAutoClosure()) {
+    if (auto fnType = Ty->getAs<FunctionType>()) {
+      if (fnType->isAsync() &&
+          !(isa<AbstractFunctionDecl>(dc) &&
+            cast<AbstractFunctionDecl>(dc)->hasAsync())) {
+        decl->diagnose(diag::async_autoclosure_nonasync_function);
+        if (auto func = dyn_cast<FuncDecl>(dc)) {
+          func->diagnose(diag::note_add_async_to_function, func->getName());
+        }
+      }
+    }
+  }
+
   return Ty;
 }
 
