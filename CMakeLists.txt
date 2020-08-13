@@ -250,6 +250,10 @@ option(SWIFT_STDLIB_ENABLE_SIB_TARGETS
        "Should we generate sib targets for the stdlib or not?"
        FALSE)
 
+option(SWIFT_STDLIB_STABLE_ABI
+       "Should stdlib be built with stable ABI (library evolution, resilience)."
+       TRUE)
+
 
 set(SWIFT_DARWIN_SUPPORTED_ARCHS "" CACHE STRING
   "Semicolon-separated list of architectures to configure on Darwin platforms. \

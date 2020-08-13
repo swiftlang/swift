@@ -403,8 +403,8 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-sil-verify-all")
   endif()
 
-  # The standard library and overlays are always built resiliently.
-  if(SWIFTFILE_IS_STDLIB)
+  # The standard library and overlays are built resiliently when SWIFT_STDLIB_STABLE_ABI=On.
+  if(SWIFTFILE_IS_STDLIB AND SWIFT_STDLIB_STABLE_ABI)
     list(APPEND swift_flags "-enable-library-evolution")
   endif()
 
