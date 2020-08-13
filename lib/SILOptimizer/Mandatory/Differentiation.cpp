@@ -1330,7 +1330,7 @@ bool DifferentiationTransformer::processLinearFunctionInst(
                                    cast<SILInstruction>(lfi));
   PrettyStackTraceSILFunction fnTrace("...in", lfi->getFunction());
   LLVM_DEBUG({
-    auto &s = getADDebugStream() << "Processing LinearFunctoinInst:\n";
+    auto &s = getADDebugStream() << "Processing LinearFunctionInst:\n";
     lfi->printInContext(s);
   });
 
@@ -1385,8 +1385,8 @@ void Differentiation::run() {
         if (auto *dfi = dyn_cast<DifferentiableFunctionInst>(&i)) {
           context.getDifferentiableFunctionInstWorklist().push_back(dfi);
         } else if (auto *lfi = dyn_cast<LinearFunctionInst>(&i)) {
-          // If linear map transposition is not enable and an uncanonical
-          // `linear_function` instruction is encounter, emit a diagnostic.
+          // If linear map transposition is not enabled and an uncanonical
+          // `linear_function` instruction is encountered, emit a diagnostic.
           // FIXME(SR-11850): Finish support for linear map transposition.
           if (!EnableExperimentalLinearMapTransposition) {
             if (!lfi->hasTransposeFunction()) {
