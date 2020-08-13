@@ -300,6 +300,10 @@ static void buildMethodDescriptorFields(IRGenModule &IGM,
 
 void IRGenModule::emitNonoverriddenMethodDescriptor(const SILVTable *VTable,
                                                     SILDeclRef declRef) {
+  auto entity = LinkEntity::forMethodDescriptor(declRef);
+
+  auto *var = cast<llvm::GlobalVariable>(getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo()));
+  var->setInitializer(nullptr);
  
   ConstantInitBuilder ib(*this);
   ConstantStructBuilder sb(ib.beginStruct(MethodDescriptorStructTy));
@@ -308,7 +312,6 @@ void IRGenModule::emitNonoverriddenMethodDescriptor(const SILVTable *VTable,
   
   auto init = sb.finishAndCreateFuture();
   
-  auto entity = LinkEntity::forMethodDescriptor(declRef);
   getAddrOfLLVMVariable(entity, init, DebugTypeInfo());
 }
 
