@@ -112,7 +112,6 @@
 #include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "llvm/Support/StringSaver.h"
-#include <sstream>
 
 namespace clang {
 class CompilerInstance;
@@ -263,8 +262,14 @@ private:
       } else if (key == "sourceInfoPath") {
         result.moduleSourceInfoPath = val.str();
       } else if (key == "isFramework") {
-        std::istringstream is(val.str());
-        is >> std::boolalpha >> result.isFramework;
+        auto valStr = val.str();
+        valStr.erase(std::remove(valStr.begin(), valStr.end(), '\n'), valStr.end());
+        if (valStr.compare("true") == 0)
+          result.isFramework = true;
+        else if (valStr.compare("false") == 0)
+          result.isFramework = false;
+        else
+          llvm_unreachable("Unexpected JSON value for isFramework");
       } else {
         // Being forgiving for future fields.
         continue;

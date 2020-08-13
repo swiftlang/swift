@@ -3,8 +3,8 @@
 
 // Check the contents of the JSON output
 // RUN: %FileCheck %s < %t/deps.json
-// REQUIRES: objc_interop
-
+// REQUIRES: OS=macosx
+  
 import CryptoKit
 
 // CHECK: "mainModuleName": "deps"

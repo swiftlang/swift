@@ -27,11 +27,11 @@
 import Foo
 
 // This test is to verify autolinking behavior so it is macOS-specific. 
-// REQUIRES OS=macosx
+// REQUIRES: OS=macosx
 
 // RUN: otool -l %t/explicit-framework-irgen.o | %FileCheck %s
 // CHECK: cmd LC_LINKER_OPTION
-// CHECK-NEXT:  cmdsize 32
-// CHECK-NEXT:  count 2
+// CHECK-NEXT:  cmdsize
+// CHECK-NEXT:  count
 // CHECK-NEXT:  string #1 -framework
 // CHECK-NEXT:  string #2 Foo

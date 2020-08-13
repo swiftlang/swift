@@ -129,7 +129,7 @@ public:
       ArrayRef<StringRef> buildCommandLine,
       ArrayRef<StringRef> extraPCMArgs,
       StringRef contextHash,
-      bool isFramework = false
+      bool isFramework
   ) : ModuleDependenciesStorageBase(ModuleDependenciesKind::Swift,
                                     compiledModulePath),
       swiftInterfaceFile(swiftInterfaceFile),
