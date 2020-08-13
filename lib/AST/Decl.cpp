@@ -6597,7 +6597,7 @@ SubscriptDecl::createDeserialized(ASTContext &Context, DeclName Name,
   assert(ElementTy && "Deserialized element type must not be null");
   auto *const SD = new (Context)
       SubscriptDecl(Name, SourceLoc(), StaticSpelling, SourceLoc(), nullptr,
-                    SourceLoc(), TypeLoc(), Parent, GenericParams);
+                    SourceLoc(), /*ElementTyR=*/nullptr, Parent, GenericParams);
   SD->setElementInterfaceType(ElementTy);
   return SD;
 }
@@ -6607,11 +6607,12 @@ SubscriptDecl *SubscriptDecl::create(ASTContext &Context, DeclName Name,
                                      StaticSpellingKind StaticSpelling,
                                      SourceLoc SubscriptLoc,
                                      ParameterList *Indices, SourceLoc ArrowLoc,
-                                     TypeLoc ElementTy, DeclContext *Parent,
+                                     TypeRepr *ElementTyR, DeclContext *Parent,
                                      GenericParamList *GenericParams) {
+  assert(ElementTyR);
   auto *const SD = new (Context)
       SubscriptDecl(Name, StaticLoc, StaticSpelling, SubscriptLoc, Indices,
-                    ArrowLoc, ElementTy, Parent, GenericParams);
+                    ArrowLoc, ElementTyR, Parent, GenericParams);
   return SD;
 }
 
@@ -6627,7 +6628,7 @@ SubscriptDecl *SubscriptDecl::createImported(ASTContext &Context, DeclName Name,
 
   auto *const SD = ::new (DeclPtr)
       SubscriptDecl(Name, SourceLoc(), StaticSpellingKind::None, SubscriptLoc,
-                    Indices, ArrowLoc, TypeLoc(), Parent,
+                    Indices, ArrowLoc, /*ElementTyR=*/nullptr, Parent,
                     /*GenericParams=*/nullptr);
   SD->setElementInterfaceType(ElementTy);
   SD->setClangNode(ClangN);

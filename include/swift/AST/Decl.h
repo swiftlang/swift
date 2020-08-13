@@ -5611,7 +5611,7 @@ class SubscriptDecl : public GenericContext, public AbstractStorageDecl {
   SubscriptDecl(DeclName Name,
                 SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
                 SourceLoc SubscriptLoc, ParameterList *Indices,
-                SourceLoc ArrowLoc, TypeLoc ElementTy, DeclContext *Parent,
+                SourceLoc ArrowLoc, TypeRepr *ElementTyR, DeclContext *Parent,
                 GenericParamList *GenericParams)
     : GenericContext(DeclContextKind::SubscriptDecl, Parent, GenericParams),
       AbstractStorageDecl(DeclKind::Subscript,
@@ -5619,7 +5619,7 @@ class SubscriptDecl : public GenericContext, public AbstractStorageDecl {
                           Parent, Name, SubscriptLoc,
                           /*will be overwritten*/ StorageIsNotMutable),
       StaticLoc(StaticLoc), ArrowLoc(ArrowLoc),
-      Indices(nullptr), ElementTy(ElementTy) {
+      Indices(nullptr), ElementTy(ElementTyR) {
     Bits.SubscriptDecl.StaticSpelling = static_cast<unsigned>(StaticSpelling);
     setIndices(Indices);
   }
@@ -5635,7 +5635,7 @@ public:
                                SourceLoc StaticLoc,
                                StaticSpellingKind StaticSpelling,
                                SourceLoc SubscriptLoc, ParameterList *Indices,
-                               SourceLoc ArrowLoc, TypeLoc ElementTy,
+                               SourceLoc ArrowLoc, TypeRepr *ElementTyR,
                                DeclContext *Parent,
                                GenericParamList *GenericParams);
 
