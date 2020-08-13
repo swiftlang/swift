@@ -38,6 +38,9 @@ struct TBDGenOptions {
   /// Only collect linker directive symbols.
   bool LinkerDirectivesOnly = false;
 
+  /// Whether to include only symbols with public linkage.
+  bool PublicSymbolsOnly = true;
+
   /// The install_name to use in the TBD file.
   std::string InstallName;
 
@@ -66,6 +69,7 @@ struct TBDGenOptions {
     return lhs.HasMultipleIGMs == rhs.HasMultipleIGMs &&
            lhs.IsInstallAPI == rhs.IsInstallAPI &&
            lhs.LinkerDirectivesOnly == rhs.LinkerDirectivesOnly &&
+           lhs.PublicSymbolsOnly == rhs.PublicSymbolsOnly &&
            lhs.InstallName == rhs.InstallName &&
            lhs.ModuleLinkName == rhs.ModuleLinkName &&
            lhs.CurrentVersion == rhs.CurrentVersion &&
@@ -82,8 +86,9 @@ struct TBDGenOptions {
     using namespace llvm;
     return hash_combine(
         opts.HasMultipleIGMs, opts.IsInstallAPI, opts.LinkerDirectivesOnly,
-        opts.InstallName, opts.ModuleLinkName, opts.CurrentVersion,
-        opts.CompatibilityVersion, opts.ModuleInstallNameMapPath,
+        opts.PublicSymbolsOnly, opts.InstallName, opts.ModuleLinkName,
+        opts.CurrentVersion, opts.CompatibilityVersion,
+        opts.ModuleInstallNameMapPath,
         hash_combine_range(opts.embedSymbolsFromModules.begin(),
                            opts.embedSymbolsFromModules.end()));
   }

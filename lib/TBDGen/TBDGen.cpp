@@ -406,8 +406,10 @@ void TBDGenVisitor::addSymbol(SILDeclRef declRef) {
   auto linkage = effectiveLinkageForClassMember(
     declRef.getLinkage(ForDefinition),
     declRef.getSubclassScope());
-  if (linkage == SILLinkage::Public)
-    addSymbol(declRef.mangle(), SymbolSource::forSILDeclRef(declRef));
+  if (Opts.PublicSymbolsOnly && linkage != SILLinkage::Public)
+    return;
+
+  addSymbol(declRef.mangle(), SymbolSource::forSILDeclRef(declRef));
 }
 
 void TBDGenVisitor::addSymbol(LinkEntity entity) {
@@ -418,8 +420,10 @@ void TBDGenVisitor::addSymbol(LinkEntity entity) {
       llvm::GlobalValue::isExternalLinkage(linkage.getLinkage()) &&
       linkage.getVisibility() != llvm::GlobalValue::HiddenVisibility;
 
-  if (externallyVisible)
-    addSymbol(linkage.getName(), SymbolSource::forIRLinkEntity(entity));
+  if (Opts.PublicSymbolsOnly && !externallyVisible)
+    return;
+
+  addSymbol(linkage.getName(), SymbolSource::forIRLinkEntity(entity));
 }
 
 void TBDGenVisitor::addDispatchThunk(SILDeclRef declRef) {
@@ -486,15 +490,21 @@ void TBDGenVisitor::addConformances(const IterableDeclContext *IDC) {
     auto addSymbolIfNecessary = [&](ValueDecl *requirementDecl,
                                     ValueDecl *witnessDecl) {
       auto witnessRef = SILDeclRef(witnessDecl);
-      if (conformanceIsFixed &&
-          (isa<SelfProtocolConformance>(rootConformance) ||
-           fixmeWitnessHasLinkageThatNeedsToBePublic(witnessRef))) {
-        Mangle::ASTMangler Mangler;
+      if (Opts.PublicSymbolsOnly) {
+        if (!conformanceIsFixed)
+          return;
 
-        // FIXME: We should have a SILDeclRef SymbolSource for this.
-        addSymbol(Mangler.mangleWitnessThunk(rootConformance, requirementDecl),
-                  SymbolSource::forUnknown());
+        if (!isa<SelfProtocolConformance>(rootConformance) &&
+            !fixmeWitnessHasLinkageThatNeedsToBePublic(witnessRef)) {
+          return;
+        }
       }
+
+      Mangle::ASTMangler Mangler;
+
+      // FIXME: We should have a SILDeclRef SymbolSource for this.
+      addSymbol(Mangler.mangleWitnessThunk(rootConformance, requirementDecl),
+                SymbolSource::forUnknown());
     };
 
     rootConformance->forEachValueWitness([&](ValueDecl *valueReq,
@@ -525,11 +535,11 @@ void TBDGenVisitor::addAutoDiffLinearMapFunction(AbstractFunctionDecl *original,
   auto declRef =
       SILDeclRef(original).asForeign(requiresForeignEntryPoint(original));
 
-  if (!declRef.isSerialized())
+  // Linear maps are public only when the original function is serialized. So
+  // if we're only including public symbols and it's not serialized, bail.
+  if (Opts.PublicSymbolsOnly && !declRef.isSerialized())
     return;
-  // Linear maps are public only when the original function is serialized.
-  if (!declRef.isSerialized())
-    return;
+
   // Differential functions are emitted only when forward-mode is enabled.
   if (kind == AutoDiffLinearMapKind::Differential &&
       !ctx.LangOpts.EnableExperimentalForwardModeDifferentiation)
@@ -573,7 +583,7 @@ void TBDGenVisitor::addDifferentiabilityWitness(
   auto originalLinkage = declRef.getLinkage(ForDefinition);
   if (foreign)
     originalLinkage = stripExternalFromLinkage(originalLinkage);
-  if (originalLinkage != SILLinkage::Public)
+  if (Opts.PublicSymbolsOnly && originalLinkage != SILLinkage::Public)
     return;
 
   auto *silParamIndices = autodiff::getLoweredParameterIndices(
@@ -631,7 +641,7 @@ static bool shouldUseAllocatorMangling(const AbstractFunctionDecl *afd) {
 void TBDGenVisitor::visitDefaultArguments(ValueDecl *VD, ParameterList *PL) {
   auto publicDefaultArgGenerators = SwiftModule->isTestingEnabled() ||
                                     SwiftModule->arePrivateImportsEnabled();
-  if (!publicDefaultArgGenerators)
+  if (Opts.PublicSymbolsOnly && !publicDefaultArgGenerators)
     return;
 
   // In Swift 3 (or under -enable-testing), default arguments (of public
@@ -771,7 +781,8 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
     // statically/globally stored variables have some special handling.
     if (VD->hasStorage() &&
         isGlobalOrStaticVar(VD)) {
-      if (getDeclLinkage(VD) == FormalLinkage::PublicUnique) {
+      if (!Opts.PublicSymbolsOnly ||
+          getDeclLinkage(VD) == FormalLinkage::PublicUnique) {
         // The actual variable has a symbol.
         // FIXME: We ought to have a symbol source for this.
         Mangle::ASTMangler mangler;
@@ -814,7 +825,8 @@ void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
 }
 
 void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
-  if (getDeclLinkage(CD) != FormalLinkage::PublicUnique)
+  if (Opts.PublicSymbolsOnly &&
+      getDeclLinkage(CD) != FormalLinkage::PublicUnique)
     return;
 
   auto &ctxt = CD->getASTContext();
