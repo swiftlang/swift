@@ -417,6 +417,8 @@ bool CompletionInstance::performCachedOperationIfPossible(
 
     auto *AFD = cast<AbstractFunctionDecl>(DC);
     AFD->setBodyToBeReparsed(newBodyRange);
+    SM.setReplacedRange({AFD->getOriginalBodySourceRange(), newBodyRange});
+    oldSF->clearScope();
 
     traceDC = AFD;
     break;
@@ -601,9 +603,6 @@ bool swift::ide::CompletionInstance::performOperation(
 
   // We don't need token list.
   Invocation.getLangOptions().CollectParsedToken = false;
-
-  // FIXME: ASTScopeLookup doesn't support code completion yet.
-  Invocation.disableASTScopeLookup();
 
   if (EnableASTCaching) {
     // Compute the signature of the invocation.
