@@ -192,6 +192,7 @@ KNOWN_SETTINGS=(
     report-statistics                             "0"               "set to 1 to generate compilation statistics files for swift libraries"
     sil-verify-all                                "0"               "If enabled, run the SIL verifier after each transform when building Swift files during this build process"
     stdlib-deployment-targets                     ""                "space-separated list of targets to configure the Swift standard library to be compiled or cross-compiled for"
+    swift-objc-interop                            ""                "whether to enable interoperability with Objective-C, default is 1 on Apple platfors, 0 otherwise"
 
     ## FREESTANDING Stdlib Options
     swift-freestanding-sdk                      ""                "which SDK to use when building the FREESTANDING stdlib"
@@ -1813,6 +1814,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_SDKS:STRING="$(join ";" ${SWIFT_SDKS[@]})"
+                    )
+                fi
+
+                if [[ "${SWIFT_OBJC_INTEROP}" == "0" ]] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_DISABLE_OBJC_INTEROP:BOOL=True
                     )
                 fi
 
