@@ -339,7 +339,6 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
         let usableBits = s &>> -shift
         isLowerBound = s == (usableBits &<< -shift)
         n = UInt64(truncatingIfNeeded: usableBits)
-        
       } else {
         // It is okay to use `&<<` here because `shift` is less than
         // `UInt64.bitWidth`. We know this because:
