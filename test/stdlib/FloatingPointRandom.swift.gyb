@@ -7,13 +7,13 @@ var FloatingPointRandom = TestSuite("FloatingPointRandom")
 defer { runAllTests() }
 
 extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
-  // Basic sanity check
+  // Ensure the random value is in the range
   static func isRandomInRange(_ range: Range<Self>) -> Bool {
     let x = Self.random(in: range)
     return range.contains(x)
   }
   
-  // Basic sanity check
+  // Ensure the random value is in the range
   static func isRandomInRange(_ range: ClosedRange<Self>) -> Bool {
     let x = Self.random(in: range)
     return range.contains(x)
