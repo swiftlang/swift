@@ -101,6 +101,7 @@ void Serializer::writeBlockInfoBlock() {
 
   BLOCK_RECORD(record_block, FUNC_METADATA);
   BLOCK_RECORD(record_block, CALL_GRAPH_EDGE);
+  BLOCK_RECORD(record_block, TYPE_REF);
 
   BLOCK_RECORD(record_block, VFUNC_METADATA);
   BLOCK_RECORD(record_block, VFUNC_IMPL);
@@ -125,6 +126,13 @@ void Serializer::emitFunctionSummary(const FunctionSummary *summary) {
     CallGraphEdgeLayout::emitRecord(
         Out, ScratchRecord, AbbrCodes[CallGraphEdgeLayout::Code],
         unsigned(call.getKind()), call.getCallee(), debugName);
+  }
+
+  for (auto typeRef : summary->typeRefs()) {
+    std::string debugName = ModuleSummaryEmbedDebugName ? typeRef.Name : "";
+    TypeRefLayout::emitRecord(Out, ScratchRecord,
+                              AbbrCodes[TypeRefLayout::Code], typeRef.Guid,
+                              debugName);
   }
 }
 
@@ -154,6 +162,7 @@ void Serializer::emitModuleSummary(const ModuleSummaryIndex &index) {
   registerRecordAbbr<ModuleMetadataLayout>();
   registerRecordAbbr<FunctionMetadataLayout>();
   registerRecordAbbr<CallGraphEdgeLayout>();
+  registerRecordAbbr<TypeRefLayout>();
   registerRecordAbbr<VFuncMetadataLayout>();
   registerRecordAbbr<VFuncImplLayout>();
 
@@ -376,6 +385,18 @@ bool Deserializer::readModuleSummary() {
       }
       FunctionSummary::Call call(calleeGUID, BlobData.str(), callKind.getValue());
       CurrentFunc->addCall(call);
+      break;
+    }
+    case TYPE_REF: {
+      // TYPE_REF must follow a FUNC_METADATA.
+      if (!CurrentFunc) {
+        report_fatal_error("Unexpected TYPE_REF record");
+      }
+      GUID typeGUID;
+      std::string name;
+      TypeRefLayout::readRecord(Scratch, typeGUID);
+      name = BlobData.str();
+      CurrentFunc->addTypeRef({typeGUID, name});
       break;
     }
     case VFUNC_METADATA: {

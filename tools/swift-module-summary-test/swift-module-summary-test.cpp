@@ -58,7 +58,9 @@ static llvm::cl::opt<ActionType>
 LLVM_YAML_DECLARE_MAPPING_TRAITS(modulesummary::ModuleSummaryIndex)
 LLVM_YAML_DECLARE_MAPPING_TRAITS(modulesummary::FunctionSummary)
 LLVM_YAML_DECLARE_MAPPING_TRAITS(modulesummary::FunctionSummary::Call)
+LLVM_YAML_DECLARE_MAPPING_TRAITS(modulesummary::FunctionSummary::TypeRef)
 LLVM_YAML_IS_SEQUENCE_VECTOR(modulesummary::FunctionSummary::Call)
+LLVM_YAML_IS_SEQUENCE_VECTOR(modulesummary::FunctionSummary::TypeRef)
 LLVM_YAML_DECLARE_ENUM_TRAITS(modulesummary::FunctionSummary::Call::KindTy)
 
 namespace llvm {
@@ -88,12 +90,18 @@ void MappingTraits<FunctionSummary::Call>::mapping(IO &io,
   io.mapRequired("kind", V.Kind);
 }
 
+void MappingTraits<FunctionSummary::TypeRef>::mapping(IO &io,
+                                                      FunctionSummary::TypeRef &V) {
+  io.mapRequired("name", V.Name);
+  io.mapRequired("guid", V.Guid);
+}
 void MappingTraits<FunctionSummary>::mapping(IO &io, FunctionSummary &V) {
   io.mapRequired("name", V.Name);
   io.mapRequired("guid", V.Guid);
   io.mapRequired("live", V.Flags.Live);
   io.mapRequired("preserved", V.Flags.Preserved);
   io.mapRequired("calls", V.CallGraphEdgeList);
+  io.mapRequired("type_refs", V.TypeRefList);
 }
 
 template <>

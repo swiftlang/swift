@@ -32,6 +32,7 @@ enum {
   MODULE_METADATA,
   FUNC_METADATA,
   CALL_GRAPH_EDGE,
+  TYPE_REF,
   VFUNC_METADATA,
   VFUNC_IMPL,
 };
@@ -54,6 +55,11 @@ using CallGraphEdgeLayout =
                    BCGUID,     // callee func guid
                    BCBlob      // name (debug purpose)
                    >;
+
+using TypeRefLayout = BCRecordLayout<TYPE_REF,
+                                     BCGUID, // type guid
+                                     BCBlob  // type name (debug purpose)
+                                     >;
 
 using VFuncMetadataLayout =
     BCRecordLayout<VFUNC_METADATA,
