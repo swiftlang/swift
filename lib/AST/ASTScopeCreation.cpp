@@ -795,7 +795,7 @@ void ASTSourceFileScope::
 void ASTSourceFileScope::expandFunctionBody(AbstractFunctionDecl *AFD) {
   if (!AFD)
     return;
-  auto sr = AFD->getBodySourceRange();
+  auto sr = AFD->getOriginalBodySourceRange();
   if (sr.isInvalid())
     return;
   ASTScopeImpl *bodyScope = findInnermostEnclosingScope(sr.Start, nullptr);
@@ -1596,11 +1596,6 @@ ASTScopeImpl *GenericTypeOrExtensionWholePortion::expandScope(
   // Get now in case recursion emancipates scope
   auto *const ip = scope->getParent().get();
   
-  // Prevent circular request bugs caused by illegal input and
-  // doing lookups that getExtendedNominal in the midst of getExtendedNominal.
-  if (scope->shouldHaveABody() && !scope->doesDeclHaveABody())
-    return ip;
-
   auto *context = scope->getGenericContext();
   auto *genericParams = (isa<TypeAliasDecl>(context)
                          ? context->getParsedGenericParams()
@@ -1609,6 +1604,12 @@ ASTScopeImpl *GenericTypeOrExtensionWholePortion::expandScope(
       scope->getDecl(), genericParams, scope);
   if (context->getTrailingWhereClause())
     scope->createTrailingWhereClauseScope(deepestScope, scopeCreator);
+
+  // Prevent circular request bugs caused by illegal input and
+  // doing lookups that getExtendedNominal in the midst of getExtendedNominal.
+  if (scope->shouldHaveABody() && !scope->doesDeclHaveABody())
+    return ip;
+
   scope->createBodyScope(deepestScope, scopeCreator);
   return ip;
 }
