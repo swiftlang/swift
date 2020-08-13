@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2018-2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -26,6 +26,10 @@ public let RandomValues = [
   BenchmarkInfo(name: "RandomDoubleDef", runFunction: run_RandomDoubleDef,
     tags: [.api], legacyFactor: 100),
   BenchmarkInfo(name: "RandomDoubleLCG", runFunction: run_RandomDoubleLCG,
+    tags: [.api], legacyFactor: 2),
+  BenchmarkInfo(name: "RandomDoubleUnitDef", runFunction: run_RandomDoubleUnitDef,
+    tags: [.api], legacyFactor: 100),
+  BenchmarkInfo(name: "RandomDoubleUnitLCG", runFunction: run_RandomDoubleUnitLCG,
     tags: [.api], legacyFactor: 2),
 ]
 
@@ -89,3 +93,27 @@ public func run_RandomDoubleLCG(_ N: Int) {
     blackHole(x)
   }
 }
+
+@inline(never)
+public func run_RandomDoubleUnitDef(_ N: Int) {
+  for _ in 0 ..< N {
+    var x = 0.0
+    for _ in 0 ..< 1_000 {
+      x += Double.random(in: 0..<1)
+    }
+    blackHole(x)
+  }
+}
+
+@inline(never)
+public func run_RandomDoubleUnitLCG(_ N: Int) {
+  for _ in 0 ..< N {
+    var x = 0.0
+    var generator = LCRNG(seed: 0)
+    for _ in 0 ..< 50_000 {
+      x += Double.random(in: 0..<1, using: &generator)
+    }
+    blackHole(x)
+  }
+}
+
