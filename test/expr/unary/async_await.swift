@@ -40,6 +40,11 @@ func acceptAutoclosureNonAsyncBad(_: @autoclosure () async -> Int) { }
 // expected-error@-1{{'async' autoclosure parameter in a non-'async' function}}
 // expected-note@-2{{add 'async' to function 'acceptAutoclosureNonAsyncBad' to make it asynchronous}}
 
+struct HasAsyncBad {
+  init(_: @autoclosure () async -> Int) { }
+  // expected-error@-1{{'async' autoclosure parameter in a non-'async' function}}
+}
+
 func testAutoclosure() async {
   __await acceptAutoclosureAsync(getInt()) // expected-error{{call is 'async' in an autoclosure argument is not marked with 'await'}}
   __await acceptAutoclosureNonAsync(getInt()) // expected-error{{'async' in an autoclosure that does not support concurrency}}
