@@ -116,4 +116,3 @@ public func run_RandomDoubleUnitLCG(_ N: Int) {
     blackHole(x)
   }
 }
-
