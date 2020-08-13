@@ -342,7 +342,7 @@ extension BinaryFloatingPoint where RawSignificand: FixedWidthInteger {
       } else {
         // It is okay to use `&<<` here because `shift` is less than
         // `UInt64.bitWidth`. We know this because:
-        // shift <= bitsNeeded < w < UInt64.bitWidth
+        // shift <= bitsNeeded <= w < _sectionBitCount <= UInt64.bitWidth
         n = UInt64(truncatingIfNeeded: s) &<< shift
         isLowerBound = true
       }
