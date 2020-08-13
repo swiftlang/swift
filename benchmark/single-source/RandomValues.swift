@@ -27,10 +27,6 @@ public let RandomValues = [
     tags: [.api], legacyFactor: 100),
   BenchmarkInfo(name: "RandomDoubleLCG", runFunction: run_RandomDoubleLCG,
     tags: [.api], legacyFactor: 2),
-  BenchmarkInfo(name: "RandomDoubleUnitDef", runFunction: run_RandomDoubleUnitDef,
-    tags: [.api], legacyFactor: 100),
-  BenchmarkInfo(name: "RandomDoubleUnitLCG", runFunction: run_RandomDoubleUnitLCG,
-    tags: [.api], legacyFactor: 2),
 ]
 
 /// A linear congruential PRNG.
@@ -89,29 +85,6 @@ public func run_RandomDoubleLCG(_ N: Int) {
     var generator = LCRNG(seed: 0)
     for _ in 0 ..< 50_000 {
       x += Double.random(in: -1000...1000, using: &generator)
-    }
-    blackHole(x)
-  }
-}
-
-@inline(never)
-public func run_RandomDoubleUnitDef(_ N: Int) {
-  for _ in 0 ..< N {
-    var x = 0.0
-    for _ in 0 ..< 1_000 {
-      x += Double.random(in: 0..<1)
-    }
-    blackHole(x)
-  }
-}
-
-@inline(never)
-public func run_RandomDoubleUnitLCG(_ N: Int) {
-  for _ in 0 ..< N {
-    var x = 0.0
-    var generator = LCRNG(seed: 0)
-    for _ in 0 ..< 50_000 {
-      x += Double.random(in: 0..<1, using: &generator)
     }
     blackHole(x)
   }
