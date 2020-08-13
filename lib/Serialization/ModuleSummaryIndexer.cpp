@@ -1,6 +1,7 @@
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILVisitor.h"
 #include "swift/Serialization/ModuleSummary.h"
 #include "llvm/Support/MD5.h"
 #include "llvm/Support/raw_ostream.h"
@@ -15,17 +16,25 @@ GUID modulesummary::getGUIDFromUniqueName(llvm::StringRef Name) {
 }
 
 namespace {
-class FunctionSummaryIndexer {
-  const SILFunction &F;
+class FunctionSummaryIndexer : public SILInstructionVisitor<FunctionSummaryIndexer> {
+  friend SILInstructionVisitor<FunctionSummaryIndexer>;
+
+  SILFunction &F;
   std::unique_ptr<FunctionSummary> TheSummary;
 
   void indexDirectFunctionCall(const SILFunction &Callee);
   void indexIndirectFunctionCall(const SILDeclRef &Callee,
                                  FunctionSummary::Call::KindTy Kind);
-  void indexInstruction(const SILInstruction *I);
 
+  void visitFunctionRefInst(FunctionRefInst *FRI);
+  void visitWitnessMethodInst(WitnessMethodInst *WMI);
+  void visitMethodInst(MethodInst *MI);
+  void visitDynamicFunctionRefInst(DynamicFunctionRefInst *FRI);
+  void visitPreviousDynamicFunctionRefInst(PreviousDynamicFunctionRefInst *FRI);
+  void visitKeyPathInst(KeyPathInst *KPI);
+  void visitSILInstruction(SILInstruction *I) {}
 public:
-  FunctionSummaryIndexer(const SILFunction &F) : F(F) {}
+  FunctionSummaryIndexer(SILFunction &F) : F(F) {}
   void indexFunction();
 
   std::unique_ptr<FunctionSummary> takeSummary() {
@@ -49,57 +58,50 @@ void FunctionSummaryIndexer::indexIndirectFunctionCall(
   TheSummary->addCall(call);
 }
 
-void FunctionSummaryIndexer::indexInstruction(const SILInstruction *I) {
-  if (auto *FRI = dyn_cast<FunctionRefInst>(I)) {
-    SILFunction *callee = FRI->getReferencedFunctionOrNull();
-    assert(callee);
-    indexDirectFunctionCall(*callee);
-    return;
-  }
+void FunctionSummaryIndexer::visitFunctionRefInst(FunctionRefInst *FRI) {
+  SILFunction *callee = FRI->getReferencedFunctionOrNull();
+  assert(callee);
+  indexDirectFunctionCall(*callee);
+}
 
-  if (auto *WMI = dyn_cast<WitnessMethodInst>(I)) {
-    indexIndirectFunctionCall(WMI->getMember(), FunctionSummary::Call::Witness);
-    return;
-  }
+void FunctionSummaryIndexer::visitWitnessMethodInst(WitnessMethodInst *WMI) {
+  indexIndirectFunctionCall(WMI->getMember(), FunctionSummary::Call::Witness);
+}
 
-  if (auto *MI = dyn_cast<MethodInst>(I)) {
-    indexIndirectFunctionCall(MI->getMember(), FunctionSummary::Call::VTable);
-    return;
-  }
+void FunctionSummaryIndexer::visitMethodInst(MethodInst *MI) {
+  indexIndirectFunctionCall(MI->getMember(), FunctionSummary::Call::VTable);
+}
 
-  if (auto *FRI = dyn_cast<DynamicFunctionRefInst>(I)) {
-    SILFunction *callee = FRI->getInitiallyReferencedFunction();
-    assert(callee);
-    indexDirectFunctionCall(*callee);
-    return;
-  }
+void FunctionSummaryIndexer::visitDynamicFunctionRefInst(DynamicFunctionRefInst *FRI) {
+  SILFunction *callee = FRI->getInitiallyReferencedFunction();
+  assert(callee);
+  indexDirectFunctionCall(*callee);
+}
 
-  if (auto *FRI = dyn_cast<PreviousDynamicFunctionRefInst>(I)) {
-    SILFunction *callee = FRI->getInitiallyReferencedFunction();
-    assert(callee);
-    indexDirectFunctionCall(*callee);
-    return;
-  }
+void FunctionSummaryIndexer::visitPreviousDynamicFunctionRefInst(PreviousDynamicFunctionRefInst *FRI) {
+  SILFunction *callee = FRI->getInitiallyReferencedFunction();
+  assert(callee);
+  indexDirectFunctionCall(*callee);
+}
 
-  if (auto *KPI = dyn_cast<KeyPathInst>(I)) {
-    for (auto &component : KPI->getPattern()->getComponents()) {
-      component.visitReferencedFunctionsAndMethods(
-          [this](SILFunction *F) {
-            assert(F);
-            indexDirectFunctionCall(*F);
-          },
-          [this](SILDeclRef method) {
-            auto decl = cast<AbstractFunctionDecl>(method.getDecl());
-            if (auto clas = dyn_cast<ClassDecl>(decl->getDeclContext())) {
-              indexIndirectFunctionCall(method, FunctionSummary::Call::VTable);
-            } else if (isa<ProtocolDecl>(decl->getDeclContext())) {
-              indexIndirectFunctionCall(method, FunctionSummary::Call::Witness);
-            } else {
-              llvm_unreachable(
-                  "key path keyed by a non-class, non-protocol method");
-            }
-          });
-    }
+void FunctionSummaryIndexer::visitKeyPathInst(KeyPathInst *KPI) {
+  for (auto &component : KPI->getPattern()->getComponents()) {
+    component.visitReferencedFunctionsAndMethods(
+        [this](SILFunction *F) {
+          assert(F);
+          indexDirectFunctionCall(*F);
+        },
+        [this](SILDeclRef method) {
+          auto decl = cast<AbstractFunctionDecl>(method.getDecl());
+          if (auto clas = dyn_cast<ClassDecl>(decl->getDeclContext())) {
+            indexIndirectFunctionCall(method, FunctionSummary::Call::VTable);
+          } else if (isa<ProtocolDecl>(decl->getDeclContext())) {
+            indexIndirectFunctionCall(method, FunctionSummary::Call::Witness);
+          } else {
+            llvm_unreachable(
+                "key path keyed by a non-class, non-protocol method");
+          }
+        });
   }
 }
 
@@ -122,7 +124,7 @@ void FunctionSummaryIndexer::indexFunction() {
   TheSummary->setName(F.getName());
   for (auto &BB : F) {
     for (auto &I : BB) {
-      indexInstruction(&I);
+      visit(&I);
     }
   }
   TheSummary->setPreserved(shouldPreserveFunction(F));
@@ -130,7 +132,7 @@ void FunctionSummaryIndexer::indexFunction() {
 
 class ModuleSummaryIndexer {
   std::unique_ptr<ModuleSummaryIndex> TheSummary;
-  const SILModule &Mod;
+  SILModule &Mod;
   void ensurePreserved(const SILFunction &F);
   void ensurePreserved(const SILDeclRef &Ref, VFuncSlot::KindTy Kind);
   void preserveKeyPathFunctions(const SILProperty &P);
@@ -138,7 +140,7 @@ class ModuleSummaryIndexer {
   void indexVTable(const SILVTable &VT);
 
 public:
-  ModuleSummaryIndexer(const SILModule &M) : Mod(M) {}
+  ModuleSummaryIndexer(SILModule &M) : Mod(M) {}
   void indexModule();
   std::unique_ptr<ModuleSummaryIndex> takeSummary() {
     return std::move(TheSummary);
