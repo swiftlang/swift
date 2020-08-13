@@ -1164,21 +1164,10 @@ void IRGenerator::emitTypeMetadataRecords() {
   }
 }
 
-void IRGenerator::
-    deleteAndReenqueueForEmissionValuesDependentOnCanonicalPrespecializedMetadataRecords(
-        IRGenModule &IGM, CanType typeWithCanonicalMetadataPrespecialization,
-        NominalTypeDecl &decl) {
-  // The accessor depends on canonical metadata records because they are
-  // returned from the function when the arguments match.
-  //
-  // TODO: Once work of looking through canonical prespecialized metadata has
-  //       been moved into getGenericMetadata, this reemission will no longer
-  //       be necessary.
-  auto *accessor = IGM.getAddrOfTypeMetadataAccessFunction(
-      decl.getDeclaredType()->getCanonicalType(), NotForDefinition);
-  accessor->deleteBody();
-  IGM.IRGen.noteUseOfMetadataAccessor(&decl);
-
+static void
+deleteAndReenqueueForEmissionValuesDependentOnCanonicalPrespecializedMetadataRecords(
+    IRGenModule &IGM, CanType typeWithCanonicalMetadataPrespecialization,
+    NominalTypeDecl &decl) {
   // The type context descriptor depends on canonical metadata records because
   // pointers to them are attached as trailing objects to it.
   //

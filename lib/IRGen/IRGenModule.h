@@ -436,11 +436,6 @@ public:
     return MetadataPrespecializationsForGenericTypes.lookup(type);
   }
 
-  void
-  deleteAndReenqueueForEmissionValuesDependentOnCanonicalPrespecializedMetadataRecords(
-      IRGenModule &IGM, CanType typeWithCanonicalMetadataPrespecialization,
-      NominalTypeDecl &decl);
-
   void noteUseOfMetadataAccessor(NominalTypeDecl *decl) {
     if (LazyMetadataAccessors.count(decl) == 0) {
       LazyMetadataAccessors.insert(decl);
