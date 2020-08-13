@@ -148,7 +148,7 @@ public:
   };
 
 private:
-  virtual void anchor();
+  virtual void anchor() override;
   InputInfo inputInfo;
 
 public:
@@ -191,7 +191,7 @@ public:
 
 class InterpretJobAction : public JobAction {
 private:
-  virtual void anchor();
+  virtual void anchor() override;
 
 public:
   explicit InterpretJobAction()
@@ -205,7 +205,7 @@ public:
 
 class BackendJobAction : public JobAction {
 private:
-  virtual void anchor();
+  virtual void anchor() override;
   
   // In case of multi-threaded compilation, the compile-action produces multiple
   // output bitcode-files. For each bitcode-file a BackendJobAction is created.
@@ -220,7 +220,7 @@ public:
     return A->getKind() == Action::Kind::BackendJob;
   }
   
-  virtual size_t getInputIndex() const { return InputIndex; }
+  virtual size_t getInputIndex() const override { return InputIndex; }
 };
 
 class REPLJobAction : public JobAction {
@@ -231,7 +231,7 @@ public:
     RequireLLDB
   };
 private:
-  virtual void anchor();
+  virtual void anchor() override;
   Mode RequestedMode;
 public:
   REPLJobAction(Mode mode)
@@ -247,7 +247,7 @@ public:
 };
 
 class MergeModuleJobAction : public JobAction {
-  virtual void anchor();
+  virtual void anchor() override;
 public:
   MergeModuleJobAction(ArrayRef<const Action *> Inputs)
       : JobAction(Action::Kind::MergeModuleJob, Inputs,
@@ -259,7 +259,7 @@ public:
 };
 
 class ModuleWrapJobAction : public JobAction {
-  virtual void anchor();
+  virtual void anchor() override;
 public:
   ModuleWrapJobAction(ArrayRef<const Action *> Inputs)
       : JobAction(Action::Kind::ModuleWrapJob, Inputs,
@@ -271,7 +271,7 @@ public:
 };
 
 class AutolinkExtractJobAction : public JobAction {
-  virtual void anchor();
+  virtual void anchor() override;
 public:
   AutolinkExtractJobAction(ArrayRef<const Action *> Inputs)
       : JobAction(Action::Kind::AutolinkExtractJob, Inputs,
@@ -283,7 +283,7 @@ public:
 };
 
 class GenerateDSYMJobAction : public JobAction {
-  virtual void anchor();
+  virtual void anchor() override;
 public:
   explicit GenerateDSYMJobAction(const Action *Input)
       : JobAction(Action::Kind::GenerateDSYMJob, Input,
@@ -295,7 +295,7 @@ public:
 };
 
 class VerifyDebugInfoJobAction : public JobAction {
-  virtual void anchor();
+  virtual void anchor() override;
 public:
   explicit VerifyDebugInfoJobAction(const Action *Input)
       : JobAction(Action::Kind::VerifyDebugInfoJob, Input,
@@ -309,7 +309,7 @@ public:
 class GeneratePCHJobAction : public JobAction {
   std::string PersistentPCHDir;
 
-  virtual void anchor();
+  virtual void anchor() override;
 public:
   GeneratePCHJobAction(const Action *Input, StringRef persistentPCHDir)
       : JobAction(Action::Kind::GeneratePCHJob, Input,
@@ -326,7 +326,7 @@ public:
 };
 
 class DynamicLinkJobAction : public JobAction {
-  virtual void anchor();
+  virtual void anchor() override;
   LinkKind Kind;
 
 public:
@@ -344,7 +344,7 @@ public:
 };
 
 class StaticLinkJobAction : public JobAction {
-  virtual void anchor();
+  virtual void anchor() override;
 
 public:
   StaticLinkJobAction(ArrayRef<const Action *> Inputs, LinkKind K)

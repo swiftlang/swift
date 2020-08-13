@@ -51,7 +51,7 @@ public:
   PrettyStackTraceLocation(const ASTContext &C, const char *action,
                            SourceLoc loc)
     : Context(C), Loc(loc), Action(action) {}
-  virtual void print(llvm::raw_ostream &OS) const;
+  virtual void print(llvm::raw_ostream &OS) const override;
 };
 
 void printDeclDescription(llvm::raw_ostream &out, const Decl *D,
@@ -65,7 +65,7 @@ class PrettyStackTraceDecl : public llvm::PrettyStackTraceEntry {
 public:
   PrettyStackTraceDecl(const char *action, const Decl *D)
     : TheDecl(D), Action(action) {}
-  virtual void print(llvm::raw_ostream &OS) const;
+  virtual void print(llvm::raw_ostream &OS) const override;
 };
 
 /// PrettyStackTraceAnyFunctionRef - Observe that we are processing a specific
@@ -76,7 +76,7 @@ class PrettyStackTraceAnyFunctionRef : public llvm::PrettyStackTraceEntry {
 public:
   PrettyStackTraceAnyFunctionRef(const char *action, AnyFunctionRef ref)
     : TheRef(ref), Action(action) {}
-  virtual void print(llvm::raw_ostream &OS) const;
+  virtual void print(llvm::raw_ostream &OS) const override;
 };
 
 void printExprDescription(llvm::raw_ostream &out, Expr *E,
@@ -91,7 +91,7 @@ class PrettyStackTraceExpr : public llvm::PrettyStackTraceEntry {
 public:
   PrettyStackTraceExpr(const ASTContext &C, const char *action, Expr *E)
     : Context(C), TheExpr(E), Action(action) {}
-  virtual void print(llvm::raw_ostream &OS) const;
+  virtual void print(llvm::raw_ostream &OS) const override;
 };
 
 void printStmtDescription(llvm::raw_ostream &out, Stmt *S,
@@ -106,7 +106,7 @@ class PrettyStackTraceStmt : public llvm::PrettyStackTraceEntry {
 public:
   PrettyStackTraceStmt(const ASTContext &C, const char *action, Stmt *S)
     : Context(C), TheStmt(S), Action(action) {}
-  virtual void print(llvm::raw_ostream &OS) const;
+  virtual void print(llvm::raw_ostream &OS) const override;
 };
 
 void printPatternDescription(llvm::raw_ostream &out, Pattern *P,
@@ -121,7 +121,7 @@ class PrettyStackTracePattern : public llvm::PrettyStackTraceEntry {
 public:
   PrettyStackTracePattern(const ASTContext &C, const char *action, Pattern *P)
     : Context(C), ThePattern(P), Action(action) {}
-  virtual void print(llvm::raw_ostream &OS) const;
+  virtual void print(llvm::raw_ostream &OS) const override;
 };
 
 void printTypeDescription(llvm::raw_ostream &out, Type T,
@@ -135,7 +135,7 @@ class PrettyStackTraceType : public llvm::PrettyStackTraceEntry {
 public:
   PrettyStackTraceType(const ASTContext &C, const char *action, Type type)
     : Context(C), TheType(type), Action(action) {}
-  virtual void print(llvm::raw_ostream &OS) const;
+  virtual void print(llvm::raw_ostream &OS) const override;
 };
 
 /// PrettyStackTraceClangType - Observe that we are processing a
@@ -146,7 +146,7 @@ class PrettyStackTraceClangType : public llvm::PrettyStackTraceEntry {
 public:
   PrettyStackTraceClangType(const char *action, const clang::Type *type)
     : TheType(type), Action(action) {}
-  virtual void print(llvm::raw_ostream &OS) const;
+  virtual void print(llvm::raw_ostream &OS) const override;
 };
 
 /// Observe that we are processing a specific type representation.
@@ -158,7 +158,7 @@ public:
   PrettyStackTraceTypeRepr(const ASTContext &C, const char *action,
                            TypeRepr *type)
     : Context(C), TheType(type), Action(action) {}
-  virtual void print(llvm::raw_ostream &OS) const;
+  virtual void print(llvm::raw_ostream &OS) const override;
 };
 
 /// PrettyStackTraceConformance - Observe that we are processing a
@@ -171,7 +171,7 @@ public:
   PrettyStackTraceConformance(const ASTContext &C, const char *action,
                               const ProtocolConformance *conformance)
     : Context(C), Conformance(conformance), Action(action) {}
-  virtual void print(llvm::raw_ostream &OS) const;
+  virtual void print(llvm::raw_ostream &OS) const override;
 };
 
 void printConformanceDescription(llvm::raw_ostream &out,
@@ -217,7 +217,7 @@ public:
   PrettyStackTraceDifferentiabilityWitness(
       const char *action, const SILDifferentiabilityWitnessKey key)
       : Key(key), Action(action) {}
-  virtual void print(llvm::raw_ostream &OS) const;
+  virtual void print(llvm::raw_ostream &OS) const override;
 };
 
 void printDifferentiabilityWitnessDescription(
@@ -232,7 +232,7 @@ class PrettyStackTraceDeclContext : public llvm::PrettyStackTraceEntry {
 public:
   PrettyStackTraceDeclContext(const char *action, const DeclContext *DC)
     : DC(DC), Action(action) {}
-  virtual void print(llvm::raw_ostream &OS) const;
+  virtual void print(llvm::raw_ostream &OS) const override;
 };
 
 } // end namespace swift

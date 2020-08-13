@@ -375,7 +375,7 @@ class LambdaDeclConsumer : public VisibleDeclConsumer {
 public:
   LambdaDeclConsumer(Fn &&callback) : Callback(std::move(callback)) {}
 
-  void foundDecl(ValueDecl *VD, DeclVisibilityKind reason, DynamicLookupInfo) {
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind reason, DynamicLookupInfo) override {
     Callback(VD, reason);
   }
 };

@@ -8885,7 +8885,7 @@ ClangImporter::getEnumConstantName(const clang::EnumConstantDecl *enumConstant){
 // linkage dependency.
 
 struct ClangDeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
-  void traceName(const void *Entity, raw_ostream &OS) const {
+  void traceName(const void *Entity, raw_ostream &OS) const override {
     if (!Entity)
       return;
     const clang::Decl *CD = static_cast<const clang::Decl *>(Entity);
@@ -8908,7 +8908,7 @@ struct ClangDeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
   }
 
   void traceLoc(const void *Entity, SourceManager *SM,
-                clang::SourceManager *CSM, raw_ostream &OS) const {
+                clang::SourceManager *CSM, raw_ostream &OS) const override {
     if (!Entity)
       return;
     if (CSM) {
