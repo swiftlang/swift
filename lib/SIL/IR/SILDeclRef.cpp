@@ -260,7 +260,7 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   // if the function was type-checked in Swift 4 mode.
   if (kind == SILDeclRef::Kind::DefaultArgGenerator) {
     if (isSerialized())
-      return maybeAddExternal(SILLinkage::PublicNonABI);
+      return maybeAddExternal(SILLinkage::Public);
   }
 
   enum class Limit {
