@@ -2024,8 +2024,10 @@ llvm::Function *irgen::createFunction(IRGenModule &IGM,
     IGM.Module.getFunctionList().push_back(fn);
   }
 
-  ApplyIRLinkage({linkInfo.getLinkage(), linkInfo.getVisibility(), linkInfo.getDLLStorage()})
-      .to(fn);
+  ApplyIRLinkage({linkInfo.getLinkage(),
+                  linkInfo.getVisibility(),
+                  linkInfo.getDLLStorage()})
+      .to(fn, linkInfo.isForDefinition());
 
   llvm::AttrBuilder initialAttrs;
   IGM.constructInitialFnAttributes(initialAttrs, FuncOptMode);
@@ -2082,7 +2084,7 @@ llvm::GlobalVariable *swift::irgen::createVariable(
   ApplyIRLinkage({linkInfo.getLinkage(),
                   linkInfo.getVisibility(),
                   linkInfo.getDLLStorage()})
-      .to(var);
+      .to(var, linkInfo.isForDefinition());
   var->setAlignment(llvm::MaybeAlign(alignment.getValue()));
 
   // Everything externally visible is considered used in Swift.
@@ -4742,7 +4744,7 @@ IRGenModule::getAddrOfWitnessTableLazyAccessFunction(
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = createFunction(*this, link, signature);
   ApplyIRLinkage({link.getLinkage(), link.getVisibility(), link.getDLLStorage()})
-      .to(entry);
+      .to(entry, link.isForDefinition());
   return entry;
 }
 
