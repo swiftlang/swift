@@ -67,6 +67,14 @@ ASTScopeImpl::widenSourceRangeForChildren(const SourceRange range,
   if (range.isInvalid())
     return childRange;
   auto r = range;
+
+  // HACK: For code completion. If the range of the child is from another
+  // source buffer, don't widen using that range.
+  if (const auto &replacedRange = getSourceManager().getReplacedRange()) {
+    if (getSourceManager().rangeContains(replacedRange.Original, range) &&
+        getSourceManager().rangeContains(replacedRange.New, childRange))
+      return r;
+  }
   r.widen(childRange);
   return r;
 }
@@ -114,6 +122,14 @@ bool ASTScopeImpl::verifyThatChildrenAreContainedWithin(
                   getChildren().back()->getSourceRangeOfScope().End);
   if (getSourceManager().rangeContains(range, rangeOfChildren))
     return true;
+
+  // HACK: For code completion. Handle replaced range.
+  if (const auto &replacedRange = getSourceManager().getReplacedRange()) {
+    if (getSourceManager().rangeContains(replacedRange.Original, range) &&
+        getSourceManager().rangeContains(replacedRange.New, rangeOfChildren))
+      return true;
+  }
+
   auto &out = verificationError() << "children not contained in its parent\n";
   if (getChildren().size() == 1) {
     out << "\n***Only Child node***\n";
@@ -200,7 +216,7 @@ SourceRange DifferentiableAttributeScope::getSourceRangeOfThisASTNode(
 
 SourceRange AbstractFunctionBodyScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
-  return decl->getBodySourceRange();
+  return decl->getOriginalBodySourceRange();
 }
 
 SourceRange TopLevelCodeScope::getSourceRangeOfThisASTNode(
@@ -357,7 +373,7 @@ SourceRange AbstractFunctionDeclScope::getSourceRangeOfThisASTNode(
     ASTScopeAssert(r.End.isValid(), "Start valid imples end valid.");
     return r;
   }
-  return decl->getBodySourceRange();
+  return decl->getOriginalBodySourceRange();
 }
 
 SourceRange ParameterListScope::getSourceRangeOfThisASTNode(
@@ -609,7 +625,7 @@ SourceRange IterableTypeScope::sourceRangeForDeferredExpansion() const {
   return portion->sourceRangeForDeferredExpansion(this);
 }
 SourceRange AbstractFunctionBodyScope::sourceRangeForDeferredExpansion() const {
-  const auto bsr = decl->getBodySourceRange();
+  const auto bsr = decl->getOriginalBodySourceRange();
   const SourceLoc endEvenIfNoCloseBraceAndEndsWithInterpolatedStringLiteral =
       getLocEncompassingPotentialLookups(getSourceManager(), bsr.End);
   return SourceRange(bsr.Start,
