@@ -1429,7 +1429,8 @@ void ConstraintSystem::solveForCodeCompletion(
 
   cs.shrink(expr);
 
-  if (!cs.generateConstraints(expr, DC))
+  expr = cs.generateConstraints(expr, DC);
+  if (!expr)
     return;
 
   if (cs.isDebugMode()) {
