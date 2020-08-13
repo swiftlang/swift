@@ -56,12 +56,15 @@ TEST(ConcurrentReadableArrayTest, MultiThreaded) {
   };
   ConcurrentReadableArray<Value> array;
 
+  // The writers will append values with their thread number and increasing
+  // values of x.
   auto writer = [&](int threadNumber) {
     for (int i = 0; i < insertCount; i++)
       array.push_back({ threadNumber, i });
   };
 
   auto reader = [&] {
+    // Track the maximum value we've seen for each writer thread.
     int maxByThread[writerCount];
     bool done = false;
     while (!done) {
@@ -69,9 +72,15 @@ TEST(ConcurrentReadableArrayTest, MultiThreaded) {
         maxByThread[i] = -1;
       for (auto element : array.snapshot()) {
         ASSERT_LT(element.threadNumber, writerCount);
+        // Each element we see must be larger than the maximum element we've
+        // previously seen for that writer thread, otherwise that means that
+        // we're seeing mutations out of order.
         ASSERT_GT(element.x, maxByThread[element.threadNumber]);
         maxByThread[element.threadNumber] = element.x;
       }
+
+      // If the max for each thread is the max that'll be inserted, then we're
+      // done and should exit.
       done = true;
       for (int i = 0; i < writerCount; i++) {
         if (maxByThread[i] < insertCount - 1)
@@ -87,5 +96,61 @@ TEST(ConcurrentReadableArrayTest, MultiThreaded) {
       reader();
   });
 
-  ASSERT_EQ(array.snapshot().count(), writerCount * insertCount);
+  ASSERT_EQ(array.snapshot().count(), (size_t)writerCount * insertCount);
+}
+
+TEST(ConcurrentReadableArrayTest, MultiThreaded2) {
+  const int writerCount = 16;
+  const int readerCount = 8;
+  const int insertCount = 100000;
+
+  struct Value {
+    int threadNumber;
+    int x;
+  };
+  ConcurrentReadableArray<Value> array;
+
+  // The writers will append values with their thread number and increasing
+  // values of x.
+  auto writer = [&](int threadNumber) {
+    for (int i = 0; i < insertCount; i++)
+      array.push_back({ threadNumber, i });
+  };
+
+  auto reader = [&] {
+    // Track the maximum value we've seen for each writer thread.
+    int maxByThread[writerCount];
+    for (int i = 0; i < writerCount; i++)
+      maxByThread[i] = -1;
+    bool done = false;
+    while (!done) {
+      auto snapshot = array.snapshot();
+      // Don't do anything until some data is actually added.
+      if (snapshot.count() == 0)
+        continue;
+
+      // Grab the last element in the snapshot.
+      auto element = snapshot.begin()[snapshot.count() - 1];
+      ASSERT_LT(element.threadNumber, writerCount);
+      // Each element we see must be equal to or larger than the maximum element
+      // we've previously seen for that writer thread, otherwise that means that
+      // we're seeing mutations out of order.
+      ASSERT_GE(element.x, maxByThread[element.threadNumber]);
+      maxByThread[element.threadNumber] = element.x;
+
+      // We'll eventually see some thread add its maximum value. We'll call it
+      // done when we reach that point.
+      if (element.x == insertCount - 1)
+        done = true;
+    }
+  };
+
+  threadedExecute(writerCount + readerCount, [&](int i) {
+    if (i < writerCount)
+      writer(i);
+    else
+      reader();
+  });
+
+  ASSERT_EQ(array.snapshot().count(), (size_t)writerCount * insertCount);
 }
