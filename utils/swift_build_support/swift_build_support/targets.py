@@ -179,6 +179,12 @@ class StdlibDeploymentTarget(object):
                                          sdk_name="WATCHOS_SIMULATOR",
                                          is_simulator=True)
 
+    # A platform that's not tied to any particular OS, and it meant to be used
+    # to build the stdlib as standalone and/or statically linked.
+    Freestanding = Platform("freestanding",
+                            archs=["i386", "x86_64", "armv7", "armv7s", "armv7k",
+                                   "arm64", "arm64e"])
+
     Linux = Platform("linux", archs=[
         "x86_64",
         "i686",
@@ -207,6 +213,7 @@ class StdlibDeploymentTarget(object):
         iOS, iOSSimulator,
         AppleTV, AppleTVSimulator,
         AppleWatch, AppleWatchSimulator,
+        Freestanding,
         Linux,
         FreeBSD,
         OpenBSD,

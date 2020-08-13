@@ -1,4 +1,8 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -verify-syntax-tree
+// Verify that async parses correctly via the parser lib even without the
+// experimental flag being set in LangOpts.
+//
+// REQUIRES: syntax_parser_lib
+// RUN: %swift-syntax-parser-test %s -dump-diags 2>&1 | %FileCheck %s
 
 func asyncGlobal1() async { }
 func asyncGlobal2() async throws { }
@@ -20,3 +24,5 @@ func testAsyncClosure() {
   let _ = { () throws in 5 }
   let _ = { () async throws in 5 }
 }
+
+// CHECK: 0 error(s) 0 warnings(s) 0 note(s)

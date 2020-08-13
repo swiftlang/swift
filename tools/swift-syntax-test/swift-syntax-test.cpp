@@ -610,7 +610,6 @@ int parseFile(
   Invocation.getLangOptions().VerifySyntaxTree = options::VerifySyntaxTree;
   Invocation.getLangOptions().RequestEvaluatorGraphVizPath = options::GraphVisPath;
   Invocation.getLangOptions().DisablePoundIfEvaluation = true;
-  Invocation.getLangOptions().EnableExperimentalConcurrency = true;
 
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(InputFileName);
 
