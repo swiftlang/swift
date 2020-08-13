@@ -201,8 +201,6 @@ public:
       return reinterpret_cast<T *>(storage << 3);
     }
 
-    friend class ConstraintLocator;
-
   public:
 #define LOCATOR_PATH_ELT(Name) class Name;
 #include "ConstraintLocatorPathElts.def"
@@ -216,6 +214,9 @@ public:
 
     /// Retrieve the kind of path element.
     PathElementKind getKind() const { return kind; }
+
+    /// Retrieve the raw storage value.
+    uint64_t getRawStorage() const { return storage; }
 
     /// Attempts to cast the path element to a specific \c LocatorPathElt
     /// subclass, returning \c None if unsuccessful.
