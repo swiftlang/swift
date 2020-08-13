@@ -4720,6 +4720,7 @@ private:
     /// if it has only concrete types or would resolve a closure.
     bool favoredOverDisjunction(Constraint *disjunction) const;
 
+private:
     /// Detect `subtype` relationship between two type variables and
     /// attempt to infer supertype bindings transitively e.g.
     ///
@@ -4732,19 +4733,25 @@ private:
     /// \param inferredBindings The set of all bindings inferred for type
     /// variables in the workset.
     void inferTransitiveBindings(
-        ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes,
+        const ConstraintSystem &cs,
+        llvm::SmallPtrSetImpl<CanType> &existingTypes,
         const llvm::SmallDenseMap<TypeVariableType *,
                                   ConstraintSystem::PotentialBindings>
             &inferredBindings);
 
     /// Infer bindings based on any protocol conformances that have default
     /// types.
-    void inferDefaultTypes(ConstraintSystem &cs,
+    void inferDefaultTypes(const ConstraintSystem &cs,
                            llvm::SmallPtrSetImpl<CanType> &existingTypes);
+
+public:
+    bool infer(const ConstraintSystem &cs,
+               llvm::SmallPtrSetImpl<CanType> &exactTypes,
+               Constraint *constraint);
 
     /// Finalize binding computation for this type variable by
     /// inferring bindings from context e.g. transitive bindings.
-    void finalize(ConstraintSystem &cs,
+    void finalize(const ConstraintSystem &cs,
                   const llvm::SmallDenseMap<TypeVariableType *,
                                             ConstraintSystem::PotentialBindings>
                       &inferredBindings);
@@ -4812,14 +4819,13 @@ private:
 
   /// Infer bindings for the given type variable based on current
   /// state of the constraint system.
-  PotentialBindings inferBindingsFor(TypeVariableType *typeVar);
+  PotentialBindings inferBindingsFor(TypeVariableType *typeVar,
+                                     bool finalize = true) const;
 
 private:
   Optional<ConstraintSystem::PotentialBinding>
-  getPotentialBindingForRelationalConstraint(
-      PotentialBindings &result, Constraint *constraint,
-      bool &hasDependentMemberRelationalConstraints,
-      bool &hasNonDependentMemberRelationalConstraints) const;
+  getPotentialBindingForRelationalConstraint(PotentialBindings &result,
+                                             Constraint *constraint) const;
   PotentialBindings getPotentialBindings(TypeVariableType *typeVar) const;
 
   /// Add a constraint to the constraint system.
