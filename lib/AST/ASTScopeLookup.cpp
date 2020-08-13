@@ -30,7 +30,6 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/Support/Compiler.h"
-#include <algorithm>
 
 using namespace swift;
 using namespace namelookup;
@@ -170,22 +169,15 @@ NullablePtr<ASTScopeImpl>
 ASTScopeImpl::findChildContaining(SourceLoc loc,
                                   SourceManager &sourceMgr) const {
   // Use binary search to find the child that contains this location.
-  struct CompareLocs {
-    SourceManager &sourceMgr;
-
-    bool operator()(const ASTScopeImpl *scope, SourceLoc loc) {
-      ASTScopeAssert(scope->checkSourceRangeOfThisASTNode(), "Bad range.");
-      auto rangeOfScope = scope->getSourceRangeOfScope();
-      loc = translateLocForReplacedRange(sourceMgr, rangeOfScope, loc);
-      return -1 == ASTScopeImpl::compare(rangeOfScope, loc, sourceMgr,
-                                         /*ensureDisjoint=*/false);
-    }
-    bool operator()(SourceLoc loc, const ASTScopeImpl *scope) {
-      return !(*this)(scope, loc);
-    }
-  };
-  auto *const *child = std::lower_bound(
-      getChildren().begin(), getChildren().end(), loc, CompareLocs{sourceMgr});
+  auto *const *child = llvm::lower_bound(
+      getChildren(), loc,
+      [&sourceMgr](const ASTScopeImpl *scope, SourceLoc loc) {
+        ASTScopeAssert(scope->checkSourceRangeOfThisASTNode(), "Bad range.");
+        auto rangeOfScope = scope->getSourceRangeOfScope();
+        loc = translateLocForReplacedRange(sourceMgr, rangeOfScope, loc);
+        return -1 == ASTScopeImpl::compare(rangeOfScope, loc, sourceMgr,
+                                           /*ensureDisjoint=*/false);
+      });
 
   if (child != getChildren().end()) {
     auto rangeOfScope = (*child)->getSourceRangeOfScope();
