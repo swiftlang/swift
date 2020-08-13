@@ -1714,7 +1714,6 @@ bool ClangImporter::canImportModule(Located<Identifier> moduleID) {
 
 ModuleDecl *ClangImporter::Implementation::loadModuleClang(
     SourceLoc importLoc, ArrayRef<Located<Identifier>> path) {
-  auto &clangContext = getClangASTContext();
   auto &clangHeaderSearch = getClangPreprocessor().getHeaderSearchInfo();
 
   // Look up the top-level module first, to see if it exists at all.
@@ -1728,8 +1727,9 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
   SmallVector<std::pair<clang::IdentifierInfo *, clang::SourceLocation>, 4>
       clangPath;
   for (auto component : path) {
-    clangPath.push_back({&clangContext.Idents.get(component.Item.str()),
-                         exportSourceLoc(component.Loc)});
+    clangPath.emplace_back(
+        getClangPreprocessor().getIdentifierInfo(component.Item.str()),
+        exportSourceLoc(component.Loc));
   }
 
   auto &rawDiagClient = Instance->getDiagnosticClient();

@@ -6556,8 +6556,8 @@
 
 - id: cannot_synthesize_in_crossfile_extension
   msg: >-
-    implementation of %0 cannot be automatically synthesized in an extension
-    in a different file to the type
+    extension outside of file declaring %0 %1 prevents automatic synthesis
+    of %2 for protocol %3
 
 - id: broken_additive_arithmetic_requirement
   msg: >-

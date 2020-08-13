@@ -349,3 +349,10 @@ struct SR_10466<T> {
 extension SR_10466 where T == Never { // expected-note {{requirement specified as 'T' == 'Never' [with T = T]}}
   typealias A = Int
 }
+
+#if true
+protocol Rdar66943328 {
+  associatedtype Assoc
+}
+extension Rdar66943328 where Assoc == Int // expected-error {{expected '{' in extension}}
+#endif

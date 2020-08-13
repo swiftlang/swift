@@ -50,6 +50,16 @@ public:
   /// this loop by unrolling or versioning.
   bool canDuplicate(SILInstruction *Inst) const;
 
+  void getExitingAndLatchBlocks(
+    SmallVectorImpl<SILBasicBlock *> &ExitingAndLatchBlocks) const {
+    this->getExitingBlocks(ExitingAndLatchBlocks);
+    SILBasicBlock *header = getHeader();
+    for (auto *predBB : header->getPredecessorBlocks()) {
+      if (contains(predBB) && !this->isLoopExiting(predBB))
+        ExitingAndLatchBlocks.push_back(predBB);
+    }
+  }
+
 private:
   friend class llvm::LoopInfoBase<SILBasicBlock, SILLoop>;
 
