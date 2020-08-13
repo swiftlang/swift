@@ -39,6 +39,7 @@
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/AST/DeclTemplate.h"
 #include "clang/AST/Mangle.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallString.h"
@@ -2114,6 +2115,7 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
   // Always use Clang names for imported Clang declarations, unless they don't
   // have one.
   auto tryAppendClangName = [this, decl]() -> bool {
+    auto *nominal = dyn_cast<NominalTypeDecl>(decl);
     auto namedDecl = getClangDeclForMangling(decl);
     if (!namedDecl)
       return false;
@@ -2126,6 +2128,13 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
       appendIdentifier(interface->getObjCRuntimeNameAsString());
     } else if (UseObjCRuntimeNames && protocol) {
       appendIdentifier(protocol->getObjCRuntimeNameAsString());
+    } else if (auto ctsd = dyn_cast<clang::ClassTemplateSpecializationDecl>(namedDecl)) {
+      // If this is a `ClassTemplateSpecializationDecl`, it was
+      // imported as a Swift decl with `__CxxTemplateInst...` name.
+      // `ClassTemplateSpecializationDecl`'s name does not include information about
+      // template arguments, and in order to prevent name clashes we use the
+      // name of the Swift decl which does include template arguments.
+      appendIdentifier(nominal->getName().str());
     } else {
       appendIdentifier(namedDecl->getName());
     }
