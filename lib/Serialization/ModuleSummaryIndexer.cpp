@@ -1,3 +1,4 @@
+#include "swift/AST/ASTMangler.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
@@ -26,12 +27,53 @@ class FunctionSummaryIndexer : public SILInstructionVisitor<FunctionSummaryIndex
   void indexIndirectFunctionCall(const SILDeclRef &Callee,
                                  FunctionSummary::Call::KindTy Kind);
 
+  /// Index that the conformances of type can be used from this function.
+  void indexUseOfType(CanType type);
+
   void visitFunctionRefInst(FunctionRefInst *FRI);
   void visitWitnessMethodInst(WitnessMethodInst *WMI);
   void visitMethodInst(MethodInst *MI);
   void visitDynamicFunctionRefInst(DynamicFunctionRefInst *FRI);
   void visitPreviousDynamicFunctionRefInst(PreviousDynamicFunctionRefInst *FRI);
   void visitKeyPathInst(KeyPathInst *KPI);
+
+  void visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI);
+  void visitAllocGlobalInst(AllocGlobalInst *AGI);
+  void visitAllocRefInst(AllocRefInst *ARI);
+  void visitAllocStackInst(AllocStackInst *ASI);
+  void visitAllocValueBufferInst(AllocValueBufferInst *AVBI);
+  void visitApplyInst(ApplyInst *AI);
+  void visitBeginApplyInst(BeginApplyInst *BAI);
+  void visitBuiltinInst(BuiltinInst *BI);
+  void visitCheckedCastBranchInst(CheckedCastBranchInst *CCBI);
+  void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI);
+  void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *CCVBI);
+  void visitCopyAddrInst(CopyAddrInst *CAI);
+  void visitCopyValueInst(CopyValueInst *CVI);
+  void visitDestroyAddrInst(DestroyAddrInst *DAI);
+  void visitDestroyValueInst(DestroyValueInst *DVI);
+  void visitGlobalAddrInst(GlobalAddrInst *GAI);
+  void visitGlobalValueInst(GlobalValueInst *GVI);
+  //  void visitKeyPathInst(KeyPathInst *KPI);
+  void visitInitEnumDataAddrInst(InitEnumDataAddrInst *IEDAI);
+  void visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI);
+  void visitInitExistentialAddrInst(InitExistentialAddrInst *IEAI);
+  void visitInitExistentialMetatypeInst(InitExistentialMetatypeInst *IEMI);
+  void visitInitExistentialRefInst(InitExistentialRefInst *IERI);
+  void visitInitExistentialValueInst(InitExistentialValueInst *IEVI);
+  void visitMetatypeInst(MetatypeInst *MI);
+  void visitPartialApplyInst(PartialApplyInst *PAI);
+  void visitSelectEnumAddrInst(SelectEnumAddrInst *SEAI);
+  void visitStructElementAddrInst(StructElementAddrInst *SEAI);
+  void visitTryApplyInst(TryApplyInst *TAI);
+  void visitTupleElementAddrInst(TupleElementAddrInst *TEAI);
+  void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI);
+  void visitUnconditionalCheckedCastAddrInst(
+      UnconditionalCheckedCastAddrInst *UCCAI);
+  void
+  visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *UTEDAI);
+  //  void visitWitnessMethodInst(WitnessMethodInst *WMI);
+
   void visitSILInstruction(SILInstruction *I) {}
 public:
   FunctionSummaryIndexer(SILFunction &F) : F(F) {}
@@ -56,6 +98,135 @@ void FunctionSummaryIndexer::indexIndirectFunctionCall(
   GUID guid = getGUIDFromUniqueName(mangledName);
   FunctionSummary::Call call(guid, mangledName, Kind);
   TheSummary->addCall(call);
+}
+
+void FunctionSummaryIndexer::indexUseOfType(CanType type) {
+  Mangle::ASTMangler mangler;
+  type.visit([&](Type t) {
+    std::string mangled = mangler.mangleTypeWithoutPrefix(t);
+    GUID guid = getGUIDFromUniqueName(mangled);
+    TheSummary->addTypeRef({guid, mangled});
+  });
+}
+
+void FunctionSummaryIndexer::visitAllocExistentialBoxInst(
+    AllocExistentialBoxInst *AEBI) {
+  indexUseOfType(AEBI->getFormalConcreteType());
+}
+
+void FunctionSummaryIndexer::visitAllocGlobalInst(AllocGlobalInst *AGI) {
+  indexUseOfType(AGI->getReferencedGlobal()->getLoweredType().getASTType());
+}
+
+void FunctionSummaryIndexer::visitAllocRefInst(AllocRefInst *ARI) {
+  indexUseOfType(ARI->getType().getASTType());
+}
+void FunctionSummaryIndexer::visitAllocStackInst(AllocStackInst *ASI) {
+  indexUseOfType(ASI->getType().getASTType());
+}
+void FunctionSummaryIndexer::visitAllocValueBufferInst(
+    AllocValueBufferInst *AVBI) {
+  indexUseOfType(AVBI->getType().getASTType());
+}
+void FunctionSummaryIndexer::visitApplyInst(ApplyInst *AI) {
+  indexUseOfType(AI->getSubstCalleeType());
+}
+void FunctionSummaryIndexer::visitBeginApplyInst(BeginApplyInst *BAI) {
+  indexUseOfType(BAI->getSubstCalleeType());
+}
+void FunctionSummaryIndexer::visitBuiltinInst(BuiltinInst *BI) {
+  // FIXME: Need to index substitution map?
+}
+void FunctionSummaryIndexer::visitCheckedCastBranchInst(
+    CheckedCastBranchInst *CCBI) {
+  indexUseOfType(CCBI->getSourceFormalType());
+  indexUseOfType(CCBI->getTargetFormalType());
+}
+void FunctionSummaryIndexer::visitCheckedCastAddrBranchInst(
+    CheckedCastAddrBranchInst *CCABI) {
+  indexUseOfType(CCABI->getSourceFormalType());
+  indexUseOfType(CCABI->getTargetFormalType());
+}
+void FunctionSummaryIndexer::visitCheckedCastValueBranchInst(
+    CheckedCastValueBranchInst *CCVBI) {
+  indexUseOfType(CCVBI->getSourceFormalType());
+  indexUseOfType(CCVBI->getTargetFormalType());
+}
+void FunctionSummaryIndexer::visitCopyAddrInst(CopyAddrInst *CAI) {
+  indexUseOfType(CAI->getSrc()->getType().getASTType());
+  indexUseOfType(CAI->getDest()->getType().getASTType());
+}
+void FunctionSummaryIndexer::visitCopyValueInst(CopyValueInst *CVI) {
+  indexUseOfType(CVI->getOperand()->getType().getASTType());
+}
+void FunctionSummaryIndexer::visitDestroyAddrInst(DestroyAddrInst *DAI) {
+  indexUseOfType(DAI->getOperand()->getType().getASTType());
+}
+void FunctionSummaryIndexer::visitDestroyValueInst(DestroyValueInst *DVI) {
+  indexUseOfType(DVI->getOperand()->getType().getASTType());
+}
+void FunctionSummaryIndexer::visitGlobalAddrInst(GlobalAddrInst *GAI) {
+  indexUseOfType(GAI->getReferencedGlobal()->getLoweredType().getASTType());
+}
+void FunctionSummaryIndexer::visitGlobalValueInst(GlobalValueInst *GVI) {
+  indexUseOfType(GVI->getReferencedGlobal()->getLoweredType().getASTType());
+}
+void FunctionSummaryIndexer::visitInitEnumDataAddrInst(
+    InitEnumDataAddrInst *IEDAI) {
+  indexUseOfType(IEDAI->getOperand()->getType().getASTType());
+}
+void FunctionSummaryIndexer::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
+  indexUseOfType(IEAI->getOperand()->getType().getASTType());
+}
+void FunctionSummaryIndexer::visitInitExistentialAddrInst(
+    InitExistentialAddrInst *IEAI) {
+  indexUseOfType(IEAI->getFormalConcreteType());
+}
+void FunctionSummaryIndexer::visitInitExistentialMetatypeInst(
+    InitExistentialMetatypeInst *IEMI) {
+  indexUseOfType(IEMI->getOperand()->getType().getASTType());
+}
+void FunctionSummaryIndexer::visitInitExistentialRefInst(
+    InitExistentialRefInst *IERI) {
+  indexUseOfType(IERI->getFormalConcreteType());
+}
+void FunctionSummaryIndexer::visitInitExistentialValueInst(
+    InitExistentialValueInst *IEVI) {
+  indexUseOfType(IEVI->getFormalConcreteType());
+}
+void FunctionSummaryIndexer::visitMetatypeInst(MetatypeInst *MI) {
+  indexUseOfType(MI->getType().getASTType());
+}
+void FunctionSummaryIndexer::visitPartialApplyInst(PartialApplyInst *PAI) {
+  indexUseOfType(PAI->getSubstCalleeType());
+}
+void FunctionSummaryIndexer::visitSelectEnumAddrInst(SelectEnumAddrInst *SEAI) {
+  indexUseOfType(SEAI->getEnumOperand()->getType().getASTType());
+}
+void FunctionSummaryIndexer::visitStructElementAddrInst(
+    StructElementAddrInst *SEAI) {
+  indexUseOfType(SEAI->getOperand()->getType().getASTType());
+}
+void FunctionSummaryIndexer::visitTryApplyInst(TryApplyInst *TAI) {
+  indexUseOfType(TAI->getSubstCalleeType());
+}
+void FunctionSummaryIndexer::visitTupleElementAddrInst(
+    TupleElementAddrInst *TEAI) {
+  indexUseOfType(TEAI->getOperand()->getType().getASTType());
+}
+void FunctionSummaryIndexer::visitUnconditionalCheckedCastInst(
+    UnconditionalCheckedCastInst *UCCI) {
+  indexUseOfType(UCCI->getSourceFormalType());
+  indexUseOfType(UCCI->getTargetFormalType());
+}
+void FunctionSummaryIndexer::visitUnconditionalCheckedCastAddrInst(
+    UnconditionalCheckedCastAddrInst *UCCAI) {
+  indexUseOfType(UCCAI->getSourceFormalType());
+  indexUseOfType(UCCAI->getTargetFormalType());
+}
+void FunctionSummaryIndexer::visitUncheckedTakeEnumDataAddrInst(
+    UncheckedTakeEnumDataAddrInst *UTEDAI) {
+  indexUseOfType(UTEDAI->getOperand()->getType().getASTType());
 }
 
 void FunctionSummaryIndexer::visitFunctionRefInst(FunctionRefInst *FRI) {

@@ -65,6 +65,13 @@ public:
     std::string getName() const { return Name; };
   };
 
+  struct TypeRef {
+    /// The type identity.
+    GUID Guid;
+    /// The symbol name of the type only for debug and test purposes.
+    std::string Name;
+  };
+
   /// Function state flags
   struct FlagsTy {
     /// In per-module summary, always false.
@@ -76,6 +83,7 @@ public:
   };
 
   using CallGraphEdgeListTy = std::vector<Call>;
+  using TypeRefListTy = std::vector<TypeRef>;
 
 private:
   // For import/export
@@ -87,6 +95,8 @@ private:
   FlagsTy Flags;
   /// List of Call from this function.
   CallGraphEdgeListTy CallGraphEdgeList;
+  /// List of TypeRef from this function.
+  TypeRefListTy TypeRefList;
   /// The symbol name of the function only for debug and test purposes.
   std::string Name;
 
@@ -100,6 +110,11 @@ public:
 
   /// Return the list of Call from this function
   ArrayRef<Call> calls() const { return CallGraphEdgeList; }
+
+  /// TBD
+  void addTypeRef(TypeRef ref) { TypeRefList.push_back(ref); }
+  /// TBD
+  ArrayRef<TypeRef> typeRefs() const { return TypeRefList; }
 
   bool isLive() const { return Flags.Live; }
   void setLive(bool Live) { Flags.Live = Live; }
@@ -132,6 +147,7 @@ struct VFuncSlot {
 
 using FunctionSummaryMapTy = std::map<GUID, std::unique_ptr<FunctionSummary>>;
 using VFuncToImplsMapTy = std::map<GUID, std::vector<GUID>>;
+using UsedTypeListTy = std::vector<GUID>;
 
 /// Module summary that consists of function summaries and virtual function
 /// tables.
@@ -146,6 +162,9 @@ class ModuleSummaryIndex {
   VFuncToImplsMapTy WitnessTableMethodMap;
   /// Map from virtual function GUID to list of implementations for vtables.
   VFuncToImplsMapTy VTableMethodMap;
+  /// In per-module summary, always empty map.
+  /// In combined summary, map from type GUID to liveness of the type.
+  UsedTypeListTy UsedTypeList;
   /// The symbol name of the module.
   std::string Name;
 
@@ -214,6 +233,8 @@ public:
     }
     return ArrayRef<GUID>(found->second);
   }
+
+  void markUsedType(GUID typeGUID) { UsedTypeList.push_back(typeGUID); }
 
   const VFuncToImplsMapTy &getWitnessTableMethodMap() const {
     return WitnessTableMethodMap;
