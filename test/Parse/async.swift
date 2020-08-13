@@ -41,3 +41,14 @@ func testTypeExprs() {
 
   let _ = [() -> async ()]() // expected-error{{'async' may only occur before '->'}}{{18-24=}}{{15-15=async }}
 }
+
+// Parsing await syntax.
+struct MyFuture {
+  func await() -> Int { 0 }
+}
+
+func testAwaitExpr() async {
+  let _ = await asyncGlobal1()
+  let myFuture = MyFuture()
+  let _ = myFuture.await()
+}
