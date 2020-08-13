@@ -450,6 +450,10 @@ function(_compile_swift_files
     list(APPEND swift_flags "-warn-swift3-objc-inference-complete")
   endif()
 
+  if(SWIFT_DISABLE_OBJC_INTEROP)
+    list(APPEND swift_flags "-Xfrontend" "-disable-objc-interop")
+  endif()
+
   list(APPEND swift_flags ${SWIFT_EXPERIMENTAL_EXTRA_FLAGS})
 
   if(SWIFTFILE_OPT_FLAGS)

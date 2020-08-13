@@ -329,6 +329,10 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-D_WASI_EMULATED_MMAN")
   endif()
 
+  if(SWIFT_DISABLE_OBJC_INTEROP)
+    list(APPEND result "-DSWIFT_OBJC_INTEROP=0")
+  endif()
+
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
 endfunction()
 
