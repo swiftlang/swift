@@ -1432,6 +1432,14 @@ void ConstraintSystem::solveForCodeCompletion(
   if (!cs.generateConstraints(expr, DC))
     return;
 
+  if (cs.isDebugMode()) {
+    auto &log = llvm::errs();
+    log << "--- Code Completion ---\n";
+    cs.print(log, expr);
+    log << '\n';
+    cs.print(log);
+  }
+
   llvm::SmallVector<Solution, 4> solutions;
 
   {
@@ -1445,7 +1453,17 @@ void ConstraintSystem::solveForCodeCompletion(
     cs.solveImpl(solutions);
   }
 
+  if (cs.isDebugMode()) {
+    llvm::errs() << "--- Discovered " << solutions.size() << " solutions ---\n";
+  }
+
   for (const auto &solution : solutions) {
+    if (cs.isDebugMode()) {
+      auto &log = llvm::errs();
+      log << "--- Solution ---\n";
+      solution.dump(log);
+    }
+
     callback(solution);
   }
 }
