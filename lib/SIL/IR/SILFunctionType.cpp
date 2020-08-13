@@ -2361,6 +2361,12 @@ static CanSILFunctionType getNativeSILFunctionType(
     Optional<SubstitutionMap> reqtSubs,
     ProtocolConformanceRef witnessMethodConformance) {
   assert(bool(origConstant) == bool(constant));
+  auto getSILFunctionTypeForConventions =
+      [&](const Conventions &convs) -> CanSILFunctionType {
+    return getSILFunctionType(TC, context, origType, substInterfaceType,
+                              extInfo, convs, ForeignInfo(), origConstant,
+                              constant, reqtSubs, witnessMethodConformance);
+  };
   switch (extInfo.getSILRepresentation()) {
   case SILFunctionType::Representation::Block:
   case SILFunctionType::Representation::CFunctionPointer:
@@ -2377,42 +2383,29 @@ static CanSILFunctionType getNativeSILFunctionType(
     switch (constant ? constant->kind : SILDeclRef::Kind::Func) {
     case SILDeclRef::Kind::Initializer:
     case SILDeclRef::Kind::EnumElement:
-      return getSILFunctionType(TC, context, origType, substInterfaceType,
-                                extInfo, DefaultInitializerConventions(),
-                                ForeignInfo(), origConstant, constant, reqtSubs,
-                                witnessMethodConformance);
+      return getSILFunctionTypeForConventions(DefaultInitializerConventions());
     case SILDeclRef::Kind::Allocator:
-      return getSILFunctionType(TC, context, origType, substInterfaceType,
-                                extInfo, DefaultAllocatorConventions(),
-                                ForeignInfo(), origConstant, constant, reqtSubs,
-                                witnessMethodConformance);
-    case SILDeclRef::Kind::Func:
+      return getSILFunctionTypeForConventions(DefaultAllocatorConventions());
+    case SILDeclRef::Kind::Func: {
       // If we have a setter, use the special setter convention. This ensures
       // that we take normal parameters at +1.
       if (constant && constant->isSetter()) {
-        return getSILFunctionType(TC, context, origType, substInterfaceType,
-                                  extInfo, DefaultSetterConventions(),
-                                  ForeignInfo(), origConstant, constant,
-                                  reqtSubs, witnessMethodConformance);
+        return getSILFunctionTypeForConventions(DefaultSetterConventions());
       }
-      LLVM_FALLTHROUGH;
+      return getSILFunctionTypeForConventions(
+          DefaultConventions(NormalParameterConvention::Guaranteed));
+    }
     case SILDeclRef::Kind::Destroyer:
     case SILDeclRef::Kind::GlobalAccessor:
     case SILDeclRef::Kind::DefaultArgGenerator:
     case SILDeclRef::Kind::StoredPropertyInitializer:
     case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     case SILDeclRef::Kind::IVarInitializer:
-    case SILDeclRef::Kind::IVarDestroyer: {
-      auto conv = DefaultConventions(NormalParameterConvention::Guaranteed);
-      return getSILFunctionType(TC, context, origType, substInterfaceType,
-                                extInfo, conv, ForeignInfo(), origConstant,
-                                constant, reqtSubs, witnessMethodConformance);
-    }
+    case SILDeclRef::Kind::IVarDestroyer:
+      return getSILFunctionTypeForConventions(
+          DefaultConventions(NormalParameterConvention::Guaranteed));
     case SILDeclRef::Kind::Deallocator:
-      return getSILFunctionType(TC, context, origType, substInterfaceType,
-                                extInfo, DeallocatorConventions(),
-                                ForeignInfo(), origConstant, constant, reqtSubs,
-                                witnessMethodConformance);
+      return getSILFunctionTypeForConventions(DeallocatorConventions());
     }
   }
   }
