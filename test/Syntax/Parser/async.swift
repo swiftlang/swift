@@ -16,7 +16,7 @@ func testTypeExprs() {
 }
 
 func testAwaitOperator() async {
-  let _ = __await asyncGlobal1()
+  let _ = await asyncGlobal1()
 }
 
 func testAsyncClosure() {
