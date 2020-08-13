@@ -3,13 +3,7 @@ include(AddSwift)
 include(SwiftSource)
 
 function(is_darwin_based_sdk sdk_name out_var)
-  if ("${sdk_name}" STREQUAL "OSX" OR
-      "${sdk_name}" STREQUAL "IOS" OR
-      "${sdk_name}" STREQUAL "IOS_SIMULATOR" OR
-      "${sdk_name}" STREQUAL "TVOS" OR
-      "${sdk_name}" STREQUAL "TVOS_SIMULATOR" OR
-      "${sdk_name}" STREQUAL "WATCHOS" OR
-      "${sdk_name}" STREQUAL "WATCHOS_SIMULATOR")
+  if ("${sdk_name}" IN_LIST SWIFT_APPLE_PLATFORMS)
     set(${out_var} TRUE PARENT_SCOPE)
   else()
     set(${out_var} FALSE PARENT_SCOPE)
