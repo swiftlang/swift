@@ -688,6 +688,14 @@ public:
   Optional<StringRef>
   getStringLiteralIfNotInterpolated(SourceLoc Loc, StringRef DiagText);
 
+  /// Returns true to indicate that experimental concurrency syntax should be
+  /// parsed if the parser is generating only a syntax tree or if the user has
+  /// passed the `-enable-experimental-concurrency` flag to the frontend.
+  bool shouldParseExperimentalConcurrency() const {
+    return Context.LangOpts.EnableExperimentalConcurrency ||
+      Context.LangOpts.ParseForSyntaxTreeOnly;
+  }
+
 public:
   InFlightDiagnostic diagnose(SourceLoc Loc, Diagnostic Diag) {
     if (Diags.isDiagnosticPointsToFirstBadToken(Diag.getID()) &&
@@ -1572,6 +1580,7 @@ public:
           SmallVectorImpl<CaptureListEntry> &captureList,
           VarDecl *&capturedSelfParamDecl,
           ParameterList *&params,
+          SourceLoc &asyncLoc,
           SourceLoc &throwsLoc,
           SourceLoc &arrowLoc,
           TypeExpr *&explicitResultType,

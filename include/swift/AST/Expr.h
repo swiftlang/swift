@@ -3815,6 +3815,9 @@ private:
   /// this information directly on the ClosureExpr.
   VarDecl * CapturedSelfDecl;
 
+  /// The location of the "async", if present.
+  SourceLoc AsyncLoc;
+
   /// The location of the "throws", if present.
   SourceLoc ThrowsLoc;
   
@@ -3833,14 +3836,15 @@ private:
   llvm::PointerIntPair<BraceStmt *, 1, bool> Body;
 public:
   ClosureExpr(SourceRange bracketRange, VarDecl *capturedSelfDecl,
-              ParameterList *params, SourceLoc throwsLoc, SourceLoc arrowLoc,
-              SourceLoc inLoc, TypeExpr *explicitResultType,
+              ParameterList *params, SourceLoc asyncLoc, SourceLoc throwsLoc,
+              SourceLoc arrowLoc, SourceLoc inLoc, TypeExpr *explicitResultType,
               unsigned discriminator, DeclContext *parent)
     : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
                           discriminator, parent),
       BracketRange(bracketRange),
       CapturedSelfDecl(capturedSelfDecl),
-      ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc), InLoc(inLoc),
+      AsyncLoc(asyncLoc), ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc),
+      InLoc(inLoc),
       ExplicitResultTypeAndBodyState(explicitResultType, BodyState::Parsed),
       Body(nullptr) {
     setParameterList(params);
@@ -3888,7 +3892,12 @@ public:
   SourceLoc getInLoc() const {
     return InLoc;
   }
-  
+
+  /// Retrieve the location of the 'async' for a closure that has it.
+  SourceLoc getAsyncLoc() const {
+    return AsyncLoc;
+  }
+
   /// Retrieve the location of the 'throws' for a closure that has it.
   SourceLoc getThrowsLoc() const {
     return ThrowsLoc;

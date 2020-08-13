@@ -33,18 +33,41 @@ struct SomeStruct {
   static var y = __await getInt() // expected-error{{'async' call cannot occur in a global variable initializer}}
 }
 
-func acceptAutoclosureNonAsync(_: @autoclosure () -> Int) { }
-func acceptAutoclosureAsync(_: @autoclosure () async -> Int) { }
+func acceptAutoclosureNonAsync(_: @autoclosure () -> Int) async { }
+func acceptAutoclosureAsync(_: @autoclosure () async -> Int) async { }
+
+func acceptAutoclosureNonAsyncBad(_: @autoclosure () async -> Int) { }
+// expected-error@-1{{'async' autoclosure parameter in a non-'async' function}}
+// expected-note@-2{{add 'async' to function 'acceptAutoclosureNonAsyncBad' to make it asynchronous}}
+
+struct HasAsyncBad {
+  init(_: @autoclosure () async -> Int) { }
+  // expected-error@-1{{'async' autoclosure parameter in a non-'async' function}}
+}
 
 func testAutoclosure() async {
-  acceptAutoclosureAsync(getInt()) // expected-error{{call is 'async' in an autoclosure argument is not marked with 'await'}}
-  acceptAutoclosureNonAsync(getInt()) // expected-error{{'async' in an autoclosure that does not support concurrency}}
+  __await acceptAutoclosureAsync(getInt()) // expected-error{{call is 'async' in an autoclosure argument is not marked with 'await'}}
+  __await acceptAutoclosureNonAsync(getInt()) // expected-error{{'async' in an autoclosure that does not support concurrency}}
 
-  acceptAutoclosureAsync(__await getInt())
-  acceptAutoclosureNonAsync(__await getInt()) // expected-error{{'async' in an autoclosure that does not support concurrency}}
+  __await acceptAutoclosureAsync(__await getInt())
+  __await acceptAutoclosureNonAsync(__await getInt()) // expected-error{{'async' in an autoclosure that does not support concurrency}}
 
   __await acceptAutoclosureAsync(getInt()) // expected-error{{call is 'async' in an autoclosure argument is not marked with 'await'}}
-  // expected-warning@-1{{no calls to 'async' functions occur within 'await' expression}}
   __await acceptAutoclosureNonAsync(getInt()) // expected-error{{'async' in an autoclosure that does not support concurrency}}
-  // expected-warning@-1{{no calls to 'async' functions occur within 'await' expression}}
+}
+
+// Test inference of 'async' from the body of a closure.
+func testClosure() {
+  let closure = {
+     __await getInt()
+  }
+
+  let _: () -> Int = closure // expected-error{{cannot convert value of type '() async -> Int' to specified type '() -> Int'}}
+
+  let closure2 = { () async -> Int in
+    print("here")
+    return __await getInt()
+  }
+
+  let _: () -> Int = closure2 // expected-error{{cannot convert value of type '() async -> Int' to specified type '() -> Int'}}
 }

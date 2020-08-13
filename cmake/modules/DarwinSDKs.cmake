@@ -26,6 +26,24 @@ if(swift_build_osx)
   configure_target_variant(OSX-R  "OS X Release"         OSX R  "Release")
 endif()
 
+is_sdk_requested(FREESTANDING swift_build_freestanding)
+if(swift_build_freestanding)
+  set(SWIFT_FREESTANDING_SDK "" CACHE STRING
+      "Which SDK to use when building the FREESTANDING stdlib")
+  set(SWIFT_FREESTANDING_TRIPLE_NAME "" CACHE STRING
+      "Which triple name (e.g. 'none-macho') to use when building the FREESTANDING stdlib")
+  set(SWIFT_FREESTANDING_ARCHS "" CACHE STRING
+      "Which architectures to build when building the FREESTANDING stdlib")
+  configure_sdk_darwin(
+      FREESTANDING "FREESTANDING" ""
+      "${SWIFT_FREESTANDING_SDK}" freestanding "${SWIFT_FREESTANDING_TRIPLE_NAME}" freestanding "${SWIFT_FREESTANDING_ARCHS}")
+  set(SWIFT_SDK_FREESTANDING_LIB_SUBDIR "freestanding")
+  configure_target_variant(FREESTANDING-DA "FREESTANDING Debug+Asserts"   FREESTANDING DA "Debug+Asserts")
+  configure_target_variant(FREESTANDING-RA "FREESTANDING Release+Asserts" FREESTANDING RA "Release+Asserts")
+  configure_target_variant(FREESTANDING-R  "FREESTANDING Release"         FREESTANDING R  "Release")
+  configure_target_variant(FREESTANDING-S  "FREESTANDING MinSizeRelease"  FREESTANDING S  "MinSizeRelease")
+endif()
+
 # Compatible cross-compile SDKS for Darwin OSes: IOS, IOS_SIMULATOR, TVOS,
 #   TVOS_SIMULATOR, WATCHOS, WATCHOS_SIMULATOR (archs hardcoded below).
 

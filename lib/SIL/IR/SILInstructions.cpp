@@ -762,10 +762,10 @@ getExtracteeType(
 
 LinearFunctionExtractInst::LinearFunctionExtractInst(
     SILModule &module, SILDebugLocation debugLoc,
-    LinearDifferentiableFunctionTypeComponent extractee, SILValue theFunction)
-    : InstructionBase(debugLoc,
-                      getExtracteeType(theFunction, extractee, module)),
-      extractee(extractee), operands(this, theFunction) {}
+    LinearDifferentiableFunctionTypeComponent extractee, SILValue function)
+    : UnaryInstructionBase(debugLoc, function,
+                           getExtracteeType(function, extractee, module)),
+      extractee(extractee) {}
 
 SILType DifferentiabilityWitnessFunctionInst::getDifferentiabilityWitnessType(
     SILModule &module, DifferentiabilityWitnessFunctionKind witnessKind,
