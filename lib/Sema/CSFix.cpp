@@ -1563,7 +1563,8 @@ bool IgnoreInvalidFunctionBuilderBody::diagnose(const Solution &solution,
     PreCheckWalker(DeclContext *dc) : DC(dc) {}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      auto hasError = ConstraintSystem::preCheckExpression(E, DC);
+      auto hasError = ConstraintSystem::preCheckExpression(
+          E, DC, /*replaceInvalidRefsWithErrors=*/true);
       return std::make_pair(false, hasError ? nullptr : E);
     }
 

@@ -1749,7 +1749,8 @@ public:
       // Suppress any diangostics which could be produced by this expression.
       DiagnosticTransaction transaction(diagEngine);
 
-      HasError |= ConstraintSystem::preCheckExpression(E, DC);
+      HasError |= ConstraintSystem::preCheckExpression(
+          E, DC, /*replaceInvalidRefsWithErrors=*/false);
       HasError |= transaction.hasDiagnostics();
 
       transaction.abort();

@@ -1411,7 +1411,8 @@ void ConstraintSystem::solveForCodeCompletion(
     llvm::function_ref<void(const Solution &)> callback) {
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
-  if (ConstraintSystem::preCheckExpression(expr, DC))
+  if (ConstraintSystem::preCheckExpression(
+          expr, DC, /*replaceInvalidRefsWithErrors=*/true))
     return;
 
   ConstraintSystemOptions options;
