@@ -780,6 +780,36 @@ public:
   }
 };
 
+namespace details {
+  template <typename CustomPathElement>
+  class PathElement {
+    static constexpr bool hasStoredValueImpl(...) { return false; }
+
+    template <unsigned N>
+    static constexpr bool hasStoredValueImpl(StoredIntegerElement<N> *) { return true; }
+
+    template <typename T>
+    static constexpr bool hasStoredValueImpl(StoredPointerElement<T> *) { return true; }
+
+  public:
+    static constexpr bool hasStoredValue() {
+      return hasStoredValueImpl(static_cast<CustomPathElement *>(nullptr));
+    }
+  };
+}
+
+template <typename CustomPathElement>
+constexpr bool isValidCustomPathElement() {
+  return details::PathElement<CustomPathElement>::hasStoredValue();
+}
+
+// All custom path element classes must inherit from StoredIntegerElement or StoredPointerElement
+#define CUSTOM_LOCATOR_PATH_ELT(Name) \
+static_assert(isValidCustomPathElement<LocatorPathElt::Name>(), \
+    "Custom path elements must inherit from StoredIntegerElement or StoredPointerElement");
+#include "ConstraintLocatorPathElts.def"
+
+
 /// A simple stack-only builder object that constructs a
 /// constraint locator without allocating memory.
 ///
