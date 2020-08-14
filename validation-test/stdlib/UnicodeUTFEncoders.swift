@@ -1,162 +1,253 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -o %t/a.out -O
-// RUN: %target-codesign %t/a.out
-// RUN: %target-run %t/a.out
+// RUN: %target-run-simple-swift(-O)
 // REQUIRES: executable_test
-// REQUIRES: objc_interop
+// REQUIRES: foundation
 
 // With a non-optimized stdlib the test takes very long.
 // REQUIRES: optimized_stdlib
 
 import SwiftPrivate
 import StdlibUnittest
-
-
 import Foundation
 
-protocol TestableUnicodeCodec : UnicodeCodec {
-  associatedtype CodeUnit : FixedWidthInteger
-  static func encodingId() -> String.Encoding
-  static func name() -> NSString
+protocol TestableUnicodeCodec: UnicodeCodec {
+
+  static var nsEncoding: String.Encoding { get }
 }
 
-extension UTF8 : TestableUnicodeCodec {
-  static func encodingId() -> String.Encoding {
-    return .utf8
-  }
-  static func name() -> NSString {
-    return "UTF8"
-  }
+extension UTF8: TestableUnicodeCodec {
+
+  static var nsEncoding: String.Encoding { .utf8 }
 }
 
-extension UTF16 : TestableUnicodeCodec {
-  static func encodingId() -> String.Encoding {
+extension UTF16: TestableUnicodeCodec {
+
+  static var nsEncoding: String.Encoding {
+    #if _endian(little)
     return .utf16LittleEndian
-  }
-  static func name() -> NSString {
-    return "UTF16"
+    #else
+    return .utf16BigEndian
+    #endif
   }
 }
 
-extension UTF32 : TestableUnicodeCodec {
-  static func encodingId() -> String.Encoding {
+extension UTF32: TestableUnicodeCodec {
+
+  static var nsEncoding: String.Encoding {
+    #if _endian(little)
     return .utf32LittleEndian
-  }
-  static func name() -> NSString {
-    return "UTF32"
+    #else
+    return .utf32BigEndian
+    #endif
   }
 }
 
-// The valid ranges of Unicode scalar values
-var unicodeScalarRanges: [CountableClosedRange<UInt32>] = [UInt32(0)...0xd7ff, 0xe000...0x10ffff]
+//===----------------------------------------------------------------------===//
 
-var unicodeScalarCount: Int {
-  var count = 0
-  for r in unicodeScalarRanges {
-    count += Int(r.upperBound - r.lowerBound)
+final class CodecTest<Codec: TestableUnicodeCodec> {
+
+  typealias CodeUnitBuffer = UnsafeMutableBufferPointer<Codec.CodeUnit>
+
+  var _unicodeScalar: Unicode.Scalar = "\0"
+  var _nsEncodedScalar: Slice<CodeUnitBuffer>
+  var _encodedScalar: Slice<CodeUnitBuffer>
+
+  init() {
+    _nsEncodedScalar = CodeUnitBuffer.allocate(capacity: 4)[...]
+    _encodedScalar = CodeUnitBuffer.allocate(capacity: 4)[...]
   }
-  return count
-}
 
-func nthUnicodeScalar(_ n: UInt32) -> UnicodeScalar {
-  var count: UInt32 = 0
-  for r in unicodeScalarRanges {
-    count += r.upperBound - r.lowerBound
-    if count > n {
-      return UnicodeScalar(r.upperBound - (count - n))!
-    }
+  deinit {
+    _nsEncodedScalar.base.deallocate()
+    _encodedScalar.base.deallocate()
   }
-  preconditionFailure("Index out of range")
-}
 
-// `buffer` should have a length >= 4
-func nsEncode<CodeUnit>(
-  _ c: UInt32,
-  _ encoding: String.Encoding,
-  _ buffer: inout [CodeUnit],
-  _ used: inout Int
-) {
-  var c = c
-  precondition(buffer.count >= 4, "buffer is not large enough")
-
-  let s = NSString(
-    bytes: &c,
-    length: 4,
-    encoding: String.Encoding.utf32LittleEndian.rawValue)!
-
-  s.getBytes(
-    &buffer,
-    maxLength: buffer.count,
-    usedLength: &used,
-    encoding: encoding.rawValue,
-    options: [],
-    range: NSRange(location: 0, length: s.length),
-    remaining: nil)
-}
-
-final class CodecTest<Codec : TestableUnicodeCodec> {
-  var used = 0
-  typealias CodeUnit = Codec.CodeUnit
-  var nsEncodeBuffer: [CodeUnit] = Array(repeating: 0, count: 4)
-  var encodeBuffer: [CodeUnit] = Array(repeating: 0, count: 4)
-
-  final func testOne(_ scalar: UnicodeScalar) {
-    /* Progress reporter
-    if (scalar.value % 0x1000) == 0 {
-      print("\(asHex(scalar.value))")
-    }
-    */
-
-    // Use Cocoa to encode the scalar
-    nsEncode(scalar.value, Codec.encodingId(), &nsEncodeBuffer, &used)
-    let nsEncoded = nsEncodeBuffer[0..<(used/MemoryLayout<CodeUnit>.size)]
-    var encodeIndex = encodeBuffer.startIndex
-    let encodeOutput: (CodeUnit) -> Void = {
-      self.encodeBuffer[encodeIndex] = $0
-      encodeIndex += 1
+  func testNSString() -> Bool {
+    // Test the `NSString.init(bytes:length:encoding:)` API.
+    guard let nsString = withUnsafeBytes(of: _unicodeScalar.value, {
+      NSString(
+        bytes: $0.baseAddress!,
+        length: $0.count,
+        encoding: UTF32.nsEncoding.rawValue
+      )
+    }) else {
+      expectUnreachable(
+        """
+        `NSString.init(bytes:length:encoding:)` failed: \
+        \(asHex(_unicodeScalar.value)) => ???
+        """
+      )
+      return false
     }
 
-    var iter = nsEncoded.makeIterator()
-    var decoded: UnicodeScalar
+    // Test the `NSString.getBytes` API.
+    var usedLength = 0
+    let codeUnitStride = MemoryLayout<Codec.CodeUnit>.stride
+    let hasBytes = nsString.getBytes(
+      _nsEncodedScalar.base.baseAddress,
+      maxLength: _nsEncodedScalar.base.count,
+      usedLength: &usedLength,
+      encoding: Codec.nsEncoding.rawValue,
+      options: [],
+      range: NSRange(location: 0, length: nsString.length),
+      remaining: nil
+    )
+    guard
+      hasBytes,
+      (1...4).contains(usedLength),
+      usedLength.isMultiple(of: codeUnitStride)
+    else {
+      expectUnreachable(
+        """
+        `NSString.getBytes(_:maxLength:usedLength:\
+        encoding:options:range:remaining:)` failed: \
+        \(asHex(_unicodeScalar.value)) => \
+        \(asHex(_nsEncodedScalar.base)), \
+        usedLength = \(usedLength)
+        """
+      )
+      return false
+    }
+
+    _nsEncodedScalar = _nsEncodedScalar.base.prefix(usedLength / codeUnitStride)
+    return true
+  }
+
+  func testUnicodeCodec() {
+    // Test the `UnicodeCodec.encode(_:into:)` API.
+    _encodedScalar = _encodedScalar.base[...]
+    var encodedScalarIndex = _encodedScalar.startIndex
+    Codec.encode(_unicodeScalar, into: { [self] in
+      _encodedScalar[encodedScalarIndex] = $0
+      _encodedScalar.formIndex(after: &encodedScalarIndex)
+    })
+    _encodedScalar = _encodedScalar.base[..<encodedScalarIndex]
+    expectEqualSequence(
+      _nsEncodedScalar, _encodedScalar,
+      """
+      `UnicodeCodec.encode(_:into:)` failed: \
+      \(asHex(_unicodeScalar.value)) => \
+      \(asHex(_nsEncodedScalar)) => \
+      \(asHex(_encodedScalar))
+      """
+    )
+
+    // Test the `UnicodeCodec.decode(_:)` API.
+    var iterator = _nsEncodedScalar.makeIterator()
     var decoder = Codec()
-    switch decoder.decode(&iter) {
-    case .scalarValue(let us):
-      decoded = us
+    switch decoder.decode(&iterator) {
+    case .scalarValue(let decodedScalar):
+      expectEqual(
+        _unicodeScalar, decodedScalar,
+        """
+        `UnicodeCodec.decode(_:)` failed: \
+        \(asHex(_unicodeScalar.value)) => \
+        \(asHex(_nsEncodedScalar)) => \
+        \(asHex(decodedScalar.value))
+        """
+      )
     default:
-      fatalError("decoding failed")
+      expectUnreachable(
+        """
+        `UnicodeCodec.decode(_:)` failed: \
+        \(asHex(_unicodeScalar.value)) => \
+        \(asHex(_nsEncodedScalar)) => ???
+        """
+      )
     }
-    expectEqualTest(
-      scalar, decoded,
-      "Decoding failed: \(asHex(scalar.value)) => " +
-      "\(asHex(nsEncoded)) => \(asHex(decoded.value))"
-    ) { $0 == $1 }
-
-    encodeIndex = encodeBuffer.startIndex
-    Codec.encode(scalar, into: encodeOutput)
-    expectEqualTest(
-      nsEncoded, encodeBuffer[0..<encodeIndex],
-      "Decoding failed: \(asHex(nsEncoded)) => " +
-        "\(asHex(scalar.value)) => \(asHex(self.encodeBuffer[0]))"
-    ) { $0 == $1 }
   }
 
-  final func run(_ minScalarOrd: Int, _ maxScalarOrd: Int) {
-    print("testing \(Codec.name())")
-    for i in minScalarOrd..<maxScalarOrd {
-      testOne(nthUnicodeScalar(UInt32(i)))
+  func testUnicodeEncoding() {
+    // Test the `Unicode.Encoding.encode(_:)` API.
+    guard let encodedScalar = Codec.encode(_unicodeScalar) else {
+      expectUnreachable(
+        """
+        `Unicode.Encoding.encode(_:)` failed: \
+        \(asHex(_unicodeScalar.value)) => \
+        \(asHex(_nsEncodedScalar)) => ???
+        """
+      )
+      return
+    }
+    expectEqualSequence(
+      _nsEncodedScalar, encodedScalar,
+      """
+      `Unicode.Encoding.encode(_:)` failed: \
+      \(asHex(_unicodeScalar.value)) => \
+      \(asHex(_nsEncodedScalar)) => \
+      \(asHex(encodedScalar))
+      """
+    )
+
+    // Test the `Unicode.Encoding.decode(_:)` API.
+    let decodedScalar = Codec.decode(encodedScalar)
+    expectEqual(
+      _unicodeScalar, decodedScalar,
+      """
+      `Unicode.Encoding.decode(_:)` failed: \
+      \(asHex(_unicodeScalar.value)) => \
+      \(asHex(encodedScalar)) => \
+      \(asHex(decodedScalar.value))
+      """
+    )
+  }
+
+  func testUnicodeParser() {
+    // Test the `Unicode.Parser.parseScalar(from:)` API.
+    var iterator = _nsEncodedScalar.makeIterator()
+    var parser = Codec.ForwardParser()
+    switch parser.parseScalar(from: &iterator) {
+    case .valid(let encodedScalar):
+      expectEqualSequence(
+        _nsEncodedScalar, encodedScalar,
+        """
+        `Unicode.Parser.parseScalar(from:)` failed: \
+        \(asHex(_unicodeScalar.value)) => \
+        \(asHex(_nsEncodedScalar)) => \
+        \(asHex(encodedScalar))
+        """
+      )
+    default:
+      expectUnreachable(
+        """
+        `Unicode.Parser.parseScalar(from:)` failed: \
+        \(asHex(_unicodeScalar.value)) => \
+        \(asHex(_nsEncodedScalar)) => ???
+        """
+      )
+    }
+  }
+
+  func run() {
+    for value: UInt32 in 0...0x10FFFF {
+      if let unicodeScalar = Unicode.Scalar(value) {
+        _unicodeScalar = unicodeScalar
+        _nsEncodedScalar.base.initialize(repeating: 0)
+        _encodedScalar.base.initialize(repeating: 0)
+
+        if testNSString() {
+          testUnicodeCodec()
+          testUnicodeEncoding()
+          testUnicodeParser()
+        }
+      }
     }
   }
 }
 
-var UTFEncoders = TestSuite("UTFEncoders")
+//===----------------------------------------------------------------------===//
 
-UTFEncoders.test("encode") {
-  let minScalarOrd = 0
-  let maxScalarOrd = unicodeScalarCount
-  CodecTest<UTF8>().run(minScalarOrd, maxScalarOrd)
-  CodecTest<UTF16>().run(minScalarOrd, maxScalarOrd)
-  CodecTest<UTF32>().run(minScalarOrd, maxScalarOrd)
+var CodecTestSuite = TestSuite("CodecTestSuite")
+
+CodecTestSuite.test("UTF8") {
+  CodecTest<UTF8>().run()
+}
+
+CodecTestSuite.test("UTF16") {
+  CodecTest<UTF16>().run()
+}
+
+CodecTestSuite.test("UTF32") {
+  CodecTest<UTF32>().run()
 }
 
 runAllTests()
-
