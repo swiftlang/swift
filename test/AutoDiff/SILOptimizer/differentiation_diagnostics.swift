@@ -32,22 +32,16 @@ func conditional(_ x: Float, _ flag: Bool) -> Float {
 
 func throwing() throws -> Void {}
 
-// expected-error @+2 {{function is not differentiable}}
-// expected-note @+2 {{when differentiating this function definition}}
 @differentiable
 func try_apply(_ x: Float) -> Float {
-  // expected-note @+1 {{cannot differentiate unsupported control flow}}
   try! throwing()
   return x
 }
 
 func rethrowing(_ x: () throws -> Void) rethrows -> Void {}
 
-// expected-error @+2 {{function is not differentiable}}
-// expected-note @+2 {{when differentiating this function definition}}
 @differentiable
 func try_apply_rethrows(_ x: Float) -> Float {
-  // expected-note @+1 {{cannot differentiate unsupported control flow}}
   rethrowing({})
   return x
 }

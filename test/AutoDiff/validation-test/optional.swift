@@ -10,11 +10,11 @@ var OptionalTests = TestSuite("OptionalDifferentiation")
 // Basic tests.
 //===----------------------------------------------------------------------===//
 
+
+// TODO(TF-433): operator `??` lowers to an active `try_apply`.
 /*
-// TODO(TF-433): operator `??` lowers to `try_apply` instead of `switch_enum`,
-// which is not yet supported by differentiation.
 @differentiable
-func optional1(_ maybeX: Float?) -> Float {
+func optional_nil_coalescing(_ maybeX: Float?) -> Float {
   return maybeX ?? 10
 }
 */
