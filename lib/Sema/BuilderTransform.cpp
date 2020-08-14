@@ -1712,7 +1712,7 @@ class PreCheckFunctionBuilderApplication : public ASTWalker {
 
 public:
   PreCheckFunctionBuilderApplication(AnyFunctionRef fn, bool skipPrecheck)
-    : Fn(fn), SkipPrecheck(skipPrecheck) {}
+      : Fn(fn), SkipPrecheck(skipPrecheck) {}
 
   const std::vector<ReturnStmt *> getReturnStmts() const { return ReturnStmts; }
 
@@ -1736,16 +1736,25 @@ public:
   }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    if (SkipPrecheck)
+      return std::make_pair(false, E);
+
     // Pre-check the expression.  If this fails, abort the walk immediately.
     // Otherwise, replace the expression with the result of pre-checking.
     // In either case, don't recurse into the expression.
-    if (!SkipPrecheck &&
-        ConstraintSystem::preCheckExpression(E, /*DC*/ Fn.getAsDeclContext())) {
-      HasError = true;
-      return std::make_pair(false, nullptr);
-    }
+    {
+      auto *DC = Fn.getAsDeclContext();
+      auto &diagEngine = DC->getASTContext().Diags;
 
-    return std::make_pair(false, E);
+      // Suppress any diangostics which could be produced by this expression.
+      DiagnosticTransaction transaction(diagEngine);
+
+      HasError |= ConstraintSystem::preCheckExpression(E, DC);
+      HasError |= transaction.hasDiagnostics();
+
+      transaction.abort();
+      return std::make_pair(false, HasError ? nullptr : E);
+    }
   }
 
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
