@@ -517,7 +517,7 @@ SourceRange ExprPattern::getSourceRange() const {
 // dependency.
 
 struct PatternTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
-  void traceName(const void *Entity, raw_ostream &OS) const {
+  void traceName(const void *Entity, raw_ostream &OS) const override {
     if (!Entity)
       return;
     const Pattern *P = static_cast<const Pattern *>(Entity);
@@ -526,7 +526,7 @@ struct PatternTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
     }
   }
   void traceLoc(const void *Entity, SourceManager *SM,
-                clang::SourceManager *CSM, raw_ostream &OS) const {
+                clang::SourceManager *CSM, raw_ostream &OS) const override {
     if (!Entity)
       return;
     const Pattern *P = static_cast<const Pattern *>(Entity);

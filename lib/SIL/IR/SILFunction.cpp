@@ -641,7 +641,7 @@ void SILFunction::setObjCReplacement(Identifier replacedFunc) {
 // linkage dependency.
 
 struct SILFunctionTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
-  void traceName(const void *Entity, raw_ostream &OS) const {
+  void traceName(const void *Entity, raw_ostream &OS) const override {
     if (!Entity)
       return;
     const SILFunction *F = static_cast<const SILFunction *>(Entity);
@@ -649,7 +649,7 @@ struct SILFunctionTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
   }
 
   void traceLoc(const void *Entity, SourceManager *SM,
-                clang::SourceManager *CSM, raw_ostream &OS) const {
+                clang::SourceManager *CSM, raw_ostream &OS) const override {
     if (!Entity)
       return;
     const SILFunction *F = static_cast<const SILFunction *>(Entity);
