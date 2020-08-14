@@ -846,57 +846,7 @@ bool irgen::isSpecializedNominalTypeMetadataStaticallyAddressable(
         return !isGenericWithoutPrespecializedConformance() &&
                metadataAccessIsTrivial() && witnessTablesAreReferenceable();
       });
-  auto anyArgumentIsFromCurrentModule =
-      llvm::any_of(environment->getGenericParams(), [&](auto parameter) {
-        auto signature = environment->getGenericSignature();
-        const auto protocols = signature->getRequiredProtocols(parameter);
-        auto argument = ((Type *)parameter)->subst(substitutions);
-        auto canonicalType = argument->getCanonicalType();
-
-        auto argumentIsFromCurrentModule = [&]() {
-          if (auto *argumentNominal = argument->getAnyNominal()) {
-            return IGM.getSwiftModule() == argumentNominal->getModuleContext();
-          }
-          return false;
-        };
-        auto anyConformanceIsFromCurrentModule = [&]() {
-          return llvm::any_of(protocols, [&](ProtocolDecl *protocol) {
-            auto conformance =
-                signature->lookupConformance(canonicalType, protocol);
-            if (!conformance.isConcrete()) {
-              return false;
-            }
-            auto rootConformance =
-                conformance.getConcrete()->getRootConformance();
-            return IGM.getSwiftModule() ==
-                   rootConformance->getDeclContext()->getParentModule();
-          });
-        };
-
-        return argumentIsFromCurrentModule() ||
-               anyConformanceIsFromCurrentModule();
-      });
   return allArgumentsAreStaticallyAddressable &&
-         // A type's metadata cannot be prespecialized non-canonically if it
-         // could be specialized canonically.  The reasons for that:
-         // (1) Canonically prespecialized metadata is not registered with the
-         //     runtime; at runtime, whether canonically prespecialized
-         //     metadata exists can only be determined by calling the metadata
-         //     accessor.
-         // (2) At compile time, there is no way to determine whether the
-         //     defining module has prespecialized metadata at a particular
-         //     argument list.
-         // (3) Subsequent versions of the defining module may add or remove
-         //     prespecialized metadata.
-         //
-         // To account for that, we only allow non-canonical prespecialization
-         // when at least one of the arguments is from the current module
-         // where non-canonical prespecialization might occur.  Consequently,
-         // some prespecialization opportunities may be missed (such as when
-         // an argument comes from a module which it is known the defining
-         // module does not depend on).
-         !((canonicality == NoncanonicalSpecializedMetadata) &&
-           !anyArgumentIsFromCurrentModule) &&
          IGM.getTypeInfoForUnlowered(type).isFixedSize(
              ResilienceExpansion::Maximal);
 }
