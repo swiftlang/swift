@@ -49,7 +49,9 @@ EXPR_NODES = [
     # await foo()
     Node('AwaitExpr', kind='Expr',
          children=[
-             Child('AwaitKeyword', kind='AwaitToken'),
+             Child('AwaitKeyword', kind='IdentifierToken',
+                   classification='Keyword',
+                   text_choices=['await']),
              Child('Expression', kind='Expr'),
          ]),
 
