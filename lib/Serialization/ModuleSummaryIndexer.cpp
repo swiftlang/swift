@@ -103,6 +103,10 @@ void FunctionSummaryIndexer::indexIndirectFunctionCall(
 void FunctionSummaryIndexer::indexUseOfType(CanType type) {
   Mangle::ASTMangler mangler;
   type.visit([&](Type t) {
+    if (t.getPointer()->hasArchetype() ||
+        t.getPointer()->hasOpaqueArchetype()) {
+      return;
+    }
     std::string mangled = mangler.mangleTypeWithoutPrefix(t);
     GUID guid = getGUIDFromUniqueName(mangled);
     TheSummary->addTypeRef({guid, mangled});
