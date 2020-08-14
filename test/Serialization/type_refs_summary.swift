@@ -18,6 +18,14 @@
 // SIMPLE-COERCE-NEXT:     - name:            9type_refs1SV
 // SIMPLE-COERCE-NEXT:       guid:            12736589225588998764
 
+
+// RUN: %swift_frontend_plain -cross-module-opt %t/type_refs.swiftmodule.summary -module-summary-embed-debug-name -o %t/type_refs.swiftmodule.merged-summary
+// RUN: %swift-module-summary-test --to-yaml %t/type_refs.swiftmodule.merged-summary -o %t/type_refs.merged-summary.yaml
+// Ensure that WT of V is not used.
+// RUN: cat %t/type_refs.merged-summary.yaml | %FileCheck %s -check-prefix USED-TYPE
+
+// USED-TYPE-NOT: s9type_refs1VVXMt
+
 protocol P {
     func foo()
 }
@@ -26,4 +34,10 @@ struct S : P {
     func foo() {}
 } 
 
+struct V : P {
+    func foo() {}
+}
+
 func coerceToP(_ x: S) -> P { return x }
+
+_ = coerceToP(S())
