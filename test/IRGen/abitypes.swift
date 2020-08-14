@@ -580,7 +580,8 @@ public func testInlineAgg(_ rect: MyRect) -> Float {
 // arm64-ios:  [[PTR0:%.*]] = getelementptr inbounds %TSo14FiveByteStructV, %TSo14FiveByteStructV* [[STRUCTPTR]], {{i.*}} 0, {{i.*}} 0
 // arm64-ios:  [[PTR1:%.*]] = getelementptr inbounds %T10ObjectiveC8ObjCBoolV, %T10ObjectiveC8ObjCBoolV* [[PTR0]], {{i.*}} 0, {{i.*}} 0
 // arm64-ios:  [[PTR2:%.*]] = getelementptr inbounds %TSb, %TSb* [[PTR1]], {{i.*}} 0, {{i.*}} 0
-// arm64-ios:  store i1 false, i1* [[PTR2]], align 8
+// arm64-ios:  [[BYTE_ADDR:%.*]] = bitcast i1* [[PTR2]] to i8*
+// arm64-ios:  store i8 0, i8* [[BYTE_ADDR]], align 8
 // arm64-ios:  [[ARG:%.*]] = load i64, i64* [[COERCED]]
 // arm64-ios:  call void bitcast (void ()* @objc_msgSend to void (i8*, i8*, i64)*)(i8* {{.*}}, i8* {{.*}}, i64 [[ARG]])
 //
@@ -590,7 +591,8 @@ public func testInlineAgg(_ rect: MyRect) -> Float {
 // arm64e-ios:  [[PTR0:%.*]] = getelementptr inbounds %TSo14FiveByteStructV, %TSo14FiveByteStructV* [[STRUCTPTR]], {{i.*}} 0, {{i.*}} 0
 // arm64e-ios:  [[PTR1:%.*]] = getelementptr inbounds %T10ObjectiveC8ObjCBoolV, %T10ObjectiveC8ObjCBoolV* [[PTR0]], {{i.*}} 0, {{i.*}} 0
 // arm64e-ios:  [[PTR2:%.*]] = getelementptr inbounds %TSb, %TSb* [[PTR1]], {{i.*}} 0, {{i.*}} 0
-// arm64e-ios:  store i1 false, i1* [[PTR2]], align 8
+// arm64e-ios:  [[BYTE_ADDR:%.*]] = bitcast i1* [[PTR2]] to i8*
+// arm64e-ios:  store i8 0, i8* [[BYTE_ADDR]], align 8
 // arm64e-ios:  [[ARG:%.*]] = load i64, i64* [[COERCED]]
 // arm64e-ios:  call void bitcast (void ()* @objc_msgSend to void (i8*, i8*, i64)*)(i8* {{.*}}, i8* {{.*}}, i64 [[ARG]])
 // arm64-macosx: define swiftcc void @"$s8abitypes14testBOOLStructyyF"()
@@ -599,7 +601,8 @@ public func testInlineAgg(_ rect: MyRect) -> Float {
 // arm64-macosx:  [[PTR0:%.*]] = getelementptr inbounds %TSo14FiveByteStructV, %TSo14FiveByteStructV* [[STRUCTPTR]], {{i.*}} 0, {{i.*}} 0
 // arm64-macosx:  [[PTR1:%.*]] = getelementptr inbounds %T10ObjectiveC8ObjCBoolV, %T10ObjectiveC8ObjCBoolV* [[PTR0]], {{i.*}} 0, {{i.*}} 0
 // arm64-macosx:  [[PTR2:%.*]] = getelementptr inbounds %TSb, %TSb* [[PTR1]], {{i.*}} 0, {{i.*}} 0
-// arm64-macosx:  store i1 false, i1* [[PTR2]], align 8
+// arm64-macosx:  [[BYTE_ADDR:%.*]] = bitcast i1* [[PTR2]] to i8*
+// arm64-macosx:  store i8 0, i8* [[BYTE_ADDR]], align 8
 // arm64-macosx:  [[ARG:%.*]] = load i64, i64* [[COERCED]]
 // arm64-macosx:  call void bitcast (void ()* @objc_msgSend to void (i8*, i8*, i64)*)(i8* {{.*}}, i8* {{.*}}, i64 [[ARG]])
 public func testBOOLStruct() {
