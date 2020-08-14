@@ -2995,6 +2995,7 @@ public:
     DeclID accessorStorageDeclID;
     bool overriddenAffectsABI, needsNewVTableEntry, isTransparent;
     DeclID opaqueReturnTypeID;
+    bool isUserAccessible;
     ArrayRef<uint64_t> nameAndDependencyIDs;
 
     if (!isAccessor) {
@@ -3012,6 +3013,7 @@ public:
                                           rawAccessLevel,
                                           needsNewVTableEntry,
                                           opaqueReturnTypeID,
+                                          isUserAccessible,
                                           nameAndDependencyIDs);
     } else {
       decls_block::AccessorLayout::readRecord(scratch, contextID, isImplicit,
@@ -3196,6 +3198,7 @@ public:
     fn->setForcedStaticDispatch(hasForcedStaticDispatch);
     ctx.evaluator.cacheOutput(NeedsNewVTableEntryRequest{fn},
                               std::move(needsNewVTableEntry));
+    fn->setUserAccessible(isUserAccessible);
 
     if (opaqueReturnTypeID) {
       ctx.evaluator.cacheOutput(
