@@ -88,6 +88,13 @@ ERROR(could_not_find_subscript_member_did_you_mean,none,
       "did you mean to use the subscript operator?",
       (Type))
 
+ERROR(could_not_find_subscript_member_tuple, none,
+      "cannot access element using subscript for tuple type %0; "
+      "use '.' notation instead", (Type))
+ERROR(could_not_find_subscript_member_tuple_did_you_mean_use_dot, none,
+      "cannot access element using subscript for tuple type %0; "
+      "did you mean to use '.%1'?", (Type, StringRef))
+
 ERROR(could_not_find_enum_case,none,
       "enum type %0 has no case %1; did you mean %2?",
       (Type, DeclNameRef, DeclName))
@@ -2835,7 +2842,8 @@ NOTE(codable_extraneous_codingkey_case_here,none,
 NOTE(codable_non_conforming_property_here,none,
      "cannot automatically synthesize %0 because %1 does not conform to %0", (Type, TypeLoc))
 NOTE(codable_non_decoded_property_here,none,
-     "cannot automatically synthesize %0 because %1 does not have a matching CodingKey and does not have a default value", (Type, Identifier))
+     "cannot automatically synthesize %0 because %1 does not have a matching "
+     "CodingKey and does not have a default value", (Type, Identifier))
 NOTE(codable_codingkeys_type_is_not_an_enum_here,none,
      "cannot automatically synthesize %0 because 'CodingKeys' is not an enum", (Type))
 NOTE(codable_codingkeys_type_does_not_conform_here,none,
@@ -4064,10 +4072,13 @@ ERROR(throw_in_nonexhaustive_catch,none,
       "error is not handled because the enclosing catch is not exhaustive", ())
 
 ERROR(throwing_call_in_illegal_context,none,
-      "call can throw, but errors cannot be thrown out of %0",
-      (StringRef))
+      "call can throw, but errors cannot be thrown out of "
+      "%select{<<ERROR>>|a default argument|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
+      (unsigned))
 ERROR(throw_in_illegal_context,none,
-      "errors cannot be thrown out of %0", (StringRef))
+      "errors cannot be thrown out of "
+      "%select{<<ERROR>>|a default argument|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
+      (unsigned))
 
 ERROR(throwing_operator_without_try,none,
       "operator can throw but expression is not marked with 'try'", ())
@@ -4716,12 +4727,23 @@ ERROR(availability_decl_unavailable, none,
       "%select{ in %3|}2%select{|: %4}4",
       (unsigned, DeclName, bool, StringRef, StringRef))
 
+WARNING(availability_decl_unavailable_warn, none,
+        "%select{getter for |setter for |}0%1 is unavailable"
+        "%select{ in %3|}2%select{|: %4}4",
+        (unsigned, DeclName, bool, StringRef, StringRef))
+
 #define REPLACEMENT_DECL_KIND_SELECT "select{| instance method| property}"
 ERROR(availability_decl_unavailable_rename, none,
       "%select{getter for |setter for |}0%1 has been "
       "%select{renamed to|replaced by}2%" REPLACEMENT_DECL_KIND_SELECT "3 "
       "'%4'%select{|: %5}5",
       (unsigned, DeclName, bool, unsigned, StringRef, StringRef))
+
+WARNING(availability_decl_unavailable_rename_warn, none,
+        "%select{getter for |setter for |}0%1 has been "
+        "%select{renamed to|replaced by}2%" REPLACEMENT_DECL_KIND_SELECT "3 "
+        "'%4'%select{|: %5}5",
+        (unsigned, DeclName, bool, unsigned, StringRef, StringRef))
 
 NOTE(availability_marked_unavailable, none,
      "%select{getter for |setter for |}0%1 has been explicitly marked "

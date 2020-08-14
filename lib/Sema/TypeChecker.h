@@ -1147,11 +1147,11 @@ void diagnoseIfDeprecated(SourceRange SourceRange,
 void checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name);
 
 /// Check error handling in the given type-checked top-level code.
-void checkTopLevelErrorHandling(TopLevelCodeDecl *D);
-void checkFunctionErrorHandling(AbstractFunctionDecl *D);
-void checkInitializerErrorHandling(Initializer *I, Expr *E);
-void checkEnumElementErrorHandling(EnumElementDecl *D, Expr *expr);
-void checkPropertyWrapperErrorHandling(PatternBindingDecl *binding,
+void checkTopLevelEffects(TopLevelCodeDecl *D);
+void checkFunctionEffects(AbstractFunctionDecl *D);
+void checkInitializerEffects(Initializer *I, Expr *E);
+void checkEnumElementEffects(EnumElementDecl *D, Expr *expr);
+void checkPropertyWrapperEffects(PatternBindingDecl *binding,
                                        Expr *expr);
 void checkFunctionBodyCompilerEvaluable(AbstractFunctionDecl *D);
 

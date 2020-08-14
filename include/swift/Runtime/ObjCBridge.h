@@ -68,6 +68,9 @@ OBJC_EXPORT Class objc_readClassPair(Class cls,
                                      const struct objc_image_info *info)
     __OSX_AVAILABLE_STARTING(__MAC_10_10, __IPHONE_8_0);
 
+// Magic symbol whose _address_ is the runtime's isa mask.
+OBJC_EXPORT const struct { char c; } objc_absolute_packed_isa_class_mask;
+
 
 namespace swift {
 

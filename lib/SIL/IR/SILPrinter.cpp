@@ -1339,7 +1339,6 @@ public:
     switch (kind) {
     case StringLiteralInst::Encoding::Bytes: return "bytes ";
     case StringLiteralInst::Encoding::UTF8: return "utf8 ";
-    case StringLiteralInst::Encoding::UTF16: return "utf16 ";
     case StringLiteralInst::Encoding::ObjCSelector: return "objc_selector ";
     }
     llvm_unreachable("bad string literal encoding");
@@ -2598,6 +2597,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   }
   if (isWithoutActuallyEscapingThunk())
     OS << "[without_actually_escaping] ";
+
+  if (isAsync())
+    OS << "[async] ";
 
   switch (getSpecialPurpose()) {
   case SILFunction::Purpose::None:

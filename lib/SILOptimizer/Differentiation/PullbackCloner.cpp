@@ -651,6 +651,19 @@ private:
   }
 
   //--------------------------------------------------------------------------//
+  // Optional differentiation
+  //--------------------------------------------------------------------------//
+
+  /// Given a `wrappedAdjoint` value of type `T.TangentVector`, creates an
+  /// `Optional<T>.TangentVector` value from it and adds it to the adjoint value
+  /// of `optionalValue`.
+  ///
+  /// `wrappedAdjoint` may be an object or address value, both cases are
+  /// handled.
+  void accumulateAdjointForOptional(SILBasicBlock *bb, SILValue optionalValue,
+                                    SILValue wrappedAdjoint);
+
+  //--------------------------------------------------------------------------//
   // Array literal initialization differentiation
   //--------------------------------------------------------------------------//
 
@@ -1503,6 +1516,30 @@ public:
     }
   }
 
+  /// Handle `unchecked_take_enum_data_addr` instruction.
+  /// Currently, only `Optional`-typed operands are supported.
+  ///   Original: y = unchecked_take_enum_data_addr x : $*Enum, #Enum.Case
+  ///    Adjoint: adj[x] += $Enum.TangentVector(adj[y])
+  void
+  visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *utedai) {
+    auto *bb = utedai->getParent();
+    auto adjBuf = getAdjointBuffer(bb, utedai);
+    auto enumTy = utedai->getOperand()->getType();
+    auto *optionalEnumDecl = getASTContext().getOptionalDecl();
+    // Only `Optional`-typed operands are supported for now. Diagnose all other
+    // enum operand types.
+    if (enumTy.getASTType().getEnumOrBoundGenericEnum() != optionalEnumDecl) {
+      LLVM_DEBUG(getADDebugStream()
+                 << "Unhandled instruction in PullbackCloner: " << *utedai);
+      getContext().emitNondifferentiabilityError(
+          utedai, getInvoker(),
+          diag::autodiff_expression_not_differentiable_note);
+      errorOccurred = true;
+      return;
+    }
+    accumulateAdjointForOptional(bb, utedai->getOperand(), adjBuf);
+  }
+
 #define NOT_DIFFERENTIABLE(INST, DIAG) void visit##INST##Inst(INST##Inst *inst);
 #undef NOT_DIFFERENTIABLE
 
@@ -1639,11 +1676,16 @@ bool PullbackCloner::Implementation::run() {
       // Diagnose active enum values. Differentiation of enum values requires
       // special adjoint value handling and is not yet supported. Diagnose
       // only the first active enum value to prevent too many diagnostics.
-      if (type.getEnumOrBoundGenericEnum()) {
-        getContext().emitNondifferentiabilityError(
-            v, getInvoker(), diag::autodiff_enums_unsupported);
-        errorOccurred = true;
-        return true;
+      //
+      // Do not diagnose `Optional`-typed values, which will have special-case
+      // differentiation support.
+      if (auto *enumDecl = type.getEnumOrBoundGenericEnum()) {
+        if (enumDecl != getContext().getASTContext().getOptionalDecl()) {
+          getContext().emitNondifferentiabilityError(
+              v, getInvoker(), diag::autodiff_enums_unsupported);
+          errorOccurred = true;
+          return true;
+        }
       }
       // Diagnose unsupported stored property projections.
       if (auto *inst = dyn_cast<FieldIndexCacheBase>(v)) {
@@ -1972,6 +2014,103 @@ void PullbackCloner::Implementation::emitZeroDerivativesForNonvariedResult(
              << pullback);
 }
 
+void PullbackCloner::Implementation::accumulateAdjointForOptional(
+    SILBasicBlock *bb, SILValue optionalValue, SILValue wrappedAdjoint) {
+  auto pbLoc = getPullback().getLocation();
+  // Handle `switch_enum` on `Optional`.
+  auto *optionalEnumDecl = getASTContext().getOptionalDecl();
+  auto optionalTy = optionalValue->getType();
+  assert(optionalTy.getASTType().getEnumOrBoundGenericEnum() ==
+         optionalEnumDecl);
+  // `Optional<T>`
+  optionalTy = remapType(optionalTy);
+  // `T`
+  auto wrappedType = optionalTy.getOptionalObjectType();
+  // `T.TangentVector`
+  auto wrappedTanType = remapType(wrappedAdjoint->getType());
+  // `Optional<T.TangentVector>`
+  auto optionalOfWrappedTanType = SILType::getOptionalType(wrappedTanType);
+  // `Optional<T>.TangentVector`
+  auto optionalTanTy = getRemappedTangentType(optionalTy);
+  auto *optionalTanDecl = optionalTanTy.getNominalOrBoundGenericNominal();
+  // Look up the `Optional<T>.TangentVector.init` declaration.
+  auto initLookup =
+      optionalTanDecl->lookupDirect(DeclBaseName::createConstructor());
+  ConstructorDecl *constructorDecl = nullptr;
+  for (auto *candidate : initLookup) {
+    auto candidateModule = candidate->getModuleContext();
+    if (candidateModule->getName() ==
+            builder.getASTContext().Id_Differentiation ||
+        candidateModule->isStdlibModule()) {
+      assert(!constructorDecl && "Multiple `Optional.TangentVector.init`s");
+      constructorDecl = cast<ConstructorDecl>(candidate);
+#ifdef NDEBUG
+      break;
+#endif
+    }
+  }
+  assert(constructorDecl && "No `Optional.TangentVector.init`");
+
+  // Allocate a local buffer for the `Optional` adjoint value.
+  auto *optTanAdjBuf = builder.createAllocStack(pbLoc, optionalTanTy);
+  // Find `Optional<T.TangentVector>.some` EnumElementDecl.
+  auto someEltDecl = builder.getASTContext().getOptionalSomeDecl();
+
+  // Initialize an `Optional<T.TangentVector>` buffer from `wrappedAdjoint` as
+  // the input for `Optional<T>.TangentVector.init`.
+  auto *optArgBuf = builder.createAllocStack(pbLoc, optionalOfWrappedTanType);
+  if (optionalOfWrappedTanType.isLoadableOrOpaque(builder.getFunction())) {
+    // %enum = enum $Optional<T.TangentVector>, #Optional.some!enumelt,
+    //         %wrappedAdjoint : $T
+    auto *enumInst = builder.createEnum(pbLoc, wrappedAdjoint, someEltDecl,
+                                        optionalOfWrappedTanType);
+    // store %enum to %optArgBuf
+    builder.emitStoreValueOperation(pbLoc, enumInst, optArgBuf,
+                                    StoreOwnershipQualifier::Init);
+  } else {
+    // %enumAddr = init_enum_data_addr %optArgBuf $Optional<T.TangentVector>,
+    //                                 #Optional.some!enumelt
+    auto *enumAddr = builder.createInitEnumDataAddr(
+        pbLoc, optArgBuf, someEltDecl, wrappedTanType.getAddressType());
+    // copy_addr %wrappedAdjoint to [initialization] %enumAddr
+    builder.createCopyAddr(pbLoc, wrappedAdjoint, enumAddr, IsNotTake,
+                           IsInitialization);
+    // inject_enum_addr %optArgBuf : $*Optional<T.TangentVector>,
+    //                  #Optional.some!enumelt
+    builder.createInjectEnumAddr(pbLoc, optArgBuf, someEltDecl);
+  }
+
+  // Apply `Optional<T>.TangentVector.init`.
+  SILOptFunctionBuilder fb(getContext().getTransform());
+  // %init_fn = function_ref @Optional<T>.TangentVector.init
+  auto *initFn = fb.getOrCreateFunction(pbLoc, SILDeclRef(constructorDecl),
+                                        NotForDefinition);
+  auto *initFnRef = builder.createFunctionRef(pbLoc, initFn);
+  auto *diffProto =
+      builder.getASTContext().getProtocol(KnownProtocolKind::Differentiable);
+  auto *swiftModule = getModule().getSwiftModule();
+  auto diffConf =
+      swiftModule->lookupConformance(wrappedType.getASTType(), diffProto);
+  assert(!diffConf.isInvalid() && "Missing conformance to `Differentiable`");
+  auto subMap = SubstitutionMap::get(
+      initFn->getLoweredFunctionType()->getSubstGenericSignature(),
+      ArrayRef<Type>(wrappedType.getASTType()), {diffConf});
+  // %metatype = metatype $Optional<T>.TangentVector.Type
+  auto metatypeType = CanMetatypeType::get(optionalTanTy.getASTType(),
+                                           MetatypeRepresentation::Thin);
+  auto metatypeSILType = SILType::getPrimitiveObjectType(metatypeType);
+  auto metatype = builder.createMetatype(pbLoc, metatypeSILType);
+  // apply %init_fn(%optTanAdjBuf, %optArgBuf, %metatype)
+  builder.createApply(pbLoc, initFnRef, subMap,
+                      {optTanAdjBuf, optArgBuf, metatype});
+  builder.createDeallocStack(pbLoc, optArgBuf);
+
+  // Accumulate adjoint for the incoming `Optional` value.
+  addToAdjointBuffer(bb, optionalValue, optTanAdjBuf, pbLoc);
+  builder.emitDestroyAddr(pbLoc, optTanAdjBuf);
+  builder.createDeallocStack(pbLoc, optTanAdjBuf);
+}
+
 SILBasicBlock *PullbackCloner::Implementation::buildPullbackSuccessor(
     SILBasicBlock *origBB, SILBasicBlock *origPredBB,
     SmallDenseMap<SILValue, TrampolineBlockSet> &pullbackTrampolineBlockMap) {
@@ -2110,18 +2249,65 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
     // Get predecessor terminator operands.
     SmallVector<std::pair<SILBasicBlock *, SILValue>, 4> incomingValues;
     bbArg->getSingleTerminatorOperands(incomingValues);
-    // Materialize adjoint value of active basic block argument, create a
-    // copy, and set copy as adjoint value of incoming values.
-    auto bbArgAdj = getAdjointValue(bb, bbArg);
-    auto concreteBBArgAdj = materializeAdjointDirect(bbArgAdj, pbLoc);
-    auto concreteBBArgAdjCopy =
-        builder.emitCopyValueOperation(pbLoc, concreteBBArgAdj);
-    for (auto pair : incomingValues) {
-      auto *predBB = std::get<0>(pair);
-      auto incomingValue = std::get<1>(pair);
-      blockTemporaries[getPullbackBlock(predBB)].insert(concreteBBArgAdjCopy);
-      setAdjointValue(predBB, incomingValue,
-                      makeConcreteAdjointValue(concreteBBArgAdjCopy));
+
+    // Returns true if the given terminator instruction is a `switch_enum` on
+    // an `Optional`-typed value. `switch_enum` instructions require
+    // special-case adjoint value propagation for the operand.
+    auto isSwitchEnumInstOnOptional =
+        [&ctx = getASTContext()](TermInst *termInst) {
+          if (!termInst)
+            return false;
+          if (auto *sei = dyn_cast<SwitchEnumInst>(termInst)) {
+            auto *optionalEnumDecl = ctx.getOptionalDecl();
+            auto operandTy = sei->getOperand()->getType();
+            return operandTy.getASTType().getEnumOrBoundGenericEnum() ==
+                   optionalEnumDecl;
+          }
+          return false;
+        };
+
+    // Check the tangent value category of the active basic block argument.
+    switch (getTangentValueCategory(bbArg)) {
+    // If argument has a loadable tangent value category: materialize adjoint
+    // value of the argument, create a copy, and set the copy as the adjoint
+    // value of incoming values.
+    case SILValueCategory::Object: {
+      auto bbArgAdj = getAdjointValue(bb, bbArg);
+      auto concreteBBArgAdj = materializeAdjointDirect(bbArgAdj, pbLoc);
+      auto concreteBBArgAdjCopy =
+          builder.emitCopyValueOperation(pbLoc, concreteBBArgAdj);
+      for (auto pair : incomingValues) {
+        auto *predBB = std::get<0>(pair);
+        auto incomingValue = std::get<1>(pair);
+        // Handle `switch_enum` on `Optional`.
+        auto termInst = bbArg->getSingleTerminator();
+        if (isSwitchEnumInstOnOptional(termInst)) {
+          accumulateAdjointForOptional(bb, incomingValue, concreteBBArgAdjCopy);
+        } else {
+          blockTemporaries[getPullbackBlock(predBB)].insert(concreteBBArgAdjCopy);
+          setAdjointValue(predBB, incomingValue,
+                          makeConcreteAdjointValue(concreteBBArgAdjCopy));
+        }
+      }
+      break;
+    }
+    // If argument has an address tangent value category: materialize adjoint
+    // value of the argument, create a copy, and set the copy as the adjoint
+    // value of incoming values.
+    case SILValueCategory::Address: {
+      auto bbArgAdjBuf = getAdjointBuffer(bb, bbArg);
+      for (auto pair : incomingValues) {
+        auto *predBB = std::get<0>(pair);
+        auto incomingValue = std::get<1>(pair);
+        // Handle `switch_enum` on `Optional`.
+        auto termInst = bbArg->getSingleTerminator();
+        if (isSwitchEnumInstOnOptional(termInst))
+          accumulateAdjointForOptional(bb, incomingValue, bbArgAdjBuf);
+        else
+          addToAdjointBuffer(predBB, incomingValue, bbArgAdjBuf, pbLoc);
+      }
+      break;
+    }
     }
   }
 
@@ -2657,7 +2843,7 @@ void PullbackCloner::Implementation::accumulateIndirect(SILValue resultAddress,
         CanMetatypeType::get(adjointASTTy, MetatypeRepresentation::Thick);
     auto metatypeSILType = SILType::getPrimitiveObjectType(metatypeType);
     auto metatype = builder.createMetatype(loc, metatypeSILType);
-    // %2 = apply $0(%result, %new, %old, %1)
+    // %2 = apply %0(%result, %new, %old, %1)
     builder.createApply(loc, witnessMethod, subMap,
                         {resultAddress, rhsAddress, lhsAddress, metatype},
                         /*isNonThrowing*/ false);

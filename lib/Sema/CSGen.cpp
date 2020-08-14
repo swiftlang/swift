@@ -1803,31 +1803,28 @@ namespace {
 
       auto locator = CS.getConstraintLocator(expr);
       auto contextualType = CS.getContextualType(expr);
-      Type contextualArrayType = nullptr;
-      Type contextualArrayElementType = nullptr;
-      
+
+      auto joinElementTypes = [&](Optional<Type> elementType) {
+        const auto elements = expr->getElements();
+        unsigned index = 0;
+
+        using Iterator = decltype(elements)::iterator;
+        CS.addJoinConstraint<Iterator>(locator, elements.begin(), elements.end(),
+                                       elementType, [&](const auto it) {
+          auto *locator = CS.getConstraintLocator(expr, LocatorPathElt::TupleElement(index++));
+          return std::make_pair(CS.getType(*it), locator);
+        });
+      };
+
       // If a contextual type exists for this expression, apply it directly.
       Optional<Type> arrayElementType;
       if (contextualType &&
           (arrayElementType = ConstraintSystem::isArrayType(contextualType))) {
-        // Is the array type a contextual type
-        contextualArrayType = contextualType;
-        contextualArrayElementType = *arrayElementType;
-
         CS.addConstraint(ConstraintKind::LiteralConformsTo, contextualType,
                          arrayProto->getDeclaredInterfaceType(),
                          locator);
-        
-        unsigned index = 0;
-        for (auto element : expr->getElements()) {
-          CS.addConstraint(ConstraintKind::Conversion,
-                           CS.getType(element),
-                           contextualArrayElementType,
-                           CS.getConstraintLocator(
-                               expr, LocatorPathElt::TupleElement(index++)));
-        }
-        
-        return contextualArrayType;
+        joinElementTypes(arrayElementType);
+        return contextualType;
       }
 
       // Produce a specialized diagnostic if this is an attempt to initialize
@@ -1893,14 +1890,7 @@ namespace {
 
       // Introduce conversions from each element to the element type of the
       // array.
-      unsigned index = 0;
-      for (auto element : expr->getElements()) {
-        CS.addConstraint(ConstraintKind::Conversion,
-                         CS.getType(element),
-                         arrayElementTy,
-                         CS.getConstraintLocator(
-                           expr, LocatorPathElt::TupleElement(index++)));
-      }
+      joinElementTypes(arrayElementTy);
 
       // The array element type defaults to 'Any'.
       CS.addConstraint(ConstraintKind::Defaultable, arrayElementTy,
@@ -2501,22 +2491,30 @@ namespace {
         if (enumPattern->getParentType() || enumPattern->getParentTypeRepr()) {
           // Resolve the parent type.
           Type parentType = [&]() -> Type {
-            if (const auto resolvedTy = enumPattern->getParentType()) {
-              assert(resolvedTy->hasUnboundGenericType() == false &&
-                     "A pre-resolved type must be fully bound");
-              return resolvedTy;
+            if (auto preTy = enumPattern->getParentType()) {
+              return preTy;
             }
             return resolveTypeReferenceInExpression(
                 enumPattern->getParentTypeRepr(),
-                TypeResolverContext::InExpression,
-                OpenUnboundGenericType(
-                    CS, CS.getConstraintLocator(
-                            locator, {LocatorPathElt::PatternMatch(pattern),
-                                      ConstraintLocator::ParentType})));
+                TypeResolverContext::InExpression, [](auto unboundTy) {
+                  // FIXME: We ought to pass an OpenUnboundGenericType object
+                  // rather than calling CS.openUnboundGenericType below, but
+                  // sometimes the parent type is resolved eagerly in
+                  // ResolvePattern::visitUnresolvedDotExpr, letting unbound
+                  // generics escape.
+                  return unboundTy;
+                });
           }();
 
           if (!parentType)
             return Type();
+
+          parentType = CS.openUnboundGenericTypes(
+              parentType, CS.getConstraintLocator(
+                              locator, {LocatorPathElt::PatternMatch(pattern),
+                                        ConstraintLocator::ParentType}));
+
+          assert(parentType);
 
           // Perform member lookup into the parent's metatype.
           Type parentMetaType = MetatypeType::get(parentType);
@@ -3494,6 +3492,9 @@ namespace {
         }
         case KeyPathExpr::Component::Kind::Identity:
           continue;
+        case KeyPathExpr::Component::Kind::DictionaryKey:
+          llvm_unreachable("DictionaryKey only valid in #keyPath");
+          break;
         }
 
         // By now, `base` is the result type of this component. Set it in the
@@ -4012,6 +4013,9 @@ generateForEachStmtConstraints(
         /*isDiscarded=*/false);
     if (cs.generateConstraints(whereTarget, FreeTypeVariableBinding::Disallow))
       return None;
+
+    cs.setContextualType(forEachStmtInfo.whereExpr,
+                         TypeLoc::withoutLoc(boolType), CTP_Condition);
 
     forEachStmtInfo.whereExpr = whereTarget.getAsExpr();
   }

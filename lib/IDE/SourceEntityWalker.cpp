@@ -412,6 +412,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       case KeyPathExpr::Component::Kind::OptionalWrap:
       case KeyPathExpr::Component::Kind::OptionalForce:
       case KeyPathExpr::Component::Kind::Identity:
+      case KeyPathExpr::Component::Kind::DictionaryKey:
         break;
       }
     }
@@ -684,7 +685,7 @@ bool SemaAnnotator::
 passReference(ValueDecl *D, Type Ty, DeclNameLoc Loc, ReferenceMetaData Data) {
   SourceManager &SM = D->getASTContext().SourceMgr;
   SourceLoc BaseStart = Loc.getBaseNameLoc(), BaseEnd = BaseStart;
-  if (SM.extractText({BaseStart, 1}) == "`")
+  if (BaseStart.isValid() && SM.extractText({BaseStart, 1}) == "`")
     BaseEnd = Lexer::getLocForEndOfToken(SM, BaseStart.getAdvancedLoc(1));
   return passReference(D, Ty, BaseStart, {BaseStart, BaseEnd}, Data);
 }

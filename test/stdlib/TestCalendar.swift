@@ -11,6 +11,8 @@
 // RUN: %target-clang %S/Inputs/FoundationBridge/FoundationBridge.m -c -o %t/FoundationBridgeObjC.o -g
 // RUN: %target-build-swift %s -I %S/Inputs/FoundationBridge/ -Xlinker %t/FoundationBridgeObjC.o -o %t/TestCalendar
 
+// RUN: %target-codesign %t/TestCalendar
+
 // RUN: %target-run %t/TestCalendar > %t.txt
 // REQUIRES: executable_test
 // REQUIRES: objc_interop

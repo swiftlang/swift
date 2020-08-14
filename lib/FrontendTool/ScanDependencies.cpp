@@ -470,6 +470,57 @@ static void writeJSON(llvm::raw_ostream &out,
   }
 }
 
+static bool diagnoseCycle(CompilerInstance &instance,
+                          ModuleDependenciesCache &cache,
+                          ModuleDependencyID mainId,
+                          InterfaceSubContextDelegate &astDelegate) {
+  llvm::SetVector<ModuleDependencyID, std::vector<ModuleDependencyID>,
+                  std::set<ModuleDependencyID>> openSet;
+  llvm::SetVector<ModuleDependencyID, std::vector<ModuleDependencyID>,
+                  std::set<ModuleDependencyID>> closeSet;
+  // Start from the main module.
+  openSet.insert(mainId);
+  while(!openSet.empty()) {
+    auto &lastOpen = openSet.back();
+    auto beforeSize = openSet.size();
+    for (auto dep: resolveDirectDependencies(instance, lastOpen, cache,
+                                             astDelegate)) {
+      if (closeSet.count(dep))
+        continue;
+      if (openSet.insert(dep)) {
+        break;
+      } else {
+        // Find a cycle, diagnose.
+        auto startIt = std::find(openSet.begin(), openSet.end(), dep);
+        assert(startIt != openSet.end());
+        llvm::SmallString<64> buffer;
+        for (auto it = startIt; it != openSet.end(); ++ it) {
+          buffer.append(it->first);
+          buffer.append(it->second == ModuleDependenciesKind::Swift?
+                        ".swiftmodule": ".pcm");
+          buffer.append(" -> ");
+        }
+        buffer.append(startIt->first);
+        buffer.append(startIt->second == ModuleDependenciesKind::Swift?
+                      ".swiftmodule": ".pcm");
+        instance.getASTContext().Diags.diagnose(SourceLoc(),
+                                                diag::scanner_find_cycle,
+                                                buffer.str());
+        return true;
+      }
+    }
+    // No new node added. We can close this node
+    if (openSet.size() == beforeSize) {
+      closeSet.insert(openSet.back());
+      openSet.pop_back();
+    } else {
+      assert(openSet.size() == beforeSize + 1);
+    }
+  }
+  assert(openSet.empty());
+  return false;
+}
+
 bool swift::scanDependencies(CompilerInstance &instance) {
   ASTContext &Context = instance.getASTContext();
   ModuleDecl *mainModule = instance.getMainModule();
@@ -591,6 +642,10 @@ bool swift::scanDependencies(CompilerInstance &instance) {
       ASTDelegate, [&](ModuleDependencyID id) {
     allModules.insert(id);
   });
+
+  // Dignose cycle in dependency graph.
+  if (diagnoseCycle(instance, cache, /*MainModule*/allModules.front(), ASTDelegate))
+    return true;
 
   // Write out the JSON description.
   writeJSON(out, instance, cache, ASTDelegate, allModules.getArrayRef());

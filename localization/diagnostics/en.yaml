@@ -147,10 +147,10 @@
   msg: >-
     unrecognized accessor kind '%0' in SDK node
 
-- id: pound_source_location_creates_pound_file_conflicts
+- id: source_location_creates_file_id_conflicts
   msg: >-
-    '#sourceLocation' directive produces '#file' string of '%0', which
-    conflicts with '#file' strings produced by other paths in the module
+    '#sourceLocation' directive produces '#fileID' string of '%0', which
+    conflicts with '#fileID' strings produced by other paths in the module
 
 - id: fixit_correct_source_location_file
   msg: >-
@@ -1343,13 +1343,9 @@
     only function declarations may be marked 'rethrows'; did you mean
     'throws'?
 
-- id: throws_in_wrong_position
+- id: async_or_throws_in_wrong_position
   msg: >-
-    'throws' may only occur before '->'
-
-- id: rethrows_in_wrong_position
-  msg: >-
-    'rethrows' may only occur before '->'
+    %select{'throws'|'rethrows'|'async'}0 may only occur before '->'
 
 - id: throw_in_function_type
   msg: >-
@@ -2970,6 +2966,14 @@
   msg: >-
     value of type %0 has no property or method named 'subscript'; did you
     mean to use the subscript operator?
+
+- id: could_not_find_subscript_member_tuple
+  msg: >-
+    cannot access element using subscript for tuple type %0; use '.' notation instead
+
+- id: could_not_find_subscript_member_tuple_did_you_mean_use_dot
+  msg: >-
+    cannot access element using subscript for tuple type %0; did you mean to use '.%1'?
 
 - id: could_not_find_enum_case
   msg: >-
@@ -7132,14 +7136,6 @@
     %0 is not a 'func', 'init', 'subscript', or 'var' computed property
     declaration
 
-- id: autodiff_attr_accessor_not_found
-  msg: >-
-    %0 does not have a '%1' accessor
-
-- id: autodiff_attr_original_decl_none_valid_found
-  msg: >-
-    could not find function %0 with expected type %1
-
 - id: autodiff_attr_original_decl_not_same_type_context
   msg: >-
     %0 is not defined in the current type context
@@ -9244,7 +9240,17 @@
     %select{getter for |setter for |}0%1 is unavailable%select{ in
     %3|}2%select{|: %4}4
 
+- id: availability_decl_unavailable_warn
+  msg: >-
+    %select{getter for |setter for |}0%1 is unavailable%select{ in
+    %3|}2%select{|: %4}4
+
 - id: availability_decl_unavailable_rename
+  msg: >-
+    %select{getter for |setter for |}0%1 has been %select{renamed to|replaced
+    by}2%select{| instance method| property}3 '%4'%select{|: %5}5
+
+- id: availability_decl_unavailable_rename_warn
   msg: >-
     %select{getter for |setter for |}0%1 has been %select{renamed to|replaced
     by}2%select{| instance method| property}3 '%4'%select{|: %5}5

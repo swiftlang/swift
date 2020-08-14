@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -Onone %s -o %t/a.out
 // RUN: %target-build-swift -O %s -o %t/a.out.optimized
+// RUN: %target-codesign %t/a.out
 // RUN: %target-codesign %t/a.out.optimized
 //
 // RUN: %target-run %t/a.out | %FileCheck --check-prefix CHECK %s

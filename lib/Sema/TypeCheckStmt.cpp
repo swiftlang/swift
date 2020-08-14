@@ -1698,7 +1698,7 @@ static Type getFunctionBuilderType(FuncDecl *FD) {
 bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   auto res = evaluateOrDefault(AFD->getASTContext().evaluator,
                                TypeCheckFunctionBodyRequest{AFD}, true);
-  TypeChecker::checkFunctionErrorHandling(AFD);
+  TypeChecker::checkFunctionEffects(AFD);
   TypeChecker::computeCaptures(AFD);
   // SWIFT_ENABLE_TENSORFLOW
   // Check `@compilerEvaluable` function body correctness.
@@ -2159,7 +2159,7 @@ void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   BraceStmt *Body = TLCD->getBody();
   StmtChecker(TLCD).typeCheckStmt(Body);
   TLCD->setBody(Body);
-  checkTopLevelErrorHandling(TLCD);
+  checkTopLevelEffects(TLCD);
   performTopLevelDeclDiagnostics(TLCD);
 }
 

@@ -3214,6 +3214,9 @@ bool MissingMemberFailure::diagnoseAsError() {
   if (diagnoseInLiteralCollectionContext())
     return true;
 
+  if (diagnoseForSubscriptMemberWithTupleBase())
+    return true;
+
   auto baseType = resolveType(getBaseType())->getWithoutSpecifierType();
 
   DeclNameLoc nameLoc(::getLoc(anchor));
@@ -3428,6 +3431,73 @@ bool MissingMemberFailure::diagnoseInLiteralCollectionContext() const {
     }
   }
   return false;
+}
+
+bool MissingMemberFailure::diagnoseForSubscriptMemberWithTupleBase() const {
+  auto locator = getLocator();
+  auto baseType = resolveType(getBaseType())->getWithoutSpecifierType();
+
+  auto *SE = getAsExpr<SubscriptExpr>(locator->getAnchor());
+  if (!SE)
+    return false;
+
+  auto tupleType = baseType->getAs<TupleType>();
+  // For non-tuple type or empty tuples, let's fallback to the general
+  // diagnostic logic.
+  if (!tupleType || tupleType->getNumElements() == 0)
+    return false;
+
+  auto *index = SE->getIndex();
+  if (SE->getNumArguments() == 1) {
+    auto *literal =
+        dyn_cast<IntegerLiteralExpr>(index->getSemanticsProvidingExpr());
+
+    llvm::Regex NumericRegex("^[0-9]+$");
+    // Literal expressions may have other types of representations e.g. 0x01,
+    // 0b01. So let's make sure to only suggest this tailored literal fix-it for
+    // number only literals.
+    if (literal && NumericRegex.match(literal->getDigitsText())) {
+      unsigned int literalValue = 0;
+      literal->getDigitsText().getAsInteger(/*Radix=*/0, literalValue);
+
+      // Verify if the literal value is within the bounds of tuple elements.
+      if (!literal->isNegative() &&
+          literalValue < tupleType->getNumElements()) {
+        llvm::SmallString<4> dotAccess;
+        llvm::raw_svector_ostream OS(dotAccess);
+        OS << "." << literalValue;
+
+        emitDiagnostic(
+            diag::could_not_find_subscript_member_tuple_did_you_mean_use_dot,
+            baseType, literal->getDigitsText())
+            .fixItReplace(index->getSourceRange(), OS.str());
+        return true;
+      }
+    }
+
+    // For subscript access on tuple base types where the subscript index is a
+    // string literal expression which value matches a tuple element label,
+    // let's suggest tuple label access.
+    auto stringLiteral =
+        dyn_cast<StringLiteralExpr>(index->getSemanticsProvidingExpr());
+    if (stringLiteral && !stringLiteral->getValue().empty() &&
+        llvm::any_of(tupleType->getElements(), [&](TupleTypeElt element) {
+          return element.getName().is(stringLiteral->getValue());
+        })) {
+      llvm::SmallString<16> dotAccess;
+      llvm::raw_svector_ostream OS(dotAccess);
+      OS << "." << stringLiteral->getValue();
+
+      emitDiagnostic(
+          diag::could_not_find_subscript_member_tuple_did_you_mean_use_dot,
+          baseType, stringLiteral->getValue())
+          .fixItReplace(index->getSourceRange(), OS.str());
+      return true;
+    }
+  }
+
+  emitDiagnostic(diag::could_not_find_subscript_member_tuple, baseType);
+  return true;
 }
 
 bool UnintendedExtraGenericParamMemberFailure::diagnoseAsError() {
@@ -4956,6 +5026,9 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
 
   Optional<InFlightDiagnostic> diagnostic;
   if (isExpr<ArrayExpr>(anchor)) {
+    if (diagnoseMergedLiteralElements())
+      return true;
+
     diagnostic.emplace(emitDiagnostic(diag::cannot_convert_array_element,
                                       eltType, contextualType));
   }
@@ -5003,6 +5076,30 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
     return false;
 
   (void)trySequenceSubsequenceFixIts(*diagnostic);
+  return true;
+}
+
+bool CollectionElementContextualFailure::diagnoseMergedLiteralElements() {
+  auto elementAnchor = simplifyLocatorToAnchor(getLocator());
+  if (!elementAnchor)
+    return false;
+
+  auto *typeVar = getRawType(elementAnchor)->getAs<TypeVariableType>();
+  if (!typeVar || !typeVar->getImpl().getAtomicLiteralKind())
+    return false;
+
+  // This element is a literal whose type variable could have been merged with others,
+  // but the conversion constraint to the array element type was only placed on one
+  // of them. So, we want to emit the error for each element whose type variable is in
+  // this equivalence class.
+  auto &cs = getConstraintSystem();
+  auto node = cs.getRepresentative(typeVar)->getImpl().getGraphNode();
+  for (const auto *typeVar : node->getEquivalenceClass()) {
+    auto anchor = typeVar->getImpl().getLocator()->getAnchor();
+    emitDiagnosticAt(constraints::getLoc(anchor), diag::cannot_convert_array_element,
+                     getFromType(), getToType());
+  }
+
   return true;
 }
 
@@ -6572,4 +6669,96 @@ bool MissingOptionalUnwrapKeyPathFailure::diagnoseAsError() {
 SourceLoc MissingOptionalUnwrapKeyPathFailure::getLoc() const {
   auto *SE = castToExpr<SubscriptExpr>(getAnchor());
   return SE->getBase()->getEndLoc();
+}
+
+bool TrailingClosureRequiresExplicitLabel::diagnoseAsError() {
+  auto argInfo = *getFunctionArgApplyInfo(getLocator());
+
+  {
+    auto diagnostic = emitDiagnostic(
+        diag::unlabeled_trailing_closure_deprecated, argInfo.getParamLabel());
+    fixIt(diagnostic, argInfo);
+  }
+
+  if (auto *callee = argInfo.getCallee()) {
+    emitDiagnosticAt(callee, diag::decl_declared_here, callee->getName());
+  }
+
+  return true;
+}
+
+void TrailingClosureRequiresExplicitLabel::fixIt(
+    InFlightDiagnostic &diagnostic, const FunctionArgApplyInfo &info) const {
+  auto &ctx = getASTContext();
+
+  // Dig out source locations.
+  SourceLoc existingRParenLoc;
+  SourceLoc leadingCommaLoc;
+
+  auto anchor = getRawAnchor();
+  auto *arg = info.getArgListExpr();
+  Expr *fn = nullptr;
+
+  if (auto *applyExpr = getAsExpr<ApplyExpr>(anchor)) {
+    fn = applyExpr->getFn();
+  } else {
+    // Covers subscripts, unresolved members etc.
+    fn = getAsExpr(anchor);
+  }
+
+  if (!fn)
+    return;
+
+  auto *trailingClosure = info.getArgExpr();
+
+  if (auto tupleExpr = dyn_cast<TupleExpr>(arg)) {
+    existingRParenLoc = tupleExpr->getRParenLoc();
+    assert(tupleExpr->getNumElements() >= 2 && "Should be a ParenExpr?");
+    leadingCommaLoc = Lexer::getLocForEndOfToken(
+        ctx.SourceMgr,
+        tupleExpr->getElements()[tupleExpr->getNumElements() - 2]->getEndLoc());
+  } else {
+    auto parenExpr = cast<ParenExpr>(arg);
+    existingRParenLoc = parenExpr->getRParenLoc();
+  }
+
+  // Figure out the text to be inserted before the trailing closure.
+  SmallString<16> insertionText;
+  SourceLoc insertionLoc;
+  if (leadingCommaLoc.isValid()) {
+    insertionText += ", ";
+    assert(existingRParenLoc.isValid());
+    insertionLoc = leadingCommaLoc;
+  } else if (existingRParenLoc.isInvalid()) {
+    insertionText += "(";
+    insertionLoc = Lexer::getLocForEndOfToken(ctx.SourceMgr, fn->getEndLoc());
+  } else {
+    insertionLoc = existingRParenLoc;
+  }
+
+  // Add the label, if there is one.
+  auto paramName = info.getParamLabel();
+  if (!paramName.empty()) {
+    insertionText += paramName.str();
+    insertionText += ": ";
+  }
+
+  // If there is an existing right parentheses/brace, remove it while we
+  // insert the new text.
+  if (existingRParenLoc.isValid()) {
+    SourceLoc afterExistingRParenLoc =
+        Lexer::getLocForEndOfToken(ctx.SourceMgr, existingRParenLoc);
+    diagnostic.fixItReplaceChars(insertionLoc, afterExistingRParenLoc,
+                                 insertionText);
+  } else {
+    // Insert the appropriate prefix.
+    diagnostic.fixItInsert(insertionLoc, insertionText);
+  }
+
+  // Insert a right parenthesis/brace after the closing '}' of the trailing
+  // closure;
+  SourceLoc newRParenLoc =
+      Lexer::getLocForEndOfToken(ctx.SourceMgr, trailingClosure->getEndLoc());
+  diagnostic.fixItInsert(newRParenLoc,
+                         isExpr<SubscriptExpr>(anchor) ? "]" : ")");
 }

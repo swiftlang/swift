@@ -105,7 +105,7 @@ documentation, please create a thread on the Swift forums under the
   - [RequestEvaluator.md](/docs/RequestEvaluator.md):
     Describes the request evaluator architecture, which is used for
     lazy type-checking and efficient caching.
-  - [Literal.md](/docs/Literal.md):
+  - [Literals.md](/docs/Literals.md):
     Describes type-checking and inference specifically for literals.
 - [Serialization.rst](/docs/Serialization.rst):
   Gives an overview of the LLVM bitcode format used for swiftmodules.
@@ -117,7 +117,7 @@ documentation, please create a thread on the Swift forums under the
     Provides an overview of the implementation of SIL in the compiler.
   - [OptimizerDesign.md](/docs/OptimizerDesign.md):
     Describes the design of the optimizer pipeline.
-  - [HighLevelSILOptimizations.rst](docs/HighLevelSILOptimizations.rst):
+  - [HighLevelSILOptimizations.rst](/docs/HighLevelSILOptimizations.rst):
     Describes how the optimizer understands the semantics of high-level
     operations on currency data types and optimizes accordingly.
     Includes a thorough discussion of the `@_semantics` attribute.

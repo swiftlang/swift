@@ -178,5 +178,12 @@ WARNING(cross_imported_by_both_modules, none,
         "please report this bug to the maintainers of these modules",
         (Identifier, Identifier, Identifier))
 
+//------------------------------------------------------------------------------
+// MARK: dependencies scanner diagnostics
+//------------------------------------------------------------------------------
+
+ERROR(scanner_find_cycle, none,
+      "dependency scanner detected dependency cycle: '%0'", (StringRef))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

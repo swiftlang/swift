@@ -198,18 +198,18 @@ static id _getClassDescription(Class cls) {
 
 @implementation SwiftObject
 + (void)initialize {
-#if SWIFT_HAS_ISA_MASKING && !NDEBUG
-  // Older OSes may not have this variable, or it may not match. This code only
-  // runs on older OSes in certain testing scenarios, so that doesn't matter.
-  // Only perform the check on newer OSes where the value should definitely
-  // match.
-#  if SWIFT_BUILD_HAS_BACK_DEPLOYMENT
-  if (!_swift_isBackDeploying())
+#if SWIFT_HAS_ISA_MASKING && !TARGET_OS_SIMULATOR && !NDEBUG
+  uintptr_t libObjCMask = (uintptr_t)&objc_absolute_packed_isa_class_mask;
+  assert(libObjCMask);
+
+#  if __arm64__ && !__has_feature(ptrauth_calls)
+  // When we're built ARM64 but running on ARM64e hardware, we will get an
+  // ARM64e libobjc with an ARM64e ISA mask. This mismatch is harmless and we
+  // shouldn't assert.
+  assert(libObjCMask == SWIFT_ISA_MASK || libObjCMask == SWIFT_ISA_MASK_PTRAUTH);
+#  else
+  assert(libObjCMask == SWIFT_ISA_MASK);
 #  endif
-  {
-    assert(&objc_debug_isa_class_mask);
-    assert(objc_debug_isa_class_mask == SWIFT_ISA_MASK);
-  }
 #endif
 }
 

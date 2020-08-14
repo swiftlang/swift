@@ -365,6 +365,14 @@ bool BottomUpRefCountState::handlePotentialGuaranteedUser(
   if (!mayGuaranteedUseValue(PotentialGuaranteedUser, getRCRoot(), AA))
     return false;
 
+  // If we can prove that the pointer we are tracking cannot be decremented,
+  // return. On return, BottomUpRefCountState::handlePotentialUser can correctly
+  // handle transition of refcount state. It transitions from a Decrement
+  // refcount state to a MighBeUsed refcount state
+  if (!mayDecrementRefCount(PotentialGuaranteedUser, getRCRoot(), AA)) {
+    return false;
+   }
+
   // Instructions that we do not recognize (and thus will not move) and that
   // *must* use RCIdentity, implies we are always known safe as long as meet
   // over all path constraints are satisfied.
@@ -815,6 +823,13 @@ bool TopDownRefCountState::handlePotentialGuaranteedUser(
   // return...
   if (!mayGuaranteedUseValue(PotentialGuaranteedUser, getRCRoot(), AA))
     return false;
+
+  // If we can prove that the pointer we are tracking cannot be decremented,
+  // return. On return, TopDownRefCountState::handlePotentialUser can correctly
+  // handle transition of refcount state.
+  if (!mayDecrementRefCount(PotentialGuaranteedUser, getRCRoot(), AA)) {
+    return false;
+   }
 
   // Otherwise, update our step given that we have a potential decrement.
   return handleGuaranteedUser(PotentialGuaranteedUser, getRCRoot(),

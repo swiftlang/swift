@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/reflect_nested
+// RUN: %target-codesign %t/reflect_nested
 // RUN: %target-run %target-swift-reflection-test %t/reflect_nested 2>&1 | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
 // REQUIRES: reflection_test_support
 // REQUIRES: executable_test

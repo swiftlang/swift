@@ -1208,6 +1208,9 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
 
   // Match up the call arguments to the parameters.
   SmallVector<ParamBinding, 4> parameterBindings;
+  TrailingClosureMatching selectedTrailingMatching =
+      TrailingClosureMatching::Forward;
+
   {
     ArgumentFailureTracker listener(cs, argsWithLabels, params, locator);
     auto callArgumentMatch = constraints::matchCallArguments(
@@ -1224,10 +1227,10 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
       return cs.getTypeMatchAmbiguous();
     }
 
+    selectedTrailingMatching = callArgumentMatch->trailingClosureMatching;
     // Record the direction of matching used for this call.
-    cs.recordTrailingClosureMatch(
-        cs.getConstraintLocator(locator),
-        callArgumentMatch->trailingClosureMatching);
+    cs.recordTrailingClosureMatch(cs.getConstraintLocator(locator),
+                                  selectedTrailingMatching);
 
     // If there was a disjunction because both forward and backward were
     // possible, increase the score for forward matches to bias toward the
@@ -1314,6 +1317,15 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
           cs.increaseScore(SK_FunctionConversion);
           matchingAutoClosureResult = false;
         }
+      }
+
+      // In case solver matched trailing based on the backward scan,
+      // let's produce a warning which would suggest to add a label
+      // to disambiguate in the future.
+      if (selectedTrailingMatching == TrailingClosureMatching::Backward &&
+          argIdx == *argInfo->UnlabeledTrailingClosureIndex) {
+        cs.recordFix(SpecifyLabelToAssociateTrailingClosure::create(
+            cs, cs.getConstraintLocator(loc)));
       }
 
       // If argument comes for declaration it should loose
@@ -4220,6 +4232,7 @@ bool ConstraintSystem::repairFailures(
 
       conversionsOrFixes.push_back(CollectionElementContextualMismatch::create(
           *this, lhs, rhs, getConstraintLocator(locator)));
+      break;
     }
 
     // Drop the `tuple element` locator element so that all tuple element
@@ -6590,6 +6603,14 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       baseObjTy->is<AnyMetatypeType>() &&
       constraintKind == ConstraintKind::UnresolvedValueMember) {
     if (auto objectType = instanceTy->getOptionalObjectType()) {
+      // If we don't have a wrapped type yet, we can't look through the optional
+      // type.
+      if (objectType->getAs<TypeVariableType>()) {
+        MemberLookupResult result;
+        result.OverallResult = MemberLookupResult::Unsolved;
+        return result;
+      }
+
       if (objectType->mayHaveMembers()) {
         LookupResult &optionalLookup = lookupMember(objectType, memberName);
         for (auto result : optionalLookup)
@@ -8241,6 +8262,9 @@ ConstraintSystem::simplifyKeyPathConstraint(
 
     case KeyPathExpr::Component::Kind::TupleElement:
       llvm_unreachable("not implemented");
+      break;
+    case KeyPathExpr::Component::Kind::DictionaryKey:
+      llvm_unreachable("DictionaryKey only valid in #keyPath");
       break;
     }
   }
@@ -9963,7 +9987,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowKeyPathRootTypeMismatch:
   case FixKind::UnwrapOptionalBaseKeyPathApplication:
   case FixKind::AllowCoercionToForceCast:
-  case FixKind::SpecifyKeyPathRootType: {
+  case FixKind::SpecifyKeyPathRootType:
+  case FixKind::SpecifyLabelToAssociateTrailingClosure: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
@@ -10430,35 +10455,6 @@ void ConstraintSystem::addContextualConversionConstraint(
       expr, LocatorPathElt::ContextualType(isForSingleExprFunction));
   addConstraint(constraintKind, getType(expr), conversionType,
                 convertTypeLocator, /*isFavored*/ true);
-}
-
-Type ConstraintSystem::addJoinConstraint(
-    ConstraintLocator *locator,
-    ArrayRef<std::pair<Type, ConstraintLocator *>> inputs) {
-  switch (inputs.size()) {
-  case 0:
-    return Type();
-
-  case 1:
-    return inputs.front().first;
-
-  default:
-    // Produce the join below.
-    break;
-  }
-
-  // Create a type variable to capture the result of the join.
-  Type resultTy = createTypeVariable(locator,
-                                     (TVO_PrefersSubtypeBinding |
-                                      TVO_CanBindToNoEscape));
-
-  // Introduce conversions from each input type to the type variable.
-  for (const auto &input : inputs) {
-    addConstraint(
-      ConstraintKind::Conversion, input.first, resultTy, input.second);
-  }
-
-  return resultTy;
 }
 
 void ConstraintSystem::addFixConstraint(ConstraintFix *fix, ConstraintKind kind,
