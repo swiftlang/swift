@@ -45,6 +45,7 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/Constant.h"
+#include "llvm/IR/GlobalVariable.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FormatVariadic.h"
 #include <algorithm>
@@ -2040,8 +2041,12 @@ static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
     GenericArguments &genericArgs,
     std::function<llvm::Value *(int)> valueAtIndex) {
   auto &IGM = IGF.IGM;
-  auto specializations = IGF.IGM.IRGen.canonicalSpecializationsForType(nominal);
-  if (specializations.size() > 0) {
+  auto specializations = IGM.IRGen.metadataPrespecializationsForType(nominal);
+  auto canonicalCount = llvm::count_if(specializations, [](auto pair) {
+    return pair.second == TypeMetadataCanonicality::Canonical;
+  });
+
+  if (canonicalCount > 0) {
     SmallVector<llvm::BasicBlock *, 4> conditionBlocks;
     for (size_t index = 0; index < specializations.size(); ++index) {
       conditionBlocks.push_back(llvm::BasicBlock::Create(IGM.getLLVMContext()));
@@ -2057,7 +2062,11 @@ static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
         specializationBlocks;
     auto switchDestination = llvm::BasicBlock::Create(IGM.getLLVMContext());
     unsigned long blockIndex = 0;
-    for (auto specialization : specializations) {
+    for (auto pair : specializations) {
+      if (pair.second != TypeMetadataCanonicality::Canonical) {
+        continue;
+      }
+      auto specialization = pair.first;
       auto conditionBlock = conditionBlocks[blockIndex];
       IGF.Builder.emitBlock(conditionBlock);
       auto successorBlock = blockIndex < conditionBlocks.size() - 1
@@ -2069,7 +2078,7 @@ static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
 
       llvm::Value *condition = llvm::ConstantInt::get(IGM.Int1Ty, 1);
       auto nominal = specialization->getAnyNominal();
-      auto requirements = GenericTypeRequirements(IGF.IGM, nominal);
+      auto requirements = GenericTypeRequirements(IGM, nominal);
       int requirementIndex = 0;
       for (auto requirement : requirements.getRequirements()) {
         auto parameter = requirement.TypeParameter;
@@ -2090,7 +2099,7 @@ static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
             RootProtocolConformance *rootConformance =
                 concreteConformance->getRootConformance();
             llvm::Value *expectedDescriptor =
-                IGF.IGM.getAddrOfProtocolConformanceDescriptor(rootConformance);
+                IGM.getAddrOfProtocolConformanceDescriptor(rootConformance);
             auto *witnessTable = valueAtIndex(requirementIndex);
             auto *witnessBuffer =
                 IGF.Builder.CreateBitCast(witnessTable, IGM.Int8PtrPtrTy);
@@ -2102,7 +2111,7 @@ static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
 
             // Auth the stored descriptor.
             auto storedScheme =
-                IGF.IGM.getOptions().PointerAuth.ProtocolConformanceDescriptors;
+                IGM.getOptions().PointerAuth.ProtocolConformanceDescriptors;
             if (storedScheme) {
               auto authInfo = PointerAuthInfo::emit(
                   IGF, storedScheme, witnessTable,
@@ -2113,7 +2122,7 @@ static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
 
             // Sign the descriptors.
             auto argScheme =
-                IGF.IGM.getOptions()
+                IGM.getOptions()
                     .PointerAuth.ProtocolConformanceDescriptorsAsArguments;
             if (argScheme) {
               auto authInfo = PointerAuthInfo::emit(
@@ -2127,10 +2136,10 @@ static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
             }
 
             auto *call = IGF.Builder.CreateCall(
-                IGF.IGM.getCompareProtocolConformanceDescriptorsFn(),
+                IGM.getCompareProtocolConformanceDescriptorsFn(),
                 {providedDescriptor, expectedDescriptor});
             call->setDoesNotThrow();
-            call->setCallingConv(IGF.IGM.SwiftCC);
+            call->setCallingConv(IGM.SwiftCC);
             call->addAttribute(llvm::AttributeList::FunctionIndex,
                                llvm::Attribute::ReadNone);
             condition = IGF.Builder.CreateAnd(condition, call);
@@ -2153,7 +2162,7 @@ static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
         llvm::Value *specializedMetadata;
         if (isa<ClassDecl>(nominal)) {
           llvm::Function *accessor =
-              IGF.IGM
+              IGM
                   .getAddrOfCanonicalSpecializedGenericTypeMetadataAccessFunction(
                       specialization, NotForDefinition);
 
