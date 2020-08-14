@@ -996,7 +996,7 @@ class BuildScriptInvocation(object):
         for host_target in all_hosts:
             for product_class in impl_product_classes:
                 self._execute_install_action(host_target, product_class)
-        
+
         # Lipo...
         self._execute_merged_host_lipo_action()
 
