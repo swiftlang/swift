@@ -877,6 +877,10 @@ public:
   /// \returns The requested module, or NULL if the module cannot be found.
   ModuleDecl *getModule(ImportPath::Module ModulePath);
 
+  // Attempts to load the matching overlay module for the given clang
+  // module into this ASTContext.
+  ModuleDecl *getOverlayModule(const FileUnit *ClangModule);
+
   ModuleDecl *getModuleByName(StringRef ModuleName);
 
   ModuleDecl *getModuleByIdentifier(Identifier ModuleID);
