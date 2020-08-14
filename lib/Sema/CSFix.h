@@ -274,7 +274,7 @@ enum class FixKind : uint8_t {
   /// parameter in the call.
   SpecifyLabelToAssociateTrailingClosure,
 
-  /// Allow key path expressions missing component.
+  /// Allow key path expressions with no components.
   AllowKeyPathWithoutComponents,
 };
 
@@ -1961,7 +1961,7 @@ public:
   create(ConstraintSystem &cs, ConstraintLocator *locator);
 };
 
-/// Diagnose situations where we have key path missing a component.
+/// Diagnose situations where we have a key path with no components.
 ///
 /// \code
 /// let _ : KeyPath<A, B> = \A

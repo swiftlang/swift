@@ -2248,7 +2248,7 @@ private:
              const FunctionArgApplyInfo &info) const;
 };
 
-/// Diagnose situations where we have key path missing a component.
+/// Diagnose situations where we have a key path with no components.
 ///
 /// \code
 /// let _ : KeyPath<A, B> = \A

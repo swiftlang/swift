@@ -6766,9 +6766,9 @@ bool InvalidEmptyKeyPathFailure::diagnoseAsError() {
   assert(KPE && KPE->hasSingleInvalidComponent() &&
          "Expected a malformed key path expression");
 
-  // String interpolation represented as key path expressions e.g. \(x),
-  // \(x, a: 1) and this is already diagnosed. So let's skip it because
-  // that is not the case for a empty key path diagnostic.
+  // If we have a string interpolation represented as key path expressions
+  // e.g. \(x), \(x, a: 1). Let's skip it because this would be already
+  // diagnosed and it is not the case for an extra empty key path diagnostic.
   auto *root = KPE->getParsedRoot();
   if (root && (isa<ParenExpr>(root) || isa<TupleExpr>(root)))
     return true;
