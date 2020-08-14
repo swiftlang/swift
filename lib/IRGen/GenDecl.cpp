@@ -1164,18 +1164,42 @@ void IRGenerator::emitTypeMetadataRecords() {
   }
 }
 
+void IRGenerator::
+    deleteAndReenqueueForEmissionValuesDependentOnCanonicalPrespecializedMetadataRecords(
+        IRGenModule &IGM, CanType typeWithCanonicalMetadataPrespecialization,
+        NominalTypeDecl &decl) {
+  // The accessor depends on canonical metadata records because they are
+  // returned from the function when the arguments match.
+  //
+  // TODO: Once work of looking through canonical prespecialized metadata has
+  //       been moved into getGenericMetadata, this reemission will no longer
+  //       be necessary.
+  auto *accessor = IGM.getAddrOfTypeMetadataAccessFunction(
+      decl.getDeclaredType()->getCanonicalType(), NotForDefinition);
+  accessor->deleteBody();
+  IGM.IRGen.noteUseOfMetadataAccessor(&decl);
+
+  // The type context descriptor depends on canonical metadata records because
+  // pointers to them are attached as trailing objects to it.
+  //
+  // Don't call
+  //
+  //     noteUseOfTypeContextDescriptor
+  //
+  // here because we don't want to reemit metadata.
+  emitLazyTypeContextDescriptor(IGM, &decl, RequireMetadata);
+}
+
 /// Emit any lazy definitions (of globals or functions or whatever
 /// else) that we require.
 void IRGenerator::emitLazyDefinitions() {
   while (!LazyTypeMetadata.empty() ||
          !LazySpecializedTypeMetadataRecords.empty() ||
          !LazyTypeContextDescriptors.empty() ||
-         !LazyOpaqueTypeDescriptors.empty() ||
-         !LazyFieldDescriptors.empty() ||
-         !LazyFunctionDefinitions.empty() ||
-         !LazyWitnessTables.empty() ||
-         !LazyCanonicalSpecializedMetadataAccessors.empty()) {
-
+         !LazyOpaqueTypeDescriptors.empty() || !LazyFieldDescriptors.empty() ||
+         !LazyFunctionDefinitions.empty() || !LazyWitnessTables.empty() ||
+         !LazyCanonicalSpecializedMetadataAccessors.empty() ||
+         !LazyMetadataAccessors.empty()) {
     // Emit any lazy type metadata we require.
     while (!LazyTypeMetadata.empty()) {
       NominalTypeDecl *type = LazyTypeMetadata.pop_back_val();
@@ -1187,10 +1211,23 @@ void IRGenerator::emitLazyDefinitions() {
       emitLazyTypeMetadata(*IGM.get(), type);
     }
     while (!LazySpecializedTypeMetadataRecords.empty()) {
-      CanType type = LazySpecializedTypeMetadataRecords.pop_back_val();
-      auto *nominal = type->getNominalOrBoundGenericNominal();
-      CurrentIGMPtr IGM = getGenModule(nominal->getDeclContext());
-      emitLazySpecializedGenericTypeMetadata(*IGM.get(), type);
+      CanType theType;
+      TypeMetadataCanonicality canonicality;
+      std::tie(theType, canonicality) =
+          LazySpecializedTypeMetadataRecords.pop_back_val();
+      auto *nominal = theType->getNominalOrBoundGenericNominal();
+      CurrentIGMPtr IGMPtr = getGenModule(nominal->getDeclContext());
+      auto &IGM = *IGMPtr.get();
+      // A new canonical prespecialized metadata changes both the type
+      // descriptor (adding a new entry to the trailing list of metadata) and
+      // the metadata accessor (adding a new list of generic arguments against
+      // which to compare the arguments to the function).  Consequently, it is
+      // necessary to force these to be reemitted.
+      if (canonicality == TypeMetadataCanonicality::Canonical) {
+        deleteAndReenqueueForEmissionValuesDependentOnCanonicalPrespecializedMetadataRecords(
+            IGM, theType, *nominal);
+      }
+      emitLazySpecializedGenericTypeMetadata(IGM, theType);
     }
     while (!LazyTypeContextDescriptors.empty()) {
       NominalTypeDecl *type = LazyTypeContextDescriptors.pop_back_val();
@@ -1236,15 +1273,23 @@ void IRGenerator::emitLazyDefinitions() {
           LazyCanonicalSpecializedMetadataAccessors.pop_back_val();
       auto *nominal = theType->getAnyNominal();
       assert(nominal);
-      CurrentIGMPtr IGM = getGenModule(nominal->getDeclContext());
-      emitLazyCanonicalSpecializedMetadataAccessor(*IGM.get(), theType);
+      CurrentIGMPtr IGMPtr = getGenModule(nominal->getDeclContext());
+      auto &IGM = *IGMPtr.get();
+      // TODO: Once non-canonical accessors are available, this variable should
+      //       reflect the canonicality of the accessor rather than always being
+      //       canonical.
+      auto canonicality = TypeMetadataCanonicality::Canonical;
+      if (canonicality == TypeMetadataCanonicality::Canonical) {
+        deleteAndReenqueueForEmissionValuesDependentOnCanonicalPrespecializedMetadataRecords(
+            IGM, theType, *nominal);
+      }
+      emitLazyCanonicalSpecializedMetadataAccessor(IGM, theType);
     }
-  }
-
-  while (!LazyMetadataAccessors.empty()) {
-    NominalTypeDecl *nominal = LazyMetadataAccessors.pop_back_val();
-    CurrentIGMPtr IGM = getGenModule(nominal->getDeclContext());
-    emitLazyMetadataAccessor(*IGM.get(), nominal);
+    while (!LazyMetadataAccessors.empty()) {
+      NominalTypeDecl *nominal = LazyMetadataAccessors.pop_back_val();
+      CurrentIGMPtr IGM = getGenModule(nominal->getDeclContext());
+      emitLazyMetadataAccessor(*IGM.get(), nominal);
+    }
   }
 
   FinishedEmittingLazyDefinitions = true;
@@ -1442,17 +1487,19 @@ static bool typeKindCanBePrespecialized(TypeKind theKind) {
   }
 }
 
-void IRGenerator::noteUseOfSpecializedGenericTypeMetadata(CanType type) {
-  assert(typeKindCanBePrespecialized(type->getKind()));
-  auto key = type->getAnyNominal();
+void IRGenerator::noteUseOfSpecializedGenericTypeMetadata(
+    IRGenModule &IGM, CanType theType, TypeMetadataCanonicality canonicality) {
+  assert(typeKindCanBePrespecialized(theType->getKind()));
+  auto key = theType->getAnyNominal();
   assert(key);
   assert(key->isGenericContext());
-  auto &enqueuedSpecializedTypes = CanonicalSpecializationsForGenericTypes[key];
+  auto &enqueuedSpecializedTypes =
+      MetadataPrespecializationsForGenericTypes[key];
   if (llvm::all_of(enqueuedSpecializedTypes,
-                   [&](CanType enqueued) { return enqueued != type; })) {
+                   [&](auto enqueued) { return enqueued.first != theType; })) {
     assert(!FinishedEmittingLazyDefinitions);
-    LazySpecializedTypeMetadataRecords.push_back(type);
-    enqueuedSpecializedTypes.push_back(type);
+    LazySpecializedTypeMetadataRecords.push_back({theType, canonicality});
+    enqueuedSpecializedTypes.push_back({theType, canonicality});
   }
 }
 
@@ -3853,6 +3900,19 @@ llvm::GlobalValue *IRGenModule::defineAlias(LinkEntity entity,
   if (entry) {
     auto existingVal = cast<llvm::GlobalValue>(entry);
 
+    for (auto iterator = std::begin(LLVMUsed); iterator < std::end(LLVMUsed); ++iterator) {
+      llvm::Value *thisValue = *iterator;
+      if (thisValue == existingVal) {
+        LLVMUsed.erase(iterator);
+      }
+    }
+    for (auto iterator = std::begin(LLVMCompilerUsed); iterator < std::end(LLVMCompilerUsed); ++iterator) {
+      llvm::Value *thisValue = *iterator;
+      if (thisValue == existingVal) {
+        LLVMCompilerUsed.erase(iterator);
+      }
+    }
+
     // FIXME: MC breaks when emitting alias references on some platforms
     // (rdar://problem/22450593 ). Work around this by referring to the aliasee
     // instead.
@@ -4019,7 +4079,8 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   if (shouldPrespecializeGenericMetadata()) {
     if (auto nominal = concreteType->getAnyNominal()) {
       if (nominal->isGenericContext()) {
-        IRGen.noteUseOfSpecializedGenericTypeMetadata(concreteType);
+        IRGen.noteUseOfSpecializedGenericTypeMetadata(*this, concreteType,
+                                                      canonicality);
       }
     }
   }
