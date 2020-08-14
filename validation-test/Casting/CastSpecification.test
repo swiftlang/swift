@@ -461,11 +461,12 @@ class Type_Any_Protocol(TypeTester):
    def customLocals(self):
       return 'let a: Any.Protocol = Any.self'
    def tests(self):
-      return [self.invariant_common,
-              'expectTrue(Any.self is Any.Protocol)',
+      return ['expectTrue(Any.self is Any.Protocol)',
               'expectFalse(Int.self is Any.Protocol)',
               'expectFalse(Any?.self is Any.Protocol)',
-              'expectFalse(P.self is Any.Protocol)']
+              'expectFalse(P.self is Any.Protocol)',
+              self.invariant_common,
+              ]
 
 class Type_Struct_Same(TypeTester):
    name = 'Struct_Same'
