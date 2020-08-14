@@ -87,11 +87,11 @@ namespace {
         : Command(std::move(Cmd)) {}
 
     virtual std::vector<CompileCommand>
-    getCompileCommands(StringRef FilePath) const {
+    getCompileCommands(StringRef FilePath) const override {
       return {Command};
     }
 
-    virtual std::vector<CompileCommand> getAllCompileCommands() const {
+    virtual std::vector<CompileCommand> getAllCompileCommands() const override {
       return {Command};
     }
 
