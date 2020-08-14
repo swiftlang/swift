@@ -614,6 +614,7 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
   bool hasCCToken = false;
   if (SourceMgr.hasCodeCompletionBuffer() &&
       SourceMgr.getCodeCompletionBufferID() == L->getBufferID()) {
+    llvm::SaveAndRestore<Optional<llvm::MD5>> H(CurrentTokenHash, None);
     BacktrackingScope backtrack(*this);
     auto startLoc = Tok.getLoc();
     skipSingle();
@@ -676,6 +677,7 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
 
     // Treat the region containing code completion token as "active".
     if (hasCCToken && !foundActive) {
+      llvm::SaveAndRestore<Optional<llvm::MD5>> H(CurrentTokenHash, None);
       BacktrackingScope backtrack(*this);
       auto startLoc = Tok.getLoc();
       skipUntilConditionalBlockClose();
