@@ -2253,10 +2253,10 @@ private:
 /// \code
 /// let _ : KeyPath<A, B> = \A
 /// \endcode
-class AllowKeyPathMissingComponentFailure final : public FailureDiagnostic {
+class InvalidEmptyKeyPathFailure final : public FailureDiagnostic {
 public:
-  AllowKeyPathMissingComponentFailure(const Solution &solution,
-                                      ConstraintLocator *locator)
+  InvalidEmptyKeyPathFailure(const Solution &solution,
+                             ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
 
   bool diagnoseAsError() override;

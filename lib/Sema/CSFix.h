@@ -275,7 +275,7 @@ enum class FixKind : uint8_t {
   SpecifyLabelToAssociateTrailingClosure,
 
   /// Allow key path expressions missing component.
-  AllowKeyPathMissingComponent,
+  AllowKeyPathWithoutComponents,
 };
 
 class ConstraintFix {
@@ -1966,17 +1966,18 @@ public:
 /// \code
 /// let _ : KeyPath<A, B> = \A
 /// \endcode
-class AllowKeyPathMissingComponent final : public ConstraintFix {
-  AllowKeyPathMissingComponent(ConstraintSystem &cs, ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::AllowKeyPathMissingComponent, locator) {}
+class AllowKeyPathWithoutComponents final : public ConstraintFix {
+  AllowKeyPathWithoutComponents(ConstraintSystem &cs,
+                                ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowKeyPathWithoutComponents, locator) {}
 
 public:
   std::string getName() const override { return "key path missing component"; }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  static AllowKeyPathMissingComponent *create(ConstraintSystem &cs,
-                                              ConstraintLocator *locator);
+  static AllowKeyPathWithoutComponents *create(ConstraintSystem &cs,
+                                               ConstraintLocator *locator);
 };
 
 } // end namespace constraints

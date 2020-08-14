@@ -1540,14 +1540,14 @@ SpecifyLabelToAssociateTrailingClosure::create(ConstraintSystem &cs,
       SpecifyLabelToAssociateTrailingClosure(cs, locator);
 }
 
-bool AllowKeyPathMissingComponent::diagnose(const Solution &solution,
-                                            bool asNote) const {
-  AllowKeyPathMissingComponentFailure failure(solution, getLocator());
+bool AllowKeyPathWithoutComponents::diagnose(const Solution &solution,
+                                             bool asNote) const {
+  InvalidEmptyKeyPathFailure failure(solution, getLocator());
   return failure.diagnose(asNote);
 }
 
-AllowKeyPathMissingComponent *
-AllowKeyPathMissingComponent::create(ConstraintSystem &cs,
-                                     ConstraintLocator *locator) {
-  return new (cs.getAllocator()) AllowKeyPathMissingComponent(cs, locator);
+AllowKeyPathWithoutComponents *
+AllowKeyPathWithoutComponents::create(ConstraintSystem &cs,
+                                      ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AllowKeyPathWithoutComponents(cs, locator);
 }

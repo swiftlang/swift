@@ -8130,7 +8130,7 @@ ConstraintSystem::simplifyKeyPathConstraint(
     // If we have a malformed KeyPathExpr e.g. let _: KeyPath<A, C> = \A
     // let's record a AllowKeyPathMissingComponent fix.
     if (keyPath->hasSingleInvalidComponent()) {
-      auto *fix = AllowKeyPathMissingComponent::create(
+      auto *fix = AllowKeyPathWithoutComponents::create(
           *this, getConstraintLocator(locator));
       return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
     }
@@ -9997,7 +9997,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowCoercionToForceCast:
   case FixKind::SpecifyKeyPathRootType:
   case FixKind::SpecifyLabelToAssociateTrailingClosure:
-  case FixKind::AllowKeyPathMissingComponent: {
+  case FixKind::AllowKeyPathWithoutComponents: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 

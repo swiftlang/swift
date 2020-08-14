@@ -6761,7 +6761,7 @@ void TrailingClosureRequiresExplicitLabel::fixIt(
                          isExpr<SubscriptExpr>(anchor) ? "]" : ")");
 }
 
-bool AllowKeyPathMissingComponentFailure::diagnoseAsError() {
+bool InvalidEmptyKeyPathFailure::diagnoseAsError() {
   auto *KPE = getAsExpr<KeyPathExpr>(getAnchor());
   assert(KPE && KPE->hasSingleInvalidComponent() &&
          "Expected a malformed key path expression");
