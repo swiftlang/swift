@@ -37,3 +37,16 @@ struct X {
   @asyncHandler init() { }
   // expected-error@-1{{@asyncHandler may only be used on 'func' declarations}}
 }
+
+
+// Inference of @asyncHandler
+protocol P {
+  @asyncHandler func callback()
+}
+
+extension X: P {
+  func callback() {
+    // okay, it's an async context
+    let _ = await globalAsyncFunction()
+ }
+}

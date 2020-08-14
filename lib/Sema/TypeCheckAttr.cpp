@@ -29,6 +29,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/StorageImpl.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -5246,6 +5247,59 @@ bool IsAsyncHandlerRequest::evaluate(
     }
 
     return true;
+  }
+
+  // Are we in a context where inference is possible?
+  auto dc = func->getDeclContext();
+  if (!dc->isTypeContext() || !dc->getParentSourceFile() ||
+      isa<ProtocolDecl>(dc) || !func->hasBody())
+    return false;
+
+  // Is it possible to infer @asyncHandler for this function at all?
+  if (checkAsyncHandler(func, /*diagnose=*/false))
+    return false;
+
+  // Add an implicit @asyncHandler attribute and return true. We're done.
+  auto addImplicitAsyncHandlerAttr = [&] {
+    func->getAttrs().add(new (func->getASTContext()) AsyncHandlerAttr(true));
+    return true;
+  };
+
+  // Check whether any of the conformances in the context of the function
+  // implies @asyncHandler.
+  {
+    auto idc = cast<IterableDeclContext>(dc->getAsDecl());
+    auto conformances = evaluateOrDefault(
+        dc->getASTContext().evaluator,
+        LookupAllConformancesInContextRequest{idc}, { });
+
+    for (auto conformance : conformances) {
+      auto protocol = conformance->getProtocol();
+      for (auto found : protocol->lookupDirect(func->getName())) {
+        if (!isa<ProtocolDecl>(found->getDeclContext()))
+          continue;
+
+        auto requirement = dyn_cast<FuncDecl>(found);
+        if (!requirement)
+          continue;
+
+        if (!requirement->isAsyncHandler())
+          continue;
+
+        auto witness = conformance->getWitnessDecl(requirement);
+        if (witness != func)
+          continue;
+
+        return addImplicitAsyncHandlerAttr();
+      }
+    }
+  }
+
+  // Look through dynamic replacements.
+  if (auto replaced = func->getDynamicallyReplacedDecl()) {
+    if (auto replacedFunc = dyn_cast<FuncDecl>(replaced))
+      if (replacedFunc->isAsyncHandler())
+        return addImplicitAsyncHandlerAttr();
   }
 
   return false;
