@@ -365,3 +365,5 @@ $s0059xxxxxxxxxxxxxxx_ttttttttBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBee -> $s0059xxxx
 $sx1td_t ---> (t: A...)
 $s7example1fyyYF -> example.f() async -> ()
 $s7example1fyyYKF -> example.f() async throws -> ()
+$s4main20receiveInstantiationyySo34__CxxTemplateInst12MagicWrapperIiEVzF ---> main.receiveInstantiation(inout __C.__CxxTemplateInst12MagicWrapperIiE) -> ()
+$s4main19returnInstantiationSo34__CxxTemplateInst12MagicWrapperIiEVyF ---> main.returnInstantiation() -> __C.__CxxTemplateInst12MagicWrapperIiE
