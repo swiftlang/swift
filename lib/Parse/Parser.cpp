@@ -695,8 +695,9 @@ void Parser::skipSingle() {
 void Parser::skipUntil(tok T1, tok T2) {
   // tok::NUM_TOKENS is a sentinel that means "don't skip".
   if (T1 == tok::NUM_TOKENS && T2 == tok::NUM_TOKENS) return;
-  
-  while (Tok.isNot(T1, T2, tok::eof, tok::pound_endif, tok::code_complete))
+
+  while (Tok.isNot(T1, T2, tok::eof, tok::pound_endif, tok::pound_else,
+                   tok::pound_elseif))
     skipSingle();
 }
 

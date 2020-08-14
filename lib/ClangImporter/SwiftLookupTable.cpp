@@ -1881,10 +1881,16 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
   // struct names when relevant, not just pointer names. That way we can check
   // both CFDatabase.def and the objc_bridge attribute and cover all our bases.
   if (auto *tagDecl = dyn_cast<clang::TagDecl>(named)) {
-    if (!tagDecl->getDefinition())
+    // We add entries for ClassTemplateSpecializations that don't have
+    // definition. It's possible that the decl will be instantiated by
+    // SwiftDeclConverter later on. We cannot force instantiating
+    // ClassTemplateSPecializations here because we're currently writing the
+    // AST, so we cannot modify it.
+    if (!isa<clang::ClassTemplateSpecializationDecl>(named) &&
+        !tagDecl->getDefinition()) {
       return;
+    }
   }
-
   // If we have a name to import as, add this entry to the table.
   auto currentVersion =
       ImportNameVersion::fromOptions(nameImporter.getLangOpts());
@@ -2077,6 +2083,19 @@ void SwiftLookupTableWriter::populateTableWithDecl(SwiftLookupTable &table,
 
   // Add this entry to the lookup table.
   addEntryToLookupTable(table, named, nameImporter);
+  if (auto typedefDecl = dyn_cast<clang::TypedefNameDecl>(named)) {
+    if (auto typedefType = dyn_cast<clang::TemplateSpecializationType>(
+            typedefDecl->getUnderlyingType())) {
+      if (auto CTSD = dyn_cast<clang::ClassTemplateSpecializationDecl>(
+              typedefType->getAsTagDecl())) {
+        // Adding template instantiation behind typedef as a top-level entry
+        // so the instantiation appears in the API.
+        assert(!isa<clang::ClassTemplatePartialSpecializationDecl>(CTSD) &&
+            "Class template partial specialization cannot appear behind typedef");
+        addEntryToLookupTable(table, CTSD, nameImporter);
+      }
+    }
+  }
 }
 
 void SwiftLookupTableWriter::populateTable(SwiftLookupTable &table,

@@ -16,8 +16,8 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/AST/TBDGenRequests.h"
 #include "swift/Subsystems.h"
-#include "swift/TBDGen/TBDGen.h"
 #include "llvm/IR/Module.h"
 #include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
 
