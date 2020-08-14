@@ -3635,7 +3635,7 @@ static void emitObjCClassSymbol(IRGenModule &IGM,
       ptrTy->getElementType(), ptrTy->getAddressSpace(), link.getLinkage(),
       link.getName(), metadata, &IGM.Module);
   ApplyIRLinkage({link.getLinkage(), link.getVisibility(), link.getDLLStorage()})
-      .to(alias);
+      .to(alias, link.isForDefinition());
 }
 
 /// Emit the type metadata or metadata template for a class.
