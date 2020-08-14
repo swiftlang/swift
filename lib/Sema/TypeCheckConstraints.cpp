@@ -962,12 +962,12 @@ namespace {
       public:
         StrangeInterpolationRewriter(ASTContext &Ctx) : Context(Ctx) {}
 
-        virtual bool walkToDeclPre(Decl *D) {
+        virtual bool walkToDeclPre(Decl *D) override {
           // We don't want to look inside decls.
           return false;
         }
 
-        virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) {
+        virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
           // One InterpolatedStringLiteralExpr should never be nested inside
           // another except as a child of a CallExpr, and we don't recurse into
           // the children of CallExprs.
