@@ -330,10 +330,8 @@ public:
       return;
     }
 
-    if (checkAsyncHandler(func, /*diagnose=*/true)) {
-      attr->setInvalid();
-      return;
-    }
+    // Trigger the request to check for @asyncHandler.
+    (void)func->isAsyncHandler();
   }
 };
 } // end anonymous namespace
@@ -5235,4 +5233,20 @@ void swift::addAsyncNotes(FuncDecl *func) {
             diag::note_add_asynchandler_to_function, func->getName())
         .fixItInsert(func->getAttributeInsertionLoc(false), "@asyncHandler ");
   }
+}
+
+bool IsAsyncHandlerRequest::evaluate(
+    Evaluator &evaluator, FuncDecl *func) const {
+  // Check whether the attribute was explicitly specified.
+  if (auto attr = func->getAttrs().getAttribute<AsyncHandlerAttr>()) {
+    // Check for well-formedness.
+    if (checkAsyncHandler(func, /*diagnose=*/true)) {
+      attr->setInvalid();
+      return false;
+    }
+
+    return true;
+  }
+
+  return false;
 }
