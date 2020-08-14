@@ -543,9 +543,6 @@ set(SWIFT_DARWIN_EMBEDDED_VARIANTS "^(iphoneos|iphonesimulator|appletvos|appletv
 #  endif()
 set(SWIFT_APPLE_PLATFORMS "IOS" "IOS_SIMULATOR" "TVOS" "TVOS_SIMULATOR" "WATCHOS" "WATCHOS_SIMULATOR" "OSX")
 
-# A convenient list of platforms that allow multiple architectures in the build product (using 'lipo' tool).
-set(SWIFT_PLATFORMS_SUPPORTING_LIPO SWIFT_APPLE_PLATFORMS "FREESTANDING")
-
 # Configuration flags passed to all of our invocations of gyb.  Try to
 # avoid making up new variable names here if you can find a CMake
 # variable that will do the job.
