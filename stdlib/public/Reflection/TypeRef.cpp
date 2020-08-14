@@ -109,8 +109,14 @@ public:
 
   void visitTupleTypeRef(const TupleTypeRef *T) {
     printHeader("tuple");
-    for (auto element : T->getElements())
-      printRec(element);
+    T->getLabels();
+    auto Labels = T->getLabels();
+    for (auto NameElement : llvm::zip_first(Labels, T->getElements())) {
+      auto Label = std::get<0>(NameElement);
+      if (!Label.empty())
+        fprintf(file, "%s = ", Label.str().c_str());
+      printRec(std::get<1>(NameElement));
+    }
     fprintf(file, ")");
   }
 
@@ -459,9 +465,15 @@ public:
   Demangle::NodePointer visitTupleTypeRef(const TupleTypeRef *T) {
     auto tuple = Dem.createNode(Node::Kind::Tuple);
 
-    for (auto element : T->getElements()) {
+    auto Labels = T->getLabels();
+    for (auto LabelElement : llvm::zip(Labels, T->getElements())) {
       auto tupleElt = Dem.createNode(Node::Kind::TupleElement);
-      tupleElt->addChild(visit(element), Dem);
+      auto Label = std::get<0>(LabelElement);
+      if (!Label.empty()) {
+        auto name = Dem.createNode(Node::Kind::TupleElementName, Label);
+        tupleElt->addChild(name, Dem);
+      }
+      tupleElt->addChild(visit(std::get<1>(LabelElement)), Dem);
       tuple->addChild(tupleElt, Dem);
     }
     return tuple;
@@ -816,7 +828,8 @@ public:
     std::vector<const TypeRef *> Elements;
     for (auto Element : T->getElements())
       Elements.push_back(visit(Element));
-    return TupleTypeRef::create(Builder, Elements);
+    std::string Labels = T->getLabelString();
+    return TupleTypeRef::create(Builder, Elements, std::move(Labels));
   }
 
   const TypeRef *visitFunctionTypeRef(const FunctionTypeRef *F) {
@@ -929,7 +942,8 @@ public:
     std::vector<const TypeRef *> Elements;
     for (auto Element : T->getElements())
       Elements.push_back(visit(Element));
-    return TupleTypeRef::create(Builder, Elements);
+    std::string Labels = T->getLabelString();
+    return TupleTypeRef::create(Builder, Elements, std::move(Labels));
   }
 
   const TypeRef *visitFunctionTypeRef(const FunctionTypeRef *F) {

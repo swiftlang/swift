@@ -405,9 +405,7 @@ public:
 
   const TupleTypeRef *createTupleType(llvm::ArrayRef<const TypeRef *> elements,
                                       std::string &&labels) {
-    // FIXME: Add uniqueness checks in TupleTypeRef::Profile and
-    // unittests/Reflection/TypeRef.cpp if using labels for identity.
-    return TupleTypeRef::create(*this, elements);
+    return TupleTypeRef::create(*this, elements, std::move(labels));
   }
 
   const FunctionTypeRef *createFunctionType(

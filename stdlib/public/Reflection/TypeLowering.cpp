@@ -2021,6 +2021,7 @@ public:
   const TypeInfo *visitTupleTypeRef(const TupleTypeRef *T) {
     RecordTypeInfoBuilder builder(TC, RecordKind::Tuple);
     for (auto Element : T->getElements())
+      // The label is not going to be relevant/harmful for looking up type info.
       builder.addField("", Element, ExternalTypeInfo);
     return builder.build();
   }
