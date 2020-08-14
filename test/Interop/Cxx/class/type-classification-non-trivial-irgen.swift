@@ -29,7 +29,6 @@ public func testStructWithCopyConstructorAndValue() -> Bool {
 // CHECK: [[MEMBER_ELEMENT:%.*]] = getelementptr inbounds %TSo33StructWithCopyConstructorAndValueV, %TSo33StructWithCopyConstructorAndValueV* [[MEMBER]], i32 0, i32 0
 // CHECK: [[MEMBER_VALUE:%.*]] = getelementptr inbounds %Ts5Int32V, %Ts5Int32V* [[MEMBER_ELEMENT]], i32 0, i32 0
 // CHECK: store i32 42, i32* [[MEMBER_VALUE]]
-// CHECK: %obj.member = getelementptr inbounds %TSo42StructWithSubobjectCopyConstructorAndValueV, %TSo42StructWithSubobjectCopyConstructorAndValueV* [[OBJ]], i32 0, i32 0
 // CHECK: [[TEMP_MEMBER:%.*]] = getelementptr inbounds %TSo33StructWithCopyConstructorAndValueV, %TSo33StructWithCopyConstructorAndValueV* [[TMP]], i32 0, i32 0
 // CHECK: [[TEMP_MEMBER_VALUE:%.*]] = getelementptr inbounds %Ts5Int32V, %Ts5Int32V* [[TEMP_MEMBER]], i32 0, i32 0
 // CHECK: [[LHS:%.*]] = load i32, i32* [[TEMP_MEMBER_VALUE]]
