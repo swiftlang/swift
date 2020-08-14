@@ -85,8 +85,6 @@ template <typename Range> Decl *getElementAt(const Range &Decls, unsigned N) {
 /// Find the equivalent \c DeclContext with \p DC from \p SF AST.
 /// This assumes the AST which contains \p DC has exact the same structure with
 /// \p SF.
-/// FIXME: This doesn't support IfConfigDecl blocks. If \p DC is in an inactive
-///        config block, this function returns \c false.
 static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
                                                            SourceFile *SF) {
   PrettyStackTraceDeclContext trace("getting equivalent decl context for", DC);
@@ -129,7 +127,6 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
     }
 
     // Not found in the decl context tree.
-    // FIXME: Probably DC is in an inactive #if block.
     if (N == ~0U) {
       return nullptr;
     }
