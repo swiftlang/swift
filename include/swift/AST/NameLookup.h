@@ -741,8 +741,6 @@ public:
     return Mem;
   }
 
-  static bool areInactiveIfConfigClausesSupported();
-
 private:
   static ast_scope::ASTSourceFileScope *createScopeTree(SourceFile *);
 
