@@ -2155,11 +2155,10 @@ static Type validateParameterType(ParamDecl *decl) {
     if (auto fnType = Ty->getAs<FunctionType>()) {
       if (fnType->isAsync() &&
           !(isa<AbstractFunctionDecl>(dc) &&
-            cast<AbstractFunctionDecl>(dc)->hasAsync())) {
+            cast<AbstractFunctionDecl>(dc)->isAsyncContext())) {
         decl->diagnose(diag::async_autoclosure_nonasync_function);
-        if (auto func = dyn_cast<FuncDecl>(dc)) {
-          func->diagnose(diag::note_add_async_to_function, func->getName());
-        }
+        if (auto func = dyn_cast<FuncDecl>(dc))
+          addAsyncNotes(func);
       }
     }
   }

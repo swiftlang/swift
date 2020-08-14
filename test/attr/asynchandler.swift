@@ -1,6 +1,15 @@
 // RUN: %target-swift-frontend -typecheck -verify %s -enable-experimental-concurrency
 
-@asyncHandler func asyncHandler1() { }
+func globalAsyncFunction() async -> Int { 0 }
+
+@asyncHandler func asyncHandler1() {
+  // okay, it's an async context
+  let _ = await globalAsyncFunction()
+}
+
+@asyncHandler func asyncHandler2(fn: @autoclosure () async -> Int ) {
+  // okay, it's an async context
+}
 
 @asyncHandler
 func asyncHandlerBad1() -> Int { 0 }

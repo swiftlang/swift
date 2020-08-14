@@ -4047,7 +4047,7 @@ WARNING(no_throw_in_do_with_catch,none,
 ERROR(async_call_without_await,none,
       "call is 'async' but is not marked with 'await'", ())
 ERROR(async_call_without_await_in_autoclosure,none,
-      "call is 'async' in an autoclosure argument is not marked with 'await'", ())
+      "call is 'async' in an autoclosure argument that is not marked with 'await'", ())
 WARNING(no_async_in_await,none,
         "no calls to 'async' functions occur within 'await' expression", ())
 ERROR(async_call_in_illegal_context,none,
@@ -4064,6 +4064,8 @@ ERROR(async_in_nonasync_function,none,
       (bool, bool))
 NOTE(note_add_async_to_function,none,
      "add 'async' to function %0 to make it asynchronous", (DeclName))
+NOTE(note_add_asynchandler_to_function,none,
+     "add '@asyncHandler' to function %0 to create an implicit asynchronous context", (DeclName))
 ERROR(not_objc_function_async,none,
       "'async' function cannot be represented in Objective-C", ())
 NOTE(not_objc_function_type_async,none,
