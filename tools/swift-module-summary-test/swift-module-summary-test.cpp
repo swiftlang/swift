@@ -142,6 +142,7 @@ void MappingTraits<ModuleSummaryIndex>::mapping(IO &io, ModuleSummaryIndex &V) {
   io.mapRequired("functions", V.FunctionSummaryMap);
   io.mapRequired("witness_tables", V.WitnessTableMethodMap);
   io.mapRequired("vtables", V.VTableMethodMap);
+  io.mapRequired("used_types", V.UsedTypeList);
 }
 } // namespace yaml
 } // namespace llvm

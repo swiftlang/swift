@@ -23,6 +23,8 @@ class FunctionSummaryIndexer : public SILInstructionVisitor<FunctionSummaryIndex
   SILFunction &F;
   std::unique_ptr<FunctionSummary> TheSummary;
 
+  std::set<GUID> RecordedTypes;
+
   void indexDirectFunctionCall(const SILFunction &Callee);
   void indexIndirectFunctionCall(const SILDeclRef &Callee,
                                  FunctionSummary::Call::KindTy Kind);
@@ -109,7 +111,9 @@ void FunctionSummaryIndexer::indexUseOfType(CanType type) {
     }
     std::string mangled = mangler.mangleTypeWithoutPrefix(t);
     GUID guid = getGUIDFromUniqueName(mangled);
-    TheSummary->addTypeRef({guid, mangled});
+    if (RecordedTypes.insert(guid).second) {
+      TheSummary->addTypeRef({guid, mangled});
+    }
   });
 }
 

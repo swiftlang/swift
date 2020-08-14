@@ -53,6 +53,7 @@ class Serializer {
   void emitRecordID(unsigned ID, StringRef name,
                     SmallVectorImpl<unsigned char> &nameBuffer);
   void emitVFuncTable(const VFuncToImplsMapTy T, VFuncSlot::KindTy kind);
+  void emitUsedTypeList(const ArrayRef<GUID> L);
 
 public:
   void emitHeader();
@@ -105,6 +106,8 @@ void Serializer::writeBlockInfoBlock() {
 
   BLOCK_RECORD(record_block, VFUNC_METADATA);
   BLOCK_RECORD(record_block, VFUNC_IMPL);
+
+  BLOCK_RECORD(record_block, USED_TYPE);
 }
 
 void Serializer::emitHeader() {
@@ -154,6 +157,14 @@ void Serializer::emitVFuncTable(const VFuncToImplsMapTy T,
   }
 }
 
+void Serializer::emitUsedTypeList(const ArrayRef<GUID> L) {
+  using namespace record_block;
+  for (GUID usedType : L) {
+    UsedTypeLayout::emitRecord(Out, ScratchRecord,
+                               AbbrCodes[UsedTypeLayout::Code], usedType);
+  }
+}
+
 void Serializer::emitModuleSummary(const ModuleSummaryIndex &index) {
   using namespace record_block;
 
@@ -165,6 +176,7 @@ void Serializer::emitModuleSummary(const ModuleSummaryIndex &index) {
   registerRecordAbbr<TypeRefLayout>();
   registerRecordAbbr<VFuncMetadataLayout>();
   registerRecordAbbr<VFuncImplLayout>();
+  registerRecordAbbr<UsedTypeLayout>();
 
   ModuleMetadataLayout::emitRecord(Out, ScratchRecord,
                                    AbbrCodes[ModuleMetadataLayout::Code],
@@ -176,6 +188,8 @@ void Serializer::emitModuleSummary(const ModuleSummaryIndex &index) {
 
   emitVFuncTable(index.getWitnessTableMethodMap(), VFuncSlot::Witness);
   emitVFuncTable(index.getVTableMethodMap(), VFuncSlot::VTable);
+
+  emitUsedTypeList(index.getUsedTypeList());
 }
 
 void Serializer::write(raw_ostream &os) {
@@ -420,6 +434,11 @@ bool Deserializer::readModuleSummary() {
       VFuncImplLayout::readRecord(Scratch, implGUID);
       moduleSummary.addImplementation(CurrentSlot.getValue(), implGUID);
       break;
+    }
+    case USED_TYPE: {
+      GUID typeGUID;
+      UsedTypeLayout::readRecord(Scratch, typeGUID);
+      moduleSummary.markUsedType(typeGUID);
     }
     }
   }

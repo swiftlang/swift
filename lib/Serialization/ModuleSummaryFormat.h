@@ -35,6 +35,7 @@ enum {
   TYPE_REF,
   VFUNC_METADATA,
   VFUNC_IMPL,
+  USED_TYPE,
 };
 
 using BCGUID = llvm::BCVBR<16>;
@@ -70,6 +71,9 @@ using VFuncMetadataLayout =
 using VFuncImplLayout = BCRecordLayout<VFUNC_IMPL,
                                        BCGUID // impl func guid
                                        >;
+using UsedTypeLayout = BCRecordLayout<USED_TYPE,
+                                      BCGUID // type guid
+                                      >;
 } // namespace record_block
 } // namespace modulesummary
 } // namespace swift

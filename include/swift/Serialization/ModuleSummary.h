@@ -243,6 +243,10 @@ public:
     return VTableMethodMap;
   }
 
+  ArrayRef<GUID> getUsedTypeList() const {
+    return ArrayRef<GUID>(UsedTypeList);
+  }
+
   FunctionSummaryMapTy::const_iterator functions_begin() const {
     return FunctionSummaryMap.begin();
   }

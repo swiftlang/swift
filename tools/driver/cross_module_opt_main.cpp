@@ -111,6 +111,7 @@ VFuncSlot createVFuncSlot(FunctionSummary::Call call) {
 void markDeadSymbols(ModuleSummaryIndex &summary, llvm::DenseSet<GUID> &PreservedGUIDs) {
 
   SmallVector<std::shared_ptr<LivenessTrace>, 8> Worklist;
+  std::set<GUID> UseMarkedTypes;
   unsigned LiveSymbols = 0;
 
   for (auto GUID : PreservedGUIDs) {
@@ -141,7 +142,12 @@ void markDeadSymbols(ModuleSummaryIndex &summary, llvm::DenseSet<GUID> &Preserve
     }
     FS->setLive(true);
     LiveSymbols++;
-    
+
+    for (auto typeRef : FS->typeRefs()) {
+      if (UseMarkedTypes.insert(typeRef.Guid).second) {
+        summary.markUsedType(typeRef.Guid);
+      }
+    }
     for (auto Call : FS->calls()) {
       switch (Call.getKind()) {
       case FunctionSummary::Call::Direct: {
