@@ -603,17 +603,33 @@ static Expr *findAnyLikelySimulatorEnvironmentTest(Expr *Condition) {
 /// Delegate callback function to parse elements in the blocks.
 ParserResult<IfConfigDecl> Parser::parseIfConfig(
     llvm::function_ref<void(SmallVectorImpl<ASTNode> &, bool)> parseElements) {
+  assert(Tok.is(tok::pound_if));
   SyntaxParsingContext IfConfigCtx(SyntaxContext, SyntaxKind::IfConfigDecl);
 
   SmallVector<IfConfigClause, 4> Clauses;
   Parser::StructureMarkerRAII ParsingDecl(
       *this, Tok.getLoc(), Parser::StructureMarkerKind::IfConfig);
 
+  // See if this '#if ... #endif' directive contains code completion token.
+  bool hasCCToken = false;
+  if (SourceMgr.hasCodeCompletionBuffer() &&
+      SourceMgr.getCodeCompletionBufferID() == L->getBufferID()) {
+    BacktrackingScope backtrack(*this);
+    auto startLoc = Tok.getLoc();
+    skipSingle();
+    auto endLoc = PreviousLoc;
+    hasCCToken = SourceMgr.rangeContainsTokenLoc(
+        SourceRange(startLoc, endLoc), SourceMgr.getCodeCompletionLoc());
+  }
+
   bool shouldEvaluate =
       // Don't evaluate if it's in '-parse' mode, etc.
       shouldEvaluatePoundIfDecls() &&
       // If it's in inactive #if ... #endif block, there's no point to do it.
-      !getScopeInfo().isInactiveConfigBlock();
+      !getScopeInfo().isInactiveConfigBlock() &&
+      // If this directive contains code completion, 'isActive' is determined
+      // solely by which block has the completion token.
+      !hasCCToken;
 
   bool foundActive = false;
   bool isVersionCondition = false;
@@ -656,6 +672,16 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
         isActive = evaluateIfConfigCondition(Condition, Context);
         isVersionCondition = isVersionIfConfigCondition(Condition);
       }
+    }
+
+    // Treat the region containing code completion token as "active".
+    if (hasCCToken && !foundActive) {
+      BacktrackingScope backtrack(*this);
+      auto startLoc = Tok.getLoc();
+      skipUntilConditionalBlockClose();
+      auto endLoc = PreviousLoc;
+      isActive = SourceMgr.rangeContainsTokenLoc(
+          SourceRange(startLoc, endLoc), SourceMgr.getCodeCompletionLoc());
     }
 
     foundActive |= isActive;
