@@ -45,6 +45,7 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/Constant.h"
+#include "llvm/IR/GlobalVariable.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FormatVariadic.h"
 #include <algorithm>
@@ -845,57 +846,7 @@ bool irgen::isSpecializedNominalTypeMetadataStaticallyAddressable(
         return !isGenericWithoutPrespecializedConformance() &&
                metadataAccessIsTrivial() && witnessTablesAreReferenceable();
       });
-  auto anyArgumentIsFromCurrentModule =
-      llvm::any_of(environment->getGenericParams(), [&](auto parameter) {
-        auto signature = environment->getGenericSignature();
-        const auto protocols = signature->getRequiredProtocols(parameter);
-        auto argument = ((Type *)parameter)->subst(substitutions);
-        auto canonicalType = argument->getCanonicalType();
-
-        auto argumentIsFromCurrentModule = [&]() {
-          if (auto *argumentNominal = argument->getAnyNominal()) {
-            return IGM.getSwiftModule() == argumentNominal->getModuleContext();
-          }
-          return false;
-        };
-        auto anyConformanceIsFromCurrentModule = [&]() {
-          return llvm::any_of(protocols, [&](ProtocolDecl *protocol) {
-            auto conformance =
-                signature->lookupConformance(canonicalType, protocol);
-            if (!conformance.isConcrete()) {
-              return false;
-            }
-            auto rootConformance =
-                conformance.getConcrete()->getRootConformance();
-            return IGM.getSwiftModule() ==
-                   rootConformance->getDeclContext()->getParentModule();
-          });
-        };
-
-        return argumentIsFromCurrentModule() ||
-               anyConformanceIsFromCurrentModule();
-      });
   return allArgumentsAreStaticallyAddressable &&
-         // A type's metadata cannot be prespecialized non-canonically if it
-         // could be specialized canonically.  The reasons for that:
-         // (1) Canonically prespecialized metadata is not registered with the
-         //     runtime; at runtime, whether canonically prespecialized
-         //     metadata exists can only be determined by calling the metadata
-         //     accessor.
-         // (2) At compile time, there is no way to determine whether the
-         //     defining module has prespecialized metadata at a particular
-         //     argument list.
-         // (3) Subsequent versions of the defining module may add or remove
-         //     prespecialized metadata.
-         //
-         // To account for that, we only allow non-canonical prespecialization
-         // when at least one of the arguments is from the current module
-         // where non-canonical prespecialization might occur.  Consequently,
-         // some prespecialization opportunities may be missed (such as when
-         // an argument comes from a module which it is known the defining
-         // module does not depend on).
-         !((canonicality == NoncanonicalSpecializedMetadata) &&
-           !anyArgumentIsFromCurrentModule) &&
          IGM.getTypeInfoForUnlowered(type).isFixedSize(
              ResilienceExpansion::Maximal);
 }
@@ -2040,8 +1991,12 @@ static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
     GenericArguments &genericArgs,
     std::function<llvm::Value *(int)> valueAtIndex) {
   auto &IGM = IGF.IGM;
-  auto specializations = IGF.IGM.IRGen.canonicalSpecializationsForType(nominal);
-  if (specializations.size() > 0) {
+  auto specializations = IGM.IRGen.metadataPrespecializationsForType(nominal);
+  auto canonicalCount = llvm::count_if(specializations, [](auto pair) {
+    return pair.second == TypeMetadataCanonicality::Canonical;
+  });
+
+  if (canonicalCount > 0) {
     SmallVector<llvm::BasicBlock *, 4> conditionBlocks;
     for (size_t index = 0; index < specializations.size(); ++index) {
       conditionBlocks.push_back(llvm::BasicBlock::Create(IGM.getLLVMContext()));
@@ -2057,7 +2012,11 @@ static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
         specializationBlocks;
     auto switchDestination = llvm::BasicBlock::Create(IGM.getLLVMContext());
     unsigned long blockIndex = 0;
-    for (auto specialization : specializations) {
+    for (auto pair : specializations) {
+      if (pair.second != TypeMetadataCanonicality::Canonical) {
+        continue;
+      }
+      auto specialization = pair.first;
       auto conditionBlock = conditionBlocks[blockIndex];
       IGF.Builder.emitBlock(conditionBlock);
       auto successorBlock = blockIndex < conditionBlocks.size() - 1
@@ -2069,7 +2028,7 @@ static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
 
       llvm::Value *condition = llvm::ConstantInt::get(IGM.Int1Ty, 1);
       auto nominal = specialization->getAnyNominal();
-      auto requirements = GenericTypeRequirements(IGF.IGM, nominal);
+      auto requirements = GenericTypeRequirements(IGM, nominal);
       int requirementIndex = 0;
       for (auto requirement : requirements.getRequirements()) {
         auto parameter = requirement.TypeParameter;
@@ -2090,7 +2049,7 @@ static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
             RootProtocolConformance *rootConformance =
                 concreteConformance->getRootConformance();
             llvm::Value *expectedDescriptor =
-                IGF.IGM.getAddrOfProtocolConformanceDescriptor(rootConformance);
+                IGM.getAddrOfProtocolConformanceDescriptor(rootConformance);
             auto *witnessTable = valueAtIndex(requirementIndex);
             auto *witnessBuffer =
                 IGF.Builder.CreateBitCast(witnessTable, IGM.Int8PtrPtrTy);
@@ -2102,7 +2061,7 @@ static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
 
             // Auth the stored descriptor.
             auto storedScheme =
-                IGF.IGM.getOptions().PointerAuth.ProtocolConformanceDescriptors;
+                IGM.getOptions().PointerAuth.ProtocolConformanceDescriptors;
             if (storedScheme) {
               auto authInfo = PointerAuthInfo::emit(
                   IGF, storedScheme, witnessTable,
@@ -2113,7 +2072,7 @@ static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
 
             // Sign the descriptors.
             auto argScheme =
-                IGF.IGM.getOptions()
+                IGM.getOptions()
                     .PointerAuth.ProtocolConformanceDescriptorsAsArguments;
             if (argScheme) {
               auto authInfo = PointerAuthInfo::emit(
@@ -2127,10 +2086,10 @@ static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
             }
 
             auto *call = IGF.Builder.CreateCall(
-                IGF.IGM.getCompareProtocolConformanceDescriptorsFn(),
+                IGM.getCompareProtocolConformanceDescriptorsFn(),
                 {providedDescriptor, expectedDescriptor});
             call->setDoesNotThrow();
-            call->setCallingConv(IGF.IGM.SwiftCC);
+            call->setCallingConv(IGM.SwiftCC);
             call->addAttribute(llvm::AttributeList::FunctionIndex,
                                llvm::Attribute::ReadNone);
             condition = IGF.Builder.CreateAnd(condition, call);
@@ -2153,7 +2112,7 @@ static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
         llvm::Value *specializedMetadata;
         if (isa<ClassDecl>(nominal)) {
           llvm::Function *accessor =
-              IGF.IGM
+              IGM
                   .getAddrOfCanonicalSpecializedGenericTypeMetadataAccessFunction(
                       specialization, NotForDefinition);
 

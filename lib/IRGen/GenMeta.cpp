@@ -300,6 +300,10 @@ static void buildMethodDescriptorFields(IRGenModule &IGM,
 
 void IRGenModule::emitNonoverriddenMethodDescriptor(const SILVTable *VTable,
                                                     SILDeclRef declRef) {
+  auto entity = LinkEntity::forMethodDescriptor(declRef);
+
+  auto *var = cast<llvm::GlobalVariable>(getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo()));
+  var->setInitializer(nullptr);
  
   ConstantInitBuilder ib(*this);
   ConstantStructBuilder sb(ib.beginStruct(MethodDescriptorStructTy));
@@ -308,7 +312,6 @@ void IRGenModule::emitNonoverriddenMethodDescriptor(const SILVTable *VTable,
   
   auto init = sb.finishAndCreateFuture();
   
-  auto entity = LinkEntity::forMethodDescriptor(declRef);
   getAddrOfLLVMVariable(entity, init, DebugTypeInfo());
 }
 
@@ -1215,6 +1218,7 @@ namespace {
     void setCommonFlags(TypeContextDescriptorFlags &flags) {
       setClangImportedFlags(flags);
       setMetadataInitializationKind(flags);
+      setHasCanonicalMetadataPrespecializations(flags);
     }
     
     void setClangImportedFlags(TypeContextDescriptorFlags &flags) {
@@ -1246,6 +1250,19 @@ namespace {
 
     void setMetadataInitializationKind(TypeContextDescriptorFlags &flags) {
       flags.setMetadataInitialization(MetadataInitialization);
+    }
+
+    void setHasCanonicalMetadataPrespecializations(TypeContextDescriptorFlags &flags) {
+      flags.setHasCanonicalMetadataPrespecializations(hasCanonicalMetadataPrespecializations());
+    }
+
+    bool hasCanonicalMetadataPrespecializations() {
+      return IGM.shouldPrespecializeGenericMetadata() &&
+             llvm::any_of(IGM.IRGen.metadataPrespecializationsForType(Type),
+                          [](auto pair) {
+                            return pair.second ==
+                                   TypeMetadataCanonicality::Canonical;
+                          });
     }
 
     void maybeAddMetadataInitialization() {
@@ -1307,6 +1324,28 @@ namespace {
       addIncompleteMetadata();
     }
 
+    void maybeAddCanonicalMetadataPrespecializations() {
+      if (Type->isGenericContext() && hasCanonicalMetadataPrespecializations()) {
+        asImpl().addCanonicalMetadataPrespecializations();
+      }
+    }
+
+    void addCanonicalMetadataPrespecializations() {
+      auto specializations = IGM.IRGen.metadataPrespecializationsForType(Type);
+      auto count = llvm::count_if(specializations, [](auto pair) {
+        return pair.second == TypeMetadataCanonicality::Canonical;
+      });
+      B.addInt32(count);
+      for (auto pair : specializations) {
+        if (pair.second != TypeMetadataCanonicality::Canonical) {
+          continue;
+        }
+        auto specialization = pair.first;
+        auto *metadata = IGM.getAddrOfTypeMetadata(specialization);
+        B.addRelativeAddress(metadata);
+      }
+    }
+
     // Subclasses should provide:
     // ContextDescriptorKind getContextKind();
     // void addLayoutInfo();
@@ -1332,6 +1371,11 @@ namespace {
     {
       auto &layout = IGM.getMetadataLayout(getType());
       FieldVectorOffset = layout.getFieldOffsetVectorOffset().getStatic();
+    }
+
+    void layout() {
+      super::layout();
+      maybeAddCanonicalMetadataPrespecializations();
     }
 
     ContextDescriptorKind getContextKind() {
@@ -1393,6 +1437,11 @@ namespace {
       auto &layout = IGM.getMetadataLayout(getType());
       if (layout.hasPayloadSizeOffset())
         PayloadSizeOffset = layout.getPayloadSizeOffset().getStatic();
+    }
+
+    void layout() {
+      super::layout();
+      maybeAddCanonicalMetadataPrespecializations();
     }
     
     ContextDescriptorKind getContextKind() {
@@ -1508,6 +1557,7 @@ namespace {
       addVTable();
       addOverrideTable();
       addObjCResilientClassStubInfo();
+      maybeAddCanonicalMetadataPrespecializations();
     }
 
     void addIncompleteMetadataOrRelocationFunction() {
@@ -1779,6 +1829,19 @@ namespace {
         IGM.getAddrOfObjCResilientClassStub(
           getType(), NotForDefinition,
           TypeMetadataAddress::AddressPoint));
+    }
+
+    void addCanonicalMetadataPrespecializations() {
+      super::addCanonicalMetadataPrespecializations();
+      auto specializations = IGM.IRGen.metadataPrespecializationsForType(Type);
+      for (auto pair : specializations) {
+        if (pair.second != TypeMetadataCanonicality::Canonical) {
+          continue;
+        }
+        auto specialization = pair.first;
+        auto *function = IGM.getAddrOfCanonicalSpecializedGenericTypeMetadataAccessFunction(specialization, NotForDefinition);
+        B.addRelativeAddress(function);
+      }
     }
   };
   

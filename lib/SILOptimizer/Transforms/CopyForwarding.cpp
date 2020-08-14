@@ -537,7 +537,7 @@ class CopyForwarding {
   public:
     CopySrcUserVisitor(CopyForwarding &CPF) : CPF(CPF) {}
 
-    virtual bool visitNormalUse(SILInstruction *user) {
+    virtual bool visitNormalUse(SILInstruction *user) override {
       if (isa<LoadInst>(user))
         CPF.IsSrcLoadedFrom = true;
 
@@ -549,18 +549,18 @@ class CopyForwarding {
       // Bail on multiple uses in the same instruction to avoid complexity.
       return CPF.SrcUserInsts.insert(user).second;
     }
-    virtual bool visitTake(CopyAddrInst *take) {
+    virtual bool visitTake(CopyAddrInst *take) override {
       if (take->getSrc() == take->getDest())
         return false;
 
       CPF.TakePoints.push_back(take);
       return true;
     }
-    virtual bool visitDestroy(DestroyAddrInst *destroy) {
+    virtual bool visitDestroy(DestroyAddrInst *destroy) override {
       CPF.DestroyPoints.push_back(destroy);
       return true;
     }
-    virtual bool visitDebugValue(DebugValueAddrInst *debugValue) {
+    virtual bool visitDebugValue(DebugValueAddrInst *debugValue) override {
       return CPF.SrcDebugValueInsts.insert(debugValue).second;
     }
   };
@@ -635,17 +635,17 @@ public:
   CopyDestUserVisitor(SmallPtrSetImpl<SILInstruction *> &DestUsers)
       : DestUsers(DestUsers) {}
 
-  virtual bool visitNormalUse(SILInstruction *user) {
+  virtual bool visitNormalUse(SILInstruction *user) override {
     // Bail on multiple uses in the same instruction to avoid complexity.
     return DestUsers.insert(user).second;
   }
-  virtual bool visitTake(CopyAddrInst *take) {
+  virtual bool visitTake(CopyAddrInst *take) override {
     return DestUsers.insert(take).second;
   }
-  virtual bool visitDestroy(DestroyAddrInst *destroy) {
+  virtual bool visitDestroy(DestroyAddrInst *destroy) override {
     return DestUsers.insert(destroy).second;
   }
-  virtual bool visitDebugValue(DebugValueAddrInst *debugValue) {
+  virtual bool visitDebugValue(DebugValueAddrInst *debugValue) override {
     return DestUsers.insert(debugValue).second;
   }
 };
