@@ -2248,6 +2248,20 @@ private:
              const FunctionArgApplyInfo &info) const;
 };
 
+/// Diagnose situations where we have key path missing a component.
+///
+/// \code
+/// let _ : KeyPath<A, B> = \A
+/// \endcode
+class AllowKeyPathMissingComponentFailure final : public FailureDiagnostic {
+public:
+  AllowKeyPathMissingComponentFailure(const Solution &solution,
+                                      ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

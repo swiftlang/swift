@@ -6760,3 +6760,19 @@ void TrailingClosureRequiresExplicitLabel::fixIt(
   diagnostic.fixItInsert(newRParenLoc,
                          isExpr<SubscriptExpr>(anchor) ? "]" : ")");
 }
+
+bool AllowKeyPathMissingComponentFailure::diagnoseAsError() {
+  auto *KPE = getAsExpr<KeyPathExpr>(getAnchor());
+  assert(KPE && KPE->hasSingleInvalidComponent() &&
+         "Expected a malformed key path expression");
+
+  // String interpolation represented as key path expressions e.g. \(x),
+  // \(x, a: 1) and this is already diagnosed. So let's skip it because
+  // that is not the case for a empty key path diagnostic.
+  auto *root = KPE->getParsedRoot();
+  if (root && (isa<ParenExpr>(root) || isa<TupleExpr>(root)))
+    return true;
+
+  emitDiagnostic(diag::expr_swift_keypath_empty);
+  return true;
+}
