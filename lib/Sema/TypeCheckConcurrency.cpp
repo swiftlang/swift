@@ -103,6 +103,9 @@ bool IsAsyncHandlerRequest::evaluate(
     return true;
   }
 
+  if (!func->getASTContext().LangOpts.EnableExperimentalConcurrency)
+    return false;
+
   // Are we in a context where inference is possible?
   auto dc = func->getDeclContext();
   if (!dc->isTypeContext() || !dc->getParentSourceFile() ||
