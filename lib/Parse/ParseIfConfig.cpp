@@ -610,17 +610,25 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
   Parser::StructureMarkerRAII ParsingDecl(
       *this, Tok.getLoc(), Parser::StructureMarkerKind::IfConfig);
 
-  // See if this '#if ... #endif' directive contains code completion token.
-  bool hasCCToken = false;
+  // Find the region containing code completion token.
+  SourceLoc codeCompletionClauseLoc;
   if (SourceMgr.hasCodeCompletionBuffer() &&
-      SourceMgr.getCodeCompletionBufferID() == L->getBufferID()) {
+      SourceMgr.getCodeCompletionBufferID() == L->getBufferID() &&
+      SourceMgr.isBeforeInBuffer(Tok.getLoc(),
+                                 SourceMgr.getCodeCompletionLoc())) {
     llvm::SaveAndRestore<Optional<llvm::MD5>> H(CurrentTokenHash, None);
     BacktrackingScope backtrack(*this);
-    auto startLoc = Tok.getLoc();
-    skipSingle();
-    auto endLoc = PreviousLoc;
-    hasCCToken = SourceMgr.rangeContainsTokenLoc(
-        SourceRange(startLoc, endLoc), SourceMgr.getCodeCompletionLoc());
+    do {
+      auto startLoc = Tok.getLoc();
+      consumeToken();
+      skipUntilConditionalBlockClose();
+      auto endLoc = PreviousLoc;
+      if (SourceMgr.rangeContainsTokenLoc(SourceRange(startLoc, endLoc),
+                                          SourceMgr.getCodeCompletionLoc())){
+        codeCompletionClauseLoc = startLoc;
+        break;
+      }
+    } while (Tok.isNot(tok::pound_endif, tok::eof));
   }
 
   bool shouldEvaluate =
@@ -628,9 +636,9 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
       shouldEvaluatePoundIfDecls() &&
       // If it's in inactive #if ... #endif block, there's no point to do it.
       !getScopeInfo().isInactiveConfigBlock() &&
-      // If this directive contains code completion, 'isActive' is determined
-      // solely by which block has the completion token.
-      !hasCCToken;
+      // If this directive contains code completion location, 'isActive' is
+      // determined solely by which block has the completion token.
+      !codeCompletionClauseLoc.isValid();
 
   bool foundActive = false;
   bool isVersionCondition = false;
@@ -676,15 +684,8 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
     }
 
     // Treat the region containing code completion token as "active".
-    if (hasCCToken && !foundActive) {
-      llvm::SaveAndRestore<Optional<llvm::MD5>> H(CurrentTokenHash, None);
-      BacktrackingScope backtrack(*this);
-      auto startLoc = Tok.getLoc();
-      skipUntilConditionalBlockClose();
-      auto endLoc = PreviousLoc;
-      isActive = SourceMgr.rangeContainsTokenLoc(
-          SourceRange(startLoc, endLoc), SourceMgr.getCodeCompletionLoc());
-    }
+    if (codeCompletionClauseLoc.isValid() && !foundActive)
+      isActive = (ClauseLoc == codeCompletionClauseLoc);
 
     foundActive |= isActive;
 
