@@ -257,6 +257,59 @@ public:
   void visitDifferentiableAttr(DifferentiableAttr *attr);
   void visitDerivativeAttr(DerivativeAttr *attr);
   void visitTransposeAttr(TransposeAttr *attr);
+
+  void visitAsyncHandlerAttr(AsyncHandlerAttr *attr) {
+    if (!Ctx.LangOpts.EnableExperimentalConcurrency) {
+      diagnoseAndRemoveAttr(attr, diag::asynchandler_attr_requires_concurrency);
+      return;
+    }
+
+    auto func = dyn_cast<FuncDecl>(D);
+    if (!func) {
+      diagnoseAndRemoveAttr(attr, diag::asynchandler_non_func);
+      return;
+    }
+
+    if (!func->getResultInterfaceType()->isVoid()) {
+      func->diagnose(diag::asynchandler_returns_value)
+          .highlight(func->getBodyResultTypeLoc().getSourceRange());
+      attr->setInvalid();
+      return;
+    }
+
+    if (func->hasThrows()) {
+      func->diagnose(diag::asynchandler_throws)
+          .fixItRemove(func->getThrowsLoc());
+      attr->setInvalid();
+      return;
+    }
+
+    if (func->hasAsync()) {
+      func->diagnose(diag::asynchandler_async)
+          .fixItRemove(func->getAsyncLoc());
+      attr->setInvalid();
+      return;
+    }
+
+    for (auto param : *func->getParameters()) {
+      if (param->isInOut()) {
+        param->diagnose(diag::asynchandler_inout_parameter)
+            .fixItRemove(param->getSpecifierLoc());
+        attr->setInvalid();
+        return;
+      }
+    }
+
+    if (func->isMutating()) {
+      auto diag = Ctx.Diags.diagnose(func, diag::asynchandler_mutating);
+      diag.highlight(attr->getRangeWithAt());
+      if (auto mutatingAttr = func->getAttrs().getAttribute<MutatingAttr>()) {
+        diag.fixItRemove(mutatingAttr->getRange());
+      }
+      attr->setInvalid();
+      return;
+    }
+  }
 };
 } // end anonymous namespace
 
