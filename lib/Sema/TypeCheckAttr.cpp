@@ -41,6 +41,66 @@
 
 using namespace swift;
 
+/// Check whether the @asyncHandler attribute can be applied to the given
+/// function declaration.
+///
+/// \param diagnose Whether to emit a diagnostic when a problem is encountered.
+///
+/// \returns \c true if there was a problem with adding the attribute, \c false
+/// otherwise.
+static bool checkAsyncHandler(FuncDecl *func, bool diagnose) {
+  if (!func->getResultInterfaceType()->isVoid()) {
+    if (diagnose) {
+      func->diagnose(diag::asynchandler_returns_value)
+          .highlight(func->getBodyResultTypeLoc().getSourceRange());
+    }
+
+    return true;
+  }
+
+  if (func->hasThrows()) {
+    if (diagnose) {
+      func->diagnose(diag::asynchandler_throws)
+          .fixItRemove(func->getThrowsLoc());
+    }
+
+    return true;
+  }
+
+  if (func->hasAsync()) {
+    if (diagnose) {
+      func->diagnose(diag::asynchandler_async)
+          .fixItRemove(func->getAsyncLoc());
+    }
+
+    return true;
+  }
+
+  for (auto param : *func->getParameters()) {
+    if (param->isInOut()) {
+      if (diagnose) {
+        param->diagnose(diag::asynchandler_inout_parameter)
+            .fixItRemove(param->getSpecifierLoc());
+      }
+
+      return true;
+    }
+  }
+
+  if (func->isMutating()) {
+    if (diagnose) {
+      auto diag = func->diagnose(diag::asynchandler_mutating);
+      if (auto mutatingAttr = func->getAttrs().getAttribute<MutatingAttr>()) {
+        diag.fixItRemove(mutatingAttr->getRange());
+      }
+    }
+
+    return true;
+  }
+
+  return false;
+}
+
 namespace {
   /// This emits a diagnostic with a fixit to remove the attribute.
   template<typename ...ArgTypes>
@@ -260,6 +320,24 @@ public:
   // SWIFT_ENABLE_TENSORFLOW
   void visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr);
   // SWIFT_ENABLE_TENSORFLOW END
+
+  void visitAsyncHandlerAttr(AsyncHandlerAttr *attr) {
+    if (!Ctx.LangOpts.EnableExperimentalConcurrency) {
+      diagnoseAndRemoveAttr(attr, diag::asynchandler_attr_requires_concurrency);
+      return;
+    }
+
+    auto func = dyn_cast<FuncDecl>(D);
+    if (!func) {
+      diagnoseAndRemoveAttr(attr, diag::asynchandler_non_func);
+      return;
+    }
+
+    if (checkAsyncHandler(func, /*diagnose=*/true)) {
+      attr->setInvalid();
+      return;
+    }
+  }
 };
 } // end anonymous namespace
 
@@ -5149,6 +5227,16 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
 
   // Set the resolved linearity parameter indices in the attribute.
   attr->setParameterIndices(linearParamIndices);
+}
+
+void swift::addAsyncNotes(FuncDecl *func) {
+  func->diagnose(diag::note_add_async_to_function, func->getName());
+
+  if (!checkAsyncHandler(func, /*diagnose=*/false)) {
+    func->diagnose(
+            diag::note_add_asynchandler_to_function, func->getName())
+        .fixItInsert(func->getAttributeInsertionLoc(false), "@asyncHandler ");
+  }
 }
 
 // SWIFT_ENABLE_TENSORFLOW
