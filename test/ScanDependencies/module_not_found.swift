@@ -7,10 +7,12 @@
 // RUN: echo "[{" >> %/t/inputs/map.json
 // RUN: echo "\"moduleName\": \"Swift\"," >> %/t/inputs/map.json
 // RUN: echo "\"modulePath\": \"%stdlib_dir/Swift.swiftmodule/%module-target-triple.swiftmodule\"," >> %/t/inputs/map.json
+// RUN: echo "\"isFramework\": false" >> %/t/inputs/map.json
 // RUN: echo "}," >> %/t/inputs/map.json
 // RUN: echo "{" >> %/t/inputs/map.json
 // RUN: echo "\"moduleName\": \"SwiftOnoneSupport\"," >> %/t/inputs/map.json
 // RUN: echo "\"modulePath\": \"%stdlib_dir/SwiftOnoneSupport.swiftmodule/%module-target-triple.swiftmodule\"," >> %/t/inputs/map.json
+// RUN: echo "\"isFramework\": false" >> %/t/inputs/map.json
 // RUN: echo "}]" >> %/t/inputs/map.json
 
 // Add the -I search path to ensure we do not accidentally implicitly load Foo.swiftmodule
