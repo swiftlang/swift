@@ -30,7 +30,6 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/Support/Compiler.h"
-#include <algorithm>
 
 using namespace swift;
 using namespace namelookup;
@@ -82,6 +81,15 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
   // Someday, just use the assertion below. For now, print out lots of info for
   // debugging.
   if (!startingScope) {
+
+    // Be lenient in code completion mode. There are cases where the decl
+    // context doesn't match with the ASTScope. e.g. dangling attributes.
+    // FIXME: Create ASTScope tree even for invalid code.
+    if (innermost &&
+        startingContext->getASTContext().SourceMgr.hasCodeCompletionBuffer()) {
+      return innermost;
+    }
+
     llvm::errs() << "ASTScopeImpl: resorting to startingScope hack, file: "
                  << sourceFile->getFilename() << "\n";
     // The check is costly, and inactive lookups will end up here, so don't
@@ -143,33 +151,40 @@ bool ASTScopeImpl::checkSourceRangeOfThisASTNode() const {
   return true;
 }
 
+/// If the \p loc is in a new buffer but \p range is not, consider the location
+/// is at the start of replaced range. Otherwise, returns \p loc as is.
+static SourceLoc translateLocForReplacedRange(SourceManager &sourceMgr,
+                                              SourceRange range,
+                                              SourceLoc loc) {
+  if (const auto &replacedRange = sourceMgr.getReplacedRange()) {
+    if (sourceMgr.rangeContainsTokenLoc(replacedRange.New, loc) &&
+        !sourceMgr.rangeContains(replacedRange.New, range)) {
+      return replacedRange.Original.Start;
+    }
+  }
+  return loc;
+}
+
 NullablePtr<ASTScopeImpl>
 ASTScopeImpl::findChildContaining(SourceLoc loc,
                                   SourceManager &sourceMgr) const {
   // Use binary search to find the child that contains this location.
-  struct CompareLocs {
-    SourceManager &sourceMgr;
+  auto *const *child = llvm::lower_bound(
+      getChildren(), loc,
+      [&sourceMgr](const ASTScopeImpl *scope, SourceLoc loc) {
+        ASTScopeAssert(scope->checkSourceRangeOfThisASTNode(), "Bad range.");
+        auto rangeOfScope = scope->getSourceRangeOfScope();
+        loc = translateLocForReplacedRange(sourceMgr, rangeOfScope, loc);
+        return -1 == ASTScopeImpl::compare(rangeOfScope, loc, sourceMgr,
+                                           /*ensureDisjoint=*/false);
+      });
 
-    bool operator()(const ASTScopeImpl *scope, SourceLoc loc) {
-      ASTScopeAssert(scope->checkSourceRangeOfThisASTNode(), "Bad range.");
-      return -1 == ASTScopeImpl::compare(scope->getSourceRangeOfScope(), loc,
-                                         sourceMgr,
-                                         /*ensureDisjoint=*/false);
-    }
-    bool operator()(SourceLoc loc, const ASTScopeImpl *scope) {
-      ASTScopeAssert(scope->checkSourceRangeOfThisASTNode(), "Bad range.");
-      // Alternatively, we could check that loc < start-of-scope
-      return 0 >= ASTScopeImpl::compare(loc, scope->getSourceRangeOfScope(),
-                                        sourceMgr,
-                                        /*ensureDisjoint=*/false);
-    }
-  };
-  auto *const *child = std::lower_bound(
-      getChildren().begin(), getChildren().end(), loc, CompareLocs{sourceMgr});
-
-  if (child != getChildren().end() &&
-      sourceMgr.rangeContainsTokenLoc((*child)->getSourceRangeOfScope(), loc))
-    return *child;
+  if (child != getChildren().end()) {
+    auto rangeOfScope = (*child)->getSourceRangeOfScope();
+    loc = translateLocForReplacedRange(sourceMgr, rangeOfScope, loc);
+    if (sourceMgr.rangeContainsTokenLoc(rangeOfScope, loc))
+      return *child;
+  }
 
   return nullptr;
 }

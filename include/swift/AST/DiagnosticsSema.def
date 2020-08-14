@@ -2174,9 +2174,6 @@ NOTE(protocol_witness_settable_conflict,none,
      "candidate is not settable, but protocol requires it", ())
 NOTE(protocol_witness_rethrows_conflict,none,
      "candidate is not 'rethrows', but protocol requires it", ())
-NOTE(protocol_witness_async_conflict,none,
-     "candidate is %select{not |}0'async', but protocol requirement is%select{| not}0",
-     (bool))
 NOTE(protocol_witness_throws_conflict,none,
      "candidate throws, but protocol does not allow it", ())
 NOTE(protocol_witness_not_objc,none,
@@ -4037,10 +4034,20 @@ NOTE(note_error_to_optional,none,
       "did you mean to handle error as optional value?", ())
 NOTE(note_disable_error_propagation,none,
       "did you mean to disable error propagation?", ())
+
+WARNING(no_throw_in_try,none,
+        "no calls to throwing functions occur within 'try' expression", ())
+
+WARNING(no_throw_in_do_with_catch,none,
+        "'catch' block is unreachable because no errors are thrown in 'do' block", ())
+
+//------------------------------------------------------------------------------
+// MARK: Concurrency
+//------------------------------------------------------------------------------
 ERROR(async_call_without_await,none,
       "call is 'async' but is not marked with 'await'", ())
 ERROR(async_call_without_await_in_autoclosure,none,
-      "call is 'async' in an autoclosure argument is not marked with 'await'", ())
+      "call is 'async' in an autoclosure argument that is not marked with 'await'", ())
 WARNING(no_async_in_await,none,
         "no calls to 'async' functions occur within 'await' expression", ())
 ERROR(async_call_in_illegal_context,none,
@@ -4057,12 +4064,39 @@ ERROR(async_in_nonasync_function,none,
       (bool, bool))
 NOTE(note_add_async_to_function,none,
      "add 'async' to function %0 to make it asynchronous", (DeclName))
+NOTE(note_add_asynchandler_to_function,none,
+     "add '@asyncHandler' to function %0 to create an implicit asynchronous context", (DeclName))
+ERROR(not_objc_function_async,none,
+      "'async' function cannot be represented in Objective-C", ())
+NOTE(not_objc_function_type_async,none,
+      "'async' function types cannot be represented in Objective-C", ())
+NOTE(protocol_witness_async_conflict,none,
+     "candidate is %select{not |}0'async', but protocol requirement is%select{| not}0",
+     (bool))
+ERROR(async_autoclosure_nonasync_function,none,
+      "'async' autoclosure parameter in a non-'async' function", ())
 
-WARNING(no_throw_in_try,none,
-        "no calls to throwing functions occur within 'try' expression", ())
-
-WARNING(no_throw_in_do_with_catch,none,
-        "'catch' block is unreachable because no errors are thrown in 'do' block", ())
+ERROR(asynchandler_attr_requires_concurrency,none,
+      "'@asyncHandler' is only valid when experimental concurrency is enabled",
+      ())
+ERROR(asynchandler_non_func,none,
+      "'@asyncHandler' can only be applied to functions",
+      ())
+ERROR(asynchandler_returns_value,none,
+      "'@asyncHandler' function can only return 'Void'",
+      ())
+ERROR(asynchandler_throws,none,
+      "'@asyncHandler' function cannot throw",
+      ())
+ERROR(asynchandler_async,none,
+      "'@asyncHandler' function cannot be 'async' itself",
+      ())
+ERROR(asynchandler_inout_parameter,none,
+      "'inout' parameter is not allowed in '@asyncHandler' function",
+      ())
+ERROR(asynchandler_mutating,none,
+      "'@asyncHandler' function cannot be 'mutating'",
+      ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Types
@@ -4418,10 +4452,6 @@ NOTE(not_objc_generic_type_param,none,
 NOTE(not_objc_function_type_param,none,
      "function types cannot be represented in Objective-C unless their "
      "parameters and returns can be", ())
-ERROR(not_objc_function_async,none,
-      "'async' function cannot be represented in Objective-C", ())
-NOTE(not_objc_function_type_async,none,
-      "'async' function types cannot be represented in Objective-C", ())
 NOTE(not_objc_function_type_throwing,none,
       "throwing function types cannot be represented in Objective-C", ())
 NOTE(objc_inferring_on_objc_protocol_member,none,

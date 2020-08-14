@@ -379,7 +379,7 @@ done:
 /// parseExprSequenceElement
 ///
 ///   expr-sequence-element(Mode):
-///     '__await' expr-sequence-element(Mode)
+///     'await' expr-sequence-element(Mode)
 ///     'try' expr-sequence-element(Mode)
 ///     'try' '?' expr-sequence-element(Mode)
 ///     'try' '!' expr-sequence-element(Mode)
@@ -392,8 +392,8 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
   SyntaxParsingContext ElementContext(SyntaxContext,
                                       SyntaxContextKind::Expr);
 
-  if (shouldParseExperimentalConcurrency() && Tok.is(tok::kw___await)) {
-    SourceLoc awaitLoc = consumeToken(tok::kw___await);
+  if (shouldParseExperimentalConcurrency() && Tok.isContextualKeyword("await")) {
+    SourceLoc awaitLoc = consumeToken();
     ParserResult<Expr> sub = parseExprUnary(message, isExprBasic);
     if (!sub.hasCodeCompletion() && !sub.isNull()) {
       ElementContext.setCreateSyntax(SyntaxKind::AwaitExpr);

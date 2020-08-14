@@ -216,6 +216,13 @@ namespace {
     out << "\"";
   }
 
+  /// Write a boolean value as JSON.
+  void writeJSONValue(llvm::raw_ostream &out,
+                      bool value,
+                      unsigned indentLevel) {
+    out.write_escaped(value ? "true" : "false");
+  }
+
   /// Write a module identifier.
   void writeJSONValue(llvm::raw_ostream &out,
                       const ModuleDependencyID &module,
@@ -397,6 +404,11 @@ static void writeJSON(llvm::raw_ostream &out,
             swiftDeps->compiledModulePath, 5,
             /*trailingComma=*/false);
       }
+      writeJSONSingleField(
+          out, "isFramework",
+          swiftDeps->isFramework, 5,
+          /*trailingComma=*/!swiftDeps->extraPCMArgs.empty() ||
+                           swiftDeps->bridgingHeaderFile.hasValue());
       if (!swiftDeps->extraPCMArgs.empty()) {
         out.indent(5 * 2);
         out << "\"extraPcmArgs\": [\n";
