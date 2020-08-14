@@ -3596,6 +3596,10 @@ Type TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,
     return ErrorType::get(getASTContext());
   }
 
+  if (ty->is<AnyMetatypeType>()) {
+    diagnose(repr->getStartLoc(), diag::meta_metatype_deprecated);
+  }
+
   Optional<MetatypeRepresentation> storedRepr;
   
   // In SIL mode, a metatype must have a @thin, @thick, or
@@ -3627,6 +3631,10 @@ Type TypeResolver::resolveProtocolType(ProtocolTypeRepr *repr,
   auto ty = resolveType(repr->getBase(), options.withoutContext());
   if (ty->hasError()) {
     return ErrorType::get(getASTContext());
+  }
+
+  if (ty->is<AnyMetatypeType>()) {
+    diagnose(repr->getStartLoc(), diag::meta_metatype_deprecated);
   }
 
   Optional<MetatypeRepresentation> storedRepr;

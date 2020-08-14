@@ -4136,6 +4136,9 @@ WARNING(class_super_not_usable_from_inline_warn,none,
         "should be '@usableFromInline' or public",
         (bool))
 
+ERROR(meta_metatype_deprecated,none,
+      "meta-metatypes are deprecated and will be removed in a future release", ())
+
 ERROR(dot_protocol_on_non_existential,none,
       "cannot use 'Protocol' with non-protocol type %0", (Type))
 ERROR(tuple_single_element,none,
