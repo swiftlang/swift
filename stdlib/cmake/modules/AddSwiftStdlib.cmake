@@ -98,7 +98,7 @@ function(_add_target_variant_c_compile_link_flags)
   endif()
 
   set(_sysroot "${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_PATH}")
-  if(CFLAGS_SDK IN_LIST SWIFT_PLATFORMS_USING_ISYSROOT)
+  if(SWIFT_SDK_${CFLAGS_SDK}_USE_ISYSROOT)
     list(APPEND result "-isysroot" "${_sysroot}")
   elseif(NOT SWIFT_COMPILER_IS_MSVC_LIKE AND NOT "${_sysroot}" STREQUAL "/")
     list(APPEND result "--sysroot=${_sysroot}")
