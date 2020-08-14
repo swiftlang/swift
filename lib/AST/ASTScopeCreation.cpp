@@ -479,23 +479,6 @@ public:
   }
 
 public:
-  /// When ASTScopes are enabled for code completion,
-  /// IfConfigs will pose a challenge because we may need to field lookups into
-  /// the inactive clauses, but the AST contains redundancy: the active clause's
-  /// elements are present in the members or elements of an IterableTypeDecl or
-  /// BraceStmt alongside of the IfConfigDecl. In addition there are two more
-  /// complications:
-  ///
-  /// 1. The active clause's elements may be nested inside an init self
-  /// rebinding decl (as in StringObject.self).
-  ///
-  /// 2. The active clause may be before or after the inactive ones
-  ///
-  /// So, when encountering an IfConfigDecl, we will expand  the inactive
-  /// elements. Also, always sort members or elements so that the child scopes
-  /// are in source order (Just one of several reasons we need to sort.)
-  ///
-  static const bool includeInactiveIfConfigClauses = false;
 
 private:
   static std::vector<ASTNode> expandIfConfigClauses(ArrayRef<ASTNode> input) {
@@ -526,9 +509,6 @@ private:
               if (isa<IfConfigDecl>(d))
                 expandIfConfigClausesInto(expansion, {d}, true);
           }
-        } else if (includeInactiveIfConfigClauses) {
-          expandIfConfigClausesInto(expansion, clause.Elements,
-                                    /*isInAnActiveNode=*/false);
         }
       }
     }
@@ -760,10 +740,6 @@ void ASTScope::buildFullyExpandedTree() { impl->buildFullyExpandedTree(); }
 void ASTScope::
     buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals() {
   impl->buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals();
-}
-
-bool ASTScope::areInactiveIfConfigClausesSupported() {
-  return ScopeCreator::includeInactiveIfConfigClauses;
 }
 
 void ASTScope::expandFunctionBody(AbstractFunctionDecl *AFD) {
@@ -2083,10 +2059,8 @@ public:
     //    catchForDebugging(D, "DictionaryBridging.swift", 694);
     if (const auto *dc = dyn_cast<DeclContext>(D))
       record(dc);
-    if (auto *icd = dyn_cast<IfConfigDecl>(D)) {
-      walkToClauses(icd);
+    if (isa<IfConfigDecl>(D))
       return false;
-    }
     if (auto *pd = dyn_cast<ParamDecl>(D))
       record(pd->getDefaultArgumentInitContext());
     else if (auto *pbd = dyn_cast<PatternBindingDecl>(D))
@@ -2104,18 +2078,6 @@ public:
   }
 
 private:
-  void walkToClauses(IfConfigDecl *icd) {
-    for (auto &clause : icd->getClauses()) {
-      // Generate scopes for any closures in the condition
-      if (ScopeCreator::includeInactiveIfConfigClauses && clause.isActive) {
-        if (clause.Cond)
-          clause.Cond->walk(*this);
-        for (auto n : clause.Elements)
-          n.walk(*this);
-      }
-    }
-  }
-
   void recordInitializers(PatternBindingDecl *pbd) {
     for (auto idx : range(pbd->getNumPatternEntries()))
       record(pbd->getInitContext(idx));
