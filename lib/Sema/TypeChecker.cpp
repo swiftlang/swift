@@ -579,7 +579,8 @@ static Optional<Type> getTypeOfCompletionContextExpr(
                         CompletionTypeCheckKind kind,
                         Expr *&parsedExpr,
                         ConcreteDeclRef &referencedDecl) {
-  if (constraints::ConstraintSystem::preCheckExpression(parsedExpr, DC))
+  if (constraints::ConstraintSystem::preCheckExpression(
+          parsedExpr, DC, /*replaceInvalidRefsWithErrors=*/true))
     return None;
 
   switch (kind) {

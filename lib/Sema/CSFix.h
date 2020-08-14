@@ -264,6 +264,8 @@ enum class FixKind : uint8_t {
   /// Specify key path root type when it cannot be infered from context.
   SpecifyKeyPathRootType,
 
+  /// Ignore function builder body which fails `pre-check` call.
+  IgnoreInvalidFunctionBuilderBody,
 };
 
 class ConstraintFix {
@@ -1839,6 +1841,26 @@ class SpecifyKeyPathRootType final : public ConstraintFix {
 
     static SpecifyKeyPathRootType *create(ConstraintSystem &cs,
                                           ConstraintLocator *locator);
+};
+
+class IgnoreInvalidFunctionBuilderBody final : public ConstraintFix {
+  IgnoreInvalidFunctionBuilderBody(ConstraintSystem &cs,
+                                   ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::IgnoreInvalidFunctionBuilderBody, locator) {}
+
+public:
+  std::string getName() const override {
+    return "ignore invalid function builder body";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static IgnoreInvalidFunctionBuilderBody *create(ConstraintSystem &cs,
+                                                  ConstraintLocator *locator);
 };
 
 } // end namespace constraints

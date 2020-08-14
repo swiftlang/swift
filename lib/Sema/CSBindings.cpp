@@ -1106,7 +1106,14 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
       } else if (TypeVar->getImpl().isClosureParameterType()) {
         fix = SpecifyClosureParameterType::create(cs, dstLocator);
       } else if (TypeVar->getImpl().isClosureResultType()) {
-        fix = SpecifyClosureReturnType::create(cs, dstLocator);
+        auto *locator = TypeVar->getImpl().getLocator();
+        auto *closure = cast<ClosureExpr>(locator->getAnchor());
+        // If the whole body is being ignored due to a pre-check failure,
+        // let's not record a fix about result type since there is
+        // just not enough context to infer it without a body.
+        if (!cs.hasFixFor(cs.getConstraintLocator(closure),
+                          FixKind::IgnoreInvalidFunctionBuilderBody))
+          fix = SpecifyClosureReturnType::create(cs, dstLocator);
       } else if (srcLocator->getAnchor() &&
                  isa<ObjectLiteralExpr>(srcLocator->getAnchor())) {
         fix = SpecifyObjectLiteralTypeImport::create(cs, dstLocator);
