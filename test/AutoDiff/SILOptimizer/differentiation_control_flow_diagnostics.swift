@@ -78,11 +78,8 @@ func nested_loop(_ x: Float) -> Float {
 
 func rethrowing(_ x: () throws -> Void) rethrows -> Void {}
 
-// expected-error @+1 {{function is not differentiable}}
 @differentiable
-// expected-note @+1 {{when differentiating this function definition}}
 func testTryApply(_ x: Float) -> Float {
-  // expected-note @+1 {{cannot differentiate unsupported control flow}}
   rethrowing({})
   return x
 }
@@ -93,8 +90,17 @@ func testTryApply(_ x: Float) -> Float {
 func withoutDerivative<T : Differentiable, R: Differentiable>(
   at x: T, in body: (T) throws -> R
 ) rethrows -> R {
-  // expected-note @+1 {{cannot differentiate unsupported control flow}}
+  // expected-note @+1 {{expression is not differentiable}}
   try body(x)
+}
+
+// Tests active `try_apply`.
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
+func testNilCoalescing(_ maybeX: Float?) -> Float {
+  // expected-note @+1 {{expression is not differentiable}}
+  return maybeX ?? 10
 }
 
 // Test unsupported differentiation of active enum values.
