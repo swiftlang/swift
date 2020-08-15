@@ -112,7 +112,9 @@ void FunctionSummaryIndexer::indexUseOfType(CanType type) {
   Mangle::ASTMangler mangler;
   type.visit([&](Type t) {
     if (t.getPointer()->hasArchetype() ||
-        t.getPointer()->hasOpaqueArchetype()) {
+        t.getPointer()->hasOpaqueArchetype() ||
+        t.getPointer()->getKind() == TypeKind::SILBlockStorage ||
+        t.getPointer()->getKind() == TypeKind::SILFunction) {
       return;
     }
     std::string mangled = mangler.mangleTypeWithoutPrefix(t);
