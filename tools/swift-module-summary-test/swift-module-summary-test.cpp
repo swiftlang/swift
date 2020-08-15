@@ -59,8 +59,10 @@ LLVM_YAML_DECLARE_MAPPING_TRAITS(modulesummary::ModuleSummaryIndex)
 LLVM_YAML_DECLARE_MAPPING_TRAITS(modulesummary::FunctionSummary)
 LLVM_YAML_DECLARE_MAPPING_TRAITS(modulesummary::FunctionSummary::Call)
 LLVM_YAML_DECLARE_MAPPING_TRAITS(modulesummary::FunctionSummary::TypeRef)
+LLVM_YAML_DECLARE_MAPPING_TRAITS(modulesummary::VFuncImpl)
 LLVM_YAML_IS_SEQUENCE_VECTOR(modulesummary::FunctionSummary::Call)
 LLVM_YAML_IS_SEQUENCE_VECTOR(modulesummary::FunctionSummary::TypeRef)
+LLVM_YAML_IS_SEQUENCE_VECTOR(modulesummary::VFuncImpl)
 LLVM_YAML_DECLARE_ENUM_TRAITS(modulesummary::FunctionSummary::Call::KindTy)
 
 namespace llvm {
@@ -120,6 +122,11 @@ struct CustomMappingTraits<FunctionSummaryMapTy> {
       io.mapRequired(llvm::utostr(P.first).c_str(), P.second);
   }
 };
+
+void MappingTraits<VFuncImpl>::mapping(IO &io, VFuncImpl &V) {
+  io.mapRequired("guid", V.Guid);
+  io.mapRequired("type_guid", V.TypeGuid);
+}
 
 template <>
 struct CustomMappingTraits<VFuncToImplsMapTy> {

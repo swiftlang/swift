@@ -1,4 +1,5 @@
 #define DEBUG_TYPE "sil-cross-dead-function-elimination"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -31,7 +32,29 @@ private:
 
 public:
   SILCrossDeadFuncElimination() {}
-  
+
+  void eliminateDeadTables(SILModule &M) {
+    auto &WitnessTables = M.getWitnessTableList();
+    std::set<GUID> UsedTypes;
+    for (auto type : TheSummary.getUsedTypeList()) {
+      UsedTypes.insert(type);
+    }
+    Mangle::ASTMangler mangler;
+    for (auto WI = WitnessTables.begin(), EI = WitnessTables.end(); WI != EI;) {
+      SILWitnessTable *WT = &*WI;
+      ++WI;
+      CanType type = WI->getConformingType();
+      std::string mangled = mangler.mangleTypeWithoutPrefix(type);
+      GUID guid = getGUIDFromUniqueName(mangled);
+      if (UsedTypes.find(guid) != UsedTypes.end()) {
+        continue;
+      }
+      WT->clearMethods_if([&] (const SILWitnessTable::MethodWitness &MW) -> bool {
+        return true;
+      });
+    }
+  }
+
   void eliminateDeadEntriesFromTables(SILModule &M) {
     
     for (auto VT : M.getVTables()) {

@@ -16,6 +16,12 @@ GUID modulesummary::getGUIDFromUniqueName(llvm::StringRef Name) {
   return llvm::MD5Hash(Name);
 }
 
+static GUID getTypeGUID(Type type) {
+  Mangle::ASTMangler mangler;
+  std::string mangled = mangler.mangleTypeWithoutPrefix(type);
+  return getGUIDFromUniqueName(mangled);
+}
+
 namespace {
 class FunctionSummaryIndexer : public SILInstructionVisitor<FunctionSummaryIndexer> {
   friend SILInstructionVisitor<FunctionSummaryIndexer>;
@@ -344,8 +350,8 @@ void ModuleSummaryIndexer::ensurePreserved(const SILDeclRef &Ref,
   if (Impls.empty())
     return;
 
-  for (GUID Impl : Impls) {
-    auto FS = TheSummary->getFunctionSummary(Impl);
+  for (VFuncImpl Impl : Impls) {
+    auto FS = TheSummary->getFunctionSummary(Impl.Guid);
     assert(FS);
     FS->setPreserved(true);
   }
@@ -376,6 +382,7 @@ void ModuleSummaryIndexer::indexWitnessTable(const SILWitnessTable &WT) {
   auto isPossibllyUsedExternally =
       WT.getDeclContext()->getParentModule() != Mod.getSwiftModule() ||
       WT.getProtocol()->getParentModule() != Mod.getSwiftModule();
+  auto typeGUID = getTypeGUID(WT.getConformingType());
   for (auto entry : WT.getEntries()) {
     if (entry.getKind() != SILWitnessTable::Method)
       continue;
@@ -386,7 +393,8 @@ void ModuleSummaryIndexer::indexWitnessTable(const SILWitnessTable &WT) {
       continue;
     auto slot = createVFuncSlot(methodWitness.Requirement, VFuncSlot::Witness);
     TheSummary->addImplementation(slot,
-                                  getGUIDFromUniqueName(Witness->getName()));
+                                  getGUIDFromUniqueName(Witness->getName()),
+                                  typeGUID);
 
     if (isPossibllyUsedExternally) {
       ensurePreserved(*Witness);
@@ -395,7 +403,7 @@ void ModuleSummaryIndexer::indexWitnessTable(const SILWitnessTable &WT) {
 }
 
 void ModuleSummaryIndexer::indexVTable(const SILVTable &VT) {
-
+  auto typeGUID = getTypeGUID(VT.getClass()->getInterfaceType());
   for (auto entry : VT.getEntries()) {
     auto Impl = entry.getImplementation();
     if (entry.getMethod().kind == SILDeclRef::Kind::Deallocator ||
@@ -411,7 +419,7 @@ void ModuleSummaryIndexer::indexVTable(const SILVTable &VT) {
       ensurePreserved(*Impl);
     }
     auto slot = createVFuncSlot(entry.getMethod(), VFuncSlot::VTable);
-    TheSummary->addImplementation(slot, getGUIDFromUniqueName(Impl->getName()));
+    TheSummary->addImplementation(slot, getGUIDFromUniqueName(Impl->getName()), typeGUID);
   }
 }
 

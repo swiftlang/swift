@@ -145,8 +145,13 @@ struct VFuncSlot {
   VFuncSlot(KindTy Kind, GUID VFuncID) : Kind(Kind), VFuncID(VFuncID) {}
 };
 
+struct VFuncImpl {
+  GUID Guid;
+  GUID TypeGuid;
+};
+
 using FunctionSummaryMapTy = std::map<GUID, std::unique_ptr<FunctionSummary>>;
-using VFuncToImplsMapTy = std::map<GUID, std::vector<GUID>>;
+using VFuncToImplsMapTy = std::map<GUID, std::vector<VFuncImpl>>;
 using UsedTypeListTy = std::vector<GUID>;
 
 /// Module summary that consists of function summaries and virtual function
@@ -214,24 +219,25 @@ public:
   }
 
   /// Record a implementation for the virtual function slot.
-  void addImplementation(VFuncSlot slot, GUID implGUID) {
+  void addImplementation(VFuncSlot slot, GUID implGUID, GUID typeGUID) {
     VFuncToImplsMapTy &table = getVFuncMap(slot.Kind);
     auto found = table.find(slot.VFuncID);
+      VFuncImpl impl = {implGUID, typeGUID};
     if (found == table.end()) {
-      table.insert(std::make_pair(slot.VFuncID, std::vector<GUID>{implGUID}));
+      table.insert(std::make_pair(slot.VFuncID, std::vector<VFuncImpl>{impl}));
       return;
     }
-    found->second.push_back(implGUID);
+    found->second.push_back(impl);
   }
 
   /// Return a list of implementations for the virtual function slot.
-  ArrayRef<GUID> getImplementations(VFuncSlot slot) const {
+  ArrayRef<VFuncImpl> getImplementations(VFuncSlot slot) const {
     const VFuncToImplsMapTy &table = getVFuncMap(slot.Kind);
     auto found = table.find(slot.VFuncID);
     if (found == table.end()) {
-      return ArrayRef<GUID>();
+      return ArrayRef<VFuncImpl>();
     }
-    return ArrayRef<GUID>(found->second);
+    return ArrayRef<VFuncImpl>(found->second);
   }
 
   void markUsedType(GUID typeGUID) { UsedTypeList.push_back(typeGUID); }

@@ -143,7 +143,7 @@ void Serializer::emitVFuncTable(const VFuncToImplsMapTy T,
                                 VFuncSlot::KindTy kind) {
   for (auto &pair : T) {
     GUID guid = pair.first;
-    std::vector<GUID> impls = pair.second;
+    std::vector<VFuncImpl> impls = pair.second;
     using namespace record_block;
 
     VFuncMetadataLayout::emitRecord(Out, ScratchRecord,
@@ -152,7 +152,7 @@ void Serializer::emitVFuncTable(const VFuncToImplsMapTy T,
 
     for (auto impl : impls) {
       VFuncImplLayout::emitRecord(Out, ScratchRecord,
-                                  AbbrCodes[VFuncImplLayout::Code], impl);
+                                  AbbrCodes[VFuncImplLayout::Code], impl.Guid, impl.TypeGuid);
     }
   }
 }
@@ -430,9 +430,9 @@ bool Deserializer::readModuleSummary() {
       if (!CurrentSlot) {
         report_fatal_error("Unexpected METHOD_IMPL record");
       }
-      GUID implGUID;
-      VFuncImplLayout::readRecord(Scratch, implGUID);
-      moduleSummary.addImplementation(CurrentSlot.getValue(), implGUID);
+      GUID implGUID, typeGUID;
+      VFuncImplLayout::readRecord(Scratch, implGUID, typeGUID);
+      moduleSummary.addImplementation(CurrentSlot.getValue(), implGUID, typeGUID);
       break;
     }
     case USED_TYPE: {

@@ -108,10 +108,56 @@ VFuncSlot createVFuncSlot(FunctionSummary::Call call) {
   return VFuncSlot(slotKind, call.getCallee());
 }
 
+void markDeadTypeRef(ModuleSummaryIndex &summary, const llvm::DenseSet<GUID> &PreservedGUIDs) {
+  SmallVector<GUID, 8> Worklist;
+  SmallSetVector<GUID, 16> beenInWorklist;
+  SmallSetVector<GUID, 16> UseMarkedTypes;
+
+  Worklist.append(PreservedGUIDs.begin(), PreservedGUIDs.end());
+  
+  while (!Worklist.empty()) {
+    auto target = Worklist.pop_back_val();
+    if (!beenInWorklist.insert(target)) {
+      continue;
+    }
+    auto maybeSummary = summary.getFunctionSummary(target);
+    if (!maybeSummary) {
+      llvm_unreachable("Bad GUID");
+    }
+    auto FS = maybeSummary;
+
+    for (auto typeRef : FS->typeRefs()) {
+      if (UseMarkedTypes.insert(typeRef.Guid)) {
+        summary.markUsedType(typeRef.Guid);
+      }
+    }
+    for (auto Call : FS->calls()) {
+      switch (Call.getKind()) {
+      case FunctionSummary::Call::Direct: {
+        Worklist.push_back(Call.getCallee());
+        continue;
+      }
+      case FunctionSummary::Call::Witness:
+      case FunctionSummary::Call::VTable: {
+        VFuncSlot slot = createVFuncSlot(Call);
+        auto Impls = summary.getImplementations(slot);
+        for (auto Impl : Impls) {
+          Worklist.push_back(Impl.Guid);
+        }
+        break;
+      }
+      case FunctionSummary::Call::kindCount:
+        llvm_unreachable("impossible");
+      }
+    }
+  }
+}
+
 void markDeadSymbols(ModuleSummaryIndex &summary, llvm::DenseSet<GUID> &PreservedGUIDs) {
 
   SmallVector<std::shared_ptr<LivenessTrace>, 8> Worklist;
-  std::set<GUID> UseMarkedTypes;
+  auto UsedTypesList = summary.getUsedTypeList();
+  std::set<GUID> UsedTypesSet(UsedTypesList.begin(), UsedTypesList.end());
   unsigned LiveSymbols = 0;
 
   for (auto GUID : PreservedGUIDs) {
@@ -143,11 +189,6 @@ void markDeadSymbols(ModuleSummaryIndex &summary, llvm::DenseSet<GUID> &Preserve
     FS->setLive(true);
     LiveSymbols++;
 
-    for (auto typeRef : FS->typeRefs()) {
-      if (UseMarkedTypes.insert(typeRef.Guid).second) {
-        summary.markUsedType(typeRef.Guid);
-      }
-    }
     for (auto Call : FS->calls()) {
       switch (Call.getKind()) {
       case FunctionSummary::Call::Direct: {
@@ -160,8 +201,11 @@ void markDeadSymbols(ModuleSummaryIndex &summary, llvm::DenseSet<GUID> &Preserve
         VFuncSlot slot = createVFuncSlot(Call);
         auto Impls = summary.getImplementations(slot);
         for (auto Impl : Impls) {
+          if (UsedTypesSet.find(Impl.TypeGuid) == UsedTypesSet.end()) {
+            continue;
+          }
           Worklist.push_back(std::make_shared<LivenessTrace>(
-              trace, Impl, LivenessTrace::IndirectReferenced));
+              trace, Impl.Guid, LivenessTrace::IndirectReferenced));
         }
         break;
       }
@@ -212,6 +256,7 @@ int cross_module_opt_main(ArrayRef<const char *> Args, const char *Argv0,
   TheSummary->setName("combined");
   
   auto PreservedGUIDs = computePreservedGUIDs(TheSummary.get());
+  markDeadTypeRef(*TheSummary.get(), PreservedGUIDs);
   markDeadSymbols(*TheSummary.get(), PreservedGUIDs);
 
   modulesummary::writeModuleSummaryIndex(*TheSummary, Instance.getDiags(),

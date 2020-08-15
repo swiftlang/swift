@@ -69,7 +69,8 @@ using VFuncMetadataLayout =
                    >;
 
 using VFuncImplLayout = BCRecordLayout<VFUNC_IMPL,
-                                       BCGUID // impl func guid
+                                       BCGUID, // impl func guid
+                                       BCGUID // impl type guid
                                        >;
 using UsedTypeLayout = BCRecordLayout<USED_TYPE,
                                       BCGUID // type guid
