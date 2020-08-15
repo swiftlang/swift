@@ -3206,14 +3206,8 @@ PrimaryArchetypeType::getNew(const ASTContext &Ctx,
 }
 
 bool ArchetypeType::requiresClass() const {
-  if (Bits.ArchetypeType.HasSuperclass)
-    return true;
   if (auto layout = getLayoutConstraint())
-    if (layout->isClass())
-      return true;
-  for (ProtocolDecl *conformed : getConformsTo())
-    if (conformed->requiresClass())
-      return true;
+    return layout->isClass();
   return false;
 }
 
