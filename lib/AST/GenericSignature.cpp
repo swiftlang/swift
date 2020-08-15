@@ -404,16 +404,6 @@ bool GenericSignatureImpl::requiresClass(Type type) const {
   // If there is a layout constraint, it might be a class.
   if (equivClass->layout && equivClass->layout->isClass()) return true;
 
-  // If there is a superclass bound, then obviously it must be a class.
-  // FIXME: We shouldn't need this?
-  if (equivClass->superclass) return true;
-
-  // If any of the protocols are class-bound, then it must be a class.
-  // FIXME: We shouldn't need this?
-  for (const auto &conforms : equivClass->conformsTo) {
-    if (conforms.first->requiresClass()) return true;
-  }
-
   return false;
 }
 
