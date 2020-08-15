@@ -6,17 +6,64 @@
 
 // RUN: %swift-module-summary-test --to-yaml %t/type_refs.swiftmodule.summary -o %t/type_refs.summary.yaml
 
-// Ensure that type reference to S is recorded
+// Ensure that type reference to S, C and D are recorded
 // RUN: cat %t/type_refs.summary.yaml | %FileCheck %s -check-prefix SIMPLE-COERCE
 
+// SIMPLE-COERCE:      name:            '$s9type_refs11coerceToAnyyypAA1DCF'
+// SIMPLE-COERCE-NEXT: guid:            14079990488171131
+// SIMPLE-COERCE-NEXT: live:            false
+// SIMPLE-COERCE-NEXT: preserved:       false
+// SIMPLE-COERCE-NEXT: calls:           []
+// SIMPLE-COERCE-NEXT: type_refs:
+// SIMPLE-COERCE-NEXT:   - name:            9type_refs1DC
+// SIMPLE-COERCE-NEXT:     guid:            1332210649212571009
+
+// SIMPLE-COERCE:       name:            '$s9type_refs11coerceToAnyyypAA1CCF'
+// SIMPLE-COERCE-NEXT:  guid:            1940219073901329473
+// SIMPLE-COERCE-NEXT:  live:            false
+// SIMPLE-COERCE-NEXT:  preserved:       false
+// SIMPLE-COERCE-NEXT:  calls:           []
+// SIMPLE-COERCE-NEXT:  type_refs:
+// SIMPLE-COERCE-NEXT:    - name:            9type_refs1CC
+// SIMPLE-COERCE-NEXT:      guid:            14053292587484144632
+
 // SIMPLE-COERCE:      name:            '$s9type_refs9coerceToPyAA1P_pAA1SVF'
-// SIMPLE-COERCE-NEXT:   guid:            15452386893050095333
-// SIMPLE-COERCE-NEXT:   live:            false
-// SIMPLE-COERCE-NEXT:   preserved:       false
-// SIMPLE-COERCE-NEXT:   calls:           []
-// SIMPLE-COERCE-NEXT:   type_refs:
-// SIMPLE-COERCE-NEXT:     - name:            9type_refs1SV
-// SIMPLE-COERCE-NEXT:       guid:            12736589225588998764
+// SIMPLE-COERCE-NEXT: guid:            15452386893050095333
+// SIMPLE-COERCE-NEXT: live:            false
+// SIMPLE-COERCE-NEXT: preserved:       false
+// SIMPLE-COERCE-NEXT: calls:           []
+// SIMPLE-COERCE-NEXT: type_refs:
+// SIMPLE-COERCE-NEXT:   - name:            9type_refs1SV
+// SIMPLE-COERCE-NEXT:     guid:            12736589225588998764
+
+
+
+// Ensure that witness impl of S.foo for P has type ref to S
+// RUN: cat %t/type_refs.summary.yaml | %FileCheck %s -check-prefix WITNESS-IMPL
+
+// WITNESS-IMPL:      12925277474523063582:
+// WITNESS-IMPL-NEXT:   name:            '$s9type_refs1SVAA1PA2aDP3fooyyFTW'
+
+// WITNESS-IMPL:      witness_tables:
+// WITNESS-IMPL-NEXT:   17891631795932606560:
+// WITNESS-IMPL-NEXT:     - guid:            12925277474523063582
+// WITNESS-IMPL-NEXT:       type_guid:       12736589225588998764
+
+
+// Ensure that vtable impl of C.bar and D.bar have type ref to C
+// RUN: cat %t/type_refs.summary.yaml | %FileCheck %s -check-prefix WITNESS-IMPL
+
+
+// VTABLE-IMPL:      14897920476774525675:
+// VTABLE-IMPL-NEXT:   name:            '$s9type_refs1CC3baryyF'
+// VTABLE-IMPL:      16977749031506698911:
+// VTABLE-IMPL-NEXT:   name:            '$s9type_refs1DC3baryyF'
+
+// VTABLE-IMPL:      14897920476774525675:
+// VTABLE-IMPL-NEXT:   - guid:            14897920476774525675
+// VTABLE-IMPL-NEXT:     type_guid:       14053292587484144632
+// VTABLE-IMPL-NEXT:   - guid:            16977749031506698911
+// VTABLE-IMPL-NEXT:     type_guid:       1332210649212571009
 
 
 // RUN: %swift_frontend_plain -cross-module-opt %t/type_refs.swiftmodule.summary -module-summary-embed-debug-name -o %t/type_refs.swiftmodule.merged-summary
@@ -38,6 +85,17 @@ struct V : P {
     func foo() {}
 }
 
+class C {
+    func bar() {}
+}
+
+class D : C {
+    override func bar() {}
+}
+
 func coerceToP(_ x: S) -> P { return x }
 
 _ = coerceToP(S())
+
+func coerceToAny(_ x: C) -> Any { return x }
+func coerceToAny(_ x: D) -> Any { return x }
