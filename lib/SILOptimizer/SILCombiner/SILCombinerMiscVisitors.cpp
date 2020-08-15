@@ -1974,3 +1974,168 @@ visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *CBOI) {
   return nullptr;
 }
 
+SILInstruction *
+SILCombiner::visitDifferentiableFunctionInst(DifferentiableFunctionInst *DFI) {
+  for (auto use : DFI->getUses()) {
+    auto *DFEI = dyn_cast<DifferentiableFunctionExtractInst>(use->getUser());
+    if (!DFEI)
+      continue;
+    // %diff_func = differentiable_function(%orig, %jvp, %vjp)
+    // differentiable_function_extract [original] %diff_func -> %orig
+    // differentiable_function_extract [jvp]      %diff_func -> %jvp
+    // differentiable_function_extract [vjp]      %diff_func -> %vjp
+    if (DFI->hasExtractee(DFEI->getExtractee())) {
+      SILValue newValue = DFI->getExtractee(DFEI->getExtractee());
+      // If the type of the `differentiable_function` operand does not precisely
+      // match the type of the original `differentiable_function_extract`,
+      // create a `convert_function`.
+      if (newValue->getType() != DFEI->getType()) {
+        auto newValueFnType = newValue->getType().castTo<SILFunctionType>();
+        auto extracteeFnType = DFEI->getType().castTo<SILFunctionType>();
+        if (!newValueFnType->isABICompatibleWith(
+                extracteeFnType, *DFI->getFunction()).isCompatible()) {
+          llvm::errs() << "NON-ABI-COMPATIBLE TYPES\n";
+          newValue->getType().dump();
+          DFEI->getType().dump();
+          
+          continue;
+        }
+        newValue = Builder.createConvertFunction(
+            DFEI->getLoc(), newValue, DFEI->getType(),
+            /*withoutActuallyEscaping*/ false);
+      }
+      replaceInstUsesWith(*DFEI, newValue);
+      return nullptr;
+    }
+  }
+
+  auto original = DFI->getOriginalFunction();
+  auto jvp = DFI->getJVPFunction();
+  auto vjp = DFI->getVJPFunction();
+
+#if 0
+  if (auto *originalConvertInst = dyn_cast<ThinToThickFunctionInst>(original)) {
+    llvm::errs() << "YES!\n";
+    DFI->dumpInContext();
+    auto *jvpConvertInst = dyn_cast<ThinToThickFunctionInst>(jvp);
+    auto *vjpConvertInst = dyn_cast<ThinToThickFunctionInst>(vjp);
+    if (jvpConvertInst && vjpConvertInst) {
+      auto *newDFI = Builder.createDifferentiableFunction(
+          DFI->getLoc(), DFI->getParameterIndices(), DFI->getResultIndices(),
+          originalConvertInst->getOperand(), std::make_pair(jvpConvertInst->getOperand(), vjpConvertInst->getOperand()));
+      auto *newConvertInst = Builder.createThinToThickFunction(DFI->getLoc(), newDFI, DFI->getType());
+      return newConvertInst;
+    }
+  }
+#endif
+
+  for (auto &operand : DFI->getAllOperands()) {
+    // (convert_function (thin_to_thick_function x)) => (thin_to_thick_function (convert_function x))
+    // This unblocks downstream optimizations.
+    if (auto *CFI = dyn_cast<ConvertFunctionInst>(operand.get())) {
+      if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(CFI->getConverted())) {
+        if (TTTFI->getSingleUse()) {
+          // tttfi->replaceAllUsesWith(subCFI->getConverted());
+          // eraseInstFromFunction(*CFI);
+          // CFI->getOperandRef().set(tttfi->getConverted());
+          auto convertedThickType = CFI->getType().castTo<SILFunctionType>();
+          auto convertedThinType = convertedThickType->getWithRepresentation(SILFunctionTypeRepresentation::Thin);
+          auto *newCFI = Builder.createConvertFunction(CFI->getLoc(), TTTFI->getConverted(),
+                                                       SILType::getPrimitiveObjectType(convertedThinType),
+                                                       CFI->withoutActuallyEscaping());
+          // eraseInstFromFunction(*tttfi);
+          auto *newTTTFI = Builder.createThinToThickFunction(TTTFI->getLoc(), newCFI, CFI->getType());
+          replaceValueUsesWith(operand.get(), newTTTFI);
+        }
+      }
+    }
+  }
+
+  // Push conversion instructions of inside `differentiable_function`. This
+  // unblocks more optimizations.
+  //
+  // %diff_func = differentiable_function(%orig, %jvp, %vjp)
+  // if (auto *use = DFI->getSingleUse()) {
+  for (auto *use : DFI->getUses()) {
+    auto *user = use->getUser();
+    if (auto *convertInst = dyn_cast<ConvertEscapeToNoEscapeInst>(user)) {
+      llvm::errs() << "FOUND CONVERT_ESCAPE_TO_NO_ESCAPE OF "
+                      "DIFFERENTIABLE_FUNCTION_INST!\n";
+      convertInst->dumpInContext();
+      auto createConvertEscapeToNoEscape = [&](SILValue v) {
+        auto fnType = v->getType().castTo<SILFunctionType>();
+        auto noEscapeFnType =
+            fnType->getWithExtInfo(fnType->getExtInfo().withNoEscape());
+        auto noEscapeType = SILType::getPrimitiveObjectType(noEscapeFnType);
+        return Builder.createConvertEscapeToNoEscape(
+            v.getLoc(), v, noEscapeType, convertInst->isLifetimeGuaranteed());
+      };
+      auto *originalNoEscape = createConvertEscapeToNoEscape(original);
+      SILValue jvpNoEscape = createConvertEscapeToNoEscape(jvp);
+      SILValue vjpNoEscape = createConvertEscapeToNoEscape(vjp);
+      auto *newDFI = Builder.createDifferentiableFunction(
+          DFI->getLoc(), DFI->getParameterIndices(), DFI->getResultIndices(),
+          originalNoEscape, std::make_pair(jvpNoEscape, vjpNoEscape));
+      assert(newDFI->getType() == convertInst->getType() &&
+             "New `@differentiable` function instruction should have same type "
+             "as the old `convert_escape_to_no_escape` instruction");
+      replaceInstUsesWith(*convertInst, newDFI);
+      return nullptr;
+    }
+    if (auto *convertInst = dyn_cast<ConvertFunctionInst>(user)) {
+      llvm::errs()
+          << "FOUND CONVERT_FUNCTION OF DIFFERENTIABLE_FUNCTION_INST!\n";
+      convertInst->dumpInContext();
+      auto createConvertFunctionOfComponent =
+          [&](NormalDifferentiableFunctionTypeComponent extractee) {
+            auto operand = DFI->getExtractee(extractee);
+            auto convertInstType = convertInst->getType().castTo<SILFunctionType>();
+            auto convertedComponentFnType = convertInstType->getDifferentiableComponentType(extractee, Builder.getModule());
+            auto convertedComponentType = SILType::getPrimitiveObjectType(convertedComponentFnType);
+            return Builder.createConvertFunction(
+                operand.getLoc(), operand, convertedComponentType,
+                convertInst->withoutActuallyEscaping());
+          };
+      auto *convertedOriginal = createConvertFunctionOfComponent(
+          NormalDifferentiableFunctionTypeComponent::Original);
+      SILValue convertedJVP = createConvertFunctionOfComponent(
+          NormalDifferentiableFunctionTypeComponent::JVP);
+      SILValue convertedVJP = createConvertFunctionOfComponent(
+          NormalDifferentiableFunctionTypeComponent::VJP);
+      auto *newDFI = Builder.createDifferentiableFunction(
+          DFI->getLoc(), DFI->getParameterIndices(), DFI->getResultIndices(),
+          convertedOriginal, std::make_pair(convertedJVP, convertedVJP));
+      assert(newDFI->getType() == convertInst->getType() &&
+             "New `@differentiable` function instruction should have same type "
+             "as the old `convert_function` instruction");
+      replaceInstUsesWith(*convertInst, newDFI);
+      return nullptr;
+    }
+  }
+
+  return nullptr;
+}
+
+SILInstruction *
+SILCombiner::visitLinearFunctionExtractInst(LinearFunctionExtractInst *LFEI) {
+  // linear_func = linear_function(orig, transpose)
+  // linear_function_extract [original]  linear_func -> orig
+  // linear_function_extract [transpose] linear_func -> transpose
+  if (auto *LFI = dyn_cast<LinearFunctionInst>(LFEI->getFunctionOperand())) {
+    if (LFI->hasExtractee(LFEI->getExtractee())) {
+      SILValue newValue = LFI->getExtractee(LFEI->getExtractee());
+      // If the type of the `differentiable_function` operand does not precisely
+      // match the type of the original `differentiable_function_extract`,
+      // create a `convert_function`.
+      if (newValue->getType() != LFEI->getType()) {
+        newValue = Builder.createConvertFunction(
+            LFEI->getLoc(), newValue, LFEI->getType(),
+            /*WithoutActuallyEscaping*/ false);
+      }
+      replaceInstUsesWith(*LFEI, newValue);
+      return nullptr;
+    }
+  }
+
+  return nullptr;
+}

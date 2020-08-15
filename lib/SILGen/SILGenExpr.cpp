@@ -1699,13 +1699,26 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
   llvm_unreachable("bad representation");
 }
 
+// static raw_ostream& OS = llvm::errs();
+static raw_ostream& OS = llvm::nulls();
+
 RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
                                                   SGFContext C)
 {
+  OS << "RValueEmitter::visitFunctionConversionExpr\n";
+  e->dump(OS);
+  OS << "\n";
+
   CanAnyFunctionType srcRepTy =
       cast<FunctionType>(e->getSubExpr()->getType()->getCanonicalType());
   CanAnyFunctionType destRepTy =
       cast<FunctionType>(e->getType()->getCanonicalType());
+
+  OS << "SRC REP TY\n";
+  srcRepTy.dump(OS);
+  OS << "DEST REP TY\n";
+  destRepTy.dump(OS);
+  OS << "EQUAL?" << (srcRepTy->isEqual(destRepTy)) << "\n";
 
   if (destRepTy->getRepresentation() ==
       FunctionTypeRepresentation::CFunctionPointer) {
@@ -5464,6 +5477,9 @@ RValue RValueEmitter::visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E,
 
 RValue RValueEmitter::visitDifferentiableFunctionExpr(
     DifferentiableFunctionExpr *E, SGFContext C) {
+  OS << "RValueEmitter::visitDifferentiableFunctionExpr\n";
+  E->dump(OS);
+  OS << "\n";
   auto origFunc = SGF.emitRValueAsSingleValue(E->getSubExpr());
   auto destTy = SGF.getLoweredType(E->getType()).castTo<SILFunctionType>();
   auto *diffFunc = SGF.B.createDifferentiableFunction(

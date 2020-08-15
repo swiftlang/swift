@@ -716,6 +716,7 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses() {
                         "lifetime ending use?!\n";
       }
       llvm::errs() << "Value: " << *value << '\n';
+      value->getFunction()->dump();
     });
   }
 
@@ -878,6 +879,7 @@ void SILInstruction::verifyOperandOwnership() const {
       llvm::errs() << "Instruction:\n";
       printInContext(llvm::errs());
       llvm::errs() << "Operand Ownership Kind Map: " << operandOwnershipKindMap;
+      opValue->getFunction()->dump();
     });
   }
 }

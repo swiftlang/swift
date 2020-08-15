@@ -41,6 +41,9 @@ namespace {
 
     SILValue visitTupleExtractInst(TupleExtractInst *TEI);
     SILValue visitStructExtractInst(StructExtractInst *SEI);
+    SILValue visitDifferentiableFunctionExtractInst(
+        DifferentiableFunctionExtractInst *DFEI);
+    SILValue visitLinearFunctionExtractInst(LinearFunctionExtractInst *LFEI);
     SILValue visitEnumInst(EnumInst *EI);
     SILValue visitSelectEnumInst(SelectEnumInst *SEI);
     SILValue visitUncheckedEnumDataInst(UncheckedEnumDataInst *UEDI);
@@ -161,6 +164,35 @@ SILValue InstSimplifier::visitStructExtractInst(StructExtractInst *SEI) {
   if (auto *Struct = dyn_cast<StructInst>(SEI->getOperand()))
     return Struct->getFieldValue(SEI->getField());
 
+  return SILValue();
+}
+
+SILValue InstSimplifier::visitDifferentiableFunctionExtractInst(
+    DifferentiableFunctionExtractInst *DFEI) {
+#if 0
+  // diff_func = differentiable_function(orig, jvp, vjp)
+  // differentiable_function_extract [original] diff_func -> orig
+  // differentiable_function_extract [jvp]      diff_func -> jvp
+  // differentiable_function_extract [vjp       diff_func -> vjp
+  if (auto *DFI = dyn_cast<DifferentiableFunctionInst>(DFEI->getOperand()))
+    if (DFI->hasExtractee(DFEI->getExtractee()))
+      return DFI->getExtractee(DFEI->getExtractee());
+
+#endif
+  return SILValue();
+}
+
+SILValue InstSimplifier::visitLinearFunctionExtractInst(
+    LinearFunctionExtractInst *LFEI) {
+#if 0
+  // linear_func = linear_function(orig, transpose)
+  // linear_function_extract [original]  linear_func -> orig
+  // linear_function_extract [transpose] linear_func -> transpose
+  if (auto *LFI = dyn_cast<LinearFunctionInst>(LFEI->getOperand()))
+    if (LFI->hasExtractee(LFEI->getExtractee()))
+      return LFI->getExtractee(LFEI->getExtractee());
+
+#endif
   return SILValue();
 }
 

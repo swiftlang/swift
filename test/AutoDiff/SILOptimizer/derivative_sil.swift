@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -enable-experimental-forward-mode-differentiation -verify -Xllvm -sil-print-after=differentiation -o /dev/null 2>&1 %s | %FileCheck %s -check-prefix=CHECK-SIL
+// RUN: %target-swift-frontend -emit-sil -enable-experimental-forward-mode-differentiation -verify -Xllvm -sil-print-after=differentiation -Xllvm -differentiation-skip-folding-differentiable-function-extraction -o /dev/null 2>&1 %s | %FileCheck %s -check-prefix=CHECK-SIL
 // REQUIRES: asserts
 
 // Simple generated derivative code FileCheck tests.

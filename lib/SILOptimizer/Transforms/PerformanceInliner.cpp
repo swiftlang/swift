@@ -268,6 +268,13 @@ bool SILPerformanceInliner::isProfitableToInline(
   assert(Callee);
   bool IsGeneric = AI.hasSubstitutions();
 
+#if 0
+  if (Callee->getName() == "$sS4fIegyd_Igydo_S2fxq_r0_lyS2fIsegnr_Iegnro_TR24AD__foo__vjp_src_0_wrt_0Tf3nnpf_n") {
+    assert(false);
+    return true;
+  }
+#endif
+
   // Start with a base benefit.
   int BaseBenefit = RemovedCallBenefit;
 

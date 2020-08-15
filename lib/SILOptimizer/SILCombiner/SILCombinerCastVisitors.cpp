@@ -630,6 +630,17 @@ SILInstruction *SILCombiner::visitConvertEscapeToNoEscapeInst(
   if (Cvt->getFunction()->hasOwnership())
     return nullptr;
 
+#if 0
+  if (auto *convertInst = dyn_cast<ConvertFunctionInst>(Cvt->getConverted())) {
+    auto origFunType = convertInst->getType().getAs<SILFunctionType>();
+    auto newTy = origFunType->getWithExtInfo(origFunType->getExtInfo().withNoEscape(true));
+    return Builder.createConvertFunction(
+        convertInst->getLoc(), convertInst->getConverted(),
+        SILType::getPrimitiveObjectType(newTy),
+        convertInst->withoutActuallyEscaping());
+  }
+#endif
+
   auto *OrigThinToThick =
       dyn_cast<ThinToThickFunctionInst>(Cvt->getConverted());
   if (!OrigThinToThick)
@@ -693,7 +704,39 @@ SILInstruction *SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *CFI) 
       }
     }
   }
-  
+
+#if 0
+  // FIXME: Make this more constrained to differentiable_function by moving the logic there
+
+  // (convert_function (thin_to_thick_function x)) => (thin_to_thick_function (convert_function x))
+  if (auto *tttfi = dyn_cast<ThinToThickFunctionInst>(CFI->getConverted())) {
+    if (tttfi->getSingleUse()) {
+      // tttfi->replaceAllUsesWith(subCFI->getConverted());
+      // eraseInstFromFunction(*CFI);
+      // CFI->getOperandRef().set(tttfi->getConverted());
+      auto convertedThickType = CFI->getType().castTo<SILFunctionType>();
+      auto convertedThinType = convertedThickType->getWithRepresentation(SILFunctionTypeRepresentation::Thin);
+      auto *newCFI = Builder.createConvertFunction(CFI->getLoc(), tttfi->getConverted(),
+                                                   SILType::getPrimitiveObjectType(convertedThinType),
+                                                   CFI->withoutActuallyEscaping());
+      // eraseInstFromFunction(*tttfi);
+      auto *newTTTFI = Builder.createThinToThickFunction(tttfi->getLoc(), newCFI, CFI->getType());
+      return newTTTFI;
+    }
+  }
+#endif
+
+#if 0
+  // (convert_function (thin_to_thick_function x)) => (convert_function x)
+  if (auto *tttfi = dyn_cast<ThinToThickFunctionInst>(CFI->getConverted())) {
+    if (tttfi->getSingleUse()) {
+      // tttfi->replaceAllUsesWith(subCFI->getConverted());
+      // eraseInstFromFunction(*CFI);
+      CFI->getOperandRef().set(tttfi->getConverted());
+    }
+  }
+#endif
+
   // (convert_function (convert_function x)) => (convert_function x)
   if (auto subCFI = dyn_cast<ConvertFunctionInst>(CFI->getConverted())) {
     // If we convert the function type back to itself, we can replace the

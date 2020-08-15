@@ -3377,6 +3377,15 @@ static ManagedValue createDifferentiableFunctionThunk(
     SILGenFunction &SGF, SILLocation loc, ManagedValue fn,
     AbstractionPattern inputOrigType, CanAnyFunctionType inputSubstType,
     AbstractionPattern outputOrigType, CanAnyFunctionType outputSubstType) {
+#if 0
+  llvm::errs() << "createDifferentiableFunctionThunk\n";
+  llvm::errs() << "INPUT:\n";
+  inputOrigType.dump();
+  inputSubstType.dump();
+  llvm::errs() << "OUTPUT:\n";
+  outputOrigType.dump();
+  outputSubstType.dump();
+#endif
   // Applies a thunk to all the components by extracting them, applying thunks
   // to all of them, and then putting them back together.
   auto sourceType = fn.getType().castTo<SILFunctionType>();
@@ -3824,7 +3833,8 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
       assert(paramTy.isAddress());
       auto toArg = (*toArgIter++).getValue();
       auto *buf = createAllocStack(toArg->getType());
-      thunkSGF.B.createStore(loc, toArg, buf, StoreOwnershipQualifier::Init);
+      thunkSGF.B.emitStoreValueOperation(loc, toArg, buf,
+                                         StoreOwnershipQualifier::Init);
       arguments.push_back(buf);
       continue;
     }
@@ -3883,8 +3893,8 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
     // Load direct results from indirect results.
     if (fromRes.isFormalIndirect()) {
       auto indRes = *fromIndResultsIter++;
-      auto *load = thunkSGF.B.createLoad(loc, indRes,
-                                         LoadOwnershipQualifier::Unqualified);
+      auto load = thunkSGF.B.emitLoadValueOperation(
+          loc, indRes, LoadOwnershipQualifier::Take);
       results.push_back(load);
       continue;
     }
