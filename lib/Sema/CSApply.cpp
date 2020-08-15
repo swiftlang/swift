@@ -398,6 +398,26 @@ namespace {
       return base.getOldType();
     }
 
+    /// Check whether it is possible to have an ObjC key path string for the keypath expression
+    /// and set the key path string, if yes
+    void checkAndSetObjCKeyPathString(KeyPathExpr *keyPath) {
+      if (cs.getASTContext().LangOpts.EnableObjCInterop) {
+        SmallString<64> compatStringBuf;
+        if (buildObjCKeyPathString(keyPath, compatStringBuf)) {
+            auto stringCopy = cs.getASTContext().AllocateCopy<char>(compatStringBuf.begin(),
+                                                                    compatStringBuf.end());
+            auto stringExpr = new (cs.getASTContext()) StringLiteralExpr(
+                                  StringRef(stringCopy, compatStringBuf.size()),
+                                  SourceRange(),
+                                  /*implicit*/ true);
+            cs.setType(
+                stringExpr,
+                cs.getASTContext().getStringDecl()->getDeclaredInterfaceType());
+            keyPath->setObjCStringLiteralExpr(stringExpr);
+        }
+      }
+    }
+
     // Returns None if the AST does not contain enough information to recover
     // substitutions; this is different from an Optional(SubstitutionMap()),
     // indicating a valid call to a non-generic operator.
@@ -2041,6 +2061,11 @@ namespace {
       keyPath->setParsedPath(componentExpr);
       keyPath->resolveComponents(ctx, components);
       cs.cacheExprTypes(keyPath);
+
+      // See whether there's an equivalent ObjC key path string we can produce
+      // for interop purposes.
+      checkAndSetObjCKeyPathString(keyPath);
+
       return keyPath;
     }
 
@@ -4765,22 +4790,7 @@ namespace {
 
       // See whether there's an equivalent ObjC key path string we can produce
       // for interop purposes.
-      if (cs.getASTContext().LangOpts.EnableObjCInterop) {
-        SmallString<64> compatStringBuf;
-        if (buildObjCKeyPathString(E, compatStringBuf)) {
-          auto stringCopy =
-            cs.getASTContext().AllocateCopy<char>(compatStringBuf.begin(),
-                                                  compatStringBuf.end());
-          auto stringExpr = new (cs.getASTContext()) StringLiteralExpr(
-                                 StringRef(stringCopy, compatStringBuf.size()),
-                                 SourceRange(),
-                                 /*implicit*/ true);
-          cs.setType(
-              stringExpr,
-              cs.getASTContext().getStringDecl()->getDeclaredInterfaceType());
-          E->setObjCStringLiteralExpr(stringExpr);
-        }
-      }
+      checkAndSetObjCKeyPathString(E);
       
       // The final component type ought to line up with the leaf type of the
       // key path.
