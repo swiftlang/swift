@@ -7212,24 +7212,51 @@ FuncDecl *FuncDecl::createDeserialized(ASTContext &Context,
 }
 
 FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
-                           StaticSpellingKind StaticSpelling,
-                           SourceLoc FuncLoc,
-                           DeclName Name, SourceLoc NameLoc,
-                           bool Async, SourceLoc AsyncLoc,
-                           bool Throws, SourceLoc ThrowsLoc,
+                           StaticSpellingKind StaticSpelling, SourceLoc FuncLoc,
+                           DeclName Name, SourceLoc NameLoc, bool Async,
+                           SourceLoc AsyncLoc, bool Throws, SourceLoc ThrowsLoc,
                            GenericParamList *GenericParams,
-                           ParameterList *BodyParams,
-                           TypeLoc FnRetType, DeclContext *Parent,
-                           ClangNode ClangN) {
-  auto *FD = FuncDecl::createImpl(
-      Context, StaticLoc, StaticSpelling, FuncLoc,
-      Name, NameLoc, Async, AsyncLoc, Throws, ThrowsLoc,
-      GenericParams, Parent, ClangN);
+                           ParameterList *BodyParams, TypeRepr *ResultTyR,
+                           DeclContext *Parent) {
+  auto *const FD = FuncDecl::createImpl(
+      Context, StaticLoc, StaticSpelling, FuncLoc, Name, NameLoc, Async,
+      AsyncLoc, Throws, ThrowsLoc, GenericParams, Parent, ClangNode());
   FD->setParameters(BodyParams);
-  FD->FnRetType = FnRetType;
+  FD->FnRetType = TypeLoc(ResultTyR);
   return FD;
 }
-      
+
+FuncDecl *FuncDecl::createImplicit(ASTContext &Context,
+                                   StaticSpellingKind StaticSpelling,
+                                   DeclName Name, SourceLoc NameLoc, bool Async,
+                                   bool Throws, GenericParamList *GenericParams,
+                                   ParameterList *BodyParams, Type FnRetType,
+                                   DeclContext *Parent) {
+  assert(FnRetType);
+  auto *const FD = FuncDecl::createImpl(
+      Context, SourceLoc(), StaticSpelling, SourceLoc(), Name, NameLoc, Async,
+      SourceLoc(), Throws, SourceLoc(), GenericParams, Parent, ClangNode());
+  FD->setImplicit();
+  FD->setParameters(BodyParams);
+  FD->setResultInterfaceType(FnRetType);
+  return FD;
+}
+
+FuncDecl *FuncDecl::createImported(ASTContext &Context, SourceLoc FuncLoc,
+                                   DeclName Name, SourceLoc NameLoc,
+                                   bool Throws, ParameterList *BodyParams,
+                                   Type FnRetType, DeclContext *Parent,
+                                   ClangNode ClangN) {
+  assert(ClangN && FnRetType);
+  auto *const FD = FuncDecl::createImpl(
+      Context, SourceLoc(), StaticSpellingKind::None, FuncLoc, Name, NameLoc,
+      /*Async=*/false, SourceLoc(), Throws, SourceLoc(),
+      /*GenericParams=*/nullptr, Parent, ClangN);
+  FD->setParameters(BodyParams);
+  FD->setResultInterfaceType(FnRetType);
+  return FD;
+}
+
 OperatorDecl *FuncDecl::getOperatorDecl() const {
   // Fast-path: Most functions are not operators.
   if (!isOperator()) {

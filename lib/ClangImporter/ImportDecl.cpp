@@ -176,15 +176,8 @@ static FuncDecl *createFuncOrAccessor(ASTContext &ctx, SourceLoc funcLoc,
                                 bodyParams,
                                 resultTy, dc, clangNode);
   } else {
-    TypeLoc resultTypeLoc = resultTy ? TypeLoc::withoutLoc(resultTy) : TypeLoc();
-    return FuncDecl::create(ctx, /*StaticLoc=*/SourceLoc(),
-                            StaticSpellingKind::None,
-                            funcLoc, name, nameLoc,
-                            /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-                            throws, /*ThrowsLoc=*/SourceLoc(),
-                            /*GenericParams=*/nullptr,
-                            bodyParams,
-                            resultTypeLoc, dc, clangNode);
+    return FuncDecl::createImported(ctx, funcLoc, name, nameLoc, throws,
+                                    bodyParams, resultTy, dc, clangNode);
   }
 }
 

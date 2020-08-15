@@ -6244,15 +6244,24 @@ public:
                                       Type FnRetType, DeclContext *Parent);
 
   static FuncDecl *create(ASTContext &Context, SourceLoc StaticLoc,
-                          StaticSpellingKind StaticSpelling,
-                          SourceLoc FuncLoc,
-                          DeclName Name, SourceLoc NameLoc,
-                          bool Async, SourceLoc AsyncLoc,
-                          bool Throws, SourceLoc ThrowsLoc,
+                          StaticSpellingKind StaticSpelling, SourceLoc FuncLoc,
+                          DeclName Name, SourceLoc NameLoc, bool Async,
+                          SourceLoc AsyncLoc, bool Throws, SourceLoc ThrowsLoc,
                           GenericParamList *GenericParams,
-                          ParameterList *ParameterList,
-                          TypeLoc FnRetType, DeclContext *Parent,
-                          ClangNode ClangN = ClangNode());
+                          ParameterList *BodyParams, TypeRepr *ResultTyR,
+                          DeclContext *Parent);
+
+  static FuncDecl *createImplicit(ASTContext &Context,
+                                  StaticSpellingKind StaticSpelling,
+                                  DeclName Name, SourceLoc NameLoc, bool Async,
+                                  bool Throws, GenericParamList *GenericParams,
+                                  ParameterList *BodyParams, Type FnRetType,
+                                  DeclContext *Parent);
+
+  static FuncDecl *createImported(ASTContext &Context, SourceLoc FuncLoc,
+                                  DeclName Name, SourceLoc NameLoc, bool Throws,
+                                  ParameterList *BodyParams, Type FnRetType,
+                                  DeclContext *Parent, ClangNode ClangN);
 
   bool isStatic() const;
 
