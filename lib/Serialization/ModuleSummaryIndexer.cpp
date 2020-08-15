@@ -403,7 +403,7 @@ void ModuleSummaryIndexer::indexWitnessTable(const SILWitnessTable &WT) {
 }
 
 void ModuleSummaryIndexer::indexVTable(const SILVTable &VT) {
-  auto typeGUID = getTypeGUID(VT.getClass()->getInterfaceType());
+  auto typeGUID = getTypeGUID(VT.getClass()->getDeclaredType()->getCanonicalType());
   for (auto entry : VT.getEntries()) {
     auto Impl = entry.getImplementation();
     if (entry.getMethod().kind == SILDeclRef::Kind::Deallocator ||
