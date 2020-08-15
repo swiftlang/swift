@@ -1168,6 +1168,7 @@ static void
 deleteAndReenqueueForEmissionValuesDependentOnCanonicalPrespecializedMetadataRecords(
     IRGenModule &IGM, CanType typeWithCanonicalMetadataPrespecialization,
     NominalTypeDecl &decl) {
+  IGM.IRGen.noteLazyReemissionOfNominalTypeDescriptor(&decl);
   // The type context descriptor depends on canonical metadata records because
   // pointers to them are attached as trailing objects to it.
   //
