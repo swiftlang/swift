@@ -16,9 +16,9 @@ GUID modulesummary::getGUIDFromUniqueName(llvm::StringRef Name) {
   return llvm::MD5Hash(Name);
 }
 
-static GUID getTypeGUID(Type type) {
+static GUID getTypeGUID(NominalTypeDecl *type) {
   Mangle::ASTMangler mangler;
-  std::string mangled = mangler.mangleTypeWithoutPrefix(type);
+  std::string mangled = mangler.mangleNominalType(type);
   return getGUIDFromUniqueName(mangled);
 }
 
@@ -111,13 +111,11 @@ void FunctionSummaryIndexer::indexIndirectFunctionCall(
 void FunctionSummaryIndexer::indexUseOfType(CanType type) {
   Mangle::ASTMangler mangler;
   type.visit([&](Type t) {
-    if (t.getPointer()->hasArchetype() ||
-        t.getPointer()->hasOpaqueArchetype() ||
-        t.getPointer()->getKind() == TypeKind::SILBlockStorage ||
-        t.getPointer()->getKind() == TypeKind::SILFunction) {
+    auto *decl = t->getAnyNominal();
+    if (!decl) {
       return;
     }
-    std::string mangled = mangler.mangleTypeWithoutPrefix(t);
+    std::string mangled = mangler.mangleNominalType(decl);
     GUID guid = getGUIDFromUniqueName(mangled);
     if (RecordedTypes.insert(guid).second) {
       TheSummary->addTypeRef({guid, mangled});
@@ -384,7 +382,7 @@ void ModuleSummaryIndexer::indexWitnessTable(const SILWitnessTable &WT) {
   auto isPossibllyUsedExternally =
       WT.getDeclContext()->getParentModule() != Mod.getSwiftModule() ||
       WT.getProtocol()->getParentModule() != Mod.getSwiftModule();
-  auto typeGUID = getTypeGUID(WT.getConformingType());
+  auto typeGUID = getTypeGUID(WT.getConformingType()->getAnyNominal());
   for (auto entry : WT.getEntries()) {
     if (entry.getKind() != SILWitnessTable::Method)
       continue;
@@ -405,7 +403,7 @@ void ModuleSummaryIndexer::indexWitnessTable(const SILWitnessTable &WT) {
 }
 
 void ModuleSummaryIndexer::indexVTable(const SILVTable &VT) {
-  auto typeGUID = getTypeGUID(VT.getClass()->getDeclaredType()->getCanonicalType());
+  auto typeGUID = getTypeGUID(VT.getClass());
   for (auto entry : VT.getEntries()) {
     auto Impl = entry.getImplementation();
     if (entry.getMethod().kind == SILDeclRef::Kind::Deallocator ||

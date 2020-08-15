@@ -18,14 +18,14 @@
 // CHECK:      witness_tables:
 // CHECK-NEXT:   2682576275888919121:
 // CHECK-NEXT:     - guid:            767048646313834908
-// CHECK-NEXT:       type_guid:       16119760784751072103
+// CHECK-NEXT:       type_guid:       16808374101942615301
 // `classMember` impls are recorded on the table
 // CHECK:      vtables:
 // CHECK:        17602567966448237004:
 // CHECK-NEXT:     - guid:            17602567966448237004
-// CHECK-NEXT:       type_guid:       3703703597861618193
+// CHECK-NEXT:       type_guid:       6261216615345887281
 // CHECK-NEXT:     - guid:            11756327503593502600
-// CHECK-NEXT:       type_guid:       9043091933214513226
+// CHECK-NEXT:       type_guid:       1726984972356197982
 
 protocol P {
     func protoMember()
