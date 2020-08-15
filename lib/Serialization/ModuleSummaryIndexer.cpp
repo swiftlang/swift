@@ -102,7 +102,7 @@ void FunctionSummaryIndexer::indexDirectFunctionCall(
 
 void FunctionSummaryIndexer::indexIndirectFunctionCall(
     const SILDeclRef &Callee, FunctionSummary::Call::KindTy Kind) {
-  StringRef mangledName = Callee.mangle();
+  std::string mangledName = Callee.mangle();
   GUID guid = getGUIDFromUniqueName(mangledName);
   FunctionSummary::Call call(guid, mangledName, Kind);
   TheSummary->addCall(call);
