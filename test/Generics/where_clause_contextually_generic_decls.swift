@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -typecheck %s -verify -swift-version 4
+// RUN: %target-typecheck-verify-swift -swift-version 4
 
 func bet() where A : B {} // expected-error {{'where' clause cannot be applied to a non-generic top-level declaration}}
 
@@ -148,7 +148,7 @@ _ = Container<String>.NestedAlias2.self // expected-error {{type 'String' does n
 _ = Container<Container<Bool>>.NestedClass.self // expected-error {{type 'Container<Bool>' does not conform to protocol 'Equatable'}}
 _ = Container<Void>.NestedStruct.self // expected-error {{type 'Void' does not conform to protocol 'Sequence'}}
 _ = Container<Array<Void>>.NestedStruct2.self // expected-error {{type 'Void' does not conform to protocol 'Comparable'}}
-_ = Container<String>.NestedStruct2.NestedEnum.self // expected-error {{'Container<String>.NestedStruct2.NestedEnum' requires the types 'String.Element' (aka 'Character') and 'Double' be equivalent}}
+_ = Container<String>.NestedStruct2.NestedEnum.self // expected-error {{'Container<T>.NestedStruct2.NestedEnum' requires the types 'String.Element' (aka 'Character') and 'Double' be equivalent}}
 _ = Container<Int>.NestedAlias2.self
 _ = Container<Bool>.NestedClass.self
 _ = Container<String>.NestedStruct.self
