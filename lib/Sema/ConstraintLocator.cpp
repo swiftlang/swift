@@ -32,54 +32,7 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, ASTNode anchor,
   id.AddInteger(path.size());
   for (auto elt : path) {
     id.AddInteger(elt.getKind());
-    switch (elt.getKind()) {
-    case GenericParameter:
-      id.AddPointer(elt.castTo<LocatorPathElt::GenericParameter>().getType());
-      break;
-
-    case ProtocolRequirement: {
-      auto reqElt = elt.castTo<LocatorPathElt::ProtocolRequirement>();
-      id.AddPointer(reqElt.getDecl());
-      break;
-    }
-
-    case Witness:
-      id.AddPointer(elt.castTo<LocatorPathElt::Witness>().getDecl());
-      break;
-
-    case KeyPathDynamicMember: {
-      auto kpElt = elt.castTo<LocatorPathElt::KeyPathDynamicMember>();
-      id.AddPointer(kpElt.getKeyPathDecl());
-      break;
-    }
-
-    case PatternMatch:
-      id.AddPointer(elt.castTo<LocatorPathElt::PatternMatch>().getPattern());
-      break;
-
-    case ArgumentAttribute:
-    case GenericArgument:
-    case NamedTupleElement:
-    case TupleElement:
-    case ApplyArgToParam:
-    case OpenedGeneric:
-    case KeyPathComponent:
-    case ConditionalRequirement:
-    case TypeParameterRequirement:
-    case ContextualType:
-    case SynthesizedArgument:
-    case TernaryBranch:
-    case ClosureBody: {
-      auto numValues = numNumericValuesInPathElement(elt.getKind());
-      for (unsigned i = 0; i < numValues; ++i)
-        id.AddInteger(elt.getValue(i));
-      break;
-    }
-#define SIMPLE_LOCATOR_PATH_ELT(Name) case Name :
-#include "ConstraintLocatorPathElts.def"
-    // Nothing to do for simple locator elements.
-    break;
-    }
+    id.AddInteger(elt.getRawStorage());
   }
 }
 
