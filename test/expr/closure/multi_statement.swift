@@ -80,6 +80,17 @@ func mapWithMoreStatements(ints: [Int], state: State) throws {
 
     #assert(true)
 
+    // expected-warning@+1{{danger zone}}
+    #warning("danger zone")
+
+#if false
+    struct NothingHere { }
+#else
+    struct NestedStruct {
+      var x: Int
+    }
+#endif
+
     do {
       print(try mightThrow())
     } catch let e as MyError {

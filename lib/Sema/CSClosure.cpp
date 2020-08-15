@@ -43,21 +43,6 @@ public:
 
 private:
   void visitDecl(Decl *decl) {
-    // Just ignore #if; the chosen children should appear in the
-    // surrounding context.  This isn't good for source tools but it
-    // at least works.
-    if (isa<IfConfigDecl>(decl))
-      return;
-
-    // Skip #warning/#error; we'll handle them when applying the closure.
-    if (isa<PoundDiagnosticDecl>(decl))
-      return;
-
-    // Ignore variable declarations, because they're always handled within
-    // their enclosing pattern bindings.
-    if (isa<VarDecl>(decl))
-      return;
-
     // Generate constraints for pattern binding declarations.
     if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
       SolutionApplicationTarget target(patternBinding);
@@ -67,7 +52,12 @@ private:
       return;
     }
 
-    llvm_unreachable("Unimplemented case for closure body");
+    // Ignore variable declarations, because they're always handled within
+    // their enclosing pattern bindings.
+    if (isa<VarDecl>(decl))
+      return;
+
+    // Other declarations will be handled at application time.
   }
 
   void visitBraceStmt(BraceStmt *braceStmt) {
@@ -334,7 +324,14 @@ private:
       return;
     }
 
-    llvm_unreachable("Declarations not supported");
+    // Just ignore #if; the chosen children should appear in the
+    // surrounding context.  This isn't good for source tools but it
+    // at least works.
+    if (isa<IfConfigDecl>(decl))
+      return;
+
+    // Type check the declaration.
+    TypeChecker::typeCheckDecl(decl);
   }
 
   ASTNode visitBraceStmt(BraceStmt *braceStmt) {
