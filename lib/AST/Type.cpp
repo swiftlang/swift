@@ -4952,8 +4952,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
     auto archetype = cast<ArchetypeType>(type);
     auto layout = archetype->getLayoutConstraint();
     (void)layout;
-    assert(archetype->requiresClass() ||
-           (layout && layout->isRefCounted()));
+    assert(layout && layout->isRefCounted());
     if (auto supertype = archetype->getSuperclass())
       return supertype->getReferenceCounting();
     return ReferenceCounting::Unknown;
