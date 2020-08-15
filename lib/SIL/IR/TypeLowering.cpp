@@ -421,10 +421,6 @@ namespace {
 
     RetTy visitArchetypeType(CanArchetypeType type,
                              AbstractionPattern origType) {
-      if (type->requiresClass()) {
-        return asImpl().handleReference(type);
-      }
-
       auto LayoutInfo = type->getLayoutConstraint();
       if (LayoutInfo) {
         if (LayoutInfo->isFixedSizeTrivial()) {
