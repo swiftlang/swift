@@ -1214,8 +1214,6 @@ public:
         substRequirements.push_back(
                       Requirement(RequirementKind::Layout, param, layout));
       }
-    } else {
-      (void)0;
     }
     
     for (unsigned i : indices(upperBoundConformances)) {
@@ -1313,12 +1311,7 @@ public:
             CanType binding,
             ArchetypeType *upperBound,
             ArrayRef<ProtocolConformanceRef> bindingConformances) -> CanType {
-          // TODO: ArchetypeType::getLayoutConstraint sometimes misses out on
-          // implied layout constraints. For now AnyObject is the only one we
-          // care about.
-          return addSubstitution(archetype->requiresClass()
-                                   ? LayoutConstraint::getLayoutConstraint(LayoutConstraintKind::Class)
-                                   : LayoutConstraint(),
+          return addSubstitution(archetype->getLayoutConstraint(),
                                  binding,
                                  upperBound,
                                  bindingConformances);
