@@ -30,6 +30,9 @@ class FunctionSummaryIndexer : public SILInstructionVisitor<FunctionSummaryIndex
   std::unique_ptr<FunctionSummary> TheSummary;
 
   std::set<GUID> RecordedTypes;
+  std::set<GUID> RecordedDirectTargets;
+  std::set<GUID> RecordedVTableTargets;
+  std::set<GUID> RecordedWitnessTargets;
 
   void indexDirectFunctionCall(const SILFunction &Callee);
   void indexIndirectFunctionCall(const SILDeclRef &Callee,
@@ -95,6 +98,9 @@ public:
 void FunctionSummaryIndexer::indexDirectFunctionCall(
     const SILFunction &Callee) {
   GUID guid = getGUIDFromUniqueName(Callee.getName());
+  if (!RecordedDirectTargets.insert(guid).second) {
+    return;
+  }
   FunctionSummary::Call call(guid, Callee.getName(),
                              FunctionSummary::Call::Direct);
   TheSummary->addCall(call);
@@ -104,6 +110,11 @@ void FunctionSummaryIndexer::indexIndirectFunctionCall(
     const SILDeclRef &Callee, FunctionSummary::Call::KindTy Kind) {
   std::string mangledName = Callee.mangle();
   GUID guid = getGUIDFromUniqueName(mangledName);
+  std::set<GUID> &RecordedTargets = Kind == FunctionSummary::Call::VTable ?
+    RecordedVTableTargets : RecordedWitnessTargets;
+  if (!RecordedTargets.insert(guid).second) {
+    return;
+  }
   FunctionSummary::Call call(guid, mangledName, Kind);
   TheSummary->addCall(call);
 }
