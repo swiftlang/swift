@@ -233,19 +233,32 @@ private:
     assert(subjectExpr && "Must have a subject expression here");
 
     // Visit the raw cases.
+    auto subjectLocator = cs.getConstraintLocator(
+        subjectExpr, LocatorPathElt::ContextualType());
+    Type subjectType = cs.getType(subjectExpr);
     for (auto rawCase : switchStmt->getRawCases()) {
-      if (auto decl = rawCase.dyn_cast<Decl *>())
+      if (auto decl = rawCase.dyn_cast<Decl *>()) {
         visitDecl(decl);
-      else
-        visitCaseStmt(cast<CaseStmt>(rawCase.get<Stmt *>()), subjectExpr);
+      } else {
+        visitCaseStmt(
+            cast<CaseStmt>(rawCase.get<Stmt *>()), subjectType, subjectLocator);
+      }
     }
   }
 
-  void visitCaseStmt(CaseStmt *caseStmt, Expr *subjectExpr) {
-    auto locator = cs.getConstraintLocator(
-        subjectExpr, LocatorPathElt::ContextualType());
-    Type subjectType = cs.getType(subjectExpr);
+  void visitDoCatchStmt(DoCatchStmt *doCatchStmt) {
+    visit(doCatchStmt->getBody());
 
+    // Visit the "catch" blocks.
+    Type exceptionType = cs.getASTContext().getExceptionType();
+    for (auto catchStmt : doCatchStmt->getCatches()) {
+      auto locator = cs.getConstraintLocator(catchStmt);
+      visitCaseStmt(catchStmt, exceptionType, locator);
+    }
+  }
+
+  void visitCaseStmt(
+      CaseStmt *caseStmt, Type subjectType, ConstraintLocator *locator) {
     if (cs.generateConstraints(caseStmt, closure, subjectType, locator)) {
       hadError = true;
       return;
@@ -261,7 +274,6 @@ private:
       llvm_unreachable("Unsupported statement kind " #STMT);          \
   }
   UNSUPPORTED_STMT(Yield)
-  UNSUPPORTED_STMT(DoCatch)
   UNSUPPORTED_STMT(Case)
   UNSUPPORTED_STMT(Fail)
 #undef UNSUPPORTED_STMT
@@ -585,6 +597,19 @@ private:
     return switchStmt;
   }
 
+  ASTNode visitDoCatchStmt(DoCatchStmt *doCatchStmt) {
+    // Translate the body.
+    auto newBody = visit(doCatchStmt->getBody());
+    doCatchStmt->setBody(newBody.get<Stmt *>());
+
+    // Visit the catch blocks.
+    for (auto catchStmt : doCatchStmt->getCatches()) {
+      visitCaseStmt(catchStmt);
+    }
+
+    return doCatchStmt;
+  }
+
   ASTNode visitCaseStmt(CaseStmt *caseStmt) {
     // Translate the patterns and guard expressions for each case label item.
     for (auto &caseLabelItem : caseStmt->getMutableCaseLabelItems()) {
@@ -610,7 +635,6 @@ private:
       llvm_unreachable("Unsupported statement kind " #STMT);          \
   }
   UNSUPPORTED_STMT(Yield)
-  UNSUPPORTED_STMT(DoCatch)
   UNSUPPORTED_STMT(Fail)
 #undef UNSUPPORTED_STMT
 

@@ -1324,8 +1324,8 @@ public:
     // There is nothing more to do.
     return S;
   }
-
 };
+
 } // end anonymous namespace
 
 static bool isDiscardableType(Type type) {

@@ -10,6 +10,8 @@ func maybeGetValue<T>(_ value: T) -> T? {
 
 enum MyError: Error {
   case featureIsTooCool
+
+  func doIt() { }
 }
 
 enum State {
@@ -19,6 +21,8 @@ enum State {
 }
 
 func random(_: Int) -> Bool { return false }
+
+func mightThrow() throws -> Bool { throw MyError.featureIsTooCool }
 
 func mapWithMoreStatements(ints: [Int], state: State) throws {
   let _ = try ints.map { i in
@@ -76,6 +80,13 @@ func mapWithMoreStatements(ints: [Int], state: State) throws {
 
     #assert(true)
 
+    do {
+      print(try mightThrow())
+    } catch let e as MyError {
+      e.doIt()
+    } catch {
+      print(error)
+    }
     return String(value)
   }
 }
