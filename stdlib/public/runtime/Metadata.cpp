@@ -49,6 +49,8 @@
 #endif
 #if SWIFT_PTRAUTH
 #include <ptrauth.h>
+#endif
+#if SWIFT_OBJC_INTEROP
 extern "C" void _objc_setClassCopyFixupHandler(void (* _Nonnull newFixupHandler)
     (Class _Nonnull oldClass, Class _Nonnull newClass));
 #endif
@@ -395,7 +397,7 @@ static GenericMetadataCache &unsafeGetInitializedCache(
   return lazyCache->unsafeGetAlreadyInitialized();
 }
 
-#if SWIFT_PTRAUTH
+#if SWIFT_PTRAUTH && SWIFT_OBJC_INTEROP
 static void swift_objc_classCopyFixupHandler(Class oldClass, Class newClass) {
   auto oldClassMetadata = reinterpret_cast<const ClassMetadata *>(oldClass);
 
