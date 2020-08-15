@@ -3862,58 +3862,86 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
     abort();
   }
 
+  NLOptions subOptions = (NL_QualifiedDefault | NL_OnlyTypes | NL_ProtocolMembers);
+
   // Look for a member type with the same name as the associated type.
-  auto candidates = TypeChecker::lookupMemberType(
-      DC, Adoptee, assocType->createNameRef(),
-      NameLookupFlags::ProtocolMembers);
+  SmallVector<ValueDecl *, 4> candidates;
+
+  DC->lookupQualified(Adoptee->getAnyNominal(),
+                      assocType->createNameRef(),
+                      subOptions, candidates);
 
   // If there aren't any candidates, we're done.
-  if (!candidates) {
+  if (candidates.empty()) {
     return ResolveWitnessResult::Missing;
   }
 
   // Determine which of the candidates is viable.
   SmallVector<LookupTypeResultEntry, 2> viable;
   SmallVector<std::pair<TypeDecl *, CheckTypeWitnessResult>, 2> nonViable;
+  SmallPtrSet<CanType, 4> viableTypes;
+
   for (auto candidate : candidates) {
-    // Skip nested generic types.
-    if (auto *genericDecl = dyn_cast<GenericTypeDecl>(candidate.Member)) {
-      // If the declaration has generic parameters, it cannot witness an
-      // associated type.
-      if (genericDecl->isGeneric())
+    auto *typeDecl = cast<TypeDecl>(candidate);
+
+    // Skip other associated types.
+    if (isa<AssociatedTypeDecl>(typeDecl))
+      continue;
+
+    auto *genericDecl = cast<GenericTypeDecl>(typeDecl);
+
+    // If the declaration has generic parameters, it cannot witness an
+    // associated type.
+    if (genericDecl->isGeneric())
+      continue;
+
+    // As a narrow fix for a source compatibility issue with SwiftUI's
+    // swiftinterface, allow the conformance if the underlying type of
+    // the typealias is Never.
+    //
+    // FIXME: This should be conditionalized on a new language version.
+    bool skipRequirementCheck = false;
+    if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
+      if (typeAliasDecl->getUnderlyingType()->isUninhabited())
+        skipRequirementCheck = true;
+    }
+
+    // Skip typealiases with an unbound generic type as their underlying type.
+    if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl))
+      if (typeAliasDecl->getDeclaredInterfaceType()->is<UnboundGenericType>())
         continue;
 
-      // As a narrow fix for a source compatibility issue with SwiftUI's
-      // swiftinterface, allow the conformance if the underlying type of
-      // the typealias is Never.
-      //
-      // FIXME: This should be conditionalized on a new language version.
-      bool skipRequirementCheck = false;
-      if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(candidate.Member)) {
-        if (typeAliasDecl->getUnderlyingType()->isUninhabited())
-          skipRequirementCheck = true;
-      }
-
-      // If the type comes from a constrained extension or has a 'where'
-      // clause, check those requirements now.
-      if (!skipRequirementCheck &&
-          !TypeChecker::checkContextualRequirements(genericDecl, Adoptee,
-                                                    SourceLoc(), DC)) {
+    // Skip dependent protocol typealiases.
+    //
+    // FIXME: This should not be necessary.
+    if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
+      if (isa<ProtocolDecl>(typeAliasDecl->getDeclContext()) &&
+          typeAliasDecl->getUnderlyingType()->getCanonicalType()
+            ->hasTypeParameter()) {
         continue;
       }
     }
 
-    // Skip typealiases with an unbound generic type as their underlying type.
-    if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(candidate.Member))
-      if (typeAliasDecl->getDeclaredInterfaceType()->is<UnboundGenericType>())
-        continue;
+    // If the type comes from a constrained extension or has a 'where'
+    // clause, check those requirements now.
+    if (!skipRequirementCheck &&
+        !TypeChecker::checkContextualRequirements(genericDecl, Adoptee,
+                                                  SourceLoc(), DC)) {
+      continue;
+    }
+
+    auto memberType = TypeChecker::substMemberTypeWithBase(DC->getParentModule(),
+                                                           typeDecl, Adoptee);
+
+    if (!viableTypes.insert(memberType->getCanonicalType()).second)
+      continue;
 
     // Check this type against the protocol requirements.
     if (auto checkResult =
-            checkTypeWitness(candidate.MemberType, assocType, Conformance)) {
-      nonViable.push_back({candidate.Member, checkResult});
+            checkTypeWitness(memberType, assocType, Conformance)) {
+      nonViable.push_back({typeDecl, checkResult});
     } else {
-      viable.push_back(candidate);
+      viable.push_back({typeDecl, memberType, nullptr});
     }
   }
 
