@@ -259,6 +259,7 @@ public:
   FunctionSummaryMapTy::const_iterator functions_end() const {
     return FunctionSummaryMap.end();
   }
+  size_t functions_size() const { return FunctionSummaryMap.size(); }
 };
 
 /// Compute a \c ModuleSummaryIndex from the given SILModule.

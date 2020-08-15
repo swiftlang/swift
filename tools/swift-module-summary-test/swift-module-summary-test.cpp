@@ -17,8 +17,10 @@
 #include "swift/AST/FileSystem.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/Serialization/ModuleSummary.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/GraphWriter.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
@@ -30,6 +32,7 @@ enum class ActionType : unsigned {
   None,
   BinaryToYAML,
   YAMLToBinary,
+  BinaryToDot,
 };
 
 namespace options {
@@ -49,9 +52,11 @@ static llvm::cl::opt<ActionType>
            llvm::cl::cat(Category),
            llvm::cl::values(
                clEnumValN(ActionType::BinaryToYAML, "to-yaml",
-                          "Convert new binary .swiftdeps format to YAML"),
+                          "Convert new binary .swiftmodule.summary format to YAML"),
                clEnumValN(ActionType::YAMLToBinary, "from-yaml",
-                          "Convert YAML to new binary .swiftdeps format")));
+                          "Convert YAML to new binary .swiftmodule.summary format"),
+               clEnumValN(ActionType::BinaryToDot, "binary-to-dot",
+                          "Convert new binary .swiftmodule.summary format to Dot")));
 
 } // namespace options
 
@@ -154,6 +159,184 @@ void MappingTraits<ModuleSummaryIndex>::mapping(IO &io, ModuleSummaryIndex &V) {
 } // namespace yaml
 } // namespace llvm
 
+VFuncSlot createVFuncSlot(FunctionSummary::Call call) {
+  VFuncSlot::KindTy slotKind;
+  switch (call.getKind()) {
+    case FunctionSummary::Call::Witness: {
+      slotKind = VFuncSlot::Witness;
+      break;
+    }
+    case FunctionSummary::Call::VTable: {
+      slotKind = VFuncSlot::VTable;
+      break;
+    }
+    case FunctionSummary::Call::Direct: {
+      llvm_unreachable("Can't get slot for static call");
+    }
+    case FunctionSummary::Call::kindCount: {
+      llvm_unreachable("impossible");
+    }
+  }
+  return VFuncSlot(slotKind, call.getCallee());
+}
+
+struct CallGraph {
+  struct Node;
+
+  struct Edge {
+    FunctionSummary::Call Call;
+    GUID Target;
+    Node *Child;
+  };
+
+  struct Node {
+    FunctionSummary *FS;
+    SmallVector<Edge, 8> Children;
+  };
+  
+  struct child_iterator
+      : public std::iterator<std::random_access_iterator_tag, Node *,
+                             ptrdiff_t> {
+    SmallVectorImpl<Edge>::iterator baseIter;
+
+    child_iterator(SmallVectorImpl<Edge>::iterator baseIter) :
+    baseIter(baseIter)
+    { }
+
+    child_iterator &operator++() { baseIter++; return *this; }
+    child_iterator operator++(int) {
+      auto tmp = *this;
+      ++baseIter;
+      return tmp;
+    }
+    Node *operator*() const { return baseIter->Child; }
+    bool operator==(const child_iterator &RHS) const {
+      return baseIter == RHS.baseIter;
+    }
+    bool operator!=(const child_iterator &RHS) const {
+      return baseIter != RHS.baseIter;
+    }
+    difference_type operator-(const child_iterator &RHS) const {
+      return baseIter - RHS.baseIter;
+    }
+  };
+
+  std::vector<Node> Nodes;
+  using iterator = std::vector<Node>::iterator;
+  CallGraph(ModuleSummaryIndex *);
+};
+
+CallGraph::CallGraph(ModuleSummaryIndex *Summary) {
+  Nodes.resize(Summary->functions_size());
+  llvm::DenseMap<GUID, Node *> NodeMap;
+  int idx = 0;
+  for (auto FI = Summary->functions_begin(), FE = Summary->functions_end();
+       FI != FE; ++FI) {
+    Node &node = Nodes[idx++];
+    node.FS = FI->second.get();
+    NodeMap[FI->first] = &node;
+  }
+
+  for (Node &node : Nodes) {
+    for (FunctionSummary::Call call : node.FS->calls()) {
+      switch (call.getKind()) {
+      case FunctionSummary::Call::Witness:
+      case FunctionSummary::Call::VTable: {
+        VFuncSlot slot = createVFuncSlot(call);
+        for (auto Impl : Summary->getImplementations(slot)) {
+          Node *CalleeNode = NodeMap[Impl.Guid];
+          node.Children.push_back({ call, Impl.Guid, CalleeNode });
+        }
+        break;
+      }
+      case FunctionSummary::Call::Direct: {
+        Node *CalleeNode = NodeMap[call.getCallee()];
+        node.Children.push_back({ call, call.getCallee(), CalleeNode });
+        break;
+      }
+      case FunctionSummary::Call::kindCount:
+        llvm_unreachable("impossible");
+      }
+    }
+  }
+}
+
+
+namespace llvm {
+
+  template <> struct GraphTraits<CallGraph::Node *> {
+    typedef CallGraph::child_iterator ChildIteratorType;
+    typedef CallGraph::Node *NodeRef;
+  
+    static NodeRef getEntryNode(NodeRef N) { return N; }
+    static inline ChildIteratorType child_begin(NodeRef N) {
+      return N->Children.begin();
+    }
+    static inline ChildIteratorType child_end(NodeRef N) {
+      return N->Children.end();
+    }
+  };
+
+  template <> struct GraphTraits<CallGraph *>
+  : public GraphTraits<CallGraph::Node *> {
+    typedef CallGraph *GraphType;
+    typedef CallGraph::Node *NodeRef;
+  
+    static NodeRef getEntryNode(GraphType F) { return nullptr; }
+  
+    typedef pointer_iterator<CallGraph::iterator> nodes_iterator;
+    static nodes_iterator nodes_begin(GraphType CG) {
+      return nodes_iterator(CG->Nodes.begin());
+    }
+    static nodes_iterator nodes_end(GraphType CG) {
+      return nodes_iterator(CG->Nodes.end());
+    }
+    static unsigned size(GraphType CG) { return CG->Nodes.size(); }
+  };
+  
+  /// This is everything the llvm::GraphWriter needs to write the call graph in
+  /// a dot file.
+  template <>
+  struct DOTGraphTraits<CallGraph *> : public DefaultDOTGraphTraits {
+  
+    DOTGraphTraits(bool isSimple = false) : DefaultDOTGraphTraits(isSimple) {}
+  
+    std::string getNodeLabel(const CallGraph::Node *Node,
+                             const CallGraph *Graph) {
+      Demangle::Context DCtx;
+      return DCtx.demangleSymbolAsString(Node->FS->getName());
+    }
+
+    static std::string getEdgeSourceLabel(const CallGraph::Node *Node,
+                                          CallGraph::child_iterator I) {
+      std::string Label;
+      raw_string_ostream O(Label);
+      FunctionSummary::Call call = I.baseIter->Call;
+      Demangle::Context DCtx;
+      O << DCtx.demangleSymbolAsString(call.getName());
+      O << " (";
+      switch (call.getKind()) {
+      case FunctionSummary::Call::Witness: {
+        O << "W";
+        break;
+      }
+      case FunctionSummary::Call::VTable: {
+        O << "V";
+        break;
+      }
+      case FunctionSummary::Call::Direct: {
+        O << "D";
+        break;
+      }
+      case FunctionSummary::Call::kindCount:
+        llvm_unreachable("impossible");
+      }
+      O << ")";
+      return Label;
+    }
+  };
+} // namespace llvm
+
 int main(int argc, char *argv[]) {
   PROGRAM_START(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift Module Summary Test\n");
@@ -193,7 +376,7 @@ int main(int argc, char *argv[]) {
     }
     break;
   }
-  case ActionType::YAMLToBinary:
+  case ActionType::YAMLToBinary: {
     ModuleSummaryIndex summary;
     llvm::yaml::Input yamlReader(fileBufOrErr.get()->getMemBufferRef(),
                                  nullptr);
@@ -208,6 +391,18 @@ int main(int argc, char *argv[]) {
       return 1;
     }
     break;
+  }
+  case ActionType::BinaryToDot: {
+    modulesummary::ModuleSummaryIndex summary;
+    modulesummary::loadModuleSummaryIndex(fileBufOrErr.get()->getMemBufferRef(),
+                                          summary);
+    CallGraph CG(&summary);
+    withOutputFile(diags, options::OutputFilename, [&](raw_ostream &out) {
+      llvm::WriteGraph(out, &CG);
+      return false;
+    });
+    break;
+  }
   }
   return 0;
 }
