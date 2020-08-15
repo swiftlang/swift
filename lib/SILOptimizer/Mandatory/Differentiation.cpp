@@ -158,8 +158,7 @@ static bool diagnoseNoReturn(ADContext &context, SILFunction *original,
 /// flow unsupported" error at appropriate source locations. Returns true if
 /// error is emitted.
 ///
-/// Update as control flow support is added. Currently, branching terminators
-/// other than `br`, `cond_br`, `switch_enum` are not supported.
+/// Update as control flow support is added.
 static bool diagnoseUnsupportedControlFlow(ADContext &context,
                                            SILFunction *original,
                                            DifferentiationInvoker invoker) {
@@ -173,7 +172,7 @@ static bool diagnoseUnsupportedControlFlow(ADContext &context,
         isa<SwitchEnumInst>(term) || isa<SwitchEnumAddrInst>(term) ||
         isa<CheckedCastBranchInst>(term) ||
         isa<CheckedCastValueBranchInst>(term) ||
-        isa<CheckedCastAddrBranchInst>(term))
+        isa<CheckedCastAddrBranchInst>(term) || isa<TryApplyInst>(term))
       continue;
     // If terminator is an unsupported branching terminator, emit an error.
     if (term->isBranch()) {

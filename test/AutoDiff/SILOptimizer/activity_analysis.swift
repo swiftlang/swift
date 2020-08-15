@@ -543,17 +543,25 @@ func activeInoutArgNonactiveInitialResult(_ x: Float) -> Float {
 
 func rethrowing(_ x: () throws -> Void) rethrows -> Void {}
 
-// expected-error @+1 {{function is not differentiable}}
 @differentiable
-// expected-note @+1 {{when differentiating this function definition}}
 func testTryApply(_ x: Float) -> Float {
-  // expected-note @+1 {{cannot differentiate unsupported control flow}}
   rethrowing({})
   return x
 }
 
 // TF-433: differentiation diagnoses `try_apply` before activity info is printed.
-// CHECK-NOT: [AD] Activity info for ${{.*}}testTryApply{{.*}} at (parameters=(0) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testTryApply{{.*}} at (parameters=(0) results=(0))
+// CHECK: bb0:
+// CHECK: [ACTIVE] %0 = argument of bb0 : $Float
+// CHECK: [NONE]   // function_ref closure #1 in testTryApply(_:)
+// CHECK: [NONE]   %3 = convert_function %2 : $@convention(thin) () -> () to $@convention(thin) @noescape () -> ()
+// CHECK: [NONE]   %4 = thin_to_thick_function %3 : $@convention(thin) @noescape () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [NONE]   %5 = convert_function %4 : $@noescape @callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> @error Error
+// CHECK: [NONE]   // function_ref rethrowing(_:)
+// CHECK: bb1:
+// CHECK: [NONE] %8 = argument of bb1 : $()
+// CHECK: bb2:
+// CHECK: [NONE] %10 = argument of bb2 : $Error
 
 //===----------------------------------------------------------------------===//
 // Coroutine differentiation (`begin_apply`)
