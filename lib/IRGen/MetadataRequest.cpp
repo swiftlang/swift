@@ -45,6 +45,7 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/Constant.h"
+#include "llvm/IR/GlobalVariable.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FormatVariadic.h"
 #include <algorithm>
@@ -845,57 +846,7 @@ bool irgen::isSpecializedNominalTypeMetadataStaticallyAddressable(
         return !isGenericWithoutPrespecializedConformance() &&
                metadataAccessIsTrivial() && witnessTablesAreReferenceable();
       });
-  auto anyArgumentIsFromCurrentModule =
-      llvm::any_of(environment->getGenericParams(), [&](auto parameter) {
-        auto signature = environment->getGenericSignature();
-        const auto protocols = signature->getRequiredProtocols(parameter);
-        auto argument = ((Type *)parameter)->subst(substitutions);
-        auto canonicalType = argument->getCanonicalType();
-
-        auto argumentIsFromCurrentModule = [&]() {
-          if (auto *argumentNominal = argument->getAnyNominal()) {
-            return IGM.getSwiftModule() == argumentNominal->getModuleContext();
-          }
-          return false;
-        };
-        auto anyConformanceIsFromCurrentModule = [&]() {
-          return llvm::any_of(protocols, [&](ProtocolDecl *protocol) {
-            auto conformance =
-                signature->lookupConformance(canonicalType, protocol);
-            if (!conformance.isConcrete()) {
-              return false;
-            }
-            auto rootConformance =
-                conformance.getConcrete()->getRootConformance();
-            return IGM.getSwiftModule() ==
-                   rootConformance->getDeclContext()->getParentModule();
-          });
-        };
-
-        return argumentIsFromCurrentModule() ||
-               anyConformanceIsFromCurrentModule();
-      });
   return allArgumentsAreStaticallyAddressable &&
-         // A type's metadata cannot be prespecialized non-canonically if it
-         // could be specialized canonically.  The reasons for that:
-         // (1) Canonically prespecialized metadata is not registered with the
-         //     runtime; at runtime, whether canonically prespecialized
-         //     metadata exists can only be determined by calling the metadata
-         //     accessor.
-         // (2) At compile time, there is no way to determine whether the
-         //     defining module has prespecialized metadata at a particular
-         //     argument list.
-         // (3) Subsequent versions of the defining module may add or remove
-         //     prespecialized metadata.
-         //
-         // To account for that, we only allow non-canonical prespecialization
-         // when at least one of the arguments is from the current module
-         // where non-canonical prespecialization might occur.  Consequently,
-         // some prespecialization opportunities may be missed (such as when
-         // an argument comes from a module which it is known the defining
-         // module does not depend on).
-         !((canonicality == NoncanonicalSpecializedMetadata) &&
-           !anyArgumentIsFromCurrentModule) &&
          IGM.getTypeInfoForUnlowered(type).isFixedSize(
              ResilienceExpansion::Maximal);
 }
@@ -2035,168 +1986,6 @@ IRGenFunction::emitGenericTypeMetadataAccessFunctionCall(
   return MetadataResponse::handle(*this, request, call);
 }
 
-static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
-    IRGenFunction &IGF, llvm::Value *request, NominalTypeDecl *nominal,
-    GenericArguments &genericArgs,
-    std::function<llvm::Value *(int)> valueAtIndex) {
-  auto &IGM = IGF.IGM;
-  auto specializations = IGF.IGM.IRGen.canonicalSpecializationsForType(nominal);
-  if (specializations.size() > 0) {
-    SmallVector<llvm::BasicBlock *, 4> conditionBlocks;
-    for (size_t index = 0; index < specializations.size(); ++index) {
-      conditionBlocks.push_back(llvm::BasicBlock::Create(IGM.getLLVMContext()));
-    }
-
-    IGF.Builder.CreateBr(conditionBlocks[0]);
-
-    SmallVector<std::tuple<llvm::BasicBlock *, CanType,
-                           std::function<llvm::Value *(llvm::Value *, CanType,
-                                                       IRGenFunction &,
-                                                       IRGenModule &)>>,
-                4>
-        specializationBlocks;
-    auto switchDestination = llvm::BasicBlock::Create(IGM.getLLVMContext());
-    unsigned long blockIndex = 0;
-    for (auto specialization : specializations) {
-      auto conditionBlock = conditionBlocks[blockIndex];
-      IGF.Builder.emitBlock(conditionBlock);
-      auto successorBlock = blockIndex < conditionBlocks.size() - 1
-                                ? conditionBlocks[blockIndex + 1]
-                                : switchDestination;
-      auto specializationBlock = llvm::BasicBlock::Create(IGM.getLLVMContext());
-      auto substitutions = specialization->getContextSubstitutionMap(
-          IGM.getSwiftModule(), nominal);
-
-      llvm::Value *condition = llvm::ConstantInt::get(IGM.Int1Ty, 1);
-      auto nominal = specialization->getAnyNominal();
-      auto requirements = GenericTypeRequirements(IGF.IGM, nominal);
-      int requirementIndex = 0;
-      for (auto requirement : requirements.getRequirements()) {
-        auto parameter = requirement.TypeParameter;
-        auto argument = parameter.subst(substitutions);
-        if (requirement.Protocol) {
-          auto conformance = substitutions.lookupConformance(
-              requirement.TypeParameter->getCanonicalType(),
-              requirement.Protocol);
-          ProtocolConformance *concreteConformance = conformance.getConcrete();
-          auto argumentNominal = argument->getAnyNominal();
-          if (argumentNominal && argumentNominal->isGenericContext()) {
-            // TODO: Statically specialize the witness table pattern for t's
-            //       conformance.
-            llvm_unreachable(
-                "Statically specializing metadata at generic types is "
-                "not supported.");
-          } else {
-            RootProtocolConformance *rootConformance =
-                concreteConformance->getRootConformance();
-            llvm::Value *expectedDescriptor =
-                IGF.IGM.getAddrOfProtocolConformanceDescriptor(rootConformance);
-            auto *witnessTable = valueAtIndex(requirementIndex);
-            auto *witnessBuffer =
-                IGF.Builder.CreateBitCast(witnessTable, IGM.Int8PtrPtrTy);
-            auto *uncastProvidedDescriptor =
-                IGF.Builder.CreateLoad(witnessBuffer, Alignment());
-            auto *providedDescriptor = IGF.Builder.CreateBitCast(
-                uncastProvidedDescriptor,
-                IGM.ProtocolConformanceDescriptorPtrTy);
-
-            // Auth the stored descriptor.
-            auto storedScheme =
-                IGF.IGM.getOptions().PointerAuth.ProtocolConformanceDescriptors;
-            if (storedScheme) {
-              auto authInfo = PointerAuthInfo::emit(
-                  IGF, storedScheme, witnessTable,
-                  PointerAuthEntity::Special::ProtocolConformanceDescriptor);
-              providedDescriptor =
-                  emitPointerAuthAuth(IGF, providedDescriptor, authInfo);
-            }
-
-            // Sign the descriptors.
-            auto argScheme =
-                IGF.IGM.getOptions()
-                    .PointerAuth.ProtocolConformanceDescriptorsAsArguments;
-            if (argScheme) {
-              auto authInfo = PointerAuthInfo::emit(
-                  IGF, argScheme, nullptr,
-                  PointerAuthEntity::Special::
-                      ProtocolConformanceDescriptorAsArgument);
-              expectedDescriptor =
-                  emitPointerAuthSign(IGF, expectedDescriptor, authInfo);
-              providedDescriptor =
-                  emitPointerAuthSign(IGF, providedDescriptor, authInfo);
-            }
-
-            auto *call = IGF.Builder.CreateCall(
-                IGF.IGM.getCompareProtocolConformanceDescriptorsFn(),
-                {providedDescriptor, expectedDescriptor});
-            call->setDoesNotThrow();
-            call->setCallingConv(IGF.IGM.SwiftCC);
-            call->addAttribute(llvm::AttributeList::FunctionIndex,
-                               llvm::Attribute::ReadNone);
-            condition = IGF.Builder.CreateAnd(condition, call);
-          }
-        } else {
-          llvm::Constant *addr =
-              IGM.getAddrOfTypeMetadata(argument->getCanonicalType());
-          auto addrInt = IGF.Builder.CreateBitCast(addr, IGM.Int8PtrTy);
-          condition = IGF.Builder.CreateAnd(
-              condition, IGF.Builder.CreateICmpEQ(
-                             addrInt, valueAtIndex(requirementIndex)));
-        }
-        ++requirementIndex;
-      }
-      IGF.Builder.CreateCondBr(condition, specializationBlock, successorBlock);
-
-      auto responseBuilder = [](llvm::Value *request, CanType specialization,
-                                IRGenFunction &IGF, IRGenModule &IGM) {
-        auto nominal = specialization->getAnyNominal();
-        llvm::Value *specializedMetadata;
-        if (isa<ClassDecl>(nominal)) {
-          llvm::Function *accessor =
-              IGF.IGM
-                  .getAddrOfCanonicalSpecializedGenericTypeMetadataAccessFunction(
-                      specialization, NotForDefinition);
-
-          specializedMetadata =
-              IGF.emitGenericTypeMetadataAccessFunctionCall(
-                     accessor, {}, DynamicMetadataRequest(request))
-                  .getMetadata();
-        } else {
-          specializedMetadata = IGM.getAddrOfTypeMetadata(specialization);
-        }
-        // Construct a MetadataResponse.  It has three fields in the following
-        // order:
-        //        - const Metadata *Metadata;
-        //        - MetadataState (i32) StaticState;
-        llvm::Value *response =
-            llvm::UndefValue::get(IGM.TypeMetadataResponseTy);
-        response = IGF.Builder.CreateInsertValue(
-            response, specializedMetadata, 0,
-            "insert metadata address into response");
-        auto state = MetadataResponse::getCompletedState(IGM);
-        response = IGF.Builder.CreateInsertValue(
-            response, state, 1, "insert metadata state into response");
-        return response;
-      };
-      specializationBlocks.push_back(std::make_tuple(
-          specializationBlock, specialization, responseBuilder));
-      ++blockIndex;
-    }
-
-    for (auto tuple : specializationBlocks) {
-      llvm::BasicBlock *block;
-      CanType type;
-      std::function<llvm::Value *(llvm::Value *, CanType, IRGenFunction &,
-                                  IRGenModule &)>
-          builder;
-      std::tie(block, type, builder) = tuple;
-      IGF.Builder.emitBlock(block);
-      IGF.Builder.CreateRet(builder(request, type, IGF, IGM));
-    }
-    IGF.Builder.emitBlock(switchDestination);
-  }
-}
-
 MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
     IRGenFunction &IGF, Explosion &params, NominalTypeDecl *nominal,
     GenericArguments &genericArgs) {
@@ -2226,20 +2015,6 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
     auto argsBuffer = Address(params.claimNext(), IGM.getPointerAlignment());
     llvm::Value *arguments =
       IGF.Builder.CreateBitCast(argsBuffer.getAddress(), IGM.Int8PtrTy);
-
-    llvm::Value *argumentsBuffer =
-        IGF.Builder.CreateBitCast(argsBuffer.getAddress(), IGM.Int8PtrPtrTy);
-
-    emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
-        IGF, request, nominal, genericArgs, [&](int index) {
-          llvm::Value *indexValue = llvm::ConstantInt::get(IGM.Int64Ty, index);
-          llvm::Value *elementPointer =
-              IGF.Builder.CreateGEP(argumentsBuffer, indexValue);
-          llvm::LoadInst *retval = IGF.Builder.CreateLoad(
-              elementPointer, Alignment(),
-              llvm::formatv("load argument at index {0} from buffer", index));
-          return retval;
-        });
 
     // Make the call.
     auto call = IGF.Builder.CreateCall(IGM.getGetGenericMetadataFn(),
@@ -2318,12 +2093,6 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
     auto arg2 = numArguments >= 3
       ? IGF.Builder.CreateBitCast(params.claimNext(), IGM.Int8PtrTy)
       : llvm::UndefValue::get(IGM.Int8PtrTy);
-
-    std::array<llvm::Value *, 3> argValues = {arg0, arg1, arg2};
-
-    emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
-        IGF, request, nominal, genericArgs,
-        [&](int index) { return argValues[index]; });
 
     auto call = IGF.Builder.CreateCall(thunkFn,
                                        {request, arg0, arg1, arg2, descriptor});

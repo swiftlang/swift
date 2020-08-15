@@ -932,7 +932,7 @@ public:
       }
     }
 
-    return Context(D->hasThrows(), D->hasAsync(), AnyFunctionRef(D));
+    return Context(D->hasThrows(), D->isAsyncContext(), AnyFunctionRef(D));
   }
 
   static Context forDeferBody() {
@@ -1254,7 +1254,7 @@ public:
     if (!func)
       return;
 
-    func->diagnose(diag::note_add_async_to_function, func->getName());
+    addAsyncNotes(func);
   }
 
   void diagnoseUnhandledAsyncSite(DiagnosticEngine &Diags, ASTNode node) {

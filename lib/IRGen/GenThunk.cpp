@@ -102,6 +102,9 @@ static FunctionPointer lookupMethod(IRGenFunction &IGF, SILDeclRef declRef) {
 
 void IRGenModule::emitDispatchThunk(SILDeclRef declRef) {
   auto *f = getAddrOfDispatchThunk(declRef, ForDefinition);
+  if (!f->isDeclaration()) {
+    f->deleteBody();
+  }
 
   IRGenFunction IGF(*this, f);
 
@@ -163,6 +166,9 @@ IRGenModule::getAddrOfMethodLookupFunction(ClassDecl *classDecl,
 
 void IRGenModule::emitMethodLookupFunction(ClassDecl *classDecl) {
   auto *f = getAddrOfMethodLookupFunction(classDecl, ForDefinition);
+  if (!f->isDeclaration()) {
+    f->deleteBody();
+  }
 
   IRGenFunction IGF(*this, f);
 

@@ -181,7 +181,7 @@ public:
 
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
                                 remote::RemoteAddress address,
-                                int *extraInhabitantIndex) const;
+                                int *extraInhabitantIndex) const override;
 
   static bool classof(const TypeInfo *TI) {
     return TI->getKind() == TypeInfoKind::Builtin;
@@ -208,7 +208,7 @@ public:
 
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
                                 remote::RemoteAddress address,
-                                int *index) const;
+                                int *index) const override;
 
   static bool classof(const TypeInfo *TI) {
     return TI->getKind() == TypeInfoKind::Record;
@@ -299,7 +299,7 @@ public:
 
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
                                 remote::RemoteAddress address,
-                                int *extraInhabitantIndex) const {
+                                int *extraInhabitantIndex) const override {
     if (getNumExtraInhabitants() == 0) {
       *extraInhabitantIndex = -1;
       return true;

@@ -1231,7 +1231,7 @@ class ApplyIRLinkage {
   IRLinkage IRL;
 public:
   ApplyIRLinkage(IRLinkage IRL) : IRL(IRL) {}
-  void to(llvm::GlobalValue *GV) const {
+  void to(llvm::GlobalValue *GV, bool definition = true) const {
     llvm::Module *M = GV->getParent();
     const llvm::Triple Triple(M->getTargetTriple());
 
@@ -1244,11 +1244,14 @@ public:
     if (Triple.isOSBinFormatELF())
       return;
 
-    if (IRL.Linkage == llvm::GlobalValue::LinkOnceODRLinkage ||
-        IRL.Linkage == llvm::GlobalValue::WeakODRLinkage)
-      if (Triple.supportsCOMDAT())
-        if (llvm::GlobalObject *GO = dyn_cast<llvm::GlobalObject>(GV))
-          GO->setComdat(M->getOrInsertComdat(GV->getName()));
+    // COMDATs cannot be applied to declarations.  If we have a definition,
+    // apply the COMDAT.
+    if (definition)
+      if (IRL.Linkage == llvm::GlobalValue::LinkOnceODRLinkage ||
+          IRL.Linkage == llvm::GlobalValue::WeakODRLinkage)
+        if (Triple.supportsCOMDAT())
+          if (llvm::GlobalObject *GO = dyn_cast<llvm::GlobalObject>(GV))
+            GO->setComdat(M->getOrInsertComdat(GV->getName()));
   }
 };
 

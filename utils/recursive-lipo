@@ -63,6 +63,9 @@ def merge_lipo_files(src_root_dirs, file_list, copy_verbatim_subpaths,
         if all([os.path.islink(item) for item in file_paths]):
             # It's a symlink in all found instances, copy the link.
             print("-- Creating symlink %s" % dest_path)
+            # Remove symlink if it already exists
+            if os.path.islink(dest_path):
+                os.remove(dest_path)
             os.symlink(os.readlink(file_paths[0]), dest_path)
         elif all([os.path.isdir(item) for item in file_paths]):
             # It's a subdir in all found instances.

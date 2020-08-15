@@ -35,6 +35,7 @@
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/TBDGenRequests.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Edit.h"
