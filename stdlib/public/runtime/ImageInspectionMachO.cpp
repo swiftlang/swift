@@ -169,6 +169,8 @@ int swift::lookupSymbol(const void *address, SymbolInfo *info) {
   return 1;
 }
 
+#ifndef SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
+
 void *swift::lookupSection(const char *segment, const char *section, size_t *outSize) {
   unsigned long size;
   auto *executableHeader = static_cast<mach_header_platform *>(_NSGetMachExecuteHeader());
@@ -177,5 +179,7 @@ void *swift::lookupSection(const char *segment, const char *section, size_t *out
     *outSize = size;
   return static_cast<void *>(data);
 }
+
+#endif // #ifndef SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
 
 #endif // defined(__APPLE__) && defined(__MACH__)

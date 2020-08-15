@@ -333,6 +333,10 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-DSWIFT_OBJC_INTEROP=0")
   endif()
 
+  if(NOT SWIFT_ENABLE_COMPATIBILITY_OVERRIDES)
+    list(APPEND result "-DSWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES")
+  endif()
+
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
 endfunction()
 
@@ -501,7 +505,7 @@ function(_add_swift_lipo_target)
     list(APPEND source_binaries $<TARGET_FILE:${source_target}>)
   endforeach()
 
-  if(${LIPO_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
+  if("${SWIFT_SDK_${LIPO_SDK}_OBJECT_FORMAT}" STREQUAL "MACHO")
     if(LIPO_CODESIGN)
       set(codesign_command COMMAND "codesign" "-f" "-s" "-" "${LIPO_OUTPUT}")
     endif()
