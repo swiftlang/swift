@@ -69,7 +69,6 @@ set(SWIFTLIB_ESSENTIAL
   FlatMap.swift
   Flatten.swift
   FloatingPoint.swift
-  FloatingPointRandom.swift
   Hashable.swift
   # WORKAROUND: This file name is not sorted alphabetically in the list because
   # if we do so, the compiler crashes.
@@ -210,6 +209,7 @@ set(SWIFTLIB_SOURCES
   CollectionOfOne.swift
   DiscontiguousSlice.swift
   Diffing.swift
+  FloatingPointRandom.swift
   Mirror.swift
   PlaygroundDisplay.swift
   CommandLine.swift
