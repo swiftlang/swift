@@ -23,6 +23,7 @@ namespace modulesummary {
 using llvm::BCBlob;
 using llvm::BCFixed;
 using llvm::BCRecordLayout;
+using llvm::BCVBR;
 
 const unsigned char MODULE_SUMMARY_SIGNATURE[] = {'M', 'O', 'D', 'S'};
 const unsigned RECORD_BLOCK_ID = llvm::bitc::FIRST_APPLICATION_BLOCKID;
@@ -48,6 +49,7 @@ using FunctionMetadataLayout = BCRecordLayout<FUNC_METADATA,
                                               BCGUID,     // function guid
                                               BCFixed<1>, // live
                                               BCFixed<1>, // preserved
+                                              BCVBR<16>,  // instruction size
                                               BCBlob // name (debug purpose)
                                               >;
 using CallGraphEdgeLayout =

@@ -207,6 +207,10 @@ struct CallGraph {
 
     CallGraph *getParent() const { return Parent; }
 
+    FunctionSummary *getFS() const {
+      return Parent->Summary.getFunctionSummary(Guid);
+    }
+
     void printAsOperand(raw_ostream &OS, bool /*PrintType*/) {
       FunctionSummary *FS = Parent->Summary.getFunctionSummary(Guid);
       if (!FS) {
@@ -410,9 +414,55 @@ public:
   DomCallTree(CallGraph &CG) : DominatorTreeBase() { recalculate(CG); }
 };
 
+class RetainedSizeCalculator {
+  struct Entry {
+    DomCallInfoNode *DomNode;
+    size_t InstSize;
+  };
+  std::map<DomCallInfoNode *, size_t> SizeCache;
+  std::vector<Entry> Entries;
+
+  size_t getInstSize(DomCallInfoNode *domNode) {
+    auto FS = domNode->getBlock()->getFS();
+    size_t size = FS->getInstSize();
+    for (auto I = domNode->begin(), E = domNode->end(); I != E; ++I) {
+      auto Child = *I;
+      size += getInstSize(Child);
+    }
+    SizeCache[domNode] = size;
+    return size;
+  }
+
+  void calculateRecursively(DomCallInfoNode *domNode) {
+    Entries.push_back({domNode, getInstSize(domNode)});
+    for (auto child : domNode->getChildren()) {
+      calculateRecursively(child);
+    }
+  }
+
+public:
+  void calculate(DomCallInfoNode *root) {
+    for (auto child : root->getChildren()) {
+      calculateRecursively(child);
+    }
+    std::sort(Entries.begin(), Entries.end(),
+              [](Entry lhs, Entry rhs) { return lhs.InstSize > rhs.InstSize; });
+  }
+
+  void display(llvm::raw_ostream &O) {
+    for (auto entry : Entries) {
+      auto FS = entry.DomNode->getBlock()->getFS();
+      O << entry.InstSize << "\t| " << FS->getName() << "\n";
+    }
+  }
+};
+
 int dominance_analysis(CallGraph &CG) {
   DomCallTree DT(CG);
-  DT.print(llvm::dbgs());
+  DomCallInfoNode *Root = DT.getRootNode();
+  RetainedSizeCalculator calculator;
+  calculator.calculate(Root);
+  calculator.display(llvm::dbgs());
   return 0;
 };
 
@@ -487,7 +537,15 @@ int main(int argc, char *argv[]) {
     modulesummary::loadModuleSummaryIndex(fileBufOrErr.get()->getMemBufferRef(),
                                           summary);
     CallGraph CG(std::move(summary));
-    return dominance_analysis(CG);
+    DomCallTree DT(CG);
+    DomCallInfoNode *Root = DT.getRootNode();
+    RetainedSizeCalculator calculator;
+    calculator.calculate(Root);
+    withOutputFile(diags, options::OutputFilename, [&](raw_ostream &out) {
+      calculator.display(out);
+      return false;
+    });
+    break;
   }
   }
   return 0;

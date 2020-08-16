@@ -320,14 +320,17 @@ bool shouldPreserveFunction(const SILFunction &F) {
 
 void FunctionSummaryIndexer::indexFunction() {
   GUID guid = getGUIDFromUniqueName(F.getName());
+  size_t instSize = 0;
   TheSummary = std::make_unique<FunctionSummary>(guid);
   TheSummary->setName(F.getName());
   for (auto &BB : F) {
     for (auto &I : BB) {
       visit(&I);
+      instSize++;
     }
   }
   TheSummary->setPreserved(shouldPreserveFunction(F));
+  TheSummary->setInstSize(instSize);
 }
 
 class ModuleSummaryIndexer {
@@ -447,7 +450,6 @@ void ModuleSummaryIndexer::indexModule() {
     FunctionSummaryIndexer indexer(F);
     indexer.indexFunction();
     std::unique_ptr<FunctionSummary> FS = indexer.takeSummary();
-    FS->setPreserved(shouldPreserveFunction(F));
     TheSummary->addFunctionSummary(std::move(FS));
   }
 

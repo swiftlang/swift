@@ -122,7 +122,7 @@ void Serializer::emitFunctionSummary(const FunctionSummary *summary) {
   FunctionMetadataLayout::emitRecord(
       Out, ScratchRecord, AbbrCodes[FunctionMetadataLayout::Code],
       summary->getGUID(), unsigned(summary->isLive()),
-      unsigned(summary->isPreserved()), debugFuncName);
+      unsigned(summary->isPreserved()), summary->getInstSize(), debugFuncName);
 
   for (auto call : summary->calls()) {
     std::string debugName = ModuleSummaryEmbedDebugName ? call.getName() : "";
@@ -361,8 +361,10 @@ bool Deserializer::readModuleSummary() {
       std::string name;
       unsigned isLive, isPreserved;
       bool shouldMerge = false;
+      uint32_t instSize;
 
-      FunctionMetadataLayout::readRecord(Scratch, guid, isLive, isPreserved);
+      FunctionMetadataLayout::readRecord(Scratch, guid, isLive, isPreserved,
+                                         instSize);
       name = BlobData.str();
       if (auto summary = moduleSummary.getFunctionSummary(guid)) {
         CurrentFunc = summary;
@@ -382,6 +384,7 @@ bool Deserializer::readModuleSummary() {
       if (!shouldMerge || !name.empty()) {
         CurrentFunc->setName(name);
       }
+      CurrentFunc->setInstSize(instSize);
       break;
     }
     case CALL_GRAPH_EDGE: {
