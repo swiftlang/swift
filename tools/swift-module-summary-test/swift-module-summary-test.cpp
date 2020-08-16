@@ -20,6 +20,8 @@
 #include "swift/Demangling/Demangle.h"
 #include "swift/Serialization/ModuleSummary.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/GenericDomTree.h"
+#include "llvm/Support/GenericDomTreeConstruction.h"
 #include "llvm/Support/GraphWriter.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/YAMLParser.h"
@@ -32,6 +34,7 @@ enum class ActionType : unsigned {
   None,
   BinaryToYAML,
   YAMLToBinary,
+  BinaryToDominators,
   BinaryToDot,
 };
 
@@ -51,16 +54,19 @@ static llvm::cl::opt<bool>
     OmitDeadSymbol("omit-dead-symbol", llvm::cl::init(false),
                    llvm::cl::desc("Omit dead symbols"));
 
-static llvm::cl::opt<ActionType>
-    Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
-           llvm::cl::cat(Category),
-           llvm::cl::values(
-               clEnumValN(ActionType::BinaryToYAML, "to-yaml",
-                          "Convert new binary .swiftmodule.summary format to YAML"),
-               clEnumValN(ActionType::YAMLToBinary, "from-yaml",
-                          "Convert YAML to new binary .swiftmodule.summary format"),
-               clEnumValN(ActionType::BinaryToDot, "binary-to-dot",
-                          "Convert new binary .swiftmodule.summary format to Dot")));
+static llvm::cl::opt<ActionType> Action(
+    llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
+    llvm::cl::cat(Category),
+    llvm::cl::values(
+        clEnumValN(ActionType::BinaryToYAML, "to-yaml",
+                   "Convert new binary .swiftmodule.summary format to YAML"),
+        clEnumValN(ActionType::YAMLToBinary, "from-yaml",
+                   "Convert YAML to new binary .swiftmodule.summary format"),
+        clEnumValN(
+            ActionType::BinaryToDominators, "binary-to-dom",
+            "Convert new binary .swiftmodule.summary format to dominator tree"),
+        clEnumValN(ActionType::BinaryToDot, "binary-to-dot",
+                   "Convert new binary .swiftmodule.summary format to Dot")));
 
 } // namespace options
 
@@ -190,72 +196,73 @@ struct CallGraph {
   struct Edge {
     FunctionSummary::Call Call;
     GUID Target;
-    Node *Child;
   };
 
   struct Node {
-    FunctionSummary *FS;
-    SmallVector<Edge, 8> Children;
-    Node(FunctionSummary *FS) : FS(FS), Children() {}
-  };
-  
-  struct child_iterator
-      : public std::iterator<std::random_access_iterator_tag, Node *,
-                             ptrdiff_t> {
-    SmallVectorImpl<Edge>::iterator baseIter;
+    GUID Guid;
+    CallGraph *Parent;
+    std::vector<Node *> Children;
+    std::vector<Node *> PredChildren;
+    std::vector<Edge> Edges;
 
-    child_iterator(SmallVectorImpl<Edge>::iterator baseIter) :
-    baseIter(baseIter)
-    { }
+    CallGraph *getParent() const { return Parent; }
 
-    child_iterator &operator++() { baseIter++; return *this; }
-    child_iterator operator++(int) {
-      auto tmp = *this;
-      ++baseIter;
-      return tmp;
-    }
-    Node *operator*() const { return baseIter->Child; }
-    bool operator==(const child_iterator &RHS) const {
-      return baseIter == RHS.baseIter;
-    }
-    bool operator!=(const child_iterator &RHS) const {
-      return baseIter != RHS.baseIter;
-    }
-    difference_type operator-(const child_iterator &RHS) const {
-      return baseIter - RHS.baseIter;
+    void printAsOperand(raw_ostream &OS, bool /*PrintType*/) {
+      FunctionSummary *FS = Parent->Summary.getFunctionSummary(Guid);
+      if (!FS) {
+        OS << "Entry node";
+        return;
+      }
+      OS << "Fn#" << FS->getName();
     }
   };
+
+  using child_iterator = std::vector<Node *>::iterator;
 
   std::vector<Node> Nodes;
+  Node EntryNode;
+  ModuleSummaryIndex Summary;
   using iterator = std::vector<Node>::iterator;
-  CallGraph(ModuleSummaryIndex *);
+  CallGraph(ModuleSummaryIndex);
 };
 
-CallGraph::CallGraph(ModuleSummaryIndex *Summary) {
-  llvm::DenseMap<GUID, Node *> NodeMap;
-  for (auto FI = Summary->functions_begin(), FE = Summary->functions_end();
+CallGraph::CallGraph(ModuleSummaryIndex Summary) : Nodes(), EntryNode() {
+  std::map<GUID, Node *> NodeMap;
+  Nodes.resize(Summary.functions_size());
+  int idx = 0;
+  for (auto FI = Summary.functions_begin(), FE = Summary.functions_end();
        FI != FE; ++FI) {
-    if (options::OmitDeadSymbol && !FI->second->isLive()) continue;
-    Nodes.emplace_back(FI->second.get());
-    Node &node = Nodes.back();
-    NodeMap[FI->first] = &node;
+    Node *node = &Nodes[idx++];
+    node->Guid = FI->first;
+    node->Parent = this;
+    NodeMap[FI->first] = node;
+    if (FI->second->isPreserved()) {
+      EntryNode.Children.push_back(node);
+      EntryNode.PredChildren.push_back(node);
+    }
   }
+  EntryNode.Parent = this;
 
   for (Node &node : Nodes) {
-    for (FunctionSummary::Call call : node.FS->calls()) {
+    FunctionSummary *FS = Summary.getFunctionSummary(node.Guid);
+    for (FunctionSummary::Call call : FS->calls()) {
       switch (call.getKind()) {
       case FunctionSummary::Call::Witness:
       case FunctionSummary::Call::VTable: {
         VFuncSlot slot = createVFuncSlot(call);
-        for (auto Impl : Summary->getImplementations(slot)) {
+        for (auto Impl : Summary.getImplementations(slot)) {
           Node *CalleeNode = NodeMap[Impl.Guid];
-          node.Children.push_back({ call, Impl.Guid, CalleeNode });
+          node.Children.push_back(CalleeNode);
+          node.PredChildren.push_back(CalleeNode);
+          node.Edges.push_back({call, Impl.Guid});
         }
         break;
       }
       case FunctionSummary::Call::Direct: {
         Node *CalleeNode = NodeMap[call.getCallee()];
-        node.Children.push_back({ call, call.getCallee(), CalleeNode });
+        node.Children.push_back(CalleeNode);
+        node.PredChildren.push_back(CalleeNode);
+        node.Edges.push_back({call, call.getCallee()});
         break;
       }
       case FunctionSummary::Call::kindCount:
@@ -263,8 +270,8 @@ CallGraph::CallGraph(ModuleSummaryIndex *Summary) {
       }
     }
   }
+  this->Summary = std::move(Summary);
 }
-
 
 namespace llvm {
 
@@ -281,13 +288,28 @@ namespace llvm {
     }
   };
 
+  template <> struct GraphTraits<Inverse<CallGraph::Node *>> {
+    using ChildIteratorType = CallGraph::child_iterator;
+    using Node = CallGraph::Node;
+    using NodeRef = Node *;
+    static NodeRef getEntryNode(Inverse<CallGraph::Node *> G) {
+      return G.Graph;
+    }
+    static inline ChildIteratorType child_begin(NodeRef N) {
+      return N->PredChildren.begin();
+    }
+    static inline ChildIteratorType child_end(NodeRef N) {
+      return N->PredChildren.end();
+    }
+  };
+
   template <> struct GraphTraits<CallGraph *>
   : public GraphTraits<CallGraph::Node *> {
     typedef CallGraph *GraphType;
     typedef CallGraph::Node *NodeRef;
-  
-    static NodeRef getEntryNode(GraphType F) { return nullptr; }
-  
+
+    static NodeRef getEntryNode(GraphType G) { return &G->EntryNode; }
+
     typedef pointer_iterator<CallGraph::iterator> nodes_iterator;
     static nodes_iterator nodes_begin(GraphType CG) {
       return nodes_iterator(CG->Nodes.begin());
@@ -307,13 +329,15 @@ namespace llvm {
   
     std::string getNodeLabel(const CallGraph::Node *Node,
                              const CallGraph *Graph) {
+      FunctionSummary *FS = Graph->Summary.getFunctionSummary(Node->Guid);
       Demangle::Context DCtx;
-      return DCtx.demangleSymbolAsString(Node->FS->getName());
+      return DCtx.demangleSymbolAsString(FS->getName());
     }
 
     static std::string getNodeAttributes(const CallGraph::Node *Node,
                                          const CallGraph *Graph) {
-      std::string color = Node->FS->isLive() ? "green" : "red";
+      FunctionSummary *FS = Graph->Summary.getFunctionSummary(Node->Guid);
+      std::string color = FS->isLive() ? "green" : "red";
       std::string attrs = "color=\"" + color + "\"";
       return attrs;
     }
@@ -321,10 +345,12 @@ namespace llvm {
     static std::string getEdgeAttributes(const CallGraph::Node *Node,
                                          CallGraph::child_iterator I,
                                          const CallGraph *Graph) {
+      unsigned ChildIdx = I - Node->Children.begin();
       std::string Label;
       raw_string_ostream O(Label);
       Demangle::Context DCtx;
-      FunctionSummary::Call call = I.baseIter->Call;
+      CallGraph::Edge edge = Node->Edges[ChildIdx];
+      FunctionSummary::Call call = edge.Call;
       std::string demangled = DCtx.demangleSymbolAsString(call.getName());
       O << "label=\"";
       switch (call.getKind()) {
@@ -348,6 +374,47 @@ namespace llvm {
     }
   };
 } // namespace llvm
+using DomCallTreeBase = llvm::DominatorTreeBase<CallGraph::Node, false>;
+using DomCallInfoNode = llvm::DomTreeNodeBase<CallGraph::Node>;
+
+namespace llvm {
+
+template <> struct GraphTraits<DomCallInfoNode *> {
+  using ChildIteratorType = DomCallInfoNode::iterator;
+  using NodeRef = DomCallInfoNode *;
+
+  static NodeRef getEntryNode(NodeRef N) { return N; }
+  static inline ChildIteratorType child_begin(NodeRef N) { return N->begin(); }
+  static inline ChildIteratorType child_end(NodeRef N) { return N->end(); }
+};
+
+template <> struct GraphTraits<const DomCallInfoNode *> {
+  using ChildIteratorType = DomCallInfoNode::const_iterator;
+  using NodeRef = const DomCallInfoNode *;
+
+  static NodeRef getEntryNode(NodeRef N) { return N; }
+  static inline ChildIteratorType child_begin(NodeRef N) { return N->begin(); }
+  static inline ChildIteratorType child_end(NodeRef N) { return N->end(); }
+};
+
+namespace DomTreeBuilder {
+extern template void Calculate<DomCallTreeBase>(DomCallTreeBase &DT);
+template void Calculate<DomCallTreeBase>(DomCallTreeBase &DT);
+} // namespace DomTreeBuilder
+} // namespace llvm
+
+class DomCallTree : public DomCallTreeBase {
+  using super = DominatorTreeBase;
+
+public:
+  DomCallTree(CallGraph &CG) : DominatorTreeBase() { recalculate(CG); }
+};
+
+int dominance_analysis(CallGraph &CG) {
+  DomCallTree DT(CG);
+  DT.print(llvm::dbgs());
+  return 0;
+};
 
 int main(int argc, char *argv[]) {
   PROGRAM_START(argc, argv);
@@ -408,12 +475,19 @@ int main(int argc, char *argv[]) {
     modulesummary::ModuleSummaryIndex summary;
     modulesummary::loadModuleSummaryIndex(fileBufOrErr.get()->getMemBufferRef(),
                                           summary);
-    CallGraph CG(&summary);
+    CallGraph CG(std::move(summary));
     withOutputFile(diags, options::OutputFilename, [&](raw_ostream &out) {
       llvm::WriteGraph(out, &CG);
       return false;
     });
     break;
+  }
+  case ActionType::BinaryToDominators: {
+    modulesummary::ModuleSummaryIndex summary;
+    modulesummary::loadModuleSummaryIndex(fileBufOrErr.get()->getMemBufferRef(),
+                                          summary);
+    CallGraph CG(std::move(summary));
+    return dominance_analysis(CG);
   }
   }
   return 0;
