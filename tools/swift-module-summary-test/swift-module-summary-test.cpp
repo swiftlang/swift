@@ -450,6 +450,7 @@ public:
   }
 
   void display(llvm::raw_ostream &O) {
+    O << "size\t| symbol\n";
     for (auto entry : Entries) {
       auto FS = entry.DomNode->getBlock()->getFS();
       O << entry.InstSize << "\t| " << FS->getName() << "\n";
