@@ -37,7 +37,6 @@ static llvm::cl::opt<std::string>
 
 static llvm::DenseSet<GUID> computePreservedGUIDs(ModuleSummaryIndex *summary) {
   llvm::DenseSet<GUID> Set(1);
-  Set.insert(getGUIDFromUniqueName("main"));
   for (auto FI = summary->functions_begin(), FE = summary->functions_end();
        FI != FE; ++FI) {
     auto summary = FI->second.get();

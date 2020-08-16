@@ -302,6 +302,10 @@ void FunctionSummaryIndexer::visitKeyPathInst(KeyPathInst *KPI) {
 }
 
 bool shouldPreserveFunction(const SILFunction &F) {
+  if (F.getName().equals(SWIFT_ENTRY_POINT_FUNCTION)) {
+    return true;
+  }
+
   if (F.getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod) {
     return true;
   }
