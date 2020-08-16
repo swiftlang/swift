@@ -134,23 +134,26 @@ private:
   }
 
   void visitReturnStmt(ReturnStmt *returnStmt) {
-    auto expr = returnStmt->getResult();
+    Type resultType;
+    if (returnStmt->hasResult()) {
+      auto expr = returnStmt->getResult();
 
-    // FIXME: Implies Void return?
-    if (!expr)
-      return;
+      // FIXME: Use SolutionApplicationTarget?
+      expr = cs.generateConstraints(expr, closure, /*isInputExpression=*/false);
+      if (!expr) {
+        hadError = true;
+        return;
+      }
 
-    // FIXME: Use SolutionApplicationTarget?
-    expr = cs.generateConstraints(expr, closure, /*isInputExpression=*/false);
-    if (!expr) {
-      hadError = true;
-      return;
+      resultType = cs.getType(expr);
+    } else {
+      resultType = cs.getASTContext().getVoidDecl()->getDeclaredInterfaceType();
     }
 
     // FIXME: Locator should point at the return statement?
     bool hasReturn = hasExplicitResult(closure);
     cs.addConstraint(
-        ConstraintKind::Conversion, cs.getType(expr),
+        ConstraintKind::Conversion, resultType,
         closureResultType,
         cs.getConstraintLocator(
            closure, LocatorPathElt::ClosureBody(hasReturn)));
@@ -425,9 +428,10 @@ private:
   }
 
   ASTNode visitReturnStmt(ReturnStmt *returnStmt) {
-    auto resultExpr = returnStmt->getResult();
-    if (!resultExpr)
+    if (!returnStmt->hasResult())
       return returnStmt;
+
+    auto resultExpr = returnStmt->getResult();
 
     enum {
       convertToResult,

@@ -101,3 +101,13 @@ func mapWithMoreStatements(ints: [Int], state: State) throws {
     return String(value)
   }
 }
+
+func acceptsWhateverClosure<T, R>(_ value: T, _ fn: (T) -> R) { }
+
+func testReturnWithoutExpr(i: Int) {
+  acceptsWhateverClosure(i) { i in
+    print(i)
+    return
+  }
+}
+
