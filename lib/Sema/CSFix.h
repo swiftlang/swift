@@ -266,13 +266,16 @@ enum class FixKind : uint8_t {
 
   /// Specify key path root type when it cannot be infered from context.
   SpecifyKeyPathRootType,
-  
+
   /// Unwrap optional base on key path application.
   UnwrapOptionalBaseKeyPathApplication,
 
   /// Explicitly specify a label to match trailing closure to a certain
   /// parameter in the call.
   SpecifyLabelToAssociateTrailingClosure,
+
+  /// Allow key path expressions with no components.
+  AllowKeyPathWithoutComponents,
 };
 
 class ConstraintFix {
@@ -1956,6 +1959,25 @@ public:
 
   static SpecifyLabelToAssociateTrailingClosure *
   create(ConstraintSystem &cs, ConstraintLocator *locator);
+};
+
+/// Diagnose situations where we have a key path with no components.
+///
+/// \code
+/// let _ : KeyPath<A, B> = \A
+/// \endcode
+class AllowKeyPathWithoutComponents final : public ConstraintFix {
+  AllowKeyPathWithoutComponents(ConstraintSystem &cs,
+                                ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowKeyPathWithoutComponents, locator) {}
+
+public:
+  std::string getName() const override { return "key path missing component"; }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowKeyPathWithoutComponents *create(ConstraintSystem &cs,
+                                               ConstraintLocator *locator);
 };
 
 } // end namespace constraints

@@ -36,7 +36,7 @@ struct A: Hashable {
   func hash(into hasher: inout Hasher) { fatalError() }
 }
 struct B {}
-struct C<T> { // expected-note 3 {{'T' declared as parameter to type 'C'}}
+struct C<T> { // expected-note 4 {{'T' declared as parameter to type 'C'}}
   var value: T
   subscript() -> T { get { return value } }
   subscript(sub: Sub) -> T { get { return value } set { } }
@@ -224,15 +224,17 @@ func testKeyPathInGenericContext<H: Hashable, X>(hashable: H, anything: X) {
 }
 
 func testDisembodiedStringInterpolation(x: Int) {
-  \(x) // expected-error{{string interpolation}} expected-error{{}}
-  \(x, radix: 16) // expected-error{{string interpolation}} expected-error{{}}
+  \(x) // expected-error{{string interpolation can only appear inside a string literal}} 
+  \(x, radix: 16) // expected-error{{string interpolation can only appear inside a string literal}} 
 }
 
 func testNoComponents() {
   let _: KeyPath<A, A> = \A // expected-error{{must have at least one component}}
-  let _: KeyPath<C, A> = \C // expected-error{{must have at least one component}} expected-error{{}}
+  let _: KeyPath<C, A> = \C // expected-error{{must have at least one component}}
   // expected-error@-1 {{generic parameter 'T' could not be inferred}}
-  // expected-error@-2 {{cannot convert value of type 'KeyPath<Root, Value>' to specified type 'KeyPath<C<T>, A>'}}
+  let _: KeyPath<A, C> = \A // expected-error{{must have at least one component}} 
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  _ = \A // expected-error {{key path must have at least one component}}
 }
 
 struct TupleStruct {
