@@ -47,6 +47,10 @@ static llvm::cl::opt<std::string>
     OutputFilename("o", llvm::cl::desc("Override output filename"),
                    llvm::cl::value_desc("filename"));
 
+static llvm::cl::opt<bool>
+    OmitDeadSymbol("omit-dead-symbol", llvm::cl::init(false),
+                   llvm::cl::desc("Omit dead symbols"));
+
 static llvm::cl::opt<ActionType>
     Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
            llvm::cl::cat(Category),
@@ -192,6 +196,7 @@ struct CallGraph {
   struct Node {
     FunctionSummary *FS;
     SmallVector<Edge, 8> Children;
+    Node(FunctionSummary *FS) : FS(FS), Children() {}
   };
   
   struct child_iterator
@@ -227,13 +232,12 @@ struct CallGraph {
 };
 
 CallGraph::CallGraph(ModuleSummaryIndex *Summary) {
-  Nodes.resize(Summary->functions_size());
   llvm::DenseMap<GUID, Node *> NodeMap;
-  int idx = 0;
   for (auto FI = Summary->functions_begin(), FE = Summary->functions_end();
        FI != FE; ++FI) {
-    Node &node = Nodes[idx++];
-    node.FS = FI->second.get();
+    if (options::OmitDeadSymbol && !FI->second->isLive()) continue;
+    Nodes.emplace_back(FI->second.get());
+    Node &node = Nodes.back();
     NodeMap[FI->first] = &node;
   }
 
@@ -307,31 +311,39 @@ namespace llvm {
       return DCtx.demangleSymbolAsString(Node->FS->getName());
     }
 
-    static std::string getEdgeSourceLabel(const CallGraph::Node *Node,
-                                          CallGraph::child_iterator I) {
+    static std::string getNodeAttributes(const CallGraph::Node *Node,
+                                         const CallGraph *Graph) {
+      std::string color = Node->FS->isLive() ? "green" : "red";
+      std::string attrs = "color=\"" + color + "\"";
+      return attrs;
+    }
+
+    static std::string getEdgeAttributes(const CallGraph::Node *Node,
+                                         CallGraph::child_iterator I,
+                                         const CallGraph *Graph) {
       std::string Label;
       raw_string_ostream O(Label);
-      FunctionSummary::Call call = I.baseIter->Call;
       Demangle::Context DCtx;
-      O << DCtx.demangleSymbolAsString(call.getName());
-      O << " (";
+      FunctionSummary::Call call = I.baseIter->Call;
+      std::string demangled = DCtx.demangleSymbolAsString(call.getName());
+      O << "label=\"";
       switch (call.getKind()) {
       case FunctionSummary::Call::Witness: {
-        O << "W";
+        O << "(W) " << demangled;
         break;
       }
       case FunctionSummary::Call::VTable: {
-        O << "V";
+        O << "(V) " << demangled;
         break;
       }
       case FunctionSummary::Call::Direct: {
-        O << "D";
+        O << "(D)";
         break;
       }
       case FunctionSummary::Call::kindCount:
         llvm_unreachable("impossible");
       }
-      O << ")";
+      O << "\"";
       return Label;
     }
   };
