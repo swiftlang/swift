@@ -13,6 +13,10 @@ list(APPEND CMAKE_MODULE_PATH
 # User-configurable options for the standard library.
 #
 
+option(SWIFT_STDLIB_STABLE_ABI
+       "Should stdlib be built with stable ABI (library evolution, resilience)."
+       TRUE)
+
 option(SWIFT_ENABLE_COMPATIBILITY_OVERRIDES
   "Support back-deploying compatibility fixes for newer apps running on older runtimes."
   TRUE)
