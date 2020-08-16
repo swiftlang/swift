@@ -8,5 +8,5 @@ func foo() {
 // REGULAR: {{^}}@inline(__always) func foo()
 // REGULAR: sil hidden [always_inline] @$s4main3fooyyF
 
-// IGNORED: {{^}}func foo()
+// IGNORED: {{^}}@inline(__always) func foo()
 // IGNORED: sil hidden @$s4main3fooyyF
