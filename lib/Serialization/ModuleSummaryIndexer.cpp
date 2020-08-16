@@ -4,10 +4,16 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/Serialization/ModuleSummary.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MD5.h"
 #include "llvm/Support/raw_ostream.h"
 
 #define DEBUG_TYPE "module-summary-index"
+
+static llvm::cl::opt<bool> EagerElimination(
+    "module-summary-eager-elim", llvm::cl::init(false),
+    llvm::cl::desc(
+        "Enable eager elimination which doesn't support debug print"));
 
 using namespace swift;
 using namespace modulesummary;
@@ -302,6 +308,12 @@ void FunctionSummaryIndexer::visitKeyPathInst(KeyPathInst *KPI) {
 }
 
 bool shouldPreserveFunction(const SILFunction &F) {
+  if (EagerElimination &&
+      (F.getName().equals("swift_unexpectedError") ||
+       F.getName().equals("swift_errorInMain") ||
+       F.getName().equals("$ss23_getErrorDomainNSStringyyXlSPyxGs0B0RzlF"))) {
+    return false;
+  }
   if (F.getName().equals(SWIFT_ENTRY_POINT_FUNCTION)) {
     return true;
   }
