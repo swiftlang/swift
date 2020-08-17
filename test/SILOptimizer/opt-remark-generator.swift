@@ -1,6 +1,8 @@
 // RUN: %target-swiftc_driver -O -Rpass-missed=sil-opt-remark-gen -Xllvm -sil-disable-pass=FunctionSignatureOpts -emit-sil %s -o /dev/null -Xfrontend -verify
 // REQUIRES: optimized_stdlib
 
+// XFAIL: OS=linux-androideabi && CPU=armv7
+
 public class Klass {}
 
 public var global = Klass()
