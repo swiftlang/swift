@@ -703,5 +703,69 @@ tuplify(true) { c in
   }
 }
 
+// Test the use of function builders partly implemented through a protocol.
+indirect enum FunctionBuilder<Expression> {
+    case expression(Expression)
+    case block([FunctionBuilder])
+    case either(Either<FunctionBuilder, FunctionBuilder>)
+    case optional(FunctionBuilder?)
+}
 
+protocol FunctionBuilderProtocol {
+    associatedtype Expression
+    typealias Component = FunctionBuilder<Expression>
+    associatedtype Return
+
+    static func buildExpression(_ expression: Expression) -> Component
+    static func buildBlock(_ components: Component...) -> Component
+    static func buildDo(_ components: Component...) -> Component
+    static func buildOptional(_ optional: Component?) -> Component
+    static func buildArray(_ components: [Component]) -> Component
+    static func buildLimitedAvailability(_ component: Component) -> Component
+
+    static func buildFinalResult(_ components: Component) -> Return
+}
+
+extension FunctionBuilderProtocol {
+    static func buildExpression(_ expression: Expression) -> Component { .expression(expression) }
+    static func buildBlock(_ components: Component...) -> Component { .block(components) }
+    static func buildDo(_ components: Component...) -> Component { .block(components) }
+    static func buildOptional(_ optional: Component?) -> Component { .optional(optional) }
+    static func buildArray(_ components: [Component]) -> Component { .block(components) }
+    static func buildLimitedAvailability(_ component: Component) -> Component { component }
+}
+
+@_functionBuilder
+enum ArrayBuilder<E>: FunctionBuilderProtocol {
+    typealias Expression = E
+    typealias Component = FunctionBuilder<E>
+    typealias Return = [E]
+
+    static func buildFinalResult(_ components: Component) -> Return {
+        switch components {
+        case .expression(let e): return [e]
+        case .block(let children): return children.flatMap(buildFinalResult)
+        case .either(.first(let child)): return buildFinalResult(child)
+        case .either(.second(let child)): return buildFinalResult(child)
+        case .optional(let child?): return buildFinalResult(child)
+        case .optional(nil): return []
+        }
+    }
+}
+
+
+func buildArray(@ArrayBuilder<String> build: () -> [String]) -> [String] {
+    return build()
+}
+
+
+let a = buildArray {
+    "1"
+    "2"
+    if Bool.random() {
+        "maybe 3"
+    }
+}
+// CHECK: ["1", "2"
+print(a)
 
