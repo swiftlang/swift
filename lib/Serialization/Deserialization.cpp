@@ -20,6 +20,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Pattern.h"
@@ -2031,13 +2032,21 @@ ModuleDecl *ModuleFile::getModule(ImportPath::Module name,
       assert(importer && "no way to import shadowed module");
       UnderlyingModule =
           importer->loadModule(SourceLoc(), name.getTopLevelPath());
+      if (UnderlyingModule) {
+        (void) namelookup::getAllImports(UnderlyingModule);
+      }
     }
 
     return UnderlyingModule;
   }
 
-  if (allowLoading)
-    return getContext().getModule(name);
+  if (allowLoading) {
+    auto *M = getContext().getModule(name);
+    if (M) {
+      (void) namelookup::getAllImports(M);
+    }
+    return M;
+  }
   return getContext().getLoadedModule(name);
 }
 

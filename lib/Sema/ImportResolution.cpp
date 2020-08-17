@@ -17,6 +17,7 @@
 #define DEBUG_TYPE "swift-import-resolution"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
@@ -337,6 +338,11 @@ void ImportResolver::bindImport(UnboundImport &&I) {
     return;
   }
 
+  // Force load overlays for all imported modules.
+  // FIXME: This forces the creation of wrapper modules for all imports as
+  // well, and may do unnecessary work.
+  (void) namelookup::getAllImports(M);
+
   auto topLevelModule = I.getTopLevelModule(M, SF);
 
   I.validateOptions(topLevelModule, SF);
@@ -457,6 +463,7 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
       }
       continue;
     }
+    (void) namelookup::getAllImports(importModule);
     imports.emplace_back(importModule);
   }
 

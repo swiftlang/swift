@@ -1,4 +1,5 @@
 #include "llvm/ADT/STLExtras.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/SIL/SILDeclRef.h"
 #include <ModuleAnalyzerNodes.h>
 #include <algorithm>
@@ -2215,6 +2216,7 @@ swift::ide::api::getSDKNodeRoot(SDKContext &SDKCtx,
       if (Opts.AbortOnModuleLoadFailure)
         return nullptr;
     } else {
+      (void) namelookup::getAllImports(M);
       Modules.push_back(M);
     }
   }

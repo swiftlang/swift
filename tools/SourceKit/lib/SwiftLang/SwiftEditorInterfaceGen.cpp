@@ -16,6 +16,7 @@
 
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/Basic/Version.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -285,6 +286,7 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx,
     ErrMsg += ModuleName;
     return true;
   }
+  (void) namelookup::getAllImports(Mod);
 
   PrintOptions Options = PrintOptions::printModuleInterface();
   ModuleTraversalOptions TraversalOptions = None; // Don't print submodules.
@@ -384,6 +386,7 @@ SwiftInterfaceGenContext::create(StringRef DocumentName,
     ErrMsg = "Could not load the stdlib module";
     return nullptr;
   }
+  (void) namelookup::getAllImports(Stdlib);
 
   if (IsModule) {
     if (getModuleInterfaceInfo(Ctx, ModuleOrHeaderName, Group, IFaceGenCtx->Impl,
@@ -444,6 +447,8 @@ SwiftInterfaceGenContext::createForTypeInterface(CompilerInvocation Invocation,
     ErrorMsg = "Could not load the stdlib module";
     return nullptr;
   }
+  (void) namelookup::getAllImports(Stdlib);
+
   auto *Module = CI.getMainModule();
   if (!Module) {
     ErrorMsg = "Could not load the main module";

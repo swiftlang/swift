@@ -2112,6 +2112,7 @@ static ModuleDecl *getModuleByFullName(ASTContext &Context, StringRef ModuleName
   ModuleDecl *Result = Context.getModuleByName(ModuleName);
   if (!Result || Result->failedToLoad())
     return nullptr;
+  (void) namelookup::getAllImports(Result);
   return Result;
 }
 
@@ -2119,6 +2120,7 @@ static ModuleDecl *getModuleByFullName(ASTContext &Context, Identifier ModuleNam
   ModuleDecl *Result = Context.getModuleByIdentifier(ModuleName);
   if (!Result || Result->failedToLoad())
     return nullptr;
+  (void) namelookup::getAllImports(Result);
   return Result;
 }
 

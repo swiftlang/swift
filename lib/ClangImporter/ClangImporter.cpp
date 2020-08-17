@@ -1848,14 +1848,10 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
   // Bump the generation count.
   bumpGeneration();
 
-  // Force load overlays for all imported modules.
-  // FIXME: This forces the creation of wrapper modules for all imports as
-  // well, and may do unnecessary work.
   ClangModuleUnit *wrapperUnit = getWrapperForModule(clangModule, importLoc);
   ModuleDecl *result = wrapperUnit->getParentModule();
   if (!ModuleWrappers[clangModule].getInt()) {
     ModuleWrappers[clangModule].setInt(true);
-    (void) namelookup::getAllImports(result);
   }
 
   if (clangModule->isSubModule()) {
@@ -1888,7 +1884,16 @@ void ClangImporter::Implementation::handleDeferredImports(SourceLoc diagLoc) {
   // officially supported with bridging headers: app targets and unit tests
   // only. Unfortunately that's not enforced.
   for (size_t i = 0; i < ImportedHeaderExports.size(); ++i) {
-    (void)finishLoadingClangModule(ImportedHeaderExports[i], diagLoc);
+    auto *CM = ImportedHeaderExports[i];
+    // Force load overlays for all imported modules.
+    // FIXME: This forces the creation of wrapper modules for all imports as
+    // well, and may do unnecessary work.
+    if (CM->isSubModule()) {
+      auto *TM = finishLoadingClangModule(CM->getTopLevelModule(), diagLoc);
+      (void) namelookup::getAllImports(TM);
+    }
+    auto *M = finishLoadingClangModule(CM, diagLoc);
+    (void) namelookup::getAllImports(M);
   }
 }
 
@@ -3481,13 +3486,8 @@ void ClangModuleUnit::getImportedModules(
       if (importTopLevel != importMod) {
         if (!clangModule || importTopLevel != clangModule->getTopLevelModule()){
           auto topLevelWrapper = owner.getWrapperForModule(importTopLevel);
-<<<<<<< HEAD
-          imports.push_back({ ImportPath::Access(),
-                              topLevelWrapper->getParentModule() });
-=======
-          imports.emplace_back(ModuleDecl::AccessPathTy(),
+          imports.emplace_back(ImportPath::Access(),
                                topLevelWrapper->getParentModule());
->>>>>>> Fixup getOverlayModule
         }
       }
       actualMod = wrapper->getParentModule();
@@ -3496,11 +3496,7 @@ void ClangModuleUnit::getImportedModules(
     }
 
     assert(actualMod && "Missing imported overlay");
-<<<<<<< HEAD
-    imports.push_back({ImportPath::Access(), actualMod});
-=======
-    imports.emplace_back(ModuleDecl::AccessPathTy(), actualMod);
->>>>>>> Fixup getOverlayModule
+    imports.emplace_back(ImportPath::Access(), actualMod);
   }
 }
 
@@ -3576,11 +3572,7 @@ void ClangModuleUnit::getImportedModulesForLookup(
       actualMod = wrapper->getParentModule();
     }
     assert(actualMod && "Missing imported overlay");
-<<<<<<< HEAD
-    imports.push_back({ImportPath::Access(), actualMod});
-=======
-    imports.emplace_back(ModuleDecl::AccessPathTy(), actualMod);
->>>>>>> Fixup getOverlayModule
+    imports.emplace_back(ImportPath::Access()(), actualMod);
   }
 
   // Cache our results for use next time.

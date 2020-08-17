@@ -16,6 +16,7 @@
 #include "SourceKit/Support/Tracing.h"
 #include "SourceKit/Support/UIdent.h"
 
+#include "swift/AST/ImportCache.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Index/Index.h"
@@ -215,6 +216,9 @@ static void indexModule(llvm::MemoryBuffer *Input,
   ModuleDecl *Mod = nullptr;
   if (ModuleName == Ctx.StdlibModuleName.str()) {
     Mod = Ctx.getModuleByIdentifier(Ctx.StdlibModuleName);
+    if (Mod) {
+      (void) namelookup::getAllImports(Mod);
+    }
   } else {
     Loader = ImplicitSerializedModuleLoader::create(Ctx);
     auto Buf = std::unique_ptr<llvm::MemoryBuffer>(

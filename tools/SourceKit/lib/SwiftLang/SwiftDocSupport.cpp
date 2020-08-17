@@ -21,6 +21,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -1011,10 +1012,12 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx, StringRef ModuleName,
   auto *Stdlib = Ctx.getModuleByIdentifier(Ctx.StdlibModuleName);
   if (!Stdlib)
     return true;
+  (void) namelookup::getAllImports(Stdlib);
 
   auto *M = Ctx.getModuleByName(ModuleName);
   if (!M)
     return true;
+  (void) namelookup::getAllImports(M);
 
   PrintOptions Options = PrintOptions::printDocInterface();
   ModuleTraversalOptions TraversalOptions = None;
@@ -1541,12 +1544,15 @@ findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
     Receiver(RequestResult<ArrayRef<StringRef>>::fromError(Error));
     return;
   }
+  (void) namelookup::getAllImports(Stdlib);
+
   auto *M = Ctx.getModuleByName(ModuleName);
   if (!M) {
     Error = "Cannot find the module.";
     Receiver(RequestResult<ArrayRef<StringRef>>::fromError(Error));
     return;
   }
+  (void) namelookup::getAllImports(M);
   std::vector<StringRef> Scratch;
   Receiver(RequestResult<ArrayRef<StringRef>>::fromResult(
       collectModuleGroups(M, Scratch)));

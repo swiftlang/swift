@@ -24,6 +24,7 @@
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
@@ -2438,10 +2439,14 @@ static ModuleDecl *tryLoadModule(ASTContext &C,
 
   // If we're synthesizing forward declarations, we don't want to pull in
   // the module too eagerly.
-  if (importForwardDeclarations)
+  if (importForwardDeclarations) {
     module = C.getLoadedModule(moduleName);
-  else
+  } else {
     module = C.getModuleByIdentifier(moduleName);
+    if (module) {
+      (void) namelookup::getAllImports(module);
+    }
+  }
 
   checkedModules[moduleName] = module;
   return module;
