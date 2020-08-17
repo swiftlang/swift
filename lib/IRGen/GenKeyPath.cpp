@@ -119,7 +119,11 @@ getAccessorForComputedComponent(IRGenModule &IGM,
     accessor = component.getSubscriptIndexHash();
     break;
   }
-  
+
+  if (!accessor) {
+    return nullptr;
+  }
+
   // If the accessor is not generic, and locally available, we can use it as is.
   // If it's only externally available, we need a local thunk to relative-
   // reference.
@@ -510,10 +514,18 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
     fields.addNullPointer(IGM.FunctionPtrTy);
   fields.addSignedPointer(copy, schemaKeyPath,
                           PointerAuthEntity::Special::KeyPathCopy);
-  fields.addSignedPointer(equals, schemaKeyPath,
-                          PointerAuthEntity::Special::KeyPathEquals);
-  fields.addSignedPointer(hash, schemaKeyPath,
-                          PointerAuthEntity::Special::KeyPathHash);
+  if (equals)
+    fields.addSignedPointer(equals, schemaKeyPath,
+                            PointerAuthEntity::Special::KeyPathEquals);
+  else
+    fields.addNullPointer(IGM.FunctionPtrTy);
+
+  if (hash)
+    fields.addSignedPointer(hash, schemaKeyPath,
+                            PointerAuthEntity::Special::KeyPathHash);
+  else
+    fields.addNullPointer(IGM.FunctionPtrTy);
+
   return fields.finishAndCreateGlobal(
       "keypath_witnesses", IGM.getPointerAlignment(), /*constant*/ true,
       llvm::GlobalVariable::PrivateLinkage);
@@ -914,6 +926,11 @@ emitKeyPathComponent(IRGenModule &IGM,
     switch (id.getKind()) {
     case KeyPathPatternComponent::ComputedPropertyId::Function: {
       idKind = KeyPathComponentHeader::Pointer;
+      if (!id.getFunction()) {
+        idValue = nullptr;
+        idResolution = KeyPathComponentHeader::Resolved;
+        break;
+      }
       // FIXME: Does this need to be signed?
       auto idRef = IGM.getAddrOfLLVMVariableOrGOTEquivalent(
         LinkEntity::forSILFunction(id.getFunction(), false));
@@ -1066,7 +1083,7 @@ emitKeyPathComponent(IRGenModule &IGM,
     switch (idKind) {
     case KeyPathComponentHeader::Pointer:
       // Use a relative offset to the referent.
-      fields.addRelativeAddress(idValue);
+      fields.addRelativeAddressOrNull(idValue);
       break;
 
     case KeyPathComponentHeader::VTableOffset:
@@ -1077,15 +1094,12 @@ emitKeyPathComponent(IRGenModule &IGM,
     }
 
     // Push the accessors, possibly thunked to marshal generic environment.
-    fields.addRelativeAddress(
-      getAccessorForComputedComponent(IGM, component, Getter,
-                                      genericEnv, requirements,
-                                      hasSubscriptIndices));
+    fields.addRelativeAddressOrNull(getAccessorForComputedComponent(
+        IGM, component, Getter, genericEnv, requirements, hasSubscriptIndices));
     if (settable)
-      fields.addRelativeAddress(
-        getAccessorForComputedComponent(IGM, component, Setter,
-                                        genericEnv, requirements,
-                                        hasSubscriptIndices));
+      fields.addRelativeAddressOrNull(
+          getAccessorForComputedComponent(IGM, component, Setter, genericEnv,
+                                          requirements, hasSubscriptIndices));
 
     if (!isInstantiableOnce) {
       // If there's generic context or subscript indexes, embed as

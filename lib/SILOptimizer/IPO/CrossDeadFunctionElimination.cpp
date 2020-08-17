@@ -113,6 +113,17 @@ public:
     }
   }
 
+  void cleanupSILProperty(SILModule &M,
+                          const std::vector<SILFunction *> &DeadFunctions) {
+    std::set<SILFunction *> DeadFunctionsSet(DeadFunctions.begin(),
+                                             DeadFunctions.end());
+    for (SILProperty &P : M.getPropertyList()) {
+      P.clearReferencedFunctions_if([&](SILFunction *f) {
+        return DeadFunctionsSet.find(f) != DeadFunctionsSet.end();
+      });
+    }
+  }
+
   void run() override {
     LLVM_DEBUG(llvm::dbgs() << "Running CrossDeadFuncElimination\n");
     auto &Context = getModule()->getASTContext();
@@ -134,6 +145,7 @@ public:
     this->eliminateDeadEntriesFromTables(M);
     std::vector<SILFunction *> DeadFunctions;
     this->eliminateDeadFunctions(M, DeadFunctions);
+    this->cleanupSILProperty(M, DeadFunctions);
 
     while (!DeadFunctions.empty()) {
       SILFunction *F = DeadFunctions.back();
