@@ -241,14 +241,11 @@ bool BottomUpRefCountState::handleGuaranteedUser(
 
   // Advance the sequence...
   switch (LatState) {
-  // If were decremented, insert the insertion point.
   case LatticeState::Decremented: {
     LatState = LatticeState::MightBeDecremented;
     return true;
   }
   case LatticeState::MightBeUsed:
-    // If we have a might be used, we already created an insertion point
-    // earlier. Just move to MightBeDecremented.
     LatState = LatticeState::MightBeDecremented;
     return true;
   case LatticeState::MightBeDecremented:
@@ -705,14 +702,11 @@ bool TopDownRefCountState::handleGuaranteedUser(
          "Must be able to be used at this point of the lattice.");
   // Advance the sequence...
   switch (LatState) {
-  // If were decremented, insert the insertion point.
   case LatticeState::Incremented: {
     LatState = LatticeState::MightBeUsed;
     return true;
   }
   case LatticeState::MightBeDecremented:
-    // If we have a might be used, we already created an insertion point
-    // earlier. Just move to MightBeDecremented.
     LatState = LatticeState::MightBeUsed;
     return true;
   case LatticeState::MightBeUsed:

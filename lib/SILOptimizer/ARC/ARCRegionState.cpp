@@ -188,7 +188,7 @@ static bool isARCSignificantTerminator(TermInst *TI) {
 
 // Visit each one of our predecessor regions and see if any are blocks that can
 // use reference counted values. If any of them do, we advance the sequence for
-// the pointer and create an insertion point here. This state will be propagated
+// the pointer. This state will be propagated
 // into all of our predecessors, allowing us to be conservatively correct in all
 // cases.
 //
@@ -305,9 +305,8 @@ bool ARCRegionState::processBlockBottomUp(
 
   // Now visit each one of our predecessor regions and see if any are blocks
   // that can use reference counted values. If any of them do, we advance the
-  // sequence for the pointer and create an insertion point here. This state
-  // will be propagated into all of our predecessors, allowing us to be
-  // conservatively correct in all cases.
+  // sequence for the pointer. This state will be propagated into all of our
+  // predecessors, allowing us to be conservatively correct in all cases.
   processBlockBottomUpPredTerminators(R, AA, LRFI, SetFactory);
 
   return NestingDetected;
