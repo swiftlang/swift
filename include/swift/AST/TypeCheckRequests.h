@@ -1843,6 +1843,7 @@ public:
 
 struct PreCheckFunctionBuilderDescriptor {
   AnyFunctionRef Fn;
+  bool SuppressDiagnostics;
 
 private:
   // NOTE: Since source tooling (e.g. code completion) might replace the body,
@@ -1852,8 +1853,8 @@ private:
   BraceStmt *Body;
 
 public:
-  PreCheckFunctionBuilderDescriptor(AnyFunctionRef Fn)
-      : Fn(Fn), Body(Fn.getBody()) {}
+  PreCheckFunctionBuilderDescriptor(AnyFunctionRef Fn, bool suppressDiagnostics)
+      : Fn(Fn), SuppressDiagnostics(suppressDiagnostics), Body(Fn.getBody()) {}
 
   friend llvm::hash_code
   hash_value(const PreCheckFunctionBuilderDescriptor &owner) {
