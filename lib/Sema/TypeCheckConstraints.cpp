@@ -491,6 +491,8 @@ static Expr *getMemberChainSubExpr(Expr *expr) {
     return FVE->getSubExpr();
   } else if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
     return SE->getBase();
+  } else if (auto *CCE = dyn_cast<CodeCompletionExpr>(expr)) {
+    return CCE->getBase();
   } else {
     return nullptr;
   }
