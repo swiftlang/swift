@@ -20,12 +20,14 @@
 // RUN: %target-codesign %t/a.swift5.Onone.out
 // RUN: %line-directive %t/BoxingCasts.swift -- %target-run %t/a.swift5.Onone.out
 //
-// Note: The RUN directives above override the default test optimizations.
-// This test is deliberately run non-optimized in order to verify the
-// behavior of runtime methods that may not be called for optimized casts.
+// RUN: %line-directive %t/BoxingCasts.swift -- %target-build-swift -g -module-name a -swift-version 5 -O %t/BoxingCasts.swift -o %t/a.swift5.O.out
+// RUN: %target-codesign %t/a.swift5.O.out
+// RUN: %line-directive %t/BoxingCasts.swift -- %target-run %t/a.swift5.O.out
 //
-// XXX FIXME XXX TODO XXX  _Also_ build this with optimizations in order to
-// verify compiler behaviors.
+// Note: The RUN directives above override the default test optimizations.
+// This test is deliberately run both ways:
+//  * optimized to verify compiler cast optimizations, and
+//  * non-optimized to verify the runtime methods used for non-optimized casts.
 //
 // REQUIRES: executable_test
 
