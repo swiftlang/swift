@@ -500,40 +500,6 @@ void BottomUpRefCountState::updateForDifferentLoopInst(
                           << getRCRoot());
 }
 
-void BottomUpRefCountState::updateForPredTerminators(
-    ArrayRef<SILInstruction *> Terms,
-    ImmutablePointerSetFactory<SILInstruction> &SetFactory, AliasAnalysis *AA) {
-  // If this state is not tracking anything, there is nothing to update.
-  if (!isTrackingRefCount())
-    return;
-
-  if (valueCanBeGuaranteedUsedGivenLatticeState() &&
-      std::any_of(Terms.begin(), Terms.end(),
-                  [this, &AA](SILInstruction *I) -> bool {
-                    return mayGuaranteedUseValue(I, getRCRoot(), AA);
-                  })) {
-    handleGuaranteedUser(getRCRoot(), SetFactory, AA);
-    return;
-  }
-
-  if (valueCanBeDecrementedGivenLatticeState() &&
-      std::any_of(Terms.begin(), Terms.end(),
-                  [this, &AA](SILInstruction *I) -> bool {
-                    return mayDecrementRefCount(I, getRCRoot(), AA);
-                  })) {
-    handleDecrement();
-    return;
-  }
-
-  if (!valueCanBeUsedGivenLatticeState() ||
-      std::none_of(Terms.begin(), Terms.end(),
-                   [this, &AA](SILInstruction *I)
-       -> bool { return mayHaveSymmetricInterference(I, getRCRoot(), AA); }))
-    return;
-
-  handleUser(getRCRoot(), SetFactory, AA);
-}
-
 //===----------------------------------------------------------------------===//
 //                          Top Down Ref Count State
 //===----------------------------------------------------------------------===//
