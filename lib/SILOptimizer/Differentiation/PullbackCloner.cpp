@@ -2414,7 +2414,7 @@ bool PullbackCloner::Implementation::runForSemanticMemberGetter() {
 
   // Switch based on the base tangent struct's value category.
   // TODO(TF-1255): Simplify using unified adjoint value data structure.
-  switch (tangentVectorSILTy.getCategory()) {
+  switch (getTangentValueCategory(origSelf)) {
   case SILValueCategory::Object: {
     auto adjResult = getAdjointValue(origEntry, origResult);
     switch (adjResult.getKind()) {
@@ -2455,7 +2455,7 @@ bool PullbackCloner::Implementation::runForSemanticMemberGetter() {
       if (field == tanField) {
         // Switch based on the property's value category.
         // TODO(TF-1255): Simplify using unified adjoint value data structure.
-        switch (origResult->getType().getCategory()) {
+        switch (getTangentValueCategory(origResult)) {
         case SILValueCategory::Object: {
           auto adjResult = getAdjointValue(origEntry, origResult);
           auto adjResultValue = materializeAdjointDirect(adjResult, pbLoc);
