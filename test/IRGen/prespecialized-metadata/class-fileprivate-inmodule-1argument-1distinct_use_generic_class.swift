@@ -193,55 +193,6 @@ doit()
 //      CHECK: define internal swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_1]]LLCMa"([[INT]] [[METADATA_REQUEST:%[0-9]+]], %swift.type* %1) #{{[0-9]+}} {
 //      CHECK: entry:
 //      CHECK:   [[ERASED_TYPE:%[0-9]+]] = bitcast %swift.type* %1 to i8*
-//      CHECK:   br label %[[TYPE_COMPARISON_LABEL:[0-9]+]]
-//      CHECK: [[TYPE_COMPARISON_LABEL]]:
-//      CHECK:   [[EQUAL_TYPE:%[0-9]+]] = icmp eq i8* bitcast (
-//           :     %swift.type* getelementptr inbounds (
-//           :       %swift.full_heapmetadata,
-//           :       %swift.full_heapmetadata* bitcast (
-//           :         <{
-//           :           void (
-//           :             %T4main3Box[[UNIQUE_ID_2]]LLC*
-//           :           )*,
-//           :           i8**,
-//           :           [[INT]],
-//           :           %objc_class*,
-//           :           %swift.opaque*,
-//           :           %swift.opaque*,
-//           :           [[INT]],
-//           :           i32,
-//           :           i32,
-//           :           i32,
-//           :           i16,
-//           :           i16,
-//           :           i32,
-//           :           i32,
-//           :           %swift.type_descriptor*,
-//           :           i8*,
-//           :           %swift.type*,
-//           :           [[INT]],
-//           :           %T4main3Box[[UNIQUE_ID_2]]LLC* (
-//           :             %swift.opaque*,
-//           :             %swift.type*
-//           :           )*
-//           :         }>* 
-// CHECK-SAME:         @"$s4main3Box[[UNIQUE_ID_1]]LLCySiGMf" 
-//           :         to %swift.full_heapmetadata*
-//           :       ),
-// CHECK-SAME:       i32 0,
-// CHECK-SAME:       i32 2
-// CHECK-SAME:     ) to i8*
-// CHECK-SAME:   ),
-// CHECK-SAME:   [[ERASED_TYPE]]
-//      CHECK:   [[EQUAL_TYPES:%[0-9]+]] = and i1 true, [[EQUAL_TYPE]]
-//      CHECK:   br i1 [[EQUAL_TYPES]], label %[[EXIT_PRESPECIALIZED:[0-9]+]], label %[[EXIT_NORMAL:[0-9]+]]
-//      CHECK: [[EXIT_PRESPECIALIZED]]:
-//      CHECK-NEXT:   [[METADATA_RESPONSE:%[0-9]+]] = call swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_3:[0-9A-Z_]+]]LLCyAA3BoxACLLCySiGGMb"([[INT]] [[METADATA_REQUEST]])
-//      CHECK:   [[METADATA:%[0-9]+]] = extractvalue %swift.metadata_response [[METADATA_RESPONSE]], 0
-//      CHECK:   [[PARTIAL_RESULT_METADATA:%[\" a-zA-Z0-9]+]] = insertvalue %swift.metadata_response undef, %swift.type* [[METADATA]], 0
-//      CHECK:   [[RESULT_METADATA:%[\" a-zA-Z0-9]+]] = insertvalue %swift.metadata_response [[PARTIAL_RESULT_METADATA]], [[INT]] 0, 1
-//      CHECK:   ret %swift.metadata_response [[RESULT_METADATA]] 
-//      CHECK: [[EXIT_NORMAL]]:
 //      CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata(
 //      CHECK:     [[INT]] [[METADATA_REQUEST]], 
 //      CHECK:     i8* [[ERASED_TYPE]], 

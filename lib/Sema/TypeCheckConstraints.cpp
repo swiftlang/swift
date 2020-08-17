@@ -962,12 +962,12 @@ namespace {
       public:
         StrangeInterpolationRewriter(ASTContext &Ctx) : Context(Ctx) {}
 
-        virtual bool walkToDeclPre(Decl *D) {
+        virtual bool walkToDeclPre(Decl *D) override {
           // We don't want to look inside decls.
           return false;
         }
 
-        virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) {
+        virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
           // One InterpolatedStringLiteralExpr should never be nested inside
           // another except as a child of a CallExpr, and we don't recurse into
           // the children of CallExprs.
@@ -1900,7 +1900,6 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
 
   // Key paths must be spelled with at least one component.
   if (components.empty()) {
-    DE.diagnose(KPE->getLoc(), diag::expr_swift_keypath_empty);
     // Passes further down the pipeline expect keypaths to always have at least
     // one component, so stuff an invalid component in the AST for recovery.
     components.push_back(KeyPathExpr::Component());

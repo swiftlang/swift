@@ -397,7 +397,7 @@ llvm::ErrorOr<ModuleDependencies> SerializedModuleLoaderBase::scanModuleFile(
                        &extInfo);
 
   // Map the set of dependencies over to the "module dependencies".
-  auto dependencies = ModuleDependencies::forSwiftModule(modulePath.str());
+  auto dependencies = ModuleDependencies::forSwiftModule(modulePath.str(), isFramework);
   llvm::StringSet<> addedModuleNames;
   for (const auto &dependency : loadedModuleFile->getDependencies()) {
     // FIXME: Record header dependency?
@@ -423,7 +423,8 @@ std::error_code ImplicitSerializedModuleLoader::findModuleFilesInDirectory(
     SmallVectorImpl<char> *ModuleInterfacePath,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) {
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+    bool IsFramework) {
   assert(((ModuleBuffer && ModuleDocBuffer) ||
           (!ModuleBuffer && !ModuleDocBuffer)) &&
          "Module and Module Doc buffer must both be initialized or NULL");
@@ -539,7 +540,7 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
   /// Returns true if a target-specific module file was found, false if an error
   /// was diagnosed, or None if neither one happened and the search should
   /// continue.
-  auto findTargetSpecificModuleFiles = [&]() -> Optional<bool> {
+  auto findTargetSpecificModuleFiles = [&](bool IsFramework) -> Optional<bool> {
     Optional<SerializedModuleBaseName> firstAbsoluteBaseName;
 
     for (const auto &targetSpecificBaseName : targetSpecificBaseNames) {
@@ -553,7 +554,8 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
                         absoluteBaseName,
                         moduleInterfacePath,
                         moduleBuffer, moduleDocBuffer,
-                        moduleSourceInfoBuffer);
+                        moduleSourceInfoBuffer,
+                        IsFramework);
       if (!result) {
         return true;
       } else if (result == std::errc::not_supported) {
@@ -604,13 +606,13 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
 
           if (checkTargetSpecificModule)
             // A .swiftmodule directory contains architecture-specific files.
-            return findTargetSpecificModuleFiles();
+            return findTargetSpecificModuleFiles(isFramework);
 
           SerializedModuleBaseName absoluteBaseName{currPath, genericBaseName};
 
           auto result = findModuleFilesInDirectory(
               moduleID, absoluteBaseName, moduleInterfacePath,
-              moduleBuffer, moduleDocBuffer, moduleSourceInfoBuffer);
+              moduleBuffer, moduleDocBuffer, moduleSourceInfoBuffer, isFramework);
           if (!result)
             return true;
           else if (result == std::errc::not_supported)
@@ -629,7 +631,7 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
           // Frameworks always use architecture-specific files within a
           // .swiftmodule directory.
           llvm::sys::path::append(currPath, "Modules");
-          return findTargetSpecificModuleFiles();
+          return findTargetSpecificModuleFiles(isFramework);
         }
         }
         llvm_unreachable("covered switch");
@@ -681,7 +683,6 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
     std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
     bool isFramework) {
   assert(moduleInputBuffer);
-
   StringRef moduleBufferID = moduleInputBuffer->getBufferIdentifier();
   StringRef moduleDocBufferID;
   if (moduleDocInputBuffer)
@@ -992,7 +993,6 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
 
   StringRef moduleInterfacePathStr =
     Ctx.AllocateCopy(moduleInterfacePath.str());
-
   auto *file =
       loadAST(*M, moduleID.Loc, moduleInterfacePathStr,
               std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
@@ -1082,7 +1082,8 @@ std::error_code MemoryBufferSerializedModuleLoader::findModuleFilesInDirectory(
     SmallVectorImpl<char> *ModuleInterfacePath,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) {
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+    bool IsFramework) {
   // This is a soft error instead of an llvm_unreachable because this API is
   // primarily used by LLDB which makes it more likely that unwitting changes to
   // the Swift compiler accidentally break the contract.

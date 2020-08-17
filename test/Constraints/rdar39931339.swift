@@ -32,12 +32,12 @@ _ = B<C>.S1()          // Ok
 _ = B<Int>.S2()        // Ok
 _ = B<Float>.S1()      // expected-error {{type 'Float' does not conform to protocol 'P'}}
 _ = B<String>.S2()
-// expected-error@-1 {{'B<String>.S2' (aka 'Int') requires the types '[String]' and '[Int]' be equivalent}}
+// expected-error@-1 {{'A<T, U>.S2' (aka 'Int') requires the types '[String]' and '[Int]' be equivalent}}
 
 _ = S<C>.A()           // Ok
 _ = S<Int>.A()         // expected-error {{type 'Int' does not conform to protocol 'P'}}
 _ = S<String>.B<Int>() // expected-error {{type 'String' does not conform to protocol 'P'}}
-_ = S<Int>.C()         // expected-error {{'S<Int>.C' (aka 'Int') requires the types 'Int' and 'Float' be equivalent}}
+_ = S<Int>.C()         // expected-error {{'S<T>.C' (aka 'Int') requires the types 'Int' and 'Float' be equivalent}}
 
 func foo<T>(_ s: S<T>.Type) {
   _ = s.A() // expected-error {{referencing type alias 'A' on 'S' requires that 'T' conform to 'P'}}
