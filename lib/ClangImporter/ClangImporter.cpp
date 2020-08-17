@@ -1850,9 +1850,6 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
 
   ClangModuleUnit *wrapperUnit = getWrapperForModule(clangModule, importLoc);
   ModuleDecl *result = wrapperUnit->getParentModule();
-  if (!ModuleWrappers[clangModule].getInt()) {
-    ModuleWrappers[clangModule].setInt(true);
-  }
 
   if (clangModule->isSubModule()) {
     finishLoadingClangModule(clangModule->getTopLevelModule(), importLoc);
@@ -2046,8 +2043,7 @@ ClangImporter::Implementation::~Implementation() {
 
 ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
     const clang::Module *underlying, SourceLoc diagLoc) {
-  auto &cacheEntry = ModuleWrappers[underlying];
-  if (ClangModuleUnit *cached = cacheEntry.getPointer())
+  if (ClangModuleUnit *cached = ModuleWrappers.lookup(underlying))
     return cached;
 
   // FIXME: Handle hierarchical names better.
@@ -2061,7 +2057,7 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
                                                  underlying);
   wrapper->addFile(*file);
   SwiftContext.getClangModuleLoader()->findOverlayFiles(diagLoc, wrapper, file);
-  cacheEntry.setPointer(file);
+  ModuleWrappers[underlying] = file;
 
   return file;
 }

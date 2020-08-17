@@ -526,14 +526,10 @@ private:
   /// NSObject, imported into Swift.
   Type NSObjectTy;
 
-  /// A pair containing a ClangModuleUnit,
-  /// and whether the overlays of its re-exported modules have all been forced
-  /// to load already.
-  using ModuleInitPair = llvm::PointerIntPair<ClangModuleUnit *, 1, bool>;
-
 public:
   /// A map from Clang modules to their Swift wrapper modules.
-  llvm::SmallDenseMap<const clang::Module *, ModuleInitPair, 16> ModuleWrappers;
+  llvm::SmallDenseMap<const clang::Module *, ClangModuleUnit *, 16>
+      ModuleWrappers;
 
   /// The module unit that contains declarations from imported headers.
   ClangModuleUnit *ImportedHeaderUnit = nullptr;
