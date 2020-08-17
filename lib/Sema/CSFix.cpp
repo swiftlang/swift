@@ -1558,9 +1558,11 @@ bool IgnoreInvalidFunctionBuilderBody::diagnose(const Solution &solution,
 
   class PreCheckWalker : public ASTWalker {
     DeclContext *DC;
+    DiagnosticTransaction Transaction;
 
   public:
-    PreCheckWalker(DeclContext *dc) : DC(dc) {}
+    PreCheckWalker(DeclContext *dc)
+        : DC(dc), Transaction(dc->getASTContext().Diags) {}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       auto hasError = ConstraintSystem::preCheckExpression(
@@ -1576,12 +1578,16 @@ bool IgnoreInvalidFunctionBuilderBody::diagnose(const Solution &solution,
     std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
       return std::make_pair(false, P);
     }
+
+    bool diagnosed() const {
+      return Transaction.hasDiagnostics();
+    }
   };
 
   PreCheckWalker walker(solution.getDC());
   S->walk(walker);
 
-  return true;
+  return walker.diagnosed();
 }
 
 IgnoreInvalidFunctionBuilderBody *
