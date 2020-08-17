@@ -533,6 +533,56 @@ static bool diagnoseCycle(CompilerInstance &instance,
   return false;
 }
 
+bool swift::scanClangDependencies(CompilerInstance &instance) {
+  ASTContext &ctx = instance.getASTContext();
+  ModuleDecl *mainModule = instance.getMainModule();
+  auto &FEOpts = instance.getInvocation().getFrontendOptions();
+  ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
+  auto ModuleCachePath = getModuleCachePathFromClang(ctx
+    .getClangModuleLoader()->getClangInstance());
+
+  StringRef mainModuleName = mainModule->getNameStr();
+  llvm::SetVector<ModuleDependencyID, std::vector<ModuleDependencyID>,
+                  std::set<ModuleDependencyID>> allModules;
+  // Create the module dependency cache.
+  ModuleDependenciesCache cache;
+  InterfaceSubContextDelegateImpl ASTDelegate(ctx.SourceMgr, ctx.Diags,
+                                              ctx.SearchPathOpts, ctx.LangOpts,
+                                              LoaderOpts,
+                                              ctx.getClangModuleLoader(),
+                                              /*buildModuleCacheDirIfAbsent*/false,
+                                              ModuleCachePath,
+                                              FEOpts.PrebuiltModuleCachePath,
+                                              FEOpts.SerializeModuleInterfaceDependencyHashes,
+                                              FEOpts.shouldTrackSystemDependencies());
+  // Loading the clang module using Clang importer.
+  // This action will populate the cache with the main module's dependencies.
+  auto rootDeps = static_cast<ClangImporter*>(ctx.getClangModuleLoader())
+    ->getModuleDependencies(mainModuleName, cache, ASTDelegate);
+  if (!rootDeps.hasValue()) {
+    // We cannot find the clang module, abort.
+    return true;
+  }
+  // Add the main module.
+  allModules.insert({mainModuleName.str(), ModuleDependenciesKind::Clang});
+
+  // Explore the dependencies of every module.
+  for (unsigned currentModuleIdx = 0;
+       currentModuleIdx < allModules.size();
+       ++currentModuleIdx) {
+    auto module = allModules[currentModuleIdx];
+    auto discoveredModules =
+        resolveDirectDependencies(instance, module, cache, ASTDelegate);
+    allModules.insert(discoveredModules.begin(), discoveredModules.end());
+  }
+  // Write out the JSON description.
+  std::string path = FEOpts.InputsAndOutputs.getSingleOutputFilename();
+  std::error_code EC;
+  llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::F_None);
+  writeJSON(out, instance, cache, ASTDelegate, allModules.getArrayRef());
+  return false;
+}
+
 bool swift::scanDependencies(CompilerInstance &instance) {
   ASTContext &Context = instance.getASTContext();
   ModuleDecl *mainModule = instance.getMainModule();
