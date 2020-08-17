@@ -1,5 +1,5 @@
 // RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-cxx-interop | %FileCheck %s
-
+// REQUIRES: rdar67257133
 import DeclWithDefinition
 
 public func getWrappedMagicInt() -> CInt {
