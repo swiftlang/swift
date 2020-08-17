@@ -124,9 +124,6 @@ namespace {
 
       assert(isa<ProtocolDecl>(foundDC));
 
-      if (!Options.contains(NameLookupFlags::PerformConformanceCheck))
-        return;
-
       // If we found something within the protocol itself, and our
       // search began somewhere that is not in a protocol or extension
       // thereof, remap this declaration to the witness.
@@ -434,21 +431,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
         if (!type->is<ArchetypeType>() &&
             !type->isTypeParameter()) {
-          if (options.contains(NameLookupFlags::PerformConformanceCheck))
-            inferredAssociatedTypes.push_back(assocType);
-          continue;
-        }
-      }
-
-      // FIXME: This is a hack, we should be able to remove this entire 'if'
-      // statement once we learn how to deal with the circularity here.
-      if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
-        if (isa<ProtocolDecl>(aliasDecl->getDeclContext()) &&
-            !type->is<ArchetypeType>() &&
-            !type->isTypeParameter() &&
-            aliasDecl->getUnderlyingType()->getCanonicalType()
-              ->hasTypeParameter() &&
-            !options.contains(NameLookupFlags::PerformConformanceCheck)) {
+          inferredAssociatedTypes.push_back(assocType);
           continue;
         }
       }

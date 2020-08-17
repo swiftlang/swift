@@ -190,14 +190,6 @@ enum class NameLookupFlags {
   KnownPrivate = 0x01,
   /// Whether name lookup should be able to find protocol members.
   ProtocolMembers = 0x02,
-  /// Whether we should map the requirement to the witness if we
-  /// find a protocol member and the base type is a concrete type.
-  ///
-  /// If this is not set but ProtocolMembers is set, we will
-  /// find protocol extension members, but not protocol requirements
-  /// that do not yet have a witness (such as inferred associated
-  /// types, or witnesses for derived conformances).
-  PerformConformanceCheck = 0x04,
   /// Whether to perform 'dynamic' name lookup that finds @objc
   /// members of any class or protocol.
   DynamicLookup = 0x08,
@@ -221,23 +213,19 @@ inline NameLookupOptions operator|(NameLookupFlags flag1,
 
 /// Default options for member name lookup.
 const NameLookupOptions defaultMemberLookupOptions
-  = NameLookupFlags::ProtocolMembers |
-    NameLookupFlags::PerformConformanceCheck;
+  = NameLookupFlags::ProtocolMembers;
 
 /// Default options for constructor lookup.
 const NameLookupOptions defaultConstructorLookupOptions
-  = NameLookupFlags::ProtocolMembers |
-    NameLookupFlags::PerformConformanceCheck;
+  = NameLookupFlags::ProtocolMembers;
 
 /// Default options for member type lookup.
 const NameLookupOptions defaultMemberTypeLookupOptions
-  = NameLookupFlags::ProtocolMembers |
-    NameLookupFlags::PerformConformanceCheck;
+  = NameLookupFlags::ProtocolMembers;
 
 /// Default options for unqualified name lookup.
 const NameLookupOptions defaultUnqualifiedLookupOptions
-  = NameLookupFlags::ProtocolMembers |
-    NameLookupFlags::PerformConformanceCheck;
+  = NameLookupFlags::ProtocolMembers;
 
 /// Describes the result of comparing two entities, of which one may be better
 /// or worse than the other, or they are unordered.
