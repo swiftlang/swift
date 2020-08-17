@@ -11,9 +11,23 @@
 //===----------------------------------------------------------------------===//
 //
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -o %t/a.out
-// RUN: %target-codesign %t/a.out
-// RUN: %target-run %t/a.out
+//
+// RUN: %target-build-swift %s -O -swift-version 5 -o %t/a.swift5.O.out
+// RUN: %target-codesign %t/a.swift5.O.out
+// RUN: %target-run %t/a.swift5.O.out
+//
+// RUN: %target-build-swift %s -Onone -swift-version 5 -o %t/a.swift5.Onone.out
+// RUN: %target-codesign %t/a.swift5.Onone.out
+// RUN: %target-run %t/a.swift5.Onone.out
+//
+// RUN: %target-build-swift %s -O -swift-version 4 -o %t/a.swift4.O.out
+// RUN: %target-codesign %t/a.swift4.O.out
+// RUN: %target-run %t/a.swift4.O.out
+//
+// RUN: %target-build-swift %s -Onone -swift-version 4 -o %t/a.swift4.Onone.out
+// RUN: %target-codesign %t/a.swift4.Onone.out
+// RUN: %target-run %t/a.swift4.Onone.out
+//
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 //
