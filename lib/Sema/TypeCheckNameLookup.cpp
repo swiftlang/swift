@@ -113,8 +113,7 @@ namespace {
 
       // If this isn't a protocol member to be given special
       // treatment, just add the result.
-      if (!Options.contains(NameLookupFlags::ProtocolMembers) ||
-          !isa<ProtocolDecl>(foundDC) ||
+      if (!isa<ProtocolDecl>(foundDC) ||
           isa<GenericTypeParamDecl>(found) ||
           isa<TypeAliasDecl>(found) ||
           (isa<FuncDecl>(found) && cast<FuncDecl>(found)->isOperator())) {
@@ -207,11 +206,9 @@ namespace {
 
 static UnqualifiedLookupOptions
 convertToUnqualifiedLookupOptions(NameLookupOptions options) {
-  UnqualifiedLookupOptions newOptions;
+  UnqualifiedLookupOptions newOptions = UnqualifiedLookupFlags::AllowProtocolMembers;
   if (options.contains(NameLookupFlags::KnownPrivate))
     newOptions |= UnqualifiedLookupFlags::KnownPrivate;
-  if (options.contains(NameLookupFlags::ProtocolMembers))
-    newOptions |= UnqualifiedLookupFlags::AllowProtocolMembers;
   if (options.contains(NameLookupFlags::IgnoreAccessControl))
     newOptions |= UnqualifiedLookupFlags::IgnoreAccessControl;
   if (options.contains(NameLookupFlags::IncludeOuterResults))
@@ -275,8 +272,7 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclNameRef name,
 
     auto lookup =
         evaluateOrDefault(ctx.evaluator, UnqualifiedLookupRequest{desc}, {});
-    if (!lookup.allResults().empty() ||
-        !options.contains(NameLookupFlags::ProtocolMembers))
+    if (!lookup.allResults().empty())
       return lookup;
   }
 
@@ -299,14 +295,11 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   assert(type->mayHaveMembers());
 
   LookupResult result;
-  NLOptions subOptions = NL_QualifiedDefault;
+  NLOptions subOptions = (NL_QualifiedDefault | NL_ProtocolMembers);
   if (options.contains(NameLookupFlags::KnownPrivate))
     subOptions |= NL_KnownNonCascadingDependency;
   if (options.contains(NameLookupFlags::IgnoreAccessControl))
     subOptions |= NL_IgnoreAccessControl;
-
-  if (options.contains(NameLookupFlags::ProtocolMembers))
-    subOptions |= NL_ProtocolMembers;
 
   // We handle our own overriding/shadowing filtering.
   subOptions &= ~NL_RemoveOverridden;
@@ -381,12 +374,10 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
 
   // Look for members with the given name.
   SmallVector<ValueDecl *, 4> decls;
-  NLOptions subOptions = NL_QualifiedDefault | NL_OnlyTypes;
+  NLOptions subOptions = (NL_QualifiedDefault | NL_OnlyTypes | NL_ProtocolMembers);
 
   if (options.contains(NameLookupFlags::KnownPrivate))
     subOptions |= NL_KnownNonCascadingDependency;
-  if (options.contains(NameLookupFlags::ProtocolMembers))
-    subOptions |= NL_ProtocolMembers;
   if (options.contains(NameLookupFlags::IgnoreAccessControl))
     subOptions |= NL_IgnoreAccessControl;
 

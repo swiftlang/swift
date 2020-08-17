@@ -188,8 +188,6 @@ inline TypeCheckExprOptions operator|(TypeCheckExprFlags flag1,
 enum class NameLookupFlags {
   /// Whether we know that this lookup is always a private dependency.
   KnownPrivate = 0x01,
-  /// Whether name lookup should be able to find protocol members.
-  ProtocolMembers = 0x02,
   /// Whether to ignore access control for this lookup, allowing inaccessible
   /// results to be returned.
   IgnoreAccessControl = 0x10,
@@ -207,20 +205,13 @@ inline NameLookupOptions operator|(NameLookupFlags flag1,
 }
 
 /// Default options for member name lookup.
-const NameLookupOptions defaultMemberLookupOptions
-  = NameLookupFlags::ProtocolMembers;
-
-/// Default options for constructor lookup.
-const NameLookupOptions defaultConstructorLookupOptions
-  = NameLookupFlags::ProtocolMembers;
+const NameLookupOptions defaultMemberLookupOptions;
 
 /// Default options for member type lookup.
-const NameLookupOptions defaultMemberTypeLookupOptions
-  = NameLookupFlags::ProtocolMembers;
+const NameLookupOptions defaultMemberTypeLookupOptions;
 
 /// Default options for unqualified name lookup.
-const NameLookupOptions defaultUnqualifiedLookupOptions
-  = NameLookupFlags::ProtocolMembers;
+const NameLookupOptions defaultUnqualifiedLookupOptions;
 
 /// Describes the result of comparing two entities, of which one may be better
 /// or worse than the other, or they are unordered.
