@@ -194,6 +194,9 @@ function(_add_target_variant_c_compile_flags)
     # Omit leaf frame pointers on x86 production builds (optimized, no debug
     # info, and no asserts).
     if(NOT debuginfo AND NOT CFLAGS_ENABLE_ASSERTIONS)
+      # Unfortunately, this cannot be folded into the standard
+      # CMAKE_CXX_FLAGS_... because Apple multi-SDK builds use different
+      # architectures for different SDKs (CFLAGS_ARCH isn't constant here).
       if("${CFLAGS_ARCH}" STREQUAL "i386" OR "${CFLAGS_ARCH}" STREQUAL "i686")
         if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
           list(APPEND result "-momit-leaf-frame-pointer")
