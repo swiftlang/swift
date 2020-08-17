@@ -16,13 +16,22 @@
 // RUN: %empty-directory(%t)
 //
 // RUN: %gyb %s -o %t/BoxingCasts.swift
-// RUN: %line-directive %t/BoxingCasts.swift -- %target-build-swift -g -module-name a -swift-version 5 -Onone %t/BoxingCasts.swift -o %t/a.swift5.Onone.out
+//
+// RUN: %line-directive %t/BoxingCasts.swift -- %target-build-swift -g -module-name a -Onone -swift-version 5 %t/BoxingCasts.swift -o %t/a.swift5.Onone.out
 // RUN: %target-codesign %t/a.swift5.Onone.out
 // RUN: %line-directive %t/BoxingCasts.swift -- %target-run %t/a.swift5.Onone.out
 //
-// RUN: %line-directive %t/BoxingCasts.swift -- %target-build-swift -g -module-name a -swift-version 5 -O %t/BoxingCasts.swift -o %t/a.swift5.O.out
+// RUN: %line-directive %t/BoxingCasts.swift -- %target-build-swift -g -O -module-name a -O -swift-version 5 %t/BoxingCasts.swift -o %t/a.swift5.O.out
 // RUN: %target-codesign %t/a.swift5.O.out
 // RUN: %line-directive %t/BoxingCasts.swift -- %target-run %t/a.swift5.O.out
+//
+// RUN: %line-directive %t/BoxingCasts.swift -- %target-build-swift -g -module-name a -Onone -swift-version 4 %t/BoxingCasts.swift -o %t/a.swift4.Onone.out
+// RUN: %target-codesign %t/a.swift4.Onone.out
+// RUN: %line-directive %t/BoxingCasts.swift -- %target-run %t/a.swift4.Onone.out
+//
+// RUN: %line-directive %t/BoxingCasts.swift -- %target-build-swift -g -O -module-name a -O -swift-version 4 %t/BoxingCasts.swift -o %t/a.swift4.O.out
+// RUN: %target-codesign %t/a.swift4.O.out
+// RUN: %line-directive %t/BoxingCasts.swift -- %target-run %t/a.swift4.O.out
 //
 // Note: The RUN directives above override the default test optimizations.
 // This test is deliberately run both ways:
