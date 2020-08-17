@@ -465,11 +465,6 @@ void ModuleSummaryIndexer::indexModule() {
     TheSummary->addFunctionSummary(std::move(FS));
   }
 
-  // FIXME: KeyPaths can be eliminated but now preserved conservatively.
-  for (auto &P : Mod.getPropertyList()) {
-    preserveKeyPathFunctions(P);
-  }
-
   for (auto &WT : Mod.getWitnessTableList()) {
     indexWitnessTable(WT);
   }
