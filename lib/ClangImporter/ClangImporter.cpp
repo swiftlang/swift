@@ -1851,11 +1851,9 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
   ClangModuleUnit *wrapperUnit = getWrapperForModule(clangModule, importLoc);
   ModuleDecl *result = wrapperUnit->getParentModule();
 
-  if (clangModule->isSubModule()) {
-    finishLoadingClangModule(clangModule->getTopLevelModule(), importLoc);
-  } else {
-    if (!SwiftContext.getLoadedModule(result->getName()))
-      SwiftContext.addLoadedModule(result);
+  if (!clangModule->isSubModule() &&
+      !SwiftContext.getLoadedModule(result->getName())) {
+    SwiftContext.addLoadedModule(result);
   }
 
   return result;
@@ -3568,7 +3566,7 @@ void ClangModuleUnit::getImportedModulesForLookup(
       actualMod = wrapper->getParentModule();
     }
     assert(actualMod && "Missing imported overlay");
-    imports.emplace_back(ImportPath::Access()(), actualMod);
+    imports.emplace_back(ImportPath::Access(), actualMod);
   }
 
   // Cache our results for use next time.
