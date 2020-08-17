@@ -190,9 +190,6 @@ enum class NameLookupFlags {
   KnownPrivate = 0x01,
   /// Whether name lookup should be able to find protocol members.
   ProtocolMembers = 0x02,
-  /// Whether to perform 'dynamic' name lookup that finds @objc
-  /// members of any class or protocol.
-  DynamicLookup = 0x08,
   /// Whether to ignore access control for this lookup, allowing inaccessible
   /// results to be returned.
   IgnoreAccessControl = 0x10,
