@@ -17,6 +17,10 @@ option(SWIFT_ENABLE_COMPATIBILITY_OVERRIDES
   "Support back-deploying compatibility fixes for newer apps running on older runtimes."
   TRUE)
 
+option(SWIFT_RUNTIME_MACHO_NO_DYLD
+  "Build stdlib assuming the runtime environment uses Mach-O but does not support dynamic modules."
+  FALSE)
+
 #
 # End of user-configurable options.
 #
