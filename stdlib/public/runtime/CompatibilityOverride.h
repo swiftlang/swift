@@ -24,6 +24,15 @@
 
 namespace swift {
 
+#ifdef SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
+
+#define COMPATIBILITY_OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
+  attrs ccAttrs ret namespace swift_ ## name typedArgs {                          \
+    return swift_ ## name ## Impl namedArgs; \
+  }
+
+#else // #ifdef SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
+
 #define COMPATIBILITY_UNPAREN(...) __VA_ARGS__
 
 #define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
@@ -69,6 +78,8 @@ namespace swift {
     return swift_ ## name ## Impl namedArgs; \
   }
 #endif
+
+#endif // #else SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
 
 } /* end namespace swift */
 

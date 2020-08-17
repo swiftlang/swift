@@ -257,6 +257,22 @@ public:
   void visitDifferentiableAttr(DifferentiableAttr *attr);
   void visitDerivativeAttr(DerivativeAttr *attr);
   void visitTransposeAttr(TransposeAttr *attr);
+
+  void visitAsyncHandlerAttr(AsyncHandlerAttr *attr) {
+    if (!Ctx.LangOpts.EnableExperimentalConcurrency) {
+      diagnoseAndRemoveAttr(attr, diag::asynchandler_attr_requires_concurrency);
+      return;
+    }
+
+    auto func = dyn_cast<FuncDecl>(D);
+    if (!func) {
+      diagnoseAndRemoveAttr(attr, diag::asynchandler_non_func);
+      return;
+    }
+
+    // Trigger the request to check for @asyncHandler.
+    (void)func->isAsyncHandler();
+  }
 };
 } // end anonymous namespace
 

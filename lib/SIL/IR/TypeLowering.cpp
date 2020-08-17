@@ -421,10 +421,6 @@ namespace {
 
     RetTy visitArchetypeType(CanArchetypeType type,
                              AbstractionPattern origType) {
-      if (type->requiresClass()) {
-        return asImpl().handleReference(type);
-      }
-
       auto LayoutInfo = type->getLayoutConstraint();
       if (LayoutInfo) {
         if (LayoutInfo->isFixedSizeTrivial()) {
@@ -1623,7 +1619,7 @@ namespace {
       for (auto field : D->getStoredProperties()) {
         auto substFieldType =
           field->getInterfaceType().subst(subMap)
-               ->getCanonicalType(D->getGenericSignature());
+               ->getCanonicalType();
         
         // We are determining the recursive properties of the struct here,
         // not the lowered types of the fields, so instead of lowering the
@@ -1676,7 +1672,7 @@ namespace {
         
         auto substEltType =
           elt->getArgumentInterfaceType().subst(subMap)
-             ->getCanonicalType(D->getGenericSignature());
+             ->getCanonicalType();
         
         auto origEltType = origType.unsafeGetSubstFieldType(elt,
                               elt->getArgumentInterfaceType()

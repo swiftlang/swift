@@ -454,14 +454,14 @@ void SILBoxTypeRepr::printImpl(ASTPrinter &Printer,
 // linkage dependency.
 
 struct TypeReprTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
-  void traceName(const void *Entity, raw_ostream &OS) const {
+  void traceName(const void *Entity, raw_ostream &OS) const override {
     if (!Entity)
       return;
     const TypeRepr *TR = static_cast<const TypeRepr *>(Entity);
     TR->print(OS);
   }
   void traceLoc(const void *Entity, SourceManager *SM,
-                clang::SourceManager *CSM, raw_ostream &OS) const {
+                clang::SourceManager *CSM, raw_ostream &OS) const override {
     if (!Entity)
       return;
     const TypeRepr *TR = static_cast<const TypeRepr *>(Entity);

@@ -2397,7 +2397,7 @@ public:
       break;
     }
     *this << "] ";
-    *this << getIDAndType(lfei->getFunctionOperand());
+    *this << getIDAndType(lfei->getOperand());
   }
 
   void visitDifferentiabilityWitnessFunctionInst(

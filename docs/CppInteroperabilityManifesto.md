@@ -67,6 +67,7 @@ Assumptions:
     + [Function templates: calls with generic type parameters](#function-templates-calls-with-generic-type-parameters)
     + [Function templates: importing as real generic functions](#function-templates-importing-as-real-generic-functions)
     + [Class templates](#class-templates)
+    + [Class templates: importing instantiation behind typedef](#class-templates-importing-instantiation-behind-typedef)
     + [Class templates: importing specific specilalizations](#class-templates-importing-specific-specilalizations)
     + [Class templates: using with generic type parameters](#class-templates-using-with-generic-type-parameters)
     + [Class templates: using in generic code through a synthesized protocol](#class-templates-using-in-generic-code-through-a-synthesized-protocol)
@@ -2575,6 +2576,45 @@ We could ignore explicit specializations of function templates, because they
 don't affect the API. Explicit specializations of class templates can
 dramatically change the API of the type.
 
+### Class templates: Importing full class template instantiations
+
+A class template instantiation could be imported as a struct named
+`__CxxTemplateInst` plus Itanium mangled type of the instantiation (see the
+`type` production in the Itanium specification). Note that Itanium mangling is
+used on all platforms, regardless of the ABI of the C++ toolchain, to ensure
+that the mangled name is a valid Swift type name (this is not the case for MSVC
+mangled names). A prefix with a double underscore (to ensure we have a reserved
+C++ identifier) is added to limit the possibility for conflicts with names of
+user-defined structs. The struct is notionally defined in the `__C` module,
+similarly to regular C and C++ structs and classes. Consider the following C++
+module:
+
+```c++
+// C++ header.
+
+template<class T>
+struct MagicWrapper {
+  T t;
+};
+struct MagicNumber {};
+
+typedef MagicWrapper<MagicNumber> WrappedMagicNumber;
+```
+
+`WrappedMagicNumber` will be imported as a typealias for a struct
+`__CxxTemplateInst12MagicWrapperI11MagicNumberE`. Interface of the imported
+module will look as follows:
+
+```swift
+// C++ header imported to Swift.
+
+struct __CxxTemplateInst12MagicWrapperI11MagicNumberE {
+    var t: MagicNumber
+}
+struct MagicNumber {}
+typealias WrappedMagicNumber = __CxxTemplateInst12MagicWrapperI11MagicNumberE
+```
+
 ### Class templates: importing specific specilalizations
 
 Just like with calls to C++ function templates, it is easy to compile a use of a
@@ -2752,7 +2792,7 @@ func useConcrete() {
 
 ### Class templates: importing as real generic structs
 
-If we know the complete set of allowed type arguments to a C++ function
+If we know the complete set of allowed type arguments to a C++ struct
 template, we could import it as an actual Swift generic struct. Every method of
 that struct will perform dynamic dispatch based on type parameters. See
 the section about function templates for more details.

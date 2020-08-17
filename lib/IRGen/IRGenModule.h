@@ -192,6 +192,11 @@ enum RequireMetadata_t : bool {
   RequireMetadata = true
 };
 
+enum class TypeMetadataCanonicality : bool {
+  Noncanonical,
+  Canonical,
+};
+
 /// The principal singleton which manages all of IR generation.
 ///
 /// The IRGenerator delegates the emission of different top-level entities
@@ -259,17 +264,22 @@ private:
   /// queued up.
   llvm::SmallPtrSet<NominalTypeDecl *, 4> LazilyEmittedFieldMetadata;
 
-  /// Maps every generic type that is specialized within the module to its
-  /// specializations.
-  llvm::DenseMap<NominalTypeDecl *, llvm::SmallVector<CanType, 4>>
-      CanonicalSpecializationsForGenericTypes;
+  /// Maps every generic type whose metadata is specialized within the module
+  /// to its specializations.
+  llvm::DenseMap<
+      NominalTypeDecl *,
+      llvm::SmallVector<std::pair<CanType, TypeMetadataCanonicality>, 4>>
+      MetadataPrespecializationsForGenericTypes;
 
   llvm::DenseMap<NominalTypeDecl *, llvm::SmallVector<CanType, 4>>
       CanonicalSpecializedAccessorsForGenericTypes;
 
   /// The queue of specialized generic types whose prespecialized metadata to
   /// emit.
-  llvm::SmallVector<CanType, 4> LazySpecializedTypeMetadataRecords;
+  llvm::SmallVector<std::pair<CanType, TypeMetadataCanonicality>, 4>
+      LazySpecializedTypeMetadataRecords;
+
+  llvm::SmallPtrSet<NominalTypeDecl *, 4> LazilyReemittedTypeContextDescriptors;
 
   /// The queue of metadata accessors to emit.
   ///
@@ -423,9 +433,18 @@ public:
 
   void ensureRelativeSymbolCollocation(SILDefaultWitnessTable &wt);
 
-  llvm::SmallVector<CanType, 4>
-  canonicalSpecializationsForType(NominalTypeDecl *type) {
-    return CanonicalSpecializationsForGenericTypes.lookup(type);
+  llvm::SmallVector<std::pair<CanType, TypeMetadataCanonicality>, 4>
+  metadataPrespecializationsForType(NominalTypeDecl *type) {
+    return MetadataPrespecializationsForGenericTypes.lookup(type);
+  }
+
+  void noteLazyReemissionOfNominalTypeDescriptor(NominalTypeDecl *decl) {
+    LazilyReemittedTypeContextDescriptors.insert(decl);
+  }
+
+  bool isLazilyReemittingNominalTypeDescriptor(NominalTypeDecl *decl) {
+    return LazilyReemittedTypeContextDescriptors.find(decl) !=
+           std::end(LazilyReemittedTypeContextDescriptors);
   }
 
   void noteUseOfMetadataAccessor(NominalTypeDecl *decl) {
@@ -438,7 +457,8 @@ public:
     noteUseOfTypeGlobals(type, true, RequireMetadata);
   }
 
-  void noteUseOfSpecializedGenericTypeMetadata(CanType type);
+  void noteUseOfSpecializedGenericTypeMetadata(
+      IRGenModule &IGM, CanType theType, TypeMetadataCanonicality canonicality);
   void noteUseOfCanonicalSpecializedMetadataAccessor(CanType forType);
 
   void noteUseOfTypeMetadata(CanType type) {
@@ -545,11 +565,6 @@ enum class MangledTypeRefRole {
   /// The mangled type reference is used for a default associated type
   /// witness.
   DefaultAssociatedTypeWitness,
-};
-
-enum class TypeMetadataCanonicality : bool {
-  Noncanonical,
-  Canonical,
 };
 
 /// IRGenModule - Primary class for emitting IR for global declarations.

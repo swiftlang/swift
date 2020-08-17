@@ -1539,3 +1539,15 @@ SpecifyLabelToAssociateTrailingClosure::create(ConstraintSystem &cs,
   return new (cs.getAllocator())
       SpecifyLabelToAssociateTrailingClosure(cs, locator);
 }
+
+bool AllowKeyPathWithoutComponents::diagnose(const Solution &solution,
+                                             bool asNote) const {
+  InvalidEmptyKeyPathFailure failure(solution, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowKeyPathWithoutComponents *
+AllowKeyPathWithoutComponents::create(ConstraintSystem &cs,
+                                      ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AllowKeyPathWithoutComponents(cs, locator);
+}

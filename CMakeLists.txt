@@ -369,6 +369,10 @@ option(SWIFT_REPORT_STATISTICS
     "Create json files which contain internal compilation statistics"
     FALSE)
 
+option(SWIFT_DISABLE_OBJC_INTEROP
+    "Disable Objective-C interoperability even on platforms what would normally have it"
+    FALSE)
+
 # FIXME(wasm) Reflection tests are temporalily disabled due to lack of linker features
 option(SWIFTWASM_DISABLE_REFLECTION_TEST
     "Disable building swift-reflection-test for WebAssembly build"

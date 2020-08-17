@@ -950,7 +950,8 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   SmallVectorImpl<char> *ModuleInterfacePath,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-  std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) {
+  std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+  bool IsFramework) {
 
   // If running in OnlySerialized mode, ModuleInterfaceLoader
   // should not have been constructed at all.
@@ -1521,27 +1522,29 @@ ExplicitSwiftModuleLoader::ExplicitSwiftModuleLoader(
 
 ExplicitSwiftModuleLoader::~ExplicitSwiftModuleLoader() { delete &Impl; }
 
-std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
-    AccessPathElem ModuleID,
-    const SerializedModuleBaseName &BaseName,
-    SmallVectorImpl<char> *ModuleInterfacePath,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) {
+bool ExplicitSwiftModuleLoader::findModule(AccessPathElem ModuleID,
+           SmallVectorImpl<char> *ModuleInterfacePath,
+           std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+           std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+           std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+           bool &IsFramework, bool &IsSystemModule) {
   StringRef moduleName = ModuleID.Item.str();
   auto it = Impl.ExplicitModuleMap.find(moduleName);
   // If no explicit module path is given matches the name, return with an
   // error code.
   if (it == Impl.ExplicitModuleMap.end()) {
-    return std::make_error_code(std::errc::not_supported);
+    return false;
   }
   auto &moduleInfo = it->getValue();
   if (moduleInfo.moduleBuffer) {
     // We found an explicit module matches the given name, give the buffer
     // back to the caller side.
     *ModuleBuffer = std::move(moduleInfo.moduleBuffer);
-    return std::error_code();
+    return true;
   }
+
+  // Set IsFramework bit according to the moduleInfo
+  IsFramework = moduleInfo.isFramework;
 
   auto &fs = *Ctx.SourceMgr.getFileSystem();
   // Open .swiftmodule file
@@ -1550,7 +1553,7 @@ std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
     // We cannot read the module content, diagnose.
     Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_explicit_module_file,
                        moduleInfo.modulePath);
-    return moduleBuf.getError();
+    return false;
   }
 
   assert(moduleBuf);
@@ -1566,13 +1569,13 @@ std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
         // We cannot read the module content, diagnose.
         Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_explicit_module_file,
                            moduleInfo.modulePath);
-        return moduleBuf.getError();
+        return false;
       }
     } else {
       // We cannot read the module content, diagnose.
       Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_explicit_module_file,
                          moduleInfo.modulePath);
-      return forwardingModule.getError();
+      return false;
     }
   }
   assert(moduleBuf);
@@ -1591,7 +1594,19 @@ std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
     if (moduleSourceInfoBuf)
       *ModuleSourceInfoBuffer = std::move(moduleSourceInfoBuf.get());
   }
-  return std::error_code();
+  return true;
+}
+
+std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
+  AccessPathElem ModuleID,
+  const SerializedModuleBaseName &BaseName,
+  SmallVectorImpl<char> *ModuleInterfacePath,
+  std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+  std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+  std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+  bool IsFramework) {
+  llvm_unreachable("Not supported in the Explicit Swift Module Loader.");
+  return std::make_error_code(std::errc::not_supported);
 }
 
 bool ExplicitSwiftModuleLoader::canImportModule(

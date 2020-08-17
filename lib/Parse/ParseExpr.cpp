@@ -330,7 +330,7 @@ parse_operator:
     case tok::identifier: {
       // 'async' followed by 'throws' or '->' implies that we have an arrow
       // expression.
-      if (!(Context.LangOpts.EnableExperimentalConcurrency &&
+      if (!(shouldParseExperimentalConcurrency() &&
             Tok.isContextualKeyword("async") &&
             peekToken().isAny(tok::arrow, tok::kw_throws)))
         goto done;
@@ -379,7 +379,7 @@ done:
 /// parseExprSequenceElement
 ///
 ///   expr-sequence-element(Mode):
-///     '__await' expr-sequence-element(Mode)
+///     'await' expr-sequence-element(Mode)
 ///     'try' expr-sequence-element(Mode)
 ///     'try' '?' expr-sequence-element(Mode)
 ///     'try' '!' expr-sequence-element(Mode)
@@ -392,9 +392,8 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
   SyntaxParsingContext ElementContext(SyntaxContext,
                                       SyntaxContextKind::Expr);
 
-  if (Context.LangOpts.EnableExperimentalConcurrency &&
-      Tok.is(tok::kw___await)) {
-    SourceLoc awaitLoc = consumeToken(tok::kw___await);
+  if (shouldParseExperimentalConcurrency() && Tok.isContextualKeyword("await")) {
+    SourceLoc awaitLoc = consumeToken();
     ParserResult<Expr> sub = parseExprUnary(message, isExprBasic);
     if (!sub.hasCodeCompletion() && !sub.isNull()) {
       ElementContext.setCreateSyntax(SyntaxKind::AwaitExpr);
@@ -2432,7 +2431,8 @@ bool Parser::
 parseClosureSignatureIfPresent(SourceRange &bracketRange,
                                SmallVectorImpl<CaptureListEntry> &captureList,
                                VarDecl *&capturedSelfDecl,
-                               ParameterList *&params, SourceLoc &throwsLoc,
+                               ParameterList *&params,
+                               SourceLoc &asyncLoc, SourceLoc &throwsLoc,
                                SourceLoc &arrowLoc,
                                TypeExpr *&explicitResultType, SourceLoc &inLoc){
   // Clear out result parameters.
@@ -2443,6 +2443,24 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
   arrowLoc = SourceLoc();
   explicitResultType = nullptr;
   inLoc = SourceLoc();
+
+  // Consume 'async', 'throws', and 'rethrows', but in any order.
+  auto consumeAsyncThrows = [&] {
+    bool hadAsync = false;
+    if (shouldParseExperimentalConcurrency() &&
+        Tok.isContextualKeyword("async")) {
+      consumeToken();
+      hadAsync = true;
+    }
+
+    if (!consumeIf(tok::kw_throws) && !consumeIf(tok::kw_rethrows))
+      return;
+
+    if (shouldParseExperimentalConcurrency() && !hadAsync &&
+        Tok.isContextualKeyword("async")) {
+      consumeToken();
+    }
+  };
 
   // If we have a leading token that may be part of the closure signature, do a
   // speculative parse to validate it and look for 'in'.
@@ -2465,7 +2483,8 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
 
       // Consume the ')', if it's there.
       if (consumeIf(tok::r_paren)) {
-        consumeIf(tok::kw_throws) || consumeIf(tok::kw_rethrows);
+        consumeAsyncThrows();
+
         // Parse the func-signature-result, if present.
         if (consumeIf(tok::arrow)) {
           if (!canParseType())
@@ -2485,8 +2504,8 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
 
         return false;
       }
-      
-      consumeIf(tok::kw_throws) || consumeIf(tok::kw_rethrows);
+
+      consumeAsyncThrows();
 
       // Parse the func-signature-result, if present.
       if (consumeIf(tok::arrow)) {
@@ -2682,11 +2701,10 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
 
       params = ParameterList::create(Context, elements);
     }
-    
-    if (Tok.is(tok::kw_throws)) {
-      throwsLoc = consumeToken();
-    } else if (Tok.is(tok::kw_rethrows)) {
-      throwsLoc = consumeToken();
+
+    bool rethrows = false;
+    parseAsyncThrows(SourceLoc(), asyncLoc, throwsLoc, &rethrows);
+    if (rethrows) {
       diagnose(throwsLoc, diag::rethrowing_function_type)
         .fixItReplace(throwsLoc, "throws");
     }
@@ -2803,13 +2821,14 @@ ParserResult<Expr> Parser::parseExprClosure() {
   SmallVector<CaptureListEntry, 2> captureList;
   VarDecl *capturedSelfDecl;
   ParameterList *params = nullptr;
+  SourceLoc asyncLoc;
   SourceLoc throwsLoc;
   SourceLoc arrowLoc;
   TypeExpr *explicitResultType;
   SourceLoc inLoc;
-  parseClosureSignatureIfPresent(bracketRange, captureList,
-                                 capturedSelfDecl, params, throwsLoc,
-                                 arrowLoc, explicitResultType, inLoc);
+  parseClosureSignatureIfPresent(
+      bracketRange, captureList, capturedSelfDecl, params, asyncLoc, throwsLoc,
+      arrowLoc, explicitResultType, inLoc);
 
   // If the closure was created in the context of an array type signature's
   // size expression, there will not be a local context. A parse error will
@@ -2824,10 +2843,9 @@ ParserResult<Expr> Parser::parseExprClosure() {
   unsigned discriminator = CurLocalContext->claimNextClosureDiscriminator();
 
   // Create the closure expression and enter its context.
-  auto *closure = new (Context) ClosureExpr(bracketRange, capturedSelfDecl,
-                                            params, throwsLoc, arrowLoc, inLoc,
-                                            explicitResultType, discriminator,
-                                            CurDeclContext);
+  auto *closure = new (Context) ClosureExpr(
+      bracketRange, capturedSelfDecl, params, asyncLoc, throwsLoc, arrowLoc,
+      inLoc, explicitResultType, discriminator, CurDeclContext);
   // The arguments to the func are defined in their own scope.
   Scope S(this, ScopeKind::ClosureParams);
   ParseFunctionBody cc(*this, closure);

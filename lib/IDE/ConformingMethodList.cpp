@@ -154,7 +154,7 @@ void ConformingMethodListCallbacks::getMatchingMethods(
           Result(result) {}
 
     void foundDecl(ValueDecl *VD, DeclVisibilityKind reason,
-                   DynamicLookupInfo) {
+                   DynamicLookupInfo) override {
       if (isMatchingMethod(VD) && !VD->shouldHideFromEditor())
         Result.push_back(VD);
     }
