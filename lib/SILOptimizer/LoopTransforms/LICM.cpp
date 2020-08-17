@@ -214,8 +214,8 @@ static void getDominatingBlocks(SmallVectorImpl<SILBasicBlock *> &domBlocks,
                                 SILLoop *Loop, DominanceInfo *DT) {
   auto HeaderBB = Loop->getHeader();
   auto DTRoot = DT->getNode(HeaderBB);
-  SmallVector<SILBasicBlock *, 8> ExitingBBs;
-  Loop->getExitingBlocks(ExitingBBs);
+  SmallVector<SILBasicBlock *, 8> ExitingAndLatchBBs;
+  Loop->getExitingAndLatchBlocks(ExitingAndLatchBBs);
   for (llvm::df_iterator<DominanceInfoNode *> It = llvm::df_begin(DTRoot),
                                               E = llvm::df_end(DTRoot);
        It != E;) {
@@ -223,7 +223,7 @@ static void getDominatingBlocks(SmallVectorImpl<SILBasicBlock *> &domBlocks,
 
     // Don't decent into control-dependent code. Only traverse into basic blocks
     // that dominate all exits.
-    if (!std::all_of(ExitingBBs.begin(), ExitingBBs.end(),
+    if (!std::all_of(ExitingAndLatchBBs.begin(), ExitingAndLatchBBs.end(),
                      [=](SILBasicBlock *ExitBB) {
           return DT->dominates(CurBB, ExitBB);
         })) {

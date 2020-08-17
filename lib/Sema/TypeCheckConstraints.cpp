@@ -2905,7 +2905,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
         out << " as ";
         Type(fixed).print(out, PO);
       } else {
-        getPotentialBindings(tv).dump(out, 1);
+        inferBindingsFor(tv).dump(out, 1);
       }
     } else {
       out << " equivalent to ";

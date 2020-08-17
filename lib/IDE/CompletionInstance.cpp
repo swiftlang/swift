@@ -411,9 +411,14 @@ bool CompletionInstance::performCachedOperationIfPossible(
     oldInfo.PrevOffset = newInfo.PrevOffset;
     oldState->restoreCodeCompletionDelayedDeclState(oldInfo);
 
+    auto newBufferStart = SM.getRangeForBuffer(newBufferID).getStart();
+    SourceRange newBodyRange(newBufferStart.getAdvancedLoc(newInfo.StartOffset),
+                             newBufferStart.getAdvancedLoc(newInfo.EndOffset));
+
     auto *AFD = cast<AbstractFunctionDecl>(DC);
-    if (AFD->isBodySkipped())
-      AFD->setBodyDelayed(AFD->getBodySourceRange());
+    AFD->setBodyToBeReparsed(newBodyRange);
+    SM.setReplacedRange({AFD->getOriginalBodySourceRange(), newBodyRange});
+    oldSF->clearScope();
 
     traceDC = AFD;
     break;
@@ -598,9 +603,6 @@ bool swift::ide::CompletionInstance::performOperation(
 
   // We don't need token list.
   Invocation.getLangOptions().CollectParsedToken = false;
-
-  // FIXME: ASTScopeLookup doesn't support code completion yet.
-  Invocation.disableASTScopeLookup();
 
   if (EnableASTCaching) {
     // Compute the signature of the invocation.
