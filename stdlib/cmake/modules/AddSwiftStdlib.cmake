@@ -181,16 +181,10 @@ function(_add_target_variant_c_compile_flags)
   is_build_type_optimized("${CFLAGS_BUILD_TYPE}" optimized)
   is_build_type_with_debuginfo("${CFLAGS_BUILD_TYPE}" debuginfo)
 
-  # Add -O0/-O2/-O3/-Os based on CFLAGS_BUILD_TYPE.
+  # Add -O0/-O2/-O3/-Os/-g/... based on CFLAGS_BUILD_TYPE.
   list(APPEND result "${CMAKE_CXX_FLAGS_${CFLAGS_BUILD_TYPE}}")
 
   if(optimized)
-    if("${CFLAGS_BUILD_TYPE}" STREQUAL "MinSizeRel")
-      list(APPEND result "-Os")
-    else()
-      list(APPEND result "-O2")
-    endif()
-
     # Omit leaf frame pointers on x86 production builds (optimized, no debug
     # info, and no asserts).
     if(NOT debuginfo AND NOT CFLAGS_ENABLE_ASSERTIONS)
