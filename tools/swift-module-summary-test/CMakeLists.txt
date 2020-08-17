@@ -7,4 +7,6 @@ add_swift_host_tool(swift-module-summary-test
 
 target_link_libraries(swift-module-summary-test
                       PRIVATE
+                        swiftAST
+                        swiftDemangling
                         swiftSerialization)
