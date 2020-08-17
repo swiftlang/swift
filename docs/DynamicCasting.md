@@ -47,9 +47,9 @@ a as! Int == a // true
 
 Casting among class types follows standard object-oriented programming conventions:
 
-* Class upcasts: If `C` is a subclass of `SuperC` and `c` is an instance of `C`, then `c is SuperC == true` and `(c as? SuperC) != nil`.  These "upcasts" do not change the representation in any way.  However, when `c` is accessed via a variable or expression of type `SuperC`, only methods and instance variables defined on `SuperC` are available.
+* Class upcasts: If `C` is a subclass of `SuperC` and `c` is an instance of `C`, then `c is SuperC == true` and `(c as? SuperC) != nil`.  (Note: These "upcasts" do not change the in-memory representation.)  However, when `c` is accessed via a variable or expression of type `SuperC`, only methods and instance variables defined on `SuperC` are available.
 
-* Class downcasts: If `C` is a subclass of `SuperC` and `sc` is an instance of `SuperC`, then `sc is C` will be true iff `sc` is actually an instance of `C`.  When this "downcast" does succeed, it does not change the representation.
+* Class downcasts: If `C` is a subclass of `SuperC` and `sc` is an instance of `SuperC`, then `sc is C` will be true iff `sc` is actually an instance of `C`.  (Note: Again, a downcast does not affect the in-memory representation.)
 
 * Objective-C class casting:  The rules above also apply when one of the classes in question is defined with the `@objc` attribute or inherits from an Objective-C class.
 
