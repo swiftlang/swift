@@ -210,8 +210,7 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-sdk" "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}")
   endif()
 
-  is_darwin_based_sdk("${sdk}" IS_DARWIN)
-  if(IS_DARWIN)
+  if("${sdk}" IN_LIST SWIFT_APPLE_PLATFORMS)
     set(sdk_deployment_version "${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION}")
     get_target_triple(target target_variant "${sdk}" "${arch}"
     MACCATALYST_BUILD_FLAVOR "${VARIANT_MACCATALYST_BUILD_FLAVOR}"
@@ -237,7 +236,7 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-resource-dir" "${SWIFTLIB_DIR}")
   endif()
 
-  if(IS_DARWIN)
+  if("${sdk}" IN_LIST SWIFT_APPLE_PLATFORMS)
     # We collate -F with the framework path to avoid unwanted deduplication
     # of options by target_compile_options -- this way no undesired
     # side effects are introduced should a new search path be added.
@@ -448,6 +447,10 @@ function(_compile_swift_files
 
   if (SWIFTFILE_IS_STDLIB_CORE OR SWIFTFILE_IS_SDK_OVERLAY)
     list(APPEND swift_flags "-warn-swift3-objc-inference-complete")
+  endif()
+
+  if(SWIFT_DISABLE_OBJC_INTEROP)
+    list(APPEND swift_flags "-Xfrontend" "-disable-objc-interop")
   endif()
 
   list(APPEND swift_flags ${SWIFT_EXPERIMENTAL_EXTRA_FLAGS})

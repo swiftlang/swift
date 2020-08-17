@@ -1177,7 +1177,7 @@ class VarDeclMultipleReferencesChecker : public ASTWalker {
   VarDecl *varDecl;
   int count;
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) {
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
       if (DRE->getDecl() == varDecl)
         ++count;
@@ -6759,4 +6759,20 @@ void TrailingClosureRequiresExplicitLabel::fixIt(
       Lexer::getLocForEndOfToken(ctx.SourceMgr, trailingClosure->getEndLoc());
   diagnostic.fixItInsert(newRParenLoc,
                          isExpr<SubscriptExpr>(anchor) ? "]" : ")");
+}
+
+bool InvalidEmptyKeyPathFailure::diagnoseAsError() {
+  auto *KPE = getAsExpr<KeyPathExpr>(getAnchor());
+  assert(KPE && KPE->hasSingleInvalidComponent() &&
+         "Expected a malformed key path expression");
+
+  // If we have a string interpolation represented as key path expressions
+  // e.g. \(x), \(x, a: 1). Let's skip it because this would be already
+  // diagnosed and it is not the case for an extra empty key path diagnostic.
+  auto *root = KPE->getParsedRoot();
+  if (root && (isa<ParenExpr>(root) || isa<TupleExpr>(root)))
+    return true;
+
+  emitDiagnostic(diag::expr_swift_keypath_empty);
+  return true;
 }

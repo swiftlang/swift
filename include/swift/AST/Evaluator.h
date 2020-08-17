@@ -65,7 +65,7 @@ class PrettyStackTraceRequest : public llvm::PrettyStackTraceEntry {
 public:
   PrettyStackTraceRequest(const Request &request) : request(request) { }
 
-  void print(llvm::raw_ostream &out) const {
+  void print(llvm::raw_ostream &out) const override {
     out << "While evaluating request ";
     simple_display(out, request);
     out << "\n";
@@ -85,9 +85,9 @@ public:
   CyclicalRequestError(const Request &request, const Evaluator &evaluator)
     : request(request), evaluator(evaluator) {}
 
-  virtual void log(llvm::raw_ostream &out) const;
+  virtual void log(llvm::raw_ostream &out) const override;
 
-  virtual std::error_code convertToErrorCode() const {
+  virtual std::error_code convertToErrorCode() const override {
     // This is essentially unused, but is a temporary requirement for
     // llvm::ErrorInfo subclasses.
     llvm_unreachable("shouldn't get std::error_code from CyclicalRequestError");

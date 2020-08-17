@@ -57,7 +57,6 @@ struct ArgumentKeyKind {
   InnerTy innerValue;
 
   ArgumentKeyKind(InnerTy value) : innerValue(value) {}
-  ArgumentKeyKind(const ArgumentKeyKind &kind) : innerValue(kind.innerValue) {}
 
   operator InnerTy() const { return innerValue; }
 

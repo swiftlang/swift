@@ -5888,6 +5888,16 @@ public:
   /// type of the function will be `async` as well.
   bool hasAsync() const { return Bits.AbstractFunctionDecl.Async; }
 
+  /// Returns true if the function is a suitable 'async' context.
+  ///
+  /// Functions that are an 'async' context can make calls to 'async' functions.
+  bool isAsyncContext() const {
+    return hasAsync() || isAsyncHandler();
+  }
+
+  /// Returns true if the function is an @asyncHandler.
+  bool isAsyncHandler() const;
+
   /// Returns true if the function body throws.
   bool hasThrows() const { return Bits.AbstractFunctionDecl.Throws; }
 

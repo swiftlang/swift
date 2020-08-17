@@ -6691,6 +6691,17 @@ bool AbstractFunctionDecl::argumentNameIsAPIByDefault() const {
   return false;
 }
 
+bool AbstractFunctionDecl::isAsyncHandler() const {
+  auto func = dyn_cast<FuncDecl>(this);
+  if (!func)
+    return false;
+
+  auto mutableFunc = const_cast<FuncDecl *>(func);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           IsAsyncHandlerRequest{mutableFunc},
+                           false);
+}
+
 BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {
   if ((getBodyKind() == BodyKind::Synthesize ||
        getBodyKind() == BodyKind::Unparsed) &&
@@ -7923,7 +7934,7 @@ void Decl::setClangNode(ClangNode Node) {
 // dependency.
 
 struct DeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
-  void traceName(const void *Entity, raw_ostream &OS) const {
+  void traceName(const void *Entity, raw_ostream &OS) const override {
     if (!Entity)
       return;
     const Decl *D = static_cast<const Decl *>(Entity);
@@ -7936,7 +7947,7 @@ struct DeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
     }
   }
   void traceLoc(const void *Entity, SourceManager *SM,
-                clang::SourceManager *CSM, raw_ostream &OS) const {
+                clang::SourceManager *CSM, raw_ostream &OS) const override {
     if (!Entity)
       return;
     const Decl *D = static_cast<const Decl *>(Entity);

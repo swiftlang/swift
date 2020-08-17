@@ -1711,7 +1711,7 @@ class FindAllSubDecls : public SourceEntityWalker {
   FindAllSubDecls(llvm::SmallPtrSetImpl<Decl *> &found)
     : Found(found) {}
 
-  bool walkToDeclPre(Decl *D, CharSourceRange range) {
+  bool walkToDeclPre(Decl *D, CharSourceRange range) override {
     // Record this Decl, and skip its contents if we've already touched it.
     if (!Found.insert(D).second)
       return false;
@@ -1876,7 +1876,7 @@ findConcatenatedExpressions(ResolvedRangeInfo Info, ASTContext &Ctx) {
       return true;
     }
 
-    bool walkToExprPre(Expr *E) {
+    bool walkToExprPre(Expr *E) override {
       if (E->isImplicit())
         return true;
       // FIXME: we should have ErrorType instead of null.
@@ -2001,13 +2001,13 @@ class ExpandableAssignTernaryExprInfo: public ExpandableTernaryExprInfo {
 public:
   ExpandableAssignTernaryExprInfo(AssignExpr *Assign): Assign(Assign) {}
 
-  IfExpr *getIf() {
+  IfExpr *getIf() override {
     if (!Assign)
       return nullptr;
     return dyn_cast_or_null<IfExpr>(Assign->getSrc());
   }
 
-  SourceRange getNameRange() {
+  SourceRange getNameRange() override {
     auto Invalid = SourceRange();
 
     if (!Assign)
@@ -2019,7 +2019,7 @@ public:
     return Invalid;
   }
 
-  Type getType() {
+  Type getType() override {
     return nullptr;
   }
 
@@ -2035,7 +2035,7 @@ public:
   ExpandableBindingTernaryExprInfo(PatternBindingDecl *Binding):
   Binding(Binding) {}
 
-  IfExpr *getIf() {
+  IfExpr *getIf() override {
     if (Binding && Binding->getNumPatternEntries() == 1) {
       if (auto *Init = Binding->getInit(0)) {
         return dyn_cast<IfExpr>(Init);
@@ -2045,14 +2045,14 @@ public:
     return nullptr;
   }
 
-  SourceRange getNameRange() {
+  SourceRange getNameRange() override {
     if (auto Pattern = getNamePattern())
       return Pattern->getSourceRange();
 
     return SourceRange();
   }
 
-  Type getType() {
+  Type getType() override {
     if (auto Pattern = getNamePattern())
       return Pattern->getType();
 
@@ -2347,7 +2347,7 @@ isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
     bool ConditionUseOnlyAllowedFunctions = false;
     StringRef ExpectName;
 
-    Expr *walkToExprPost(Expr *E) {
+    Expr *walkToExprPost(Expr *E) override {
       if (E->getKind() != ExprKind::DeclRef)
         return E;
       auto D = dyn_cast<DeclRefExpr>(E)->getDecl();
@@ -2446,7 +2446,7 @@ bool RefactoringActionConvertToSwitchStmt::performChange() {
   public:
     std::string VarName;
 
-    Expr *walkToExprPost(Expr *E) {
+    Expr *walkToExprPost(Expr *E) override {
       if (E->getKind() != ExprKind::DeclRef)
         return E;
       auto D = dyn_cast<DeclRefExpr>(E)->getDecl();
@@ -2463,7 +2463,7 @@ bool RefactoringActionConvertToSwitchStmt::performChange() {
 
     SmallString<64> ConditionalPattern = SmallString<64>();
 
-    Expr *walkToExprPost(Expr *E) {
+    Expr *walkToExprPost(Expr *E) override {
       if (E->getKind() != ExprKind::Binary)
         return E;
       auto BE = dyn_cast<BinaryExpr>(E);
@@ -2472,7 +2472,7 @@ bool RefactoringActionConvertToSwitchStmt::performChange() {
       return E;
     }
 
-    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) {
+    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
       ConditionalPattern.append(Lexer::getCharSourceRangeFromSourceRange(SM, P->getSourceRange()).str());
       if (P->getKind() == PatternKind::OptionalSome)
         ConditionalPattern.append("?");
@@ -2705,7 +2705,7 @@ findConvertToTernaryExpression(ResolvedRangeInfo Info) {
         walk(S);
     }
 
-    virtual bool walkToExprPre(Expr *E) {
+    virtual bool walkToExprPre(Expr *E) override {
       Assign = dyn_cast<AssignExpr>(E);
       return false;
     }
@@ -3086,7 +3086,7 @@ static Expr *findLocalizeTarget(ResolvedCursorInfo CursorInfo) {
     SourceLoc StartLoc;
     Expr *Target;
     StringLiteralFinder(SourceLoc StartLoc): StartLoc(StartLoc), Target(nullptr) {}
-    bool walkToExprPre(Expr *E) {
+    bool walkToExprPre(Expr *E) override {
       if (E->getStartLoc() != StartLoc)
         return false;
       if (E->getKind() == ExprKind::InterpolatedStringLiteral)

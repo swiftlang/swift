@@ -691,7 +691,8 @@ public:
       // is equivalent to what we have here.
       if (LS->getStartLoc().isValid() && sourceFile &&
           SC.getASTContext().LangOpts.EnableASTScopeLookup &&
-          !SC.getASTContext().Diags.hadAnyError()) {
+          !SC.getASTContext().Diags.hadAnyError() &&
+          !SC.LeaveBraceStmtBodyUnchecked) {
         // The labeled statements from ASTScope lookup have the
         // innermost labeled statement first, so reverse it to
         // match the data structure maintained here.
