@@ -1622,16 +1622,23 @@ ConstraintSystem::matchFunctionBuilder(
   // Pre-check the body: pre-check any expressions in it and look
   // for return statements.
   auto request =
-      PreCheckFunctionBuilderRequest{{fn, /*SuppressDiagnostics=*/false}};
+      PreCheckFunctionBuilderRequest{{fn, /*SuppressDiagnostics=*/true}};
   switch (evaluateOrDefault(getASTContext().evaluator, request,
                             FunctionBuilderBodyPreCheck::Error)) {
   case FunctionBuilderBodyPreCheck::Okay:
     // If the pre-check was okay, apply the function-builder transform.
     break;
 
-  case FunctionBuilderBodyPreCheck::Error:
-    // If the pre-check had an error, flag that.
-    return getTypeMatchFailure(locator);
+  case FunctionBuilderBodyPreCheck::Error: {
+    if (!shouldAttemptFixes())
+      return getTypeMatchFailure(locator);
+
+    if (recordFix(IgnoreInvalidFunctionBuilderBody::create(
+            *this, getConstraintLocator(fn.getBody()))))
+      return getTypeMatchFailure(locator);
+
+    return getTypeMatchSuccess();
+  }
 
   case FunctionBuilderBodyPreCheck::HasReturnStmt:
     // If the body has a return statement, suppress the transform but
