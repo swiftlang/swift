@@ -893,10 +893,10 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
   auto *pbGenericEnv =
       pbGenericSig ? pbGenericSig->getGenericEnvironment() : nullptr;
   auto pbType = SILFunctionType::get(
-      pbGenericSig, origTy->getExtInfo(), origTy->getCoroutineKind(),
-      origTy->getCalleeConvention(), pbParams, {}, adjResults, None,
-      origTy->getPatternSubstitutions(), origTy->getInvocationSubstitutions(),
-      original->getASTContext());
+      pbGenericSig, origTy->getExtInfo(), origTy->isAsync(),
+      origTy->getCoroutineKind(), origTy->getCalleeConvention(), pbParams, {},
+      adjResults, None, origTy->getPatternSubstitutions(),
+      origTy->getInvocationSubstitutions(), original->getASTContext());
 
   SILOptFunctionBuilder fb(context.getTransform());
   auto linkage = vjp->isSerialized() ? SILLinkage::Public : SILLinkage::Private;

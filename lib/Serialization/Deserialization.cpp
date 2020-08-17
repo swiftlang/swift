@@ -5355,6 +5355,7 @@ public:
 
   Expected<Type> deserializeSILFunctionType(ArrayRef<uint64_t> scratch,
                                             StringRef blobData) {
+    bool async;
     uint8_t rawCoroutineKind;
     uint8_t rawCalleeConvention;
     uint8_t rawRepresentation;
@@ -5372,6 +5373,7 @@ public:
     ClangTypeID clangFunctionTypeID;
 
     decls_block::SILFunctionTypeLayout::readRecord(scratch,
+                                             async,
                                              rawCoroutineKind,
                                              rawCalleeConvention,
                                              rawRepresentation,
@@ -5561,7 +5563,8 @@ public:
     if (!patternSubsOrErr)
       return patternSubsOrErr.takeError();
 
-    return SILFunctionType::get(invocationSig, extInfo, coroutineKind.getValue(),
+    return SILFunctionType::get(invocationSig, extInfo,
+                                async, coroutineKind.getValue(),
                                 calleeConvention.getValue(),
                                 allParams, allYields, allResults,
                                 errorResult,

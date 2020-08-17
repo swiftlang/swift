@@ -501,6 +501,8 @@ public:
     IsWithoutActuallyEscapingThunk = val;
   }
 
+  bool isAsync() const { return LoweredType->isAsync(); }
+
   /// Returns the calling convention used by this entry point.
   SILFunctionTypeRepresentation getRepresentation() const {
     return getLoweredFunctionType()->getRepresentation();
