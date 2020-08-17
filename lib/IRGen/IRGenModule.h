@@ -279,6 +279,8 @@ private:
   llvm::SmallVector<std::pair<CanType, TypeMetadataCanonicality>, 4>
       LazySpecializedTypeMetadataRecords;
 
+  llvm::SmallPtrSet<NominalTypeDecl *, 4> LazilyReemittedTypeContextDescriptors;
+
   /// The queue of metadata accessors to emit.
   ///
   /// The accessors must be emitted after everything else which might result in
@@ -434,6 +436,15 @@ public:
   llvm::SmallVector<std::pair<CanType, TypeMetadataCanonicality>, 4>
   metadataPrespecializationsForType(NominalTypeDecl *type) {
     return MetadataPrespecializationsForGenericTypes.lookup(type);
+  }
+
+  void noteLazyReemissionOfNominalTypeDescriptor(NominalTypeDecl *decl) {
+    LazilyReemittedTypeContextDescriptors.insert(decl);
+  }
+
+  bool isLazilyReemittingNominalTypeDescriptor(NominalTypeDecl *decl) {
+    return LazilyReemittedTypeContextDescriptors.find(decl) !=
+           std::end(LazilyReemittedTypeContextDescriptors);
   }
 
   void noteUseOfMetadataAccessor(NominalTypeDecl *decl) {

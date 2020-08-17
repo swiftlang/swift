@@ -618,6 +618,18 @@ public:
             getOpValue(origCallee)->getDefiningInstruction());
   }
 
+  void visitTryApplyInst(TryApplyInst *tai) {
+    // Build pullback struct value for original block.
+    auto *pbStructVal = buildPullbackValueStructValue(tai);
+    // Create a new `try_apply` instruction.
+    auto args = getOpValueArray<8>(tai->getArguments());
+    getBuilder().createTryApply(
+        tai->getLoc(), getOpValue(tai->getCallee()),
+        getOpSubstitutionMap(tai->getSubstitutionMap()), args,
+        createTrampolineBasicBlock(tai, pbStructVal, tai->getNormalBB()),
+        createTrampolineBasicBlock(tai, pbStructVal, tai->getErrorBB()));
+  }
+
   void visitDifferentiableFunctionInst(DifferentiableFunctionInst *dfi) {
     // Clone `differentiable_function` from original to VJP, then add the cloned
     // instruction to the `differentiable_function` worklist.

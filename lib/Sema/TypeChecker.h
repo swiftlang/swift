@@ -601,6 +601,11 @@ RequirementCheckResult checkGenericArguments(
     ArrayRef<Requirement> requirements, TypeSubstitutionFn substitutions,
     SubstOptions options = None);
 
+bool checkContextualRequirements(GenericTypeDecl *decl,
+                                 Type parentTy,
+                                 SourceLoc loc,
+                                 DeclContext *dc);
+
 /// Add any implicitly-defined constructors required for the given
 /// struct or class.
 void addImplicitConstructors(NominalTypeDecl *typeDecl);

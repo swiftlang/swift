@@ -1210,6 +1210,12 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
       } else if (srcLocator->directlyAt<ObjectLiteralExpr>()) {
         fix = SpecifyObjectLiteralTypeImport::create(cs, dstLocator);
       } else if (srcLocator->isKeyPathRoot()) {
+        // If we recorded an invalid key path fix, let's skip this specify root
+        // type fix because it wouldn't produce a useful diagnostic.
+        auto *kpLocator = cs.getConstraintLocator(srcLocator->getAnchor());
+        if (cs.hasFixFor(kpLocator, FixKind::AllowKeyPathWithoutComponents))
+          return true;
+        
         fix = SpecifyKeyPathRootType::create(cs, dstLocator);
       }
 
