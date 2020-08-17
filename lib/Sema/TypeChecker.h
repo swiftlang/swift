@@ -941,17 +941,6 @@ LookupTypeResult
 lookupMemberType(DeclContext *dc, Type type, DeclNameRef name,
                  NameLookupOptions options = defaultMemberTypeLookupOptions);
 
-/// Look up the constructors of the given type.
-///
-/// \param dc The context that needs the constructor.
-/// \param type The type for which we will look for constructors.
-/// \param options Options that control name lookup.
-///
-/// \returns the constructors found for this type.
-LookupResult lookupConstructors(
-    DeclContext *dc, Type type,
-    NameLookupOptions options = defaultConstructorLookupOptions);
-
 /// Given an expression that's known to be an infix operator,
 /// look up its precedence group.
 PrecedenceGroupDecl *lookupPrecedenceGroupForInfixOperator(DeclContext *dc,

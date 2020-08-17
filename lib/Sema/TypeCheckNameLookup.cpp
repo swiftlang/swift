@@ -511,11 +511,6 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
   return result;
 }
 
-LookupResult TypeChecker::lookupConstructors(DeclContext *dc, Type type,
-                                             NameLookupOptions options) {
-  return lookupMember(dc, type, DeclNameRef::createConstructor(), options);
-}
-
 unsigned TypeChecker::getCallEditDistance(DeclNameRef writtenName,
                                           DeclName correctedName,
                                           unsigned maxEditDistance) {
