@@ -630,8 +630,10 @@ if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC" OR "${CMAKE_CXX_SIMULATE_ID}" STREQU
 endif()
 
 if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-  # Avoid CMake's default -O3 for Release builds.
-  set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG")
+  # CMake's default for CMAKE_CXX_FLAGS_RELEASE is "-O3 -DNDEBUG". Let's avoid "-O3" for consistency
+  # between Release and RelWithDebInfo. And let's not set -DNDEBUG because we're setting that manually
+  # based on LLVM_ENABLE_ASSERTIONS.
+  set(CMAKE_CXX_FLAGS_RELEASE "-O2")
 
   _compute_lto_flag("${SWIFT_TOOLS_ENABLE_LTO}" _lto_flag_out)
   if(_lto_flag_out)
