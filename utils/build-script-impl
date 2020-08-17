@@ -2030,6 +2030,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_CXX_COMPILER:PATH="${CLANG_BIN}/clang++"
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
                     -DCMAKE_Swift_COMPILER:PATH=${SWIFTC_BIN}
+                    -DCMAKE_OSX_ARCHITECTURES="${architecture}"
 
                     -DLLBUILD_ENABLE_ASSERTIONS:BOOL=$(true_false "${LLBUILD_ENABLE_ASSERTIONS}")
                     -DLLBUILD_SUPPORT_BINDINGS:=Swift
