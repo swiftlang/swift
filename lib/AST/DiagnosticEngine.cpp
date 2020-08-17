@@ -1010,8 +1010,9 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
     emitDiagnostic(childNote);
 }
 
-const char *DiagnosticEngine::diagnosticStringFor(const DiagID id,
-                                                  bool printDiagnosticName) {
+llvm::StringRef
+DiagnosticEngine::diagnosticStringFor(const DiagID id,
+                                      bool printDiagnosticName) {
   // TODO: Print diagnostic names from `localization`.
   if (printDiagnosticName) {
     return debugDiagnosticStrings[(unsigned)id];
@@ -1020,7 +1021,7 @@ const char *DiagnosticEngine::diagnosticStringFor(const DiagID id,
   if (localization) {
     auto localizedMessage =
         localization.get()->getMessageOr(id, defaultMessage);
-    return localizedMessage.data();
+    return localizedMessage;
   }
   return defaultMessage;
 }

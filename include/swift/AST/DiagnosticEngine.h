@@ -22,6 +22,7 @@
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/LocalizationFormat.h"
 #include "swift/AST/TypeLoc.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/FileSystem.h"
@@ -987,7 +988,8 @@ namespace swift {
     void emitTentativeDiagnostics();
 
   public:
-    const char *diagnosticStringFor(const DiagID id, bool printDiagnosticName);
+    llvm::StringRef diagnosticStringFor(const DiagID id,
+                                        bool printDiagnosticName);
 
     /// If there is no clear .dia file for a diagnostic, put it in the one
     /// corresponding to the SourceLoc given here.
