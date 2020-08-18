@@ -606,7 +606,6 @@ public:
   const clang::Type *
   getCanonicalClangFunctionType(
     ArrayRef<SILParameterInfo> params, Optional<SILResultInfo> result,
-    const SILFunctionType::ExtInfo incompleteExtInfo,
     SILFunctionType::Representation trueRep);
 
   /// Get the Swift declaration that a Clang declaration was exported from,

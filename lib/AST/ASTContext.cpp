@@ -4477,7 +4477,6 @@ const clang::Type *
 ASTContext::getCanonicalClangFunctionType(
     ArrayRef<SILParameterInfo> params,
     Optional<SILResultInfo> result,
-    SILFunctionType::ExtInfo incompleteExtInfo,
     SILFunctionType::Representation trueRep) {
   auto *ty = getClangTypeConverter().getFunctionType(params, result, trueRep);
   return ty ? ty->getCanonicalTypeInternal().getTypePtr() : nullptr;
