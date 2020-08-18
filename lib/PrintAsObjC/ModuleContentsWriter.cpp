@@ -278,6 +278,9 @@ public:
         if (TD == container)
           return;
 
+        // Bridge, if necessary.
+        TD = printer.getObjCTypeDecl(TD);
+
         if (finder.needsDefinition() && isa<NominalTypeDecl>(TD)) {
           // We can delay individual members of classes; do so if necessary.
           if (isa<ClassDecl>(container)) {
