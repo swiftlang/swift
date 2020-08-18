@@ -256,9 +256,6 @@ class CMake(object):
     # the source and build the source if necessary. Returns the path to the
     # cmake binary.
     def check_cmake_version(self, source_root, build_root):
-        if platform.system() != 'Linux':
-            return
-
         cmake_source_dir = os.path.join(source_root, 'cmake')
         # If the source is not checked out then don't attempt to build cmake.
         if not os.path.isdir(cmake_source_dir):
