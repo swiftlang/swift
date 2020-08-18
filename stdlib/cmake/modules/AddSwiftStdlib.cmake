@@ -302,6 +302,10 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-DSWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES")
   endif()
 
+  if(SWIFT_RUNTIME_MACHO_NO_DYLD)
+    list(APPEND result "-DSWIFT_RUNTIME_MACHO_NO_DYLD")
+  endif()
+
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
 endfunction()
 
