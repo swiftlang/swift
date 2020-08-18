@@ -50,6 +50,7 @@ set(swift_runtime_sources
     ImageInspectionMachO.cpp
     ImageInspectionELF.cpp
     ImageInspectionCOFF.cpp
+    ImageInspectionStatic.cpp
     KeyPaths.cpp
     KnownMetadata.cpp
     Metadata.cpp
