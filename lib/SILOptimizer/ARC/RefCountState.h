@@ -205,13 +205,6 @@ public:
       ImmutablePointerSetFactory<SILInstruction> &SetFactory,
       AliasAnalysis *AA);
 
-  // Determine the conservative effect of the given list of predecessor
-  // terminators upon this reference count.
-  void updateForPredTerminators(
-      ArrayRef<SILInstruction *> PredTerms,
-      ImmutablePointerSetFactory<SILInstruction> &SetFactory,
-      AliasAnalysis *AA);
-
   /// Attempt to merge \p Other into this ref count state. Return true if we
   /// succeed and false otherwise.
   bool merge(const BottomUpRefCountState &Other);
