@@ -5882,7 +5882,7 @@
   msg: "call is 'async' but is not marked with 'await'"
 
 - id: async_call_without_await_in_autoclosure
-  msg: "call is 'async' in an autoclosure argument is not marked with 'await'"
+  msg: "call is 'async' in an autoclosure argument that is not marked with 'await'"
 
 - id: no_async_in_await
   msg: "no calls to 'async' functions occur within 'await' expression"
@@ -5899,6 +5899,9 @@
 - id: note_add_async_to_function
   msg: "add 'async' to function %0 to make it asynchronous"
 
+- id: note_add_asynchandler_to_function
+  msg: "add '@asyncHandler' to function %0 to create an implicit asynchronous context"
+
 - id: not_objc_function_async
   msg: "'async' function cannot be represented in Objective-C"
 
@@ -5910,6 +5913,27 @@
 
 - id: async_autoclosure_nonasync_function
   msg: "'async' autoclosure parameter in a non-'async' function"
+
+- id: asynchandler_attr_requires_concurrency
+  msg: "'@asyncHandler' is only valid when experimental concurrency is enabled"
+
+- id: asynchandler_non_func
+  msg: "'@asyncHandler' can only be applied to functions"
+
+- id: asynchandler_returns_value
+  msg: "'@asyncHandler' function can only return 'Void'"
+
+- id: asynchandler_throws
+  msg: "'@asyncHandler' function cannot throw"
+
+- id: asynchandler_async
+  msg: "'@asyncHandler' function cannot be 'async' itself"
+
+- id: asynchandler_inout_parameter
+  msg: "'inout' parameter is not allowed in '@asyncHandler' function"
+
+- id: asynchandler_mutating
+  msg: "'@asyncHandler' function cannot be 'mutating'"
 
 - id: unsupported_recursive_struct
   msg: "value type %0 cannot have a stored property that recursively contains it"
@@ -8277,3 +8301,4 @@
 
 - id: enum_case_added
   msg: "%0 has been added as a new enum case"
+
