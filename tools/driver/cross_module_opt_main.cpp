@@ -160,10 +160,18 @@ void markDeadSymbols(ModuleSummaryIndex &summary, llvm::DenseSet<GUID> &Preserve
   unsigned LiveSymbols = 0;
 
   for (auto GUID : PreservedGUIDs) {
-    Worklist.push_back(std::make_shared<LivenessTrace>(
-        nullptr, GUID, LivenessTrace::Preserved));
+    auto trace = std::make_shared<LivenessTrace>(
+        nullptr, GUID, LivenessTrace::Preserved);
+    auto maybeFS = summary.getFunctionSummary(GUID);
+    if (!maybeFS) {
+      llvm_unreachable("Bad GUID");
+    }
+    if (!maybeFS->getName().empty()) {
+      trace->setName(maybeFS->getName());
+    }
+    Worklist.push_back(trace);
   }
-  std::shared_ptr<LivenessTrace> dumpTarget;
+  std::set<std::shared_ptr<LivenessTrace>> dumpTargets;
   while (!Worklist.empty()) {
     auto trace = Worklist.pop_back_val();
 
@@ -172,12 +180,6 @@ void markDeadSymbols(ModuleSummaryIndex &summary, llvm::DenseSet<GUID> &Preserve
       llvm_unreachable("Bad GUID");
     }
     auto FS = maybeSummary;
-    if (!FS->getName().empty()) {
-      trace->setName(FS->getName());
-      if (LTOPrintLiveTrace == FS->getName()) {
-        dumpTarget = trace;
-      }
-    }
     if (FS->isLive()) continue;
 
     if (!FS->getName().empty()) {
@@ -188,10 +190,25 @@ void markDeadSymbols(ModuleSummaryIndex &summary, llvm::DenseSet<GUID> &Preserve
     FS->setLive(true);
     LiveSymbols++;
 
+    auto queueWorklist = [&](std::shared_ptr<LivenessTrace> trace) {
+      auto maybeCallee = summary.getFunctionSummary(trace->guid);
+      if (!maybeCallee) {
+        llvm_unreachable("Bad GUID");
+      }
+      auto Callee = maybeCallee;
+      if (!Callee->getName().empty()) {
+        trace->setName(Callee->getName());
+        if (LTOPrintLiveTrace == Callee->getName()) {
+          dumpTargets.insert(trace);
+        }
+      }
+      Worklist.push_back(trace);
+    };
+
     for (auto Call : FS->calls()) {
       switch (Call.getKind()) {
       case FunctionSummary::Call::Direct: {
-        Worklist.push_back(std::make_shared<LivenessTrace>(
+        queueWorklist(std::make_shared<LivenessTrace>(
             trace, Call.getCallee(), LivenessTrace::StaticReferenced));
         continue;
       }
@@ -203,7 +220,7 @@ void markDeadSymbols(ModuleSummaryIndex &summary, llvm::DenseSet<GUID> &Preserve
           if (UsedTypesSet.find(Impl.TypeGuid) == UsedTypesSet.end()) {
             continue;
           }
-          Worklist.push_back(std::make_shared<LivenessTrace>(
+          queueWorklist(std::make_shared<LivenessTrace>(
               trace, Impl.Guid, LivenessTrace::IndirectReferenced));
         }
         break;
@@ -213,7 +230,7 @@ void markDeadSymbols(ModuleSummaryIndex &summary, llvm::DenseSet<GUID> &Preserve
       }
     }
   }
-  if (dumpTarget) {
+  for (auto dumpTarget : dumpTargets) {
     dumpTarget->dump();
   }
 }
