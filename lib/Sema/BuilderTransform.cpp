@@ -1489,9 +1489,11 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
   // If we encountered an error or there was an explicit result type,
   // bail out and report that to the caller.
   auto &ctx = func->getASTContext();
-  auto request = PreCheckFunctionBuilderRequest{AnyFunctionRef(func)};
-  switch (evaluateOrDefault(
-              ctx.evaluator, request, FunctionBuilderBodyPreCheck::Error)) {
+  auto request =
+      PreCheckFunctionBuilderRequest{{AnyFunctionRef(func),
+                                      /*SuppressDiagnostics=*/false}};
+  switch (evaluateOrDefault(ctx.evaluator, request,
+                            FunctionBuilderBodyPreCheck::Error)) {
   case FunctionBuilderBodyPreCheck::Okay:
     // If the pre-check was okay, apply the function-builder transform.
     break;
@@ -1623,16 +1625,24 @@ ConstraintSystem::matchFunctionBuilder(
 
   // Pre-check the body: pre-check any expressions in it and look
   // for return statements.
-  auto request = PreCheckFunctionBuilderRequest{fn};
+  auto request =
+      PreCheckFunctionBuilderRequest{{fn, /*SuppressDiagnostics=*/true}};
   switch (evaluateOrDefault(getASTContext().evaluator, request,
                             FunctionBuilderBodyPreCheck::Error)) {
   case FunctionBuilderBodyPreCheck::Okay:
     // If the pre-check was okay, apply the function-builder transform.
     break;
 
-  case FunctionBuilderBodyPreCheck::Error:
-    // If the pre-check had an error, flag that.
-    return getTypeMatchFailure(locator);
+  case FunctionBuilderBodyPreCheck::Error: {
+    if (!shouldAttemptFixes())
+      return getTypeMatchFailure(locator);
+
+    if (recordFix(IgnoreInvalidFunctionBuilderBody::create(
+            *this, getConstraintLocator(fn.getBody()))))
+      return getTypeMatchFailure(locator);
+
+    return getTypeMatchSuccess();
+  }
 
   case FunctionBuilderBodyPreCheck::HasReturnStmt:
     // If the body has a return statement, suppress the transform but
@@ -1709,14 +1719,17 @@ namespace {
 class PreCheckFunctionBuilderApplication : public ASTWalker {
   AnyFunctionRef Fn;
   bool SkipPrecheck = false;
+  bool SuppressDiagnostics = false;
   std::vector<ReturnStmt *> ReturnStmts;
   bool HasError = false;
 
   bool hasReturnStmt() const { return !ReturnStmts.empty(); }
 
 public:
-  PreCheckFunctionBuilderApplication(AnyFunctionRef fn, bool skipPrecheck)
-    : Fn(fn), SkipPrecheck(skipPrecheck) {}
+  PreCheckFunctionBuilderApplication(AnyFunctionRef fn, bool skipPrecheck,
+                                     bool suppressDiagnostics)
+      : Fn(fn), SkipPrecheck(skipPrecheck),
+        SuppressDiagnostics(suppressDiagnostics) {}
 
   const std::vector<ReturnStmt *> getReturnStmts() const { return ReturnStmts; }
 
@@ -1740,16 +1753,28 @@ public:
   }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    if (SkipPrecheck)
+      return std::make_pair(false, E);
+
     // Pre-check the expression.  If this fails, abort the walk immediately.
     // Otherwise, replace the expression with the result of pre-checking.
     // In either case, don't recurse into the expression.
-    if (!SkipPrecheck &&
-        ConstraintSystem::preCheckExpression(E, /*DC*/ Fn.getAsDeclContext())) {
-      HasError = true;
-      return std::make_pair(false, nullptr);
-    }
+    {
+      auto *DC = Fn.getAsDeclContext();
+      auto &diagEngine = DC->getASTContext().Diags;
 
-    return std::make_pair(false, E);
+      // Suppress any diangostics which could be produced by this expression.
+      DiagnosticTransaction transaction(diagEngine);
+
+      HasError |= ConstraintSystem::preCheckExpression(
+          E, DC, /*replaceInvalidRefsWithErrors=*/false);
+      HasError |= transaction.hasDiagnostics();
+
+      if (SuppressDiagnostics)
+        transaction.abort();
+
+      return std::make_pair(false, HasError ? nullptr : E);
+    }
   }
 
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
@@ -1782,11 +1807,15 @@ FunctionBuilderBodyPreCheck PreCheckFunctionBuilderRequest::evaluate(
           owner.Fn.getAbstractClosureExpr()))
     skipPrecheck = shouldTypeCheckInEnclosingExpression(closure);
 
-  return PreCheckFunctionBuilderApplication(owner.Fn, false).run();
+  return PreCheckFunctionBuilderApplication(
+             owner.Fn, /*skipPrecheck=*/false,
+             /*suppressDiagnostics=*/owner.SuppressDiagnostics)
+      .run();
 }
 
 std::vector<ReturnStmt *> TypeChecker::findReturnStatements(AnyFunctionRef fn) {
-  PreCheckFunctionBuilderApplication precheck(fn, true);
+  PreCheckFunctionBuilderApplication precheck(fn, /*skipPreCheck=*/true,
+                                              /*SuppressDiagnostics=*/true);
   (void)precheck.run();
   return precheck.getReturnStmts();
 }
