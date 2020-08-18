@@ -164,7 +164,9 @@ func catchError2(_ b: Bool) -> Int {
   do {
     throw CustomError.Err // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
   } catch {
-    if b {                // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
+    // reviews.llvm.org/D85036 regressed coverage reporting for the
+    // following line (rdar://67280997).
+    if b {                // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
       return 1            // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
     }
   }
