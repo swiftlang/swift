@@ -28,6 +28,24 @@ namespace swift {
 /// of the analysis and can be a super set of the uses of the SILValue
 /// e.g. it can be the set of transitive uses of the SILValue.
 class ValueLifetimeAnalysis {
+  /// The instruction or argument that define the value.
+  PointerUnion<SILInstruction *, SILArgument *> defValue;
+
+  /// The set of blocks where the value is live.
+  llvm::SmallSetVector<SILBasicBlock *, 16> liveBlocks;
+
+  /// The set of instructions where the value is used, or the users-list
+  /// provided with the constructor.
+  llvm::SmallPtrSet<SILInstruction *, 16> userSet;
+
+  /// Indicates whether the basic block containing def has users of def that
+  /// precede def. This field is initialized by propagateLiveness.
+  bool hasUsersBeforeDef;
+
+  /// Critical edges that couldn't be split to compute the frontier. This could
+  /// be non-empty when the analysis is invoked with DontModifyCFG mode.
+  llvm::SmallVector<std::pair<TermInst *, unsigned>, 16> criticalEdges;
+
 public:
 
   /// The lifetime frontier for the value. It is the list of instructions
@@ -35,13 +53,13 @@ public:
   /// end the value's lifetime.
   using Frontier = SmallVector<SILInstruction *, 4>;
 
-  /// Constructor for the value \p Def with a specific range of users.
+  /// Constructor for the value \p def with a specific range of users.
   ///
   /// We templatize over the RangeTy so that we can initialize
   /// ValueLifetimeAnalysis with misc iterators including transform
   /// iterators.
   template <typename RangeTy>
-  ValueLifetimeAnalysis(SILInstruction *def, const RangeTy &userRange)
+  ValueLifetimeAnalysis(decltype(defValue) def, const RangeTy &userRange)
       : defValue(def), userSet(userRange.begin(), userRange.end()) {
     propagateLiveness();
   }
@@ -102,7 +120,7 @@ public:
   /// Returns true if the value is alive at the begin of block \p bb.
   bool isAliveAtBeginOfBlock(SILBasicBlock *bb) {
     return liveBlocks.count(bb) &&
-           (bb != defValue->getParent() || hasUsersBeforeDef);
+           (hasUsersBeforeDef || bb != getDefValueParentBlock());
   }
 
   /// Checks if there is a dealloc_ref inside the value's live range.
@@ -112,24 +130,19 @@ public:
   void dump() const;
 
 private:
+  SILFunction *getFunction() const {
+    if (auto *inst = defValue.dyn_cast<SILInstruction *>()) {
+      return inst->getFunction();
+    }
+    return defValue.get<SILArgument *>()->getFunction();
+  }
 
-  /// The value.
-  SILInstruction *defValue;
-
-  /// The set of blocks where the value is live.
-  llvm::SmallSetVector<SILBasicBlock *, 16> liveBlocks;
-
-  /// The set of instructions where the value is used, or the users-list
-  /// provided with the constructor.
-  llvm::SmallPtrSet<SILInstruction *, 16> userSet;
-
-  /// Indicates whether the basic block containing def has users of def that
-  /// precede def. This field is initialized by propagateLiveness.
-  bool hasUsersBeforeDef;
-
-  /// Critical edges that couldn't be split to compute the frontier. This could
-  /// be non-empty when the analysis is invoked with DontModifyCFG mode.
-  llvm::SmallVector<std::pair<TermInst *, unsigned>, 16> criticalEdges;
+  SILBasicBlock *getDefValueParentBlock() const {
+    if (auto *inst = defValue.dyn_cast<SILInstruction *>()) {
+      return inst->getParent();
+    }
+    return defValue.get<SILArgument *>()->getParent();
+  }
 
   /// Propagates the liveness information up the control flow graph.
   void propagateLiveness();
