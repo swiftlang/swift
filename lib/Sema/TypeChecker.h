@@ -315,7 +315,11 @@ Type getOptionalType(SourceLoc loc, Type elementType);
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
 /// returning the resultant expression.  Context is the DeclContext used
 /// for the lookup.
-Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context);
+///
+/// \param replaceInvalidRefsWithErrors Indicates whether it's allowed
+/// to replace any discovered invalid member references with `ErrorExpr`.
+Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
+                         bool replaceInvalidRefsWithErrors);
 
 /// Check for unsupported protocol types in the given declaration.
 void checkUnsupportedProtocolType(Decl *decl);

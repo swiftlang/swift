@@ -276,6 +276,9 @@ enum class FixKind : uint8_t {
 
   /// Allow key path expressions with no components.
   AllowKeyPathWithoutComponents,
+
+  /// Ignore function builder body which fails `pre-check` call.
+  IgnoreInvalidFunctionBuilderBody,
 };
 
 class ConstraintFix {
@@ -1978,6 +1981,26 @@ public:
 
   static AllowKeyPathWithoutComponents *create(ConstraintSystem &cs,
                                                ConstraintLocator *locator);
+};
+
+class IgnoreInvalidFunctionBuilderBody final : public ConstraintFix {
+  IgnoreInvalidFunctionBuilderBody(ConstraintSystem &cs,
+                                   ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::IgnoreInvalidFunctionBuilderBody, locator) {}
+
+public:
+  std::string getName() const override {
+    return "ignore invalid function builder body";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static IgnoreInvalidFunctionBuilderBody *create(ConstraintSystem &cs,
+                                                  ConstraintLocator *locator);
 };
 
 } // end namespace constraints
