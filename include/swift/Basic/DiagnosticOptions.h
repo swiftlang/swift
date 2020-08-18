@@ -67,9 +67,8 @@ public:
 
   std::string DiagnosticDocumentationPath = "";
 
+  // Locale code and directory path for localized diagnostics.
   std::string LocalizationCode = "";
-
-  // Diagnostic messages directory path.
   std::string LocalizationPath = "";
 
   /// Return a hash code of any components from these options that should

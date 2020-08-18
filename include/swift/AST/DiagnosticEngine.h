@@ -667,6 +667,10 @@ namespace swift {
     /// but rather stored until all transactions complete.
     llvm::StringSet<llvm::BumpPtrAllocator &> TransactionStrings;
 
+    /// Diagnostic producer to handle the logic behind retrieving the default
+    /// diagnostic messages.
+    std::unique_ptr<diag::LocalizationProducer> defaultLocalization;
+
     /// Diagnostic producer to handle the logic behind retrieving a localized
     /// diagnostic message.
     std::unique_ptr<diag::LocalizationProducer> localization;
@@ -694,7 +698,8 @@ namespace swift {
   public:
     explicit DiagnosticEngine(SourceManager &SourceMgr)
         : SourceMgr(SourceMgr), ActiveDiagnostic(),
-          TransactionStrings(TransactionAllocator) {}
+          TransactionStrings(TransactionAllocator),
+          defaultLocalization(setDefaultLocalization("", "")) {}
 
     /// hadAnyError - return true if any *error* diagnostics have been emitted.
     bool hadAnyError() const { return state.hadAnyError(); }
@@ -742,6 +747,35 @@ namespace swift {
       return diagnosticDocumentationPath;
     }
 
+    std::unique_ptr<diag::LocalizationProducer>
+    setDefaultLocalization(std::string defaultLocale, std::string path) {
+      defaultLocale = "en";
+      path = "/Volumes/Extreme/swift-source/build/Ninja-DebugAssert/swift-macosx-x86_64/share/swift/diagnostics";
+      assert(!path.empty());
+      assert(!defaultLocale.empty());
+
+      llvm::SmallString<128> filePath(path);
+      llvm::sys::path::append(filePath, defaultLocale);
+      llvm::sys::path::replace_extension(filePath, ".db");
+
+      std::unique_ptr<diag::LocalizationProducer> defLocle;
+      // If the serialized diagnostics file not available,
+      // fallback to the `YAML` file.
+      if (llvm::sys::fs::exists(filePath)) {
+        if (auto file = llvm::MemoryBuffer::getFile(filePath)) {
+          defLocle = std::make_unique<diag::SerializedLocalizationProducer>(
+              std::move(file.get()));
+        }
+      } else {
+        llvm::sys::path::replace_extension(filePath, ".yaml");
+        // Crash if both `.db` and `.yaml` localization files not found.
+        assert(llvm::sys::fs::exists(filePath));
+        defLocle =
+            std::make_unique<diag::YAMLLocalizationProducer>(filePath.str());
+      }
+      return defLocle;
+    }
+
     void setLocalization(std::string locale, std::string path) {
       assert(!locale.empty());
       assert(!path.empty());
@@ -759,7 +793,7 @@ namespace swift {
       } else {
         llvm::sys::path::replace_extension(filePath, ".yaml");
         // In case of missing localization files, we should fallback to messages
-        // from `.def` files.
+        // from the default localization producer i.e. English.
         if (llvm::sys::fs::exists(filePath)) {
           localization =
               std::make_unique<diag::YAMLLocalizationProducer>(filePath.str());

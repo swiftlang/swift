@@ -140,12 +140,10 @@ public:
 
 class LocalizationProducer {
 public:
-  /// If the  message isn't available/localized in the current `yaml` file,
-  /// return the fallback default message.
-  virtual llvm::StringRef getMessageOr(swift::DiagID id,
-                                       llvm::StringRef defaultMessage) const {
-    return defaultMessage;
-  }
+  /// Get a diagnostic  message from the current `yaml` or `.db` file. If it's
+  /// not available return `llvm::None`.
+  virtual llvm::Optional<llvm::StringRef>
+  getMessageOr(swift::DiagID id) const = 0;
 
   virtual ~LocalizationProducer() {}
 };
@@ -157,8 +155,7 @@ public:
   /// The diagnostics IDs that are no longer available in `.def`
   std::vector<std::string> unknownIDs;
   explicit YAMLLocalizationProducer(llvm::StringRef filePath);
-  llvm::StringRef getMessageOr(swift::DiagID id,
-                               llvm::StringRef defaultMessage) const override;
+  llvm::Optional<llvm::StringRef> getMessageOr(swift::DiagID id) const override;
 
   /// Iterate over all of the available (non-empty) translations
   /// maintained by this producer, callback gets each translation
@@ -178,8 +175,7 @@ public:
   explicit SerializedLocalizationProducer(
       std::unique_ptr<llvm::MemoryBuffer> buffer);
 
-  llvm::StringRef getMessageOr(swift::DiagID id,
-                               llvm::StringRef defaultMessage) const override;
+  llvm::Optional<llvm::StringRef> getMessageOr(swift::DiagID id) const override;
 };
 
 class LocalizationInput : public llvm::yaml::Input {
