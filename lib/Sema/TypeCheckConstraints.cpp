@@ -39,6 +39,7 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Parse/Confusables.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -2160,6 +2161,17 @@ TypeChecker::typeCheckExpression(
   FrontendStatsTracer StatsTracer(Context.Stats,
                                   "typecheck-expr", expr);
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
+
+  if (Context.CompletionCallback &&
+      Context.CompletionCallback->isApplicable(expr)) {
+    typeCheckForCodeCompletion(expr, dc, target.getExprContextualType(),
+                               target.getExprContextualTypePurpose(),
+                               [&](const constraints::Solution &S) {
+      Context.CompletionCallback->sawSolution(S);
+    });
+    target.setExpr(expr);
+    return None;
+  }
 
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.

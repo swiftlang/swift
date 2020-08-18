@@ -52,12 +52,13 @@ namespace swift {
 
   namespace ide {
     class CodeCompletionContext;
+    class CodeCompletionConsumer;
   }
 
   class CompletionCollector {
   public:
     virtual void sawSolution(const constraints::Solution &solution) = 0;
-    virtual void simple_display(llvm::raw_ostream &out) const = 0;
+    virtual bool isApplicable(Expr *E) { return false; }
     virtual ~CompletionCollector() {}
   };
 
@@ -68,6 +69,7 @@ namespace swift {
       ValueDecl* ReferencedDecl;
       SmallVector<Type, 4> ExpectedTypes;
       bool BaseIsStaticMetaType;
+      bool isSingleExpressionClosure;
     };
 
     SourceLoc DotLoc;
@@ -83,12 +85,13 @@ namespace swift {
                   CodeCompletionExpr *CompletionExpr)
       : DotLoc(DotLoc), DC(DC), CompletionExpr(CompletionExpr) {}
 
-    void performLookup(ide::CodeCompletionContext &CompletionCtx) const;
+    void performLookup(ide::CodeCompletionContext &CompletionCtx,
+                       ide::CodeCompletionConsumer &Consumer) const;
     bool gotCallback() const { return GotCallback; }
 
   private:
     void sawSolution(const constraints::Solution &solution) override;
-    void simple_display(llvm::raw_ostream &out) const override;
+    bool isApplicable(Expr *E) override;
   };
 
   /// Typecheck binding initializer at \p bindingIndex.
@@ -179,8 +182,7 @@ namespace swift {
   bool typeCheckExpression(DeclContext *DC, Expr *&parsedExpr);
 
   /// Type check a function body element which is at \p TagetLoc .
-  bool typeCheckASTNodeAtLoc(DeclContext *DC, SourceLoc TargetLoc,
-                             CompletionCollector *Collector = nullptr);
+  bool typeCheckASTNodeAtLoc(DeclContext *DC, SourceLoc TargetLoc);
 
   /// Typecheck top-level code parsed during code completion.
   ///

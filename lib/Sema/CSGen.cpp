@@ -1024,7 +1024,7 @@ namespace {
         CS.addConstraint(ConstraintKind::Defaultable, ty, CS.getType(base),
                          locator);
       }
-      
+
       return ty;
     }
 

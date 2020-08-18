@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Parse/Parser.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/EditorPlaceholder.h"
@@ -2752,6 +2753,22 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
   return invalid;
 }
 
+static bool isMemberCompletion(ASTNode Node) {
+  struct HasMemberCompletion: public ASTWalker {
+    bool Value = false;
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (auto *CCE = dyn_cast<CodeCompletionExpr>(E)) {
+        Value = CCE->getBase();
+        return {false, nullptr};
+      }
+      return {true, E};
+    }
+  };
+  HasMemberCompletion Check;
+  Node.walk(Check);
+  return Check.Value;
+}
+
 ParserResult<Expr> Parser::parseExprClosure() {
   assert(Tok.is(tok::l_brace) && "Not at a left brace?");
   SyntaxParsingContext ClosureContext(SyntaxContext, SyntaxKind::ClosureExpr);
@@ -2862,8 +2879,9 @@ ParserResult<Expr> Parser::parseExprClosure() {
   // may be incomplete and the type mismatch in return statement will just
   // confuse the type checker.
   bool hasSingleExpressionBody = false;
-  if (!missingRBrace && !Status.hasCodeCompletion() &&
-      bodyElements.size() == 1) {
+  // FIXME: make this change separately
+  if (!missingRBrace && bodyElements.size() == 1 &&
+      (!Status.hasCodeCompletion() || isMemberCompletion(bodyElements[0]))) {
     // If the closure's only body element is a single return statement,
     // use that instead of creating a new wrapping return expression.
     Expr *returnExpr = nullptr;

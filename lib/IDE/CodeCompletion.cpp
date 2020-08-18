@@ -1526,6 +1526,8 @@ void CodeCompletionContext::sortCompletionResults(
 }
 
 namespace {
+class CompletionLookup;
+
 class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   CodeCompletionContext &CompletionContext;
   std::vector<RequestedCachedModule> RequestedModules;
@@ -5798,10 +5800,109 @@ static void addConditionalCompilationFlags(ASTContext &Ctx,
   }
 }
 
-void DotExprLookup::performLookup(ide::CodeCompletionContext &CompletionCtx) const {
+static void processModuleRequests(CodeCompletionContext &CompletionContext,
+                                  CompletionLookup &Lookup,
+                                  SourceFile &SF,
+                                  CodeCompletionConsumer &Consumer) {
+  llvm::SmallPtrSet<Identifier, 8> seenModuleNames;
+  std::vector<RequestedCachedModule> RequestedModules;
+
+  for (auto &Request: Lookup.RequestedCachedResults) {
+    llvm::DenseSet<CodeCompletionCache::Key> ImportsSeen;
+    auto handleImport = [&](ModuleDecl::ImportedModule Import) {
+      ModuleDecl *TheModule = Import.importedModule;
+      ModuleDecl::AccessPathTy Path = Import.accessPath;
+      if (TheModule->getFiles().empty())
+        return;
+
+      // Clang submodules are ignored and there's no lookup cost involved,
+      // so just ignore them and don't put the empty results in the cache
+      // because putting a lot of objects in the cache will push out
+      // other lookups.
+      if (isClangSubModule(TheModule))
+        return;
+
+      std::vector<std::string> AccessPath;
+      for (auto Piece : Path) {
+        AccessPath.push_back(std::string(Piece.Item));
+      }
+
+      StringRef ModuleFilename = TheModule->getModuleFilename();
+      // ModuleFilename can be empty if something strange happened during
+      // module loading, for example, the module file is corrupted.
+      if (!ModuleFilename.empty()) {
+        auto &Ctx = TheModule->getASTContext();
+        CodeCompletionCache::Key K{
+            ModuleFilename.str(),
+            std::string(TheModule->getName()),
+            AccessPath,
+            Request.NeedLeadingDot,
+            SF.hasTestableOrPrivateImport(
+                AccessLevel::Internal, TheModule,
+                SourceFile::ImportQueryKind::TestableOnly),
+            SF.hasTestableOrPrivateImport(
+                AccessLevel::Internal, TheModule,
+                SourceFile::ImportQueryKind::PrivateOnly),
+            Ctx.LangOpts.CodeCompleteInitsInPostfixExpr,
+            CompletionContext.getAnnotateResult(),
+        };
+
+        using PairType = llvm::DenseSet<swift::ide::CodeCompletionCache::Key,
+            llvm::DenseMapInfo<CodeCompletionCache::Key>>::iterator;
+        std::pair<PairType, bool> Result = ImportsSeen.insert(K);
+        if (!Result.second)
+          return; // already handled.
+        RequestedModules.push_back({std::move(K), TheModule,
+          Request.OnlyTypes, Request.OnlyPrecedenceGroups});
+
+        if (Request.IncludeModuleQualifier &&
+            seenModuleNames.insert(TheModule->getName()).second)
+          Lookup.addModuleName(TheModule);
+      }
+    };
+
+    if (Request.TheModule) {
+      // FIXME: actually check imports.
+      for (auto Import : namelookup::getAllImports(Request.TheModule)) {
+        handleImport(Import);
+      }
+    } else {
+      // Add results from current module.
+      Lookup.getToplevelCompletions(Request.OnlyTypes);
+
+      // Add the qualifying module name
+      auto curModule = SF.getParentModule();
+      if (Request.IncludeModuleQualifier &&
+          seenModuleNames.insert(curModule->getName()).second)
+        Lookup.addModuleName(curModule);
+
+      // Add results for all imported modules.
+      SmallVector<ModuleDecl::ImportedModule, 4> Imports;
+      //auto *SF = CurDeclContext->getParentSourceFile();
+      SF.getImportedModules(
+          Imports, {ModuleDecl::ImportFilterKind::Public,
+                    ModuleDecl::ImportFilterKind::Private,
+                    ModuleDecl::ImportFilterKind::ImplementationOnly});
+
+      for (auto Imported : Imports) {
+        for (auto Import : namelookup::getAllImports(Imported.importedModule))
+          handleImport(Import);
+      }
+    }
+  }
+  Lookup.RequestedCachedResults.clear();
+
+  DeclContext *DCForModules = &SF;
+  Consumer.handleResultsAndModules(CompletionContext, RequestedModules,
+                                   DCForModules);
+}
+
+void DotExprLookup::performLookup(ide::CodeCompletionContext &CompletionCtx,
+                                  CodeCompletionConsumer &Consumer) const {
   ASTContext &Ctx = DC->getASTContext();
   CompletionLookup Lookup(CompletionCtx.getResultSink(), Ctx, DC,
                           &CompletionCtx);
+
   if (DotLoc.isValid())
     Lookup.setHaveDot(DotLoc);
 
@@ -5811,15 +5912,22 @@ void DotExprLookup::performLookup(ide::CodeCompletionContext &CompletionCtx) con
   if (auto *DRE = dyn_cast<DeclRefExpr>(BaseExpr))
     Lookup.setIsSelfRefExpr(DRE->getDecl()->getName() == Ctx.Id_self);
 
+  if (isa<BindOptionalExpr>(BaseExpr) || isa<ForceValueExpr>(BaseExpr))
+    Lookup.setIsUnwrappedOptional(true);
+
   for (auto &Solution: Solutions) {
     Lookup.setIsStaticMetatype(Solution.BaseIsStaticMetaType);
     Lookup.getPostfixKeywordCompletions(Solution.Ty, BaseExpr);
-    Lookup.setExpectedTypes(Solution.ExpectedTypes, true);
+    Lookup.setExpectedTypes(Solution.ExpectedTypes, Solution.isSingleExpressionClosure);
+    if (isDynamicLookup(Solution.Ty))
+      Lookup.setIsDynamicLookup();
     Lookup.getValueExprCompletions(Solution.Ty, Solution.ReferencedDecl);
   }
 
+  SourceFile *SF = DC->getParentSourceFile();
   // FIXME: There may be multiple of these now.
   CompletionCtx.typeContextKind = Lookup.typeContextKind();
+  processModuleRequests(CompletionCtx, Lookup, *SF, Consumer);
 }
 
 bool CodeCompletionCallbacksImpl::trySolverCompletion() {
@@ -5853,16 +5961,18 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion() {
     assert(CurDeclContext);
 
     DotExprLookup Lookup(DotLoc, CurDeclContext, CodeCompleteTokenExpr);
-    typeCheckContextAt(CurDeclContext, CompletionLoc, &Lookup);
+    llvm::SaveAndRestore<CompletionCollector*>
+      CompletionCollector(Context.CompletionCallback, &Lookup);
+    typeCheckContextAt(CurDeclContext, CompletionLoc);
 
     // FIXME: This should be an assertion.
     // We're not propagating CompletionCollector everywhere we need to in
     // typeCheckContextAt().
-    if (!Lookup.gotCallback())
-      return false;
+    //assert(Lookup.gotCallback());
+//      return false;
 
-    Lookup.performLookup(CompletionContext);
     addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
+    Lookup.performLookup(CompletionContext, Consumer);
     deliverCompletionResults();
     return true;
   }

@@ -920,7 +920,7 @@ public:
 /// Produces true if an error occurred, false otherwise.
 class TypeCheckASTNodeAtLocRequest
     : public SimpleRequest<TypeCheckASTNodeAtLocRequest,
-                           bool(DeclContext *, SourceLoc, CompletionCollector *),
+                           bool(DeclContext *, SourceLoc),
                            RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -929,8 +929,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, DeclContext *DC, SourceLoc Loc,
-                CompletionCollector *Collector) const;
+  bool evaluate(Evaluator &evaluator, DeclContext *DC, SourceLoc Loc) const;
 };
 
 void simple_display(llvm::raw_ostream &out, CompletionCollector *collector);

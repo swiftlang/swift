@@ -704,6 +704,14 @@ swift::lookupSemanticMember(DeclContext *DC, Type ty, DeclName name) {
   return TypeChecker::lookupMember(DC, ty, DeclNameRef(name), None);
 }
 
+bool DotExprLookup::isApplicable(Expr *E) {
+  SourceRange Range = E->getSourceRange();
+  if (Range.isInvalid())
+    return false;
+  auto &SM = DC->getASTContext().SourceMgr;
+  return SM.rangeContainsCodeCompletionLoc(Range);
+}
+
 void DotExprLookup::sawSolution(const constraints::Solution &S) {
   GotCallback = true;
   auto &CS = S.getConstraintSystem();
@@ -724,16 +732,19 @@ void DotExprLookup::sawSolution(const constraints::Solution &S) {
     if (auto SelectedOverload = S.getOverloadChoiceIfAvailable(CalleeLocator))
       ReferencedDecl = SelectedOverload->choice.getDeclOrNull();
 
-    bool ISDMT = S.isStaticallyDerivedMetatype(ParsedExpr);
     auto Key = std::make_pair(BaseTy, ReferencedDecl);
     auto Ret = ResultToIndex.insert({Key, Solutions.size()});
-    if (!Ret.second && ExpectedTy)
+    if (!Ret.second && ExpectedTy) {
       Solutions[Ret.first->getSecond()].ExpectedTypes.push_back(ExpectedTy);
-    else
-      Solutions.push_back({BaseTy, ReferencedDecl, {ExpectedTy}, ISDMT});
+    } else {
+      bool ISDMT = S.isStaticallyDerivedMetatype(CompletionExpr);
+      bool ISEC = false;
+      if (auto *Parent = dyn_cast_or_null<ClosureExpr>(CS.getParentExpr(CompletionExpr))) {
+        if (Parent->hasSingleExpressionBody()) {
+          ISEC = Parent->getSingleExpressionBody() == CompletionExpr;
+        }
+      }
+      Solutions.push_back({BaseTy, ReferencedDecl, {ExpectedTy}, ISDMT, ISEC});
+    }
   }
-}
-
-void DotExprLookup::simple_display(llvm::raw_ostream &out) const {
-  out << "DotExprLookup(" << this << ")";
 }

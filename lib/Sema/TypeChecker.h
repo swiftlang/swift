@@ -472,8 +472,7 @@ bool typesSatisfyConstraint(Type t1, Type t2, bool openArchetypes,
 Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
 
 void typeCheckASTNode(ASTNode &node, DeclContext *DC,
-                      bool LeaveBodyUnchecked = false,
-                      CompletionCollector *Collector = nullptr);
+                      bool LeaveBodyUnchecked = false);
 
 bool typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);
 
