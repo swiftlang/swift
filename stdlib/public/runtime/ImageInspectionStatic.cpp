@@ -1,4 +1,4 @@
-//===--- ImageInspectionMachO.cpp - Mach-O image inspection ---------------===//
+//===--- ImageInspectionStatic.cpp - image inspection for static stdlib ---===//
 //
 // This source file is part of the Swift.org open source project
 //
