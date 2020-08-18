@@ -26,6 +26,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
+#include <iomanip>
 
 using namespace swift;
 using namespace modulesummary;
@@ -35,6 +36,7 @@ enum class ActionType : unsigned {
   BinaryToYAML,
   YAMLToBinary,
   BinaryToDominators,
+  BinaryToDominatorTree,
   BinaryToDot,
 };
 
@@ -62,8 +64,11 @@ static llvm::cl::opt<ActionType> Action(
                    "Convert new binary .swiftmodule.summary format to YAML"),
         clEnumValN(ActionType::YAMLToBinary, "from-yaml",
                    "Convert YAML to new binary .swiftmodule.summary format"),
+        clEnumValN(ActionType::BinaryToDominators, "binary-to-dom",
+                   "Convert new binary .swiftmodule.summary format to "
+                   "dominators list"),
         clEnumValN(
-            ActionType::BinaryToDominators, "binary-to-dom",
+            ActionType::BinaryToDominatorTree, "binary-to-dom-tree",
             "Convert new binary .swiftmodule.summary format to dominator tree"),
         clEnumValN(ActionType::BinaryToDot, "binary-to-dot",
                    "Convert new binary .swiftmodule.summary format to Dot")));
@@ -418,14 +423,14 @@ public:
 class RetainedSizeCalculator {
   struct Entry {
     DomCallInfoNode *DomNode;
-    size_t InstSize;
+    uint32_t InstSize;
   };
-  std::map<DomCallInfoNode *, size_t> SizeCache;
+  std::map<DomCallInfoNode *, uint32_t> SizeCache;
   std::vector<Entry> Entries;
 
-  size_t getInstSize(DomCallInfoNode *domNode) {
+  uint32_t getInstSize(DomCallInfoNode *domNode) {
     auto FS = domNode->getBlock()->getFS();
-    size_t size = FS->getInstSize();
+    uint32_t size = FS->getInstSize();
     for (auto I = domNode->begin(), E = domNode->end(); I != E; ++I) {
       auto Child = *I;
       size += getInstSize(Child);
@@ -457,10 +462,46 @@ public:
       O << entry.InstSize << "\t| " << FS->getName() << "\n";
     }
   }
+
+  void displayTreeRec(llvm::raw_ostream &O, uint32_t TotalSize,
+                      DomCallInfoNode *Root, unsigned Lev) {
+    auto Size = getInstSize(Root);
+    auto Percent = (double(Size) / TotalSize * 100);
+    auto FS = Root->getBlock()->getFS();
+    O << Size << "\t| ";
+    llvm::format_provider<double>::format(Percent, O, "f2");
+    O << "\t| ";
+    O.indent(2 * Lev) << FS->getName() << "\n";
+
+    auto Children = Root->getChildren();
+    std::sort(Children.begin(), Children.end(),
+              [&](DomCallInfoNode *lhs, DomCallInfoNode *rhs) {
+                return getInstSize(lhs) > getInstSize(rhs);
+              });
+    for (auto Child : Children) {
+      displayTreeRec(O, TotalSize, Child, Lev + 1);
+    }
+  }
+  void displayTree(llvm::raw_ostream &O, DomCallInfoNode *Root) {
+    O << "size\t| %\t| symbol\n";
+    uint32_t TotalSize = 0;
+    for (auto Child : Root->getChildren()) {
+      TotalSize += getInstSize(Child);
+    }
+    auto Children = Root->getChildren();
+    std::sort(Children.begin(), Children.end(),
+              [&](DomCallInfoNode *lhs, DomCallInfoNode *rhs) {
+                return getInstSize(lhs) > getInstSize(rhs);
+              });
+    for (auto Child : Children) {
+      displayTreeRec(O, TotalSize, Child, 0);
+    }
+  }
 };
 
 int dominance_analysis(CallGraph &CG) {
   DomCallTree DT(CG);
+  DT.print(llvm::dbgs());
   DomCallInfoNode *Root = DT.getRootNode();
   RetainedSizeCalculator calculator;
   calculator.calculate(Root);
@@ -534,7 +575,8 @@ int main(int argc, char *argv[]) {
     });
     break;
   }
-  case ActionType::BinaryToDominators: {
+  case ActionType::BinaryToDominators:
+  case ActionType::BinaryToDominatorTree: {
     modulesummary::ModuleSummaryIndex summary;
     modulesummary::loadModuleSummaryIndex(fileBufOrErr.get()->getMemBufferRef(),
                                           summary);
@@ -544,7 +586,11 @@ int main(int argc, char *argv[]) {
     RetainedSizeCalculator calculator;
     calculator.calculate(Root);
     withOutputFile(diags, options::OutputFilename, [&](raw_ostream &out) {
-      calculator.display(out);
+      if (options::Action == ActionType::BinaryToDominators) {
+        calculator.display(out);
+      } else {
+        calculator.displayTree(out, Root);
+      }
       return false;
     });
     break;
