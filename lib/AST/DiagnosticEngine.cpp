@@ -1017,13 +1017,14 @@ DiagnosticEngine::diagnosticStringFor(const DiagID id,
   if (printDiagnosticName) {
     return debugDiagnosticStrings[(unsigned)id];
   }
-  auto defaultMessage = diagnosticStrings[(unsigned)id];
+  auto defaultMessage = defaultLocalization.get()->getMessageOr(id);
   if (localization) {
-    auto localizedMessage =
-        localization.get()->getMessageOr(id, defaultMessage);
-    return localizedMessage;
+    auto localizedMessage = localization.get()->getMessageOr(id);
+    if (localizedMessage) {
+      return localizedMessage.getValue();
+    }
   }
-  return defaultMessage;
+  return defaultMessage.getValue();
 }
 
 const char *InFlightDiagnostic::fixItStringFor(const FixItID id) {
