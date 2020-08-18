@@ -49,7 +49,7 @@ class TensorFlowSwiftAPIs(product.Product):
         # result, we need to create the build tree before we can use it and
         # change into it.
         try:
-            os.makedirs(self.build_dir)
+            shell.makedirs(self.build_dir)
         except OSError:
             pass
 
