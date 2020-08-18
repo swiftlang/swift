@@ -5413,16 +5413,12 @@ public:
     if (!diffKind.hasValue())
       MF.fatal();
 
-    const clang::FunctionType *clangFunctionType = nullptr;
+    const clang::Type *clangFunctionType = nullptr;
     if (clangFunctionTypeID) {
       auto clangType = MF.getClangType(clangFunctionTypeID);
       if (!clangType)
         return clangType.takeError();
-      // FIXME: allow block pointers here.
-      clangFunctionType =
-        dyn_cast_or_null<clang::FunctionType>(clangType.get());
-      if (!clangFunctionType)
-        MF.fatal();
+      clangFunctionType = clangType.get();
     }
 
     auto extInfo =
