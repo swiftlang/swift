@@ -1837,6 +1837,9 @@ static bool performCompile(CompilerInstance &Instance,
   if (Action == FrontendOptions::ActionType::ScanDependencies)
     return finishPipeline(scanDependencies(Instance));
 
+  if (Action == FrontendOptions::ActionType::ScanClangDependencies)
+    return finishPipeline(scanClangDependencies(Instance));
+
   if (observer)
     observer->performedSemanticAnalysis(Instance);
 
