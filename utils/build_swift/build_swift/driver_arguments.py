@@ -549,16 +549,16 @@ def create_argument_parser():
     # -------------------------------------------------------------------------
     in_group('Options to select projects')
 
-    option('--infer', store_true('infer_dependencies'),
+    option('--infer', toggle_true('infer_dependencies'),
            help='Infer any downstream dependencies from enabled projects')
 
-    option(['-l', '--lldb'], store_true('build_lldb'),
+    option(['-l', '--lldb'], toggle_true('build_lldb'),
            help='build LLDB')
 
-    option(['-b', '--llbuild'], store_true('build_llbuild'),
+    option(['-b', '--llbuild'], toggle_true('build_llbuild'),
            help='build llbuild')
 
-    option(['--libcxx'], store_true('build_libcxx'),
+    option(['--libcxx'], toggle_true('build_libcxx'),
            help='build libcxx')
 
     option(['-p', '--swiftpm'], toggle_true('build_swiftpm'),
@@ -567,16 +567,16 @@ def create_argument_parser():
     option(['--install-swiftpm'], toggle_true('install_swiftpm'),
            help='install swiftpm')
 
-    option(['--swiftsyntax'], store_true('build_swiftsyntax'),
+    option(['--swiftsyntax'], toggle_true('build_swiftsyntax'),
            help='build swiftSyntax')
 
-    option(['--skstresstester'], store_true('build_skstresstester'),
+    option(['--skstresstester'], toggle_true('build_skstresstester'),
            help='build the SourceKit stress tester')
 
-    option(['--swiftformat'], store_true('build_swiftformat'),
+    option(['--swiftformat'], toggle_true('build_swiftformat'),
            help='build swift-format')
 
-    option(['--swiftevolve'], store_true('build_swiftevolve'),
+    option(['--swiftevolve'], toggle_true('build_swiftevolve'),
            help='build the swift-evolve tool')
 
     option(['--swift-driver'], toggle_true('build_swift_driver'),
@@ -630,13 +630,13 @@ def create_argument_parser():
     option('--playgroundsupport', toggle_true('build_playgroundsupport'),
            help='build PlaygroundSupport')
     option('--install-playgroundsupport',
-           store_true('install_playgroundsupport'),
+           toggle_true('install_playgroundsupport'),
            help='install playground support')
 
     option('--build-ninja', toggle_true,
            help='build the Ninja tool')
 
-    option(['--build-libparser-only'], store_true('build_libparser_only'),
+    option(['--build-libparser-only'], toggle_true('build_libparser_only'),
            help='build only libParser for SwiftSyntax')
 
     option('--skip-build-clang-tools-extra',
