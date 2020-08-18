@@ -212,7 +212,6 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_require_explicit_availability_target);
   inputArgs.AddLastArg(arguments, options::OPT_enable_testing);
   inputArgs.AddLastArg(arguments, options::OPT_enable_private_imports);
-  inputArgs.AddLastArg(arguments, options::OPT_enable_cxx_interop);
   inputArgs.AddLastArg(arguments, options::OPT_g_Group);
   inputArgs.AddLastArg(arguments, options::OPT_debug_info_format);
   inputArgs.AddLastArg(arguments, options::OPT_import_underlying_module);
