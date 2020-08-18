@@ -20,6 +20,10 @@ class CompilerInstance;
 /// Scans the dependencies of the main module of \c instance.
 bool scanDependencies(CompilerInstance &instance);
 
+/// Scans the dependencies of the underlying clang module of the main module
+/// of \c instance.
+bool scanClangDependencies(CompilerInstance &instance);
+
 } // end namespace swift
 
 #endif
