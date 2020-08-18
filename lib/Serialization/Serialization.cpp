@@ -3439,7 +3439,6 @@ public:
                            rawAccessLevel,
                            fn->needsNewVTableEntry(),
                            S.addDeclRef(fn->getOpaqueResultTypeDecl()),
-                           fn->isUserAccessible(),
                            nameComponentsAndDependencies);
 
     writeGenericParams(fn->getGenericParams());
