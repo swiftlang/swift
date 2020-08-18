@@ -13,7 +13,6 @@
 // RUN: %llvm-profdata show %t/default.profdata -function=main | %FileCheck %s --check-prefix=CHECK-MAIN
 // RUN: %llvm-cov show %t/main -instr-profile=%t/default.profdata | %FileCheck %s --check-prefix=CHECK-COV
 // RUN: %llvm-cov report %t/main -instr-profile=%t/default.profdata -show-functions %s | %FileCheck %s --check-prefix=CHECK-REPORT
-// RUN: rm -rf %t
 
 // REQUIRES: profile_runtime
 // REQUIRES: executable_test
@@ -164,9 +163,7 @@ func catchError2(_ b: Bool) -> Int {
   do {
     throw CustomError.Err // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
   } catch {
-    // reviews.llvm.org/D85036 regressed coverage reporting for the
-    // following line (rdar://67280997).
-    if b {                // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+    if b {                // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
       return 1            // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
     }
   }
