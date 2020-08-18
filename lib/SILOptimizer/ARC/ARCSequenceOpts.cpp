@@ -45,10 +45,8 @@ llvm::cl::opt<bool> EnableLoopARC("enable-loop-arc", llvm::cl::init(false));
 //                                Code Motion
 //===----------------------------------------------------------------------===//
 
-// This routine takes in the ARCMatchingSet \p MatchSet and inserts new
-// increments, decrements at the insertion points and adds the old increment,
-// decrements to the delete list. Sets changed to true if anything was moved or
-// deleted.
+// This routine takes in the ARCMatchingSet \p MatchSet and adds the increments
+// and decrements to the delete list.
 void ARCPairingContext::optimizeMatchingSet(
     ARCMatchingSet &MatchSet, llvm::SmallVectorImpl<SILInstruction *> &NewInsts,
     llvm::SmallVectorImpl<SILInstruction *> &DeadInsts) {
@@ -99,9 +97,6 @@ bool ARCPairingContext::performMatching(
       for (auto *I : Set.Decrements)
         DecToIncStateMap.erase(I);
 
-      // Add the Set to the callback. *NOTE* No instruction destruction can
-      // happen here since we may remove instructions that are insertion points
-      // for other instructions.
       optimizeMatchingSet(Set, NewInsts, DeadInsts);
     }
   }
