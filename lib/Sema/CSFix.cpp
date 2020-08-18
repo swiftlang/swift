@@ -1551,3 +1551,47 @@ AllowKeyPathWithoutComponents::create(ConstraintSystem &cs,
                                       ConstraintLocator *locator) {
   return new (cs.getAllocator()) AllowKeyPathWithoutComponents(cs, locator);
 }
+
+bool IgnoreInvalidFunctionBuilderBody::diagnose(const Solution &solution,
+                                                bool asNote) const {
+  auto *S = getAnchor().get<Stmt *>();
+
+  class PreCheckWalker : public ASTWalker {
+    DeclContext *DC;
+    DiagnosticTransaction Transaction;
+
+  public:
+    PreCheckWalker(DeclContext *dc)
+        : DC(dc), Transaction(dc->getASTContext().Diags) {}
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      auto hasError = ConstraintSystem::preCheckExpression(
+          E, DC, /*replaceInvalidRefsWithErrors=*/true);
+      return std::make_pair(false, hasError ? nullptr : E);
+    }
+
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+      return std::make_pair(true, S);
+    }
+
+    // Ignore patterns because function builder pre-check does so as well.
+    std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
+      return std::make_pair(false, P);
+    }
+
+    bool diagnosed() const {
+      return Transaction.hasDiagnostics();
+    }
+  };
+
+  PreCheckWalker walker(solution.getDC());
+  S->walk(walker);
+
+  return walker.diagnosed();
+}
+
+IgnoreInvalidFunctionBuilderBody *
+IgnoreInvalidFunctionBuilderBody::create(ConstraintSystem &cs,
+                                         ConstraintLocator *locator) {
+  return new (cs.getAllocator()) IgnoreInvalidFunctionBuilderBody(cs, locator);
+}

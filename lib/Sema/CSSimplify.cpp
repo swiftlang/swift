@@ -9997,7 +9997,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowCoercionToForceCast:
   case FixKind::SpecifyKeyPathRootType:
   case FixKind::SpecifyLabelToAssociateTrailingClosure:
-  case FixKind::AllowKeyPathWithoutComponents: {
+  case FixKind::AllowKeyPathWithoutComponents:
+  case FixKind::IgnoreInvalidFunctionBuilderBody: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
