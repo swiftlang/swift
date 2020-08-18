@@ -1185,6 +1185,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_path))
     Opts.OptRecordFile = A->getValue();
 
+  if (const Arg *A = Args.getLastArg(OPT_module_summary_path)) {
+    Opts.ModuleSummaryPath = A->getValue();
+  }
+
   if (Args.hasArg(OPT_debug_on_sil)) {
     // Derive the name of the SIL file for debugging from
     // the regular outputfile.

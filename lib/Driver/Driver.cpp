@@ -1991,6 +1991,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_SwiftModuleInterfaceFile:
       case file_types::TY_PrivateSwiftModuleInterfaceFile:
       case file_types::TY_SwiftCrossImportDir:
+      case file_types::TY_SwiftModuleSummaryFile: // FIXME(katei)
       case file_types::TY_SwiftOverlayFile:
       case file_types::TY_JSONDependencies:
         // We could in theory handle assembly or LLVM input, but let's not.

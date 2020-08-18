@@ -435,6 +435,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.isThunk(), (unsigned)F.isWithoutActuallyEscapingThunk(),
       (unsigned)F.isAsync(), (unsigned)F.getSpecialPurpose(),
       (unsigned)F.getInlineStrategy(), (unsigned)F.getOptimizationMode(),
+      (unsigned)F.getClassSubclassScope(), (unsigned)F.hasCReferences(), 
       (unsigned)F.getEffectsKind(), (unsigned)numSpecAttrs,
       (unsigned)F.hasOwnership(), F.isAlwaysWeakImported(),
       LIST_VER_TUPLE_PIECES(available), (unsigned)F.isDynamicallyReplaceable(),
@@ -2345,6 +2346,11 @@ void SILSerializer::writeIndexTables() {
                 DefaultWitnessTableOffset);
   }
 
+  if (!PropertyOffset.empty()) {
+    Offset.emit(ScratchRecord, sil_index_block::SIL_PROPERTY_OFFSETS,
+                PropertyOffset);
+  }
+
   if (!DifferentiabilityWitnessList.empty()) {
     writeIndexTable(S, List,
                     sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES,
@@ -2354,11 +2360,6 @@ void SILSerializer::writeIndexTables() {
                 DifferentiabilityWitnessOffset);
   }
 
-  if (!PropertyOffset.empty()) {
-    Offset.emit(ScratchRecord, sil_index_block::SIL_PROPERTY_OFFSETS,
-                PropertyOffset);
-  }
-  
 }
 
 void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {

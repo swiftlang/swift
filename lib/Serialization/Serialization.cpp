@@ -580,7 +580,6 @@ DeclID Serializer::addDeclRef(const Decl *D, bool allowTypeAliasXRef) {
   assert((!D || allowTypeAliasXRef || !isa<TypeAliasDecl>(D) ||
           D->getModuleContext() == M) &&
          "cannot cross-reference typealiases directly (use the TypeAliasType)");
-
   return DeclsToSerialize.addRef(D);
 }
 
@@ -856,6 +855,8 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_index_block, SIL_DEFAULT_WITNESS_TABLE_NAMES);
   BLOCK_RECORD(sil_index_block, SIL_DEFAULT_WITNESS_TABLE_OFFSETS);
   BLOCK_RECORD(sil_index_block, SIL_PROPERTY_OFFSETS);
+  BLOCK_RECORD(sil_index_block, SIL_DIFFERENTIABILITY_WITNESS_NAMES);
+  BLOCK_RECORD(sil_index_block, SIL_DIFFERENTIABILITY_WITNESS_OFFSETS);
 
 #undef BLOCK
 #undef BLOCK_RECORD

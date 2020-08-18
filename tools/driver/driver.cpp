@@ -66,6 +66,9 @@ extern int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
 extern int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
                            void *MainAddr);
 
+extern int cross_module_opt_main(ArrayRef<const char *> Args, const char *Argv0,
+                                 void *MainAddr);
+
 /// Run 'swift-indent'
 extern int swift_indent_main(ArrayRef<const char *> Args, const char *Argv0,
                              void *MainAddr);
@@ -139,6 +142,12 @@ static int run_driver(StringRef ExecName,
       return modulewrap_main(llvm::makeArrayRef(argv.data()+2,
                                                 argv.data()+argv.size()),
                              argv[0], (void *)(intptr_t)getExecutablePath);
+    }
+
+    if (FirstArg == "-cross-module-opt") {
+      return cross_module_opt_main(
+          llvm::makeArrayRef(argv.data() + 1, argv.data() + argv.size()),
+          argv[0], (void *)(intptr_t)getExecutablePath);
     }
   }
 

@@ -511,14 +511,14 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   GenericSignatureID genericSigID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isAsync, specialPurpose, inlineStrategy,
-      optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
+      optimizationMode, subclassScope, hasCReferences, effect, numSpecAttrs, hasQualifiedOwnership,
       isWeakImported, LIST_VER_TUPLE_PIECES(available),
       isDynamic, isExactSelfClass;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isAsync, specialPurpose, inlineStrategy,
-      optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
+      optimizationMode, subclassScope, hasCReferences, effect, numSpecAttrs, hasQualifiedOwnership,
       isWeakImported, LIST_VER_TUPLE_PIECES(available),
       isDynamic, isExactSelfClass,
       funcTyID, replacedFunctionID, genericSigID,
@@ -645,6 +645,8 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setEffectsKind(EffectsKind(effect));
     fn->setOptimizationMode(OptimizationMode(optimizationMode));
     fn->setAlwaysWeakImported(isWeakImported);
+    fn->setClassSubclassScope(SubclassScope(subclassScope));
+    fn->setHasCReferences(bool(hasCReferences));
 
     llvm::VersionTuple available;
     DECODE_VER_TUPLE(available);
@@ -677,7 +679,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   // Mark this function as deserialized. This avoids rerunning diagnostic
   // passes. Certain passes in the madatory pipeline may not work as expected
   // after arbitrary optimization and lowering.
-  if (!MF->isSIB())
+//  if (!MF->isSIB())
     fn->setWasDeserializedCanonical();
 
   fn->setBare(IsBare);
@@ -2830,14 +2832,14 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   GenericSignatureID genericSigID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isAsync, isGlobal, inlineStrategy,
-      optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
+      optimizationMode, subclassScope, hasCReferences, effect, numSpecAttrs, hasQualifiedOwnership,
       isWeakImported, LIST_VER_TUPLE_PIECES(available),
       isDynamic, isExactSelfClass;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isAsync, isGlobal, inlineStrategy,
-      optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
+      optimizationMode, subclassScope, hasCReferences, effect, numSpecAttrs, hasQualifiedOwnership,
       isWeakImported, LIST_VER_TUPLE_PIECES(available),
       isDynamic, isExactSelfClass,
       funcTyID, replacedFunctionID, genericSigID,

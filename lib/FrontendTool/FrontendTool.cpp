@@ -65,6 +65,8 @@
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 #include "swift/Syntax/SyntaxNodes.h"
 #include "swift/TBDGen/TBDGen.h"
+#include "swift/SIL/ModuleSummary.h"
+#include "swift/Serialization/ModuleSummary.h"
 
 #include "clang/AST/ASTContext.h"
 
@@ -1824,6 +1826,14 @@ static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
   return Context.hadError();
 }
 
+static bool emitModuleSummary(SILModule *SM,
+                              const std::string &ModuleSummaryOutputPath,
+                              const ASTContext &Context) {
+  auto Summary = modulesummary::buildModuleSummaryIndex(*SM);
+  return modulesummary::writeModuleSummaryIndex(*Summary.get(), Context.Diags,
+                                                ModuleSummaryOutputPath);
+}
+
 static GeneratedModule
 generateIR(const IRGenOptions &IRGenOpts, const TBDGenOptions &TBDOpts,
            std::unique_ptr<SILModule> SM,
@@ -2047,6 +2057,12 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
   if (observer)
     observer->performedSILProcessing(*SM);
+
+  if (!opts.ModuleSummaryOutputPath.empty()) {
+    if (emitModuleSummary(SM.get(), opts.ModuleSummaryOutputPath, Context)) {
+      return true;
+    }
+  }
 
   if (Action == FrontendOptions::ActionType::EmitSIB)
     return serializeSIB(SM.get(), PSPs, Context, MSF);
