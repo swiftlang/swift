@@ -211,7 +211,7 @@ public:
   static inline
   bool objectUsesNativeSwiftReferenceCounting(const void *object) {
     assert(!isObjCTaggedPointerOrNull(object));
-#if SWIFT_HAS_OPAQUE_ISAS
+#if SWIFT_OBJC_INTEROP && SWIFT_HAS_OPAQUE_ISAS
     // Fast path for opaque ISAs.  We don't want to call
     // _swift_getClassOfAllocated as that will call object_getClass.
     // Instead we can look at the bits in the ISA and tell if its a
