@@ -146,7 +146,11 @@ class BuilderClosureVisitor
     }
 
     bool found = false;
-    for (auto decl : builder->lookupDirect(fnName)) {
+    SmallVector<ValueDecl *, 4> foundDecls;
+    dc->lookupQualified(
+        builderType, DeclNameRef(fnName),
+        NL_QualifiedDefault | NL_ProtocolMembers, foundDecls);
+    for (auto decl : foundDecls) {
       if (auto func = dyn_cast<FuncDecl>(decl)) {
         // Function must be static.
         if (!func->isStatic())
