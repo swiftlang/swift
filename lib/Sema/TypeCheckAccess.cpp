@@ -1553,10 +1553,12 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
 
           const RootProtocolConformance *rootConf =
               concreteConf->getRootConformance();
-          ModuleDecl *M = rootConf->getDeclContext()->getParentModule();
-          if (!SF.isImportedImplementationOnly(M))
+          auto originKind = getDisallowedOriginKind(
+              rootConf->getDeclContext()->getAsDecl(),
+              SF, context);
+          if (originKind == DisallowedOriginKind::None)
             continue;
-          diagnoser.diagnoseConformance(rootConf);
+          diagnoser.diagnoseConformance(rootConf, originKind);
         }
       }
 
@@ -1667,12 +1669,14 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
       highlightOffendingType(diag, complainRepr);
     }
 
-    void diagnoseConformance(const ProtocolConformance *offendingConformance) const {
+    void diagnoseConformance(const ProtocolConformance *offendingConformance,
+                             DisallowedOriginKind originKind) const {
       ModuleDecl *M = offendingConformance->getDeclContext()->getParentModule();
       D->diagnose(diag::conformance_from_implementation_only_module,
                   offendingConformance->getType(),
                   offendingConformance->getProtocol()->getName(),
-                  static_cast<unsigned>(reason), M->getName());
+                  static_cast<unsigned>(reason), M->getName(),
+                  static_cast<unsigned>(originKind));
     }
 
     void diagnoseClangFunctionType(Type fnType, const clang::Type *type) const {
