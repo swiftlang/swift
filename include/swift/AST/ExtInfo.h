@@ -246,10 +246,7 @@ public:
            DifferentiabilityKind::NonDifferentiable;
   }
 
-  /// Get the underlying ClangTypeInfo value if it is not the default value.
-  Optional<ClangTypeInfo> getClangTypeInfo() const {
-    return clangTypeInfo.empty() ? Optional<ClangTypeInfo>() : clangTypeInfo;
-  }
+  ClangTypeInfo getClangTypeInfo() const { return clangTypeInfo; }
 
   constexpr SILFunctionTypeRepresentation getSILRepresentation() const {
     unsigned rawRep = bits & RepresentationMask;
@@ -396,9 +393,7 @@ public:
 
   constexpr bool isDifferentiable() const { return builder.isDifferentiable(); }
 
-  Optional<ClangTypeInfo> getClangTypeInfo() const {
-    return builder.getClangTypeInfo();
-  }
+  ClangTypeInfo getClangTypeInfo() const { return builder.getClangTypeInfo(); }
 
   constexpr bool hasSelfParam() const { return builder.hasSelfParam(); }
 
@@ -558,10 +553,8 @@ public:
            DifferentiabilityKind::NonDifferentiable;
   }
 
-  /// Get the underlying ClangTypeInfo value if it is not the default value.
-  Optional<ClangTypeInfo> getClangTypeInfo() const {
-    return clangTypeInfo.empty() ? Optional<ClangTypeInfo>() : clangTypeInfo;
-  }
+  /// Get the underlying ClangTypeInfo value.
+  ClangTypeInfo getClangTypeInfo() const { return clangTypeInfo; }
 
   constexpr bool hasSelfParam() const {
     switch (getRepresentation()) {
@@ -689,9 +682,7 @@ public:
 
   constexpr bool isDifferentiable() const { return builder.isDifferentiable(); }
 
-  Optional<ClangTypeInfo> getClangTypeInfo() const {
-    return builder.getClangTypeInfo();
-  }
+  ClangTypeInfo getClangTypeInfo() const { return builder.getClangTypeInfo(); }
 
   constexpr bool hasSelfParam() const { return builder.hasSelfParam(); }
 

@@ -3629,7 +3629,7 @@ void printCType(ASTContext &Ctx, ASTPrinter &Printer, ExtInfo &info) {
   auto *cml = Ctx.getClangModuleLoader();
   SmallString<64> buf;
   llvm::raw_svector_ostream os(buf);
-  info.getClangTypeInfo().getValue().printType(cml, os);
+  info.getClangTypeInfo().printType(cml, os);
   Printer << ", cType: " << QuotedString(os.str());
 }
 
@@ -4054,7 +4054,7 @@ public:
       case SILFunctionType::Representation::CFunctionPointer:
         Printer << "c";
         // [TODO: Clang-type-plumbing] Remove the second check.
-        if (printNameOnly || !info.getClangTypeInfo().hasValue())
+        if (printNameOnly || info.getClangTypeInfo().empty())
           break;
         printCType(Ctx, Printer, info);
         break;
@@ -4120,7 +4120,7 @@ public:
       case SILFunctionType::Representation::CFunctionPointer:
         Printer << "c";
         // [TODO: Clang-type-plumbing] Remove the second check.
-        if (printNameOnly || !info.getClangTypeInfo().hasValue())
+        if (printNameOnly || info.getClangTypeInfo().empty())
           break;
         printCType(Ctx, Printer, info);
         break;

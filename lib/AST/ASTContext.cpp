@@ -3131,16 +3131,16 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
     return funcTy;
   }
 
-  Optional<ClangTypeInfo> clangTypeInfo = info.getClangTypeInfo();
+  auto clangTypeInfo = info.getClangTypeInfo();
 
   size_t allocSize = totalSizeToAlloc<AnyFunctionType::Param, ClangTypeInfo>(
-      params.size(), clangTypeInfo.hasValue() ? 1 : 0);
+      params.size(), clangTypeInfo.empty() ? 0 : 1);
   void *mem = ctx.Allocate(allocSize, alignof(FunctionType), arena);
 
   bool isCanonical = isFunctionTypeCanonical(params, result);
-  if (clangTypeInfo.hasValue()) {
+  if (!clangTypeInfo.empty()) {
     if (ctx.LangOpts.UseClangFunctionTypes)
-      isCanonical &= clangTypeInfo->type->isCanonicalUnqualified();
+      isCanonical &= clangTypeInfo.getType()->isCanonicalUnqualified();
     else
       isCanonical = false;
   }
@@ -3162,8 +3162,8 @@ FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params,
   std::uninitialized_copy(params.begin(), params.end(),
                           getTrailingObjects<AnyFunctionType::Param>());
   auto clangTypeInfo = info.getClangTypeInfo();
-  if (clangTypeInfo.hasValue())
-    *getTrailingObjects<ClangTypeInfo>() = clangTypeInfo.getValue();
+  if (!clangTypeInfo.empty())
+    *getTrailingObjects<ClangTypeInfo>() = clangTypeInfo;
 }
 
 void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
