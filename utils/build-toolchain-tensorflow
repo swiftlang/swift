@@ -26,6 +26,9 @@ function usage() {
   echo "-t --test"
   echo "Run tests."
   echo ""
+  echo "-r <version>, --release <version>"
+  echo "Build a release toolchain with the specified version name."
+  echo ""
   echo "--tensorflow-swift-apis"
   echo "Build and install the tensorflow-swift-apis library in the toolchain. (Default)."
   echo ""
@@ -42,7 +45,7 @@ function usage() {
 cd "$(dirname $0)/.." || exit
 SRC_DIR=$PWD
 
-# Set defaults
+# Set defaults.
 DRY_RUN=
 BUNDLE_PREFIX=
 INSTALLER_PACKAGE=
@@ -50,7 +53,8 @@ SWIFT_PACKAGE_BASE=
 SWIFT_PACKAGE_TENSORFLOW_SWIFT_APIS=,tensorflow_swift_apis
 SWIFT_PACKAGE_NOTEST=
 SWIFT_PACKAGE_INSTALLER=
-# SWIFT_ENABLE_TENSORFLOW
+S4TF_RELEASE_VERSION=
+
 if [[ -z ${SWIFT_PACKAGE} ]]; then
   case $(uname -s) in
     Darwin)
@@ -68,7 +72,7 @@ if [[ -z ${SWIFT_PACKAGE} ]]; then
   esac
 fi
 
-# Process command line arguments
+# Process command line arguments.
 FIRST_ARG_PROCESSED=0
 while [ $# -ne 0 ]; do
   case "$1" in
@@ -82,12 +86,20 @@ while [ $# -ne 0 ]; do
     usage
     exit 0
   ;;
+  -r|--release)
+    shift
+    S4TF_RELEASE_VERSION=$1
+    if [ -z "$S4TF_RELEASE_VERSION" ]; then
+      echo "Missing release version name after --release. See --help."
+      exit 1
+    fi
+  ;;
   -p|--pkg)
     INSTALLER_PACKAGE=1
     if [ "$(uname -s)" == "Darwin" ]; then
       SWIFT_PACKAGE_INSTALLER=,installer
     else
-      echo "--pkg is not supported on \"$(uname -s)\". See --help"
+      echo "--pkg is not supported on \"$(uname -s)\". See --help."
       exit 1
     fi
   ;;
@@ -131,20 +143,28 @@ elif [ "$(uname -s)" == "Linux" ]; then
 fi
 
 
-# Report the commands being run
+# Report the commands being run.
 set -x
 YEAR=$(date +"%Y")
 MONTH=$(date +"%m")
 DAY=$(date +"%d")
 TOOLCHAIN_VERSION_DATE="5.0.${YEAR}${MONTH}${DAY}"
-TOOLCHAIN_VERSION="swift-tensorflow-LOCAL-${YEAR}-${MONTH}-${DAY}-a"
-ARCHIVE="${TOOLCHAIN_VERSION}-${HOST}.tar.gz"
-SYM_ARCHIVE="${TOOLCHAIN_VERSION}-osx-symbols.tar.gz"
+
+# Set toolchain name based on whether this is a normal or release toolchain.
+if [[ -z ${S4TF_RELEASE_VERSION} ]]; then
+  TOOLCHAIN_NAME="swift-tensorflow-DEVELOPMENT-${YEAR}-${MONTH}-${DAY}-a"
+  DISPLAY_NAME_SHORT="Swift for TensorFlow Development Snapshot"
+  DISPLAY_NAME="${DISPLAY_NAME_SHORT} ${YEAR}-${MONTH}-${DAY}"
+else
+  TOOLCHAIN_NAME="swift-tensorflow-RELEASE-${S4TF_RELEASE_VERSION}"
+  DISPLAY_NAME_SHORT="Swift for TensorFlow ${S4TF_RELEASE_VERSION} Release"
+  DISPLAY_NAME="${DISPLAY_NAME_SHORT}"
+fi
+
+ARCHIVE="${TOOLCHAIN_NAME}-${HOST}.tar.gz"
+SYM_ARCHIVE="${TOOLCHAIN_NAME}-osx-symbols.tar.gz"
 BUNDLE_PREFIX=com.google.swift
 BUNDLE_IDENTIFIER="${BUNDLE_PREFIX}.${YEAR}${MONTH}${DAY}"
-DISPLAY_NAME_SHORT="Swift for TensorFlow Local Snapshot"
-DISPLAY_NAME="${DISPLAY_NAME_SHORT} ${YEAR}-${MONTH}-${DAY}"
-TOOLCHAIN_NAME="${TOOLCHAIN_VERSION}"
 
 SWIFT_INSTALLABLE_PACKAGE="${SRC_DIR}/${ARCHIVE}"
 SWIFT_INSTALL_DIR="${SRC_DIR}/swift-nightly-install"
