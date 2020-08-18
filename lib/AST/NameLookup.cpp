@@ -312,6 +312,19 @@ static void recordShadowedDeclsAfterTypeMatch(
           }
         }
 
+        // If one declaration is in a protocol or extension thereof and the
+        // other is not, prefer the one that is not.
+        if ((bool)firstDecl->getDeclContext()->getSelfProtocolDecl() !=
+              (bool)secondDecl->getDeclContext()->getSelfProtocolDecl()) {
+          if (firstDecl->getDeclContext()->getSelfProtocolDecl()) {
+            shadowed.insert(firstDecl);
+            break;
+          } else {
+            shadowed.insert(secondDecl);
+            continue;
+          }
+        }
+
         continue;
       }
 
