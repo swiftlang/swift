@@ -194,16 +194,8 @@ class ASTExtInfoBuilder {
 
   using Representation = FunctionTypeRepresentation;
 
-  static void assertIsFunctionType(const clang::Type *);
-
   ASTExtInfoBuilder(unsigned bits, ClangTypeInfo clangTypeInfo)
-      : bits(bits), clangTypeInfo(clangTypeInfo) {
-    // TODO: [clang-function-type-serialization] Once we start serializing
-    // the Clang type, we should also assert that the pointer is non-null.
-    auto Rep = Representation(bits & RepresentationMask);
-    if ((Rep == Representation::CFunctionPointer) && clangTypeInfo.type)
-      assertIsFunctionType(clangTypeInfo.type);
-  }
+      : bits(bits), clangTypeInfo(clangTypeInfo) {}
 
 public:
   // Constructor with all defaults.
