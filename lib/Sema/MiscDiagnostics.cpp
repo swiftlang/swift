@@ -594,8 +594,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         isExistential = instanceTy->isExistentialType();
         if (!isExistential &&
             instanceTy->mayHaveMembers() &&
-            !TypeChecker::lookupConstructors(const_cast<DeclContext *>(DC),
-                                             instanceTy).empty()) {
+            !TypeChecker::lookupMember(const_cast<DeclContext *>(DC), instanceTy,
+                                       DeclNameRef::createConstructor()).empty()) {
           Ctx.Diags.diagnose(E->getEndLoc(), diag::add_parens_to_type)
             .fixItInsertAfter(E->getEndLoc(), "()");
         }
