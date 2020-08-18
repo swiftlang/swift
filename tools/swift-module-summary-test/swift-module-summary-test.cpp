@@ -119,6 +119,7 @@ void MappingTraits<FunctionSummary>::mapping(IO &io, FunctionSummary &V) {
   io.mapRequired("preserved", V.Flags.Preserved);
   io.mapRequired("calls", V.CallGraphEdgeList);
   io.mapRequired("type_refs", V.TypeRefList);
+  io.mapRequired("inst_size", V.InstSize);
 }
 
 template <>

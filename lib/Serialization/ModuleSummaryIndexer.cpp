@@ -332,7 +332,7 @@ bool shouldPreserveFunction(const SILFunction &F) {
 
 void FunctionSummaryIndexer::indexFunction() {
   GUID guid = getGUIDFromUniqueName(F.getName());
-  size_t instSize = 0;
+  uint32_t instSize = 0;
   TheSummary = std::make_unique<FunctionSummary>(guid);
   TheSummary->setName(F.getName());
   for (auto &BB : F) {

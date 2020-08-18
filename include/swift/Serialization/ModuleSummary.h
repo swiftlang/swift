@@ -100,7 +100,7 @@ private:
   /// The symbol name of the function only for debug and test purposes.
   std::string Name;
   /// Size of instructions only for debug purpose
-  size_t InstSize;
+  uint32_t InstSize;
 
 public:
   FunctionSummary() = default;
@@ -129,8 +129,8 @@ public:
 
   GUID getGUID() const { return Guid; }
 
-  size_t getInstSize() const { return InstSize; }
-  void setInstSize(size_t size) { this->InstSize = size; }
+  uint32_t getInstSize() const { return InstSize; }
+  void setInstSize(uint32_t size) { this->InstSize = size; }
 };
 
 /// A slot in a set of virtual tables.
