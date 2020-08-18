@@ -274,9 +274,6 @@ private:
   /// that it may have unboxed capture (i.e. @inout_aliasable parameters).
   unsigned IsWithoutActuallyEscapingThunk : 1;
 
-  /// True if this function is an async function.
-  unsigned IsAsync : 1;
-
   /// If != OptimizationMode::NotSet, the optimization mode specified with an
   /// function attribute.
   unsigned OptMode : NumOptimizationModeBits;
@@ -503,10 +500,6 @@ public:
     assert(!val || isThunk() == IsReabstractionThunk);
     IsWithoutActuallyEscapingThunk = val;
   }
-
-  bool isAsync() const { return IsAsync; }
-
-  void setAsync(bool val = true) { IsAsync = val; }
 
   /// Returns the calling convention used by this entry point.
   SILFunctionTypeRepresentation getRepresentation() const {
