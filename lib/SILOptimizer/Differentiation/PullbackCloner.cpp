@@ -1721,22 +1721,36 @@ bool PullbackCloner::Implementation::run() {
     domOrder.pushChildren(bb);
   }
 
-  // Create pullback blocks and arguments, visiting original blocks in
-  // post-order post-dominance order.
-  SmallVector<SILBasicBlock *, 8> postOrderPostDomOrder;
-  // Start from the root node, which may have a marker `nullptr` block if
-  // there are multiple roots.
-  PostOrderPostDominanceOrder postDomOrder(postDomInfo->getRootNode(),
-                                           postOrderInfo, original.size());
-  while (auto *origNode = postDomOrder.getNext()) {
-    auto *origBB = origNode->getBlock();
-    postDomOrder.pushChildren(origNode);
-    // If node is the `nullptr` marker basic block, do not push it.
-    if (!origBB)
-      continue;
-    postOrderPostDomOrder.push_back(origBB);
+  // Create pullback blocks and arguments, visiting original blocks using BFS
+  // starting from the original exit block. Unvisited original basic blocks
+  // (e.g unreachable blocks) are not relevant for pullback generation and thus
+  // ignored.
+  // The original blocks in traversal order for pullback generation.
+  SmallVector<SILBasicBlock *, 8> originalBlocks;
+  // The set of visited original blocks.
+  SmallDenseSet<SILBasicBlock *, 8> visitedBlocks;
+
+  // Perform BFS from the original exit block.
+  {
+    std::deque<SILBasicBlock *> worklist = {};
+    worklist.push_back(origExit);
+    visitedBlocks.insert(origExit);
+    while (!worklist.empty()) {
+      auto *BB = worklist.front();
+      worklist.pop_front();
+
+      originalBlocks.push_back(BB);
+
+      for (auto *nextBB : BB->getPredecessorBlocks()) {
+        if (!visitedBlocks.count(nextBB)) {
+          worklist.push_back(nextBB);
+          visitedBlocks.insert(nextBB);
+        }
+      }
+    }
   }
-  for (auto *origBB : postOrderPostDomOrder) {
+
+  for (auto *origBB : originalBlocks) {
     auto *pullbackBB = pullback.createBasicBlock();
     pullbackBBMap.insert({origBB, pullbackBB});
     auto pbStructLoweredType =
@@ -1801,6 +1815,9 @@ bool PullbackCloner::Implementation::run() {
     //   struct argument. They branch from a pullback successor block to the
     //   pullback original block, passing adjoint values of active values.
     for (auto *succBB : origBB->getSuccessorBlocks()) {
+      // Skip generating pullback block for original unreachable blocks.
+      if (!visitedBlocks.count(succBB))
+        continue;
       auto *pullbackTrampolineBB = pullback.createBasicBlockBefore(pullbackBB);
       pullbackTrampolineBBMap.insert({{origBB, succBB}, pullbackTrampolineBB});
       // Get the enum element type (i.e. the pullback struct type). The enum
@@ -1870,7 +1887,7 @@ bool PullbackCloner::Implementation::run() {
   // Visit original blocks blocks in post-order and perform differentiation
   // in corresponding pullback blocks. If errors occurred, back out.
   else {
-    for (auto *bb : postOrderPostDomOrder) {
+    for (auto *bb : originalBlocks) {
       visitSILBasicBlock(bb);
       if (errorOccurred)
         return true;
