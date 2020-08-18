@@ -64,6 +64,7 @@ bool FrontendOptions::needsProperModuleName(ActionType action) {
   case ActionType::DumpTypeInfo:
   case ActionType::EmitPCM:
   case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
     return true;
   }
   llvm_unreachable("Unknown ActionType");
@@ -77,6 +78,7 @@ bool FrontendOptions::shouldActionOnlyParse(ActionType action) {
   case FrontendOptions::ActionType::DumpInterfaceHash:
   case FrontendOptions::ActionType::EmitImportedModules:
   case FrontendOptions::ActionType::ScanDependencies:
+  case FrontendOptions::ActionType::ScanClangDependencies:
   case FrontendOptions::ActionType::PrintVersion:
     return true;
   default:
@@ -174,6 +176,7 @@ FrontendOptions::formatForPrincipalOutputFileForAction(ActionType action) {
     return TY_ClangModuleFile;
 
   case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
     return TY_JSONDependencies;
   }
   llvm_unreachable("unhandled action");
@@ -213,6 +216,7 @@ bool FrontendOptions::canActionEmitDependencies(ActionType action) {
   case ActionType::EmitImportedModules:
   case ActionType::EmitPCM:
   case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
     return true;
   }
   llvm_unreachable("unhandled action");
@@ -237,6 +241,7 @@ bool FrontendOptions::canActionEmitReferenceDependencies(ActionType action) {
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
   case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
   case ActionType::PrintVersion:
     return false;
   case ActionType::Typecheck:
@@ -285,6 +290,7 @@ bool FrontendOptions::canActionEmitObjCHeader(ActionType action) {
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
   case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
   case ActionType::PrintVersion:
     return false;
   case ActionType::Typecheck:
@@ -322,6 +328,7 @@ bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
   case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
   case ActionType::PrintVersion:
     return false;
   case ActionType::ResolveImports:
@@ -365,6 +372,7 @@ bool FrontendOptions::canActionEmitModule(ActionType action) {
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
   case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
   case ActionType::PrintVersion:
     return false;
   case ActionType::MergeModules:
@@ -409,6 +417,7 @@ bool FrontendOptions::canActionEmitInterface(ActionType action) {
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
   case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
     return false;
   case ActionType::Typecheck:
   case ActionType::MergeModules:
@@ -454,6 +463,7 @@ bool FrontendOptions::doesActionProduceOutput(ActionType action) {
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
   case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
     return true;
 
   case ActionType::NoneAction:
@@ -499,6 +509,7 @@ bool FrontendOptions::doesActionProduceTextualOutput(ActionType action) {
   case ActionType::DumpTypeInfo:
   case ActionType::DumpPCM:
   case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
   case ActionType::PrintVersion:
     return true;
   }
@@ -524,6 +535,7 @@ bool FrontendOptions::doesActionGenerateSIL(ActionType action) {
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
   case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
   case ActionType::PrintVersion:
     return false;
   case ActionType::EmitSILGen:
@@ -570,6 +582,7 @@ bool FrontendOptions::doesActionGenerateIR(ActionType action) {
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
   case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
   case ActionType::PrintVersion:
     return false;
   case ActionType::Immediate:
