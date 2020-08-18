@@ -1307,7 +1307,6 @@ namespace decls_block {
     AccessLevelField, // access level
     BCFixed<1>,   // requires a new vtable slot
     DeclIDField,  // opaque result type decl
-    BCFixed<1>,   // isUserAccessible?
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
     // The record is trailed by:
