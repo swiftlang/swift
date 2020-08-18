@@ -407,6 +407,7 @@ static CanSILFunctionType getAutoDiffDifferentialType(
     // result's convention is indirect.
     if (tl.isAddressOnly() && !isIndirectFormalResult(origResConv)) {
       switch (origResConv) {
+      case ResultConvention::Unowned:
       case ResultConvention::Owned:
         return ResultConvention::Indirect;
       default:
