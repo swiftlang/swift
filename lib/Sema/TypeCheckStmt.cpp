@@ -1755,19 +1755,21 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
   // For an implicitly generated super.init() call, make sure there's
   // only one designated initializer.
   if (implicitlyGenerated) {
-    auto superclassTy = ctor->getDeclContext()->getDeclaredInterfaceType();
-    auto lookupOptions = defaultConstructorLookupOptions;
-    lookupOptions |= NameLookupFlags::KnownPrivate;
+    auto *dc = ctor->getDeclContext();
+    auto *superclassDecl = dc->getSelfClassDecl();
 
-    // If a constructor is only visible as a witness for a protocol
-    // requirement, it must be an invalid override. Also, protocol
-    // extensions cannot yet define designated initializers.
-    lookupOptions -= NameLookupFlags::ProtocolMembers;
-    lookupOptions -= NameLookupFlags::PerformConformanceCheck;
+    superclassDecl->synthesizeSemanticMembersIfNeeded(
+        DeclBaseName::createConstructor());
 
-    for (auto member : TypeChecker::lookupConstructors(fromCtor, superclassTy,
-                                                       lookupOptions)) {
-      auto superclassCtor = dyn_cast<ConstructorDecl>(member.getValueDecl());
+    NLOptions subOptions = NL_QualifiedDefault | NL_KnownNonCascadingDependency;
+
+    SmallVector<ValueDecl *, 4> lookupResults;
+    dc->lookupQualified(superclassDecl,
+                        DeclNameRef::createConstructor(),
+                        subOptions, lookupResults);
+
+    for (auto decl : lookupResults) {
+      auto superclassCtor = dyn_cast<ConstructorDecl>(decl);
       if (!superclassCtor || !superclassCtor->isDesignatedInit() ||
           superclassCtor == ctor)
         continue;

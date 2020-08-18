@@ -1136,8 +1136,7 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
           { C, DeclBaseName::createConstructor(), { C.Id_from } });
       auto result =
           TypeChecker::lookupMember(superclassDecl, superclassType, initFrom,
-                                    NameLookupFlags::ProtocolMembers |
-                                        NameLookupFlags::IgnoreAccessControl);
+                                    NameLookupFlags::IgnoreAccessControl);
 
       if (!result.empty() && !result.front().getValueDecl()->isImplicit())
         diagDest = result.front().getValueDecl();

@@ -197,7 +197,7 @@ Type TypeResolution::resolveDependentMemberType(
     TypoCorrectionResults corrections(ref->getNameRef(), ref->getNameLoc());
     TypeChecker::performTypoCorrection(DC, DeclRefKind::Ordinary,
                                        MetatypeType::get(baseTy),
-                                       NameLookupFlags::ProtocolMembers,
+                                       defaultMemberLookupOptions,
                                        corrections, builder);
 
     // Check whether we have a single type result.
@@ -1499,8 +1499,6 @@ static Type resolveNestedIdentTypeComponent(TypeResolution resolution,
   NameLookupOptions lookupOptions = defaultMemberLookupOptions;
   if (isKnownNonCascading)
     lookupOptions |= NameLookupFlags::KnownPrivate;
-  if (options.is(TypeResolverContext::ExtensionBinding))
-    lookupOptions -= NameLookupFlags::ProtocolMembers;
   LookupTypeResult memberTypes;
   if (parentTy->mayHaveMembers())
     memberTypes = TypeChecker::lookupMemberType(DC, parentTy,
