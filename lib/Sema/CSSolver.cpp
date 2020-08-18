@@ -1412,8 +1412,50 @@ void ConstraintSystem::solveForCodeCompletion(
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
   if (ConstraintSystem::preCheckExpression(
-          expr, DC, /*replaceInvalidRefsWithErrors=*/true))
+          expr, DC, /*replaceInvalidRefsWithErrors=*/false))
     return;
+
+  // If there was an invalid reference which was caught by pre-check,
+  // let's remove all context besides code completion itself and try again.
+  {
+    // We need this walker because by default it walks into statements
+    // declarations and patterns which are ignored by `Expr::forEachChildExpr`.
+    struct ExprWalker : public ASTWalker {
+      bool HadErrors = false;
+      Expr *CompletionExpr = nullptr;
+
+    public:
+      std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+        HadErrors |= isa<ErrorExpr>(E) || isa<UnresolvedDeclRefExpr>(E);
+
+        if (isa<CodeCompletionExpr>(E))
+          CompletionExpr = E;
+
+        return std::make_pair(true, E);
+      }
+
+      Expr *getCodeCompletionExpr() const { return CompletionExpr; }
+
+      bool foundErrors() const { return HadErrors; }
+    };
+
+    ExprWalker walker;
+    expr->walk(walker);
+
+    if (walker.foundErrors()) {
+      auto *codeCompletionExpr = walker.getCodeCompletionExpr();
+
+      assert(codeCompletionExpr &&
+             cast<CodeCompletionExpr>(codeCompletionExpr)->getBase());
+
+      // Make sure that code completion is valid.
+      if (ConstraintSystem::preCheckExpression(
+              codeCompletionExpr, DC, /*replaceInvalidRefsWithErrors=*/true))
+        return;
+
+      expr = codeCompletionExpr;
+    }
+  }
 
   ConstraintSystemOptions options;
   options |= ConstraintSystemFlags::AllowFixes;
