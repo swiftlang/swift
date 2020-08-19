@@ -1074,13 +1074,13 @@ namespace {
       Indent -= 2;
 
       if (auto FD = dyn_cast<FuncDecl>(D)) {
-        if (FD->getBodyResultTypeLoc().getTypeRepr()) {
+        if (FD->getResultTypeRepr()) {
           OS << '\n';
           Indent += 2;
           OS.indent(Indent);
           PrintWithColorRAII(OS, ParenthesisColor) << '(';
           OS << "result\n";
-          printRec(FD->getBodyResultTypeLoc().getTypeRepr());
+          printRec(FD->getResultTypeRepr());
           PrintWithColorRAII(OS, ParenthesisColor) << ')';
           if (auto opaque = FD->getOpaqueResultTypeDecl()) {
             OS << '\n';
