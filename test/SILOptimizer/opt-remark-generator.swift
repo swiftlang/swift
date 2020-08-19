@@ -231,3 +231,29 @@ func inoutKlassQuestionCastArgument2(x: inout Klass?) -> SubKlass? {
     return x as? SubKlass // expected-remark {{retain of type 'Klass'}}
                           // expected-note @-2 {{of 'x.some'}}
 }
+
+// We should have 1x rr remark here on calleeX for storing it into the array to
+// print. Release is from the array. We don't pattern match it due to the actual
+// underlying Array type name changing under the hood in between platforms.
+@inline(__always)
+func alwaysInlineCallee(_ calleeX: Klass) {
+    print(calleeX) // expected-remark @:5 {{retain of type 'Klass'}}
+                   // expected-note @-2:27 {{of 'calleeX'}}
+                   // expected-remark @-2:18 {{release of type}}
+}
+
+// We should have 3x rr remarks here on callerX and none on calleeX.  All of the
+// releases are for the temporary array that we pass into print.
+//
+// TODO: Should we print out as notes the whole inlined call stack?
+func alwaysInlineCaller(_ callerX: Klass) {
+    alwaysInlineCallee(callerX) // expected-remark @:5 {{retain of type 'Klass'}}
+                                // expected-note @-2:27 {{of 'callerX'}}
+                                // expected-remark @-2:31 {{release of type}}
+    print(callerX)              // expected-remark @:5 {{retain of type 'Klass'}}
+                                // expected-note @-5:27 {{of 'callerX'}}
+                                // expected-remark @-2:18 {{release of type}}
+    alwaysInlineCallee(callerX) // expected-remark @:5 {{retain of type 'Klass'}}
+                                // expected-note @-8:27 {{of 'callerX'}}
+                                // expected-remark @-2:31 {{release of type}}
+}
