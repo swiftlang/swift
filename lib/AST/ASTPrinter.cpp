@@ -4249,6 +4249,12 @@ public:
     llvm_unreachable("bad convention");
   }
 
+  void printSILAsyncAttr(bool isAsync) {
+    if (isAsync) {
+      Printer << "@async ";
+    }
+  }
+
   void printCalleeConvention(ParameterConvention conv) {
     switch (conv) {
     case ParameterConvention::Direct_Unowned:
@@ -4271,6 +4277,7 @@ public:
 
   void visitSILFunctionType(SILFunctionType *T) {
     printSILCoroutineKind(T->getCoroutineKind());
+    printSILAsyncAttr(T->isAsync());
     printFunctionExtInfo(T->getASTContext(), T->getExtInfo(),
                          T->getWitnessMethodConformanceOrInvalid());
     printCalleeConvention(T->getCalleeConvention());
