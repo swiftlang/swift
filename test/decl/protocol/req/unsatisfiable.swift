@@ -58,3 +58,25 @@ protocol P4 {
 protocol P5 {
   associatedtype Y where Y : S // expected-error {{type 'Self.Y' constrained to non-protocol, non-class type 'S'}}
 }
+
+protocol P6 {
+  associatedtype T
+  associatedtype U
+
+  func foo() where T == U
+  // expected-error@-1 {{instance method requirement 'foo()' cannot add constraint 'Self.T == Self.U' on 'Self'}}
+  // expected-note@-2 {{protocol requires function 'foo()' with type '() -> ()'; do you want to add a stub?}}
+}
+
+struct S2 : P6 {
+  // expected-error@-1 {{type 'S2' does not conform to protocol 'P6'}}
+  typealias T = Int
+  typealias U = String
+
+  func foo() {}
+  // expected-note@-1 {{candidate has non-matching type '() -> ()'}}
+
+  // FIXME: This error is bogus and should be omitted on account of the protocol requirement itself
+  // being invalid.
+}
+
