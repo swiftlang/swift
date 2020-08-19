@@ -222,10 +222,8 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
       SetFactory);
 
   auto II = BB.rbegin();
-  if (isa<TermInst>(*II)) {
-    if (!isARCSignificantTerminator(&cast<TermInst>(*II))) {
-      II++;
-    }
+  if (!isARCSignificantTerminator(&cast<TermInst>(*II))) {
+    II++;
   }
 
   // For each instruction I in BB visited in reverse...
