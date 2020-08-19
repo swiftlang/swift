@@ -850,7 +850,14 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
   Type openedFullWitnessType;
   Type reqType, openedFullReqType;
 
-  auto reqSig = req->getInnermostDeclContext()->getGenericSignatureOfContext();
+  GenericSignature reqSig = proto->getGenericSignature();
+  if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(req)) {
+    if (funcDecl->isGeneric())
+      reqSig = funcDecl->getGenericSignature();
+  } else if (auto *subscriptDecl = dyn_cast<SubscriptDecl>(req)) {
+    if (subscriptDecl->isGeneric())
+      reqSig = subscriptDecl->getGenericSignature();
+  }
 
   ClassDecl *covariantSelf = nullptr;
   if (witness->getDeclContext()->getExtendedProtocolDecl()) {
@@ -5790,6 +5797,8 @@ TypeChecker::deriveTypeWitness(DeclContext *DC,
   switch (*knownKind) {
   case KnownProtocolKind::RawRepresentable:
     return std::make_pair(derived.deriveRawRepresentable(AssocType), nullptr);
+  case KnownProtocolKind::CaseIterable:
+    return std::make_pair(derived.deriveCaseIterable(AssocType), nullptr);
   case KnownProtocolKind::Differentiable:
     return derived.deriveDifferentiable(AssocType);
   // SWIFT_ENABLE_TENSORFLOW

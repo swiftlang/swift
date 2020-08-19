@@ -415,17 +415,18 @@ public:
                                   StringRef prebuiltCachePath,
                                   bool serializeDependencyHashes,
                                   bool trackSystemDependencies);
-  bool runInSubContext(StringRef moduleName,
-                       StringRef interfacePath,
-                       StringRef outputPath,
-                       SourceLoc diagLoc,
-    llvm::function_ref<bool(ASTContext&, ModuleDecl*, ArrayRef<StringRef>,
-                            ArrayRef<StringRef>, StringRef)> action) override;
-  bool runInSubCompilerInstance(StringRef moduleName,
-                                StringRef interfacePath,
-                                StringRef outputPath,
-                                SourceLoc diagLoc,
-            llvm::function_ref<bool(SubCompilerInstanceInfo&)> action) override;
+  std::error_code runInSubContext(StringRef moduleName,
+                                  StringRef interfacePath,
+                                  StringRef outputPath,
+                                  SourceLoc diagLoc,
+    llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*,
+                                       ArrayRef<StringRef>, ArrayRef<StringRef>,
+                                       StringRef)> action) override;
+  std::error_code runInSubCompilerInstance(StringRef moduleName,
+                                           StringRef interfacePath,
+                                           StringRef outputPath,
+                                           SourceLoc diagLoc,
+    llvm::function_ref<std::error_code(SubCompilerInstanceInfo&)> action) override;
 
   ~InterfaceSubContextDelegateImpl() = default;
 

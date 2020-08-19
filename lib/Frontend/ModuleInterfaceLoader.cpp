@@ -1405,11 +1405,12 @@ InterfaceSubContextDelegateImpl::getCacheHash(StringRef useInterfacePath) {
   return llvm::APInt(64, H).toString(36, /*Signed=*/false);
 }
 
-bool InterfaceSubContextDelegateImpl::runInSubContext(StringRef moduleName,
-                                                      StringRef interfacePath,
-                                                      StringRef outputPath,
-                                                      SourceLoc diagLoc,
-    llvm::function_ref<bool(ASTContext&, ModuleDecl*, ArrayRef<StringRef>,
+std::error_code
+InterfaceSubContextDelegateImpl::runInSubContext(StringRef moduleName,
+                                                 StringRef interfacePath,
+                                                 StringRef outputPath,
+                                                 SourceLoc diagLoc,
+    llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*, ArrayRef<StringRef>,
                             ArrayRef<StringRef>, StringRef)> action) {
   return runInSubCompilerInstance(moduleName, interfacePath, outputPath, diagLoc,
                                   [&](SubCompilerInstanceInfo &info){
@@ -1421,11 +1422,12 @@ bool InterfaceSubContextDelegateImpl::runInSubContext(StringRef moduleName,
   });
 }
 
-bool InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
-                                                               StringRef interfacePath,
-                                                               StringRef outputPath,
-                                                               SourceLoc diagLoc,
-                  llvm::function_ref<bool(SubCompilerInstanceInfo&)> action) {
+std::error_code
+InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
+                                                          StringRef interfacePath,
+                                                          StringRef outputPath,
+                                                          SourceLoc diagLoc,
+                  llvm::function_ref<std::error_code(SubCompilerInstanceInfo&)> action) {
   // We are about to mess up the compiler invocation by using the compiler
   // arguments in the textual interface file. So copy to use a new compiler
   // invocation.
@@ -1469,12 +1471,12 @@ bool InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleN
                                           CompilerVersion,
                                           interfacePath,
                                           diagLoc)) {
-    return true;
+    return std::make_error_code(std::errc::not_supported);
   }
   // Insert arguments collected from the interface file.
   BuildArgs.insert(BuildArgs.end(), SubArgs.begin(), SubArgs.end());
   if (subInvocation.parseArgs(SubArgs, Diags)) {
-    return true;
+    return std::make_error_code(std::errc::not_supported);
   }
   CompilerInstance subInstance;
   SubCompilerInstanceInfo info;
@@ -1486,7 +1488,7 @@ bool InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleN
   ForwardingDiagnosticConsumer FDC(Diags);
   subInstance.addDiagnosticConsumer(&FDC);
   if (subInstance.setup(subInvocation)) {
-    return true;
+    return std::make_error_code(std::errc::not_supported);
   }
   info.BuildArguments = BuildArgs;
   info.Hash = CacheHash;
