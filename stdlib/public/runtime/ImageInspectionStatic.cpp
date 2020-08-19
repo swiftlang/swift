@@ -33,7 +33,8 @@ using namespace swift;
 void swift::initializeProtocolLookup() {
   void *start;
   uintptr_t size;
-  GET_SECTION_START_AND_SIZE(start, size, TextSegment, ProtocolsSection);
+  GET_SECTION_START_AND_SIZE(start, size, MachOTextSegment,
+                             MachOProtocolsSection);
   if (start == nullptr || size == 0)
     return;
   addImageProtocolsBlockCallbackUnsafe(start, size);
@@ -42,8 +43,8 @@ void swift::initializeProtocolLookup() {
 void swift::initializeProtocolConformanceLookup() {
   void *start;
   uintptr_t size;
-  GET_SECTION_START_AND_SIZE(start, size, TextSegment,
-                             ProtocolConformancesSection);
+  GET_SECTION_START_AND_SIZE(start, size, MachOTextSegment,
+                             MachOProtocolConformancesSection);
   if (start == nullptr || size == 0)
     return;
   addImageProtocolConformanceBlockCallbackUnsafe(start, size);
@@ -51,8 +52,8 @@ void swift::initializeProtocolConformanceLookup() {
 void swift::initializeTypeMetadataRecordLookup() {
   void *start;
   uintptr_t size;
-  GET_SECTION_START_AND_SIZE(start, size, TextSegment,
-                             TypeMetadataRecordSection);
+  GET_SECTION_START_AND_SIZE(start, size, MachOTextSegment,
+                             MachOTypeMetadataRecordSection);
   if (start == nullptr || size == 0)
     return;
   addImageTypeMetadataRecordBlockCallbackUnsafe(start, size);
@@ -61,14 +62,14 @@ void swift::initializeTypeMetadataRecordLookup() {
 void swift::initializeDynamicReplacementLookup() {
   void *start1;
   uintptr_t size1;
-  GET_SECTION_START_AND_SIZE(start1, size1, TextSegment,
-                             DynamicReplacementSection);
+  GET_SECTION_START_AND_SIZE(start1, size1, MachOTextSegment,
+                             MachODynamicReplacementSection);
   if (start1 == nullptr || size1 == 0)
     return;
   void *start2;
   uintptr_t size2;
-  GET_SECTION_START_AND_SIZE(start2, size2, TextSegment,
-                             DynamicReplacementSection);
+  GET_SECTION_START_AND_SIZE(start2, size2, MachOTextSegment,
+                             MachODynamicReplacementSection);
   if (start2 == nullptr || size2 == 0)
     return;
   addImageDynamicReplacementBlockCallback(start1, size1, start2, size2);
