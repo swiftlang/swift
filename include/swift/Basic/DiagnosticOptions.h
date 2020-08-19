@@ -71,6 +71,8 @@ public:
   std::string LocalizationCode = "";
   std::string LocalizationPath = "";
 
+  std::string DefaultLocalizationMessagesPath = "";
+
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
   llvm::hash_code getPCHHashComponents() const {

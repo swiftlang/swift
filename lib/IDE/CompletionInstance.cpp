@@ -322,7 +322,8 @@ bool CompletionInstance::performCachedOperationIfPossible(
   langOpts.EnableTypeFingerprints = false;
   TypeCheckerOptions typeckOpts = CI.getASTContext().TypeCheckerOpts;
   SearchPathOptions searchPathOpts = CI.getASTContext().SearchPathOpts;
-  DiagnosticEngine tmpDiags(tmpSM);
+  DiagnosticEngine tmpDiags(
+      tmpSM, Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
   std::unique_ptr<ASTContext> tmpCtx(
       ASTContext::get(langOpts, typeckOpts, searchPathOpts, tmpSM, tmpDiags));
   registerParseRequestFunctions(tmpCtx->evaluator);
@@ -501,7 +502,8 @@ bool CompletionInstance::performNewOperation(
 
   auto isCachedCompletionRequested = ArgsHash.hasValue();
 
-  auto TheInstance = std::make_unique<CompilerInstance>();
+  auto TheInstance = std::make_unique<CompilerInstance>(
+      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
 
   // Track non-system dependencies in fast-completion mode to invalidate the
   // compiler instance if any dependent files are modified.

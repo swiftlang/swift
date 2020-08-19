@@ -100,12 +100,15 @@ struct SharedState : llvm::RefCountedBase<SharedState> {
 class SerializedDiagnosticConsumer : public DiagnosticConsumer {
   /// State shared among the various clones of this diagnostic consumer.
   llvm::IntrusiveRefCntPtr<SharedState> State;
+  std::string DefaultLocalizationMessagesPath;
   bool CalledFinishProcessing = false;
   bool CompilationWasComplete = true;
 
 public:
-  SerializedDiagnosticConsumer(StringRef serializedDiagnosticsPath)
-      : State(new SharedState(serializedDiagnosticsPath)) {
+  SerializedDiagnosticConsumer(StringRef serializedDiagnosticsPath,
+                               std::string defaultLocalizationMessagesPath)
+      : State(new SharedState(serializedDiagnosticsPath)),
+        DefaultLocalizationMessagesPath(defaultLocalizationMessagesPath) {
     emitPreamble();
   }
 
@@ -134,7 +137,7 @@ public:
     if (EC) {
       // Create a temporary diagnostics engine to print the error to stderr.
       SourceManager dummyMgr;
-      DiagnosticEngine DE(dummyMgr);
+      DiagnosticEngine DE(dummyMgr, DefaultLocalizationMessagesPath);
       PrintingDiagnosticConsumer PDC;
       DE.addConsumer(PDC);
       DE.diagnose(SourceLoc(), diag::cannot_open_serialized_file,
@@ -205,9 +208,12 @@ private:
 
 namespace swift {
 namespace serialized_diagnostics {
-  std::unique_ptr<DiagnosticConsumer> createConsumer(StringRef outputPath) {
-    return std::make_unique<SerializedDiagnosticConsumer>(outputPath);
-  }
+std::unique_ptr<DiagnosticConsumer>
+createConsumer(StringRef outputPath,
+               std::string defaultLocalizationMessagesPath) {
+  return std::make_unique<SerializedDiagnosticConsumer>(
+      outputPath, defaultLocalizationMessagesPath);
+}
 } // namespace serialized_diagnostics
 } // namespace swift
 

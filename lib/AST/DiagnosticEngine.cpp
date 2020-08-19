@@ -1017,9 +1017,9 @@ DiagnosticEngine::diagnosticStringFor(const DiagID id,
   if (printDiagnosticName) {
     return debugDiagnosticStrings[(unsigned)id];
   }
-  auto defaultMessage = defaultLocalization.get()->getMessageOr(id);
+  auto defaultMessage = defaultLocalization.get()->getMessage(id);
   if (localization) {
-    auto localizedMessage = localization.get()->getMessageOr(id);
+    auto localizedMessage = localization.get()->getMessage(id);
     if (localizedMessage) {
       return localizedMessage.getValue();
     }

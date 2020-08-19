@@ -78,8 +78,11 @@ struct SourceCompleteResult {
 };
 
 SourceCompleteResult
-isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf, SourceFileKind SFKind);
-SourceCompleteResult isSourceInputComplete(StringRef Text, SourceFileKind SFKind);
+isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf,
+                      SourceFileKind SFKind, CompilerInvocation &Invok);
+SourceCompleteResult isSourceInputComplete(StringRef Text,
+                                           SourceFileKind SFKind,
+                                           CompilerInvocation &Invok);
 
 bool initInvocationByClangArguments(ArrayRef<const char *> ArgList,
                                     CompilerInvocation &Invok,

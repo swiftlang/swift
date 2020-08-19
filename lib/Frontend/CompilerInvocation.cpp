@@ -79,6 +79,15 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
   llvm::sys::path::remove_filename(DiagnosticMessagesDir); // Remove /bin
   llvm::sys::path::append(DiagnosticMessagesDir, "share", "swift", "diagnostics");
   DiagnosticOpts.LocalizationPath = std::string(DiagnosticMessagesDir.str());
+
+  llvm::SmallString<128> DefaultDiagnosticMessagesDir(Path);
+  llvm::sys::path::remove_filename(
+      DefaultDiagnosticMessagesDir); // Remove /swift
+  llvm::sys::path::remove_filename(DefaultDiagnosticMessagesDir); // Remove /bin
+  llvm::sys::path::append(DefaultDiagnosticMessagesDir, "share", "swift",
+                          "diagnostics");
+  DiagnosticOpts.DefaultLocalizationMessagesPath =
+      std::string(DefaultDiagnosticMessagesDir.str());
 }
 
 void CompilerInvocation::setDefaultPrebuiltCacheIfNecessary() {

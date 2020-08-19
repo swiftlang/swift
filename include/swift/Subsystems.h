@@ -269,11 +269,14 @@ namespace swift {
     ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
                const LangOptions &LangOpts, const TypeCheckerOptions &TyOpts,
                StringRef ModuleName,
+               std::string defaultLocalizationMessagesPath,
                std::shared_ptr<SyntaxParseActions> spActions = nullptr,
                SyntaxParsingCache *SyntaxCache = nullptr);
-    ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID);
     ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
-               unsigned Offset, unsigned EndOffset);
+               std::string defaultLocalizationMessagesPath);
+    ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
+               unsigned Offset, unsigned EndOffset,
+               std::string defaultLocalizationMessagesPath);
 
     ~ParserUnit();
 

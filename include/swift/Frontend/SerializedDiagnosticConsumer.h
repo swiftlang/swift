@@ -35,8 +35,9 @@ namespace swift {
     /// \param outputPath the file path to write the diagnostics to.
     ///
     /// \returns A new diagnostic consumer that serializes diagnostics.
-    std::unique_ptr<DiagnosticConsumer>
-    createConsumer(llvm::StringRef outputPath);
+  std::unique_ptr<DiagnosticConsumer>
+  createConsumer(llvm::StringRef outputPath,
+                 std::string defaultLocalizationMessagesPath);
   }
 }
 

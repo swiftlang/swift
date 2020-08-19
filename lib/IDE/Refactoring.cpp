@@ -753,15 +753,14 @@ public:
   virtual bool performChange() = 0;
 };
 
-RefactoringAction::
-RefactoringAction(ModuleDecl *MD, RefactoringOptions &Opts,
-                  SourceEditConsumer &EditConsumer,
-                  DiagnosticConsumer &DiagConsumer): MD(MD),
-    TheFile(getContainingFile(MD, Opts.Range)),
-    EditConsumer(EditConsumer), Ctx(MD->getASTContext()),
-    SM(MD->getASTContext().SourceMgr), DiagEngine(SM),
-    StartLoc(Lexer::getLocForStartOfToken(SM, Opts.Range.getStart(SM))),
-    PreferredName(Opts.PreferredName) {
+RefactoringAction::RefactoringAction(ModuleDecl *MD, RefactoringOptions &Opts,
+                                     SourceEditConsumer &EditConsumer,
+                                     DiagnosticConsumer &DiagConsumer)
+    : MD(MD), TheFile(getContainingFile(MD, Opts.Range)),
+      EditConsumer(EditConsumer), Ctx(MD->getASTContext()),
+      SM(MD->getASTContext().SourceMgr), DiagEngine(SM, "/path"),
+      StartLoc(Lexer::getLocForStartOfToken(SM, Opts.Range.getStart(SM))),
+      PreferredName(Opts.PreferredName) {
   DiagEngine.addConsumer(DiagConsumer);
 }
 
@@ -1176,7 +1175,8 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
   Invocation.getFrontendOptions().ModuleName = "extract";
   Invocation.getLangOptions().DisablePoundIfEvaluation = true;
 
-  auto Instance = std::make_unique<swift::CompilerInstance>();
+  auto Instance = std::make_unique<swift::CompilerInstance>(
+      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
   if (Instance->setup(Invocation))
     llvm_unreachable("Failed setup");
 
@@ -2924,7 +2924,7 @@ collectAvailableRefactoringsAtCursor(SourceFile *SF, unsigned Line,
   // Prepare the tool box.
   ASTContext &Ctx = SF->getASTContext();
   SourceManager &SM = Ctx.SourceMgr;
-  DiagnosticEngine DiagEngine(SM);
+  DiagnosticEngine DiagEngine(SM, "/path");
   std::for_each(DiagConsumers.begin(), DiagConsumers.end(),
                 [&](DiagnosticConsumer *Con) { DiagEngine.addConsumer(*Con); });
   SourceLoc Loc = SM.getLocForLineCol(SF->getBufferID().getValue(), Line, Column);
@@ -4077,7 +4077,7 @@ collectAvailableRefactorings(SourceFile *SF,
       AllKinds.push_back(RenameOp.getValue());
     }
   }
-  DiagnosticEngine DiagEngine(SF->getASTContext().SourceMgr);
+  DiagnosticEngine DiagEngine(SF->getASTContext().SourceMgr, "/path");
 #define CURSOR_REFACTORING(KIND, NAME, ID)                                     \
   if (RefactoringAction##KIND::isApplicable(CursorInfo, DiagEngine))           \
     AllKinds.push_back(RefactoringKind::KIND);
@@ -4114,7 +4114,7 @@ collectAvailableRefactorings(SourceFile *SF, RangeConfig Range,
   // Prepare the tool box.
   ASTContext &Ctx = SF->getASTContext();
   SourceManager &SM = Ctx.SourceMgr;
-  DiagnosticEngine DiagEngine(SM);
+  DiagnosticEngine DiagEngine(SM, "/path");
   std::for_each(DiagConsumers.begin(), DiagConsumers.end(),
     [&](DiagnosticConsumer *Con) { DiagEngine.addConsumer(*Con); });
   ResolvedRangeInfo Result = evaluateOrDefault(SF->getASTContext().evaluator,
@@ -4231,7 +4231,7 @@ int swift::ide::syntacticRename(SourceFile *SF, ArrayRef<RenameLoc> RenameLocs,
   assert(SF && "null source file");
 
   SourceManager &SM = SF->getASTContext().SourceMgr;
-  DiagnosticEngine DiagEngine(SM);
+  DiagnosticEngine DiagEngine(SM, "/path");
   DiagEngine.addConsumer(DiagConsumer);
 
   auto ResolvedLocs = resolveRenameLocations(RenameLocs, *SF, DiagEngine);
@@ -4264,7 +4264,7 @@ int swift::ide::findSyntacticRenameRanges(
   assert(SF && "null source file");
 
   SourceManager &SM = SF->getASTContext().SourceMgr;
-  DiagnosticEngine DiagEngine(SM);
+  DiagnosticEngine DiagEngine(SM, "/path");
   DiagEngine.addConsumer(DiagConsumer);
 
   auto ResolvedLocs = resolveRenameLocations(RenameLocs, *SF, DiagEngine);
@@ -4295,7 +4295,7 @@ int swift::ide::findLocalRenameRanges(
   assert(SF && "null source file");
 
   SourceManager &SM = SF->getASTContext().SourceMgr;
-  DiagnosticEngine Diags(SM);
+  DiagnosticEngine Diags(SM, "/path");
   Diags.addConsumer(DiagConsumer);
 
   auto StartLoc = Lexer::getLocForStartOfToken(SM, Range.getStart(SM));

@@ -59,10 +59,10 @@ public:
 
   void updateCode(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
     BufferID = SM.addNewSourceBuffer(std::move(Buffer));
-    Parser.reset(new ParserUnit(SM, SourceFileKind::Main,
-                                BufferID, CompInv.getLangOptions(),
-                                CompInv.getTypeCheckerOptions(),
-                                CompInv.getModuleName()));
+    Parser.reset(new ParserUnit(
+        SM, SourceFileKind::Main, BufferID, CompInv.getLangOptions(),
+        CompInv.getTypeCheckerOptions(), CompInv.getModuleName(),
+        CompInv.getDiagnosticOptions().DefaultLocalizationMessagesPath));
     Parser->getDiagnosticEngine().addConsumer(DiagConsumer);
     Parser->parse();
   }
@@ -235,7 +235,19 @@ public:
 
 int swift_indent_main(ArrayRef<const char *> Args, const char *Argv0,
                       void *MainAddr) {
-  CompilerInstance Instance;
+
+  std::string MainExecutablePath =
+      llvm::sys::fs::getMainExecutable(Argv0, MainAddr);
+  llvm::SmallString<128> DefaultDiagnosticMessagesDir(MainExecutablePath);
+  llvm::sys::path::remove_filename(
+      DefaultDiagnosticMessagesDir); // Remove /swift
+  llvm::sys::path::remove_filename(DefaultDiagnosticMessagesDir); // Remove /bin
+  llvm::sys::path::append(DefaultDiagnosticMessagesDir, "share", "swift",
+                          "diagnostics");
+  std::string DefaultLocalizationPath =
+      std::string(DefaultDiagnosticMessagesDir.str());
+
+  CompilerInstance Instance(DefaultLocalizationPath);
   PrintingDiagnosticConsumer PDC;
   Instance.addDiagnosticConsumer(&PDC);
 

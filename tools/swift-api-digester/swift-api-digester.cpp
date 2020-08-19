@@ -2299,7 +2299,8 @@ static std::unique_ptr<DiagnosticConsumer>
 createDiagConsumer(llvm::raw_ostream &OS, bool &FailOnError) {
   if (!options::SerializedDiagPath.empty()) {
     FailOnError = true;
-    return serialized_diagnostics::createConsumer(options::SerializedDiagPath);
+    return serialized_diagnostics::createConsumer(options::SerializedDiagPath,
+                                                  "test");
   } else if (options::CompilerStyleDiags) {
     FailOnError = true;
     return std::make_unique<PrintingDiagnosticConsumer>();

@@ -153,10 +153,19 @@ static int run_driver(StringRef ExecName,
 
   std::string Path = getExecutablePath(argv[0]);
 
+  llvm::SmallString<128> DefaultDiagnosticMessagesDir(Path);
+  llvm::sys::path::remove_filename(
+      DefaultDiagnosticMessagesDir); // Remove /swift
+  llvm::sys::path::remove_filename(DefaultDiagnosticMessagesDir); // Remove /bin
+  llvm::sys::path::append(DefaultDiagnosticMessagesDir, "share", "swift",
+                          "diagnostics");
+  std::string DefaultLocalizationPath =
+      std::string(DefaultDiagnosticMessagesDir.str());
+
   PrintingDiagnosticConsumer PDC;
 
   SourceManager SM;
-  DiagnosticEngine Diags(SM);
+  DiagnosticEngine Diags(SM, DefaultLocalizationPath);
   Diags.addConsumer(PDC);
 
   Driver TheDriver(Path, ExecName, argv, Diags);

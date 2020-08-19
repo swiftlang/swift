@@ -984,6 +984,7 @@ namespace {
 class JSONFixitWriter
   : public DiagnosticConsumer, public migrator::FixitFilter {
   std::string FixitsOutputPath;
+  std::string DefaultLocalizationMessagesPath;
   std::unique_ptr<llvm::raw_ostream> OSPtr;
   bool FixitAll;
   std::vector<SingleEdit> AllEdits;
@@ -991,8 +992,10 @@ class JSONFixitWriter
 public:
   JSONFixitWriter(std::string fixitsOutputPath,
                   const DiagnosticOptions &DiagOpts)
-    : FixitsOutputPath(fixitsOutputPath),
-      FixitAll(DiagOpts.FixitCodeForAllDiagnostics) {}
+      : FixitsOutputPath(fixitsOutputPath),
+        DefaultLocalizationMessagesPath(
+            DiagOpts.DefaultLocalizationMessagesPath),
+        FixitAll(DiagOpts.FixitCodeForAllDiagnostics) {}
 
 private:
   void handleDiagnostic(SourceManager &SM,
@@ -1013,7 +1016,7 @@ private:
     if (EC) {
       // Create a temporary diagnostics engine to print the error to stderr.
       SourceManager dummyMgr;
-      DiagnosticEngine DE(dummyMgr);
+      DiagnosticEngine DE(dummyMgr, DefaultLocalizationMessagesPath);
       PrintingDiagnosticConsumer PDC;
       DE.addConsumer(PDC);
       DE.diagnose(SourceLoc(), diag::cannot_open_file,
@@ -2294,15 +2297,19 @@ createDispatchingDiagnosticConsumerIfNeeded(
 /// If no serialized diagnostics are being produced, returns null.
 static std::unique_ptr<DiagnosticConsumer>
 createSerializedDiagnosticConsumerIfNeeded(
-    const FrontendInputsAndOutputs &inputsAndOutputs) {
+    const FrontendInputsAndOutputs &inputsAndOutputs,
+    std::string defaultLocalizationMessagesPath) {
   return createDispatchingDiagnosticConsumerIfNeeded(
       inputsAndOutputs,
-      [](const InputFile &input) -> std::unique_ptr<DiagnosticConsumer> {
-    std::string serializedDiagnosticsPath = input.serializedDiagnosticsPath();
-    if (serializedDiagnosticsPath.empty())
-      return nullptr;
-    return serialized_diagnostics::createConsumer(serializedDiagnosticsPath);
-  });
+      [&defaultLocalizationMessagesPath](
+          const InputFile &input) -> std::unique_ptr<DiagnosticConsumer> {
+        std::string serializedDiagnosticsPath =
+            input.serializedDiagnosticsPath();
+        if (serializedDiagnosticsPath.empty())
+          return nullptr;
+        return serialized_diagnostics::createConsumer(
+            serializedDiagnosticsPath, defaultLocalizationMessagesPath);
+      });
 }
 
 /// Creates a diagnostic consumer that handles serializing diagnostics, based on
@@ -2506,8 +2513,20 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     (*callback)(reason, shouldCrash);
   }, &diagnoseFatalError);
 
+  std::string MainExecutablePath =
+      llvm::sys::fs::getMainExecutable(Argv0, MainAddr);
+
+  llvm::SmallString<128> DefaultDiagnosticMessagesDir(MainExecutablePath);
+  llvm::sys::path::remove_filename(
+      DefaultDiagnosticMessagesDir); // Remove /swift
+  llvm::sys::path::remove_filename(DefaultDiagnosticMessagesDir); // Remove /bin
+  llvm::sys::path::append(DefaultDiagnosticMessagesDir, "share", "swift",
+                          "diagnostics");
+  std::string DefaultLocalizationPath =
+      std::string(DefaultDiagnosticMessagesDir.str());
+
   std::unique_ptr<CompilerInstance> Instance =
-    std::make_unique<CompilerInstance>();
+      std::make_unique<CompilerInstance>(DefaultLocalizationPath);
   Instance->addDiagnosticConsumer(&PDC);
 
   struct FinishDiagProcessingCheckRAII {
@@ -2540,9 +2559,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   SmallString<128> workingDirectory;
   llvm::sys::fs::current_path(workingDirectory);
-
-  std::string MainExecutablePath =
-      llvm::sys::fs::getMainExecutable(Argv0, MainAddr);
 
   // Parse arguments.
   SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 4> configurationFileBuffers;
@@ -2614,7 +2630,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   // for details.
   std::unique_ptr<DiagnosticConsumer> SerializedConsumerDispatcher =
       createSerializedDiagnosticConsumerIfNeeded(
-        Invocation.getFrontendOptions().InputsAndOutputs);
+          Invocation.getFrontendOptions().InputsAndOutputs,
+          Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
   if (SerializedConsumerDispatcher)
     Instance->addDiagnosticConsumer(SerializedConsumerDispatcher.get());
 

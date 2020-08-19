@@ -59,6 +59,8 @@ template <> struct ScalarEnumerationTraits<LocalDiagID> {
 namespace swift {
 namespace diag {
 
+using namespace llvm;
+
 void SerializedLocalizationWriter::insert(swift::DiagID id,
                                           llvm::StringRef translation) {
   generator.insert(static_cast<uint32_t>(id), translation);
@@ -95,12 +97,12 @@ SerializedLocalizationProducer::SerializedLocalizationProducer(
 }
 
 llvm::Optional<llvm::StringRef>
-SerializedLocalizationProducer::getMessageOr(swift::DiagID id) const {
+SerializedLocalizationProducer::getMessage(swift::DiagID id) const {
   auto value = SerializedTable.get()->find(id);
   llvm::StringRef diagnosticMessage((const char *)value.getDataPtr(),
                                     value.getDataLen());
   if (diagnosticMessage.empty())
-    return llvm::None;
+    return None;
 
   return diagnosticMessage;
 }
@@ -114,12 +116,12 @@ YAMLLocalizationProducer::YAMLLocalizationProducer(llvm::StringRef filePath) {
 }
 
 llvm::Optional<llvm::StringRef>
-YAMLLocalizationProducer::getMessageOr(swift::DiagID id) const {
+YAMLLocalizationProducer::getMessage(swift::DiagID id) const {
   if (diagnostics.empty())
-    return llvm::None;
+    return None;
   const std::string &diagnosticMessage = diagnostics[(unsigned)id];
   if (diagnosticMessage.empty())
-    return llvm::None;
+    return None;
   return llvm::StringRef(diagnosticMessage);
 }
 
@@ -136,7 +138,7 @@ llvm::Optional<uint32_t> LocalizationInput::readID(llvm::yaml::IO &io) {
   LocalDiagID diagID;
   io.mapRequired("id", diagID);
   if (diagID == LocalDiagID::NumDiags)
-    return llvm::None;
+    return None;
   return static_cast<uint32_t>(diagID);
 }
 

@@ -101,10 +101,12 @@ static const char *skipStringInCode(const char *p, const char *End) {
 
 SourceCompleteResult
 ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf,
-                           SourceFileKind SFKind) {
+                           SourceFileKind SFKind, CompilerInvocation &Invok) {
   SourceManager SM;
   auto BufferID = SM.addNewSourceBuffer(std::move(MemBuf));
-  ParserUnit Parse(SM, SFKind, BufferID);
+  ParserUnit Parse(
+      SM, SFKind, BufferID,
+      Invok.getDiagnosticOptions().DefaultLocalizationMessagesPath);
   Parse.parse();
   SourceCompleteResult SCR;
   SCR.IsComplete = !Parse.getParser().isInputIncomplete();
@@ -182,10 +184,11 @@ ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf,
   return SCR;
 }
 
-SourceCompleteResult
-ide::isSourceInputComplete(StringRef Text,SourceFileKind SFKind) {
+SourceCompleteResult ide::isSourceInputComplete(StringRef Text,
+                                                SourceFileKind SFKind,
+                                                CompilerInvocation &Invok) {
   return ide::isSourceInputComplete(llvm::MemoryBuffer::getMemBufferCopy(Text),
-                                    SFKind);
+                                    SFKind, Invok);
 }
 
 // Adjust the cc1 triple string we got from clang, to make sure it will be

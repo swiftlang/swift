@@ -1469,7 +1469,8 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   if (subInvocation.parseArgs(SubArgs, Diags)) {
     return std::make_error_code(std::errc::not_supported);
   }
-  CompilerInstance subInstance;
+  CompilerInstance subInstance(
+      subInvocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
   SubCompilerInstanceInfo info;
   info.Instance = &subInstance;
   info.CompilerVersion = CompilerVersion;

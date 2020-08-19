@@ -426,7 +426,7 @@ public:
 class CompilerInstance {
   CompilerInvocation Invocation;
   SourceManager SourceMgr;
-  DiagnosticEngine Diagnostics{SourceMgr};
+  DiagnosticEngine Diagnostics;
   std::unique_ptr<ASTContext> Context;
   std::unique_ptr<Lowering::TypeConverter> TheSILTypes;
   std::unique_ptr<DiagnosticVerifier> DiagVerifier;
@@ -469,7 +469,7 @@ class CompilerInstance {
 
 public:
   // Out of line to avoid having to import SILModule.h.
-  CompilerInstance();
+  CompilerInstance(std::string defaultLocalizationMessagesPath);
   ~CompilerInstance();
 
   CompilerInstance(const CompilerInstance &) = delete;

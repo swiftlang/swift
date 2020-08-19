@@ -184,14 +184,23 @@ static bool extractLinkerFlags(const llvm::object::Binary *Bin,
 
 int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
                           void *MainAddr) {
-  CompilerInstance Instance;
-  PrintingDiagnosticConsumer PDC;
-  Instance.addDiagnosticConsumer(&PDC);
-
   AutolinkExtractInvocation Invocation;
   std::string MainExecutablePath = llvm::sys::fs::getMainExecutable(Argv0,
                                                                     MainAddr);
   Invocation.setMainExecutablePath(MainExecutablePath);
+
+  llvm::SmallString<128> DefaultDiagnosticMessagesDir(MainExecutablePath);
+  llvm::sys::path::remove_filename(
+      DefaultDiagnosticMessagesDir); // Remove /swift
+  llvm::sys::path::remove_filename(DefaultDiagnosticMessagesDir); // Remove /bin
+  llvm::sys::path::append(DefaultDiagnosticMessagesDir, "share", "swift",
+                          "diagnostics");
+  std::string DefaultLocalizationPath =
+      std::string(DefaultDiagnosticMessagesDir.str());
+
+  CompilerInstance Instance(DefaultLocalizationPath);
+  PrintingDiagnosticConsumer PDC;
+  Instance.addDiagnosticConsumer(&PDC);
 
   // Parse arguments.
   if (Invocation.parseArgs(Args, Instance.getDiags()) != 0) {

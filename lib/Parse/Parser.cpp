@@ -1198,9 +1198,10 @@ struct ParserUnit::Implementation {
   Implementation(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
                  const LangOptions &Opts, const TypeCheckerOptions &TyOpts,
                  StringRef ModuleName,
-                 std::shared_ptr<SyntaxParseActions> spActions)
+                 std::shared_ptr<SyntaxParseActions> spActions,
+                 std::string defaultLocalizationMessagesPath)
       : SPActions(std::move(spActions)), LangOpts(Opts),
-        TypeCheckerOpts(TyOpts), Diags(SM),
+        TypeCheckerOpts(TyOpts), Diags(SM, defaultLocalizationMessagesPath),
         Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SearchPathOpts, SM,
                              Diags)) {
     auto parsingOpts = SourceFile::getDefaultParsingOptions(LangOpts);
@@ -1219,29 +1220,34 @@ struct ParserUnit::Implementation {
   }
 };
 
-ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID)
-  : ParserUnit(SM, SFKind, BufferID,
-               LangOptions(), TypeCheckerOptions(), "input") {
-}
+ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind,
+                       unsigned BufferID,
+                       std::string defaultLocalizationMessagesPath)
+    : ParserUnit(SM, SFKind, BufferID, LangOptions(), TypeCheckerOptions(),
+                 "input", defaultLocalizationMessagesPath) {}
 
-ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
-                       const LangOptions &LangOpts,
+ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind,
+                       unsigned BufferID, const LangOptions &LangOpts,
                        const TypeCheckerOptions &TypeCheckOpts,
                        StringRef ModuleName,
+                       std::string defaultLocalizationMessagesPath,
                        std::shared_ptr<SyntaxParseActions> spActions,
                        SyntaxParsingCache *SyntaxCache)
     : Impl(*new Implementation(SM, SFKind, BufferID, LangOpts, TypeCheckOpts,
-                               ModuleName, std::move(spActions))) {
+                               ModuleName, std::move(spActions),
+                               defaultLocalizationMessagesPath)) {
 
   Impl.SF->SyntaxParsingCache = SyntaxCache;
   Impl.TheParser.reset(new Parser(BufferID, *Impl.SF, /*SIL=*/nullptr,
                                   /*PersistentState=*/nullptr, Impl.SPActions));
 }
 
-ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
-                       unsigned Offset, unsigned EndOffset)
-  : Impl(*new Implementation(SM, SFKind, BufferID, LangOptions(),
-                             TypeCheckerOptions(), "input", nullptr)) {
+ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind,
+                       unsigned BufferID, unsigned Offset, unsigned EndOffset,
+                       std::string defaultLocalizationMessagesPath)
+    : Impl(*new Implementation(SM, SFKind, BufferID, LangOptions(),
+                               TypeCheckerOptions(), "input", nullptr,
+                               defaultLocalizationMessagesPath)) {
 
   std::unique_ptr<Lexer> Lex;
   Lex.reset(new Lexer(Impl.LangOpts, SM,

@@ -46,7 +46,8 @@
 
 using namespace swift;
 
-CompilerInstance::CompilerInstance() = default;
+CompilerInstance::CompilerInstance(std::string defaultLocalizationMessagesPath)
+    : Diagnostics(SourceMgr, defaultLocalizationMessagesPath) {}
 CompilerInstance::~CompilerInstance() = default;
 
 std::string CompilerInvocation::getPCHHash() const {
