@@ -510,14 +510,14 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   IdentifierID replacedFunctionID;
   GenericSignatureID genericSigID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
-      isWithoutactuallyEscapingThunk, isAsync, specialPurpose, inlineStrategy,
+      isWithoutactuallyEscapingThunk, specialPurpose, inlineStrategy,
       optimizationMode, subclassScope, effect, numSpecAttrs,
       hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
       isDynamic, isExactSelfClass;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
-      isWithoutactuallyEscapingThunk, isAsync, specialPurpose, inlineStrategy,
+      isWithoutactuallyEscapingThunk, specialPurpose, inlineStrategy,
       optimizationMode, subclassScope, effect, numSpecAttrs,
       hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
       isDynamic, isExactSelfClass, funcTyID, replacedFunctionID, genericSigID,
@@ -625,11 +625,6 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
       MF->fatal();
     }
 
-    if (fn->isAsync() != isAsync) {
-      LLVM_DEBUG(llvm::dbgs() << "SILFunction type mismatch.\n");
-      MF->fatal();
-    }
-
   } else {
     // Otherwise, create a new function.
     fn = builder.createDeclaration(name, ty, loc);
@@ -638,7 +633,6 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setSerialized(IsSerialized_t(isSerialized));
     fn->setThunk(IsThunk_t(isThunk));
     fn->setWithoutActuallyEscapingThunk(bool(isWithoutactuallyEscapingThunk));
-    fn->setAsync((bool)isAsync);
     fn->setInlineStrategy(Inline_t(inlineStrategy));
     fn->setSpecialPurpose(SILFunction::Purpose(specialPurpose));
     fn->setEffectsKind(EffectsKind(effect));
@@ -2829,14 +2823,14 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   IdentifierID replacedFunctionID;
   GenericSignatureID genericSigID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
-      isWithoutactuallyEscapingThunk, isAsync, isGlobal, inlineStrategy,
+      isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, subclassScope, effect, numSpecAttrs,
       hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
       isDynamic, isExactSelfClass;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
-      isWithoutactuallyEscapingThunk, isAsync, isGlobal, inlineStrategy,
+      isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, subclassScope, effect, numSpecAttrs,
       hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
       isDynamic, isExactSelfClass, funcTyID, replacedFunctionID, genericSigID,

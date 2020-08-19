@@ -671,9 +671,10 @@ TypeBase::replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) cons
       
       if (!didChange)
         return sft;
-      
+
       return SILFunctionType::get(sft->getInvocationGenericSignature(),
-                                  sft->getExtInfo(), sft->getCoroutineKind(),
+                                  sft->getExtInfo(), sft->isAsync(),
+                                  sft->getCoroutineKind(),
                                   sft->getCalleeConvention(),
                                   newParams, newYields, newResults,
                                   newErrorResult,
