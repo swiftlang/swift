@@ -422,6 +422,7 @@ function set_build_options_for_host() {
     swift_cmake_options=()
     cmark_cmake_options=()
     lldb_cmake_options=()
+    llbuild_cmake_options=()
     SWIFT_HOST_VARIANT=
     SWIFT_HOST_VARIANT_SDK=
     SWIFT_HOST_VARIANT_ARCH=
@@ -685,6 +686,9 @@ function set_build_options_for_host() {
 
             lldb_cmake_options+=(
                 -DCMAKE_OSX_SYSROOT:PATH="${cmake_os_sysroot}"
+                -DCMAKE_OSX_ARCHITECTURES="${architecture}"
+            )
+            llbuild_cmake_options+=(
                 -DCMAKE_OSX_ARCHITECTURES="${architecture}"
             )
             ;;
@@ -2024,13 +2028,13 @@ for host in "${ALL_HOSTS[@]}"; do
             llbuild)
                 cmake_options=(
                     "${cmake_options[@]}"
+                    "${llbuild_cmake_options[@]}"
 
                     -DCMAKE_BUILD_TYPE:STRING="${LLBUILD_BUILD_TYPE}"
                     -DCMAKE_C_COMPILER:PATH="${CLANG_BIN}/clang"
                     -DCMAKE_CXX_COMPILER:PATH="${CLANG_BIN}/clang++"
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
                     -DCMAKE_Swift_COMPILER:PATH=${SWIFTC_BIN}
-                    -DCMAKE_OSX_ARCHITECTURES="${architecture}"
 
                     -DLLBUILD_ENABLE_ASSERTIONS:BOOL=$(true_false "${LLBUILD_ENABLE_ASSERTIONS}")
                     -DLLBUILD_SUPPORT_BINDINGS:=Swift
