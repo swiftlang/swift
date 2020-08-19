@@ -1860,7 +1860,9 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
           // In Swift versions lower than 5, this check will fail as read only
           // key paths can masquerade as writable for compatibilty reasons.
           // This is fine as in this case we just fall back on old diagnostics.
-          if (bgt->getDecl() == getASTContext().getKeyPathDecl()) {
+          auto &ctx = getASTContext();
+          if (bgt->getDecl() == ctx.getKeyPathDecl() ||
+              bgt->getDecl() == ctx.getPartialKeyPathDecl()) {
             return {expr, member};
           }
         }
