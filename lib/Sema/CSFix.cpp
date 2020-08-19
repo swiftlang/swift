@@ -1163,11 +1163,11 @@ bool RemoveUnnecessaryCoercion::attempt(ConstraintSystem &cs, Type fromType,
   // to AnyHashable where if we coerce a generic type that conforms to
   // this protocol to AnyHashable we match equal types here, but the
   // explicit coercion is still required.
-  auto castType = cs.getType(expr->getCastTypeLoc());
+  auto castType = cs.getType(expr->getCastTypeRepr());
   if (!fromType->isEqual(castType) && cs.isAnyHashableType(castType))
     return false;
 
-  auto toTypeRepr = expr->getCastTypeLoc().getTypeRepr();
+  auto toTypeRepr = expr->getCastTypeRepr();
   
   // Don't emit this diagnostic for Implicitly unwrapped optional types
   // e.g. i as Int!

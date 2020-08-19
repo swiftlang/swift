@@ -5549,8 +5549,8 @@ bool ThrowingFunctionConversionFailure::diagnoseAsError() {
 bool UnnecessaryCoercionFailure::diagnoseAsError() {
   auto expr = getAsExpr<CoerceExpr>(getAnchor());
   auto sourceRange =
-      SourceRange(expr->getLoc(), expr->getCastTypeLoc().getSourceRange().End);
-  auto castType = expr->getCastTypeLoc().getType();
+      SourceRange(expr->getLoc(), expr->getCastTypeRepr()->getSourceRange().End);
+  auto castType = getType(expr->getCastTypeRepr());
   
   if (isa<TypeAliasType>(getFromType().getPointer()) &&
       isa<TypeAliasType>(getToType().getPointer())) {
