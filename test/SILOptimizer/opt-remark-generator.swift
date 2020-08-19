@@ -31,13 +31,7 @@ case third
 }
 
 struct StructWithOwner {
-    // This retain is from the initializers of owner.
-    //
-    // TODO: Should we emit this?
-    var owner = Klass() // expected-remark {{retain of type 'Klass'}}
-                        // expected-note @-1 {{of 'self.owner'}}
-                        // expected-remark @-2 {{release of type 'Klass'}}
-                        // expected-note @-3 {{of 'self.owner'}}
+    var owner = Klass()
     var state = TrivialState.first
 }
 
@@ -66,14 +60,8 @@ func callingAnInitializerStructWithOwner(x: Klass) -> StructWithOwner {
 }
 
 struct KlassPair {
-    var lhs: Klass // expected-remark {{retain of type 'Klass'}}
-                   // expected-note @-1 {{of 'self.lhs'}}
-                   // expected-remark @-2 {{release of type 'Klass'}}
-                   // expected-note @-3 {{of 'self.lhs'}}
-    var rhs: Klass // expected-remark {{retain of type 'Klass'}}
-                   // expected-note @-1 {{of 'self.rhs'}}
-                   // expected-remark @-2 {{release of type 'Klass'}}
-                   // expected-note @-3 {{of 'self.rhs'}}
+    var lhs: Klass
+    var rhs: Klass
 }
 
 func printKlassPair(x : KlassPair) {
