@@ -1851,7 +1851,7 @@ public:
       if (!computeAutomaticEnumValueKind(ED)) {
         DE.diagnose(ED->getInherited().front().getSourceRange().Start,
                     diag::raw_type_not_literal_convertible, rawTy);
-        ED->getInherited().front().setInvalidType(getASTContext());
+        ED->getInherited().front().setType(ErrorType::get(getASTContext()));
       }
       
       // We need at least one case to have a raw value.

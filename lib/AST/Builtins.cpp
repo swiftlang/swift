@@ -168,16 +168,10 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType) {
   auto *paramList = ParameterList::create(Context, params);
   
   DeclName Name(Context, Id, paramList);
-  auto FD = FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(),
-                             StaticSpellingKind::None,
-                             /*FuncLoc=*/SourceLoc(),
-                             Name, /*NameLoc=*/SourceLoc(),
-                             /*Async-*/false, /*AsyncLoc=*/SourceLoc(),
-                             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                             /*GenericParams=*/nullptr,
-                             paramList,
-                             TypeLoc::withoutLoc(ResType), DC);
-  FD->setImplicit();
+  auto *const FD = FuncDecl::createImplicit(
+      Context, StaticSpellingKind::None, Name, /*NameLoc=*/SourceLoc(),
+      /*Async=*/false, /*Throws=*/false,
+      /*GenericParams=*/nullptr, paramList, ResType, DC);
   FD->setAccess(AccessLevel::Public);
   return FD;
 }
@@ -214,17 +208,11 @@ getBuiltinGenericFunction(Identifier Id,
   auto *paramList = ParameterList::create(Context, params);
 
   DeclName Name(Context, Id, paramList);
-  auto func = FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(),
-                               StaticSpellingKind::None,
-                               /*FuncLoc=*/SourceLoc(),
-                               Name, /*NameLoc=*/SourceLoc(),
-                               /*Async-*/false, /*AsyncLoc=*/SourceLoc(),
-                               /*Throws=*/ Rethrows, /*ThrowsLoc=*/SourceLoc(),
-                               GenericParams,
-                               paramList,
-                               TypeLoc::withoutLoc(ResType), DC);
+  auto *const func = FuncDecl::createImplicit(
+      Context, StaticSpellingKind::None, Name, /*NameLoc=*/SourceLoc(),
+      /*Async=*/false,
+      /*Throws=*/Rethrows, GenericParams, paramList, ResType, DC);
 
-  func->setImplicit();
   func->setAccess(AccessLevel::Public);
   func->setGenericSignature(Sig);
   if (Rethrows)

@@ -1860,7 +1860,9 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
           // In Swift versions lower than 5, this check will fail as read only
           // key paths can masquerade as writable for compatibilty reasons.
           // This is fine as in this case we just fall back on old diagnostics.
-          if (bgt->getDecl() == getASTContext().getKeyPathDecl()) {
+          auto &ctx = getASTContext();
+          if (bgt->getDecl() == ctx.getKeyPathDecl() ||
+              bgt->getDecl() == ctx.getPartialKeyPathDecl()) {
             return {expr, member};
           }
         }
@@ -5002,7 +5004,7 @@ bool ExtraneousReturnFailure::diagnoseAsError() {
     // cases like like 'var foo: () { return 1 }' as here that loc will
     // be invalid. We also need to check that the name is not empty,
     // because certain decls will have empty name (like setters).
-    if (FD->getBodyResultTypeLoc().getLoc().isInvalid() &&
+    if (FD->getResultTypeRepr() == nullptr &&
         FD->getParameters()->getStartLoc().isValid() &&
         !FD->getBaseIdentifier().empty()) {
       auto fixItLoc = Lexer::getLocForEndOfToken(

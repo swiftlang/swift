@@ -544,15 +544,13 @@ static ValueDecl *deriveDifferentiable_method(
   ParameterList *params = ParameterList::create(C, {param});
 
   DeclName declName(C, methodName, params);
-  auto *funcDecl = FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None,
-                                    SourceLoc(), declName, SourceLoc(),
-                                    /*Async*/ false, SourceLoc(),
-                                    /*Throws*/ false, SourceLoc(),
-                                    /*GenericParams=*/nullptr, params,
-                                    TypeLoc::withoutLoc(returnType), parentDC);
+  auto *const funcDecl = FuncDecl::createImplicit(
+      C, StaticSpellingKind::None, declName, /*NameLoc=*/SourceLoc(),
+      /*Async=*/false,
+      /*Throws=*/false,
+      /*GenericParams=*/nullptr, params, returnType, parentDC);
   if (!nominal->getSelfClassDecl())
     funcDecl->setSelfAccessKind(SelfAccessKind::Mutating);
-  funcDecl->setImplicit();
   funcDecl->setBodySynthesizer(bodySynthesizer.Fn, bodySynthesizer.Context);
 
   funcDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
