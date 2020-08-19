@@ -279,8 +279,8 @@ cmake^
     -B "%build_root%\lldb"^
     -G Ninja^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
-    -DCMAKE_C_COMPILER=clang-cl^
-    -DCMAKE_CXX_COMPILER=clang-cl^
+    -DCMAKE_C_COMPILER=cl^
+    -DCMAKE_CXX_COMPILER=cl^
     -DCMAKE_INSTALL_PREFIX:PATH=%install_directory%^
     -DLLVM_DIR:PATH=%build_root%\llvm\lib\cmake\llvm^
     -DClang_DIR:PATH=%build_root%\llvm\lib\cmake\clang^
