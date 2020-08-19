@@ -5621,17 +5621,20 @@ enum class ObjCSubscriptKind {
 /// signatures (indices and element type) are distinct.
 ///
 class SubscriptDecl : public GenericContext, public AbstractStorageDecl {
+  friend class ResultTypeRequest;
+
   SourceLoc StaticLoc;
   SourceLoc ArrowLoc;
   SourceLoc EndLoc;
   ParameterList *Indices;
   TypeLoc ElementTy;
 
-public:
+  void setElementInterfaceType(Type type);
+
   SubscriptDecl(DeclName Name,
                 SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
                 SourceLoc SubscriptLoc, ParameterList *Indices,
-                SourceLoc ArrowLoc, TypeLoc ElementTy, DeclContext *Parent,
+                SourceLoc ArrowLoc, TypeRepr *ElementTyR, DeclContext *Parent,
                 GenericParamList *GenericParams)
     : GenericContext(DeclContextKind::SubscriptDecl, Parent, GenericParams),
       AbstractStorageDecl(DeclKind::Subscript,
@@ -5639,10 +5642,31 @@ public:
                           Parent, Name, SubscriptLoc,
                           /*will be overwritten*/ StorageIsNotMutable),
       StaticLoc(StaticLoc), ArrowLoc(ArrowLoc),
-      Indices(nullptr), ElementTy(ElementTy) {
+      Indices(nullptr), ElementTy(ElementTyR) {
     Bits.SubscriptDecl.StaticSpelling = static_cast<unsigned>(StaticSpelling);
     setIndices(Indices);
   }
+
+public:
+  /// Factory function only for use by deserialization.
+  static SubscriptDecl *createDeserialized(ASTContext &Context, DeclName Name,
+                                           StaticSpellingKind StaticSpelling,
+                                           Type ElementTy, DeclContext *Parent,
+                                           GenericParamList *GenericParams);
+
+  static SubscriptDecl *create(ASTContext &Context, DeclName Name,
+                               SourceLoc StaticLoc,
+                               StaticSpellingKind StaticSpelling,
+                               SourceLoc SubscriptLoc, ParameterList *Indices,
+                               SourceLoc ArrowLoc, TypeRepr *ElementTyR,
+                               DeclContext *Parent,
+                               GenericParamList *GenericParams);
+
+  static SubscriptDecl *createImported(ASTContext &Context, DeclName Name,
+                                       SourceLoc SubscriptLoc,
+                                       ParameterList *Indices,
+                                       SourceLoc ArrowLoc, Type ElementTy,
+                                       DeclContext *Parent, ClangNode ClangN);
   
   /// \returns the way 'static'/'class' was spelled in the source.
   StaticSpellingKind getStaticSpelling() const {
@@ -5669,8 +5693,11 @@ public:
   /// Retrieve the type of the element referenced by a subscript
   /// operation.
   Type getElementInterfaceType() const;
-  TypeLoc &getElementTypeLoc() { return ElementTy; }
-  const TypeLoc &getElementTypeLoc() const { return ElementTy; }
+
+  TypeRepr *getElementTypeRepr() const { return ElementTy.getTypeRepr(); }
+  SourceRange getElementTypeSourceRange() const {
+    return ElementTy.getSourceRange();
+  }
 
   /// Determine the kind of Objective-C subscripting this declaration
   /// implies.
@@ -6169,6 +6196,7 @@ class FuncDecl : public AbstractFunctionDecl {
   friend class AbstractFunctionDecl;
   friend class SelfAccessKindRequest;
   friend class IsStaticRequest;
+  friend class ResultTypeRequest;
 
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
   SourceLoc FuncLoc;    // Location of the 'func' token.
@@ -6203,6 +6231,8 @@ protected:
     Bits.FuncDecl.HasTopLevelLocalContextCaptures = false;
   }
 
+  void setResultInterfaceType(Type type);
+
 private:
   static FuncDecl *createImpl(ASTContext &Context, SourceLoc StaticLoc,
                               StaticSpellingKind StaticSpelling,
@@ -6230,25 +6260,31 @@ private:
 
 public:
   /// Factory function only for use by deserialization.
-  static FuncDecl *createDeserialized(ASTContext &Context, SourceLoc StaticLoc,
+  static FuncDecl *createDeserialized(ASTContext &Context,
                                       StaticSpellingKind StaticSpelling,
-                                      SourceLoc FuncLoc,
-                                      DeclName Name, SourceLoc NameLoc,
-                                      bool Async, SourceLoc AsyncLoc,
-                                      bool Throws, SourceLoc ThrowsLoc,
+                                      DeclName Name, bool Async, bool Throws,
                                       GenericParamList *GenericParams,
-                                      DeclContext *Parent);
+                                      Type FnRetType, DeclContext *Parent);
 
   static FuncDecl *create(ASTContext &Context, SourceLoc StaticLoc,
-                          StaticSpellingKind StaticSpelling,
-                          SourceLoc FuncLoc,
-                          DeclName Name, SourceLoc NameLoc,
-                          bool Async, SourceLoc AsyncLoc,
-                          bool Throws, SourceLoc ThrowsLoc,
+                          StaticSpellingKind StaticSpelling, SourceLoc FuncLoc,
+                          DeclName Name, SourceLoc NameLoc, bool Async,
+                          SourceLoc AsyncLoc, bool Throws, SourceLoc ThrowsLoc,
                           GenericParamList *GenericParams,
-                          ParameterList *ParameterList,
-                          TypeLoc FnRetType, DeclContext *Parent,
-                          ClangNode ClangN = ClangNode());
+                          ParameterList *BodyParams, TypeRepr *ResultTyR,
+                          DeclContext *Parent);
+
+  static FuncDecl *createImplicit(ASTContext &Context,
+                                  StaticSpellingKind StaticSpelling,
+                                  DeclName Name, SourceLoc NameLoc, bool Async,
+                                  bool Throws, GenericParamList *GenericParams,
+                                  ParameterList *BodyParams, Type FnRetType,
+                                  DeclContext *Parent);
+
+  static FuncDecl *createImported(ASTContext &Context, SourceLoc FuncLoc,
+                                  DeclName Name, SourceLoc NameLoc, bool Throws,
+                                  ParameterList *BodyParams, Type FnRetType,
+                                  DeclContext *Parent, ClangNode ClangN);
 
   bool isStatic() const;
 
@@ -6292,8 +6328,10 @@ public:
   }
   SourceRange getSourceRange() const;
 
-  TypeLoc &getBodyResultTypeLoc() { return FnRetType; }
-  const TypeLoc &getBodyResultTypeLoc() const { return FnRetType; }
+  TypeRepr *getResultTypeRepr() const { return FnRetType.getTypeRepr(); }
+  SourceRange getResultTypeSourceRange() const {
+    return FnRetType.getSourceRange();
+  }
 
   /// Retrieve the result interface type of this function.
   Type getResultInterfaceType() const;
@@ -6414,15 +6452,12 @@ class AccessorDecl final : public FuncDecl {
 
 public:
   static AccessorDecl *createDeserialized(ASTContext &ctx,
-                              SourceLoc declLoc,
-                              SourceLoc accessorKeywordLoc,
-                              AccessorKind accessorKind,
-                              AbstractStorageDecl *storage,
-                              SourceLoc staticLoc,
-                              StaticSpellingKind staticSpelling,
-                              bool throws, SourceLoc throwsLoc,
-                              GenericParamList *genericParams,
-                              DeclContext *parent);
+                                          AccessorKind accessorKind,
+                                          AbstractStorageDecl *storage,
+                                          StaticSpellingKind staticSpelling,
+                                          bool throws,
+                                          GenericParamList *genericParams,
+                                          Type fnRetType, DeclContext *parent);
 
   static AccessorDecl *create(ASTContext &ctx, SourceLoc declLoc,
                               SourceLoc accessorKeywordLoc,
@@ -6433,7 +6468,7 @@ public:
                               bool throws, SourceLoc throwsLoc,
                               GenericParamList *genericParams,
                               ParameterList *parameterList,
-                              TypeLoc fnRetType, DeclContext *parent,
+                              Type fnRetType, DeclContext *parent,
                               ClangNode clangNode = ClangNode());
 
   SourceLoc getAccessorKeywordLoc() const { return AccessorKeywordLoc; }

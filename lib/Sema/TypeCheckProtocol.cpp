@@ -2086,13 +2086,12 @@ SourceLoc OptionalAdjustment::getOptionalityLoc(ValueDecl *witness) const {
     // For a function, use the result type.
     if (auto func = dyn_cast<FuncDecl>(witness)) {
       return getOptionalityLoc(
-               func->getBodyResultTypeLoc().getTypeRepr());
+               func->getResultTypeRepr());
     }
 
     // For a subscript, use the element type.
     if (auto subscript = dyn_cast<SubscriptDecl>(witness)) {
-      return getOptionalityLoc(
-               subscript->getElementTypeLoc().getTypeRepr());
+      return getOptionalityLoc(subscript->getElementTypeRepr());
     }
 
     // Otherwise, we have a variable.
@@ -5196,11 +5195,13 @@ diagnoseMissingAppendInterpolationMethod(NominalTypeDecl *typeDecl) {
         break;
         
       case InvalidMethod::Reason::ReturnType:
-        C.Diags
-            .diagnose(invalidMethod.method->getBodyResultTypeLoc().getLoc(),
-                      diag::append_interpolation_void_or_discardable)
-            .fixItInsert(invalidMethod.method->getStartLoc(),
-                         "@discardableResult ");
+        if (auto *const repr = invalidMethod.method->getResultTypeRepr()) {
+          C.Diags
+              .diagnose(repr->getLoc(),
+                        diag::append_interpolation_void_or_discardable)
+              .fixItInsert(invalidMethod.method->getStartLoc(),
+                           "@discardableResult ");
+        }
         break;
         
       case InvalidMethod::Reason::AccessControl:

@@ -4054,10 +4054,6 @@ CanType OpenedArchetypeType::getAny(Type existential) {
   return OpenedArchetypeType::get(existential);
 }
 
-void TypeLoc::setInvalidType(ASTContext &C) {
-  Ty = ErrorType::get(C);
-}
-
 void SubstitutionMap::Storage::Profile(
                                llvm::FoldingSetNodeID &id,
                                GenericSignature genericSig,

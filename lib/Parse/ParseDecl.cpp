@@ -5240,9 +5240,6 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
                                      EndLoc);
   }
 
-  // The typechecker will always fill this in.
-  TypeLoc ReturnType;
-
   // Start the function.
   auto *D = AccessorDecl::create(P->Context,
                                  /*FIXME FuncLoc=*/DeclLoc,
@@ -5253,7 +5250,7 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
                                  (GenericParams
                                   ? GenericParams->clone(P->CurDeclContext)
                                   : nullptr),
-                                 ValueArg, ReturnType,
+                                 ValueArg, Type(),
                                  P->CurDeclContext);
 
   return D;
@@ -7273,12 +7270,9 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
   // Build an AST for the subscript declaration.
   DeclName name = DeclName(Context, DeclBaseName::createSubscript(),
                            argumentNames);
-  auto *Subscript = new (Context) SubscriptDecl(name,
-                                                StaticLoc, StaticSpelling,
-                                                SubscriptLoc, Indices.get(),
-                                                ArrowLoc, ElementTy.get(),
-                                                CurDeclContext,
-                                                GenericParams);
+  auto *const Subscript = SubscriptDecl::create(
+      Context, name, StaticLoc, StaticSpelling, SubscriptLoc, Indices.get(),
+      ArrowLoc, ElementTy.get(), CurDeclContext, GenericParams);
   Subscript->getAttrs() = Attributes;
   
   // Let the source file track the opaque return type mapping, if any.

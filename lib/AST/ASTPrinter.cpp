@@ -2948,8 +2948,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
   if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
     SourceLoc StartLoc = decl->getStartLoc();
     SourceLoc EndLoc;
-    if (!decl->getBodyResultTypeLoc().isNull()) {
-      EndLoc = decl->getBodyResultTypeLoc().getSourceRange().End;
+    if (decl->getResultTypeRepr()) {
+      EndLoc = decl->getResultTypeSourceRange().End;
     } else {
       EndLoc = decl->getSignatureSourceRange().End;
     }
@@ -2986,7 +2986,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
 
     Type ResultTy = decl->getResultInterfaceType();
     if (ResultTy && !ResultTy->isVoid()) {
-      TypeLoc ResultTyLoc = decl->getBodyResultTypeLoc();
+      TypeLoc ResultTyLoc(decl->getResultTypeRepr(), ResultTy);
 
       // When printing a protocol requirement with types substituted for a
       // conforming class, replace occurrences of the 'Self' generic parameter
@@ -3166,9 +3166,8 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   });
   Printer << " -> ";
 
-  TypeLoc elementTy = decl->getElementTypeLoc();
-  if (!elementTy.getTypeRepr())
-    elementTy = TypeLoc::withoutLoc(decl->getElementInterfaceType());
+  TypeLoc elementTy(decl->getElementTypeRepr(),
+                    decl->getElementInterfaceType());
   Printer.printDeclResultTypePre(decl, elementTy);
   Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
 
