@@ -5004,7 +5004,7 @@ bool ExtraneousReturnFailure::diagnoseAsError() {
     // cases like like 'var foo: () { return 1 }' as here that loc will
     // be invalid. We also need to check that the name is not empty,
     // because certain decls will have empty name (like setters).
-    if (FD->getBodyResultTypeLoc().getLoc().isInvalid() &&
+    if (FD->getResultTypeRepr() == nullptr &&
         FD->getParameters()->getStartLoc().isValid() &&
         !FD->getBaseIdentifier().empty()) {
       auto fixItLoc = Lexer::getLocForEndOfToken(

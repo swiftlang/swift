@@ -31,7 +31,7 @@ static bool checkAsyncHandler(FuncDecl *func, bool diagnose) {
   if (!func->getResultInterfaceType()->isVoid()) {
     if (diagnose) {
       func->diagnose(diag::asynchandler_returns_value)
-          .highlight(func->getBodyResultTypeLoc().getSourceRange());
+          .highlight(func->getResultTypeSourceRange());
     }
 
     return true;

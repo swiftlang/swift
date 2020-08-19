@@ -62,7 +62,6 @@ public:
 
   bool isNull() const { return getType().isNull() && TyR == nullptr; }
 
-  void setInvalidType(ASTContext &C);
   void setType(Type Ty);
 
   friend llvm::hash_code hash_value(const TypeLoc &owner) {

@@ -255,17 +255,11 @@ deriveComparable_lt(
   }
 
   DeclName name(C, generatedIdentifier, params);
-  auto comparableDecl =
-    FuncDecl::create(C, /*StaticLoc=*/SourceLoc(),
-                     StaticSpellingKind::KeywordStatic,
-                     /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
-                     /*Async*/ false, SourceLoc(),
-                     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                     /*GenericParams=*/nullptr,
-                     params,
-                     TypeLoc::withoutLoc(boolTy),
-                     parentDC);
-  comparableDecl->setImplicit();
+  auto *const comparableDecl = FuncDecl::createImplicit(
+      C, StaticSpellingKind::KeywordStatic, name, /*NameLoc=*/SourceLoc(),
+      /*Async=*/false,
+      /*Throws=*/false,
+      /*GenericParams=*/nullptr, params, boolTy, parentDC);
   comparableDecl->setUserAccessible(false);
 
   // Add the @_implements(Comparable, < (_:_:)) attribute

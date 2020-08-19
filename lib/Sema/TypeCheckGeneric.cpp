@@ -691,9 +691,9 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       // Gather requirements from the result type.
       auto *resultTypeRepr = [&subscr, &func]() -> TypeRepr * {
         if (subscr) {
-          return subscr->getElementTypeLoc().getTypeRepr();
+          return subscr->getElementTypeRepr();
         } else if (auto *FD = dyn_cast<FuncDecl>(func)) {
-          return FD->getBodyResultTypeLoc().getTypeRepr();
+          return FD->getResultTypeRepr();
         } else {
           return nullptr;
         }
