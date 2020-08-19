@@ -104,3 +104,20 @@ missionCritical(storage: { haltAndCatchFire() })
 enum E { }
 func takesAnotherUninhabitedType(e: () -> E) {}
 takesAnotherUninhabitedType { haltAndCatchFire() }
+
+// Weak capture bug caught by rdar://problem/67351438
+class Y {
+  var toggle: Bool = false
+
+  func doSomething(animated: Bool, completionHandler: (Int, Int) -> Void) { }
+}
+
+class X {
+  private(set) var someY: Y!
+
+  func doSomething() {
+    someY?.doSomething(animated: true, completionHandler: { [weak someY] _, _ in
+        someY?.toggle = true
+      })
+  }
+}
