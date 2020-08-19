@@ -81,6 +81,12 @@ public:
       }
     }
     assert(fs.exists(InPath));
+    // Use the private interface file if exits.
+    auto PrivateInPath =
+      BaseName.getName(file_types::TY_PrivateSwiftModuleInterfaceFile);
+    if (fs.exists(PrivateInPath)) {
+      InPath = PrivateInPath;
+    }
     auto dependencies = scanInterfaceFile(InPath, IsFramework);
     if (dependencies) {
       this->dependencies = std::move(dependencies.get());
@@ -182,9 +188,8 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
   llvm::SmallString<32> modulePath = moduleName.str();
   llvm::sys::path::replace_extension(modulePath, newExt);
   Optional<ModuleDependencies> Result;
-  std::error_code code;
-
-  auto hasError = astDelegate.runInSubContext(moduleName.str(),
+  std::error_code code =
+    astDelegate.runInSubContext(moduleName.str(),
                                               moduleInterfacePath.str(),
                                               StringRef(),
                                               SourceLoc(),
@@ -205,8 +210,7 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
     auto &fs = *Ctx.SourceMgr.getFileSystem();
     auto interfaceBuf = fs.getBufferForFile(moduleInterfacePath);
     if (!interfaceBuf) {
-      code = interfaceBuf.getError();
-      return true;
+      return interfaceBuf.getError();
     }
 
     // Create a source file.
@@ -225,10 +229,10 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
     for (auto name: imInfo.ModuleNames) {
       Result->addModuleDependency(name.str(), &alreadyAddedModules);
     }
-    return false;
+    return std::error_code();
   });
 
-  if (hasError) {
+  if (code) {
     return code;
   }
   return *Result;
