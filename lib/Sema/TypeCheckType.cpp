@@ -1749,6 +1749,7 @@ namespace {
 
     Type resolveSILFunctionType(FunctionTypeRepr *repr,
                                 TypeResolutionOptions options,
+                                bool isAsync = false,
                                 SILCoroutineKind coroutineKind
                                   = SILCoroutineKind::None,
                                 SILFunctionType::ExtInfo extInfo
@@ -2078,7 +2079,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   static const TypeAttrKind FunctionAttrs[] = {
     TAK_convention, TAK_pseudogeneric,
     TAK_callee_owned, TAK_callee_guaranteed, TAK_noescape, TAK_autoclosure,
-    TAK_differentiable, TAK_escaping, TAK_yield_once, TAK_yield_many
+    TAK_differentiable, TAK_escaping, TAK_yield_once, TAK_yield_many, TAK_async
   };
 
   auto checkUnsupportedAttr = [&](TypeAttrKind attr) {
@@ -2145,6 +2146,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     if (options & TypeResolutionFlags::SILType) {
       SILFunctionType::Representation rep;
       TypeRepr *witnessMethodProtocol = nullptr;
+
+      auto isAsync = attrs.has(TAK_async);
 
       auto coroutineKind = SILCoroutineKind::None;
       if (attrs.has(TAK_yield_once)) {
@@ -2227,7 +2230,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                          attrs.has(TAK_noescape), diffKind, nullptr)
                          .build();
 
-      ty = resolveSILFunctionType(fnRepr, options, coroutineKind, extInfo,
+      ty = resolveSILFunctionType(fnRepr, options, isAsync, coroutineKind, extInfo,
                                   calleeConvention, witnessMethodProtocol);
       if (!ty || ty->hasError())
         return ty;
@@ -2468,6 +2471,13 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   if ((options & TypeResolutionFlags::SILMode) && attrs.has(TAK_dynamic_self)) {
     ty = rebuildWithDynamicSelf(getASTContext(), ty);
     attrs.clearAttribute(TAK_dynamic_self);
+  }
+
+  // In SIL *only*, allow @async to specify an async function
+  if ((options & TypeResolutionFlags::SILMode) && attrs.has(TAK_async)) {
+    if (fnRepr != nullptr) {
+      attrs.clearAttribute(TAK_async);
+    }
   }
 
   for (unsigned i = 0; i != TypeAttrKind::TAK_Count; ++i)
@@ -2835,6 +2845,7 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
 
 Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
                                           TypeResolutionOptions options,
+                                          bool isAsync,
                                           SILCoroutineKind coroutineKind,
                                           SILFunctionType::ExtInfo extInfo,
                                           ParameterConvention callee,
@@ -3029,7 +3040,8 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
            "found witness_method without matching conformance");
   }
 
-  return SILFunctionType::get(genericSig, extInfo, coroutineKind, callee,
+  return SILFunctionType::get(genericSig, extInfo, isAsync,
+                              coroutineKind, callee,
                               interfaceParams, interfaceYields,
                               interfaceResults, interfaceErrorResult,
                               interfacePatternSubs, invocationSubs,

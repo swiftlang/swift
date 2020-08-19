@@ -3451,6 +3451,7 @@ void SILFunctionType::Profile(
 SILFunctionType::SILFunctionType(
     GenericSignature genericSig,
     ExtInfo ext,
+    bool isAsync,
     SILCoroutineKind coroutineKind,
     ParameterConvention calleeConvention,
     ArrayRef<SILParameterInfo> params,
@@ -3476,6 +3477,7 @@ SILFunctionType::SILFunctionType(
          "Bits were dropped!");
   static_assert(SILExtInfoBuilder::NumMaskBits == NumSILExtInfoBits,
                 "ExtInfo and SILFunctionTypeBitfields must agree on bit size");
+  Bits.SILFunctionType.IsAsync = isAsync;
   Bits.SILFunctionType.CoroutineKind = unsigned(coroutineKind);
   NumParameters = params.size();
   if (coroutineKind == SILCoroutineKind::None) {
@@ -3619,7 +3621,7 @@ CanSILBlockStorageType SILBlockStorageType::get(CanType captureType) {
 
 CanSILFunctionType SILFunctionType::get(
     GenericSignature genericSig,
-    ExtInfo ext, SILCoroutineKind coroutineKind,
+    ExtInfo ext, bool isAsync, SILCoroutineKind coroutineKind,
     ParameterConvention callee,
     ArrayRef<SILParameterInfo> params,
     ArrayRef<SILYieldInfo> yields,
@@ -3686,7 +3688,7 @@ CanSILFunctionType SILFunctionType::get(
   }
 
   auto fnType =
-      new (mem) SILFunctionType(genericSig, ext, coroutineKind, callee,
+      new (mem) SILFunctionType(genericSig, ext, isAsync, coroutineKind, callee,
                                 params, yields, normalResults, errorResult,
                                 patternSubs, invocationSubs,
                                 ctx, properties, witnessMethodConformance);

@@ -302,7 +302,7 @@ CanSILFunctionType BridgedProperty::getOutlinedFunctionType(SILModule &M) {
                      /*clangFunctionType*/ nullptr)
                      .build();
   auto FunctionType = SILFunctionType::get(
-      nullptr, ExtInfo, SILCoroutineKind::None,
+      nullptr, ExtInfo, /*isAsync*/ false, SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned, Parameters, /*yields*/ {},
       Results, None,
       SubstitutionMap(), SubstitutionMap(),
@@ -1203,7 +1203,7 @@ CanSILFunctionType ObjCMethodCall::getOutlinedFunctionType(SILModule &M) {
         SILResultInfo(BridgedReturn.getReturnType(), ResultConvention::Owned));
   }
   auto FunctionType = SILFunctionType::get(
-      nullptr, ExtInfo, SILCoroutineKind::None,
+      nullptr, ExtInfo, /*isAsync*/ false, SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned, Parameters, {},
       Results, None,
       SubstitutionMap(), SubstitutionMap(),

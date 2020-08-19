@@ -89,7 +89,8 @@ class BugReducerTester : public SILFunctionTransform {
             false /*noescape*/, DifferentiabilityKind::NonDifferentiable,
             nullptr /*clangFunctionType*/)
             .build(),
-        SILCoroutineKind::None, ParameterConvention::Direct_Unowned,
+        /*isAsync*/ false, SILCoroutineKind::None,
+        ParameterConvention::Direct_Unowned,
         ArrayRef<SILParameterInfo>(), ArrayRef<SILYieldInfo>(), ResultInfoArray,
         None, SubstitutionMap(), SubstitutionMap(),
         getFunction()->getModule().getASTContext());
