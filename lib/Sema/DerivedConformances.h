@@ -163,6 +163,12 @@ public:
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveCaseIterable(ValueDecl *requirement);
 
+  /// Derive a CaseIterable type witness for an enum if it has no associated
+  /// values for any of its cases.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  Type deriveCaseIterable(AssociatedTypeDecl *assocType);
+
   /// Determine if a RawRepresentable requirement can be derived for a type.
   ///
   /// This is implemented for non-empty enums without associated values,
