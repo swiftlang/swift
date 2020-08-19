@@ -48,7 +48,7 @@ llvm::cl::opt<bool> EnableLoopARC("enable-loop-arc", llvm::cl::init(false));
 // This routine takes in the ARCMatchingSet \p MatchSet and adds the increments
 // and decrements to the delete list.
 void ARCPairingContext::optimizeMatchingSet(
-    ARCMatchingSet &MatchSet, llvm::SmallVectorImpl<SILInstruction *> &NewInsts,
+    ARCMatchingSet &MatchSet,
     llvm::SmallVectorImpl<SILInstruction *> &DeadInsts) {
   LLVM_DEBUG(llvm::dbgs() << "**** Optimizing Matching Set ****\n");
   // Add the old increments to the delete list.
@@ -69,7 +69,6 @@ void ARCPairingContext::optimizeMatchingSet(
 }
 
 bool ARCPairingContext::performMatching(
-    llvm::SmallVectorImpl<SILInstruction *> &NewInsts,
     llvm::SmallVectorImpl<SILInstruction *> &DeadInsts) {
   bool MatchedPair = false;
 
@@ -97,7 +96,7 @@ bool ARCPairingContext::performMatching(
       for (auto *I : Set.Decrements)
         DecToIncStateMap.erase(I);
 
-      optimizeMatchingSet(Set, NewInsts, DeadInsts);
+      optimizeMatchingSet(Set, DeadInsts);
     }
   }
 
@@ -131,7 +130,6 @@ void LoopARCPairingContext::runOnFunction(SILFunction *F) {
 bool LoopARCPairingContext::processRegion(const LoopRegion *Region,
                                           bool FreezePostDomReleases,
                                           bool RecomputePostDomReleases) {
-  llvm::SmallVector<SILInstruction *, 8> NewInsts;
   llvm::SmallVector<SILInstruction *, 8> DeadInsts;
 
   // We have already summarized all subloops of this loop. Now summarize our
@@ -145,16 +143,7 @@ bool LoopARCPairingContext::processRegion(const LoopRegion *Region,
   do {
     NestingDetected = Evaluator.runOnLoop(Region, FreezePostDomReleases,
                                           RecomputePostDomReleases);
-    MatchedPair = Context.performMatching(NewInsts, DeadInsts);
-
-    if (!NewInsts.empty()) {
-      LLVM_DEBUG(llvm::dbgs() << "Adding new interesting insts!\n");
-      do {
-        auto *I = NewInsts.pop_back_val();
-        LLVM_DEBUG(llvm::dbgs() << "    " << *I);
-        Evaluator.addInterestingInst(I);
-      } while (!NewInsts.empty());
-    }
+    MatchedPair = Context.performMatching(DeadInsts);
 
     if (!DeadInsts.empty()) {
       LLVM_DEBUG(llvm::dbgs() << "Removing dead interesting insts!\n");
