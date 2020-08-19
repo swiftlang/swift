@@ -5898,7 +5898,8 @@ static void processModuleRequests(CodeCompletionContext &CompletionContext,
 }
 
 void DotExprLookup::performLookup(ide::CodeCompletionContext &CompletionCtx,
-                                  CodeCompletionConsumer &Consumer) const {
+                                  CodeCompletionConsumer &Consumer,
+                                  bool IsInSelector) const {
   ASTContext &Ctx = DC->getASTContext();
   CompletionLookup Lookup(CompletionCtx.getResultSink(), Ctx, DC,
                           &CompletionCtx);
@@ -5914,6 +5915,11 @@ void DotExprLookup::performLookup(ide::CodeCompletionContext &CompletionCtx,
 
   if (isa<BindOptionalExpr>(BaseExpr) || isa<ForceValueExpr>(BaseExpr))
     Lookup.setIsUnwrappedOptional(true);
+
+  if (IsInSelector) {
+    Lookup.includeInstanceMembers();
+    Lookup.setPreferFunctionReferencesToCalls();
+  }
 
   for (auto &Solution: Solutions) {
     Lookup.setIsStaticMetatype(Solution.BaseIsStaticMetaType);
@@ -5965,15 +5971,16 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion() {
       CompletionCollector(Context.CompletionCallback, &Lookup);
     typeCheckContextAt(CurDeclContext, CompletionLoc);
 
-    // FIXME: This should be an assertion.
-    // We're not propagating CompletionCollector everywhere we need to in
-    // typeCheckContextAt().
-    //assert(Lookup.gotCallback());
-//      return false;
+    // This (should) only happens in cases where the expression isn't
+    // typechecked during normal compilation either (e.g. member completion in a
+    // switch case where there switched value is invalid). Having normal
+    // typechecking still resolve even these cases would be beneficial for
+    // tooling in general though.
+    if (!Lookup.gotCallback())
+      Lookup.fallbackTypeCheck();
 
     addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
-    Lookup.performLookup(CompletionContext, Consumer);
-    deliverCompletionResults();
+    Lookup.performLookup(CompletionContext, Consumer, isInsideObjCSelector());
     return true;
   }
   default:

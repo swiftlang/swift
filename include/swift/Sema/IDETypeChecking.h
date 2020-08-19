@@ -86,8 +86,10 @@ namespace swift {
       : DotLoc(DotLoc), DC(DC), CompletionExpr(CompletionExpr) {}
 
     void performLookup(ide::CodeCompletionContext &CompletionCtx,
-                       ide::CodeCompletionConsumer &Consumer) const;
+                       ide::CodeCompletionConsumer &Consumer,
+                       bool isInSelector) const;
     bool gotCallback() const { return GotCallback; }
+    void fallbackTypeCheck();
 
   private:
     void sawSolution(const constraints::Solution &solution) override;

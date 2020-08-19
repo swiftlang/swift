@@ -712,6 +712,15 @@ bool DotExprLookup::isApplicable(Expr *E) {
   return SM.rangeContainsCodeCompletionLoc(Range);
 }
 
+void DotExprLookup::fallbackTypeCheck() {
+  assert(!gotCallback());
+  TypeChecker::typeCheckForCodeCompletion(CompletionExpr, DC, Type(),
+                                          ContextualTypePurpose::CTP_Unused,
+                                          [&](const Solution &S) {
+    sawSolution(S);
+  });
+}
+
 void DotExprLookup::sawSolution(const constraints::Solution &S) {
   GotCallback = true;
   auto &CS = S.getConstraintSystem();
@@ -737,7 +746,7 @@ void DotExprLookup::sawSolution(const constraints::Solution &S) {
     if (!Ret.second && ExpectedTy) {
       Solutions[Ret.first->getSecond()].ExpectedTypes.push_back(ExpectedTy);
     } else {
-      bool ISDMT = S.isStaticallyDerivedMetatype(CompletionExpr);
+      bool ISDMT = S.isStaticallyDerivedMetatype(ParsedExpr);
       bool ISEC = false;
       if (auto *Parent = dyn_cast_or_null<ClosureExpr>(CS.getParentExpr(CompletionExpr))) {
         if (Parent->hasSingleExpressionBody()) {
