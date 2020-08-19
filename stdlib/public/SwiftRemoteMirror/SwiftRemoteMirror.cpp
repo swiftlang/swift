@@ -298,7 +298,7 @@ swift_reflection_typeRefForMangledTypeName(SwiftReflectionContextRef ContextRef,
                                            const char *MangledTypeName,
                                            uint64_t Length) {
   auto Context = ContextRef->nativeContext;
-  auto TR = Context->readTypeFromMangledName(MangledTypeName, Length);
+  auto TR = Context->readTypeFromMangledName(MangledTypeName, Length).getType();
   return reinterpret_cast<swift_typeref_t>(TR);
 }
 
