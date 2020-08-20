@@ -6,10 +6,6 @@ enum Either<T,U> {
   case second(U)
 }
 
-struct Do<T> {
-  var value: T
-}
-
 @_functionBuilder
 struct TupleBuilder {
   static func buildBlock<T1>(_ t1: T1) -> (T1) {
