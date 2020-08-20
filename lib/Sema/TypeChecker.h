@@ -637,7 +637,10 @@ FunctionType *getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
 /// it doesn't mutate given expression, even if there is a single valid
 /// solution, and constraint solver is allowed to produce partially correct
 /// solutions. Such solutions can have any number of holes in them.
-void typeCheckForCodeCompletion(
+///
+/// \returns `true` if target was applicable and it was possible to infer
+/// types for code completion, `false` othrewise.
+bool typeCheckForCodeCompletion(
     constraints::SolutionApplicationTarget &target,
     llvm::function_ref<void(const constraints::Solution &)> callback);
 

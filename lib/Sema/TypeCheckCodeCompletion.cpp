@@ -592,13 +592,25 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
   }
 }
 
-void TypeChecker::typeCheckForCodeCompletion(
+bool TypeChecker::typeCheckForCodeCompletion(
     SolutionApplicationTarget &target,
     llvm::function_ref<void(const Solution &)> callback) {
   auto *DC = target.getDeclContext();
   auto &Context = DC->getASTContext();
 
   auto *expr = target.getAsExpr();
+  if (!expr)
+    return false;
+
+  // First of all, let's check whether given target expression
+  // does indeed have a code completion token in it.
+  {
+    auto range = expr->getSourceRange();
+    if (range.isInvalid() ||
+        !Context.SourceMgr.rangeContainsCodeCompletionLoc(range))
+      return false;
+  }
+
   FrontendStatsTracer StatsTracer(Context.Stats,
                                   "typecheck-for-code-completion", expr);
   PrettyStackTraceExpr stackTrace(Context, "code-completion", expr);
@@ -606,31 +618,83 @@ void TypeChecker::typeCheckForCodeCompletion(
   expr = expr->walk(SanitizeExpr(Context,
                                  /*shouldReusePrecheckedType=*/false));
 
-  class ExprWalker : public ASTWalker {
-    Expr *CompletionExpr = nullptr;
+  enum class ContextKind {
+    Expression,
+    StringInterpolation,
+    SingleStmtClosure,
+    MultiStmtClosure
+  };
+
+  class ContextFinder : public ASTWalker {
+    // Stacks of all "interesting" contexts
+    llvm::SmallVector<ContextKind, 4> Contexts;
+
+    Optional<std::pair<Expr *, ContextKind>> Completion;
 
   public:
+    ContextFinder() { Contexts.push_back(ContextKind::Expression); }
+
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (auto *closure = dyn_cast<ClosureExpr>(E)) {
+        Contexts.push_back(closure->hasSingleExpressionBody()
+                               ? ContextKind::SingleStmtClosure
+                               : ContextKind::MultiStmtClosure);
+      }
+
+      if (auto *interpolation = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
+        Contexts.push_back(ContextKind::StringInterpolation);
+      }
+
       if (isa<CodeCompletionExpr>(E)) {
-        CompletionExpr = E;
+        Completion = std::make_pair(E, Contexts.pop_back_val());
         return std::make_pair(false, nullptr);
       }
 
       return std::make_pair(true, E);
     }
 
-    Expr *getCompletionExpr() const { return CompletionExpr; }
+    Expr *walkToExprPost(Expr *E) override {
+      if (isa<ClosureExpr>(E) || isa<InterpolatedStringLiteralExpr>(E))
+        Contexts.pop_back();
+      return E;
+    }
+
+    ContextKind getCompletionContext() const {
+      assert(Completion);
+      return Completion->second;
+    }
+
+    Expr *getCompletionExpr() const {
+      assert(Completion);
+      return Completion->first;
+    }
   };
 
-  ExprWalker walker;
-  expr->walk(walker);
+  ContextFinder finder;
+  expr->walk(finder);
 
-  auto *completionExpr = walker.getCompletionExpr();
+  switch (finder.getCompletionContext()) {
+  case ContextKind::StringInterpolation:
+    return false;
+
+  case ContextKind::SingleStmtClosure:
+  case ContextKind::Expression:
+    break;
+
+  // FIXME: There is currently no way to distinguish between
+  // multi-statement closures which are function builder bodies
+  // (that are type-checked together with enclosing context)
+  // and regular closures which are type-checked separately.
+  case ContextKind::MultiStmtClosure:
+    break;
+  }
+
+  auto *completionExpr = finder.getCompletionExpr();
   assert(completionExpr);
 
   // If it was possible to solve for a while expression, we are done.
   if (ConstraintSystem::solveForCodeCompletion(target, callback))
-    return;
+    return true;
 
   // If initial solve failed, let's fallback to checking only code completion
   // expresion without any context.
@@ -639,6 +703,7 @@ void TypeChecker::typeCheckForCodeCompletion(
                                              /*isDiscarded=*/true);
 
   (void)ConstraintSystem::solveForCodeCompletion(completionTarget, callback);
+  return true;
 }
 
 static Optional<Type> getTypeOfCompletionContextExpr(
@@ -735,14 +800,6 @@ bool swift::typeCheckExpression(DeclContext *DC, Expr *&parsedExpr) {
 LookupResult
 swift::lookupSemanticMember(DeclContext *DC, Type ty, DeclName name) {
   return TypeChecker::lookupMember(DC, ty, DeclNameRef(name), None);
-}
-
-bool DotExprLookup::isApplicable(Expr *E) {
-  SourceRange Range = E->getSourceRange();
-  if (Range.isInvalid())
-    return false;
-  auto &SM = DC->getASTContext().SourceMgr;
-  return SM.rangeContainsCodeCompletionLoc(Range);
 }
 
 void DotExprLookup::fallbackTypeCheck() {

@@ -2162,13 +2162,13 @@ TypeChecker::typeCheckExpression(
                                   "typecheck-expr", expr);
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
+  // First let's check whether given expression has a code completion
+  // token which requires special handling.
   if (Context.CompletionCallback &&
-      Context.CompletionCallback->isApplicable(expr)) {
-    typeCheckForCodeCompletion(target, [&](const constraints::Solution &S) {
-      Context.CompletionCallback->sawSolution(S);
-    });
+      typeCheckForCodeCompletion(target, [&](const constraints::Solution &S) {
+        Context.CompletionCallback->sawSolution(S);
+      }))
     return None;
-  }
 
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.

@@ -93,7 +93,6 @@ namespace swift {
 
   private:
     void sawSolution(const constraints::Solution &solution) override;
-    bool isApplicable(Expr *E) override;
   };
 
   /// Typecheck binding initializer at \p bindingIndex.
