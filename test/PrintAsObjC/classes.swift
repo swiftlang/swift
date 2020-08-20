@@ -49,13 +49,35 @@ import SingleGenericClass
 // CHECK-NEXT: @end
 @objc class B1 : A1 {}
 
+// Used in BridgedTypes test case
+struct Notification: _ObjectiveCBridgeable {
+  func _bridgeToObjectiveC() -> NSNotification { fatalError() }
+  static func _forceBridgeFromObjectiveC(
+    _ source: NSNotification,
+    result: inout Self?
+  ) { fatalError() }
+  @discardableResult
+  static func _conditionallyBridgeFromObjectiveC(
+    _ source: NSNotification,
+    result: inout Self?
+  ) -> Bool { fatalError() }
+  @_effects(readonly)
+  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
+    -> Self { fatalError() }
+}
+
 // CHECK-LABEL: @interface BridgedTypes
 // CHECK-NEXT: - (NSDictionary * _Nonnull)dictBridge:(NSDictionary * _Nonnull)x SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: - (NSNotification * _Nonnull)noteBridge:(NSNotification * _Nonnull)x SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: - (NSSet * _Nonnull)setBridge:(NSSet * _Nonnull)x SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc @objcMembers class BridgedTypes {
   @objc func dictBridge(_ x: Dictionary<NSObject, AnyObject>) -> Dictionary<NSObject, AnyObject> {
+    return x
+  }
+
+  @objc func noteBridge(_ x: Notification) -> Notification {
     return x
   }
 

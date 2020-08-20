@@ -16,6 +16,7 @@
 
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeDeclFinder.h"
@@ -236,6 +237,8 @@ public:
   }
 
   bool forwardDeclareMemberTypes(DeclRange members, const Decl *container) {
+    PrettyStackTraceDecl
+        entry("printing forward declarations needed by members of", container);
     switch (container->getKind()) {
     case DeclKind::Class:
     case DeclKind::Protocol:
@@ -248,6 +251,7 @@ public:
     bool hadAnyDelayedMembers = false;
     SmallVector<ValueDecl *, 4> nestedTypes;
     for (auto member : members) {
+      PrettyStackTraceDecl loopEntry("printing for member", member);
       auto VD = dyn_cast<ValueDecl>(member);
       if (!VD || !printer.shouldInclude(VD))
         continue;
@@ -270,8 +274,13 @@ public:
       ReferencedTypeFinder::walk(VD->getInterfaceType(),
                                  [&](ReferencedTypeFinder &finder,
                                      const TypeDecl *TD) {
+        PrettyStackTraceDecl
+            entry("walking its interface type, currently at", TD);
         if (TD == container)
           return;
+
+        // Bridge, if necessary.
+        TD = printer.getObjCTypeDecl(TD);
 
         if (finder.needsDefinition() && isa<NominalTypeDecl>(TD)) {
           // We can delay individual members of classes; do so if necessary.
