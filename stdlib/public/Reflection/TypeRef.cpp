@@ -406,6 +406,14 @@ class DemanglingForTypeRef
     : public TypeRefVisitor<DemanglingForTypeRef, Demangle::NodePointer> {
   Demangle::Demangler &Dem;
 
+  /// Demangle a type and dive into the outermost Type node.
+  Demangle::NodePointer demangleAndUnwrapType(llvm::StringRef mangledName) {
+    auto node = Dem.demangleType(mangledName);
+    if (node && node->getKind() == Node::Kind::Type && node->getNumChildren())
+      node = node->getFirstChild();
+    return node;
+  }
+
 public:
   DemanglingForTypeRef(Demangle::Demangler &Dem) : Dem(Dem) {}
 
@@ -420,13 +428,32 @@ public:
   }
 
   Demangle::NodePointer visitBuiltinTypeRef(const BuiltinTypeRef *B) {
-    return Dem.demangleType(B->getMangledName());
+    return demangleAndUnwrapType(B->getMangledName());
   }
 
   Demangle::NodePointer visitNominalTypeRef(const NominalTypeRef *N) {
-    if (auto parent = N->getParent())
-      assert(false && "not implemented");
-    return Dem.demangleType(N->getMangledName());
+    auto node = demangleAndUnwrapType(N->getMangledName());
+    if (!node || node->getNumChildren() != 2)
+      return node;
+
+    auto parent = N->getParent();
+    if (!parent)
+      return node;
+
+    // Swap in the richer parent that is stored in the NominalTypeRef
+    // instead of what is encoded in the mangled name. The mangled name's
+    // context has been "unspecialized" by NodeBuilder.
+    auto parentNode = visit(parent);
+    if (!parentNode)
+      return node;
+    if (parentNode->getKind() == Node::Kind::Type &&
+        parentNode->getNumChildren())
+      parentNode = parentNode->getFirstChild();
+
+    auto contextualizedNode = Dem.createNode(node->getKind());
+    contextualizedNode->addChild(parentNode, Dem);
+    contextualizedNode->addChild(node->getChild(1), Dem);
+    return contextualizedNode;
   }
 
   Demangle::NodePointer
@@ -650,7 +677,7 @@ public:
   }
 
   Demangle::NodePointer visitForeignClassTypeRef(const ForeignClassTypeRef *F) {
-    return Dem.demangleType(F->getName());
+    return demangleAndUnwrapType(F->getName());
   }
 
   Demangle::NodePointer visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
