@@ -116,6 +116,17 @@ const clang::Module *ClangNode::getClangModule() const {
   return nullptr;
 }
 
+void ClangNode::dump() const {
+  if (auto D = getAsDecl())
+    D->dump();
+  else if (auto M = getAsMacro())
+    M->dump();
+  else if (auto M = getAsModule())
+    M->dump();
+  else
+    llvm::errs() << "ClangNode contains nullptr\n";
+}
+
 // Only allow allocation of Decls using the allocator in ASTContext.
 void *Decl::operator new(size_t Bytes, const ASTContext &C,
                          unsigned Alignment) {
