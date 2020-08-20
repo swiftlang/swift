@@ -2996,11 +2996,29 @@ public:
   /// Retrieve a sugared interface type containing the structure of the interface
   /// type before any semantic validation has occured.
   Type getStructuralType() const;
-  
+
+  /// Whether the typealias forwards perfectly to its underlying type.
+  ///
+  /// If true, this typealias was created by ClangImporter to preserve source
+  /// compatibility with a previous language version's name for a type. Many
+  /// checks in Sema look through compatibility aliases even when they would
+  /// operate on other typealiases.
+  ///
+  /// \warning This has absolutely nothing to do with the Objective-C
+  /// \c compatibility_alias keyword.
   bool isCompatibilityAlias() const {
     return Bits.TypeAliasDecl.IsCompatibilityAlias;
   }
 
+  /// Sets whether the typealias forwards perfectly to its underlying type.
+  ///
+  /// Marks this typealias as having been created by ClangImporter to preserve
+  /// source compatibility with a previous language version's name for a type.
+  /// Many checks in Sema look through compatibility aliases even when they
+  /// would operate on other typealiases.
+  ///
+  /// \warning This has absolutely nothing to do with the Objective-C
+  /// \c compatibility_alias keyword.
   void markAsCompatibilityAlias(bool newValue = true) {
     Bits.TypeAliasDecl.IsCompatibilityAlias = newValue;
   }
