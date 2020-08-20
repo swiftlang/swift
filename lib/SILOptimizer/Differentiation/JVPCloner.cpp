@@ -704,9 +704,11 @@ public:
         getModule(), jvpSubstMap, TypeExpansionContext::minimal());
     differentialType = differentialType.subst(getModule(), jvpSubstMap);
     auto differentialFnType = differentialType.castTo<SILFunctionType>();
-
     auto differentialSubstType =
         differentialPartialApply->getType().castTo<SILFunctionType>();
+
+    // If necessary, convert the differential value to the returned differential
+    // function type.
     SILValue differentialValue;
     if (differentialSubstType == differentialFnType) {
       differentialValue = differentialPartialApply;
@@ -717,11 +719,8 @@ public:
           loc, differentialPartialApply, differentialType,
           /*withoutActuallyEscaping*/ false);
     } else {
-      // When `diag::autodiff_loadable_value_addressonly_tangent_unsupported`
-      // applies, the return type may be ABI-incomaptible with the type of the
-      // partially applied differential. In these cases, produce an undef and
-      // rely on other code to emit a diagnostic.
-      differentialValue = SILUndef::get(differentialType, *jvp);
+      llvm::report_fatal_error("Differential value type is not ABI-compatible "
+                               "with the returned differential type");
     }
 
     // Return a tuple of the original result and differential.
