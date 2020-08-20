@@ -3194,13 +3194,15 @@ public:
     fn->setForcedStaticDispatch(hasForcedStaticDispatch);
     ctx.evaluator.cacheOutput(NeedsNewVTableEntryRequest{fn},
                               std::move(needsNewVTableEntry));
-    fn->setUserAccessible(isUserAccessible);
 
     if (opaqueReturnTypeID) {
       ctx.evaluator.cacheOutput(
           OpaqueResultTypeRequest{fn},
           cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
     }
+
+    if (!isAccessor)
+      fn->setUserAccessible(isUserAccessible);
 
     return fn;
   }
