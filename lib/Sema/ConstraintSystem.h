@@ -5011,14 +5011,7 @@ public:
   /// solution, and constraint solver is allowed to produce partially correct
   /// solutions. Such solutions can have any number of holes in them.
   ///
-  /// \param expr The expression involved in code completion.
-  ///
-  /// \param DC The declaration context this expression is found in.
-  ///
-  /// \param contextualType The type \p expr is being converted to.
-  ///
-  /// \param CTP When contextualType is specified, this indicates what
-  /// the conversion is doing.
+  /// \param target The expression involved in code completion.
   ///
   /// \param callback The callback to be used to provide results to
   /// code completion.
@@ -5026,8 +5019,7 @@ public:
   /// \returns `false` if this call fails (e.g. pre-check or constraint
   /// generation fails), `true` otherwise.
   static bool
-  solveForCodeCompletion(Expr *expr, DeclContext *DC, Type contextualType,
-                         ContextualTypePurpose CTP,
+  solveForCodeCompletion(SolutionApplicationTarget &target,
                          llvm::function_ref<void(const Solution &)> callback);
 
 private:

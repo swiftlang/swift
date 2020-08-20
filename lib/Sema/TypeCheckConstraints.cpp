@@ -2164,12 +2164,9 @@ TypeChecker::typeCheckExpression(
 
   if (Context.CompletionCallback &&
       Context.CompletionCallback->isApplicable(expr)) {
-    typeCheckForCodeCompletion(expr, dc, target.getExprContextualType(),
-                               target.getExprContextualTypePurpose(),
-                               [&](const constraints::Solution &S) {
+    typeCheckForCodeCompletion(target, [&](const constraints::Solution &S) {
       Context.CompletionCallback->sawSolution(S);
     });
-    target.setExpr(expr);
     return None;
   }
 

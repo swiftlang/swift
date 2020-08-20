@@ -638,7 +638,7 @@ FunctionType *getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
 /// solution, and constraint solver is allowed to produce partially correct
 /// solutions. Such solutions can have any number of holes in them.
 void typeCheckForCodeCompletion(
-    Expr *expr, DeclContext *DC, Type contextualType, ContextualTypePurpose CTP,
+    constraints::SolutionApplicationTarget &target,
     llvm::function_ref<void(const constraints::Solution &)> callback);
 
 /// Check the key-path expression.

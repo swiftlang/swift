@@ -593,10 +593,12 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
 }
 
 void TypeChecker::typeCheckForCodeCompletion(
-    Expr *expr, DeclContext *DC, Type contextualType, ContextualTypePurpose CTP,
+    SolutionApplicationTarget &target,
     llvm::function_ref<void(const Solution &)> callback) {
+  auto *DC = target.getDeclContext();
   auto &Context = DC->getASTContext();
 
+  auto *expr = target.getAsExpr();
   FrontendStatsTracer StatsTracer(Context.Stats,
                                   "typecheck-for-code-completion", expr);
   PrettyStackTraceExpr stackTrace(Context, "code-completion", expr);
@@ -627,14 +629,16 @@ void TypeChecker::typeCheckForCodeCompletion(
   assert(completionExpr);
 
   // If it was possible to solve for a while expression, we are done.
-  if (ConstraintSystem::solveForCodeCompletion(expr, DC, contextualType, CTP,
-                                               callback))
+  if (ConstraintSystem::solveForCodeCompletion(target, callback))
     return;
 
   // If initial solve failed, let's fallback to checking only code completion
   // expresion without any context.
-  (void)ConstraintSystem::solveForCodeCompletion(completionExpr, DC, Type(),
-                                                 CTP_Unused, callback);
+  SolutionApplicationTarget completionTarget(completionExpr, DC, CTP_Unused,
+                                             /*contextualType=*/Type(),
+                                             /*isDiscarded=*/true);
+
+  (void)ConstraintSystem::solveForCodeCompletion(completionTarget, callback);
 }
 
 static Optional<Type> getTypeOfCompletionContextExpr(
@@ -743,11 +747,10 @@ bool DotExprLookup::isApplicable(Expr *E) {
 
 void DotExprLookup::fallbackTypeCheck() {
   assert(!gotCallback());
-  TypeChecker::typeCheckForCodeCompletion(CompletionExpr, DC, Type(),
-                                          ContextualTypePurpose::CTP_Unused,
-                                          [&](const Solution &S) {
-    sawSolution(S);
-  });
+  SolutionApplicationTarget completionTarget(CompletionExpr, DC, CTP_Unused,
+                                             Type(), /*isDiscared=*/true);
+  TypeChecker::typeCheckForCodeCompletion(
+      completionTarget, [&](const Solution &S) { sawSolution(S); });
 }
 
 void DotExprLookup::sawSolution(const constraints::Solution &S) {

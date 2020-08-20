@@ -1467,39 +1467,44 @@ void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {
 }
 
 bool ConstraintSystem::solveForCodeCompletion(
-    Expr *expr, DeclContext *DC, Type contextualType, ContextualTypePurpose CTP,
+    SolutionApplicationTarget &target,
     llvm::function_ref<void(const Solution &)> callback) {
-  // First, pre-check the expression, validating any types that occur in the
-  // expression and folding sequence expressions.
-  if (ConstraintSystem::preCheckExpression(
-          expr, DC, /*replaceInvalidRefsWithErrors=*/true))
-    return false;
+  auto *expr = target.getAsExpr();
+  {
+    // First, pre-check the expression, validating any types that occur in the
+    // expression and folding sequence expressions.
+    auto failedPreCheck = ConstraintSystem::preCheckExpression(
+        expr, target.getDeclContext(),
+        /*replaceInvalidRefsWithErrors=*/true);
+
+    target.setExpr(expr);
+
+    if (failedPreCheck)
+      return false;
+  }
 
   ConstraintSystemOptions options;
   options |= ConstraintSystemFlags::AllowFixes;
   options |= ConstraintSystemFlags::SuppressDiagnostics;
 
-  ConstraintSystem cs(DC, options);
+  ConstraintSystem cs(target.getDeclContext(), options);
 
-  if (CTP != ContextualTypePurpose::CTP_Unused)
-    cs.setContextualType(expr, TypeLoc::withoutLoc(contextualType), CTP);
+  // Tell the constraint system what the contextual type is.
+  cs.setContextualType(expr, target.getExprContextualTypeLoc(),
+                       target.getExprContextualTypePurpose());
 
   // Set up the expression type checker timer.
   cs.Timer.emplace(expr, cs);
 
   cs.shrink(expr);
 
-  expr = cs.generateConstraints(expr, DC);
-  if (!expr)
-    return false;
-
   if (cs.isDebugMode()) {
     auto &log = llvm::errs();
     log << "--- Code Completion ---\n";
-    cs.print(log, expr);
-    log << '\n';
-    cs.print(log);
   }
+
+  if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow))
+    return false;
 
   llvm::SmallVector<Solution, 4> solutions;
 
