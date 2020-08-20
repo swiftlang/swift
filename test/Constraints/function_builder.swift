@@ -44,8 +44,8 @@ struct TupleBuilder {
   static func buildArray<T>(_ array: [T]) -> [T] { return array }
 }
 
-func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) {
-  print(body(cond))
+func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) throws -> T) rethrows {
+  print(try body(cond))
 }
 
 // CHECK: (17, 3.14159, "Hello, DSL", (["nested", "do"], 6), Optional((2.71828, ["if", "stmt"])))
@@ -749,3 +749,21 @@ let a = buildArray {
 // CHECK: ["1", "2"
 print(a)
 
+// Throwing in function builders.
+enum MyError: Error {
+  case boom
+}
+
+// CHECK: testThrow
+do {
+  print("testThrow")
+  try tuplify(true) { c in
+    "ready to throw"
+    throw MyError.boom
+  }
+} catch MyError.boom {
+  // CHECK: caught it!
+  print("caught it!")
+} catch {
+  fatalError("Threw something else?")
+}

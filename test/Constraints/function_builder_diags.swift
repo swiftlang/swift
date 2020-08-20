@@ -620,3 +620,15 @@ struct MyView {
     ""
   }
 }
+
+// Make sure throwing function builder closures are implied.
+enum MyError: Error {
+  case boom
+}
+
+do {
+    tuplify(true) { c in // expected-error{{invalid conversion from throwing function of type '(Bool) throws -> String' to non-throwing function type '(Bool) -> String'}}
+    "testThrow"
+    throw MyError.boom
+  }
+}

@@ -896,6 +896,26 @@ protected:
     return finalForEachVar;
   }
 
+  /// Visit a throw statement, which never produces a result.
+  VarDecl *visitThrowStmt(ThrowStmt *throwStmt) {
+    Type exnType = ctx.getErrorDecl()->getDeclaredInterfaceType();
+    if (!exnType) {
+      hadError = true;
+    }
+
+    if (cs) {
+     SolutionApplicationTarget target(
+         throwStmt->getSubExpr(), dc, CTP_ThrowStmt, exnType,
+         /*isDiscarded=*/false);
+     if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow))
+       hadError = true;
+
+     cs->setSolutionApplicationTarget(throwStmt, target);
+   }
+
+    return nullptr;
+  }
+
   CONTROL_FLOW_STMT(Guard)
   CONTROL_FLOW_STMT(While)
   CONTROL_FLOW_STMT(DoCatch)
@@ -905,7 +925,6 @@ protected:
   CONTROL_FLOW_STMT(Continue)
   CONTROL_FLOW_STMT(Fallthrough)
   CONTROL_FLOW_STMT(Fail)
-  CONTROL_FLOW_STMT(Throw)
   CONTROL_FLOW_STMT(PoundAssert)
 
 #undef CONTROL_FLOW_STMT
@@ -1141,6 +1160,14 @@ public:
       }
 
       if (auto stmt = node.dyn_cast<Stmt *>()) {
+        // "throw" statements produce no value. Transform them directly.
+        if (auto throwStmt = dyn_cast<ThrowStmt>(stmt)) {
+          if (auto newStmt = visitThrowStmt(throwStmt)) {
+            newElements.push_back(stmt);
+          }
+          continue;
+        }
+
         // Each statement turns into a (potential) temporary variable
         // binding followed by the statement itself.
         auto captured = takeCapturedStmt(stmt);
@@ -1429,6 +1456,22 @@ public:
         ctx, forEachStmt->getStartLoc(), outerBodySteps, newBody->getEndLoc());
   }
 
+  Stmt *visitThrowStmt(ThrowStmt *throwStmt) {
+    // Rewrite the error.
+    auto target = *solution.getConstraintSystem()
+        .getSolutionApplicationTarget(throwStmt);
+    if (auto result = rewriteTarget(target))
+      throwStmt->setSubExpr(result->getAsExpr());
+    else
+      return nullptr;
+
+    return throwStmt;
+  }
+
+  Stmt *visitThrowStmt(ThrowStmt *throwStmt, FunctionBuilderTarget target) {
+    llvm_unreachable("Throw statements produce no value");
+  }
+
 #define UNHANDLED_FUNCTION_BUILDER_STMT(STMT) \
   Stmt *visit##STMT##Stmt(STMT##Stmt *stmt, FunctionBuilderTarget target) { \
     llvm_unreachable("Function builders do not allow statement of kind " \
@@ -1446,7 +1489,6 @@ public:
   UNHANDLED_FUNCTION_BUILDER_STMT(Continue)
   UNHANDLED_FUNCTION_BUILDER_STMT(Fallthrough)
   UNHANDLED_FUNCTION_BUILDER_STMT(Fail)
-  UNHANDLED_FUNCTION_BUILDER_STMT(Throw)
   UNHANDLED_FUNCTION_BUILDER_STMT(PoundAssert)
 #undef UNHANDLED_FUNCTION_BUILDER_STMT
 };
