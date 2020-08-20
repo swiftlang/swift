@@ -201,9 +201,11 @@ public:
         getModule(), vjpSubstMap, TypeExpansionContext::minimal());
     pullbackType = pullbackType.subst(getModule(), vjpSubstMap);
     auto pullbackFnType = pullbackType.castTo<SILFunctionType>();
-
     auto pullbackSubstType =
         pullbackPartialApply->getType().castTo<SILFunctionType>();
+
+    // If necessary, convert the pullback value to the returned pullback
+    // function type.
     SILValue pullbackValue;
     if (pullbackSubstType == pullbackFnType) {
       pullbackValue = pullbackPartialApply;
@@ -213,11 +215,8 @@ public:
           builder.createConvertFunction(loc, pullbackPartialApply, pullbackType,
                                         /*withoutActuallyEscaping*/ false);
     } else {
-      // When `diag::autodiff_loadable_value_addressonly_tangent_unsupported`
-      // applies, the return type may be ABI-incomaptible with the type of the
-      // partially applied pullback. In these cases, produce an undef and rely
-      // on other code to emit a diagnostic.
-      pullbackValue = SILUndef::get(pullbackType, *vjp);
+      llvm::report_fatal_error("Pullback value type is not ABI-compatible "
+                               "with the returned pullback type");
     }
 
     // Return a tuple of the original result and pullback.
