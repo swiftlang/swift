@@ -36,19 +36,6 @@ struct TupleBuilder {
     return (t1, t2, t3, t4, t5)
   }
 
-  static func buildDo<T1>(_ t1: T1) -> Do<(T1)> {
-    .init(value: t1)
-  }
-
-  static func buildDo<T1, T2>(_ t1: T1, _ t2: T2) -> Do<(T1, T2)> {
-    .init(value: (t1, t2))
-  }
-  
-  static func buildDo<T1, T2, T3>(_ t1: T1, _ t2: T2, _ t3: T3)
-      -> Do<(T1, T2, T3)> {
-    .init(value: (t1, t2, t3))
-  }
-
   static func buildIf<T>(_ value: T?) -> T? { return value }
 
   static func buildEither<T,U>(first value: T) -> Either<T,U> {
@@ -65,7 +52,7 @@ func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) {
   print(body(cond))
 }
 
-// CHECK: (17, 3.14159, "Hello, DSL", main.Do<(Swift.Array<Swift.String>, Swift.Int)>(value: (["nested", "do"], 6)), Optional((2.71828, ["if", "stmt"])))
+// CHECK: (17, 3.14159, "Hello, DSL", (["nested", "do"], 6), Optional((2.71828, ["if", "stmt"])))
 let name = "dsl"
 tuplify(true) {
   17
@@ -664,7 +651,6 @@ struct TupleBuilderWithOpt {
     return (t1, t2, t3, t4, t5)
   }
 
-  static func buildDo<T>(_ value: T) -> T { return value }
   static func buildOptional<T>(_ value: T?) -> T? { return value }
 
   static func buildEither<T,U>(first value: T) -> Either<T,U> {
@@ -718,7 +704,6 @@ protocol FunctionBuilderProtocol {
 
     static func buildExpression(_ expression: Expression) -> Component
     static func buildBlock(_ components: Component...) -> Component
-    static func buildDo(_ components: Component...) -> Component
     static func buildOptional(_ optional: Component?) -> Component
     static func buildArray(_ components: [Component]) -> Component
     static func buildLimitedAvailability(_ component: Component) -> Component
@@ -729,7 +714,6 @@ protocol FunctionBuilderProtocol {
 extension FunctionBuilderProtocol {
     static func buildExpression(_ expression: Expression) -> Component { .expression(expression) }
     static func buildBlock(_ components: Component...) -> Component { .block(components) }
-    static func buildDo(_ components: Component...) -> Component { .block(components) }
     static func buildOptional(_ optional: Component?) -> Component { .optional(optional) }
     static func buildArray(_ components: [Component]) -> Component { .block(components) }
     static func buildLimitedAvailability(_ component: Component) -> Component { component }
