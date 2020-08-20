@@ -24,9 +24,8 @@ internal typealias _CocoaString = AnyObject
 
 @objc private protocol _StringSelectorHolder : _NSCopying {
 
-  @objc var length: Int { get }
-
-  @objc var hash: UInt { get }
+  @objc(`length`)
+  func getLength() -> Int //not using a var here avoids some overhead, oddly
 
   @objc(characterAtIndex:)
   func character(at offset: Int) -> UInt16
@@ -64,37 +63,12 @@ internal typealias _CocoaString = AnyObject
                           count: Int) -> AnyObject?
 }
 
-/*
- Passing a _CocoaString through _objc() lets you call ObjC methods that the
- compiler doesn't know about, via the protocol above. In order to get good
- performance, you need a double indirection like this:
-
-  func a -> _objc -> func a'
-
- because any refcounting @_effects on 'a' will be lost when _objc breaks ARC's
- knowledge that the _CocoaString and _StringSelectorHolder are the same object.
- */
-@inline(__always)
-private func _objc(_ str: _CocoaString) -> _StringSelectorHolder {
-  return unsafeBitCast(str, to: _StringSelectorHolder.self)
-}
-
-@_effects(releasenone)
-private func _copyNSString(_ str: _StringSelectorHolder) -> _CocoaString {
-  return str.copy(with: nil)
-}
-
 @usableFromInline // @testable
 @_effects(releasenone)
 internal func _stdlib_binary_CFStringCreateCopy(
   _ source: _CocoaString
 ) -> _CocoaString {
-  return _copyNSString(_objc(source))
-}
-
-@_effects(readonly)
-private func _NSStringLen(_ str: _StringSelectorHolder) -> Int {
-  return str.length
+  return (source as AnyObject).copy(with: nil)
 }
 
 @usableFromInline // @testable
@@ -105,7 +79,7 @@ internal func _stdlib_binary_CFStringGetLength(
   if let len = getConstantTaggedCocoaContents(source)?.utf16Length {
     return len
   }
-  return _NSStringLen(_objc(source))
+  return (source as AnyObject).getLength()
 }
 
 @_effects(readonly)
@@ -116,29 +90,12 @@ internal func _isNSString(_ str:AnyObject) -> Bool {
   return _swift_stdlib_isNSString(str) != 0
 }
 
-@_effects(readonly)
-private func _NSStringCharactersPtr(_ str: _StringSelectorHolder) -> UnsafeMutablePointer<UTF16.CodeUnit>? {
-  return UnsafeMutablePointer(mutating: str._fastCharacterContents())
-}
-
 @usableFromInline // @testable
 @_effects(readonly)
 internal func _stdlib_binary_CFStringGetCharactersPtr(
   _ source: _CocoaString
 ) -> UnsafeMutablePointer<UTF16.CodeUnit>? {
-  return _NSStringCharactersPtr(_objc(source))
-}
-
-@_effects(releasenone)
-private func _NSStringGetCharacters(
-  from source: _StringSelectorHolder,
-  range: Range<Int>,
-  into destination: UnsafeMutablePointer<UTF16.CodeUnit>
-) {
-  source.getCharacters(destination, range: _SwiftNSRange(
-    location: range.startIndex,
-    length: range.count)
-  )
+  return UnsafeMutablePointer(mutating: (source as AnyObject)._fastCharacterContents())
 }
 
 /// Copies a slice of a _CocoaString into contiguous storage of sufficient
@@ -149,30 +106,27 @@ internal func _cocoaStringCopyCharacters(
   range: Range<Int>,
   into destination: UnsafeMutablePointer<UTF16.CodeUnit>
 ) {
-  _NSStringGetCharacters(from: _objc(source), range: range, into: destination)
-}
-
-@_effects(readonly)
-private func _NSStringGetCharacter(
-  _ target: _StringSelectorHolder, _ position: Int
-) -> UTF16.CodeUnit {
-  return target.character(at: position)
+  (source as AnyObject).getCharacters(destination, range: _SwiftNSRange(
+    location: range.startIndex,
+    length: range.count)
+  )
 }
 
 @_effects(readonly)
 internal func _cocoaStringSubscript(
   _ target: _CocoaString, _ position: Int
 ) -> UTF16.CodeUnit {
-  return _NSStringGetCharacter(_objc(target), position)
+  return (target as AnyObject).character(at: position)
 }
 
 @_effects(releasenone)
-private func _NSStringCopyUTF8(
-  _ o: _StringSelectorHolder,
+internal func _cocoaStringCopyUTF8(
+  _ target: _CocoaString,
   into bufPtr: UnsafeMutableBufferPointer<UInt8>
 ) -> Int? {
+  let o = target as AnyObject
   let ptr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
-  let len = o.length
+  let len = _stdlib_binary_CFStringGetLength(target)
   var remainingRange = _SwiftNSRange(location: 0, length: 0)
   var usedLen = 0
   let success = 0 != o.getBytes(
@@ -190,19 +144,13 @@ private func _NSStringCopyUTF8(
   return nil
 }
 
-@_effects(releasenone)
-internal func _cocoaStringCopyUTF8(
-  _ target: _CocoaString,
-  into bufPtr: UnsafeMutableBufferPointer<UInt8>
-) -> Int? {
-  return _NSStringCopyUTF8(_objc(target), into: bufPtr)
-}
-
 @_effects(readonly)
-private func _NSStringUTF8Count(
-  _ o: _StringSelectorHolder,
+internal func _cocoaStringUTF8Count(
+  _ target: _CocoaString,
   range: Range<Int>
 ) -> Int? {
+  if range.isEmpty { return 0 }
+  let o = target as AnyObject
   var remainingRange = _SwiftNSRange(location: 0, length: 0)
   var usedLen = 0
   let success = 0 != o.getBytes(
@@ -221,28 +169,13 @@ private func _NSStringUTF8Count(
 }
 
 @_effects(readonly)
-internal func _cocoaStringUTF8Count(
-  _ target: _CocoaString,
-  range: Range<Int>
-) -> Int? {
-  if range.isEmpty { return 0 }
-  return _NSStringUTF8Count(_objc(target), range: range)
-}
-
-@_effects(readonly)
-private func _NSStringCompare(
-  _ o: _StringSelectorHolder, _ other: _CocoaString
-) -> Int {
-  let range = _SwiftNSRange(location: 0, length: o.length)
-  let options = UInt(2) /* NSLiteralSearch*/
-  return o.compare(other, options: options, range: range, locale: nil)
-}
-
-@_effects(readonly)
 internal func _cocoaStringCompare(
   _ string: _CocoaString, _ other: _CocoaString
 ) -> Int {
-  return _NSStringCompare(_objc(string), other)
+  let o = string as AnyObject
+  let range = _SwiftNSRange(location: 0, length: _stdlib_binary_CFStringGetLength(string))
+  let options = UInt(2) /* NSLiteralSearch*/
+  return o.compare(other, options: options, range: range, locale: nil)
 }
 
 @_effects(readonly)
@@ -347,13 +280,6 @@ internal func _bridgeTagged(
 }
 #endif
 
-@_effects(readonly)
-private func _NSStringASCIIPointer(_ str: _StringSelectorHolder) -> UnsafePointer<UInt8>? {
- // TODO(String bridging): Is there a better interface here? Ideally we'd be
-  // able to ask for UTF8 rather than just ASCII
-  return str._fastCStringContents(0)?._asUInt8
-}
-
 @_effects(readonly) // @opaque
 private func _withCocoaASCIIPointer<R>(
   _ str: _CocoaString,
@@ -373,7 +299,9 @@ private func _withCocoaASCIIPointer<R>(
   }
   #endif
   defer { _fixLifetime(str) }
-  if let ptr = _NSStringASCIIPointer(_objc(str)) {
+  // TODO(String bridging): Is there a better interface here? Ideally we'd be
+  // able to ask for UTF8 rather than just ASCII
+  if let ptr = (str as AnyObject)._fastCStringContents(0)?._asUInt8 {
     return work(ptr)
   }
   return nil
