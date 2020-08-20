@@ -604,8 +604,37 @@ void TypeChecker::typeCheckForCodeCompletion(
   expr = expr->walk(SanitizeExpr(Context,
                                  /*shouldReusePrecheckedType=*/false));
 
-  ConstraintSystem::solveForCodeCompletion(expr, DC, contextualType, CTP,
-                                           callback);
+  class ExprWalker : public ASTWalker {
+    Expr *CompletionExpr = nullptr;
+
+  public:
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (isa<CodeCompletionExpr>(E)) {
+        CompletionExpr = E;
+        return std::make_pair(false, nullptr);
+      }
+
+      return std::make_pair(true, E);
+    }
+
+    Expr *getCompletionExpr() const { return CompletionExpr; }
+  };
+
+  ExprWalker walker;
+  expr->walk(walker);
+
+  auto *completionExpr = walker.getCompletionExpr();
+  assert(completionExpr);
+
+  // If it was possible to solve for a while expression, we are done.
+  if (ConstraintSystem::solveForCodeCompletion(expr, DC, contextualType, CTP,
+                                               callback))
+    return;
+
+  // If initial solve failed, let's fallback to checking only code completion
+  // expresion without any context.
+  (void)ConstraintSystem::solveForCodeCompletion(completionExpr, DC, Type(),
+                                                 CTP_Unused, callback);
 }
 
 static Optional<Type> getTypeOfCompletionContextExpr(
