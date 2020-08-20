@@ -5022,7 +5022,10 @@ public:
   ///
   /// \param callback The callback to be used to provide results to
   /// code completion.
-  static void
+  ///
+  /// \returns `false` if this call fails (e.g. pre-check or constraint
+  /// generation fails), `true` otherwise.
+  static bool
   solveForCodeCompletion(Expr *expr, DeclContext *DC, Type contextualType,
                          ContextualTypePurpose CTP,
                          llvm::function_ref<void(const Solution &)> callback);

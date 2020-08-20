@@ -1466,14 +1466,14 @@ void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {
   }
 }
 
-void ConstraintSystem::solveForCodeCompletion(
+bool ConstraintSystem::solveForCodeCompletion(
     Expr *expr, DeclContext *DC, Type contextualType, ContextualTypePurpose CTP,
     llvm::function_ref<void(const Solution &)> callback) {
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
   if (ConstraintSystem::preCheckExpression(
           expr, DC, /*replaceInvalidRefsWithErrors=*/false))
-    return;
+    return false;
 
   // If there was an invalid reference which was caught by pre-check,
   // let's remove all context besides code completion itself and try again.
@@ -1511,7 +1511,7 @@ void ConstraintSystem::solveForCodeCompletion(
       // Make sure that code completion is valid.
       if (ConstraintSystem::preCheckExpression(
               codeCompletionExpr, DC, /*replaceInvalidRefsWithErrors=*/true))
-        return;
+        return false;
 
       expr = codeCompletionExpr;
     }
@@ -1533,7 +1533,7 @@ void ConstraintSystem::solveForCodeCompletion(
 
   expr = cs.generateConstraints(expr, DC);
   if (!expr)
-    return;
+    return false;
 
   if (cs.isDebugMode()) {
     auto &log = llvm::errs();
@@ -1569,6 +1569,8 @@ void ConstraintSystem::solveForCodeCompletion(
 
     callback(solution);
   }
+
+  return true;
 }
 
 void ConstraintSystem::collectDisjunctions(
