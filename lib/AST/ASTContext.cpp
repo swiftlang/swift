@@ -3245,6 +3245,7 @@ void SILFunctionType::Profile(
     llvm::FoldingSetNodeID &id,
     GenericSignature genericParams,
     ExtInfo info,
+    bool isAsync,
     SILCoroutineKind coroutineKind,
     ParameterConvention calleeConvention,
     ArrayRef<SILParameterInfo> params,
@@ -3258,6 +3259,7 @@ void SILFunctionType::Profile(
   auto infoKey = info.getFuncAttrKey();
   id.AddInteger(infoKey.first);
   id.AddPointer(infoKey.second);
+  id.AddBoolean(isAsync);
   id.AddInteger(unsigned(coroutineKind));
   id.AddInteger(unsigned(calleeConvention));
   id.AddInteger(params.size());
@@ -3471,8 +3473,8 @@ CanSILFunctionType SILFunctionType::get(
   invocationSubs = invocationSubs.getCanonical();
   
   llvm::FoldingSetNodeID id;
-  SILFunctionType::Profile(id, genericSig, ext, coroutineKind, callee, params,
-                           yields, normalResults, errorResult,
+  SILFunctionType::Profile(id, genericSig, ext, isAsync, coroutineKind, callee,
+                           params, yields, normalResults, errorResult,
                            witnessMethodConformance,
                            patternSubs, invocationSubs);
 
