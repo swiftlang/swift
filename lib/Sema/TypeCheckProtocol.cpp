@@ -3877,9 +3877,31 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
   SmallVector<std::pair<TypeDecl *, CheckTypeWitnessResult>, 2> nonViable;
   for (auto candidate : candidates) {
     // Skip nested generic types.
-    if (auto *genericDecl = dyn_cast<GenericTypeDecl>(candidate.Member))
+    if (auto *genericDecl = dyn_cast<GenericTypeDecl>(candidate.Member)) {
+      // If the declaration has generic parameters, it cannot witness an
+      // associated type.
       if (genericDecl->isGeneric())
         continue;
+
+      // As a narrow fix for a source compatibility issue with SwiftUI's
+      // swiftinterface, allow the conformance if the underlying type of
+      // the typealias is Never.
+      //
+      // FIXME: This should be conditionalized on a new language version.
+      bool skipRequirementCheck = false;
+      if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(candidate.Member)) {
+        if (typeAliasDecl->getUnderlyingType()->isUninhabited())
+          skipRequirementCheck = true;
+      }
+
+      // If the type comes from a constrained extension or has a 'where'
+      // clause, check those requirements now.
+      if (!skipRequirementCheck &&
+          !TypeChecker::checkContextualRequirements(genericDecl, Adoptee,
+                                                    SourceLoc(), DC)) {
+        continue;
+      }
+    }
 
     // Skip typealiases with an unbound generic type as their underlying type.
     if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(candidate.Member))
@@ -3908,8 +3930,6 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
   // If there is a single viable candidate, form a substitution for it.
   if (viable.size() == 1) {
     auto interfaceType = viable.front().MemberType;
-    if (interfaceType->hasArchetype())
-      interfaceType = interfaceType->mapTypeOutOfContext();
     recordTypeWitness(assocType, interfaceType, viable.front().Member);
     return ResolveWitnessResult::Success;
   }

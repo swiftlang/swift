@@ -21,6 +21,7 @@
 #if defined(__APPLE__) && defined(__MACH__)
 
 #include "ImageInspection.h"
+#include "swift/Runtime/Config.h"
 #include <mach-o/dyld.h>
 #include <mach-o/getsect.h>
 #include <objc/runtime.h>
@@ -121,7 +122,7 @@ void addImageCallback2Sections(const mach_header *mh, intptr_t vmaddr_slide) {
 
 } // end anonymous namespace
 
-#if OBJC_ADDLOADIMAGEFUNC_DEFINED
+#if OBJC_ADDLOADIMAGEFUNC_DEFINED && SWIFT_OBJC_INTEROP
 #define REGISTER_FUNC(...)                                               \
   if (__builtin_available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)) { \
     objc_addLoadImageFunc(__VA_ARGS__);                                  \
@@ -168,6 +169,8 @@ int swift::lookupSymbol(const void *address, SymbolInfo *info) {
   return 1;
 }
 
+#ifndef SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
+
 void *swift::lookupSection(const char *segment, const char *section, size_t *outSize) {
   unsigned long size;
   auto *executableHeader = static_cast<mach_header_platform *>(_NSGetMachExecuteHeader());
@@ -176,5 +179,7 @@ void *swift::lookupSection(const char *segment, const char *section, size_t *out
     *outSize = size;
   return static_cast<void *>(data);
 }
+
+#endif // #ifndef SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
 
 #endif // defined(__APPLE__) && defined(__MACH__)

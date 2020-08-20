@@ -54,6 +54,7 @@ add_swift_host_library(swiftSema STATIC
   # SWIFT_ENABLE_TENSORFLOW
   TypeCheckCompilerEvaluable.cpp
   # SWIFT_ENABLE_TENSORFLOW END
+  TypeCheckConcurrency.cpp
   TypeCheckConstraints.cpp
   TypeCheckDecl.cpp
   TypeCheckDeclObjC.cpp

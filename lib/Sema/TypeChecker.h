@@ -601,6 +601,11 @@ RequirementCheckResult checkGenericArguments(
     ArrayRef<Requirement> requirements, TypeSubstitutionFn substitutions,
     SubstOptions options = None);
 
+bool checkContextualRequirements(GenericTypeDecl *decl,
+                                 Type parentTy,
+                                 SourceLoc loc,
+                                 DeclContext *dc);
+
 /// Add any implicitly-defined constructors required for the given
 /// struct or class.
 void addImplicitConstructors(NominalTypeDecl *typeDecl);
@@ -1391,6 +1396,10 @@ void checkUnknownAttrRestrictions(
 /// let vs. var. This function does not perform any of that validation, leaving
 /// it to later stages.
 void bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *stmt);
+
+/// Add notes suggesting the addition of 'async' or '@asyncHandler', as
+/// appropriate, to a diagnostic for a function that isn't an async context.
+void addAsyncNotes(FuncDecl *func);
 
 } // end namespace swift
 

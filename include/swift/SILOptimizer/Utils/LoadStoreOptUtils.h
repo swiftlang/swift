@@ -236,7 +236,7 @@ public:
   }
 
   /// Returns whether the LSValue has been initialized properly.
-  bool isValid() const {
+  bool isValid() const override {
     if (CoveringValue)
       return true;
     return LSBase::isValid();
@@ -261,7 +261,7 @@ public:
     return Path.getValue().createExtract(Base, Inst, true);
   }
 
-  void print(llvm::raw_ostream &os) {
+  void print(llvm::raw_ostream &os) override {
     if (CoveringValue) {
       os << "Covering Value";
       return;

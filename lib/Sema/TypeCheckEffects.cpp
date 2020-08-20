@@ -857,6 +857,7 @@ private:
   Kind TheKind;
   Optional<AnyFunctionRef> Function;
   bool HandlesErrors = false;
+  bool HandlesAsync = false;
 
   /// Whether error-handling queries should ignore the function context, e.g.,
   /// for autoclosure and rethrows checks.
@@ -870,9 +871,10 @@ private:
     assert(TheKind != Kind::PotentiallyHandled);
   }
 
-  explicit Context(bool handlesErrors, Optional<AnyFunctionRef> function)
+  explicit Context(bool handlesErrors, bool handlesAsync,
+                   Optional<AnyFunctionRef> function)
     : TheKind(Kind::PotentiallyHandled), Function(function),
-      HandlesErrors(handlesErrors) { }
+      HandlesErrors(handlesErrors), HandlesAsync(handlesAsync) { }
 
 public:
   /// Whether this is a function that rethrows.
@@ -910,7 +912,7 @@ public:
 
   static Context forTopLevelCode(TopLevelCodeDecl *D) {
     // Top-level code implicitly handles errors and 'async' calls.
-    return Context(/*handlesErrors=*/true, None);
+    return Context(/*handlesErrors=*/true, /*handlesAsync=*/true, None);
   }
 
   static Context forFunction(AbstractFunctionDecl *D) {
@@ -930,8 +932,7 @@ public:
       }
     }
 
-    bool handlesErrors = D->hasThrows();
-    return Context(handlesErrors, AnyFunctionRef(D));
+    return Context(D->hasThrows(), D->isAsyncContext(), AnyFunctionRef(D));
   }
 
   static Context forDeferBody() {
@@ -956,12 +957,15 @@ public:
   static Context forClosure(AbstractClosureExpr *E) {
     // Determine whether the closure has throwing function type.
     bool closureTypeThrows = true;
+    bool closureTypeIsAsync = true;
     if (auto closureType = E->getType()) {
-      if (auto fnType = closureType->getAs<AnyFunctionType>())
+      if (auto fnType = closureType->getAs<AnyFunctionType>()) {
         closureTypeThrows = fnType->isThrowing();
+        closureTypeIsAsync = fnType->isAsync();
+      }
     }
 
-    return Context(closureTypeThrows, AnyFunctionRef(E));
+    return Context(closureTypeThrows, closureTypeIsAsync, AnyFunctionRef(E));
   }
 
   static Context forCatchPattern(CaseStmt *S) {
@@ -1011,6 +1015,10 @@ public:
       return HandlesErrors && !isRethrows();
     }
     llvm_unreachable("bad error kind");
+  }
+
+  bool handlesAsync() const {
+    return HandlesAsync;
   }
 
   DeclContext *getRethrowsDC() const {
@@ -1182,7 +1190,6 @@ public:
     case Kind::DeferBody:
       diagnoseThrowInIllegalContext(Diags, E, getKind());
       return;
-
     }
     llvm_unreachable("bad context kind");
   }
@@ -1210,6 +1217,64 @@ public:
       return;
     }
     llvm_unreachable("bad context kind");
+  }
+
+  void diagnoseUncoveredAsyncSite(ASTContext &ctx, ASTNode node) {
+    SourceRange highlight;
+
+    // Generate more specific messages in some cases.
+    if (auto apply = dyn_cast_or_null<ApplyExpr>(node.dyn_cast<Expr*>()))
+      highlight = apply->getSourceRange();
+
+    auto diag = diag::async_call_without_await;
+    if (isAutoClosure())
+      diag = diag::async_call_without_await_in_autoclosure;
+    ctx.Diags.diagnose(node.getStartLoc(), diag)
+        .highlight(highlight);
+  }
+
+  void diagnoseAsyncInIllegalContext(DiagnosticEngine &Diags, ASTNode node) {
+    if (auto *e = node.dyn_cast<Expr*>()) {
+      if (isa<ApplyExpr>(e)) {
+        Diags.diagnose(e->getLoc(), diag::async_call_in_illegal_context,
+                       static_cast<unsigned>(getKind()));
+        return;
+      }
+    }
+
+    Diags.diagnose(node.getStartLoc(), diag::await_in_illegal_context,
+                   static_cast<unsigned>(getKind()));
+  }
+
+  void maybeAddAsyncNote(DiagnosticEngine &Diags) {
+    if (!Function)
+      return;
+
+    auto func = dyn_cast_or_null<FuncDecl>(Function->getAbstractFunctionDecl());
+    if (!func)
+      return;
+
+    addAsyncNotes(func);
+  }
+
+  void diagnoseUnhandledAsyncSite(DiagnosticEngine &Diags, ASTNode node) {
+    switch (getKind()) {
+    case Kind::PotentiallyHandled:
+      Diags.diagnose(node.getStartLoc(), diag::async_in_nonasync_function,
+                     node.isExpr(ExprKind::Await), isAutoClosure());
+      maybeAddAsyncNote(Diags);
+      return;
+
+    case Kind::EnumElementInitializer:
+    case Kind::GlobalVarInitializer:
+    case Kind::IVarInitializer:
+    case Kind::DefaultArgument:
+    case Kind::CatchPattern:
+    case Kind::CatchGuard:
+    case Kind::DeferBody:
+      diagnoseAsyncInIllegalContext(Diags, node);
+      return;
+    }
   }
 };
 
@@ -1322,6 +1387,12 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       Self.MaxThrowingKind = ThrowingKind::None;
     }
 
+    void resetCoverageForAutoclosureBody() {
+      Self.Flags.clear(ContextFlags::IsAsyncCovered);
+      Self.Flags.clear(ContextFlags::HasAnyAsyncSite);
+      Self.Flags.clear(ContextFlags::HasAnyAwait);
+    }
+
     void resetCoverageForDoCatch() {
       Self.Flags.reset();
       Self.MaxThrowingKind = ThrowingKind::None;
@@ -1409,6 +1480,7 @@ private:
   ShouldRecurse_t checkAutoClosure(AutoClosureExpr *E) {
     ContextScope scope(*this, Context::forClosure(E));
     scope.enterSubFunction();
+    scope.resetCoverageForAutoclosureBody();
     E->getBody()->walk(*this);
     scope.preserveCoverageFromAutoclosureBody();
     return ShouldNotRecurse;
@@ -1572,17 +1644,14 @@ private:
     if (classification.isAsync()) {
       // Remember that we've seen an async call.
       Flags.set(ContextFlags::HasAnyAsyncSite);
-      
-      // Diagnose async calls that are outside of an await context.
-      if (!Flags.has(ContextFlags::IsAsyncCovered)) {
-        SourceRange highlight;
-        
-        // Generate more specific messages in some cases.
-        if (auto e = dyn_cast_or_null<ApplyExpr>(E.dyn_cast<Expr*>()))
-          highlight = e->getSourceRange();
 
-        Ctx.Diags.diagnose(E.getStartLoc(), diag::async_call_without_await)
-              .highlight(highlight);
+      // Diagnose async calls in a context that doesn't handle async.
+      if (!CurContext.handlesAsync()) {
+        CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, E);
+      }
+      // Diagnose async calls that are outside of an await context.
+      else if (!Flags.has(ContextFlags::IsAsyncCovered)) {
+        CurContext.diagnoseUncoveredAsyncSite(Ctx, E);
       }
     }
     
@@ -1626,10 +1695,16 @@ private:
     scope.enterAwait();
     
     E->getSubExpr()->walk(*this);
-    
-    // Warn about 'await' expressions that weren't actually needed.
-    if (!Flags.has(ContextFlags::HasAnyAsyncSite))
-      Ctx.Diags.diagnose(E->getAwaitLoc(), diag::no_async_in_await);
+
+    // Warn about 'await' expressions that weren't actually needed, unless of
+    // course we're in a context that could never handle an 'async'. Then, we
+    // produce an error.
+    if (!Flags.has(ContextFlags::HasAnyAsyncSite)) {
+      if (CurContext.handlesAsync())
+        Ctx.Diags.diagnose(E->getAwaitLoc(), diag::no_async_in_await);
+      else
+        CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, E);
+    }
     
     // Inform the parent of the walk that an 'await' exists here.
     scope.preserveCoverageFromAwaitOperand();

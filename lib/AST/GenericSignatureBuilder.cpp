@@ -3871,9 +3871,21 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
         return false;
       });
 
-  // Remaining logic is not relevant in ObjC protocol cases.
-  if (proto->isObjC())
+  if (proto->isObjC()) {
+    // @objc implies an inferred AnyObject constraint.
+    auto innerSource =
+      FloatingRequirementSource::viaProtocolRequirement(source, proto,
+                                                        /*inferred=*/true);
+    addLayoutRequirementDirect(selfType,
+                         LayoutConstraint::getLayoutConstraint(
+                             LayoutConstraintKind::Class,
+                             getASTContext()),
+                         innerSource);
+
     return ConstraintResult::Resolved;
+  }
+
+  // Remaining logic is not relevant in ObjC protocol cases.
 
   // Collect all of the inherited associated types and typealiases in the
   // inherited protocols (recursively).

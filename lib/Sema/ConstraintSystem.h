@@ -1190,6 +1190,11 @@ public:
   /// Retrieve the type of the given node, as recorded in this solution.
   Type getType(ASTNode node) const;
 
+  /// Retrieve the type of the given node as recorded in this solution
+  /// and resolve all of the type variables in contains to form a fully
+  /// "resolved" concrete type.
+  Type getResolvedType(ASTNode node) const;
+
   /// Resolve type variables present in the raw type, using generic parameter
   /// types where possible.
   Type resolveInterfaceType(Type type) const;
@@ -1209,6 +1214,16 @@ public:
         ? &known->second
         : nullptr;
   }
+
+  /// This method implements functionality of `Expr::isTypeReference`
+  /// with data provided by a given solution.
+  bool isTypeReference(Expr *E) const;
+
+  /// Call Expr::isIsStaticallyDerivedMetatype on the given
+  /// expression, using a custom accessor for the type on the
+  /// expression that reads the type from the Solution
+  /// expression type map.
+  bool isStaticallyDerivedMetatype(Expr *E) const;
 
   SWIFT_DEBUG_DUMP;
 
@@ -3147,7 +3162,7 @@ public:
 
           if (originalRep) {
             if (originalRep != currentRep)
-              mergeEquivalenceClasses(currentRep, originalRep);
+              mergeEquivalenceClasses(currentRep, originalRep, /*updateWorkList=*/false);
             continue;
           }
 
@@ -3443,7 +3458,7 @@ public:
   /// distinct.
   void mergeEquivalenceClasses(TypeVariableType *typeVar1,
                                TypeVariableType *typeVar2,
-                               bool updateWorkList = true);
+                               bool updateWorkList);
 
   /// Flags that direct type matching.
   enum TypeMatchFlags {
@@ -4705,6 +4720,7 @@ private:
     /// if it has only concrete types or would resolve a closure.
     bool favoredOverDisjunction(Constraint *disjunction) const;
 
+private:
     /// Detect `subtype` relationship between two type variables and
     /// attempt to infer supertype bindings transitively e.g.
     ///
@@ -4717,19 +4733,25 @@ private:
     /// \param inferredBindings The set of all bindings inferred for type
     /// variables in the workset.
     void inferTransitiveBindings(
-        ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes,
+        const ConstraintSystem &cs,
+        llvm::SmallPtrSetImpl<CanType> &existingTypes,
         const llvm::SmallDenseMap<TypeVariableType *,
                                   ConstraintSystem::PotentialBindings>
             &inferredBindings);
 
     /// Infer bindings based on any protocol conformances that have default
     /// types.
-    void inferDefaultTypes(ConstraintSystem &cs,
+    void inferDefaultTypes(const ConstraintSystem &cs,
                            llvm::SmallPtrSetImpl<CanType> &existingTypes);
+
+public:
+    bool infer(const ConstraintSystem &cs,
+               llvm::SmallPtrSetImpl<CanType> &exactTypes,
+               Constraint *constraint);
 
     /// Finalize binding computation for this type variable by
     /// inferring bindings from context e.g. transitive bindings.
-    void finalize(ConstraintSystem &cs,
+    void finalize(const ConstraintSystem &cs,
                   const llvm::SmallDenseMap<TypeVariableType *,
                                             ConstraintSystem::PotentialBindings>
                       &inferredBindings);
@@ -4797,14 +4819,13 @@ private:
 
   /// Infer bindings for the given type variable based on current
   /// state of the constraint system.
-  PotentialBindings inferBindingsFor(TypeVariableType *typeVar);
+  PotentialBindings inferBindingsFor(TypeVariableType *typeVar,
+                                     bool finalize = true) const;
 
 private:
   Optional<ConstraintSystem::PotentialBinding>
-  getPotentialBindingForRelationalConstraint(
-      PotentialBindings &result, Constraint *constraint,
-      bool &hasDependentMemberRelationalConstraints,
-      bool &hasNonDependentMemberRelationalConstraints) const;
+  getPotentialBindingForRelationalConstraint(PotentialBindings &result,
+                                             Constraint *constraint) const;
   PotentialBindings getPotentialBindings(TypeVariableType *typeVar) const;
 
   /// Add a constraint to the constraint system.

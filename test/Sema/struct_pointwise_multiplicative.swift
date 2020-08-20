@@ -87,8 +87,8 @@ extension NoMemberwiseInitializerExtended: Equatable, AdditiveArithmetic, Pointw
 
 // Test derived conformances in disallowed contexts.
 
-// expected-error @+1 3 {{implementation of 'PointwiseMultiplicative' cannot be automatically synthesized in an extension in a different file to the type}}
+// expected-error @+1 3 {{extension outside of file declaring struct 'OtherFileNonconforming' prevents automatic synthesis of}}
 extension OtherFileNonconforming : PointwiseMultiplicative {}
 
-// expected-error @+1 3 {{implementation of 'PointwiseMultiplicative' cannot be automatically synthesized in an extension in a different file to the type}}
+// expected-error @+1 3 {{extension outside of file declaring generic struct 'GenericOtherFileNonconforming' prevents automatic synthesis of}}
 extension GenericOtherFileNonconforming : PointwiseMultiplicative {}

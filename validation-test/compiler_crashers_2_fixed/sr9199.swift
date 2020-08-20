@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -o %t.ll %s
+// RUN: not %target-swift-frontend -emit-ir %s
 
 // Just make sure we don't crash.
 

@@ -31,8 +31,10 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporterOptions.h"
 #include "swift/Parse/Parser.h"
+#include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
+#include "clang/AST/Mangle.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/OperatorKinds.h"
@@ -1695,6 +1697,34 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         // Adopt the requested name.
         baseName = swiftName;
       }
+    }
+  }
+
+  if (auto classTemplateSpecDecl =
+          dyn_cast<clang::ClassTemplateSpecializationDecl>(D)) {
+    if (!isa<clang::ClassTemplatePartialSpecializationDecl>(D)) {
+
+      auto &astContext = classTemplateSpecDecl->getASTContext();
+      // Itanium mangler produces valid Swift identifiers, use it to generate a name for
+      // this instantiation.
+      clang::MangleContext *mangler = clang::ItaniumMangleContext::create(
+          astContext, astContext.getDiagnostics());
+      llvm::SmallString<128> storage;
+      llvm::raw_svector_ostream buffer(storage);
+      mangler->mangleTypeName(astContext.getRecordType(classTemplateSpecDecl),
+                              buffer);
+
+      // The Itanium mangler does not provide a way to get the mangled
+      // representation of a type. Instead, we call mangleTypeName() that
+      // returns the name of the RTTI typeinfo symbol, and remove the _ZTS
+      // prefix. Then we prepend __CxxTemplateInst to reduce chances of conflict
+      // with regular C and C++ structs.
+      llvm::SmallString<128> mangledNameStorage;
+      llvm::raw_svector_ostream mangledName(mangledNameStorage);
+      assert(buffer.str().take_front(4) == "_ZTS");
+      mangledName << CXX_TEMPLATE_INST_PREFIX << buffer.str().drop_front(4);
+
+      baseName = swiftCtx.getIdentifier(mangledName.str()).get();
     }
   }
 

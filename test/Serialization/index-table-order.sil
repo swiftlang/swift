@@ -1,0 +1,51 @@
+// RUN: %empty-directory(%t)
+
+// Ensure that serialized sib can be deserialized correctly assuming 
+// contents of SIL_INDEX_BLOCK are sorted by their ids
+// RUN: %target-swift-frontend -emit-sib %s -module-name test -o %t/test.sib
+// RUN: %target-swift-frontend -emit-sil %t/test.sib -module-name test
+// CHECK-DAG: sil_vtable
+// CHECK-DAG: sil_global
+// CHECK-DAG: sil_witness_table
+// CHECK-DAG: sil_default_witness_table
+// CHECK-DAG: sil_property
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// For SIL_FUNC_NAMES
+sil @id : $@convention(thin) (Float) -> Float {
+bb0(%0 : $Float):
+  return %0 : $Float
+}
+
+
+// For SIL_VTABLE_NAMES
+class C {}
+sil_vtable C {}
+
+// For SIL_GLOBALVAR_NAMES
+sil_global @x : $Int
+
+// For SIL_WITNESS_TABLE_NAMES
+protocol P1 {}
+struct S : P1 {}
+
+sil_witness_table S: P1 module test {}
+
+// For SIL_DEFAULT_WITNESS_TABLE_NAMES
+protocol P2 {}
+sil_default_witness_table P2 {}
+
+// For SIL_PROPERTY_OFFSETS
+struct A {
+  var a: Int
+}
+
+sil_property #A.a ()
+
+// For SIL_DIFFERENTIABILITY_WITNESS_NAMES
+sil_differentiability_witness [parameters 0] [results 0] @id : $@convention(thin) (Float) -> Float {}
+

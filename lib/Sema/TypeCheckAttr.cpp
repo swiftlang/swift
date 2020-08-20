@@ -260,6 +260,22 @@ public:
   // SWIFT_ENABLE_TENSORFLOW
   void visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr);
   // SWIFT_ENABLE_TENSORFLOW END
+
+  void visitAsyncHandlerAttr(AsyncHandlerAttr *attr) {
+    if (!Ctx.LangOpts.EnableExperimentalConcurrency) {
+      diagnoseAndRemoveAttr(attr, diag::asynchandler_attr_requires_concurrency);
+      return;
+    }
+
+    auto func = dyn_cast<FuncDecl>(D);
+    if (!func) {
+      diagnoseAndRemoveAttr(attr, diag::asynchandler_non_func);
+      return;
+    }
+
+    // Trigger the request to check for @asyncHandler.
+    (void)func->isAsyncHandler();
+  }
 };
 } // end anonymous namespace
 

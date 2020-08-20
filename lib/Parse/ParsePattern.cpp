@@ -824,7 +824,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
 void Parser::parseAsyncThrows(
     SourceLoc existingArrowLoc, SourceLoc &asyncLoc, SourceLoc &throwsLoc,
     bool *rethrows) {
-  if (Context.LangOpts.EnableExperimentalConcurrency &&
+  if (shouldParseExperimentalConcurrency() &&
       Tok.isContextualKeyword("async")) {
     asyncLoc = consumeToken();
 
@@ -857,7 +857,7 @@ void Parser::parseAsyncThrows(
         .fixItInsert(existingArrowLoc, (keyword + " ").str());
     }
 
-    if (Context.LangOpts.EnableExperimentalConcurrency &&
+    if (shouldParseExperimentalConcurrency() &&
         Tok.isContextualKeyword("async")) {
       asyncLoc = consumeToken();
 

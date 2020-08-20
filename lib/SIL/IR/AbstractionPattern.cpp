@@ -236,7 +236,7 @@ bool AbstractionPattern::requiresClass() const {
         // ObjC generics are always class constrained.
         return true;
       }
-      
+
       assert(GenericSig &&
              "Dependent type in pattern without generic signature?");
       return GenericSig->requiresClass(type);
@@ -250,30 +250,23 @@ bool AbstractionPattern::requiresClass() const {
 }
 
 LayoutConstraint AbstractionPattern::getLayoutConstraint() const {
-  // TODO: `ArchetypeType::getLayoutConstraint` and
-  // `GenericSignature::getLayoutConstraint` don't always propagate implied
-  // layout constraints from protocol/class constraints. `requiresClass`
-  // is, for the time being, the only one we really care about, though, and
-  // it behaves correctly.
-  if (requiresClass()) {
-    return LayoutConstraint::getLayoutConstraint(LayoutConstraintKind::Class);
-  }
-  return LayoutConstraint();
-
-#if GET_LAYOUT_CONSTRAINT_WORKED_THE_WAY_I_WANT
   switch (getKind()) {
   case Kind::Opaque:
     return LayoutConstraint();
   case Kind::Type:
-  case Kind::Discard: {
+  case Kind::Discard:
+  case Kind::ClangType: {
     auto type = getType();
     if (auto archetype = dyn_cast<ArchetypeType>(type)) {
-      auto archetypeSig = archetype->getGenericEnvironment()
-                                   ->getGenericSignature();
-      return archetypeSig->getLayoutConstraint(archetype->getInterfaceType());
-    }
-    else if (isa<DependentMemberType>(type) ||
-             isa<GenericTypeParamType>(type)) {
+      return archetype->getLayoutConstraint();
+    } else if (isa<DependentMemberType>(type) ||
+               isa<GenericTypeParamType>(type)) {
+      if (getKind() == Kind::ClangType) {
+        // ObjC generics are always class constrained.
+        return LayoutConstraint::getLayoutConstraint(
+          LayoutConstraintKind::Class);
+      }
+
       assert(GenericSig &&
              "Dependent type in pattern without generic signature?");
       return GenericSig->getLayoutConstraint(type);
@@ -283,7 +276,6 @@ LayoutConstraint AbstractionPattern::getLayoutConstraint() const {
   default:
     return LayoutConstraint();
   }
-#endif
 }
 
 bool AbstractionPattern::matchesTuple(CanTupleType substType) {

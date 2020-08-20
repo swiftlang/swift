@@ -73,12 +73,12 @@ protected:
                                              StringRef extension) const;
 
   using AccessPathElem = Located<Identifier>;
-  bool findModule(AccessPathElem moduleID,
-                  SmallVectorImpl<char> *moduleInterfacePath,
-                  std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
-                  std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
-                  std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-                  bool &isFramework, bool &isSystemModule);
+  virtual bool findModule(AccessPathElem moduleID,
+                          SmallVectorImpl<char> *moduleInterfacePath,
+                          std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
+                          std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
+                          std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
+                          bool &isFramework, bool &isSystemModule);
 
   /// Attempts to search the provided directory for a loadable serialized
   /// .swiftmodule with the provided `ModuleFilename`. Subclasses must
@@ -98,7 +98,8 @@ protected:
       SmallVectorImpl<char> *ModuleInterfacePath,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) = 0;
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+      bool IsFramework) = 0;
 
   std::error_code
   openModuleFile(
@@ -229,7 +230,8 @@ class ImplicitSerializedModuleLoader : public SerializedModuleLoaderBase {
       SmallVectorImpl<char> *ModuleInterfacePath,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) override;
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+      bool IsFramework) override;
 
   bool maybeDiagnoseTargetMismatch(
       SourceLoc sourceLocation,
@@ -274,7 +276,8 @@ class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
       SmallVectorImpl<char> *ModuleInterfacePath,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) override;
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+      bool IsFramework) override;
 
   bool maybeDiagnoseTargetMismatch(
       SourceLoc sourceLocation,

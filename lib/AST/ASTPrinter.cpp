@@ -1297,9 +1297,9 @@ bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req) {
   bool inWhereClause;
 
   switch (req.getKind()) {
+  case RequirementKind::Layout:
   case RequirementKind::Conformance:
-  case RequirementKind::Superclass:
-  case RequirementKind::Layout: {
+  case RequirementKind::Superclass: {
     auto subject = req.getFirstType();
     auto result = findRelevantDeclAndDirectUse(subject);
 
@@ -1351,6 +1351,15 @@ void PrintAST::printInheritedFromRequirementSignature(ProtocolDecl *proto,
                             proto->getRequirementSignature()),
       PrintInherited,
       [&](const Requirement &req) {
+        // Skip the inferred 'Self : AnyObject' constraint if this is an
+        // @objc protocol.
+        if (req.getKind() == RequirementKind::Layout &&
+            req.getFirstType()->isEqual(proto->getProtocolSelfType()) &&
+            req.getLayoutConstraint()->getKind() == LayoutConstraintKind::Class &&
+            proto->isObjC()) {
+          return false;
+        }
+
         auto location = bestRequirementPrintLocation(proto, req);
         return location.AttachedTo == attachingTo && !location.InWhereClause;
       });
@@ -3787,8 +3796,11 @@ public:
   }
 
   void visitErrorType(ErrorType *T) {
-    if (auto originalType = T->getOriginalType())
+    if (auto originalType = T->getOriginalType()) {
+      if (Options.PrintInSILBody)
+        Printer << "@error_type ";
       visit(originalType);
+    }
     else
       Printer << "<<error type>>";
   }

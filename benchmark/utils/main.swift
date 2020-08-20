@@ -131,6 +131,7 @@ import PrefixWhile
 import Prims
 import PrimsNonStrongRef
 import PrimsSplit
+import ProtocolConformance
 import ProtocolDispatch
 import ProtocolDispatch2
 import Queue
@@ -317,6 +318,7 @@ registerBenchmark(PrefixWhile)
 registerBenchmark(Prims)
 registerBenchmark(PrimsNonStrongRef)
 registerBenchmark(PrimsSplit)
+registerBenchmark(ProtocolConformance)
 registerBenchmark(ProtocolDispatch)
 registerBenchmark(ProtocolDispatch2)
 registerBenchmark(QueueGeneric)

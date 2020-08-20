@@ -79,22 +79,10 @@ namespace {
   /// Internal struct for tracking information about types within a series
   /// of "linked" expressions. (Such as a chain of binary operator invocations.)
   struct LinkedTypeInfo {
-    unsigned haveIntLiteral : 1;
-    unsigned haveFloatLiteral : 1;
-    unsigned haveStringLiteral : 1;
+    bool hasLiteral = false;
 
     llvm::SmallSet<TypeBase*, 16> collectedTypes;
     llvm::SmallVector<BinaryExpr *, 4> binaryExprs;
-
-    LinkedTypeInfo() {
-      haveIntLiteral = false;
-      haveFloatLiteral = false;
-      haveStringLiteral = false;
-    }
-
-    bool hasLiteral() {
-      return haveIntLiteral || haveFloatLiteral || haveStringLiteral;
-    }
   };
 
   /// Walks an expression sub-tree, and collects information about expressions
@@ -180,19 +168,9 @@ namespace {
           !CS.getType(expr)->hasTypeVariable()) {
         return { false, expr };
       }
-      
-      if (isa<IntegerLiteralExpr>(expr)) {
-        LTI.haveIntLiteral = true;
-        return { false, expr };
-      }
-      
-      if (isa<FloatLiteralExpr>(expr)) {
-        LTI.haveFloatLiteral = true;
-        return { false, expr };
-      }
-      
-      if (isa<StringLiteralExpr>(expr)) {
-        LTI.haveStringLiteral = true;
+
+      if (isa<LiteralExpr>(expr)) {
+        LTI.hasLiteral = true;
         return { false, expr };
       }
 
@@ -331,7 +309,7 @@ namespace {
       auto simplifyBinOpExprTyVars = [&]() {
         // Don't attempt to do linking if there are
         // literals intermingled with other inferred types.
-        if (lti.hasLiteral())
+        if (lti.hasLiteral)
           return;
 
         for (auto binExp1 : lti.binaryExprs) {
@@ -391,42 +369,6 @@ namespace {
       simplifyBinOpExprTyVars();       
 
       return true;
-    }    
-    
-    if (lti.haveFloatLiteral) {
-      if (auto floatProto = CS.getASTContext().getProtocol(
-              KnownProtocolKind::ExpressibleByFloatLiteral)) {
-        if (auto defaultType = TypeChecker::getDefaultType(floatProto, CS.DC)) {
-          if (!CS.getFavoredType(expr)) {
-            CS.setFavoredType(expr, defaultType.getPointer());
-          }
-          return true;
-        }
-      }
-    }
-    
-    if (lti.haveIntLiteral) {
-      if (auto intProto = CS.getASTContext().getProtocol(
-              KnownProtocolKind::ExpressibleByIntegerLiteral)) {
-        if (auto defaultType = TypeChecker::getDefaultType(intProto, CS.DC)) {
-          if (!CS.getFavoredType(expr)) {
-            CS.setFavoredType(expr, defaultType.getPointer());
-          }
-          return true;
-        }
-      }
-    }
-    
-    if (lti.haveStringLiteral) {
-      if (auto stringProto = CS.getASTContext().getProtocol(
-              KnownProtocolKind::ExpressibleByStringLiteral)) {
-        if (auto defTy = TypeChecker::getDefaultType(stringProto, CS.DC)) {
-          if (!CS.getFavoredType(expr)) {
-            CS.setFavoredType(expr, defTy.getPointer());
-          }
-          return true;
-        }
-      }
     }
     
     return false;
@@ -2114,9 +2056,7 @@ namespace {
         }
       }
 
-      auto extInfo = FunctionType::ExtInfo();
-      if (closureCanThrow(closure))
-        extInfo = extInfo.withThrows();
+      auto extInfo = closureEffects(closure);
 
       // Closure expressions always have function type. In cases where a
       // parameter or return type is omitted, a fresh type variable is used to
@@ -2596,9 +2536,12 @@ namespace {
       return CS.getType(expr->getClosureBody());
     }
 
-    /// Walk a closure AST to determine if it can throw.
-    bool closureCanThrow(ClosureExpr *expr) {
-      // A walker that looks for 'try' or 'throw' expressions
+    /// Walk a closure AST to determine its effects.
+    ///
+    /// \returns a function's extended info describing the effects, as
+    /// determined syntactically.
+    FunctionType::ExtInfo closureEffects(ClosureExpr *expr) {
+      // A walker that looks for 'try' and 'throw' expressions
       // that aren't nested within closures, nested declarations,
       // or exhaustive catches.
       class FindInnerThrows : public ASTWalker {
@@ -2743,18 +2686,62 @@ namespace {
 
         bool foundThrow() { return FoundThrow; }
       };
-      
-      if (expr->getThrowsLoc().isValid())
-        return true;
-      
+
+      // A walker that looks for 'async' and 'await' expressions
+      // that aren't nested within closures or nested declarations.
+      class FindInnerAsync : public ASTWalker {
+        bool FoundAsync = false;
+
+        std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+          // If we've found an 'await', record it and terminate the traversal.
+          if (isa<AwaitExpr>(expr)) {
+            FoundAsync = true;
+            return { false, nullptr };
+          }
+
+          // Do not recurse into other closures.
+          if (isa<ClosureExpr>(expr))
+            return { false, expr };
+
+          return { true, expr };
+        }
+
+        bool walkToDeclPre(Decl *decl) override {
+          // Do not walk into function or type declarations.
+          if (!isa<PatternBindingDecl>(decl))
+            return false;
+
+          return true;
+        }
+
+      public:
+        bool foundAsync() { return FoundAsync; }
+      };
+
+      // If either 'throws' or 'async' was explicitly specified, use that
+      // set of effects.
+      bool throws = expr->getThrowsLoc().isValid();
+      bool async = expr->getAsyncLoc().isValid();
+      if (throws || async) {
+        return ASTExtInfoBuilder()
+          .withThrows(throws)
+          .withAsync(async)
+          .build();
+      }
+
+      // Scan the body to determine the effects.
       auto body = expr->getBody();
-      
       if (!body)
-        return false;
-      
-      auto tryFinder = FindInnerThrows(CS, expr);
-      body->walk(tryFinder);
-      return tryFinder.foundThrow();
+        return FunctionType::ExtInfo();
+
+      auto throwFinder = FindInnerThrows(CS, expr);
+      body->walk(throwFinder);
+      auto asyncFinder = FindInnerAsync();
+      body->walk(asyncFinder);
+      return ASTExtInfoBuilder()
+        .withThrows(throwFinder.foundThrow())
+        .withAsync(asyncFinder.foundAsync())
+        .build();
     }
 
     Type visitClosureExpr(ClosureExpr *closure) {

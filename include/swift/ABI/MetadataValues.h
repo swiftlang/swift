@@ -1326,6 +1326,10 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     /// Meaningful for all type-descriptor kinds.
     HasImportInfo = 2,
 
+    /// Set if the type descriptor has a pointer to a list of canonical 
+    /// prespecializations.
+    HasCanonicalMetadataPrespecializations = 3,
+
     // Type-specific flags:
 
     /// The kind of reference that this class makes to its resilient superclass
@@ -1392,6 +1396,8 @@ public:
   }
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(HasImportInfo, hasImportInfo, setHasImportInfo)
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(HasCanonicalMetadataPrespecializations, hasCanonicalMetadataPrespecializations, setHasCanonicalMetadataPrespecializations)
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasVTable,
                                 class_hasVTable,

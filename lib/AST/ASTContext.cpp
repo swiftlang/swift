@@ -354,6 +354,10 @@ struct ASTContext::Implementation {
   /// LiteralExprs in fully-checked AST.
   llvm::DenseMap<const NominalTypeDecl *, ConcreteDeclRef> BuiltinInitWitness;
 
+  /// Mapping from the function decl to its original body's source range. This
+  /// is populated if the body is reparsed from other source buffers.
+  llvm::DenseMap<const AbstractFunctionDecl *, SourceRange> OriginalBodySourceRanges;
+
   /// Structure that captures data that is segregated into different
   /// arenas.
   struct Arena {
@@ -3999,6 +4003,11 @@ CanOpenedArchetypeType OpenedArchetypeType::get(Type existential,
     protos.push_back(proto->getDecl());
 
   auto layoutConstraint = layout.getLayoutConstraint();
+  if (!layoutConstraint && layout.requiresClass()) {
+    layoutConstraint = LayoutConstraint::getLayoutConstraint(
+        LayoutConstraintKind::Class);
+  }
+
   auto layoutSuperclass = layout.getSuperclass();
 
   auto arena = AllocationArena::Permanent;
@@ -4944,6 +4953,36 @@ void VarDecl::setOriginalWrappedProperty(VarDecl *originalProperty) {
   ASTContext &ctx = getASTContext();
   assert(ctx.getImpl().OriginalWrappedProperties.count(this) == 0);
   ctx.getImpl().OriginalWrappedProperties[this] = originalProperty;
+}
+
+#ifndef NDEBUG
+static bool isSourceLocInOrignalBuffer(const Decl *D, SourceLoc Loc) {
+  assert(Loc.isValid());
+  auto bufferID = D->getDeclContext()->getParentSourceFile()->getBufferID();
+  assert(bufferID.hasValue() && "Source buffer ID must be set");
+  auto &SM = D->getASTContext().SourceMgr;
+  return SM.getRangeForBuffer(*bufferID).contains(Loc);
+}
+#endif
+
+void AbstractFunctionDecl::keepOriginalBodySourceRange() {
+  auto &impl = getASTContext().getImpl();
+  auto result =
+      impl.OriginalBodySourceRanges.insert({this, getBodySourceRange()});
+  assert((!result.second ||
+          isSourceLocInOrignalBuffer(this, result.first->getSecond().Start)) &&
+         "This function must be called before setting new body range");
+  (void)result;
+}
+
+SourceRange AbstractFunctionDecl::getOriginalBodySourceRange() const {
+  auto &impl = getASTContext().getImpl();
+  auto found = impl.OriginalBodySourceRanges.find(this);
+  if (found != impl.OriginalBodySourceRanges.end()) {
+    return found->getSecond();
+  } else {
+    return getBodySourceRange();
+  }
 }
 
 IndexSubset *

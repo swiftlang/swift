@@ -6743,6 +6743,17 @@ bool AbstractFunctionDecl::argumentNameIsAPIByDefault() const {
   return false;
 }
 
+bool AbstractFunctionDecl::isAsyncHandler() const {
+  auto func = dyn_cast<FuncDecl>(this);
+  if (!func)
+    return false;
+
+  auto mutableFunc = const_cast<FuncDecl *>(func);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           IsAsyncHandlerRequest{mutableFunc},
+                           false);
+}
+
 BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {
   if ((getBodyKind() == BodyKind::Synthesize ||
        getBodyKind() == BodyKind::Unparsed) &&
@@ -6776,6 +6787,20 @@ void AbstractFunctionDecl::setBody(BraceStmt *S, BodyKind NewBodyKind) {
     if (auto *ctor = dyn_cast<ConstructorDecl>(this))
       ctor->clearCachedDelegatingOrChainedInitKind();
   }
+}
+
+void AbstractFunctionDecl::setBodyToBeReparsed(SourceRange bodyRange) {
+  assert(bodyRange.isValid());
+  assert(getBodyKind() == BodyKind::Unparsed ||
+         getBodyKind() == BodyKind::Parsed ||
+         getBodyKind() == BodyKind::TypeChecked);
+  assert(getASTContext().SourceMgr.rangeContainsTokenLoc(
+             bodyRange, getASTContext().SourceMgr.getCodeCompletionLoc()) &&
+         "This function is only intended to be used for code completion");
+
+  keepOriginalBodySourceRange();
+  BodyRange = bodyRange;
+  setBodyKind(BodyKind::Unparsed);
 }
 
 SourceRange AbstractFunctionDecl::getBodySourceRange() const {
@@ -7438,7 +7463,7 @@ SourceRange FuncDecl::getSourceRange() const {
       getBodyKind() == BodyKind::Skipped)
     return { StartLoc, BodyRange.End };
 
-  SourceLoc RBraceLoc = getBodySourceRange().End;
+  SourceLoc RBraceLoc = getOriginalBodySourceRange().End;
   if (RBraceLoc.isValid()) {
     return { StartLoc, RBraceLoc };
   }
@@ -7559,7 +7584,7 @@ SourceRange ConstructorDecl::getSourceRange() const {
   if (isImplicit())
     return getConstructorLoc();
 
-  SourceLoc End = getBodySourceRange().End;
+  SourceLoc End = getOriginalBodySourceRange().End;
   if (End.isInvalid())
     End = getGenericTrailingWhereClauseSourceRange().End;
   if (End.isInvalid())
@@ -7785,7 +7810,7 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
 }
 
 SourceRange DestructorDecl::getSourceRange() const {
-  SourceLoc End = getBodySourceRange().End;
+  SourceLoc End = getOriginalBodySourceRange().End;
   if (End.isInvalid()) {
     End = getDestructorLoc();
   }
@@ -7961,7 +7986,7 @@ void Decl::setClangNode(ClangNode Node) {
 // dependency.
 
 struct DeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
-  void traceName(const void *Entity, raw_ostream &OS) const {
+  void traceName(const void *Entity, raw_ostream &OS) const override {
     if (!Entity)
       return;
     const Decl *D = static_cast<const Decl *>(Entity);
@@ -7974,7 +7999,7 @@ struct DeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
     }
   }
   void traceLoc(const void *Entity, SourceManager *SM,
-                clang::SourceManager *CSM, raw_ostream &OS) const {
+                clang::SourceManager *CSM, raw_ostream &OS) const override {
     if (!Entity)
       return;
     const Decl *D = static_cast<const Decl *>(Entity);

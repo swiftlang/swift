@@ -563,6 +563,11 @@ SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   100)
 
+SIMPLE_DECL_ATTR(asyncHandler, AsyncHandler,
+  OnFunc | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  101)
+
 // SWIFT_ENABLE_TENSORFLOW
 SIMPLE_DECL_ATTR(compilerEvaluable, CompilerEvaluable,
   OnAccessor | OnFunc | OnConstructor | OnSubscript |

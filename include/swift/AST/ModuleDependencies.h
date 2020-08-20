@@ -107,6 +107,9 @@ public:
   /// The hash value that will be used for the generated module
   const std::string contextHash;
 
+  /// A flag that indicates this dependency is a framework
+  const bool isFramework;
+
   /// Bridging header file, if there is one.
   Optional<std::string> bridgingHeaderFile;
 
@@ -125,7 +128,8 @@ public:
       ArrayRef<std::string> compiledModuleCandidates,
       ArrayRef<StringRef> buildCommandLine,
       ArrayRef<StringRef> extraPCMArgs,
-      StringRef contextHash
+      StringRef contextHash,
+      bool isFramework
   ) : ModuleDependenciesStorageBase(ModuleDependenciesKind::Swift,
                                     compiledModulePath),
       swiftInterfaceFile(swiftInterfaceFile),
@@ -133,7 +137,7 @@ public:
                                compiledModuleCandidates.end()),
       buildCommandLine(buildCommandLine.begin(), buildCommandLine.end()),
       extraPCMArgs(extraPCMArgs.begin(), extraPCMArgs.end()),
-      contextHash(contextHash) { }
+      contextHash(contextHash), isFramework(isFramework) { }
 
   ModuleDependenciesStorageBase *clone() const override {
     return new SwiftModuleDependenciesStorage(*this);
@@ -242,21 +246,22 @@ public:
       ArrayRef<std::string> compiledCandidates,
       ArrayRef<StringRef> buildCommands,
       ArrayRef<StringRef> extraPCMArgs,
-      StringRef contextHash) {
+      StringRef contextHash,
+      bool isFramework) {
     std::string compiledModulePath;
     return ModuleDependencies(
         std::make_unique<SwiftModuleDependenciesStorage>(
           compiledModulePath, swiftInterfaceFile, compiledCandidates, buildCommands,
-          extraPCMArgs, contextHash));
+          extraPCMArgs, contextHash, isFramework));
   }
 
   /// Describe the module dependencies for a serialized or parsed Swift module.
   static ModuleDependencies forSwiftModule(
-      const std::string &compiledModulePath) {
+      const std::string &compiledModulePath, bool isFramework) {
     return ModuleDependencies(
         std::make_unique<SwiftModuleDependenciesStorage>(
           compiledModulePath, None, ArrayRef<std::string>(), ArrayRef<StringRef>(),
-          ArrayRef<StringRef>(), StringRef()));
+          ArrayRef<StringRef>(), StringRef(), isFramework));
   }
 
   /// Describe the main Swift module.
@@ -265,7 +270,7 @@ public:
     return ModuleDependencies(
         std::make_unique<SwiftModuleDependenciesStorage>(
           compiledModulePath, None, ArrayRef<std::string>(),
-          ArrayRef<StringRef>(), extraPCMArgs, StringRef()));
+          ArrayRef<StringRef>(), extraPCMArgs, StringRef(), false));
   }
 
   /// Describe the module dependencies for a Clang module that can be

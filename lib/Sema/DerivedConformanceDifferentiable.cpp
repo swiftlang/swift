@@ -410,9 +410,9 @@ deriveBodyDifferentiable_zeroTangentVectorInitializer(
 
     auto *closureParams = ParameterList::createEmpty(C);
     auto *closure = new (C) ClosureExpr(
-        SourceRange(), /*capturedSelfDecl*/ nullptr, closureParams, SourceLoc(),
-        SourceLoc(), SourceLoc(), TypeExpr::createImplicit(resultTy, C),
-        discriminator, funcDecl);
+        SourceRange(), /*capturedSelfDecl*/ nullptr, closureParams,
+        SourceLoc(), SourceLoc(), SourceLoc(), SourceLoc(),
+        TypeExpr::createImplicit(resultTy, C), discriminator, funcDecl);
     closure->setImplicit();
     auto *closureReturn = new (C) ReturnStmt(SourceLoc(), zeroExpr, true);
     auto *closureBody =
@@ -521,8 +521,8 @@ deriveBodyDifferentiable_zeroTangentVectorInitializer(
   auto *closureParams = ParameterList::createEmpty(C);
   auto *closure = new (C) ClosureExpr(
       SourceRange(), /*capturedSelfDecl*/ nullptr, closureParams, SourceLoc(),
-      SourceLoc(), SourceLoc(), TypeExpr::createImplicit(resultTy, C),
-      discriminator, funcDecl);
+      SourceLoc(), SourceLoc(), SourceLoc(),
+      TypeExpr::createImplicit(resultTy, C), discriminator, funcDecl);
   closure->setImplicit();
   auto *closureReturn = new (C) ReturnStmt(SourceLoc(), callExpr, true);
   auto *closureBody =

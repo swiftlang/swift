@@ -61,16 +61,15 @@ static bool isGlobalOrStaticVar(VarDecl *VD) {
   return VD->isStatic() || VD->getDeclContext()->isModuleScopeContext();
 }
 
-TBDGenVisitor::TBDGenVisitor(TBDGenDescriptor desc,
+TBDGenVisitor::TBDGenVisitor(const TBDGenDescriptor &desc,
                              SymbolCallbackFn symbolCallback)
     : TBDGenVisitor(desc.getTarget(), desc.getDataLayout(),
                     desc.getParentModule(), desc.getOptions(),
                     symbolCallback) {}
 
-void TBDGenVisitor::addSymbolInternal(StringRef name,
-                                      llvm::MachO::SymbolKind kind,
-                                      bool isLinkerDirective) {
-  if (!isLinkerDirective && Opts.LinkerDirectivesOnly)
+void TBDGenVisitor::addSymbolInternal(StringRef name, SymbolKind kind,
+                                      SymbolSource source) {
+  if (!source.isLinkerDirective() && Opts.LinkerDirectivesOnly)
     return;
 
 #ifndef NDEBUG
@@ -81,7 +80,7 @@ void TBDGenVisitor::addSymbolInternal(StringRef name,
     }
   }
 #endif
-  SymbolCallback(name, kind);
+  SymbolCallback(name, kind, source);
 }
 
 static std::vector<OriginallyDefinedInAttr::ActiveVersion>
@@ -337,8 +336,8 @@ void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(StringRef name,
     OS << IntroVer->getMajor() << "." << getMinor(IntroVer->getMinor()) << "$";
     OS << Ver.Version.getMajor() << "." << getMinor(Ver.Version.getMinor()) << "$";
     OS << name << "$";
-    addSymbolInternal(OS.str(), llvm::MachO::SymbolKind::GlobalSymbol,
-                      /*LinkerDirective*/true);
+    addSymbolInternal(OS.str(), SymbolKind::GlobalSymbol,
+                      SymbolSource::forLinkerDirective());
   }
 }
 
@@ -383,18 +382,19 @@ void TBDGenVisitor::addLinkerDirectiveSymbolsLdHide(StringRef name,
       llvm::SmallString<64> Buffer;
       llvm::raw_svector_ostream OS(Buffer);
       OS << "$ld$hide$os" << CurMaj << "." << CurMin << "$" << name;
-      addSymbolInternal(OS.str(), llvm::MachO::SymbolKind::GlobalSymbol,
-                        /*LinkerDirective*/true);
+      addSymbolInternal(OS.str(), SymbolKind::GlobalSymbol,
+                        SymbolSource::forLinkerDirective());
     }
   }
 }
 
-void TBDGenVisitor::addSymbol(StringRef name, SymbolKind kind) {
+void TBDGenVisitor::addSymbol(StringRef name, SymbolSource source,
+                              SymbolKind kind) {
   // The linker expects to see mangled symbol names in TBD files, so make sure
   // to mangle before inserting the symbol.
   SmallString<32> mangled;
   llvm::Mangler::getNameWithPrefix(mangled, name, DataLayout);
-  addSymbolInternal(mangled, kind);
+  addSymbolInternal(mangled, kind, source);
   if (previousInstallNameMap) {
     addLinkerDirectiveSymbolsLdPrevious(mangled, kind);
   } else {
@@ -406,8 +406,10 @@ void TBDGenVisitor::addSymbol(SILDeclRef declRef) {
   auto linkage = effectiveLinkageForClassMember(
     declRef.getLinkage(ForDefinition),
     declRef.getSubclassScope());
-  if (linkage == SILLinkage::Public)
-    addSymbol(declRef.mangle());
+  if (Opts.PublicSymbolsOnly && linkage != SILLinkage::Public)
+    return;
+
+  addSymbol(declRef.mangle(), SymbolSource::forSILDeclRef(declRef));
 }
 
 void TBDGenVisitor::addSymbol(LinkEntity entity) {
@@ -418,8 +420,10 @@ void TBDGenVisitor::addSymbol(LinkEntity entity) {
       llvm::GlobalValue::isExternalLinkage(linkage.getLinkage()) &&
       linkage.getVisibility() != llvm::GlobalValue::HiddenVisibility;
 
-  if (externallyVisible)
-    addSymbol(linkage.getName());
+  if (Opts.PublicSymbolsOnly && !externallyVisible)
+    return;
+
+  addSymbol(linkage.getName(), SymbolSource::forIRLinkEntity(entity));
 }
 
 void TBDGenVisitor::addDispatchThunk(SILDeclRef declRef) {
@@ -486,13 +490,21 @@ void TBDGenVisitor::addConformances(const IterableDeclContext *IDC) {
     auto addSymbolIfNecessary = [&](ValueDecl *requirementDecl,
                                     ValueDecl *witnessDecl) {
       auto witnessRef = SILDeclRef(witnessDecl);
-      if (conformanceIsFixed &&
-          (isa<SelfProtocolConformance>(rootConformance) ||
-           fixmeWitnessHasLinkageThatNeedsToBePublic(witnessRef))) {
-        Mangle::ASTMangler Mangler;
-        addSymbol(
-            Mangler.mangleWitnessThunk(rootConformance, requirementDecl));
+      if (Opts.PublicSymbolsOnly) {
+        if (!conformanceIsFixed)
+          return;
+
+        if (!isa<SelfProtocolConformance>(rootConformance) &&
+            !fixmeWitnessHasLinkageThatNeedsToBePublic(witnessRef)) {
+          return;
+        }
       }
+
+      Mangle::ASTMangler Mangler;
+
+      // FIXME: We should have a SILDeclRef SymbolSource for this.
+      addSymbol(Mangler.mangleWitnessThunk(rootConformance, requirementDecl),
+                SymbolSource::forUnknown());
     };
 
     rootConformance->forEachValueWitness([&](ValueDecl *valueReq,
@@ -523,11 +535,11 @@ void TBDGenVisitor::addAutoDiffLinearMapFunction(AbstractFunctionDecl *original,
   auto declRef =
       SILDeclRef(original).asForeign(requiresForeignEntryPoint(original));
 
-  if (!declRef.isSerialized())
+  // Linear maps are public only when the original function is serialized. So
+  // if we're only including public symbols and it's not serialized, bail.
+  if (Opts.PublicSymbolsOnly && !declRef.isSerialized())
     return;
-  // Linear maps are public only when the original function is serialized.
-  if (!declRef.isSerialized())
-    return;
+
   // Differential functions are emitted only when forward-mode is enabled.
   if (kind == AutoDiffLinearMapKind::Differential &&
       !ctx.LangOpts.EnableExperimentalForwardModeDifferentiation)
@@ -542,7 +554,7 @@ void TBDGenVisitor::addAutoDiffLinearMapFunction(AbstractFunctionDecl *original,
           original->getGenericSignature(), config.derivativeGenericSignature)};
   std::string linearMapName =
       mangler.mangleAutoDiffLinearMapHelper(declRef.mangle(), kind, silConfig);
-  addSymbol(linearMapName);
+  addSymbol(linearMapName, SymbolSource::forSILDeclRef(declRef));
 }
 
 void TBDGenVisitor::addAutoDiffDerivativeFunction(
@@ -571,7 +583,7 @@ void TBDGenVisitor::addDifferentiabilityWitness(
   auto originalLinkage = declRef.getLinkage(ForDefinition);
   if (foreign)
     originalLinkage = stripExternalFromLinkage(originalLinkage);
-  if (originalLinkage != SILLinkage::Public)
+  if (Opts.PublicSymbolsOnly && originalLinkage != SILLinkage::Public)
     return;
 
   auto *silParamIndices = autodiff::getLoweredParameterIndices(
@@ -587,7 +599,7 @@ void TBDGenVisitor::addDifferentiabilityWitness(
 
   Mangle::ASTMangler mangler;
   auto mangledName = mangler.mangleSILDifferentiabilityWitnessKey(key);
-  addSymbol(mangledName);
+  addSymbol(mangledName, SymbolSource::forSILDeclRef(declRef));
 }
 
 void TBDGenVisitor::addDerivativeConfiguration(AbstractFunctionDecl *original,
@@ -629,7 +641,7 @@ static bool shouldUseAllocatorMangling(const AbstractFunctionDecl *afd) {
 void TBDGenVisitor::visitDefaultArguments(ValueDecl *VD, ParameterList *PL) {
   auto publicDefaultArgGenerators = SwiftModule->isTestingEnabled() ||
                                     SwiftModule->arePrivateImportsEnabled();
-  if (!publicDefaultArgGenerators)
+  if (Opts.PublicSymbolsOnly && !publicDefaultArgGenerators)
     return;
 
   // In Swift 3 (or under -enable-testing), default arguments (of public
@@ -769,10 +781,12 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
     // statically/globally stored variables have some special handling.
     if (VD->hasStorage() &&
         isGlobalOrStaticVar(VD)) {
-      if (getDeclLinkage(VD) == FormalLinkage::PublicUnique) {
+      if (!Opts.PublicSymbolsOnly ||
+          getDeclLinkage(VD) == FormalLinkage::PublicUnique) {
         // The actual variable has a symbol.
+        // FIXME: We ought to have a symbol source for this.
         Mangle::ASTMangler mangler;
-        addSymbol(mangler.mangleEntity(VD));
+        addSymbol(mangler.mangleEntity(VD), SymbolSource::forUnknown());
       }
 
       if (VD->isLazilyInitializedGlobal())
@@ -811,7 +825,8 @@ void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
 }
 
 void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
-  if (getDeclLinkage(CD) != FormalLinkage::PublicUnique)
+  if (Opts.PublicSymbolsOnly &&
+      getDeclLinkage(CD) != FormalLinkage::PublicUnique)
     return;
 
   auto &ctxt = CD->getASTContext();
@@ -835,8 +850,10 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
       addSymbol(LinkEntity::forSwiftMetaclassStub(CD));
 
     if (addObjCClass) {
+      // FIXME: We ought to have a symbol source for this.
       SmallString<128> buffer;
-      addSymbol(CD->getObjCRuntimeName(buffer), SymbolKind::ObjectiveCClass);
+      addSymbol(CD->getObjCRuntimeName(buffer), SymbolSource::forUnknown(),
+                SymbolKind::ObjectiveCClass);
     }
   }
 
@@ -1048,8 +1065,10 @@ void TBDGenVisitor::visitEnumElementDecl(EnumElementDecl *EED) {
 
 void TBDGenVisitor::addFirstFileSymbols() {
   if (!Opts.ModuleLinkName.empty()) {
+    // FIXME: We ought to have a symbol source for this.
     SmallString<32> buf;
-    addSymbol(irgen::encodeForceLoadSymbolName(buf, Opts.ModuleLinkName));
+    addSymbol(irgen::encodeForceLoadSymbolName(buf, Opts.ModuleLinkName),
+              SymbolSource::forUnknown());
   }
 }
 
@@ -1196,7 +1215,7 @@ TBDFile GenerateTBDRequest::evaluate(Evaluator &evaluator,
   }
 
   llvm::MachO::TargetList targets{target};
-  auto addSymbol = [&](StringRef symbol, SymbolKind kind) {
+  auto addSymbol = [&](StringRef symbol, SymbolKind kind, SymbolSource source) {
     file.addSymbol(kind, symbol, targets);
   };
 
@@ -1209,7 +1228,7 @@ std::vector<std::string>
 PublicSymbolsRequest::evaluate(Evaluator &evaluator,
                                TBDGenDescriptor desc) const {
   std::vector<std::string> symbols;
-  auto addSymbol = [&](StringRef symbol, SymbolKind kind) {
+  auto addSymbol = [&](StringRef symbol, SymbolKind kind, SymbolSource source) {
     if (kind == SymbolKind::GlobalSymbol)
       symbols.push_back(symbol.str());
   };
@@ -1230,4 +1249,25 @@ void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
   auto file = llvm::cantFail(evaluator(GenerateTBDRequest{desc}));
   llvm::cantFail(llvm::MachO::TextAPIWriter::writeToStream(os, file),
                  "YAML writing should be error-free");
+}
+
+SymbolSourceMap SymbolSourceMapRequest::evaluate(Evaluator &evaluator,
+                                                 TBDGenDescriptor desc) const {
+  using Map = SymbolSourceMap::Storage;
+  Map symbolSources;
+
+  auto addSymbol = [&](StringRef symbol, SymbolKind kind, SymbolSource source) {
+    symbolSources.insert({symbol, source});
+  };
+
+  TBDGenVisitor visitor(desc, addSymbol);
+  visitor.visit(desc);
+
+  // FIXME: Once the evaluator supports returning a reference to a cached value
+  // in storage, this won't be necessary.
+  auto &ctx = desc.getParentModule()->getASTContext();
+  auto *memory = ctx.Allocate<Map>();
+  *memory = std::move(symbolSources);
+  ctx.addCleanup([memory](){ memory->~Map(); });
+  return SymbolSourceMap(memory);
 }

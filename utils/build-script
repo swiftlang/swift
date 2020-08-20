@@ -560,9 +560,6 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-build"]
         if not args.build_benchmarks:
             impl_args += ["--skip-build-benchmarks"]
-        # Currently we do not build external benchmarks by default.
-        if args.build_external_benchmarks:
-            impl_args += ["--skip-build-external-benchmarks=0"]
 
         # Then add subproject install flags that either skip building them /or/
         # if we are going to build them and install_all is set, we also install
@@ -596,26 +593,6 @@ class BuildScriptInvocation(object):
         if args.build_swift_static_sdk_overlay:
             impl_args += ["--build-swift-static-sdk-overlay"]
 
-        if not args.build_linux:
-            impl_args += ["--skip-build-linux"]
-        if not args.build_freebsd:
-            impl_args += ["--skip-build-freebsd"]
-        if not args.build_cygwin:
-            impl_args += ["--skip-build-cygwin"]
-        if not args.build_osx:
-            impl_args += ["--skip-build-osx"]
-        if not args.build_ios_device:
-            impl_args += ["--skip-build-ios-device"]
-        if not args.build_ios_simulator:
-            impl_args += ["--skip-build-ios-simulator"]
-        if not args.build_tvos_device:
-            impl_args += ["--skip-build-tvos-device"]
-        if not args.build_tvos_simulator:
-            impl_args += ["--skip-build-tvos-simulator"]
-        if not args.build_watchos_device:
-            impl_args += ["--skip-build-watchos-device"]
-        if not args.build_watchos_simulator:
-            impl_args += ["--skip-build-watchos-simulator"]
         if not args.build_android:
             impl_args += ["--skip-build-android"]
         if not args.build_clang_tools_extra:
@@ -633,32 +610,6 @@ class BuildScriptInvocation(object):
                 "--skip-test-libdispatch",
                 "--skip-test-libicu",
             ]
-        if not args.test_linux:
-            impl_args += ["--skip-test-linux"]
-        if not args.test_freebsd:
-            impl_args += ["--skip-test-freebsd"]
-        if not args.test_cygwin:
-            impl_args += ["--skip-test-cygwin"]
-        if not args.test_osx:
-            impl_args += ["--skip-test-osx"]
-        if not args.test_ios_host:
-            impl_args += ["--skip-test-ios-host"]
-        if not args.test_ios_simulator:
-            impl_args += ["--skip-test-ios-simulator"]
-        if not args.test_ios_32bit_simulator:
-            impl_args += ["--skip-test-ios-32bit-simulator"]
-        if not args.test_tvos_host:
-            impl_args += ["--skip-test-tvos-host"]
-        if not args.test_tvos_simulator:
-            impl_args += ["--skip-test-tvos-simulator"]
-        if not args.test_watchos_host:
-            impl_args += ["--skip-test-watchos-host"]
-        if not args.test_watchos_simulator:
-            impl_args += ["--skip-test-watchos-simulator"]
-        if not args.test_android:
-            impl_args += ["--skip-test-android"]
-        if not args.test_android_host:
-            impl_args += ["--skip-test-android-host"]
         if args.build_runtime_with_host_compiler:
             impl_args += ["--build-runtime-with-host-compiler"]
         if args.validation_test:
@@ -673,12 +624,6 @@ class BuildScriptInvocation(object):
             impl_args += ["--only-executable-test"]
         if not args.benchmark:
             impl_args += ["--skip-test-benchmarks"]
-        if not args.test_optimized:
-            impl_args += ["--skip-test-optimized"]
-        if not args.test_optimize_for_size:
-            impl_args += ["--skip-test-optimize-for-size"]
-        if not args.test_optimize_none_with_implicit_dynamic:
-            impl_args += ["--skip-test-optimize-none-with-implicit-dynamic"]
         if args.build_libparser_only:
             impl_args += ["--build-libparser-only"]
         if args.android:
@@ -1001,6 +946,9 @@ class BuildScriptInvocation(object):
             for product_class in impl_product_classes:
                 self._execute_install_action(host_target, product_class)
 
+        # Lipo...
+        self._execute_merged_host_lipo_action()
+
         # Non-build-script-impl products...
         # Note: currently only supports building for the host.
         for host_target in [self.args.host_target]:
@@ -1039,9 +987,6 @@ class BuildScriptInvocation(object):
         # Package...
         for host_target in all_hosts:
             self._execute_package_action(host_target)
-
-        # Lipo...
-        self._execute_merged_host_lipo_action()
 
     def _execute_build_action(self, host_target, product_class):
         action_name = "{}-{}-build".format(host_target.name,

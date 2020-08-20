@@ -158,7 +158,7 @@ void ContextInfoCallbacks::getImplicitMembers(
         : DC(DC), CurModule(DC->getParentModule()), T(T), Result(Result) {}
 
     void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
-                   DynamicLookupInfo) {
+                   DynamicLookupInfo) override {
       if (canBeImplictMember(VD) && !VD->shouldHideFromEditor())
         Result.push_back(VD);
     }
