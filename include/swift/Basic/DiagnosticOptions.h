@@ -67,11 +67,12 @@ public:
 
   std::string DiagnosticDocumentationPath = "";
 
-  // Locale code and directory path for localized diagnostics.
+  // Default directory path for localized diagnostic messages.
+  std::string DefaultLocalizationMessagesPath = "";
+
+  // Locale code and directory path for localized diagnostic messages.
   std::string LocalizationCode = "";
   std::string LocalizationPath = "";
-
-  std::string DefaultLocalizationMessagesPath = "";
 
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.

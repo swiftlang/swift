@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Parse/Parser.h"
-#include "swift/Subsystems.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Module.h"
@@ -23,22 +22,24 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/DiagnosticOptions.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseSILSupport.h"
 #include "swift/Parse/SyntaxParseActions.h"
 #include "swift/Parse/SyntaxParsingContext.h"
+#include "swift/Subsystems.h"
 #include "swift/Syntax/RawSyntax.h"
 #include "swift/Syntax/TokenSyntax.h"
 #include "swift/SyntaxParse/SyntaxTreeCreator.h"
-#include "llvm/Support/Compiler.h"
-#include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/MD5.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/Support/Compiler.h"
+#include "llvm/Support/MD5.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Support/raw_ostream.h"
 
 static void getStringPartTokens(const swift::Token &Tok,
                                 const swift::LangOptions &LangOpts,
@@ -1199,9 +1200,10 @@ struct ParserUnit::Implementation {
                  const LangOptions &Opts, const TypeCheckerOptions &TyOpts,
                  StringRef ModuleName,
                  std::shared_ptr<SyntaxParseActions> spActions,
-                 std::string defaultLocalizationMessagesPath)
+                 const DiagnosticOptions &DiagOpts)
       : SPActions(std::move(spActions)), LangOpts(Opts),
-        TypeCheckerOpts(TyOpts), Diags(SM, defaultLocalizationMessagesPath),
+        TypeCheckerOpts(TyOpts),
+        Diags(SM, DiagOpts.DefaultLocalizationMessagesPath),
         Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SearchPathOpts, SM,
                              Diags)) {
     auto parsingOpts = SourceFile::getDefaultParsingOptions(LangOpts);
@@ -1221,21 +1223,18 @@ struct ParserUnit::Implementation {
 };
 
 ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind,
-                       unsigned BufferID,
-                       std::string defaultLocalizationMessagesPath)
+                       unsigned BufferID, const DiagnosticOptions &DiagOpts)
     : ParserUnit(SM, SFKind, BufferID, LangOptions(), TypeCheckerOptions(),
-                 "input", defaultLocalizationMessagesPath) {}
+                 "input", DiagOpts) {}
 
 ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind,
                        unsigned BufferID, const LangOptions &LangOpts,
                        const TypeCheckerOptions &TypeCheckOpts,
-                       StringRef ModuleName,
-                       std::string defaultLocalizationMessagesPath,
+                       StringRef ModuleName, const DiagnosticOptions &DiagOpts,
                        std::shared_ptr<SyntaxParseActions> spActions,
                        SyntaxParsingCache *SyntaxCache)
     : Impl(*new Implementation(SM, SFKind, BufferID, LangOpts, TypeCheckOpts,
-                               ModuleName, std::move(spActions),
-                               defaultLocalizationMessagesPath)) {
+                               ModuleName, std::move(spActions), DiagOpts)) {
 
   Impl.SF->SyntaxParsingCache = SyntaxCache;
   Impl.TheParser.reset(new Parser(BufferID, *Impl.SF, /*SIL=*/nullptr,
@@ -1244,10 +1243,10 @@ ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind,
 
 ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind,
                        unsigned BufferID, unsigned Offset, unsigned EndOffset,
-                       std::string defaultLocalizationMessagesPath)
+                       const DiagnosticOptions &DiagOpts)
     : Impl(*new Implementation(SM, SFKind, BufferID, LangOptions(),
                                TypeCheckerOptions(), "input", nullptr,
-                               defaultLocalizationMessagesPath)) {
+                               DiagOpts)) {
 
   std::unique_ptr<Lexer> Lex;
   Lex.reset(new Lexer(Impl.LangOpts, SM,

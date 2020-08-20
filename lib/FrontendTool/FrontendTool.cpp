@@ -25,7 +25,7 @@
 #include "ScanDependencies.h"
 #include "TBD.h"
 
-#include "swift/Subsystems.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/FileSystem.h"
@@ -34,9 +34,9 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/TBDGenRequests.h"
 #include "swift/AST/TypeRefinementContext.h"
+#include "swift/Basic/DiagnosticOptions.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/FileSystem.h"
@@ -49,20 +49,21 @@
 #include "swift/Basic/UUID.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
-#include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/Frontend/SerializedDiagnosticConsumer.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
+#include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/Frontend/SerializedDiagnosticConsumer.h"
 #include "swift/Immediate/Immediate.h"
 #include "swift/Index/IndexRecord.h"
-#include "swift/Option/Options.h"
 #include "swift/Migrator/FixitFilter.h"
 #include "swift/Migrator/Migrator.h"
+#include "swift/Option/Options.h"
 #include "swift/PrintAsObjC/PrintAsObjC.h"
+#include "swift/SIL/SILRemarkStreamer.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
-#include "swift/SILOptimizer/PassManager/Passes.h"
-#include "swift/SIL/SILRemarkStreamer.h"
+#include "swift/Subsystems.h"
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 #include "swift/Syntax/SyntaxNodes.h"
 #include "swift/TBDGen/TBDGen.h"
@@ -2298,17 +2299,16 @@ createDispatchingDiagnosticConsumerIfNeeded(
 static std::unique_ptr<DiagnosticConsumer>
 createSerializedDiagnosticConsumerIfNeeded(
     const FrontendInputsAndOutputs &inputsAndOutputs,
-    std::string defaultLocalizationMessagesPath) {
+    DiagnosticOptions &diagOpts) {
   return createDispatchingDiagnosticConsumerIfNeeded(
       inputsAndOutputs,
-      [&defaultLocalizationMessagesPath](
-          const InputFile &input) -> std::unique_ptr<DiagnosticConsumer> {
+      [&](const InputFile &input) -> std::unique_ptr<DiagnosticConsumer> {
         std::string serializedDiagnosticsPath =
             input.serializedDiagnosticsPath();
         if (serializedDiagnosticsPath.empty())
           return nullptr;
-        return serialized_diagnostics::createConsumer(
-            serializedDiagnosticsPath, defaultLocalizationMessagesPath);
+        return serialized_diagnostics::createConsumer(serializedDiagnosticsPath,
+                                                      diagOpts);
       });
 }
 
@@ -2631,7 +2631,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   std::unique_ptr<DiagnosticConsumer> SerializedConsumerDispatcher =
       createSerializedDiagnosticConsumerIfNeeded(
           Invocation.getFrontendOptions().InputsAndOutputs,
-          Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+          Invocation.getDiagnosticOptions());
   if (SerializedConsumerDispatcher)
     Instance->addDiagnosticConsumer(SerializedConsumerDispatcher.get());
 

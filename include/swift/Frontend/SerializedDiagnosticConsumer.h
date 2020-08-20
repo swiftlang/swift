@@ -18,6 +18,7 @@
 #ifndef SWIFT_SERIALIZEDDIAGNOSTICCONSUMER_H
 #define SWIFT_SERIALIZEDDIAGNOSTICCONSUMER_H
 
+#include "swift/Basic/DiagnosticOptions.h"
 #include <memory>
 
 namespace llvm {
@@ -36,8 +37,7 @@ namespace swift {
     ///
     /// \returns A new diagnostic consumer that serializes diagnostics.
   std::unique_ptr<DiagnosticConsumer>
-  createConsumer(llvm::StringRef outputPath,
-                 std::string defaultLocalizationMessagesPath);
+  createConsumer(llvm::StringRef outputPath, DiagnosticOptions &diagOpts);
   }
 }
 

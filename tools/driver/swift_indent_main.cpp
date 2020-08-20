@@ -62,7 +62,7 @@ public:
     Parser.reset(new ParserUnit(
         SM, SourceFileKind::Main, BufferID, CompInv.getLangOptions(),
         CompInv.getTypeCheckerOptions(), CompInv.getModuleName(),
-        CompInv.getDiagnosticOptions().DefaultLocalizationMessagesPath));
+        CompInv.getDiagnosticOptions()));
     Parser->getDiagnosticEngine().addConsumer(DiagConsumer);
     Parser->parse();
   }

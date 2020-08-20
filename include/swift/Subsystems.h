@@ -17,6 +17,7 @@
 #ifndef SWIFT_SUBSYSTEMS_H
 #define SWIFT_SUBSYSTEMS_H
 
+#include "swift/Basic/DiagnosticOptions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/PrimarySpecificPaths.h"
@@ -268,15 +269,14 @@ namespace swift {
   public:
     ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
                const LangOptions &LangOpts, const TypeCheckerOptions &TyOpts,
-               StringRef ModuleName,
-               std::string defaultLocalizationMessagesPath,
+               StringRef ModuleName, const DiagnosticOptions &DiagOpts,
                std::shared_ptr<SyntaxParseActions> spActions = nullptr,
                SyntaxParsingCache *SyntaxCache = nullptr);
     ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
-               std::string defaultLocalizationMessagesPath);
+               const DiagnosticOptions &DiagOpts);
     ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
                unsigned Offset, unsigned EndOffset,
-               std::string defaultLocalizationMessagesPath);
+               const DiagnosticOptions &DiagOpts);
 
     ~ParserUnit();
 

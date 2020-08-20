@@ -104,9 +104,7 @@ ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf,
                            SourceFileKind SFKind, CompilerInvocation &Invok) {
   SourceManager SM;
   auto BufferID = SM.addNewSourceBuffer(std::move(MemBuf));
-  ParserUnit Parse(
-      SM, SFKind, BufferID,
-      Invok.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+  ParserUnit Parse(SM, SFKind, BufferID, Invok.getDiagnosticOptions());
   Parse.parse();
   SourceCompleteResult SCR;
   SCR.IsComplete = !Parse.getParser().isInputIncomplete();
