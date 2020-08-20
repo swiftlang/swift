@@ -1516,6 +1516,21 @@ Optional<ModuleDependencies> ASTContext::getModuleDependencies(
   return None;
 }
 
+Optional<ModuleDependencies>
+ASTContext::getSwiftModuleDependencies(StringRef moduleName,
+                                       ModuleDependenciesCache &cache,
+                                       InterfaceSubContextDelegate &delegate) {
+  for (auto &loader : getImpl().ModuleLoaders) {
+    if (loader.get() == getImpl().TheClangModuleLoader)
+      continue;
+
+    if (auto dependencies = loader->getModuleDependencies(moduleName, cache,
+                                                          delegate))
+      return dependencies;
+  }
+  return None;
+}
+
 void ASTContext::loadExtensions(NominalTypeDecl *nominal,
                                 unsigned previousGeneration) {
   PrettyStackTraceDecl stackTrace("loading extensions for", nominal);
