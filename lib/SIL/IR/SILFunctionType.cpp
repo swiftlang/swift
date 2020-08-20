@@ -3984,7 +3984,6 @@ SILFunctionType::substituteOpaqueArchetypes(TypeConverter &TC,
 CanAnyFunctionType
 TypeConverter::getBridgedFunctionType(AbstractionPattern pattern,
                                       CanAnyFunctionType t,
-                                      AnyFunctionType::ExtInfo extInfo,
                                       Bridgeability bridging) {
   // Pull out the generic signature.
   CanGenericSignature genericSig = t.getOptGenericSignature();
@@ -3996,12 +3995,8 @@ TypeConverter::getBridgedFunctionType(AbstractionPattern pattern,
   case SILFunctionTypeRepresentation::Closure:
   case SILFunctionTypeRepresentation::WitnessMethod: {
     // No bridging needed for native functions.
-    if (t->getExtInfo().isEqualTo(extInfo, useClangTypes(t)))
-      return t;
-    return CanAnyFunctionType::get(genericSig, t.getParams(), t.getResult(),
-                                   extInfo);
+    return t;
   }
-
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Block:
   case SILFunctionTypeRepresentation::ObjCMethod: {
@@ -4016,7 +4011,7 @@ TypeConverter::getBridgedFunctionType(AbstractionPattern pattern,
                                        suppressOptional);
 
     return CanAnyFunctionType::get(genericSig, llvm::makeArrayRef(params),
-                                   result, extInfo);
+                                   result, t->getExtInfo());
   }
   }
   llvm_unreachable("bad calling convention");
@@ -4098,7 +4093,6 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
   auto bridging = Bridgeability::Full;
 
   unsigned numParameterLists = constant.getParameterListCount();
-  auto extInfo = fnType->getExtInfo();
 
   // Form an abstraction pattern for bridging purposes.
   AbstractionPattern bridgingFnPattern =
@@ -4108,12 +4102,13 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
   // Fast path: no uncurrying required.
   if (numParameterLists == 1) {
     auto bridgedFnType =
-      getBridgedFunctionType(bridgingFnPattern, fnType, extInfo, bridging);
+      getBridgedFunctionType(bridgingFnPattern, fnType, bridging);
     bridgingFnPattern.rewriteType(bridgingFnPattern.getGenericSignature(),
                                   bridgedFnType);
     return { bridgingFnPattern, bridgedFnType };
   }
 
+  auto extInfo = fnType->getExtInfo();
   SILFunctionTypeRepresentation rep = extInfo.getSILRepresentation();
   assert(rep != SILFunctionType::Representation::Block
          && "objc blocks cannot be curried");
