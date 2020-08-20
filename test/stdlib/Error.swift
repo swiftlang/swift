@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -o %t/Error -DPTR_SIZE_%target-ptrsize -module-name main %/s
+// RUN: %target-codesign %t/Error
 // RUN: %target-run %t/Error
 // REQUIRES: executable_test
 
 import StdlibUnittest
-
 
 var ErrorTests = TestSuite("Error")
 
