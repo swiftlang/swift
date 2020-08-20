@@ -1339,6 +1339,7 @@ private:
     return true;
   }
 
+public:
   /// If \p nominal is bridged to an Objective-C class (via a conformance to
   /// _ObjectiveCBridgeable), return that class.
   ///
@@ -1369,6 +1370,7 @@ private:
     return objcType->getClassOrBoundGenericClass();
   }
 
+private:
   /// If the nominal type is bridged to Objective-C (via a conformance
   /// to _ObjectiveCBridgeable), print the bridged type.
   void printObjCBridgeableType(const NominalTypeDecl *swiftNominal,
@@ -2065,6 +2067,14 @@ void DeclAndTypePrinter::printAdHocCategory(
 
 bool DeclAndTypePrinter::isEmptyExtensionDecl(const ExtensionDecl *ED) {
   return getImpl().isEmptyExtensionDecl(ED);
+}
+
+const TypeDecl *DeclAndTypePrinter::getObjCTypeDecl(const TypeDecl* TD) {
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(TD))
+    if (auto *bridged = getImpl().getObjCBridgedClass(nominal))
+      return bridged;
+
+  return TD;
 }
 
 StringRef
