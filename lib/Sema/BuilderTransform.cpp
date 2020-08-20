@@ -310,10 +310,6 @@ protected:
   }
 
   VarDecl *visitBraceStmt(BraceStmt *braceStmt) {
-    return visitBraceStmt(braceStmt, ctx.Id_buildBlock);
-  }
-
-  VarDecl *visitBraceStmt(BraceStmt *braceStmt, Identifier builderFunction) {
     SmallVector<Expr *, 4> expressions;
     auto addChild = [&](VarDecl *childVar) {
       if (!childVar)
@@ -380,7 +376,7 @@ protected:
 
     // Call Builder.buildBlock(... args ...)
     auto call = buildCallIfWanted(braceStmt->getStartLoc(),
-                                  builderFunction, expressions,
+                                  ctx.Id_buildBlock, expressions,
                                   /*argLabels=*/{ });
     if (!call)
       return nullptr;
@@ -395,13 +391,7 @@ protected:
   }
 
   VarDecl *visitDoStmt(DoStmt *doStmt) {
-    if (!builderSupports(ctx.Id_buildDo)) {
-      if (!unhandledNode)
-        unhandledNode = doStmt;
-      return nullptr;
-    }
-
-    auto childVar = visitBraceStmt(doStmt->getBody(), ctx.Id_buildDo);
+    auto childVar = visitBraceStmt(doStmt->getBody());
     if (!childVar)
       return nullptr;
 
