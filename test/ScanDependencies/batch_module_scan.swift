@@ -4,12 +4,12 @@
 // RUN: mkdir -p %t/clang-module-cache
 
 // RUN: echo "[{" > %/t/inputs/input.json
-// RUN: echo "\"module\": \"F.swiftmodule\"," >> %/t/inputs/input.json
+// RUN: echo "\"swiftModuleName\": \"F\"," >> %/t/inputs/input.json
 // RUN: echo "\"arguments\": \"-target x86_64-apple-macosx10.9\"," >> %/t/inputs/input.json
 // RUN: echo "\"output\": \"%/t/outputs/F.swiftmodule.json\"" >> %/t/inputs/input.json
 // RUN: echo "}," >> %/t/inputs/input.json
 // RUN: echo "{" >> %/t/inputs/input.json
-// RUN: echo "\"module\": \"F.pcm\"," >> %/t/inputs/input.json
+// RUN: echo "\"clangModuleName\": \"F\"," >> %/t/inputs/input.json
 // RUN: echo "\"arguments\": \"-target x86_64-apple-macosx10.9\"," >> %/t/inputs/input.json
 // RUN: echo "\"output\": \"%/t/outputs/F.pcm.json\"" >> %/t/inputs/input.json
 // RUN: echo "}]" >> %/t/inputs/input.json

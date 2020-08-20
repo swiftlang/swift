@@ -45,6 +45,7 @@ struct BatchScanInput {
   StringRef moduleName;
   StringRef arguments;
   StringRef outputPath;
+  bool isSwift;
 };
 
 static std::string getScalaNodeText(Node *N) {
@@ -54,7 +55,7 @@ static std::string getScalaNodeText(Node *N) {
 
 /// Parse an entry like this, where the "platforms" key-value pair is optional:
 ///  {
-///     "module": "Foo.pcm",
+///     "swiftModuleName": "Foo",
 ///     "arguments": "-target 10.15",
 ///     "output": "../Foo.json"
 ///  },
@@ -70,8 +71,12 @@ static bool parseBatchInputEntries(ASTContext &Ctx, llvm::StringSaver &saver,
     for (auto &Pair: *MN) {
       auto Key = getScalaNodeText(Pair.getKey());
       auto* Value = Pair.getValue();
-      if (Key == "module") {
+      if (Key == "clangModuleName") {
         entry.moduleName = saver.save(getScalaNodeText(Value));
+        entry.isSwift = false;
+      } else if (Key == "swiftModuleName") {
+        entry.moduleName = saver.save(getScalaNodeText(Value));
+        entry.isSwift = true;
       } else if (Key == "arguments") {
         entry.arguments = saver.save(getScalaNodeText(Value));
       } else if (Key == "output") {
@@ -84,9 +89,6 @@ static bool parseBatchInputEntries(ASTContext &Ctx, llvm::StringSaver &saver,
     if (entry.moduleName.empty())
       return true;
     if (entry.outputPath.empty())
-      return true;
-    auto ext = llvm::sys::path::extension(entry.moduleName);
-    if (ext != ".swiftmodule" && ext != ".pcm")
       return true;
     result.emplace_back(std::move(entry));
   }
@@ -699,10 +701,8 @@ bool swift::batchScanModuleDependencies(CompilerInstance &instance,
   if (!results.hasValue())
     return true;
   for (auto &entry: *results) {
-    auto moduleName = llvm::sys::path::stem(entry.moduleName);
-    auto isClang = llvm::sys::path::extension(entry.moduleName) == ".pcm";
-    if (scanModuleDependencies(instance, moduleName, entry.arguments, isClang,
-                               entry.outputPath))
+    if (scanModuleDependencies(instance, entry.moduleName, entry.arguments,
+                               !entry.isSwift, entry.outputPath))
       return true;
   }
   return false;
