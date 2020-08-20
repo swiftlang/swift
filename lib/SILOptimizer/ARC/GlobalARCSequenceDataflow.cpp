@@ -118,7 +118,6 @@ bool ARCSequenceDataflowEvaluator::processBBTopDown(ARCBBState &BBState) {
 void ARCSequenceDataflowEvaluator::mergePredecessors(
     ARCBBStateInfoHandle &DataHandle) {
   bool HasAtLeastOnePred = false;
-  llvm::SmallVector<SILBasicBlock *, 4> BBThatNeedInsertPts;
 
   SILBasicBlock *BB = DataHandle.getBB();
   ARCBBState &BBState = DataHandle.getState();
