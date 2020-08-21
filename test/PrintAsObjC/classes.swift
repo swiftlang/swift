@@ -820,6 +820,9 @@ public class NonObjCClass { }
   // CHECK-NEXT: - (StringCheese * _Nullable)foo SWIFT_WARN_UNUSED_RESULT;
   @objc func foo() -> StringCheese? { return nil }
 
+  // CHECK-NEXT: - (GymClass<StringCheese *> * _Nullable)foosball SWIFT_WARN_UNUSED_RESULT;
+  @objc func foosball() -> GymClass<StringCheese>? { return nil }
+
   // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 }
 // CHECK-NEXT: @end
