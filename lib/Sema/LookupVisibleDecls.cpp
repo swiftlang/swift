@@ -941,17 +941,22 @@ public:
                         /*wouldConflictInSwift5*/nullptr,
                         /*skipProtocolExtensionCheck*/true)) {
           FoundConflicting = true;
-          // Prefer derived requirements over their witnesses.
-          if (Reason ==
-                DeclVisibilityKind::MemberOfProtocolDerivedByCurrentNominal ||
-              VD->getFormalAccess() > OtherVD->getFormalAccess() ||
-              //Prefer available one.
-              (!AvailableAttr::isUnavailable(VD) &&
-               AvailableAttr::isUnavailable(OtherVD))) {
-            FilteredResults.remove(
-                FoundDeclTy(OtherVD, DeclVisibilityKind::LocalVariable, {}));
-            FilteredResults.insert(DeclAndReason);
-            *I = VD;
+
+          if (!AvailableAttr::isUnavailable(VD)) {
+            bool preferVD = (
+                // Prefer derived requirements over their witnesses.
+                Reason == DeclVisibilityKind::
+                              MemberOfProtocolDerivedByCurrentNominal ||
+                // Prefer available one.
+                AvailableAttr::isUnavailable(OtherVD) ||
+                // Prefer more accessible one.
+                VD->getFormalAccess() > OtherVD->getFormalAccess());
+            if (preferVD) {
+              FilteredResults.remove(
+                  FoundDeclTy(OtherVD, DeclVisibilityKind::LocalVariable, {}));
+              FilteredResults.insert(DeclAndReason);
+              *I = VD;
+            }
           }
         }
       }
