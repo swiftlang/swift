@@ -3788,9 +3788,10 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDefault(
 
 # pragma mark Type witness resolution
 
-CheckTypeWitnessResult swift::checkTypeWitness(Type type,
-                                               AssociatedTypeDecl *assocType,
-                                               NormalProtocolConformance *Conf) {
+CheckTypeWitnessResult
+swift::checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
+                        const NormalProtocolConformance *Conf,
+                        SubstOptions options) {
   if (type->hasError())
     return ErrorType::get(assocType->getASTContext());
 
@@ -3804,13 +3805,19 @@ CheckTypeWitnessResult swift::checkTypeWitness(Type type,
                                               : type;
 
   if (auto superclass = genericSig->getSuperclassBound(depTy)) {
-    // If the superclass has a type parameter, substitute in known type
-    // witnesses.
     if (superclass->hasTypeParameter()) {
-      const auto subMap = SubstitutionMap::getProtocolSubstitutions(
-          proto, Conf->getType(), ProtocolConformanceRef(Conf));
+      // Replace type parameters with other known or tentative type witnesses.
+      superclass = superclass.subst(
+          [&](SubstitutableType *type) {
+            if (type->isEqual(proto->getSelfInterfaceType()))
+              return Conf->getType();
 
-      superclass = superclass.subst(subMap);
+            return Type();
+          },
+          LookUpConformanceInModule(dc->getParentModule()), options);
+
+      if (superclass->hasTypeParameter())
+        superclass = dc->mapTypeIntoContext(superclass);
     }
     if (!superclass->isExactSuperclassOf(contextType))
       return superclass;
