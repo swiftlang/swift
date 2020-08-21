@@ -1187,6 +1187,8 @@ public:
 
   void setExprTypes(Expr *expr) const;
 
+  bool hasType(ASTNode node) const;
+
   /// Retrieve the type of the given node, as recorded in this solution.
   Type getType(ASTNode node) const;
 
