@@ -455,18 +455,6 @@ public:
       return;
     }
 
-    // Diagnose functions with active inout arguments.
-    // TODO(TF-129): Support `inout` argument differentiation.
-    for (auto inoutArg : ai->getInoutArguments()) {
-      if (activityInfo.isActive(inoutArg, getIndices())) {
-        context.emitNondifferentiabilityError(
-            ai, invoker,
-            diag::autodiff_cannot_differentiate_through_inout_arguments);
-        errorOccurred = true;
-        return;
-      }
-    }
-
     auto loc = ai->getLoc();
     auto &builder = getBuilder();
     auto origCallee = getOpValue(ai->getCallee());
@@ -1241,6 +1229,10 @@ public:
     SmallVector<SILValue, 8> differentialAllResults;
     collectAllActualResultsInTypeOrder(
         differentialCall, differentialDirectResults, differentialAllResults);
+    for (auto inoutArg : ai->getInoutArguments()) {
+      origAllResults.push_back(inoutArg);
+      differentialAllResults.push_back(inoutArg);
+    }
     assert(applyIndices.results->getNumIndices() ==
            differentialAllResults.size());
 
@@ -1483,12 +1475,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   // Initialize tangent mapping for indirect results.
   auto origIndResults = original->getIndirectResults();
   auto diffIndResults = differential.getIndirectResults();
-#ifndef NDEBUG
-  unsigned numInoutParameters = llvm::count_if(
-      original->getLoweredFunctionType()->getParameters(),
-      [](SILParameterInfo paramInfo) { return paramInfo.isIndirectInOut(); });
-  assert(origIndResults.size() + numInoutParameters == diffIndResults.size());
-#endif
+
   for (auto &origBB : *original)
     for (auto i : indices(origIndResults))
       setTangentBuffer(&origBB, origIndResults[i], diffIndResults[i]);
@@ -1521,23 +1508,10 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   auto origParams = origTy->getParameters();
   auto indices = witness->getSILAutoDiffIndices();
 
-  // Add differential results.
-  Optional<SILParameterInfo> inoutDiffParam = None;
-  for (auto origParam : origTy->getParameters()) {
-    if (!origParam.isIndirectInOut())
-      continue;
-    inoutDiffParam = origParam;
-  }
 
-  if (inoutDiffParam) {
-    dfResults.push_back(
-        SILResultInfo(inoutDiffParam->getInterfaceType()
-                          ->getAutoDiffTangentSpace(lookupConformance)
-                          ->getType()
-                          ->getCanonicalType(witnessCanGenSig),
-                      ResultConvention::Indirect));
-  } else {
-    for (auto resultIndex : indices.results->getIndices()) {
+  for (auto resultIndex : indices.results->getIndices()) {
+    if (resultIndex < origTy->getNumResults()) {
+      // Handle formal original result.
       auto origResult = origTy->getResults()[resultIndex];
       origResult = origResult.getWithInterfaceType(
           origResult.getInterfaceType()->getCanonicalType(witnessCanGenSig));
@@ -1547,6 +1521,25 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
                             ->getType()
                             ->getCanonicalType(witnessCanGenSig),
                         origResult.getConvention()));
+    }
+    else {
+      // Handle original `inout` parameter.
+      auto inoutParamIndex = resultIndex - origTy->getNumResults();
+      auto inoutParamIt = std::next(
+          origTy->getIndirectMutatingParameters().begin(), inoutParamIndex);
+      auto paramIndex =
+          std::distance(origTy->getParameters().begin(), &*inoutParamIt);
+      // If the original `inout` parameter is a differentiability parameter, then
+      // it already has a corresponding differential parameter. Skip adding a
+      // corresponding differential result.
+      if (indices.parameters->contains(paramIndex))
+        continue;
+      auto inoutParam = origTy->getParameters()[paramIndex];
+      auto paramTan = inoutParam.getInterfaceType()->getAutoDiffTangentSpace(
+          lookupConformance);
+      assert(paramTan && "Parameter type does not have a tangent space?");
+      dfResults.push_back(
+          {paramTan->getCanonicalType(), ResultConvention::Indirect});
     }
   }
 
