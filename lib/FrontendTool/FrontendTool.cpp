@@ -1751,7 +1751,8 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
 /// \param Instance Will be reset after performIRGeneration when the verifier
 ///                 mode is NoVerify and there were no errors.
 /// \returns true on error
-static bool performCompile(CompilerInstance &Instance,
+static bool performCompile(CompilerInvocation &Invok,
+                           CompilerInstance &Instance,
                            ArrayRef<const char *> Args,
                            int &ReturnValue,
                            FrontendObserver *observer) {
@@ -1839,7 +1840,8 @@ static bool performCompile(CompilerInstance &Instance,
     if (batchScanInput.empty())
       return finishPipeline(scanDependencies(Instance));
     else
-      return finishPipeline(batchScanModuleDependencies(Instance,
+      return finishPipeline(batchScanModuleDependencies(Invok,
+                                                        Instance,
                                                         batchScanInput));
   }
 
@@ -2652,7 +2654,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   }
 
   int ReturnValue = 0;
-  bool HadError = performCompile(*Instance, Args, ReturnValue, observer);
+  bool HadError = performCompile(Invocation, *Instance, Args, ReturnValue, observer);
 
   if (verifierEnabled) {
     DiagnosticEngine &diags = Instance->getDiags();
