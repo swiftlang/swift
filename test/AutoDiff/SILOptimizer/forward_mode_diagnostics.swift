@@ -87,7 +87,7 @@ func activeInoutParamControlFlow(_ array: [Float]) -> Float {
 
 // FIXME(TF-984): Forward-mode crash due to unset tangent buffer.
 /*
-struct X : Differentiable {
+struct X: Differentiable {
   var x : Float
 
   @differentiable(wrt: y)
@@ -103,21 +103,11 @@ func activeMutatingMethod(_ x: Float) -> Float {
 }
 */
 
-/*struct Mut: Differentiable {}
+
+struct Mut: Differentiable {}
 extension Mut {
   @differentiable(wrt: x)
   mutating func mutatingMethod(_ x: Mut) {}
-
-  // exxpected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
-  @differentiable(wrt: x)
-  mutating func mutatingMethodWithResult(_ x: Mut) -> Mut { return x }
-}
-
-// exxpected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
-@differentiable(wrt: x)
-func nonActiveInoutParam(_ nonactive: inout Mut, _ x: Mut) -> Mut {
-  nonactive.mutatingMethod(x)
-  return x
 }
 
 @differentiable(wrt: x)
@@ -126,22 +116,6 @@ func activeInoutParamMutatingMethod(_ x: Mut) -> Mut {
   result.mutatingMethod(result)
   return result
 }
-
-// exxpected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
-@differentiable(wrt: x)
-func activeInoutParamMutatingMethodVar(_ nonactive: inout Mut, _ x: Mut) -> Mut {
-  var result = nonactive
-  result = result.mutatingMethodWithResult(x)
-  return result
-}
-
-// exxpected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
-@differentiable(wrt: x)
-func activeInoutParamMutatingMethodTuple(_ nonactive: inout Mut, _ x: Mut) -> Mut {
-  var result = (nonactive, x)
-  let result2 = result.0.mutatingMethodWithResult(result.0)
-  return result2
-}*/
 
 //===----------------------------------------------------------------------===//
 // Subset parameter differentiation thunks

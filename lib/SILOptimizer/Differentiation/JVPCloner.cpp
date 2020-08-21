@@ -1229,10 +1229,10 @@ public:
     SmallVector<SILValue, 8> differentialAllResults;
     collectAllActualResultsInTypeOrder(
         differentialCall, differentialDirectResults, differentialAllResults);
-    for (auto inoutArg : ai->getInoutArguments()) {
+    for (auto inoutArg : ai->getInoutArguments())
       origAllResults.push_back(inoutArg);
+    for (auto inoutArg : differentialCall->getInoutArguments())
       differentialAllResults.push_back(inoutArg);
-    }
     assert(applyIndices.results->getNumIndices() ==
            differentialAllResults.size());
 
@@ -1475,7 +1475,15 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   // Initialize tangent mapping for indirect results.
   auto origIndResults = original->getIndirectResults();
   auto diffIndResults = differential.getIndirectResults();
-
+#ifndef NDEBUG
+  unsigned numNonWrtInoutParameters = llvm::count_if(
+    range(original->getLoweredFunctionType()->getNumParameters()),
+    [&] (unsigned i) {
+      auto &paramInfo = original->getLoweredFunctionType()->getParameters()[i];
+      return paramInfo.isIndirectInOut() && !getIndices().parameters->contains(i);
+    });
+#endif
+  assert(origIndResults.size() + numNonWrtInoutParameters == diffIndResults.size());
   for (auto &origBB : *original)
     for (auto i : indices(origIndResults))
       setTangentBuffer(&origBB, origIndResults[i], diffIndResults[i]);

@@ -77,9 +77,9 @@ ForwardModeInoutTests.test("InoutIdentity") {
 
 ForwardModeInoutTests.test("MultipleInoutParams") {
   func swap<T: Differentiable>(_ x: inout T, _ y: inout T) {
-      let z = x
-      x = y
-      y = z
+    let z = x
+    x = y
+    y = z
   }
 
   func first<T: Differentiable>(_ x: T, _ y: T) -> T {
@@ -100,7 +100,7 @@ ForwardModeInoutTests.test("MultipleInoutParams") {
 }
 
 ForwardModeInoutTests.test("StructMutatingMethod") {
-  struct Mut : Differentiable {
+  struct Mut: Differentiable {
     var x: Float
 
     mutating func add(_ y: Float) {
@@ -113,45 +113,45 @@ ForwardModeInoutTests.test("StructMutatingMethod") {
   }
 
   func identity(_ y: Float) -> Float {
-    var mut = Mut.init(x: 0.0)
+    var mut = Mut(x: 0.0)
     mut.add(y)
     return mut.x
   }
   expectEqual(1, derivative(at: 1, in: identity))
 
   func identity2(_ y: Float) -> Float {
-    var mut = Mut.init(x: 0.0)
-    let mut2 = Mut.init(x: y)
+    var mut = Mut(x: 0.0)
+    let mut2 = Mut(x: y)
     mut.addMut(mut2)
     return mut.x
   }
   expectEqual(1, derivative(at: 1, in: identity2))
 
   func double(_ y: Float) -> Float {
-    var mut = Mut.init(x: y)
+    var mut = Mut(x: y)
     mut.add(y)
     return mut.x
   }
   expectEqual(2, derivative(at: 1, in: double))
 
   func double2(_ y: Float) -> Float {
-    var mut = Mut.init(x: y)
-    let mut2 = Mut.init(x: y)
+    var mut = Mut(x: y)
+    let mut2 = Mut(x: y)
     mut.addMut(mut2)
     return mut.x
   }
   expectEqual(2, derivative(at: 1, in: double2))
 
   func square(_ y: Float) -> Float {
-    var mut = Mut.init(x: 0.0)
+    var mut = Mut(x: 0.0)
     mut.add(y * y)
     return mut.x
   }
   expectEqual(6, derivative(at: 3, in: square))
 
   func square2(_ y: Float) -> Float {
-    var mut = Mut.init(x: 0.0)
-    let mut2 = Mut.init(x: y * y)
+    var mut = Mut(x: 0.0)
+    let mut2 = Mut(x: y * y)
     mut.addMut(mut2)
     return mut.x
   }
