@@ -185,5 +185,8 @@ WARNING(cross_imported_by_both_modules, none,
 ERROR(scanner_find_cycle, none,
       "dependency scanner detected dependency cycle: '%0'", (StringRef))
 
+ERROR(scanner_arguments_invalid, none,
+      "dependencies scanner cannot be configured with arguments: '%0'", (StringRef))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
