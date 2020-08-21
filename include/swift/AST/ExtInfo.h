@@ -516,7 +516,7 @@ class SILExtInfoBuilder {
 
 public:
   // Constructor with all defaults.
-  SILExtInfoBuilder() : bits(0), clangTypeInfo(ClangTypeInfo(nullptr)) {}
+  SILExtInfoBuilder() : SILExtInfoBuilder(0, ClangTypeInfo(nullptr)) {}
 
   // Constructor for polymorphic type.
   SILExtInfoBuilder(Representation rep, bool isPseudogeneric, bool isNoEscape,
@@ -525,6 +525,12 @@ public:
       : SILExtInfoBuilder(makeBits(rep, isPseudogeneric, isNoEscape, isAsync,
                                    diffKind),
                           ClangTypeInfo(type)) {}
+
+  SILExtInfoBuilder(ASTExtInfoBuilder info, bool isPseudogeneric)
+      : SILExtInfoBuilder(makeBits(info.getSILRepresentation(), isPseudogeneric,
+                                   info.isNoEscape(), info.isAsync(),
+                                   info.getDifferentiabilityKind()),
+                          info.getClangTypeInfo()) {}
 
   void checkInvariants() const;
 
