@@ -1572,12 +1572,16 @@ private:
   }
 
   bool printImportedAlias(const TypeAliasDecl *alias,
+                          ArrayRef<Type> genericArgs,
                           Optional<OptionalTypeKind> optionalKind) {
     if (!alias->hasClangNode())
       return false;
 
     if (auto *clangTypeDecl =
           dyn_cast<clang::TypeDecl>(alias->getClangDecl())) {
+      assert(!alias->isGeneric()
+             && "generic typealias backed by clang typedecl?");
+
       maybePrintTagKeyword(alias);
       os << getNameForObjC(alias);
 
@@ -1585,12 +1589,19 @@ private:
         printNullability(optionalKind);
     } else if (auto *clangObjCClass
                = dyn_cast<clang::ObjCInterfaceDecl>(alias->getClangDecl())){
+      assert(!alias->isGeneric()
+             && "generic typealias backed by clang interface?");
+
       os << clangObjCClass->getName() << " *";
       printNullability(optionalKind);
     } else {
       auto *clangCompatAlias =
       cast<clang::ObjCCompatibleAliasDecl>(alias->getClangDecl());
-      os << clangCompatAlias->getName() << " *";
+
+      os << clangCompatAlias->getName();
+      if (!genericArgs.empty())
+        printGenericArgs(genericArgs);
+      os << " *";
       printNullability(optionalKind);
     }
 
@@ -1600,10 +1611,12 @@ private:
   void visitTypeAliasType(TypeAliasType *aliasTy,
                                Optional<OptionalTypeKind> optionalKind) {
     const TypeAliasDecl *alias = aliasTy->getDecl();
+    auto genericArgs = aliasTy->getDirectGenericArgs();
+
     if (printIfKnownSimpleType(alias, optionalKind))
       return;
 
-    if (printImportedAlias(alias, optionalKind))
+    if (printImportedAlias(alias, genericArgs, optionalKind))
       return;
 
     visitPart(aliasTy->getSinglyDesugaredType(), optionalKind);
@@ -1737,8 +1750,12 @@ private:
   }
 
   void printGenericArgs(BoundGenericType *BGT) {
+    printGenericArgs(BGT->getGenericArgs());
+  }
+
+  void printGenericArgs(ArrayRef<Type> genericArgs) {
     os << '<';
-    interleave(BGT->getGenericArgs(),
+    interleave(genericArgs,
                [this](Type t) { print(t, None); },
                [this] { os << ", "; });
     os << '>';

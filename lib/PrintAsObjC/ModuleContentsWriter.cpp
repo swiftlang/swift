@@ -57,7 +57,6 @@ class ReferencedTypeFinder : public TypeDeclFinder {
   Action visitTypeAliasType(TypeAliasType *aliasTy) override {
     if (aliasTy->getDecl()->hasClangNode() &&
         !aliasTy->getDecl()->isCompatibilityAlias()) {
-      assert(!aliasTy->getDecl()->isGeneric());
       Callback(*this, aliasTy->getDecl());
     } else {
       Type(aliasTy->getSinglyDesugaredType()).walk(*this);
@@ -319,8 +318,10 @@ public:
         } else if (auto PD = dyn_cast<ProtocolDecl>(TD)) {
           forwardDeclare(PD);
         } else if (auto TAD = dyn_cast<TypeAliasDecl>(TD)) {
+          bool imported = false;
           if (TAD->hasClangNode())
-            (void)addImport(TD);
+            imported = addImport(TD);
+          assert((imported || !TAD->isGeneric()) && "referencing non-imported generic typealias?");
         } else if (addImport(TD)) {
           return;
         } else if (auto ED = dyn_cast<EnumDecl>(TD)) {
