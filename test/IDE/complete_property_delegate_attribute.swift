@@ -34,9 +34,10 @@ struct TestStruct {
 
   @MyStruct(arg1: .#^ARG_MyEnum_DOT^#
   var test3
-// ARG_MyEnum_DOT: Begin completions, 2 items
+// ARG_MyEnum_DOT: Begin completions, 3 items
 // ARG_MyEnum_DOT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]:     east[#MyEnum#]; name=east
 // ARG_MyEnum_DOT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]:     west[#MyEnum#]; name=west
+// ARG_MyEnum_DOT-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): MyEnum#})[#(into: inout Hasher) -> Void#];
 // ARG_MyEnum_DOT: End completions
 
   @MyStruct(arg1: MyEnum.#^ARG_MyEnum_NOBINDING^#)

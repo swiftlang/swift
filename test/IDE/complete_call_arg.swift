@@ -579,10 +579,12 @@ func testTupleShuffle() {
 // SHUFFLE_2-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: s1[#String#]; name=s1
 // SHUFFLE_2-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: s2[#String#]; name=s2
 
-// SHUFFLE_3: Begin completions, 3 items
+// SHUFFLE_3: Begin completions, 4 items
 // SHUFFLE_3-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     foo[#SimpleEnum#]; name=foo
 // SHUFFLE_3-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     bar[#SimpleEnum#]; name=bar
 // SHUFFLE_3-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     baz[#SimpleEnum#]; name=baz
+// SHUFFLE_3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:     hash({#(self): SimpleEnum#})[#(into: inout Hasher) -> Void#]; name=hash(self: SimpleEnum)
+
 
 class HasSubscript {
   subscript(idx: Int) -> String {}
@@ -833,10 +835,11 @@ func testPamrameterFlags(_: Int, inoutArg: inout Int, autoclosureArg: @autoclosu
 
 func testTupleElement(arg: (SimpleEnum, SimpleEnum)) {
   testTupleElement(arg: (.foo, .#^TUPLEELEM_1^#))
-// TUPLEELEM_1: Begin completions, 3 items
+// TUPLEELEM_1: Begin completions, 4 items
 // TUPLEELEM_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     foo[#SimpleEnum#]; name=foo
 // TUPLEELEM_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     bar[#SimpleEnum#]; name=bar
 // TUPLEELEM_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     baz[#SimpleEnum#]; name=baz
+// TUPLEELEM_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:     hash({#(self): SimpleEnum#})[#(into: inout Hasher) -> Void#]; name=hash(self: SimpleEnum)
 // TUPLEELEM_1: End completions
   testTupleElement(arg: (.foo, .bar, .#^TUPLEELEM_2^#))
 // TUPLEELEM_2-NOT: Begin completions
@@ -852,10 +855,11 @@ func testKeyPathThunkInBase() {
     func foo(_ fn: (TestKP) -> Int) -> TestKPResult { TestKPResult() }
 
     foo(\.value).testFunc(.#^KEYPATH_THUNK_BASE^#)
-// KEYPATH_THUNK_BASE: Begin completions, 3 items
+// KEYPATH_THUNK_BASE: Begin completions, 4 items
 // KEYPATH_THUNK_BASE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     foo[#SimpleEnum#]; name=foo
 // KEYPATH_THUNK_BASE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     bar[#SimpleEnum#]; name=bar
 // KEYPATH_THUNK_BASE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     baz[#SimpleEnum#]; name=baz
+// KEYPATH_THUNK_BASE-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:     hash({#(self): SimpleEnum#})[#(into: inout Hasher) -> Void#]; name=hash(self: SimpleEnum)
 // KEYPATH_THUNK_BASE: End completions
 }
 
