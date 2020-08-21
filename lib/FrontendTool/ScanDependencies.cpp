@@ -32,12 +32,103 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/StringSaver.h"
+#include "llvm/Support/YAMLTraits.h"
+#include "llvm/Support/YAMLParser.h"
 #include <set>
 
 using namespace swift;
+using namespace llvm::yaml;
 
 namespace {
+struct BatchScanInput {
+  StringRef moduleName;
+  StringRef arguments;
+  StringRef outputPath;
+  bool isSwift;
+};
 
+static std::string getScalaNodeText(Node *N) {
+  SmallString<32> Buffer;
+  return cast<ScalarNode>(N)->getValue(Buffer).str();
+}
+
+/// Parse an entry like this, where the "platforms" key-value pair is optional:
+///  {
+///     "swiftModuleName": "Foo",
+///     "arguments": "-target 10.15",
+///     "output": "../Foo.json"
+///  },
+static bool parseBatchInputEntries(ASTContext &Ctx, llvm::StringSaver &saver,
+                                   Node *Node, std::vector<BatchScanInput> &result) {
+  auto *SN = cast<SequenceNode>(Node);
+  if (!SN)
+    return true;
+  for (auto It = SN->begin(); It != SN->end(); ++It) {
+    auto *MN = cast<MappingNode>(&*It);
+    BatchScanInput entry;
+    Optional<std::set<int8_t>> Platforms;
+    for (auto &Pair: *MN) {
+      auto Key = getScalaNodeText(Pair.getKey());
+      auto* Value = Pair.getValue();
+      if (Key == "clangModuleName") {
+        entry.moduleName = saver.save(getScalaNodeText(Value));
+        entry.isSwift = false;
+      } else if (Key == "swiftModuleName") {
+        entry.moduleName = saver.save(getScalaNodeText(Value));
+        entry.isSwift = true;
+      } else if (Key == "arguments") {
+        entry.arguments = saver.save(getScalaNodeText(Value));
+      } else if (Key == "output") {
+        entry.outputPath = saver.save(getScalaNodeText(Value));
+      } else {
+        // Future proof.
+        continue;
+      }
+    }
+    if (entry.moduleName.empty())
+      return true;
+    if (entry.outputPath.empty())
+      return true;
+    result.emplace_back(std::move(entry));
+  }
+  return false;
+}
+
+static Optional<std::vector<BatchScanInput>>
+parseBatchScanInputFile(ASTContext &ctx, StringRef batchInputPath,
+                        llvm::StringSaver &saver) {
+  assert(!batchInputPath.empty());
+  namespace yaml = llvm::yaml;
+  std::vector<BatchScanInput> result;
+
+  // Load the input file.
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
+    llvm::MemoryBuffer::getFile(batchInputPath);
+  if (!FileBufOrErr) {
+    ctx.Diags.diagnose(SourceLoc(), diag::batch_scan_input_file_missing,
+                       batchInputPath);
+    return None;
+  }
+  StringRef Buffer = FileBufOrErr->get()->getBuffer();
+
+  // Use a new source manager instead of the one from ASTContext because we
+  // don't want the Json file to be persistent.
+  SourceManager SM;
+  yaml::Stream Stream(llvm::MemoryBufferRef(Buffer, batchInputPath),
+                      SM.getLLVMSourceMgr());
+  for (auto DI = Stream.begin(); DI != Stream.end(); ++ DI) {
+    assert(DI != Stream.end() && "Failed to read a document");
+    yaml::Node *N = DI->getRoot();
+    assert(N && "Failed to find a root");
+    if (parseBatchInputEntries(ctx, saver, N, result)) {
+      ctx.Diags.diagnose(SourceLoc(), diag::batch_scan_input_file_corrupted,
+                         batchInputPath);
+      return None;
+    }
+  }
+  return result;
+}
 }
 
 /// Find all of the imported Clang modules starting with the given module name.
@@ -533,15 +624,17 @@ static bool diagnoseCycle(CompilerInstance &instance,
   return false;
 }
 
-bool swift::scanClangDependencies(CompilerInstance &instance) {
+static bool scanModuleDependencies(CompilerInstance &instance,
+                                   StringRef moduleName,
+                                   StringRef arguments,
+                                   bool isClang,
+                                   StringRef outputPath) {
   ASTContext &ctx = instance.getASTContext();
-  ModuleDecl *mainModule = instance.getMainModule();
   auto &FEOpts = instance.getInvocation().getFrontendOptions();
   ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
   auto ModuleCachePath = getModuleCachePathFromClang(ctx
     .getClangModuleLoader()->getClangInstance());
 
-  StringRef mainModuleName = mainModule->getNameStr();
   llvm::SetVector<ModuleDependencyID, std::vector<ModuleDependencyID>,
                   std::set<ModuleDependencyID>> allModules;
   // Create the module dependency cache.
@@ -555,16 +648,23 @@ bool swift::scanClangDependencies(CompilerInstance &instance) {
                                               FEOpts.PrebuiltModuleCachePath,
                                               FEOpts.SerializeModuleInterfaceDependencyHashes,
                                               FEOpts.shouldTrackSystemDependencies());
-  // Loading the clang module using Clang importer.
-  // This action will populate the cache with the main module's dependencies.
-  auto rootDeps = static_cast<ClangImporter*>(ctx.getClangModuleLoader())
-    ->getModuleDependencies(mainModuleName, cache, ASTDelegate);
+  Optional<ModuleDependencies> rootDeps;
+  if (isClang) {
+    // Loading the clang module using Clang importer.
+    // This action will populate the cache with the main module's dependencies.
+    rootDeps = ctx.getModuleDependencies(moduleName, /*IsClang*/true, cache,
+                                         ASTDelegate);
+  } else {
+    // Loading the swift module's dependencies.
+    rootDeps = ctx.getSwiftModuleDependencies(moduleName, cache, ASTDelegate);
+  }
   if (!rootDeps.hasValue()) {
     // We cannot find the clang module, abort.
     return true;
   }
   // Add the main module.
-  allModules.insert({mainModuleName.str(), ModuleDependenciesKind::Clang});
+  allModules.insert({moduleName.str(), isClang ? ModuleDependenciesKind::Clang:
+    ModuleDependenciesKind::Swift});
 
   // Explore the dependencies of every module.
   for (unsigned currentModuleIdx = 0;
@@ -576,10 +676,35 @@ bool swift::scanClangDependencies(CompilerInstance &instance) {
     allModules.insert(discoveredModules.begin(), discoveredModules.end());
   }
   // Write out the JSON description.
-  std::string path = FEOpts.InputsAndOutputs.getSingleOutputFilename();
   std::error_code EC;
-  llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream out(outputPath, EC, llvm::sys::fs::F_None);
   writeJSON(out, instance, cache, ASTDelegate, allModules.getArrayRef());
+  return false;
+}
+
+bool swift::scanClangDependencies(CompilerInstance &instance) {
+  return scanModuleDependencies(instance,
+                                instance.getMainModule()->getNameStr(),
+                                StringRef(),
+                                /*isClang*/true,
+                                instance.getInvocation().getFrontendOptions()
+                                  .InputsAndOutputs.getSingleOutputFilename());
+}
+
+bool swift::batchScanModuleDependencies(CompilerInstance &instance,
+                                      llvm::StringRef batchInputFile) {
+  (void)instance.getMainModule();
+  llvm::BumpPtrAllocator alloc;
+  llvm::StringSaver saver(alloc);
+  auto results = parseBatchScanInputFile(instance.getASTContext(),
+                                         batchInputFile, saver);
+  if (!results.hasValue())
+    return true;
+  for (auto &entry: *results) {
+    if (scanModuleDependencies(instance, entry.moduleName, entry.arguments,
+                               !entry.isSwift, entry.outputPath))
+      return true;
+  }
   return false;
 }
 
