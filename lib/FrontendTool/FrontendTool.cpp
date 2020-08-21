@@ -1835,8 +1835,14 @@ static bool performCompile(CompilerInstance &Instance,
     return finishPipeline(Context.hadError());
   }
 
-  if (Action == FrontendOptions::ActionType::ScanDependencies)
-    return finishPipeline(scanDependencies(Instance));
+  if (Action == FrontendOptions::ActionType::ScanDependencies) {
+    auto batchScanInput = Instance.getASTContext().SearchPathOpts.BatchScanInputFilePath;
+    if (batchScanInput.empty())
+      return finishPipeline(scanDependencies(Instance));
+    else
+      return finishPipeline(batchScanModuleDependencies(Instance,
+                                                        batchScanInput));
+  }
 
   if (Action == FrontendOptions::ActionType::ScanClangDependencies)
     return finishPipeline(scanClangDependencies(Instance));

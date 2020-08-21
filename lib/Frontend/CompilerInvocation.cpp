@@ -926,7 +926,8 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   }
   if (const Arg *A = Args.getLastArg(OPT_placeholder_dependency_module_map))
     Opts.PlaceholderDependencyModuleMap = A->getValue();
-
+  if (const Arg *A = Args.getLastArg(OPT_batch_scan_input_file))
+    Opts.BatchScanInputFilePath = A->getValue();
   // Opts.RuntimeIncludePath is set by calls to
   // setRuntimeIncludePath() or setMainExecutablePath().
   // Opts.RuntimeImportPath is set by calls to
