@@ -3988,18 +3988,13 @@ TypeConverter::getBridgedFunctionType(AbstractionPattern pattern,
   // Pull out the generic signature.
   CanGenericSignature genericSig = t.getOptGenericSignature();
 
-  switch (auto rep = t->getExtInfo().getSILRepresentation()) {
-  case SILFunctionTypeRepresentation::Thick:
-  case SILFunctionTypeRepresentation::Thin:
-  case SILFunctionTypeRepresentation::Method:
-  case SILFunctionTypeRepresentation::Closure:
-  case SILFunctionTypeRepresentation::WitnessMethod: {
+  auto rep = t->getExtInfo().getSILRepresentation();
+  switch (getSILFunctionLanguage(rep)) {
+  case SILFunctionLanguage::Swift: {
     // No bridging needed for native functions.
     return t;
   }
-  case SILFunctionTypeRepresentation::CFunctionPointer:
-  case SILFunctionTypeRepresentation::Block:
-  case SILFunctionTypeRepresentation::ObjCMethod: {
+  case SILFunctionLanguage::C: {
     SmallVector<AnyFunctionType::Param, 8> params;
     getBridgedParams(rep, pattern, t->getParams(), params, bridging);
 
