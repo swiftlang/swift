@@ -1467,70 +1467,43 @@ void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {
 }
 
 bool ConstraintSystem::solveForCodeCompletion(
-    SolutionApplicationTarget &target,
-    llvm::function_ref<void(const Solution &)> callback) {
+    SolutionApplicationTarget &target, SmallVectorImpl<Solution> &solutions) {
   auto *expr = target.getAsExpr();
-  {
-    // First, pre-check the expression, validating any types that occur in the
-    // expression and folding sequence expressions.
-    auto failedPreCheck = ConstraintSystem::preCheckExpression(
-        expr, target.getDeclContext(),
-        /*replaceInvalidRefsWithErrors=*/true);
-
-    target.setExpr(expr);
-
-    if (failedPreCheck)
-      return false;
-  }
-
-  ConstraintSystemOptions options;
-  options |= ConstraintSystemFlags::AllowFixes;
-  options |= ConstraintSystemFlags::SuppressDiagnostics;
-
-  ConstraintSystem cs(target.getDeclContext(), options);
-
   // Tell the constraint system what the contextual type is.
-  cs.setContextualType(expr, target.getExprContextualTypeLoc(),
-                       target.getExprContextualTypePurpose());
+  setContextualType(expr, target.getExprContextualTypeLoc(),
+                    target.getExprContextualTypePurpose());
 
   // Set up the expression type checker timer.
-  cs.Timer.emplace(expr, cs);
+  Timer.emplace(expr, *this);
 
-  cs.shrink(expr);
+  shrink(expr);
 
-  if (cs.isDebugMode()) {
+  if (isDebugMode()) {
     auto &log = llvm::errs();
     log << "--- Code Completion ---\n";
   }
 
-  if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow))
+  if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
     return false;
 
-  llvm::SmallVector<Solution, 4> solutions;
-
   {
-    SolverState state(cs, FreeTypeVariableBinding::Disallow);
+    SolverState state(*this, FreeTypeVariableBinding::Disallow);
 
     // Enable "diagnostic mode" by default, this means that
     // solver would produce "fixed" solutions alongside valid
     // ones, which helps code completion to rank choices.
     state.recordFixes = true;
 
-    cs.solveImpl(solutions);
+    solveImpl(solutions);
   }
 
-  if (cs.isDebugMode()) {
-    llvm::errs() << "--- Discovered " << solutions.size() << " solutions ---\n";
-  }
-
-  for (const auto &solution : solutions) {
-    if (cs.isDebugMode()) {
-      auto &log = llvm::errs();
+  if (isDebugMode()) {
+    auto &log = llvm::errs();
+    log << "--- Discovered " << solutions.size() << " solutions ---\n";
+    for (const auto &solution : solutions) {
       log << "--- Solution ---\n";
       solution.dump(log);
     }
-
-    callback(solution);
   }
 
   return true;

@@ -673,7 +673,8 @@ bool TypeChecker::typeCheckForCodeCompletion(
   ContextFinder finder;
   expr->walk(finder);
 
-  switch (finder.getCompletionContext()) {
+  auto completionContext = finder.getCompletionContext();
+  switch (completionContext) {
   case ContextKind::StringInterpolation:
     return false;
 
@@ -689,12 +690,73 @@ bool TypeChecker::typeCheckForCodeCompletion(
     break;
   }
 
+  {
+    // First, pre-check the expression, validating any types that occur in the
+    // expression and folding sequence expressions.
+    auto failedPreCheck = ConstraintSystem::preCheckExpression(
+        expr, DC,
+        /*replaceInvalidRefsWithErrors=*/true);
+
+    target.setExpr(expr);
+
+    if (failedPreCheck)
+      return false;
+  }
+
   auto *completionExpr = finder.getCompletionExpr();
   assert(completionExpr);
 
-  // If it was possible to solve for a while expression, we are done.
-  if (ConstraintSystem::solveForCodeCompletion(target, callback))
+  enum class CompletionResult { Ok, NotApplicable, Fallback };
+
+  auto solveForCodeCompletion =
+      [&](SolutionApplicationTarget &target) -> CompletionResult {
+    ConstraintSystemOptions options;
+    options |= ConstraintSystemFlags::AllowFixes;
+    options |= ConstraintSystemFlags::SuppressDiagnostics;
+
+    ConstraintSystem cs(DC, options);
+
+    llvm::SmallVector<Solution, 4> solutions;
+
+    // If solve failed to generate constraints or with some other
+    // issue, we need to fallback to type-checking code completion
+    // expression directly.
+    if (!cs.solveForCodeCompletion(target, solutions))
+      return CompletionResult::Fallback;
+
+    // If case type-check didn't produce any solutions, let's
+    // attempt to type-check code completion expression without
+    // enclosing context.
+    if (solutions.empty())
+      return CompletionResult::Fallback;
+
+    // If code completion expression resides inside of multi-statement
+    // closure body it code either be type-checker together with context
+    // or not, it's impossible to say without trying. If solution
+    // doesn't have a type for a code completion expression it means that
+    // we have to wait until body of the closure is type-checked.
+    if (completionContext == ContextKind::MultiStmtClosure) {
+      const auto &solution = solutions.front();
+      if (!solution.hasType(completionExpr))
+        return CompletionResult::NotApplicable;
+    }
+
+    for (const auto &solution : solutions)
+      callback(solution);
+
+    return CompletionResult::Ok;
+  };
+
+  switch (solveForCodeCompletion(target)) {
+  case CompletionResult::Ok:
     return true;
+
+  case CompletionResult::NotApplicable:
+    return false;
+
+  case CompletionResult::Fallback:
+    break;
+  }
 
   // If initial solve failed, let's fallback to checking only code completion
   // expresion without any context.
@@ -702,7 +764,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
                                              /*contextualType=*/Type(),
                                              /*isDiscarded=*/true);
 
-  (void)ConstraintSystem::solveForCodeCompletion(completionTarget, callback);
+  (void)solveForCodeCompletion(completionTarget);
   return true;
 }
 

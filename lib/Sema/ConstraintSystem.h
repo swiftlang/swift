@@ -5015,14 +5015,13 @@ public:
   ///
   /// \param target The expression involved in code completion.
   ///
-  /// \param callback The callback to be used to provide results to
-  /// code completion.
+  /// \param solutions The solutions produced for the given target without
+  /// filtering.
   ///
   /// \returns `false` if this call fails (e.g. pre-check or constraint
   /// generation fails), `true` otherwise.
-  static bool
-  solveForCodeCompletion(SolutionApplicationTarget &target,
-                         llvm::function_ref<void(const Solution &)> callback);
+  bool solveForCodeCompletion(SolutionApplicationTarget &target,
+                              SmallVectorImpl<Solution> &solutions);
 
 private:
   /// Solve the system of constraints.
