@@ -1908,6 +1908,10 @@ PlatformAvailability::PlatformAvailability(LangOptions &langOpts)
         "APIs deprecated as of macOS 10.9 and earlier are unavailable in Swift";
     break;
 
+  case PlatformKind::OpenBSD:
+    deprecatedAsUnavailableMessage = "";
+    break;
+
   case PlatformKind::none:
     break;
   }
@@ -1939,6 +1943,9 @@ bool PlatformAvailability::isPlatformRelevant(StringRef name) const {
     return name == "watchos";
   case PlatformKind::watchOSApplicationExtension:
     return name == "watchos" || name == "watchos_app_extension";
+
+  case PlatformKind::OpenBSD:
+    return name == "openbsd";
 
   case PlatformKind::none:
     return false;
@@ -1978,6 +1985,10 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
   case PlatformKind::watchOS:
   case PlatformKind::watchOSApplicationExtension:
     // No deprecation filter on watchOS
+    return false;
+
+  case PlatformKind::OpenBSD:
+    // No deprecation filter on OpenBSD
     return false;
   }
 

@@ -366,6 +366,8 @@ Symbol::getDomain(PlatformAgnosticAvailabilityKind AgnosticKind,
       return { "tvOSAppExtension" };
     case swift::PlatformKind::watchOSApplicationExtension:
       return { "watchOSAppExtension" };
+    case swift::PlatformKind::OpenBSD:
+      return { "OpenBSD" };
     // Platform-agnostic availability, such as "unconditionally deprecated"
     // or "unconditionally obsoleted".
     case swift::PlatformKind::none:
