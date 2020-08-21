@@ -589,8 +589,9 @@ void ABIDependencyEvaluator::computeABIDependenciesForClangModule(
     }
     if (import->isNonSwiftModule()
         && module->getTopLevelModule() == import->getTopLevelModule()
-        && !import->findUnderlyingClangModule()
-                  ->isSubModuleOf(module->findUnderlyingClangModule())) {
+        && (module == import
+            || !import->findUnderlyingClangModule()
+                      ->isSubModuleOf(module->findUnderlyingClangModule()))) {
       continue;
     }
     computeABIDependenciesForModule(import);
