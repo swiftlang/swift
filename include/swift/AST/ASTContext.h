@@ -771,6 +771,12 @@ public:
       ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate);
 
+  /// Retrieve the module dependencies for the Swift module with the given name.
+  Optional<ModuleDependencies> getSwiftModuleDependencies(
+      StringRef moduleName,
+      ModuleDependenciesCache &cache,
+      InterfaceSubContextDelegate &delegate);
+
   /// Load extensions to the given nominal type from the external
   /// module loaders.
   ///

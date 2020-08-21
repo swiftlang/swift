@@ -46,6 +46,20 @@ template <typename Runtime> struct MetadataCacheNode {
   typename Runtime::StoredPointer Right;
 };
 
+template <typename Runtime> struct ConcurrentHashMap {
+  typename Runtime::StoredSize ReaderCount;
+  typename Runtime::StoredSize ElementCount;
+  typename Runtime::StoredPointer Elements;
+  typename Runtime::StoredPointer Indices;
+  // We'll ignore the remaining fields for now....
+};
+
+template <typename Runtime> struct ConformanceCacheEntry {
+  typename Runtime::StoredPointer Type;
+  typename Runtime::StoredPointer Proto;
+  typename Runtime::StoredPointer Witness;
+};
+
 } // end namespace reflection
 } // end namespace swift
 

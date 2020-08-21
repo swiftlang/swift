@@ -879,7 +879,8 @@ public:
     std::function<void(StoredPointer Type, StoredPointer Proto)> Call) {
     if (!NodePtr)
       return;
-    auto NodeBytes = getReader().readBytes(RemoteAddress(NodePtr), sizeof(Node));
+    auto NodeBytes = getReader().readBytes(RemoteAddress(NodePtr),
+                                           sizeof(ConformanceNode<Runtime>));
     auto NodeData =
       reinterpret_cast<const ConformanceNode<Runtime> *>(NodeBytes.get());
     if (!NodeData)
@@ -887,6 +888,33 @@ public:
     Call(NodeData->Type, NodeData->Proto);
     iterateConformanceTree(NodeData->Left, Call);
     iterateConformanceTree(NodeData->Right, Call);
+  }
+
+  void IterateConformanceTable(
+      RemoteAddress ConformancesPtr,
+      std::function<void(StoredPointer Type, StoredPointer Proto)> Call) {
+    auto MapBytes = getReader().readBytes(RemoteAddress(ConformancesPtr),
+                                          sizeof(ConcurrentHashMap<Runtime>));
+    auto MapData =
+        reinterpret_cast<const ConcurrentHashMap<Runtime> *>(MapBytes.get());
+    if (!MapData)
+      return;
+
+    auto Count = MapData->ElementCount;
+    auto Size = Count * sizeof(ConformanceCacheEntry<Runtime>);
+
+    auto ElementsBytes =
+        getReader().readBytes(RemoteAddress(MapData->Elements), Size);
+    auto ElementsData =
+        reinterpret_cast<const ConformanceCacheEntry<Runtime> *>(
+            ElementsBytes.get());
+    if (!ElementsData)
+      return;
+
+    for (StoredSize i = 0; i < Count; i++) {
+      auto &Element = ElementsData[i];
+      Call(Element.Type, Element.Proto);
+    }
   }
 
   /// Iterate the protocol conformance cache in the target process, calling Call
@@ -908,7 +936,26 @@ public:
 
     auto Root = getReader().readPointer(ConformancesAddr->getResolvedAddress(),
                                         sizeof(StoredPointer));
-    iterateConformanceTree(Root->getResolvedAddress().getAddressData(), Call);
+    auto ReaderCount = Root->getResolvedAddress().getAddressData();
+
+    // ReaderCount will be the root pointer if the conformance cache is a
+    // ConcurrentMap. It's very unlikely that there would ever be more readers
+    // than the least valid pointer value, so compare with that to distinguish.
+    // TODO: once the old conformance cache is gone for good, remove that code.
+    uint64_t LeastValidPointerValue;
+    if (!getReader().queryDataLayout(
+            DataLayoutQueryType::DLQ_GetLeastValidPointerValue, nullptr,
+            &LeastValidPointerValue)) {
+      return std::string("unable to query least valid pointer value");
+    }
+
+    if (ReaderCount < LeastValidPointerValue)
+      IterateConformanceTable(ConformancesAddr->getResolvedAddress(), Call);
+    else {
+      // The old code has the root address at this location.
+      auto RootAddr = ReaderCount;
+      iterateConformanceTree(RootAddr, Call);
+    }
     return llvm::None;
   }
   

@@ -19,6 +19,7 @@
 // RUN:             -e _ZNSt6vectorIjSaIjEE13_M_insert_auxIJjEEEvN9__gnu_cxx17__normal_iteratorIPjS1_EEDpOT_ \
 // RUN:             -e _ZNSt6vectorISt10unique_ptrIKvSt8functionIFvPS1_EEESaIS6_EE19_M_emplace_back_auxIJS6_EEEvDpOT_ \
 // RUN:             -e _ZNSt6vectorISt10unique_ptrIKvSt8functionIFvPS1_EEESaIS6_EE17_M_realloc_insertIJS6_EEEvN9__gnu_cxx17__normal_iteratorIPS6_S8_EEDpOT_ \
+// RUN:             -e _ZNSt3_V28__rotateIPcEET_S2_S2_S2_St26random_access_iterator_tag \
 // RUN:             -e _ZN9__gnu_cxx12__to_xstringINSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEcEET_PFiPT0_mPKS8_P13__va_list_tagEmSB_z \
 // RUN:             -e _ZZNSt19_Sp_make_shared_tag5_S_tiEvE5__tag \
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEDnEEEvv \
@@ -30,6 +31,7 @@
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA80_cEEEvv \
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA88_cEEEvv \
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA104_cEEEvv \
+// RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA216_cEEEvv \
 // RUN:             -e _ZN9__gnu_cxx12__to_xstringISscEET_PFiPT0_mPKS2_P13__va_list_tagEmS5_z \
 // RUN:   > %t/swiftCore-all.txt
 // RUN: %llvm-nm --defined-only --extern-only --no-weak %platform-dylib-dir/%target-library-name(swiftCore) > %t/swiftCore-no-weak.txt
@@ -41,6 +43,7 @@
 // RUN:             -e _ZNSt6vectorIjSaIjEE13_M_insert_auxIJjEEEvN9__gnu_cxx17__normal_iteratorIPjS1_EEDpOT_ \
 // RUN:             -e _ZNSt6vectorISt10unique_ptrIKvSt8functionIFvPS1_EEESaIS6_EE19_M_emplace_back_auxIJS6_EEEvDpOT_ \
 // RUN:             -e _ZNSt6vectorISt10unique_ptrIKvSt8functionIFvPS1_EEESaIS6_EE17_M_realloc_insertIJS6_EEEvN9__gnu_cxx17__normal_iteratorIPS6_S8_EEDpOT_ \
+// RUN:             -e _ZNSt3_V28__rotateIPcEET_S2_S2_S2_St26random_access_iterator_tag \
 // RUN:             -e _ZN9__gnu_cxx12__to_xstringINSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEcEET_PFiPT0_mPKS8_P13__va_list_tagEmSB_z \
 // RUN:             -e _ZZNSt19_Sp_make_shared_tag5_S_tiEvE5__tag \
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEDnEEEvv \
@@ -52,6 +55,7 @@
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA80_cEEEvv \
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA88_cEEEvv \
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA104_cEEEvv \
+// RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA216_cEEEvv \
 // RUN:             -e _ZN9__gnu_cxx12__to_xstringISscEET_PFiPT0_mPKS2_P13__va_list_tagEmS5_z \
 // RUN:   > %t/swiftRemoteMirror-all.txt
 // RUN: %llvm-nm --defined-only --extern-only --no-weak %platform-dylib-dir/%target-library-name(swiftRemoteMirror) > %t/swiftRemoteMirror-no-weak.txt
