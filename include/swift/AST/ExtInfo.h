@@ -505,6 +505,15 @@ class SILExtInfoBuilder {
   SILExtInfoBuilder(unsigned bits, ClangTypeInfo clangTypeInfo)
       : bits(bits), clangTypeInfo(clangTypeInfo) {}
 
+  static constexpr unsigned makeBits(Representation rep, bool isPseudogeneric,
+                                     bool isNoEscape, bool isAsync,
+                                     DifferentiabilityKind diffKind) {
+    return ((unsigned)rep) | (isPseudogeneric ? PseudogenericMask : 0) |
+           (isNoEscape ? NoEscapeMask : 0) | (isAsync ? AsyncMask : 0) |
+           (((unsigned)diffKind << DifferentiabilityMaskOffset) &
+            DifferentiabilityMask);
+  }
+
 public:
   // Constructor with all defaults.
   SILExtInfoBuilder() : bits(0), clangTypeInfo(ClangTypeInfo(nullptr)) {}
@@ -513,12 +522,9 @@ public:
   SILExtInfoBuilder(Representation rep, bool isPseudogeneric, bool isNoEscape,
                     bool isAsync, DifferentiabilityKind diffKind,
                     const clang::Type *type)
-      : SILExtInfoBuilder(
-            ((unsigned)rep) | (isPseudogeneric ? PseudogenericMask : 0) |
-                (isNoEscape ? NoEscapeMask : 0) | (isAsync ? AsyncMask : 0) |
-                (((unsigned)diffKind << DifferentiabilityMaskOffset) &
-                 DifferentiabilityMask),
-            ClangTypeInfo(type)) {}
+      : SILExtInfoBuilder(makeBits(rep, isPseudogeneric, isNoEscape, isAsync,
+                                   diffKind),
+                          ClangTypeInfo(type)) {}
 
   void checkInvariants() const;
 
