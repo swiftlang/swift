@@ -169,12 +169,22 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(bool preferTypeRepr,
         if (!shouldPrint(ED->getExtendedNominal(), options))
           return false;
 
-        // Skip extensions to implementation-only imported types.
+        // Skip extensions to implementation-only imported types that have
+        // no public members.
         auto localModule = ED->getParentModule();
         auto nominalModule = ED->getExtendedNominal()->getParentModule();
         if (localModule != nominalModule &&
-            localModule->isImportedImplementationOnly(nominalModule))
-          return false;
+            localModule->isImportedImplementationOnly(nominalModule)) {
+
+          bool shouldPrintMembers = llvm::any_of(
+                                      ED->getMembers(),
+                                      [&](const Decl *member) -> bool {
+            return shouldPrint(member, options);
+          });
+
+          if (!shouldPrintMembers)
+            return false;
+        }
 
         for (const Requirement &req : ED->getGenericRequirements()) {
           if (!isPublicOrUsableFromInline(req.getFirstType()))
