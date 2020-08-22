@@ -1162,7 +1162,7 @@ static CodeCompletionResult::ExpectedTypeRelation calculateTypeRelation(
 static CodeCompletionResult::ExpectedTypeRelation
 calculateTypeRelationForDecl(const Decl *D, Type ExpectedType,
                              bool IsImplicitlyCurriedInstanceMethod,
-                             bool UseFuncResultType = true) {
+                             bool UseFuncResultType){
   auto VD = dyn_cast<ValueDecl>(D);
   auto DC = D->getDeclContext();
   if (!VD)
@@ -1197,9 +1197,9 @@ calculateTypeRelationForDecl(const Decl *D, Type ExpectedType,
 }
 
 static CodeCompletionResult::ExpectedTypeRelation
-calculateMaxTypeRelationForDecl(
-    const Decl *D, const ExpectedTypeContext &typeContext,
-    bool IsImplicitlyCurriedInstanceMethod = false) {
+calculateMaxTypeRelationForDecl(const Decl *D,
+                                const ExpectedTypeContext &typeContext,
+                                bool IsImplicitlyCurriedInstanceMethod) {
   if (typeContext.empty())
     return CodeCompletionResult::ExpectedTypeRelation::Unknown;
 
@@ -1218,7 +1218,8 @@ calculateMaxTypeRelationForDecl(
       continue;
 
     Result = std::max(Result, calculateTypeRelationForDecl(
-                                  D, Type, IsImplicitlyCurriedInstanceMethod));
+                                  D, Type, IsImplicitlyCurriedInstanceMethod,
+                                  /*UseFuncResultTy*/true));
 
     // Map invalid -> unrelated when in a single-expression body, since the
     // input may be incomplete.
@@ -1334,9 +1335,12 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
     }
 
     auto typeRelation = ExpectedTypeRelation;
+    // FIXME: we don't actually have enough info to compute
+    // IsImplicitlyCurriedInstanceMethod here.
     if (typeRelation == CodeCompletionResult::Unknown)
       typeRelation =
-          calculateMaxTypeRelationForDecl(AssociatedDecl, declTypeContext);
+          calculateMaxTypeRelationForDecl(AssociatedDecl, declTypeContext,
+                                          /*IsImplicitlyCurriedMethod*/false);
 
     return new (*Sink.Allocator) CodeCompletionResult(
         SemanticContext, NumBytesToErase, CCS, AssociatedDecl, ModuleName,
@@ -2012,8 +2016,10 @@ public:
     IsStaticMetatype = value;
   }
 
-  void setExpectedTypes(ArrayRef<Type> Types, bool isSingleExpressionBody) {
+  void setExpectedTypes(ArrayRef<Type> Types, bool isSingleExpressionBody,
+                        bool preferNonVoid = false) {
     expectedTypeContext.isSingleExpressionBody = isSingleExpressionBody;
+    expectedTypeContext.preferNonVoid = preferNonVoid;
     expectedTypeContext.possibleTypes.clear();
     expectedTypeContext.possibleTypes.reserve(Types.size());
     for (auto T : Types)
@@ -2026,7 +2032,7 @@ public:
   }
 
   CodeCompletionContext::TypeContextKind typeContextKind() const {
-    if (expectedTypeContext.empty()) {
+    if (expectedTypeContext.empty() && !expectedTypeContext.preferNonVoid) {
       return CodeCompletionContext::TypeContextKind::None;
     } else if (expectedTypeContext.isSingleExpressionBody) {
       return CodeCompletionContext::TypeContextKind::SingleExpressionBody;
@@ -3044,6 +3050,12 @@ public:
 
       if (isUnresolvedMemberIdealType(ResultType))
         Builder.setSemanticContext(SemanticContextKind::ExpressionSpecific);
+
+      if (!IsImplicitlyCurriedInstanceMethod &&
+          expectedTypeContext.requiresNonVoid() &&
+          ResultType->isVoid()) {
+        Builder.setExpectedTypeRelation(CodeCompletionResult::Invalid);
+      }
     };
 
     if (!AFT || IsImplicitlyCurriedInstanceMethod) {
@@ -5924,7 +5936,9 @@ void DotExprLookup::performLookup(ide::CodeCompletionContext &CompletionCtx,
   for (auto &Solution: Solutions) {
     Lookup.setIsStaticMetatype(Solution.BaseIsStaticMetaType);
     Lookup.getPostfixKeywordCompletions(Solution.Ty, BaseExpr);
-    Lookup.setExpectedTypes(Solution.ExpectedTypes, Solution.isSingleExpressionClosure);
+    Lookup.setExpectedTypes(Solution.ExpectedTypes,
+                            Solution.IsSingleExpressionClosure,
+                            Solution.ExpectsNonVoid);
     if (isDynamicLookup(Solution.Ty))
       Lookup.setIsDynamicLookup();
     Lookup.getValueExprCompletions(Solution.Ty, Solution.ReferencedDecl);

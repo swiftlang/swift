@@ -58,7 +58,6 @@ namespace swift {
   class CompletionCollector {
   public:
     virtual void sawSolution(const constraints::Solution &solution) = 0;
-    virtual bool isApplicable(Expr *E) { return false; }
     virtual ~CompletionCollector() {}
   };
 
@@ -68,8 +67,9 @@ namespace swift {
       Type Ty;
       ValueDecl* ReferencedDecl;
       SmallVector<Type, 4> ExpectedTypes;
+      bool ExpectsNonVoid;
       bool BaseIsStaticMetaType;
-      bool isSingleExpressionClosure;
+      bool IsSingleExpressionClosure;
     };
 
     SourceLoc DotLoc;

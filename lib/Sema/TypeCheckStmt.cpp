@@ -1608,15 +1608,6 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
       options |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
     }
 
-//    if (ctx.CompletionCallback) {
-//      TypeChecker::typeCheckForCodeCompletion(E, DC, Type(), CTP_Unused,
-//        [&](const constraints::Solution &solution) {
-//        ctx.CompletionCallback->sawSolution(solution);
-//        });
-//      node = E;
-//      return;
-//    }
-
     auto resultTy =
         TypeChecker::typeCheckExpression(E, DC, Type(), CTP_Unused, options);
 

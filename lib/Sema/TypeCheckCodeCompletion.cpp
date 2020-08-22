@@ -884,8 +884,11 @@ void DotExprLookup::sawSolution(const constraints::Solution &S) {
   if (Type BaseTy = GetType(ParsedExpr)) {
     auto *Locator = CS.getConstraintLocator(SemanticExpr);
     Type ExpectedTy = GetType(CompletionExpr);
-    if (!CS.getParentExpr(CompletionExpr))
+    bool DisallowVoid = true;
+    if (!CS.getParentExpr(CompletionExpr)) {
       ExpectedTy = CS.getContextualType(CompletionExpr);
+      DisallowVoid = CS.getContextualTypePurpose(CompletionExpr) != CTP_Unused;
+    }
 
     auto *CalleeLocator = S.getCalleeLocator(Locator);
     ValueDecl *ReferencedDecl = nullptr;
@@ -904,7 +907,11 @@ void DotExprLookup::sawSolution(const constraints::Solution &S) {
           ISEC = Parent->getSingleExpressionBody() == CompletionExpr;
         }
       }
-      Solutions.push_back({BaseTy, ReferencedDecl, {ExpectedTy}, ISDMT, ISEC});
+      Solutions.push_back({
+        BaseTy, ReferencedDecl, {}, DisallowVoid, ISDMT, ISEC
+      });
+      if (ExpectedTy)
+        Solutions.back().ExpectedTypes.push_back(ExpectedTy);
     }
   }
 }
