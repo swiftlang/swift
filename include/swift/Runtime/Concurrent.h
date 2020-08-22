@@ -830,9 +830,37 @@ public:
   /// Take a snapshot of the current state of the hash map.
   Snapshot snapshot() {
     incrementReaders();
-    auto *indices = Indices.load(SWIFT_MEMORY_ORDER_CONSUME);
-    auto elementCount = ElementCount.load(std::memory_order_acquire);
-    auto *elements = Elements.load(std::memory_order_acquire);
+
+    // Carefully loading the indices, element count, and elements pointer in
+    // order ensures a consistent view of the table with respect to concurrent
+    // inserts. However, this is not sufficient to avoid an inconsistent view
+    // with respect to concurrent clears. The danger scenario is:
+    //
+    // 1. Read indices and elementCount from a table with N entries.
+    // 2. Another thread clears the table.
+    // 3. Another thread inserts M entries, where M < N.
+    // 4. The reader thread reads elements.
+    // 5. The reader thread performs a find. The key's hash leads us to an index
+    //    I, where > M.
+    // 6. The reader thread reads from element I, which is off the end of the
+    //    elements array.
+    //
+    // To avoid this, read the elements pointer twice, at the beginning and end.
+    // If the values are not the same then there may have been a clear in the
+    // middle, so we retry. This will have false positives: a new element
+    // pointer can just mean a concurrent insert that triggered a resize of the
+    // elements array. This is harmless aside from a small performance hit, and
+    // should not happen often.
+    IndexStorage *indices;
+    size_t elementCount;
+    ElemTy *elements;
+    ElemTy *elements2;
+    do {
+      elements = Elements.load(std::memory_order_acquire);
+      indices = Indices.load(SWIFT_MEMORY_ORDER_CONSUME);
+      elementCount = ElementCount.load(std::memory_order_acquire);
+      elements2 = Elements.load(std::memory_order_acquire);
+    } while (elements != elements2);
 
     return Snapshot(this, indices, elements, elementCount);
   }
