@@ -317,7 +317,8 @@ public:
 class TypeConverter {
   TypeRefBuilder &Builder;
   std::vector<std::unique_ptr<const TypeInfo>> Pool;
-  llvm::DenseMap<const TypeRef *, const TypeInfo *> Cache;
+  llvm::DenseMap<std::pair<const TypeRef *, remote::TypeInfoProvider *>,
+                 const TypeInfo *> Cache;
   llvm::DenseSet<const TypeRef *> RecursionCheck;
   llvm::DenseMap<std::pair<unsigned, unsigned>,
                  const ReferenceTypeInfo *> ReferenceCache;

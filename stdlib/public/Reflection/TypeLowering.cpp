@@ -2194,7 +2194,7 @@ const TypeInfo *
 TypeConverter::getTypeInfo(const TypeRef *TR,
                            remote::TypeInfoProvider *ExternalTypeInfo) {
   // See if we already computed the result
-  auto found = Cache.find(TR);
+  auto found = Cache.find({TR, ExternalTypeInfo});
   if (found != Cache.end())
     return found->second;
 
@@ -2207,7 +2207,7 @@ TypeConverter::getTypeInfo(const TypeRef *TR,
 
   // Compute the result and cache it
   auto *TI = LowerType(*this, ExternalTypeInfo).visit(TR);
-  Cache[TR] = TI;
+  Cache.insert({{TR, ExternalTypeInfo}, TI});
 
   RecursionCheck.erase(TR);
 
