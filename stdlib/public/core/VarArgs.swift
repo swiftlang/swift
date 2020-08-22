@@ -63,6 +63,7 @@ protocol _CVarArgAligned: CVarArg {
   var _cVarArgAlignment: Int { get }
 }
 
+#if !_runtime(_ObjC)
 /// Some pointers require an alternate object to be retained.  The object
 /// that is returned will be used with _cVarArgEncoding and held until
 /// the closure is complete.  This is required since autoreleased storage
@@ -71,6 +72,7 @@ public protocol _CVarArgObject: CVarArg {
   /// Returns the alternate object that should be encoded.
   var _cVarArgObject: CVarArg { get }
 }
+#endif
 
 #if arch(x86_64)
 @usableFromInline
@@ -471,8 +473,10 @@ final internal class __VaListBuilder {
   @usableFromInline // c-abi
   internal var storage: ContiguousArray<Int>
 
+#if !_runtime(_ObjC)
   @usableFromInline // c-abi
   internal var retainer = [CVarArg]()
+#endif
 
   @inlinable // c-abi
   internal init() {
@@ -487,11 +491,13 @@ final internal class __VaListBuilder {
   internal func append(_ arg: CVarArg) {
     var arg = arg
 
+#if !_runtime(_ObjC)
     // We may need to retain an object that provides a pointer value.
     if let obj = arg as? _CVarArgObject {
       arg = obj._cVarArgObject
       retainer.append(arg)
     }
+#endif
 
     var encoded = arg._cVarArgEncoding
 
@@ -582,11 +588,13 @@ final internal class __VaListBuilder {
   internal func append(_ arg: CVarArg) {
     var arg = arg
 
+#if !_runtime(_ObjC)
     // We may need to retain an object that provides a pointer value.
     if let obj = arg as? _CVarArgObject {
       arg = obj._cVarArgObject
       retainer.append(arg)
     }
+#endif
 
     // Write alignment padding if necessary.
     // This is needed on architectures where the ABI alignment of some
@@ -693,8 +701,10 @@ final internal class __VaListBuilder {
   @usableFromInline // c-abi
   internal var storage: UnsafeMutablePointer<Int>?
 
+#if !_runtime(_ObjC)
   @usableFromInline // c-abi
   internal var retainer = [CVarArg]()
+#endif
 
   internal static var alignedStorageForEmptyVaLists: Double = 0
 }
