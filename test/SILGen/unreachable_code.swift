@@ -67,8 +67,7 @@ func testUnreachableCase1(a : Tree) {
   case let Leaf:
     _ = Leaf
     return
-  case .Branch(_):  // expected-warning {{case will never be executed}}
-  // expected-warning@-1 {{case is already handled by previous patterns; consider removing it}}
+  case .Branch(_): // expected-warning {{case is already handled by previous patterns; consider removing it}}
     return
   }
 }
@@ -87,8 +86,7 @@ func testUnreachableCase3(a : Tree) {
   switch a {
   case _:
     break
-  case .Branch(_):  // expected-warning {{case will never be executed}}
-  // expected-warning@-1 {{case is already handled by previous patterns; consider removing it}}
+  case .Branch(_): // expected-warning {{case is already handled by previous patterns; consider removing it}}
     return
   }
 }
@@ -136,4 +134,15 @@ func sr6141() {
   var bar: String? = ""
   return;
   bar?.append("x")  // expected-warning{{code after 'return' will never be executed}}
+}
+
+func testUnreachableCatchClause() {
+  enum ErrorEnum: Error { case someError }
+  do {
+    throw ErrorEnum.someError
+  } catch let error {
+    print(error)
+  } catch ErrorEnum.someError { // expected-warning {{case will never be executed}}
+    print("some error")
+  }
 }
