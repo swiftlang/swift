@@ -489,9 +489,9 @@ final internal class __VaListBuilder {
 
   @inlinable // c-abi
   internal func append(_ arg: CVarArg) {
+#if !_runtime(_ObjC)
     var arg = arg
 
-#if !_runtime(_ObjC)
     // We may need to retain an object that provides a pointer value.
     if let obj = arg as? _CVarArgObject {
       arg = obj._cVarArgObject
@@ -586,9 +586,9 @@ final internal class __VaListBuilder {
 
   @inlinable // c-abi
   internal func append(_ arg: CVarArg) {
+#if !_runtime(_ObjC)
     var arg = arg
 
-#if !_runtime(_ObjC)
     // We may need to retain an object that provides a pointer value.
     if let obj = arg as? _CVarArgObject {
       arg = obj._cVarArgObject
