@@ -31,6 +31,7 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/StringSaver.h"
 #include "llvm/Support/YAMLTraits.h"
@@ -626,7 +627,6 @@ static bool diagnoseCycle(CompilerInstance &instance,
 
 static bool scanModuleDependencies(CompilerInstance &instance,
                                    StringRef moduleName,
-                                   StringRef arguments,
                                    bool isClang,
                                    StringRef outputPath) {
   ASTContext &ctx = instance.getASTContext();
@@ -685,14 +685,14 @@ static bool scanModuleDependencies(CompilerInstance &instance,
 bool swift::scanClangDependencies(CompilerInstance &instance) {
   return scanModuleDependencies(instance,
                                 instance.getMainModule()->getNameStr(),
-                                StringRef(),
                                 /*isClang*/true,
                                 instance.getInvocation().getFrontendOptions()
                                   .InputsAndOutputs.getSingleOutputFilename());
 }
 
-bool swift::batchScanModuleDependencies(CompilerInstance &instance,
-                                      llvm::StringRef batchInputFile) {
+bool swift::batchScanModuleDependencies(CompilerInvocation &invok,
+                                        CompilerInstance &instance,
+                                        llvm::StringRef batchInputFile) {
   (void)instance.getMainModule();
   llvm::BumpPtrAllocator alloc;
   llvm::StringSaver saver(alloc);
@@ -700,10 +700,43 @@ bool swift::batchScanModuleDependencies(CompilerInstance &instance,
                                          batchInputFile, saver);
   if (!results.hasValue())
     return true;
+  auto &diags = instance.getDiags();
+  ForwardingDiagnosticConsumer FDC(diags);
+  // Keep track of all compiler instances we have created.
+  llvm::StringMap<std::unique_ptr<CompilerInstance>> subInstanceMap;
   for (auto &entry: *results) {
-    if (scanModuleDependencies(instance, entry.moduleName, entry.arguments,
-                               !entry.isSwift, entry.outputPath))
+    CompilerInstance *pInstance = nullptr;
+    if (entry.arguments.empty()) {
+      // Use the compiler's instance if no arguments are specified.
+      pInstance = &instance;
+    } else if (subInstanceMap.count(entry.arguments)) {
+      // Use the previously created instance if we've seen the arguments before.
+      pInstance = subInstanceMap[entry.arguments].get();
+    } else {
+      // Create a new instance by the arguments and save it in the map.
+      pInstance = subInstanceMap.insert({entry.arguments,
+        std::make_unique<CompilerInstance>()}).first->getValue().get();
+      SmallVector<const char*, 4> args;
+      llvm::cl::TokenizeGNUCommandLine(entry.arguments, saver, args);
+      CompilerInvocation subInvok = invok;
+      pInstance->addDiagnosticConsumer(&FDC);
+      if (subInvok.parseArgs(args, diags)) {
+        instance.getDiags().diagnose(SourceLoc(), diag::scanner_arguments_invalid,
+                                     entry.arguments);
+        return true;
+      }
+      if (pInstance->setup(subInvok)) {
+        instance.getDiags().diagnose(SourceLoc(), diag::scanner_arguments_invalid,
+                                     entry.arguments);
+        return true;
+      }
+    }
+    assert(pInstance);
+    // Scan using the chosen compiler instance.
+    if (scanModuleDependencies(*pInstance, entry.moduleName, !entry.isSwift,
+                               entry.outputPath)) {
       return true;
+    }
   }
   return false;
 }
