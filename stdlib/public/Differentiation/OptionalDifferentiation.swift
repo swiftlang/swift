@@ -23,7 +23,7 @@ extension Optional: Differentiable where Wrapped: Differentiable {
     }
 
     public static var zero: Self {
-      return Self(.zero)
+      return Self(nil)
     }
 
     public static func + (lhs: Self, rhs: Self) -> Self {

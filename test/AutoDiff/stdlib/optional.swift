@@ -64,11 +64,11 @@ OptionalDifferentiationTests.test("Optional.TangentVector operations") {
   }
 
   // AdditiveArithmetic.zero
-  expectEqual(.init(Float.zero), Float?.TangentVector.zero)
-  expectEqual(.init([Float].TangentVector.zero), [Float]?.TangentVector.zero)
+  expectEqual(.init(nil), Float?.TangentVector.zero)
+  expectEqual(.init(nil), [Float]?.TangentVector.zero)
 
-  expectEqual(.init(.init(Float.zero)), Float??.TangentVector.zero)
-  expectEqual(.init(.init([Float].TangentVector.zero)), [Float]??.TangentVector.zero)
+  expectEqual(.init(nil), Float??.TangentVector.zero)
+  expectEqual(.init(nil), [Float]??.TangentVector.zero)
 
   // AdditiveArithmetic.+, AdditiveArithmetic.-
   do {
