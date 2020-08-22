@@ -21,6 +21,16 @@ using namespace swift;
 using namespace llvm;
 using syntax::TriviaKind;
 
+static std::string getDefaultLocalizationPath() {
+  std::string libPath = llvm::sys::path::parent_path(SWIFTLIB_DIR);
+  llvm::SmallString<128> DefaultDiagnosticMessagesDir(libPath);
+  llvm::sys::path::remove_filename(DefaultDiagnosticMessagesDir); // Remove /lib
+  llvm::sys::path::remove_filename(DefaultDiagnosticMessagesDir); // Remove /.
+  llvm::sys::path::append(DefaultDiagnosticMessagesDir, "share", "swift",
+                          "diagnostics");
+  return std::string(DefaultDiagnosticMessagesDir.str());
+}
+
 // The test fixture.
 class LexerTest : public ::testing::Test {
 public:
@@ -781,7 +791,7 @@ TEST_F(LexerTest, DiagnoseEmbeddedNul) {
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source, SourceLen));
 
   StringCaptureDiagnosticConsumer DiagConsumer;
-  DiagnosticEngine Diags(SourceMgr);
+  DiagnosticEngine Diags(SourceMgr, getDefaultLocalizationPath());
   Diags.addConsumer(DiagConsumer);
 
   Lexer L(LangOpts, SourceMgr, BufferID, &Diags,
@@ -803,7 +813,7 @@ TEST_F(LexerTest, DiagnoseEmbeddedNulOffset) {
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source, SourceLen));
 
   StringCaptureDiagnosticConsumer DiagConsumer;
-  DiagnosticEngine Diags(SourceMgr);
+  DiagnosticEngine Diags(SourceMgr, getDefaultLocalizationPath());
   Diags.addConsumer(DiagConsumer);
 
   Lexer L(LangOpts, SourceMgr, BufferID, &Diags,

@@ -15,3 +15,6 @@ target_link_libraries(SwiftASTTests
    swiftParse
    swiftSema
 )
+
+target_compile_definitions(SwiftASTTests PRIVATE
+  SWIFTLIB_DIR=\"${SWIFTLIB_DIR}\")

@@ -25,6 +25,16 @@
 using namespace swift;
 using namespace llvm;
 
+static std::string getDefaultLocalizationPath() {
+  std::string libPath = llvm::sys::path::parent_path(SWIFTLIB_DIR);
+  llvm::SmallString<128> DefaultDiagnosticMessagesDir(libPath);
+  llvm::sys::path::remove_filename(DefaultDiagnosticMessagesDir); // Remove /lib
+  llvm::sys::path::remove_filename(DefaultDiagnosticMessagesDir); // Remove /.
+  llvm::sys::path::append(DefaultDiagnosticMessagesDir, "share", "swift",
+                          "diagnostics");
+  return std::string(DefaultDiagnosticMessagesDir.str());
+}
+
 class ArithmeticExpr {
  public:
   enum class Kind {
@@ -218,7 +228,7 @@ TEST(ArithmeticEvaluator, Simple) {
                                        lifeUniverseEverything);
 
   SourceManager sourceMgr;
-  DiagnosticEngine diags(sourceMgr);
+  DiagnosticEngine diags(sourceMgr, getDefaultLocalizationPath());
   LangOptions opts;
   opts.DebugDumpCycles = false;
   opts.BuildRequestDependencyGraph = true;
@@ -345,7 +355,7 @@ TEST(ArithmeticEvaluator, Cycle) {
   sum->rhs = product;
 
   SourceManager sourceMgr;
-  DiagnosticEngine diags(sourceMgr);
+  DiagnosticEngine diags(sourceMgr, getDefaultLocalizationPath());
   LangOptions opts;
   opts.DebugDumpCycles = false;
   opts.BuildRequestDependencyGraph = false;

@@ -17,6 +17,16 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 
+static std::string getDefaultLocalizationPath() {
+  std::string libPath = llvm::sys::path::parent_path(SWIFTLIB_DIR);
+  llvm::SmallString<128> DefaultDiagnosticMessagesDir(libPath);
+  llvm::sys::path::remove_filename(DefaultDiagnosticMessagesDir); // Remove /lib
+  llvm::sys::path::remove_filename(DefaultDiagnosticMessagesDir); // Remove /.
+  llvm::sys::path::append(DefaultDiagnosticMessagesDir, "share", "swift",
+                          "diagnostics");
+  return std::string(DefaultDiagnosticMessagesDir.str());
+}
+
 namespace swift {
 namespace unittest {
 
@@ -32,7 +42,7 @@ public:
   SourceManager SourceMgr;
   DiagnosticEngine Diags;
 
-  TestContextBase() : Diags(SourceMgr) {
+  TestContextBase() : Diags(SourceMgr, getDefaultLocalizationPath()) {
     LangOpts.Target = llvm::Triple(llvm::sys::getProcessTriple());
   }
 };

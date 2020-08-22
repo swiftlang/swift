@@ -1,4 +1,5 @@
 #include "swift/AST/Module.h"
+#include "swift/Basic/DiagnosticOptions.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
@@ -9,6 +10,16 @@
 
 using namespace swift;
 using namespace llvm;
+
+static std::string getDefaultLocalizationPath() {
+  std::string libPath = llvm::sys::path::parent_path(SWIFTLIB_DIR);
+  llvm::SmallString<128> DefaultDiagnosticMessagesDir(libPath);
+  llvm::sys::path::remove_filename(DefaultDiagnosticMessagesDir); // Remove /lib
+  llvm::sys::path::remove_filename(DefaultDiagnosticMessagesDir); // Remove /.
+  llvm::sys::path::append(DefaultDiagnosticMessagesDir, "share", "swift",
+                          "diagnostics");
+  return std::string(DefaultDiagnosticMessagesDir.str());
+}
 
 // The test fixture.
 class TokenizerTest : public ::testing::Test {
@@ -82,8 +93,10 @@ public:
   }
   
   std::vector<Token> parseAndGetSplitTokens(unsigned BufID) {
-    swift::ParserUnit PU(SM, SourceFileKind::Main, BufID,
-                         LangOpts, TypeCheckerOptions(), "unknown");
+    DiagnosticOptions DiagOpts;
+    DiagOpts.DefaultLocalizationMessagesPath = getDefaultLocalizationPath();
+    swift::ParserUnit PU(SM, SourceFileKind::Main, BufID, LangOpts,
+                         TypeCheckerOptions(), "unknown", DiagOpts);
     SmallVector<Decl *, 8> decls;
     PU.getParser().parseTopLevel(decls);
     return PU.getParser().getSplitTokens();

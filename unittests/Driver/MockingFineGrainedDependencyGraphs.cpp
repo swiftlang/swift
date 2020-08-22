@@ -23,6 +23,16 @@ using namespace swift;
 using namespace fine_grained_dependencies;
 using namespace mocking_fine_grained_dependency_graphs;
 
+static std::string getDefaultLocalizationPath() {
+  std::string libPath = llvm::sys::path::parent_path(SWIFTLIB_DIR);
+  llvm::SmallString<128> DefaultDiagnosticMessagesDir(libPath);
+  llvm::sys::path::remove_filename(DefaultDiagnosticMessagesDir); // Remove /lib
+  llvm::sys::path::remove_filename(DefaultDiagnosticMessagesDir); // Remove /.
+  llvm::sys::path::append(DefaultDiagnosticMessagesDir, "share", "swift",
+                          "diagnostics");
+  return std::string(DefaultDiagnosticMessagesDir.str());
+}
+
 void mocking_fine_grained_dependency_graphs::simulateLoad(
     ModuleDepGraph &g, const driver::Job *cmd,
     const DependencyDescriptions &dependencyDescriptions,
@@ -47,7 +57,7 @@ mocking_fine_grained_dependency_graphs::getChangesForSimulatedLoad(
       interfaceHashIfNonEmpty.empty() ? swiftDeps : interfaceHashIfNonEmpty;
 
   SourceManager sm;
-  DiagnosticEngine diags(sm);
+  DiagnosticEngine diags(sm, getDefaultLocalizationPath());
 
   auto sfdg =
       UnitTestSourceFileDepGraphFactory(

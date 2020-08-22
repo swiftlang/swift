@@ -15,3 +15,6 @@ target_link_libraries(SwiftParseTests
     # FIXME: Sema must go last because of circular dependencies with AST.
     swiftSema
 )
+
+target_compile_definitions(SwiftParseTests PRIVATE
+  SWIFTLIB_DIR=\"${SWIFTLIB_DIR}\")

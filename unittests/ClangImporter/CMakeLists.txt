@@ -8,3 +8,6 @@ target_link_libraries(SwiftClangImporterTests
     swiftParse
     swiftAST
 )
+
+target_compile_definitions(SwiftClangImporterTests PRIVATE
+  SWIFTLIB_DIR=\"${SWIFTLIB_DIR}\")

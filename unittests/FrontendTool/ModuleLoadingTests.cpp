@@ -45,6 +45,16 @@ static bool emitFileWithContents(StringRef base, StringRef name,
   return emitFileWithContents(createFilename(base, name), contents, pathOut);
 }
 
+static std::string getDefaultLocalizationPath() {
+  std::string libPath = llvm::sys::path::parent_path(SWIFTLIB_DIR);
+  llvm::SmallString<128> DefaultDiagnosticMessagesDir(libPath);
+  llvm::sys::path::remove_filename(DefaultDiagnosticMessagesDir); // Remove /lib
+  llvm::sys::path::remove_filename(DefaultDiagnosticMessagesDir); // Remove /.
+  llvm::sys::path::append(DefaultDiagnosticMessagesDir, "share", "swift",
+                          "diagnostics");
+  return std::string(DefaultDiagnosticMessagesDir.str());
+}
+
 namespace unittest {
 
 class OpenTrackingFileSystem : public llvm::vfs::ProxyFileSystem {
@@ -92,7 +102,7 @@ protected:
 
     sourceMgr.setFileSystem(fs);
     PrintingDiagnosticConsumer printingConsumer;
-    DiagnosticEngine diags(sourceMgr);
+    DiagnosticEngine diags(sourceMgr, getDefaultLocalizationPath());
     diags.addConsumer(printingConsumer);
     TypeCheckerOptions typeckOpts;
     LangOptions langOpts;

@@ -41,6 +41,16 @@ static bool emitFileWithContents(StringRef base, StringRef name,
   return emitFileWithContents(createFilename(base, name), contents, pathOut);
 }
 
+static std::string getDefaultLocalizationPath() {
+  std::string libPath = llvm::sys::path::parent_path(SWIFTLIB_DIR);
+  llvm::SmallString<128> DefaultDiagnosticMessagesDir(libPath);
+  llvm::sys::path::remove_filename(DefaultDiagnosticMessagesDir); // Remove /lib
+  llvm::sys::path::remove_filename(DefaultDiagnosticMessagesDir); // Remove /.
+  llvm::sys::path::append(DefaultDiagnosticMessagesDir, "share", "swift",
+                          "diagnostics");
+  return std::string(DefaultDiagnosticMessagesDir.str());
+}
+
 TEST(ClangImporterTest, emitPCHInMemory) {
   // Create a temporary cache on disk and clean it up at the end.
   ClangImporterOptions options;
@@ -76,7 +86,7 @@ TEST(ClangImporterTest, emitPCHInMemory) {
   INITIALIZE_LLVM();
   swift::SearchPathOptions searchPathOpts;
   swift::SourceManager sourceMgr;
-  swift::DiagnosticEngine diags(sourceMgr);
+  swift::DiagnosticEngine diags(sourceMgr, getDefaultLocalizationPath());
   std::unique_ptr<ASTContext> context(
       ASTContext::get(langOpts, typeckOpts, searchPathOpts, sourceMgr, diags));
   auto importer = ClangImporter::create(*context, options);
