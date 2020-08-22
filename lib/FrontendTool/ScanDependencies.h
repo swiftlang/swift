@@ -17,10 +17,13 @@
 
 namespace swift {
 
+class CompilerInvocation;
 class CompilerInstance;
 
 /// Batch scan the dependencies for modules specified in \c batchInputFile.
-bool batchScanModuleDependencies(CompilerInstance &instance, llvm::StringRef batchInputFile);
+bool batchScanModuleDependencies(CompilerInvocation &invok,
+                                 CompilerInstance &instance,
+                                 llvm::StringRef batchInputFile);
 
 /// Scans the dependencies of the main module of \c instance.
 bool scanDependencies(CompilerInstance &instance);
