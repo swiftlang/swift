@@ -13,6 +13,7 @@
 #ifndef SWIFT_CLANGNODE_H
 #define SWIFT_CLANGNODE_H
 
+#include "swift/Basic/Debug.h"
 #include "llvm/ADT/PointerUnion.h"
 
 namespace clang {
@@ -97,6 +98,8 @@ public:
 
   clang::SourceLocation getLocation() const;
   clang::SourceRange getSourceRange() const;
+
+  SWIFT_DEBUG_DUMP;
 
   void *getOpaqueValue() const { return Ptr.getOpaqueValue(); }
   static inline ClangNode getFromOpaqueValue(void *VP) {

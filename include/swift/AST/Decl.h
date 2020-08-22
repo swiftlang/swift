@@ -283,7 +283,7 @@ class alignas(1 << DeclAlignInBits) Decl {
 protected:
   union { uint64_t OpaqueBits;
 
-  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1,
     Kind : bitmax(NumDeclKindBits,8),
 
     /// Whether this declaration is invalid.
@@ -385,7 +385,7 @@ protected:
   SWIFT_INLINE_BITFIELD(SubscriptDecl, VarDecl, 2,
     StaticSpelling : 2
   );
-  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+1+1+1+1+1+1,
     /// \see AbstractFunctionDecl::BodyKind
     BodyKind : 3,
 
@@ -2996,11 +2996,29 @@ public:
   /// Retrieve a sugared interface type containing the structure of the interface
   /// type before any semantic validation has occured.
   Type getStructuralType() const;
-  
+
+  /// Whether the typealias forwards perfectly to its underlying type.
+  ///
+  /// If true, this typealias was created by ClangImporter to preserve source
+  /// compatibility with a previous language version's name for a type. Many
+  /// checks in Sema look through compatibility aliases even when they would
+  /// operate on other typealiases.
+  ///
+  /// \warning This has absolutely nothing to do with the Objective-C
+  /// \c compatibility_alias keyword.
   bool isCompatibilityAlias() const {
     return Bits.TypeAliasDecl.IsCompatibilityAlias;
   }
 
+  /// Sets whether the typealias forwards perfectly to its underlying type.
+  ///
+  /// Marks this typealias as having been created by ClangImporter to preserve
+  /// source compatibility with a previous language version's name for a type.
+  /// Many checks in Sema look through compatibility aliases even when they
+  /// would operate on other typealiases.
+  ///
+  /// \warning This has absolutely nothing to do with the Objective-C
+  /// \c compatibility_alias keyword.
   void markAsCompatibilityAlias(bool newValue = true) {
     Bits.TypeAliasDecl.IsCompatibilityAlias = newValue;
   }

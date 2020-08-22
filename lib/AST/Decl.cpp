@@ -59,6 +59,7 @@
 #include "swift/Demangling/ManglingMacros.h"
 
 #include "clang/Basic/CharInfo.h"
+#include "clang/Basic/Module.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 
@@ -114,6 +115,17 @@ const clang::Module *ClangNode::getClangModule() const {
   if (auto *ID = dyn_cast_or_null<clang::ImportDecl>(getAsDecl()))
     return ID->getImportedModule();
   return nullptr;
+}
+
+void ClangNode::dump() const {
+  if (auto D = getAsDecl())
+    D->dump();
+  else if (auto M = getAsMacro())
+    M->dump();
+  else if (auto M = getAsModule())
+    M->dump();
+  else
+    llvm::errs() << "ClangNode contains nullptr\n";
 }
 
 // Only allow allocation of Decls using the allocator in ASTContext.

@@ -2995,6 +2995,7 @@ public:
     DeclID accessorStorageDeclID;
     bool overriddenAffectsABI, needsNewVTableEntry, isTransparent;
     DeclID opaqueReturnTypeID;
+    bool isUserAccessible;
     ArrayRef<uint64_t> nameAndDependencyIDs;
 
     if (!isAccessor) {
@@ -3012,6 +3013,7 @@ public:
                                           rawAccessLevel,
                                           needsNewVTableEntry,
                                           opaqueReturnTypeID,
+                                          isUserAccessible,
                                           nameAndDependencyIDs);
     } else {
       decls_block::AccessorLayout::readRecord(scratch, contextID, isImplicit,
@@ -3198,6 +3200,9 @@ public:
           OpaqueResultTypeRequest{fn},
           cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
     }
+
+    if (!isAccessor)
+      fn->setUserAccessible(isUserAccessible);
 
     return fn;
   }
