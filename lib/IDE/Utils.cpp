@@ -101,7 +101,7 @@ static const char *skipStringInCode(const char *p, const char *End) {
 
 SourceCompleteResult
 ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf,
-                           SourceFileKind SFKind, CompilerInvocation &Invok) {
+                           SourceFileKind SFKind, const CompilerInvocation &Invok) {
   SourceManager SM;
   auto BufferID = SM.addNewSourceBuffer(std::move(MemBuf));
   ParserUnit Parse(SM, SFKind, BufferID, Invok.getDiagnosticOptions());
@@ -184,7 +184,7 @@ ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf,
 
 SourceCompleteResult ide::isSourceInputComplete(StringRef Text,
                                                 SourceFileKind SFKind,
-                                                CompilerInvocation &Invok) {
+                                                const CompilerInvocation &Invok) {
   return ide::isSourceInputComplete(llvm::MemoryBuffer::getMemBufferCopy(Text),
                                     SFKind, Invok);
 }

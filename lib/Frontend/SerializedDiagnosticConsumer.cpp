@@ -106,7 +106,7 @@ class SerializedDiagnosticConsumer : public DiagnosticConsumer {
 
 public:
   SerializedDiagnosticConsumer(StringRef serializedDiagnosticsPath,
-                               DiagnosticOptions &diagOpts)
+                               const DiagnosticOptions &diagOpts)
       : State(new SharedState(serializedDiagnosticsPath)),
         DefaultLocalizationMessagesPath(
             diagOpts.DefaultLocalizationMessagesPath) {
@@ -210,7 +210,7 @@ private:
 namespace swift {
 namespace serialized_diagnostics {
 std::unique_ptr<DiagnosticConsumer>
-createConsumer(StringRef outputPath, DiagnosticOptions &diagOpts) {
+createConsumer(StringRef outputPath, const DiagnosticOptions &diagOpts) {
   return std::make_unique<SerializedDiagnosticConsumer>(outputPath, diagOpts);
 }
 } // namespace serialized_diagnostics

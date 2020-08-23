@@ -2299,7 +2299,7 @@ createDispatchingDiagnosticConsumerIfNeeded(
 static std::unique_ptr<DiagnosticConsumer>
 createSerializedDiagnosticConsumerIfNeeded(
     const FrontendInputsAndOutputs &inputsAndOutputs,
-    DiagnosticOptions &diagOpts) {
+    const DiagnosticOptions &diagOpts) {
   return createDispatchingDiagnosticConsumerIfNeeded(
       inputsAndOutputs,
       [&](const InputFile &input) -> std::unique_ptr<DiagnosticConsumer> {
