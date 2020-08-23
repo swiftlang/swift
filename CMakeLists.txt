@@ -654,9 +654,10 @@ endif()
 
 if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
   # CMake's default for CMAKE_CXX_FLAGS_RELEASE is "-O3 -DNDEBUG". Let's avoid "-O3" for consistency
-  # between Release and RelWithDebInfo. And let's not set -DNDEBUG because we're setting that manually
-  # based on LLVM_ENABLE_ASSERTIONS.
-  set(CMAKE_CXX_FLAGS_RELEASE "-O2")
+  # between Release and RelWithDebInfo. Dropping -DNDEBUG from this setting is blocked by triggering
+  # a test failure of Swift-Unit :: Syntax/./SwiftSyntaxTests/TypeSyntaxTests.MetatypeTypeWithAPIs
+  # because unit tests don't currently explicitly set -DNDEBUG/-UNDEBUG.
+  set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG")
 
   _compute_lto_flag("${SWIFT_TOOLS_ENABLE_LTO}" _lto_flag_out)
   if(_lto_flag_out)
