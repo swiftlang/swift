@@ -1074,7 +1074,8 @@ static bool reportModuleDocInfo(CompilerInvocation Invocation,
   if (getModuleInterfaceInfo(Ctx, ModuleName, IFaceInfo))
     return true;
 
-  CompilerInstance ParseCI{Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath};
+  CompilerInstance ParseCI{
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath};
   if (makeParserAST(ParseCI, IFaceInfo.Text, Invocation))
     return true;
   addParameterEntities(ParseCI, IFaceInfo);

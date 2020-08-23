@@ -323,7 +323,7 @@ bool CompletionInstance::performCachedOperationIfPossible(
   TypeCheckerOptions typeckOpts = CI.getASTContext().TypeCheckerOpts;
   SearchPathOptions searchPathOpts = CI.getASTContext().SearchPathOpts;
   DiagnosticEngine tmpDiags(
-      tmpSM, Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      tmpSM, Invocation.getDiagnosticOptions().DefaultLocalizationPath);
   std::unique_ptr<ASTContext> tmpCtx(
       ASTContext::get(langOpts, typeckOpts, searchPathOpts, tmpSM, tmpDiags));
   registerParseRequestFunctions(tmpCtx->evaluator);
@@ -503,7 +503,7 @@ bool CompletionInstance::performNewOperation(
   auto isCachedCompletionRequested = ArgsHash.hasValue();
 
   auto TheInstance = std::make_unique<CompilerInstance>(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
 
   // Track non-system dependencies in fast-completion mode to invalidate the
   // compiler instance if any dependent files are modified.

@@ -259,7 +259,7 @@ int main(int argc, char *argv[]) {
     Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(FileName);
   Invocation.setModuleName(options::ModuleName);
   CompilerInstance CI(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);

@@ -100,7 +100,7 @@ struct SharedState : llvm::RefCountedBase<SharedState> {
 class SerializedDiagnosticConsumer : public DiagnosticConsumer {
   /// State shared among the various clones of this diagnostic consumer.
   llvm::IntrusiveRefCntPtr<SharedState> State;
-  std::string DefaultLocalizationMessagesPath;
+  std::string DefaultLocalizationPath;
   bool CalledFinishProcessing = false;
   bool CompilationWasComplete = true;
 
@@ -108,8 +108,7 @@ public:
   SerializedDiagnosticConsumer(StringRef serializedDiagnosticsPath,
                                const DiagnosticOptions &diagOpts)
       : State(new SharedState(serializedDiagnosticsPath)),
-        DefaultLocalizationMessagesPath(
-            diagOpts.DefaultLocalizationMessagesPath) {
+        DefaultLocalizationPath(diagOpts.DefaultLocalizationPath) {
     emitPreamble();
   }
 
@@ -138,7 +137,7 @@ public:
     if (EC) {
       // Create a temporary diagnostics engine to print the error to stderr.
       SourceManager dummyMgr;
-      DiagnosticEngine DE(dummyMgr, DefaultLocalizationMessagesPath);
+      DiagnosticEngine DE(dummyMgr, DefaultLocalizationPath);
       PrintingDiagnosticConsumer PDC;
       DE.addConsumer(PDC);
       DE.diagnose(SourceLoc(), diag::cannot_open_serialized_file,

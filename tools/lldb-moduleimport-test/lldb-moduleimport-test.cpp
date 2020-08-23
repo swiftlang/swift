@@ -297,7 +297,7 @@ int main(int argc, char **argv) {
       llvm::sys::fs::getMainExecutable(argv[0],
           reinterpret_cast<void *>(&anchorForGetMainExecutable)));
   swift::CompilerInstance CI(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
 
   // Infer SDK and Target triple from the module.
   if (!extendedInfo.getSDKPath().empty())

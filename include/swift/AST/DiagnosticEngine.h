@@ -697,12 +697,12 @@ namespace swift {
 
   public:
     explicit DiagnosticEngine(SourceManager &SourceMgr,
-                              std::string defaultLocalizationMessagesPath)
+                              std::string DefaultLocalizationPath)
         : SourceMgr(SourceMgr), ActiveDiagnostic(),
           TransactionStrings(TransactionAllocator) {
-      assert(!defaultLocalizationMessagesPath.empty());
+      assert(!DefaultLocalizationPath.empty());
       std::string defaultLocale = "en";
-      llvm::SmallString<128> filePath(defaultLocalizationMessagesPath);
+      llvm::SmallString<128> filePath(DefaultLocalizationPath);
       llvm::sys::path::append(filePath, defaultLocale);
       llvm::sys::path::replace_extension(filePath, ".db");
 

@@ -1176,7 +1176,7 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
   Invocation.getLangOptions().DisablePoundIfEvaluation = true;
 
   auto Instance = std::make_unique<swift::CompilerInstance>(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
   if (Instance->setup(Invocation))
     llvm_unreachable("Failed setup");
 

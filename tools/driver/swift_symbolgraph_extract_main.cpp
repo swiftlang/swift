@@ -209,7 +209,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args, const char *Argv
   PrintingDiagnosticConsumer DiagPrinter;
 
   CompilerInstance CI(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
   CI.getDiags().addConsumer(DiagPrinter);
 
   if (CI.setup(Invocation)) {

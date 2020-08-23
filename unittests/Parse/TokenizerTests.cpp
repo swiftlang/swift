@@ -94,7 +94,7 @@ public:
   
   std::vector<Token> parseAndGetSplitTokens(unsigned BufID) {
     DiagnosticOptions DiagOpts;
-    DiagOpts.DefaultLocalizationMessagesPath = getDefaultLocalizationPath();
+    DiagOpts.DefaultLocalizationPath = getDefaultLocalizationPath();
     swift::ParserUnit PU(SM, SourceFileKind::Main, BufID, LangOpts,
                          TypeCheckerOptions(), "unknown", DiagOpts);
     SmallVector<Decl *, 8> decls;

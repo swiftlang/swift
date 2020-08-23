@@ -932,7 +932,7 @@ int swift::doGenerateModuleAPIDescription(StringRef MainExecutablePath,
   Invocation.setMainExecutablePath(MainExecutablePath);
 
   CompilerInstance CI(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
   CI.addDiagnosticConsumer(&PDC);
   if (CI.setup(Invocation))
     return 1;

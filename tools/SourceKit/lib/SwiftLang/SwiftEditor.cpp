@@ -1987,7 +1987,8 @@ void SwiftEditorDocument::parse(ImmutableTextSnapshotRef Snapshot,
   // all tokens are visited and thus token collection is invalid
   CompInv.getLangOptions().CollectParsedToken = (SyntaxCache == nullptr);
   // Access to Impl.SyntaxInfo is guarded by Impl.AccessMtx
-  CompInv.getDiagnosticOptions().DefaultLocalizationMessagesPath = DefaultLocalizationPath;
+  CompInv.getDiagnosticOptions().DefaultLocalizationPath =
+      DefaultLocalizationPath;
   Impl.SyntaxInfo.reset(
     new SwiftDocumentSyntaxInfo(CompInv, Snapshot, Args, Impl.FilePath));
 
@@ -2402,7 +2403,8 @@ void verifyIncrementalParse(SwiftEditorDocumentRef EditorDoc,
   CompilerInvocation Invocation;
   Invocation.getLangOptions().BuildSyntaxTree = true;
   std::vector<std::string> Args;
-  Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath = DefaultLocalizationPath;
+  Invocation.getDiagnosticOptions().DefaultLocalizationPath =
+      DefaultLocalizationPath;
   SwiftDocumentSyntaxInfo ScratchSyntaxInfo(Invocation,
                                             EditorDoc->getLatestSnapshot(),
                                             Args, EditorDoc->getFilePath());

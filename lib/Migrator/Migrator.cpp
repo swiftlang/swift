@@ -147,7 +147,7 @@ Migrator::performAFixItMigration(version::Version SwiftLanguageVersion) {
   }
 
   auto Instance = std::make_unique<swift::CompilerInstance>(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
   if (Instance->setup(Invocation)) {
     return nullptr;
   }

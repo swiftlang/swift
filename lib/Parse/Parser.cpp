@@ -1202,8 +1202,7 @@ struct ParserUnit::Implementation {
                  std::shared_ptr<SyntaxParseActions> spActions,
                  const DiagnosticOptions &DiagOpts)
       : SPActions(std::move(spActions)), LangOpts(Opts),
-        TypeCheckerOpts(TyOpts),
-        Diags(SM, DiagOpts.DefaultLocalizationMessagesPath),
+        TypeCheckerOpts(TyOpts), Diags(SM, DiagOpts.DefaultLocalizationPath),
         Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SearchPathOpts, SM,
                              Diags)) {
     auto parsingOpts = SourceFile::getDefaultParsingOptions(LangOpts);

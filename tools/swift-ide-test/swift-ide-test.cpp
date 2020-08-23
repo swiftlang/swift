@@ -1326,7 +1326,7 @@ static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
   Invocation.setInputKind(InputFileKind::Swift);
 
   CompilerInstance CI(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
 
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
@@ -1541,7 +1541,7 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
 
   if (RunTypeChecker) {
     CompilerInstance CI(
-        Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+        Invocation.getDiagnosticOptions().DefaultLocalizationPath);
     CI.addDiagnosticConsumer(&PrintDiags);
     if (CI.setup(Invocation))
       return 1;
@@ -1613,7 +1613,7 @@ static int doDumpImporterLookupTables(const CompilerInvocation &InitInvok,
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFilename);
 
   CompilerInstance CI(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
 
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
@@ -2075,7 +2075,7 @@ static int doSemanticAnnotation(const CompilerInvocation &InitInvok,
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFilename);
 
   CompilerInstance CI(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
 
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
@@ -2149,7 +2149,7 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
     Invocation.getLangOptions().DisablePoundIfEvaluation = true;
 
   CompilerInstance CI(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
 
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
@@ -2194,7 +2194,7 @@ static int doPrintExpressionTypes(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
   Invocation.getFrontendOptions().InputsAndOutputs.addPrimaryInputFile(SourceFilename);
   CompilerInstance CI(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
 
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
@@ -2252,7 +2252,7 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
 
   CompilerInvocation Invocation(InitInvok);
   CompilerInstance CI(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation))
@@ -2466,7 +2466,7 @@ static int doPrintModuleGroups(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
 
   CompilerInstance CI(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
@@ -2520,7 +2520,7 @@ static int doPrintModuleMetaData(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
 
   CompilerInstance CI(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
@@ -2588,7 +2588,7 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
 
   CompilerInstance CI(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
@@ -2646,7 +2646,7 @@ static int doPrintHeaders(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
 
   CompilerInstance CI(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
@@ -2700,7 +2700,7 @@ static int doPrintSwiftFileInterface(const CompilerInvocation &InitInvok,
       SourceFilename);
   Invocation.getLangOptions().AttachCommentsToDecls = true;
   CompilerInstance CI(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
@@ -2733,7 +2733,7 @@ static int doPrintDecls(const CompilerInvocation &InitInvok,
       SourceFilename);
   Invocation.getLangOptions().AttachCommentsToDecls = true;
   CompilerInstance CI(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
@@ -2850,7 +2850,7 @@ static int doPrintTypes(const CompilerInvocation &InitInvok,
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFilename);
 
   CompilerInstance CI(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
@@ -3092,7 +3092,7 @@ static int doDumpComments(const CompilerInvocation &InitInvok,
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFilename);
   Invocation.getLangOptions().AttachCommentsToDecls = true;
   CompilerInstance CI(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
@@ -3118,7 +3118,7 @@ static int doPrintComments(const CompilerInvocation &InitInvok,
   Invocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;
 
   CompilerInstance CI(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
@@ -3143,7 +3143,7 @@ static int doPrintModuleComments(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
 
   CompilerInstance CI(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
@@ -3182,7 +3182,7 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
 
   CompilerInstance CI(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
@@ -3245,7 +3245,7 @@ static int doPrintTypeInterface(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(FileName);
   CompilerInstance CI(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
   if (CI.setup(Invocation))
     return 1;
   registerIDERequestFunctions(CI.getASTContext().evaluator);
@@ -3295,7 +3295,7 @@ static int doPrintTypeInterfaceForTypeUsr(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(FileName);
   CompilerInstance CI(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
   if (CI.setup(Invocation))
     return 1;
   registerIDERequestFunctions(CI.getASTContext().evaluator);
@@ -3459,7 +3459,7 @@ static int doReconstructType(const CompilerInvocation &InitInvok,
   Invocation.getLangOptions().DisableAvailabilityChecking = false;
 
   CompilerInstance CI(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
 
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
@@ -3497,7 +3497,7 @@ static int doPrintRangeInfo(const CompilerInvocation &InitInvok,
   Invocation.getLangOptions().CollectParsedToken = true;
 
   CompilerInstance CI(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
 
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
@@ -3600,7 +3600,7 @@ static int doPrintIndexedSymbols(const CompilerInvocation &InitInvok,
   Invocation.getLangOptions().TypoCorrectionLimit = 0;
 
   CompilerInstance CI(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
 
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
@@ -3632,7 +3632,7 @@ static int doPrintIndexedSymbolsFromModule(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
 
   CompilerInstance CI(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
@@ -3669,7 +3669,7 @@ static int doPrintUSRs(const CompilerInvocation &InitInvok,
   ImporterOpts.DetailedPreprocessingRecord = true;
 
   CompilerInstance CI(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
@@ -3684,12 +3684,12 @@ static int doPrintUSRs(const CompilerInvocation &InitInvok,
   return 0;
 }
 
-static int
-doTestCreateCompilerInvocation(ArrayRef<const char *> Args, bool ForceNoOutputs,
-                               std::string DefaultLocalizationMessagesPath) {
+static int doTestCreateCompilerInvocation(ArrayRef<const char *> Args,
+                                          bool ForceNoOutputs,
+                                          std::string DefaultLocalizationPath) {
   PrintingDiagnosticConsumer PDC;
   SourceManager SM;
-  DiagnosticEngine Diags(SM, DefaultLocalizationMessagesPath);
+  DiagnosticEngine Diags(SM, DefaultLocalizationPath);
   Diags.addConsumer(PDC);
 
   CompilerInvocation CI;

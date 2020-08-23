@@ -2322,7 +2322,7 @@ createDiagConsumer(llvm::raw_ostream &OS, bool &FailOnError,
   if (!options::SerializedDiagPath.empty()) {
     FailOnError = true;
     DiagnosticOptions DiagOpts;
-    DiagOpts.DefaultLocalizationMessagesPath = DefaultLocalizationPath;
+    DiagOpts.DefaultLocalizationPath = DefaultLocalizationPath;
     return serialized_diagnostics::createConsumer(options::SerializedDiagPath,
                                                   DiagOpts);
   } else if (options::CompilerStyleDiags) {

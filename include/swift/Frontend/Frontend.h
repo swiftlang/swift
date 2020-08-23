@@ -469,7 +469,7 @@ class CompilerInstance {
 
 public:
   // Out of line to avoid having to import SILModule.h.
-  CompilerInstance(std::string defaultLocalizationMessagesPath);
+  CompilerInstance(std::string DefaultLocalizationPath);
   ~CompilerInstance();
 
   CompilerInstance(const CompilerInstance &) = delete;

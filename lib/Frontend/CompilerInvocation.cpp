@@ -86,7 +86,7 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
   llvm::sys::path::remove_filename(DefaultDiagnosticMessagesDir); // Remove /bin
   llvm::sys::path::append(DefaultDiagnosticMessagesDir, "share", "swift",
                           "diagnostics");
-  DiagnosticOpts.DefaultLocalizationMessagesPath =
+  DiagnosticOpts.DefaultLocalizationPath =
       std::string(DefaultDiagnosticMessagesDir.str());
 }
 

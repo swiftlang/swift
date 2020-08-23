@@ -290,7 +290,7 @@ swiftparse_client_node_t SynParser::parse(const char *source) {
   // Not ready yet:
   // langOpts.EnableASTScopeLookup = true;
   DiagnosticOptions DiagOpts;
-  DiagOpts.DefaultLocalizationMessagesPath =
+  DiagOpts.DefaultLocalizationPath =
       "/Volumes/Extreme/swift-source/build/Ninja-DebugAssert/"
       "swift-macosx-x86_64/share/swift/diagnostics";
 

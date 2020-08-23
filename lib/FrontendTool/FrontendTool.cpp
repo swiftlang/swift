@@ -985,7 +985,7 @@ namespace {
 class JSONFixitWriter
   : public DiagnosticConsumer, public migrator::FixitFilter {
   std::string FixitsOutputPath;
-  std::string DefaultLocalizationMessagesPath;
+  std::string DefaultLocalizationPath;
   std::unique_ptr<llvm::raw_ostream> OSPtr;
   bool FixitAll;
   std::vector<SingleEdit> AllEdits;
@@ -994,8 +994,7 @@ public:
   JSONFixitWriter(std::string fixitsOutputPath,
                   const DiagnosticOptions &DiagOpts)
       : FixitsOutputPath(fixitsOutputPath),
-        DefaultLocalizationMessagesPath(
-            DiagOpts.DefaultLocalizationMessagesPath),
+        DefaultLocalizationPath(DiagOpts.DefaultLocalizationPath),
         FixitAll(DiagOpts.FixitCodeForAllDiagnostics) {}
 
 private:
@@ -1017,7 +1016,7 @@ private:
     if (EC) {
       // Create a temporary diagnostics engine to print the error to stderr.
       SourceManager dummyMgr;
-      DiagnosticEngine DE(dummyMgr, DefaultLocalizationMessagesPath);
+      DiagnosticEngine DE(dummyMgr, DefaultLocalizationPath);
       PrintingDiagnosticConsumer PDC;
       DE.addConsumer(PDC);
       DE.diagnose(SourceLoc(), diag::cannot_open_file,

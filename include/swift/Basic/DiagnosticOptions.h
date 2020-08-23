@@ -68,7 +68,7 @@ public:
   std::string DiagnosticDocumentationPath = "";
 
   // Default directory path for localized diagnostic messages.
-  std::string DefaultLocalizationMessagesPath = "";
+  std::string DefaultLocalizationPath = "";
 
   // Locale code and directory path for localized diagnostic messages.
   std::string LocalizationCode = "";

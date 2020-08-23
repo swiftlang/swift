@@ -625,7 +625,7 @@ int parseFile(
   llvm::raw_string_ostream DiagOS(DiagsString);
   PrintingDiagnosticConsumer DiagConsumer(DiagOS);
   CompilerInstance Instance(
-      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
+      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
   Instance.addDiagnosticConsumer(&DiagConsumer);
   if (Instance.setup(Invocation)) {
     llvm::errs() << "Unable to set up compiler instance";
