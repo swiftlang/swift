@@ -71,7 +71,10 @@ struct ValueToDeclInferrer {
 
 void ValueToDeclInferrer::printNote(llvm::raw_string_ostream &stream,
                                     const ValueDecl *decl) {
+  assert(decl &&
+         "We assume for now that this is always called with a non-null decl");
   stream << "of '" << decl->getBaseName();
+
   for (auto &pair : accessPath) {
     auto baseType = pair.first;
     auto &proj = pair.second;
@@ -133,6 +136,12 @@ static SingleValueInstruction *isSupportedProjection(Projection p, SILValue v) {
   llvm_unreachable("Covered switch is not covered?!");
 }
 
+static bool hasNonInlinedDebugScope(SILInstruction *i) {
+  if (auto *scope = i->getDebugScope())
+    return !scope->InlinedCallSite;
+  return false;
+}
+
 bool ValueToDeclInferrer::infer(
     ArgumentKeyKind keyKind, SILValue value,
     SmallVectorImpl<Argument> &resultingInferredDecls) {
@@ -167,6 +176,46 @@ bool ValueToDeclInferrer::infer(
         return true;
       }
 
+    if (auto *ari = dyn_cast<AllocRefInst>(value)) {
+      if (auto *decl = ari->getDecl()) {
+        std::string msg;
+        {
+          llvm::raw_string_ostream stream(msg);
+          printNote(stream, decl);
+        }
+        resultingInferredDecls.push_back(
+            Argument({keyKind, "InferredValue"}, std::move(msg), decl));
+        return true;
+      }
+    }
+
+    if (auto *abi = dyn_cast<AllocBoxInst>(value)) {
+      if (auto *decl = abi->getDecl()) {
+        std::string msg;
+        {
+          llvm::raw_string_ostream stream(msg);
+          printNote(stream, decl);
+        }
+
+        resultingInferredDecls.push_back(
+            Argument({keyKind, "InferredValue"}, std::move(msg), decl));
+        return true;
+      }
+    }
+
+    if (auto *asi = dyn_cast<AllocStackInst>(value)) {
+      if (auto *decl = asi->getDecl()) {
+        std::string msg;
+        {
+          llvm::raw_string_ostream stream(msg);
+          printNote(stream, decl);
+        }
+        resultingInferredDecls.push_back(
+            Argument({keyKind, "InferredValue"}, std::move(msg), decl));
+        return true;
+      }
+    }
+
     // Then visit our users and see if we can find a debug_value that provides
     // us with a decl we can use to construct an argument.
     bool foundDeclFromUse = false;
@@ -178,18 +227,16 @@ bool ValueToDeclInferrer::infer(
       if (auto *dvi = dyn_cast<DebugValueInst>(use->getUser())) {
         // Check if our debug_value has a decl and was not inlined into the
         // current function.
-        if (auto *scope = dvi->getDebugScope()) {
-          if (!scope->InlinedCallSite) {
-            if (auto *decl = dvi->getDecl()) {
-              std::string msg;
-              {
-                llvm::raw_string_ostream stream(msg);
-                printNote(stream, decl);
-              }
-              resultingInferredDecls.push_back(
-                  Argument({keyKind, "InferredValue"}, std::move(msg), decl));
-              foundDeclFromUse = true;
+        if (hasNonInlinedDebugScope(dvi)) {
+          if (auto *decl = dvi->getDecl()) {
+            std::string msg;
+            {
+              llvm::raw_string_ostream stream(msg);
+              printNote(stream, decl);
             }
+            resultingInferredDecls.push_back(
+                Argument({keyKind, "InferredValue"}, std::move(msg), decl));
+            foundDeclFromUse = true;
           }
         }
       }
@@ -215,6 +262,8 @@ bool ValueToDeclInferrer::infer(
         continue;
       }
     }
+
+    // TODO: We could emit at this point a msg for temporary allocations.
 
     // If we reached this point, we finished falling through the loop and return
     // true.
@@ -245,6 +294,8 @@ struct OptRemarkGeneratorInstructionVisitor
   void visitStrongReleaseInst(StrongReleaseInst *sri);
   void visitRetainValueInst(RetainValueInst *rvi);
   void visitReleaseValueInst(ReleaseValueInst *rvi);
+  void visitAllocRefInst(AllocRefInst *ari);
+  void visitAllocBoxInst(AllocBoxInst *abi);
   void visitSILInstruction(SILInstruction *) {}
 };
 
@@ -330,6 +381,64 @@ void OptRemarkGeneratorInstructionVisitor::visitReleaseValueInst(
       remark << arg;
     }
     return remark;
+  });
+}
+
+void OptRemarkGeneratorInstructionVisitor::visitAllocRefInst(
+    AllocRefInst *ari) {
+  if (ari->canAllocOnStack()) {
+    return ORE.emit([&]() {
+      using namespace OptRemark;
+      SmallVector<Argument, 8> inferredArgs;
+      bool foundArgs =
+          valueToDeclInferrer.infer(ArgumentKeyKind::Note, ari, inferredArgs);
+      (void)foundArgs;
+      auto resultRemark =
+          RemarkPassed("memory", *ari,
+                       SourceLocInferenceBehavior::ForwardScanOnly)
+          << "stack allocated ref of type '" << NV("ValueType", ari->getType())
+          << "'";
+      for (auto &arg : inferredArgs)
+        resultRemark << arg;
+      return resultRemark;
+    });
+  }
+
+  return ORE.emit([&]() {
+    using namespace OptRemark;
+    SmallVector<Argument, 8> inferredArgs;
+    bool foundArgs =
+        valueToDeclInferrer.infer(ArgumentKeyKind::Note, ari, inferredArgs);
+    (void)foundArgs;
+
+    auto resultRemark =
+        RemarkMissed("memory", *ari,
+                     SourceLocInferenceBehavior::ForwardScanOnly)
+        << "heap allocated ref of type '" << NV("ValueType", ari->getType())
+        << "'";
+    for (auto &arg : inferredArgs)
+      resultRemark << arg;
+    return resultRemark;
+  });
+}
+
+void OptRemarkGeneratorInstructionVisitor::visitAllocBoxInst(
+    AllocBoxInst *abi) {
+  return ORE.emit([&]() {
+    using namespace OptRemark;
+    SmallVector<Argument, 8> inferredArgs;
+    bool foundArgs =
+        valueToDeclInferrer.infer(ArgumentKeyKind::Note, abi, inferredArgs);
+    (void)foundArgs;
+
+    auto resultRemark =
+        RemarkMissed("memory", *abi,
+                     SourceLocInferenceBehavior::ForwardScanOnly)
+        << "heap allocated box of type '" << NV("ValueType", abi->getType())
+        << "'";
+    for (auto &arg : inferredArgs)
+      resultRemark << arg;
+    return resultRemark;
   });
 }
 
