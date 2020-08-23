@@ -17,13 +17,14 @@
 
 #include "swift-c/SyntaxParser/SwiftSyntaxParser.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/DiagnosticOptions.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/SyntaxParseActions.h"
+#include "swift/Subsystems.h"
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 #include "swift/Syntax/SyntaxNodes.h"
-#include "swift/Subsystems.h"
 #include <Block.h>
 
 using namespace swift;
@@ -288,13 +289,17 @@ swiftparse_client_node_t SynParser::parse(const char *source) {
   // Disable name lookups during parsing.
   // Not ready yet:
   // langOpts.EnableASTScopeLookup = true;
+  DiagnosticOptions DiagOpts;
+  DiagOpts.DefaultLocalizationMessagesPath =
+      "/Volumes/Extreme/swift-source/build/Ninja-DebugAssert/"
+      "swift-macosx-x86_64/share/swift/diagnostics";
 
   auto parseActions =
     std::make_shared<CLibParseActions>(*this, SM, bufID);
   // We have to use SourceFileKind::Main to avoid diagnostics like
   // illegal_top_level_expr
   ParserUnit PU(SM, SourceFileKind::Main, bufID, langOpts, tyckOpts,
-                "syntax_parse_module", std::move(parseActions),
+                "syntax_parse_module", DiagOpts, std::move(parseActions),
                 /*SyntaxCache=*/nullptr);
   std::unique_ptr<SynParserDiagConsumer> pConsumer;
   if (DiagHandler) {

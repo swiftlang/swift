@@ -50,7 +50,9 @@ struct swift::ide::api::SDKNodeInitInfo {
   SDKNode* createSDKNode(SDKNodeKind Kind);
 };
 
-SDKContext::SDKContext(CheckerOptions Opts): Diags(SourceMgr), Opts(Opts) {}
+SDKContext::SDKContext(CheckerOptions Opts, std::string DefaultLocalizationPath)
+    : DefaultLocalizationPath(DefaultLocalizationPath),
+      Diags(SourceMgr, DefaultLocalizationPath), Opts(Opts) {}
 
 DiagnosticEngine &SDKContext::getDiags(SourceLoc Loc) {
   // If the location is invalid, we just use the locally created DiagEngine.
@@ -2233,8 +2235,9 @@ void swift::ide::api::dumpSDKRoot(SDKNodeRoot *Root, StringRef OutputFile) {
 
 int swift::ide::api::dumpSDKContent(const CompilerInvocation &InitInvok,
                                     const llvm::StringSet<> &ModuleNames,
-                                    StringRef OutputFile, CheckerOptions Opts) {
-  SDKContext SDKCtx(Opts);
+                                    StringRef OutputFile, CheckerOptions Opts,
+                                    std::string DefaultLocalizationPath) {
+  SDKContext SDKCtx(Opts, DefaultLocalizationPath);
   SDKNodeRoot *Root = getSDKNodeRoot(SDKCtx, InitInvok, ModuleNames);
   if (!Root)
     return 1;
@@ -2242,8 +2245,10 @@ int swift::ide::api::dumpSDKContent(const CompilerInvocation &InitInvok,
   return 0;
 }
 
-int swift::ide::api::deserializeSDKDump(StringRef dumpPath, StringRef OutputPath,
-    CheckerOptions Opts) {
+int swift::ide::api::deserializeSDKDump(StringRef dumpPath,
+                                        StringRef OutputPath,
+                                        CheckerOptions Opts,
+                                        std::string DefaultLocalizationPath) {
   std::error_code EC;
   llvm::raw_fd_ostream FS(OutputPath, EC, llvm::sys::fs::F_None);
   if (!fs::exists(dumpPath)) {
@@ -2251,7 +2256,7 @@ int swift::ide::api::deserializeSDKDump(StringRef dumpPath, StringRef OutputPath
     return 1;
   }
   PrintingDiagnosticConsumer PDC;
-  SDKContext Ctx(Opts);
+  SDKContext Ctx(Opts, DefaultLocalizationPath);
   Ctx.addDiagConsumer(PDC);
 
   SwiftDeclCollector Collector(Ctx);
@@ -2260,14 +2265,15 @@ int swift::ide::api::deserializeSDKDump(StringRef dumpPath, StringRef OutputPath
   return 0;
 }
 
-int swift::ide::api::findDeclUsr(StringRef dumpPath, CheckerOptions Opts) {
+int swift::ide::api::findDeclUsr(StringRef dumpPath, CheckerOptions Opts,
+                                 std::string DefaultLocalizationPath) {
   std::error_code EC;
   if (!fs::exists(dumpPath)) {
     llvm::errs() << dumpPath << " does not exist\n";
     return 1;
   }
   PrintingDiagnosticConsumer PDC;
-  SDKContext Ctx(Opts);
+  SDKContext Ctx(Opts, DefaultLocalizationPath);
   Ctx.addDiagConsumer(PDC);
 
   SwiftDeclCollector Collector(Ctx);

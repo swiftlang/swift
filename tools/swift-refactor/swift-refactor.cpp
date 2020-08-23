@@ -258,7 +258,8 @@ int main(int argc, char *argv[]) {
   for (auto FileName : options::InputFilenames)
     Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(FileName);
   Invocation.setModuleName(options::ModuleName);
-  CompilerInstance CI;
+  CompilerInstance CI(
+      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);

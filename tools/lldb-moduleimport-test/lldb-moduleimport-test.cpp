@@ -291,12 +291,13 @@ int main(int argc, char **argv) {
 
   // Create a Swift compiler.
   llvm::SmallVector<std::string, 4> modules;
-  swift::CompilerInstance CI;
   swift::CompilerInvocation Invocation;
 
   Invocation.setMainExecutablePath(
       llvm::sys::fs::getMainExecutable(argv[0],
           reinterpret_cast<void *>(&anchorForGetMainExecutable)));
+  swift::CompilerInstance CI(
+      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
 
   // Infer SDK and Target triple from the module.
   if (!extendedInfo.getSDKPath().empty())

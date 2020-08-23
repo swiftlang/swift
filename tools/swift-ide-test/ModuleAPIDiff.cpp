@@ -904,9 +904,18 @@ int swift::doGenerateModuleAPIDescription(StringRef MainExecutablePath,
     CStringArgs.push_back(S.c_str());
   }
 
+  llvm::SmallString<128> DefaultDiagnosticMessagesDir(MainExecutablePath.str());
+  llvm::sys::path::remove_filename(
+      DefaultDiagnosticMessagesDir); // Remove /swift-ide-test
+  llvm::sys::path::remove_filename(DefaultDiagnosticMessagesDir); // Remove /bin
+  llvm::sys::path::append(DefaultDiagnosticMessagesDir, "share", "swift",
+                          "diagnostics");
+  std::string DefaultLocalizationPath =
+      std::string(DefaultDiagnosticMessagesDir.str());
+
   PrintingDiagnosticConsumer PDC;
   SourceManager SM;
-  DiagnosticEngine Diags(SM);
+  DiagnosticEngine Diags(SM, DefaultLocalizationPath);
   Diags.addConsumer(PDC);
 
   CompilerInvocation Invocation;
@@ -922,7 +931,8 @@ int swift::doGenerateModuleAPIDescription(StringRef MainExecutablePath,
 
   Invocation.setMainExecutablePath(MainExecutablePath);
 
-  CompilerInstance CI;
+  CompilerInstance CI(
+      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
   CI.addDiagnosticConsumer(&PDC);
   if (CI.setup(Invocation))
     return 1;

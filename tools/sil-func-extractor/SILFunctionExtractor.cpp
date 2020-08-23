@@ -255,7 +255,8 @@ int main(int argc, char **argv) {
     exit(-1);
   }
 
-  CompilerInstance CI;
+  CompilerInstance CI(
+      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
 

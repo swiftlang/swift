@@ -164,6 +164,7 @@ class SDKContext {
   llvm::StringSet<> TextData;
   llvm::BumpPtrAllocator Allocator;
   SourceManager SourceMgr;
+  std::string DefaultLocalizationPath;
   DiagnosticEngine Diags;
   UpdatedNodesMap UpdateMap;
   NodeMap TypeAliasUpdateMap;
@@ -179,7 +180,7 @@ public:
 #define IDENTIFIER_WITH_NAME(Name, IdStr) StringRef Id_##Name = IdStr;
 #include "swift/AST/KnownIdentifiers.def"
 
-  SDKContext(CheckerOptions Options);
+  SDKContext(CheckerOptions Options, std::string DefaultLocalizationPath);
 
   llvm::BumpPtrAllocator &allocator() {
     return Allocator;
@@ -228,7 +229,7 @@ public:
   Optional<uint8_t> getFixedBinaryOrder(ValueDecl *VD) const;
 
   CompilerInstance &newCompilerInstance() {
-    CIs.emplace_back(new CompilerInstance());
+    CIs.emplace_back(new CompilerInstance(DefaultLocalizationPath));
     return *CIs.back();
   }
   template<class YAMLNodeTy, typename ...ArgTypes>
@@ -795,16 +796,18 @@ SDKNodeRoot *getEmptySDKNodeRoot(SDKContext &SDKCtx);
 void dumpSDKRoot(SDKNodeRoot *Root, StringRef OutputFile);
 
 int dumpSDKContent(const CompilerInvocation &InitInvok,
-                   const llvm::StringSet<> &ModuleNames,
-                   StringRef OutputFile, CheckerOptions Opts);
+                   const llvm::StringSet<> &ModuleNames, StringRef OutputFile,
+                   CheckerOptions Opts, std::string DefaultLocalizationPath);
 
 /// Mostly for testing purposes, this function de-serializes the SDK dump in
 /// dumpPath and re-serialize them to OutputPath. If the tool performs correctly,
 /// the contents in dumpPath and OutputPath should be identical.
 int deserializeSDKDump(StringRef dumpPath, StringRef OutputPath,
-                       CheckerOptions Opts);
+                       CheckerOptions Opts,
+                       std::string DefaultLocalizationPath);
 
-int findDeclUsr(StringRef dumpPath, CheckerOptions Opts);
+int findDeclUsr(StringRef dumpPath, CheckerOptions Opts,
+                std::string DefaultLocalizationPath);
 
 void nodeSetDifference(ArrayRef<SDKNode*> Left, ArrayRef<SDKNode*> Right,
   NodeVector &LeftMinusRight, NodeVector &RightMinusLeft);

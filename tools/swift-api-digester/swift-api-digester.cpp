@@ -2295,12 +2295,36 @@ static void findTypeMemberDiffs(NodePtr leftSDKRoot, NodePtr rightSDKRoot,
   }
 }
 
+// This function isn't referenced outside its translation unit, but it
+// can't use the "static" keyword because its address is used for
+// getMainExecutable (since some platforms don't support taking the
+// address of main, and some platforms can't implement getMainExecutable
+// without being given the address of a function in the main executable).
+void anchorForGetMainExecutable() {}
+
+static std::string getDefaultLocalizationPath(const char *Main) {
+  llvm::SmallString<128> DefaultLocalizationDir;
+  // The path of the swift-api-digester executable.
+  std::string ExePath = llvm::sys::fs::getMainExecutable(
+      Main, reinterpret_cast<void *>(&anchorForGetMainExecutable));
+  DefaultLocalizationDir.append(ExePath);
+  llvm::sys::path::remove_filename(
+      DefaultLocalizationDir); // Remove /swift-api-digester
+  llvm::sys::path::remove_filename(DefaultLocalizationDir); // Remove /bin
+  llvm::sys::path::append(DefaultLocalizationDir, "share", "swift",
+                          "diagnostics");
+  return DefaultLocalizationDir.str().str();
+}
+
 static std::unique_ptr<DiagnosticConsumer>
-createDiagConsumer(llvm::raw_ostream &OS, bool &FailOnError) {
+createDiagConsumer(llvm::raw_ostream &OS, bool &FailOnError,
+                   std::string DefaultLocalizationPath) {
   if (!options::SerializedDiagPath.empty()) {
     FailOnError = true;
+    DiagnosticOptions DiagOpts;
+    DiagOpts.DefaultLocalizationMessagesPath = DefaultLocalizationPath;
     return serialized_diagnostics::createConsumer(options::SerializedDiagPath,
-                                                  "test");
+                                                  DiagOpts);
   } else if (options::CompilerStyleDiags) {
     FailOnError = true;
     return std::make_unique<PrintingDiagnosticConsumer>();
@@ -2311,8 +2335,9 @@ createDiagConsumer(llvm::raw_ostream &OS, bool &FailOnError) {
 }
 
 static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
-                             SDKNodeRoot *RightModule, StringRef OutputPath,
-                             llvm::StringSet<> ProtocolReqWhitelist) {
+                                SDKNodeRoot *RightModule, StringRef OutputPath,
+                                llvm::StringSet<> ProtocolReqWhitelist,
+                                std::string DefaultLocalizationPath) {
   assert(LeftModule);
   assert(RightModule);
   llvm::raw_ostream *OS = &llvm::errs();
@@ -2328,7 +2353,7 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
   }
   bool FailOnError;
   std::unique_ptr<DiagnosticConsumer> pConsumer =
-    createDiagConsumer(*OS, FailOnError);
+      createDiagConsumer(*OS, FailOnError, DefaultLocalizationPath);
 
   Ctx.addDiagConsumer(*pConsumer);
   Ctx.setCommonVersion(std::min(LeftModule->getJsonFormatVersion(),
@@ -2346,9 +2371,9 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
 }
 
 static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
-                                StringRef OutputPath,
-                                CheckerOptions Opts,
-                                llvm::StringSet<> ProtocolReqWhitelist) {
+                                StringRef OutputPath, CheckerOptions Opts,
+                                llvm::StringSet<> ProtocolReqWhitelist,
+                                std::string DefaultLocalizationPath) {
   if (!fs::exists(LeftPath)) {
     llvm::errs() << LeftPath << " does not exist\n";
     return 1;
@@ -2357,13 +2382,14 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
     llvm::errs() << RightPath << " does not exist\n";
     return 1;
   }
-  SDKContext Ctx(Opts);
+  SDKContext Ctx(Opts, DefaultLocalizationPath);
   SwiftDeclCollector LeftCollector(Ctx);
   LeftCollector.deSerialize(LeftPath);
   SwiftDeclCollector RightCollector(Ctx);
   RightCollector.deSerialize(RightPath);
-  diagnoseModuleChange(Ctx, LeftCollector.getSDKRoot(), RightCollector.getSDKRoot(),
-                       OutputPath, std::move(ProtocolReqWhitelist));
+  diagnoseModuleChange(
+      Ctx, LeftCollector.getSDKRoot(), RightCollector.getSDKRoot(), OutputPath,
+      std::move(ProtocolReqWhitelist), DefaultLocalizationPath);
   return options::CompilerStyleDiags && Ctx.getDiags().hadAnyError() ? 1 : 0;
 }
 
@@ -2391,7 +2417,8 @@ static void populateAliasChanges(NodeMap &AliasMap, DiffVector &AllItems,
 static int generateMigrationScript(StringRef LeftPath, StringRef RightPath,
                                    StringRef DiffPath,
                                    llvm::StringSet<> &IgnoredRemoveUsrs,
-                                   CheckerOptions Opts) {
+                                   CheckerOptions Opts,
+                                   std::string DefaultLocalizationPath) {
   if (!fs::exists(LeftPath)) {
     llvm::errs() << LeftPath << " does not exist\n";
     return 1;
@@ -2404,7 +2431,7 @@ static int generateMigrationScript(StringRef LeftPath, StringRef RightPath,
   std::unique_ptr<DiagnosticConsumer> pConsumer = options::CompilerStyleDiags ?
     std::make_unique<PrintingDiagnosticConsumer>():
     std::make_unique<ModuleDifferDiagsConsumer>(false);
-  SDKContext Ctx(Opts);
+  SDKContext Ctx(Opts, DefaultLocalizationPath);
   Ctx.addDiagConsumer(*pConsumer);
 
   SwiftDeclCollector LeftCollector(Ctx);
@@ -2504,13 +2531,6 @@ static int readFileLineByLine(StringRef Path, llvm::StringSet<> &Lines) {
   }
   return 0;
 }
-
-// This function isn't referenced outside its translation unit, but it
-// can't use the "static" keyword because its address is used for
-// getMainExecutable (since some platforms don't support taking the
-// address of main, and some platforms can't implement getMainExecutable
-// without being given the address of a function in the main executable).
-void anchorForGetMainExecutable() {}
 
 static void setSDKPath(CompilerInvocation &InitInvok, bool IsBaseline) {
   if (IsBaseline) {
@@ -2831,10 +2851,13 @@ int main(int argc, char *argv[]) {
     PrintApis.push_back(Name);
   switch (options::Action) {
   case ActionType::DumpSDK:
-    return (prepareForDump(argv[0], InitInvok, Modules)) ? 1 :
-      dumpSDKContent(InitInvok, Modules,
-                     getJsonOutputFilePath(InitInvok.getLangOptions().Target, Opts.ABI),
-                     Opts);
+    return (prepareForDump(argv[0], InitInvok, Modules))
+               ? 1
+               : dumpSDKContent(
+                     InitInvok, Modules,
+                     getJsonOutputFilePath(InitInvok.getLangOptions().Target,
+                                           Opts.ABI),
+                     Opts, getDefaultLocalizationPath(argv[0]));
   case ActionType::MigratorGen:
   case ActionType::DiagnoseSDKs: {
     ComparisonInputMode Mode = checkComparisonInputMode();
@@ -2847,28 +2870,29 @@ int main(int argc, char *argv[]) {
       assert(Mode == ComparisonInputMode::BothJson && "Only BothJson mode is supported");
       return generateMigrationScript(options::SDKJsonPaths[0],
                                      options::SDKJsonPaths[1],
-                                     options::OutputFile, IgnoredUsrs, Opts);
+                                     options::OutputFile, IgnoredUsrs, Opts,
+                                     getDefaultLocalizationPath(argv[0]));
     }
     switch(Mode) {
     case ComparisonInputMode::BothJson: {
       return diagnoseModuleChange(options::SDKJsonPaths[0],
-                                  options::SDKJsonPaths[1],
-                                  options::OutputFile, Opts,
-                                  std::move(protocolWhitelist));
+                                  options::SDKJsonPaths[1], options::OutputFile,
+                                  Opts, std::move(protocolWhitelist),
+                                  getDefaultLocalizationPath(argv[0]));
     }
     case ComparisonInputMode::BaselineJson: {
-      SDKContext Ctx(Opts);
-      return diagnoseModuleChange(Ctx, getBaselineFromJson(argv[0], Ctx),
-                                  getSDKRoot(argv[0], Ctx, false),
-                                  options::OutputFile,
-                                  std::move(protocolWhitelist));
+      SDKContext Ctx(Opts, getDefaultLocalizationPath(argv[0]));
+      return diagnoseModuleChange(
+          Ctx, getBaselineFromJson(argv[0], Ctx),
+          getSDKRoot(argv[0], Ctx, false), options::OutputFile,
+          std::move(protocolWhitelist), getDefaultLocalizationPath(argv[0]));
     }
     case ComparisonInputMode::BothLoad: {
-      SDKContext Ctx(Opts);
-      return diagnoseModuleChange(Ctx, getSDKRoot(argv[0], Ctx, true),
-                                  getSDKRoot(argv[0], Ctx, false),
-                                  options::OutputFile,
-                                  std::move(protocolWhitelist));
+      SDKContext Ctx(Opts, getDefaultLocalizationPath(argv[0]));
+      return diagnoseModuleChange(
+          Ctx, getSDKRoot(argv[0], Ctx, true), getSDKRoot(argv[0], Ctx, false),
+          options::OutputFile, std::move(protocolWhitelist),
+          getDefaultLocalizationPath(argv[0]));
     }
     }
   }
@@ -2879,17 +2903,17 @@ int main(int argc, char *argv[]) {
       return 1;
     }
     if (options::Action == ActionType::DeserializeDiffItems) {
-      CompilerInstance CI;
+      CompilerInstance CI(getDefaultLocalizationPath(argv[0]));
       APIDiffItemStore Store(CI.getDiags());
       return deserializeDiffItems(Store, options::SDKJsonPaths[0],
         options::OutputFile);
     } else {
       return deserializeSDKDump(options::SDKJsonPaths[0], options::OutputFile,
-        Opts);
+                                Opts, getDefaultLocalizationPath(argv[0]));
     }
   }
   case ActionType::GenerateNameCorrectionTemplate: {
-    CompilerInstance CI;
+    CompilerInstance CI(getDefaultLocalizationPath(argv[0]));
     APIDiffItemStore Store(CI.getDiags());
     auto &Paths = options::SDKJsonPaths;
     for (unsigned I = 0; I < Paths.size(); I ++)
@@ -2897,7 +2921,7 @@ int main(int argc, char *argv[]) {
     return deserializeNameCorrection(Store, options::OutputFile);
   }
   case ActionType::GenerateEmptyBaseline: {
-    SDKContext Ctx(Opts);
+    SDKContext Ctx(Opts, getDefaultLocalizationPath(argv[0]));
     dumpSDKRoot(getEmptySDKNodeRoot(Ctx), options::OutputFile);
     return 0;
   }
@@ -2906,7 +2930,8 @@ int main(int argc, char *argv[]) {
       llvm::cl::PrintHelpMessage();
       return 1;
     }
-    return findDeclUsr(options::SDKJsonPaths[0], Opts);
+    return findDeclUsr(options::SDKJsonPaths[0], Opts,
+                       getDefaultLocalizationPath(argv[0]));
   }
   case ActionType::None:
     llvm::errs() << "Action required\n";

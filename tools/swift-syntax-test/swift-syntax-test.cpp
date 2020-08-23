@@ -624,7 +624,8 @@ int parseFile(
   std::string DiagsString;
   llvm::raw_string_ostream DiagOS(DiagsString);
   PrintingDiagnosticConsumer DiagConsumer(DiagOS);
-  CompilerInstance Instance;
+  CompilerInstance Instance(
+      Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath);
   Instance.addDiagnosticConsumer(&DiagConsumer);
   if (Instance.setup(Invocation)) {
     llvm::errs() << "Unable to set up compiler instance";
@@ -682,10 +683,20 @@ int parseFile(
   }
 }
 
-int doFullLexRoundTrip(const StringRef InputFilename) {
+int doFullLexRoundTrip(const char *MainExecutablePath,
+                       const StringRef InputFilename) {
+  llvm::SmallString<128> DefaultDiagnosticMessagesDir(MainExecutablePath);
+  llvm::sys::path::remove_filename(
+      DefaultDiagnosticMessagesDir); // Remove /swift-syntax-test
+  llvm::sys::path::remove_filename(DefaultDiagnosticMessagesDir); // Remove /bin
+  llvm::sys::path::append(DefaultDiagnosticMessagesDir, "share", "swift",
+                          "diagnostics");
+  std::string DefaultLocalizationPath =
+      std::string(DefaultDiagnosticMessagesDir.str());
+
   LangOptions LangOpts;
   SourceManager SourceMgr;
-  DiagnosticEngine Diags(SourceMgr);
+  DiagnosticEngine Diags(SourceMgr, DefaultLocalizationPath);
   PrintingDiagnosticConsumer DiagPrinter;
   Diags.addConsumer(DiagPrinter);
 
@@ -703,10 +714,20 @@ int doFullLexRoundTrip(const StringRef InputFilename) {
   return EXIT_SUCCESS;
 }
 
-int doDumpRawTokenSyntax(const StringRef InputFile) {
+int doDumpRawTokenSyntax(const char *MainExecutablePath,
+                         const StringRef InputFile) {
+  llvm::SmallString<128> DefaultDiagnosticMessagesDir(MainExecutablePath);
+  llvm::sys::path::remove_filename(
+      DefaultDiagnosticMessagesDir); // Remove /swift-syntax-test
+  llvm::sys::path::remove_filename(DefaultDiagnosticMessagesDir); // Remove /bin
+  llvm::sys::path::append(DefaultDiagnosticMessagesDir, "share", "swift",
+                          "diagnostics");
+  std::string DefaultLocalizationPath =
+      std::string(DefaultDiagnosticMessagesDir.str());
+
   LangOptions LangOpts;
   SourceManager SourceMgr;
-  DiagnosticEngine Diags(SourceMgr);
+  DiagnosticEngine Diags(SourceMgr, DefaultLocalizationPath);
   PrintingDiagnosticConsumer DiagPrinter;
   Diags.addConsumer(DiagPrinter);
 
@@ -884,10 +905,10 @@ static int invokeCommand(const char *MainExecutablePath,
   
   switch (options::Action) {
     case ActionType::DumpRawTokenSyntax:
-      ExitCode = doDumpRawTokenSyntax(InputSourceFilename);
+      ExitCode = doDumpRawTokenSyntax(MainExecutablePath, InputSourceFilename);
       break;
     case ActionType::FullLexRoundTrip:
-      ExitCode = doFullLexRoundTrip(InputSourceFilename);
+      ExitCode = doFullLexRoundTrip(MainExecutablePath, InputSourceFilename);
       break;
     case ActionType::FullParseRoundTrip:
       ExitCode = doFullParseRoundTrip(MainExecutablePath, InputSourceFilename);

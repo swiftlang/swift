@@ -182,6 +182,13 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
 
 }
 
+// This function isn't referenced outside its translation unit, but it
+// can't use the "static" keyword because its address is used for
+// getMainExecutable (since some platforms don't support taking the
+// address of main, and some platforms can't implement getMainExecutable
+// without being given the address of a function in the main executable).
+void anchorForGetMainExecutable() {}
+
 int main(int argc, char *argv[]) {
   PROGRAM_START(argc, argv);
   INITIALIZE_LLVM();
@@ -189,8 +196,19 @@ int main(int argc, char *argv[]) {
   llvm::cl::HideUnrelatedOptions(options::Category);
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift Dependency Tool\n");
 
+  std::string MainExecutablePath = llvm::sys::fs::getMainExecutable(
+      argv[0], reinterpret_cast<void *>(&anchorForGetMainExecutable));
+  llvm::SmallString<128> DefaultDiagnosticMessagesDir(MainExecutablePath);
+  llvm::sys::path::remove_filename(
+      DefaultDiagnosticMessagesDir); // Remove /swift-dependency-tool
+  llvm::sys::path::remove_filename(DefaultDiagnosticMessagesDir); // Remove /bin
+  llvm::sys::path::append(DefaultDiagnosticMessagesDir, "share", "swift",
+                          "diagnostics");
+  std::string DefaultLocalizationPath =
+      std::string(DefaultDiagnosticMessagesDir.str());
+
   SourceManager sourceMgr;
-  DiagnosticEngine diags(sourceMgr);
+  DiagnosticEngine diags(sourceMgr, DefaultLocalizationPath);
 
   switch (options::Action) {
   case ActionType::None: {
