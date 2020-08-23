@@ -1231,9 +1231,6 @@ function build_directory_bin() {
                 ;;
             libicu)
                 ;;
-            playgroundsupport)
-                echo "${root}/${PLAYGROUNDSUPPORT_BUILD_TYPE}/bin"
-                ;;
             *)
                 echo "error: unknown product: ${product}"
                 exit 1
@@ -1351,9 +1348,6 @@ function cmake_config_opt() {
                 echo "--config ${LIBDISPATCH_BUILD_TYPE}"
                 ;;
             libicu)
-                ;;
-            playgroundsupport)
-                echo "--config ${PLAYGROUNDSUPPORT_BUILD_TYPE}"
                 ;;
             *)
                 echo "error: unknown product: ${product}"
