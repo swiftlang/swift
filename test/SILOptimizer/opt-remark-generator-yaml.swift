@@ -9,7 +9,18 @@
 
 public class Klass {}
 
-public var global = Klass()
+// CHECK: --- !Missed
+// CHECK-NEXT: Pass:            sil-opt-remark-gen
+// CHECK-NEXT: Name:            sil.memory
+// CHECK-NEXT: DebugLoc:        { File: '{{.*}}opt-remark-generator-yaml.swift',
+// CHECK-NEXT:                    Line: [[# @LINE + 7 ]], Column: 21 }
+// CHECK-NEXT: Function:        main
+// CHECK-NEXT: Args:
+// CHECK-NEXT:   - String:          'heap allocated ref of type '''
+// CHECK-NEXT:   - ValueType:       Klass
+// CHECK-NEXT:   - String:          ''''
+// CHECK-NEXT: ...
+public var global = Klass() // expected-remark {{heap allocated ref of type 'Klass'}}
 
 // CHECK: --- !Missed
 // CHECK-NEXT: Pass:            sil-opt-remark-gen
@@ -31,6 +42,17 @@ public func getGlobal() -> Klass {
                   // expected-note @-19:12 {{of 'global'}}
 }
 
+// CHECK: --- !Missed
+// CHECK-NEXT: Pass:            sil-opt-remark-gen
+// CHECK-NEXT: Name:            sil.memory
+// CHECK-NEXT: DebugLoc:        { File: '{{.*}}opt-remark-generator-yaml.swift',
+// CHECK-NEXT:                    Line: [[# @LINE + 51]], Column: 11 }
+// CHECK-NEXT: Function:        'useGlobal()'
+// CHECK-NEXT: Args:
+// CHECK-NEXT:   - String:          'heap allocated ref of type '''
+// CHECK-NEXT:   - ValueType:
+// CHECK-NEXT:   - String:          ''''
+// CHECK-NEXT: ...
 // CHECK-NEXT: --- !Missed
 // CHECK-NEXT: Pass:            sil-opt-remark-gen
 // CHECK-NEXT: Name:            sil.memory
@@ -75,10 +97,11 @@ public func useGlobal() {
     let x = getGlobal()
     // Make sure that the retain msg is at the beginning of the print and the
     // releases are the end of the print.
-    print(x) // expected-remark @:5 {{retain of type 'Klass'}}
-             // expected-note @-4:9 {{of 'x'}}
+    print(x) // expected-remark @:11 {{heap allocated ref of type}}
+             // expected-remark @-1:5 {{retain of type 'Klass'}}
+             // expected-note @-5:9 {{of 'x'}}
              // We test the type emission above since FileCheck can handle regex.
-             // expected-remark @-3:12 {{release of type}}
-             // expected-remark @-4:12 {{release of type 'Klass'}}
-             // expected-note @-8:9 {{of 'x'}}
+             // expected-remark @-4:12 {{release of type}}
+             // expected-remark @-5:12 {{release of type 'Klass'}}
+             // expected-note @-9:9 {{of 'x'}}
 }
