@@ -152,6 +152,8 @@ static SourceLoc inferOptRemarkSearchForwards(SILInstruction &i) {
   for (auto &inst :
        llvm::make_range(std::next(i.getIterator()), i.getParent()->end())) {
     auto newLoc = inst.getLoc().getSourceLoc();
+    if (auto inlinedLoc = inst.getDebugScope()->getOutermostInlineLocation())
+      newLoc = inlinedLoc.getSourceLoc();
     if (newLoc.isValid())
       return newLoc;
   }
@@ -167,7 +169,9 @@ static SourceLoc inferOptRemarkSearchBackwards(SILInstruction &i) {
   for (auto &inst : llvm::make_range(std::next(i.getReverseIterator()),
                                      i.getParent()->rend())) {
     auto loc = inst.getLoc();
-    if (!bool(loc))
+    if (auto inlinedLoc = inst.getDebugScope()->getOutermostInlineLocation())
+      loc = inlinedLoc;
+    if (!loc.getSourceLoc().isValid())
       continue;
 
     auto range = loc.getSourceRange();
@@ -180,12 +184,16 @@ static SourceLoc inferOptRemarkSearchBackwards(SILInstruction &i) {
 
 SourceLoc swift::OptRemark::inferOptRemarkSourceLoc(
     SILInstruction &i, SourceLocInferenceBehavior inferBehavior) {
-  auto loc = i.getLoc().getSourceLoc();
-
-  // Do a quick check if we already have a valid loc. In such a case, just
-  // return. Otherwise, we try to infer using one of our heuristics below.
-  if (loc.isValid())
-    return loc;
+  // Do a quick check if we already have a valid loc and it isnt an inline
+  // loc. In such a case, just return. Otherwise, we try to infer using one of
+  // our heuristics below.
+  auto loc = i.getLoc();
+  if (loc.getSourceLoc().isValid()) {
+    // Before we do anything, if we do not have an inlined call site, just
+    // return our loc.
+    if (!i.getDebugScope() || !i.getDebugScope()->InlinedCallSite)
+      return loc.getSourceLoc();
+  }
 
   // Otherwise, try to handle the individual behavior cases, returning loc at
   // the end of each case (its invalid, so it will get ignored). If loc is not
@@ -193,18 +201,18 @@ SourceLoc swift::OptRemark::inferOptRemarkSourceLoc(
   // was missed.
   switch (inferBehavior) {
   case SourceLocInferenceBehavior::None:
-    return loc;
+    return SourceLoc();
   case SourceLocInferenceBehavior::ForwardScanOnly: {
     SourceLoc newLoc = inferOptRemarkSearchForwards(i);
     if (newLoc.isValid())
       return newLoc;
-    return loc;
+    return SourceLoc();
   }
   case SourceLocInferenceBehavior::BackwardScanOnly: {
     SourceLoc newLoc = inferOptRemarkSearchBackwards(i);
     if (newLoc.isValid())
       return newLoc;
-    return loc;
+    return SourceLoc();
   }
   case SourceLocInferenceBehavior::ForwardThenBackward: {
     SourceLoc newLoc = inferOptRemarkSearchForwards(i);
@@ -213,7 +221,7 @@ SourceLoc swift::OptRemark::inferOptRemarkSourceLoc(
     newLoc = inferOptRemarkSearchBackwards(i);
     if (newLoc.isValid())
       return newLoc;
-    return loc;
+    return SourceLoc();
   }
   case SourceLocInferenceBehavior::BackwardThenForward: {
     SourceLoc newLoc = inferOptRemarkSearchBackwards(i);
@@ -222,7 +230,7 @@ SourceLoc swift::OptRemark::inferOptRemarkSourceLoc(
     newLoc = inferOptRemarkSearchForwards(i);
     if (newLoc.isValid())
       return newLoc;
-    return loc;
+    return SourceLoc();
   }
   }
 
