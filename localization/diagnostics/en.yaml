@@ -3136,6 +3136,9 @@
 - id: optional_base_not_unwrapped
   msg: "value of optional type %0 must be unwrapped to refer to member %1 of wrapped base type %2"
 
+- id: invalid_optional_infered_keypath_root
+  msg: "key path root inferred as optional type %0 must be unwrapped to refer to member %1 of unwrapped type %2"
+
 - id: optional_base_chain
   msg: "chain the optional using '?' to access member %0 only for non-'nil' base values"
 
@@ -3144,6 +3147,12 @@
 
 - id: optional_keypath_application_base
   msg: "use '?' to access key path subscript only for non-'nil' base values"
+
+- id: optional_key_path_root_base_chain
+  msg: "chain the optional using '?.' to access unwrapped type member %0"
+
+- id: optional_key_path_root_base_unwrap
+  msg: "unwrap the optional using '!.' to access unwrapped type member %0"
 
 - id: missing_unwrap_optional_try
   msg: "value of optional type %0 not unwrapped; did you mean to use 'try!' or chain with '?'?"
