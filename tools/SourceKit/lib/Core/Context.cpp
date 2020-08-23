@@ -37,11 +37,12 @@ unsigned GlobalConfig::getCompletionCheckDependencyInterval() const {
 }
 
 SourceKit::Context::Context(
-    StringRef RuntimeLibPath, StringRef DiagnosticDocumentationPath,
+    StringRef RuntimeLibPath, std::string DefaultLocalizationPath, StringRef DiagnosticDocumentationPath,
     llvm::function_ref<std::unique_ptr<LangSupport>(Context &)>
         LangSupportFactoryFn,
     bool shouldDispatchNotificationsOnMain)
     : RuntimeLibPath(RuntimeLibPath),
+      DefaultLocalizationPath(DefaultLocalizationPath),
       DiagnosticDocumentationPath(DiagnosticDocumentationPath),
       NotificationCtr(
           new NotificationCenter(shouldDispatchNotificationsOnMain)),

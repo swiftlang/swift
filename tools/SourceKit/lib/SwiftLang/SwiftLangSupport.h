@@ -81,6 +81,8 @@ namespace SourceKit {
 class SwiftEditorDocument :
     public ThreadSafeRefCountedBase<SwiftEditorDocument> {
 
+  std::string DefaultLocalizationPath;
+
   struct Implementation;
   Implementation &Impl;
 
@@ -88,6 +90,7 @@ public:
 
   SwiftEditorDocument(StringRef FilePath, SwiftLangSupport &LangSupport,
        llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
+       std::string DefaultLocalizationPath,
        swift::ide::CodeFormatOptions Options = swift::ide::CodeFormatOptions());
   ~SwiftEditorDocument();
 
@@ -298,6 +301,7 @@ struct SwiftStatistics {
 class SwiftLangSupport : public LangSupport {
   std::shared_ptr<NotificationCenter> NotificationCtr;
   std::string RuntimeResourcePath;
+  std::string DefaultLocalizationPath;
   std::string DiagnosticDocumentationPath;
   std::shared_ptr<SwiftASTManager> ASTMgr;
   std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocuments;
@@ -319,6 +323,9 @@ public:
   }
 
   StringRef getRuntimeResourcePath() const { return RuntimeResourcePath; }
+  StringRef getDefaultLocalizationPath() const {
+    return DefaultLocalizationPath;
+  }
   StringRef getDiagnosticDocumentationPath() const {
     return DiagnosticDocumentationPath;
   }

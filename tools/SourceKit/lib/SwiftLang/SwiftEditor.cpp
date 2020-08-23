@@ -704,6 +704,7 @@ public:
                      CompInv.getLangOptions(),
                      CompInv.getTypeCheckerOptions(),
                      CompInv.getModuleName(),
+                     CompInv.getDiagnosticOptions(),
                      SynTreeCreator,
                      CompInv.getMainFileSyntaxParsingCache())
     );
@@ -1069,6 +1070,8 @@ struct SwiftEditorDocument::Implementation {
   std::vector<DiagnosticEntryInfo> ParserDiagnostics;
   RefPtr<SwiftDocumentSemanticInfo> SemanticInfo;
   CodeFormatOptions FormatOptions;
+  
+  std::string DefaultLocalizationPath;
 
   std::shared_ptr<SwiftDocumentSyntaxInfo> SyntaxInfo;
 
@@ -1081,10 +1084,11 @@ struct SwiftEditorDocument::Implementation {
 
   Implementation(StringRef FilePath, SwiftLangSupport &LangSupport,
                  CodeFormatOptions options,
-                 llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem)
+                 llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
+                 std::string DefaultLocalizationPath)
       : ASTMgr(LangSupport.getASTManager()),
         NotificationCtr(LangSupport.getNotificationCenter()),
-        FilePath(FilePath), FormatOptions(options) {
+        FilePath(FilePath), FormatOptions(options), DefaultLocalizationPath(DefaultLocalizationPath) {
     assert(fileSystem);
     // This instance of semantic info is used if a document is opened with
     // `key.syntactic_only: 1`, but subsequently a semantic request such as
@@ -1850,8 +1854,8 @@ public:
 SwiftEditorDocument::SwiftEditorDocument(
     StringRef FilePath, SwiftLangSupport &LangSupport,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
-    CodeFormatOptions Options)
-  :Impl(*new Implementation(FilePath, LangSupport, Options, fileSystem)) { }
+    std::string DefaultLocalizationPath, CodeFormatOptions Options)
+  : DefaultLocalizationPath(DefaultLocalizationPath), Impl(*new Implementation(FilePath, LangSupport, Options, fileSystem, DefaultLocalizationPath)) { }
 
 SwiftEditorDocument::~SwiftEditorDocument()
 {
@@ -1983,6 +1987,7 @@ void SwiftEditorDocument::parse(ImmutableTextSnapshotRef Snapshot,
   // all tokens are visited and thus token collection is invalid
   CompInv.getLangOptions().CollectParsedToken = (SyntaxCache == nullptr);
   // Access to Impl.SyntaxInfo is guarded by Impl.AccessMtx
+  CompInv.getDiagnosticOptions().DefaultLocalizationMessagesPath = DefaultLocalizationPath;
   Impl.SyntaxInfo.reset(
     new SwiftDocumentSyntaxInfo(CompInv, Snapshot, Args, Impl.FilePath));
 
@@ -2323,7 +2328,7 @@ void SwiftLangSupport::editorOpen(
   ImmutableTextSnapshotRef Snapshot = nullptr;
   auto EditorDoc = EditorDocuments->getByUnresolvedName(Name);
   if (!EditorDoc) {
-    EditorDoc = new SwiftEditorDocument(Name, *this, fileSystem);
+    EditorDoc = new SwiftEditorDocument(Name, *this, fileSystem, DefaultLocalizationPath);
     Snapshot = EditorDoc->initializeText(
         Buf, Args, Consumer.needsSemanticInfo(), fileSystem);
     EditorDoc->parse(Snapshot, *this, Consumer.syntaxTreeEnabled());
@@ -2381,7 +2386,8 @@ void SwiftLangSupport::editorClose(StringRef Name, bool RemoveCache) {
 
 void verifyIncrementalParse(SwiftEditorDocumentRef EditorDoc,
                             unsigned EditOffset, unsigned EditLength,
-                            StringRef PreEditText, StringRef ReplaceText) {
+                            StringRef PreEditText, StringRef ReplaceText,
+                            std::string DefaultLocalizationPath) {
   swift::json::Output::UserInfoMap JsonUserInfo;
   JsonUserInfo[swift::json::DontSerializeNodeIdsUserInfoKey] =
       reinterpret_cast<void *>(true);
@@ -2396,6 +2402,7 @@ void verifyIncrementalParse(SwiftEditorDocumentRef EditorDoc,
   CompilerInvocation Invocation;
   Invocation.getLangOptions().BuildSyntaxTree = true;
   std::vector<std::string> Args;
+  Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath = DefaultLocalizationPath;
   SwiftDocumentSyntaxInfo ScratchSyntaxInfo(Invocation,
                                             EditorDoc->getLatestSnapshot(),
                                             Args, EditorDoc->getFilePath());
@@ -2545,7 +2552,7 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
 
     if (ValidateSyntaxTree) {
       verifyIncrementalParse(EditorDoc, Offset, Length, PreEditText,
-                             Buf->getBuffer());
+                             Buf->getBuffer(), DefaultLocalizationPath);
     }
   } else {
     Snapshot = EditorDoc->getLatestSnapshot();

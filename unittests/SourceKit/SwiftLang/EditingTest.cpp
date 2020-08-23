@@ -32,6 +32,16 @@ static StringRef getRuntimeLibPath() {
   return sys::path::parent_path(SWIFTLIB_DIR);
 }
 
+static std::string getDefaultLocalizationPath() {
+  std::string libPath = llvm::sys::path::parent_path(SWIFTLIB_DIR);
+  llvm::SmallString<128> DefaultDiagnosticMessagesDir(libPath);
+  llvm::sys::path::remove_filename(DefaultDiagnosticMessagesDir); // Remove /lib
+  llvm::sys::path::remove_filename(DefaultDiagnosticMessagesDir); // Remove /.
+  llvm::sys::path::append(DefaultDiagnosticMessagesDir, "share", "swift",
+                          "diagnostics");
+  return std::string(DefaultDiagnosticMessagesDir.str());
+}
+
 namespace {
 
 struct Token {
@@ -124,6 +134,7 @@ public:
     // thread may be active trying to use it to post notifications.
     // FIXME: Use shared_ptr ownership to avoid such issues.
     Ctx = new SourceKit::Context(getRuntimeLibPath(),
+                                 getDefaultLocalizationPath(),
                                  /*diagnosticDocumentationPath*/ "",
                                  SourceKit::createSwiftLangSupport,
                                  /*dispatchOnMain=*/false);

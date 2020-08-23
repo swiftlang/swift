@@ -54,19 +54,24 @@ public:
 
 class Context {
   std::string RuntimeLibPath;
+  std::string DefaultLocalizationPath;
   std::string DiagnosticDocumentationPath;
   std::unique_ptr<LangSupport> SwiftLang;
   std::shared_ptr<NotificationCenter> NotificationCtr;
   std::shared_ptr<GlobalConfig> Config;
 
 public:
-  Context(StringRef RuntimeLibPath, StringRef DiagnosticDocumentationPath,
+  Context(StringRef RuntimeLibPath, std::string DefaultLocalizationPath, 
+          StringRef DiagnosticDocumentationPath,
           llvm::function_ref<std::unique_ptr<LangSupport>(Context &)>
               LangSupportFactoryFn,
           bool shouldDispatchNotificationsOnMain = true);
   ~Context();
 
   StringRef getRuntimeLibPath() const { return RuntimeLibPath; }
+  StringRef getDefaultLocalizationPath() const {
+    return DefaultLocalizationPath;
+  }
   StringRef getDiagnosticDocumentationPath() const {
     return DiagnosticDocumentationPath;
   }

@@ -34,6 +34,8 @@ namespace SourceKit {
 class SwiftInterfaceGenContext :
   public llvm::ThreadSafeRefCountedBase<SwiftInterfaceGenContext> {
 public:
+  std::string DefaultLocalizationPath;
+
   static SwiftInterfaceGenContextRef create(StringRef DocumentName,
                                             bool IsModule,
                                             StringRef ModuleOrHeaderName,
@@ -41,18 +43,21 @@ public:
                                             swift::CompilerInvocation Invocation,
                                             std::string &ErrorMsg,
                                             bool SynthesizedExtensions,
-                                            Optional<StringRef> InterestedUSR);
+                                            Optional<StringRef> InterestedUSR,
+                                            std::string DefaultLocalizationPath);
 
   static SwiftInterfaceGenContextRef
     createForTypeInterface(swift::CompilerInvocation Invocation,
                            StringRef TypeUSR,
-                           std::string &ErrorMsg);
+                           std::string &ErrorMsg,
+                           std::string DefaultLocalizationPath);
 
   static SwiftInterfaceGenContextRef createForSwiftSource(StringRef DocumentName,
                                                           StringRef SourceFileName,
                                                           ASTUnitRef AstUnit,
                                                           swift::CompilerInvocation Invocation,
-                                                          std::string &ErrMsg);
+                                                          std::string &ErrMsg,
+                                                          std::string DefaultLocalizationPath);
 
   ~SwiftInterfaceGenContext();
 
@@ -99,7 +104,7 @@ public:
 private:
   Implementation &Impl;
 
-  SwiftInterfaceGenContext();
+  SwiftInterfaceGenContext(std::string DefaultLocalizationPath);
 };
 
 } // namespace SourceKit

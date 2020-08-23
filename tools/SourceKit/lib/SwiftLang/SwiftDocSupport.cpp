@@ -1057,8 +1057,9 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx, StringRef ModuleName,
 
 static bool reportModuleDocInfo(CompilerInvocation Invocation,
                                 StringRef ModuleName,
-                                DocInfoConsumer &Consumer) {
-  CompilerInstance CI;
+                                DocInfoConsumer &Consumer,
+                                std::string DefaultLocalizationPath) {
+  CompilerInstance CI(DefaultLocalizationPath);
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
@@ -1073,7 +1074,7 @@ static bool reportModuleDocInfo(CompilerInvocation Invocation,
   if (getModuleInterfaceInfo(Ctx, ModuleName, IFaceInfo))
     return true;
 
-  CompilerInstance ParseCI;
+  CompilerInstance ParseCI{Invocation.getDiagnosticOptions().DefaultLocalizationMessagesPath};
   if (makeParserAST(ParseCI, IFaceInfo.Text, Invocation))
     return true;
   addParameterEntities(ParseCI, IFaceInfo);
@@ -1177,8 +1178,9 @@ static bool getSourceTextInfo(CompilerInstance &CI,
 
 static bool reportSourceDocInfo(CompilerInvocation Invocation,
                                 llvm::MemoryBuffer *InputBuf,
-                                DocInfoConsumer &Consumer) {
-  CompilerInstance CI;
+                                DocInfoConsumer &Consumer,
+                                std::string DefaultLocalizationPath) {
+  CompilerInstance CI(DefaultLocalizationPath);
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
@@ -1363,7 +1365,7 @@ syntacticRename(llvm::MemoryBuffer *InputBuf,
                 ArrayRef<const char*> Args,
                 CategorizedEditsReceiver Receiver) {
   std::string Error;
-  CompilerInstance ParseCI;
+  CompilerInstance ParseCI(DefaultLocalizationPath);
   PrintingDiagnosticConsumer PrintDiags;
   ParseCI.addDiagnosticConsumer(&PrintDiags);
   SourceFile *SF = getSyntacticSourceFile(InputBuf, Args, ParseCI, Error);
@@ -1381,7 +1383,7 @@ void SwiftLangSupport::findRenameRanges(
     llvm::MemoryBuffer *InputBuf, ArrayRef<RenameLocations> RenameLocations,
     ArrayRef<const char *> Args, CategorizedRenameRangesReceiver Receiver) {
   std::string Error;
-  CompilerInstance ParseCI;
+  CompilerInstance ParseCI(DefaultLocalizationPath);
   PrintingDiagnosticConsumer PrintDiags;
   ParseCI.addDiagnosticConsumer(&PrintDiags);
   SourceFile *SF = getSyntacticSourceFile(InputBuf, Args, ParseCI, Error);
@@ -1492,7 +1494,7 @@ void SwiftLangSupport::getDocInfo(llvm::MemoryBuffer *InputBuf,
                                   StringRef ModuleName,
                                   ArrayRef<const char *> Args,
                                   DocInfoConsumer &Consumer) {
-  CompilerInstance CI;
+  CompilerInstance CI(DefaultLocalizationPath);
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
@@ -1510,13 +1512,13 @@ void SwiftLangSupport::getDocInfo(llvm::MemoryBuffer *InputBuf,
   Invocation.getClangImporterOptions().ImportForwardDeclarations = true;
 
   if (!ModuleName.empty()) {
-    bool Error = reportModuleDocInfo(Invocation, ModuleName, Consumer);
+    bool Error = reportModuleDocInfo(Invocation, ModuleName, Consumer, DefaultLocalizationPath);
     if (Error)
       Consumer.failed("Error occurred");
     return;
   }
 
-  Failed = reportSourceDocInfo(Invocation, InputBuf, Consumer);
+  Failed = reportSourceDocInfo(Invocation, InputBuf, Consumer, DefaultLocalizationPath);
   if (Failed)
     Consumer.failed("Error occurred");
 }
@@ -1528,7 +1530,7 @@ findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
   Invocation.getClangImporterOptions().ImportForwardDeclarations = true;
   Invocation.getFrontendOptions().InputsAndOutputs.clearInputs();
 
-  CompilerInstance CI;
+  CompilerInstance CI(DefaultLocalizationPath);
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);

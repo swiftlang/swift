@@ -287,7 +287,7 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
   StringRef FileExt = llvm::sys::path::extension(Filename);
 
   bool IsModuleIndexing = (FileExt == ".swiftmodule" || FileExt == ".pcm");
-  CompilerInstance CI;
+  CompilerInstance CI(DefaultLocalizationPath);
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);

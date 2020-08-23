@@ -215,6 +215,13 @@ std::string sourcekitd::getRuntimeLibPath() {
   return path.str().str();
 }
 
+std::string sourcekitd::getDefaultLocalizationPath() {
+  llvm::SmallString<128> path;
+  getToolchainPrefixPath(path);
+  llvm::sys::path::append(path, "share", "swift", "diagnostics");
+  return path.str().str();
+}
+
 std::string sourcekitd::getDiagnosticDocumentationPath() {
   llvm::SmallString<128> path;
   getToolchainPrefixPath(path);

@@ -33,6 +33,9 @@ using namespace ide;
 
 class SwiftInterfaceGenContext::Implementation {
 public:
+  std::string DefaultLocalizationPath;
+  Implementation(std::string DefaultLocalizationPath) : DefaultLocalizationPath(DefaultLocalizationPath) {}
+
   struct TextRange {
     unsigned Offset;
     unsigned Length;
@@ -75,11 +78,11 @@ public:
   std::string ModuleOrHeaderName;
   CompilerInvocation Invocation;
   PrintingDiagnosticConsumer DiagConsumer;
-  CompilerInstance Instance;
+  CompilerInstance Instance{DefaultLocalizationPath};
   ModuleDecl *Mod = nullptr;
   SourceTextInfo Info;
   // This is the non-typechecked AST for the generated interface source.
-  CompilerInstance TextCI;
+  CompilerInstance TextCI{DefaultLocalizationPath};
   // Synchronize access to the embedded compiler instance (if we don't have an
   // ASTUnit).
   WorkQueue Queue{WorkQueue::Dequeuing::Serial,
@@ -344,8 +347,9 @@ SwiftInterfaceGenContext::createForSwiftSource(StringRef DocumentName,
                                                StringRef SourceFileName,
                                                ASTUnitRef AstUnit,
                                                CompilerInvocation Invocation,
-                                               std::string &ErrMsg) {
-  SwiftInterfaceGenContextRef IFaceGenCtx{ new SwiftInterfaceGenContext() };
+                                               std::string &ErrMsg,
+                                               std::string DefaultLocalizationPath) {
+  SwiftInterfaceGenContextRef IFaceGenCtx{ new SwiftInterfaceGenContext(DefaultLocalizationPath) };
   IFaceGenCtx->Impl.DocumentName = DocumentName.str();
   IFaceGenCtx->Impl.IsModule = true;
   IFaceGenCtx->Impl.ModuleOrHeaderName = SourceFileName.str();
@@ -373,8 +377,9 @@ SwiftInterfaceGenContext::create(StringRef DocumentName,
                                  CompilerInvocation Invocation,
                                  std::string &ErrMsg,
                                  bool SynthesizedExtensions,
-                                 Optional<StringRef> InterestedUSR) {
-  SwiftInterfaceGenContextRef IFaceGenCtx{ new SwiftInterfaceGenContext() };
+                                 Optional<StringRef> InterestedUSR,
+                                 std::string DefaultLocalizationPath) {
+  SwiftInterfaceGenContextRef IFaceGenCtx{ new SwiftInterfaceGenContext(DefaultLocalizationPath) };
   IFaceGenCtx->Impl.DocumentName = DocumentName.str();
   IFaceGenCtx->Impl.IsModule = IsModule;
   IFaceGenCtx->Impl.ModuleOrHeaderName = ModuleOrHeaderName.str();
@@ -433,8 +438,9 @@ SwiftInterfaceGenContext::create(StringRef DocumentName,
 SwiftInterfaceGenContextRef
 SwiftInterfaceGenContext::createForTypeInterface(CompilerInvocation Invocation,
                                                  StringRef TypeUSR,
-                                                 std::string &ErrorMsg) {
-  SwiftInterfaceGenContextRef IFaceGenCtx{ new SwiftInterfaceGenContext() };
+                                                 std::string &ErrorMsg,
+                                                 std::string DefaultLocalizationPath) {
+  SwiftInterfaceGenContextRef IFaceGenCtx{ new SwiftInterfaceGenContext(DefaultLocalizationPath) };
   IFaceGenCtx->Impl.IsModule = false;
   IFaceGenCtx->Impl.ModuleOrHeaderName = TypeUSR.str();
   IFaceGenCtx->Impl.Invocation = Invocation;
@@ -479,8 +485,8 @@ SwiftInterfaceGenContext::createForTypeInterface(CompilerInvocation Invocation,
   return IFaceGenCtx;
 }
 
-SwiftInterfaceGenContext::SwiftInterfaceGenContext()
-  : Impl(*new Implementation) {
+SwiftInterfaceGenContext::SwiftInterfaceGenContext(std::string DefaultLocalizationPath)
+  : DefaultLocalizationPath(DefaultLocalizationPath), Impl(*new Implementation(DefaultLocalizationPath)) {
 }
 SwiftInterfaceGenContext::~SwiftInterfaceGenContext() {
   delete &Impl;
@@ -640,7 +646,7 @@ SwiftInterfaceGenMap::find(StringRef ModuleName,
 void SwiftLangSupport::editorOpenTypeInterface(EditorConsumer &Consumer,
                                                ArrayRef<const char *> Args,
                                                StringRef TypeUSR) {
-  CompilerInstance CI;
+  CompilerInstance CI(DefaultLocalizationPath);
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
@@ -658,7 +664,8 @@ void SwiftLangSupport::editorOpenTypeInterface(EditorConsumer &Consumer,
   auto IFaceGenRef = SwiftInterfaceGenContext::createForTypeInterface(
                                                       Invocation,
                                                       TypeUSR,
-                                                      ErrMsg);
+                                                      ErrMsg,
+                                                      DefaultLocalizationPath);
   if (!IFaceGenRef) {
     Consumer.handleRequestError(ErrMsg.c_str());
     return;
@@ -680,7 +687,7 @@ void SwiftLangSupport::editorOpenInterface(EditorConsumer &Consumer,
                                            ArrayRef<const char *> Args,
                                            bool SynthesizedExtensions,
                                            Optional<StringRef> InterestedUSR) {
-  CompilerInstance CI;
+  CompilerInstance CI(DefaultLocalizationPath);
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
@@ -703,7 +710,8 @@ void SwiftLangSupport::editorOpenInterface(EditorConsumer &Consumer,
                                                       Invocation,
                                                       ErrMsg,
                                                       SynthesizedExtensions,
-                                                      InterestedUSR);
+                                                      InterestedUSR,
+                                                      DefaultLocalizationPath);
   if (!IFaceGenRef) {
     Consumer.handleRequestError(ErrMsg.c_str());
     return;
@@ -740,7 +748,7 @@ public:
     ASTInvok->applyTo(CompInvok);
     std::string Error;
     auto IFaceGenRef = SwiftInterfaceGenContext::createForSwiftSource(Name,
-      SourceFileName, AstUnit, CompInvok, Error);
+      SourceFileName, AstUnit, CompInvok, Error, "DefaultLocalizationPath");
     if (!Error.empty())
       Consumer->handleRequestError(Error.data());
     Contexts.set(Name, IFaceGenRef);
@@ -772,7 +780,7 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
                                                  bool UsingSwiftArgs,
                                                  bool SynthesizedExtensions,
                                                  StringRef swiftVersion) {
-  CompilerInstance CI;
+  CompilerInstance CI(DefaultLocalizationPath);
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
@@ -807,7 +815,8 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
                                                       Invocation,
                                                       Error,
                                                       SynthesizedExtensions,
-                                                      None);
+                                                      None,
+                                                      DefaultLocalizationPath);
   if (!IFaceGenRef) {
     Consumer.handleRequestError(Error.c_str());
     return;
@@ -824,7 +833,7 @@ void SwiftLangSupport::findInterfaceDocument(StringRef ModuleName,
                        std::function<void(const RequestResult<InterfaceDocInfo> &)> Receiver) {
   InterfaceDocInfo Info;
 
-  CompilerInstance CI;
+  CompilerInstance CI(DefaultLocalizationPath);
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);

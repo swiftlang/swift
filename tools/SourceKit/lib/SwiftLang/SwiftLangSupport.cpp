@@ -270,6 +270,7 @@ configureCompletionInstance(std::shared_ptr<CompletionInstance> CompletionInst,
 
 SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
     : NotificationCtr(SKCtx.getNotificationCenter()),
+      DefaultLocalizationPath(SKCtx.getDefaultLocalizationPath()), 
       CCCache(new SwiftCompletionCache) {
   llvm::SmallString<128> LibPath(SKCtx.getRuntimeLibPath());
   llvm::sys::path::append(LibPath, "swift");
@@ -280,7 +281,7 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
   EditorDocuments = std::make_shared<SwiftEditorDocumentFileMap>();
   ASTMgr = std::make_shared<SwiftASTManager>(
       EditorDocuments, SKCtx.getGlobalConfiguration(), Stats,
-      RuntimeResourcePath, DiagnosticDocumentationPath);
+      RuntimeResourcePath, DefaultLocalizationPath, DiagnosticDocumentationPath);
 
   CompletionInst = std::make_shared<CompletionInstance>();
   configureCompletionInstance(CompletionInst, SKCtx.getGlobalConfiguration());
@@ -1005,7 +1006,7 @@ bool SwiftLangSupport::performCompletionLikeOperation(
       UnresolvedInputFile, Offset, bufferIdentifier);
 
   SourceManager SM;
-  DiagnosticEngine Diags(SM);
+  DiagnosticEngine Diags(SM, DefaultLocalizationPath);
   PrintingDiagnosticConsumer PrintDiags;
   EditorDiagConsumer TraceDiags;
   trace::TracedOperation TracedOp{trace::OperationKind::CodeCompletion};

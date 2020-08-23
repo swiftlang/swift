@@ -184,8 +184,8 @@ namespace SourceKit {
     CompilerInstance CompInst;
     WorkQueue Queue{ WorkQueue::Dequeuing::Serial, "sourcekit.swift.ConsumeAST" };
 
-    Implementation(uint64_t Generation, std::shared_ptr<SwiftStatistics> Stats)
-        : Generation(Generation), Stats(Stats) {}
+    Implementation(uint64_t Generation, std::shared_ptr<SwiftStatistics> Stats, std::string DefaultLocalizationPath)
+        : Generation(Generation), Stats(Stats), CompInst(DefaultLocalizationPath) {}
 
     void consumeAsync(SwiftASTConsumerRef ASTConsumer, ASTUnitRef ASTRef);
   };
@@ -215,8 +215,8 @@ namespace SourceKit {
     }, useDeepStack);
   }
 
-  ASTUnit::ASTUnit(uint64_t Generation, std::shared_ptr<SwiftStatistics> Stats)
-      : Impl(*new Implementation(Generation, Stats)) {
+  ASTUnit::ASTUnit(uint64_t Generation, std::shared_ptr<SwiftStatistics> Stats, std::string DefaultLocalizationPath)
+      : Impl(*new Implementation(Generation, Stats, DefaultLocalizationPath)), DefaultLocalizationPath(DefaultLocalizationPath) {
     auto numASTs = ++Stats->numASTsInMem;
     Stats->maxASTsInMem.updateMax(numASTs);
   }
@@ -275,6 +275,7 @@ struct FileContent {
 
 class ASTProducer : public ThreadSafeRefCountedBase<ASTProducer> {
   SwiftInvocationRef InvokRef;
+  std::string DefaultLocalizationPath;
   SmallVector<BufferStamp, 8> Stamps;
   ThreadSafeRefCntPtr<ASTUnit> AST;
   SmallVector<std::pair<std::string, BufferStamp>, 8> DependencyStamps;
@@ -289,8 +290,8 @@ class ASTProducer : public ThreadSafeRefCountedBase<ASTProducer> {
   llvm::sys::Mutex Mtx;
 
 public:
-  explicit ASTProducer(SwiftInvocationRef InvokRef)
-    : InvokRef(std::move(InvokRef)) {}
+  explicit ASTProducer(SwiftInvocationRef InvokRef, std::string DefaultLocalizationPath)
+    : InvokRef(std::move(InvokRef)), DefaultLocalizationPath(DefaultLocalizationPath) {}
 
   ASTUnitRef getExistingAST() {
     // FIXME: ThreadSafeRefCntPtr is racy.
@@ -374,9 +375,11 @@ struct SwiftASTManager::Implementation {
       std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocs,
       std::shared_ptr<GlobalConfig> Config,
       std::shared_ptr<SwiftStatistics> Stats, StringRef RuntimeResourcePath,
+      StringRef DefaultLocalizationPath,
       StringRef DiagnosticDocumentationPath)
       : EditorDocs(EditorDocs), Config(Config), Stats(Stats),
         RuntimeResourcePath(RuntimeResourcePath),
+        DefaultLocalizationPath(DefaultLocalizationPath),
         DiagnosticDocumentationPath(DiagnosticDocumentationPath),
         SessionTimestamp(llvm::sys::toTimeT(std::chrono::system_clock::now())) {
   }
@@ -385,6 +388,7 @@ struct SwiftASTManager::Implementation {
   std::shared_ptr<GlobalConfig> Config;
   std::shared_ptr<SwiftStatistics> Stats;
   std::string RuntimeResourcePath;
+  std::string DefaultLocalizationPath;
   std::string DiagnosticDocumentationPath;
   SourceManager SourceMgr;
   Cache<ASTKey, ASTProducerRef> ASTCache{ "sourcekit.swift.ASTCache" };
@@ -412,9 +416,10 @@ SwiftASTManager::SwiftASTManager(
     std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocs,
     std::shared_ptr<GlobalConfig> Config,
     std::shared_ptr<SwiftStatistics> Stats, StringRef RuntimeResourcePath,
+    std::string DefaultLocalizationPath,
     StringRef DiagnosticDocumentationPath)
-    : Impl(*new Implementation(EditorDocs, Config, Stats, RuntimeResourcePath,
-                               DiagnosticDocumentationPath)) {}
+    : DefaultLocalizationPath(DefaultLocalizationPath), Impl(*new Implementation(EditorDocs, Config, Stats, RuntimeResourcePath,
+                               DefaultLocalizationPath, DiagnosticDocumentationPath)) {}
 
 SwiftASTManager::~SwiftASTManager() {
   delete &Impl;
@@ -589,7 +594,7 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &CompInvok,
                                              ArrayRef<const char *> OrigArgs,
                                              StringRef PrimaryFile,
                                              std::string &Error) {
-  DiagnosticEngine Diagnostics(Impl.SourceMgr);
+  DiagnosticEngine Diagnostics(Impl.SourceMgr, DefaultLocalizationPath);
   return initCompilerInvocation(CompInvok, OrigArgs, Diagnostics, PrimaryFile,
                                 Error);
 }
@@ -627,7 +632,7 @@ SwiftInvocationRef SwiftASTManager::getInvocation(
     std::string &Error) {
   assert(FileSystem);
 
-  DiagnosticEngine Diags(Impl.SourceMgr);
+  DiagnosticEngine Diags(Impl.SourceMgr, DefaultLocalizationPath);
   EditorDiagConsumer CollectDiagConsumer;
   Diags.addConsumer(CollectDiagConsumer);
 
@@ -705,7 +710,7 @@ SwiftASTManager::Implementation::getASTProducer(SwiftInvocationRef InvokRef) {
   llvm::Optional<ASTProducerRef> OptProducer = ASTCache.get(InvokRef->Impl.Key);
   if (OptProducer.hasValue())
     return OptProducer.getValue();
-  ASTProducerRef Producer = new ASTProducer(InvokRef);
+  ASTProducerRef Producer = new ASTProducer(InvokRef, DefaultLocalizationPath);
   ASTCache.set(InvokRef->Impl.Key, Producer);
   return Producer;
 }
@@ -973,7 +978,7 @@ ASTUnitRef ASTProducer::createASTUnit(
   for (auto &Content : Contents)
     Stamps.push_back(Content.Stamp);
 
-  ASTUnitRef ASTRef = new ASTUnit(++ASTUnitGeneration, MgrImpl.Stats);
+  ASTUnitRef ASTRef = new ASTUnit(++ASTUnitGeneration, MgrImpl.Stats, DefaultLocalizationPath);
   for (auto &Content : Contents) {
     if (Content.Snapshot)
       ASTRef->Impl.Snapshots.push_back(Content.Snapshot);
