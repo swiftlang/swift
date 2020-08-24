@@ -923,25 +923,14 @@ initializeToNilAtDepth(OpaqueValue *destLocation, const Metadata *destType, int 
   }
 }
 
-static DynamicCastResult
-tryCastFromNil(
-  OpaqueValue *destLocation, const Metadata *destType,
-  OpaqueValue *srcValue, const Metadata *srcType,
-  const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks)
+static void
+copyNil(OpaqueValue *destLocation, const Metadata *destType, const Metadata *srcType)
 {
   assert(srcType->getKind() == MetadataKind::Optional);
-  // We can't assign a nil unless destination is an optional.
-  if(destType->getKind() != MetadataKind::Optional) {
-    return DynamicCastResult::Failure;
-  }
+  assert(destType->getKind() == MetadataKind::Optional);
 
-  // Probe the source optional
+  // Measure how deep the source nil is: Is it Int?.none or Int??.none or ...
   auto srcInnerType = cast<EnumMetadata>(srcType)->getGenericArgs()[0];
-  // Assert that we only got called for a real nil
-  assert(srcInnerType->vw_getEnumTagSinglePayload(srcValue, 1) != 0);
-
-  // Measure how deep the source nil is
   int srcDepth = 1;
   while (srcInnerType->getKind() == MetadataKind::Optional) {
     srcInnerType = cast<EnumMetadata>(srcInnerType)->getGenericArgs()[0];
@@ -959,7 +948,6 @@ tryCastFromNil(
   // Recursively set the destination to .some(.some(... .some(.none)))
   auto targetDepth = std::max(destDepth - srcDepth, 0);
   initializeToNilAtDepth(destLocation, destType, targetDepth);
-  return DynamicCastResult::SuccessViaCopy; // nil was essentially copied to dest
 }
 
 // Try unwrapping both source and dest optionals together.
@@ -979,9 +967,8 @@ tryCastUnwrappingOptionalBoth(
     srcValue, /*emptyCases=*/1);
   auto sourceIsNil = (sourceEnumCase != 0);
   if (sourceIsNil) {
-    return tryCastFromNil(
-      destLocation, destType, srcValue, srcType,
-      destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks);
+    copyNil(destLocation, destType, srcType);
+    return DynamicCastResult::SuccessViaCopy; // nil was essentially copied to dest
   } else {
     auto destEnumType = cast<EnumMetadata>(destType);
     const Metadata *destInnerType = destEnumType->getGenericArgs()[0];
