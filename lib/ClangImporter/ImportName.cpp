@@ -807,8 +807,6 @@ static bool omitNeedlessWordsInFunctionName(
     Optional<unsigned> errorParamIndex, bool returnsSelf, bool isInstanceMethod,
     NameImporter &nameImporter) {
   clang::ASTContext &clangCtx = nameImporter.getClangContext();
-  const version::Version &swiftLanguageVersion =
-      nameImporter.getLangOpts().EffectiveLanguageVersion;
 
   // Collect the parameter type names.
   StringRef firstParamName;
@@ -837,8 +835,7 @@ static bool omitNeedlessWordsInFunctionName(
     bool hasDefaultArg =
         ClangImporter::Implementation::inferDefaultArgument(
             param->getType(),
-            getParamOptionality(swiftLanguageVersion, param,
-                                !nonNullArgs.empty() && nonNullArgs[i]),
+            getParamOptionality(param, !nonNullArgs.empty() && nonNullArgs[i]),
             nameImporter.getIdentifier(baseName), argumentName, i == 0,
             isLastParameter, nameImporter) != DefaultArgumentKind::None;
 
