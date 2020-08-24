@@ -750,18 +750,6 @@ tryCastToDictionary(
   assert(destStructType->Description == &NOMINAL_TYPE_DESCR_SYM(SD));
 
   switch (srcType->getKind()) {
-  case MetadataKind::ForeignClass: // CF -> String
-  case MetadataKind::ObjCClassWrapper: { // Obj-C -> String
-#if SWIFT_OBJC_INTEROP
-    static ObjCBridgeMemo memo;
-
-    return memo.tryBridge(
-      destLocation, destType, srcValue, srcType,
-      destFailureType, srcFailureType,
-      takeOnSuccess, mayDeferChecks);
-#endif
-  }
-
   case MetadataKind::Struct: { // Struct -> Dictionary
     const auto srcStructType = cast<StructMetadata>(srcType);
     if (srcStructType->Description == &NOMINAL_TYPE_DESCR_SYM(SD)) { // Dictionary -> Dictionary
@@ -871,7 +859,11 @@ tryCastToStruct(
   assert(srcType != destType);
   assert(destType->getKind() == MetadataKind::Struct);
 
-  // Struct has no special cast handling at present.
+  // There is no special cast handling at present for general Struct types.
+
+  // Special logic for AnyHashable, Set, Dictionary, Array, and String
+  // is broken out above.  See also selectCasterForDest() for the
+  // logic that chooses one of these functions.
 
   return DynamicCastResult::Failure;
 }
