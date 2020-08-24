@@ -1014,6 +1014,10 @@ def create_argument_parser():
            help='skip testing Android device targets on the host machine (the '
                 'phone itself)')
 
+    option('--skip-clean-swiftpm', toggle_false('clean_swiftpm'),
+           help='skip cleaning up swiftpm')
+    option('--skip-clean-swift-driver', toggle_false('clean_swift_driver'),
+           help='skip cleaning up Swift driver')
     option('--skip-test-swiftpm', toggle_false('test_swiftpm'),
            help='skip testing swiftpm')
     option('--skip-test-swift-driver', toggle_false('test_swift_driver'),
