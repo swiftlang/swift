@@ -4,7 +4,7 @@
 
 /// Generate 3 empty modules.
 // RUN: touch %t/empty.swift
-// RUN: %target-swift-frontend -emit-module %t/empty.swift -module-name ExperimentalImported -emit-module-path %t/ExperimentalImported.swiftmodule -swift-version 5 -enable-library-evolution
+// RUN: %target-swift-frontend -emit-module %S/Inputs/ioi_helper.swift -module-name ExperimentalImported -emit-module-path %t/ExperimentalImported.swiftmodule -swift-version 5 -enable-library-evolution
 // RUN: %target-swift-frontend -emit-module %t/empty.swift -module-name IOIImported -emit-module-path %t/IOIImported.swiftmodule -swift-version 5 -enable-library-evolution
 // RUN: %target-swift-frontend -emit-module %t/empty.swift -module-name SPIImported -emit-module-path %t/SPIImported.swiftmodule -swift-version 5 -enable-library-evolution
 
@@ -24,3 +24,10 @@
 @_spi(dummy) import SPIImported
 // CHECK-PUBLIC: {{^}}import SPIImported
 // CHECK-PRIVATE: @_spi{{.*}} import SPIImported
+
+@_spi(X)
+extension IOIPublicStruct {
+  public func foo() {}
+}
+// CHECK-PUBLIC-NOT: IOIPublicStruct
+// CHECK-PRIVATE: @_spi{{.*}} extension IOIPublicStruct

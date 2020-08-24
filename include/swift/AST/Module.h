@@ -575,8 +575,9 @@ public:
 
   /// Find all SPI names imported from \p importedModule by this module,
   /// collecting the identifiers in \p spiGroups.
-  void lookupImportedSPIGroups(const ModuleDecl *importedModule,
-                          SmallVectorImpl<Identifier> &spiGroups) const;
+  void lookupImportedSPIGroups(
+                         const ModuleDecl *importedModule,
+                         llvm::SmallSetVector<Identifier, 4> &spiGroups) const;
 
   /// \sa getImportedModules
   enum class ImportFilterKind {
@@ -610,6 +611,12 @@ public:
   /// May go away in the future.
   void
   getImportedModulesForLookup(SmallVectorImpl<ImportedModule> &imports) const;
+
+  /// Has \p module been imported via an '@_implementationOnly' import
+  /// instead of another kind of import?
+  ///
+  /// This assumes that \p module was imported.
+  bool isImportedImplementationOnly(const ModuleDecl *module) const;
 
   /// Uniques the items in \p imports, ignoring the source locations of the
   /// access paths.

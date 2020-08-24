@@ -816,8 +816,9 @@ public:
 
   /// Find all SPI names imported from \p importedModule by this module,
   /// collecting the identifiers in \p spiGroups.
-  void lookupImportedSPIGroups(const ModuleDecl *importedModule,
-                              SmallVectorImpl<Identifier> &spiGroups) const;
+  void lookupImportedSPIGroups(
+                         const ModuleDecl *importedModule,
+                         llvm::SmallSetVector<Identifier, 4> &spiGroups) const;
 
   /// Reports all link-time dependencies.
   void collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const;

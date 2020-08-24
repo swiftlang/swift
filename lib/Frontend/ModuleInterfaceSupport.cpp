@@ -139,7 +139,7 @@ static void printImports(raw_ostream &out,
       continue;
     }
 
-    llvm::SmallVector<Identifier, 4> spis;
+    llvm::SmallSetVector<Identifier, 4> spis;
     M->lookupImportedSPIGroups(importedModule, spis);
 
     // Only print implementation-only imports which have an SPI import.

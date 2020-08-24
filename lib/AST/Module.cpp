@@ -639,8 +639,9 @@ void ModuleDecl::lookupObjCMethods(
   FORWARD(lookupObjCMethods, (selector, results));
 }
 
-void ModuleDecl::lookupImportedSPIGroups(const ModuleDecl *importedModule,
-                                    SmallVectorImpl<Identifier> &spiGroups) const {
+void ModuleDecl::lookupImportedSPIGroups(
+                        const ModuleDecl *importedModule,
+                        llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
   FORWARD(lookupImportedSPIGroups, (importedModule, spiGroups));
 }
 
@@ -2190,31 +2191,50 @@ bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
   return !imports.isImportedBy(module, getParentModule());
 }
 
-void SourceFile::lookupImportedSPIGroups(const ModuleDecl *importedModule,
-                                    SmallVectorImpl<Identifier> &spiGroups) const {
+bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {
+  auto &imports = getASTContext().getImportCache();
+
+  // Look through non-implementation-only imports to see if module is imported
+  // in some other way. Otherwise we assume it's implementation-only imported.
+  ModuleDecl::ImportFilter filter;
+  filter |= ModuleDecl::ImportFilterKind::Public;
+  filter |= ModuleDecl::ImportFilterKind::Private;
+  filter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
+  filter |= ModuleDecl::ImportFilterKind::ShadowedBySeparateOverlay;
+  SmallVector<ModuleDecl::ImportedModule, 4> results;
+  getImportedModules(results, filter);
+
+  for (auto &desc : results) {
+    if (imports.isImportedBy(module, desc.second))
+      return false;
+  }
+
+  return true;
+}
+
+void SourceFile::lookupImportedSPIGroups(
+                        const ModuleDecl *importedModule,
+                        llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
   for (auto &import : Imports) {
     if (import.importOptions.contains(ImportFlags::SPIAccessControl) &&
         importedModule == std::get<ModuleDecl*>(import.module)) {
       auto importedSpis = import.spiGroups;
-      spiGroups.append(importedSpis.begin(), importedSpis.end());
+      spiGroups.insert(importedSpis.begin(), importedSpis.end());
     }
   }
 }
 
 bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
   auto targetModule = targetDecl->getModuleContext();
-  SmallVector<Identifier, 4> importedSPIGroups;
+  llvm::SmallSetVector<Identifier, 4> importedSPIGroups;
   lookupImportedSPIGroups(targetModule, importedSPIGroups);
   if (importedSPIGroups.empty()) return false;
 
   auto declSPIGroups = targetDecl->getSPIGroups();
 
-  // Note: If we reach a point where there are many SPI imports or SPI groups
-  // on decls we could optimize this further by using a set.
-  for (auto importedSPI : importedSPIGroups)
-    for (auto declSPI : declSPIGroups)
-      if (importedSPI == declSPI)
-        return true;
+  for (auto declSPI : declSPIGroups)
+    if (importedSPIGroups.count(declSPI))
+      return true;
 
   return false;
 }
