@@ -103,7 +103,7 @@ To build for macOS, you need [Xcode 12 beta 3](https://developer.apple.com/xcode
 The required version of Xcode changes frequently, and is often a beta release.
 Check this document or the host information on <https://ci.swift.org> for the
 current required version. Recently (as of 8-22-20), we have seen a bug that causes the build to fail
-if the Xcode app path includes any spaces.
+if the Xcode app path includes any spaces. (See https://bugs.swift.org/browse/SR-13441 .)
 
 You will also need [CMake](https://cmake.org) and [Ninja](https://ninja-build.org),
 which can be installed via a package manager:
