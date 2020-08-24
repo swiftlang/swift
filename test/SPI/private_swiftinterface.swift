@@ -3,6 +3,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module %S/Inputs/spi_helper.swift -module-name SPIHelper -emit-module-path %t/SPIHelper.swiftmodule -swift-version 5 -enable-library-evolution -emit-module-interface-path %t/SPIHelper.swiftinterface -emit-private-module-interface-path %t/SPIHelper.private.swiftinterface
+// RUN: %target-swift-frontend -emit-module %S/Inputs/ioi_helper.swift -module-name IOIHelper -emit-module-path %t/IOIHelper.swiftmodule -swift-version 5 -enable-library-evolution -emit-module-interface-path %t/IOIHelper.swiftinterface -emit-private-module-interface-path %t/IOIHelper.private.swiftinterface
 
 /// Make sure that the public swiftinterface of spi_helper doesn't leak SPI.
 // RUN: %FileCheck -check-prefix=CHECK-HELPER %s < %t/SPIHelper.swiftinterface
@@ -25,6 +26,7 @@
 // CHECK-PUBLIC: import SPIHelper
 // CHECK-PRIVATE: @_spi(OtherSPI) @_spi(HelperSPI) import SPIHelper
 
+@_implementationOnly import IOIHelper
 public func foo() {}
 // CHECK-PUBLIC: foo()
 // CHECK-PRIVATE: foo()
@@ -154,6 +156,11 @@ private protocol PrivateConstraint {}
 extension PublicType: SPIProto2 where T: SPIProto2 {}
 // CHECK-PRIVATE: extension PublicType : {{.*}}.SPIProto2 where T : {{.*}}.SPIProto2
 // CHECK-PUBLIC-NOT: _ConstraintThatIsNotPartOfTheAPIOfThisLibrary
+
+public protocol LocalPublicProto {}
+extension IOIPublicStruct : LocalPublicProto {}
+// CHECK-PRIVATE-NOT: IOIPublicStruct
+// CHECK-PUBLIC-NOT: IOIPublicStruct
 
 // The dummy conformance should be only in the private swiftinterface for
 // SPI extensions.

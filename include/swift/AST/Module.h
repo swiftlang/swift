@@ -685,6 +685,12 @@ public:
   void
   getImportedModulesForLookup(SmallVectorImpl<ImportedModule> &imports) const;
 
+  /// Has \p module been imported via an '@_implementationOnly' import
+  /// instead of another kind of import?
+  ///
+  /// This assumes that \p module was imported.
+  bool isImportedImplementationOnly(const ModuleDecl *module) const;
+
   /// Uniques the items in \p imports, ignoring the source locations of the
   /// access paths.
   ///
