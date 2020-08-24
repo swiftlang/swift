@@ -131,6 +131,7 @@ TEST(SyntaxCollectionTests, prepending) {
   ASSERT_TRUE(GottenArg2_1.hasSameIdentityAs(GottenArg2_2));
 }
 
+/* SWIFT_ENABLE_TENSORFLOW - Turning off test (http://b/165034295)
 TEST(SyntaxCollectionTests, removingFirst) {
   ASSERT_DEATH({
     SyntaxFactory::makeBlankTupleExprElementList().removingFirst();
@@ -148,6 +149,7 @@ TEST(SyntaxCollectionTests, removingFirst) {
   List.print(OS);
   ASSERT_EQ(OS.str().str(), "x: foo, x: foo");
 }
+SWIFT_ENABLE_TENSORFLOW END */
 
 TEST(SyntaxCollectionTests, inserting) {
   auto Arg = getCannedArgument();
