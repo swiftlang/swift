@@ -589,32 +589,11 @@ static void printDifferentiableAttrArguments(
     if (!isLeadingClause)
       stream << ' ';
     stream << "where ";
-    std::function<Type(Type)> getInterfaceType;
-    if (!original || !original->getGenericSignature()) {
-      getInterfaceType = [](Type Ty) -> Type { return Ty; };
-    } else {
-      // Use GenericSignature to produce user-friendly
-      // names instead of something like 't_0_0'.
-      auto genericSig = original->getGenericSignature();
-      assert(genericSig);
-      getInterfaceType = [=](Type Ty) -> Type {
-        return genericSig->getSugaredType(Ty);
-      };
-    }
     interleave(requirementsToPrint, [&](Requirement req) {
       if (const auto &originalGenSig = original->getGenericSignature())
         if (originalGenSig->isRequirementSatisfied(req))
           return;
-      auto FirstTy = getInterfaceType(req.getFirstType());
-      if (req.getKind() != RequirementKind::Layout) {
-        auto SecondTy = getInterfaceType(req.getSecondType());
-        Requirement ReqWithDecls(req.getKind(), FirstTy, SecondTy);
-        ReqWithDecls.print(stream, Options);
-      } else {
-        Requirement ReqWithDecls(req.getKind(), FirstTy,
-        req.getLayoutConstraint());
-        ReqWithDecls.print(stream, Options);
-      }
+      req.print(stream, Options);
     }, [&] {
       stream << ", ";
     });
@@ -931,22 +910,13 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     if (auto sig = attr->getSpecializedSgnature())
       requirements = sig->getRequirements();
 
-    std::function<Type(Type)> GetInterfaceType;
     auto *FnDecl = dyn_cast_or_null<AbstractFunctionDecl>(D);
-    if (!FnDecl || !FnDecl->getGenericSignature())
-      GetInterfaceType = [](Type Ty) -> Type { return Ty; };
-    else {
-      // Use GenericSignature to produce user-friendly
-      // names instead of something like t_0_0.
-      auto GenericSig = FnDecl->getGenericSignature();
-      assert(GenericSig);
-      GetInterfaceType = [=](Type Ty) -> Type {
-        return GenericSig->getSugaredType(Ty);
-      };
+    if (FnDecl && FnDecl->getGenericSignature()) {
+      auto genericSig = FnDecl->getGenericSignature();
 
       if (auto sig = attr->getSpecializedSgnature()) {
         requirementsScratch = sig->requirementsNotSatisfiedBy(
-            GenericSig);
+            genericSig);
         requirements = requirementsScratch;
       }
     }
@@ -957,16 +927,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
     interleave(requirements,
                [&](Requirement req) {
-                 auto FirstTy = GetInterfaceType(req.getFirstType());
-                 if (req.getKind() != RequirementKind::Layout) {
-                   auto SecondTy = GetInterfaceType(req.getSecondType());
-                   Requirement ReqWithDecls(req.getKind(), FirstTy, SecondTy);
-                   ReqWithDecls.print(Printer, Options);
-                 } else {
-                   Requirement ReqWithDecls(req.getKind(), FirstTy,
-                                            req.getLayoutConstraint());
-                   ReqWithDecls.print(Printer, Options);
-                 }
+                 req.print(Printer, Options);
                },
                [&] { Printer << ", "; });
 
