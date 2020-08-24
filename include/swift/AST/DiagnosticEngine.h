@@ -20,8 +20,8 @@
 
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/DiagnosticConsumer.h"
-#include "swift/AST/LocalizationFormat.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/Localization/LocalizationFormat.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Allocator.h"
