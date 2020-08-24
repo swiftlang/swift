@@ -1724,11 +1724,11 @@ tryCastToExistentialMetatype(
 
 // A layer of functions that evaluate the source and/or destination types
 // in order to invoke a tailored casting operation above.
-
+//
 // This layer also deals with general issues of unwrapping box types
 // and invoking bridging conversions defined via the _ObjectiveCBridgeable
 // protocol.
-
+//
 // Most of the caster functions above should be fairly simple:
 // * They should deal with a single target type,
 // * They should assume the source is fully unwrapped,
@@ -1942,6 +1942,11 @@ tryCast(
   //
   // 4. Try recursively unwrapping Optionals.  First try jointly unwrapping
   //    both source and destination, then just destination, then just source.
+  //    Note that if both are optional, we try all three of these!
+  //    For example, consider casting an Optional<T> to
+  //    Optional<CustomDebugStringConvertible>.  If T conforms, we need to
+  //    unwrap both.  But if it doesn't, we unwrap just the destination
+  //    in order to cast Optional<T> to the protocol directly.
   //
   if (destKind == MetadataKind::Optional) {
     if (srcKind == MetadataKind::Optional) {
