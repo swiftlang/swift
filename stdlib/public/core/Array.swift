@@ -264,7 +264,7 @@
 ///     let colors = ["periwinkle", "rose", "moss"]
 ///     let moreColors: [String?] = ["ochre", "pine"]
 ///
-///     let url = NSURL(fileURLWithPath: "names.plist")
+///     let url = URL(fileURLWithPath: "names.plist")
 ///     (colors as NSArray).write(to: url, atomically: true)
 ///     // true
 ///
