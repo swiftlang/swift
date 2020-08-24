@@ -141,6 +141,7 @@ func anonymousClosureArgsInClosureWithArgs() {
   var a5 = { (_: [Int], w: [Int]) in
     f($0.count) // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments}}
     f($1.count) // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments; did you mean 'w'?}} {{7-9=w}}
+    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'String'}}
   }
 }
 
