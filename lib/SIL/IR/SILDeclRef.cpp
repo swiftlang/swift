@@ -587,9 +587,6 @@ bool SILDeclRef::isAlwaysInline() const {
 
   auto *decl = getDecl();
 
-  if (decl->getASTContext().LangOpts.IgnoreAlwaysInline)
-    return false;
-
   if (auto attr = decl->getAttrs().getAttribute<InlineAttr>())
     if (attr->getKind() == InlineKind::Always)
       return true;
