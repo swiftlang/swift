@@ -907,14 +907,14 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << "kind: " << kind << ", ";
     SmallVector<Requirement, 4> requirementsScratch;
     ArrayRef<Requirement> requirements;
-    if (auto sig = attr->getSpecializedSgnature())
+    if (auto sig = attr->getSpecializedSignature())
       requirements = sig->getRequirements();
 
     auto *FnDecl = dyn_cast_or_null<AbstractFunctionDecl>(D);
     if (FnDecl && FnDecl->getGenericSignature()) {
       auto genericSig = FnDecl->getGenericSignature();
 
-      if (auto sig = attr->getSpecializedSgnature()) {
+      if (auto sig = attr->getSpecializedSignature()) {
         requirementsScratch = sig->requirementsNotSatisfiedBy(
             genericSig);
         requirements = requirementsScratch;

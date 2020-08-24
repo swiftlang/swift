@@ -1427,7 +1427,7 @@ public:
 
   TrailingWhereClause *getTrailingWhereClause() const;
 
-  GenericSignature getSpecializedSgnature() const {
+  GenericSignature getSpecializedSignature() const {
     return specializedSignature;
   }
 
