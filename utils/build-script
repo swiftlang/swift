@@ -964,6 +964,9 @@ class BuildScriptInvocation(object):
                     toolchain=self.toolchain,
                     source_dir=self.workspace.source_dir(product_source),
                     build_dir=build_dir)
+                if product.should_clean(host_target):
+                    print("--- Cleaning %s ---" % product_name)
+                    product.clean(host_target)
                 if product.should_build(host_target):
                     print("--- Building %s ---" % product_name)
                     product.build(host_target)
