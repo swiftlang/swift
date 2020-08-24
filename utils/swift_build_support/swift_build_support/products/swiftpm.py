@@ -51,6 +51,11 @@ class SwiftPM(product.Product):
 
         helper_cmd = [script_path, action]
 
+        if action == 'clean':
+            helper_cmd += ["--build-dir", self.build_dir]
+            shell.call(helper_cmd)
+            return
+
         if self.is_release():
             helper_cmd.append("--release")
 
@@ -93,6 +98,12 @@ class SwiftPM(product.Product):
 
     def test(self, host_target):
         self.run_bootstrap_script('test', host_target)
+
+    def should_clean(self, host_target):
+        return self.args.clean_swiftpm
+
+    def clean(self, host_target):
+        self.run_bootstrap_script('clean', host_target)
 
     def should_install(self, host_target):
         return self.args.install_swiftpm
