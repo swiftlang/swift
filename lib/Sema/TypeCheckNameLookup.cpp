@@ -232,8 +232,26 @@ convertToUnqualifiedLookupOptions(NameLookupOptions options) {
 LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclNameRef name,
                                             SourceLoc loc,
                                             NameLookupOptions options) {
-  auto ulOptions = convertToUnqualifiedLookupOptions(options);
   auto &ctx = dc->getASTContext();
+  // HACK: Qualified lookup cannot be allowed to synthesize CodingKeys because
+  // it would lead to a number of egregious cycles through
+  // QualifiedLookupRequest when we resolve the protocol conformance. Codable's
+  // magic has pushed its way so deeply into the compiler, we have to
+  // pessimistically force every nominal context above this one to synthesize
+  // it in the event the user needs it from e.g. a non-primary input.
+  // We can undo this if Codable's semantic content is divorced from its
+  // syntactic content - so we synthesize just enough to allow lookups to
+  // succeed, but don't force protocol conformances while we're doing it.
+  if (name.getBaseIdentifier() == ctx.Id_CodingKeys) {
+    for (auto typeCtx = dc->getInnermostTypeContext(); typeCtx != nullptr;
+         typeCtx = typeCtx->getParent()->getInnermostTypeContext()) {
+      if (auto *nominal = typeCtx->getSelfNominalTypeDecl()) {
+        nominal->synthesizeSemanticMembersIfNeeded(name.getFullName());
+      }
+    }
+  }
+
+  auto ulOptions = convertToUnqualifiedLookupOptions(options);
   auto descriptor = UnqualifiedLookupDescriptor(name, dc, loc, ulOptions);
   auto lookup = evaluateOrDefault(ctx.evaluator,
                                   UnqualifiedLookupRequest{descriptor}, {});
