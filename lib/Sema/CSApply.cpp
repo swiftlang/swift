@@ -860,12 +860,9 @@ namespace {
         }
 
         // Similarly, ".foo(...)" really applies two argument lists.
-        if (auto *unresolvedMemberExpr = dyn_cast<UnresolvedMemberExpr>(prev)) {
-          if (unresolvedMemberExpr->hasArguments() ||
-              unresolvedMemberExpr->hasTrailingClosure())
-            return 2;
-          return 1;
-        }
+        if (isa<CallExpr>(prev) &&
+            isa<UnresolvedMemberExpr>(cast<CallExpr>(prev)->getFn()))
+          return 2;
 
         return getArgCount(maxArgCount);
       }();
@@ -2785,30 +2782,6 @@ namespace {
           memberLocator, expr->isImplicit(), AccessSemantics::Ordinary);
       if (!result)
         return nullptr;
-
-      auto getType = [&](Expr *E) -> Type { return cs.getType(E); };
-
-      // If there was an argument, apply it.
-      if (auto arg = expr->getArgument()) {
-        // Get the callee locator. Note this may be different to the locator for
-        // the member being referenced for things like callAsFunction.
-        auto *calleeLoc = cs.getCalleeLocator(exprLoc);
-
-        // Build and finish the apply.
-        ApplyExpr *apply = CallExpr::create(
-            ctx, result, arg, expr->getArgumentLabels(),
-            expr->getArgumentLabelLocs(), expr->hasTrailingClosure(),
-            /*implicit=*/expr->isImplicit(), Type(), getType);
-        result = finishApply(apply, Type(), exprLoc, calleeLoc);
-
-        // FIXME: Application could fail, because some of the solutions
-        // are not expressible in AST (yet?), like certain tuple-to-tuple
-        // conversions. Better solution here would be not to form solutions
-        // which couldn't be applied by e.g. detecting situations like that
-        // and inserting fixes early.
-        if (!result)
-          return nullptr;
-      }
 
       // Check for ambiguous member if the base is an Optional
       if (baseTy->getOptionalObjectType()) {

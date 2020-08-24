@@ -2108,11 +2108,8 @@ public:
   void visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     printCommon(E, "unresolved_member_expr")
       << " name='" << E->getName() << "'";
-    printArgumentLabels(E->getArgumentLabels());
-    if (E->getArgument()) {
-      OS << '\n';
-      printRec(E->getArgument());
-    }
+    PrintWithColorRAII(OS, ExprModifierColor)
+      << " function_ref=" << getFunctionRefKindStr(E->getFunctionRefKind());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitDotSelfExpr(DotSelfExpr *E) {

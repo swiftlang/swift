@@ -1443,10 +1443,7 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
   } else if (isa<SubscriptExpr>(diagExpr)) {
       subElementDiagID = diag::assignment_subscript_has_immutable_base;
   } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(diagExpr)) {
-    if (UME->hasArguments())
-      subElementDiagID = diag::assignment_lhs_is_apply_expression;
-    else
-      subElementDiagID = diag::assignment_lhs_is_immutable_property;
+    subElementDiagID = diag::assignment_lhs_is_immutable_property;
   } else {
     subElementDiagID = diag::assignment_lhs_is_immutable_variable;
   }
@@ -4500,9 +4497,6 @@ MissingArgumentsFailure::getCallInfo(ASTNode anchor) const {
     return std::make_tuple(call->getFn(), call->getArg(),
                            call->getNumArguments(),
                            call->getUnlabeledTrailingClosureIndex());
-  } else if (auto *UME = getAsExpr<UnresolvedMemberExpr>(anchor)) {
-    return std::make_tuple(UME, UME->getArgument(), UME->getNumArguments(),
-                           UME->getUnlabeledTrailingClosureIndex());
   } else if (auto *SE = getAsExpr<SubscriptExpr>(anchor)) {
     return std::make_tuple(SE, SE->getIndex(), SE->getNumArguments(),
                            SE->getUnlabeledTrailingClosureIndex());
@@ -6341,6 +6335,14 @@ bool MissingContextualBaseInMemberRefFailure::diagnoseAsError() {
   // Member reference could be wrapped into a number of parens
   // e.g. `((.foo))`.
   auto *parentExpr = findParentExpr(anchor);
+
+  // Look through immediate call of unresolved member (e.g., `.foo(0)`).
+  if (parentExpr && isa<CallExpr>(parentExpr))
+    parentExpr = findParentExpr(parentExpr);
+
+  // FIXME: We should probably look through the entire member chain so that
+  // something like `let _ = .foo().bar` gets the "no contextual type" error
+  // rather than the "Cannot infer contextual base" error.
   UnresolvedMemberChainResultExpr *resultExpr = nullptr;
   if (parentExpr && isa<UnresolvedMemberChainResultExpr>(parentExpr)) {
     resultExpr = cast<UnresolvedMemberChainResultExpr>(parentExpr);

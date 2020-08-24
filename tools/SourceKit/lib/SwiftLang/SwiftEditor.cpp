@@ -1601,9 +1601,6 @@ private:
         if (auto *CE = dyn_cast<CallExpr>(E)) {
           // Call expression can have argument.
           Arg = CE->getArg();
-        } else if (auto UME = dyn_cast<UnresolvedMemberExpr>(E)) {
-          // Unresolved member can have argument too.
-          Arg = UME->getArgument();
         }
         if (!Arg)
           return false;

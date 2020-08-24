@@ -54,6 +54,11 @@ struct ImplicitMembers: Equatable {
     func getAnotherOptional(arg: Int) -> ImplicitMembers? {
         ImplicitMembers()
     }
+
+    static func takesClosure(_: (Int) -> Void) -> ImplicitMembers { ImplicitMembers() }
+    static func takesArgClosure(_: Int, _: (Int) -> Void) -> ImplicitMembers { ImplicitMembers() }
+    func methodTakesClosure(_: (Int) -> Void) -> ImplicitMembers { ImplicitMembers() }
+    func methodTakesArgClosure(_: Int, _: (Int) -> Void) -> ImplicitMembers { ImplicitMembers() }
     
     subscript(arg: Void) -> ImplicitMembers {
         get { ImplicitMembers() }
@@ -165,6 +170,13 @@ let _: ImplicitMembers? = .createOptional()?.getAnotherOptional()?.another
 // FIXME: This should be allowed
 // let _: ImplicitMembers? = .superOptional???.another
 
+let _: ImplicitMembers = .takesClosure { _ in }
+let _: ImplicitMembers = .takesArgClosure(0) { _ in }
+let _: ImplicitMembers = .implicit.methodTakesClosure { _ in }
+let _: ImplicitMembers = .implicit.methodTakesArgClosure(0) { _ in }
+let _: ImplicitMembers? = .optional?.methodTakesClosure { _ in }
+let _: ImplicitMembers? = .optional?.methodTakesArgClosure(0) { _ in }
+
 let _: ImplicitMembers = .implicit[()]
 let _: ImplicitMembers = .implicit[optional: ()]!
 let _: ImplicitMembers? = .implicit[optional: ()]
@@ -212,14 +224,14 @@ func testLValues() {
 
     .implicitLet = local; // expected-error {{cannot assign to property: 'implicitLet' is a 'let' constant}}
     .implicitImmutable = local; // expected-error {{cannot assign to property: 'implicitImmutable' is a get-only property}}
-    .createImplicit() = local; // expected-error {{cannot assign to value: 'createImplicit' is a method}}
+    .createImplicit() = local; // expected-error {{expression is not assignable: function call returns immutable value}}
     .implicit.another = local; // expected-error {{cannot assign to property: 'another' is a get-only property}}
     .implicit[immutable: ()] = local; // expected-error {{cannot assign through subscript: subscript is get-only}}
     .implicit.getAnother() = local; // expected-error {{expression is not assignable: function call returns immutable value}}
 
     .implicitLet.anotherMutable = local; // expected-error {{cannot assign to property: 'implicitLet' is a 'let' constant}}
     .implicitImmutable.anotherMutable = local; // expected-error {{cannot assign to property: 'implicitImmutable' is a get-only property}}
-    .createImplicit().anotherMutable = local; // expected-error {{cannot assign to value: 'createImplicit' is a method}}
+    .createImplicit().anotherMutable = local; // expected-error {{cannot assign to property: function call returns immutable value}}
     .implicit.another.anotherMutable = local; // expected-error {{cannot assign to property: 'another' is a get-only property}}
     .implicit[immutable: ()].anotherMutable = local; // expected-error {{cannot assign to property: subscript is get-only}}
     .implicit.getAnother().anotherMutable = local; // expected-error {{cannot assign to property: function call returns immutable value}}
@@ -279,3 +291,36 @@ implicit(.implicit.anotherString.anotherStringInt) // expected-error {{member ch
 implicit(.implicit.getAnotherString().anotherStringInt) // expected-error {{member chain produces result of type 'ImplicitGeneric<Int>' but contextual base was inferred as 'ImplicitGeneric<String>'}}
 implicit(.implicit.anotherString.getAnotherStringInt()) // expected-error {{member chain produces result of type 'ImplicitGeneric<Int>' but contextual base was inferred as 'ImplicitGeneric<String>'}}
 implicit(.implicit.getAnotherString().getAnotherStringInt()) // expected-error {{member chain produces result of type 'ImplicitGeneric<Int>' but contextual base was inferred as 'ImplicitGeneric<String>'}}
+
+// Implicit member syntax can be used to apply curried instance methods:
+struct Curried {
+    func method() -> Curried { Curried() }
+    func method(with arg: Int) -> Curried { Curried() }
+    func method(with arg1: Int, and arg2: String) -> Curried { Curried() }
+    func takesClosure(_: (Int) -> Void) -> Curried { Curried() }
+    func takesArgClosure(_: Int, _: (Int) -> Void) -> Curried { Curried() }
+    static func curried(_ _self: Curried) -> () -> Curried{ return { _self } }
+    static func curriedWithArgs(_ _self: Curried) -> (Int, String) -> Curried { return { _, _ in _self } }
+}
+
+let _: Curried = .method(Curried())()
+let _: Curried = .method(Curried())(with: 0)
+let _: Curried = .method(Curried())(with: 0, and: "")
+let _: Curried = .takesClosure(Curried())() { _ in }
+let _: Curried = .takesArgClosure(Curried())(0) { _ in }
+let _: Curried = .curried(Curried())()
+let _: Curried = .curriedWithArgs(Curried())(0, "")
+
+
+struct CurriedGeneric<T> {
+    func create<U>(_: U.Type) -> CurriedGeneric<U> { return CurriedGeneric<U>() }
+}
+
+extension CurriedGeneric where T == Int {
+    func createInt() -> Self {
+        return self
+    }
+}
+
+let _: CurriedGeneric = .createInt(CurriedGeneric())()
+let _: CurriedGeneric = .create(CurriedGeneric())(Int.self)

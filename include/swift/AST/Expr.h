@@ -249,17 +249,8 @@ protected:
     NumArgLabels : 16
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(UnresolvedMemberExpr, Expr, 1+1+1+16,
-    /// Whether the UnresolvedMemberExpr has arguments.
-    HasArguments : 1,
-    /// Whether the UnresolvedMemberExpr also has source locations for the
-    /// argument label.
-    HasArgLabelLocs : 1,
-    /// Whether the last argument is a trailing closure.
-    HasTrailingClosure : 1,
-    : NumPadBits,
-    /// # of argument labels stored after the UnresolvedMemberExpr.
-    NumArgLabels : 16
+  SWIFT_INLINE_BITFIELD_FULL(UnresolvedMemberExpr, Expr, 2,
+    FunctionRefKind : 2
   );
 
   SWIFT_INLINE_BITFIELD(OverloadSetRefExpr, Expr, 2,
@@ -1841,71 +1832,35 @@ public:
 /// member, which is to be resolved with context sensitive type information into
 /// bar.foo.  These always have unresolved type.
 class UnresolvedMemberExpr final
-    : public Expr,
-      public TrailingCallArguments<UnresolvedMemberExpr> {
+    : public Expr {
   SourceLoc DotLoc;
   DeclNameLoc NameLoc;
   DeclNameRef Name;
-  Expr *Argument;
-
-  UnresolvedMemberExpr(SourceLoc dotLoc, DeclNameLoc nameLoc,
-                       DeclNameRef name, Expr *argument,
-                       ArrayRef<Identifier> argLabels,
-                       ArrayRef<SourceLoc> argLabelLocs,
-                       bool hasTrailingClosure,
-                       bool implicit);
 
 public:
-  /// Create a new unresolved member expression with no arguments.
-  static UnresolvedMemberExpr *create(ASTContext &ctx, SourceLoc dotLoc,
-                                      DeclNameLoc nameLoc, DeclNameRef name,
-                                      bool implicit);
-
-  /// Create a new unresolved member expression.
-  static UnresolvedMemberExpr *create(ASTContext &ctx, SourceLoc dotLoc,
-                                      DeclNameLoc nameLoc, DeclNameRef name,
-                                      SourceLoc lParenLoc,
-                                      ArrayRef<Expr *> args,
-                                      ArrayRef<Identifier> argLabels,
-                                      ArrayRef<SourceLoc> argLabelLocs,
-                                      SourceLoc rParenLoc,
-                                      ArrayRef<TrailingClosure> trailingClosures,
-                                      bool implicit);
+  UnresolvedMemberExpr(SourceLoc dotLoc, DeclNameLoc nameLoc, DeclNameRef name,
+                       bool implicit)
+    : Expr(ExprKind::UnresolvedMember, implicit), DotLoc(dotLoc),
+      NameLoc(nameLoc), Name(name) {}
 
   DeclNameRef getName() const { return Name; }
   DeclNameLoc getNameLoc() const { return NameLoc; }
   SourceLoc getDotLoc() const { return DotLoc; }
-  Expr *getArgument() const { return Argument; }
-  void setArgument(Expr *argument) { Argument = argument; }
-
-  /// Whether this reference has arguments.
-  bool hasArguments() const {
-    return Bits.UnresolvedMemberExpr.HasArguments;
-  }
-
-  unsigned getNumArguments() const {
-    return Bits.UnresolvedMemberExpr.NumArgLabels;
-  }
-
-  bool hasArgumentLabelLocs() const {
-    return Bits.UnresolvedMemberExpr.HasArgLabelLocs;
-  }
-
-  /// Whether this call with written with a trailing closure.
-  bool hasTrailingClosure() const {
-    return Bits.UnresolvedMemberExpr.HasTrailingClosure;
-  }
-
-  /// Return the index of the unlabeled trailing closure argument.
-  Optional<unsigned> getUnlabeledTrailingClosureIndex() const {
-    return getArgument()->getUnlabeledTrailingClosureIndexOfPackedArgument();
-  }
 
   SourceLoc getLoc() const { return NameLoc.getBaseNameLoc(); }
 
   SourceLoc getStartLoc() const { return DotLoc; }
-  SourceLoc getEndLoc() const {
-    return (Argument ? Argument->getEndLoc() : NameLoc.getSourceRange().End);
+  SourceLoc getEndLoc() const { return NameLoc.getSourceRange().End; }
+
+  /// Retrieve the kind of function reference.
+  FunctionRefKind getFunctionRefKind() const {
+    return static_cast<FunctionRefKind>(
+        Bits.UnresolvedMemberExpr.FunctionRefKind);
+  }
+
+  /// Set the kind of function reference.
+  void setFunctionRefKind(FunctionRefKind refKind) {
+    Bits.UnresolvedMemberExpr.FunctionRefKind = static_cast<unsigned>(refKind);
   }
   
   static bool classof(const Expr *E) {

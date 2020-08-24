@@ -1441,10 +1441,6 @@ namespace {
       auto baseLocator = CS.getConstraintLocator(
                             expr,
                             ConstraintLocator::MemberRefBase);
-      FunctionRefKind functionRefKind =
-        expr->getArgument() ? FunctionRefKind::DoubleApply
-                            : FunctionRefKind::Compound;
-
       auto memberLocator
         = CS.getConstraintLocator(expr, ConstraintLocator::UnresolvedMember);
 
@@ -1466,37 +1462,9 @@ namespace {
       // member, i.e., an enum case or a static variable.
       auto baseMetaTy = MetatypeType::get(baseTy);
       CS.addUnresolvedValueMemberConstraint(baseMetaTy, expr->getName(),
-                                            memberTy, CurDC, functionRefKind,
+                                            memberTy, CurDC,
+                                            expr->getFunctionRefKind(),
                                             memberLocator);
-
-      // If there is an argument, apply it.
-      if (auto arg = expr->getArgument()) {
-        // Create a new type variable for the result of the function.
-        auto outputTy = CS.createTypeVariable(
-            CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult),
-            TVO_CanBindToNoEscape);
-
-        // The function/enum case must be callable with the given argument.
-
-        // FIXME: Redesign the AST so that an UnresolvedMemberExpr directly
-        // stores a list of arguments together with their inout-ness, instead of
-        // a single ParenExpr or TupleExpr argument.
-        SmallVector<AnyFunctionType::Param, 8> params;
-        AnyFunctionType::decomposeInput(CS.getType(arg), params);
-
-        CS.addConstraint(ConstraintKind::ApplicableFunction,
-                         FunctionType::get(params, outputTy),
-                         memberTy,
-          CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
-
-        associateArgumentLabels(
-            CS.getConstraintLocator(expr),
-            {expr->getArgumentLabels(),
-             expr->getUnlabeledTrailingClosureIndex()});
-        return outputTy;
-      }
-      
-      // Otherwise, the result is just the type of the member.
       return memberTy;
     }
 

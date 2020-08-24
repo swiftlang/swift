@@ -562,21 +562,7 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
   }
 
   if (auto *UME = getAsExpr<UnresolvedMemberExpr>(anchor)) {
-    auto *calleeLoc =
-        getConstraintLocator(UME, ConstraintLocator::UnresolvedMember);
-
-    // Handle special cases for applies of non-function types.
-    // FIXME: Consider re-designing the AST such that an unresolved member expr
-    // with arguments uses a CallExpr, which would make this logic unnecessary
-    // and clean up a bunch of other special cases. Doing so may require a bit
-    // of hacking in CSGen though.
-    if (UME->hasArguments()) {
-      if (auto overload = getOverloadFor(calleeLoc)) {
-        if (auto *loc = getSpecialFnCalleeLoc(overload->boundType))
-          return loc;
-      }
-    }
-    return calleeLoc;
+    return getConstraintLocator(UME, ConstraintLocator::UnresolvedMember);
   }
 
   if (isExpr<MemberRefExpr>(anchor))
@@ -3153,9 +3139,7 @@ static bool diagnoseAmbiguityWithContextualType(
 
       auto type = solution.simplifyType(overload.boundType);
 
-      if (isExpr<ApplyExpr>(anchor) || isExpr<SubscriptExpr>(anchor) ||
-          (isExpr<UnresolvedMemberExpr>(anchor) &&
-           castToExpr<UnresolvedMemberExpr>(anchor)->hasArguments())) {
+      if (isExpr<ApplyExpr>(anchor) || isExpr<SubscriptExpr>(anchor)) {
         auto fnType = type->castTo<FunctionType>();
         DE.diagnose(
             loc, diag::cannot_convert_candidate_result_to_contextual_type,
@@ -3665,11 +3649,6 @@ void constraints::simplifyLocator(ASTNode &anchor,
         continue;
       }
 
-      if (auto *UME = getAsExpr<UnresolvedMemberExpr>(anchor)) {
-        anchor = UME->getArgument();
-        path = path.slice(1);
-        continue;
-      }
       break;
     }
 
@@ -3692,15 +3671,6 @@ void constraints::simplifyLocator(ASTNode &anchor,
         anchor = subscriptExpr;
         path = path.slice(1);
         continue;
-      }
-
-      // The unresolved member itself is the function.
-      if (auto unresolvedMember = getAsExpr<UnresolvedMemberExpr>(anchor)) {
-        if (unresolvedMember->getArgument()) {
-          anchor = unresolvedMember;
-          path = path.slice(1);
-          continue;
-        }
       }
 
       break;
@@ -3898,8 +3868,6 @@ Expr *constraints::getArgumentExpr(ASTNode node, unsigned index) {
   Expr *argExpr = nullptr;
   if (auto *AE = dyn_cast<ApplyExpr>(expr))
     argExpr = AE->getArg();
-  else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(expr))
-    argExpr = UME->getArgument();
   else if (auto *SE = dyn_cast<SubscriptExpr>(expr))
     argExpr = SE->getIndex();
   else

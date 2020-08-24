@@ -6755,22 +6755,27 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
   } else if (auto *CE = getAsExpr<CallExpr>(anchor)) {
     baseExpr = CE->getFn();
     baseType = getType(baseExpr);
-    // If this is an initializer call without explicit mention
-    // of `.init` on metatype value.
-    if (auto *AMT = baseType->getAs<AnyMetatypeType>()) {
-      auto instanceType = AMT->getInstanceType()->getWithoutParens();
-      if (!cs.isTypeReference(baseExpr)) {
-        if (baseType->is<MetatypeType>() &&
-            instanceType->isAnyExistentialType()) {
-          return AllowInvalidInitRef::onProtocolMetatype(
-              cs, baseType, init, cs.isStaticallyDerivedMetatype(baseExpr),
-              baseExpr->getSourceRange(), locator);
-        }
+    // FIXME: Historically, UnresolvedMemberExprs have allowed implicit
+    // construction through a metatype value, but this should probably be
+    // illegal.
+    if (!isa<UnresolvedMemberExpr>(baseExpr)) {
+      // If this is an initializer call without explicit mention
+      // of `.init` on metatype value.
+      if (auto *AMT = baseType->getAs<AnyMetatypeType>()) {
+        auto instanceType = AMT->getInstanceType()->getWithoutParens();
+        if (!cs.isTypeReference(baseExpr)) {
+          if (baseType->is<MetatypeType>() &&
+              instanceType->isAnyExistentialType()) {
+            return AllowInvalidInitRef::onProtocolMetatype(
+                cs, baseType, init, cs.isStaticallyDerivedMetatype(baseExpr),
+                baseExpr->getSourceRange(), locator);
+          }
 
-        if (!instanceType->isExistentialType() ||
-            instanceType->isAnyExistentialType()) {
-          return AllowInvalidInitRef::onNonConstMetatype(cs, baseType, init,
-                                                         locator);
+          if (!instanceType->isExistentialType() ||
+              instanceType->isAnyExistentialType()) {
+            return AllowInvalidInitRef::onNonConstMetatype(cs, baseType, init,
+                                                           locator);
+          }
         }
       }
     }

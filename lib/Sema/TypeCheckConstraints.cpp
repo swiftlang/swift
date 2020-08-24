@@ -1125,13 +1125,6 @@ namespace {
         }
       }
 
-      // If this is an unresolved member with a call argument (e.g.,
-      // .some(x)), record the argument expression.
-      if (auto unresolvedMember = dyn_cast<UnresolvedMemberExpr>(expr)) {
-        if (auto arg = unresolvedMember->getArgument())
-          CallArgs.insert(arg);
-      }
-
       // FIXME(diagnostics): `InOutType` could appear here as a result
       // of successful re-typecheck of the one of the sub-expressions e.g.
       // `let _: Int = { (s: inout S) in s.bar() }`. On the first
