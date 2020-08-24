@@ -19,7 +19,10 @@
 #define SWIFT_RUNTIME_MUTEX_H
 
 #include <type_traits>
+
+#if __has_include(<unistd.h>)
 #include <unistd.h>
+#endif
 
 #if defined(_POSIX_THREADS)
 #include "swift/Runtime/MutexPThread.h"
