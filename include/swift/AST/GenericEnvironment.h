@@ -149,13 +149,6 @@ public:
   std::pair<Type, ProtocolConformanceRef>
   mapConformanceRefIntoContext(Type conformingType,
                                ProtocolConformanceRef conformance) const;
-          
-  /// Get the sugared form of a generic parameter type.
-  GenericTypeParamType *getSugaredType(GenericTypeParamType *type) const;
-
-  /// Get the sugared form of a type by substituting any
-  /// generic parameter types by their sugared form.
-  Type getSugaredType(Type type) const;
 
   SubstitutionMap getForwardingSubstitutionMap() const;
 

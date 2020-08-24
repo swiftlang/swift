@@ -590,15 +590,15 @@ static void printDifferentiableAttrArguments(
       stream << ' ';
     stream << "where ";
     std::function<Type(Type)> getInterfaceType;
-    if (!original || !original->getGenericEnvironment()) {
+    if (!original || !original->getGenericSignature()) {
       getInterfaceType = [](Type Ty) -> Type { return Ty; };
     } else {
-      // Use GenericEnvironment to produce user-friendly
+      // Use GenericSignature to produce user-friendly
       // names instead of something like 't_0_0'.
-      auto *genericEnv = original->getGenericEnvironment();
-      assert(genericEnv);
+      auto genericSig = original->getGenericSignature();
+      assert(genericSig);
       getInterfaceType = [=](Type Ty) -> Type {
-        return genericEnv->getSugaredType(Ty);
+        return genericSig->getSugaredType(Ty);
       };
     }
     interleave(requirementsToPrint, [&](Requirement req) {
@@ -933,20 +933,20 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
     std::function<Type(Type)> GetInterfaceType;
     auto *FnDecl = dyn_cast_or_null<AbstractFunctionDecl>(D);
-    if (!FnDecl || !FnDecl->getGenericEnvironment())
+    if (!FnDecl || !FnDecl->getGenericSignature())
       GetInterfaceType = [](Type Ty) -> Type { return Ty; };
     else {
-      // Use GenericEnvironment to produce user-friendly
+      // Use GenericSignature to produce user-friendly
       // names instead of something like t_0_0.
-      auto *GenericEnv = FnDecl->getGenericEnvironment();
-      assert(GenericEnv);
+      auto GenericSig = FnDecl->getGenericSignature();
+      assert(GenericSig);
       GetInterfaceType = [=](Type Ty) -> Type {
-        return GenericEnv->getSugaredType(Ty);
+        return GenericSig->getSugaredType(Ty);
       };
 
       if (auto sig = attr->getSpecializedSgnature()) {
         requirementsScratch = sig->requirementsNotSatisfiedBy(
-            GenericEnv->getGenericSignature());
+            GenericSig);
         requirements = requirementsScratch;
       }
     }

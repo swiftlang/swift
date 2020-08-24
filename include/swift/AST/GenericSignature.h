@@ -397,10 +397,17 @@ public:
   ///   <t_0_0, t_0_1, t_1_0>
   /// then this will return 0 for t_0_0, 1 for t_0_1, and 2 for t_1_0.
   unsigned getGenericParamOrdinal(GenericTypeParamType *param) const;
-      
+
   /// Get a substitution map that maps all of the generic signature's
   /// generic parameters to themselves.
   SubstitutionMap getIdentitySubstitutionMap() const;
+
+  /// Get the sugared form of a generic parameter type.
+  GenericTypeParamType *getSugaredType(GenericTypeParamType *type) const;
+
+  /// Get the sugared form of a type by substituting any
+  /// generic parameter types by their sugared form.
+  Type getSugaredType(Type type) const;
 
   /// Whether this generic signature involves a type variable.
   bool hasTypeVariable() const;
