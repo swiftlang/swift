@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/LocalizationFormat.h"
+#include "swift/Localization/LocalizationFormat.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"

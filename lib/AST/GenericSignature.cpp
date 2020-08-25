@@ -1037,10 +1037,27 @@ SubstitutionMap GenericSignatureImpl::getIdentitySubstitutionMap() const {
                               MakeAbstractConformanceForGenericType());
 }
 
+GenericTypeParamType *GenericSignatureImpl::getSugaredType(
+    GenericTypeParamType *type) const {
+  unsigned ordinal = getGenericParamOrdinal(type);
+  return getGenericParams()[ordinal];
+}
+
+Type GenericSignatureImpl::getSugaredType(Type type) const {
+  if (!type->hasTypeParameter())
+    return type;
+
+  return type.transform([this](Type Ty) -> Type {
+    if (auto GP = dyn_cast<GenericTypeParamType>(Ty.getPointer())) {
+      return Type(getSugaredType(GP));
+    }
+    return Ty;
+  });
+}
+
 unsigned GenericSignatureImpl::getGenericParamOrdinal(
     GenericTypeParamType *param) const {
-  return GenericParamKey(param->getDepth(), param->getIndex())
-    .findIndexIn(getGenericParams());
+  return GenericParamKey(param).findIndexIn(getGenericParams());
 }
 
 bool GenericSignatureImpl::hasTypeVariable() const {

@@ -684,7 +684,7 @@ private:
   /// Free all the arrays in the free lists if there are no active readers. If
   /// there are active readers, do nothing.
   void deallocateFreeListIfSafe() {
-    if (ReaderCount.load(std::memory_order_relaxed) == 0)
+    if (ReaderCount.load(std::memory_order_acquire) == 0)
       deallocateFreeList();
   }
 
@@ -857,7 +857,7 @@ public:
     ElemTy *elements2;
     do {
       elements = Elements.load(std::memory_order_acquire);
-      indices = Indices.load(SWIFT_MEMORY_ORDER_CONSUME);
+      indices = Indices.load(std::memory_order_acquire);
       elementCount = ElementCount.load(std::memory_order_acquire);
       elements2 = Elements.load(std::memory_order_acquire);
     } while (elements != elements2);

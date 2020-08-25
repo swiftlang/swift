@@ -20,9 +20,13 @@
 
 #include <type_traits>
 
+#if __has_include(<unistd.h>)
+#include <unistd.h>
+#endif
+
 #ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
 #include "swift/Runtime/MutexSingleThreaded.h"
-#elif (defined(__APPLE__) || defined(__linux__) || defined(__CYGWIN__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__HAIKU__))
+#elif defined(_POSIX_THREADS)
 #include "swift/Runtime/MutexPThread.h"
 #elif defined(_WIN32)
 #include "swift/Runtime/MutexWin32.h"
