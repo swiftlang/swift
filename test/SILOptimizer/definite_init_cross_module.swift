@@ -254,3 +254,27 @@ extension GenericEmpty {
   init(xx: Double) {
   } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 }
+
+class AcceptsVisibleNoArgsDesignatedInit: VisibleNoArgsDesignatedInit {
+  var y: Float
+  init(y: Float) {
+    self.y = y
+    // no error
+  }
+}
+
+open class InModuleVisibleNoArgsDesignatedInit {
+  var x: Float
+  public init() { x = 0.0 }
+
+  // Add a designated init the subclass cannot see.
+  private init(x: Float) { self.x = x }
+}
+
+class AcceptsInModuleVisibleNoArgsDesignatedInit: InModuleVisibleNoArgsDesignatedInit {
+  var y: Float
+  init(y: Float) {
+    self.y = y
+    // no error
+  }
+}

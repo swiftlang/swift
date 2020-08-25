@@ -1910,7 +1910,7 @@ private:
       assert(extension->getGenericSignature().getCanonicalSignature() ==
                  extendedClass->getGenericSignature().getCanonicalSignature() &&
              "constrained extensions or custom generic parameters?");
-      type = extendedClass->getGenericEnvironment()->getSugaredType(type);
+      type = extendedClass->getGenericSignature()->getSugaredType(type);
       decl = type->getDecl();
     }
 

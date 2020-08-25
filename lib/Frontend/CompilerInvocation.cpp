@@ -326,6 +326,8 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
     Args.hasArg(OPT_experimental_print_full_convention);
   Opts.ExperimentalSPIImports |=
     Args.hasArg(OPT_experimental_spi_imports);
+  Opts.DebugPrintInvalidSyntax |=
+    Args.hasArg(OPT_debug_emit_invalid_swiftinterface_syntax);
 }
 
 /// Save a copy of any flags marked as ModuleInterfaceOption, if running

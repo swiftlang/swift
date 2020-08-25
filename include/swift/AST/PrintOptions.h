@@ -24,7 +24,7 @@
 
 namespace swift {
 class ASTPrinter;
-class GenericEnvironment;
+class GenericSignatureImpl;
 class CanType;
 class Decl;
 class Pattern;
@@ -423,8 +423,8 @@ struct PrintOptions {
   /// Replaces the name of private and internal properties of types with '_'.
   bool OmitNameOfInaccessibleProperties = false;
 
-  /// Print dependent types as references into this generic environment.
-  GenericEnvironment *GenericEnv = nullptr;
+  /// Use this signature to re-sugar dependent types.
+  const GenericSignatureImpl *GenericSig = nullptr;
 
   /// Print types with alternative names from their canonical names.
   llvm::DenseMap<CanType, Identifier> *AlternativeTypeNames = nullptr;

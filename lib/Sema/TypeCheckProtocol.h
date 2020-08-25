@@ -96,7 +96,8 @@ public:
 /// \returns an empty result on success, or a description of the error.
 CheckTypeWitnessResult checkTypeWitness(Type type,
                                         AssociatedTypeDecl *assocType,
-                                        NormalProtocolConformance *Conf);
+                                        const NormalProtocolConformance *Conf,
+                                        SubstOptions options = None);
 
 /// Describes the means of inferring an abstract type witness.
 enum class AbstractTypeWitnessKind : uint8_t {

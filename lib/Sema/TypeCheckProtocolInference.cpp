@@ -1172,6 +1172,7 @@ AssociatedTypeDecl *AssociatedTypeInference::completeSolution(
 
   // Check each abstract type witness we computed against the generic
   // requirements on the corresponding associated type.
+  const auto substOptions = getSubstOptionsWithCurrentTypeWitnesses();
   for (const auto &witness : abstractTypeWitnesses) {
     Type type = witness.getType();
     if (type->hasTypeParameter()) {
@@ -1184,8 +1185,7 @@ AssociatedTypeDecl *AssociatedTypeInference::completeSolution(
 
               return Type();
             },
-            LookUpConformanceInModule(dc->getParentModule()),
-            getSubstOptionsWithCurrentTypeWitnesses());
+            LookUpConformanceInModule(dc->getParentModule()), substOptions);
 
         // If the substitution produced an error, we're done.
         if (type->hasError())
@@ -1194,8 +1194,8 @@ AssociatedTypeDecl *AssociatedTypeInference::completeSolution(
       type = dc->mapTypeIntoContext(type);
     }
 
-    if (const auto &failed =
-            checkTypeWitness(type, witness.getAssocType(), conformance)) {
+    if (const auto &failed = checkTypeWitness(type, witness.getAssocType(),
+                                              conformance, substOptions)) {
       // We failed to satisfy a requirement. If this is a default type
       // witness failure and we haven't seen one already, write it down.
       if (witness.getKind() == AbstractTypeWitnessKind::Default &&
