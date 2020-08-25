@@ -1,4 +1,4 @@
-//===--- MutexWASI.h - -----------------------------------------*- C++ -*-===//
+//===--- MutexSingleThreaded.h - --------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,16 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// No-op implementation of locks for the WebAssembly System Interface. The 
-// implementation does not need to perform locking, because as of January 2020 
-// WebAssembly does not support threads.
-// See the current status at https://github.com/WebAssembly/proposals and 
-// https://github.com/webassembly/threads
+// No-op implementation of locks for single-threaded environments.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_RUNTIME_MUTEX_WASI_H
-#define SWIFT_RUNTIME_MUTEX_WASI_H
+#ifndef SWIFT_RUNTIME_MUTEX_SINGLE_THREADED_H
+#define SWIFT_RUNTIME_MUTEX_SINGLE_THREADED_H
 
 namespace swift {
 

@@ -24,12 +24,14 @@
 #include <unistd.h>
 #endif
 
-#if defined(_POSIX_THREADS)
+#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+#include "swift/Runtime/MutexSingleThreaded.h"
+#elif defined(_POSIX_THREADS)
 #include "swift/Runtime/MutexPThread.h"
 #elif defined(_WIN32)
 #include "swift/Runtime/MutexWin32.h"
 #elif defined(__wasi__)
-#include "swift/Runtime/MutexWASI.h"
+#include "swift/Runtime/MutexSingleThreaded.h"
 #else
 #error "Implement equivalent of MutexPThread.h/cpp for your platform."
 #endif
