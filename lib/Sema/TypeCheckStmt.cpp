@@ -1771,9 +1771,9 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
     NLOptions subOptions = NL_QualifiedDefault | NL_KnownNonCascadingDependency;
 
     SmallVector<ValueDecl *, 4> lookupResults;
-    dc->lookupQualified(superclassDecl,
-                        DeclNameRef::createConstructor(),
-                        subOptions, lookupResults);
+    fromCtor->lookupQualified(superclassDecl,
+                              DeclNameRef::createConstructor(),
+                              subOptions, lookupResults);
 
     for (auto decl : lookupResults) {
       auto superclassCtor = dyn_cast<ConstructorDecl>(decl);
