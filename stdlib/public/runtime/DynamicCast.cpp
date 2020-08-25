@@ -501,11 +501,15 @@ tryCastToForeignClass(
   case MetadataKind::ObjCClassWrapper: // Obj-C class => CF class
   case MetadataKind::ForeignClass: { // CF class => CF class
     auto srcObject = getNonNullSrcObject(srcValue, srcType, destType);
-    auto resultObject = swift_dynamicCastForeignClass(srcObject, destClassType);
-    if (resultObject) {
+    if (auto resultObject
+        = swift_dynamicCastForeignClass(srcObject, destClassType)) {
       *reinterpret_cast<const void **>(destLocation) = resultObject;
-      objc_retain((id)const_cast<void *>(resultObject));
-      return DynamicCastResult::SuccessViaCopy;
+      if (takeOnSuccess) {
+        return DynamicCastResult::SuccessViaTake;
+      } else {
+        objc_retain((id)const_cast<void *>(resultObject));
+        return DynamicCastResult::SuccessViaCopy;
+      }
     }
     break;
   }
