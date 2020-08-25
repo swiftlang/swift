@@ -22,6 +22,7 @@ add_swift_host_library(swiftIDE STATIC
 target_link_libraries(swiftIDE PRIVATE
   swiftAST
   swiftClangImporter
+  swiftDriver
   swiftFrontend
   swiftIndex
   swiftParse
