@@ -22,7 +22,11 @@
 
 namespace swift {
 
-#ifdef __APPLE__
+#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+
+typedef bool swift_once_t;
+
+#elif defined(__APPLE__)
 
 // On OS X and iOS, swift_once_t matches dispatch_once_t.
 typedef long swift_once_t;
