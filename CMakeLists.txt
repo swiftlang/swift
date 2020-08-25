@@ -409,10 +409,6 @@ option(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
   "Should the runtime be built with support for non-thread-safe leak detecting entrypoints"
   FALSE)
 
-option(SWIFT_STDLIB_USE_NONATOMIC_RC
-    "Build the standard libraries and overlays with nonatomic reference count operations enabled"
-    FALSE)
-
 option(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS
   "Enable runtime function counters and expose the API."
   FALSE)
