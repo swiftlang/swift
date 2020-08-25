@@ -49,8 +49,7 @@ struct SwiftToSourceKitCompletionAdapter {
     llvm::SmallString<64> name;
     {
       llvm::raw_svector_ostream OSS(name);
-      CodeCompletion::CompletionBuilder::getFilterName(
-          result->getCompletionString(), OSS);
+      ide::printCodeCompletionResultFilterName(*result, OSS);
     }
 
     llvm::SmallString<64> description;
@@ -887,8 +886,7 @@ filterInnerResults(ArrayRef<Result *> results, bool includeInner,
     llvm::SmallString<64> filterName;
     {
       llvm::raw_svector_ostream OSS(filterName);
-      CodeCompletion::CompletionBuilder::getFilterName(
-          result->getCompletionString(), OSS);
+      ide::printCodeCompletionResultFilterName(*result, OSS);
     }
     llvm::SmallString<64> description;
     {

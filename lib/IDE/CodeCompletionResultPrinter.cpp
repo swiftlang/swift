@@ -368,3 +368,67 @@ void swift::ide::printCodeCompletionResultSourceText(const CodeCompletionResult 
     }
   }
 }
+
+void swift::ide::printCodeCompletionResultFilterName(const CodeCompletionResult &Result, llvm::raw_ostream &OS) {
+  auto str = Result.getCompletionString();
+  // FIXME: we need a more uniform way to handle operator completions.
+  if (str->getChunks().size() == 1 && str->getChunks()[0].is(ChunkKind::Dot)) {
+    OS << ".";
+    return;
+  } else if (str->getChunks().size() == 2 &&
+             str->getChunks()[0].is(ChunkKind::QuestionMark) &&
+             str->getChunks()[1].is(ChunkKind::Dot)) {
+    OS << "?.";
+    return;
+  }
+
+  auto FirstTextChunk = str->getFirstTextChunkIndex();
+  if (FirstTextChunk.hasValue()) {
+    auto chunks = str->getChunks().slice(*FirstTextChunk);
+    for (auto i = chunks.begin(), e = chunks.end(); i != e; ++i) {
+      auto &C = *i;
+
+      if (C.is(ChunkKind::BraceStmtWithCursor))
+        break; // Don't include brace-stmt in filter name.
+
+      if (C.is(ChunkKind::Equal)) {
+        OS << C.getText();
+        break;
+      }
+
+      bool shouldPrint = !C.isAnnotation();
+      switch (C.getKind()) {
+      case ChunkKind::TypeAnnotation:
+      case ChunkKind::CallParameterInternalName:
+      case ChunkKind::CallParameterClosureType:
+      case ChunkKind::CallParameterClosureExpr:
+      case ChunkKind::CallParameterType:
+      case ChunkKind::DeclAttrParamColon:
+      case ChunkKind::Comma:
+      case ChunkKind::Whitespace:
+      case ChunkKind::Ellipsis:
+      case ChunkKind::Ampersand:
+      case ChunkKind::OptionalMethodCallTail:
+        continue;
+      case ChunkKind::CallParameterTypeBegin:
+      case ChunkKind::TypeAnnotationBegin: {
+        // Skip call parameter type or type annotation structure.
+        auto nestingLevel = C.getNestingLevel();
+        do { ++i; } while (i != e && !i->endsPreviousNestedGroup(nestingLevel));
+        --i;
+        continue;
+      }
+      case ChunkKind::CallParameterColon:
+        // Since we don't add the type, also don't add the space after ':'.
+        if (shouldPrint)
+          OS << ":";
+        continue;
+      default:
+        break;
+      }
+
+      if (C.hasText() && shouldPrint)
+        OS << C.getText();
+    }
+  } 
+}
