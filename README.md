@@ -102,8 +102,9 @@ Please make sure you use Python 2.x. Python 3.x is not supported currently.
 To build for macOS, you need [Xcode 12 beta 3](https://developer.apple.com/xcode/resources/).
 The required version of Xcode changes frequently, and is often a beta release.
 Check this document or the host information on <https://ci.swift.org> for the
-current required version. Recently (as of 8-22-20), we have seen a bug that causes the build to fail
-if the Xcode app path includes any spaces. (See https://bugs.swift.org/browse/SR-13441 .)
+current required version.
+
+Swift's build tooling is meant to support spaces in the paths passed to them, but using spaces sometimes tickles bugs in Swift's build scripts or the tools they rely on. For example, https://bugs.swift.org/browse/SR-13441 is caused by a space in the Xcode path used on macOS. If you see Swift's build tooling misbehave due to a space in a path, please report the bug on the Swift bug tracker and then change the path to work around it.
 
 You will also need [CMake](https://cmake.org) and [Ninja](https://ninja-build.org),
 which can be installed via a package manager:
