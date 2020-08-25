@@ -171,27 +171,6 @@ Type GenericEnvironment::mapTypeIntoContext(GenericTypeParamType *type) const {
   return result;
 }
 
-GenericTypeParamType *GenericEnvironment::getSugaredType(
-    GenericTypeParamType *type) const {
-  for (auto *sugaredType : getGenericParams())
-    if (sugaredType->isEqual(type))
-      return sugaredType;
-
-  llvm_unreachable("missing generic parameter");
-}
-
-Type GenericEnvironment::getSugaredType(Type type) const {
-  if (!type->hasTypeParameter())
-    return type;
-
-  return type.transform([this](Type Ty) -> Type {
-    if (auto GP = dyn_cast<GenericTypeParamType>(Ty.getPointer())) {
-      return Type(getSugaredType(GP));
-    }
-    return Ty;
-  });
-}
-
 SubstitutionMap GenericEnvironment::getForwardingSubstitutionMap() const {
   auto genericSig = getGenericSignature();
   return SubstitutionMap::get(genericSig,

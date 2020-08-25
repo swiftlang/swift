@@ -54,7 +54,7 @@ void SILFunctionBuilder::addFunctionAttributes(
             ? SILSpecializeAttr::SpecializationKind::Full
             : SILSpecializeAttr::SpecializationKind::Partial;
     F->addSpecializeAttr(
-        SILSpecializeAttr::create(M, SA->getSpecializedSgnature(),
+        SILSpecializeAttr::create(M, SA->getSpecializedSignature(),
                                   SA->isExported(), kind));
   }
 
