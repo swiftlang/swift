@@ -644,7 +644,10 @@ public:
 
   Demangle::NodePointer visitMetatypeTypeRef(const MetatypeTypeRef *M) {
     auto node = Dem.createNode(Node::Kind::Metatype);
-    assert(!M->wasAbstract() && "not implemented");
+    // FIXME: This is lossy. @objc_metatype is also abstract.
+    auto repr = Dem.createNode(Node::Kind::MetatypeRepresentation,
+                               M->wasAbstract() ? "@thick" : "@thin");
+    node->addChild(repr, Dem);
     node->addChild(visit(M->getInstanceType()), Dem);
     return node;
   }
