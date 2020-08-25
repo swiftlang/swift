@@ -415,6 +415,7 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
       SILFunctionType::ExtInfoBuilder(SILFunctionTypeRepresentation::Thin,
                                       /*pseudogeneric*/ false,
                                       /*non-escaping*/ false,
+                                      /*async*/ false,
                                       DifferentiabilityKind::NonDifferentiable,
                                       /*clangFunctionType*/ nullptr)
           .build();

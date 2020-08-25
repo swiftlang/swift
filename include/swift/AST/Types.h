@@ -308,7 +308,7 @@ class alignas(1 << TypeAlignInBits) TypeBase {
 
 protected:
   enum { NumAFTExtInfoBits = 9 };
-  enum { NumSILExtInfoBits = 8 };
+  enum { NumSILExtInfoBits = 9 };
   union { uint64_t OpaqueBits;
 
   SWIFT_INLINE_BITFIELD_BASE(TypeBase, bitmax(NumTypeKindBits,8) +
@@ -4046,7 +4046,7 @@ public:
     return SILCoroutineKind(Bits.SILFunctionType.CoroutineKind);
   }
 
-  bool isAsync() const { return Bits.SILFunctionType.IsAsync; }
+  bool isAsync() const { return getExtInfo().isAsync(); }
 
   /// Return the array of all the yields.
   ArrayRef<SILYieldInfo> getYields() const {

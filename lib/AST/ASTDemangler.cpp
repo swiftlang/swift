@@ -530,7 +530,7 @@ Type ASTBuilder::createImplFunctionType(
 
   // [TODO: Store-SIL-Clang-type]
   auto einfo = SILExtInfoBuilder(representation, flags.isPseudogeneric(),
-                                 !flags.isEscaping(), diffKind,
+                                 !flags.isEscaping(), flags.isAsync(), diffKind,
                                  /*clangFunctionType*/ nullptr)
                    .build();
 

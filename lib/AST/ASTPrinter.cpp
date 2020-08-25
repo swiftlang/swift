@@ -4133,6 +4133,9 @@ public:
     if (info.isNoEscape()) {
       Printer.printSimpleAttr("@noescape") << " ";
     }
+    if (info.isAsync()) {
+      Printer.printSimpleAttr("@async") << " ";
+    }
   }
 
   void visitAnyFunctionTypeParams(ArrayRef<AnyFunctionType::Param> Params,

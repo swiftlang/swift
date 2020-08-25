@@ -2146,8 +2146,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       SILFunctionType::Representation rep;
       TypeRepr *witnessMethodProtocol = nullptr;
 
-      auto isAsync = attrs.has(TAK_async);
-
       auto coroutineKind = SILCoroutineKind::None;
       if (attrs.has(TAK_yield_once)) {
         coroutineKind = SILCoroutineKind::YieldOnce;
@@ -2226,7 +2224,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       // [TODO: Store-SIL-Clang-type]
       auto extInfo = SILFunctionType::ExtInfoBuilder(
                          rep, attrs.has(TAK_pseudogeneric),
-                         attrs.has(TAK_noescape), diffKind, nullptr)
+                         attrs.has(TAK_noescape), attrs.has(TAK_async), 
+                         diffKind, nullptr)
                          .build();
 
       ty = resolveSILFunctionType(fnRepr, options, coroutineKind, extInfo,

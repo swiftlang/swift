@@ -5419,7 +5419,8 @@ public:
 
     auto extInfo =
         SILFunctionType::ExtInfoBuilder(*representation, pseudogeneric,
-                                        noescape, *diffKind, clangFunctionType)
+                                        noescape, async, *diffKind, 
+                                        clangFunctionType)
             .build();
 
     // Process the coroutine kind.

@@ -86,7 +86,8 @@ class BugReducerTester : public SILFunctionTransform {
         nullptr,
         SILFunctionType::ExtInfoBuilder(
             SILFunctionType::Representation::Thin, false /*isPseudoGeneric*/,
-            false /*noescape*/, DifferentiabilityKind::NonDifferentiable,
+            false /*noescape*/, false /*async*/,
+            DifferentiabilityKind::NonDifferentiable,
             nullptr /*clangFunctionType*/)
             .build(),
         SILCoroutineKind::None, ParameterConvention::Direct_Unowned,
