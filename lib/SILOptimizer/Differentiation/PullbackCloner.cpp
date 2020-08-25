@@ -2035,12 +2035,10 @@ void PullbackCloner::Implementation::accumulateAdjointForOptional(
     SILBasicBlock *bb, SILValue optionalValue, SILValue wrappedAdjoint) {
   auto pbLoc = getPullback().getLocation();
   // Handle `switch_enum` on `Optional`.
-  auto *optionalEnumDecl = getASTContext().getOptionalDecl();
-  auto optionalTy = optionalValue->getType();
-  assert(optionalTy.getASTType().getEnumOrBoundGenericEnum() ==
-         optionalEnumDecl);
   // `Optional<T>`
-  optionalTy = remapType(optionalTy);
+  auto optionalTy = remapType(optionalValue->getType());
+  assert(optionalTy.getASTType().getEnumOrBoundGenericEnum() ==
+         getASTContext().getOptionalDecl());
   // `T`
   auto wrappedType = optionalTy.getOptionalObjectType();
   // `T.TangentVector`
