@@ -4575,14 +4575,14 @@ public:
                                     
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getInvocationGenericSignature(),
-            getExtInfo(), isAsync(), getCoroutineKind(), getCalleeConvention(),
+            getExtInfo(), getCoroutineKind(), getCalleeConvention(),
             getParameters(), getYields(), getResults(),
             getOptionalErrorResult(), getWitnessMethodConformanceOrInvalid(),
             getPatternSubstitutions(), getInvocationSubstitutions());
   }
   static void
   Profile(llvm::FoldingSetNodeID &ID, GenericSignature genericSig, ExtInfo info,
-          bool isAsync, SILCoroutineKind coroutineKind, ParameterConvention calleeConvention,
+          SILCoroutineKind coroutineKind, ParameterConvention calleeConvention,
           ArrayRef<SILParameterInfo> params, ArrayRef<SILYieldInfo> yields,
           ArrayRef<SILResultInfo> results, Optional<SILResultInfo> errorResult,
           ProtocolConformanceRef conformance,
