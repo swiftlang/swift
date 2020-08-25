@@ -1,6 +1,5 @@
 add_sourcekit_library(SourceKitSupport
   Concurrency-libdispatch.cpp
-  FuzzyStringMatcher.cpp
   Logging.cpp
   ImmutableTextBuffer.cpp
   ThreadSafeRefCntPtr.cpp
