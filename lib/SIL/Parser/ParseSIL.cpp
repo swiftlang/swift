@@ -961,6 +961,8 @@ static bool parseDeclSILOptional(bool *isTransparent,
       *specialPurpose = SILFunction::Purpose::GlobalInit;
     else if (specialPurpose && SP.P.Tok.getText() == "lazy_getter")
       *specialPurpose = SILFunction::Purpose::LazyPropertyGetter;
+    else if (specialPurpose && SP.P.Tok.getText() == "global_init_once_fn")
+      *specialPurpose = SILFunction::Purpose::GlobalInitOnceFunction;
     else if (isWeakImported && SP.P.Tok.getText() == "weak_imported") {
       if (M.getASTContext().LangOpts.Target.isOSBinFormatCOFF())
         SP.P.diagnose(SP.P.Tok, diag::attr_unsupported_on_target,

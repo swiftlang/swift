@@ -1,6 +1,6 @@
 // RUN: %target-swift-emit-silgen -parse-as-library %s | %FileCheck %s
 
-// CHECK: sil private [ossa] @globalinit_[[T:.*]]_func0 : $@convention(c) () -> () {
+// CHECK: sil private [global_init_once_fn] [ossa] @globalinit_[[T:.*]]_func0 : $@convention(c) () -> () {
 // CHECK:   alloc_global @$s12lazy_globals1xSiv
 // CHECK:   [[XADDR:%.*]] = global_addr @$s12lazy_globals1xSivp : $*Int
 // CHECK:   store {{%.*}} to [trivial] [[XADDR]] : $*Int
@@ -16,7 +16,7 @@
 // CHECK: }
 var x: Int = 0
 
-// CHECK: sil private [ossa] @globalinit_[[T:.*]]_func1 : $@convention(c) () -> () {
+// CHECK: sil private [global_init_once_fn] [ossa] @globalinit_[[T:.*]]_func1 : $@convention(c) () -> () {
 // CHECK:   alloc_global @$s12lazy_globals3FooV3fooSivpZ
 // CHECK:   [[XADDR:%.*]] = global_addr @$s12lazy_globals3FooV3fooSivpZ : $*Int
 // CHECK:   store {{.*}} to [trivial] [[XADDR]] : $*Int
@@ -40,7 +40,7 @@ struct Foo {
   static var initialized: Int = 57
 }
 
-// CHECK: sil private [ossa] @globalinit_[[T:.*]]_func3 : $@convention(c) () -> () {
+// CHECK: sil private [global_init_once_fn] [ossa] @globalinit_[[T:.*]]_func3 : $@convention(c) () -> () {
 // CHECK:   alloc_global @$s12lazy_globals3BarO3barSivpZ
 // CHECK:   [[XADDR:%.*]] = global_addr @$s12lazy_globals3BarO3barSivpZ : $*Int
 // CHECK:   store {{.*}} to [trivial] [[XADDR]] : $*Int
@@ -63,7 +63,7 @@ enum Bar {
 
 func f() -> (Int, Int) { return (1, 2) }
 
-// CHECK: sil private [ossa] @globalinit_[[T]]_func4 : $@convention(c) () -> () {
+// CHECK: sil private [global_init_once_fn] [ossa] @globalinit_[[T]]_func4 : $@convention(c) () -> () {
 // CHECK:   function_ref @$s12lazy_globals1fSi_SityF : $@convention(thin) () -> (Int, Int)
 // CHECK: sil hidden [global_init] [ossa] @$s12lazy_globals2a1Sivau : $@convention(thin) () -> Builtin.RawPointer
 // CHECK:   function_ref @globalinit_[[T]]_func4 : $@convention(c) () -> ()
