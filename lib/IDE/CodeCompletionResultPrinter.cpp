@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/LLVM.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/IDE/CodeCompletionResultPrinter.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/Markup/XMLUtils.h"
@@ -254,4 +255,116 @@ void swift::ide::printCodeCompletionResultTypeName(const CodeCompletionResult &R
 void swift::ide::printCodeCompletionResultTypeNameAnnotated(const CodeCompletionResult &Result, llvm::raw_ostream &OS) {
   AnnotatingResultPrinter printer(OS);
   printer.printTypeName(Result);
+}
+
+/// Provide the text for the call parameter, including constructing a typed
+/// editor placeholder for it.
+static void constructTextForCallParam(
+    ArrayRef<CodeCompletionString::Chunk> ParamGroup, raw_ostream &OS) {
+  assert(ParamGroup.front().is(ChunkKind::CallParameterBegin));
+
+  for (; !ParamGroup.empty(); ParamGroup = ParamGroup.slice(1)) {
+    auto &C = ParamGroup.front();
+    if (C.isAnnotation())
+      continue;
+    if (C.is(ChunkKind::CallParameterInternalName) ||
+        C.is(ChunkKind::CallParameterType) ||
+        C.is(ChunkKind::CallParameterTypeBegin) ||
+        C.is(ChunkKind::CallParameterClosureExpr)) {
+      break;
+    }
+    if (!C.hasText())
+      continue;
+    OS << C.getText();
+  }
+
+  SmallString<32> DisplayString;
+  SmallString<32> TypeString;
+  SmallString<32> ExpansionTypeString;
+
+  for (auto i = ParamGroup.begin(), e = ParamGroup.end(); i != e; ++i) {
+    auto &C = *i;
+    if (C.is(ChunkKind::CallParameterTypeBegin)) {
+      assert(TypeString.empty());
+      auto nestingLevel = C.getNestingLevel();
+      ++i;
+      for (; i != e; ++i) {
+        if (i->endsPreviousNestedGroup(nestingLevel))
+          break;
+        if (!i->isAnnotation() && i->hasText()) {
+          TypeString += i->getText();
+          DisplayString += i->getText();
+        }
+      }
+      --i;
+      continue;
+    }
+    if (C.is(ChunkKind::CallParameterClosureType)) {
+      assert(ExpansionTypeString.empty());
+      ExpansionTypeString = C.getText();
+      continue;
+    }
+    if (C.is(ChunkKind::CallParameterType)) {
+      assert(TypeString.empty());
+      TypeString = C.getText();
+    }
+    if (C.is(ChunkKind::CallParameterClosureExpr)) {
+      // We have a closure expression, so provide it directly instead of in
+      // a placeholder.
+      OS << "{";
+      if (!C.getText().empty())
+        OS << " " << C.getText();
+      OS << "\n" << getCodePlaceholder() << "\n}";
+      return;
+    }
+    if (C.isAnnotation() || !C.hasText())
+      continue;
+    DisplayString += C.getText();
+  }
+
+  StringRef Display = DisplayString.str();
+  StringRef Type = TypeString.str();
+  StringRef ExpansionType = ExpansionTypeString.str();
+  if (ExpansionType.empty())
+    ExpansionType = Type;
+
+  OS << "<#T##" << Display;
+  if (Display == Type && Display == ExpansionType) {
+    // Short version, display and type are the same.
+  } else {
+    OS << "##" << Type;
+    if (ExpansionType != Type)
+      OS << "##" << ExpansionType;
+  }
+  OS << "#>";
+}
+
+void swift::ide::printCodeCompletionResultSourceText(const CodeCompletionResult &Result, llvm::raw_ostream &OS) {
+  auto Chunks = Result.getCompletionString()->getChunks();
+  for (size_t i = 0; i < Chunks.size(); ++i) {
+    auto &C = Chunks[i];
+    if (C.is(ChunkKind::BraceStmtWithCursor)) {
+      OS << " {\n" << getCodePlaceholder() << "\n}";
+      continue;
+    }
+    if (C.is(ChunkKind::CallParameterBegin)) {
+      size_t Start = i++;
+      for (; i < Chunks.size(); ++i) {
+        if (Chunks[i].endsPreviousNestedGroup(C.getNestingLevel()))
+          break;
+      }
+      constructTextForCallParam(Chunks.slice(Start, i-Start), OS);
+      --i;
+      continue;
+    }
+    if (C.is(ChunkKind::TypeAnnotationBegin)) {
+      // Skip type annotation structure.
+      auto level = C.getNestingLevel();
+      do { ++i; } while (i != Chunks.size() && !Chunks[i].endsPreviousNestedGroup(level));
+      --i;
+    }
+    if (!C.isAnnotation() && C.hasText()) {
+      OS << C.getText();
+    }
+  }
 }
