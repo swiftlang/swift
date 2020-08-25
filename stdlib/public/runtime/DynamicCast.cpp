@@ -54,6 +54,8 @@ using namespace hashable_support;
 // * Destination location and type
 // * Source value address and type
 // * References to the types that will be used to report failure.
+//   The function can update these with specific failing types
+//   to improve the reported failure.
 // * Bool indicating whether the compiler has asked us to "take" the
 //   value instead of copying.
 // * Bool indicating whether it's okay to do type checks lazily on later
