@@ -118,7 +118,6 @@ bool ARCSequenceDataflowEvaluator::processBBTopDown(ARCBBState &BBState) {
 void ARCSequenceDataflowEvaluator::mergePredecessors(
     ARCBBStateInfoHandle &DataHandle) {
   bool HasAtLeastOnePred = false;
-  llvm::SmallVector<SILBasicBlock *, 4> BBThatNeedInsertPts;
 
   SILBasicBlock *BB = DataHandle.getBB();
   ARCBBState &BBState = DataHandle.getState();
@@ -223,10 +222,8 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
       SetFactory);
 
   auto II = BB.rbegin();
-  if (isa<TermInst>(*II)) {
-    if (!isARCSignificantTerminator(&cast<TermInst>(*II))) {
-      II++;
-    }
+  if (!isARCSignificantTerminator(&cast<TermInst>(*II))) {
+    II++;
   }
 
   // For each instruction I in BB visited in reverse...

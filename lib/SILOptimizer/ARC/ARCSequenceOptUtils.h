@@ -21,7 +21,7 @@
 #include "swift/SIL/SILInstruction.h"
 
 namespace swift {
-  bool isARCSignificantTerminator(TermInst *TI);
+bool isARCSignificantTerminator(TermInst *TI);
 } // end namespace swift
 
 #endif
