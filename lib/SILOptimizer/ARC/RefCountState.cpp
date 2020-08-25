@@ -285,9 +285,6 @@ handleRefCountInstMatch(SILInstruction *RefCountInst) {
     return false;
   case LatticeState::Decremented:
   case LatticeState::MightBeUsed:
-    // Unset InsertPt so we remove retain release pairs instead of
-    // performing code motion.
-    LLVM_FALLTHROUGH;
   case LatticeState::MightBeDecremented:
     return true;
   }
