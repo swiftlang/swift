@@ -260,6 +260,10 @@ option(SWIFT_BENCHMARK_GENERATE_DEBUG_INFO
   "Produce debug info for benchmarks"
   TRUE)
 
+option(SWIFT_BENCHMARK_GENERATE_COVERAGE
+  "Generate coverage data for use with profiled execution counts"
+  FALSE)
+
 if(SWIFT_BENCHMARK_OPT_VIEWER)
   # If the path to the opt-viewer was specified manually and we have no access
   # to the LLVM tree, assume we have the modules for the opt-viewer installed.

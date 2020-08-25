@@ -71,6 +71,10 @@ The following build options are available:
     * Enable this option to compile benchmark binaries with debug info.
     (default: ON)
 
+* `-DSWIFT_BENCHMARK_GENERATE_COVERAGE`
+    * Enable this option to compile benchmarks with coverage information.
+    (default: OFF)
+
 The following build targets are available:
 
 * `swift-benchmark-macosx-x86_64`

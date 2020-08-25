@@ -360,6 +360,10 @@ function (swift_benchmark_compile_archopts)
     list(APPEND common_options "-g")
   endif()
 
+  if (SWIFT_BENCHMARK_GENERATE_COVERAGE)
+    list(APPEND common_options "-profile-coverage-mapping")
+  endif()
+
   if (is_darwin)
     list(APPEND common_options
       "-I" "${srcdir}/utils/ObjectiveCTests"
@@ -399,6 +403,10 @@ function (swift_benchmark_compile_archopts)
 
   if(SWIFT_BENCHMARK_GENERATE_DEBUG_INFO)
     list(APPEND common_options_driver "-g")
+  endif()
+
+  if (SWIFT_BENCHMARK_GENERATE_COVERAGE)
+    list(APPEND common_options_driver "-profile-coverage-mapping")
   endif()
 
   if (is_darwin)
