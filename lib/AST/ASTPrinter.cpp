@@ -24,7 +24,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileUnit.h"
-#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
@@ -2488,14 +2488,14 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
     Printer << " = ";
     // FIXME: An inferred associated type witness type alias may reference
     // an opaque type, but OpaqueTypeArchetypes are always canonicalized
-    // so lose type sugar for generic params. Bind the generic environment so
-    // we can map params back into the generic environment and print them
+    // so lose type sugar for generic params. Bind the generic signature so
+    // we can map params back into the generic signature and print them
     // correctly.
     //
     // Remove this when we have a way to represent non-canonical archetypes
     // preserving sugar.
-    llvm::SaveAndRestore<GenericEnvironment*> setGenericEnv(Options.GenericEnv,
-                                                decl->getGenericEnvironment());
+    llvm::SaveAndRestore<const GenericSignatureImpl *> setGenericSig(
+        Options.GenericSig, decl->getGenericSignature().getPointer());
     printTypeLoc(TypeLoc(decl->getUnderlyingTypeRepr(), Ty));
     printDeclGenericRequirements(decl);
   }
@@ -4319,7 +4319,7 @@ public:
     Optional<TypePrinter> subBuffer;
     PrintOptions subOptions = Options;
     if (auto substitutions = T->getPatternSubstitutions()) {
-      subOptions.GenericEnv = nullptr;
+      subOptions.GenericSig = nullptr;
       subBuffer.emplace(Printer, subOptions);
       sub = &*subBuffer;
 
@@ -4411,7 +4411,7 @@ public:
       // A box layout has its own independent generic environment. Don't try
       // to print it with the environment's generic params.
       PrintOptions subOptions = Options;
-      subOptions.GenericEnv = nullptr;
+      subOptions.GenericSig = nullptr;
       TypePrinter sub(Printer, subOptions);
 
       // Capture list used here to ensure we don't print anything using `this`
@@ -4594,10 +4594,10 @@ public:
         }
       }
 
-      // When printing SIL types, use a generic environment to map them from
+      // When printing SIL types, use a generic signature to map them from
       // canonical types to sugared types.
-      if (Options.GenericEnv)
-        T = Options.GenericEnv->getSugaredType(T);
+      if (Options.GenericSig)
+        T = Options.GenericSig->getSugaredType(T);
     }
 
     auto Name = T->getName();

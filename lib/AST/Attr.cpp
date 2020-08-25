@@ -589,32 +589,11 @@ static void printDifferentiableAttrArguments(
     if (!isLeadingClause)
       stream << ' ';
     stream << "where ";
-    std::function<Type(Type)> getInterfaceType;
-    if (!original || !original->getGenericEnvironment()) {
-      getInterfaceType = [](Type Ty) -> Type { return Ty; };
-    } else {
-      // Use GenericEnvironment to produce user-friendly
-      // names instead of something like 't_0_0'.
-      auto *genericEnv = original->getGenericEnvironment();
-      assert(genericEnv);
-      getInterfaceType = [=](Type Ty) -> Type {
-        return genericEnv->getSugaredType(Ty);
-      };
-    }
     interleave(requirementsToPrint, [&](Requirement req) {
       if (const auto &originalGenSig = original->getGenericSignature())
         if (originalGenSig->isRequirementSatisfied(req))
           return;
-      auto FirstTy = getInterfaceType(req.getFirstType());
-      if (req.getKind() != RequirementKind::Layout) {
-        auto SecondTy = getInterfaceType(req.getSecondType());
-        Requirement ReqWithDecls(req.getKind(), FirstTy, SecondTy);
-        ReqWithDecls.print(stream, Options);
-      } else {
-        Requirement ReqWithDecls(req.getKind(), FirstTy,
-        req.getLayoutConstraint());
-        ReqWithDecls.print(stream, Options);
-      }
+      req.print(stream, Options);
     }, [&] {
       stream << ", ";
     });
@@ -928,25 +907,16 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << "kind: " << kind << ", ";
     SmallVector<Requirement, 4> requirementsScratch;
     ArrayRef<Requirement> requirements;
-    if (auto sig = attr->getSpecializedSgnature())
+    if (auto sig = attr->getSpecializedSignature())
       requirements = sig->getRequirements();
 
-    std::function<Type(Type)> GetInterfaceType;
     auto *FnDecl = dyn_cast_or_null<AbstractFunctionDecl>(D);
-    if (!FnDecl || !FnDecl->getGenericEnvironment())
-      GetInterfaceType = [](Type Ty) -> Type { return Ty; };
-    else {
-      // Use GenericEnvironment to produce user-friendly
-      // names instead of something like t_0_0.
-      auto *GenericEnv = FnDecl->getGenericEnvironment();
-      assert(GenericEnv);
-      GetInterfaceType = [=](Type Ty) -> Type {
-        return GenericEnv->getSugaredType(Ty);
-      };
+    if (FnDecl && FnDecl->getGenericSignature()) {
+      auto genericSig = FnDecl->getGenericSignature();
 
-      if (auto sig = attr->getSpecializedSgnature()) {
+      if (auto sig = attr->getSpecializedSignature()) {
         requirementsScratch = sig->requirementsNotSatisfiedBy(
-            GenericEnv->getGenericSignature());
+            genericSig);
         requirements = requirementsScratch;
       }
     }
@@ -957,16 +927,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
     interleave(requirements,
                [&](Requirement req) {
-                 auto FirstTy = GetInterfaceType(req.getFirstType());
-                 if (req.getKind() != RequirementKind::Layout) {
-                   auto SecondTy = GetInterfaceType(req.getSecondType());
-                   Requirement ReqWithDecls(req.getKind(), FirstTy, SecondTy);
-                   ReqWithDecls.print(Printer, Options);
-                 } else {
-                   Requirement ReqWithDecls(req.getKind(), FirstTy,
-                                            req.getLayoutConstraint());
-                   ReqWithDecls.print(Printer, Options);
-                 }
+                 req.print(Printer, Options);
                },
                [&] { Printer << ", "; });
 
