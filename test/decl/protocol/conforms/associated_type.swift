@@ -94,27 +94,8 @@ struct SR_12707_Conform_P2: SR_12707_P2 {
   typealias A = Never
 }
 
-// Default type witness
-protocol SR_12707_P3 {
-  associatedtype A
-  associatedtype B: SR_12707_C<(A, Self)> = SR_12707_C<(A, Self)>
-}
-struct SR_12707_Conform_P3: SR_12707_P3 {
-  typealias A = Never
-}
-
-// FIXME: Type witness resolution success is order-dependent.
-protocol SR_12707_FIXME_P1 {
-  associatedtype A
-}
-protocol SR_12707_FIXME_P2: SR_12707_FIXME_P1 {
-  associatedtype B: SR_12707_C<(A, Self)> = SR_12707_C<(A, Self)> // expected-note {{default type 'associated_type.SR_12707_C<(associated_type.SR_12707_FIXME_Conform_P2.A, associated_type.SR_12707_FIXME_Conform_P2)>' (aka 'SR_12707_C<(Never, SR_12707_FIXME_Conform_P2)>') for associated type 'B' (from protocol 'SR_12707_FIXME_P2') does not inherit from 'associated_type.SR_12707_C<(associated_type.SR_12707_FIXME_Conform_P2.A, associated_type.SR_12707_FIXME_Conform_P2)>'}}
-}
-struct SR_12707_FIXME_Conform_P2: SR_12707_FIXME_P2 { // expected-error {{type 'SR_12707_FIXME_Conform_P2' does not conform to protocol 'SR_12707_FIXME_P2'}}
-  typealias A = Never
-}
-
-// FIXME: Type witness resolution success is order-dependent.
+// FIXME: resolveTypeWitnessViaLookup must not happen independently in the
+// general case.
 protocol SR_12707_FIXME_P3 {
   associatedtype A: SR_12707_C<B> // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
   associatedtype B
@@ -123,3 +104,27 @@ struct SR_12707_FIXME_Conform_P3: SR_12707_FIXME_P3 { // expected-error {{type '
   typealias A = SR_12707_C<B> // expected-note {{possibly intended match 'SR_12707_FIXME_Conform_P3.A' (aka 'SR_12707_C<Never>') does not inherit from 'SR_12707_C<SR_12707_FIXME_Conform_P3.B>'}}
   typealias B = Never
 }
+
+// FIXME: Associated type inference via value witnesses should consider
+// tentative witnesses when checking a candidate.
+protocol SR_12707_FIXME_P4 {
+  associatedtype X = Never
+
+  associatedtype A: SR_12707_C<X> // expected-note {{unable to infer associated type 'A' for protocol 'SR_12707_FIXME_P4'}}
+  func foo(arg: A)
+}
+struct SR_12707_FIXME_Conform_P4: SR_12707_FIXME_P4 { // expected-error {{type 'SR_12707_FIXME_Conform_P4' does not conform to protocol 'SR_12707_FIXME_P4'}}
+  func foo(arg: SR_12707_C<Never>) {} // expected-note {{candidate would match and infer 'A' = 'SR_12707_C<Never>' if 'SR_12707_C<Never>' inherited from 'SR_12707_C<SR_12707_FIXME_Conform_P4.X>'}}
+}
+
+// Abstract type witnesses.
+protocol SR_12707_P5a {
+  associatedtype X = Never
+
+  associatedtype A: SR_12707_C<X>
+  associatedtype B: SR_12707_C<X>
+}
+protocol SR_12707_P5b: SR_12707_P5a where B == SR_12707_C<X> {
+  associatedtype C: SR_12707_C<Self> = SR_12707_C<Self>
+}
+struct SR_12707_Conform_P5<A: SR_12707_C<Never>>: SR_12707_P5b {}
