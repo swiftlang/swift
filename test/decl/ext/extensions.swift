@@ -267,14 +267,14 @@ extension ImposeClassReq1 where Self: AnyObject {
 
   var wrappingProperty2: Int {
     get { return someProperty }
-    mutating set { someProperty = newValue } // expected-error {{'mutating' isn't valid on methods in classes or class-bound protocols}}
+    mutating set { someProperty = newValue } // expected-error {{'mutating' is not valid on setters in class-bound protocols}}
   }
 
-  mutating func foo() { // expected-error {{mutating' isn't valid on methods in classes or class-bound protocols}}
+  mutating func foo() { // expected-error {{mutating' is not valid on instance methods in class-bound protocols}}
     someProperty = 1
   }
 
-  nonmutating func bar() { // expected-error {{'nonmutating' isn't valid on methods in classes or class-bound protocols}}
+  nonmutating func bar() { // expected-error {{'nonmutating' is not valid on instance methods in class-bound protocols}}
     someProperty = 2
   }
 
@@ -309,14 +309,14 @@ extension ImposeClassReq2 {
 
   var wrappingProperty2: Int {
     get { return someProperty }
-    mutating set { someProperty = newValue } // expected-error {{'mutating' isn't valid on methods in classes or class-bound protocols}}
+    mutating set { someProperty = newValue } // expected-error {{'mutating' is not valid on setters in class-bound protocols}}
   }
 
-  mutating func foo() { // expected-error {{mutating' isn't valid on methods in classes or class-bound protocols}}
+  mutating func foo() { // expected-error {{mutating' is not valid on instance methods in class-bound protocols}}
     someProperty = 1
   }
 
-  nonmutating func bar() { // expected-error {{'nonmutating' isn't valid on methods in classes or class-bound protocols}}
+  nonmutating func bar() { // expected-error {{'nonmutating' is not valid on instance methods in class-bound protocols}}
     someProperty = 2
   }
 
