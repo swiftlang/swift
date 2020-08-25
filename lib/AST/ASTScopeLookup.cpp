@@ -485,7 +485,7 @@ bool BraceStmtScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
 bool PatternEntryInitializerScope::lookupLocalsOrMembers(
     ArrayRef<const ASTScopeImpl *>, DeclConsumer consumer) const {
   // 'self' is available within the pattern initializer of a 'lazy' variable.
-  auto *initContext = cast_or_null<PatternBindingInitializer>(
+  auto *initContext = dyn_cast_or_null<PatternBindingInitializer>(
       decl->getInitContext(0));
   if (initContext) {
     if (auto *selfParam = initContext->getImplicitSelfDecl()) {
@@ -782,7 +782,7 @@ Optional<bool> ClosureBodyScope::resolveIsCascadingUseForThisScope(
 Optional<bool> PatternEntryInitializerScope::resolveIsCascadingUseForThisScope(
     Optional<bool> isCascadingUse) const {
   auto *const initContext = getPatternEntry().getInitContext();
-  auto *PBI = cast_or_null<PatternBindingInitializer>(initContext);
+  auto *PBI = dyn_cast_or_null<PatternBindingInitializer>(initContext);
   auto *isd = PBI ? PBI->getImplicitSelfDecl() : nullptr;
 
   // 'self' is available within the pattern initializer of a 'lazy' variable.
