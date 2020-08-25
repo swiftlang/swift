@@ -1749,7 +1749,6 @@ namespace {
 
     Type resolveSILFunctionType(FunctionTypeRepr *repr,
                                 TypeResolutionOptions options,
-                                bool isAsync = false,
                                 SILCoroutineKind coroutineKind
                                   = SILCoroutineKind::None,
                                 SILFunctionType::ExtInfo extInfo
@@ -2230,7 +2229,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                          attrs.has(TAK_noescape), diffKind, nullptr)
                          .build();
 
-      ty = resolveSILFunctionType(fnRepr, options, isAsync, coroutineKind, extInfo,
+      ty = resolveSILFunctionType(fnRepr, options, coroutineKind, extInfo,
                                   calleeConvention, witnessMethodProtocol);
       if (!ty || ty->hasError())
         return ty;
@@ -2845,7 +2844,6 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
 
 Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
                                           TypeResolutionOptions options,
-                                          bool isAsync,
                                           SILCoroutineKind coroutineKind,
                                           SILFunctionType::ExtInfo extInfo,
                                           ParameterConvention callee,
@@ -3040,8 +3038,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
            "found witness_method without matching conformance");
   }
 
-  return SILFunctionType::get(genericSig, extInfo, isAsync,
-                              coroutineKind, callee,
+  return SILFunctionType::get(genericSig, extInfo, coroutineKind, callee,
                               interfaceParams, interfaceYields,
                               interfaceResults, interfaceErrorResult,
                               interfacePatternSubs, invocationSubs,

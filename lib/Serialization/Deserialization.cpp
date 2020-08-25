@@ -5568,8 +5568,7 @@ public:
     if (!patternSubsOrErr)
       return patternSubsOrErr.takeError();
 
-    return SILFunctionType::get(invocationSig, extInfo,
-                                async, coroutineKind.getValue(),
+    return SILFunctionType::get(invocationSig, extInfo, coroutineKind.getValue(),
                                 calleeConvention.getValue(),
                                 allParams, allYields, allResults,
                                 errorResult,

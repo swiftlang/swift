@@ -3056,7 +3056,7 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
   // Construct a representative function type.
   auto generics = ncGenerics.getCanonicalSignature();
   auto fnType = SILFunctionType::get(generics, SILFunctionType::ExtInfo(),
-                                /*isAsync*/ false, SILCoroutineKind::None,
+                                SILCoroutineKind::None,
                                 /*callee*/ ParameterConvention::Direct_Unowned,
                                 /*params*/ {}, /*yields*/ {},
                                 /*results*/ {}, /*error*/ None,

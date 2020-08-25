@@ -419,7 +419,7 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
                                       /*clangFunctionType*/ nullptr)
           .build();
 
-  auto functionTy = SILFunctionType::get(sig, extInfo, /*isAsync*/ false,
+  auto functionTy = SILFunctionType::get(sig, extInfo,
                                          SILCoroutineKind::YieldOnce,
                                          ParameterConvention::Direct_Unowned,
                                          params,
@@ -482,7 +482,7 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   };
 
   CanSILFunctionType topLevelType = SILFunctionType::get(nullptr, extInfo,
-                                   /*isAsync*/ false, SILCoroutineKind::None,
+                                   SILCoroutineKind::None,
                                    ParameterConvention::Direct_Unowned,
                                    params, /*yields*/ {},
                                    SILResultInfo(Int32Ty,

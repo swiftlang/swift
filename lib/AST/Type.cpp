@@ -4378,7 +4378,6 @@ case TypeKind::Id:
     return SILFunctionType::get(
         fnTy->getInvocationGenericSignature(),
         fnTy->getExtInfo(),
-        fnTy->isAsync(),
         fnTy->getCoroutineKind(),
         fnTy->getCalleeConvention(),
         transInterfaceParams,
@@ -5372,7 +5371,7 @@ SILFunctionType::withInvocationSubstitutions(SubstitutionMap subs) const {
   assert(!subs || CanGenericSignature(subs.getGenericSignature())
                     == getInvocationGenericSignature());
   return SILFunctionType::get(getInvocationGenericSignature(),
-                          getExtInfo(), isAsync(), getCoroutineKind(),
+                          getExtInfo(), getCoroutineKind(),
                           getCalleeConvention(),
                           getParameters(), getYields(), getResults(),
                           getOptionalErrorResult(),
@@ -5390,7 +5389,7 @@ SILFunctionType::withPatternSubstitutions(SubstitutionMap subs) const {
   assert(!subs || CanGenericSignature(subs.getGenericSignature())
                     == getPatternGenericSignature());
   return SILFunctionType::get(getInvocationGenericSignature(),
-                          getExtInfo(), isAsync(), getCoroutineKind(),
+                          getExtInfo(), getCoroutineKind(),
                           getCalleeConvention(),
                           getParameters(), getYields(), getResults(),
                           getOptionalErrorResult(),
@@ -5409,7 +5408,7 @@ SILFunctionType::withPatternSpecialization(CanGenericSignature sig,
   assert(!subs || CanGenericSignature(subs.getGenericSignature())
                     == getSubstGenericSignature());
   return SILFunctionType::get(sig,
-                          getExtInfo(), isAsync(), getCoroutineKind(),
+                          getExtInfo(), getCoroutineKind(),
                           getCalleeConvention(),
                           getParameters(), getYields(), getResults(),
                           getOptionalErrorResult(),

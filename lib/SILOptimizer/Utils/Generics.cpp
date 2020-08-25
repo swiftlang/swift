@@ -785,11 +785,10 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
 
   // Use the new specialized generic signature.
   auto NewFnTy = SILFunctionType::get(
-      CanSpecializedGenericSig, FnTy->getExtInfo(), FnTy->isAsync(),
-      FnTy->getCoroutineKind(), FnTy->getCalleeConvention(),
-      FnTy->getParameters(), FnTy->getYields(), FnTy->getResults(),
-      FnTy->getOptionalErrorResult(), FnTy->getPatternSubstitutions(),
-      SubstitutionMap(), M.getASTContext(),
+      CanSpecializedGenericSig, FnTy->getExtInfo(), FnTy->getCoroutineKind(),
+      FnTy->getCalleeConvention(), FnTy->getParameters(), FnTy->getYields(),
+      FnTy->getResults(), FnTy->getOptionalErrorResult(),
+      FnTy->getPatternSubstitutions(), SubstitutionMap(), M.getASTContext(),
       FnTy->getWitnessMethodConformanceOrInvalid());
 
   // This is an interface type. It should not have any archetypes.
@@ -857,7 +856,7 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
                      ? SubstFTy->getInvocationGenericSignature()
                      : CanGenericSignature();
   return SILFunctionType::get(
-      Signature, SubstFTy->getExtInfo(), SubstFTy->isAsync(),
+      Signature, SubstFTy->getExtInfo(),
       SubstFTy->getCoroutineKind(), SubstFTy->getCalleeConvention(),
       SpecializedParams, SpecializedYields, SpecializedResults,
       SubstFTy->getOptionalErrorResult(), SubstitutionMap(), SubstitutionMap(),

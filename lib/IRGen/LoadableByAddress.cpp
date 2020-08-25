@@ -297,7 +297,6 @@ LargeSILTypeMapper::getNewSILFunctionType(GenericEnvironment *env,
   auto newFnType = SILFunctionType::get(
       fnType->getInvocationGenericSignature(),
       fnType->getExtInfo(),
-      fnType->isAsync(),
       fnType->getCoroutineKind(),
       fnType->getCalleeConvention(),
       newParams,
@@ -2362,7 +2361,6 @@ static bool rewriteFunctionReturn(StructLoweringState &pass) {
     auto NewTy = SILFunctionType::get(
         loweredTy->getSubstGenericSignature(),
         loweredTy->getExtInfo(),
-        loweredTy->isAsync(),
         loweredTy->getCoroutineKind(),
         loweredTy->getCalleeConvention(),
         loweredTy->getParameters(),

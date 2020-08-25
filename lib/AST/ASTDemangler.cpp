@@ -558,8 +558,7 @@ Type ASTBuilder::createImplFunctionType(
     auto conv = getResultConvention(errorResult->getConvention());
     funcErrorResult.emplace(type, conv);
   }
-  return SILFunctionType::get(genericSig, einfo,
-                              /*isAsync*/ false, funcCoroutineKind,
+  return SILFunctionType::get(genericSig, einfo, funcCoroutineKind,
                               funcCalleeConvention, funcParams, funcYields,
                               funcResults, funcErrorResult,
                               SubstitutionMap(), SubstitutionMap(), Ctx);
