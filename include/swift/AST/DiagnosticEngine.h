@@ -1025,6 +1025,12 @@ namespace swift {
       }
     }
 
+    bool hasDiagnostics() const {
+      return std::distance(Engine.TentativeDiagnostics.begin() +
+                               PrevDiagnostics,
+                           Engine.TentativeDiagnostics.end()) > 0;
+    }
+
     /// Abort and close this transaction and erase all diagnostics
     /// record while it was open.
     void abort() {

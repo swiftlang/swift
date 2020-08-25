@@ -9712,7 +9712,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SpecifyObjectLiteralTypeImport:
   case FixKind::AllowKeyPathRootTypeMismatch:
   case FixKind::AllowCoercionToForceCast:
-  case FixKind::SpecifyKeyPathRootType: {
+  case FixKind::SpecifyKeyPathRootType:
+  case FixKind::IgnoreInvalidFunctionBuilderBody: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
