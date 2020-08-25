@@ -189,44 +189,6 @@ ide::isSourceInputComplete(StringRef Text,SourceFileKind SFKind) {
                                     SFKind);
 }
 
-// Adjust the cc1 triple string we got from clang, to make sure it will be
-// accepted when it goes through the swift clang importer.
-static std::string adjustClangTriple(StringRef TripleStr) {
-  std::string Result;
-  llvm::raw_string_ostream OS(Result);
-
-  llvm::Triple Triple(TripleStr);
-  switch (Triple.getSubArch()) {
-  case llvm::Triple::SubArchType::ARMSubArch_v7:
-    OS << "armv7"; break;
-  case llvm::Triple::SubArchType::ARMSubArch_v7s:
-    OS << "armv7s"; break;
-  case llvm::Triple::SubArchType::ARMSubArch_v7k:
-    OS << "armv7k"; break;
-  case llvm::Triple::SubArchType::ARMSubArch_v6:
-    OS << "armv6"; break;
-  case llvm::Triple::SubArchType::ARMSubArch_v6m:
-    OS << "armv6m"; break;
-  case llvm::Triple::SubArchType::ARMSubArch_v6k:
-    OS << "armv6k"; break;
-  case llvm::Triple::SubArchType::ARMSubArch_v6t2:
-    OS << "armv6t2"; break;
-  default:
-    // Adjust i386-macosx to x86_64 because there is no Swift stdlib for i386.
-    if ((Triple.getOS() == llvm::Triple::MacOSX ||
-      Triple.getOS() == llvm::Triple::Darwin) && Triple.getArch() == llvm::Triple::x86) {
-      OS << "x86_64";
-    } else {
-      OS << Triple.getArchName();
-    }
-    break;
-  }
-  OS << '-' << Triple.getVendorName() << '-' <<
-      Triple.getOSAndEnvironmentName();
-  OS.flush();
-  return Result;
-}
-
 static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
     FrontendInputsAndOutputs &inputsAndOutputs, StringRef UnresolvedPrimaryFile,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
@@ -409,6 +371,44 @@ bool ide::initCompilerInvocation(
   disableExpensiveSILOptions(Invocation.getSILOptions());
 
   return false;
+}
+
+// Adjust the cc1 triple string we got from clang, to make sure it will be
+// accepted when it goes through the swift clang importer.
+static std::string adjustClangTriple(StringRef TripleStr) {
+  std::string Result;
+  llvm::raw_string_ostream OS(Result);
+
+  llvm::Triple Triple(TripleStr);
+  switch (Triple.getSubArch()) {
+  case llvm::Triple::SubArchType::ARMSubArch_v7:
+    OS << "armv7"; break;
+  case llvm::Triple::SubArchType::ARMSubArch_v7s:
+    OS << "armv7s"; break;
+  case llvm::Triple::SubArchType::ARMSubArch_v7k:
+    OS << "armv7k"; break;
+  case llvm::Triple::SubArchType::ARMSubArch_v6:
+    OS << "armv6"; break;
+  case llvm::Triple::SubArchType::ARMSubArch_v6m:
+    OS << "armv6m"; break;
+  case llvm::Triple::SubArchType::ARMSubArch_v6k:
+    OS << "armv6k"; break;
+  case llvm::Triple::SubArchType::ARMSubArch_v6t2:
+    OS << "armv6t2"; break;
+  default:
+    // Adjust i386-macosx to x86_64 because there is no Swift stdlib for i386.
+    if ((Triple.getOS() == llvm::Triple::MacOSX ||
+      Triple.getOS() == llvm::Triple::Darwin) && Triple.getArch() == llvm::Triple::x86) {
+      OS << "x86_64";
+    } else {
+      OS << Triple.getArchName();
+    }
+    break;
+  }
+  OS << '-' << Triple.getVendorName() << '-' <<
+      Triple.getOSAndEnvironmentName();
+  OS.flush();
+  return Result;
 }
 
 bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
