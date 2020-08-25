@@ -1052,6 +1052,41 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
 }
 
 ToolChain::InvocationInfo
+ToolChain::constructInvocation(const VerifyModuleInterfaceJobAction &job,
+                               const JobContext &context) const {
+  InvocationInfo II{SWIFT_EXECUTABLE_NAME};
+  ArgStringList &Arguments = II.Arguments;
+  II.allowsResponseFiles = true;
+
+  for (auto &s : getDriver().getSwiftProgramArgs())
+    Arguments.push_back(s.c_str());
+  Arguments.push_back("-frontend");
+
+  Arguments.push_back("-typecheck-module-from-interface");
+
+  size_t sizeBefore = Arguments.size();
+  addInputsOfType(Arguments, context.Inputs, context.Args, job.getInputType());
+
+  (void)sizeBefore;
+  assert(Arguments.size() - sizeBefore == 1 &&
+         "should verify exactly one module interface per job");
+
+  addCommonFrontendArgs(context.OI, context.Output, context.Args, Arguments);
+  addRuntimeLibraryFlags(context.OI, Arguments);
+
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   file_types::TY_SerializedDiagnostics,
+                   "-serialize-diagnostics-path");
+
+  context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
+
+  Arguments.push_back("-module-name");
+  Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));
+
+  return II;
+}
+
+ToolChain::InvocationInfo
 ToolChain::constructInvocation(const ModuleWrapJobAction &job,
                                const JobContext &context) const {
   InvocationInfo II{SWIFT_EXECUTABLE_NAME};

@@ -551,5 +551,8 @@ bool swift::emitSwiftInterface(raw_ostream &out,
   if (needDummyProtocolDeclaration)
     InheritedProtocolCollector::printDummyProtocolDeclaration(out);
 
+  if (Opts.DebugPrintInvalidSyntax)
+    out << "#__debug_emit_invalid_swiftinterface_syntax__\n";
+
   return false;
 }
