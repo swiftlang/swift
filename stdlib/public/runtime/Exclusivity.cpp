@@ -250,7 +250,7 @@ public:
 // Each of these cases should define a function with this prototype:
 //   AccessSets &getAllSets();
 
-#if SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
 
 static SwiftTLSContext &getTLSContext() {
   static SwiftTLSContext TLSContext;
