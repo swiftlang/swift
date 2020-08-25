@@ -1294,8 +1294,9 @@ ERROR(nominal_type_not_attribute,none,
 
 ERROR(mutating_invalid_global_scope,none, "%0 is only valid on methods",
       (SelfAccessKind))
-ERROR(mutating_invalid_classes,none, "%0 isn't valid on methods in "
-      "classes or class-bound protocols", (SelfAccessKind))
+ERROR(mutating_invalid_classes,none, "%0 is not valid on %1s in " 
+      "%select{classes|class-bound protocols}2",
+      (SelfAccessKind, DescriptiveDeclKind, bool))
 
 ERROR(functions_mutating_and_not,none,
       "method must not be declared both %0 and %1",

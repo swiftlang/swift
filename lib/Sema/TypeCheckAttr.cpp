@@ -317,14 +317,17 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
     llvm_unreachable("unhandled attribute kind");
   }
 
+  auto DC = FD->getDeclContext();
   // mutation attributes may only appear in type context.
-  if (auto contextTy = FD->getDeclContext()->getDeclaredInterfaceType()) {
+  if (auto contextTy = DC->getDeclaredInterfaceType()) {
     // 'mutating' and 'nonmutating' are not valid on types
     // with reference semantics.
     if (contextTy->hasReferenceSemantics()) {
-      if (attrModifier != SelfAccessKind::Consuming)
+      if (attrModifier != SelfAccessKind::Consuming) {
         diagnoseAndRemoveAttr(attr, diag::mutating_invalid_classes,
-                              attrModifier);
+                              attrModifier, FD->getDescriptiveKind(),
+                              DC->getSelfProtocolDecl() != nullptr);
+      }
     }
   } else {
     diagnoseAndRemoveAttr(attr, diag::mutating_invalid_global_scope,
