@@ -10657,7 +10657,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::OptionalObject:
     return simplifyOptionalObjectConstraint(constraint.getFirstType(),
                                             constraint.getSecondType(),
-                                            TMF_GenerateConstraints,
+                                            /*flags*/ None,
                                             constraint.getLocator());
       
   case ConstraintKind::ValueMember:
@@ -10669,8 +10669,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                     constraint.getMemberUseDC(),
                                     constraint.getFunctionRefKind(),
                                     /*outerAlternatives=*/{},
-                                    TMF_GenerateConstraints,
-                                    constraint.getLocator());
+                                    /*flags*/ None, constraint.getLocator());
 
   case ConstraintKind::ValueWitness:
     return simplifyValueWitnessConstraint(constraint.getKind(),
@@ -10679,20 +10678,20 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                           constraint.getSecondType(),
                                           constraint.getMemberUseDC(),
                                           constraint.getFunctionRefKind(),
-                                          TMF_GenerateConstraints,
+                                          /*flags*/ None,
                                           constraint.getLocator());
 
   case ConstraintKind::Defaultable:
     return simplifyDefaultableConstraint(constraint.getFirstType(),
                                          constraint.getSecondType(),
-                                         TMF_GenerateConstraints,
+                                         /*flags*/ None,
                                          constraint.getLocator());
 
   case ConstraintKind::DefaultClosureType:
     return simplifyDefaultClosureTypeConstraint(constraint.getFirstType(),
                                                 constraint.getSecondType(),
                                                 constraint.getTypeVariables(),
-                                                TMF_GenerateConstraints,
+                                                /*flags*/ None,
                                                 constraint.getLocator());
 
   case ConstraintKind::FunctionInput:
@@ -10700,7 +10699,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     return simplifyFunctionComponentConstraint(constraint.getKind(),
                                                constraint.getFirstType(),
                                                constraint.getSecondType(),
-                                               TMF_GenerateConstraints,
+                                               /*flags*/ None,
                                                constraint.getLocator());
 
   case ConstraintKind::Disjunction:
@@ -10712,8 +10711,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     return simplifyOneWayConstraint(constraint.getKind(),
                                     constraint.getFirstType(),
                                     constraint.getSecondType(),
-                                    TMF_GenerateConstraints,
-                                    constraint.getLocator());
+                                    /*flags*/ None, constraint.getLocator());
   }
 
   llvm_unreachable("Unhandled ConstraintKind in switch.");
