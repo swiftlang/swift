@@ -619,8 +619,15 @@ bool _swift_dictionaryDownCastConditionalIndirect(OpaqueValue *destination,
 // Swift struct type.  This is used to speed up the most common
 // ObjC->Swift bridging conversions by eliminating repeeated
 // protocol conformance lookups.
+
+// Currently used only for String, which may be the only
+// type used often enough to justify the extra static memory.
 struct ObjCBridgeMemo {
+#if !NDEBUG
+  // Used in assert build to verify that we always get called with
+  // the same destType
   const Metadata *destType;
+#endif
   const _ObjectiveCBridgeableWitnessTable *destBridgeWitness;
   const Metadata *targetBridgedType;
   Class targetBridgedObjCClass;
@@ -641,21 +648,25 @@ struct ObjCBridgeMemo {
                  [](void *data) {
                    struct SetupData *setupData = (struct SetupData *)data;
                    struct ObjCBridgeMemo *memo = setupData->memo;
-                   // Check that this always gets called with the same destType.
-                   assert((memo->destType == nullptr) || (memo->destType == setupData->destType));
+#if !NDEBUG
                    memo->destType = setupData->destType;
-                   memo->destBridgeWitness = findBridgeWitness(memo->destType);
+#endif
+                   memo->destBridgeWitness = findBridgeWitness(setupData->destType);
                    if (memo->destBridgeWitness == nullptr) {
                      memo->targetBridgedType = nullptr;
                      memo->targetBridgedObjCClass = nullptr;
                    } else {
                      memo->targetBridgedType = _getBridgedObjectiveCType(
-                       MetadataState::Complete, memo->destType, memo->destBridgeWitness).Value;
+                       MetadataState::Complete, setupData->destType, memo->destBridgeWitness).Value;
                      assert(memo->targetBridgedType->getKind() == MetadataKind::ObjCClassWrapper);
                      memo->targetBridgedObjCClass = memo->targetBridgedType->getObjCClassObject();
                      assert(memo->targetBridgedObjCClass != nullptr);
                    }
                  }, (void *)&setupData);
+
+      // Check that this always gets called with the same destType.
+      assert((destType == this->destType) && "ObjC casting memo used inconsistently");
+
       // !! If bridging is not usable, stop here.
       if (targetBridgedObjCClass == nullptr) {
         return DynamicCastResult::Failure;
