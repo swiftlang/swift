@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,14 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_SOURCEKIT_LIB_SUPPORT_FUZZYSTRINGMATCHER_H
-#define LLVM_SOURCEKIT_LIB_SUPPORT_FUZZYSTRINGMATCHER_H
+#ifndef SWIFT_IDE_FUZZYSTRINGMATCHER_H
+#define SWIFT_IDE_FUZZYSTRINGMATCHER_H
 
-#include "SourceKit/Core/LLVM.h"
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/BitVector.h"
 #include <string>
 
-namespace SourceKit {
+namespace swift {
+namespace ide {
 
 /// FuzzyStringMatcher compares candidate strings against a pattern
 /// string using a fuzzy matching algorithm and provides a numerical
@@ -49,6 +50,7 @@ public:
   double scoreCandidate(StringRef candidate) const;
 };
 
-} // end namespace SourceKit
+} // namespace ide
+} // namespace swift
 
-#endif // LLVM_SOURCEKIT_LIB_SUPPORT_FUZZYSTRINGMATCHER_H
+#endif // SWIFT_IDE_FUZZYSTRINGMATCHER_H

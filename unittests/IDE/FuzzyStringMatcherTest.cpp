@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SourceKit/Support/FuzzyStringMatcher.h"
+#include "swift/IDE/FuzzyStringMatcher.h"
 #include "gtest/gtest.h"
 
-using FuzzyStringMatcher = SourceKit::FuzzyStringMatcher;
+using FuzzyStringMatcher = swift::ide::FuzzyStringMatcher;
 
 TEST(FuzzyStringMatcher, BasicMatching) {
   {
