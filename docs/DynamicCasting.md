@@ -407,9 +407,10 @@ S.self.svar // 2
 ```
 
 Invariants
-* If `T` conforms to `P` and `t` is an instance of `T`, then `t is P`, and `T.self is P.Type`
+* If `T` conforms to `P` and `t` is an instance of `T`, then `t is P` and `T.self is P.Type`
+* If `P` is a sub-protocol of `P1` and `T` is any type, then `T.self is P.Type` implies that `T.self is P1.Type`
 * Since every type `T` conforms to `Any`, `T.self is Any.Type` is always true
-* `Any` self-conforms:  `Any.self is Any.Type == true`
+* Since every class type `C` conforms to `AnyObject`, `C.self is AnyObject.Type` is always true (this includes Objective-C class types)
 
 ### Note: "Self conforming" protocols
 
@@ -439,10 +440,14 @@ let b : MyGenericType(a)
 As above, since `a` has type `P`, this code is instantiating `MyGenericType` with `T = P`, which is only valid if `P` conforms to `P`.
 
 Note that any protocol that specifies static methods, static properties, associated types, or initializers cannot possibly be self-conforming.
-As of Swift 5.3, there are only three kinds of self-conforming protocols:
-* `Any` must be self-conforming since every `T.self` is an instance of `Any.Type`
-* `Error` is a self-conforming protocol
-* Objective-C protocols that have no static requirements are self-conforming
+As of Swift 5.3, the only self-conforming protocols are `Any`, `Error`, and Objective-C protocols that have no static requirements.
+
+Invariants
+* `Any` self-conforms: `Any.self is Any.Type == true`
+* `Error` self-conforms: `Error.self is Error.Type == true`
+* If `P` self-conforms and is a sub-protocol of `P1`, then `P.self is P1.Type == true`
+
+For example, the last invariant here implies that for any Objective-C protocol `OP` that has no static requirements, `OP.self is AnyObject.Type`.  This follows from the fact that `OP` self-conforms and that every Objective-C protocol has `AnyObject` as an implicit parent protocol.
 
 ## CoreFoundation types
 
