@@ -946,11 +946,9 @@ void DotExprLookup::sawSolution(const constraints::Solution &S) {
   if (Type BaseTy = GetType(ParsedExpr)) {
     auto *Locator = CS.getConstraintLocator(SemanticExpr);
     Type ExpectedTy = GetType(CompletionExpr);
-    bool DisallowVoid = true;
-    if (!CS.getParentExpr(CompletionExpr)) {
+    Expr *ParentExpr = CS.getParentExpr(CompletionExpr);
+    if (!ParentExpr)
       ExpectedTy = CS.getContextualType(CompletionExpr);
-      DisallowVoid = CS.getContextualTypePurpose(CompletionExpr) != CTP_Unused;
-    }
 
     auto *CalleeLocator = S.getCalleeLocator(Locator);
     ValueDecl *ReferencedDecl = nullptr;
@@ -964,11 +962,22 @@ void DotExprLookup::sawSolution(const constraints::Solution &S) {
     } else {
       bool ISDMT = S.isStaticallyDerivedMetatype(ParsedExpr);
       bool ISEC = false;
-      if (auto *Parent = dyn_cast_or_null<ClosureExpr>(CS.getParentExpr(CompletionExpr))) {
-        if (Parent->hasSingleExpressionBody()) {
-          ISEC = Parent->getSingleExpressionBody() == CompletionExpr;
+      bool DisallowVoid = ExpectedTy
+        ? !ExpectedTy->isVoid()
+        : !ParentExpr && CS.getContextualTypePurpose(CompletionExpr) != CTP_Unused;
+
+      if (!ParentExpr) {
+        if (CS.getContextualTypePurpose(CompletionExpr) == CTP_ReturnSingleExpr)
+          ISEC = true;
+      } else if (auto *ParentCE = dyn_cast<ClosureExpr>(ParentExpr)) {
+        if (ParentCE->hasSingleExpressionBody() &&
+            ParentCE->getSingleExpressionBody() == CompletionExpr) {
+          ASTNode Last = ParentCE->getBody()->getLastElement();
+          if (!Last.isStmt(StmtKind::Return) || Last.isImplicit())
+            ISEC = true;
         }
       }
+
       Solutions.push_back({
         BaseTy, ReferencedDecl, {}, DisallowVoid, ISDMT, ISEC
       });

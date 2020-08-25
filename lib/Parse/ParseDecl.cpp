@@ -21,6 +21,7 @@
 #include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Syntax/SyntaxKind.h"
 #include "swift/Subsystems.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/DebuggerClient.h"
@@ -6442,6 +6443,22 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   return DCC.fixupParserResult(FD);
 }
 
+static bool isMemberCompletion(ASTNode Node) {
+  struct HasMemberCompletion: public ASTWalker {
+    bool Value = false;
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (auto *CCE = dyn_cast<CodeCompletionExpr>(E)) {
+        Value = CCE->getBase();
+        return {false, nullptr};
+      }
+      return {true, E};
+    }
+  };
+  HasMemberCompletion Check;
+  Node.walk(Check);
+  return Check.Value;
+}
+
 /// Parse a function body for \p AFD, setting the body to \p AFD before
 /// returning it.
 BraceStmt *Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
@@ -6492,7 +6509,8 @@ BraceStmt *Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
   // But don't do this transformation during code completion, as the source
   // may be incomplete and the type mismatch in return statement will just
   // confuse the type checker.
-  if (BS->getNumElements() != 1 || Body.hasCodeCompletion())
+  if (BS->getNumElements() != 1 || (Body.hasCodeCompletion() &&
+                                    !isMemberCompletion(BS->getFirstElement())))
     return BS;
 
   auto Element = BS->getFirstElement();
