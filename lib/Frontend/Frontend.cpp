@@ -192,7 +192,9 @@ void CompilerInstance::recordPrimaryInputBuffer(unsigned BufID) {
 
 bool CompilerInstance::setUpASTContextIfNeeded() {
   if (Invocation.getFrontendOptions().RequestedAction ==
-      FrontendOptions::ActionType::CompileModuleFromInterface) {
+          FrontendOptions::ActionType::CompileModuleFromInterface ||
+      Invocation.getFrontendOptions().RequestedAction ==
+          FrontendOptions::ActionType::TypecheckModuleFromInterface) {
     // Compiling a module interface from source uses its own CompilerInstance
     // with options read from the input file. Don't bother setting up an
     // ASTContext at this level.

@@ -235,14 +235,12 @@ bool ARCRegionState::processBlockBottomUp(
   return NestingDetected;
 }
 
-// Find the relevant insertion points for the loop region R in its
-// successors. Returns true if we succeeded. Returns false if any of the
-// non-local successors of the region are not leaking blocks. We currently do
-// not handle early exits, but do handle trapping blocks.
-static bool getInsertionPtsForLoopRegionExits(
+// Returns true if any of the non-local successors of the region are leaking
+// blocks. We currently do not handle early exits, but do handle trapping
+// blocks. Returns false if otherwise
+static bool hasEarlyExits(
     const LoopRegion *R, LoopRegionFunctionInfo *LRFI,
-    llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo,
-    llvm::SmallVectorImpl<SILInstruction *> &InsertPts) {
+    llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo) {
   assert(R->isLoop() && "Expected a loop region that is representing a loop");
 
   // Go through all of our non local successors. If any of them cannot be
@@ -251,23 +249,10 @@ static bool getInsertionPtsForLoopRegionExits(
   if (any_of(R->getNonLocalSuccs(), [&](unsigned SuccID) -> bool {
         return !RegionStateInfo[LRFI->getRegion(SuccID)]->allowsLeaks();
       })) {
-    return false;
+    return true;
   }
 
-  // We assume that all of our loops have been canonicalized so that /all/ loop
-  // exit blocks only have exiting blocks as predecessors. This means that all
-  // successor regions of any region /cannot/ be a region representing a loop.
-  for (unsigned SuccID : R->getLocalSuccs()) {
-    auto *SuccRegion = LRFI->getRegion(SuccID);
-    assert(SuccRegion->isBlock() && "Loop canonicalization failed?!");
-    InsertPts.push_back(&*SuccRegion->getBlock()->begin());
-  }
-
-  // Sort and unique the insert points so we can put them into
-  // ImmutablePointerSets.
-  sortUnique(InsertPts);
-
-  return true;
+  return false;
 }
 
 bool ARCRegionState::processLoopBottomUp(
@@ -276,11 +261,9 @@ bool ARCRegionState::processLoopBottomUp(
     ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
   ARCRegionState *State = RegionStateInfo[R];
 
-  llvm::SmallVector<SILInstruction *, 2> InsertPts;
-  // Try to lookup insertion points for this region. If when checking for
-  // insertion points, we find that we have non-leaking early exits, clear state
+  // If we find that we have non-leaking early exits, clear state
   // and bail. We do not handle these for now.
-  if (!getInsertionPtsForLoopRegionExits(R, LRFI, RegionStateInfo, InsertPts)) {
+  if (hasEarlyExits(R, LRFI, RegionStateInfo)) {
     clearBottomUpState();
     return false;
   }
