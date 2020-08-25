@@ -1129,7 +1129,7 @@ tryCastToTuple(
       return DynamicCastResult::SuccessViaCopy;
     }
   } else {
-    // Slow patch casts each item separately.
+    // Slow path casts each item separately.
     for (unsigned j = 0, n = srcTupleType->NumElements; j != n; ++j) {
       const auto &srcElt = srcTupleType->getElement(j);
       const auto &destElt = destTupleType->getElement(j);
