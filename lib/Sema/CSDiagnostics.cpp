@@ -17,6 +17,7 @@
 #include "CSDiagnostics.h"
 #include "ConstraintSystem.h"
 #include "MiscDiagnostics.h"
+#include "TypeCheckProtocol.h"
 #include "TypoCorrection.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
@@ -2817,13 +2818,20 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
   {
     llvm::SmallString<128> Text;
     llvm::raw_svector_ostream SS(Text);
+    llvm::SetVector<ValueDecl *> missingWitnesses;
     for (auto protocol : missingProtocols) {
-      for (auto req : protocol->getMembers()) {
-        if (auto VD = dyn_cast<ValueDecl>(req)) {
-          swift::printRequirementStub(VD, nominal, nominal->getDeclaredType(),
-                                      nominal->getStartLoc(), SS);
-        }
-      }
+      auto conformance = NormalProtocolConformance(
+          nominal->getDeclaredType(), protocol, SourceLoc(), nominal,
+          ProtocolConformanceState::Incomplete);
+      ConformanceChecker checker(getASTContext(), &conformance,
+                                 missingWitnesses);
+      checker.resolveValueWitnesses();
+      checker.resolveTypeWitnesses();
+    }
+
+    for (auto decl : missingWitnesses) {
+      swift::printRequirementStub(decl, nominal, nominal->getDeclaredType(),
+                                  nominal->getStartLoc(), SS);
     }
 
     if (!Text.empty()) {
