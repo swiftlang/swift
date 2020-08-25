@@ -179,3 +179,17 @@ func key_path_root_mismatch<T>(_ base: KeyPathBase?, subBase: KeyPathBaseSubtype
   let _ : T = subBase[keyPath: kpa] // expected-error {{key path with root type 'AnotherBase' cannot be applied to a base of type 'KeyPathBaseSubtype?'}}
 
 }
+
+// SR-12897
+_ = [1, nil, 3, nil, 5].compactMap(\.self) // Okay
+let _: [Int] = [1, nil, 3, nil, 5].compactMap(\.self) // Okay
+
+// SR-12991
+
+struct SR_12991 {
+  let email: String
+}
+
+let sr_12991_arr = [SR_12991]()
+let sr_12991_func = \SR_12991.email as (SR_12991) -> String
+_ = sr_12991_arr.map(sr_12991_func) // Okay
