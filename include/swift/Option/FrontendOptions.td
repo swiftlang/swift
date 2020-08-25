@@ -260,6 +260,9 @@ def debug_forbid_typecheck_prefix : Separate<["-"], "debug-forbid-typecheck-pref
   HelpText<"Triggers llvm fatal_error if typechecker tries to typecheck a decl "
            "with the provided prefix name">;
 
+def debug_emit_invalid_swiftinterface_syntax : Flag<["-"], "debug-emit-invalid-swiftinterface-syntax">,
+  HelpText<"Write an invalid declaration into swiftinterface files">;
+
 def debug_cycles : Flag<["-"], "debug-cycles">,
   HelpText<"Print out debug dumps when cycles are detected in evaluation">;
 def build_request_dependency_graph : Flag<["-"], "build-request-dependency-graph">,
@@ -643,6 +646,11 @@ def compile_module_from_interface :
 def build_module_from_parseable_interface :
   Flag<["-"], "build-module-from-parseable-interface">,
   Alias<compile_module_from_interface>,
+  ModeOpt;
+
+def typecheck_module_from_interface :
+  Flag<["-"], "typecheck-module-from-interface">,
+  HelpText<"Treat the (single) input as a swiftinterface and typecheck it">,
   ModeOpt;
 
 def module_interface_preserve_types_as_written :

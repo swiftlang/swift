@@ -285,6 +285,8 @@ private:
 };
 
 struct ModuleInterfaceLoaderOptions {
+  FrontendOptions::ActionType requestedAction =
+      FrontendOptions::ActionType::EmitModuleOnly;
   bool remarkOnRebuildFromInterface = false;
   bool disableInterfaceLock = false;
   bool disableImplicitSwiftModule = false;
@@ -293,7 +295,17 @@ struct ModuleInterfaceLoaderOptions {
     remarkOnRebuildFromInterface(Opts.RemarkOnRebuildFromModuleInterface),
     disableInterfaceLock(Opts.DisableInterfaceFileLock),
     disableImplicitSwiftModule(Opts.DisableImplicitModules),
-    mainExecutablePath(Opts.MainExecutablePath) {}
+    mainExecutablePath(Opts.MainExecutablePath)
+  {
+    switch (Opts.RequestedAction) {
+    case FrontendOptions::ActionType::TypecheckModuleFromInterface:
+      requestedAction = FrontendOptions::ActionType::Typecheck;
+      break;
+    default:
+      requestedAction = FrontendOptions::ActionType::EmitModuleOnly;
+      break;
+    }
+  }
   ModuleInterfaceLoaderOptions() = default;
 };
 

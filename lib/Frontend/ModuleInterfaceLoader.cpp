@@ -1260,7 +1260,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   inheritOptionsForBuildingInterface(searchPathOpts, langOpts);
   // Configure front-end input.
   auto &SubFEOpts = genericSubInvocation.getFrontendOptions();
-  SubFEOpts.RequestedAction = FrontendOptions::ActionType::EmitModuleOnly;
+  SubFEOpts.RequestedAction = LoaderOpts.requestedAction;
   if (!moduleCachePath.empty()) {
     genericSubInvocation.setClangModuleCachePath(moduleCachePath);
   }
@@ -1445,7 +1445,10 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   std::vector<std::string> outputFiles{"/<unused>"};
   std::vector<SupplementaryOutputPaths> ModuleOutputPaths;
   ModuleOutputPaths.emplace_back();
-  ModuleOutputPaths.back().ModuleOutputPath = outputPath.str();
+  if (subInvocation.getFrontendOptions().RequestedAction ==
+          FrontendOptions::ActionType::EmitModuleOnly) {
+    ModuleOutputPaths.back().ModuleOutputPath = outputPath.str();
+  }
   assert(subInvocation.getFrontendOptions().InputsAndOutputs.isWholeModule());
   subInvocation.getFrontendOptions().InputsAndOutputs
     .setMainAndSupplementaryOutputs(outputFiles, ModuleOutputPaths);

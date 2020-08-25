@@ -708,12 +708,12 @@ ERROR(sema_opening_import,Fatal,
 ERROR(serialization_load_failed,Fatal,
       "failed to load module '%0'", (StringRef))
 ERROR(module_interface_build_failed,Fatal,
-      "failed to build module '%0' from its module interface; "
-      "%select{the compiler that produced it, '%2', may have used features "
-      "that aren't supported by this compiler, '%3'"
-      "|it may have been damaged or it may have triggered a bug in the Swift "
-      "compiler when it was produced}1",
-      (StringRef, bool, StringRef, StringRef))
+      "failed to %select{build module '%1' from its module interface|verify "
+      "module interface of '%1'}0; %select{the compiler that produced it, "
+      "'%3', may have used features that aren't supported by this compiler, "
+      "'%4'|it may have been damaged or it may have triggered a bug in the "
+      "Swift compiler when it was produced}2",
+      (bool, StringRef, bool, StringRef, StringRef))
 ERROR(serialization_malformed_module,Fatal,
       "malformed compiled module: %0", (StringRef))
 ERROR(serialization_module_too_new,Fatal,
