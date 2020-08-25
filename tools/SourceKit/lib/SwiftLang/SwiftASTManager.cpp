@@ -418,7 +418,10 @@ bool SwiftASTManager::initCompilerInvocation(
     DiagnosticEngine &Diags, StringRef UnresolvedPrimaryFile,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     std::string &Error) {
-  return ide::initCompilerInvocation(Invocation, OrigArgs, Diags, UnresolvedPrimaryFile, FileSystem, Impl.RuntimeResourcePath, Impl.DiagnosticDocumentationPath, Impl.Config->shouldOptimizeForIDE(), Impl.SessionTimestamp, Error);
+  return ide::initCompilerInvocation(
+      Invocation, OrigArgs, Diags, UnresolvedPrimaryFile, FileSystem,
+      Impl.RuntimeResourcePath, Impl.DiagnosticDocumentationPath,
+      Impl.Config->shouldOptimizeForIDE(), Impl.SessionTimestamp, Error);
 }
 
 bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &CompInvok,

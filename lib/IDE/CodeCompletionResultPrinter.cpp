@@ -10,9 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/LLVM.h"
-#include "swift/AST/ASTPrinter.h"
 #include "swift/IDE/CodeCompletionResultPrinter.h"
+#include "swift/AST/ASTPrinter.h"
+#include "swift/Basic/LLVM.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/Markup/XMLUtils.h"
 #include "llvm/Support/raw_ostream.h"
@@ -259,8 +259,9 @@ void swift::ide::printCodeCompletionResultTypeNameAnnotated(const CodeCompletion
 
 /// Provide the text for the call parameter, including constructing a typed
 /// editor placeholder for it.
-static void constructTextForCallParam(
-    ArrayRef<CodeCompletionString::Chunk> ParamGroup, raw_ostream &OS) {
+static void
+constructTextForCallParam(ArrayRef<CodeCompletionString::Chunk> ParamGroup,
+                          raw_ostream &OS) {
   assert(ParamGroup.front().is(ChunkKind::CallParameterBegin));
 
   for (; !ParamGroup.empty(); ParamGroup = ParamGroup.slice(1)) {
@@ -339,7 +340,8 @@ static void constructTextForCallParam(
   OS << "#>";
 }
 
-void swift::ide::printCodeCompletionResultSourceText(const CodeCompletionResult &Result, llvm::raw_ostream &OS) {
+void swift::ide::printCodeCompletionResultSourceText(
+    const CodeCompletionResult &Result, llvm::raw_ostream &OS) {
   auto Chunks = Result.getCompletionString()->getChunks();
   for (size_t i = 0; i < Chunks.size(); ++i) {
     auto &C = Chunks[i];
@@ -353,14 +355,16 @@ void swift::ide::printCodeCompletionResultSourceText(const CodeCompletionResult 
         if (Chunks[i].endsPreviousNestedGroup(C.getNestingLevel()))
           break;
       }
-      constructTextForCallParam(Chunks.slice(Start, i-Start), OS);
+      constructTextForCallParam(Chunks.slice(Start, i - Start), OS);
       --i;
       continue;
     }
     if (C.is(ChunkKind::TypeAnnotationBegin)) {
       // Skip type annotation structure.
       auto level = C.getNestingLevel();
-      do { ++i; } while (i != Chunks.size() && !Chunks[i].endsPreviousNestedGroup(level));
+      do {
+        ++i;
+      } while (i != Chunks.size() && !Chunks[i].endsPreviousNestedGroup(level));
       --i;
     }
     if (!C.isAnnotation() && C.hasText()) {
@@ -369,7 +373,8 @@ void swift::ide::printCodeCompletionResultSourceText(const CodeCompletionResult 
   }
 }
 
-void swift::ide::printCodeCompletionResultFilterName(const CodeCompletionResult &Result, llvm::raw_ostream &OS) {
+void swift::ide::printCodeCompletionResultFilterName(
+    const CodeCompletionResult &Result, llvm::raw_ostream &OS) {
   auto str = Result.getCompletionString();
   // FIXME: we need a more uniform way to handle operator completions.
   if (str->getChunks().size() == 1 && str->getChunks()[0].is(ChunkKind::Dot)) {
@@ -414,7 +419,9 @@ void swift::ide::printCodeCompletionResultFilterName(const CodeCompletionResult 
       case ChunkKind::TypeAnnotationBegin: {
         // Skip call parameter type or type annotation structure.
         auto nestingLevel = C.getNestingLevel();
-        do { ++i; } while (i != e && !i->endsPreviousNestedGroup(nestingLevel));
+        do {
+          ++i;
+        } while (i != e && !i->endsPreviousNestedGroup(nestingLevel));
         --i;
         continue;
       }
@@ -430,5 +437,5 @@ void swift::ide::printCodeCompletionResultFilterName(const CodeCompletionResult 
       if (C.hasText() && shouldPrint)
         OS << C.getText();
     }
-  } 
+  }
 }
