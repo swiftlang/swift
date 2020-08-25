@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/Refactoring.h"
-#include "swift/IDE/IDERequests.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
@@ -23,16 +22,18 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/DiagnosticOptions.h"
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Frontend/Frontend.h"
+#include "swift/IDE/IDERequests.h"
 #include "swift/Index/Index.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Subsystems.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
-#include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/StringSet.h"
 
 using namespace swift;
 using namespace swift::ide;
@@ -741,6 +742,7 @@ protected:
   SourceFile *TheFile;
   SourceEditConsumer &EditConsumer;
   ASTContext &Ctx;
+  std::string DefaultLocalizationPath;
   SourceManager &SM;
   DiagnosticEngine DiagEngine;
   SourceLoc StartLoc;
@@ -748,17 +750,21 @@ protected:
 public:
   RefactoringAction(ModuleDecl *MD, RefactoringOptions &Opts,
                     SourceEditConsumer &EditConsumer,
-                    DiagnosticConsumer &DiagConsumer);
+                    DiagnosticConsumer &DiagConsumer,
+                    const DiagnosticOptions &DiagOpts);
   virtual ~RefactoringAction() = default;
   virtual bool performChange() = 0;
 };
 
 RefactoringAction::RefactoringAction(ModuleDecl *MD, RefactoringOptions &Opts,
                                      SourceEditConsumer &EditConsumer,
-                                     DiagnosticConsumer &DiagConsumer)
+                                     DiagnosticConsumer &DiagConsumer,
+                                     const DiagnosticOptions &DiagOpts)
     : MD(MD), TheFile(getContainingFile(MD, Opts.Range)),
       EditConsumer(EditConsumer), Ctx(MD->getASTContext()),
-      SM(MD->getASTContext().SourceMgr), DiagEngine(SM, "/path"),
+      DefaultLocalizationPath(DiagOpts.DefaultLocalizationPath),
+      SM(MD->getASTContext().SourceMgr),
+      DiagEngine(SM, DefaultLocalizationPath),
       StartLoc(Lexer::getLocForStartOfToken(SM, Opts.Range.getStart(SM))),
       PreferredName(Opts.PreferredName) {
   DiagEngine.addConsumer(DiagConsumer);
@@ -774,28 +780,32 @@ protected:
 public:
   TokenBasedRefactoringAction(ModuleDecl *MD, RefactoringOptions &Opts,
                               SourceEditConsumer &EditConsumer,
-                              DiagnosticConsumer &DiagConsumer) :
-  RefactoringAction(MD, Opts, EditConsumer, DiagConsumer) {
-  // Resolve the sema token and save it for later use.
-  CursorInfo = evaluateOrDefault(TheFile->getASTContext().evaluator,
-                          CursorInfoRequest{ CursorInfoOwner(TheFile, StartLoc)},
-                                 ResolvedCursorInfo());
+                              DiagnosticConsumer &DiagConsumer,
+                              const DiagnosticOptions &DiagOpts)
+      : RefactoringAction(MD, Opts, EditConsumer, DiagConsumer, DiagOpts) {
+    // Resolve the sema token and save it for later use.
+    CursorInfo =
+        evaluateOrDefault(TheFile->getASTContext().evaluator,
+                          CursorInfoRequest{CursorInfoOwner(TheFile, StartLoc)},
+                          ResolvedCursorInfo());
   }
 };
 
-#define CURSOR_REFACTORING(KIND, NAME, ID)                                    \
-class RefactoringAction##KIND: public TokenBasedRefactoringAction {           \
-  public:                                                                     \
-  RefactoringAction##KIND(ModuleDecl *MD, RefactoringOptions &Opts,           \
-                          SourceEditConsumer &EditConsumer,                   \
-                          DiagnosticConsumer &DiagConsumer) :                 \
-    TokenBasedRefactoringAction(MD, Opts, EditConsumer, DiagConsumer) {}      \
-  bool performChange() override;                                              \
-  static bool isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag);   \
-  bool isApplicable() {                                                       \
-    return RefactoringAction##KIND::isApplicable(CursorInfo, DiagEngine) ;    \
-  }                                                                           \
-};
+#define CURSOR_REFACTORING(KIND, NAME, ID)                                     \
+  class RefactoringAction##KIND : public TokenBasedRefactoringAction {         \
+  public:                                                                      \
+    RefactoringAction##KIND(ModuleDecl *MD, RefactoringOptions &Opts,          \
+                            SourceEditConsumer &EditConsumer,                  \
+                            DiagnosticConsumer &DiagConsumer,                  \
+                            const DiagnosticOptions &DiagOpts)                 \
+        : TokenBasedRefactoringAction(MD, Opts, EditConsumer, DiagConsumer,    \
+                                      DiagOpts) {}                             \
+    bool performChange() override;                                             \
+    static bool isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag);  \
+    bool isApplicable() {                                                      \
+      return RefactoringAction##KIND::isApplicable(CursorInfo, DiagEngine);    \
+    }                                                                          \
+  };
 #include "swift/IDE/RefactoringKinds.def"
 
 class RangeBasedRefactoringAction : public RefactoringAction {
@@ -804,26 +814,31 @@ protected:
 public:
   RangeBasedRefactoringAction(ModuleDecl *MD, RefactoringOptions &Opts,
                               SourceEditConsumer &EditConsumer,
-                              DiagnosticConsumer &DiagConsumer) :
-  RefactoringAction(MD, Opts, EditConsumer, DiagConsumer),
-  RangeInfo(evaluateOrDefault(MD->getASTContext().evaluator,
-    RangeInfoRequest(RangeInfoOwner(TheFile, Opts.Range.getStart(SM), Opts.Range.getEnd(SM))),
-                              ResolvedRangeInfo())) {}
+                              DiagnosticConsumer &DiagConsumer,
+                              const DiagnosticOptions &DiagOpts)
+      : RefactoringAction(MD, Opts, EditConsumer, DiagConsumer, DiagOpts),
+        RangeInfo(evaluateOrDefault(
+            MD->getASTContext().evaluator,
+            RangeInfoRequest(RangeInfoOwner(TheFile, Opts.Range.getStart(SM),
+                                            Opts.Range.getEnd(SM))),
+            ResolvedRangeInfo())) {}
 };
 
-#define RANGE_REFACTORING(KIND, NAME, ID)                                     \
-class RefactoringAction##KIND: public RangeBasedRefactoringAction {           \
-  public:                                                                     \
-  RefactoringAction##KIND(ModuleDecl *MD, RefactoringOptions &Opts,           \
-                          SourceEditConsumer &EditConsumer,                   \
-                          DiagnosticConsumer &DiagConsumer) :                 \
-    RangeBasedRefactoringAction(MD, Opts, EditConsumer, DiagConsumer) {}      \
-  bool performChange() override;                                              \
-  static bool isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag);   \
-  bool isApplicable() {                                                       \
-    return RefactoringAction##KIND::isApplicable(RangeInfo, DiagEngine) ;     \
-  }                                                                           \
-};
+#define RANGE_REFACTORING(KIND, NAME, ID)                                      \
+  class RefactoringAction##KIND : public RangeBasedRefactoringAction {         \
+  public:                                                                      \
+    RefactoringAction##KIND(ModuleDecl *MD, RefactoringOptions &Opts,          \
+                            SourceEditConsumer &EditConsumer,                  \
+                            DiagnosticConsumer &DiagConsumer,                  \
+                            const DiagnosticOptions &DiagOpts)                 \
+        : RangeBasedRefactoringAction(MD, Opts, EditConsumer, DiagConsumer,    \
+                                      DiagOpts) {}                             \
+    bool performChange() override;                                             \
+    static bool isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag);  \
+    bool isApplicable() {                                                      \
+      return RefactoringAction##KIND::isApplicable(RangeInfo, DiagEngine);     \
+    }                                                                          \
+  };
 #include "swift/IDE/RefactoringKinds.def"
 
 bool RefactoringActionLocalRename::
@@ -892,8 +907,10 @@ bool RefactoringActionLocalRename::performChange() {
 
     auto consumers = DiagEngine.takeConsumers();
     assert(consumers.size() == 1);
+    DiagnosticOptions DiagOpts;
+    DiagOpts.DefaultLocalizationPath = DefaultLocalizationPath;
     return syntacticRename(TheFile, rangeCollector.results(), EditConsumer,
-                           *consumers[0]);
+                           *consumers[0], DiagOpts);
   } else {
     DiagEngine.diagnose(StartLoc, diag::unresolved_location);
     return true;
@@ -2916,15 +2933,15 @@ bool RefactoringActionFillProtocolStub::performChange() {
   return false;
 }
 
-ArrayRef<RefactoringKind>
-collectAvailableRefactoringsAtCursor(SourceFile *SF, unsigned Line,
-                                     unsigned Column,
-                                     std::vector<RefactoringKind> &Scratch,
-                            llvm::ArrayRef<DiagnosticConsumer*> DiagConsumers) {
+ArrayRef<RefactoringKind> collectAvailableRefactoringsAtCursor(
+    SourceFile *SF, unsigned Line, unsigned Column,
+    std::vector<RefactoringKind> &Scratch,
+    llvm::ArrayRef<DiagnosticConsumer *> DiagConsumers,
+    const DiagnosticOptions &DiagOpts) {
   // Prepare the tool box.
   ASTContext &Ctx = SF->getASTContext();
   SourceManager &SM = Ctx.SourceMgr;
-  DiagnosticEngine DiagEngine(SM, "/path");
+  DiagnosticEngine DiagEngine(SM, DiagOpts.DefaultLocalizationPath);
   std::for_each(DiagConsumers.begin(), DiagConsumers.end(),
                 [&](DiagnosticConsumer *Con) { DiagEngine.addConsumer(*Con); });
   SourceLoc Loc = SM.getLocForLineCol(SF->getBufferID().getValue(), Line, Column);
@@ -2933,7 +2950,8 @@ collectAvailableRefactoringsAtCursor(SourceFile *SF, unsigned Line,
   ResolvedCursorInfo Tok = evaluateOrDefault(SF->getASTContext().evaluator,
     CursorInfoRequest{CursorInfoOwner(SF, Lexer::getLocForStartOfToken(SM, Loc))},
                                              ResolvedCursorInfo());
-  return collectAvailableRefactorings(SF, Tok, Scratch, /*Exclude rename*/false);
+  return collectAvailableRefactorings(SF, Tok, Scratch,
+                                      /*Exclude rename*/ false, DiagOpts);
 }
 
 static EnumDecl* getEnumDeclFromSwitchStmt(SwitchStmt *SwitchS) {
@@ -4055,11 +4073,10 @@ swift::ide::collectRenameAvailabilityInfo(const ValueDecl *VD,
   return llvm::makeArrayRef(Scratch);
 }
 
-ArrayRef<RefactoringKind> swift::ide::
-collectAvailableRefactorings(SourceFile *SF,
-                             ResolvedCursorInfo CursorInfo,
-                             std::vector<RefactoringKind> &Scratch,
-                             bool ExcludeRename) {
+ArrayRef<RefactoringKind> swift::ide::collectAvailableRefactorings(
+    SourceFile *SF, ResolvedCursorInfo CursorInfo,
+    std::vector<RefactoringKind> &Scratch, bool ExcludeRename,
+    const DiagnosticOptions &DiagOpts) {
   llvm::SmallVector<RefactoringKind, 2> AllKinds;
   switch(CursorInfo.Kind) {
   case CursorInfoKind::ModuleRef:
@@ -4077,7 +4094,8 @@ collectAvailableRefactorings(SourceFile *SF,
       AllKinds.push_back(RenameOp.getValue());
     }
   }
-  DiagnosticEngine DiagEngine(SF->getASTContext().SourceMgr, "/path");
+  DiagnosticEngine DiagEngine(SF->getASTContext().SourceMgr,
+                              DiagOpts.DefaultLocalizationPath);
 #define CURSOR_REFACTORING(KIND, NAME, ID)                                     \
   if (RefactoringAction##KIND::isApplicable(CursorInfo, DiagEngine))           \
     AllKinds.push_back(RefactoringKind::KIND);
@@ -4099,22 +4117,20 @@ collectAvailableRefactorings(SourceFile *SF,
   return llvm::makeArrayRef(Scratch);
 }
 
-
-
-ArrayRef<RefactoringKind> swift::ide::
-collectAvailableRefactorings(SourceFile *SF, RangeConfig Range,
-                             bool &RangeStartMayNeedRename,
-                             std::vector<RefactoringKind> &Scratch,
-                             llvm::ArrayRef<DiagnosticConsumer*> DiagConsumers) {
+ArrayRef<RefactoringKind> swift::ide::collectAvailableRefactorings(
+    SourceFile *SF, RangeConfig Range, bool &RangeStartMayNeedRename,
+    std::vector<RefactoringKind> &Scratch,
+    llvm::ArrayRef<DiagnosticConsumer *> DiagConsumers,
+    const DiagnosticOptions &DiagOpts) {
 
   if (Range.Length == 0) {
-    return collectAvailableRefactoringsAtCursor(SF, Range.Line, Range.Column,
-                                                Scratch, DiagConsumers);
+    return collectAvailableRefactoringsAtCursor(
+        SF, Range.Line, Range.Column, Scratch, DiagConsumers, DiagOpts);
   }
   // Prepare the tool box.
   ASTContext &Ctx = SF->getASTContext();
   SourceManager &SM = Ctx.SourceMgr;
-  DiagnosticEngine DiagEngine(SM, "/path");
+  DiagnosticEngine DiagEngine(SM, DiagOpts.DefaultLocalizationPath);
   std::for_each(DiagConsumers.begin(), DiagConsumers.end(),
     [&](DiagnosticConsumer *Con) { DiagEngine.addConsumer(*Con); });
   ResolvedRangeInfo Result = evaluateOrDefault(SF->getASTContext().evaluator,
@@ -4137,10 +4153,10 @@ collectAvailableRefactorings(SourceFile *SF, RangeConfig Range,
   return Scratch;
 }
 
-bool swift::ide::
-refactorSwiftModule(ModuleDecl *M, RefactoringOptions Opts,
-                    SourceEditConsumer &EditConsumer,
-                    DiagnosticConsumer &DiagConsumer) {
+bool swift::ide::refactorSwiftModule(ModuleDecl *M, RefactoringOptions Opts,
+                                     SourceEditConsumer &EditConsumer,
+                                     DiagnosticConsumer &DiagConsumer,
+                                     const DiagnosticOptions &DiagOpts) {
   assert(Opts.Kind != RefactoringKind::None && "should have a refactoring kind.");
 
   // Use the default name if not specified.
@@ -4150,12 +4166,13 @@ refactorSwiftModule(ModuleDecl *M, RefactoringOptions Opts,
 
   switch (Opts.Kind) {
 #define SEMANTIC_REFACTORING(KIND, NAME, ID)                                   \
-case RefactoringKind::KIND: {                                                  \
-      RefactoringAction##KIND Action(M, Opts, EditConsumer, DiagConsumer);     \
-      if (RefactoringKind::KIND == RefactoringKind::LocalRename ||             \
-          Action.isApplicable())                                               \
-        return Action.performChange();                                         \
-      return true;                                                             \
+  case RefactoringKind::KIND: {                                                \
+    RefactoringAction##KIND Action(M, Opts, EditConsumer, DiagConsumer,        \
+                                   DiagOpts);                                  \
+    if (RefactoringKind::KIND == RefactoringKind::LocalRename ||               \
+        Action.isApplicable())                                                 \
+      return Action.performChange();                                           \
+    return true;                                                               \
   }
 #include "swift/IDE/RefactoringKinds.def"
     case RefactoringKind::GlobalRename:
@@ -4226,12 +4243,13 @@ resolveRenameLocations(ArrayRef<RenameLoc> RenameLocs, SourceFile &SF,
 
 int swift::ide::syntacticRename(SourceFile *SF, ArrayRef<RenameLoc> RenameLocs,
                                 SourceEditConsumer &EditConsumer,
-                                DiagnosticConsumer &DiagConsumer) {
+                                DiagnosticConsumer &DiagConsumer,
+                                const DiagnosticOptions &DiagOpts) {
 
   assert(SF && "null source file");
 
   SourceManager &SM = SF->getASTContext().SourceMgr;
-  DiagnosticEngine DiagEngine(SM, "/path");
+  DiagnosticEngine DiagEngine(SM, DiagOpts.DefaultLocalizationPath);
   DiagEngine.addConsumer(DiagConsumer);
 
   auto ResolvedLocs = resolveRenameLocations(RenameLocs, *SF, DiagEngine);
@@ -4259,12 +4277,12 @@ int swift::ide::syntacticRename(SourceFile *SF, ArrayRef<RenameLoc> RenameLocs,
 
 int swift::ide::findSyntacticRenameRanges(
     SourceFile *SF, llvm::ArrayRef<RenameLoc> RenameLocs,
-    FindRenameRangesConsumer &RenameConsumer,
-    DiagnosticConsumer &DiagConsumer) {
+    FindRenameRangesConsumer &RenameConsumer, DiagnosticConsumer &DiagConsumer,
+    const DiagnosticOptions &DiagOpts) {
   assert(SF && "null source file");
 
   SourceManager &SM = SF->getASTContext().SourceMgr;
-  DiagnosticEngine DiagEngine(SM, "/path");
+  DiagnosticEngine DiagEngine(SM, DiagOpts.DefaultLocalizationPath);
   DiagEngine.addConsumer(DiagConsumer);
 
   auto ResolvedLocs = resolveRenameLocations(RenameLocs, *SF, DiagEngine);
@@ -4288,14 +4306,14 @@ int swift::ide::findSyntacticRenameRanges(
   return false;
 }
 
-int swift::ide::findLocalRenameRanges(
-    SourceFile *SF, RangeConfig Range,
-    FindRenameRangesConsumer &RenameConsumer,
-    DiagnosticConsumer &DiagConsumer) {
+int swift::ide::findLocalRenameRanges(SourceFile *SF, RangeConfig Range,
+                                      FindRenameRangesConsumer &RenameConsumer,
+                                      DiagnosticConsumer &DiagConsumer,
+                                      const DiagnosticOptions &DiagOpts) {
   assert(SF && "null source file");
 
   SourceManager &SM = SF->getASTContext().SourceMgr;
-  DiagnosticEngine Diags(SM, "/path");
+  DiagnosticEngine Diags(SM, DiagOpts.DefaultLocalizationPath);
   Diags.addConsumer(DiagConsumer);
 
   auto StartLoc = Lexer::getLocForStartOfToken(SM, Range.getStart(SM));
@@ -4321,5 +4339,5 @@ int swift::ide::findLocalRenameRanges(
     indexDeclContext(DC, RangeCollector);
 
   return findSyntacticRenameRanges(SF, RangeCollector.results(), RenameConsumer,
-                                   DiagConsumer);
+                                   DiagConsumer, DiagOpts);
 }

@@ -13,10 +13,11 @@
 #ifndef SWIFT_IDE_REFACTORING_H
 #define SWIFT_IDE_REFACTORING_H
 
-#include "llvm/ADT/StringRef.h"
-#include "swift/Basic/LLVM.h"
 #include "swift/AST/DiagnosticConsumer.h"
+#include "swift/Basic/DiagnosticOptions.h"
+#include "swift/Basic/LLVM.h"
 #include "swift/IDE/Utils.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace swift {
   class ModuleDecl;
@@ -115,31 +116,37 @@ StringRef getDescriptiveRenameUnavailableReason(RenameAvailableKind Kind);
 
 bool refactorSwiftModule(ModuleDecl *M, RefactoringOptions Opts,
                          SourceEditConsumer &EditConsumer,
-                         DiagnosticConsumer &DiagConsumer);
+                         DiagnosticConsumer &DiagConsumer,
+                         const DiagnosticOptions &DiagOpts);
 
 int syntacticRename(SourceFile *SF, llvm::ArrayRef<RenameLoc> RenameLocs,
                     SourceEditConsumer &EditConsumer,
-                    DiagnosticConsumer &DiagConsumer);
+                    DiagnosticConsumer &DiagConsumer,
+                    const DiagnosticOptions &DiagOpts);
 
 int findSyntacticRenameRanges(SourceFile *SF,
                               llvm::ArrayRef<RenameLoc> RenameLocs,
                               FindRenameRangesConsumer &RenameConsumer,
-                              DiagnosticConsumer &DiagConsumer);
+                              DiagnosticConsumer &DiagConsumer,
+                              const DiagnosticOptions &DiagOpts);
 
 int findLocalRenameRanges(SourceFile *SF, RangeConfig Range,
                           FindRenameRangesConsumer &RenameConsumer,
-                          DiagnosticConsumer &DiagConsumer);
+                          DiagnosticConsumer &DiagConsumer,
+                          const DiagnosticOptions &DiagOpts);
 
 ArrayRef<RefactoringKind>
 collectAvailableRefactorings(SourceFile *SF, RangeConfig Range,
                              bool &RangeStartMayNeedRename,
                              std::vector<RefactoringKind> &Scratch,
-                             llvm::ArrayRef<DiagnosticConsumer*> DiagConsumers);
+                             llvm::ArrayRef<DiagnosticConsumer *> DiagConsumers,
+                             const DiagnosticOptions &DiagOpts);
 
 ArrayRef<RefactoringKind>
 collectAvailableRefactorings(SourceFile *SF, ResolvedCursorInfo CursorInfo,
                              std::vector<RefactoringKind> &Scratch,
-                             bool ExcludeRename);
+                             bool ExcludeRename,
+                             const DiagnosticOptions &DiagOpts);
 
 /// Stores information about the reference that rename availability is being
 /// queried on.

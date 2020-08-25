@@ -312,7 +312,8 @@ int main(int argc, char *argv[]) {
   if (options::Action == RefactoringKind::FindLocalRenameRanges) {
     RangeConfig Range = getRange(BufferID, SM, StartLoc, EndLoc);
     FindRenameRangesAnnotatingConsumer Consumer(SM, BufferID, llvm::outs());
-    return findLocalRenameRanges(SF, Range, Consumer, PrintDiags);
+    return findLocalRenameRanges(SF, Range, Consumer, PrintDiags,
+                                 Invocation.getDiagnosticOptions());
   }
 
   if (options::Action == RefactoringKind::GlobalRename ||
@@ -341,11 +342,13 @@ int main(int argc, char *argv[]) {
     switch (options::Action) {
     case RefactoringKind::GlobalRename: {
       SourceEditOutputConsumer EditConsumer(SM, BufferID, llvm::outs());
-      return syntacticRename(SF, RenameLocs, EditConsumer, PrintDiags);
+      return syntacticRename(SF, RenameLocs, EditConsumer, PrintDiags,
+                             Invocation.getDiagnosticOptions());
     }
     case RefactoringKind::FindGlobalRenameRanges: {
       FindRenameRangesAnnotatingConsumer Consumer(SM, BufferID, llvm::outs());
-      return findSyntacticRenameRanges(SF, RenameLocs, Consumer, PrintDiags);
+      return findSyntacticRenameRanges(SF, RenameLocs, Consumer, PrintDiags,
+                                       Invocation.getDiagnosticOptions());
     }
     default:
       llvm_unreachable("unexpected refactoring kind");
@@ -358,8 +361,9 @@ int main(int argc, char *argv[]) {
     std::vector<RefactoringKind> Scratch;
     ArrayRef<RefactoringKind> AllKinds;
     bool RangeStartMayNeedRename = false;
-    AllKinds = collectAvailableRefactorings(SF, Range,RangeStartMayNeedRename,
-                                            Scratch, {&PrintDiags});
+    AllKinds = collectAvailableRefactorings(SF, Range, RangeStartMayNeedRename,
+                                            Scratch, {&PrintDiags},
+                                            Invocation.getDiagnosticOptions());
     llvm::outs() << "Action begins\n";
     for (auto Kind : AllKinds) {
       llvm::outs() << getDescriptiveRefactoringKindName(Kind) << "\n";
@@ -381,5 +385,5 @@ int main(int argc, char *argv[]) {
                                                       llvm::outs()));
 
   return refactorSwiftModule(CI.getMainModule(), RefactoringConfig, *pConsumer,
-                             PrintDiags);
+                             PrintDiags, Invocation.getDiagnosticOptions());
 }
