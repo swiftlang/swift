@@ -33,6 +33,7 @@
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
+#include "swift/Serialization/ModuleDependencyScanner.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
@@ -520,8 +521,35 @@ bool CompilerInstance::setUpModuleLoaders() {
     this->DefaultSerializedLoader = ISML.get();
     Context->addModuleLoader(std::move(ISML));
   }
-  
+
   Context->addModuleLoader(std::move(clangImporter), /*isClang*/ true);
+
+  // When scanning for dependencies, we must add the scanner loaders in order to handle
+  // ASTContext operations such as canImportModule
+  if (Invocation.getFrontendOptions().RequestedAction ==
+      FrontendOptions::ActionType::ScanDependencies) {
+    auto ModuleCachePath = getModuleCachePathFromClang(Context
+                                                       ->getClangModuleLoader()->getClangInstance());
+    auto &FEOpts = Invocation.getFrontendOptions();
+    ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
+    InterfaceSubContextDelegateImpl ASTDelegate(Context->SourceMgr, Context->Diags,
+                                                Context->SearchPathOpts, Context->LangOpts,
+                                                LoaderOpts,
+                                                Context->getClangModuleLoader(),
+                                                /*buildModuleCacheDirIfAbsent*/false,
+                                                ModuleCachePath,
+                                                FEOpts.PrebuiltModuleCachePath,
+                                                FEOpts.SerializeModuleInterfaceDependencyHashes,
+                                                FEOpts.shouldTrackSystemDependencies());
+    auto mainModuleName = Context->getIdentifier(FEOpts.ModuleName);
+    std::unique_ptr<PlaceholderSwiftModuleScanner> PSMS =
+      std::make_unique<PlaceholderSwiftModuleScanner>(*Context,
+                                                      MLM,
+                                                      mainModuleName,
+                                                      Context->SearchPathOpts.PlaceholderDependencyModuleMap,
+                                                      ASTDelegate);
+    Context->addModuleLoader(std::move(PSMS));
+  }
 
   return false;
 }
