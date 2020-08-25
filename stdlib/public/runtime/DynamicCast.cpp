@@ -533,6 +533,7 @@ tryCastToEnum(
   bool takeOnSuccess, bool mayDeferChecks)
 {
   assert(srcType != destType);
+  // Note: Optional is handled elsewhere
   assert(destType->getKind() == MetadataKind::Enum);
 
   // Enum has no special cast support at present.
@@ -900,6 +901,8 @@ tryCastToOptional(
   assert(destType->getKind() == MetadataKind::Optional);
 
   // Nothing to do for the basic casting operation.
+  // Unwrapping is handled by top-level tryCast with assistance
+  // from utility functions below.
 
   return DynamicCastResult::Failure;
 }
