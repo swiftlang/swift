@@ -616,6 +616,7 @@ bool _swift_dictionaryDownCastConditionalIndirect(OpaqueValue *destination,
                                         const void *sourceKeyHashable,
                                         const void *targetKeyHashable);
 
+#if SWIFT_OBJC_INTEROP
 // Helper to memoize bridging conformance data for a particular
 // Swift struct type.  This is used to speed up the most common
 // ObjC->Swift bridging conversions by eliminating repeeated
@@ -691,6 +692,7 @@ struct ObjCBridgeMemo {
         destBridgeWitness, targetBridgedType);
     }
 };
+#endif
 
 static DynamicCastResult
 tryCastToAnyHashable(
