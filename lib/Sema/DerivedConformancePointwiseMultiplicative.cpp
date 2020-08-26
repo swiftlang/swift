@@ -163,13 +163,11 @@ derivePointwiseMultiplicative_multiply(DerivedConformance &derived) {
 
   auto operatorId = C.getIdentifier(".*");
   DeclName operatorDeclName(C, operatorId, params);
-  auto operatorDecl =
-      FuncDecl::create(C, SourceLoc(), StaticSpellingKind::KeywordStatic,
-                       SourceLoc(), operatorDeclName, SourceLoc(),
-		       /*Async*/ false, SourceLoc(),
-                       /*Throws*/ false, SourceLoc(),
-                       /*GenericParams=*/nullptr, params,
-                       TypeLoc::withoutLoc(selfInterfaceType), parentDC);
+  auto operatorDecl = FuncDecl::createImplicit(
+      C, StaticSpellingKind::KeywordStatic, operatorDeclName, SourceLoc(),
+      /*Async*/ false,
+      /*Throws*/ false,
+      /*GenericParams=*/nullptr, params, selfInterfaceType, parentDC);
   operatorDecl->setImplicit();
   operatorDecl->setBodySynthesizer(&deriveBodyMathOperator);
   operatorDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());

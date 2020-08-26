@@ -159,6 +159,8 @@ documentation, please create a thread on the Swift forums under the
   Documents the Swift Intermediate Language (SIL).
   - [TransparentAttr.md](/docs/TransparentAttr.md):
     Documents the semantics of the `@_transparent` attribute.
+- [DynamicCasting.md](/docs/DynamicCasting.md):
+  Behavior of the dynamic casting operators `is`, `as?`, and `as!`.
 - [Runtime.md](/docs/Runtime.md):
   Describes the ABI interface to the Swift runtime.
   <!-- NOTE: Outdated -->

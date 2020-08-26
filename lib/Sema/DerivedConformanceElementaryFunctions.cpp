@@ -253,13 +253,10 @@ ElementaryFunction op) {
   auto operatorId = C.getIdentifier(getElementaryFunctionName(op));
   DeclName operatorDeclName(C, operatorId, params);
   auto operatorDecl =
-      FuncDecl::create(C, SourceLoc(), StaticSpellingKind::KeywordStatic,
-                       SourceLoc(), operatorDeclName, SourceLoc(),
-		       /*Async*/ false, SourceLoc(),
-                       /*Throws*/ false, SourceLoc(),
-                       /*GenericParams*/ nullptr, params,
-                       TypeLoc::withoutLoc(selfInterfaceType), parentDC);
-  operatorDecl->setImplicit();
+      FuncDecl::createImplicit(C, StaticSpellingKind::KeywordStatic,
+                               operatorDeclName, SourceLoc(), /*Async*/ false,
+                               /*Throws*/ false, /*GenericParams*/ nullptr,
+                               params, selfInterfaceType, parentDC);
   switch (op) {
 #define ELEMENTARY_FUNCTION(ID, NAME)                                          \
   case ID:                                                                     \

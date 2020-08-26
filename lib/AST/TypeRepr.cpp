@@ -170,6 +170,9 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
     Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
     Printer << " ";
   }
+
+  if (hasAttr(TAK_async))
+    Printer.printSimpleAttr("@async") << " ";
 }
 
 IdentTypeRepr *IdentTypeRepr::create(ASTContext &C,

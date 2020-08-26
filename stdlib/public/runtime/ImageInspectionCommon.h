@@ -19,7 +19,27 @@
 #ifndef SWIFT_RUNTIME_IMAGEINSPECTIONCOMMON_H
 #define SWIFT_RUNTIME_IMAGEINSPECTIONCOMMON_H
 
-#if !defined(__MACH__)
+#if defined(__MACH__)
+
+#include <mach-o/dyld.h>
+
+/// The Mach-O section name for the section containing protocol descriptor
+/// references. This lives within SEG_TEXT.
+#define MachOProtocolsSection "__swift5_protos"
+/// The Mach-O section name for the section containing protocol conformances.
+/// This lives within SEG_TEXT.
+#define MachOProtocolConformancesSection "__swift5_proto"
+/// The Mach-O section name for the section containing type references.
+/// This lives within SEG_TEXT.
+#define MachOTypeMetadataRecordSection "__swift5_types"
+/// The Mach-O section name for the section containing dynamic replacements.
+/// This lives within SEG_TEXT.
+#define MachODynamicReplacementSection "__swift5_replace"
+#define MachODynamicReplacementSomeSection "__swift5_replac2"
+
+#define MachOTextSegment "__TEXT"
+
+#else
 
 #if defined(__ELF__)
 #define SWIFT_REFLECTION_METADATA_ELF_NOTE_MAGIC_STRING "swift_reflection_metadata_magic_string"

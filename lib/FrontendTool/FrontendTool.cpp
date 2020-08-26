@@ -588,8 +588,9 @@ void ABIDependencyEvaluator::computeABIDependenciesForClangModule(
     }
     if (import->isNonSwiftModule()
         && module->getTopLevelModule() == import->getTopLevelModule()
-        && !import->findUnderlyingClangModule()
-                  ->isSubModuleOf(module->findUnderlyingClangModule())) {
+        && (module == import
+            || !import->findUnderlyingClangModule()
+                      ->isSubModuleOf(module->findUnderlyingClangModule()))) {
       continue;
     }
     computeABIDependenciesForModule(import);
@@ -1750,7 +1751,8 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
 /// \param Instance Will be reset after performIRGeneration when the verifier
 ///                 mode is NoVerify and there were no errors.
 /// \returns true on error
-static bool performCompile(CompilerInstance &Instance,
+static bool performCompile(CompilerInvocation &Invok,
+                           CompilerInstance &Instance,
                            ArrayRef<const char *> Args,
                            int &ReturnValue,
                            FrontendObserver *observer) {
@@ -1773,7 +1775,8 @@ static bool performCompile(CompilerInstance &Instance,
       << Invocation.getLangOptions().Target.str() << '\n';
     return false;
   }
-  if (Action == FrontendOptions::ActionType::CompileModuleFromInterface)
+  if (Action == FrontendOptions::ActionType::CompileModuleFromInterface ||
+      Action == FrontendOptions::ActionType::TypecheckModuleFromInterface)
     return buildModuleFromInterface(Instance);
 
   if (Invocation.getInputKind() == InputFileKind::LLVM)
@@ -1833,8 +1836,18 @@ static bool performCompile(CompilerInstance &Instance,
     return finishPipeline(Context.hadError());
   }
 
-  if (Action == FrontendOptions::ActionType::ScanDependencies)
-    return finishPipeline(scanDependencies(Instance));
+  if (Action == FrontendOptions::ActionType::ScanDependencies) {
+    auto batchScanInput = Instance.getASTContext().SearchPathOpts.BatchScanInputFilePath;
+    if (batchScanInput.empty())
+      return finishPipeline(scanDependencies(Instance));
+    else
+      return finishPipeline(batchScanModuleDependencies(Invok,
+                                                        Instance,
+                                                        batchScanInput));
+  }
+
+  if (Action == FrontendOptions::ActionType::ScanClangDependencies)
+    return finishPipeline(scanClangDependencies(Instance));
 
   if (observer)
     observer->performedSemanticAnalysis(Instance);
@@ -2642,7 +2655,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   }
 
   int ReturnValue = 0;
-  bool HadError = performCompile(*Instance, Args, ReturnValue, observer);
+  bool HadError = performCompile(Invocation, *Instance, Args, ReturnValue, observer);
 
   if (verifierEnabled) {
     DiagnosticEngine &diags = Instance->getDiags();

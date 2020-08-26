@@ -594,8 +594,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         isExistential = instanceTy->isExistentialType();
         if (!isExistential &&
             instanceTy->mayHaveMembers() &&
-            !TypeChecker::lookupConstructors(const_cast<DeclContext *>(DC),
-                                             instanceTy).empty()) {
+            !TypeChecker::lookupMember(const_cast<DeclContext *>(DC), instanceTy,
+                                       DeclNameRef::createConstructor()).empty()) {
           Ctx.Diags.diagnose(E->getEndLoc(), diag::add_parens_to_type)
             .fixItInsertAfter(E->getEndLoc(), "()");
         }
@@ -2223,7 +2223,7 @@ static bool fixItOverrideDeclarationTypesImpl(
 
       fixedAny |= checkType(resultType, ParamDecl::Specifier::Default,
                             baseResultType, ParamDecl::Specifier::Default,
-                            method->getBodyResultTypeLoc().getSourceRange());
+                            method->getResultTypeSourceRange());
     }
     return fixedAny;
   }
@@ -2246,7 +2246,7 @@ static bool fixItOverrideDeclarationTypesImpl(
         baseSubscript->getElementInterfaceType());
     fixedAny |= checkType(resultType, ParamDecl::Specifier::Default,
                           baseResultType, ParamDecl::Specifier::Default,
-                          subscript->getElementTypeLoc().getSourceRange());
+                          subscript->getElementTypeSourceRange());
     return fixedAny;
   }
 

@@ -226,8 +226,8 @@ public:
       SourceLoc StartLoc = FES->getStartLoc();
       SourceLoc EndLoc = FES->getSequence()->getEndLoc();
       // FIXME: get the 'end' of the for stmt
-      // if (FD->getBodyResultTypeLoc().hasLocation()) {
-      //   EndLoc = FD->getBodyResultTypeLoc().getSourceRange().End;
+      // if (FD->getResultTypeRepr()) {
+      //   EndLoc = FD->getResultTypeSourceRange().End;
       // } else {
       //   EndLoc = FD->getParameters()->getSourceRange().End;
       // }
@@ -343,8 +343,8 @@ public:
         // decl at the start of the transformed body
         SourceLoc StartLoc = FD->getStartLoc();
         SourceLoc EndLoc = SourceLoc();
-        if (FD->getBodyResultTypeLoc().hasLocation()) {
-          EndLoc = FD->getBodyResultTypeLoc().getSourceRange().End;
+        if (FD->getResultTypeRepr()) {
+          EndLoc = FD->getResultTypeSourceRange().End;
         } else {
           EndLoc = FD->getParameters()->getSourceRange().End;
         }

@@ -116,6 +116,8 @@ public:
 
     /// Build from a swiftinterface, as close to `import` as possible
     CompileModuleFromInterface,
+    /// Same as CompileModuleFromInterface, but stopping after typechecking
+    TypecheckModuleFromInterface,
 
     EmitSIBGen, ///< Emit serialized AST + raw SIL
     EmitSIB,    ///< Emit serialized AST + canonical SIL
@@ -133,7 +135,8 @@ public:
     EmitPCM, ///< Emit precompiled Clang module from a module map
     DumpPCM, ///< Dump information about a precompiled Clang module
 
-    ScanDependencies,   ///< Scan dependencies of Swift source files
+    ScanDependencies,        ///< Scan dependencies of Swift source files
+    ScanClangDependencies,   ///< Scan dependencies of a Clang module
     PrintVersion,       ///< Print version information.
   };
 

@@ -2189,6 +2189,12 @@ namespace {
 
         Type varType;
 
+        // Determine whether optionality will be required.
+        auto ROK = ReferenceOwnership::Strong;
+        if (auto *OA = var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
+          ROK = OA->get();
+        auto optionality = optionalityOf(ROK);
+
         // If we have a type from an initializer expression, and that
         // expression does not produce an InOut type, use it.  This
         // will avoid exponential typecheck behavior in the case of
@@ -2197,18 +2203,17 @@ namespace {
         // FIXME: This should be handled in the solver, not here.
         //
         // Otherwise, create a new type variable.
-        bool assumedInitializerType = false;
         if (!var->hasNonPatternBindingInit() &&
-            !var->hasAttachedPropertyWrapper()) {
+            !var->hasAttachedPropertyWrapper() &&
+            optionality != ReferenceOwnershipOptionality::Required) {
           if (auto boundExpr = locator.trySimplifyToExpr()) {
             if (!boundExpr->isSemanticallyInOutExpr()) {
               varType = CS.getType(boundExpr)->getRValueType();
-              assumedInitializerType = true;
             }
           }
         }
 
-        if (!assumedInitializerType)
+        if (!varType)
           varType = CS.createTypeVariable(CS.getConstraintLocator(locator),
                                           TVO_CanBindToNoEscape);
 
@@ -2226,22 +2231,8 @@ namespace {
 
         // If there is an externally-imposed type.
 
-        auto ROK = ReferenceOwnership::Strong;
-        if (auto *OA = var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
-          ROK = OA->get();
-        switch (optionalityOf(ROK)) {
+        switch (optionality) {
         case ReferenceOwnershipOptionality::Required:
-          if (assumedInitializerType) {
-            // Already Optional<T>
-            if (varType->getOptionalObjectType())
-              break;
-
-            // Create a fresh type variable to handle overloaded expressions.
-            if (varType->is<TypeVariableType>())
-              varType = CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                              TVO_CanBindToNoEscape);
-          }
-
           varType = TypeChecker::getOptionalType(var->getLoc(), varType);
           assert(!varType->hasError());
 
@@ -2784,10 +2775,17 @@ namespace {
           return { true, expr };
         }
       } collectVarRefs(CS);
+
       closure->walk(collectVarRefs);
 
-      if (collectVarRefs.hasErrorExprs)
+      // If walker discovered error expressions, let's fail constraint
+      // genreation only if closure is going to participate
+      // in the type-check. This allows us to delay validation of
+      // multi-statement closures until body is opened.
+      if (shouldTypeCheckInEnclosingExpression(closure) &&
+          collectVarRefs.hasErrorExprs) {
         return Type();
+      }
 
       auto inferredType = inferClosureType(closure);
       if (!inferredType || inferredType->hasError())

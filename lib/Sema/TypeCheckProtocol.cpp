@@ -850,7 +850,14 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
   Type openedFullWitnessType;
   Type reqType, openedFullReqType;
 
-  auto reqSig = req->getInnermostDeclContext()->getGenericSignatureOfContext();
+  GenericSignature reqSig = proto->getGenericSignature();
+  if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(req)) {
+    if (funcDecl->isGeneric())
+      reqSig = funcDecl->getGenericSignature();
+  } else if (auto *subscriptDecl = dyn_cast<SubscriptDecl>(req)) {
+    if (subscriptDecl->isGeneric())
+      reqSig = subscriptDecl->getGenericSignature();
+  }
 
   ClassDecl *covariantSelf = nullptr;
   if (witness->getDeclContext()->getExtendedProtocolDecl()) {
@@ -1105,16 +1112,25 @@ WitnessChecker::WitnessChecker(ASTContext &ctx, ProtocolDecl *proto,
 void
 WitnessChecker::lookupValueWitnessesViaImplementsAttr(
     ValueDecl *req, SmallVector<ValueDecl *, 4> &witnesses) {
-  auto lookupOptions = defaultMemberTypeLookupOptions;
-  lookupOptions -= NameLookupFlags::PerformConformanceCheck;
-  lookupOptions |= NameLookupFlags::IncludeAttributeImplements;
-  auto candidates = TypeChecker::lookupMember(DC, Adoptee, req->createNameRef(),
-                                              lookupOptions);
-  for (auto candidate : candidates) {
-    if (witnessHasImplementsAttrForExactRequirement(candidate.getValueDecl(), req)) {
-      witnesses.push_back(candidate.getValueDecl());
-    }
+
+  auto name = req->createNameRef();
+  auto *nominal = Adoptee->getAnyNominal();
+
+  NLOptions subOptions = (NL_ProtocolMembers | NL_IncludeAttributeImplements);
+
+  nominal->synthesizeSemanticMembersIfNeeded(name.getFullName());
+
+  SmallVector<ValueDecl *, 4> lookupResults;
+  DC->lookupQualified(nominal, name, subOptions, lookupResults);
+
+  for (auto decl : lookupResults) {
+    if (!isa<ProtocolDecl>(decl->getDeclContext()))
+      if (witnessHasImplementsAttrForExactRequirement(decl, req))
+        witnesses.push_back(decl);
   }
+
+  removeOverriddenDecls(witnesses);
+  removeShadowedDecls(witnesses, DC);
 }
 
 SmallVector<ValueDecl *, 4>
@@ -1147,23 +1163,34 @@ WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
     }
   } else {
     // Variable/function/subscript requirements.
-    auto lookupOptions = defaultMemberTypeLookupOptions;
-    lookupOptions -= NameLookupFlags::PerformConformanceCheck;
+    auto *nominal = Adoptee->getAnyNominal();
+    nominal->synthesizeSemanticMembersIfNeeded(reqName.getFullName());
 
-    auto candidates = TypeChecker::lookupMember(DC, Adoptee, reqName,
-                                                lookupOptions);
+    SmallVector<ValueDecl *, 4> lookupResults;
+    bool addedAny = false;
+    DC->lookupQualified(nominal, reqName, NL_ProtocolMembers, lookupResults);
+    for (auto *decl : lookupResults) {
+      if (!isa<ProtocolDecl>(decl->getDeclContext())) {
+        witnesses.push_back(decl);
+        addedAny = true;
+      }
+    };
 
     // If we didn't find anything with the appropriate name, look
     // again using only the base name.
-    if (candidates.empty() && ignoringNames) {
-      candidates = TypeChecker::lookupMember(DC, Adoptee, reqBaseName,
-                                             lookupOptions);
+    if (!addedAny && ignoringNames) {
+      lookupResults.clear();
+      DC->lookupQualified(nominal, reqBaseName, NL_ProtocolMembers, lookupResults);
+      for (auto *decl : lookupResults) {
+        if (!isa<ProtocolDecl>(decl->getDeclContext()))
+          witnesses.push_back(decl);
+      }
+
       *ignoringNames = true;
     }
 
-    for (auto candidate : candidates) {
-      witnesses.push_back(candidate.getValueDecl());
-    }
+    removeOverriddenDecls(witnesses);
+    removeShadowedDecls(witnesses, DC);
   }
 
   return witnesses;
@@ -2066,13 +2093,12 @@ SourceLoc OptionalAdjustment::getOptionalityLoc(ValueDecl *witness) const {
     // For a function, use the result type.
     if (auto func = dyn_cast<FuncDecl>(witness)) {
       return getOptionalityLoc(
-               func->getBodyResultTypeLoc().getTypeRepr());
+               func->getResultTypeRepr());
     }
 
     // For a subscript, use the element type.
     if (auto subscript = dyn_cast<SubscriptDecl>(witness)) {
-      return getOptionalityLoc(
-               subscript->getElementTypeLoc().getTypeRepr());
+      return getOptionalityLoc(subscript->getElementTypeRepr());
     }
 
     // Otherwise, we have a variable.
@@ -3768,9 +3794,10 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDefault(
 
 # pragma mark Type witness resolution
 
-CheckTypeWitnessResult swift::checkTypeWitness(Type type,
-                                               AssociatedTypeDecl *assocType,
-                                               NormalProtocolConformance *Conf) {
+CheckTypeWitnessResult
+swift::checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
+                        const NormalProtocolConformance *Conf,
+                        SubstOptions options) {
   if (type->hasError())
     return ErrorType::get(assocType->getASTContext());
 
@@ -3784,13 +3811,19 @@ CheckTypeWitnessResult swift::checkTypeWitness(Type type,
                                               : type;
 
   if (auto superclass = genericSig->getSuperclassBound(depTy)) {
-    // If the superclass has a type parameter, substitute in known type
-    // witnesses.
     if (superclass->hasTypeParameter()) {
-      const auto subMap = SubstitutionMap::getProtocolSubstitutions(
-          proto, Conf->getType(), ProtocolConformanceRef(Conf));
+      // Replace type parameters with other known or tentative type witnesses.
+      superclass = superclass.subst(
+          [&](SubstitutableType *type) {
+            if (type->isEqual(proto->getSelfInterfaceType()))
+              return Conf->getType();
 
-      superclass = superclass.subst(subMap);
+            return Type();
+          },
+          LookUpConformanceInModule(dc->getParentModule()), options);
+
+      if (superclass->hasTypeParameter())
+        superclass = dc->mapTypeIntoContext(superclass);
     }
     if (!superclass->isExactSuperclassOf(contextType))
       return superclass;
@@ -3862,58 +3895,86 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
     abort();
   }
 
+  NLOptions subOptions = (NL_QualifiedDefault | NL_OnlyTypes | NL_ProtocolMembers);
+
   // Look for a member type with the same name as the associated type.
-  auto candidates = TypeChecker::lookupMemberType(
-      DC, Adoptee, assocType->createNameRef(),
-      NameLookupFlags::ProtocolMembers);
+  SmallVector<ValueDecl *, 4> candidates;
+
+  DC->lookupQualified(Adoptee->getAnyNominal(),
+                      assocType->createNameRef(),
+                      subOptions, candidates);
 
   // If there aren't any candidates, we're done.
-  if (!candidates) {
+  if (candidates.empty()) {
     return ResolveWitnessResult::Missing;
   }
 
   // Determine which of the candidates is viable.
   SmallVector<LookupTypeResultEntry, 2> viable;
   SmallVector<std::pair<TypeDecl *, CheckTypeWitnessResult>, 2> nonViable;
+  SmallPtrSet<CanType, 4> viableTypes;
+
   for (auto candidate : candidates) {
-    // Skip nested generic types.
-    if (auto *genericDecl = dyn_cast<GenericTypeDecl>(candidate.Member)) {
-      // If the declaration has generic parameters, it cannot witness an
-      // associated type.
-      if (genericDecl->isGeneric())
+    auto *typeDecl = cast<TypeDecl>(candidate);
+
+    // Skip other associated types.
+    if (isa<AssociatedTypeDecl>(typeDecl))
+      continue;
+
+    auto *genericDecl = cast<GenericTypeDecl>(typeDecl);
+
+    // If the declaration has generic parameters, it cannot witness an
+    // associated type.
+    if (genericDecl->isGeneric())
+      continue;
+
+    // As a narrow fix for a source compatibility issue with SwiftUI's
+    // swiftinterface, allow the conformance if the underlying type of
+    // the typealias is Never.
+    //
+    // FIXME: This should be conditionalized on a new language version.
+    bool skipRequirementCheck = false;
+    if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
+      if (typeAliasDecl->getUnderlyingType()->isUninhabited())
+        skipRequirementCheck = true;
+    }
+
+    // Skip typealiases with an unbound generic type as their underlying type.
+    if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl))
+      if (typeAliasDecl->getDeclaredInterfaceType()->is<UnboundGenericType>())
         continue;
 
-      // As a narrow fix for a source compatibility issue with SwiftUI's
-      // swiftinterface, allow the conformance if the underlying type of
-      // the typealias is Never.
-      //
-      // FIXME: This should be conditionalized on a new language version.
-      bool skipRequirementCheck = false;
-      if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(candidate.Member)) {
-        if (typeAliasDecl->getUnderlyingType()->isUninhabited())
-          skipRequirementCheck = true;
-      }
-
-      // If the type comes from a constrained extension or has a 'where'
-      // clause, check those requirements now.
-      if (!skipRequirementCheck &&
-          !TypeChecker::checkContextualRequirements(genericDecl, Adoptee,
-                                                    SourceLoc(), DC)) {
+    // Skip dependent protocol typealiases.
+    //
+    // FIXME: This should not be necessary.
+    if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
+      if (isa<ProtocolDecl>(typeAliasDecl->getDeclContext()) &&
+          typeAliasDecl->getUnderlyingType()->getCanonicalType()
+            ->hasTypeParameter()) {
         continue;
       }
     }
 
-    // Skip typealiases with an unbound generic type as their underlying type.
-    if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(candidate.Member))
-      if (typeAliasDecl->getDeclaredInterfaceType()->is<UnboundGenericType>())
-        continue;
+    // If the type comes from a constrained extension or has a 'where'
+    // clause, check those requirements now.
+    if (!skipRequirementCheck &&
+        !TypeChecker::checkContextualRequirements(genericDecl, Adoptee,
+                                                  SourceLoc(), DC)) {
+      continue;
+    }
+
+    auto memberType = TypeChecker::substMemberTypeWithBase(DC->getParentModule(),
+                                                           typeDecl, Adoptee);
+
+    if (!viableTypes.insert(memberType->getCanonicalType()).second)
+      continue;
 
     // Check this type against the protocol requirements.
     if (auto checkResult =
-            checkTypeWitness(candidate.MemberType, assocType, Conformance)) {
-      nonViable.push_back({candidate.Member, checkResult});
+            checkTypeWitness(memberType, assocType, Conformance)) {
+      nonViable.push_back({typeDecl, checkResult});
     } else {
-      viable.push_back(candidate);
+      viable.push_back({typeDecl, memberType, nullptr});
     }
   }
 
@@ -5093,16 +5154,20 @@ diagnoseMissingAppendInterpolationMethod(NominalTypeDecl *typeDecl) {
 
     static bool hasValidMethod(NominalTypeDecl *typeDecl,
                                SmallVectorImpl<InvalidMethod> &invalid) {
-      auto type = typeDecl->getDeclaredType();
-      DeclNameRef baseName(typeDecl->getASTContext().Id_appendInterpolation);
-      auto lookupOptions = defaultMemberTypeLookupOptions;
-      lookupOptions -= NameLookupFlags::PerformConformanceCheck;
+      NLOptions subOptions = NL_QualifiedDefault;
+      subOptions |= NL_ProtocolMembers;
 
-      for (auto resultEntry :
-           TypeChecker::lookupMember(typeDecl, type, baseName, lookupOptions)) {
-        auto method = dyn_cast<FuncDecl>(resultEntry.getValueDecl()); 
+      DeclNameRef baseName(typeDecl->getASTContext().Id_appendInterpolation);
+
+      SmallVector<ValueDecl *, 4> lookupResults;
+      typeDecl->lookupQualified(typeDecl, baseName, subOptions, lookupResults);
+      for (auto decl : lookupResults) {
+        auto method = dyn_cast<FuncDecl>(decl);
         if (!method) continue;
-        
+
+        if (isa<ProtocolDecl>(method->getDeclContext()))
+          continue;
+
         if (method->isStatic()) {
           invalid.emplace_back(method, Reason::Static);
           continue;
@@ -5144,11 +5209,13 @@ diagnoseMissingAppendInterpolationMethod(NominalTypeDecl *typeDecl) {
         break;
         
       case InvalidMethod::Reason::ReturnType:
-        C.Diags
-            .diagnose(invalidMethod.method->getBodyResultTypeLoc().getLoc(),
-                      diag::append_interpolation_void_or_discardable)
-            .fixItInsert(invalidMethod.method->getStartLoc(),
-                         "@discardableResult ");
+        if (auto *const repr = invalidMethod.method->getResultTypeRepr()) {
+          C.Diags
+              .diagnose(repr->getLoc(),
+                        diag::append_interpolation_void_or_discardable)
+              .fixItInsert(invalidMethod.method->getStartLoc(),
+                           "@discardableResult ");
+        }
         break;
         
       case InvalidMethod::Reason::AccessControl:
@@ -5737,6 +5804,8 @@ TypeChecker::deriveTypeWitness(DeclContext *DC,
   switch (*knownKind) {
   case KnownProtocolKind::RawRepresentable:
     return std::make_pair(derived.deriveRawRepresentable(AssocType), nullptr);
+  case KnownProtocolKind::CaseIterable:
+    return std::make_pair(derived.deriveCaseIterable(AssocType), nullptr);
   case KnownProtocolKind::Differentiable:
     return derived.deriveDifferentiable(AssocType);
   // SWIFT_ENABLE_TENSORFLOW

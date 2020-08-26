@@ -1994,6 +1994,27 @@ bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
   return !imports.isImportedBy(module, getParentModule());
 }
 
+bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {
+  auto &imports = getASTContext().getImportCache();
+
+  // Look through non-implementation-only imports to see if module is imported
+  // in some other way. Otherwise we assume it's implementation-only imported.
+  ModuleDecl::ImportFilter filter = {
+    ModuleDecl::ImportFilterKind::Public,
+    ModuleDecl::ImportFilterKind::Private,
+    ModuleDecl::ImportFilterKind::SPIAccessControl,
+    ModuleDecl::ImportFilterKind::ShadowedBySeparateOverlay};
+  SmallVector<ModuleDecl::ImportedModule, 4> results;
+  getImportedModules(results, filter);
+
+  for (auto &desc : results) {
+    if (imports.isImportedBy(module, desc.importedModule))
+      return false;
+  }
+
+  return true;
+}
+
 void SourceFile::lookupImportedSPIGroups(
                         const ModuleDecl *importedModule,
                         llvm::SmallSetVector<Identifier, 4> &spiGroups) const {

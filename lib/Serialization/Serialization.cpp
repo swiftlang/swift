@@ -2363,7 +2363,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           S.Out, S.ScratchRecord, abbrCode,
           (unsigned)SA->isExported(),
           (unsigned)SA->getSpecializationKind(),
-          S.addGenericSignatureRef(SA->getSpecializedSgnature()));
+          S.addGenericSignatureRef(SA->getSpecializedSignature()));
       return;
     }
 
@@ -3444,6 +3444,7 @@ public:
                            rawAccessLevel,
                            fn->needsNewVTableEntry(),
                            S.addDeclRef(fn->getOpaqueResultTypeDecl()),
+                           fn->isUserAccessible(),
                            nameComponentsAndDependencies);
 
     writeGenericParams(fn->getGenericParams());
@@ -4239,7 +4240,7 @@ public:
     unsigned abbrCode = S.DeclTypeAbbrCodes[SILFunctionTypeLayout::Code];
     SILFunctionTypeLayout::emitRecord(
         S.Out, S.ScratchRecord, abbrCode,
-        stableCoroutineKind, stableCalleeConvention,
+        fnTy->isAsync(), stableCoroutineKind, stableCalleeConvention,
         stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
         stableDiffKind, fnTy->hasErrorResult(), fnTy->getParameters().size(),
         fnTy->getNumYields(), fnTy->getNumResults(),

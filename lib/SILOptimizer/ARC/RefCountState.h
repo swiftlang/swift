@@ -185,30 +185,19 @@ public:
   bool initWithMutatorInst(ImmutablePointerSet<SILInstruction> *I,
                            RCIdentityFunctionInfo *RCFI);
 
-  /// Update this reference count's state given the instruction \p I. \p
-  /// InsertPt is the point furthest up the CFG where we can move the currently
-  /// tracked reference count.
+  /// Update this reference count's state given the instruction \p I.
   void
   updateForSameLoopInst(SILInstruction *I,
                         ImmutablePointerSetFactory<SILInstruction> &SetFactory,
                         AliasAnalysis *AA);
 
-  /// Update this reference count's state given the instruction \p I. \p
-  /// InsertPts are the points furthest up the CFG where we can move the
-  /// currently tracked reference count.
+  /// Update this reference count's state given the instruction \p I.
   //
   /// The main difference in between this routine and update for same loop inst
   /// is that if we see any decrements on a value, we treat it as being
   /// guaranteed used. We treat any uses as regular uses.
   void updateForDifferentLoopInst(
       SILInstruction *I,
-      ImmutablePointerSetFactory<SILInstruction> &SetFactory,
-      AliasAnalysis *AA);
-
-  // Determine the conservative effect of the given list of predecessor
-  // terminators upon this reference count.
-  void updateForPredTerminators(
-      ArrayRef<SILInstruction *> PredTerms,
       ImmutablePointerSetFactory<SILInstruction> &SetFactory,
       AliasAnalysis *AA);
 
@@ -251,9 +240,7 @@ private:
   bool valueCanBeUsedGivenLatticeState() const;
 
   /// Given the current lattice state, if we have seen a use, advance the
-  /// lattice state. Return true if we do so and false otherwise. \p InsertPt is
-  /// the location where if \p PotentialUser is a user of this ref count, we
-  /// would insert a release.
+  /// lattice state. Return true if we do so and false otherwise.
   bool handleUser(SILValue RCIdentity,
                   ImmutablePointerSetFactory<SILInstruction> &SetFactory,
                   AliasAnalysis *AA);
@@ -271,9 +258,7 @@ private:
   bool valueCanBeGuaranteedUsedGivenLatticeState() const;
 
   /// Given the current lattice state, if we have seen a use, advance the
-  /// lattice state. Return true if we do so and false otherwise. \p InsertPt is
-  /// the location where if \p PotentialUser is a user of this ref count, we
-  /// would insert a release.
+  /// lattice state. Return true if we do so and false otherwise.
   bool
   handleGuaranteedUser(SILValue RCIdentity,
                        ImmutablePointerSetFactory<SILInstruction> &SetFactory,
@@ -345,17 +330,13 @@ public:
   /// Uninitialize the current state.
   void clear();
 
-  /// Update this reference count's state given the instruction \p I. \p
-  /// InsertPt is the point furthest up the CFG where we can move the currently
-  /// tracked reference count.
+  /// Update this reference count's state given the instruction \p I.
   void
   updateForSameLoopInst(SILInstruction *I,
                         ImmutablePointerSetFactory<SILInstruction> &SetFactory,
                         AliasAnalysis *AA);
 
-  /// Update this reference count's state given the instruction \p I. \p
-  /// InsertPts are the points furthest up the CFG where we can move the
-  /// currently tracked reference count.
+  /// Update this reference count's state given the instruction \p I.
   ///
   /// The main difference in between this routine and update for same loop inst
   /// is that if we see any decrements on a value, we treat it as being

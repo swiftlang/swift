@@ -1684,6 +1684,21 @@ Optional<ModuleDependencies> ASTContext::getModuleDependencies(
   return None;
 }
 
+Optional<ModuleDependencies>
+ASTContext::getSwiftModuleDependencies(StringRef moduleName,
+                                       ModuleDependenciesCache &cache,
+                                       InterfaceSubContextDelegate &delegate) {
+  for (auto &loader : getImpl().ModuleLoaders) {
+    if (loader.get() == getImpl().TheClangModuleLoader)
+      continue;
+
+    if (auto dependencies = loader->getModuleDependencies(moduleName, cache,
+                                                          delegate))
+      return dependencies;
+  }
+  return None;
+}
+
 void ASTContext::loadExtensions(NominalTypeDecl *nominal,
                                 unsigned previousGeneration) {
   PrettyStackTraceDecl stackTrace("loading extensions for", nominal);
@@ -3413,6 +3428,7 @@ void SILFunctionType::Profile(
     llvm::FoldingSetNodeID &id,
     GenericSignature genericParams,
     ExtInfo info,
+    bool isAsync,
     SILCoroutineKind coroutineKind,
     ParameterConvention calleeConvention,
     ArrayRef<SILParameterInfo> params,
@@ -3426,6 +3442,7 @@ void SILFunctionType::Profile(
   auto infoKey = info.getFuncAttrKey();
   id.AddInteger(infoKey.first);
   id.AddPointer(infoKey.second);
+  id.AddBoolean(isAsync);
   id.AddInteger(unsigned(coroutineKind));
   id.AddInteger(unsigned(calleeConvention));
   id.AddInteger(params.size());
@@ -3451,6 +3468,7 @@ void SILFunctionType::Profile(
 SILFunctionType::SILFunctionType(
     GenericSignature genericSig,
     ExtInfo ext,
+    bool isAsync,
     SILCoroutineKind coroutineKind,
     ParameterConvention calleeConvention,
     ArrayRef<SILParameterInfo> params,
@@ -3476,6 +3494,7 @@ SILFunctionType::SILFunctionType(
          "Bits were dropped!");
   static_assert(SILExtInfoBuilder::NumMaskBits == NumSILExtInfoBits,
                 "ExtInfo and SILFunctionTypeBitfields must agree on bit size");
+  Bits.SILFunctionType.IsAsync = isAsync;
   Bits.SILFunctionType.CoroutineKind = unsigned(coroutineKind);
   NumParameters = params.size();
   if (coroutineKind == SILCoroutineKind::None) {
@@ -3619,7 +3638,7 @@ CanSILBlockStorageType SILBlockStorageType::get(CanType captureType) {
 
 CanSILFunctionType SILFunctionType::get(
     GenericSignature genericSig,
-    ExtInfo ext, SILCoroutineKind coroutineKind,
+    ExtInfo ext, bool isAsync, SILCoroutineKind coroutineKind,
     ParameterConvention callee,
     ArrayRef<SILParameterInfo> params,
     ArrayRef<SILYieldInfo> yields,
@@ -3637,8 +3656,8 @@ CanSILFunctionType SILFunctionType::get(
   invocationSubs = invocationSubs.getCanonical();
   
   llvm::FoldingSetNodeID id;
-  SILFunctionType::Profile(id, genericSig, ext, coroutineKind, callee, params,
-                           yields, normalResults, errorResult,
+  SILFunctionType::Profile(id, genericSig, ext, isAsync, coroutineKind, callee,
+                           params, yields, normalResults, errorResult,
                            witnessMethodConformance,
                            patternSubs, invocationSubs);
 
@@ -3686,7 +3705,7 @@ CanSILFunctionType SILFunctionType::get(
   }
 
   auto fnType =
-      new (mem) SILFunctionType(genericSig, ext, coroutineKind, callee,
+      new (mem) SILFunctionType(genericSig, ext, isAsync, coroutineKind, callee,
                                 params, yields, normalResults, errorResult,
                                 patternSubs, invocationSubs,
                                 ctx, properties, witnessMethodConformance);
@@ -4052,10 +4071,6 @@ CanType OpenedArchetypeType::getAny(Type existential) {
   }
   assert(existential->isExistentialType());
   return OpenedArchetypeType::get(existential);
-}
-
-void TypeLoc::setInvalidType(ASTContext &C) {
-  Ty = ErrorType::get(C);
 }
 
 void SubstitutionMap::Storage::Profile(

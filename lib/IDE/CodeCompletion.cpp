@@ -2387,7 +2387,7 @@ public:
       // i.e. cases where 'ExprType' != 'keyPathInfo.baseType'.
 
       auto *SD = keyPathInfo.subscript;
-      auto elementTy = SD->getElementTypeLoc().getType();
+      const auto elementTy = SD->getElementInterfaceType();
       if (!elementTy->hasTypeParameter())
         return elementTy;
 

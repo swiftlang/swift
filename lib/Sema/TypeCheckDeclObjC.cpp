@@ -604,9 +604,8 @@ bool swift::isRepresentableInObjC(
       if (Diagnose) {
         AFD->diagnose(diag::objc_invalid_on_func_result_type,
                       getObjCDiagnosticAttrKind(Reason));
-        SourceRange Range =
-            FD->getBodyResultTypeLoc().getTypeRepr()->getSourceRange();
-        diagnoseTypeNotRepresentableInObjC(FD, ResultType, Range);
+        diagnoseTypeNotRepresentableInObjC(FD, ResultType,
+                                           FD->getResultTypeSourceRange());
         describeObjCReason(FD, Reason);
       }
       return false;
@@ -928,7 +927,7 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   if (!IndexResult)
     TypeRange = SD->getIndices()->getSourceRange();
   else
-    TypeRange = SD->getElementTypeLoc().getSourceRange();
+    TypeRange = SD->getElementTypeSourceRange();
   SD->diagnose(diag::objc_invalid_on_subscript,
                getObjCDiagnosticAttrKind(Reason))
     .highlight(TypeRange);

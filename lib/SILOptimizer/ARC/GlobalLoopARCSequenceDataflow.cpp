@@ -200,40 +200,14 @@ bool LoopARCSequenceDataflowEvaluator::processLoopBottomUp(
   bool NestingDetected = false;
 
   // For each BB in our post order...
-  auto Start = R->subregion_begin(), End = R->subregion_end();
-  if (Start == End)
-    return false;
-
-  --End;
-  while (Start != End) {
-    unsigned SubregionIndex = *End;
+  for (unsigned SubregionIndex : R->getReverseSubregions()) {
     auto *Subregion = LRFI->getRegion(SubregionIndex);
     auto &SubregionData = getARCState(Subregion);
 
     // This will always succeed since we have an entry for each BB in our post
     // order.
-    LLVM_DEBUG(llvm::dbgs() << "Processing Subregion#: " << SubregionIndex
-                            << "\n");
-
-    LLVM_DEBUG(llvm::dbgs() << "Merging Successors!\n");
-    mergeSuccessors(Subregion, SubregionData);
-
-    // Then perform the region optimization.
-    NestingDetected |= SubregionData.processBottomUp(
-        AA, RCFI, EAFI, LRFI, FreezeOwnedArgEpilogueReleases, IncToDecStateMap,
-        RegionStateInfo, SetFactory);
-    --End;
-  }
-
-  {
-    unsigned SubregionIndex = *End;
-    auto *Subregion = LRFI->getRegion(SubregionIndex);
-    auto &SubregionData = getARCState(Subregion);
-
-    // This will always succeed since we have an entry for each BB in our post
-    // order.
-    LLVM_DEBUG(llvm::dbgs() << "Processing Subregion#: " << SubregionIndex
-                            << "\n");
+    LLVM_DEBUG(llvm::dbgs()
+               << "Processing Subregion#: " << SubregionIndex << "\n");
 
     LLVM_DEBUG(llvm::dbgs() << "Merging Successors!\n");
     mergeSuccessors(Subregion, SubregionData);

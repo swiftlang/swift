@@ -78,6 +78,20 @@ class Product(object):
         """Return a list of products that this product depends upon"""
         raise NotImplementedError
 
+    def should_clean(self, host_target):
+        """should_clean() -> Bool
+
+        Whether or not this product should be cleaned before being built
+        """
+        return False
+
+    def clean(self, host_target):
+        """clean() -> void
+
+        Perform the clean, for a non-build-script-impl product.
+        """
+        raise NotImplementedError
+
     def should_build(self, host_target):
         """should_build() -> Bool
 

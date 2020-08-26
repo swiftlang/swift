@@ -274,6 +274,14 @@ ERROR(placeholder_dependency_module_map_corrupted,none,
       "Swift placeholder dependency module map from %0 is malformed",
       (StringRef))
 
+ERROR(batch_scan_input_file_missing,none,
+      "cannot open batch dependencies scan input file from %0",
+      (StringRef))
+
+ERROR(batch_scan_input_file_corrupted,none,
+      "batch dependencies scan input file from %0 is malformed",
+      (StringRef))
+
 REMARK(default_previous_install_name, none,
       "default previous install name for %0 is %1", (StringRef, StringRef))
 

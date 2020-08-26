@@ -409,10 +409,6 @@ option(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
   "Should the runtime be built with support for non-thread-safe leak detecting entrypoints"
   FALSE)
 
-option(SWIFT_STDLIB_USE_NONATOMIC_RC
-    "Build the standard libraries and overlays with nonatomic reference count operations enabled"
-    FALSE)
-
 option(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS
   "Enable runtime function counters and expose the API."
   FALSE)
@@ -650,6 +646,22 @@ swift_common_cxx_warnings()
 # Check if we're build with MSVC or Clang-cl, as these compilers have similar command line arguments.
 if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC" OR "${CMAKE_CXX_SIMULATE_ID}" STREQUAL "MSVC")
   set(SWIFT_COMPILER_IS_MSVC_LIKE TRUE)
+endif()
+
+if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+  # CMake's default for CMAKE_CXX_FLAGS_RELEASE is "-O3 -DNDEBUG". Let's avoid "-O3" for consistency
+  # between Release and RelWithDebInfo. Dropping -DNDEBUG from this setting is blocked by triggering
+  # a test failure of Swift-Unit :: Syntax/./SwiftSyntaxTests/TypeSyntaxTests.MetatypeTypeWithAPIs
+  # because unit tests don't currently explicitly set -DNDEBUG/-UNDEBUG.
+  set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG")
+
+  _compute_lto_flag("${SWIFT_TOOLS_ENABLE_LTO}" _lto_flag_out)
+  if(_lto_flag_out)
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_RELEASE} -gline-tables-only")
+    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -gline-tables-only")
+  endif()
+else()
+  
 endif()
 
 #

@@ -578,7 +578,7 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   }
 
   auto invokeTy = SILFunctionType::get(
-      genericSig, extInfo, SILCoroutineKind::None,
+      genericSig, extInfo, /*isAsync*/ false, SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned, params, 
       /*yields*/ {}, blockInterfaceTy->getResults(),
       blockInterfaceTy->getOptionalErrorResult(),

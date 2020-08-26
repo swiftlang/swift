@@ -6,7 +6,7 @@ enum Either<T,U> {
 }
 
 @_functionBuilder
-struct TupleBuilder { // expected-note 3{{struct 'TupleBuilder' declared here}}
+struct TupleBuilder { // expected-note 2 {{struct 'TupleBuilder' declared here}}
   static func buildBlock() -> () { }
   
   static func buildBlock<T1>(_ t1: T1) -> T1 {
@@ -87,7 +87,7 @@ func testDiags() {
   // For loop
   tuplify(true) { _ in
     17
-    for c in name { // expected-error{{closure containing control flow statement cannot be used with function builder 'TupleBuilder'}}
+    for c in name {
     // expected-error@-1 {{cannot find 'name' in scope}}
     }
   }
@@ -418,13 +418,16 @@ func testNonExhaustiveSwitch(e: E) {
 // rdar://problem/59856491
 struct TestConstraintGenerationErrors {
   @TupleBuilder var buildTupleFnBody: String {
-    let a = nil // expected-error {{'nil' requires a contextual type}}
+    let a = nil // There is no diagnostic here because next line fails to pre-check, so body is invalid
     String(nothing) // expected-error {{cannot find 'nothing' in scope}}
   }
 
+  @TupleBuilder var nilWithoutContext: String {
+    let a = nil // expected-error {{'nil' requires a contextual type}}
+  }
+
   func buildTupleClosure() {
-    // FIXME: suppress the ambiguity error
-    tuplify(true) { _ in // expected-error {{type of expression is ambiguous without more context}}
+    tuplify(true) { _ in
       let a = nothing // expected-error {{cannot find 'nothing' in scope}}
       String(nothing) // expected-error {{cannot find 'nothing' in scope}}
     }
@@ -618,5 +621,17 @@ struct MyView {
 
   @TupleBuilder var invalidConversion: Int { // expected-error {{cannot convert value of type 'String' to specified type 'Int'}}
     ""
+  }
+}
+
+// Make sure throwing function builder closures are implied.
+enum MyError: Error {
+  case boom
+}
+
+do {
+    tuplify(true) { c in // expected-error{{invalid conversion from throwing function of type '(Bool) throws -> String' to non-throwing function type '(Bool) -> String'}}
+    "testThrow"
+    throw MyError.boom
   }
 }

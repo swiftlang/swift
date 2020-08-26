@@ -93,6 +93,9 @@ public:
 
   /// A map of placeholder Swift module dependency information.
   std::string PlaceholderDependencyModuleMap;
+
+  /// A file containing modules we should perform batch scanning.
+  std::string BatchScanInputFilePath;
 private:
   static StringRef
   pathStringFromFrameworkSearchPath(const FrameworkSearchPath &next) {

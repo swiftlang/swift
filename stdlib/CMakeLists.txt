@@ -17,6 +17,22 @@ option(SWIFT_ENABLE_COMPATIBILITY_OVERRIDES
   "Support back-deploying compatibility fixes for newer apps running on older runtimes."
   TRUE)
 
+option(SWIFT_RUNTIME_MACHO_NO_DYLD
+  "Build stdlib assuming the runtime environment uses Mach-O but does not support dynamic modules."
+  FALSE)
+
+option(SWIFT_STDLIB_USE_NONATOMIC_RC
+    "Build the standard libraries and overlays with nonatomic reference count operations enabled"
+    FALSE)
+
+option(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+    "Build the standard libraries assuming that they will be used in an environment with only a single thread. If set, also forces SWIFT_STDLIB_USE_NONATOMIC_RC to On."
+    FALSE)
+
+if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+  set(SWIFT_STDLIB_USE_NONATOMIC_RC TRUE)
+endif()
+
 #
 # End of user-configurable options.
 #

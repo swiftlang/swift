@@ -873,7 +873,8 @@ public:
           });
     }
 
-    checkTypeAccess(SD->getElementTypeLoc(), SD, /*mayBeInferred*/false,
+    checkTypeAccess(SD->getElementInterfaceType(), SD->getElementTypeRepr(),
+                    SD, /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *thisComplainRepr,
                         DowngradeToWarning downgradeDiag) {
@@ -937,7 +938,8 @@ public:
 
     bool problemIsResult = false;
     if (auto FD = dyn_cast<FuncDecl>(fn)) {
-      checkTypeAccess(FD->getBodyResultTypeLoc(), FD, /*mayBeInferred*/false,
+      checkTypeAccess(FD->getResultInterfaceType(), FD->getResultTypeRepr(),
+                      FD, /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *thisComplainRepr,
                           DowngradeToWarning downgradeDiag) {
@@ -1375,7 +1377,8 @@ public:
           });
     }
 
-    checkTypeAccess(SD->getElementTypeLoc(), SD, /*mayBeInferred*/false,
+    checkTypeAccess(SD->getElementInterfaceType(), SD->getElementTypeRepr(),
+                    SD, /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeDiag) {
@@ -1418,7 +1421,8 @@ public:
     }
 
     if (auto FD = dyn_cast<FuncDecl>(fn)) {
-      checkTypeAccess(FD->getBodyResultTypeLoc(), FD, /*mayBeInferred*/false,
+      checkTypeAccess(FD->getResultInterfaceType(), FD->getResultTypeRepr(),
+                      FD, /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeDiag) {
@@ -1916,7 +1920,8 @@ public:
       checkType(P->getInterfaceType(), P->getTypeRepr(), SD,
                 getDiagnoser(SD));
     }
-    checkType(SD->getElementTypeLoc(), SD, getDiagnoser(SD));
+    checkType(SD->getElementInterfaceType(), SD->getElementTypeRepr(), SD,
+              getDiagnoser(SD));
   }
 
   void visitAbstractFunctionDecl(AbstractFunctionDecl *fn) {
@@ -1929,7 +1934,8 @@ public:
 
   void visitFuncDecl(FuncDecl *FD) {
     visitAbstractFunctionDecl(FD);
-    checkType(FD->getBodyResultTypeLoc(), FD, getDiagnoser(FD));
+    checkType(FD->getResultInterfaceType(), FD->getResultTypeRepr(), FD,
+              getDiagnoser(FD));
   }
 
   void visitEnumElementDecl(EnumElementDecl *EED) {

@@ -510,5 +510,9 @@ int _swift_stdlib_putc_stderr(int C) {
 }
 
 size_t _swift_stdlib_getHardwareConcurrency() {
+#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+  return 1;
+#else
   return std::thread::hardware_concurrency();
+#endif
 }

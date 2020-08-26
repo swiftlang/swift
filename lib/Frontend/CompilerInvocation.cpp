@@ -325,6 +325,8 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
     Args.hasArg(OPT_experimental_print_full_convention);
   Opts.ExperimentalSPIImports |=
     Args.hasArg(OPT_experimental_spi_imports);
+  Opts.DebugPrintInvalidSyntax |=
+    Args.hasArg(OPT_debug_emit_invalid_swiftinterface_syntax);
 }
 
 /// Save a copy of any flags marked as ModuleInterfaceOption, if running
@@ -926,7 +928,8 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   }
   if (const Arg *A = Args.getLastArg(OPT_placeholder_dependency_module_map))
     Opts.PlaceholderDependencyModuleMap = A->getValue();
-
+  if (const Arg *A = Args.getLastArg(OPT_batch_scan_input_file))
+    Opts.BatchScanInputFilePath = A->getValue();
   // Opts.RuntimeIncludePath is set by calls to
   // setRuntimeIncludePath() or setMainExecutablePath().
   // Opts.RuntimeImportPath is set by calls to

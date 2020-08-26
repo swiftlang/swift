@@ -112,7 +112,16 @@ To build for macOS, you need [Xcode 12 beta 3](https://developer.apple.com/xcode
 The required version of Xcode changes frequently, and is often a beta release.
 Check this document for the current required version.
 
-You will also need [CMake](https://cmake.org), [Ninja](https://ninja-build.org), and [Bazel](https://www.bazel.build), which can be installed via a package manager.
+Swift's build tooling is meant to support spaces in the paths passed to them,
+but using spaces sometimes tickles bugs in Swift's build scripts or the tools
+they rely on. For example, [SR-13441](https://bugs.swift.org/browse/SR-13441)
+is caused by a space in the Xcode path used on macOS. If you see Swift's build
+tooling misbehave due to a space in a path, please
+[report the bug on the Swift bug tracker](https://swift.org/contributing/#reporting-bugs)
+and then change the path to work around it.
+
+You will also need [CMake](https://cmake.org) and [Ninja](https://ninja-build.org),
+and [Bazel](https://www.bazel.build), which can be installed via a package manager:
 
 **[Homebrew](https://brew.sh/)**
 

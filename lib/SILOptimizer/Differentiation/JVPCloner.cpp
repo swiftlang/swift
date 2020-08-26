@@ -455,18 +455,6 @@ public:
       return;
     }
 
-    // Diagnose functions with active inout arguments.
-    // TODO(TF-129): Support `inout` argument differentiation.
-    for (auto inoutArg : ai->getInoutArguments()) {
-      if (activityInfo.isActive(inoutArg, getIndices())) {
-        context.emitNondifferentiabilityError(
-            ai, invoker,
-            diag::autodiff_cannot_differentiate_through_inout_arguments);
-        errorOccurred = true;
-        return;
-      }
-    }
-
     auto loc = ai->getLoc();
     auto &builder = getBuilder();
     auto origCallee = getOpValue(ai->getCallee());
@@ -704,9 +692,11 @@ public:
         getModule(), jvpSubstMap, TypeExpansionContext::minimal());
     differentialType = differentialType.subst(getModule(), jvpSubstMap);
     auto differentialFnType = differentialType.castTo<SILFunctionType>();
-
     auto differentialSubstType =
         differentialPartialApply->getType().castTo<SILFunctionType>();
+
+    // If necessary, convert the differential value to the returned differential
+    // function type.
     SILValue differentialValue;
     if (differentialSubstType == differentialFnType) {
       differentialValue = differentialPartialApply;
@@ -717,11 +707,8 @@ public:
           loc, differentialPartialApply, differentialType,
           /*withoutActuallyEscaping*/ false);
     } else {
-      // When `diag::autodiff_loadable_value_addressonly_tangent_unsupported`
-      // applies, the return type may be ABI-incomaptible with the type of the
-      // partially applied differential. In these cases, produce an undef and
-      // rely on other code to emit a diagnostic.
-      differentialValue = SILUndef::get(differentialType, *jvp);
+      llvm::report_fatal_error("Differential value type is not ABI-compatible "
+                               "with the returned differential type");
     }
 
     // Return a tuple of the original result and differential.
@@ -1242,6 +1229,10 @@ public:
     SmallVector<SILValue, 8> differentialAllResults;
     collectAllActualResultsInTypeOrder(
         differentialCall, differentialDirectResults, differentialAllResults);
+    for (auto inoutArg : ai->getInoutArguments())
+      origAllResults.push_back(inoutArg);
+    for (auto inoutArg : differentialCall->getInoutArguments())
+      differentialAllResults.push_back(inoutArg);
     assert(applyIndices.results->getNumIndices() ==
            differentialAllResults.size());
 
@@ -1485,11 +1476,14 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   auto origIndResults = original->getIndirectResults();
   auto diffIndResults = differential.getIndirectResults();
 #ifndef NDEBUG
-  unsigned numInoutParameters = llvm::count_if(
-      original->getLoweredFunctionType()->getParameters(),
-      [](SILParameterInfo paramInfo) { return paramInfo.isIndirectInOut(); });
-  assert(origIndResults.size() + numInoutParameters == diffIndResults.size());
+  unsigned numNonWrtInoutParameters = llvm::count_if(
+    range(original->getLoweredFunctionType()->getNumParameters()),
+    [&] (unsigned i) {
+      auto &paramInfo = original->getLoweredFunctionType()->getParameters()[i];
+      return paramInfo.isIndirectInOut() && !getIndices().parameters->contains(i);
+    });
 #endif
+  assert(origIndResults.size() + numNonWrtInoutParameters == diffIndResults.size());
   for (auto &origBB : *original)
     for (auto i : indices(origIndResults))
       setTangentBuffer(&origBB, origIndResults[i], diffIndResults[i]);
@@ -1522,23 +1516,10 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   auto origParams = origTy->getParameters();
   auto indices = witness->getSILAutoDiffIndices();
 
-  // Add differential results.
-  Optional<SILParameterInfo> inoutDiffParam = None;
-  for (auto origParam : origTy->getParameters()) {
-    if (!origParam.isIndirectInOut())
-      continue;
-    inoutDiffParam = origParam;
-  }
 
-  if (inoutDiffParam) {
-    dfResults.push_back(
-        SILResultInfo(inoutDiffParam->getInterfaceType()
-                          ->getAutoDiffTangentSpace(lookupConformance)
-                          ->getType()
-                          ->getCanonicalType(witnessCanGenSig),
-                      ResultConvention::Indirect));
-  } else {
-    for (auto resultIndex : indices.results->getIndices()) {
+  for (auto resultIndex : indices.results->getIndices()) {
+    if (resultIndex < origTy->getNumResults()) {
+      // Handle formal original result.
       auto origResult = origTy->getResults()[resultIndex];
       origResult = origResult.getWithInterfaceType(
           origResult.getInterfaceType()->getCanonicalType(witnessCanGenSig));
@@ -1548,6 +1529,25 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
                             ->getType()
                             ->getCanonicalType(witnessCanGenSig),
                         origResult.getConvention()));
+    }
+    else {
+      // Handle original `inout` parameter.
+      auto inoutParamIndex = resultIndex - origTy->getNumResults();
+      auto inoutParamIt = std::next(
+          origTy->getIndirectMutatingParameters().begin(), inoutParamIndex);
+      auto paramIndex =
+          std::distance(origTy->getParameters().begin(), &*inoutParamIt);
+      // If the original `inout` parameter is a differentiability parameter, then
+      // it already has a corresponding differential parameter. Skip adding a
+      // corresponding differential result.
+      if (indices.parameters->contains(paramIndex))
+        continue;
+      auto inoutParam = origTy->getParameters()[paramIndex];
+      auto paramTan = inoutParam.getInterfaceType()->getAutoDiffTangentSpace(
+          lookupConformance);
+      assert(paramTan && "Parameter type does not have a tangent space?");
+      dfResults.push_back(
+          {paramTan->getCanonicalType(), ResultConvention::Indirect});
     }
   }
 
@@ -1587,10 +1587,10 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   auto *diffGenericEnv =
       diffGenericSig ? diffGenericSig->getGenericEnvironment() : nullptr;
   auto diffType = SILFunctionType::get(
-      diffGenericSig, origTy->getExtInfo(), origTy->getCoroutineKind(),
-      origTy->getCalleeConvention(), dfParams, {}, dfResults, None,
-      origTy->getPatternSubstitutions(), origTy->getInvocationSubstitutions(),
-      original->getASTContext());
+      diffGenericSig, origTy->getExtInfo(), origTy->isAsync(),
+      origTy->getCoroutineKind(), origTy->getCalleeConvention(), dfParams, {},
+      dfResults, None, origTy->getPatternSubstitutions(),
+      origTy->getInvocationSubstitutions(), original->getASTContext());
 
   SILOptFunctionBuilder fb(context.getTransform());
   auto linkage = jvp->isSerialized() ? SILLinkage::Public : SILLinkage::Hidden;
