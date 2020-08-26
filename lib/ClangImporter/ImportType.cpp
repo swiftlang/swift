@@ -1988,6 +1988,42 @@ static Type mapGenericArgs(const DeclContext *fromDC,
   return type.subst(subs);
 }
 
+/// Decompose the type of a completion handler parameter in a function
+/// imported as 'async' and produce the result type of the 'async' function.
+static Type decomposeCompletionHandlerType(
+   Type paramTy, ForeignAsyncConvention info) {
+  auto fnType = paramTy->lookThroughAllOptionalTypes()->getAs<FunctionType>();
+  if (!fnType)
+    return Type();
+
+  SmallVector<TupleTypeElt, 2> resultTypeElts;
+  auto params = fnType->getParams();
+  for (unsigned paramIdx : indices(params)) {
+    const auto &param = params[paramIdx];
+    if (param.isInOut() || param.isVariadic())
+      return Type();
+
+    // If there is an error parameter to the completion handler, it is
+    // not part of the result type of the asynchronous function.
+    if (info.completionHandlerErrorParamIndex() &&
+        paramIdx == *info.completionHandlerErrorParamIndex())
+      continue;
+
+    resultTypeElts.push_back(param.getPlainType());
+  }
+
+  switch (resultTypeElts.size()) {
+  case 0:
+    return paramTy->getASTContext().getVoidDecl()->getDeclaredInterfaceType();
+
+  case 1:
+    return resultTypeElts.front().getType();
+
+  default:
+    return TupleType::get(resultTypeElts, paramTy->getASTContext());
+  }
+}
+
 ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     const DeclContext *dc, const clang::ObjCMethodDecl *clangDecl,
     ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
@@ -2024,6 +2060,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
   CanType origSwiftResultTy;
   Optional<ForeignErrorConvention::Info> errorInfo =
       importedName.getErrorInfo();
+  auto asyncInfo = importedName.getAsyncInfo();
   OptionalTypeKind OptionalityOfReturn;
   if (clangDecl->hasAttr<clang::ReturnsNonNullAttr>()) {
     OptionalityOfReturn = OTK_None;
@@ -2122,6 +2159,9 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
       continue;
     }
 
+    bool paramIsCompletionHandler =
+        asyncInfo && paramIndex == asyncInfo->completionHandlerParamIndex();
+
     // Import the parameter type into Swift.
 
     // Check nullability of the parameter.
@@ -2189,6 +2229,21 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
         ++nameIndex;
       }
       continue;
+    }
+
+    // If this is a completion handler, figure out it's effect on the result
+    // type but don't build it into the parameter type.
+    if (paramIsCompletionHandler) {
+      if (Type replacedSwiftResultTy =
+              decomposeCompletionHandlerType(swiftParamTy, *asyncInfo)) {
+        swiftResultTy = replacedSwiftResultTy;
+
+        // FIXME: We will need an equivalent to "error parameter is replaced"
+        // for asynchronous functions. Perhaps add "async: ()"?
+        continue;
+      }
+
+      llvm_unreachable("async info computed incorrectly?");
     }
 
     // Map __attribute__((noescape)) to @noescape.
