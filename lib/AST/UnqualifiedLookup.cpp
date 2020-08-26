@@ -22,6 +22,7 @@
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
@@ -602,8 +603,28 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
       }
     }
 
-    if (!value->getName().matchesRef(factory.Name.getFullName()))
-      continue;
+    auto fullName = factory.Name.getFullName();
+    if (!value->getName().matchesRef(fullName)) {
+      if (!factory.options.contains(UnqualifiedLookupFlags::IncludePropertyWrapperResults))
+        continue;
+
+      auto *varDecl = dyn_cast<VarDecl>(value);
+      if (!varDecl || !varDecl->hasAttachedPropertyWrapper())
+        continue;
+
+      auto wrapperInfo = varDecl->getPropertyWrapperBackingPropertyInfo();
+      if (!wrapperInfo)
+        continue;
+
+      if (wrapperInfo.backingVar->ValueDecl::getName().matchesRef(fullName)) {
+        value = wrapperInfo.backingVar;
+      } else if (wrapperInfo.projectionVar &&
+                 wrapperInfo.projectionVar->ValueDecl::getName().matchesRef(fullName)) {
+        value = wrapperInfo.projectionVar;
+      } else {
+        continue;
+      }
+    }
 
     // In order to preserve the behavior of the existing context-based lookup,
     // which finds all results for non-local variables at the top level instead

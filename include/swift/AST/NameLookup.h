@@ -225,6 +225,8 @@ enum class UnqualifiedLookupFlags {
   /// This lookup should include results from outside the innermost scope with
   /// results.
   IncludeOuterResults   = 1 << 4,
+  /// Includes property wrapper name lookup results
+  IncludePropertyWrapperResults = 1 << 5,
 };
 
 using UnqualifiedLookupOptions = OptionSet<UnqualifiedLookupFlags>;
