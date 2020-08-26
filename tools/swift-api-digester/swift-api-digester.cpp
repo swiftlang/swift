@@ -26,10 +26,12 @@
 // can be reflected as source-breaking changes for API users. If they are,
 // the output of api-digester will include such changes.
 
+#include "swift/AST/DiagnosticsModuleDiffer.h"
+#include "swift/Basic/DiagnosticOptions.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
-#include "swift/AST/DiagnosticsModuleDiffer.h"
 #include "swift/IDE/APIDigesterData.h"
+
 #include <functional>
 #include "ModuleAnalyzerNodes.h"
 #include "ModuleDiagsConsumer.h"

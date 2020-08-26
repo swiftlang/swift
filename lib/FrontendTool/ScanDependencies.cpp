@@ -714,8 +714,14 @@ bool swift::batchScanModuleDependencies(CompilerInvocation &invok,
       pInstance = subInstanceMap[entry.arguments].get();
     } else {
       // Create a new instance by the arguments and save it in the map.
-      pInstance = subInstanceMap.insert({entry.arguments,
-        std::make_unique<CompilerInstance>()}).first->getValue().get();
+      pInstance =
+          subInstanceMap
+              .insert(
+                  {entry.arguments,
+                   std::make_unique<CompilerInstance>(
+                       invok.getDiagnosticOptions().DefaultLocalizationPath)})
+              .first->getValue()
+              .get();
       SmallVector<const char*, 4> args;
       llvm::cl::TokenizeGNUCommandLine(entry.arguments, saver, args);
       CompilerInvocation subInvok = invok;
