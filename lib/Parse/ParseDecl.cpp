@@ -6509,8 +6509,8 @@ BraceStmt *Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
   // But don't do this transformation during code completion, as the source
   // may be incomplete and the type mismatch in return statement will just
   // confuse the type checker.
-  if (BS->getNumElements() != 1 || (Body.hasCodeCompletion() &&
-                                    !isMemberCompletion(BS->getFirstElement())))
+  if (BS->getNumElements() != 1 ||
+      (Body.hasCodeCompletion() && !isMemberCompletion(BS->getFirstElement())))
     return BS;
 
   auto Element = BS->getFirstElement();
