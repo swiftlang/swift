@@ -447,6 +447,12 @@ static swift_childinfo_t convertChild(const TypeInfo *TI, unsigned Index) {
     FieldInfo = &(RecordTI->getFields()[Index]);
   } else {
     assert(false && "convertChild(TI): TI must be record or enum typeinfo");
+    return {
+      "unknown TypeInfo kind",
+      0,
+      SWIFT_UNKNOWN,
+      0,
+    };
   }
 
   return {
