@@ -183,7 +183,7 @@ TEST(ClangImporterTest, missingSubmodule) {
   INITIALIZE_LLVM();
   swift::SearchPathOptions searchPathOpts;
   swift::SourceManager sourceMgr;
-  swift::DiagnosticEngine diags(sourceMgr);
+  swift::DiagnosticEngine diags(sourceMgr, getDefaultLocalizationPath());
   std::unique_ptr<ASTContext> context(
       ASTContext::get(langOpts, typeckOpts, searchPathOpts, sourceMgr, diags));
   auto importer = ClangImporter::create(*context, options);
