@@ -40,6 +40,11 @@
 #include <fstream>
 #include <sstream>
 
+// This function isn't referenced outside its translation unit, but it
+// can't use the "static" keyword because its address is used for
+// getMainExecutable (since some platforms don't support taking the
+// address of main, and some platforms can't implement getMainExecutable
+// without being given the address of a function in the main executable).
 void anchorForGetMainExecutable() {}
 
 using namespace llvm::MachO;
