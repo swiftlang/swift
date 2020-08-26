@@ -2679,6 +2679,7 @@ public:
                                                /*FailabilityLoc=*/SourceLoc(),
                                                /*Throws=*/throws,
                                                /*ThrowsLoc=*/SourceLoc(),
+                                               /*ThrowsType=*/nullptr,
                                                /*BodyParams=*/nullptr,
                                                genericParams, parent);
     declOrOffset = ctor;

@@ -422,7 +422,7 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   auto initDecl =
     new (C) ConstructorDecl(name, SourceLoc(),
                             /*Failable=*/ true, /*FailabilityLoc=*/SourceLoc(),
-                            /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                            /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), /*ThrowsType=*/nullptr,
                             paramList,
                             /*GenericParams=*/nullptr, parentDC);
   

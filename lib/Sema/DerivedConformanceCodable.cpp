@@ -954,7 +954,7 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
   auto *initDecl =
       new (C) ConstructorDecl(name, SourceLoc(),
                               /*Failable=*/false,SourceLoc(),
-                              /*Throws=*/true, SourceLoc(), paramList,
+                              /*Throws=*/true, SourceLoc(), /*ThrowsType=*/nullptr, paramList,
                               /*GenericParams=*/nullptr, conformanceDC);
   initDecl->setImplicit();
   initDecl->setSynthesized();

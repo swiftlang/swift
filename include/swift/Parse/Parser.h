@@ -1359,6 +1359,7 @@ public:
                                       DefaultArgumentInfo &defaultArgs,
                                       SourceLoc &asyncLoc,
                                       SourceLoc &throws,
+                                      TypeRepr *&throwsType,
                                       bool &rethrows,
                                       TypeRepr *&retType);
 
@@ -1372,7 +1373,7 @@ public:
   /// \param rethrows If non-NULL, will also parse the 'rethrows' keyword in
   /// lieu of 'throws'.
   void parseAsyncThrows(
-      SourceLoc existingArrowLoc, SourceLoc &asyncLoc, SourceLoc &throwsLoc,
+      SourceLoc existingArrowLoc, SourceLoc &asyncLoc, SourceLoc &throwsLoc, TypeRepr *&throwsType,
       bool *rethrows);
 
   //===--------------------------------------------------------------------===//
@@ -1580,6 +1581,7 @@ public:
           ParameterList *&params,
           SourceLoc &asyncLoc,
           SourceLoc &throwsLoc,
+          TypeRepr *&throwsType,
           SourceLoc &arrowLoc,
           TypeExpr *&explicitResultType,
           SourceLoc &inLoc);

@@ -175,6 +175,7 @@ static FuncDecl *createFuncOrAccessor(ASTContext &ctx, SourceLoc funcLoc,
                                 StaticSpellingKind::None,
                                 throws,
                                 /*ThrowsLoc=*/SourceLoc(),
+                                /*ThrowsType=*/nullptr,
                                 /*GenericParams=*/nullptr,
                                 bodyParams,
                                 resultTy, dc, clangNode);
@@ -534,7 +535,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   auto *ctorDecl =
     new (C) ConstructorDecl(name, enumDecl->getLoc(),
                             /*Failable=*/true, /*FailabilityLoc=*/SourceLoc(),
-                            /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                            /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), /*ThrowsType=*/nullptr,
                             paramPL,
                             /*GenericParams=*/nullptr, enumDecl);
   ctorDecl->setImplicit();
@@ -607,6 +608,7 @@ static void makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
                      StaticSpellingKind::None,
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
+                     /*ThrowsType=*/nullptr,
                      /*GenericParams=*/nullptr, params,
                      rawTy, enumDecl);
   getterDecl->setImplicit();
@@ -683,6 +685,7 @@ static AccessorDecl *makeStructRawValueGetter(
                      StaticSpellingKind::None,
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
+                     /*ThrowsType=*/nullptr,
                      /*GenericParams=*/nullptr, params,
                      computedType, structDecl);
   getterDecl->setImplicit();
@@ -713,6 +716,7 @@ static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
                      StaticSpellingKind::None,
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
+                     /*ThrowsType=*/nullptr,
                      /*GenericParams=*/nullptr, params,
                      getterType, importedDecl, clangNode);
   getterDecl->setAccess(AccessLevel::Public);
@@ -746,6 +750,7 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
                      StaticSpellingKind::None,
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
+                     /*ThrowsType=*/nullptr,
                      /*GenericParams=*/nullptr, params,
                      voidTy, importedDecl, clangNode);
   setterDecl->setIsObjC(false);
@@ -1289,7 +1294,7 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
   auto constructor = new (context) ConstructorDecl(
       name, structDecl->getLoc(),
       /*Failable=*/false, /*FailabilityLoc=*/SourceLoc(),
-      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), emptyPL,
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), /*ThrowsType=*/nullptr, emptyPL,
       /*GenericParams=*/nullptr, structDecl);
 
   constructor->setAccess(AccessLevel::Public);
@@ -1415,7 +1420,7 @@ createValueConstructor(ClangImporter::Implementation &Impl,
   auto constructor = new (context) ConstructorDecl(
       name, structDecl->getLoc(),
       /*Failable=*/false, /*FailabilityLoc=*/SourceLoc(),
-      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), paramList,
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), /*ThrowsType=*/nullptr, paramList,
       /*GenericParams=*/nullptr, structDecl);
 
   constructor->setAccess(AccessLevel::Public);
@@ -1681,6 +1686,7 @@ buildSubscriptGetterDecl(ClangImporter::Implementation &Impl,
                      subscript->getStaticSpelling(),
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
+                     /*ThrowsType*/nullptr,
                      /*GenericParams=*/nullptr,
                      params, elementTy, dc,
                      getter->getClangNode());
@@ -1732,6 +1738,7 @@ buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
                      subscript->getStaticSpelling(),
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
+                     /*ThrowsType=*/nullptr,
                      /*GenericParams=*/nullptr,
                      valueIndicesPL,
                      TupleType::getEmpty(C), dc,
@@ -1917,6 +1924,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
                      StaticSpellingKind::None,
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
+                     /*ThrowsType=*/nullptr,
                      /*GenericParams=*/nullptr,
                      params,
                      stringTy, swiftDecl);
@@ -6002,7 +6010,7 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
   auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
       decl, AccessLevel::Public, name, /*NameLoc=*/SourceLoc(),
       failable, /*FailabilityLoc=*/SourceLoc(),
-      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), parameterList,
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), /*ThrowsType=*/nullptr, parameterList,
       /*GenericParams=*/nullptr, dc);
   result->setImplicitlyUnwrappedOptional(isIUO);
   result->getASTContext().evaluator.cacheOutput(InitKindRequest{result},
@@ -6487,7 +6495,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
       objcMethod, AccessLevel::Public, importedName.getDeclName(),
       /*NameLoc=*/SourceLoc(), failability, /*FailabilityLoc=*/SourceLoc(),
       /*Throws=*/importedName.getErrorInfo().hasValue(),
-      /*ThrowsLoc=*/SourceLoc(), bodyParams,
+      /*ThrowsLoc=*/SourceLoc(), /*ThrowsType=*/nullptr, bodyParams,
       /*GenericParams=*/nullptr, const_cast<DeclContext *>(dc));
 
   addObjCAttribute(result, selector);
@@ -8591,6 +8599,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                      StaticSpellingKind::None,
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
+                     /*ThrowsType=*/nullptr,
                      /*GenericParams=*/nullptr,
                      params, type, dc);
   func->setStatic(isStatic);

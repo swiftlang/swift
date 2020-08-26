@@ -773,6 +773,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
                                DefaultArgumentInfo &defaultArgs,
                                SourceLoc &asyncLoc,
                                SourceLoc &throwsLoc,
+                               TypeRepr *&throwsType,
                                bool &rethrows,
                                TypeRepr *&retType) {
   SyntaxParsingContext SigContext(SyntaxContext, SyntaxKind::FunctionSignature);
@@ -787,7 +788,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
 
   // Check for the 'async' and 'throws' keywords.
   rethrows = false;
-  parseAsyncThrows(SourceLoc(), asyncLoc, throwsLoc, &rethrows);
+  parseAsyncThrows(SourceLoc(), asyncLoc, throwsLoc, throwsType, &rethrows);
 
   // If there's a trailing arrow, parse the rest as the result type.
   SourceLoc arrowLoc;
@@ -802,7 +803,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
 
     // Check for 'throws' and 'rethrows' after the arrow, but
     // before the type, and correct it.
-    parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, &rethrows);
+    parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, throwsType, &rethrows);
 
     ParserResult<TypeRepr> ResultType =
         parseDeclResultType(diag::expected_type_function_result);
@@ -812,7 +813,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
       return Status;
 
     // Check for 'throws' and 'rethrows' after the type and correct it.
-    parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, &rethrows);
+    parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, throwsType, &rethrows);
   } else {
     // Otherwise, we leave retType null.
     retType = nullptr;
@@ -822,7 +823,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
 }
 
 void Parser::parseAsyncThrows(
-    SourceLoc existingArrowLoc, SourceLoc &asyncLoc, SourceLoc &throwsLoc,
+    SourceLoc existingArrowLoc, SourceLoc &asyncLoc, SourceLoc &throwsLoc, TypeRepr *&throwsType,
     bool *rethrows) {
   if (shouldParseExperimentalConcurrency() &&
       Tok.isContextualKeyword("async")) {
@@ -849,6 +850,13 @@ void Parser::parseAsyncThrows(
 
     StringRef keyword = Tok.getText();
     throwsLoc = consumeToken();
+    
+    if (!peekToken().isKeyword()) {
+      ParserResult<TypeRepr> result = parseType();
+      if (result.isNonNull()) {
+        throwsType = result.get();
+      }
+    }
 
     if (existingArrowLoc.isValid()) {
       diagnose(throwsLoc, diag::async_or_throws_in_wrong_position,
