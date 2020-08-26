@@ -4732,9 +4732,21 @@ namespace {
               KeyPathExpr::Component::forOptionalChain(objectTy, loc));
           break;
         }
-        case KeyPathExpr::Component::Kind::OptionalForce:
-          buildKeyPathOptionalForceComponent(resolvedComponents);
+        case KeyPathExpr::Component::Kind::OptionalForce: {
+          // Handle force optional when it is the first component e.g.
+          // \String?.!.count
+          if (resolvedComponents.empty()) {
+            auto loc = origComponent.getLoc();
+            auto objectTy = componentTy->getOptionalObjectType();
+            assert(objectTy);
+
+            resolvedComponents.push_back(
+                KeyPathExpr::Component::forOptionalForce(objectTy, loc));
+          } else {
+            buildKeyPathOptionalForceComponent(resolvedComponents);
+          }
           break;
+        }
         case KeyPathExpr::Component::Kind::Invalid: {
           auto component = origComponent;
           component.setComponentType(leafTy);
