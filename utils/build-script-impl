@@ -2980,12 +2980,13 @@ for host in "${ALL_HOSTS[@]}"; do
             #
             # Exclude shell scripts and static archives.
             # Exclude swift-api-digester dSYM to reduce debug toolchain size.
+            # Run sequentially -- dsymutil is multithreaded and can be memory intensive
             (cd "${host_symroot}" &&
              find ./"${CURRENT_PREFIX}" -perm -0111 -type f -print | \
                grep -v '.py$' | \
                grep -v '.a$' | \
                grep -v 'swift-api-digester' | \
-               xargs -n 1 -P ${BUILD_JOBS} ${dsymutil_path})
+               xargs -n 1 -P 1 ${dsymutil_path})
 
             # Strip executables, shared libraries and static libraries in
             # `host_install_destdir`.
