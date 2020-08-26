@@ -517,7 +517,7 @@ public:
       auto *newStorage = Storage::allocate(newCapacity);
       if (storage) {
         std::copy(storage->data(), storage->data() + count, newStorage->data());
-        newStorage->Count.store(count, std::memory_order_relaxed);
+        newStorage->Count.store(count, std::memory_order_release);
         FreeList.push_back(storage);
       }
       
