@@ -408,11 +408,10 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionType() {
       UsesGenerics ? FTy->getInvocationGenericSignature() : nullptr;
 
   return SILFunctionType::get(
-      GenericSig, ExtInfo, FTy->isAsync(), FTy->getCoroutineKind(),
-      FTy->getCalleeConvention(), InterfaceParams, InterfaceYields,
-      InterfaceResults, InterfaceErrorResult, FTy->getPatternSubstitutions(),
-      SubstitutionMap(), F->getModule().getASTContext(),
-      witnessMethodConformance);
+      GenericSig, ExtInfo, FTy->getCoroutineKind(), FTy->getCalleeConvention(),
+      InterfaceParams, InterfaceYields, InterfaceResults, InterfaceErrorResult,
+      FTy->getPatternSubstitutions(), SubstitutionMap(),
+      F->getModule().getASTContext(), witnessMethodConformance);
 }
 
 /// Compute what the function interface will look like based on the

@@ -16,7 +16,7 @@ bb0(%int : $Builtin.Int32):
   return %0 : $()
 }
 
-// CHECK: sil @async_test : $@async
+// CHECK: sil @async_test : $@convention(thin) @async
 sil @async_test : $@async () -> () {
 bb0:
   %0 = tuple ()

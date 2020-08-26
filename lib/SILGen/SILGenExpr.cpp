@@ -2750,7 +2750,6 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
     
     return SILFunctionType::get(genericSig,
       SILFunctionType::ExtInfo::getThin(),
-      /*isAsync*/ false, 
       SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
       params, {}, result, None,
@@ -2897,10 +2896,9 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
       params.push_back({C.getUnsafeRawPointerDecl()->getDeclaredInterfaceType()
                                                    ->getCanonicalType(),
                         ParameterConvention::Direct_Unowned});
-
+    
     return SILFunctionType::get(genericSig,
       SILFunctionType::ExtInfo::getThin(),
-      /*isAsync*/ false,
       SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
       params, {}, {}, None,
@@ -3083,7 +3081,6 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     
     auto signature = SILFunctionType::get(genericSig,
       SILFunctionType::ExtInfo::getThin(),
-      /*isAsync*/ false,
       SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
       params, /*yields*/ {}, results, None,
@@ -3258,7 +3255,6 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     
     auto signature = SILFunctionType::get(genericSig,
       SILFunctionType::ExtInfo::getThin(),
-      /*isAsync*/ false,
       SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
       params, /*yields*/ {}, results, None,

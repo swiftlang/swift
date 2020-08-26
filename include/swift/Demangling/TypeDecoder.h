@@ -238,48 +238,59 @@ class ImplFunctionTypeFlags {
   unsigned Rep : 3;
   unsigned Pseudogeneric : 1;
   unsigned Escaping : 1;
+  unsigned Async : 1;
   unsigned DifferentiabilityKind : 2;
 
 public:
   ImplFunctionTypeFlags()
-      : Rep(0), Pseudogeneric(0), Escaping(0), DifferentiabilityKind(0) {}
+      : Rep(0), Pseudogeneric(0), Escaping(0), Async(0),
+        DifferentiabilityKind(0) {}
 
   ImplFunctionTypeFlags(ImplFunctionRepresentation rep, bool pseudogeneric,
-                        bool noescape,
+                        bool noescape, bool async,
                         ImplFunctionDifferentiabilityKind diffKind)
       : Rep(unsigned(rep)), Pseudogeneric(pseudogeneric), Escaping(noescape),
-        DifferentiabilityKind(unsigned(diffKind)) {}
+        Async(async), DifferentiabilityKind(unsigned(diffKind)) {}
 
   ImplFunctionTypeFlags
   withRepresentation(ImplFunctionRepresentation rep) const {
     return ImplFunctionTypeFlags(
-        rep, Pseudogeneric, Escaping,
+        rep, Pseudogeneric, Escaping, Async,
+        ImplFunctionDifferentiabilityKind(DifferentiabilityKind));
+  }
+
+  ImplFunctionTypeFlags
+  withAsync() const {
+    return ImplFunctionTypeFlags(
+        ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, true,
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind));
   }
 
   ImplFunctionTypeFlags
   withEscaping() const {
     return ImplFunctionTypeFlags(
-        ImplFunctionRepresentation(Rep), Pseudogeneric, true,
+        ImplFunctionRepresentation(Rep), Pseudogeneric, true, Async,
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind));
   }
   
   ImplFunctionTypeFlags
   withPseudogeneric() const {
     return ImplFunctionTypeFlags(
-        ImplFunctionRepresentation(Rep), true, Escaping,
+        ImplFunctionRepresentation(Rep), true, Escaping, Async,
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind));
   }
 
   ImplFunctionTypeFlags
   withDifferentiabilityKind(ImplFunctionDifferentiabilityKind diffKind) const {
     return ImplFunctionTypeFlags(ImplFunctionRepresentation(Rep), Pseudogeneric,
-                                 Escaping, diffKind);
+                                 Escaping, Async, diffKind);
   }
 
   ImplFunctionRepresentation getRepresentation() const {
     return ImplFunctionRepresentation(Rep);
   }
+
+  bool isAsync() const { return Async; }
 
   bool isEscaping() const { return Escaping; }
 

@@ -5419,7 +5419,8 @@ public:
 
     auto extInfo =
         SILFunctionType::ExtInfoBuilder(*representation, pseudogeneric,
-                                        noescape, *diffKind, clangFunctionType)
+                                        noescape, async, *diffKind, 
+                                        clangFunctionType)
             .build();
 
     // Process the coroutine kind.
@@ -5568,8 +5569,7 @@ public:
     if (!patternSubsOrErr)
       return patternSubsOrErr.takeError();
 
-    return SILFunctionType::get(invocationSig, extInfo,
-                                async, coroutineKind.getValue(),
+    return SILFunctionType::get(invocationSig, extInfo, coroutineKind.getValue(),
                                 calleeConvention.getValue(),
                                 allParams, allYields, allResults,
                                 errorResult,

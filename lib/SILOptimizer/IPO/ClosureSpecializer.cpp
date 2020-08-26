@@ -670,7 +670,7 @@ ClosureSpecCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
 
   auto ClonedTy = SILFunctionType::get(
       ClosureUserFunTy->getInvocationGenericSignature(), ExtInfo,
-      ClosureUserFunTy->isAsync(), ClosureUserFunTy->getCoroutineKind(),
+      ClosureUserFunTy->getCoroutineKind(),
       ClosureUserFunTy->getCalleeConvention(), NewParameterInfoList,
       ClosureUserFunTy->getYields(), ClosureUserFunTy->getResults(),
       ClosureUserFunTy->getOptionalErrorResult(),
