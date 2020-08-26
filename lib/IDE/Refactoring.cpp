@@ -778,11 +778,13 @@ class TokenBasedRefactoringAction : public RefactoringAction {
 protected:
   ResolvedCursorInfo CursorInfo;
 public:
+  std::string DefaultLocalizationPath;
   TokenBasedRefactoringAction(ModuleDecl *MD, RefactoringOptions &Opts,
                               SourceEditConsumer &EditConsumer,
                               DiagnosticConsumer &DiagConsumer,
                               const DiagnosticOptions &DiagOpts)
-      : RefactoringAction(MD, Opts, EditConsumer, DiagConsumer, DiagOpts) {
+      : RefactoringAction(MD, Opts, EditConsumer, DiagConsumer, DiagOpts),
+        DefaultLocalizationPath(DiagOpts.DefaultLocalizationPath) {
     // Resolve the sema token and save it for later use.
     CursorInfo =
         evaluateOrDefault(TheFile->getASTContext().evaluator,
@@ -1182,7 +1184,8 @@ getNewFuncInsertLoc(DeclContext *DC, DeclContext*& InsertToContext) {
 
 static std::vector<NoteRegion>
 getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
-                    bool IsFunctionLike = false, bool IsNonProtocolType = false) {
+                  std::string DefaultLocalizationPath,
+                  bool IsFunctionLike = false, bool IsNonProtocolType = false) {
   auto InputBuffer = llvm::MemoryBuffer::getMemBufferCopy(SourceText,"<extract>");
 
   CompilerInvocation Invocation{};
@@ -1192,8 +1195,8 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
   Invocation.getFrontendOptions().ModuleName = "extract";
   Invocation.getLangOptions().DisablePoundIfEvaluation = true;
 
-  auto Instance = std::make_unique<swift::CompilerInstance>(
-      Invocation.getDiagnosticOptions().DefaultLocalizationPath);
+  auto Instance =
+      std::make_unique<swift::CompilerInstance>(DefaultLocalizationPath);
   if (Instance->setup(Invocation))
     llvm_unreachable("Failed setup");
 
@@ -1364,14 +1367,14 @@ bool RefactoringActionExtractFunction::performChange() {
   ExtractedFuncName += ")";
 
   StringRef DeclStr(Buffer.begin() + FuncBegin, FuncEnd - FuncBegin);
-  auto NotableFuncRegions = getNotableRegions(DeclStr, FuncNameOffset,
-                                              ExtractedFuncName,
-                                              /*IsFunctionLike=*/true);
+  auto NotableFuncRegions = getNotableRegions(
+      DeclStr, FuncNameOffset, ExtractedFuncName, DefaultLocalizationPath,
+      /*IsFunctionLike=*/true);
 
   StringRef CallStr(Buffer.begin() + ReplaceBegin, ReplaceEnd - ReplaceBegin);
-  auto NotableCallRegions = getNotableRegions(CallStr, CallNameOffset,
-                                              ExtractedFuncName,
-                                              /*IsFunctionLike=*/true);
+  auto NotableCallRegions = getNotableRegions(
+      CallStr, CallNameOffset, ExtractedFuncName, DefaultLocalizationPath,
+      /*IsFunctionLike=*/true);
 
   // Insert the new function's declaration.
   EditConsumer.accept(SM, InsertLoc, DeclStr, NotableFuncRegions);
