@@ -107,7 +107,6 @@ SILType SILBuilder::getPartialApplyResultType(
 
   auto appliedFnType = SILFunctionType::get(nullptr,
                                             extInfo,
-                                            FTI->isAsync(),
                                             FTI->getCoroutineKind(),
                                             calleeConvention,
                                             newParams,

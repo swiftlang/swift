@@ -3003,7 +3003,6 @@ public:
 
     auto fnTy = SILFunctionType::get(nullptr,
                                      methodTy->getExtInfo(),
-                                     methodTy->isAsync(),
                                      methodTy->getCoroutineKind(),
                                      methodTy->getCalleeConvention(),
                                      dynParams,

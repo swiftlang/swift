@@ -94,7 +94,6 @@ CanSILFunctionType SILFunctionType::getUnsubstitutedType(SILModule &M) const {
                                    : CanGenericSignature();
   return SILFunctionType::get(signature,
                               getExtInfo(),
-                              isAsync(),
                               getCoroutineKind(),
                               getCalleeConvention(),
                               params, yields, results, errorResult,
@@ -288,11 +287,11 @@ SILFunctionType::getWithDifferentiability(DifferentiabilityKind kind,
   }
   auto newExtInfo =
       getExtInfo().intoBuilder().withDifferentiabilityKind(kind).build();
-  return get(getInvocationGenericSignature(), newExtInfo, isAsync(),
-             getCoroutineKind(), getCalleeConvention(), newParameters,
-             getYields(), newResults, getOptionalErrorResult(),
-             getPatternSubstitutions(), getInvocationSubstitutions(),
-             getASTContext(), getWitnessMethodConformanceOrInvalid());
+  return get(getInvocationGenericSignature(), newExtInfo, getCoroutineKind(),
+             getCalleeConvention(), newParameters, getYields(), newResults,
+             getOptionalErrorResult(), getPatternSubstitutions(),
+             getInvocationSubstitutions(), getASTContext(),
+             getWitnessMethodConformanceOrInvalid());
 }
 
 CanSILFunctionType SILFunctionType::getWithoutDifferentiability() {
@@ -312,9 +311,9 @@ CanSILFunctionType SILFunctionType::getWithoutDifferentiability() {
     newResults.push_back(result.getWithDifferentiability(
         SILResultDifferentiability::DifferentiableOrNotApplicable));
   return SILFunctionType::get(
-      getInvocationGenericSignature(), nondiffExtInfo, isAsync(),
-      getCoroutineKind(), getCalleeConvention(), newParams, getYields(),
-      newResults, getOptionalErrorResult(), getPatternSubstitutions(),
+      getInvocationGenericSignature(), nondiffExtInfo, getCoroutineKind(),
+      getCalleeConvention(), newParams, getYields(), newResults,
+      getOptionalErrorResult(), getPatternSubstitutions(),
       getInvocationSubstitutions(), getASTContext());
 }
 
@@ -503,9 +502,9 @@ static CanSILFunctionType getAutoDiffDifferentialType(
                              llvm::makeArrayRef(substConformances));
   }
   return SILFunctionType::get(
-      GenericSignature(), SILFunctionType::ExtInfo(), /*isAsync*/ false,
-      SILCoroutineKind::None, ParameterConvention::Direct_Guaranteed,
-      differentialParams, {}, differentialResults, None, substitutions,
+      GenericSignature(), SILFunctionType::ExtInfo(), SILCoroutineKind::None,
+      ParameterConvention::Direct_Guaranteed, differentialParams, {},
+      differentialResults, None, substitutions,
       /*invocationSubstitutions*/ SubstitutionMap(), ctx);
 }
 
@@ -682,9 +681,9 @@ static CanSILFunctionType getAutoDiffPullbackType(
                              llvm::makeArrayRef(substConformances));
   }
   return SILFunctionType::get(
-      GenericSignature(), SILFunctionType::ExtInfo(), /*isAsync*/ false,
-      SILCoroutineKind::None, ParameterConvention::Direct_Guaranteed,
-      pullbackParams, {}, pullbackResults, None, substitutions,
+      GenericSignature(), SILFunctionType::ExtInfo(), SILCoroutineKind::None,
+      ParameterConvention::Direct_Guaranteed, pullbackParams, {},
+      pullbackResults, None, substitutions,
       /*invocationSubstitutions*/ SubstitutionMap(), ctx);
 }
 
@@ -738,7 +737,7 @@ static SILFunctionType *getConstrainedAutoDiffOriginalFunctionType(
       constrainedInvocationGenSig->areAllParamsConcrete()
           ? GenericSignature()
           : constrainedInvocationGenSig,
-      original->getExtInfo(), original->isAsync(), original->getCoroutineKind(),
+      original->getExtInfo(), original->getCoroutineKind(),
       original->getCalleeConvention(), newParameters, original->getYields(),
       newResults, original->getOptionalErrorResult(),
       /*patternSubstitutions*/ SubstitutionMap(),
@@ -829,7 +828,6 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   // cache and return.
   cachedResult = SILFunctionType::get(
       constrainedOriginalFnTy->getSubstGenericSignature(), extInfo,
-      constrainedOriginalFnTy->isAsync(),
       constrainedOriginalFnTy->getCoroutineKind(),
       constrainedOriginalFnTy->getCalleeConvention(), newParameters,
       constrainedOriginalFnTy->getYields(), newResults,
@@ -915,9 +913,9 @@ CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
   for (auto &res : getResults())
     newParameters.push_back(getParameterInfoForOriginalResult(res));
   return SILFunctionType::get(
-      getInvocationGenericSignature(), getExtInfo(), isAsync(),
-      getCoroutineKind(), getCalleeConvention(), newParameters, getYields(),
-      newResults, getOptionalErrorResult(), getPatternSubstitutions(),
+      getInvocationGenericSignature(), getExtInfo(), getCoroutineKind(),
+      getCalleeConvention(), newParameters, getYields(), newResults,
+      getOptionalErrorResult(), getPatternSubstitutions(),
       /*invocationSubstitutions*/ {}, getASTContext());
 }
 
@@ -991,8 +989,7 @@ Lowering::adjustFunctionType(CanSILFunctionType type,
     return type;
 
   return SILFunctionType::get(type->getInvocationGenericSignature(),
-                              extInfo, type->isAsync(),
-                              type->getCoroutineKind(), callee,
+                              extInfo, type->getCoroutineKind(), callee,
                               type->getParameters(), type->getYields(),
                               type->getResults(),
                               type->getOptionalErrorResult(),
@@ -1019,9 +1016,9 @@ CanSILFunctionType SILFunctionType::getWithExtInfo(ExtInfo newExt) {
             : Lowering::DefaultThickCalleeConvention)
        : ParameterConvention::Direct_Unowned);
 
-  return get(getInvocationGenericSignature(), newExt, isAsync(),
-             getCoroutineKind(), calleeConvention, getParameters(), getYields(),
-             getResults(), getOptionalErrorResult(), getPatternSubstitutions(),
+  return get(getInvocationGenericSignature(), newExt, getCoroutineKind(),
+             calleeConvention, getParameters(), getYields(), getResults(),
+             getOptionalErrorResult(), getPatternSubstitutions(),
              getInvocationSubstitutions(), getASTContext(),
              getWitnessMethodConformanceOrInvalid());
 }
@@ -2169,8 +2166,7 @@ static CanSILFunctionType getSILFunctionType(
     }
   }
   
-  return SILFunctionType::get(genericSig, silExtInfo,
-                              substFnInterfaceType->isAsync(), coroutineKind,
+  return SILFunctionType::get(genericSig, silExtInfo, coroutineKind,
                               calleeConvention, inputs, yields,
                               results, errorResult,
                               substitutions, SubstitutionMap(),
@@ -3760,7 +3756,7 @@ public:
                         ? origType->getInvocationGenericSignature()
                         : nullptr;
 
-    return SILFunctionType::get(genericSig, extInfo, origType->isAsync(),
+    return SILFunctionType::get(genericSig, extInfo,
                                 origType->getCoroutineKind(),
                                 origType->getCalleeConvention(), substParams,
                                 substYields, substResults, substErrorResult,

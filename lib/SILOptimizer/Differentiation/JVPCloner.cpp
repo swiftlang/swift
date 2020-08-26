@@ -1587,10 +1587,10 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   auto *diffGenericEnv =
       diffGenericSig ? diffGenericSig->getGenericEnvironment() : nullptr;
   auto diffType = SILFunctionType::get(
-      diffGenericSig, origTy->getExtInfo(), origTy->isAsync(),
-      origTy->getCoroutineKind(), origTy->getCalleeConvention(), dfParams, {},
-      dfResults, None, origTy->getPatternSubstitutions(),
-      origTy->getInvocationSubstitutions(), original->getASTContext());
+      diffGenericSig, origTy->getExtInfo(), origTy->getCoroutineKind(),
+      origTy->getCalleeConvention(), dfParams, {}, dfResults, None,
+      origTy->getPatternSubstitutions(), origTy->getInvocationSubstitutions(),
+      original->getASTContext());
 
   SILOptFunctionBuilder fb(context.getTransform());
   auto linkage = jvp->isSerialized() ? SILLinkage::Public : SILLinkage::Hidden;

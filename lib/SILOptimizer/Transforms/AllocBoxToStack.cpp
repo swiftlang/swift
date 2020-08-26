@@ -699,9 +699,8 @@ SILFunction *PromotedParamCloner::initCloned(SILOptFunctionBuilder &FuncBuilder,
   // the parameters promoted.
   auto ClonedTy = SILFunctionType::get(
       OrigFTI->getInvocationGenericSignature(), OrigFTI->getExtInfo(),
-      OrigFTI->isAsync(), OrigFTI->getCoroutineKind(),
-      OrigFTI->getCalleeConvention(), ClonedInterfaceArgTys,
-      OrigFTI->getYields(), OrigFTI->getResults(),
+      OrigFTI->getCoroutineKind(), OrigFTI->getCalleeConvention(),
+      ClonedInterfaceArgTys, OrigFTI->getYields(), OrigFTI->getResults(),
       OrigFTI->getOptionalErrorResult(), OrigFTI->getPatternSubstitutions(),
       OrigFTI->getInvocationSubstitutions(), M.getASTContext(),
       OrigFTI->getWitnessMethodConformanceOrInvalid());

@@ -4151,6 +4151,9 @@ public:
     if (info.isNoEscape()) {
       Printer.printSimpleAttr("@noescape") << " ";
     }
+    if (info.isAsync()) {
+      Printer.printSimpleAttr("@async") << " ";
+    }
   }
 
   void visitAnyFunctionTypeParams(ArrayRef<AnyFunctionType::Param> Params,
@@ -4295,7 +4298,6 @@ public:
 
   void visitSILFunctionType(SILFunctionType *T) {
     printSILCoroutineKind(T->getCoroutineKind());
-    printSILAsyncAttr(T->isAsync());
     printFunctionExtInfo(T->getASTContext(), T->getExtInfo(),
                          T->getWitnessMethodConformanceOrInvalid());
     printCalleeConvention(T->getCalleeConvention());
