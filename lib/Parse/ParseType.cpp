@@ -421,6 +421,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   // Don't consume 'throws', if the next token is not '->' or 'async', so we
   // can emit a more useful diagnostic when parsing a function decl.
   SourceLoc throwsLoc;
+  TypeRepr *throwsType;
   if (Tok.isAny(tok::kw_throws, tok::kw_rethrows, tok::kw_throw, tok::kw_try) &&
       (peekToken().is(tok::arrow) ||
        (shouldParseExperimentalConcurrency() &&
@@ -434,6 +435,10 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
         .fixItReplace(Tok.getLoc(), "throws");
     }
     throwsLoc = consumeToken();
+    // The next token is not a keyword
+    if (!peekToken().isKeyword()) {
+      throwsType = tyR;
+    }
 
     // 'async' must preceed 'throws'; accept this but complain.
     if (shouldParseExperimentalConcurrency() &&
@@ -447,11 +452,17 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   }
 
   if (Tok.is(tok::arrow)) {
+    ParserResult<TypeRepr> ty =
+      parseTypeSimpleOrComposition(MessageID, HandleCodeCompletion);
+    if (ty.isNull())
+      return ty;
+    auto tyR = ty.get();
+    auto status = ParserStatus(ty);
     // Handle type-function if we have an arrow.
     SourceLoc arrowLoc = consumeToken();
 
     // Handle async/throws in the wrong place.
-    parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, /*rethrows=*/nullptr);
+    parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, throwsType, /*rethrows=*/nullptr);
 
     ParserResult<TypeRepr> SecondHalf =
         parseType(diag::expected_type_function_result);

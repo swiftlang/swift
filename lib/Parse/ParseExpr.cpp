@@ -122,11 +122,11 @@ ParserResult<Expr> Parser::parseExprAs() {
 /// parseExprArrow
 ///
 ///   expr-arrow:
-///     'async'? 'throws'? '->'
+///     'async'? 'throws'?  type? '->'
 ParserResult<Expr> Parser::parseExprArrow() {
   SourceLoc asyncLoc, throwsLoc, arrowLoc;
-
-  parseAsyncThrows(SourceLoc(), asyncLoc, throwsLoc, /*rethrows=*/nullptr);
+  TypeRepr *throwsType;
+  parseAsyncThrows(SourceLoc(), asyncLoc, throwsLoc, throwsType, /*rethrows=*/nullptr);
 
   if (Tok.isNot(tok::arrow)) {
     assert(throwsLoc.isValid() || asyncLoc.isValid());
@@ -138,7 +138,7 @@ ParserResult<Expr> Parser::parseExprArrow() {
 
   arrowLoc = consumeToken(tok::arrow);
 
-  parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, /*rethrows=*/nullptr);
+  parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, throwsType, /*rethrows=*/nullptr);
 
   auto arrow = new (Context) ArrowExpr(asyncLoc, throwsLoc, arrowLoc);
   return makeParserResult(arrow);
@@ -2432,7 +2432,7 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
                                SmallVectorImpl<CaptureListEntry> &captureList,
                                VarDecl *&capturedSelfDecl,
                                ParameterList *&params,
-                               SourceLoc &asyncLoc, SourceLoc &throwsLoc,
+                               SourceLoc &asyncLoc, SourceLoc &throwsLoc, TypeRepr *&throwsType,
                                SourceLoc &arrowLoc,
                                TypeExpr *&explicitResultType, SourceLoc &inLoc){
   // Clear out result parameters.
@@ -2703,7 +2703,7 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
     }
 
     bool rethrows = false;
-    parseAsyncThrows(SourceLoc(), asyncLoc, throwsLoc, &rethrows);
+    parseAsyncThrows(SourceLoc(), asyncLoc, throwsLoc, throwsType, &rethrows);
     if (rethrows) {
       diagnose(throwsLoc, diag::rethrowing_function_type)
         .fixItReplace(throwsLoc, "throws");
@@ -2823,11 +2823,12 @@ ParserResult<Expr> Parser::parseExprClosure() {
   ParameterList *params = nullptr;
   SourceLoc asyncLoc;
   SourceLoc throwsLoc;
+  TypeRepr *throwsType;
   SourceLoc arrowLoc;
   TypeExpr *explicitResultType;
   SourceLoc inLoc;
   parseClosureSignatureIfPresent(
-      bracketRange, captureList, capturedSelfDecl, params, asyncLoc, throwsLoc,
+      bracketRange, captureList, capturedSelfDecl, params, asyncLoc, throwsLoc, throwsType,
       arrowLoc, explicitResultType, inLoc);
 
   // If the closure was created in the context of an array type signature's
