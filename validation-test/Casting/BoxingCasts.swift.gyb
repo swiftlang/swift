@@ -20,13 +20,10 @@
 // RUN: %target-codesign %t/a.swift5.Onone.out
 // RUN: %line-directive %t/BoxingCasts.swift -- %target-run %t/a.swift5.Onone.out
 //
-// XXX FIXME XXX Optimized builds break a lot of casts.
+// XXX FIXME XXX Optimized builds currently break a lot of casts
+// XXX Note the above RUN directives always build and run non-optimized
 //
 // REQUIRES: executable_test
-// XFAIL: swift_test_mode_optimize
-// XFAIL: swift_test_mode_optimize_size
-
-// TODO: Fix the optimized builds and remove the XFAIL above.
 
 import StdlibUnittest
 #if _runtime(_ObjC)
