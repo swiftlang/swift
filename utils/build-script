@@ -942,6 +942,9 @@ class BuildScriptInvocation(object):
             for product_class in impl_product_classes:
                 self._execute_install_action(host_target, product_class)
 
+        # Core Lipo...
+        self._execute_merged_host_lipo_core_action()
+
         # Non-build-script-impl products...
         # Note: currently only supports building for the host.
         for host_target in [self.args.host_target]:
@@ -1009,6 +1012,9 @@ class BuildScriptInvocation(object):
 
     def _execute_merged_host_lipo_action(self):
         self._execute_action("merged-hosts-lipo")
+
+    def _execute_merged_host_lipo_core_action(self):
+        self._execute_action("merged-hosts-lipo-core")
 
     def _execute_action(self, action_name):
         shell.call_without_sleeping(
