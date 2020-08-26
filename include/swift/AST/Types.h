@@ -148,7 +148,7 @@ public:
     /// This type contains an OpaqueTypeArchetype.
     HasOpaqueArchetype   = 0x400,
 
-    /// This type constains a type hole.
+    /// This type contains a type hole.
     HasTypeHole          = 0x800,
 
     Last_Property = HasTypeHole
