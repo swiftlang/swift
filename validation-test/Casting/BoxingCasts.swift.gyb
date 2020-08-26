@@ -20,8 +20,12 @@
 // RUN: %target-codesign %t/a.swift5.Onone.out
 // RUN: %line-directive %t/BoxingCasts.swift -- %target-run %t/a.swift5.Onone.out
 //
-// XXX FIXME XXX Optimized builds currently break a lot of casts
-// XXX Note the above RUN directives always build and run non-optimized
+// Note: The RUN directives above override the default test optimizations.
+// This test is deliberately run non-optimized in order to verify the
+// behavior of runtime methods that may not be called for optimized casts.
+//
+// XXX FIXME XXX TODO XXX  _Also_ build this with optimizations in order to
+// verify compiler behaviors.
 //
 // REQUIRES: executable_test
 
