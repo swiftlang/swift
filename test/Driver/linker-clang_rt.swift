@@ -6,6 +6,8 @@
 
 // RUN: rm -rf %t
 // RUN: %empty-directory(%t/bin)
+// RUN: %empty-directory(%t/share/swift/diagnostics)
+// RUN: cp -a %S/Inputs/diagnostics/. %t/share/swift/diagnostics
 // RUN: %hardlink-or-copy(from: %swift_frontend_plain, to: %t/bin/swiftc)
 // RUN: %empty-directory(%t/lib/swift/clang/lib/darwin/)
 

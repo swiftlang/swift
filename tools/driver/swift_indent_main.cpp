@@ -49,11 +49,14 @@ private:
       llvm::errs() << "\n";
     }
   } DiagConsumer;
+  std::string DefaultLocalizationPath;
 
 public:
-  FormatterDocument(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
+  FormatterDocument(std::unique_ptr<llvm::MemoryBuffer> Buffer, std::string DefaultLocalizationPath) : 
+  DefaultLocalizationPath(DefaultLocalizationPath) {
     // Formatting logic requires tokens on source file.
     CompInv.getLangOptions().CollectParsedToken = true;
+    CompInv.getDiagnosticOptions().DefaultLocalizationPath = DefaultLocalizationPath;
     updateCode(std::move(Buffer));
   }
 
@@ -167,7 +170,7 @@ public:
   }
 
   /// Formats a filename and returns false if successful, true otherwise.
-  bool format(StringRef Filename, DiagnosticEngine &Diags) {
+  bool format(StringRef Filename, DiagnosticEngine &Diags, std::string DefaultLocalizationPath) {
     auto ErrOrBuf = llvm::MemoryBuffer::getFileOrSTDIN(Filename);
     if (!ErrOrBuf) {
       Diags.diagnose(SourceLoc(), diag::error_no_such_file_or_directory,
@@ -179,7 +182,7 @@ public:
       // Assume empty files are formatted successfully.
       return false;
     }
-    FormatterDocument Doc(std::move(Code));
+    FormatterDocument Doc(std::move(Code), DefaultLocalizationPath);
     if (LineRanges.empty()) {
       LineRanges.push_back("1:" + std::to_string(UINT_MAX));
     }
@@ -262,9 +265,9 @@ int swift_indent_main(ArrayRef<const char *> Args, const char *Argv0,
   unsigned NumInputFiles = InputFiles.size();
   if (NumInputFiles == 0) {
     // Read source code from standard input.
-    Invocation.format("-", Diags);
+    Invocation.format("-", Diags, DefaultLocalizationPath);
   } else if (NumInputFiles == 1) {
-    Invocation.format(InputFiles[0], Diags);
+    Invocation.format(InputFiles[0], Diags, DefaultLocalizationPath);
   } else {
     if (!Invocation.getLineRanges().empty()) {
       // We don't support formatting file ranges for multiple files.
@@ -273,7 +276,7 @@ int swift_indent_main(ArrayRef<const char *> Args, const char *Argv0,
       return EXIT_FAILURE;
     }
     for (unsigned i = 0; i < NumInputFiles; ++i)
-      Invocation.format(InputFiles[i], Diags);
+      Invocation.format(InputFiles[i], Diags, DefaultLocalizationPath);
   }
 
   return EXIT_SUCCESS;

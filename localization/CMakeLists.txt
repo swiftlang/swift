@@ -9,6 +9,11 @@ add_custom_command(TARGET diagnostic-database
       --output-directory ${CMAKE_BINARY_DIR}/share/swift/diagnostics/
 )
 
+add_custom_command(TARGET diagnostic-database
+  COMMAND
+    ${CMAKE_COMMAND} -E copy_directory ${CMAKE_BINARY_DIR}/share/swift/diagnostics/ ${CMAKE_CURRENT_SOURCE_DIR}/../test/Driver/Inputs/diagnostics/
+)
+
 add_dependencies(swift-frontend diagnostic-database)
 add_dependencies(diagnostic-database swift-serialize-diagnostics)
 

@@ -16,6 +16,8 @@
 // RUN: %t/usr/bin/swift -### | %FileCheck -check-prefix=LLDB %s
 
 // RUN: %empty-directory(%t/Toolchains/Test.xctoolchain/usr/bin)
+// RUN: %empty-directory(%t/Toolchains/Test.xctoolchain/usr/share/swift/diagnostics)
+// RUN: cp -a %S/Inputs/diagnostics/. %t/Toolchains/Test.xctoolchain/usr/share/swift/diagnostics
 // RUN: mv %t/usr/bin/swift %t/Toolchains/Test.xctoolchain/usr/bin/swift
 // RUN: %t/Toolchains/Test.xctoolchain/usr/bin/swift -repl -### | %FileCheck -check-prefix=LLDB %s
 

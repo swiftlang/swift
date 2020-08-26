@@ -31,6 +31,9 @@ tags
 #==============================================================================#
 # Directories to ignore (do not add trailing '/'s, they skip symlinks).
 #==============================================================================#
+# Copied diagnostics files in test/Driver/diagnositcs
+test/Driver/Inputs/diagnostics
+
 # Generated docs
 docs/_build
 
