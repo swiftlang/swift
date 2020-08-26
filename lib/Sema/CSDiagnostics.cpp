@@ -17,8 +17,10 @@
 #include "CSDiagnostics.h"
 #include "ConstraintSystem.h"
 #include "MiscDiagnostics.h"
+#include "TypeCheckProtocol.h"
 #include "TypoCorrection.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
@@ -2768,9 +2770,11 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
 
   // Let's build a list of protocols that the context does not conform to.
   SmallVector<std::string, 8> missingProtoTypeStrings;
+  SmallVector<ProtocolDecl *, 8> missingProtocols;
   for (auto protocol : layout.getProtocols()) {
     if (!TypeChecker::conformsToProtocol(fromType, protocol->getDecl(), getDC())) {
       missingProtoTypeStrings.push_back(protocol->getString());
+      missingProtocols.push_back(protocol->getDecl());
     }
   }
 
@@ -2792,8 +2796,6 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
 
   // Emit a diagnostic to inform the user that they need to conform to the
   // missing protocols.
-  //
-  // TODO: Maybe also insert the requirement stubs?
   auto conformanceDiag =
       emitDiagnostic(diag::assign_protocol_conformance_fix_it, unwrappedToType,
                      nominal->getDescriptiveKind(), fromType);
@@ -2806,6 +2808,35 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
     auto nameEndLoc = Lexer::getLocForEndOfToken(getASTContext().SourceMgr,
                                                  nominal->getNameLoc());
     conformanceDiag.fixItInsert(nameEndLoc, ": " + protoString);
+  }
+
+  // Emit fix-its to insert requirement stubs if we're in editor mode.
+  if (!getASTContext().LangOpts.DiagnosticsEditorMode) {
+    return true;
+  }
+
+  {
+    llvm::SmallString<128> Text;
+    llvm::raw_svector_ostream SS(Text);
+    llvm::SetVector<ValueDecl *> missingWitnesses;
+    for (auto protocol : missingProtocols) {
+      auto conformance = NormalProtocolConformance(
+          nominal->getDeclaredType(), protocol, SourceLoc(), nominal,
+          ProtocolConformanceState::Incomplete);
+      ConformanceChecker checker(getASTContext(), &conformance,
+                                 missingWitnesses);
+      checker.resolveValueWitnesses();
+      checker.resolveTypeWitnesses();
+    }
+
+    for (auto decl : missingWitnesses) {
+      swift::printRequirementStub(decl, nominal, nominal->getDeclaredType(),
+                                  nominal->getStartLoc(), SS);
+    }
+
+    if (!Text.empty()) {
+      conformanceDiag.fixItInsertAfter(nominal->getBraces().Start, Text.str());
+    }
   }
 
   return true;
