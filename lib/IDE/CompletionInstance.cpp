@@ -491,8 +491,6 @@ bool CompletionInstance::performCachedOperationIfPossible(
   }
 
   CachedReuseCount += 1;
-  cacheDependencyHashIfNeeded(CI, CurrentModule, SM.getCodeCompletionBufferID(),
-                              InMemoryDependencyHash);
 
   return true;
 }
