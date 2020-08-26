@@ -99,16 +99,14 @@ public func runBoth(_ pair: DaemonKit.DaemonPair) {
 // RUN: %target-swift-frontend %s -typecheck -DTestDaemon -DV1 -module-name TestDaemonV1 -emit-loaded-module-trace-path %t/TestDaemonV1.trace.json -I %t/include
 // RUN: %FileCheck %s --check-prefix=TESTDAEMON < %t/TestDaemonV1.trace.json
 
-// FIXME: rdar://67704000
-// RUN: not --crash %target-swift-frontend %s -typecheck -DTestDaemon -DV2 -module-name TestDaemonV2 -emit-loaded-module-trace-path %t/TestDaemonV2.trace.json -I %t/include
-// SKIP: %FileCheck %s --check-prefix=TESTDAEMON < %t/TestDaemonV2.trace.json
+// RUN: %target-swift-frontend %s -typecheck -DTestDaemon -DV2 -module-name TestDaemonV2 -emit-loaded-module-trace-path %t/TestDaemonV2.trace.json -I %t/include
+// RUN: %FileCheck %s --check-prefix=TESTDAEMON < %t/TestDaemonV2.trace.json
 
 // RUN: %target-swift-frontend %s -typecheck -DTestDaemon -DV3 -module-name TestDaemonV3 -emit-loaded-module-trace-path %t/TestDaemonV3.trace.json -I %t/include
 // RUN: %FileCheck %s --check-prefix=TESTDAEMON < %t/TestDaemonV3.trace.json
 
-// FIXME: rdar://67704000
-// RUN: not --crash %target-swift-frontend %s -typecheck -DTestDaemon -DV4 -module-name TestDaemonV4 -emit-loaded-module-trace-path %t/TestDaemonV4.trace.json -I %t/include
-// SKIP: %FileCheck %s --check-prefix=TESTDAEMON < %t/TestDaemonV4.trace.json
+// RUN: %target-swift-frontend %s -typecheck -DTestDaemon -DV4 -module-name TestDaemonV4 -emit-loaded-module-trace-path %t/TestDaemonV4.trace.json -I %t/include
+// RUN: %FileCheck %s --check-prefix=TESTDAEMON < %t/TestDaemonV4.trace.json
 
 #if TestDaemon
   #if V1
