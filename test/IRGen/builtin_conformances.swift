@@ -74,15 +74,15 @@ public func hashValue<T: Hashable>(for instance: T) -> Int {
 
 public func useHashable<T: Hashable>(_ thing: T) -> Int {
   // CHECK: [[USE_HASHABLE_WT:%.*]] = call i8** @swift_getWitnessTable(%swift.protocol_conformance_descriptor* @_swift_tupleHashable_conf, %swift.type* {{%.*}}, i8*** {{%.*}})
-  // CHECK-NEXT: {{%.*}} = call swiftcc i64 {{.*}}(%swift.opaque* noalias nocapture {{%.*}}, %swift.type* {{%.*}}, i8** [[USE_HASHABLE_WT]])
+  // CHECK-NEXT: {{%.*}} = call swiftcc i{{.*}} {{.*}}(%swift.opaque* noalias nocapture {{%.*}}, %swift.type* {{%.*}}, i8** [[USE_HASHABLE_WT]])
   hashValue(for: (thing, thing))
 }
 
 public func testTupleHashable() {
   // CHECK: [[TEST_TUPLE_HASHABLE_WT1:%.*]] = call i8** @swift_getWitnessTable(%swift.protocol_conformance_descriptor* @_swift_tupleHashable_conf, %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @"$sytN", i32 0, i32 1), i8*** undef)
-  // CHECK: {{%.*}} = call swiftcc i64 {{.*}}(%swift.opaque* noalias nocapture undef, %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @"$sytN", i32 0, i32 1), i8** [[TEST_TUPLE_HASHABLE_WT1]])
+  // CHECK: {{%.*}} = call swiftcc i{{.*}} {{.*}}(%swift.opaque* noalias nocapture undef, %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @"$sytN", i32 0, i32 1), i8** [[TEST_TUPLE_HASHABLE_WT1]])
   let _ = hashValue(for: ())
 
-  // CHECK: {{%.*}} = call swiftcc i64 {{.*}}(%swift.type* {{%.*}}, i8** [[TEST_TUPLE_HASHABLE_WT1]], {{%.*}} noalias nocapture swiftself undef)
+  // CHECK: {{%.*}} = call swiftcc i{{.*}} {{.*}}(%swift.type* {{%.*}}, i8** [[TEST_TUPLE_HASHABLE_WT1]], {{%.*}} noalias nocapture swiftself undef)
   let _ = Wrapper(value: ()).hashValue
 }

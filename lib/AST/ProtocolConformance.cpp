@@ -1170,9 +1170,24 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
                                    const_cast<ProtocolConformance *>(this),
                                    subMap);
   }
-  case ProtocolConformanceKind::Self:
-  case ProtocolConformanceKind::Builtin:
+  case ProtocolConformanceKind::Self: {
     return const_cast<ProtocolConformance*>(this);
+  }
+  case ProtocolConformanceKind::Builtin: {
+    auto origType = getType();
+    if (!origType->hasTypeParameter() &&
+        !origType->hasArchetype())
+      return const_cast<ProtocolConformance *>(this);
+
+    auto substType = origType.subst(subs, conformances, options);
+    if (substType->isEqual(origType))
+      return const_cast<ProtocolConformance *>(this);
+
+    // All builtin conformances are concrete at the moment, so it's safe to
+    // directly call getConcrete.
+    return getProtocol()->getModuleContext()
+      ->lookupConformance(substType, getProtocol()).getConcrete();
+  }
   case ProtocolConformanceKind::Inherited: {
     // Substitute the base.
     auto inheritedConformance

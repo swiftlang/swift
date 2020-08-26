@@ -497,6 +497,27 @@ void _emplaceTupleHashableDescriptor() {
   *tupleHashableConf = intptr_t(hashable) - intptr_t(tupleHashableConf);
 }
 
+using RawHashValueFn = SWIFT_CC(swift) intptr_t(intptr_t seed,
+                                                const Metadata *Self,
+                                                const WitnessTable *witnessTable,
+                                                SWIFT_CONTEXT OpaqueValue *value);
+
+static RawHashValueFn *get_rawHashValueDefaultImplFunc() {
+  auto func = SWIFT_LAZY_CONSTANT(
+    reinterpret_cast<RawHashValueFn *>(
+                    dlsym(RTLD_DEFAULT, "$sSHsE13_rawHashValue4seedS2i_tF")));
+  return func;
+}
+
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+intptr_t _swift_tupleHashable_rawHashValue(intptr_t seed,
+                                           SWIFT_CONTEXT OpaqueValue *tuple,
+                                           const Metadata *Self,
+                                           const WitnessTable *witnessTable) {
+  auto _rawHashValue = get_rawHashValueDefaultImplFunc();
+  return _rawHashValue(seed, Self, witnessTable, tuple);
+}
+
 // The base Equatable protocol is itself a requirement, thus the requirement
 // count is 4 (Equatable + hashValue + hash(into:) + _rawHashValue) and the
 // witness is the tuple Equatable table.
@@ -507,23 +528,9 @@ _WitnessTable<4> _swift_tupleHashable_wt = {
     reinterpret_cast<const void *>(&_swift_tupleEquatable_wt),
     reinterpret_cast<void *>(_swift_tupleHashable_hashValue),
     reinterpret_cast<void *>(_swift_tupleHashable_hash),
-    nullptr
+    reinterpret_cast<void *>(_swift_tupleHashable_rawHashValue)
   }
 };
-
-static void *get_rawHashValueDefaultImplFunc() {
-  auto impl = SWIFT_LAZY_CONSTANT(
-    dlsym(RTLD_DEFAULT, "$sSHsE13_rawHashValue4seedS2i_tF"));
-  return impl;
-}
-
-// Due to the fact that the compatibility libraries can't have a hard
-// dependency to libswiftCore (which is where the _rawHashValue default impl
-// lives), we have to manually implant this before calling any user code.
-__attribute__((constructor))
-void _emplaceTupleHashable_rawHashValueDefaultImpl() {
-  _swift_tupleHashable_wt.Witnesses[3] = get_rawHashValueDefaultImplFunc();
-}
 
 using HashValueFn = SWIFT_CC(swift) intptr_t(OpaqueValue *value, Metadata *Self,
                                              void *witnessTable);
@@ -533,17 +540,17 @@ using HasherCombineFn = SWIFT_CC(swift) void(OpaqueValue *value,
                                              SWIFT_CONTEXT OpaqueValue *hasher);
 
 static HashValueFn *get_hashValueFunc() {
-  auto descriptor = SWIFT_LAZY_CONSTANT(
+  auto func = SWIFT_LAZY_CONSTANT(
     reinterpret_cast<HashValueFn *>(
                      dlsym(RTLD_DEFAULT, XSTR(SWIFT_HASHVALUE_FUNC))));
-  return descriptor;
+  return func;
 }
 
 static HasherCombineFn *getHashCombineFunc() {
-  auto descriptor = SWIFT_LAZY_CONSTANT(
+  auto func = SWIFT_LAZY_CONSTANT(
     reinterpret_cast<HasherCombineFn *>(
                      dlsym(RTLD_DEFAULT, XSTR(SWIFT_HASHER_COMBINE_FUNC))));
-  return descriptor;
+  return func;
 }
 
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
