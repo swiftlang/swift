@@ -4685,6 +4685,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
     case TypeKind::Error:
     case TypeKind::Unresolved:
+    case TypeKind::Hole:
       return getTypeMatchFailure(locator);
 
     case TypeKind::GenericTypeParam:
@@ -5366,6 +5367,7 @@ ConstraintSystem::simplifyConstructionConstraint(
     
   case TypeKind::Unresolved:
   case TypeKind::Error:
+  case TypeKind::Hole:
     return SolutionKind::Error;
 
   case TypeKind::GenericFunction:

@@ -2358,6 +2358,13 @@ Type ErrorType::get(Type originalType) {
   return entry = new (mem) ErrorType(ctx, originalType, properties);
 }
 
+Type HoleType::get(ASTContext &ctx, OriginatorType originator) {
+  assert(originator);
+  RecursiveTypeProperties properties = RecursiveTypeProperties::HasTypeHole;
+  auto arena = getArena(properties);
+  return new (ctx, arena) HoleType(ctx, originator, properties);
+}
+
 BuiltinIntegerType *BuiltinIntegerType::get(BuiltinIntegerWidth BitWidth,
                                             const ASTContext &C) {
   assert(!BitWidth.isArbitraryWidth());
@@ -2957,7 +2964,7 @@ isFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
 static RecursiveTypeProperties
 getGenericFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
                                       Type result) {
-  static_assert(RecursiveTypeProperties::BitWidth == 11,
+  static_assert(RecursiveTypeProperties::BitWidth == 12,
                 "revisit this if you add new recursive type properties");
   RecursiveTypeProperties properties;
 
@@ -3513,7 +3520,7 @@ CanSILFunctionType SILFunctionType::get(
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
   RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 11,
+  static_assert(RecursiveTypeProperties::BitWidth == 12,
                 "revisit this if you add new recursive type properties");
   for (auto &param : params)
     properties |= param.getInterfaceType()->getRecursiveProperties();

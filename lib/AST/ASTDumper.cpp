@@ -3496,6 +3496,18 @@ namespace {
 
     TRIVIAL_TYPE_PRINTER(Unresolved, unresolved)
 
+    void visitHoleType(HoleType *T, StringRef label) {
+      printCommon(label, "hole_type");
+      auto originatorTy = T->getOriginatorType();
+      if (auto *typeVar = originatorTy.dyn_cast<TypeVariableType *>()) {
+        printRec("type_variable", typeVar);
+      } else {
+        printRec("dependent_member_type",
+                 originatorTy.get<DependentMemberType *>());
+      }
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
     void visitBuiltinIntegerType(BuiltinIntegerType *T, StringRef label) {
       printCommon(label, "builtin_integer_type");
       if (T->isFixedWidth())
