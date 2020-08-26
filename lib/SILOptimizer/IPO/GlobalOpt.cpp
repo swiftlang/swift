@@ -260,7 +260,7 @@ void SILGlobalOpt::collectOnceCall(BuiltinInst *BI) {
     UnhandledOnceCallee = true;
     return;
   }
-  if (!Callee->getName().startswith("globalinit_"))
+  if (!Callee->isGlobalInitOnceFunction())
     return;
 
   // We currently disable optimizing the initializer if a globalinit_func
