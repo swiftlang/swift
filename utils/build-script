@@ -942,9 +942,6 @@ class BuildScriptInvocation(object):
             for product_class in impl_product_classes:
                 self._execute_install_action(host_target, product_class)
 
-        # Lipo...
-        self._execute_merged_host_lipo_action()
-
         # Non-build-script-impl products...
         # Note: currently only supports building for the host.
         for host_target in [self.args.host_target]:
