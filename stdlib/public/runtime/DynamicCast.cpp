@@ -701,8 +701,8 @@ tryCastToAnyHashable(
 {
   assert(srcType != destType);
   assert(destType->getKind() == MetadataKind::Struct);
-  const auto destStructType = cast<StructMetadata>(destType);
-  assert(destStructType->Description == &STRUCT_TYPE_DESCR_SYM(s11AnyHashable));
+  assert(cast<StructMetadata>(destType)->Description
+         == &STRUCT_TYPE_DESCR_SYM(s11AnyHashable));
 
   auto hashableConformance = reinterpret_cast<const HashableWitnessTable *>(
       swift_conformsToProtocol(srcType, &HashableProtocolDescriptor));
@@ -724,8 +724,8 @@ tryCastToArray(
 {
   assert(srcType != destType);
   assert(destType->getKind() == MetadataKind::Struct);
-  const auto destStructType = cast<StructMetadata>(destType);
-  assert(destStructType->Description == &NOMINAL_TYPE_DESCR_SYM(Sa));
+  assert(cast<StructMetadata>(destType)->Description
+         == &NOMINAL_TYPE_DESCR_SYM(Sa));
 
   switch (srcType->getKind()) {
   case MetadataKind::Struct: { // Struct -> Array
@@ -764,8 +764,8 @@ tryCastToDictionary(
 {
   assert(srcType != destType);
   assert(destType->getKind() == MetadataKind::Struct);
-  const auto destStructType = cast<StructMetadata>(destType);
-  assert(destStructType->Description == &NOMINAL_TYPE_DESCR_SYM(SD));
+  assert(cast<StructMetadata>(destType)->Description
+         == &NOMINAL_TYPE_DESCR_SYM(SD));
 
   switch (srcType->getKind()) {
   case MetadataKind::Struct: { // Struct -> Dictionary
@@ -805,8 +805,8 @@ tryCastToSet(
 {
   assert(srcType != destType);
   assert(destType->getKind() == MetadataKind::Struct);
-  const auto destStructType = cast<StructMetadata>(destType);
-  assert(destStructType->Description == &NOMINAL_TYPE_DESCR_SYM(Sh));
+  assert(cast<StructMetadata>(destType)->Description
+         == &NOMINAL_TYPE_DESCR_SYM(Sh));
 
   switch (srcType->getKind()) {
 
@@ -847,8 +847,8 @@ tryCastToString(
 {
   assert(srcType != destType);
   assert(destType->getKind() == MetadataKind::Struct);
-  const auto destStructType = cast<StructMetadata>(destType);
-  assert(destStructType->Description == &NOMINAL_TYPE_DESCR_SYM(SS));
+  assert(cast<StructMetadata>(destType)->Description
+         == &NOMINAL_TYPE_DESCR_SYM(SS));
 
   switch (srcType->getKind()) {
   case MetadataKind::ForeignClass: // CF -> String
@@ -1257,8 +1257,7 @@ tryCastToUnconstrainedOpaqueExistential(
 {
   assert(srcType != destType);
   assert(destType->getKind() == MetadataKind::Existential);
-  auto destExistentialType = cast<ExistentialTypeMetadata>(destType);
-  assert(destExistentialType->getRepresentation()
+  assert(cast<ExistentialTypeMetadata>(destType)->getRepresentation()
          == ExistentialTypeRepresentation::Opaque);
   auto destExistential
     = reinterpret_cast<OpaqueExistentialContainer *>(destLocation);
