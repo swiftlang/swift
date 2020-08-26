@@ -254,6 +254,20 @@ void ClangImporter::recordModuleDependencies(
     swiftArgs.push_back("-module-name");
     swiftArgs.push_back(clangModuleDep.ModuleName);
 
+    // Pass down search paths to the -emit-module action.
+    // Unlike building Swift modules, we need to include all search paths to
+    // the clang invocation to build PCMs because transitive headers can only
+    // be found via search paths. Passing these headers as explicit inputs can
+    // be quite challenging.
+    for (auto &path: Impl.SwiftContext.SearchPathOpts.ImportSearchPaths) {
+      swiftArgs.push_back("-I");
+      swiftArgs.push_back(path);
+    }
+    for (auto &path: Impl.SwiftContext.SearchPathOpts.FrameworkSearchPaths) {
+      swiftArgs.push_back(path.IsSystem ? "-Fsystem": "-F");
+      swiftArgs.push_back(path.Path);
+    }
+
     // Swift frontend option for input file path (Foo.modulemap).
     swiftArgs.push_back(clangModuleDep.ClangModuleMapFile);
     // Module-level dependencies.
