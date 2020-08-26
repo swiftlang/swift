@@ -7434,13 +7434,11 @@ AbstractGenericSignatureRequest::evaluate(
     if (baseSignature)
       canBaseSignature = baseSignature->getCanonicalSignature();
 
-    llvm::SmallDenseMap<GenericTypeParamType *, Type> mappedTypeParameters;
     SmallVector<GenericTypeParamType *, 2> canAddedParameters;
     canAddedParameters.reserve(addedParameters.size());
     for (auto gp : addedParameters) {
       auto canGP = gp->getCanonicalType()->castTo<GenericTypeParamType>();
       canAddedParameters.push_back(canGP);
-      mappedTypeParameters[canGP] = Type(gp);
     }
 
     SmallVector<Requirement, 2> canAddedRequirements;
@@ -7457,10 +7455,8 @@ AbstractGenericSignatureRequest::evaluate(
     if (!canSignatureResult || !*canSignatureResult)
       return GenericSignature();
 
-    // Substitute in the original generic parameters to form a more-sugared
-    // result closer to what the original request wanted. Note that this
-    // loses sugar on concrete types, but for abstract signatures that
-    // shouldn't matter.
+    // Substitute in the original generic parameters to form the sugared
+    // result the original request wanted.
     auto canSignature = *canSignatureResult;
     SmallVector<GenericTypeParamType *, 2> resugaredParameters;
     resugaredParameters.reserve(canSignature->getGenericParams().size());
@@ -7478,9 +7474,8 @@ AbstractGenericSignatureRequest::evaluate(
       auto resugaredReq = req.subst(
           [&](SubstitutableType *type) {
             if (auto gp = dyn_cast<GenericTypeParamType>(type)) {
-              auto knownGP = mappedTypeParameters.find(gp);
-              if (knownGP != mappedTypeParameters.end())
-                return knownGP->second;
+              unsigned ordinal = canSignature->getGenericParamOrdinal(gp);
+              return Type(resugaredParameters[ordinal]);
             }
             return Type(type);
           },
