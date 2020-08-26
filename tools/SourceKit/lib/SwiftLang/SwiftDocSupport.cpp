@@ -1377,7 +1377,10 @@ syntacticRename(llvm::MemoryBuffer *InputBuf,
 
   auto RenameLocs = getSyntacticRenameLocs(RenameLocations);
   RequestRefactoringEditConsumer EditConsumer(Receiver);
-  swift::ide::syntacticRename(SF, RenameLocs, EditConsumer, EditConsumer);
+  DiagnosticOptions DiagOpts;
+  DiagOpts.DefaultLocalizationPath = DefaultLocalizationPath;
+  swift::ide::syntacticRename(SF, RenameLocs, EditConsumer, EditConsumer,
+                              DiagOpts);
 }
 
 void SwiftLangSupport::findRenameRanges(
@@ -1395,7 +1398,10 @@ void SwiftLangSupport::findRenameRanges(
 
   auto RenameLocs = getSyntacticRenameLocs(RenameLocations);
   RequestRenameRangeConsumer Consumer(Receiver);
-  swift::ide::findSyntacticRenameRanges(SF, RenameLocs, Consumer, Consumer);
+  DiagnosticOptions DiagOpts;
+  DiagOpts.DefaultLocalizationPath = DefaultLocalizationPath;
+  swift::ide::findSyntacticRenameRanges(SF, RenameLocs, Consumer, Consumer,
+                                        DiagOpts);
 }
 
 void SwiftLangSupport::findLocalRenameRanges(
@@ -1412,17 +1418,20 @@ void SwiftLangSupport::findLocalRenameRanges(
   struct LocalRenameRangeASTConsumer : public SwiftASTConsumer {
     unsigned Line, Column, Length;
     CategorizedRenameRangesReceiver Receiver;
+    DiagnosticOptions DiagOpts;
 
     LocalRenameRangeASTConsumer(unsigned Line, unsigned Column, unsigned Length,
-                                CategorizedRenameRangesReceiver Receiver)
+                                CategorizedRenameRangesReceiver Receiver,
+                                const DiagnosticOptions &DiagOpts)
         : Line(Line), Column(Column), Length(Length),
-          Receiver(std::move(Receiver)) {}
+          Receiver(std::move(Receiver)), DiagOpts(DiagOpts) {}
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &SF = AstUnit->getPrimarySourceFile();
       swift::ide::RangeConfig Range{*SF.getBufferID(), Line, Column, Length};
       RequestRenameRangeConsumer Consumer(std::move(Receiver));
-      swift::ide::findLocalRenameRanges(&SF, Range, Consumer, Consumer);
+      swift::ide::findLocalRenameRanges(&SF, Range, Consumer, Consumer,
+                                        DiagOpts);
     }
 
     void cancelled() override {
@@ -1434,8 +1443,10 @@ void SwiftLangSupport::findLocalRenameRanges(
     }
   };
 
+  DiagnosticOptions DiagOpts;
+  DiagOpts.DefaultLocalizationPath = DefaultLocalizationPath;
   auto ASTConsumer = std::make_shared<LocalRenameRangeASTConsumer>(
-      Line, Column, Length, std::move(Receiver));
+      Line, Column, Length, std::move(Receiver), DiagOpts);
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;

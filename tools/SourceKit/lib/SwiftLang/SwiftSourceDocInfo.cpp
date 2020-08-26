@@ -682,16 +682,17 @@ serializeRefactoringKinds(ArrayRef<RefactoringKind> AllKinds,
   }
 }
 
-static void
-collectAvailableRefactoringsOtherThanRename(SourceFile *SF,
-                                            ResolvedCursorInfo CursorInfo,
-                                            std::vector<UIdent> &RefactoringIds,
-                                      DelayedStringRetriever &RefactroingNameOS,
-                                  DelayedStringRetriever &RefactoringReasonOS) {
+static void collectAvailableRefactoringsOtherThanRename(
+    SourceFile *SF, ResolvedCursorInfo CursorInfo,
+    std::vector<UIdent> &RefactoringIds,
+    DelayedStringRetriever &RefactroingNameOS,
+    DelayedStringRetriever &RefactoringReasonOS,
+    const DiagnosticOptions &DiagOpts) {
   std::vector<RefactoringKind> Scratch;
-  serializeRefactoringKinds(collectAvailableRefactorings(SF, CursorInfo, Scratch,
-    /*ExcludeRename*/true), RefactoringIds, RefactroingNameOS,
-    RefactoringReasonOS);
+  serializeRefactoringKinds(
+      collectAvailableRefactorings(SF, CursorInfo, Scratch,
+                                   /*ExcludeRename*/ true, DiagOpts),
+      RefactoringIds, RefactroingNameOS, RefactoringReasonOS);
 }
 
 static Optional<unsigned>
@@ -735,6 +736,7 @@ static bool passCursorInfoForDecl(SourceFile* SF,
                   ArrayRef<RefactoringInfo> KownRefactoringInfoFromRange,
                                   SwiftLangSupport &Lang,
                                   const CompilerInvocation &Invok,
+                                  const DiagnosticOptions &DiagOpts,
                                   std::string &Diagnostic,
                       ArrayRef<ImmutableTextSnapshotRef> PreviousASTSnaps,
                   std::function<void(const RequestResult<CursorInfoData> &)> Receiver) {
@@ -855,7 +857,8 @@ static bool passCursorInfoForDecl(SourceFile* SF,
                                RefactoringIds, RefactoringNameOS,
                                RefactoringReasonOS);
     collectAvailableRefactoringsOtherThanRename(SF, TheTok, RefactoringIds,
-      RefactoringNameOS, RefactoringReasonOS);
+                                                RefactoringNameOS,
+                                                RefactoringReasonOS, DiagOpts);
   }
 
   DelayedStringRetriever OverUSRsStream(SS);
@@ -1249,7 +1252,8 @@ public:
 static void resolveCursor(
     SwiftLangSupport &Lang, StringRef InputFile, unsigned Offset,
     unsigned Length, bool Actionables, SwiftInvocationRef Invok,
-    bool TryExistingAST, bool CancelOnSubsequentRequest,
+    const DiagnosticOptions &DiagOpts, bool TryExistingAST,
+    bool CancelOnSubsequentRequest,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
     std::function<void(const RequestResult<CursorInfoData> &)> Receiver) {
   assert(Invok);
@@ -1258,19 +1262,19 @@ static void resolveCursor(
   class CursorInfoConsumer : public CursorRangeInfoConsumer {
     bool Actionables;
     std::function<void(const RequestResult<CursorInfoData> &)> Receiver;
+    DiagnosticOptions DiagOpts;
 
   public:
-    CursorInfoConsumer(StringRef InputFile, unsigned Offset,
-                       unsigned Length, bool Actionables,
-                       SwiftLangSupport &Lang,
-                       SwiftInvocationRef ASTInvok,
-                       bool TryExistingAST,
-                       bool CancelOnSubsequentRequest,
-                       std::function<void(const RequestResult<CursorInfoData> &)> Receiver)
-    : CursorRangeInfoConsumer(InputFile, Offset, Length, Lang, ASTInvok,
-                              TryExistingAST, CancelOnSubsequentRequest),
-      Actionables(Actionables),
-      Receiver(std::move(Receiver)){ }
+    CursorInfoConsumer(
+        StringRef InputFile, unsigned Offset, unsigned Length, bool Actionables,
+        SwiftLangSupport &Lang, SwiftInvocationRef ASTInvok,
+        bool TryExistingAST, bool CancelOnSubsequentRequest,
+        std::function<void(const RequestResult<CursorInfoData> &)> Receiver,
+        const DiagnosticOptions &DiagOpts)
+        : CursorRangeInfoConsumer(InputFile, Offset, Length, Lang, ASTInvok,
+                                  TryExistingAST, CancelOnSubsequentRequest),
+          Actionables(Actionables), Receiver(std::move(Receiver)),
+          DiagOpts(DiagOpts) {}
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &CompIns = AstUnit->getCompilerInstance();
@@ -1307,9 +1311,9 @@ static void resolveCursor(
         Range.Column = Pair.second;
         Range.Length = Length;
         bool RangeStartMayNeedRename = false;
-        for (RefactoringKind Kind :
-             collectAvailableRefactorings(&AstUnit->getPrimarySourceFile(),
-                                Range, RangeStartMayNeedRename, Scratch, {})) {
+        for (RefactoringKind Kind : collectAvailableRefactorings(
+                 &AstUnit->getPrimarySourceFile(), Range,
+                 RangeStartMayNeedRename, Scratch, {}, DiagOpts)) {
           AvailableRefactorings.push_back({
             SwiftLangSupport::getUIDForRefactoringKind(Kind),
             getDescriptiveRefactoringKindName(Kind),
@@ -1362,22 +1366,16 @@ static void resolveCursor(
           ContainerType = Type();
         }
         std::string Diagnostic;
-        bool Success = passCursorInfoForDecl(&AstUnit->getPrimarySourceFile(),
-                                             VD, MainModule,
-                                             ContainerType,
-                                             CursorInfo.IsRef,
-                                             Actionables,
-                                             CursorInfo,
-                                             BufferID, Loc,
-                                             AvailableRefactorings,
-                                             Lang, CompInvok, Diagnostic,
-                                             getPreviousASTSnaps(),
-                                             Receiver);
+        bool Success = passCursorInfoForDecl(
+            &AstUnit->getPrimarySourceFile(), VD, MainModule, ContainerType,
+            CursorInfo.IsRef, Actionables, CursorInfo, BufferID, Loc,
+            AvailableRefactorings, Lang, CompInvok, DiagOpts, Diagnostic,
+            getPreviousASTSnaps(), Receiver);
         if (!Success) {
           if (!getPreviousASTSnaps().empty()) {
             // Attempt again using the up-to-date AST.
             resolveCursor(Lang, InputFile, Offset, Length, Actionables,
-                          ASTInvok,
+                          ASTInvok, DiagOpts,
                           /*TryExistingAST=*/false, CancelOnSubsequentRequest,
                           SM.getFileSystem(), Receiver);
           } else {
@@ -1396,8 +1394,8 @@ static void resolveCursor(
           DelayedStringRetriever NameRetriever(SS);
           DelayedStringRetriever ReasonRetriever(SS);
           collectAvailableRefactoringsOtherThanRename(
-            &AstUnit->getPrimarySourceFile(), CursorInfo, RefactoringIds,
-            NameRetriever, ReasonRetriever);
+              &AstUnit->getPrimarySourceFile(), CursorInfo, RefactoringIds,
+              NameRetriever, ReasonRetriever, DiagOpts);
           if (auto Size = RefactoringIds.size()) {
             CursorInfoData Info;
 
@@ -1436,8 +1434,8 @@ static void resolveCursor(
   };
 
   auto Consumer = std::make_shared<CursorInfoConsumer>(
-    InputFile, Offset, Length, Actionables, Lang, Invok, TryExistingAST,
-    CancelOnSubsequentRequest, Receiver);
+      InputFile, Offset, Length, Actionables, Lang, Invok, TryExistingAST,
+      CancelOnSubsequentRequest, Receiver, DiagOpts);
 
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
@@ -1662,11 +1660,13 @@ void SwiftLangSupport::getCursorInfo(
         } else {
           std::string Diagnostic;  // Unused.
           ModuleDecl *MainModule = IFaceGenRef->getModuleDecl();
+          DiagnosticOptions DiagOpts;
+          DiagOpts.DefaultLocalizationPath = DefaultLocalizationPath;
           passCursorInfoForDecl(
-              /*SourceFile*/nullptr, Entity.Dcl, MainModule,
-              Type(), Entity.IsRef, Actionables, ResolvedCursorInfo(),
-              /*OrigBufferID=*/None, SourceLoc(),
-              {}, *this, Invok, Diagnostic, {}, Receiver);
+              /*SourceFile*/ nullptr, Entity.Dcl, MainModule, Type(),
+              Entity.IsRef, Actionables, ResolvedCursorInfo(),
+              /*OrigBufferID=*/None, SourceLoc(), {}, *this, Invok, DiagOpts,
+              Diagnostic, {}, Receiver);
         }
       } else {
         CursorInfoData Info;
@@ -1687,7 +1687,9 @@ void SwiftLangSupport::getCursorInfo(
     return;
   }
 
-  resolveCursor(*this, InputFile, Offset, Length, Actionables, Invok,
+  DiagnosticOptions DiagOpts;
+  DiagOpts.DefaultLocalizationPath = DefaultLocalizationPath;
+  resolveCursor(*this, InputFile, Offset, Length, Actionables, Invok, DiagOpts,
                 /*TryExistingAST=*/true, CancelOnSubsequentRequest, fileSystem,
                 Receiver);
 }
@@ -1759,8 +1761,8 @@ getNameInfo(StringRef InputFile, unsigned Offset, NameTranslatingInfo &Input,
 
 static void resolveCursorFromUSR(
     SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
-    SwiftInvocationRef Invok, bool TryExistingAST,
-    bool CancelOnSubsequentRequest,
+    SwiftInvocationRef Invok, const DiagnosticOptions &DiagOpts,
+    bool TryExistingAST, bool CancelOnSubsequentRequest,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
     std::function<void(const RequestResult<CursorInfoData> &)> Receiver) {
   assert(Invok);
@@ -1773,17 +1775,20 @@ static void resolveCursorFromUSR(
     const bool TryExistingAST;
     bool CancelOnSubsequentRequest;
     std::function<void(const RequestResult<CursorInfoData> &)> Receiver;
+    DiagnosticOptions DiagOpts;
     SmallVector<ImmutableTextSnapshotRef, 4> PreviousASTSnaps;
 
   public:
-    CursorInfoConsumer(StringRef InputFile, StringRef USR,
-                       SwiftLangSupport &Lang, SwiftInvocationRef ASTInvok,
-                       bool TryExistingAST, bool CancelOnSubsequentRequest,
-                       std::function<void(const RequestResult<CursorInfoData> &)> Receiver)
+    CursorInfoConsumer(
+        StringRef InputFile, StringRef USR, SwiftLangSupport &Lang,
+        SwiftInvocationRef ASTInvok, bool TryExistingAST,
+        bool CancelOnSubsequentRequest,
+        std::function<void(const RequestResult<CursorInfoData> &)> Receiver,
+        const DiagnosticOptions &DiagOpts)
         : InputFile(InputFile), USR(USR), Lang(Lang),
           ASTInvok(std::move(ASTInvok)), TryExistingAST(TryExistingAST),
           CancelOnSubsequentRequest(CancelOnSubsequentRequest),
-          Receiver(std::move(Receiver)) {}
+          Receiver(std::move(Receiver)), DiagOpts(DiagOpts) {}
 
     bool canUseASTWithSnapshots(
         ArrayRef<ImmutableTextSnapshotRef> Snapshots) override {
@@ -1841,16 +1846,16 @@ static void resolveCursorFromUSR(
           selfTy = D->getInnermostDeclContext()->mapTypeIntoContext(selfTy);
         }
         std::string Diagnostic;
-        bool Success =
-            passCursorInfoForDecl(/*SourceFile*/nullptr, D, MainModule, selfTy,
-                                  /*IsRef=*/false, false, ResolvedCursorInfo(),
-                                  BufferID, SourceLoc(), {}, Lang, CompInvok,
-                                  Diagnostic, PreviousASTSnaps, Receiver);
+        bool Success = passCursorInfoForDecl(
+            /*SourceFile*/ nullptr, D, MainModule, selfTy,
+            /*IsRef=*/false, false, ResolvedCursorInfo(), BufferID, SourceLoc(),
+            {}, Lang, CompInvok, DiagOpts, Diagnostic, PreviousASTSnaps,
+            Receiver);
         if (!Success) {
           if (!PreviousASTSnaps.empty()) {
             // Attempt again using the up-to-date AST.
             resolveCursorFromUSR(
-                Lang, InputFile, USR, ASTInvok,
+                Lang, InputFile, USR, ASTInvok, DiagOpts,
                 /*TryExistingAST=*/false, CancelOnSubsequentRequest,
                 CompIns.getSourceMgr().getFileSystem(), Receiver);
           } else {
@@ -1874,7 +1879,7 @@ static void resolveCursorFromUSR(
 
   auto Consumer = std::make_shared<CursorInfoConsumer>(
       InputFile, USR, Lang, Invok, TryExistingAST, CancelOnSubsequentRequest,
-      Receiver);
+      Receiver, DiagOpts);
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
@@ -1912,8 +1917,11 @@ void SwiftLangSupport::getCursorInfoFromUSR(
     return;
   }
 
-  resolveCursorFromUSR(*this, filename, USR, Invok, /*TryExistingAST=*/true,
-                       CancelOnSubsequentRequest, fileSystem, Receiver);
+  DiagnosticOptions DiagOpts;
+  DiagOpts.DefaultLocalizationPath = DefaultLocalizationPath;
+  resolveCursorFromUSR(*this, filename, USR, Invok, DiagOpts,
+                       /*TryExistingAST=*/true, CancelOnSubsequentRequest,
+                       fileSystem, Receiver);
 }
 
 //===----------------------------------------------------------------------===//
@@ -2158,11 +2166,13 @@ semanticRefactoring(StringRef Filename, SemanticRefactoringInfo Info,
   class SemaRefactoringConsumer : public SwiftASTConsumer {
     SemanticRefactoringInfo Info;
     CategorizedEditsReceiver Receiver;
+    DiagnosticOptions DiagOpts;
 
   public:
     SemaRefactoringConsumer(SemanticRefactoringInfo Info,
-                            CategorizedEditsReceiver Receiver) : Info(Info),
-                                                Receiver(std::move(Receiver)) {}
+                            CategorizedEditsReceiver Receiver,
+                            const DiagnosticOptions &DiagOpts)
+        : Info(Info), Receiver(std::move(Receiver)), DiagOpts(DiagOpts) {}
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &CompIns = AstUnit->getCompilerInstance();
@@ -2176,7 +2186,8 @@ semanticRefactoring(StringRef Filename, SemanticRefactoringInfo Info,
       Opts.PreferredName = Info.PreferredName.str();
 
       RequestRefactoringEditConsumer EditConsumer(Receiver);
-      refactorSwiftModule(MainModule, Opts, EditConsumer, EditConsumer);
+      refactorSwiftModule(MainModule, Opts, EditConsumer, EditConsumer,
+                          DiagOpts);
     }
 
     void cancelled() override {
@@ -2188,7 +2199,10 @@ semanticRefactoring(StringRef Filename, SemanticRefactoringInfo Info,
     }
   };
 
-  auto Consumer = std::make_shared<SemaRefactoringConsumer>(Info, Receiver);
+  DiagnosticOptions DiagOpts;
+  DiagOpts.DefaultLocalizationPath = DefaultLocalizationPath;
+  auto Consumer =
+      std::make_shared<SemaRefactoringConsumer>(Info, Receiver, DiagOpts);
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
