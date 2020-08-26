@@ -1801,7 +1801,7 @@ static tryCastFunctionType *selectCasterForDest(const Metadata *destType) {
       return tryCastToErrorExistential;
     }
     swift_runtime_unreachable(
-      "Unhandled existential type representation in dynamic cast dispatch");
+      "Unknown existential type representation in dynamic cast dispatch");
   }
   case MetadataKind::Metatype:
    return tryCastToMetatype;
@@ -1815,10 +1815,15 @@ static tryCastFunctionType *selectCasterForDest(const Metadata *destType) {
     // These are internal details of runtime-only structures,
     // so will never appear in compiler-generated types.
     // As such, they don't need support here.
+    swift_runtime_unreachable(
+      "Unexpected MetadataKind in dynamic cast dispatch");
     return nullptr;
   default:
+    // If you see this message, then there is a new MetadataKind that I didn't
+    // know about when I wrote this code.  Please figure out what it is, how to
+    // handle it, and add a case for it.
     swift_runtime_unreachable(
-      "Unhandled MetadataKind in dynamic cast dispatch");
+      "Unknown MetadataKind in dynamic cast dispatch");
   }
 }
 
