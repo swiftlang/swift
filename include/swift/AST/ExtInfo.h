@@ -496,16 +496,17 @@ class SILExtInfoBuilder {
   // If bits are added or removed, then TypeBase::SILFunctionTypeBits
   // and NumMaskBits must be updated, and they must match.
 
-  //   |representation|pseudogeneric| noescape |differentiability|
-  //   |    0 .. 3    |      4      |     5    |      6 .. 7     |
+  //   |representation|pseudogeneric| noescape | async | differentiability|
+  //   |    0 .. 3    |      4      |     5    |   6   |      7 .. 8     |
   //
   enum : unsigned {
     RepresentationMask = 0xF << 0,
     PseudogenericMask = 1 << 4,
     NoEscapeMask = 1 << 5,
-    DifferentiabilityMaskOffset = 6,
+    AsyncMask = 1 << 6,
+    DifferentiabilityMaskOffset = 7,
     DifferentiabilityMask = 0x3 << DifferentiabilityMaskOffset,
-    NumMaskBits = 8
+    NumMaskBits = 9
   };
 
   unsigned bits; // Naturally sized for speed.
@@ -524,10 +525,11 @@ public:
 
   // Constructor for polymorphic type.
   SILExtInfoBuilder(Representation rep, bool isPseudogeneric, bool isNoEscape,
-                    DifferentiabilityKind diffKind, const clang::Type *type)
+                    bool isAsync, DifferentiabilityKind diffKind,
+                    const clang::Type *type)
       : SILExtInfoBuilder(
             ((unsigned)rep) | (isPseudogeneric ? PseudogenericMask : 0) |
-                (isNoEscape ? NoEscapeMask : 0) |
+                (isNoEscape ? NoEscapeMask : 0) | (isAsync ? AsyncMask : 0) |
                 (((unsigned)diffKind << DifferentiabilityMaskOffset) &
                  DifferentiabilityMask),
             ClangTypeInfo(type)) {}
@@ -552,6 +554,8 @@ public:
 
   // Is this function guaranteed to be no-escape by the type system?
   constexpr bool isNoEscape() const { return bits & NoEscapeMask; }
+
+  constexpr bool isAsync() const { return bits & AsyncMask; }
 
   constexpr DifferentiabilityKind getDifferentiabilityKind() const {
     return DifferentiabilityKind((bits & DifferentiabilityMask) >>
@@ -617,6 +621,10 @@ public:
                                       : (bits & ~NoEscapeMask),
                              clangTypeInfo);
   }
+  SILExtInfoBuilder withAsync(bool isAsync = true) const {
+    return SILExtInfoBuilder(isAsync ? (bits | AsyncMask) : (bits & ~AsyncMask),
+                             clangTypeInfo);
+  }
   SILExtInfoBuilder
   withDifferentiabilityKind(DifferentiabilityKind differentiability) const {
     return SILExtInfoBuilder(
@@ -658,8 +666,8 @@ public:
 
   static SILExtInfo getThin() {
     return SILExtInfoBuilder(SILExtInfoBuilder::Representation::Thin, false,
-                             false, DifferentiabilityKind::NonDifferentiable,
-                             nullptr)
+                             false, false,
+                             DifferentiabilityKind::NonDifferentiable, nullptr)
         .build();
   }
 
@@ -681,6 +689,8 @@ public:
   constexpr bool isPseudogeneric() const { return builder.isPseudogeneric(); }
 
   constexpr bool isNoEscape() const { return builder.isNoEscape(); }
+
+  constexpr bool isAsync() const { return builder.isAsync(); }
 
   constexpr DifferentiabilityKind getDifferentiabilityKind() const {
     return builder.getDifferentiabilityKind();

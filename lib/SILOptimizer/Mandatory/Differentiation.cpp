@@ -872,8 +872,7 @@ static void emitFatalError(ADContext &context, SILFunction *f,
   // Fatal error function must have type `@convention(thin) () -> Never`.
   auto fatalErrorFnType = SILFunctionType::get(
       /*genericSig*/ nullptr, SILFunctionType::ExtInfo::getThin(),
-      /*isAsync*/ false, SILCoroutineKind::None,
-      ParameterConvention::Direct_Unowned, {},
+      SILCoroutineKind::None, ParameterConvention::Direct_Unowned, {},
       /*interfaceYields*/ {}, neverResultInfo,
       /*interfaceErrorResults*/ None, {}, {}, context.getASTContext());
   auto fnBuilder = SILOptFunctionBuilder(context.getTransform());
@@ -1025,10 +1024,10 @@ static SILValue promoteCurryThunkApplicationToDifferentiableFunction(
   auto newThunkResult = thunkResult.getWithInterfaceType(diffResultFnTy);
   auto thunkType = SILFunctionType::get(
       thunkTy->getSubstGenericSignature(), thunkTy->getExtInfo(),
-      thunkTy->isAsync(), thunkTy->getCoroutineKind(),
-      thunkTy->getCalleeConvention(), thunkTy->getParameters(), {},
-      {newThunkResult}, {}, thunkTy->getPatternSubstitutions(),
-      thunkTy->getInvocationSubstitutions(), thunkTy->getASTContext());
+      thunkTy->getCoroutineKind(), thunkTy->getCalleeConvention(),
+      thunkTy->getParameters(), {}, {newThunkResult}, {},
+      thunkTy->getPatternSubstitutions(), thunkTy->getInvocationSubstitutions(),
+      thunkTy->getASTContext());
 
   // Construct new curry thunk, returning a `@differentiable` function.
   SILOptFunctionBuilder fb(dt.getTransform());

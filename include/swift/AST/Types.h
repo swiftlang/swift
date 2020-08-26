@@ -308,7 +308,7 @@ class alignas(1 << TypeAlignInBits) TypeBase {
 
 protected:
   enum { NumAFTExtInfoBits = 9 };
-  enum { NumSILExtInfoBits = 8 };
+  enum { NumSILExtInfoBits = 9 };
   union { uint64_t OpaqueBits;
 
   SWIFT_INLINE_BITFIELD_BASE(TypeBase, bitmax(NumTypeKindBits,8) +
@@ -362,12 +362,11 @@ protected:
     ID : 32
   );
 
-  SWIFT_INLINE_BITFIELD(SILFunctionType, TypeBase, NumSILExtInfoBits+1+3+1+1+2+1+1,
+  SWIFT_INLINE_BITFIELD(SILFunctionType, TypeBase, NumSILExtInfoBits+1+3+1+2+1+1,
     ExtInfoBits : NumSILExtInfoBits,
     HasClangTypeInfo : 1,
     CalleeConvention : 3,
     HasErrorResult : 1,
-    IsAsync : 1,
     CoroutineKind : 2,
     HasInvocationSubs : 1,
     HasPatternSubs : 1
@@ -3980,7 +3979,7 @@ private:
              + 1);
   }
 
-  SILFunctionType(GenericSignature genericSig, ExtInfo ext, bool isAsync,
+  SILFunctionType(GenericSignature genericSig, ExtInfo ext,
                   SILCoroutineKind coroutineKind,
                   ParameterConvention calleeConvention,
                   ArrayRef<SILParameterInfo> params,
@@ -3994,8 +3993,7 @@ private:
 
 public:
   static CanSILFunctionType
-  get(GenericSignature genericSig, ExtInfo ext, bool isAsync,
-      SILCoroutineKind coroutineKind,
+  get(GenericSignature genericSig, ExtInfo ext, SILCoroutineKind coroutineKind,
       ParameterConvention calleeConvention,
       ArrayRef<SILParameterInfo> interfaceParams,
       ArrayRef<SILYieldInfo> interfaceYields,
@@ -4048,7 +4046,7 @@ public:
     return SILCoroutineKind(Bits.SILFunctionType.CoroutineKind);
   }
 
-  bool isAsync() const { return Bits.SILFunctionType.IsAsync; }
+  bool isAsync() const { return getExtInfo().isAsync(); }
 
   /// Return the array of all the yields.
   ArrayRef<SILYieldInfo> getYields() const {
@@ -4577,14 +4575,14 @@ public:
                                     
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getInvocationGenericSignature(),
-            getExtInfo(), isAsync(), getCoroutineKind(), getCalleeConvention(),
+            getExtInfo(), getCoroutineKind(), getCalleeConvention(),
             getParameters(), getYields(), getResults(),
             getOptionalErrorResult(), getWitnessMethodConformanceOrInvalid(),
             getPatternSubstitutions(), getInvocationSubstitutions());
   }
   static void
   Profile(llvm::FoldingSetNodeID &ID, GenericSignature genericSig, ExtInfo info,
-          bool isAsync, SILCoroutineKind coroutineKind, ParameterConvention calleeConvention,
+          SILCoroutineKind coroutineKind, ParameterConvention calleeConvention,
           ArrayRef<SILParameterInfo> params, ArrayRef<SILYieldInfo> yields,
           ArrayRef<SILResultInfo> results, Optional<SILResultInfo> errorResult,
           ProtocolConformanceRef conformance,

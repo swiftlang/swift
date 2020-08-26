@@ -3260,7 +3260,6 @@ void SILFunctionType::Profile(
     llvm::FoldingSetNodeID &id,
     GenericSignature genericParams,
     ExtInfo info,
-    bool isAsync,
     SILCoroutineKind coroutineKind,
     ParameterConvention calleeConvention,
     ArrayRef<SILParameterInfo> params,
@@ -3274,7 +3273,6 @@ void SILFunctionType::Profile(
   auto infoKey = info.getFuncAttrKey();
   id.AddInteger(infoKey.first);
   id.AddPointer(infoKey.second);
-  id.AddBoolean(isAsync);
   id.AddInteger(unsigned(coroutineKind));
   id.AddInteger(unsigned(calleeConvention));
   id.AddInteger(params.size());
@@ -3300,7 +3298,6 @@ void SILFunctionType::Profile(
 SILFunctionType::SILFunctionType(
     GenericSignature genericSig,
     ExtInfo ext,
-    bool isAsync,
     SILCoroutineKind coroutineKind,
     ParameterConvention calleeConvention,
     ArrayRef<SILParameterInfo> params,
@@ -3326,7 +3323,6 @@ SILFunctionType::SILFunctionType(
          "Bits were dropped!");
   static_assert(SILExtInfoBuilder::NumMaskBits == NumSILExtInfoBits,
                 "ExtInfo and SILFunctionTypeBitfields must agree on bit size");
-  Bits.SILFunctionType.IsAsync = isAsync;
   Bits.SILFunctionType.CoroutineKind = unsigned(coroutineKind);
   NumParameters = params.size();
   if (coroutineKind == SILCoroutineKind::None) {
@@ -3470,7 +3466,7 @@ CanSILBlockStorageType SILBlockStorageType::get(CanType captureType) {
 
 CanSILFunctionType SILFunctionType::get(
     GenericSignature genericSig,
-    ExtInfo ext, bool isAsync, SILCoroutineKind coroutineKind,
+    ExtInfo ext, SILCoroutineKind coroutineKind,
     ParameterConvention callee,
     ArrayRef<SILParameterInfo> params,
     ArrayRef<SILYieldInfo> yields,
@@ -3488,8 +3484,8 @@ CanSILFunctionType SILFunctionType::get(
   invocationSubs = invocationSubs.getCanonical();
   
   llvm::FoldingSetNodeID id;
-  SILFunctionType::Profile(id, genericSig, ext, isAsync, coroutineKind, callee,
-                           params, yields, normalResults, errorResult,
+  SILFunctionType::Profile(id, genericSig, ext, coroutineKind, callee, params,
+                           yields, normalResults, errorResult,
                            witnessMethodConformance,
                            patternSubs, invocationSubs);
 
@@ -3537,7 +3533,7 @@ CanSILFunctionType SILFunctionType::get(
   }
 
   auto fnType =
-      new (mem) SILFunctionType(genericSig, ext, isAsync, coroutineKind, callee,
+      new (mem) SILFunctionType(genericSig, ext, coroutineKind, callee,
                                 params, yields, normalResults, errorResult,
                                 patternSubs, invocationSubs,
                                 ctx, properties, witnessMethodConformance);
