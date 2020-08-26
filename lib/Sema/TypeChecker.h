@@ -1245,7 +1245,7 @@ bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
 /// \param limit How many levels of unwrapping to perform, where 0 means to return the
 /// \c backingStorageType directly and the maximum is the number of attached property wrappers
 /// (which will produce the original property type). If not specified, defaults to the maximum.
-Type computeWrappedValueType(VarDecl *var, Type backingStorageType,
+Type computeWrappedValueType(const VarDecl *var, Type backingStorageType,
                              Optional<unsigned> limit = None);
 
 /// Build a call to the init(wrappedValue:) initializers of the property
@@ -1253,7 +1253,7 @@ Type computeWrappedValueType(VarDecl *var, Type backingStorageType,
 /// pass a callback that will get invoked with the innermost init(wrappedValue:)
 /// call.
 Expr *buildPropertyWrapperWrappedValueCall(
-    VarDecl *var, Type backingStorageType, Expr *value, bool ignoreAttributeArgs,
+    const VarDecl *var, Type backingStorageType, Expr *value, bool ignoreAttributeArgs,
     llvm::function_ref<void(ApplyExpr *)> callback = [](ApplyExpr *) {});
 
 /// Whether an overriding declaration requires the 'override' keyword.

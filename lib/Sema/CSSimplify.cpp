@@ -1415,6 +1415,12 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
             cs, cs.getConstraintLocator(loc)));
       }
 
+      if (auto *param = paramInfo.getPropertyWrapperParam(argIdx)) {
+        return cs.matchPropertyWrapperArgument(
+            /*wrapperType=*/paramTy, /*wrappedValueType=*/argTy, param,
+            subKind, loc);
+      }
+
       // If argument comes for declaration it should loose
       // `@autoclosure` flag, because in context it's used
       // as a function type represented by autoclosure.
@@ -1434,6 +1440,27 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   }
 
   return cs.getTypeMatchSuccess();
+}
+
+ConstraintSystem::TypeMatchResult
+ConstraintSystem::matchPropertyWrapperArgument(Type wrapperType, Type wrappedValueArgumentType,
+                                               const ParamDecl *param, ConstraintKind matchKind,
+                                               ConstraintLocatorBuilder locator) {
+  auto anchor = simplifyLocatorToAnchor(getConstraintLocator(locator));
+  if (!anchor)
+    return getTypeMatchFailure(locator);
+
+  auto *arg = getAsExpr(anchor);
+  auto initializer = buildPropertyWrapperWrappedValueCall(param, wrapperType, arg,
+                                                          /*ignoreAttributeArgs=*/false);
+  appliedPropertyWrappers[arg] = initializer;
+
+  generateConstraints(initializer, DC);
+  addConstraint(matchKind, getType(initializer), wrapperType,
+                getConstraintLocator(initializer));
+
+  // FIXME: Can there be failures from the above?
+  return getTypeMatchSuccess();
 }
 
 ConstraintSystem::TypeMatchResult
@@ -8155,6 +8182,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   SmallVector<AnyFunctionType::Param, 4> parameters;
   for (unsigned i = 0, n = paramList->size(); i != n; ++i) {
     auto param = inferredClosureType->getParams()[i];
+    auto *paramDecl = paramList->get(i);
 
     // In case of anonymous parameters let's infer flags from context
     // that helps to infer variadic and inout earlier.
@@ -8164,7 +8192,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     }
 
     Type internalType;
-    if (paramList->get(i)->getTypeRepr()) {
+    if (paramDecl->getTypeRepr()) {
       // Internal type is the type used in the body of the closure,
       // so "external" type translates to it as follows:
       //  - `Int...` -> `[Int]`,
@@ -8196,6 +8224,29 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
           param.isVariadic() ? ArraySliceType::get(typeVar) : Type(typeVar);
 
       auto externalType = param.getOldType();
+
+      if (auto wrapperInfo = paramDecl->getPropertyWrapperBackingPropertyInfo()) {
+        auto bindPropertyType = [&](VarDecl *var, Type type) {
+          auto *typeVar = createTypeVariable(paramLoc, 0);
+          auto constraintKind = (oneWayConstraints ?
+                                 ConstraintKind::OneWayEqual : ConstraintKind::Equal);
+          addConstraint(constraintKind, typeVar, type, paramLoc);
+          setType(var, typeVar);
+        };
+
+        bindPropertyType(wrapperInfo.backingVar, externalType);
+
+        if (auto *projection = wrapperInfo.projectionVar) {
+          auto typeInfo = paramDecl->getAttachedPropertyWrapperTypeInfo(0);
+          auto projectionType = externalType->getTypeOfMember(paramDecl->getModuleContext(),
+                                                              typeInfo.projectedValueVar);
+          bindPropertyType(projection, projectionType);
+        }
+
+        // Bind the internal parameter type to the wrapped value type
+        externalType = swift::computeWrappedValueType(paramDecl, externalType);
+      }
+
       if (oneWayConstraints) {
         addConstraint(
             ConstraintKind::OneWayBindParam, typeVar, externalType, paramLoc);
@@ -8205,7 +8256,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
       }
     }
 
-    setType(paramList->get(i), internalType);
+    setType(paramDecl, internalType);
     parameters.push_back(param);
   }
 

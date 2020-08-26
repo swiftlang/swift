@@ -6245,6 +6245,9 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   if (isVariadic())
     type = ParamDecl::getVarargBaseTy(type);
 
+  if (auto wrapperType = getPropertyWrapperBackingPropertyType())
+    type = wrapperType;
+
   auto label = getArgumentName();
   auto flags = ParameterTypeFlags::fromParameterType(
       type, isVariadic(), isAutoClosure(), isNonEphemeral(),

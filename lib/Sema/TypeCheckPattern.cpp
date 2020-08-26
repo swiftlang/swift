@@ -24,6 +24,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <utility>
@@ -1690,6 +1691,20 @@ void TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     // trying to coerce argument to contextual type would mean erasing
     // valuable diagnostic information.
     if (isValidType(ty) || shouldOverwriteParam(param)) {
+      // Apply property wrapper types to synthesized vars
+      if (auto wrapperInfo = param->getPropertyWrapperBackingPropertyInfo()) {
+        wrapperInfo.backingVar->setInterfaceType(ty->mapTypeOutOfContext());
+
+        if (auto *projection = wrapperInfo.projectionVar) {
+          auto typeInfo = param->getAttachedPropertyWrapperTypeInfo(0);
+          auto projectionType = ty->getTypeOfMember(param->getModuleContext(),
+                                                    typeInfo.projectedValueVar);
+          projection->setInterfaceType(projectionType->mapTypeOutOfContext());
+        }
+
+        ty = computeWrappedValueType(param, ty);
+      }
+
       param->setInterfaceType(ty->mapTypeOutOfContext());
     }
   };

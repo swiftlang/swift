@@ -873,6 +873,7 @@ ParameterListInfo::ParameterListInfo(
     const ValueDecl *paramOwner,
     bool skipCurriedSelf) {
   defaultArguments.resize(params.size());
+  propertyWrappers.resize(params.size());
 
   // No parameter owner means no parameter list means no default arguments
   // - hand back the zeroed bitvector.
@@ -920,6 +921,10 @@ ParameterListInfo::ParameterListInfo(
     if (allowsUnlabeledTrailingClosureParameter(param)) {
       acceptsUnlabeledTrailingClosures.set(i);
     }
+
+    if (param->hasAttachedPropertyWrapper()) {
+      propertyWrappers[i] = param;
+    }
   }
 }
 
@@ -932,6 +937,11 @@ bool ParameterListInfo::acceptsUnlabeledTrailingClosureArgument(
     unsigned paramIdx) const {
   return paramIdx >= acceptsUnlabeledTrailingClosures.size() ||
       acceptsUnlabeledTrailingClosures[paramIdx];
+}
+
+const ParamDecl *
+ParameterListInfo::getPropertyWrapperParam(unsigned paramIdx) const {
+  return paramIdx < propertyWrappers.size() ? propertyWrappers[paramIdx] : nullptr;
 }
 
 /// Turn a param list into a symbolic and printable representation that does not

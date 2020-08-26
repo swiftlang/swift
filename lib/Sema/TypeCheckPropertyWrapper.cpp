@@ -562,7 +562,7 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
   return type;
 }
 
-Type swift::computeWrappedValueType(VarDecl *var, Type backingStorageType,
+Type swift::computeWrappedValueType(const VarDecl *var, Type backingStorageType,
                                     Optional<unsigned> limit) {
   auto wrapperAttrs = var->getAttachedPropertyWrappers();
   unsigned realLimit = wrapperAttrs.size();
@@ -589,7 +589,7 @@ Type swift::computeWrappedValueType(VarDecl *var, Type backingStorageType,
 }
 
 Expr *swift::buildPropertyWrapperWrappedValueCall(
-    VarDecl *var, Type backingStorageType, Expr *value, bool ignoreAttributeArgs,
+    const VarDecl *var, Type backingStorageType, Expr *value, bool ignoreAttributeArgs,
     llvm::function_ref<void(ApplyExpr *)> innermostInitCallback) {
   // From the innermost wrapper type out, form init(wrapperValue:) calls.
   ASTContext &ctx = var->getASTContext();

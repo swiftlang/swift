@@ -7616,6 +7616,14 @@ namespace {
     }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      // If this expression has an applied property wrapper, get the backing
+      // initializer expression.
+      if (Rewriter.solution.appliedPropertyWrappers.count(expr)) {
+        auto *init = Rewriter.solution.appliedPropertyWrappers[expr];
+        Rewriter.solution.appliedPropertyWrappers.erase(expr);
+        expr = init;
+      }
+
       // For closures, update the parameter types and check the body.
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
         rewriteFunction(closure);
