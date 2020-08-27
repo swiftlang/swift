@@ -301,14 +301,14 @@ struct TF_687<T> : Differentiable {
   }
 }
 // expected-error @+2 {{function is not differentiable}}
-// expected-note @+1 {{cannot differentiate through a non-differentiable argument; do you want to use 'withoutDerivative(at:)'?}}
+// expected-note @+1 {{cannot differentiate through a non-differentiable argument; do you want to use 'withoutDerivative(at:)'?}} {{78-78=withoutDerivative(at: }} {{79-79=)}}
 let _: @differentiable (Float) -> TF_687<Any> = { x in TF_687<Any>(x, dummy: x) }
 
 // expected-error @+1 {{function is not differentiable}}
 @differentiable
 // expected-note @+1 {{when differentiating this function definition}}
 func roundingGivesError(x: Float) -> Float {
-  // expected-note @+1 {{cannot differentiate through a non-differentiable result; do you want to use 'withoutDerivative(at:)'?}}
+  // expected-note @+1 {{cannot differentiate through a non-differentiable result; do you want to use 'withoutDerivative(at:)'?}} {{16-16=withoutDerivative(at: }} {{22-22=)}}
   return Float(Int(x))
 }
 
@@ -688,7 +688,7 @@ func differentiableProjectedValueAccess(_ s: Struct) -> Float {
 // expected-note @+2 {{when differentiating this function definition}}
 @differentiable
 func projectedValueAccess(_ s: Struct) -> Float {
-  // expected-note @+1 {{cannot differentiate through a non-differentiable result; do you want to use 'withoutDerivative(at:)'?}}
+  // expected-note @+1 {{cannot differentiate through a non-differentiable result; do you want to use 'withoutDerivative(at:)'?}} {{3-3=withoutDerivative(at: }} {{7-7=)}}
   s.$y.wrappedValue
 }
 
@@ -714,7 +714,7 @@ func modify(_ s: Struct, _ x: Float) -> Float {
 func tupleArrayLiteralInitialization(_ x: Float, _ y: Float) -> Float {
   // `Array<(Float, Float)>` does not conform to `Differentiable`.
   let array = [(x * y, x * y)]
-  // expected-note @+1 {{cannot differentiate through a non-differentiable argument; do you want to use 'withoutDerivative(at:)'?}}
+  // expected-note @+1 {{cannot differentiate through a non-differentiable argument; do you want to use 'withoutDerivative(at:)'?}} {{10-10=withoutDerivative(at: }} {{15-15=)}}
   return array[0].0
 }
 
