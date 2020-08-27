@@ -195,9 +195,7 @@ import SubE
 /// --------Clang module SwiftShims
 // CHECK-LABEL: "modulePath": "SwiftShims.pcm",
 
-// CHECK-NO-SEARCH-PATHS-NOT: "-I"
 // CHECK-NO-SEARCH-PATHS-NOT: "-sdk"
-// CHECK-NO-SEARCH-PATHS-NOT: "-F"
 // CHECK-NO-SEARCH-PATHS-NOT: "-prebuilt-module-cache-path"
 
 // Check make-style dependencies
