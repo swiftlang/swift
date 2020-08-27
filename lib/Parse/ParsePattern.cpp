@@ -854,10 +854,13 @@ void Parser::parseAsyncThrows(
     
     if (!peekToken().isKeyword()) {
       BacktrackingScope backtrackingScope(*this);
-      ASTContext &Ctx = SF.getASTContext();
-      DiagnosticSuppression SuppressedDiags(Ctx.Diags);
-      ParserResult<TypeRepr> result = parseType();
-      throwsType = result.getPtrOrNull();
+      if (peekToken().is(tok::kw_throws)) {
+        ASTContext &Ctx = SF.getASTContext();
+        DiagnosticSuppression SuppressedDiags(Ctx.Diags);
+        backtrackingScope.cancelBacktrack();
+        ParserResult<TypeRepr> result = parseType();
+        throwsType = result.getPtrOrNull();
+      }
     }
 
     if (existingArrowLoc.isValid()) {
