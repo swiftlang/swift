@@ -1057,6 +1057,17 @@ void swift::ide::api::SDKNodeTypeFunc::diagnose(SDKNode *Right) {
 }
 
 namespace {
+static void diagnoseRemovedDecl(const SDKNodeDecl *D) {
+  if (D->getSDKContext().checkingABI()) {
+    // Don't complain about removing @_alwaysEmitIntoClient if we are checking ABI.
+    // We shouldn't include these decls in the ABI baseline file. This line is
+    // added so the checker is backward compatible.
+    if (D->hasDeclAttribute(DeclAttrKind::DAK_AlwaysEmitIntoClient))
+      return;
+  }
+  D->emitDiag(SourceLoc(), diag::removed_decl, D->isDeprecated());
+}
+
 // This is first pass on two given SDKNode trees. This pass removes the common part
 // of two versions of SDK, leaving only the changed part.
 class PrunePass : public MatchedNodeListener, public SDKTreeDiffPass {
@@ -1241,7 +1252,7 @@ public:
                      TD->isProtocol());
       }
       if (auto *Acc = dyn_cast<SDKNodeDeclAccessor>(Left)) {
-        Acc->emitDiag(SourceLoc(), diag::removed_decl, Acc->isDeprecated());
+        diagnoseRemovedDecl(Acc);
       }
       return;
     case NodeMatchReason::FuncToProperty:
@@ -2084,7 +2095,7 @@ static bool diagnoseRemovedExtensionMembers(const SDKNode *Node) {
     if (DT->isExtension()) {
       for (auto *C: DT->getChildren()) {
         auto *MD = cast<SDKNodeDecl>(C);
-        MD->emitDiag(SourceLoc(), diag::removed_decl, MD->isDeprecated());
+        diagnoseRemovedDecl(MD);
       }
       return true;
     }
@@ -2161,7 +2172,7 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
     }
     bool handled = diagnoseRemovedExtensionMembers(Node);
     if (!handled)
-      Node->emitDiag(SourceLoc(), diag::removed_decl, Node->isDeprecated());
+      diagnoseRemovedDecl(Node);
     return;
   }
   case NodeAnnotation::Rename: {
