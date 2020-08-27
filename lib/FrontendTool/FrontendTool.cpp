@@ -1888,7 +1888,7 @@ static bool performCompile(CompilerInstance &Instance,
   // trigger a bunch of other errors due to the stdlib being missing, or at
   // worst crash downstream as many call sites don't currently handle a missing
   // stdlib.
-  if (!FrontendOptions::shouldActionOnlyParse(Action)) {
+  if (FrontendOptions::doesActionRequireSwiftStandardLibrary(Action)) {
     if (Instance.loadStdlibIfNeeded())
       return true;
   }
