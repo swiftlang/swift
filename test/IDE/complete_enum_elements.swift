@@ -138,7 +138,7 @@ enum FooEnum: CaseIterable {
 // FOO_ENUM_DOT_INVALID-NEXT: Decl[StaticVar]/CurrNominal: allCases[#[FooEnum]#]{{; name=.+$}}
 // FOO_ENUM_DOT_INVALID-NEXT: End completions
 
-// FOO_ENUM_DOT_ELEMENTS: Begin completions, 11 items
+// FOO_ENUM_DOT_ELEMENTS: Begin completions, 13 items
 // FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: Foo1[#FooEnum#]{{; name=.+$}}
 // FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: Foo2[#FooEnum#]{{; name=.+$}}
 // FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: alias1[#FooEnum#]; name=alias1
@@ -149,6 +149,8 @@ enum FooEnum: CaseIterable {
 // FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[Constructor]/CurrNominal/IsSystem: AllCases({#repeating: FooEnum#}, {#count: Int#})[#Array<FooEnum>#]; name=AllCases(repeating: FooEnum, count: Int)
 // FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[Constructor]/CurrNominal/IsSystem: AllCases({#unsafeUninitializedCapacity: Int#}, {#initializingWith: (inout UnsafeMutableBufferPointer<FooEnum>, inout Int) throws -> Void##(inout UnsafeMutableBufferPointer<FooEnum>, inout Int) throws -> Void#})[' rethrows'][#Array<FooEnum>#]; name=AllCases(unsafeUninitializedCapacity: Int, initializingWith: (inout UnsafeMutableBufferPointer<FooEnum>, inout Int) throws -> Void) rethrows
 // FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[Constructor]/CurrNominal/IsSystem: AllCases({#from: Decoder#})[' throws'][#Array<FooEnum>#]; name=AllCases(from: Decoder) throws
+// FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[Constructor]/CurrNominal/IsSystem: AllCases({#repeating: FooEnum#}, {#count: Int#})[#FooEnum.AllCases#]; name=AllCases(repeating: FooEnum, count: Int)
+// FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[Constructor]/CurrNominal/IsSystem: AllCases({#(elements): Sequence#})[#FooEnum.AllCases#]; name=AllCases(elements: Sequence)
 // FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[StaticVar]/CurrNominal:        allCases[#[FooEnum]#]; name=allCases
 // FOO_ENUM_DOT_ELEMENTS-NEXT: End completions
 
@@ -462,17 +464,10 @@ func testWithInvalid1() {
 
 func testUnqualified1(x: QuxEnum) {
   _ = x == .Qux1 || x == .#^UNRESOLVED_2^#Qux2
-  // UNRESOLVED_2: Begin completions, 12 items
+  // UNRESOLVED_2: Begin completions
   // UNRESOLVED_2-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     Qux1[#QuxEnum#]; name=Qux1
   // UNRESOLVED_2-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     Qux2[#QuxEnum#]; name=Qux2
   // UNRESOLVED_2-DAG: Decl[Constructor]/CurrNominal/IsSystem:                     RawValue({#bitPattern: UInt#})[#Int#]; name=RawValue(bitPattern: UInt)
-  // UNRESOLVED_2-DAG: Decl[Constructor]/CurrNominal/IsSystem:                     RawValue({#(source): Float#})[#Int#]; name=RawValue(source: Float)
-  // UNRESOLVED_2-DAG: Decl[Constructor]/CurrNominal/IsSystem:                     RawValue({#(source): Double#})[#Int#]; name=RawValue(source: Double)
-  // UNRESOLVED_2-DAG: Decl[Constructor]/CurrNominal/IsSystem:                     RawValue({#(source): Float80#})[#Int#]; name=RawValue(source: Float80)
-  // UNRESOLVED_2-DAG: Decl[Constructor]/CurrNominal/IsSystem:                     RawValue({#from: Decoder#})[' throws'][#Int#]; name=RawValue(from: Decoder) throws
-  // UNRESOLVED_2-DAG: Decl[Constructor]/CurrNominal/IsSystem:                     RawValue({#bitPattern: OpaquePointer?#})[#Int#]; name=RawValue(bitPattern: OpaquePointer?)
-  // UNRESOLVED_2-DAG: Decl[Constructor]/CurrNominal/IsSystem:                     RawValue({#bitPattern: ObjectIdentifier#})[#Int#]; name=RawValue(bitPattern: ObjectIdentifier)
-  // UNRESOLVED_2-DAG: Decl[Constructor]/CurrNominal/IsSystem:                     RawValue({#bitPattern: _Pointer?#})[#Int#]; name=RawValue(bitPattern: _Pointer?)
   // UNRESOLVED_2-DAG: Decl[Constructor]/CurrNominal:                              init({#rawValue: Int#})[#QuxEnum?#]; name=init(rawValue: Int)
   // UNRESOLVED_2-DAG: Decl[InstanceMethod]/Super/IsSystem/TypeRelation[Invalid]:  hash({#(self): QuxEnum#})[#(into: inout Hasher) -> Void#]; name=hash(self: QuxEnum)
   // UNRESOLVED_2: End completions
