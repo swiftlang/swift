@@ -170,7 +170,7 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType) {
   DeclName Name(Context, Id, paramList);
   auto *const FD = FuncDecl::createImplicit(
       Context, StaticSpellingKind::None, Name, /*NameLoc=*/SourceLoc(),
-      /*Async=*/false, /*Throws=*/false,
+      /*Async=*/false, /*Throws=*/false, /*ThrowsType=*/nullptr,
       /*GenericParams=*/nullptr, paramList, ResType, DC);
   FD->setAccess(AccessLevel::Public);
   return FD;
@@ -211,7 +211,7 @@ getBuiltinGenericFunction(Identifier Id,
   auto *const func = FuncDecl::createImplicit(
       Context, StaticSpellingKind::None, Name, /*NameLoc=*/SourceLoc(),
       /*Async=*/false,
-      /*Throws=*/Rethrows, GenericParams, paramList, ResType, DC);
+      /*Throws=*/Rethrows, /*ThrowsType=*/nullptr, GenericParams, paramList, ResType, DC);
 
   func->setAccess(AccessLevel::Public);
   func->setGenericSignature(Sig);

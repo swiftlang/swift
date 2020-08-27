@@ -5959,6 +5959,8 @@ public:
   /// Returns true if the function has a typed throw.
   bool hasTypedThrows() const { return (Bits.AbstractFunctionDecl.Throws && ThrowsType != nullptr); }
 
+  TypeRepr *typedThrow() const { return ThrowsType; }
+
   // FIXME: Hack that provides names with keyword arguments for accessors.
   DeclName getEffectiveFullName() const;
 
@@ -6283,7 +6285,7 @@ public:
   /// Factory function only for use by deserialization.
   static FuncDecl *createDeserialized(ASTContext &Context,
                                       StaticSpellingKind StaticSpelling,
-                                      DeclName Name, bool Async, bool Throws,
+                                      DeclName Name, bool Async, bool Throws, TypeRepr *ThrowsType,
                                       GenericParamList *GenericParams,
                                       Type FnRetType, DeclContext *Parent);
 
@@ -6298,7 +6300,7 @@ public:
   static FuncDecl *createImplicit(ASTContext &Context,
                                   StaticSpellingKind StaticSpelling,
                                   DeclName Name, SourceLoc NameLoc, bool Async,
-                                  bool Throws, GenericParamList *GenericParams,
+                                  bool Throws, TypeRepr *ThrowsType, GenericParamList *GenericParams,
                                   ParameterList *BodyParams, Type FnRetType,
                                   DeclContext *Parent);
 

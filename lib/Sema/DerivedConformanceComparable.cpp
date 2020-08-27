@@ -257,7 +257,7 @@ deriveComparable_lt(
   auto *const comparableDecl = FuncDecl::createImplicit(
       C, StaticSpellingKind::KeywordStatic, name, /*NameLoc=*/SourceLoc(),
       /*Async=*/false,
-      /*Throws=*/false,
+      /*Throws=*/false, /*ThrowsType=*/nullptr,
       /*GenericParams=*/nullptr, params, boolTy, parentDC);
   comparableDecl->setUserAccessible(false);
 

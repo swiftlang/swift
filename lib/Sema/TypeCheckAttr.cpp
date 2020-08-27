@@ -1931,7 +1931,7 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
                ParameterList::createEmpty(context)),
       /*NameLoc=*/SourceLoc(),
       /*Async=*/false,
-      /*Throws=*/mainFunction->hasThrows(),
+      /*Throws=*/mainFunction->hasThrows(), /*ThrowsType=*/mainFunction->typedThrow(),
       /*GenericParams=*/nullptr, ParameterList::createEmpty(context),
       /*FnRetType=*/TupleType::getEmpty(context), declContext);
   func->setSynthesized(true);

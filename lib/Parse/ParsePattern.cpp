@@ -863,6 +863,9 @@ void Parser::parseAsyncThrows(
         ParserResult<TypeRepr> result = parseType();
         throwsType = result.getPtrOrNull();
       }
+    } else {
+      keyword = Tok.getText();
+      throwsLoc = consumeToken();
     }
 
     if (existingArrowLoc.isValid()) {

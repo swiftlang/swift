@@ -7269,14 +7269,14 @@ FuncDecl *FuncDecl::createImpl(ASTContext &Context,
 
 FuncDecl *FuncDecl::createDeserialized(ASTContext &Context,
                                        StaticSpellingKind StaticSpelling,
-                                       DeclName Name, bool Async, bool Throws,
+                                       DeclName Name, bool Async, bool Throws, TypeRepr *ThrowsType,
                                        GenericParamList *GenericParams,
                                        Type FnRetType, DeclContext *Parent) {
   assert(FnRetType && "Deserialized result type must not be null");
   auto *const FD =
       FuncDecl::createImpl(Context, SourceLoc(), StaticSpelling, SourceLoc(),
                            Name, SourceLoc(), Async, SourceLoc(), Throws,
-                           SourceLoc(), nullptr, GenericParams, Parent, ClangNode());
+                           SourceLoc(), ThrowsType, GenericParams, Parent, ClangNode());
   FD->setResultInterfaceType(FnRetType);
   return FD;
 }
@@ -7299,13 +7299,13 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
 FuncDecl *FuncDecl::createImplicit(ASTContext &Context,
                                    StaticSpellingKind StaticSpelling,
                                    DeclName Name, SourceLoc NameLoc, bool Async,
-                                   bool Throws, GenericParamList *GenericParams,
+                                   bool Throws, TypeRepr *ThrowsType, GenericParamList *GenericParams,
                                    ParameterList *BodyParams, Type FnRetType,
                                    DeclContext *Parent) {
   assert(FnRetType);
   auto *const FD = FuncDecl::createImpl(
       Context, SourceLoc(), StaticSpelling, SourceLoc(), Name, NameLoc, Async,
-      SourceLoc(), Throws, SourceLoc(), nullptr, GenericParams, Parent, ClangNode());
+      SourceLoc(), Throws, SourceLoc(), ThrowsType, GenericParams, Parent, ClangNode());
   FD->setImplicit();
   FD->setParameters(BodyParams);
   FD->setResultInterfaceType(FnRetType);
