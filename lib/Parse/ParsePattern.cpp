@@ -858,8 +858,10 @@ void Parser::parseAsyncThrows(
         ASTContext &Ctx = SF.getASTContext();
         DiagnosticSuppression SuppressedDiags(Ctx.Diags);
         backtrackingScope.cancelBacktrack();
-        ParserResult<TypeRepr> result = parseType();
-        throwsType = result.getPtrOrNull();
+        if (canParseType()) {
+          ParserResult<TypeRepr> result = parseType();
+          throwsType = result.getPtrOrNull();
+        }
       }
     }
 
