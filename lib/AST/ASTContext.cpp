@@ -1466,8 +1466,9 @@ bool ASTContext::hadError() const {
 /// Retrieve the arena from which we should allocate storage for a type.
 static AllocationArena getArena(RecursiveTypeProperties properties) {
   bool hasTypeVariable = properties.hasTypeVariable();
-  return hasTypeVariable? AllocationArena::ConstraintSolver
-                        : AllocationArena::Permanent;
+  bool hasHole = properties.hasTypeHole();
+  return hasTypeVariable || hasHole ? AllocationArena::ConstraintSolver
+                                    : AllocationArena::Permanent;
 }
 
 void ASTContext::addSearchPath(StringRef searchPath, bool isFramework,
@@ -2360,9 +2361,13 @@ Type ErrorType::get(Type originalType) {
 
 Type HoleType::get(ASTContext &ctx, OriginatorType originator) {
   assert(originator);
-  RecursiveTypeProperties properties = RecursiveTypeProperties::HasTypeHole;
+  auto properties = reinterpret_cast<TypeBase *>(originator.getOpaqueValue())
+                        ->getRecursiveProperties();
+  properties |= RecursiveTypeProperties::HasTypeHole;
+
   auto arena = getArena(properties);
-  return new (ctx, arena) HoleType(ctx, originator, properties);
+  return new (ctx, arena)
+      HoleType(ctx, originator, RecursiveTypeProperties::HasTypeHole);
 }
 
 BuiltinIntegerType *BuiltinIntegerType::get(BuiltinIntegerWidth BitWidth,
