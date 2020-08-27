@@ -72,10 +72,10 @@ func test001() {
   do {} catch #^CATCH1^#
 
 // CATCH1:      Begin completions
-// CATCH1-DAG:  Decl[Enum]/CurrModule:              Error4[#Error4#]; name=Error4{{$}}
-// CATCH1-DAG:  Decl[Class]/CurrModule:             Error3[#Error3#]; name=Error3{{$}}
-// CATCH1-DAG:  Decl[Class]/CurrModule:             Error2[#Error2#]; name=Error2{{$}}
-// CATCH1-DAG:  Decl[Class]/CurrModule:             Error1[#Error1#]; name=Error1{{$}}
+// CATCH1-DAG:  Decl[Enum]/CurrModule/TypeRelation[Convertible]:              Error4[#Error4#]; name=Error4{{$}}
+// CATCH1-DAG:  Decl[Class]/CurrModule/TypeRelation[Convertible]:             Error3[#Error3#]; name=Error3{{$}}
+// CATCH1-DAG:  Decl[Class]/CurrModule/TypeRelation[Convertible]:             Error2[#Error2#]; name=Error2{{$}}
+// CATCH1-DAG:  Decl[Class]/CurrModule/TypeRelation[Convertible]:             Error1[#Error1#]; name=Error1{{$}}
 // CATCH1-DAG:  Keyword[let]/None:                  let{{; name=.+$}}
 // CATCH1-DAG:  Decl[Class]/CurrModule:             NoneError1[#NoneError1#]; name=NoneError1{{$}}
 // CATCH1-DAG:  Decl[Class]/OtherModule[Foundation]/IsSystem: NSError[#NSError#]{{; name=.+$}}
