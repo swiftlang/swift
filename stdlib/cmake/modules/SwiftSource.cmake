@@ -404,7 +404,7 @@ function(_compile_swift_files
     list(APPEND swift_flags "-enable-library-evolution")
   endif()
 
-  if(SWIFT_STDLIB_USE_NONATOMIC_RC)
+  if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
     list(APPEND swift_flags "-Xfrontend" "-assume-single-threaded")
   endif()
 
