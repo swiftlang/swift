@@ -481,6 +481,7 @@ void ConstraintSystem::PotentialBindings::addPotentialBinding(
   if (binding.Kind == AllowedBindingKind::Supertypes &&
       !binding.BindingType->hasUnresolvedType() &&
       !binding.BindingType->hasTypeVariable() &&
+      !binding.BindingType->hasHole() &&
       !binding.BindingType->hasUnboundGenericType() &&
       !binding.hasDefaultedLiteralProtocol() &&
       !binding.isDefaultableBinding() && allowJoinMeet) {
