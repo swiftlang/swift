@@ -1603,6 +1603,11 @@ SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
       if (isa<TypeAliasDecl>(VD))
         return true;
     }
+    // Exclude decls with @_alwaysEmitIntoClient if we are checking ABI.
+    // These decls are considered effectively public because they are usable
+    // from inline, so we have to manually exclude them here.
+    if (D->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+      return true;
   } else {
     if (D->isPrivateStdlibDecl(false))
       return true;
