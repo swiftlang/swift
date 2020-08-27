@@ -2073,12 +2073,14 @@ namespace {
 
         return resolveTypeReferenceInExpression(
             closure->getExplicitResultTypeRepr(),
-            TypeResolverContext::InExpression, nullptr);
+            TypeResolverContext::InExpression,
+            // Introduce type variables for unbound generics.
+            OpenUnboundGenericType(
+                CS, CS.getConstraintLocator(closure,
+                                            ConstraintLocator::ClosureResult)));
       };
 
       Type resultTy;
-      auto *resultLoc =
-            CS.getConstraintLocator(closure, ConstraintLocator::ClosureResult);
       if (auto explicityTy = getExplicitResultType()) {
         resultTy = explicityTy;
       } else {
@@ -2099,9 +2101,11 @@ namespace {
           // If this is a multi-statement closure, let's mark result
           // as potential hole right away.
           resultTy = CS.createTypeVariable(
-              resultLoc,
+              CS.getConstraintLocator(closure,
+                                      ConstraintLocator::ClosureResult),
               shouldTypeCheckInEnclosingExpression(closure)
-                ? 0 : TVO_CanBindToHole);
+                  ? 0
+                  : TVO_CanBindToHole);
         }
       }
 
