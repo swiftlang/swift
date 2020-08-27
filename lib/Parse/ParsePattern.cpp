@@ -21,6 +21,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/ParsedSyntaxRecorder.h"
@@ -852,10 +853,11 @@ void Parser::parseAsyncThrows(
     throwsLoc = consumeToken();
     
     if (!peekToken().isKeyword()) {
+      BacktrackingScope backtrackingScope(*this);
+      ASTContext &Ctx = SF.getASTContext();
+      DiagnosticSuppression SuppressedDiags(Ctx.Diags);
       ParserResult<TypeRepr> result = parseType();
-      if (result.isNonNull()) {
-        throwsType = result.get();
-      }
+      throwsType = result.getPtrOrNull();
     }
 
     if (existingArrowLoc.isValid()) {
