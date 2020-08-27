@@ -1,5 +1,7 @@
 // RUN: %target-build-swift %s
 // RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
+// UNSUPPORTED: OS=linux-gnu
+// See: https://bugs.swift.org/browse/TF-1312
 
 // Test crashes related to differentiation and definite intiialization.
 
