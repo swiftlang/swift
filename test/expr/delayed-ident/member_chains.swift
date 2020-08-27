@@ -27,6 +27,10 @@ struct ImplicitMembers: Equatable {
     }
     static var superOptional: ImplicitMembers??? = ImplicitMembers()
 
+    static func createIUOArg(_: Int) -> ImplicitMembers { ImplicitMembers() }
+    var anotherIUO: ImplicitMembers! { ImplicitMembers() }
+    func getAnotherIUO() -> ImplicitMembers! { ImplicitMembers() }
+
     var another: ImplicitMembers { ImplicitMembers() }
     var anotherMutable: ImplicitMembers {
         get { ImplicitMembers() }
@@ -115,6 +119,16 @@ let _: ImplicitMembers = .implicit.another.another.another.another.another
 let _: ImplicitMembers = .implicit.getAnother().getAnother().getAnother().getAnother().getAnother()
 let _: ImplicitMembers = .implicit.getAnother(arg: 0).getAnother(arg: 0).getAnother(arg: 0).getAnother(arg: 0).getAnother(arg: 0)
 
+let _: ImplicitMembers = .implicit.another.getAnother().getAnother(arg: 0).anotherIUO
+let _: ImplicitMembers = .createImplicit().another.getAnother().getAnother(arg: 0).anotherIUO
+let _: ImplicitMembers = .init().another.getAnother().getAnother(arg: 0).anotherIUO
+
+let _: ImplicitMembers = .implicit.another.getAnother().getAnother(arg: 0).getAnotherIUO()
+let _: ImplicitMembers = .createImplicit().another.getAnother().getAnother(arg: 0).getAnotherIUO()
+let _: ImplicitMembers = .init().another.getAnother().getAnother(arg: 0).getAnotherIUO()
+
+let _: ImplicitMembers = .createIUOArg(_:)(0)
+
 let _: ImplicitMembers = .optional!
 let _: ImplicitMembers = .optional!.another
 let _: ImplicitMembers = .createOptional()!.another
@@ -122,6 +136,10 @@ let _: ImplicitMembers = .optional!.anotherOptional!
 let _: ImplicitMembers = .createOptional()!.anotherOptional!
 let _: ImplicitMembers = .optional!.getAnotherOptional()!
 let _: ImplicitMembers = .createOptional()!.getAnotherOptional()!
+let _: ImplicitMembers = .implicit.getAnotherIUO()
+let _: ImplicitMembers = .createImplicit().anotherIUO
+let _: ImplicitMembers = .implicit.anotherIUO
+let _: ImplicitMembers = .createImplicit().anotherIUO
 
 let _: ImplicitMembers = .optional // expected-error {{value of optional type 'ImplicitMembers?' must be unwrapped to a value of type 'ImplicitMembers'}} expected-note {{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{35-35= ?? <#default value#>}} expected-note {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{35-35=!}}
 let _: ImplicitMembers = .implicit.anotherOptional // expected-error {{value of optional type 'ImplicitMembers?' must be unwrapped to a value of type 'ImplicitMembers'}} expected-note {{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{51-51= ?? <#default value#>}} expected-note {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{51-51=!}}
@@ -167,6 +185,8 @@ let _: ImplicitMembers? = .createOptional()?.getAnother()
 let _: ImplicitMembers? = .createOptional()?.getAnotherOptional()
 let _: ImplicitMembers? = .createOptional()?.anotherOptional?.another
 let _: ImplicitMembers? = .createOptional()?.getAnotherOptional()?.another
+let _: ImplicitMembers? = .createOptional()?.getAnotherOptional()?.anotherIUO
+let _: ImplicitMembers? = .createOptional()?.getAnotherOptional()?.getAnotherIUO()
 // FIXME: This should be allowed
 // let _: ImplicitMembers? = .superOptional???.another
 
