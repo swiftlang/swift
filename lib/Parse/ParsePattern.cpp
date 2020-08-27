@@ -848,20 +848,20 @@ void Parser::parseAsyncThrows(
       diagnose(Tok, diag::throw_in_function_type)
         .fixItReplace(Tok.getLoc(), "throws");
     }
-
-    StringRef keyword = Tok.getText();
-    throwsLoc = consumeToken();
-    
-    if (!peekToken().isKeyword()) {
-      BacktrackingScope backtrackingScope(*this);
-      if (peekToken().is(tok::kw_throws)) {
-        ASTContext &Ctx = SF.getASTContext();
-        DiagnosticSuppression SuppressedDiags(Ctx.Diags);
-        backtrackingScope.cancelBacktrack();
-        if (canParseType()) {
-          ParserResult<TypeRepr> result = parseType();
-          throwsType = result.getPtrOrNull();
-        }
+    StringRef keyword;
+    if (Tok.isKeyword() && Tok.is(tok::kw_throws)) {
+      keyword = Tok.getText();
+      throwsLoc = consumeToken();
+      ASTContext &Ctx = SF.getASTContext();
+      DiagnosticSuppression SuppressedDiags(Ctx.Diags);
+      bool hasType = false;
+      {
+        BacktrackingScope backtrack(*this);
+        hasType = canParseType();
+      }
+      if (hasType) {
+        ParserResult<TypeRepr> result = parseType();
+        throwsType = result.getPtrOrNull();
       }
     }
 

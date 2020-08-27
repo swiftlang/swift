@@ -42,9 +42,11 @@ func one() {
   
   func foo() throws {}
 
-  struct SomeError: Error {}
+  struct SomeError: Swift.Error {}
 
   func bar() throws SomeError {}
+
+  func baz() throws SomeError -> Int { return 2; }
   
   do {
 #if false
