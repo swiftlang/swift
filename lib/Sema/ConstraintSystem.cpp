@@ -2617,11 +2617,13 @@ Type ConstraintSystem::simplifyTypeImpl(Type type,
           // there will be a missing conformance fix applied in diagnostic mode,
           // so the concrete dependent member type is considered a "hole" in
           // order to continue solving.
+          auto memberTy = DependentMemberType::get(lookupBaseType, assocType);
           if (shouldAttemptFixes() &&
-              getPhase() == ConstraintSystemPhase::Solving)
-            return getASTContext().TheUnresolvedType;
+              getPhase() == ConstraintSystemPhase::Solving) {
+            return HoleType::get(getASTContext(), memberTy);
+          }
 
-          return DependentMemberType::get(lookupBaseType, assocType);
+          return memberTy;
         }
 
         auto subs = SubstitutionMap::getProtocolSubstitutions(
@@ -2653,16 +2655,23 @@ Type ConstraintSystem::simplifyType(Type type) const {
 }
 
 Type Solution::simplifyType(Type type) const {
-  if (!type->hasTypeVariable())
+  if (!(type->hasTypeVariable() || type->hasHole()))
     return type;
 
   // Map type variables to fixed types from bindings.
-  return getConstraintSystem().simplifyTypeImpl(type,
-      [&](TypeVariableType *tvt) -> Type {
-        auto known = typeBindings.find(tvt);
-        assert(known != typeBindings.end());
-        return known->second;
-      });
+  auto &cs = getConstraintSystem();
+  auto resolvedType = cs.simplifyTypeImpl(
+      type, [&](TypeVariableType *tvt) -> Type { return getFixedType(tvt); });
+
+  // Holes shouldn't be reachable through a solution, they are only
+  // useful to determine what went wrong exactly.
+  if (resolvedType->hasHole()) {
+    return resolvedType.transform([&](Type type) {
+      return type->isHole() ? Type(cs.getASTContext().TheUnresolvedType) : type;
+    });
+  }
+
+  return resolvedType;
 }
 
 size_t Solution::getTotalMemory() const {
@@ -4646,7 +4655,7 @@ SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
   // Determine the contextual type for the initialization.
   TypeLoc contextualType;
   if (!(isa<OptionalSomePattern>(pattern) && !pattern->isImplicit()) &&
-      patternType && !patternType->isHole()) {
+      patternType && !patternType->is<UnresolvedType>()) {
     contextualType = TypeLoc::withoutLoc(patternType);
 
     // Only provide a TypeLoc if it makes sense to allow diagnostics.

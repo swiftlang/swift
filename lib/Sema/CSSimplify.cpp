@@ -4434,6 +4434,12 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::FunctionBuilderBodyResult: {
+    // If result type of the body couldn't be determined
+    // there is going to be other fix available to diagnose
+    // the underlying issue.
+    if (lhs->isHole())
+      return true;
+
     conversionsOrFixes.push_back(ContextualMismatch::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
     break;
@@ -4685,8 +4691,18 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
     case TypeKind::Error:
     case TypeKind::Unresolved:
-    case TypeKind::Hole:
       return getTypeMatchFailure(locator);
+
+    case TypeKind::Hole: {
+      // If it's allowed to attempt fixes, let's delegate
+      // decision to `repairFailures`, since depending on
+      // locator we might either ignore such a mismatch,
+      // or record a specialized fix.
+      if (shouldAttemptFixes())
+        break;
+
+      return getTypeMatchFailure(locator);
+    }
 
     case TypeKind::GenericTypeParam:
       llvm_unreachable("unmapped dependent type in type checker");
