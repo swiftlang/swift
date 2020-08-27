@@ -1,3 +1,6 @@
+// UNSUPPORTED: OS=linux-gnu
+// See rdar://67883963
+
 // RUN: %empty-directory(%t)
 // RUN: %gyb %s > %t/main.swift
 
