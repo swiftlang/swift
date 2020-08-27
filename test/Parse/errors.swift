@@ -41,6 +41,10 @@ func one() {
   }
   
   func foo() throws {}
+
+  struct SomeError: Error {}
+
+  func bar() throws SomeError {}
   
   do {
 #if false

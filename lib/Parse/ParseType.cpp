@@ -18,6 +18,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/SyntaxParsingContext.h"
@@ -437,7 +438,11 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
     throwsLoc = consumeToken();
     // The next token is not a keyword
     if (!peekToken().isKeyword()) {
-      throwsType = tyR;
+      BacktrackingScope backtrackingScope(*this);
+      ASTContext &Ctx = SF.getASTContext();
+      DiagnosticSuppression SuppressedDiags(Ctx.Diags);
+      ParserResult<TypeRepr> result = parseType();
+      throwsType = result.getPtrOrNull();
     }
 
     // 'async' must preceed 'throws'; accept this but complain.
@@ -452,12 +457,6 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   }
 
   if (Tok.is(tok::arrow)) {
-    ParserResult<TypeRepr> ty =
-      parseTypeSimpleOrComposition(MessageID, HandleCodeCompletion);
-    if (ty.isNull())
-      return ty;
-    auto tyR = ty.get();
-    auto status = ParserStatus(ty);
     // Handle type-function if we have an arrow.
     SourceLoc arrowLoc = consumeToken();
 
