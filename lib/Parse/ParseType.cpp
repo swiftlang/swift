@@ -422,7 +422,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   // Don't consume 'throws', if the next token is not '->' or 'async', so we
   // can emit a more useful diagnostic when parsing a function decl.
   SourceLoc throwsLoc;
-  TypeRepr *throwsType;
+  TypeRepr *throwsType = nullptr;
   if (Tok.isAny(tok::kw_throws, tok::kw_rethrows, tok::kw_throw, tok::kw_try) &&
       (peekToken().is(tok::arrow) ||
        (shouldParseExperimentalConcurrency() &&
@@ -443,8 +443,10 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
         ASTContext &Ctx = SF.getASTContext();
         DiagnosticSuppression SuppressedDiags(Ctx.Diags);
         backtrackingScope.cancelBacktrack();
-        ParserResult<TypeRepr> result = parseType();
-        throwsType = result.getPtrOrNull();
+        if (canParseType()) {
+          ParserResult<TypeRepr> result = parseType();
+          throwsType = result.getPtrOrNull();
+        }
       }
     }
 
