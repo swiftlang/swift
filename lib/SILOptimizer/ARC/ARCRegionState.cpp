@@ -18,9 +18,14 @@
 #include "swift/SILOptimizer/Analysis/LoopRegionAnalysis.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
+
+llvm::cl::opt<bool> verifyARCLoopSummary(
+    "verify-arc-loop-summary", llvm::cl::init(false),
+    llvm::cl::desc("Verify if loop summary is correct in ARCLoopsOpts"));
 
 //===----------------------------------------------------------------------===//
 //                               ARCRegionState
@@ -282,6 +287,18 @@ bool ARCRegionState::processLoopBottomUp(
       OtherState->second.checkAndResetKnownSafety(
           I, OtherState->first, checkIfRefCountInstIsMatched, RCIA, AA);
     }
+#ifndef NDEBUG
+    // Verify updateForDifferentLoopInst is conservative enough that the flow
+    // sensitive native of the loop summarized instructions does not matter.
+    if (verifyARCLoopSummary) {
+      auto NewRefCountState = OtherState->second;
+      for (auto *I : State->getSummarizedInterestingInsts()) {
+        NewRefCountState.updateForDifferentLoopInst(I, AA);
+      }
+      assert(NewRefCountState.getLatticeState() ==
+             OtherState->second.getLatticeState());
+    }
+#endif
   }
 
   return false;
@@ -420,6 +437,18 @@ bool ARCRegionState::processLoopTopDown(
       OtherState->second.checkAndResetKnownSafety(
           I, OtherState->first, checkIfRefCountInstIsMatched, RCIA, AA);
     }
+#ifndef NDEBUG
+    // Verify updateForDifferentLoopInst is conservative enough that the flow
+    // sensitive native of the loop summarized instructions does not matter.
+    if (verifyARCLoopSummary) {
+      auto NewRefCountState = OtherState->second;
+      for (auto *I : State->getSummarizedInterestingInsts()) {
+        NewRefCountState.updateForDifferentLoopInst(I, AA);
+      }
+      assert(NewRefCountState.getLatticeState() ==
+             OtherState->second.getLatticeState());
+    }
+#endif
   }
 
   return false;
