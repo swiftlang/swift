@@ -1653,6 +1653,7 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   // it's -emit-imported-modules, which can load modules.
   auto action = opts.RequestedAction;
   if (FrontendOptions::shouldActionOnlyParse(action) &&
+      !ctx.getLoadedModules().empty() &&
       action != FrontendOptions::ActionType::EmitImportedModules) {
     assert(ctx.getNumLoadedModules() == 1 &&
            "Loaded a module during parse-only");
@@ -1689,9 +1690,15 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
     }
   }
 
-  // Emit dependencies and index data.
+  // FIXME: This predicate matches the status quo, but there's no reason
+  // indexing cannot run for actions that do not require stdlib e.g. to better
+  // facilitate tests.
+  if (FrontendOptions::doesActionRequireSwiftStandardLibrary(action)) {
+    emitIndexData(Instance);
+  }
+
+  // Emit dependencies.
   emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
-  emitIndexData(Instance);
   emitMakeDependenciesIfNeeded(Instance.getDiags(),
                                Instance.getDependencyTracker(), opts);
 
@@ -1791,13 +1798,16 @@ static bool performAction(CompilerInstance &Instance,
     return buildModuleFromInterface(Instance);
 
   // MARK: Actions that Dump
-  case FrontendOptions::ActionType::DumpParse: {
+  case FrontendOptions::ActionType::DumpParse:
+    return dumpAST(Instance);
+  case FrontendOptions::ActionType::DumpAST: {
+    // FIXME: -dump-ast expects to be able to write output even if type checking
+    // fails which does not cleanly fit the model \c withSemanticAnalysis is
+    // trying to impose. Once there is a request for the "semantic AST", this
+    // point is moot.
+    Instance.performSema();
     return dumpAST(Instance);
   }
-  case FrontendOptions::ActionType::DumpAST:
-    return withSemanticAnalysis(
-        Instance, observer,
-        [](CompilerInstance &Instance) { return dumpAST(Instance); });
   case FrontendOptions::ActionType::PrintAST:
     return withSemanticAnalysis(
         Instance, observer, [](CompilerInstance &Instance) {
@@ -1860,9 +1870,6 @@ static bool performAction(CompilerInstance &Instance,
         Instance, observer, [&](CompilerInstance &Instance) {
           assert(FrontendOptions::doesActionGenerateSIL(opts.RequestedAction) &&
                  "All actions not requiring SILGen must have been handled!");
-          if (Instance.getInvocation().getInputKind() == InputFileKind::LLVM)
-            return compileLLVMIR(Instance);
-
           return performCompileStepsPostSema(Instance, ReturnValue, observer);
         });
   }
@@ -1881,6 +1888,10 @@ static bool performCompile(CompilerInstance &Instance,
   const auto &Invocation = Instance.getInvocation();
   const auto &opts = Invocation.getFrontendOptions();
   const FrontendOptions::ActionType Action = opts.RequestedAction;
+
+  // To compile LLVM IR, just pass it off unmodified.
+  if (Instance.getInvocation().getInputKind() == InputFileKind::LLVM)
+    return compileLLVMIR(Instance);
 
   // If we aren't in a parse-only context and expect an implicit stdlib import,
   // load in the standard library. If we either fail to find it or encounter an
@@ -1909,7 +1920,8 @@ static bool performCompile(CompilerInstance &Instance,
 
   // We might have freed the ASTContext already, but in that case we would
   // have already performed these actions.
-  if (Instance.hasASTContext()) {
+  if (Instance.hasASTContext() &&
+      FrontendOptions::doesActionRequireInputs(Action)) {
     performEndOfPipelineActions(Instance);
     hadError |= Instance.getASTContext().hadError();
   }

@@ -130,6 +130,47 @@ bool FrontendOptions::doesActionRequireSwiftStandardLibrary(ActionType action) {
   llvm_unreachable("Unknown ActionType");
 }
 
+bool FrontendOptions::doesActionRequireInputs(ActionType action) {
+  switch (action) {
+  case ActionType::NoneAction:
+  case ActionType::PrintVersion:
+    return false;
+  case ActionType::REPL:
+  case ActionType::Parse:
+  case ActionType::DumpParse:
+  case ActionType::EmitSyntax:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::EmitImportedModules:
+  case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
+  case ActionType::EmitPCH:
+  case ActionType::EmitPCM:
+  case ActionType::DumpPCM:
+  case ActionType::CompileModuleFromInterface:
+  case ActionType::TypecheckModuleFromInterface:
+  case ActionType::ResolveImports:
+  case ActionType::Typecheck:
+  case ActionType::DumpAST:
+  case ActionType::PrintAST:
+  case ActionType::DumpScopeMaps:
+  case ActionType::DumpTypeRefinementContexts:
+  case ActionType::EmitSILGen:
+  case ActionType::EmitSIL:
+  case ActionType::EmitModuleOnly:
+  case ActionType::MergeModules:
+  case ActionType::EmitSIBGen:
+  case ActionType::EmitSIB:
+  case ActionType::Immediate:
+  case ActionType::EmitAssembly:
+  case ActionType::EmitIR:
+  case ActionType::EmitBC:
+  case ActionType::EmitObject:
+  case ActionType::DumpTypeInfo:
+    return true;
+  }
+  llvm_unreachable("Unknown ActionType");
+}
+
 void FrontendOptions::forAllOutputPaths(
     const InputFile &input, llvm::function_ref<void(StringRef)> fn) const {
   if (RequestedAction != FrontendOptions::ActionType::EmitModuleOnly &&

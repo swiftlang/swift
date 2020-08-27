@@ -301,6 +301,9 @@ public:
   /// loaded before it is run.
   static bool doesActionRequireSwiftStandardLibrary(ActionType);
 
+  /// \return true if the given action requires input files to be provided.
+  static bool doesActionRequireInputs(ActionType action);
+
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
   llvm::hash_code getPCHHashComponents() const {

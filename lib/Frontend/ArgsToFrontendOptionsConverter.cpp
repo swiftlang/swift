@@ -406,8 +406,7 @@ bool ArgsToFrontendOptionsConverter::setUpInputKindAndImmediateArgs() {
   if (Opts.InputsAndOutputs.verifyInputs(
           Diags, treatAsSIL,
           Opts.RequestedAction == FrontendOptions::ActionType::REPL,
-          (Opts.RequestedAction == FrontendOptions::ActionType::NoneAction ||
-           Opts.RequestedAction == FrontendOptions::ActionType::PrintVersion))){
+          !FrontendOptions::doesActionRequireInputs(Opts.RequestedAction))) {
     return true;
   }
   if (Opts.RequestedAction == FrontendOptions::ActionType::Immediate) {
