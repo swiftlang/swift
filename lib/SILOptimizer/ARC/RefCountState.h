@@ -212,6 +212,8 @@ public:
   /// Uninitialize the current state.
   void clear();
 
+  void dump();
+
 private:
   /// Return true if we *might* remove this instruction.
   ///
@@ -353,6 +355,8 @@ public:
   /// Attempt to merge \p Other into this ref count state. Return true if we
   /// succeed and false otherwise.
   bool merge(const TopDownRefCountState &Other);
+
+  void dump();
 
 private:
   /// Can we guarantee that the given reference counted value has been modified?

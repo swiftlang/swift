@@ -363,7 +363,34 @@ ARCSequenceDataflowEvaluator::ARCSequenceDataflowEvaluator(
 bool ARCSequenceDataflowEvaluator::run(bool FreezeOwnedReleases) {
   bool NestingDetected = processBottomUp(FreezeOwnedReleases);
   NestingDetected |= processTopDown();
+
+  LLVM_DEBUG(
+      llvm::dbgs() << "*** Bottom-Up and Top-Down analysis results ***\n");
+  LLVM_DEBUG(dumpDataflowResults());
+
   return NestingDetected;
+}
+
+void ARCSequenceDataflowEvaluator::dumpDataflowResults() {
+  llvm::dbgs() << "IncToDecStateMap:\n";
+  for (auto it : IncToDecStateMap) {
+    if (!it.hasValue())
+      continue;
+    auto instAndState = it.getValue();
+    llvm::dbgs() << "Increment: ";
+    instAndState.first->dump();
+    instAndState.second.dump();
+  }
+
+  llvm::dbgs() << "DecToIncStateMap:\n";
+  for (auto it : DecToIncStateMap) {
+    if (!it.hasValue())
+      continue;
+    auto instAndState = it.getValue();
+    llvm::dbgs() << "Decrement: ";
+    instAndState.first->dump();
+    instAndState.second.dump();
+  }
 }
 
 // We put the destructor here so we don't need to expose the type of

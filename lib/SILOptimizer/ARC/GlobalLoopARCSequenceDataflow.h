@@ -134,6 +134,8 @@ private:
   bool processLoopTopDown(const LoopRegion *R);
   bool processLoopBottomUp(const LoopRegion *R,
                            bool FreezeOwnedArgEpilogueReleases);
+
+  void dumpDataflowResults();
 };
 
 } // end swift namespace

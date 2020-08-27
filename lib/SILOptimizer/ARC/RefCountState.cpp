@@ -903,6 +903,27 @@ void TopDownRefCountState::updateForDifferentLoopInst(
 //                             Printing Utilities
 //===----------------------------------------------------------------------===//
 
+void BottomUpRefCountState::dump() {
+  llvm::dbgs() << LatState << " "
+               << (isKnownSafe() ? "KnownSafe" : "NotKnownSafe") << " "
+               << (isCodeMotionSafe() ? "CodeMotionSafe" : "NotCodeMotionSafe")
+               << "\n";
+  llvm::dbgs() << "Matching Instructions:\n";
+  for (auto it : getInstructions()) {
+    it->dump();
+  }
+}
+void TopDownRefCountState::dump() {
+  llvm::dbgs() << LatState << " "
+               << (isKnownSafe() ? "KnownSafe" : "NotKnownSafe") << " "
+               << (isCodeMotionSafe() ? "CodeMotionSafe" : "NotCodeMotionSafe")
+               << "\n";
+  llvm::dbgs() << "Matching Instructions:\n";
+  for (auto it : getInstructions()) {
+    it->dump();
+  }
+}
+
 namespace llvm {
 
 raw_ostream &operator<<(raw_ostream &OS,
@@ -938,5 +959,4 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
 
   llvm_unreachable("Unhandled LatticeState in switch.");
 }
-
 } // end namespace llvm

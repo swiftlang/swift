@@ -252,9 +252,36 @@ LoopARCSequenceDataflowEvaluator::~LoopARCSequenceDataflowEvaluator() {
 bool LoopARCSequenceDataflowEvaluator::runOnLoop(
     const LoopRegion *R, bool FreezeOwnedArgEpilogueReleases,
     bool RecomputePostDomReleases) {
+  LLVM_DEBUG(llvm::dbgs() << "Run on region:\n");
+  LLVM_DEBUG(R->dump(true));
   bool NestingDetected = processLoopBottomUp(R, FreezeOwnedArgEpilogueReleases);
   NestingDetected |= processLoopTopDown(R);
+  LLVM_DEBUG(
+      llvm::dbgs() << "*** Bottom-Up and Top-Down analysis results ***\n");
+  LLVM_DEBUG(dumpDataflowResults());
   return NestingDetected;
+}
+
+void LoopARCSequenceDataflowEvaluator::dumpDataflowResults() {
+  llvm::dbgs() << "IncToDecStateMap:\n";
+  for (auto it : IncToDecStateMap) {
+    if (!it.hasValue())
+      continue;
+    auto instAndState = it.getValue();
+    llvm::dbgs() << "Increment: ";
+    instAndState.first->dump();
+    instAndState.second.dump();
+  }
+
+  llvm::dbgs() << "DecToIncStateMap:\n";
+  for (auto it : DecToIncStateMap) {
+    if (!it.hasValue())
+      continue;
+    auto instAndState = it.getValue();
+    llvm::dbgs() << "Decrement: ";
+    instAndState.first->dump();
+    instAndState.second.dump();
+  }
 }
 
 void LoopARCSequenceDataflowEvaluator::summarizeLoop(
