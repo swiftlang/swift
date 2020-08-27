@@ -3684,6 +3684,7 @@ namespace {
       if (CG.getConstraintSystem().shouldReusePrecheckedType()) {
         if (expr->getType()) {
           assert(!expr->getType()->hasTypeVariable());
+          assert(!expr->getType()->hasHole());
           CG.getConstraintSystem().cacheType(expr);
           return { false, expr };
         }

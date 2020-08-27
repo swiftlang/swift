@@ -76,7 +76,7 @@ Type QuerySubstitutionMap::operator()(SubstitutableType *type) const {
 }
 
 void TypeLoc::setType(Type Ty) {
-  assert(!Ty || !Ty->hasTypeVariable());
+  assert(!Ty || !Ty->hasTypeVariable() || !Ty->hasHole());
   this->Ty = Ty;
 }
 

@@ -126,7 +126,7 @@ namespace {
 } // end anonymous namespace
 
 void Expr::setType(Type T) {
-  assert(!T || !T->hasTypeVariable());
+  assert(!T || !T->hasTypeVariable() || !T->hasHole());
   Ty = T;
 }
 
@@ -2001,7 +2001,7 @@ bool ClosureExpr::capturesSelfEnablingImplictSelf() const {
 }
 
 void ClosureExpr::setExplicitResultType(Type ty) {
-  assert(ty && !ty->hasTypeVariable());
+  assert(ty && !ty->hasTypeVariable() && !ty->hasHole());
   ExplicitResultTypeAndBodyState.getPointer()
       ->setType(MetatypeType::get(ty));
 }

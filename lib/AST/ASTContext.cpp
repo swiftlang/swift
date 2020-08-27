@@ -2811,6 +2811,7 @@ ReferenceStorageType *ReferenceStorageType::get(Type T,
                                                 ReferenceOwnership ownership,
                                                 const ASTContext &C) {
   assert(!T->hasTypeVariable()); // not meaningful in type-checker
+  assert(!T->hasHole());
   switch (optionalityOf(ownership)) {
   case ReferenceOwnershipOptionality::Disallowed:
     assert(!T->getOptionalObjectType() && "optional type is disallowed");
@@ -3197,6 +3198,7 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
                                               ExtInfo info) {
   assert(sig && "no generic signature for generic function type?!");
   assert(!result->hasTypeVariable());
+  assert(!result->hasHole());
 
   llvm::FoldingSetNodeID id;
   GenericFunctionType::Profile(id, sig, params, result, info);
