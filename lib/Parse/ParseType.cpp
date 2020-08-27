@@ -355,7 +355,7 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
 ///     attribute-list type-function
 ///
 ///   type-function:
-///     type-composition 'async'? 'throws'? '->' type
+///     type-composition 'async'? 'throws'? type? '->' type
 ///
 ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
                                          bool HandleCodeCompletion,
@@ -436,18 +436,17 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
         .fixItReplace(Tok.getLoc(), "throws");
     }
     throwsLoc = consumeToken();
-    // The next token is not a keyword
-    if (!peekToken().isKeyword()) {
-      BacktrackingScope backtrackingScope(*this);
-      if (peekToken().is(tok::kw_throws)) {
-        ASTContext &Ctx = SF.getASTContext();
-        DiagnosticSuppression SuppressedDiags(Ctx.Diags);
-        backtrackingScope.cancelBacktrack();
-        if (canParseType()) {
-          ParserResult<TypeRepr> result = parseType();
-          throwsType = result.getPtrOrNull();
-        }
-      }
+
+    ASTContext &Ctx = SF.getASTContext();
+    DiagnosticSuppression SuppressedDiags(Ctx.Diags);
+    bool hasType = false;
+    {
+      BacktrackingScope backtrack(*this);
+      hasType = canParseType();
+    }
+    if (hasType) {
+      ParserResult<TypeRepr> result = parseType();
+      throwsType = result.getPtrOrNull();
     }
 
     // 'async' must preceed 'throws'; accept this but complain.

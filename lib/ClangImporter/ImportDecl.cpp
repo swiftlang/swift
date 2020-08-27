@@ -177,7 +177,7 @@ static FuncDecl *createFuncOrAccessor(ASTContext &ctx, SourceLoc funcLoc,
                                 bodyParams,
                                 resultTy, dc, clangNode);
   } else {
-    return FuncDecl::createImported(ctx, funcLoc, name, nameLoc, throws,
+    return FuncDecl::createImported(ctx, funcLoc, name, nameLoc, throws, nullptr,
                                     bodyParams, resultTy, dc, clangNode);
   }
 }

@@ -947,6 +947,7 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
       Context, StaticSpellingKind::None, name, /*NameLoc=*/PreviousLoc,
       /*Async=*/false,
       /*Throws=*/false,
+      /*ThrowsType=*/nullptr,
       /*GenericParams*/ nullptr, params, TupleType::getEmpty(Context),
       CurDeclContext);
   setLocalDiscriminator(tempDecl);
