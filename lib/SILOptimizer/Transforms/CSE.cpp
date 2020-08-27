@@ -31,9 +31,6 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
-#include "swift/SILOptimizer/Utils/SILInliner.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
-#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopedHashTable.h"
@@ -454,10 +451,6 @@ namespace swift {
 /// eliminating trivially redundant instructions and using simplifyInstruction
 /// to canonicalize things as it goes. It is intended to be fast and catch
 /// obvious cases so that SILCombine and other passes are more effective.
-///
-/// It also optimizes calls to lazy property getters: If such a call is
-/// dominated by another call to the same getter, it is replaced by a direct
-/// load of the property - assuming that it is already computed.
 class CSE {
 public:
   typedef llvm::ScopedHashTableVal<SimpleValue, ValueBase *> SimpleValueHTType;
@@ -476,21 +469,11 @@ public:
 
   SideEffectAnalysis *SEA;
 
-  SILOptFunctionBuilder &FuncBuilder;
-  
-  /// The set of calls to lazy property getters which can be replace by a direct
-  /// load of the property value.
-  llvm::SmallVector<ApplyInst *, 8> lazyPropertyGetters;
-
-  CSE(bool RunsOnHighLevelSil, SideEffectAnalysis *SEA,
-      SILOptFunctionBuilder &FuncBuilder)
-      : SEA(SEA), FuncBuilder(FuncBuilder),
-        RunsOnHighLevelSil(RunsOnHighLevelSil) {}
+  CSE(bool RunsOnHighLevelSil, SideEffectAnalysis *SEA)
+      : SEA(SEA), RunsOnHighLevelSil(RunsOnHighLevelSil) {}
 
   bool processFunction(SILFunction &F, DominanceInfo *DT);
-
-  bool processLazyPropertyGetters();
-
+  
   bool canHandle(SILInstruction *Inst);
 
 private:
@@ -598,40 +581,6 @@ bool CSE::processFunction(SILFunction &Fm, DominanceInfo *DT) {
   } // while (!nodes...)
 
   return Changed;
-}
-
-/// Replace lazy property getters (which are dominated by the same getter)
-/// by a direct load of the value.
-bool CSE::processLazyPropertyGetters() {
-  bool changed = false;
-  for (ApplyInst *ai : lazyPropertyGetters) {
-    SILFunction *getter = ai->getReferencedFunctionOrNull();
-    assert(getter && getter->isLazyPropertyGetter());
-    SILBasicBlock *callBlock = ai->getParent();
-
-    // Inline the getter...
-    SILInliner::inlineFullApply(ai, SILInliner::InlineKind::PerformanceInline,
-                                FuncBuilder);
-    
-    // ...and fold the switch_enum in the first block to the Optional.some case.
-    // The Optional.none branch becomes dead.
-    auto *sei = cast<SwitchEnumInst>(callBlock->getTerminator());
-    ASTContext &ctxt = callBlock->getParent()->getModule().getASTContext();
-    EnumElementDecl *someDecl = ctxt.getOptionalSomeDecl();
-    SILBasicBlock *someDest = sei->getCaseDestination(someDecl);
-    assert(someDest->getNumArguments() == 1);
-    SILValue enumVal = sei->getOperand();
-    SILBuilder builder(sei);
-    SILType ty = enumVal->getType().getEnumElementType(someDecl,
-                           sei->getModule(), builder.getTypeExpansionContext());
-    auto *ued =
-        builder.createUncheckedEnumData(sei->getLoc(), enumVal, someDecl, ty);
-    builder.createBranch(sei->getLoc(), someDest, { ued });
-    sei->eraseFromParent();
-    changed = true;
-    ++NumCSE;
-  }
-  return changed;
 }
 
 namespace {
@@ -826,34 +775,6 @@ bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst,
   return true;
 }
 
-/// Returns true if \p ai is a call to a lazy property getter, which we can
-/// handle.
-static bool isLazyPropertyGetter(ApplyInst *ai) {
-  SILFunction *callee = ai->getReferencedFunctionOrNull();
-  if (!callee || callee->isExternalDeclaration() ||
-      !callee->isLazyPropertyGetter())
-    return false;
-
-  // Check if the first block has a switch_enum of an Optional.
-  // We don't handle getters of generic types, which have a switch_enum_addr.
-  // This will be obsolete with opaque values anyway.
-  auto *SEI = dyn_cast<SwitchEnumInst>(callee->getEntryBlock()->getTerminator());
-  if (!SEI)
-    return false;
-
-  ASTContext &ctxt = SEI->getFunction()->getModule().getASTContext();
-  EnumElementDecl *someDecl = ctxt.getOptionalSomeDecl();
-
-  for (unsigned i = 0, e = SEI->getNumCases(); i != e; ++i) {
-    auto Entry = SEI->getCase(i);
-    if (Entry.first == someDecl) {
-      SILBasicBlock *destBlock = Entry.second;
-      return destBlock->getNumArguments() == 1;
-    }
-  }
-  return false;
-}
-
 bool CSE::processNode(DominanceInfoNode *Node) {
   SILBasicBlock *BB = Node->getBlock();
   bool Changed = false;
@@ -903,16 +824,6 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     if (SILInstruction *AvailInst = AvailableValues->lookup(Inst)) {
       LLVM_DEBUG(llvm::dbgs() << "SILCSE CSE: " << *Inst << "  to: "
                               << *AvailInst << '\n');
-
-      auto *AI = dyn_cast<ApplyInst>(Inst);
-      if (AI && isLazyPropertyGetter(AI)) {
-        // We do the actual transformation for lazy property getters later. It
-        // changes the CFG and we don't want to disturb the dominator tree walk
-        // here.
-        lazyPropertyGetters.push_back(AI);
-        continue;
-      }
-                              
       // Instructions producing a new opened archetype need a special handling,
       // because replacing these instructions may require a replacement
       // of the opened archetype type operands in some of the uses.
@@ -968,9 +879,6 @@ bool CSE::canHandle(SILInstruction *Inst) {
     // _convert_ a global_addr to a reference and retain it.
     auto MB = Effects.getMemBehavior(RetainObserveKind::ObserveRetains);
     if (MB == SILInstruction::MemoryBehavior::None)
-      return true;
-    
-    if (isLazyPropertyGetter(AI))
       return true;
       
     if (SILFunction *callee = AI->getReferencedFunctionOrNull()) {
@@ -1277,9 +1185,8 @@ class SILCSE : public SILFunctionTransform {
     DominanceAnalysis* DA = getAnalysis<DominanceAnalysis>();
 
     auto *SEA = PM->getAnalysis<SideEffectAnalysis>();
-    SILOptFunctionBuilder FuncBuilder(*this);
 
-    CSE C(RunsOnHighLevelSil, SEA, FuncBuilder);
+    CSE C(RunsOnHighLevelSil, SEA);
     bool Changed = false;
 
     // Perform the traditional CSE.
@@ -1288,15 +1195,7 @@ class SILCSE : public SILFunctionTransform {
     // Perform CSE of existential and witness_method instructions.
     Changed |= CSEExistentialCalls(getFunction(),
                                           DA->get(getFunction()));
-
-    // Handle calls to lazy property getters, which are collected in
-    // processFunction().
-    if (C.processLazyPropertyGetters()) {
-      // Cleanup the dead blocks from the inlined lazy property getters.
-      removeUnreachableBlocks(*getFunction());
-
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
-    } else if (Changed) {
+    if (Changed) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
     }
   }
