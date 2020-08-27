@@ -2062,52 +2062,38 @@ namespace {
       // parameter or return type is omitted, a fresh type variable is used to
       // stand in for that parameter or return type, allowing it to be inferred
       // from context.
-      auto getExplicitResultType = [&]() -> Type {
-        if (!closure->hasExplicitResultType()) {
-          return Type();
-        }
-
-        if (auto declaredTy = closure->getExplicitResultType()) {
-          return declaredTy;
-        }
-
-        return resolveTypeReferenceInExpression(
-            closure->getExplicitResultTypeRepr(),
-            TypeResolverContext::InExpression,
-            // Introduce type variables for unbound generics.
-            OpenUnboundGenericType(
-                CS, CS.getConstraintLocator(closure,
-                                            ConstraintLocator::ClosureResult)));
-      };
-
-      Type resultTy;
-      if (auto explicityTy = getExplicitResultType()) {
-        resultTy = explicityTy;
-      } else {
-        auto getContextualResultType = [&]() -> Type {
-          if (auto contextualType = CS.getContextualType(closure)) {
-            if (auto fnType = contextualType->getAs<FunctionType>())
-              return fnType->getResult();
+      Type resultTy = [&] {
+        if (closure->hasExplicitResultType()) {
+          if (auto declaredTy = closure->getExplicitResultType()) {
+            return declaredTy;
           }
-          return Type();
-        };
 
-        if (auto contextualResultTy = getContextualResultType()) {
-          resultTy = contextualResultTy;
-        } else {
-          // If no return type was specified, create a fresh type
-          // variable for it and mark it as possible hole.
-          //
-          // If this is a multi-statement closure, let's mark result
-          // as potential hole right away.
-          resultTy = CS.createTypeVariable(
-              CS.getConstraintLocator(closure,
-                                      ConstraintLocator::ClosureResult),
-              shouldTypeCheckInEnclosingExpression(closure)
-                  ? 0
-                  : TVO_CanBindToHole);
+          const auto resolvedTy = resolveTypeReferenceInExpression(
+              closure->getExplicitResultTypeRepr(),
+              TypeResolverContext::InExpression,
+              // Introduce type variables for unbound generics.
+              OpenUnboundGenericType(
+                  CS, CS.getConstraintLocator(
+                          closure, ConstraintLocator::ClosureResult)));
+          if (resolvedTy)
+            return resolvedTy;
         }
-      }
+
+        if (auto contextualType = CS.getContextualType(closure)) {
+          if (auto fnType = contextualType->getAs<FunctionType>())
+            return fnType->getResult();
+        }
+
+        // If no return type was specified, create a fresh type
+        // variable for it and mark it as possible hole.
+        //
+        // If this is a multi-statement closure, let's mark result
+        // as potential hole right away.
+        return Type(CS.createTypeVariable(
+            CS.getConstraintLocator(closure, ConstraintLocator::ClosureResult),
+            shouldTypeCheckInEnclosingExpression(closure) ? 0
+                                                          : TVO_CanBindToHole));
+      }();
 
       return FunctionType::get(closureParams, resultTy, extInfo);
     }
