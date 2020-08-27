@@ -157,7 +157,7 @@ TYPE_NODES = [
              Child('RightParen', kind='RightParenToken'),
          ]),
 
-    # throwing-specifier -> 'throws' | 'rethrows'
+    # throwing-specifier -> 'throws' type? | 'rethrows'
     # function-type -> attribute-list '(' function-type-argument-list ')'
     #   async? throwing-specifier? '->'? type?
     Node('FunctionType', kind='Type',
@@ -177,6 +177,7 @@ TYPE_NODES = [
                        'RethrowsToken',
                        'ThrowToken',
                    ]),
+             Child('ThrowsType', kind='Type', is_optional=True),
              Child('Arrow', kind='ArrowToken'),
              Child('ReturnType', kind='Type'),
          ]),
