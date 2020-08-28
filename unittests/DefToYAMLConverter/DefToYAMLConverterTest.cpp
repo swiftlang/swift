@@ -65,7 +65,8 @@ TEST(DefToYAMLConverterTest, matchDiagnosticMessagesSequentially) {
   YAMLLocalizationProducer yaml(EnglishLocalization.str());
 
   yaml.forEachAvailable([](swift::DiagID id, llvm::StringRef translation) {
-    ASSERT_TRUE(diagnosticMessages[static_cast<uint32_t>(id)] == translation);
+    llvm::StringRef msg = diagnosticMessages[static_cast<uint32_t>(id)];
+    ASSERT_EQ(msg, translation);
   });
 }
 
@@ -82,7 +83,8 @@ TEST(DefToYAMLConverterTest, matchDiagnosticMessagesRandomly) {
   while (numberOfQueries--) {
     unsigned randomNum = randNum(LocalDiagID::NumDiags);
     DiagID randomId = static_cast<DiagID>(randomNum);
-    ASSERT_TRUE(yaml.getMessageOr(randomId, "") ==
-                diagnosticMessages[randomNum]);
+    llvm::StringRef msg = diagnosticMessages[randomNum];
+    llvm::StringRef translation = yaml.getMessageOr(randomId, "");
+    ASSERT_EQ(msg, translation);
   }
 }
