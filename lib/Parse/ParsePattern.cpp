@@ -854,15 +854,16 @@ void Parser::parseAsyncThrows(
       throwsLoc = consumeToken();
       ASTContext &Ctx = SF.getASTContext();
       DiagnosticSuppression SuppressedDiags(Ctx.Diags);
-      bool hasType = false;
-      {
-        BacktrackingScope backtrack(*this);
-        hasType = canParseType();
-      }
-      if (hasType) {
+//      bool hasType = false;
+//      {
+//        BacktrackingScope backtrack(*this);
+//        hasType = canParseType();
+//      }
+//      if (hasType) {
+//      parseTypeIdentifier()
         ParserResult<TypeRepr> result = parseType();
         throwsType = result.getPtrOrNull();
-      }
+//      }
     } else {
       keyword = Tok.getText();
       throwsLoc = consumeToken();
