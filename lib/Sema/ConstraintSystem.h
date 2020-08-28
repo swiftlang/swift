@@ -4564,9 +4564,10 @@ private:
       return {type, kind, BindingSource};
     }
 
-    static PotentialBinding forHole(ASTContext &ctx,
+    static PotentialBinding forHole(TypeVariableType *typeVar,
                                     ConstraintLocator *locator) {
-      return {ctx.TheUnresolvedType, AllowedBindingKind::Exact,
+      return {HoleType::get(typeVar->getASTContext(), typeVar),
+              AllowedBindingKind::Exact,
               /*source=*/locator};
     }
   };

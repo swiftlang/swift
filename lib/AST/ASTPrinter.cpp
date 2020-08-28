@@ -3814,6 +3814,17 @@ public:
       Printer << "_";
   }
 
+  void visitHoleType(HoleType *T) {
+    if (Options.PrintTypesForDebugging) {
+      Printer << "<<hole for ";
+      auto originatorTy = T->getOriginatorType();
+      visit(Type(reinterpret_cast<TypeBase *>(originatorTy.getOpaqueValue())));
+      Printer << ">>";
+    } else {
+      Printer << "<<hole>>";
+    }
+  }
+
 #ifdef ASTPRINTER_HANDLE_BUILTINTYPE
 #error "ASTPRINTER_HANDLE_BUILTINTYPE should not be defined?!"
 #endif
