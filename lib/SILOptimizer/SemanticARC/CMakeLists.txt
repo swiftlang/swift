@@ -1,2 +1,3 @@
 target_sources(swiftSILOptimizer PRIVATE
-  SemanticARCOpts.cpp)
+  SemanticARCOpts.cpp
+  OwnershipLiveRange.cpp)
