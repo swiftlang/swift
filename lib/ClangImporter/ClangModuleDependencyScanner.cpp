@@ -260,12 +260,10 @@ void ClangImporter::recordModuleDependencies(
     // be found via search paths. Passing these headers as explicit inputs can
     // be quite challenging.
     for (auto &path: Impl.SwiftContext.SearchPathOpts.ImportSearchPaths) {
-      swiftArgs.push_back("-I");
-      swiftArgs.push_back(path);
+      addClangArg("-I" + path);
     }
     for (auto &path: Impl.SwiftContext.SearchPathOpts.FrameworkSearchPaths) {
-      swiftArgs.push_back(path.IsSystem ? "-Fsystem": "-F");
-      swiftArgs.push_back(path.Path);
+      addClangArg((path.IsSystem ? "-Fsystem": "-F") + path.Path);
     }
 
     // Swift frontend option for input file path (Foo.modulemap).
