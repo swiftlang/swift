@@ -308,6 +308,7 @@ Optional<ModuleDependencies> ClangImporter::getModuleDependencies(
   // Reform the Clang importer options.
   // FIXME: Just save a reference or copy so we can get this back.
   ClangImporterOptions importerOpts;
+  importerOpts.ExtraArgs = getExtraClangArgs();
 
   // Determine the command-line arguments for dependency scanning.
   auto &ctx = Impl.SwiftContext;
@@ -351,6 +352,7 @@ bool ClangImporter::addBridgingHeaderDependencies(
   // Reform the Clang importer options.
   // FIXME: Just save a reference or copy so we can get this back.
   ClangImporterOptions importerOpts;
+  importerOpts.ExtraArgs = getExtraClangArgs();
 
   // Retrieve the bridging header.
   std::string bridgingHeader = *targetModule.getBridgingHeader();
