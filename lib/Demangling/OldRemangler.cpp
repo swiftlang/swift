@@ -2139,6 +2139,15 @@ void Remangler::mangleAccessorFunctionReference(Node *node) {
 void Remangler::mangleMetadataInstantiationCache(Node *node) {
   unreachable("unsupported");
 }
+void Remangler::mangleGlobalVariableOnceToken(Node *node) {
+  unreachable("unsupported");
+}
+void Remangler::mangleGlobalVariableOnceFunction(Node *node) {
+  unreachable("unsupported");
+}
+void Remangler::mangleGlobalVariableOnceDeclList(Node *node) {
+  unreachable("unsupported");
+}
 
 void Remangler::mangleCanonicalSpecializedGenericMetaclass(Node *node) {
   Buffer << "MM";

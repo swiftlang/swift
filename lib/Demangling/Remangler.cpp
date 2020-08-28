@@ -2566,6 +2566,23 @@ void Remangler::mangleNoncanonicalSpecializedGenericTypeMetadataCache(Node *node
   Buffer << "MJ";
 }
 
+void Remangler::mangleGlobalVariableOnceToken(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "Wz";
+}
+
+void Remangler::mangleGlobalVariableOnceFunction(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "WZ";
+}
+
+void Remangler::mangleGlobalVariableOnceDeclList(Node *node) {
+  for (unsigned i = 0, e = node->getNumChildren(); i < e; ++i) {
+    mangle(node->getChild(i));
+    Buffer << '_';
+  }
+}
+
 } // anonymous namespace
 
 /// The top-level interface to the remangler.
