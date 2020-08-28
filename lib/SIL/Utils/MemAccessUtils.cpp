@@ -1274,7 +1274,7 @@ void AccessPath::Index::print(raw_ostream &os) const {
     os << '#' << getSubObjectIndex();
   else {
     os << '@';
-    if (getOffset() == AccessPath::UnknownOffset)
+    if (isUnknownOffset())
       os << "Unknown";
     else
       os << getOffset();

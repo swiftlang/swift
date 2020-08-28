@@ -844,6 +844,8 @@ public:
 
   int getOffset() const { return offset; }
 
+  bool hasUnknownOffset() const { return offset == UnknownOffset; }
+
   /// Return true if this path contains \p subPath.
   bool contains(AccessPath subPath) const;
 

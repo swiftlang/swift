@@ -422,6 +422,11 @@ static void addPerfDebugSerializationPipeline(SILPassPipelinePlan &P) {
 static void addPrepareOptimizationsPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("PrepareOptimizationPasses");
 
+  // Verify AccessedStorage once in OSSA before optimizing.
+#ifndef NDEBUG
+  P.addAccessPathVerification();
+#endif
+
   P.addForEachLoopUnroll();
   P.addMandatoryCombine();
   P.addAccessMarkerElimination();
@@ -668,6 +673,11 @@ static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
   // addAccessEnforcementDom might provide potential for LICM:
   // A loop might have only one dynamic access now, i.e. hoistable
   P.addLICM();
+
+  // Verify AccessedStorage once again after optimizing and lowering OSSA.
+#ifndef NDEBUG
+  P.addAccessPathVerification();
+#endif
 
   // Only has an effect if the -assume-single-thread option is specified.
   P.addAssumeSingleThreaded();
