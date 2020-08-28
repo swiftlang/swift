@@ -453,12 +453,20 @@ bool LoadBorrowNeverInvalidatedAnalysis::
 
 bool LoadBorrowNeverInvalidatedAnalysis::isNeverInvalidated(
     LoadBorrowInst *lbi) {
-  SILValue address = getAddressAccess(lbi->getOperand());
+
+  SILValue address = getAccessBegin(lbi->getOperand());
   if (!address)
     return false;
 
+  auto storage = findAccessedStorage(address);
+  // If we couldn't find an access storage, return that we are assumed to write.
+  if (!storage) {
+    llvm::errs() << "Couldn't compute access storage?!\n";
+    return false;
+  }
+
   // If we have a let address, then we are already done.
-  if (isLetAddress(stripAccessMarkers(address)))
+  if (storage.isLetAccess(lbi->getFunction()))
     return true;
 
   // At this point, we know that we /may/ have writes. Now we go through various
@@ -478,24 +486,34 @@ bool LoadBorrowNeverInvalidatedAnalysis::isNeverInvalidated(
 
     // Otherwise, validate that any writes to our begin_access is not when the
     // load_borrow's result is live.
+    //
+    // FIXME: do we verify that the load_borrow scope is always nested within
+    // the begin_access scope (to ensure no aliasing access)?
     return doesAddressHaveWriteThatInvalidatesLoadBorrow(lbi, endBorrowUses,
                                                          bai);
   }
+
+  // FIXME: the subsequent checks appear to assume that 'address' is not aliased
+  // within the scope of the load_borrow. This can only be assumed when either
+  // the load_borrow is nested within an access scope or when the
+  // storage.isUniquelyIdentified() and all uses of storage.getRoot() have been
+  // analyzed. The later can be done with AccessPath::collectUses().
 
   // Check if our unidentified access storage is a project_box. In such a case,
   // validate that all uses of the project_box are not writes that overlap with
   // our load_borrow's result. These are things that may not be a formal access
   // base.
   //
-  // FIXME: we don't seem to verify anywhere that a pointer_to_address cannot
-  // itself be derived from another address that is accessible in the same
-  // function, either because it was returned from a call or directly
-  // address_to_pointer'd.
+  // FIXME: Remove this PointerToAddress check. It appears to be incorrect. we
+  // don't verify anywhere that a pointer_to_address cannot itself be derived
+  // from another address that is accessible in the same function, either
+  // because it was returned from a call or directly address_to_pointer'd.
   if (isa<PointerToAddressInst>(address)) {
     return doesAddressHaveWriteThatInvalidatesLoadBorrow(lbi, endBorrowUses,
                                                          address);
   }
 
+  // FIXME: This ProjectBoxInst
   // If we have a project_box, we need to see if our base, modulo begin_borrow,
   // copy_value have any other project_box that we need to analyze.
   if (auto *pbi = dyn_cast<ProjectBoxInst>(address)) {
@@ -503,13 +521,6 @@ bool LoadBorrowNeverInvalidatedAnalysis::isNeverInvalidated(
                                                      pbi->getOperand());
   }
 
-  auto storage = findAccessedStorage(address);
-
-  // If we couldn't find an access storage, return that we are assumed to write.
-  if (!storage) {
-    llvm::errs() << "Couldn't compute access storage?!\n";
-    return false;
-  }
 
   switch (storage.getKind()) {
   case AccessedStorage::Stack: {
@@ -562,7 +573,8 @@ bool LoadBorrowNeverInvalidatedAnalysis::isNeverInvalidated(
   }
   case AccessedStorage::Unidentified: {
     // Otherwise, we didn't understand this, so bail.
-    llvm::errs() << "Unidentified access storage: " << storage;
+    llvm::errs() << "Unidentified access storage: ";
+    storage.dump();
     return false;
   }
   case AccessedStorage::Nested: {

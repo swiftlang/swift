@@ -3849,7 +3849,7 @@ void IRGenSILFunction::visitRefTailAddrInst(RefTailAddrInst *i) {
 }
 
 static bool isInvariantAddress(SILValue v) {
-  SILValue accessedAddress = getAccessedAddress(v);
+  SILValue accessedAddress = getAccessAddress(v);
   if (auto *ptrRoot = dyn_cast<PointerToAddressInst>(accessedAddress)) {
     return ptrRoot->isInvariant();
   }
