@@ -176,15 +176,15 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   SourceManager SrcMgr;
   TypeCheckerOptions TypeCheckOpts;
   LangOptions LangOpts;
+  ClangImporterOptions ClangImporterOpts;
   LangOpts.Target = Invocation.getTargetTriple();
   ASTContext &ASTCtx = *ASTContext::get(LangOpts, TypeCheckOpts, SearchPathOpts,
-                                        SrcMgr, Instance.getDiags());
+                                        ClangImporterOpts, SrcMgr,
+                                        Instance.getDiags());
   registerParseRequestFunctions(ASTCtx.evaluator);
   registerTypeCheckerRequestFunctions(ASTCtx.evaluator);
   
-  ClangImporterOptions ClangImporterOpts;
-  ASTCtx.addModuleLoader(ClangImporter::create(ASTCtx, ClangImporterOpts, ""),
-                         true);
+  ASTCtx.addModuleLoader(ClangImporter::create(ASTCtx, ""), true);
   ModuleDecl *M = ModuleDecl::create(ASTCtx.getIdentifier("swiftmodule"), ASTCtx);
   SILOptions SILOpts;
   std::unique_ptr<Lowering::TypeConverter> TC(new Lowering::TypeConverter(*M));

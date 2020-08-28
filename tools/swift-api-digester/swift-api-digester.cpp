@@ -2355,8 +2355,7 @@ static bool readBreakageAllowlist(SDKContext &Ctx, llvm::StringSet<> &lines) {
   invok.setModuleName("ForClangImporter");
   if (instance.setup(invok))
     return 1;
-  ClangImporterOptions impOpts;
-  auto importer = ClangImporter::create(instance.getASTContext(), impOpts);
+  auto importer = ClangImporter::create(instance.getASTContext());
   SmallString<128> preprocessedFilePath;
   if (auto error = llvm::sys::fs::createTemporaryFile(
     "breakage-allowlist-", "txt", preprocessedFilePath)) {

@@ -29,6 +29,7 @@ public:
   LangOptions LangOpts;
   TypeCheckerOptions TypeCheckerOpts;
   SearchPathOptions SearchPathOpts;
+  ClangImporterOptions ClangImporterOpts;
   SourceManager SourceMgr;
   DiagnosticEngine Diags;
 
