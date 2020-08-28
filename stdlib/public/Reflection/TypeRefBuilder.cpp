@@ -135,7 +135,8 @@ lookupTypeWitness(const std::string &MangledTypeName,
         auto SubstitutedTypeName = readTypeRef(AssocTy,
                                                AssocTy->SubstitutedTypeName);
         auto Demangled = demangleTypeRef(SubstitutedTypeName);
-        auto *TypeWitness = swift::Demangle::decodeMangledType(*this, Demangled);
+        auto *TypeWitness =
+            swift::Demangle::decodeMangledType(*this, Demangled).getType();
 
         AssociatedTypeCache.insert(std::make_pair(key, TypeWitness));
         return TypeWitness;
@@ -155,7 +156,8 @@ lookupSuperclass(const TypeRef *TR) {
     return nullptr;
 
   auto Demangled = demangleTypeRef(readTypeRef(FD, FD->Superclass));
-  auto Unsubstituted = swift::Demangle::decodeMangledType(*this, Demangled);
+  auto Unsubstituted =
+      swift::Demangle::decodeMangledType(*this, Demangled).getType();
   if (!Unsubstituted)
     return nullptr;
 
@@ -226,7 +228,8 @@ bool TypeRefBuilder::getFieldTypeRefs(
     }
 
     auto Demangled = demangleTypeRef(readTypeRef(Field,Field->MangledTypeName));
-    auto Unsubstituted = swift::Demangle::decodeMangledType(*this, Demangled);
+    auto Unsubstituted =
+        swift::Demangle::decodeMangledType(*this, Demangled).getType();
     if (!Unsubstituted)
       return false;
 
@@ -304,7 +307,7 @@ TypeRefBuilder::getClosureContextInfo(RemoteRef<CaptureDescriptor> CD) {
     if (CR->hasMangledTypeName()) {
       auto MangledName = readTypeRef(CR, CR->MangledTypeName);
       auto DemangleTree = demangleTypeRef(MangledName);
-      TR = swift::Demangle::decodeMangledType(*this, DemangleTree);
+      TR = swift::Demangle::decodeMangledType(*this, DemangleTree).getType();
     }
     Info.CaptureTypes.push_back(TR);
   }
@@ -316,7 +319,7 @@ TypeRefBuilder::getClosureContextInfo(RemoteRef<CaptureDescriptor> CD) {
     if (MSR->hasMangledTypeName()) {
       auto MangledName = readTypeRef(MSR, MSR->MangledTypeName);
       auto DemangleTree = demangleTypeRef(MangledName);
-      TR = swift::Demangle::decodeMangledType(*this, DemangleTree);
+      TR = swift::Demangle::decodeMangledType(*this, DemangleTree).getType();
     }
 
     const MetadataSource *MS = nullptr;
@@ -344,12 +347,17 @@ TypeRefBuilder::dumpTypeRef(RemoteRef<char> MangledName,
   auto DemangleTree = demangleTypeRef(MangledName);
   auto TypeName = nodeToString(DemangleTree);
   fprintf(file, "%s\n", TypeName.c_str());
-  auto TR = swift::Demangle::decodeMangledType(*this, DemangleTree);
-  if (!TR) {
+  auto Result = swift::Demangle::decodeMangledType(*this, DemangleTree);
+  if (Result.isError()) {
+    auto *Error = Result.getError();
+    char *ErrorStr = Error->copyErrorString();
     auto str = getTypeRefString(MangledName);
-    fprintf(file, "!!! Invalid typeref: %s\n", std::string(str.begin(), str.end()).c_str());
+    fprintf(file, "!!! Invalid typeref: %s - %s\n",
+            std::string(str.begin(), str.end()).c_str(), ErrorStr);
+    Error->freeErrorString(ErrorStr);
     return;
   }
+  auto TR = Result.getType();
   TR->dump(file);
   fprintf(file, "\n");
 }

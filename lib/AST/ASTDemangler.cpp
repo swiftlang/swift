@@ -44,7 +44,7 @@ Type swift::Demangle::getTypeForMangling(ASTContext &ctx,
     return Type();
 
   ASTBuilder builder(ctx);
-  return swift::Demangle::decodeMangledType(builder, node);
+  return swift::Demangle::decodeMangledType(builder, node).getType();
 }
 
 TypeDecl *swift::Demangle::getTypeDeclForMangling(ASTContext &ctx,
@@ -846,8 +846,8 @@ CanGenericSignature ASTBuilder::demangleGenericSignature(
 
     if (child->getNumChildren() != 2)
       return CanGenericSignature();
-    auto subjectType = swift::Demangle::decodeMangledType(
-        *this, child->getChild(0));
+    auto subjectType =
+        swift::Demangle::decodeMangledType(*this, child->getChild(0)).getType();
     if (!subjectType)
       return CanGenericSignature();
 
@@ -856,8 +856,9 @@ CanGenericSignature ASTBuilder::demangleGenericSignature(
           Demangle::Node::Kind::DependentGenericConformanceRequirement ||
         child->getKind() ==
           Demangle::Node::Kind::DependentGenericSameTypeRequirement) {
-      constraintType = swift::Demangle::decodeMangledType(
-        *this, child->getChild(1));
+      constraintType =
+          swift::Demangle::decodeMangledType(*this, child->getChild(1))
+              .getType();
       if (!constraintType)
         return CanGenericSignature();
     }
