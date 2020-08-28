@@ -421,14 +421,14 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
 
     // Check that the variable is part of a single-variable pattern.
     auto binding = var->getParentPatternBinding();
-    if (!binding || binding->getSingleVar() != var) {
+    if (binding && binding->getSingleVar() != var) {
       ctx.Diags.diagnose(attr->getLocation(),
                          diag::property_wrapper_not_single_var);
       continue;
     }
 
     // A property wrapper cannot be attached to a 'let'.
-    if (var->isLet()) {
+    if (!isa<ParamDecl>(var) && var->isLet()) {
       ctx.Diags.diagnose(attr->getLocation(), diag::property_wrapper_let);
       continue;
     }
@@ -530,14 +530,15 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
   if (!rawType || rawType->hasError())
     return Type();
 
-  auto binding = var->getParentPatternBinding();
-  if (!binding)
+  // The constraint system will infer closure parameter types
+  if (isa<ParamDecl>(var) && !var->getDeclContext()->getAsDecl())
     return Type();
 
   // If there's an initializer of some sort, checking it will determine the
   // property wrapper type.
-  unsigned index = binding->getPatternEntryIndexForVarDecl(var);
-  if (binding->isInitialized(index)) {
+  auto binding = var->getParentPatternBinding();
+  unsigned index = binding ? binding->getPatternEntryIndexForVarDecl(var) : 0;
+  if (binding && binding->isInitialized(index)) {
     // FIXME(InterfaceTypeRequest): Remove this.
     (void)var->getInterfaceType();
     if (!binding->isInitializerChecked(index))

@@ -2444,9 +2444,10 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
   Identifier name = ctx.getIdentifier(nameBuf);
 
   // Determine the type of the property.
-  Type propertyType = wrapperType->getTypeOfMember(
-      var->getModuleContext(), wrapperVar,
-      wrapperVar->getValueInterfaceType());
+  Type propertyType;
+  if (wrapperType)
+    propertyType = wrapperType->getTypeOfMember(var->getModuleContext(), wrapperVar,
+                                                wrapperVar->getValueInterfaceType());
 
   // Form the property.
   auto dc = var->getDeclContext();
@@ -2454,7 +2455,8 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
                                         VarDecl::Introducer::Var,
                                         var->getLoc(),
                                         name, dc);
-  property->setInterfaceType(propertyType);
+  if (propertyType)
+    property->setInterfaceType(propertyType);
   property->setImplicit();
   property->setOriginalWrappedProperty(var);
   addMemberToContextIfNeeded(property, dc, var);
@@ -2485,7 +2487,7 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
 
   var->getAttrs().add(
       new (ctx) ProjectedValuePropertyAttr(name, SourceLoc(), SourceRange(),
-                                            /*Implicit=*/true));
+                                           /*Implicit=*/true));
   return property;
 }
 
@@ -2684,11 +2686,6 @@ PropertyWrapperLValuenessRequest::evaluate(Evaluator &,
 PropertyWrapperBackingPropertyInfo
 PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
                                                     VarDecl *var) const {
-  // Determine the type of the backing property.
-  auto wrapperType = var->getPropertyWrapperBackingPropertyType();
-  if (!wrapperType || wrapperType->hasError())
-    return PropertyWrapperBackingPropertyInfo();
-
   auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0);
   if (!wrapperInfo)
     return PropertyWrapperBackingPropertyInfo();
@@ -2700,8 +2697,36 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   nameBuf += var->getName().str();
   Identifier name = ctx.getIdentifier(nameBuf);
 
-  // Determine the type of the storage.
   auto dc = var->getDeclContext();
+  if (auto *param = dyn_cast<ParamDecl>(var)) {
+    auto *backingVar = ParamDecl::cloneWithoutType(ctx, param);
+    backingVar->setName(name);
+    Type wrapperType;
+
+    // If this is a function parameter, compute the backing
+    // type now. For closure parameters, let the constraint
+    // system infer the backing type.
+    if (dc->getAsDecl()) {
+      wrapperType = var->getPropertyWrapperBackingPropertyType();
+      if (!wrapperType || wrapperType->hasError())
+        return PropertyWrapperBackingPropertyInfo();
+
+      backingVar->setInterfaceType(wrapperType);
+    }
+
+    VarDecl *projectionVar = nullptr;
+    if (wrapperInfo.projectedValueVar) {
+      projectionVar = synthesizePropertyWrapperProjectionVar(ctx, var, wrapperType,
+                                                             wrapperInfo.projectedValueVar);
+    }
+
+    return PropertyWrapperBackingPropertyInfo(backingVar, projectionVar, nullptr, nullptr);
+  }
+
+  // Determine the type of the storage.
+  auto wrapperType = var->getPropertyWrapperBackingPropertyType();
+  if (!wrapperType || wrapperType->hasError())
+    return PropertyWrapperBackingPropertyInfo();
   Type storageInterfaceType = wrapperType;
   Type storageType = dc->mapTypeIntoContext(storageInterfaceType);
 
