@@ -39,8 +39,8 @@ bool pointsToLocalObject(SILValue V);
 /// Returns true if \p V is a uniquely identified address or reference. Two
 /// uniquely identified pointers with distinct roots cannot alias. However, a
 /// uniquely identified pointer may alias with unidentified pointers. For
-/// example, the uniquely identified pointer may escape to a call that returns an
-/// alias of that pointer.
+/// example, the uniquely identified pointer may escape to a call that returns
+/// an alias of that pointer.
 ///
 /// It may be any of:
 ///
@@ -53,6 +53,9 @@ bool pointsToLocalObject(SILValue V);
 ///
 /// - an address projection based on an exclusive argument with no levels of
 /// indirection (e.g. ref_element_addr, project_box, etc.).
+///
+/// TODO: Fold this into the AccessedStorage API. pointsToLocalObject should be
+/// performed by AccessedStorage::isUniquelyIdentified.
 inline bool isUniquelyIdentified(SILValue V) {
   SILValue objectRef = V;
   if (V->getType().isAddress()) {
@@ -60,7 +63,7 @@ inline bool isUniquelyIdentified(SILValue V) {
     if (!storage)
       return false;
 
-    if (storage.isUniquelyIdentifiedAfterEnforcement())
+    if (storage.isUniquelyIdentified())
       return true;
 
     if (!storage.isObjectAccess())
