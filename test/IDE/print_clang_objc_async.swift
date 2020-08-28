@@ -16,4 +16,5 @@
 // CHECK-DAG:     func findAnswer() async throws -> String?
 // CHECK-DAG:     func findAnswerFailingly(completionHandler handler: @escaping (String?, Error?) -> Void) throws
 // CHECK-DAG:     func findAnswerFailingly() async throws -> String?
+// CHECK-DAG:     func doSomethingFun(_ operation: String) async
 // CHECK: {{^[}]$}}

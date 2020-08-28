@@ -1213,10 +1213,13 @@ NameImporter::considerAsyncImport(
   // handler.
   Optional<StringRef> newBaseName;
   if (isCompletionHandlerParamName(paramNames[completionHandlerParamNameIndex])) {
-    // The parameter itself has an appropriate name.
+    // The argument label itself has an appropriate name.
   } else if (!hasCustomName && completionHandlerParamIndex == 0 &&
              (newBaseName = isCompletionHandlerInBaseName(baseName))) {
     // The base name implies that the first parameter is a completion handler.
+  } else if (isCompletionHandlerParamName(
+                 params[completionHandlerParamIndex]->getName())) {
+    // The parameter has an appropriate name.
   } else {
     return None;
   }
@@ -1237,6 +1240,10 @@ NameImporter::considerAsyncImport(
   // FIXME: We might eventually allow this.
   if (isInitializer)
     return notAsync("initializers cannot be async");
+
+  // Accessors are never imported as async.
+  if (clangDecl->isPropertyAccessor())
+    return notAsync("method is a property accessor");
 
   // Check whether we method has a suitable return type.
   if (clangDecl->getReturnType()->isVoidType()) {
@@ -1515,7 +1522,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       else if (parsedName.IsSetter)
         result.info.accessorKind = ImportedAccessorKind::PropertySetter;
 
-      if (method && parsedName.IsFunctionName) {
+      if (method && parsedName.IsFunctionName &&
+          result.info.accessorKind == ImportedAccessorKind::None) {
         // Get the parameters.
         ArrayRef<const clang::ParmVarDecl *> params{method->param_begin(),
                                                     method->param_end()};
@@ -1787,16 +1795,6 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         result.info.errorInfo = *errorInfo;
     }
 
-    if (version.supportsConcurrency()) {
-      if (auto asyncInfo = considerAsyncImport(
-              objcMethod, baseName, argumentNames, params, isInitializer,
-              /*hasCustomName=*/false,
-              result.getErrorInfo())) {
-        result.info.hasAsyncInfo = true;
-        result.info.asyncInfo = *asyncInfo;
-      }
-    }
-
     isFunction = true;
 
     // Is this one of the accessors for subscripts?
@@ -1812,6 +1810,17 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
                isNonNullarySelector(objcMethod->getSelector(),
                                     {"setObject", "forKeyedSubscript"}))
         result.info.accessorKind = ImportedAccessorKind::SubscriptSetter;
+    }
+
+    if (version.supportsConcurrency() &&
+        result.info.accessorKind == ImportedAccessorKind::None) {
+      if (auto asyncInfo = considerAsyncImport(
+              objcMethod, baseName, argumentNames, params, isInitializer,
+              /*hasCustomName=*/false,
+              result.getErrorInfo())) {
+        result.info.hasAsyncInfo = true;
+        result.info.asyncInfo = *asyncInfo;
+      }
     }
 
     break;
