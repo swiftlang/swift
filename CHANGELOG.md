@@ -44,9 +44,9 @@ Swift Next
   let cgMilky: UIColor = .white.withAlphaComponent(0.5).cgColor
   ```
   
-  (Unless, of course, approprite `white` and `withAlphaComponent` members were defined on `CGColor`.)
+  (Unless, of course, appropriate `white` and `withAlphaComponent` members were defined on `CGColor`.)
   
-  Members of a "chain" can be properties, method calls, subscript accesses, force unwraps, or optional chaining question marks. Furthermore, the type of each member along the chain is permitted to differ (again, as long as the base of the chain matches the resulting type)  meaning the following successfully typechecks:
+  Members of a "chain" can be properties, method calls, subscript accesses, force unwraps, or optional chaining question marks. Furthermore, the type of each member along the chain is permitted to differ (again, as long as the base of the chain matches the resulting type) meaning the following successfully typechecks:
   
   ```swift
   struct Foo {
