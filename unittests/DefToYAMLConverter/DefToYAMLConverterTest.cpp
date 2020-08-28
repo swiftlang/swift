@@ -19,9 +19,16 @@
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
 #include "gtest/gtest.h"
+#include <random>
 
 using namespace swift;
 using namespace swift::diag;
+
+enum LocalDiagID : uint32_t {
+#define DIAG(KIND, ID, Options, Text, Signature) ID,
+#include "swift/AST/DiagnosticsAll.def"
+  NumDiags
+};
 
 static constexpr const char *const diagnosticMessages[] = {
 #define DIAG(KIND, ID, Options, Text, Signature) Text,
@@ -38,6 +45,9 @@ static std::string getDefaultLocalizationPath() {
   return std::string(DefaultDiagnosticMessagesDir.str());
 }
 
+/// Random number in [0,n)
+unsigned randNum(unsigned n) { return unsigned(rand()) % n; }
+
 TEST(DefToYAMLConverterTest, missingLocalizationFiles) {
   ASSERT_TRUE(llvm::sys::fs::exists(getDefaultLocalizationPath()));
   llvm::SmallString<128> EnglishLocalization(getDefaultLocalizationPath());
@@ -48,7 +58,7 @@ TEST(DefToYAMLConverterTest, missingLocalizationFiles) {
   ASSERT_TRUE(llvm::sys::fs::exists(EnglishLocalization));
 }
 
-TEST(DefToYAMLConverterTest, matchDiagnosticMessages) {
+TEST(DefToYAMLConverterTest, matchDiagnosticMessagesSequentially) {
   llvm::SmallString<128> EnglishLocalization(getDefaultLocalizationPath());
   llvm::sys::path::append(EnglishLocalization, "en");
   llvm::sys::path::replace_extension(EnglishLocalization, ".yaml");
@@ -57,4 +67,22 @@ TEST(DefToYAMLConverterTest, matchDiagnosticMessages) {
   yaml.forEachAvailable([](swift::DiagID id, llvm::StringRef translation) {
     ASSERT_TRUE(diagnosticMessages[static_cast<uint32_t>(id)] == translation);
   });
+}
+
+TEST(DefToYAMLConverterTest, matchDiagnosticMessagesRandomly) {
+  llvm::SmallString<128> EnglishLocalization(getDefaultLocalizationPath());
+  llvm::sys::path::append(EnglishLocalization, "en");
+  llvm::sys::path::replace_extension(EnglishLocalization, ".yaml");
+  YAMLLocalizationProducer yaml(EnglishLocalization.str());
+
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_int_distribution<> distr(50, LocalDiagID::NumDiags);
+  unsigned numberOfQueries = distr(gen);
+  while (numberOfQueries--) {
+    unsigned randomNum = randNum(LocalDiagID::NumDiags);
+    DiagID randomId = static_cast<DiagID>(randomNum);
+    ASSERT_TRUE(yaml.getMessageOr(randomId, "") ==
+                diagnosticMessages[randomNum]);
+  }
 }
