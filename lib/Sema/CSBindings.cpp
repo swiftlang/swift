@@ -335,7 +335,7 @@ void ConstraintSystem::PotentialBindings::finalize(
     if (locator->isLastElement<LocatorPathElt::MemberRefBase>())
       PotentiallyIncomplete = true;
 
-    addPotentialBinding(PotentialBinding::forHole(cs.getASTContext(), locator));
+    addPotentialBinding(PotentialBinding::forHole(TypeVar, locator));
   }
 
   // Let's always consider `Any` to be a last resort binding because
@@ -481,6 +481,7 @@ void ConstraintSystem::PotentialBindings::addPotentialBinding(
   if (binding.Kind == AllowedBindingKind::Supertypes &&
       !binding.BindingType->hasUnresolvedType() &&
       !binding.BindingType->hasTypeVariable() &&
+      !binding.BindingType->hasHole() &&
       !binding.BindingType->hasUnboundGenericType() &&
       !binding.hasDefaultedLiteralProtocol() &&
       !binding.isDefaultableBinding() && allowJoinMeet) {
