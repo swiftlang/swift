@@ -22,15 +22,18 @@ namespace swift {
 
 // Trie node representing a sequence of unsigned integer indices.
 class IndexTrieNode {
-  static const unsigned RootIdx = ~0U;
-  unsigned Index;
+public:
+  static const int RootIndex = std::numeric_limits<int>::min();
+
+private:
+  int Index;
   llvm::SmallVector<IndexTrieNode*, 8> Children;
   IndexTrieNode *Parent;
 
 public:
-  IndexTrieNode(): Index(RootIdx), Parent(nullptr) {}
+  IndexTrieNode() : Index(RootIndex), Parent(nullptr) {}
 
-  explicit IndexTrieNode(unsigned V, IndexTrieNode *P): Index(V), Parent(P) {}
+  explicit IndexTrieNode(int V, IndexTrieNode *P) : Index(V), Parent(P) {}
 
   IndexTrieNode(IndexTrieNode &) =delete;
   IndexTrieNode &operator=(const IndexTrieNode&) =delete;
@@ -40,19 +43,18 @@ public:
       delete N;
   }
 
-  bool isRoot() const { return Index == RootIdx; }
+  bool isRoot() const { return Index == RootIndex; }
 
   bool isLeaf() const { return Children.empty(); }
 
-  unsigned getIndex() const { return Index; }
+  int getIndex() const { return Index; }
 
-  IndexTrieNode *getChild(unsigned Idx) {
-    assert(Idx != RootIdx);
+  IndexTrieNode *getChild(int Idx) {
+    assert(Idx != RootIndex);
 
-    auto I = std::lower_bound(Children.begin(), Children.end(), Idx,
-                              [](IndexTrieNode *a, unsigned i) {
-                                return a->Index < i;
-                              });
+    auto I =
+        std::lower_bound(Children.begin(), Children.end(), Idx,
+                         [](IndexTrieNode *a, int i) { return a->Index < i; });
     if (I != Children.end() && (*I)->Index == Idx)
       return *I;
     auto *N = new IndexTrieNode(Idx, this);
