@@ -1071,9 +1071,6 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
     return false;
   
   auto sourceRange = getSourceRange();
-  
-  emitDiagnostic(diag::optional_base_not_unwrapped,
-                 baseType, Member, unwrappedBaseType);
 
   auto componentPathElt =
       locator->getLastElementAs<LocatorPathElt::KeyPathComponent>();
@@ -1082,12 +1079,25 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
     // let's emit a tailored note suggesting to use its unwrapped type.
     auto *keyPathExpr = castToExpr<KeyPathExpr>(getAnchor());
     if (auto rootType = keyPathExpr->getRootType()) {
+      emitDiagnostic(diag::optional_base_not_unwrapped, baseType, Member,
+                     unwrappedBaseType);
+
       emitDiagnostic(diag::optional_base_remove_optional_for_keypath_root,
                      unwrappedBaseType)
           .fixItReplace(rootType->getSourceRange(),
                         unwrappedBaseType.getString());
+    } else {
+      emitDiagnostic(diag::invalid_optional_infered_keypath_root, baseType,
+                     Member, unwrappedBaseType);
+      emitDiagnostic(diag::optional_key_path_root_base_chain, Member)
+          .fixItInsert(sourceRange.End, "?.");
+      emitDiagnostic(diag::optional_key_path_root_base_unwrap, Member)
+          .fixItInsert(sourceRange.End, "!.");
     }
   } else {
+    emitDiagnostic(diag::optional_base_not_unwrapped, baseType, Member,
+                   unwrappedBaseType);
+
     // FIXME: It would be nice to immediately offer "base?.member ?? defaultValue"
     // for non-optional results where that would be appropriate. For the moment
     // always offering "?" means that if the user chooses chaining, we'll end up
