@@ -711,7 +711,7 @@ static bool analyzeBeginAccess(BeginAccessInst *BI,
       return true;
     }
     return BIAccessedStorageNonNested.isDistinctFrom(
-        findAccessedStorage(OtherBI));
+      findAccessedStorage(OtherBI));
   };
 
   if (!std::all_of(BeginAccesses.begin(), BeginAccesses.end(), safeBeginPred))

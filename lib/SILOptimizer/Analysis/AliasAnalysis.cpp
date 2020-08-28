@@ -334,7 +334,7 @@ static bool isAccessedAddressTBAASafe(SILValue V) {
   if (!V->getType().isAddress())
     return false;
 
-  SILValue accessedAddress = getAccessedAddress(V);
+  SILValue accessedAddress = getAccessAddress(V);
   if (isa<SILFunctionArgument>(accessedAddress))
     return true;
 

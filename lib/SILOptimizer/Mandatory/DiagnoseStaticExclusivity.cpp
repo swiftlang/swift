@@ -964,20 +964,20 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
 // Check that the given address-type operand is guarded by begin/end access
 // markers.
 static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
-  SILValue address = getAddressAccess(memOper->get());
+  SILValue accessBegin = getAccessBegin(memOper->get());
   SILInstruction *memInst = memOper->getUser();
 
-  auto error = [address, memInst]() {
+  auto error = [accessBegin, memInst]() {
     llvm::dbgs() << "Memory access not protected by begin_access:\n";
     memInst->printInContext(llvm::dbgs());
-    llvm::dbgs() << "Accessing: " << address;
+    llvm::dbgs() << "Accessing: " << accessBegin;
     llvm::dbgs() << "In function:\n";
     memInst->getFunction()->print(llvm::dbgs());
     abort();
   };
 
   // Check if this address is guarded by an access.
-  if (auto *BAI = dyn_cast<BeginAccessInst>(address)) {
+  if (auto *BAI = dyn_cast<BeginAccessInst>(accessBegin)) {
     if (BAI->getEnforcement() == SILAccessEnforcement::Unsafe)
       return;
 
@@ -1017,7 +1017,7 @@ static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
       return;
   }
 
-  const AccessedStorage &storage = findAccessedStorage(address);
+  const AccessedStorage &storage = findAccessedStorage(accessBegin);
   // findAccessedStorage may return an invalid storage object if the address
   // producer is not recognized by its allowlist. For the purpose of
   // verification, we assume that this can only happen for local
