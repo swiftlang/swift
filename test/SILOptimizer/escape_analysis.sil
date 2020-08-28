@@ -1983,3 +1983,27 @@ bb4:
   %z = tuple ()
   return %z : $()
 }
+
+// Test CGNode mapping for result of an apply to no return function
+// CHECK-LABEL:CG of $testcaller
+// CHECK:  Arg [ref] %0 Esc: A, Succ: (%0.1)
+// CHECK:  Con [int] %0.1 Esc: A, Succ: (%0.2)
+// CHECK:  Con [ref] %0.2 Esc: A, Succ: 
+// CHECK-LABEL:End
+sil hidden [noinline] @$testcaller : $@convention(thin)  (@owned Z) -> () {
+bb0(%0 : $Z):
+  %2 = function_ref @$noreturncallee : $@convention(thin) (@guaranteed Z) -> @owned Z
+  %3 = apply %2(%0) : $@convention(thin) (@guaranteed Z) -> @owned Z
+  dealloc_ref %3 : $Z
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL:CG of $noreturncallee
+// CHECK:  Arg [ref] %0 Esc: A, Succ: 
+// CHECK-LABEL:End
+sil hidden [noinline] @$noreturncallee : $@convention(thin)  (@guaranteed Z) -> @owned Z {
+bb0(%0 : $Z):
+  unreachable
+}
+
