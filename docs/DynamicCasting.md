@@ -191,7 +191,7 @@ Implementation Note: `AnyObject` is represented in memory as a pointer to a refc
 ### Objective-C Interactions
 
 Note the invariant above cannot be an equality because Objective-C bridging allows libraries to introduce new relationships that can alter the behavior of seemingly-unrelated casts.
-One example of this is Foundation's `Number` (or `NSNumber`) type which conditionally bridges to several Swift numeric types.
+One example of this is Foundation's `NSNumber` type which conditionally bridges to several Swift numeric types.
 As a result, when Foundation is in scope, `Int(7) is Double == false` but `(Int(7) as! AnyObject) is Double == true`.
 In general, the ability to add new bridging behaviors from a single type to several distinct types implies that Swift casting cannot be transitive.
 
