@@ -2434,6 +2434,53 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
     }
   }
 
+  // If we have more than one attribute declaration, we have an ambiguity.
+  // So, emit an ambiguity diagnostic.
+  if (auto typeRepr = attr->getTypeRepr()) {
+    if (nominals.size() > 1) {
+      SmallVector<NominalTypeDecl *, 4> ambiguousCandidates;
+      // Filter out declarations that cannot be attributes.
+      for (auto decl : nominals) {
+        if (isa<ProtocolDecl>(decl)) {
+          continue;
+        }
+        ambiguousCandidates.push_back(decl);
+      }
+      if (ambiguousCandidates.size() > 1) {
+        auto attrName = nominals.front()->getName();
+        ctx.Diags.diagnose(typeRepr->getLoc(),
+                           diag::ambiguous_custom_attribute_ref, attrName);
+        for (auto candidate : ambiguousCandidates) {
+          ctx.Diags.diagnose(candidate->getLoc(),
+                             diag::found_attribute_candidate);
+          // If the candidate is a top-level attribute, let's suggest
+          // adding module name to resolve the ambiguity.
+          if (candidate->getDeclContext()->isModuleScopeContext()) {
+            auto moduleName = candidate->getParentModule()->getName();
+            ctx.Diags
+                .diagnose(typeRepr->getLoc(),
+                          diag::ambiguous_custom_attribute_ref_fix,
+                          moduleName.str(), attrName, moduleName)
+                .fixItInsert(typeRepr->getLoc(), moduleName.str().str() + ".");
+          }
+        }
+        return nullptr;
+      }
+    }
+  }
+
+  // There is no nominal type with this name, so complain about this being
+  // an unknown attribute.
+  std::string typeName;
+  if (auto typeRepr = attr->getTypeRepr()) {
+    llvm::raw_string_ostream out(typeName);
+    typeRepr->print(out);
+  } else {
+    typeName = attr->getType().getString();
+  }
+
+  ctx.Diags.diagnose(attr->getLocation(), diag::unknown_attribute, typeName);
+
   return nullptr;
 }
 
