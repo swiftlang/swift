@@ -125,6 +125,7 @@ KNOWN_SETTINGS=(
     ## Skip Build ...
     skip-build                                    ""                "set to configure as usual while skipping the build step"
     skip-build-android                            ""                "set to skip building Swift stdlibs for Android"
+    skip-build-wasm                               ""                "set to skip building Swift stdlibs for WebAssembly"
     skip-build-benchmarks                         ""                "set to skip building Swift Benchmark Suite"
     skip-build-clang-tools-extra                  ""                "set to skip building clang-tools-extra as part of llvm"
     skip-build-compiler-rt                        ""                "set to skip building Compiler-RT"
