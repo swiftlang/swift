@@ -3273,9 +3273,10 @@ namespace {
     Type visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
       if (auto *placeholderRepr = E->getPlaceholderTypeRepr()) {
         // Just resolve the referenced type.
-        // FIXME: The type reference needs to be opened into context.
         return resolveTypeReferenceInExpression(
-            placeholderRepr, TypeResolverContext::InExpression, nullptr);
+            placeholderRepr, TypeResolverContext::InExpression,
+            // Introduce type variables for unbound generics.
+            OpenUnboundGenericType(CS, CS.getConstraintLocator(E)));
       }
 
       auto locator = CS.getConstraintLocator(E);

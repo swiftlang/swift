@@ -2,6 +2,7 @@
 
 func foo(_ x: Int) -> Int {}
 func foo(_ x: Float) -> Float {}
+func foo<T>(_ t: T) -> T {}
 
 var v = foo(<#T##x: Float##Float#>) // expected-error {{editor placeholder}}
 v = "" // expected-error {{cannot assign value of type 'String' to type 'Float'}}
@@ -36,3 +37,6 @@ func test_ambiguity_with_placeholders(pairs: [(rank: Int, count: Int)]) -> Bool 
   // expected-error@-1 {{editor placeholder in source file}}
   // expected-error@-2 {{ambiguous use of 'subscript(_:)'}}
 }
+
+let unboundInPlaceholder1: Array<Never> = <#T##Array#> // expected-error{{editor placeholder in source file}}
+let unboundInPlaceholder2: Array<Never> = foo(<#T##t: Array##Array<Never>#>) // expected-error{{editor placeholder in source file}}
