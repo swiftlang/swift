@@ -3144,16 +3144,16 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
     return funcTy;
   }
 
-  Optional<ClangTypeInfo> clangTypeInfo = info.getClangTypeInfo();
+  auto clangTypeInfo = info.getClangTypeInfo();
 
   size_t allocSize = totalSizeToAlloc<AnyFunctionType::Param, ClangTypeInfo>(
-      params.size(), clangTypeInfo.hasValue() ? 1 : 0);
+      params.size(), clangTypeInfo.empty() ? 0 : 1);
   void *mem = ctx.Allocate(allocSize, alignof(FunctionType), arena);
 
   bool isCanonical = isFunctionTypeCanonical(params, result);
-  if (clangTypeInfo.hasValue()) {
+  if (!clangTypeInfo.empty()) {
     if (ctx.LangOpts.UseClangFunctionTypes)
-      isCanonical &= clangTypeInfo->type->isCanonicalUnqualified();
+      isCanonical &= clangTypeInfo.getType()->isCanonicalUnqualified();
     else
       isCanonical = false;
   }
@@ -3175,8 +3175,8 @@ FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params,
   std::uninitialized_copy(params.begin(), params.end(),
                           getTrailingObjects<AnyFunctionType::Param>());
   auto clangTypeInfo = info.getClangTypeInfo();
-  if (clangTypeInfo.hasValue())
-    *getTrailingObjects<ClangTypeInfo>() = clangTypeInfo.getValue();
+  if (!clangTypeInfo.empty())
+    *getTrailingObjects<ClangTypeInfo>() = clangTypeInfo;
 }
 
 void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
@@ -4471,16 +4471,29 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
   return Type();
 }
 
-const clang::Type *
-ASTContext::getClangFunctionType(ArrayRef<AnyFunctionType::Param> params,
-                                 Type resultTy,
-                                 FunctionTypeRepresentation trueRep) {
+ClangTypeConverter &ASTContext::getClangTypeConverter() {
   auto &impl = getImpl();
   if (!impl.Converter) {
     auto *cml = getClangModuleLoader();
     impl.Converter.emplace(*this, cml->getClangASTContext(), LangOpts.Target);
   }
-  return impl.Converter.getValue().getFunctionType(params, resultTy, trueRep);
+  return impl.Converter.getValue();
+}
+
+const clang::Type *
+ASTContext::getClangFunctionType(ArrayRef<AnyFunctionType::Param> params,
+                                 Type resultTy,
+                                 FunctionTypeRepresentation trueRep) {
+  return getClangTypeConverter().getFunctionType(params, resultTy, trueRep);
+}
+
+const clang::Type *
+ASTContext::getCanonicalClangFunctionType(
+    ArrayRef<SILParameterInfo> params,
+    Optional<SILResultInfo> result,
+    SILFunctionType::Representation trueRep) {
+  auto *ty = getClangTypeConverter().getFunctionType(params, result, trueRep);
+  return ty ? ty->getCanonicalTypeInternal().getTypePtr() : nullptr;
 }
 
 const Decl *
