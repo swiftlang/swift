@@ -146,7 +146,8 @@ public:
 
   std::string mangleGlobalVariableFull(const VarDecl *decl);
 
-  std::string mangleGlobalInit(const VarDecl *decl, int counter,
+  std::string mangleGlobalInit(const PatternBindingDecl *decl,
+                               unsigned entry,
                                bool isInitFunc);
 
   std::string mangleReabstractionThunkHelper(CanSILFunctionType ThunkType,

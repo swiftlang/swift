@@ -2669,7 +2669,7 @@ NodePointer Demangler::demangleSpecAttributes(Node::Kind SpecKind) {
 }
 
 NodePointer Demangler::demangleWitness() {
-  switch (nextChar()) {
+  switch (char c = nextChar()) {
     case 'C':
       return createWithChild(Node::Kind::EnumCase,
                              popNode(isEntity));
@@ -2810,6 +2810,30 @@ NodePointer Demangler::demangleWitness() {
       default:
         return nullptr;
       }
+    }
+    case 'Z':
+    case 'z': {
+      auto declList = createNode(Node::Kind::GlobalVariableOnceDeclList);
+      std::vector<NodePointer> vars;
+      while (auto sig = popNode(Node::Kind::FirstElementMarker)) {
+        auto identifier = popNode(isDeclName);
+        if (!identifier)
+          return nullptr;
+        vars.push_back(identifier);
+      }
+      for (auto i = vars.rbegin(); i != vars.rend(); ++i) {
+        declList->addChild(*i, *this);
+      }
+      
+      auto context = popContext();
+      if (!context)
+        return nullptr;
+      Node::Kind kind = c == 'Z'
+        ? Node::Kind::GlobalVariableOnceFunction
+        : Node::Kind::GlobalVariableOnceToken;
+      return createWithChildren(kind,
+                                context,
+                                declList);
     }
     default:
       return nullptr;

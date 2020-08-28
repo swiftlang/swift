@@ -552,6 +552,9 @@ private:
     case Node::Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction:
     case Node::Kind::NoncanonicalSpecializedGenericTypeMetadata:
     case Node::Kind::NoncanonicalSpecializedGenericTypeMetadataCache:
+    case Node::Kind::GlobalVariableOnceDeclList:
+    case Node::Kind::GlobalVariableOnceFunction:
+    case Node::Kind::GlobalVariableOnceToken:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -2465,6 +2468,28 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::NoncanonicalSpecializedGenericTypeMetadataCache:
     Printer << "cache variable for noncanonical specialized generic type metadata for ";
     print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::GlobalVariableOnceToken:
+  case Node::Kind::GlobalVariableOnceFunction:
+    Printer << (kind == Node::Kind::GlobalVariableOnceToken
+                  ? "one-time initialization token for "
+                  : "one-time initialization function for ");
+    printContext(Node->getChild(0));
+    print(Node->getChild(1));
+    return nullptr;
+  case Node::Kind::GlobalVariableOnceDeclList:
+    if (Node->getNumChildren() == 1) {
+      print(Node->getChild(0));
+    } else {
+      Printer << '(';
+      for (unsigned i = 0, e = Node->getNumChildren(); i < e; ++i) {
+        if (i != 0) {
+          Printer << ", ";
+        }
+        print(Node->getChild(i));
+      }
+      Printer << ')';
+    }
     return nullptr;
   }
   printer_unreachable("bad node kind!");
