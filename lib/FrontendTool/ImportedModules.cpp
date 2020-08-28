@@ -42,9 +42,9 @@ static void findAllClangImports(const clang::Module *module,
   }
 }
 
-bool swift::emitImportedModules(ASTContext &Context, ModuleDecl *mainModule,
+bool swift::emitImportedModules(ModuleDecl *mainModule,
                                 const FrontendOptions &opts) {
-
+  auto &Context = mainModule->getASTContext();
   std::string path = opts.InputsAndOutputs.getSingleOutputFilename();
   std::error_code EC;
   llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::F_None);
