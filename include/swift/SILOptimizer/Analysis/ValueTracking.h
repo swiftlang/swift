@@ -54,9 +54,21 @@ bool pointsToLocalObject(SILValue V);
 /// - an address projection based on an exclusive argument with no levels of
 /// indirection (e.g. ref_element_addr, project_box, etc.).
 inline bool isUniquelyIdentified(SILValue V) {
-  return pointsToLocalObject(V)
-         || (V->getType().isAddress()
-             && isExclusiveArgument(getAccessedAddress(V)));
+  SILValue objectRef = V;
+  if (V->getType().isAddress()) {
+    auto storage = findAccessedStorage(V);
+    if (!storage)
+      return false;
+
+    if (storage.isUniquelyIdentifiedAfterEnforcement())
+      return true;
+
+    if (!storage.isObjectAccess())
+      return false;
+
+    objectRef = storage.getObject();
+  }
+  return pointsToLocalObject(objectRef);
 }
 
 enum class IsZeroKind {
