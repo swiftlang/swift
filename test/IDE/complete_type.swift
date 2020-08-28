@@ -765,3 +765,17 @@ func testUnbound2(x: OuterStruct<Int>.Inner.#^UNBOUND_DOT_3^#) {}
 // UNBOUND_DOT_3: Begin completions
 // UNBOUND_DOT_3-DAG: Keyword/None:                       Type[#OuterStruct<Int>.Inner.Type#]; name=Type
 // UNBOUND_DOT_3: End completions
+
+// rdar://problem/67102794
+struct HasProtoAlias {
+  typealias ProtoAlias = FooProtocol
+}
+extension FooStruct: HasProtoAlias.#^EXTENSION_INHERITANCE_1?check=EXTENSION_INHERITANCE^# {}
+
+struct ContainExtension {
+  extension FooStruct: HasProtoAlias.#^EXTENSION_INHERITANCE_2?check=EXTENSION_INHERITANCE^# {}
+}
+// EXTENSION_INHERITANCE: Begin completions, 2 items
+// EXTENSION_INHERITANCE-DAG: Decl[TypeAlias]/CurrNominal:        ProtoAlias[#FooProtocol#];
+// EXTENSION_INHERITANCE-DAG: Keyword/None:                       Type[#HasProtoAlias.Type#];
+// EXTENSION_INHERITANCE: End completions
