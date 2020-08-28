@@ -4,5 +4,4 @@ add_swift_host_tool(swift-def-to-yaml-converter
 )
 
 target_link_libraries(swift-def-to-yaml-converter PRIVATE
-  swiftLocalization
-  swiftAST)
+  swiftLocalization)
