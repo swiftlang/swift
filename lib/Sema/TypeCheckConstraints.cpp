@@ -477,6 +477,46 @@ static bool findNonMembers(ArrayRef<LookupResultEntry> lookupResults,
   return AllDeclRefs;
 }
 
+/// Find the next element in a chain of members. If this expression is (or
+/// could be) the base of such a chain, this will return \c nullptr.
+static Expr *getMemberChainSubExpr(Expr *expr) {
+  assert(expr && "getMemberChainSubExpr called with null expr!");
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
+    return UDE->getBase();
+  } else if (auto *CE = dyn_cast<CallExpr>(expr)) {
+    return CE->getFn();
+  } else if (auto *BOE = dyn_cast<BindOptionalExpr>(expr)) {
+    return BOE->getSubExpr();
+  } else if (auto *FVE = dyn_cast<ForceValueExpr>(expr)) {
+    return FVE->getSubExpr();
+  } else if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
+    return SE->getBase();
+  } else if (auto *CCE = dyn_cast<CodeCompletionExpr>(expr)) {
+    return CCE->getBase();
+  } else {
+    return nullptr;
+  }
+}
+
+UnresolvedMemberExpr *TypeChecker::getUnresolvedMemberChainBase(Expr *expr) {
+  if (auto *subExpr = getMemberChainSubExpr(expr))
+    return getUnresolvedMemberChainBase(subExpr);
+  else
+    return dyn_cast<UnresolvedMemberExpr>(expr);
+}
+
+/// Whether this expression is a member of a member chain.
+static bool isMemberChainMember(Expr *expr) {
+  return getMemberChainSubExpr(expr) != nullptr;
+}
+/// Whether this expression sits at the end of a chain of member accesses.
+static bool isMemberChainTail(Expr *expr, Expr *parent) {
+  assert(expr && "isMemberChainTail called with null expr!");
+  // If this expression's parent is not itself part of a chain (or, this expr
+  // has no parent expr), this must be the tail of the chain.
+  return parent == nullptr || !isMemberChainMember(parent);
+}
+
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
 /// returning the resultant expression. Context is the DeclContext used
 /// for the lookup.
@@ -1085,13 +1125,6 @@ namespace {
         }
       }
 
-      // If this is an unresolved member with a call argument (e.g.,
-      // .some(x)), record the argument expression.
-      if (auto unresolvedMember = dyn_cast<UnresolvedMemberExpr>(expr)) {
-        if (auto arg = unresolvedMember->getArgument())
-          CallArgs.insert(arg);
-      }
-
       // FIXME(diagnostics): `InOutType` could appear here as a result
       // of successful re-typecheck of the one of the sub-expressions e.g.
       // `let _: Int = { (s: inout S) in s.bar() }`. On the first
@@ -1325,6 +1358,14 @@ namespace {
 
       if (auto *simplified = simplifyTypeConstructionWithLiteralArg(expr))
         return simplified;
+
+      // If we find an unresolved member chain, wrap it in an
+      // UnresolvedMemberChainResultExpr (unless this has already been done).
+      auto *parent = Parent.getAsExpr();
+      if (isMemberChainTail(expr, parent))
+        if (auto *UME = TypeChecker::getUnresolvedMemberChainBase(expr))
+          if (!parent || !isa<UnresolvedMemberChainResultExpr>(parent))
+            return new (ctx) UnresolvedMemberChainResultExpr(expr, UME);
 
       return expr;
     }
