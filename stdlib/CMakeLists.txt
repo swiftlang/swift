@@ -55,6 +55,12 @@ else()
   add_compile_options(-fno-sanitize=all)
 endif()
 
+# Add a workaround for older clang-cl with a newer MSVC runtime.  MSVC 16.27
+# ships with a C++ compiler that enables conditional explicit from C++20
+# unconditionally.  Newer clang supports this, but the 5.3 release branch clang
+# does not.  Add a workaround.
+add_compile_definitions($<$<OR:$<COMPILE_LANGUAGE:C>,$<COMPILE_LANGUAGE:CXX>>:_HAS_CONDITIONAL_EXPLICIT=0>)
+
 # Do not enforce checks for LLVM's ABI-breaking build settings.
 # The Swift runtime uses some header-only code from LLVM's ADT classes,
 # but we do not want to link libSupport into the runtime. These checks rely
