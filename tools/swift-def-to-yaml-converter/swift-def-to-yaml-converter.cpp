@@ -72,6 +72,11 @@ int main(int argc, char *argv[]) {
   llvm::raw_fd_ostream OS(LocalizedFilePath.str(), error,
                           llvm::sys::fs::F_None);
 
+  if (OS.has_error() || error) {
+    llvm::errs() << LocalizedFilePath.str() << " does not exist\n";
+    return EXIT_FAILURE;
+  }
+
   for (unsigned i = 0; i < LocalDiagID::NumDiags; ++i) {
     OS << "- id: " << diagnosticID[i] << "\n";
     std::string msg = diagnosticMessages[i];
