@@ -25,6 +25,8 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstdlib>
+#include <string>
+#include <system_error>
 
 static constexpr const char *const diagnosticID[] = {
 #define DIAG(KIND, ID, Options, Text, Signature) #ID,
