@@ -32,12 +32,37 @@
 
 using namespace swift;
 
+/// Return true if `move(along:)` can be invoked on the given `Differentiable`-
+/// conforming property.
+///
+/// If the given property is a `var`, return true because `move(along:)` can be
+/// invoked regardless.  Otherwise, return true if and only if the property's
+/// type's 'Differentiable.move(along:)' witness is non-mutating.
+static bool canInvokeMoveAlongOnProperty(
+    VarDecl *vd, ProtocolConformanceRef diffableConformance) {
+  assert(diffableConformance && "Property must conform to 'Differentiable'");
+  // `var` always supports `move(along:)` since it is mutable.
+  if (vd->getIntroducer() == VarDecl::Introducer::Var)
+    return true;
+  // When the property is a `let`, the only case that would be supported is when
+  // it has a `move(along:)` protocol requirement witness that is non-mutating.
+  auto interfaceType = vd->getInterfaceType();
+  auto &C = vd->getASTContext();
+  auto witness = diffableConformance.getWitnessByName(
+      interfaceType, DeclName(C, C.Id_move, {C.Id_along}));
+  if (!witness)
+    return false;
+  auto *decl = cast<FuncDecl>(witness.getDecl());
+  return decl->isNonMutating();
+}
+
 /// Get the stored properties of a nominal type that are relevant for
 /// differentiation, except the ones tagged `@noDerivative`.
 static void
-getStoredPropertiesForDifferentiation(NominalTypeDecl *nominal, DeclContext *DC,
-                                      SmallVectorImpl<VarDecl *> &result,
-                                      bool includeLetProperties = false) {
+getStoredPropertiesForDifferentiation(
+    NominalTypeDecl *nominal, DeclContext *DC,
+    SmallVectorImpl<VarDecl *> &result,
+    bool includeLetPropertiesWithNonmutatingMoveAlong = false) {
   auto &C = nominal->getASTContext();
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
   for (auto *vd : nominal->getStoredProperties()) {
@@ -53,15 +78,18 @@ getStoredPropertiesForDifferentiation(NominalTypeDecl *nominal, DeclContext *DC,
     // Skip stored properties with `@noDerivative` attribute.
     if (vd->getAttrs().hasAttribute<NoDerivativeAttr>())
       continue;
-    // Skip `let` stored properties if requested.
-    // `mutating func move(along:)` cannot be synthesized to update `let`
-    // properties.
-    if (!includeLetProperties && vd->isLet())
-      continue;
     if (vd->getInterfaceType()->hasError())
       continue;
     auto varType = DC->mapTypeIntoContext(vd->getValueInterfaceType());
-    if (!TypeChecker::conformsToProtocol(varType, diffableProto, nominal))
+    auto conformance = TypeChecker::conformsToProtocol(
+        varType, diffableProto, nominal);
+    if (!conformance)
+      continue;
+    // Skip `let` stored properties with a mutating `move(along:)` if requested.
+    // `mutating func move(along:)` cannot be synthesized to update `let`
+    // properties.
+    if (!includeLetPropertiesWithNonmutatingMoveAlong && 
+        !canInvokeMoveAlongOnProperty(vd, conformance))
       continue;
     result.push_back(vd);
   }
@@ -782,18 +810,18 @@ static void checkAndDiagnoseImplicitNoDerivative(ASTContext &Context,
       continue;
     // Check whether to diagnose stored property.
     auto varType = DC->mapTypeIntoContext(vd->getValueInterfaceType());
-    bool conformsToDifferentiable =
-        !TypeChecker::conformsToProtocol(varType, diffableProto, nominal)
-             .isInvalid();
+    auto diffableConformance =
+        TypeChecker::conformsToProtocol(varType, diffableProto, nominal);
     // If stored property should not be diagnosed, continue.
-    if (conformsToDifferentiable && !vd->isLet())
+    if (diffableConformance && 
+        canInvokeMoveAlongOnProperty(vd, diffableConformance))
       continue;
     // Otherwise, add an implicit `@noDerivative` attribute.
     vd->getAttrs().add(new (Context) NoDerivativeAttr(/*Implicit*/ true));
     auto loc = vd->getAttributeInsertionLoc(/*forModifier*/ false);
     assert(loc.isValid() && "Expected valid source location");
     // Diagnose properties that do not conform to `Differentiable`.
-    if (!conformsToDifferentiable) {
+    if (!diffableConformance) {
       Context.Diags
           .diagnose(
               loc,
