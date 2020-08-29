@@ -250,7 +250,9 @@ extension _StringGuts {
   ) -> Int? {
     #if _runtime(_ObjC)
     // Currently, foreign  means NSString
-    if let res = _cocoaStringCopyUTF8(_object.cocoaObject, into: mbp) {
+    if let res = _cocoaStringCopyUTF8(_object.cocoaObject,
+      into: UnsafeMutableRawBufferPointer(start: mbp.baseAddress,
+                                          count: mbp.count)) {
       return res
     }
     

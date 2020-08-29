@@ -197,11 +197,18 @@ extension _SmallString {
   internal func withUTF8<Result>(
     _ f: (UnsafeBufferPointer<UInt8>) throws -> Result
   ) rethrows -> Result {
+    let count = self.count
     var raw = self.zeroTerminatedRawCodeUnits
-    return try Swift.withUnsafeBytes(of: &raw) { rawBufPtr in
-      let ptr = rawBufPtr.baseAddress._unsafelyUnwrappedUnchecked
-        .assumingMemoryBound(to: UInt8.self)
-      return try f(UnsafeBufferPointer(start: ptr, count: self.count))
+    return try Swift.withUnsafeBytes(of: &raw) {
+      let rawPtr = $0.baseAddress._unsafelyUnwrappedUnchecked
+      // Rebind the underlying (UInt64, UInt64) tuple to UInt8 for the
+      // duration of the closure. Accessing self after this rebind is undefined.
+      let ptr = rawPtr.bindMemory(to: UInt8.self, capacity: count)
+      defer {
+        // Restore the memory type of self._storage
+        _ = rawPtr.bindMemory(to: RawBitPattern.self, capacity: 1)
+      }
+      return try f(UnsafeBufferPointer(start: ptr, count: count))
     }
   }
 
@@ -209,14 +216,11 @@ extension _SmallString {
   // new count.
   @inline(__always)
   internal mutating func withMutableCapacity(
-    _ f: (UnsafeMutableBufferPointer<UInt8>) throws -> Int
+    _ f: (UnsafeMutableRawBufferPointer) throws -> Int
   ) rethrows {
     let len = try withUnsafeMutableBytes(of: &self._storage) {
       (rawBufPtr: UnsafeMutableRawBufferPointer) -> Int in
-      let ptr = rawBufPtr.baseAddress._unsafelyUnwrappedUnchecked
-        .assumingMemoryBound(to: UInt8.self)
-      return try f(UnsafeMutableBufferPointer(
-        start: ptr, count: _SmallString.capacity))
+      return try f(rawBufPtr)
     }
     if len == 0 {
       self = _SmallString()
@@ -273,7 +277,17 @@ extension _SmallString {
   ) rethrows {
     self.init()
     try self.withMutableCapacity {
-      return try initializer($0)
+      let capacity = $0.count
+      let rawPtr = $0.baseAddress._unsafelyUnwrappedUnchecked
+      // Rebind the underlying (UInt64, UInt64) tuple to UInt8 for the
+      // duration of the closure. Accessing self after this rebind is undefined.
+      let ptr = rawPtr.bindMemory(to: UInt8.self, capacity: capacity)
+      defer {
+        // Restore the memory type of self._storage
+        _ = rawPtr.bindMemory(to: RawBitPattern.self, capacity: 1)
+      }
+      return try initializer(
+        UnsafeMutableBufferPointer<UInt8>(start: ptr, count: capacity))
     }
     self._invariantCheck()
   }
