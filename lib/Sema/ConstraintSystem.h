@@ -4564,9 +4564,10 @@ private:
       return {type, kind, BindingSource};
     }
 
-    static PotentialBinding forHole(ASTContext &ctx,
+    static PotentialBinding forHole(TypeVariableType *typeVar,
                                     ConstraintLocator *locator) {
-      return {ctx.TheUnresolvedType, AllowedBindingKind::Exact,
+      return {HoleType::get(typeVar->getASTContext(), typeVar),
+              AllowedBindingKind::Exact,
               /*source=*/locator};
     }
   };
@@ -4955,8 +4956,12 @@ private:
 public:
   /// Pre-check the expression, validating any types that occur in the
   /// expression and folding sequence expressions.
-  static bool preCheckExpression(Expr *&expr, DeclContext *dc);
-        
+  ///
+  /// \param replaceInvalidRefsWithErrors Indicates whether it's allowed
+  /// to replace any discovered invalid member references with `ErrorExpr`.
+  static bool preCheckExpression(Expr *&expr, DeclContext *dc,
+                                 bool replaceInvalidRefsWithErrors);
+
   /// Solve the system of constraints generated from provided target.
   ///
   /// \param target The target that we'll generate constraints from, which

@@ -416,6 +416,8 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
 
   assert(exprType && !exprType->hasTypeVariable() &&
          "free type variable with FreeTypeVariableBinding::GenericParameters?");
+  assert(exprType && !exprType->hasHole() &&
+         "type hole with FreeTypeVariableBinding::GenericParameters?");
 
   if (exprType->hasError()) {
     recoverOriginalType();
@@ -553,10 +555,10 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
   // We allocate these expressions on the stack because we know they can't
   // escape and there isn't a better way to allocate scratch Expr nodes.
   UnresolvedDeclRefExpr UDRE(DeclNameRef(opName), refKind, DeclNameLoc(Loc));
-  auto *opExpr = TypeChecker::resolveDeclRefExpr(&UDRE, DC);
+  auto *opExpr = TypeChecker::resolveDeclRefExpr(
+      &UDRE, DC, /*replaceInvalidRefsWithErrors=*/true);
 
   switch (refKind) {
-
   case DeclRefKind::PostfixOperator: {
     // (postfix_unary_expr
     //   (declref_expr name=<opName>)
@@ -611,7 +613,8 @@ static Optional<Type> getTypeOfCompletionContextExpr(
                         CompletionTypeCheckKind kind,
                         Expr *&parsedExpr,
                         ConcreteDeclRef &referencedDecl) {
-  if (constraints::ConstraintSystem::preCheckExpression(parsedExpr, DC))
+  if (constraints::ConstraintSystem::preCheckExpression(
+          parsedExpr, DC, /*replaceInvalidRefsWithErrors=*/true))
     return None;
 
   switch (kind) {

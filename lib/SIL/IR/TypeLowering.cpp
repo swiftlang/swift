@@ -1964,7 +1964,7 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
 
         // Bridge the parameters and result of the function type.
         auto bridgedFnType =
-            TC.getBridgedFunctionType(origType, substFnType, extInfo, bridging);
+            TC.getBridgedFunctionType(origType, substFnType, bridging);
         substFnType = bridgedFnType;
 
         // Also rewrite the type of the abstraction pattern.

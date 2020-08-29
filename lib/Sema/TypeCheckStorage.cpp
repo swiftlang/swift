@@ -1881,7 +1881,7 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       genericParams,
       getterParams,
-      TypeLoc(),
+      Type(),
       storage->getDeclContext());
 
   // If we're stealing the 'self' from a lazy initializer, set it now.
@@ -1930,7 +1930,7 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       genericParams, params,
-      TypeLoc(),
+      Type(),
       storage->getDeclContext());
 
   if (isMutating)
@@ -2032,7 +2032,7 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
   auto *params = buildIndexForwardingParamList(storage, {}, ctx);
 
   // Coroutine accessors always return ().
-  Type retTy = TupleType::getEmpty(ctx);
+  const Type retTy = TupleType::getEmpty(ctx);
 
   GenericParamList *genericParams = createAccessorGenericParams(storage);
 
@@ -2041,7 +2041,7 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
       kind, storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      genericParams, params, TypeLoc::withoutLoc(retTy), dc);
+      genericParams, params, retTy, dc);
   
   if (isMutating)
     accessor->setSelfAccessKind(SelfAccessKind::Mutating);

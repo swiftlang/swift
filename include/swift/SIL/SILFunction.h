@@ -121,6 +121,7 @@ public:
   enum class Purpose : uint8_t {
     None,
     GlobalInit,
+    GlobalInitOnceFunction,
     LazyPropertyGetter
   };
 
@@ -273,9 +274,6 @@ private:
   /// is not necessarily @noescape. The only relevant aspect of the argument is
   /// that it may have unboxed capture (i.e. @inout_aliasable parameters).
   unsigned IsWithoutActuallyEscapingThunk : 1;
-
-  /// True if this function is an async function.
-  unsigned IsAsync : 1;
 
   /// If != OptimizationMode::NotSet, the optimization mode specified with an
   /// function attribute.
@@ -504,9 +502,7 @@ public:
     IsWithoutActuallyEscapingThunk = val;
   }
 
-  bool isAsync() const { return IsAsync; }
-
-  void setAsync(bool val = true) { IsAsync = val; }
+  bool isAsync() const { return LoweredType->isAsync(); }
 
   /// Returns the calling convention used by this entry point.
   SILFunctionTypeRepresentation getRepresentation() const {
@@ -837,6 +833,10 @@ public:
   /// function itself does not need this attribute. It is private and only
   /// called within the addressor.
   bool isGlobalInit() const { return specialPurpose == Purpose::GlobalInit; }
+    
+  bool isGlobalInitOnceFunction() const {
+    return specialPurpose == Purpose::GlobalInitOnceFunction;
+  }
 
   bool isLazyPropertyGetter() const {
     return specialPurpose == Purpose::LazyPropertyGetter;

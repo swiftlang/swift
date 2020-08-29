@@ -1611,6 +1611,14 @@ giveUpFastPath:
                                            getXRefDeclNameForError());
       }
 
+      if (memberName.getKind() == DeclBaseName::Kind::Destructor) {
+        assert(isa<ClassDecl>(nominal));
+        // Force creation of an implicit destructor
+        auto CD = dyn_cast<ClassDecl>(nominal);
+        values.push_back(CD->getDestructor());
+        break;
+      }
+
       if (!privateDiscriminator.empty()) {
         ModuleDecl *searchModule = M;
         if (!searchModule)
@@ -3125,21 +3133,19 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
+    const auto resultType = MF.getType(resultInterfaceTypeID);
+    if (declOrOffset.isComplete())
+      return declOrOffset;
+
     FuncDecl *fn;
     if (!isAccessor) {
-      fn = FuncDecl::createDeserialized(
-        ctx, /*StaticLoc=*/SourceLoc(), staticSpelling.getValue(),
-        /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
-        async, /*AsyncLoc=*/SourceLoc(),
-        /*Throws=*/throws, /*ThrowsLoc=*/SourceLoc(),
-        genericParams, DC);
+      fn = FuncDecl::createDeserialized(ctx, staticSpelling.getValue(), name,
+                                        async, throws, genericParams,
+                                        resultType, DC);
     } else {
       auto *accessor = AccessorDecl::createDeserialized(
-        ctx, /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
-        accessorKind, storage,
-        /*StaticLoc=*/SourceLoc(), staticSpelling.getValue(),
-        /*Throws=*/throws, /*ThrowsLoc=*/SourceLoc(),
-        genericParams, DC);
+          ctx, accessorKind, storage, staticSpelling.getValue(),
+          /*Throws=*/throws, genericParams, resultType, DC);
       accessor->setIsTransparent(isTransparent);
 
       fn = accessor;
@@ -3175,8 +3181,6 @@ public:
     }
 
     fn->setStatic(isStatic);
-
-    fn->getBodyResultTypeLoc().setType(MF.getType(resultInterfaceTypeID));
     fn->setImplicitlyUnwrappedOptional(isIUO);
 
     ParameterList *paramList = MF.readParameterList();
@@ -3198,13 +3202,15 @@ public:
     fn->setForcedStaticDispatch(hasForcedStaticDispatch);
     ctx.evaluator.cacheOutput(NeedsNewVTableEntryRequest{fn},
                               std::move(needsNewVTableEntry));
-    fn->setUserAccessible(isUserAccessible);
 
     if (opaqueReturnTypeID) {
       ctx.evaluator.cacheOutput(
           OpaqueResultTypeRequest{fn},
           cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
     }
+
+    if (!isAccessor)
+      fn->setUserAccessible(isUserAccessible);
 
     return fn;
   }
@@ -3853,11 +3859,12 @@ public:
     if (!staticSpelling.hasValue())
       MF.fatal();
 
-    auto subscript = MF.createDecl<SubscriptDecl>(name,
-                                                  SourceLoc(), *staticSpelling,
-                                                  SourceLoc(), nullptr,
-                                                  SourceLoc(), TypeLoc(),
-                                                  parent, genericParams);
+    const auto elemInterfaceType = MF.getType(elemInterfaceTypeID);
+    if (declOrOffset.isComplete())
+      return declOrOffset;
+
+    auto *const subscript = SubscriptDecl::createDeserialized(
+        ctx, name, *staticSpelling, elemInterfaceType, parent, genericParams);
     subscript->setIsGetterMutating(isGetterMutating);
     subscript->setIsSetterMutating(isSetterMutating);
     declOrOffset = subscript;
@@ -3881,8 +3888,6 @@ public:
         MF.fatal();
     }
 
-    auto elemInterfaceType = MF.getType(elemInterfaceTypeID);
-    subscript->getElementTypeLoc().setType(elemInterfaceType);
     subscript->setImplicitlyUnwrappedOptional(isIUO);
 
     if (isImplicit)
@@ -5363,6 +5368,7 @@ public:
 
   Expected<Type> deserializeSILFunctionType(ArrayRef<uint64_t> scratch,
                                             StringRef blobData) {
+    bool async;
     uint8_t rawCoroutineKind;
     uint8_t rawCalleeConvention;
     uint8_t rawRepresentation;
@@ -5380,6 +5386,7 @@ public:
     ClangTypeID clangFunctionTypeID;
 
     decls_block::SILFunctionTypeLayout::readRecord(scratch,
+                                             async,
                                              rawCoroutineKind,
                                              rawCalleeConvention,
                                              rawRepresentation,
@@ -5406,21 +5413,18 @@ public:
     if (!diffKind.hasValue())
       MF.fatal();
 
-    const clang::FunctionType *clangFunctionType = nullptr;
+    const clang::Type *clangFunctionType = nullptr;
     if (clangFunctionTypeID) {
       auto clangType = MF.getClangType(clangFunctionTypeID);
       if (!clangType)
         return clangType.takeError();
-      // FIXME: allow block pointers here.
-      clangFunctionType =
-        dyn_cast_or_null<clang::FunctionType>(clangType.get());
-      if (!clangFunctionType)
-        MF.fatal();
+      clangFunctionType = clangType.get();
     }
 
     auto extInfo =
         SILFunctionType::ExtInfoBuilder(*representation, pseudogeneric,
-                                        noescape, *diffKind, clangFunctionType)
+                                        noescape, async, *diffKind, 
+                                        clangFunctionType)
             .build();
 
     // Process the coroutine kind.

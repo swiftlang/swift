@@ -298,7 +298,7 @@ CanSILFunctionType BridgedProperty::getOutlinedFunctionType(SILModule &M) {
   auto ExtInfo = SILFunctionType::ExtInfoBuilder(
                      SILFunctionType::Representation::Thin,
                      /*pseudogeneric*/ false, /*noescape*/ false,
-                     DifferentiabilityKind::NonDifferentiable,
+                     /*async*/ false, DifferentiabilityKind::NonDifferentiable,
                      /*clangFunctionType*/ nullptr)
                      .build();
   auto FunctionType = SILFunctionType::get(
@@ -1181,6 +1181,7 @@ CanSILFunctionType ObjCMethodCall::getOutlinedFunctionType(SILModule &M) {
       SILFunctionType::ExtInfoBuilder(SILFunctionType::Representation::Thin,
                                       /*pseudogeneric*/ false,
                                       /*noescape*/ false,
+                                      /*async*/ false,
                                       DifferentiabilityKind::NonDifferentiable,
                                       /*clangFunctionType*/ nullptr)
           .build();

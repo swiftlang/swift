@@ -31,17 +31,19 @@ struct MsgInterpolation: StringInterpolationProtocol {
 var messenger = Messenger()
 func testMessenger(intVal: Int, fltVal: Float) {
   messenger.send("  \(intVal, format: .#^OVERLOAD_INT^#) ")
-// OVERLOAD_INT: Begin completions, 4 items
+// OVERLOAD_INT: Begin completions, 5 items
 // OVERLOAD_INT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: decimal[#MsgInterpolation.IntFormat#];
 // OVERLOAD_INT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: hex[#MsgInterpolation.IntFormat#];
+// OVERLOAD_INT-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): MsgInterpolation.IntFormat#})[#(into: inout Hasher) -> Void#];
 // OVERLOAD_INT-DAG: Decl[StaticMethod]/CurrNominal/TypeRelation[Identical]: precision({#Int#})[#MsgInterpolation.FloatFormat#];
 // OVERLOAD_INT-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: hex[#MsgInterpolation.FloatFormat#];
 // OVERLOAD_INT: End completions
 
   messenger.send("  \(fltVal, format: .#^OVERLOAD_FLT^#) ")
-// OVERLOAD_FLT: Begin completions, 4 items
+// OVERLOAD_FLT: Begin completions, 5 items
 // OVERLOAD_FLT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: decimal[#MsgInterpolation.IntFormat#];
 // OVERLOAD_FLT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: hex[#MsgInterpolation.IntFormat#];
+// OVERLOAD_FLT-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): MsgInterpolation.IntFormat#})[#(into: inout Hasher) -> Void#];
 // OVERLOAD_FLT-DAG: Decl[StaticMethod]/ExprSpecific/TypeRelation[Identical]: precision({#Int#})[#MsgInterpolation.FloatFormat#];
 // OVERLOAD_FLT-DAG: Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: hex[#MsgInterpolation.FloatFormat#];
 // OVERLOAD_FLT: End completions

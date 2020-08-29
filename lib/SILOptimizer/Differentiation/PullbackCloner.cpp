@@ -2035,12 +2035,10 @@ void PullbackCloner::Implementation::accumulateAdjointForOptional(
     SILBasicBlock *bb, SILValue optionalValue, SILValue wrappedAdjoint) {
   auto pbLoc = getPullback().getLocation();
   // Handle `switch_enum` on `Optional`.
-  auto *optionalEnumDecl = getASTContext().getOptionalDecl();
-  auto optionalTy = optionalValue->getType();
-  assert(optionalTy.getASTType().getEnumOrBoundGenericEnum() ==
-         optionalEnumDecl);
   // `Optional<T>`
-  optionalTy = remapType(optionalTy);
+  auto optionalTy = remapType(optionalValue->getType());
+  assert(optionalTy.getASTType().getEnumOrBoundGenericEnum() ==
+         getASTContext().getOptionalDecl());
   // `T`
   auto wrappedType = optionalTy.getOptionalObjectType();
   // `T.TangentVector`
@@ -2431,7 +2429,7 @@ bool PullbackCloner::Implementation::runForSemanticMemberGetter() {
 
   // Switch based on the base tangent struct's value category.
   // TODO(TF-1255): Simplify using unified adjoint value data structure.
-  switch (tangentVectorSILTy.getCategory()) {
+  switch (getTangentValueCategory(origSelf)) {
   case SILValueCategory::Object: {
     auto adjResult = getAdjointValue(origEntry, origResult);
     switch (adjResult.getKind()) {
@@ -2472,7 +2470,7 @@ bool PullbackCloner::Implementation::runForSemanticMemberGetter() {
       if (field == tanField) {
         // Switch based on the property's value category.
         // TODO(TF-1255): Simplify using unified adjoint value data structure.
-        switch (origResult->getType().getCategory()) {
+        switch (getTangentValueCategory(origResult)) {
         case SILValueCategory::Object: {
           auto adjResult = getAdjointValue(origEntry, origResult);
           auto adjResultValue = materializeAdjointDirect(adjResult, pbLoc);

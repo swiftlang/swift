@@ -241,14 +241,11 @@ bool BottomUpRefCountState::handleGuaranteedUser(
 
   // Advance the sequence...
   switch (LatState) {
-  // If were decremented, insert the insertion point.
   case LatticeState::Decremented: {
     LatState = LatticeState::MightBeDecremented;
     return true;
   }
   case LatticeState::MightBeUsed:
-    // If we have a might be used, we already created an insertion point
-    // earlier. Just move to MightBeDecremented.
     LatState = LatticeState::MightBeDecremented;
     return true;
   case LatticeState::MightBeDecremented:
@@ -288,9 +285,6 @@ handleRefCountInstMatch(SILInstruction *RefCountInst) {
     return false;
   case LatticeState::Decremented:
   case LatticeState::MightBeUsed:
-    // Unset InsertPt so we remove retain release pairs instead of
-    // performing code motion.
-    LLVM_FALLTHROUGH;
   case LatticeState::MightBeDecremented:
     return true;
   }
@@ -503,40 +497,6 @@ void BottomUpRefCountState::updateForDifferentLoopInst(
                           << getRCRoot());
 }
 
-void BottomUpRefCountState::updateForPredTerminators(
-    ArrayRef<SILInstruction *> Terms,
-    ImmutablePointerSetFactory<SILInstruction> &SetFactory, AliasAnalysis *AA) {
-  // If this state is not tracking anything, there is nothing to update.
-  if (!isTrackingRefCount())
-    return;
-
-  if (valueCanBeGuaranteedUsedGivenLatticeState() &&
-      std::any_of(Terms.begin(), Terms.end(),
-                  [this, &AA](SILInstruction *I) -> bool {
-                    return mayGuaranteedUseValue(I, getRCRoot(), AA);
-                  })) {
-    handleGuaranteedUser(getRCRoot(), SetFactory, AA);
-    return;
-  }
-
-  if (valueCanBeDecrementedGivenLatticeState() &&
-      std::any_of(Terms.begin(), Terms.end(),
-                  [this, &AA](SILInstruction *I) -> bool {
-                    return mayDecrementRefCount(I, getRCRoot(), AA);
-                  })) {
-    handleDecrement();
-    return;
-  }
-
-  if (!valueCanBeUsedGivenLatticeState() ||
-      std::none_of(Terms.begin(), Terms.end(),
-                   [this, &AA](SILInstruction *I)
-       -> bool { return mayHaveSymmetricInterference(I, getRCRoot(), AA); }))
-    return;
-
-  handleUser(getRCRoot(), SetFactory, AA);
-}
-
 //===----------------------------------------------------------------------===//
 //                          Top Down Ref Count State
 //===----------------------------------------------------------------------===//
@@ -705,14 +665,11 @@ bool TopDownRefCountState::handleGuaranteedUser(
          "Must be able to be used at this point of the lattice.");
   // Advance the sequence...
   switch (LatState) {
-  // If were decremented, insert the insertion point.
   case LatticeState::Incremented: {
     LatState = LatticeState::MightBeUsed;
     return true;
   }
   case LatticeState::MightBeDecremented:
-    // If we have a might be used, we already created an insertion point
-    // earlier. Just move to MightBeDecremented.
     LatState = LatticeState::MightBeUsed;
     return true;
   case LatticeState::MightBeUsed:

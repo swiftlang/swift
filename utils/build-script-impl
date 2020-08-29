@@ -190,7 +190,6 @@ KNOWN_SETTINGS=(
     swift-primary-variant-sdk                     ""                "default SDK for target binaries"
     swift-runtime-enable-leak-checker             "0"               "Enable leaks checking routines in the runtime"
     swift-stdlib-enable-assertions                "1"               "enable assertions in Swift"
-    swift-stdlib-use-nonatomic-rc                 "0"               "build the Swift stdlib and overlays with nonatomic reference count operations enabled"
     swift-tools-enable-lto                        ""                "enable LTO compilation of Swift tools. *NOTE* This does not include the swift standard library and runtime. Must be set to one of 'thin' or 'full'"
     extra-swift-args                              ""                "Extra arguments to pass to swift modules which match regex. Assumed to be a flattened cmake list consisting of [module_regexp, args, module_regexp, args, ...]"
     report-statistics                             "0"               "set to 1 to generate compilation statistics files for swift libraries"
@@ -198,6 +197,8 @@ KNOWN_SETTINGS=(
     stdlib-deployment-targets                     ""                "space-separated list of targets to configure the Swift standard library to be compiled or cross-compiled for"
     swift-objc-interop                            ""                "whether to enable interoperability with Objective-C, default is 1 on Apple platfors, 0 otherwise"
     swift-enable-compatibility-overrides          "1"               "whether to support back-deploying compatibility fixes for newer apps running on older runtimes"
+    swift-runtime-macho-no-dyld                   "0"               "whether to build stdlib assuming the runtime environment does not support dynamic modules"
+    swift-stdlib-single-threaded-runtime          "0"               "whether to build stdlib as a single-threaded runtime only"
 
     ## FREESTANDING Stdlib Options
     swift-freestanding-sdk                      ""                "which SDK to use when building the FREESTANDING stdlib"
@@ -1235,9 +1236,6 @@ function build_directory_bin() {
                 ;;
             libicu)
                 ;;
-            playgroundsupport)
-                echo "${root}/${PLAYGROUNDSUPPORT_BUILD_TYPE}/bin"
-                ;;
             *)
                 echo "error: unknown product: ${product}"
                 exit 1
@@ -1359,9 +1357,6 @@ function cmake_config_opt() {
                 ;;
             libicu)
                 ;;
-            playgroundsupport)
-                echo "--config ${PLAYGROUNDSUPPORT_BUILD_TYPE}"
-                ;;
             *)
                 echo "error: unknown product: ${product}"
                 exit 1
@@ -1418,6 +1413,13 @@ for host in "${ALL_HOSTS[@]}"; do
                 -DCMAKE_BUILD_WITH_INSTALL_RPATH="1"
             )
         fi
+    fi
+
+    if [[ "${NATIVE_CLANG_TOOLS_PATH}" ]] ; then
+        common_cmake_options_host+=(
+                -DCMAKE_C_COMPILER="${NATIVE_CLANG_TOOLS_PATH}/clang"
+                -DCMAKE_CXX_COMPILER="${NATIVE_CLANG_TOOLS_PATH}/clang++"
+            )
     fi
 
     llvm_cmake_options=(
@@ -1584,8 +1586,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     "${cmake_options[@]}"
                     -DCMAKE_C_FLAGS="$(llvm_c_flags ${host})"
                     -DCMAKE_CXX_FLAGS="$(llvm_c_flags ${host})"
-                    -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
-                    -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
                     -DCMAKE_BUILD_TYPE:STRING="${LLVM_BUILD_TYPE}"
                     -DLLVM_TOOL_SWIFT_BUILD:BOOL=NO
                     -DLLVM_TOOL_LLD_BUILD:BOOL=TRUE
@@ -1771,16 +1771,15 @@ for host in "${ALL_HOSTS[@]}"; do
                     "${cmake_options[@]}"
                     -DCMAKE_C_FLAGS="$(swift_c_flags ${host})"
                     -DCMAKE_CXX_FLAGS="$(swift_c_flags ${host})"
-                    -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
-                    -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
                     -DCMAKE_BUILD_TYPE:STRING="${SWIFT_BUILD_TYPE}"
                     -DLLVM_ENABLE_ASSERTIONS:BOOL=$(true_false "${SWIFT_ENABLE_ASSERTIONS}")
                     -DSWIFT_ANALYZE_CODE_COVERAGE:STRING=$(toupper "${SWIFT_ANALYZE_CODE_COVERAGE}")
                     -DSWIFT_STDLIB_BUILD_TYPE:STRING="${SWIFT_STDLIB_BUILD_TYPE}"
                     -DSWIFT_STDLIB_ASSERTIONS:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_ASSERTIONS}")
-                    -DSWIFT_STDLIB_USE_NONATOMIC_RC:BOOL=$(true_false "${SWIFT_STDLIB_USE_NONATOMIC_RC}")
                     -DSWIFT_ENABLE_COMPATIBILITY_OVERRIDES:BOOL=$(true_false "${SWIFT_ENABLE_COMPATIBILITY_OVERRIDES}")
+                    -DSWIFT_STDLIB_SINGLE_THREADED_RUNTIME:BOOL=$(true_false "${SWIFT_STDLIB_SINGLE_THREADED_RUNTIME}")
                     -DSWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS:BOOL=$(true_false "${SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS}")
+                    -DSWIFT_RUNTIME_MACHO_NO_DYLD:BOOL=$(true_false "${SWIFT_RUNTIME_MACHO_NO_DYLD}")
                     -DSWIFT_NATIVE_LLVM_TOOLS_PATH:STRING="${native_llvm_tools_path}"
                     -DSWIFT_NATIVE_CLANG_TOOLS_PATH:STRING="${native_clang_tools_path}"
                     -DSWIFT_NATIVE_SWIFT_TOOLS_PATH:STRING="${native_swift_tools_path}"
@@ -3001,12 +3000,13 @@ for host in "${ALL_HOSTS[@]}"; do
             #
             # Exclude shell scripts and static archives.
             # Exclude swift-api-digester dSYM to reduce debug toolchain size.
+            # Run sequentially -- dsymutil is multithreaded and can be memory intensive
             (cd "${host_symroot}" &&
              find ./"${CURRENT_PREFIX}" -perm -0111 -type f -print | \
                grep -v '.py$' | \
                grep -v '.a$' | \
                grep -v 'swift-api-digester' | \
-               xargs -n 1 -P ${BUILD_JOBS} ${dsymutil_path})
+               xargs -n 1 -P 1 ${dsymutil_path})
 
             # Strip executables, shared libraries and static libraries in
             # `host_install_destdir`.

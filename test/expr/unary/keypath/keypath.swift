@@ -324,8 +324,8 @@ func testKeyPathSubscript(readonly: Z, writable: inout Z,
   var anySink2 = writable[keyPath: pkp]
   expect(&anySink2, toHaveType: Exactly<Any>.self)
 
-  readonly[keyPath: pkp] = anySink1 // expected-error{{cannot assign through subscript: 'readonly' is a 'let' constant}}
-  writable[keyPath: pkp] = anySink2 // expected-error{{cannot assign through subscript: 'writable' is immutable}}
+  readonly[keyPath: pkp] = anySink1 // expected-error{{cannot assign through subscript: 'pkp' is a read-only key path}}
+  writable[keyPath: pkp] = anySink2 // expected-error{{cannot assign through subscript: 'pkp' is a read-only key path}}
 
   let akp: AnyKeyPath = pkp
 
@@ -443,12 +443,12 @@ func testKeyPathSubscriptLValue(base: Z, kp: inout KeyPath<Z, Z>) {
 }
 
 func testKeyPathSubscriptExistentialBase(concreteBase: inout B,
-                                     existentialBase: inout P,
-                                     kp: KeyPath<P, String>,
-                                     wkp: WritableKeyPath<P, String>,
-                                     rkp: ReferenceWritableKeyPath<P, String>,
-                                     pkp: PartialKeyPath<P>,
-                                     s: String) {
+                                         existentialBase: inout P,
+                                         kp: KeyPath<P, String>,
+                                         wkp: WritableKeyPath<P, String>,
+                                         rkp: ReferenceWritableKeyPath<P, String>,
+                                         pkp: PartialKeyPath<P>,
+                                         s: String) {
   _ = concreteBase[keyPath: kp]
   _ = concreteBase[keyPath: wkp]
   _ = concreteBase[keyPath: rkp]
@@ -457,9 +457,7 @@ func testKeyPathSubscriptExistentialBase(concreteBase: inout B,
   concreteBase[keyPath: kp] = s // expected-error {{cannot assign through subscript: 'kp' is a read-only key path}}
   concreteBase[keyPath: wkp] = s // expected-error {{key path with root type 'P' cannot be applied to a base of type 'B'}}
   concreteBase[keyPath: rkp] = s
-  // TODO(diagnostics): Improve this diagnostic message because concreteBase is mutable, the problem is related to assign 
-  // through PartialKeyPath.
-  concreteBase[keyPath: pkp] = s // expected-error {{cannot assign through subscript: 'concreteBase' is immutable}}
+  concreteBase[keyPath: pkp] = s // expected-error {{cannot assign through subscript: 'pkp' is a read-only key path}}
 
   _ = existentialBase[keyPath: kp]
   _ = existentialBase[keyPath: wkp]
@@ -469,9 +467,7 @@ func testKeyPathSubscriptExistentialBase(concreteBase: inout B,
   existentialBase[keyPath: kp] = s // expected-error {{cannot assign through subscript: 'kp' is a read-only key path}}
   existentialBase[keyPath: wkp] = s
   existentialBase[keyPath: rkp] = s
-  // TODO(diagnostics): Improve this diagnostic message because existentialBase is mutable, the problem is related to assign 
-  // through PartialKeyPath.
-  existentialBase[keyPath: pkp] = s // expected-error {{cannot assign through subscript: 'existentialBase' is immutable}}
+  existentialBase[keyPath: pkp] = s // expected-error {{cannot assign through subscript: 'pkp' is a read-only key path}}
 }
 
 struct AA {
@@ -1010,9 +1006,12 @@ func testMemberAccessOnOptionalKeyPathComponent() {
   // expected-error@-1 {{value of optional type '(Int, Int)?' must be unwrapped to refer to member '0' of wrapped base type '(Int, Int)'}}
   // expected-note@-2 {{use unwrapped type '(Int, Int)' as key path root}}{{4-15=(Int, Int)}}
   
-  // TODO(diagnostics) Improve diagnostics refering to key path root not able to be infered as an optional type.
-  SR5688_KP(\.count)
-  // expected-error@-1 {{value of optional type 'String?' must be unwrapped to refer to member 'count' of wrapped base type 'String'}}
+  SR5688_KP(\.count) // expected-error {{key path root inferred as optional type 'String?' must be unwrapped to refer to member 'count' of unwrapped type 'String'}}
+  // expected-note@-1 {{chain the optional using '?.' to access unwrapped type member 'count'}} {{15-15=?.}}
+  // expected-note@-2 {{unwrap the optional using '!.' to access unwrapped type member 'count'}} {{15-15=!.}}
+  let _ : KeyPath<String?, Int> = \.count // expected-error {{key path root inferred as optional type 'String?' must be unwrapped to refer to member 'count' of unwrapped type 'String'}}
+  // expected-note@-1 {{chain the optional using '?.' to access unwrapped type member 'count'}} {{37-37=?.}}
+  // expected-note@-2 {{unwrap the optional using '!.' to access unwrapped type member 'count'}} {{37-37=!.}}
 }
 
 func testSyntaxErrors() {

@@ -5234,9 +5234,6 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
                                      EndLoc);
   }
 
-  // The typechecker will always fill this in.
-  TypeLoc ReturnType;
-
   // Start the function.
   auto *D = AccessorDecl::create(P->Context,
                                  /*FIXME FuncLoc=*/DeclLoc,
@@ -5247,7 +5244,7 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
                                  (GenericParams
                                   ? GenericParams->clone(P->CurDeclContext)
                                   : nullptr),
-                                 ValueArg, ReturnType,
+                                 ValueArg, Type(),
                                  P->CurDeclContext);
 
   return D;
@@ -6445,10 +6442,9 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   return DCC.fixupParserResult(FD);
 }
 
-/// Parse a function body for \p AFD and returns it without setting the body
-/// to \p AFD .
-ParserResult<BraceStmt>
-Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
+/// Parse a function body for \p AFD, setting the body to \p AFD before
+/// returning it.
+BraceStmt *Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
   assert(Tok.is(tok::l_brace));
 
   // Enter the arguments for the function into a new function-body scope.  We
@@ -6476,13 +6472,70 @@ Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
       CodeCompletion->completeAccessorBeginning(CCE);
       RBraceLoc = Tok.getLoc();
       consumeToken(tok::code_complete);
-      return makeParserCodeCompletionResult(
-          BraceStmt::create(Context, LBraceLoc, ASTNode(CCE), RBraceLoc,
-          /*implicit*/ true));
+      auto *BS = BraceStmt::create(Context, LBraceLoc, ASTNode(CCE), RBraceLoc,
+                                   /*implicit*/ true);
+      AFD->setBodyParsed(BS);
+      return BS;
     }
   }
 
-  return parseBraceItemList(diag::invalid_diagnostic);
+  ParserResult<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
+  if (Body.isNull())
+    return nullptr;
+
+  BraceStmt *BS = Body.get();
+  AFD->setBodyParsed(BS);
+
+  // If the body consists of a single expression, turn it into a return
+  // statement.
+  //
+  // But don't do this transformation during code completion, as the source
+  // may be incomplete and the type mismatch in return statement will just
+  // confuse the type checker.
+  if (BS->getNumElements() != 1 || Body.hasCodeCompletion())
+    return BS;
+
+  auto Element = BS->getFirstElement();
+  if (auto *stmt = Element.dyn_cast<Stmt *>()) {
+    if (isa<FuncDecl>(AFD)) {
+      if (auto *returnStmt = dyn_cast<ReturnStmt>(stmt)) {
+        if (!returnStmt->hasResult()) {
+          auto returnExpr = TupleExpr::createEmpty(Context,
+                                                   SourceLoc(),
+                                                   SourceLoc(),
+                                                   /*implicit*/true);
+          returnStmt->setResult(returnExpr);
+          AFD->setHasSingleExpressionBody();
+          AFD->setSingleExpressionBody(returnExpr);
+        }
+      }
+    }
+  } else if (auto *E = Element.dyn_cast<Expr *>()) {
+    if (auto SE = dyn_cast<SequenceExpr>(E->getSemanticsProvidingExpr())) {
+      if (SE->getNumElements() > 1 && isa<AssignExpr>(SE->getElement(1))) {
+        // This is an assignment.  We don't want to implicitly return
+        // it.
+        return BS;
+      }
+    }
+    if (isa<FuncDecl>(AFD)) {
+      auto RS = new (Context) ReturnStmt(SourceLoc(), E);
+      BS->setFirstElement(RS);
+      AFD->setHasSingleExpressionBody();
+      AFD->setSingleExpressionBody(E);
+    } else if (auto *F = dyn_cast<ConstructorDecl>(AFD)) {
+      if (F->isFailable() && isa<NilLiteralExpr>(E)) {
+        // If it's a nil literal, just insert return.  This is the only
+        // legal thing to return.
+        auto RS = new (Context) ReturnStmt(E->getStartLoc(), E);
+        BS->setFirstElement(RS);
+        AFD->setHasSingleExpressionBody();
+        AFD->setSingleExpressionBody(E);
+      }
+    }
+  }
+
+  return BS;
 }
 
 /// Parse function body into \p AFD or skip it for delayed parsing.
@@ -6507,60 +6560,7 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   }
 
   Scope S(this, ScopeKind::FunctionBody);
-
-  ParserResult<BraceStmt> Body = parseAbstractFunctionBodyImpl(AFD);
-  if (!Body.isNull()) {
-    BraceStmt * BS = Body.get();
-    AFD->setBodyParsed(BS);
-
-    // If the body consists of a single expression, turn it into a return
-    // statement.
-    //
-    // But don't do this transformation during code completion, as the source
-    // may be incomplete and the type mismatch in return statement will just
-    // confuse the type checker.
-    if (!Body.hasCodeCompletion() && BS->getNumElements() == 1) {
-      auto Element = BS->getFirstElement();
-      if (auto *stmt = Element.dyn_cast<Stmt *>()) {
-        if (isa<FuncDecl>(AFD)) {
-          if (auto *returnStmt = dyn_cast<ReturnStmt>(stmt)) {
-            if (!returnStmt->hasResult()) {
-              auto returnExpr = TupleExpr::createEmpty(Context,
-                                                       SourceLoc(),
-                                                       SourceLoc(),
-                                                       /*implicit*/true);
-              returnStmt->setResult(returnExpr);
-              AFD->setHasSingleExpressionBody();
-              AFD->setSingleExpressionBody(returnExpr);
-            }
-          }
-        }
-      } else if (auto *E = Element.dyn_cast<Expr *>()) {
-        if (auto SE = dyn_cast<SequenceExpr>(E->getSemanticsProvidingExpr())) {
-          if (SE->getNumElements() > 1 && isa<AssignExpr>(SE->getElement(1))) {
-            // This is an assignment.  We don't want to implicitly return 
-            // it.
-            return;
-          }
-        }
-        if (isa<FuncDecl>(AFD)) {
-          auto RS = new (Context) ReturnStmt(SourceLoc(), E);
-          BS->setFirstElement(RS);
-          AFD->setHasSingleExpressionBody();
-          AFD->setSingleExpressionBody(E);
-        } else if (auto *F = dyn_cast<ConstructorDecl>(AFD)) {
-          if (F->isFailable() && isa<NilLiteralExpr>(E)) {
-            // If it's a nil literal, just insert return.  This is the only 
-            // legal thing to return.
-            auto RS = new (Context) ReturnStmt(E->getStartLoc(), E);
-            BS->setFirstElement(RS);
-            AFD->setHasSingleExpressionBody();
-            AFD->setSingleExpressionBody(E);
-          }
-        }
-      }
-    }
-  }
+  (void)parseAbstractFunctionBodyImpl(AFD);
 }
 
 BraceStmt *Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
@@ -6592,7 +6592,7 @@ BraceStmt *Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
   Scope TopLevelScope(this, ScopeKind::TopLevel);
   Scope S(this, ScopeKind::FunctionBody);
 
-  return parseAbstractFunctionBodyImpl(AFD).getPtrOrNull();
+  return parseAbstractFunctionBodyImpl(AFD);
 }
 
 /// Parse a 'enum' declaration, returning true (and doing no token
@@ -7266,12 +7266,9 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
   // Build an AST for the subscript declaration.
   DeclName name = DeclName(Context, DeclBaseName::createSubscript(),
                            argumentNames);
-  auto *Subscript = new (Context) SubscriptDecl(name,
-                                                StaticLoc, StaticSpelling,
-                                                SubscriptLoc, Indices.get(),
-                                                ArrowLoc, ElementTy.get(),
-                                                CurDeclContext,
-                                                GenericParams);
+  auto *const Subscript = SubscriptDecl::create(
+      Context, name, StaticLoc, StaticSpelling, SubscriptLoc, Indices.get(),
+      ArrowLoc, ElementTy.get(), CurDeclContext, GenericParams);
   Subscript->getAttrs() = Attributes;
   
   // Let the source file track the opaque return type mapping, if any.

@@ -88,9 +88,19 @@ static inline int _stdlib_thread_setspecific(__swift_thread_key_t key, const voi
   return 0;
 }
 
-#endif
+#elif defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
 
-#if SWIFT_TLS_HAS_RESERVED_PTHREAD_SPECIFIC
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void *
+_swift_stdlib_threadLocalStorageGet(void) {
+  static void *value;
+  if (!value) {
+    value = _stdlib_createTLS();
+  }
+  return value;
+}
+
+#elif SWIFT_TLS_HAS_RESERVED_PTHREAD_SPECIFIC
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 void *

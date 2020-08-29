@@ -254,6 +254,18 @@ void ClangImporter::recordModuleDependencies(
     swiftArgs.push_back("-module-name");
     swiftArgs.push_back(clangModuleDep.ModuleName);
 
+    // Pass down search paths to the -emit-module action.
+    // Unlike building Swift modules, we need to include all search paths to
+    // the clang invocation to build PCMs because transitive headers can only
+    // be found via search paths. Passing these headers as explicit inputs can
+    // be quite challenging.
+    for (auto &path: Impl.SwiftContext.SearchPathOpts.ImportSearchPaths) {
+      addClangArg("-I" + path);
+    }
+    for (auto &path: Impl.SwiftContext.SearchPathOpts.FrameworkSearchPaths) {
+      addClangArg((path.IsSystem ? "-Fsystem": "-F") + path.Path);
+    }
+
     // Swift frontend option for input file path (Foo.modulemap).
     swiftArgs.push_back(clangModuleDep.ClangModuleMapFile);
     // Module-level dependencies.
@@ -294,6 +306,7 @@ Optional<ModuleDependencies> ClangImporter::getModuleDependencies(
   // Reform the Clang importer options.
   // FIXME: Just save a reference or copy so we can get this back.
   ClangImporterOptions importerOpts;
+  importerOpts.ExtraArgs = getExtraClangArgs();
 
   // Determine the command-line arguments for dependency scanning.
   auto &ctx = Impl.SwiftContext;
@@ -337,6 +350,7 @@ bool ClangImporter::addBridgingHeaderDependencies(
   // Reform the Clang importer options.
   // FIXME: Just save a reference or copy so we can get this back.
   ClangImporterOptions importerOpts;
+  importerOpts.ExtraArgs = getExtraClangArgs();
 
   // Retrieve the bridging header.
   std::string bridgingHeader = *targetModule.getBridgingHeader();

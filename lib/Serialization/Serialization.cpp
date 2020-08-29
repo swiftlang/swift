@@ -2356,7 +2356,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           S.Out, S.ScratchRecord, abbrCode,
           (unsigned)SA->isExported(),
           (unsigned)SA->getSpecializationKind(),
-          S.addGenericSignatureRef(SA->getSpecializedSgnature()));
+          S.addGenericSignatureRef(SA->getSpecializedSignature()));
       return;
     }
 
@@ -3925,6 +3925,10 @@ public:
     llvm_unreachable("should not serialize an invalid type");
   }
 
+  void visitHoleType(const HoleType *) {
+    llvm_unreachable("should not serialize an invalid type");
+  }
+
   void visitModuleType(const ModuleType *) {
     llvm_unreachable("modules are currently not first-class values");
   }
@@ -4233,7 +4237,7 @@ public:
     unsigned abbrCode = S.DeclTypeAbbrCodes[SILFunctionTypeLayout::Code];
     SILFunctionTypeLayout::emitRecord(
         S.Out, S.ScratchRecord, abbrCode,
-        stableCoroutineKind, stableCalleeConvention,
+        fnTy->isAsync(), stableCoroutineKind, stableCalleeConvention,
         stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
         stableDiffKind, fnTy->hasErrorResult(), fnTy->getParameters().size(),
         fnTy->getNumYields(), fnTy->getNumResults(),

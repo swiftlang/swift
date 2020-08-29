@@ -212,7 +212,6 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_require_explicit_availability_target);
   inputArgs.AddLastArg(arguments, options::OPT_enable_testing);
   inputArgs.AddLastArg(arguments, options::OPT_enable_private_imports);
-  inputArgs.AddLastArg(arguments, options::OPT_enable_cxx_interop);
   inputArgs.AddLastArg(arguments, options::OPT_g_Group);
   inputArgs.AddLastArg(arguments, options::OPT_debug_info_format);
   inputArgs.AddLastArg(arguments, options::OPT_import_underlying_module);
@@ -1043,6 +1042,41 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   Arguments.push_back("-o");
   Arguments.push_back(
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
+
+  return II;
+}
+
+ToolChain::InvocationInfo
+ToolChain::constructInvocation(const VerifyModuleInterfaceJobAction &job,
+                               const JobContext &context) const {
+  InvocationInfo II{SWIFT_EXECUTABLE_NAME};
+  ArgStringList &Arguments = II.Arguments;
+  II.allowsResponseFiles = true;
+
+  for (auto &s : getDriver().getSwiftProgramArgs())
+    Arguments.push_back(s.c_str());
+  Arguments.push_back("-frontend");
+
+  Arguments.push_back("-typecheck-module-from-interface");
+
+  size_t sizeBefore = Arguments.size();
+  addInputsOfType(Arguments, context.Inputs, context.Args, job.getInputType());
+
+  (void)sizeBefore;
+  assert(Arguments.size() - sizeBefore == 1 &&
+         "should verify exactly one module interface per job");
+
+  addCommonFrontendArgs(context.OI, context.Output, context.Args, Arguments);
+  addRuntimeLibraryFlags(context.OI, Arguments);
+
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   file_types::TY_SerializedDiagnostics,
+                   "-serialize-diagnostics-path");
+
+  context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
+
+  Arguments.push_back("-module-name");
+  Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));
 
   return II;
 }

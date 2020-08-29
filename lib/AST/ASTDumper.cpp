@@ -1074,13 +1074,13 @@ namespace {
       Indent -= 2;
 
       if (auto FD = dyn_cast<FuncDecl>(D)) {
-        if (FD->getBodyResultTypeLoc().getTypeRepr()) {
+        if (FD->getResultTypeRepr()) {
           OS << '\n';
           Indent += 2;
           OS.indent(Indent);
           PrintWithColorRAII(OS, ParenthesisColor) << '(';
           OS << "result\n";
-          printRec(FD->getBodyResultTypeLoc().getTypeRepr());
+          printRec(FD->getResultTypeRepr());
           PrintWithColorRAII(OS, ParenthesisColor) << ')';
           if (auto opaque = FD->getOpaqueResultTypeDecl()) {
             OS << '\n';
@@ -2108,11 +2108,8 @@ public:
   void visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     printCommon(E, "unresolved_member_expr")
       << " name='" << E->getName() << "'";
-    printArgumentLabels(E->getArgumentLabels());
-    if (E->getArgument()) {
-      OS << '\n';
-      printRec(E->getArgument());
-    }
+    PrintWithColorRAII(OS, ExprModifierColor)
+      << " function_ref=" << getFunctionRefKindStr(E->getFunctionRefKind());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitDotSelfExpr(DotSelfExpr *E) {
@@ -2135,7 +2132,12 @@ public:
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
-
+  void visitUnresolvedMemberChainResultExpr(UnresolvedMemberChainResultExpr *E){
+    printCommon(E, "unresolved_member_chain_expr");
+    OS << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
   void visitTupleExpr(TupleExpr *E) {
     printCommon(E, "tuple_expr");
     if (E->hasTrailingClosure())
@@ -3495,6 +3497,18 @@ namespace {
     }
 
     TRIVIAL_TYPE_PRINTER(Unresolved, unresolved)
+
+    void visitHoleType(HoleType *T, StringRef label) {
+      printCommon(label, "hole_type");
+      auto originatorTy = T->getOriginatorType();
+      if (auto *typeVar = originatorTy.dyn_cast<TypeVariableType *>()) {
+        printRec("type_variable", typeVar);
+      } else {
+        printRec("dependent_member_type",
+                 originatorTy.get<DependentMemberType *>());
+      }
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
 
     void visitBuiltinIntegerType(BuiltinIntegerType *T, StringRef label) {
       printCommon(label, "builtin_integer_type");

@@ -112,6 +112,9 @@ ERROR(expected_argument_in_contextual_member,none,
       "member %0 expects argument of type %1", (DeclName, Type))
 ERROR(expected_parens_in_contextual_member,none,
       "member %0 is a function; did you mean to call it?", (DeclName))
+ERROR(expected_parens_in_contextual_member_type,none,
+      "member %0 is a function that produces expected type %1; did you mean to "
+      "call it?", (DeclName, Type))
 
 ERROR(expected_result_in_contextual_member,none,
       "member %0 in %2 produces result of type %1, but context expects %2",
@@ -453,6 +456,10 @@ ERROR(cannot_convert_closure_result_nil,none,
 ERROR(cannot_convert_parent_type,none,
       "cannot convert parent type %0 to expected type %1",
       (Type, Type))
+ERROR(cannot_convert_chain_result_type,none,
+      "member chain produces result of type %0 but contextual base was "
+      "inferred as %1",
+      (Type, Type))
 
 NOTE(generic_argument_mismatch,none,
      "arguments to generic parameter %0 (%1 and %2) are expected to be equal",
@@ -708,12 +715,12 @@ ERROR(sema_opening_import,Fatal,
 ERROR(serialization_load_failed,Fatal,
       "failed to load module '%0'", (StringRef))
 ERROR(module_interface_build_failed,Fatal,
-      "failed to build module '%0' from its module interface; "
-      "%select{the compiler that produced it, '%2', may have used features "
-      "that aren't supported by this compiler, '%3'"
-      "|it may have been damaged or it may have triggered a bug in the Swift "
-      "compiler when it was produced}1",
-      (StringRef, bool, StringRef, StringRef))
+      "failed to %select{build module '%1' from its module interface|verify "
+      "module interface of '%1'}0; %select{the compiler that produced it, "
+      "'%3', may have used features that aren't supported by this compiler, "
+      "'%4'|it may have been damaged or it may have triggered a bug in the "
+      "Swift compiler when it was produced}2",
+      (bool, StringRef, bool, StringRef, StringRef))
 ERROR(serialization_malformed_module,Fatal,
       "malformed compiled module: %0", (StringRef))
 ERROR(serialization_module_too_new,Fatal,
@@ -1082,6 +1089,9 @@ NOTE(unwrap_with_guard,none,
 ERROR(optional_base_not_unwrapped,none,
       "value of optional type %0 must be unwrapped to refer to member %1 of "
       "wrapped base type %2", (Type, DeclNameRef, Type))
+ERROR(invalid_optional_infered_keypath_root, none,
+      "key path root inferred as optional type %0 must be unwrapped to refer to member %1 "
+      "of unwrapped type %2", (Type, DeclNameRef, Type))
 NOTE(optional_base_chain,none,
      "chain the optional using '?' to access member %0 only for non-'nil' "
      "base values", (DeclNameRef))
@@ -1089,6 +1099,12 @@ NOTE(optional_base_remove_optional_for_keypath_root, none,
      "use unwrapped type %0 as key path root", (Type))
 NOTE(optional_keypath_application_base, none,
      "use '?' to access key path subscript only for non-'nil' base values", ())
+NOTE(optional_key_path_root_base_chain, none,
+     "chain the optional using '?.' to access unwrapped type member %0",
+     (DeclNameRef))
+NOTE(optional_key_path_root_base_unwrap, none,
+     "unwrap the optional using '!.' to access unwrapped type member %0",
+     (DeclNameRef))
     
 ERROR(missing_unwrap_optional_try,none,
       "value of optional type %0 not unwrapped; did you mean to use 'try!' "
@@ -1294,8 +1310,9 @@ ERROR(nominal_type_not_attribute,none,
 
 ERROR(mutating_invalid_global_scope,none, "%0 is only valid on methods",
       (SelfAccessKind))
-ERROR(mutating_invalid_classes,none, "%0 isn't valid on methods in "
-      "classes or class-bound protocols", (SelfAccessKind))
+ERROR(mutating_invalid_classes,none, "%0 is not valid on %1s in " 
+      "%select{classes|class-bound protocols}2",
+      (SelfAccessKind, DescriptiveDeclKind, bool))
 
 ERROR(functions_mutating_and_not,none,
       "method must not be declared both %0 and %1",

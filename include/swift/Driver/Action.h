@@ -51,9 +51,10 @@ public:
     GenerateDSYMJob,
     VerifyDebugInfoJob,
     GeneratePCHJob,
+    VerifyModuleInterfaceJob,
 
     JobFirst = CompileJob,
-    JobLast = GeneratePCHJob
+    JobLast = VerifyModuleInterfaceJob
   };
 
   static const char *getClassName(Kind AC);
@@ -354,6 +355,26 @@ public:
 
   static bool classof(const Action *A) {
     return A->getKind() == Action::Kind::StaticLinkJob;
+  }
+};
+
+class VerifyModuleInterfaceJobAction : public JobAction {
+  virtual void anchor();
+  file_types::ID inputType;
+
+public:
+  VerifyModuleInterfaceJobAction(const Action * ModuleEmitter,
+                                 file_types::ID inputType)
+    : JobAction(Action::Kind::VerifyModuleInterfaceJob, { ModuleEmitter },
+                file_types::TY_Nothing), inputType(inputType) {
+    assert(inputType == file_types::TY_SwiftModuleInterfaceFile ||
+           inputType == file_types::TY_PrivateSwiftModuleInterfaceFile);
+  }
+
+  file_types::ID getInputType() const { return inputType; }
+
+  static bool classof(const Action *A) {
+    return A->getKind() == Action::Kind::VerifyModuleInterfaceJob;
   }
 };
 

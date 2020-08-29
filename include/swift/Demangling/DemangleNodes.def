@@ -294,6 +294,9 @@ NODE(CanonicalSpecializedGenericTypeMetadataAccessFunction)
 NODE(MetadataInstantiationCache)
 NODE(NoncanonicalSpecializedGenericTypeMetadata)
 NODE(NoncanonicalSpecializedGenericTypeMetadataCache)
+NODE(GlobalVariableOnceFunction)
+NODE(GlobalVariableOnceToken)
+NODE(GlobalVariableOnceDeclList)
 
 #undef CONTEXT_NODE
 #undef NODE

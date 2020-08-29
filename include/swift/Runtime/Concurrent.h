@@ -17,6 +17,7 @@
 #include <functional>
 #include <stdint.h>
 #include <vector>
+#include "llvm/ADT/Hashing.h"
 #include "llvm/Support/Allocator.h"
 #include "Atomic.h"
 #include "Debug.h"
@@ -24,6 +25,10 @@
 
 #if defined(__FreeBSD__) || defined(__CYGWIN__) || defined(__HAIKU__)
 #include <stdio.h>
+#endif
+
+#if defined(__APPLE__) && defined(__MACH__)
+#include <malloc/malloc.h>
 #endif
 
 namespace swift {
@@ -488,8 +493,8 @@ public:
     const ElemTy *end() { return Start + Count; }
     size_t count() { return Count; }
   };
-  
-  // This type cannot be safely copied, moved, or deleted.
+
+  // This type cannot be safely copied or moved.
   ConcurrentReadableArray(const ConcurrentReadableArray &) = delete;
   ConcurrentReadableArray(ConcurrentReadableArray &&) = delete;
   ConcurrentReadableArray &operator=(const ConcurrentReadableArray &) = delete;
@@ -512,7 +517,7 @@ public:
       auto *newStorage = Storage::allocate(newCapacity);
       if (storage) {
         std::copy(storage->data(), storage->data() + count, newStorage->data());
-        newStorage->Count.store(count, std::memory_order_relaxed);
+        newStorage->Count.store(count, std::memory_order_release);
         FreeList.push_back(storage);
       }
       
@@ -527,7 +532,7 @@ public:
     if (ReaderCount.load(std::memory_order_acquire) == 0)
       deallocateFreeList();
   }
-  
+
   Snapshot snapshot() {
     incrementReaders();
     auto *storage = Elements.load(SWIFT_MEMORY_ORDER_CONSUME);
@@ -538,6 +543,416 @@ public:
     auto count = storage->Count.load(std::memory_order_acquire);
     const auto *ptr = storage->data();
     return Snapshot(this, ptr, count);
+  }
+};
+
+using llvm::hash_value;
+
+/// A hash table that can be queried without taking any locks. Writes are still
+/// locked and serialized, but only with respect to other locks. Writers can add
+/// elements and clear the table, but they cannot remove individual elements.
+/// Readers work by taking a snapshot of the table and then querying that
+/// snapshot.
+///
+/// The basic structure of the table consists of two arrays. Elements are stored
+/// in a contiguous array, with new elements appended to the end. The second
+/// array is the actual hash table, and it contains indices into the elements
+/// array. This scheme cuts down on wasted space when the elements are larger
+/// than a few bytes: instead of wasting `(1 - loadFactor) * sizeof(element)`
+/// bytes on unused space in the hash table, we only waste `(1 - loadFactor) *
+/// sizeof(index)`. This scheme also avoids readers seeing partially constructed
+/// elements.
+///
+/// Reader/writer synchronization for new elements is handled by keeping an
+/// element count which is only incremented when the element has been fully
+/// constructed. A reader which sees an index beyond its view of the current
+/// count will ignore it and treat that as if there was no entry.
+///
+/// Reader/writer synchronization for resizing the arrays is handled by tracking
+/// the current number of active readers. When resizing, the new array is
+/// allocated, the data copied, and then the old array is placed in a free list.
+/// The free list is only deallocated if there are no readers, otherwise freeing
+/// is deferred.
+///
+/// Reader/writer synchronization for clearing the table is a combination of the
+/// above. By keeping the old arrays around until all readers are finished, we
+/// ensure that readers which started before the clear see valid (pre-clear)
+/// data. Readers which see any array as empty will produce no results, thus
+/// providing valid post-clear data.
+template <class ElemTy> struct ConcurrentReadableHashMap {
+  // We use memcpy and don't call destructors. Make sure the elements will put
+  // up with this.
+  static_assert(std::is_trivially_copyable<ElemTy>::value,
+                "Elements must be trivially copyable.");
+  static_assert(std::is_trivially_destructible<ElemTy>::value,
+                "Elements must not have destructors (they won't be called).");
+
+private:
+  /// The type of the elements of the indices array. TODO: use one or two byte
+  /// indices for smaller tables to save more memory.
+  using Index = unsigned;
+
+  /// The reciprocal of the load factor at which we expand the table. A value of
+  /// 4 means that we resize at 1/4 = 75% load factor.
+  static const size_t ResizeProportion = 4;
+
+  /// Get the "good size" for a given allocation size. When available, this
+  /// rounds up to the next allocation quantum by calling `malloc_good_size`.
+  /// Otherwise, just return the passed-in size, which is always valid even if
+  /// not necessarily optimal.
+  size_t goodSize(size_t size) {
+#if defined(__APPLE__) && defined(__MACH__)
+    return malloc_good_size(size);
+#else
+    return size;
+#endif
+  }
+
+  /// A private class representing the storage of the indices. In order to
+  /// ensure that readers can get a consistent view of the indices with a single
+  /// atomic read, we store the size of the indices array inline, as the first
+  /// element in the array.
+  ///
+  /// We want the number of indices to be a power of two so that we can use a
+  /// bitwise AND to convert a hash code to an index. We want the entire array
+  /// to be a power of two in size to be friendly to the allocator, but the size
+  /// is stored inline. We work around this contradiction by considering the
+  /// first index to always be occupied with a value that never matches any key.
+  struct IndexStorage {
+    std::atomic<Index> Mask;
+
+    static IndexStorage *allocate(size_t capacity) {
+      assert((capacity & (capacity - 1)) == 0 &&
+             "Capacity must be a power of 2");
+      auto *ptr =
+          reinterpret_cast<IndexStorage *>(calloc(capacity, sizeof(Mask)));
+      if (!ptr)
+        swift::crash("Could not allocate memory.");
+      ptr->Mask.store(capacity - 1, std::memory_order_relaxed);
+      return ptr;
+    }
+
+    std::atomic<Index> &at(size_t i) { return (&Mask)[i]; }
+  };
+
+  /// A simple linked list representing pointers that need to be freed.
+  struct FreeListNode {
+    FreeListNode *Next;
+    void *Ptr;
+
+    static void add(FreeListNode **head, void *ptr) {
+      auto *newNode = new FreeListNode{*head, ptr};
+      *head = newNode;
+    }
+
+    static void freeAll(FreeListNode **head) {
+      auto *node = *head;
+      while (node) {
+        auto *next = node->Next;
+        free(node->Ptr);
+        delete node;
+        node = next;
+      }
+      *head = nullptr;
+    }
+  };
+
+  /// The number of readers currently active, equal to the number of snapshot
+  /// objects currently alive.
+  std::atomic<uint32_t> ReaderCount{0};
+
+  /// The number of elements in the elements array.
+  std::atomic<uint32_t> ElementCount{0};
+
+  /// The array of elements.
+  std::atomic<ElemTy *> Elements{nullptr};
+
+  /// The array of indices.
+  std::atomic<IndexStorage *> Indices{nullptr};
+
+  /// The writer lock, which must be taken before any mutation of the table.
+  Mutex WriterLock;
+
+  /// The maximum number of elements that the current elements array can hold.
+  uint32_t ElementCapacity{0};
+
+  /// The list of pointers to be freed once no readers are active.
+  FreeListNode *FreeList{nullptr};
+
+  void incrementReaders() {
+    ReaderCount.fetch_add(1, std::memory_order_acquire);
+  }
+
+  void decrementReaders() {
+    ReaderCount.fetch_sub(1, std::memory_order_release);
+  }
+
+  /// Free all the arrays in the free lists if there are no active readers. If
+  /// there are active readers, do nothing.
+  void deallocateFreeListIfSafe() {
+    if (ReaderCount.load(std::memory_order_acquire) == 0)
+      FreeListNode::freeAll(&FreeList);
+  }
+
+  /// Grow the elements array, adding the old array to the free list and
+  /// returning the new array with all existing elements copied into it.
+  ElemTy *resize(ElemTy *elements, size_t elementCount) {
+    // Grow capacity by 25%, making sure we grow by at least 1.
+    size_t newCapacity =
+        std::max(elementCount + (elementCount >> 2), elementCount + 1);
+    size_t newSize = newCapacity * sizeof(ElemTy);
+
+    newSize = goodSize(newSize);
+    newCapacity = newSize / sizeof(ElemTy);
+
+    ElemTy *newElements = static_cast<ElemTy *>(malloc(newSize));
+    if (elements) {
+      memcpy(newElements, elements, elementCount * sizeof(ElemTy));
+      FreeListNode::add(&FreeList, elements);
+    }
+
+    ElementCapacity = newCapacity;
+    Elements.store(newElements, std::memory_order_release);
+    return newElements;
+  }
+
+  /// Grow the indices array, adding the old array to the free list and
+  /// returning the new array with all existing indices copied into it. This
+  /// operation performs a rehash, so that the indices are in the correct
+  /// location in the new array.
+  IndexStorage *resize(IndexStorage *indices, Index indicesMask,
+                       ElemTy *elements) {
+    // Mask is size - 1. Double the size. Start with 4 (fits into 16-byte malloc
+    // bucket).
+    size_t newCount = indices ? 2 * (indicesMask + 1) : 4;
+    size_t newMask = newCount - 1;
+
+    IndexStorage *newIndices = IndexStorage::allocate(newCount);
+
+    for (size_t i = 1; i <= indicesMask; i++) {
+      Index index = indices->at(i).load(std::memory_order_relaxed);
+      if (index == 0)
+        continue;
+
+      auto *element = &elements[index - 1];
+      auto hash = hash_value(*element);
+
+      size_t newI = hash & newMask;
+      while (newIndices->at(newI) != 0)
+        newI = (newI + 1) & newMask;
+      newIndices->at(newI).store(index, std::memory_order_relaxed);
+    }
+
+    Indices.store(newIndices, std::memory_order_release);
+
+    FreeListNode::add(&FreeList, indices);
+
+    return newIndices;
+  }
+
+  /// Search for the given key within the given indices and elements arrays. If
+  /// an entry already exists for that key, return a pointer to the element. If
+  /// no entry exists, return a pointer to the location in the indices array
+  /// where the index of the new element would be stored.
+  template <class KeyTy>
+  static std::pair<ElemTy *, std::atomic<Index> *>
+  find(const KeyTy &key, IndexStorage *indices, size_t elementCount,
+       ElemTy *elements) {
+    if (!indices)
+      return {nullptr, nullptr};
+    auto hash = hash_value(key);
+    auto indicesMask = indices->Mask.load(std::memory_order_relaxed);
+
+    auto i = hash & indicesMask;
+    while (true) {
+      // Index 0 is used for the mask and is not actually an index.
+      if (i == 0)
+        i++;
+
+      auto *indexPtr = &indices->at(i);
+      auto index = indexPtr->load(std::memory_order_acquire);
+      // Element indices are 1-based, 0 means no entry.
+      if (index == 0)
+        return {nullptr, indexPtr};
+      if (index - 1 < elementCount) {
+        auto *candidate = &elements[index - 1];
+        if (candidate->matchesKey(key))
+          return {candidate, nullptr};
+      }
+
+      i = (i + 1) & indicesMask;
+    }
+  }
+
+public:
+  // This type cannot be safely copied or moved.
+  ConcurrentReadableHashMap(const ConcurrentReadableHashMap &) = delete;
+  ConcurrentReadableHashMap(ConcurrentReadableHashMap &&) = delete;
+  ConcurrentReadableHashMap &
+  operator=(const ConcurrentReadableHashMap &) = delete;
+
+  ConcurrentReadableHashMap()
+      : ReaderCount(0), ElementCount(0), Elements(nullptr), Indices(nullptr),
+        ElementCapacity(0) {}
+
+  ~ConcurrentReadableHashMap() {
+    assert(ReaderCount.load(std::memory_order_acquire) == 0 &&
+           "deallocating ConcurrentReadableHashMap with outstanding snapshots");
+    FreeListNode::freeAll(&FreeList);
+  }
+
+  /// Readers take a snapshot of the hash map, then work with the snapshot.
+  class Snapshot {
+    ConcurrentReadableHashMap *Map;
+    IndexStorage *Indices;
+    ElemTy *Elements;
+    size_t ElementCount;
+
+  public:
+    Snapshot(ConcurrentReadableHashMap *map, IndexStorage *indices,
+             ElemTy *elements, size_t elementCount)
+        : Map(map), Indices(indices), Elements(elements),
+          ElementCount(elementCount) {}
+
+    Snapshot(const Snapshot &other)
+        : Map(other.Map), Indices(other.Indices), Elements(other.Elements),
+          ElementCount(other.ElementCount) {
+      Map->incrementReaders();
+    }
+
+    ~Snapshot() { Map->decrementReaders(); }
+
+    /// Search for an element matching the given key. Returns a pointer to the
+    /// found element, or nullptr if no matching element exists.
+    template <class KeyTy> const ElemTy *find(const KeyTy &key) {
+      if (!Indices || !ElementCount || !Elements)
+        return nullptr;
+      return ConcurrentReadableHashMap::find(key, Indices, ElementCount,
+                                             Elements)
+          .first;
+    }
+  };
+
+  /// Take a snapshot of the current state of the hash map.
+  Snapshot snapshot() {
+    incrementReaders();
+
+    // Carefully loading the indices, element count, and elements pointer in
+    // order ensures a consistent view of the table with respect to concurrent
+    // inserts. However, this is not sufficient to avoid an inconsistent view
+    // with respect to concurrent clears. The danger scenario is:
+    //
+    // 1. Read indices and elementCount from a table with N entries.
+    // 2. Another thread clears the table.
+    // 3. Another thread inserts M entries, where M < N.
+    // 4. The reader thread reads elements.
+    // 5. The reader thread performs a find. The key's hash leads us to an index
+    //    I, where > M.
+    // 6. The reader thread reads from element I, which is off the end of the
+    //    elements array.
+    //
+    // To avoid this, read the elements pointer twice, at the beginning and end.
+    // If the values are not the same then there may have been a clear in the
+    // middle, so we retry. This will have false positives: a new element
+    // pointer can just mean a concurrent insert that triggered a resize of the
+    // elements array. This is harmless aside from a small performance hit, and
+    // should not happen often.
+    IndexStorage *indices;
+    size_t elementCount;
+    ElemTy *elements;
+    ElemTy *elements2;
+    do {
+      elements = Elements.load(std::memory_order_acquire);
+      indices = Indices.load(std::memory_order_acquire);
+      elementCount = ElementCount.load(std::memory_order_acquire);
+      elements2 = Elements.load(std::memory_order_acquire);
+    } while (elements != elements2);
+
+    return Snapshot(this, indices, elements, elementCount);
+  }
+
+  /// Get an element by key, or insert a new element for that key if one is not
+  /// already present. Invoke `call` with the pointer to the element. BEWARE:
+  /// `call` is invoked with the internal writer lock held, keep work to a
+  /// minimum.
+  ///
+  /// `call` is passed the following parameters:
+  ///   - `element`: the pointer to the element corresponding to `key`
+  ///   - `created`: true if the element is newly created, false if it already
+  ///                exists
+  /// `call` returns a `bool`. When `created` is `true`, the return values mean:
+  ///   - `true` the new entry is to be kept
+  ///   - `false` indicates that the new entry is discarded
+  /// If the new entry is kept, then the new element MUST be initialized, and
+  /// have a hash value that matches the hash value of `key`.
+  ///
+  /// The return value is ignored when `created` is `false`.
+  template <class KeyTy, typename Call>
+  void getOrInsert(KeyTy key, const Call &call) {
+    ScopedLock guard(WriterLock);
+
+    auto *indices = Indices.load(std::memory_order_relaxed);
+    if (!indices)
+      indices = resize(indices, 0, nullptr);
+
+    auto indicesMask = indices->Mask.load(std::memory_order_relaxed);
+    auto elementCount = ElementCount.load(std::memory_order_relaxed);
+    auto *elements = Elements.load(std::memory_order_relaxed);
+
+    auto found = find(key, indices, elementCount, elements);
+    if (found.first) {
+      call(found.first, false);
+      deallocateFreeListIfSafe();
+      return;
+    }
+
+    // The actual capacity is indicesMask + 1. The number of slots in use is
+    // elementCount + 1, since the mask also takes a slot.
+    auto emptyCount = (indicesMask + 1) - (elementCount + 1);
+    auto proportion = (indicesMask + 1) / emptyCount;
+    if (proportion >= ResizeProportion) {
+      indices = resize(indices, indicesMask, elements);
+      found = find(key, indices, elementCount, elements);
+      assert(!found.first && "Shouldn't suddenly find the key after rehashing");
+    }
+
+    if (elementCount >= ElementCapacity) {
+      elements = resize(elements, elementCount);
+    }
+    auto *element = &elements[elementCount];
+
+    // Order matters: fill out the element, then update the count,
+    // then update the index.
+    bool keep = call(element, true);
+    if (keep) {
+      assert(hash_value(key) == hash_value(*element) &&
+             "Element must have the same hash code as its key.");
+      ElementCount.store(elementCount + 1, std::memory_order_release);
+      found.second->store(elementCount + 1, std::memory_order_release);
+    }
+
+    deallocateFreeListIfSafe();
+  }
+
+  /// Clear the hash table, freeing (when safe) all memory currently used for
+  /// indices and elements.
+  void clear() {
+    ScopedLock guard(WriterLock);
+
+    auto *indices = Indices.load(std::memory_order_relaxed);
+    auto *elements = Elements.load(std::memory_order_relaxed);
+
+    // Order doesn't matter here, snapshots will gracefully handle any field
+    // being NULL/0 while the others are not.
+    Indices.store(nullptr, std::memory_order_relaxed);
+    ElementCount.store(0, std::memory_order_relaxed);
+    Elements.store(nullptr, std::memory_order_relaxed);
+    ElementCapacity = 0;
+
+    FreeListNode::add(&FreeList, indices);
+    FreeListNode::add(&FreeList, elements);
+
+    deallocateFreeListIfSafe();
   }
 };
 

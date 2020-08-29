@@ -38,7 +38,7 @@ sil_global private @globalinit_nontrivialglobal_token : $Builtin.Word
 
 sil_global hidden [let] @$nontrivialglobal : $TClass
 
-sil private @globalinit_trivialglobal_func : $@convention(c) () -> () {
+sil private [global_init_once_fn] @globalinit_trivialglobal_func : $@convention(c) () -> () {
 bb0:
   alloc_global @$trivialglobal 
   %1 = global_addr @$trivialglobal : $*TStruct 
@@ -83,13 +83,13 @@ bb0:
   return %4 : $Int32                              
 }
 
-// CHECK-LABEL: sil private @globalinit_nontrivialglobal_func :
+// CHECK-LABEL: sil private [global_init_once_fn] @globalinit_nontrivialglobal_func :
 // CHECK: alloc_global @$nontrivialglobal 
 // CHECK: [[GLOBL_ADDR:%.*]] = global_addr @$nontrivialglobal : $*TClass 
 // CHECK: [[REF:%.*]] = alloc_ref $TClass                          
 // CHECK: store [[REF]] to [[GLOBL_ADDR]] : $*TClass 
 // CHECK: } // end sil function 'globalinit_nontrivialglobal_func'
-sil private @globalinit_nontrivialglobal_func : $@convention(c) () -> () {
+sil private [global_init_once_fn] @globalinit_nontrivialglobal_func : $@convention(c) () -> () {
 bb0:
   alloc_global @$nontrivialglobal 
   %1 = global_addr @$nontrivialglobal : $*TClass 

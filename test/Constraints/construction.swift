@@ -22,7 +22,7 @@ enum Z {
   init(_ x: Int, _ y: Int) { self = .point(x, y) }
 }
 
-enum Optional<T> {  // expected-note {{'T' declared as parameter to type 'Optional'}}
+enum Optional<T> {
   case none
   case value(T)
 
@@ -59,8 +59,7 @@ acceptString("\(hello), \(world) #\(i)!")
 Optional<Int>(1) // expected-warning{{unused}}
 Optional(1) // expected-warning{{unused}}
 _ = .none as Optional<Int>
-Optional(.none) // expected-error{{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{9-9=<Any>}}
-// expected-error@-1 {{cannot infer contextual base in reference to member 'none'}}
+Optional(.none) // expected-error {{cannot infer contextual base in reference to member 'none'}}
 
 // Interpolation
 _ = "\(hello), \(world) #\(i)!"

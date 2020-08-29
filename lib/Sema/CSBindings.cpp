@@ -335,7 +335,7 @@ void ConstraintSystem::PotentialBindings::finalize(
     if (locator->isLastElement<LocatorPathElt::MemberRefBase>())
       PotentiallyIncomplete = true;
 
-    addPotentialBinding(PotentialBinding::forHole(cs.getASTContext(), locator));
+    addPotentialBinding(PotentialBinding::forHole(TypeVar, locator));
   }
 
   // Let's always consider `Any` to be a last resort binding because
@@ -481,6 +481,7 @@ void ConstraintSystem::PotentialBindings::addPotentialBinding(
   if (binding.Kind == AllowedBindingKind::Supertypes &&
       !binding.BindingType->hasUnresolvedType() &&
       !binding.BindingType->hasTypeVariable() &&
+      !binding.BindingType->hasHole() &&
       !binding.BindingType->hasUnboundGenericType() &&
       !binding.hasDefaultedLiteralProtocol() &&
       !binding.isDefaultableBinding() && allowJoinMeet) {
@@ -1206,7 +1207,14 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
       } else if (TypeVar->getImpl().isClosureParameterType()) {
         fix = SpecifyClosureParameterType::create(cs, dstLocator);
       } else if (TypeVar->getImpl().isClosureResultType()) {
-        fix = SpecifyClosureReturnType::create(cs, dstLocator);
+        auto *locator = TypeVar->getImpl().getLocator();
+        auto *closure = castToExpr<ClosureExpr>(locator->getAnchor());
+        // If the whole body is being ignored due to a pre-check failure,
+        // let's not record a fix about result type since there is
+        // just not enough context to infer it without a body.
+        if (!cs.hasFixFor(cs.getConstraintLocator(closure->getBody()),
+                          FixKind::IgnoreInvalidFunctionBuilderBody))
+          fix = SpecifyClosureReturnType::create(cs, dstLocator);
       } else if (srcLocator->directlyAt<ObjectLiteralExpr>()) {
         fix = SpecifyObjectLiteralTypeImport::create(cs, dstLocator);
       } else if (srcLocator->isKeyPathRoot()) {

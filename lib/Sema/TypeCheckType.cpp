@@ -197,7 +197,7 @@ Type TypeResolution::resolveDependentMemberType(
     TypoCorrectionResults corrections(ref->getNameRef(), ref->getNameLoc());
     TypeChecker::performTypoCorrection(DC, DeclRefKind::Ordinary,
                                        MetatypeType::get(baseTy),
-                                       NameLookupFlags::ProtocolMembers,
+                                       defaultMemberLookupOptions,
                                        corrections, builder);
 
     // Check whether we have a single type result.
@@ -1499,8 +1499,6 @@ static Type resolveNestedIdentTypeComponent(TypeResolution resolution,
   NameLookupOptions lookupOptions = defaultMemberLookupOptions;
   if (isKnownNonCascading)
     lookupOptions |= NameLookupFlags::KnownPrivate;
-  if (options.is(TypeResolverContext::ExtensionBinding))
-    lookupOptions -= NameLookupFlags::ProtocolMembers;
   LookupTypeResult memberTypes;
   if (parentTy->mayHaveMembers())
     memberTypes = TypeChecker::lookupMemberType(DC, parentTy,
@@ -2080,7 +2078,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   static const TypeAttrKind FunctionAttrs[] = {
     TAK_convention, TAK_pseudogeneric,
     TAK_callee_owned, TAK_callee_guaranteed, TAK_noescape, TAK_autoclosure,
-    TAK_differentiable, TAK_escaping, TAK_yield_once, TAK_yield_many
+    TAK_differentiable, TAK_escaping, TAK_yield_once, TAK_yield_many, TAK_async
   };
 
   auto checkUnsupportedAttr = [&](TypeAttrKind attr) {
@@ -2226,7 +2224,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       // [TODO: Store-SIL-Clang-type]
       auto extInfo = SILFunctionType::ExtInfoBuilder(
                          rep, attrs.has(TAK_pseudogeneric),
-                         attrs.has(TAK_noescape), diffKind, nullptr)
+                         attrs.has(TAK_noescape), attrs.has(TAK_async), 
+                         diffKind, nullptr)
                          .build();
 
       ty = resolveSILFunctionType(fnRepr, options, coroutineKind, extInfo,
@@ -2470,6 +2469,13 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   if ((options & TypeResolutionFlags::SILMode) && attrs.has(TAK_dynamic_self)) {
     ty = rebuildWithDynamicSelf(getASTContext(), ty);
     attrs.clearAttribute(TAK_dynamic_self);
+  }
+
+  // In SIL *only*, allow @async to specify an async function
+  if ((options & TypeResolutionFlags::SILMode) && attrs.has(TAK_async)) {
+    if (fnRepr != nullptr) {
+      attrs.clearAttribute(TAK_async);
+    }
   }
 
   for (unsigned i = 0; i != TypeAttrKind::TAK_Count; ++i)

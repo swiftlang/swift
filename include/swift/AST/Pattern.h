@@ -554,6 +554,9 @@ public:
   bool hasUnresolvedOriginalExpr() const {
     return ElementDeclOrUnresolvedOriginalExpr.is<Expr*>();
   }
+  void setUnresolvedOriginalExpr(Expr *e) {
+    ElementDeclOrUnresolvedOriginalExpr = e;
+  }
 
   DeclNameLoc getNameLoc() const { return NameLoc; }
   SourceLoc getLoc() const { return NameLoc.getBaseNameLoc(); }

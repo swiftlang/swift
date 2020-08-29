@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "arc-sequence-opts"
 #include "ARCRegionState.h"
+#include "ARCSequenceOptUtils.h"
 #include "RCStateTransitionVisitors.h"
 #include "swift/Basic/Range.h"
 #include "swift/SILOptimizer/Analysis/LoopRegionAnalysis.h"
@@ -155,77 +156,6 @@ void ARCRegionState::mergePredTopDown(ARCRegionState &PredRegionState) {
 // Bottom Up Dataflow
 //
 
-static bool isARCSignificantTerminator(TermInst *TI) {
-  switch (TI->getTermKind()) {
-  case TermKind::UnreachableInst:
-  // br is a forwarding use for its arguments. It cannot in of itself extend
-  // the lifetime of an object (just like a phi-node) cannot.
-  case TermKind::BranchInst:
-  // A cond_br is a forwarding use for its non-operand arguments in a similar
-  // way to br. Its operand must be an i1 that has a different lifetime from any
-  // ref counted object.
-  case TermKind::CondBranchInst:
-    return false;
-  // Be conservative for now. These actually perform some sort of operation
-  // against the operand or can use the value in some way.
-  case TermKind::ThrowInst:
-  case TermKind::ReturnInst:
-  case TermKind::UnwindInst:
-  case TermKind::YieldInst:
-  case TermKind::TryApplyInst:
-  case TermKind::SwitchValueInst:
-  case TermKind::SwitchEnumInst:
-  case TermKind::SwitchEnumAddrInst:
-  case TermKind::DynamicMethodBranchInst:
-  case TermKind::CheckedCastBranchInst:
-  case TermKind::CheckedCastValueBranchInst:
-  case TermKind::CheckedCastAddrBranchInst:
-    return true;
-  }
-
-  llvm_unreachable("Unhandled TermKind in switch.");
-}
-
-// Visit each one of our predecessor regions and see if any are blocks that can
-// use reference counted values. If any of them do, we advance the sequence for
-// the pointer and create an insertion point here. This state will be propagated
-// into all of our predecessors, allowing us to be conservatively correct in all
-// cases.
-//
-// The key thing to notice is that in general this cannot happen due to
-// critical edge splitting. To trigger this, one would need a terminator that
-// uses a reference counted value and only has one successor due to critical
-// edge splitting. This is just to be conservative when faced with the unknown
-// of future changes.
-//
-// We do not need to worry about loops here, since a loop exit block can only
-// have predecessors in the loop itself implying that loop exit blocks at the
-// loop region level always have only one predecessor, the loop itself.
-void ARCRegionState::processBlockBottomUpPredTerminators(
-    const LoopRegion *R, AliasAnalysis *AA, LoopRegionFunctionInfo *LRFI,
-    ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
-  llvm::TinyPtrVector<SILInstruction *> PredTerminators;
-  for (unsigned PredID : R->getPreds()) {
-    auto *PredRegion = LRFI->getRegion(PredID);
-    if (!PredRegion->isBlock())
-      continue;
-
-    auto *TermInst = PredRegion->getBlock()->getTerminator();
-    if (!isARCSignificantTerminator(TermInst))
-      continue;
-    PredTerminators.push_back(TermInst);
-  }
-
-  for (auto &OtherState : getBottomupStates()) {
-    // If the other state's value is blotted, skip it.
-    if (!OtherState.hasValue())
-      continue;
-
-    OtherState->second.updateForPredTerminators(PredTerminators,
-                                                SetFactory, AA);
-  }
-}
-
 static bool processBlockBottomUpInsts(
     ARCRegionState &State, SILBasicBlock &BB,
     BottomUpDataflowRCStateVisitor<ARCRegionState> &DataflowVisitor,
@@ -239,9 +169,9 @@ static bool processBlockBottomUpInsts(
   if (II == IE)
     return false;
 
-  // If II is the terminator, skip it since our terminator was already processed
-  // in our successors.
-  if (*II == BB.getTerminator())
+  // If II is not an arc significant terminator, skip it.
+  if (*II == BB.getTerminator() &&
+      !isARCSignificantTerminator(cast<TermInst>(*II)))
     ++II;
 
   bool NestingDetected = false;
@@ -298,29 +228,19 @@ bool ARCRegionState::processBlockBottomUp(
       RCIA, EAFI, *this, FreezeOwnedArgEpilogueReleases, IncToDecStateMap,
       SetFactory);
 
-  // Visit each non-terminator arc relevant instruction I in BB visited in
-  // reverse...
+  // Visit each arc relevant instruction I in BB visited in reverse...
   bool NestingDetected =
       processBlockBottomUpInsts(*this, BB, DataflowVisitor, AA, SetFactory);
-
-  // Now visit each one of our predecessor regions and see if any are blocks
-  // that can use reference counted values. If any of them do, we advance the
-  // sequence for the pointer and create an insertion point here. This state
-  // will be propagated into all of our predecessors, allowing us to be
-  // conservatively correct in all cases.
-  processBlockBottomUpPredTerminators(R, AA, LRFI, SetFactory);
 
   return NestingDetected;
 }
 
-// Find the relevant insertion points for the loop region R in its
-// successors. Returns true if we succeeded. Returns false if any of the
-// non-local successors of the region are not leaking blocks. We currently do
-// not handle early exits, but do handle trapping blocks.
-static bool getInsertionPtsForLoopRegionExits(
+// Returns true if any of the non-local successors of the region are leaking
+// blocks. We currently do not handle early exits, but do handle trapping
+// blocks. Returns false if otherwise
+static bool hasEarlyExits(
     const LoopRegion *R, LoopRegionFunctionInfo *LRFI,
-    llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo,
-    llvm::SmallVectorImpl<SILInstruction *> &InsertPts) {
+    llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo) {
   assert(R->isLoop() && "Expected a loop region that is representing a loop");
 
   // Go through all of our non local successors. If any of them cannot be
@@ -329,23 +249,10 @@ static bool getInsertionPtsForLoopRegionExits(
   if (any_of(R->getNonLocalSuccs(), [&](unsigned SuccID) -> bool {
         return !RegionStateInfo[LRFI->getRegion(SuccID)]->allowsLeaks();
       })) {
-    return false;
+    return true;
   }
 
-  // We assume that all of our loops have been canonicalized so that /all/ loop
-  // exit blocks only have exiting blocks as predecessors. This means that all
-  // successor regions of any region /cannot/ be a region representing a loop.
-  for (unsigned SuccID : R->getLocalSuccs()) {
-    auto *SuccRegion = LRFI->getRegion(SuccID);
-    assert(SuccRegion->isBlock() && "Loop canonicalization failed?!");
-    InsertPts.push_back(&*SuccRegion->getBlock()->begin());
-  }
-
-  // Sort and unique the insert points so we can put them into
-  // ImmutablePointerSets.
-  sortUnique(InsertPts);
-
-  return true;
+  return false;
 }
 
 bool ARCRegionState::processLoopBottomUp(
@@ -354,11 +261,9 @@ bool ARCRegionState::processLoopBottomUp(
     ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
   ARCRegionState *State = RegionStateInfo[R];
 
-  llvm::SmallVector<SILInstruction *, 2> InsertPts;
-  // Try to lookup insertion points for this region. If when checking for
-  // insertion points, we find that we have non-leaking early exits, clear state
+  // If we find that we have non-leaking early exits, clear state
   // and bail. We do not handle these for now.
-  if (!getInsertionPtsForLoopRegionExits(R, LRFI, RegionStateInfo, InsertPts)) {
+  if (hasEarlyExits(R, LRFI, RegionStateInfo)) {
     clearBottomUpState();
     return false;
   }

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-forward-mode-differentiation -emit-sil -verify %s
+// RUN: %target-swift-frontend -emit-sil -enable-experimental-forward-mode-differentiation -verify %s
 
 // Test forward-mode differentiation transform diagnostics.
 
@@ -46,8 +46,6 @@ func nonVariedResult(_ x: Float) -> Float {
 // Multiple results
 //===----------------------------------------------------------------------===//
 
-// TODO(TF-983): Support differentiation of multiple results.
-/*
 func multipleResults(_ x: Float) -> (Float, Float) {
   return (x, x)
 }
@@ -56,28 +54,21 @@ func usesMultipleResults(_ x: Float) -> Float {
   let tuple = multipleResults(x)
   return tuple.0 + tuple.1
 }
-*/
 
 //===----------------------------------------------------------------------===//
 // `inout` parameter differentiation
 //===----------------------------------------------------------------------===//
 
-// expected-error @+1 {{function is not differentiable}}
 @differentiable
-// expected-note @+1 {{when differentiating this function definition}}
 func activeInoutParamNonactiveInitialResult(_ x: Float) -> Float {
   var result: Float = 1
-  // expected-note @+1 {{cannot differentiate through 'inout' arguments}}
   result += x
   return result
 }
 
-// expected-error @+1 {{function is not differentiable}}
 @differentiable
-// expected-note @+1 {{when differentiating this function definition}}
 func activeInoutParamTuple(_ x: Float) -> Float {
   var tuple = (x, x)
-  // expected-note @+1 {{cannot differentiate through 'inout' arguments}}
   tuple.0 *= x
   return x * tuple.0
 }
@@ -94,49 +85,37 @@ func activeInoutParamControlFlow(_ array: [Float]) -> Float {
   return result
 }
 
+// FIXME(TF-984): Forward-mode crash due to unset tangent buffer.
+/*
+struct X: Differentiable {
+  var x : Float
+
+  @differentiable(wrt: y)
+  mutating func mutate(_ y: X) { self.x = y.x }
+}
+
+@differentiable
+func activeMutatingMethod(_ x: Float) -> Float {
+  let x1 = X.init(x: x)
+  var x2 = X.init(x: 0)
+  x2.mutate(x1)
+  return x1.x
+}
+*/
+
+
 struct Mut: Differentiable {}
 extension Mut {
   @differentiable(wrt: x)
   mutating func mutatingMethod(_ x: Mut) {}
 }
 
-// FIXME(TF-984): Forward-mode crash due to unset tangent buffer.
-/*
-@differentiable(wrt: x)
-func nonActiveInoutParam(_ nonactive: inout Mut, _ x: Mut) -> Mut {
-  return nonactive.mutatingMethod(x)
-}
-*/
-
-// FIXME(TF-984): Forward-mode crash due to unset tangent buffer.
-/*
 @differentiable(wrt: x)
 func activeInoutParamMutatingMethod(_ x: Mut) -> Mut {
   var result = x
-  result = result.mutatingMethod(result)
+  result.mutatingMethod(result)
   return result
 }
-*/
-
-// FIXME(TF-984): Forward-mode crash due to unset tangent buffer.
-/*
-@differentiable(wrt: x)
-func activeInoutParamMutatingMethodVar(_ nonactive: inout Mut, _ x: Mut) -> Mut {
-  var result = nonactive
-  result = result.mutatingMethod(x)
-  return result
-}
-*/
-
-// FIXME(TF-984): Forward-mode crash due to unset tangent buffer.
-/*
-@differentiable(wrt: x)
-func activeInoutParamMutatingMethodTuple(_ nonactive: inout Mut, _ x: Mut) -> Mut {
-  var result = (nonactive, x)
-  let result2 = result.0.mutatingMethod(result.0)
-  return result2
-}
-*/
 
 //===----------------------------------------------------------------------===//
 // Subset parameter differentiation thunks

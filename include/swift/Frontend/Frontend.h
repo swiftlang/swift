@@ -621,7 +621,7 @@ public:
   ///
   /// This is similar to a parse-only invocation, but module imports will also
   /// be processed.
-  void performParseAndResolveImportsOnly();
+  bool performParseAndResolveImportsOnly();
 
   /// Performs mandatory, diagnostic, and optimization passes over the SIL.
   /// \param silModule The SIL module that was generated during SILGen.

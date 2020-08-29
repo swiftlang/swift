@@ -18,6 +18,7 @@
 #include "ClangTypeConverter.h"
 #include "ForeignRepresentationInfo.h"
 #include "SubstitutionMapStorage.h"
+#include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -280,6 +281,10 @@ struct ASTContext::Implementation {
   /// This applies to both actual imported functions and to @objc functions.
   llvm::DenseMap<const AbstractFunctionDecl *,
                  ForeignErrorConvention> ForeignErrorConventions;
+
+  /// Map from declarations to foreign async conventions.
+  llvm::DenseMap<const AbstractFunctionDecl *,
+                 ForeignAsyncConvention> ForeignAsyncConventions;
 
   /// Cache of previously looked-up precedence queries.
   AssociativityCacheType AssociativityCache;
@@ -1466,8 +1471,9 @@ bool ASTContext::hadError() const {
 /// Retrieve the arena from which we should allocate storage for a type.
 static AllocationArena getArena(RecursiveTypeProperties properties) {
   bool hasTypeVariable = properties.hasTypeVariable();
-  return hasTypeVariable? AllocationArena::ConstraintSolver
-                        : AllocationArena::Permanent;
+  bool hasHole = properties.hasTypeHole();
+  return hasTypeVariable || hasHole ? AllocationArena::ConstraintSolver
+                                    : AllocationArena::Permanent;
 }
 
 void ASTContext::addSearchPath(StringRef searchPath, bool isFramework,
@@ -1513,6 +1519,21 @@ Optional<ModuleDependencies> ASTContext::getModuleDependencies(
       return dependencies;
   }
 
+  return None;
+}
+
+Optional<ModuleDependencies>
+ASTContext::getSwiftModuleDependencies(StringRef moduleName,
+                                       ModuleDependenciesCache &cache,
+                                       InterfaceSubContextDelegate &delegate) {
+  for (auto &loader : getImpl().ModuleLoaders) {
+    if (loader.get() == getImpl().TheClangModuleLoader)
+      continue;
+
+    if (auto dependencies = loader->getModuleDependencies(moduleName, cache,
+                                                          delegate))
+      return dependencies;
+  }
   return None;
 }
 
@@ -2223,6 +2244,24 @@ AbstractFunctionDecl::getForeignErrorConvention() const {
   return it->second;
 }
 
+void AbstractFunctionDecl::setForeignAsyncConvention(
+                                         const ForeignAsyncConvention &conv) {
+  assert(hasAsync() && "setting error convention on non-throwing decl");
+  auto &conventionsMap = getASTContext().getImpl().ForeignAsyncConventions;
+  assert(!conventionsMap.count(this) && "error convention already set");
+  conventionsMap.insert({this, conv});
+}
+
+Optional<ForeignAsyncConvention>
+AbstractFunctionDecl::getForeignAsyncConvention() const {
+  if (!hasAsync())
+    return None;
+  auto &conventionsMap = getASTContext().getImpl().ForeignAsyncConventions;
+  auto it = conventionsMap.find(this);
+  if (it == conventionsMap.end()) return None;
+  return it->second;
+}
+
 Optional<KnownFoundationEntity> swift::getKnownFoundationEntity(StringRef name){
   return llvm::StringSwitch<Optional<KnownFoundationEntity>>(name)
 #define FOUNDATION_ENTITY(Name) .Case(#Name, KnownFoundationEntity::Name)
@@ -2341,6 +2380,17 @@ Type ErrorType::get(Type originalType) {
   if (originalProperties.hasTypeVariable())
     properties |= RecursiveTypeProperties::HasTypeVariable;
   return entry = new (mem) ErrorType(ctx, originalType, properties);
+}
+
+Type HoleType::get(ASTContext &ctx, OriginatorType originator) {
+  assert(originator);
+  auto properties = reinterpret_cast<TypeBase *>(originator.getOpaqueValue())
+                        ->getRecursiveProperties();
+  properties |= RecursiveTypeProperties::HasTypeHole;
+
+  auto arena = getArena(properties);
+  return new (ctx, arena)
+      HoleType(ctx, originator, RecursiveTypeProperties::HasTypeHole);
 }
 
 BuiltinIntegerType *BuiltinIntegerType::get(BuiltinIntegerWidth BitWidth,
@@ -2784,6 +2834,7 @@ ReferenceStorageType *ReferenceStorageType::get(Type T,
                                                 ReferenceOwnership ownership,
                                                 const ASTContext &C) {
   assert(!T->hasTypeVariable()); // not meaningful in type-checker
+  assert(!T->hasHole());
   switch (optionalityOf(ownership)) {
   case ReferenceOwnershipOptionality::Disallowed:
     assert(!T->getOptionalObjectType() && "optional type is disallowed");
@@ -2942,7 +2993,7 @@ isFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
 static RecursiveTypeProperties
 getGenericFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
                                       Type result) {
-  static_assert(RecursiveTypeProperties::BitWidth == 11,
+  static_assert(RecursiveTypeProperties::BitWidth == 12,
                 "revisit this if you add new recursive type properties");
   RecursiveTypeProperties properties;
 
@@ -3116,16 +3167,16 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
     return funcTy;
   }
 
-  Optional<ClangTypeInfo> clangTypeInfo = info.getClangTypeInfo();
+  auto clangTypeInfo = info.getClangTypeInfo();
 
   size_t allocSize = totalSizeToAlloc<AnyFunctionType::Param, ClangTypeInfo>(
-      params.size(), clangTypeInfo.hasValue() ? 1 : 0);
+      params.size(), clangTypeInfo.empty() ? 0 : 1);
   void *mem = ctx.Allocate(allocSize, alignof(FunctionType), arena);
 
   bool isCanonical = isFunctionTypeCanonical(params, result);
-  if (clangTypeInfo.hasValue()) {
+  if (!clangTypeInfo.empty()) {
     if (ctx.LangOpts.UseClangFunctionTypes)
-      isCanonical &= clangTypeInfo->type->isCanonicalUnqualified();
+      isCanonical &= clangTypeInfo.getType()->isCanonicalUnqualified();
     else
       isCanonical = false;
   }
@@ -3147,8 +3198,8 @@ FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params,
   std::uninitialized_copy(params.begin(), params.end(),
                           getTrailingObjects<AnyFunctionType::Param>());
   auto clangTypeInfo = info.getClangTypeInfo();
-  if (clangTypeInfo.hasValue())
-    *getTrailingObjects<ClangTypeInfo>() = clangTypeInfo.getValue();
+  if (!clangTypeInfo.empty())
+    *getTrailingObjects<ClangTypeInfo>() = clangTypeInfo;
 }
 
 void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
@@ -3170,6 +3221,7 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
                                               ExtInfo info) {
   assert(sig && "no generic signature for generic function type?!");
   assert(!result->hasTypeVariable());
+  assert(!result->hasHole());
 
   llvm::FoldingSetNodeID id;
   GenericFunctionType::Profile(id, sig, params, result, info);
@@ -3494,7 +3546,7 @@ CanSILFunctionType SILFunctionType::get(
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
   RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 11,
+  static_assert(RecursiveTypeProperties::BitWidth == 12,
                 "revisit this if you add new recursive type properties");
   for (auto &param : params)
     properties |= param.getInterfaceType()->getRecursiveProperties();
@@ -3884,10 +3936,6 @@ CanType OpenedArchetypeType::getAny(Type existential) {
   }
   assert(existential->isExistentialType());
   return OpenedArchetypeType::get(existential);
-}
-
-void TypeLoc::setInvalidType(ASTContext &C) {
-  Ty = ErrorType::get(C);
 }
 
 void SubstitutionMap::Storage::Profile(
@@ -4446,16 +4494,29 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
   return Type();
 }
 
-const clang::Type *
-ASTContext::getClangFunctionType(ArrayRef<AnyFunctionType::Param> params,
-                                 Type resultTy,
-                                 FunctionTypeRepresentation trueRep) {
+ClangTypeConverter &ASTContext::getClangTypeConverter() {
   auto &impl = getImpl();
   if (!impl.Converter) {
     auto *cml = getClangModuleLoader();
     impl.Converter.emplace(*this, cml->getClangASTContext(), LangOpts.Target);
   }
-  return impl.Converter.getValue().getFunctionType(params, resultTy, trueRep);
+  return impl.Converter.getValue();
+}
+
+const clang::Type *
+ASTContext::getClangFunctionType(ArrayRef<AnyFunctionType::Param> params,
+                                 Type resultTy,
+                                 FunctionTypeRepresentation trueRep) {
+  return getClangTypeConverter().getFunctionType(params, resultTy, trueRep);
+}
+
+const clang::Type *
+ASTContext::getCanonicalClangFunctionType(
+    ArrayRef<SILParameterInfo> params,
+    Optional<SILResultInfo> result,
+    SILFunctionType::Representation trueRep) {
+  auto *ty = getClangTypeConverter().getFunctionType(params, result, trueRep);
+  return ty ? ty->getCanonicalTypeInternal().getTypePtr() : nullptr;
 }
 
 const Decl *
