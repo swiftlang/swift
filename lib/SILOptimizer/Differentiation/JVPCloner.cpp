@@ -826,7 +826,7 @@ public:
     auto &diffBuilder = getDifferentialBuilder();
     auto loc = dvi->getLoc();
     auto tanVal = materializeTangent(getTangentValue(dvi->getOperand()), loc);
-    diffBuilder.emitDestroyOperation(loc, tanVal);
+    diffBuilder.emitDestroyValueOperation(loc, tanVal);
   }
 
   CLONE_AND_EMIT_TANGENT(CopyValue, cvi) {
@@ -875,8 +875,6 @@ public:
     auto &tanValDest = getTangentBuffer(si->getParent(), si->getDest());
     diffBuilder.emitStoreValueOperation(loc, tanValSrc, tanValDest,
                                         si->getOwnershipQualifier());
-    if (si->getOwnershipQualifier() == StoreOwnershipQualifier::Init)
-      tangentBufferInitializationInfo[tanValSrc] = NotInitialized;
     tangentBufferInitializationInfo[tanValDest] = Initialized;
   }
 
@@ -900,14 +898,13 @@ public:
     auto loc = cai->getLoc();
     auto *bb = cai->getParent();
     auto &tanSrc = getTangentBuffer(bb, cai->getSrc(), InitializationRequired);
-    auto isInitialization = cai->isInitializationOfDest();
-    auto tanDest = getTangentBuffer(bb, cai->getDest(),
-                                    isInitialization ? InitializationNotRequired
-                                                     : InitializationRequired);
-
+    auto tanDest = getTangentBuffer(bb, cai->getDest());
+    auto &destInitInfo = tangentBufferInitializationInfo[tanDest];
     diffBuilder.createCopyAddr(loc, tanSrc, tanDest, cai->isTakeOfSrc(),
-                               isInitialization);
-    tangentBufferInitializationInfo[tanDest] = Initialized;
+                               (destInitInfo == NotInitialized)
+                                   ? IsInitialization
+                                   : IsNotInitialization);
+    destInitInfo = Initialized;
     if (cai->isTakeOfSrc())
       tangentBufferInitializationInfo[tanSrc] = NotInitialized;
   }
