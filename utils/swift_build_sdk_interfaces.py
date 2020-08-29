@@ -354,6 +354,14 @@ def process_module_files(pool, module_files):
     return overall_exit_status
 
 
+def getSDKVersion(sdkroot):
+    settingPath = os.path.join(sdkroot, 'SDKSettings.json')
+    with open(settingPath) as json_file:
+        data = json.load(json_file)
+        return data['Version']
+    fatal("Failed to get SDK version from: " + settingPath)
+
+
 def main():
     global args, shared_output_lock
     parser = create_parser()
@@ -372,6 +380,12 @@ def main():
         fatal("SDKROOT must be set in the environment")
     if not os.path.isdir(args.sdk):
         fatal("invalid SDK: " + args.sdk)
+
+    # if the given output dir ends with 'prebuilt-modules', we should
+    # append the SDK version number so all modules will built into
+    # the SDK-versioned sub-directory.
+    if os.path.basename(args.output_dir) == 'prebuilt-modules':
+        args.output_dir = os.path.join(args.output_dir, getSDKVersion(args.sdk))
 
     xfails = ()
     if args.ignore_non_stdlib_failures:
