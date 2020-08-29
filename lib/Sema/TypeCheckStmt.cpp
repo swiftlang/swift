@@ -2006,6 +2006,11 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
       // Wire up the function body now.
       func->setBody(*optBody, AbstractFunctionDecl::BodyKind::TypeChecked);
       return false;
+    } else if (func->hasSingleExpressionBody() &&
+                func->getResultInterfaceType()->isVoid()) {
+       // The function returns void.  We don't need an explicit return, no matter
+       // what the type of the expression is.  Take the inserted return back out.
+      func->getBody()->setFirstElement(func->getSingleExpressionBody());
     }
   }
 
