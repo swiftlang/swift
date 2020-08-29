@@ -56,8 +56,33 @@ void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
 
     auto &bindings = relatedBindings->getSecond();
 
-    // Infer transitive protocol requirements.
-    llvm::copy(bindings.Protocols, std::back_inserter(Protocols));
+    // FIXME: This is a workaround necessary because solver doesn't filter
+    // bindings based on protocol requirements placed on a type variable.
+    //
+    // Forward propagate (subtype -> supertype) only literal conformance
+    // requirements since that helps solver to infer more types at
+    // parameter positions.
+    //
+    // \code
+    // func foo<T: ExpressibleByStringLiteral>(_: String, _: T) -> T {
+    //   fatalError()
+    // }
+    //
+    // func bar(_: Any?) {}
+    //
+    // func test() {
+    //   bar(foo("", ""))
+    // }
+    // \endcode
+    //
+    // If one of the literal arguments doesn't propagate its
+    // `ExpressibleByStringLiteral` conformance, we'd end up picking
+    // `T` with only one type `Any?` which is incorrect.
+    llvm::copy_if(bindings.Protocols, std::back_inserter(Protocols),
+                  [](const Constraint *protocol) {
+                    return protocol->getKind() ==
+                           ConstraintKind::LiteralConformsTo;
+                  });
 
     // Infer transitive defaults.
     llvm::copy(bindings.Defaults, std::back_inserter(Defaults));
