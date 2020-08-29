@@ -131,8 +131,8 @@ func test005() {
 func testInvalid() {
   try throw Error4.#^THROW3^#
 // THROW3: Begin completions
-// THROW3: Decl[EnumElement]/CurrNominal:      E1[#Error4#]{{; name=.+$}}
-// THROW3: Decl[EnumElement]/CurrNominal:      E2({#Int32#})[#Error4#]{{; name=.+$}}
+// THROW3: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]:      E1[#Error4#]{{; name=.+$}}
+// THROW3: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]:      E2({#Int32#})[#Error4#]{{; name=.+$}}
 // THROW3: End completions
 }
 
