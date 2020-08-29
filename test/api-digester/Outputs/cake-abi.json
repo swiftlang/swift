@@ -1482,6 +1482,22 @@
             "ObjC"
           ],
           "funcSelfKind": "NonMutating"
+        },
+        {
+          "kind": "Function",
+          "name": "functionUnavailableOnMac",
+          "printedName": "functionUnavailableOnMac()",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
+            }
+          ],
+          "declKind": "Func",
+          "usr": "s:4cake14SwiftObjcClassC24functionUnavailableOnMacyyF",
+          "moduleName": "cake",
+          "funcSelfKind": "NonMutating"
         }
       ],
       "declKind": "Class",
@@ -1490,6 +1506,24 @@
       "objc_name": "NewObjCClass",
       "declAttributes": [
         "ObjC"
+      ],
+      "hasMissingDesignatedInitializers": true
+    },
+    {
+      "kind": "TypeDecl",
+      "name": "UnavailableOnMac",
+      "printedName": "UnavailableOnMac",
+      "declKind": "Class",
+      "usr": "s:4cake16UnavailableOnMacC",
+      "moduleName": "cake",
+      "intro_iOS": "10.2",
+      "intro_tvOS": "10.3",
+      "intro_watchOS": "3.4",
+      "declAttributes": [
+        "Available",
+        "Available",
+        "Available",
+        "Available"
       ],
       "hasMissingDesignatedInitializers": true
     },

@@ -27,3 +27,82 @@
 // The digester can incorrectly register a generic signature change when
 // declarations are shuffled. rdar://problem/46618883
 // UNSUPPORTED: swift_evolve
+
+//===----------------------------------------------------------------------===//
+// Obsoleted or unavailable declarations (previously ignored by api-digester).
+//===----------------------------------------------------------------------===//
+
+// stdlib/public/core/AtomicInt.swift.gyb
+Class _stdlib_AtomicInt is a new API without @available attribute
+
+// stdlib/public/core/FloatingPointTypes.swift.gyb
+Func %(_:_:) is a new API without @available attribute
+Func %=(_:_:) is a new API without @available attribute
+Var Double.isSignMinus is a new API without @available attribute
+Var Double.quietNaN is a new API without @available attribute
+Var Float.isSignMinus is a new API without @available attribute
+Var Float.quietNaN is a new API without @available attribute
+Var Float80.quietNaN is a new API without @available attribute
+
+// stdlib/public/core/IntegerTypes.swift.gyb
+Constructor Int32.init(bitPattern:) is a new API without @available attribute
+Constructor Int64.init(bitPattern:) is a new API without @available attribute
+
+// stdlib/public/core/LegacyABI.swift
+Func String._withUTF8(_:) is a new API without @available attribute
+Func Substring._withUTF8(_:) is a new API without @available attribute
+Func Unicode.UTF16._isASCII(_:) is a new API without @available attribute
+Func _isASCII(_:) is a new API without @available attribute
+Func _isContinuation(_:) is a new API without @available attribute
+Var Substring._wholeString is a new API without @available attribute
+
+// stdlib/public/core/MigrationSupport.swift
+Constructor ClosedRange.init(_:) is a new API without @available attribute
+Constructor Range.init(_:) is a new API without @available attribute
+Constructor UnsafeMutableRawPointer.init(_:) is a new API without @available attribute
+Constructor _PlaygroundQuickLook.init(reflecting:) is a new API without @available attribute
+Func Collection.distance(from:to:) is a new API without @available attribute
+Func Collection.flatMap(_:) is a new API without @available attribute
+Func Collection.formIndex(_:offsetBy:) is a new API without @available attribute
+Func Collection.formIndex(_:offsetBy:limitedBy:) is a new API without @available attribute
+Func Collection.index(_:offsetBy:) is a new API without @available attribute
+Func Collection.index(_:offsetBy:limitedBy:) is a new API without @available attribute
+Func String.withMutableCharacters(_:) is a new API without @available attribute
+Func Substring.withMutableCharacters(_:) is a new API without @available attribute
+Func UnsafeMutablePointer.deallocate(capacity:) is a new API without @available attribute
+Func UnsafeMutablePointer.deinitialize() is a new API without @available attribute
+Func UnsafeMutablePointer.initialize(from:) is a new API without @available attribute
+Func UnsafeMutablePointer.initialize(to:count:) is a new API without @available attribute
+Func UnsafeMutableRawBufferPointer.allocate(count:) is a new API without @available attribute
+Func UnsafeMutableRawBufferPointer.copyBytes(from:) is a new API without @available attribute
+Func UnsafeMutableRawPointer.allocate(bytes:alignedTo:) is a new API without @available attribute
+Func UnsafeMutableRawPointer.copyBytes(from:count:) is a new API without @available attribute
+Func UnsafeMutableRawPointer.deallocate(bytes:alignedTo:) is a new API without @available attribute
+Func UnsafeMutableRawPointer.initializeMemory(as:at:count:to:) is a new API without @available attribute
+Func UnsafeMutableRawPointer.initializeMemory(as:from:) is a new API without @available attribute
+Var String.characters is a new API without @available attribute
+Var Substring.characters is a new API without @available attribute
+
+// stdlib/public/core/SIMDVector.swift
+Func SIMD.*(_:_:) is a new API without @available attribute
+Func SIMD.*=(_:_:) is a new API without @available attribute
+Func SIMD.+(_:_:) is a new API without @available attribute
+Func SIMD.+=(_:_:) is a new API without @available attribute
+Func SIMD.-(_:_:) is a new API without @available attribute
+Func SIMD.-=(_:_:) is a new API without @available attribute
+
+// stdlib/public/core/StringRangeReplaceableCollection.swift
+Func Sequence.+(_:_:) is a new API without @available attribute
+
+// stdlib/public/core/UnavailableStringAPIs.swift
+Subscript String.subscript(_:) is a new API without @available attribute
+
+// stdlib/public/core/Unicode.swift
+Func transcode(_:_:_:_:stopOnError:) is a new API without @available attribute
+
+// stdlib/public/core/UnicodeScalar.swift
+Constructor Unicode.Scalar.init() is a new API without @available attribute
+
+// stdlib/public/core/UnsafeRawBufferPointer.swift.gyb
+Subscript UnsafeMutableRawBufferPointer.subscript(_:) is a new API without @available attribute
+Subscript UnsafeRawBufferPointer.subscript(_:) is a new API without @available attribute
