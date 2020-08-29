@@ -2879,19 +2879,19 @@ static bool declNeedsExplicitAvailability(const Decl *decl) {
 }
 
 void swift::checkExplicitAvailability(Decl *decl) {
-  // Check only if the command line option was set.
-  if (!decl->getASTContext().LangOpts.RequireExplicitAvailability)
+  // Skip if the command line option was not set and
+  // accessors as we check the pattern binding decl instead.
+  if (!decl->getASTContext().LangOpts.RequireExplicitAvailability ||
+      isa<AccessorDecl>(decl))
     return;
 
-  // Skip nominal type members as the type should be annotated.
-  auto declContext = decl->getDeclContext();
-  if (isa<NominalTypeDecl>(declContext))
-    return;
+  // Only look at decls at module level or in extensions.
+  // This could be changed to force having attributes on all decls.
+  if (!decl->getDeclContext()->isModuleScopeContext() &&
+      !isa<ExtensionDecl>(decl->getDeclContext())) return;
 
-  ValueDecl *valueDecl = dyn_cast<ValueDecl>(decl);
-  if (valueDecl == nullptr) {
+  if (auto extension = dyn_cast<ExtensionDecl>(decl)) {
     // decl should be either a ValueDecl or an ExtensionDecl.
-    auto extension = cast<ExtensionDecl>(decl);
     auto extended = extension->getExtendedNominal();
     if (!extended || !extended->getFormalAccessScope().isPublic())
       return;
@@ -2916,6 +2916,18 @@ void swift::checkExplicitAvailability(Decl *decl) {
     });
 
     if (!hasMembers && !hasProtocols) return;
+
+  } else if (auto pbd = dyn_cast<PatternBindingDecl>(decl)) {
+    // Check the first var instead.
+    if (pbd->getNumPatternEntries() == 0)
+      return;
+
+    llvm::SmallVector<VarDecl *, 2> vars;
+    pbd->getPattern(0)->collectVariables(vars);
+    if (vars.empty())
+      return;
+
+    decl = vars.front();
   }
 
   if (declNeedsExplicitAvailability(decl)) {
