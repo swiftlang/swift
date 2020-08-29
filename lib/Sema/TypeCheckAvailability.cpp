@@ -2854,21 +2854,26 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *Decl,
   return AW.diagAvailability(const_cast<ValueDecl *>(Decl), R, nullptr, Flags);
 }
 
-/// Should we warn that \p valueDecl needs an explicit availability annotation
-/// in -require-explicit-availaiblity mode?
-static bool declNeedsExplicitAvailability(const ValueDecl *valueDecl) {
-  AccessScope scope =
-    valueDecl->getFormalAccessScope(/*useDC*/nullptr,
-                                  /*treatUsableFromInlineAsPublic*/true);
-  if (!scope.isPublic() ||
-      valueDecl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+/// Should we warn that \p decl needs an explicit availability annotation
+/// in -require-explicit-availability mode?
+static bool declNeedsExplicitAvailability(const Decl *decl) {
+  // Skip non-public decls.
+  if (auto valueDecl = dyn_cast<const ValueDecl>(decl)) {
+    AccessScope scope =
+      valueDecl->getFormalAccessScope(/*useDC*/nullptr,
+                                      /*treatUsableFromInlineAsPublic*/true);
+    if (!scope.isPublic())
+      return false;
+  }
+
+  if (decl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
     return false;
 
   // Warn on decls without an introduction version.
-  auto &ctx = valueDecl->getASTContext();
-  auto safeRangeUnderApprox = AvailabilityInference::availableRange(valueDecl, ctx);
+  auto &ctx = decl->getASTContext();
+  auto safeRangeUnderApprox = AvailabilityInference::availableRange(decl, ctx);
   return !safeRangeUnderApprox.getOSVersion().hasLowerEndpoint() &&
-         !valueDecl->getAttrs().isUnavailable(ctx);
+         !decl->getAttrs().isUnavailable(ctx);
 }
 
 void swift::checkExplicitAvailability(Decl *decl) {
@@ -2885,8 +2890,8 @@ void swift::checkExplicitAvailability(Decl *decl) {
   if (valueDecl == nullptr) {
     // decl should be either a ValueDecl or an ExtensionDecl.
     auto extension = cast<ExtensionDecl>(decl);
-    valueDecl = extension->getExtendedNominal();
-    if (!valueDecl)
+    auto extended = extension->getExtendedNominal();
+    if (!extended || !extended->getFormalAccessScope().isPublic())
       return;
 
     // Skip extensions without public members or conformances.
@@ -2911,10 +2916,11 @@ void swift::checkExplicitAvailability(Decl *decl) {
     if (!hasMembers && !hasProtocols) return;
   }
 
-  if (declNeedsExplicitAvailability(valueDecl)) {
+  if (declNeedsExplicitAvailability(decl)) {
     auto diag = decl->diagnose(diag::public_decl_needs_availability);
 
-    auto suggestPlatform = decl->getASTContext().LangOpts.RequireExplicitAvailabilityTarget;
+    auto suggestPlatform =
+      decl->getASTContext().LangOpts.RequireExplicitAvailabilityTarget;
     if (!suggestPlatform.empty()) {
       auto InsertLoc = decl->getAttrs().getStartLoc(/*forModifiers=*/false);
       if (InsertLoc.isInvalid())
@@ -2927,7 +2933,7 @@ void swift::checkExplicitAvailability(Decl *decl) {
       {
          llvm::raw_string_ostream Out(AttrText);
 
-         auto &ctx = valueDecl->getASTContext();
+         auto &ctx = decl->getASTContext();
          StringRef OriginalIndent = Lexer::getIndentationForLine(
            ctx.SourceMgr, InsertLoc);
          Out << "@available(" << suggestPlatform << ", *)\n"

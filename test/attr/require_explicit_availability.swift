@@ -52,6 +52,11 @@ extension S { // expected-warning {{public declarations should have an availabil
   public func warnForPublicMembers() { } // expected-warning {{public declarations should have an availability attribute when building with -require-explicit-availability}} {{3-3=@available(macOS 10.10, *)\n  }}
 }
 
+@available(macOS 10.1, *)
+extension S {
+  public func okWhenTheExtensionHasAttribute() { }
+}
+
 extension S {
   internal func dontWarnWithoutPublicMembers() { }
   private func dontWarnWithoutPublicMembers1() { }
@@ -68,3 +73,9 @@ open class OpenClass { } // expected-warning {{public declarations should have a
 private class PrivateClass { }
 
 extension PrivateClass { }
+
+@available(macOS 10.1, *)
+public protocol PublicProtocol { }
+
+@available(macOS 10.1, *)
+extension S : PublicProtocol { }
