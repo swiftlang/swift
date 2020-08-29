@@ -1407,6 +1407,13 @@ for host in "${ALL_HOSTS[@]}"; do
         fi
     fi
 
+    if [[ "${NATIVE_CLANG_TOOLS_PATH}" ]] ; then
+        common_cmake_options_host+=(
+                -DCMAKE_C_COMPILER="${NATIVE_CLANG_TOOLS_PATH}/clang"
+                -DCMAKE_CXX_COMPILER="${NATIVE_CLANG_TOOLS_PATH}/clang++"
+            )
+    fi
+
     llvm_cmake_options=(
         "${llvm_cmake_options[@]}"
         -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
