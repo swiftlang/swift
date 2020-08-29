@@ -688,6 +688,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::BaseAddrForOffsetInst:
   case SILInstructionKind::EndLifetimeInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:
+  case SILInstructionKind::BindMemoryInst:
     return InlineCost::Free;
 
   // Typed GEPs are free.
@@ -792,7 +793,6 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::AllocRefDynamicInst:
   case SILInstructionKind::AllocStackInst:
   case SILInstructionKind::AllocValueBufferInst:
-  case SILInstructionKind::BindMemoryInst:
   case SILInstructionKind::BeginApplyInst:
   case SILInstructionKind::ValueMetatypeInst:
   case SILInstructionKind::WitnessMethodInst:
