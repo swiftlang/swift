@@ -25,3 +25,5 @@ enum E {
 }
 
 let _: (E.Type) -> (E) -> () = { s in { e in s.f(e) } }
+// expected-warning@-1 {{will never be executed}}
+// expected-note@-2 {{'e' is uninhabited, so this function body can never be executed}}
