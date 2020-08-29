@@ -20,6 +20,6 @@
 
 using namespace swift;
 
-void ConditionPlatformHelper::wait(void* &condition,
-                                   void* &mutex) {}
+void ConditionPlatformHelper::wait(ConditionHandle &condition,
+                                   MutexHandle &mutex) {}
 #endif
