@@ -28,6 +28,6 @@ ninja -v install
 # On Linux though there's no system CoreFoundation, its headers have to be shipped
 # in the installable archive and serve for both host and target.
 if [[ "$(uname)" == "Darwin" ]]; then
-  mv $DESTINATION_TOOLCHAIN/usr/lib/swift/CoreFoundation \
+  mv $DESTINATION_TOOLCHAIN/usr/lib/swift_static/CoreFoundation \
     $DESTINATION_TOOLCHAIN/usr/lib/swift/wasi/wasm32/CoreFoundation
 fi
