@@ -931,15 +931,7 @@ bool ConstraintSystem::PotentialBindings::infer(
 
   case ConstraintKind::ConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:
-    // Swift 3 allowed the use of default types for normal conformances
-    // to expressible-by-literal protocols.
-    if (cs.getASTContext().LangOpts.EffectiveLanguageVersion[0] >= 4)
-      return false;
-
-    if (!constraint->getSecondType()->is<ProtocolType>())
-      return false;
-
-    LLVM_FALLTHROUGH;
+    return false;
 
   case ConstraintKind::LiteralConformsTo: {
     // Record constraint where protocol requirement originated
