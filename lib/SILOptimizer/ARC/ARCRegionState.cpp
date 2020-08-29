@@ -156,13 +156,21 @@ void ARCRegionState::mergePredTopDown(ARCRegionState &PredRegionState) {
 // Bottom Up Dataflow
 //
 
-static bool processBlockBottomUpInsts(
-    ARCRegionState &State, SILBasicBlock &BB,
-    BottomUpDataflowRCStateVisitor<ARCRegionState> &DataflowVisitor,
-    AliasAnalysis *AA, ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
+bool ARCRegionState::processBlockBottomUp(
+    const LoopRegion *R, AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
+    EpilogueARCFunctionInfo *EAFI, LoopRegionFunctionInfo *LRFI,
+    bool FreezeOwnedArgEpilogueReleases,
+    BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap,
+    ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
+  LLVM_DEBUG(llvm::dbgs() << ">>>> Bottom Up!\n");
 
-  auto II = State.summarizedinterestinginsts_rbegin();
-  auto IE = State.summarizedinterestinginsts_rend();
+  SILBasicBlock &BB = *R->getBlock();
+  BottomUpDataflowRCStateVisitor<ARCRegionState> DataflowVisitor(
+      RCIA, EAFI, *this, FreezeOwnedArgEpilogueReleases, IncToDecStateMap,
+      SetFactory);
+
+  auto II = summarizedinterestinginsts_rbegin();
+  auto IE = summarizedinterestinginsts_rend();
 
   // If we do not have any interesting instructions, bail and return false since
   // we can not have any nested instructions.
@@ -198,7 +206,7 @@ static bool processBlockBottomUpInsts(
 
     // For all other (reference counted value, ref count state) we are
     // tracking...
-    for (auto &OtherState : State.getBottomupStates()) {
+    for (auto &OtherState : getBottomupStates()) {
       // If the other state's value is blotted, skip it.
       if (!OtherState.hasValue())
         continue;
@@ -211,26 +219,6 @@ static bool processBlockBottomUpInsts(
       OtherState->second.updateForSameLoopInst(I, AA);
     }
   }
-
-  return NestingDetected;
-}
-
-bool ARCRegionState::processBlockBottomUp(
-    const LoopRegion *R, AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
-    EpilogueARCFunctionInfo *EAFI, LoopRegionFunctionInfo *LRFI,
-    bool FreezeOwnedArgEpilogueReleases,
-    BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap,
-    ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
-  LLVM_DEBUG(llvm::dbgs() << ">>>> Bottom Up!\n");
-
-  SILBasicBlock &BB = *R->getBlock();
-  BottomUpDataflowRCStateVisitor<ARCRegionState> DataflowVisitor(
-      RCIA, EAFI, *this, FreezeOwnedArgEpilogueReleases, IncToDecStateMap,
-      SetFactory);
-
-  // Visit each arc relevant instruction I in BB visited in reverse...
-  bool NestingDetected =
-      processBlockBottomUpInsts(*this, BB, DataflowVisitor, AA, SetFactory);
 
   return NestingDetected;
 }

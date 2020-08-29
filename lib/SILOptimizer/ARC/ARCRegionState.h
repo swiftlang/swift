@@ -219,9 +219,6 @@ public:
   void removeInterestingInst(SILInstruction *I);
 
 private:
-  void processBlockBottomUpPredTerminators(
-      const LoopRegion *R, AliasAnalysis *AA, LoopRegionFunctionInfo *LRFI,
-      ImmutablePointerSetFactory<SILInstruction> &SetFactory);
   bool processBlockBottomUp(
       const LoopRegion *R, AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
       EpilogueARCFunctionInfo *EAFI,
