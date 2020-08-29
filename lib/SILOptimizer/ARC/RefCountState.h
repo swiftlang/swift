@@ -188,7 +188,6 @@ public:
   /// Update this reference count's state given the instruction \p I.
   void
   updateForSameLoopInst(SILInstruction *I,
-                        ImmutablePointerSetFactory<SILInstruction> &SetFactory,
                         AliasAnalysis *AA);
 
   /// Update this reference count's state given the instruction \p I.
@@ -198,7 +197,6 @@ public:
   /// guaranteed used. We treat any uses as regular uses.
   void updateForDifferentLoopInst(
       SILInstruction *I,
-      ImmutablePointerSetFactory<SILInstruction> &SetFactory,
       AliasAnalysis *AA);
 
   /// Attempt to merge \p Other into this ref count state. Return true if we
@@ -243,16 +241,13 @@ private:
 
   /// Given the current lattice state, if we have seen a use, advance the
   /// lattice state. Return true if we do so and false otherwise.
-  bool handleUser(SILValue RCIdentity,
-                  ImmutablePointerSetFactory<SILInstruction> &SetFactory,
-                  AliasAnalysis *AA);
+  bool handleUser();
 
   /// Check if PotentialUser could be a use of the reference counted value that
   /// requires user to be alive. If so advance the state's sequence
   /// appropriately and return true. Otherwise return false.
   bool
   handlePotentialUser(SILInstruction *PotentialUser,
-                      ImmutablePointerSetFactory<SILInstruction> &SetFactory,
                       AliasAnalysis *AA);
 
   /// Returns true if given the current lattice state, do we care if the value
@@ -261,22 +256,18 @@ private:
 
   /// Given the current lattice state, if we have seen a use, advance the
   /// lattice state. Return true if we do so and false otherwise.
-  bool
-  handleGuaranteedUser(SILValue RCIdentity,
-                       ImmutablePointerSetFactory<SILInstruction> &SetFactory,
-                       AliasAnalysis *AA);
+  bool handleGuaranteedUser();
 
   /// Check if PotentialGuaranteedUser can use the reference count associated
   /// with the value we are tracking. If so advance the state's sequence
   /// appropriately and return true. Otherwise return false.
   bool handlePotentialGuaranteedUser(
       SILInstruction *User,
-      ImmutablePointerSetFactory<SILInstruction> &SetFactory,
       AliasAnalysis *AA);
 
   /// We have a matching ref count inst. Return true if we advance the sequence
   /// and false otherwise.
-  bool handleRefCountInstMatch(SILInstruction *RefCountInst);
+  bool handleRefCountInstMatch();
 };
 
 //===----------------------------------------------------------------------===//
@@ -335,7 +326,6 @@ public:
   /// Update this reference count's state given the instruction \p I.
   void
   updateForSameLoopInst(SILInstruction *I,
-                        ImmutablePointerSetFactory<SILInstruction> &SetFactory,
                         AliasAnalysis *AA);
 
   /// Update this reference count's state given the instruction \p I.
@@ -345,7 +335,6 @@ public:
   /// guaranteed used. We treat any uses as regular uses.
   void updateForDifferentLoopInst(
       SILInstruction *I,
-      ImmutablePointerSetFactory<SILInstruction> &SetFactory,
       AliasAnalysis *AA);
 
   /// Returns true if the passed in ref count inst matches the ref count inst
@@ -368,15 +357,13 @@ private:
 
   /// If advance the state's sequence appropriately for a decrement. If we do
   /// advance return true. Otherwise return false.
-  bool handleDecrement(SILInstruction *PotentialDecrement,
-                       ImmutablePointerSetFactory<SILInstruction> &SetFactory);
+  bool handleDecrement();
 
   /// Check if PotentialDecrement can decrement the reference count associated
   /// with the value we are tracking. If so advance the state's sequence
   /// appropriately and return true. Otherwise return false.
   bool handlePotentialDecrement(
       SILInstruction *PotentialDecrement,
-      ImmutablePointerSetFactory<SILInstruction> &SetFactory,
       AliasAnalysis *AA);
 
   /// Returns true if given the current lattice state, do we care if the value
@@ -385,8 +372,7 @@ private:
 
   /// Given the current lattice state, if we have seen a use, advance the
   /// lattice state. Return true if we do so and false otherwise.
-  bool handleUser(SILInstruction *PotentialUser,
-                  SILValue RCIdentity, AliasAnalysis *AA);
+  bool handleUser();
 
   /// Check if PotentialUser could be a use of the reference counted value that
   /// requires user to be alive. If so advance the state's sequence
@@ -399,23 +385,18 @@ private:
 
   /// Given the current lattice state, if we have seen a use, advance the
   /// lattice state. Return true if we do so and false otherwise.
-  bool
-  handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser,
-                       SILValue RCIdentity,
-                       ImmutablePointerSetFactory<SILInstruction> &SetFactory,
-                       AliasAnalysis *AA);
+  bool handleGuaranteedUser();
 
   /// Check if PotentialGuaranteedUser can use the reference count associated
   /// with the value we are tracking. If so advance the state's sequence
   /// appropriately and return true. Otherwise return false.
   bool handlePotentialGuaranteedUser(
       SILInstruction *PotentialGuaranteedUser,
-      ImmutablePointerSetFactory<SILInstruction> &SetFactory,
       AliasAnalysis *AA);
 
   /// We have a matching ref count inst. Return true if we advance the sequence
   /// and false otherwise.
-  bool handleRefCountInstMatch(SILInstruction *RefCountInst);
+  bool handleRefCountInstMatch();
 };
 
 // These static asserts are here for performance reasons.

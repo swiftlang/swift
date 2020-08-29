@@ -208,7 +208,7 @@ static bool processBlockBottomUpInsts(
       if (Op && OtherState->first == Op)
         continue;
 
-      OtherState->second.updateForSameLoopInst(I, SetFactory, AA);
+      OtherState->second.updateForSameLoopInst(I, AA);
     }
   }
 
@@ -275,7 +275,7 @@ bool ARCRegionState::processLoopBottomUp(
       continue;
 
     for (auto *I : State->getSummarizedInterestingInsts())
-      OtherState->second.updateForDifferentLoopInst(I, SetFactory, AA);
+      OtherState->second.updateForDifferentLoopInst(I, AA);
   }
 
   return false;
@@ -361,7 +361,7 @@ bool ARCRegionState::processBlockTopDown(
       if (Op && OtherState->first == Op)
         continue;
 
-      OtherState->second.updateForSameLoopInst(I, SetFactory, AA);
+      OtherState->second.updateForSameLoopInst(I, AA);
     }
   }
 
@@ -394,7 +394,7 @@ bool ARCRegionState::processLoopTopDown(
       continue;
 
     for (auto *I : State->getSummarizedInterestingInsts())
-      OtherState->second.updateForDifferentLoopInst(I, SetFactory, AA);
+      OtherState->second.updateForDifferentLoopInst(I, AA);
   }
 
   return false;

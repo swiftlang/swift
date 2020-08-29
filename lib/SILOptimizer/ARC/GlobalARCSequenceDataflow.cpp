@@ -108,7 +108,7 @@ bool ARCSequenceDataflowEvaluator::processBBTopDown(ARCBBState &BBState) {
       if (Op && OtherState->first == Op)
         continue;
 
-      OtherState->second.updateForSameLoopInst(&I, SetFactory, AA);
+      OtherState->second.updateForSameLoopInst(&I, AA);
     }
   }
 
@@ -260,7 +260,7 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
       if (Op && OtherState->first == Op)
         continue;
 
-      OtherState->second.updateForSameLoopInst(&I, SetFactory, AA);
+      OtherState->second.updateForSameLoopInst(&I, AA);
     }
   }
 
