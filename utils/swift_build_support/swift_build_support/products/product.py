@@ -158,7 +158,7 @@ class Product(object):
         install_destdir = self.args.install_destdir
         if self.args.cross_compile_hosts:
             build_root = os.path.dirname(self.build_dir)
-            install_destdir = '%s/intermediate-install/%s/' % (build_root, host_target)
+            install_destdir = '%s/intermediate-install/%s' % (build_root, host_target)
         return targets.toolchain_path(install_destdir,
                                       self.args.install_prefix)
 

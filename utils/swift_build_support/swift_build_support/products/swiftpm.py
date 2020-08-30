@@ -106,7 +106,7 @@ class SwiftPM(product.Product):
         install_destdir = args.install_destdir
         if self.has_cross_compile_hosts(args):
             build_root = os.path.dirname(build_dir)
-            install_destdir = '%s/intermediate-install/%s/' % (build_root, host_target)
+            install_destdir = '%s/intermediate-install/%s' % (build_root, host_target)
         return install_destdir
 
     def install(self, host_target):
