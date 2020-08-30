@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -scan-dependencies %s -o %t/deps.json -emit-dependencies -emit-dependencies-path %t/deps.d -swift-version 4 -disable-implicit-swift-modules -Xcc -Xclang -Xcc -fno-implicit-modules
+// RUN: %target-swift-frontend -scan-dependencies %s -o %t/deps.json -emit-dependencies -emit-dependencies-path %t/deps.d -swift-version 4 -Xcc -Xclang
 
 // Check the contents of the JSON output
 // RUN: %FileCheck %s < %t/deps.json

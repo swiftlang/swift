@@ -282,10 +282,6 @@ Stmt *NameMatcher::walkToStmtPost(Stmt *S) {
 }
 
 Expr *NameMatcher::getApplicableArgFor(Expr *E) {
-  if (auto *UME = dyn_cast<UnresolvedMemberExpr>(E)) {
-    if (auto *Arg = UME->getArgument())
-      return Arg;
-  }
   if (ParentCalls.empty())
     return nullptr;
   auto &Last = ParentCalls.back();

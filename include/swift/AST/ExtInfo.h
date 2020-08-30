@@ -194,16 +194,8 @@ class ASTExtInfoBuilder {
 
   using Representation = FunctionTypeRepresentation;
 
-  static void assertIsFunctionType(const clang::Type *);
-
   ASTExtInfoBuilder(unsigned bits, ClangTypeInfo clangTypeInfo)
-      : bits(bits), clangTypeInfo(clangTypeInfo) {
-    // TODO: [clang-function-type-serialization] Once we start serializing
-    // the Clang type, we should also assert that the pointer is non-null.
-    auto Rep = Representation(bits & RepresentationMask);
-    if ((Rep == Representation::CFunctionPointer) && clangTypeInfo.type)
-      assertIsFunctionType(clangTypeInfo.type);
-  }
+      : bits(bits), clangTypeInfo(clangTypeInfo) {}
 
 public:
   // Constructor with all defaults.
@@ -254,10 +246,7 @@ public:
            DifferentiabilityKind::NonDifferentiable;
   }
 
-  /// Get the underlying ClangTypeInfo value if it is not the default value.
-  Optional<ClangTypeInfo> getClangTypeInfo() const {
-    return clangTypeInfo.empty() ? Optional<ClangTypeInfo>() : clangTypeInfo;
-  }
+  ClangTypeInfo getClangTypeInfo() const { return clangTypeInfo; }
 
   constexpr SILFunctionTypeRepresentation getSILRepresentation() const {
     unsigned rawRep = bits & RepresentationMask;
@@ -404,9 +393,7 @@ public:
 
   constexpr bool isDifferentiable() const { return builder.isDifferentiable(); }
 
-  Optional<ClangTypeInfo> getClangTypeInfo() const {
-    return builder.getClangTypeInfo();
-  }
+  ClangTypeInfo getClangTypeInfo() const { return builder.getClangTypeInfo(); }
 
   constexpr bool hasSelfParam() const { return builder.hasSelfParam(); }
 
@@ -495,16 +482,17 @@ class SILExtInfoBuilder {
   // If bits are added or removed, then TypeBase::SILFunctionTypeBits
   // and NumMaskBits must be updated, and they must match.
 
-  //   |representation|pseudogeneric| noescape |differentiability|
-  //   |    0 .. 3    |      4      |     5    |      6 .. 7     |
+  //   |representation|pseudogeneric| noescape | async | differentiability|
+  //   |    0 .. 3    |      4      |     5    |   6   |      7 .. 8     |
   //
   enum : unsigned {
     RepresentationMask = 0xF << 0,
     PseudogenericMask = 1 << 4,
     NoEscapeMask = 1 << 5,
-    DifferentiabilityMaskOffset = 6,
+    AsyncMask = 1 << 6,
+    DifferentiabilityMaskOffset = 7,
     DifferentiabilityMask = 0x3 << DifferentiabilityMaskOffset,
-    NumMaskBits = 8
+    NumMaskBits = 9
   };
 
   unsigned bits; // Naturally sized for speed.
@@ -517,19 +505,32 @@ class SILExtInfoBuilder {
   SILExtInfoBuilder(unsigned bits, ClangTypeInfo clangTypeInfo)
       : bits(bits), clangTypeInfo(clangTypeInfo) {}
 
+  static constexpr unsigned makeBits(Representation rep, bool isPseudogeneric,
+                                     bool isNoEscape, bool isAsync,
+                                     DifferentiabilityKind diffKind) {
+    return ((unsigned)rep) | (isPseudogeneric ? PseudogenericMask : 0) |
+           (isNoEscape ? NoEscapeMask : 0) | (isAsync ? AsyncMask : 0) |
+           (((unsigned)diffKind << DifferentiabilityMaskOffset) &
+            DifferentiabilityMask);
+  }
+
 public:
   // Constructor with all defaults.
-  SILExtInfoBuilder() : bits(0), clangTypeInfo(ClangTypeInfo(nullptr)) {}
+  SILExtInfoBuilder() : SILExtInfoBuilder(0, ClangTypeInfo(nullptr)) {}
 
   // Constructor for polymorphic type.
   SILExtInfoBuilder(Representation rep, bool isPseudogeneric, bool isNoEscape,
-                    DifferentiabilityKind diffKind, const clang::Type *type)
-      : SILExtInfoBuilder(
-            ((unsigned)rep) | (isPseudogeneric ? PseudogenericMask : 0) |
-                (isNoEscape ? NoEscapeMask : 0) |
-                (((unsigned)diffKind << DifferentiabilityMaskOffset) &
-                 DifferentiabilityMask),
-            ClangTypeInfo(type)) {}
+                    bool isAsync, DifferentiabilityKind diffKind,
+                    const clang::Type *type)
+      : SILExtInfoBuilder(makeBits(rep, isPseudogeneric, isNoEscape, isAsync,
+                                   diffKind),
+                          ClangTypeInfo(type)) {}
+
+  SILExtInfoBuilder(ASTExtInfoBuilder info, bool isPseudogeneric)
+      : SILExtInfoBuilder(makeBits(info.getSILRepresentation(), isPseudogeneric,
+                                   info.isNoEscape(), info.isAsync(),
+                                   info.getDifferentiabilityKind()),
+                          info.getClangTypeInfo()) {}
 
   void checkInvariants() const;
 
@@ -552,6 +553,8 @@ public:
   // Is this function guaranteed to be no-escape by the type system?
   constexpr bool isNoEscape() const { return bits & NoEscapeMask; }
 
+  constexpr bool isAsync() const { return bits & AsyncMask; }
+
   constexpr DifferentiabilityKind getDifferentiabilityKind() const {
     return DifferentiabilityKind((bits & DifferentiabilityMask) >>
                                  DifferentiabilityMaskOffset);
@@ -562,10 +565,8 @@ public:
            DifferentiabilityKind::NonDifferentiable;
   }
 
-  /// Get the underlying ClangTypeInfo value if it is not the default value.
-  Optional<ClangTypeInfo> getClangTypeInfo() const {
-    return clangTypeInfo.empty() ? Optional<ClangTypeInfo>() : clangTypeInfo;
-  }
+  /// Get the underlying ClangTypeInfo value.
+  ClangTypeInfo getClangTypeInfo() const { return clangTypeInfo; }
 
   constexpr bool hasSelfParam() const {
     switch (getRepresentation()) {
@@ -616,6 +617,10 @@ public:
                                       : (bits & ~NoEscapeMask),
                              clangTypeInfo);
   }
+  SILExtInfoBuilder withAsync(bool isAsync = true) const {
+    return SILExtInfoBuilder(isAsync ? (bits | AsyncMask) : (bits & ~AsyncMask),
+                             clangTypeInfo);
+  }
   SILExtInfoBuilder
   withDifferentiabilityKind(DifferentiabilityKind differentiability) const {
     return SILExtInfoBuilder(
@@ -657,8 +662,8 @@ public:
 
   static SILExtInfo getThin() {
     return SILExtInfoBuilder(SILExtInfoBuilder::Representation::Thin, false,
-                             false, DifferentiabilityKind::NonDifferentiable,
-                             nullptr)
+                             false, false,
+                             DifferentiabilityKind::NonDifferentiable, nullptr)
         .build();
   }
 
@@ -681,15 +686,15 @@ public:
 
   constexpr bool isNoEscape() const { return builder.isNoEscape(); }
 
+  constexpr bool isAsync() const { return builder.isAsync(); }
+
   constexpr DifferentiabilityKind getDifferentiabilityKind() const {
     return builder.getDifferentiabilityKind();
   }
 
   constexpr bool isDifferentiable() const { return builder.isDifferentiable(); }
 
-  Optional<ClangTypeInfo> getClangTypeInfo() const {
-    return builder.getClangTypeInfo();
-  }
+  ClangTypeInfo getClangTypeInfo() const { return builder.getClangTypeInfo(); }
 
   constexpr bool hasSelfParam() const { return builder.hasSelfParam(); }
 

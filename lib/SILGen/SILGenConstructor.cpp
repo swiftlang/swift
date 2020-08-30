@@ -216,11 +216,9 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
           .forwardInto(SGF, Loc, init.get());
         ++elti;
       } else {
-#ifndef NDEBUG
-        assert(
-            field->getType()->isEqual(field->getParentInitializer()->getType())
-              && "Checked by sema");
-#endif
+        assert(field->getType()->getReferenceStorageReferent()->isEqual(
+                   field->getParentInitializer()->getType()) &&
+               "Initialization of field with mismatched type!");
 
         // Cleanup after this initialization.
         FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());

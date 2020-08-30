@@ -3707,6 +3707,7 @@ void ClangImporter::Implementation::lookupValue(
             clangDecl->getMostRecentDecl();
 
         CurrentVersion.forEachOtherImportNameVersion(
+            SwiftContext.LangOpts.EnableExperimentalConcurrency,
             [&](ImportNameVersion nameVersion) {
           if (anyMatching)
             return;
@@ -3714,6 +3715,12 @@ void ClangImporter::Implementation::lookupValue(
           // Check to see if the name and context match what we expect.
           ImportedName newName = importFullName(recentClangDecl, nameVersion);
           if (!newName.getDeclName().matchesRef(name))
+            return;
+
+          // If we asked for an async import and didn't find one, skip this.
+          // This filters out duplicates.
+          if (nameVersion.supportsConcurrency() &&
+              !newName.getAsyncInfo())
             return;
 
           const clang::DeclContext *clangDC =

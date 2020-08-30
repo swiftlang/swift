@@ -602,7 +602,6 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
                   SILFunctionType::ExtInfo()
                     .withRepresentation(SILFunctionType::Representation::
                                         CFunctionPointer),
-                  /*isAsync*/ false,
                   SILCoroutineKind::None,
                   ParameterConvention::Direct_Unowned,
                   SILParameterInfo(anyObjectMetaTy,
@@ -698,8 +697,7 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
             // has an overlay to fix the type of argv.
             .withRepresentation(SILFunctionType::Representation::Thin)
             .build(),
-        /*isAsync*/ false, SILCoroutineKind::None,
-        ParameterConvention::Direct_Unowned, argTypes,
+        SILCoroutineKind::None, ParameterConvention::Direct_Unowned, argTypes,
         /*yields*/ {},
         SILResultInfo(argc->getType().getASTType(), ResultConvention::Unowned),
         /*error result*/ None, SubstitutionMap(), SubstitutionMap(),

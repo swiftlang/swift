@@ -17,7 +17,10 @@
 #ifndef SWIFT_RUNTIME_PRIVATE_H
 #define SWIFT_RUNTIME_PRIVATE_H
 
+#include <functional>
+
 #include "swift/Demangling/Demangler.h"
+#include "swift/Demangling/TypeLookupError.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Metadata.h"
 
@@ -76,6 +79,8 @@ public:
 
   const Metadata *getMetadata() const { return Response.Value; }
   MetadataResponse getResponse() const { return Response; }
+
+  operator bool() const { return getMetadata(); }
 
 #define REF_STORAGE(Name, ...) \
   bool is##Name() const { return ReferenceOwnership.is##Name(); }
@@ -369,7 +374,7 @@ public:
   /// \p substWitnessTable Function that provides witness tables given a
   /// particular dependent conformance index.
   SWIFT_CC(swift)
-  TypeInfo swift_getTypeByMangledNode(
+  TypeLookupErrorOr<TypeInfo> swift_getTypeByMangledNode(
                                MetadataRequest request,
                                Demangler &demangler,
                                Demangle::NodePointer node,
@@ -384,7 +389,7 @@ public:
   /// \p substWitnessTable Function that provides witness tables given a
   /// particular dependent conformance index.
   SWIFT_CC(swift)
-  TypeInfo swift_getTypeByMangledName(
+  TypeLookupErrorOr<TypeInfo> swift_getTypeByMangledName(
                                MetadataRequest request,
                                StringRef typeName,
                                const void * const *arguments,
@@ -447,12 +452,12 @@ public:
   /// generic requirements (e.g., those that need to be
   /// passed to an instantiation function) will be added to this vector.
   ///
-  /// \returns true if an error occurred, false otherwise.
-  bool _checkGenericRequirements(
-                    llvm::ArrayRef<GenericRequirementDescriptor> requirements,
-                    llvm::SmallVectorImpl<const void *> &extraArguments,
-                    SubstGenericParameterFn substGenericParam,
-                    SubstDependentWitnessTableFn substWitnessTable);
+  /// \returns the error if an error occurred, None otherwise.
+  llvm::Optional<TypeLookupError> _checkGenericRequirements(
+      llvm::ArrayRef<GenericRequirementDescriptor> requirements,
+      llvm::SmallVectorImpl<const void *> &extraArguments,
+      SubstGenericParameterFn substGenericParam,
+      SubstDependentWitnessTableFn substWitnessTable);
 
   /// A helper function which avoids performing a store if the destination
   /// address already contains the source value.  This is useful when

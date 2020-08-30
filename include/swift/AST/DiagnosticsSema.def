@@ -112,6 +112,9 @@ ERROR(expected_argument_in_contextual_member,none,
       "member %0 expects argument of type %1", (DeclName, Type))
 ERROR(expected_parens_in_contextual_member,none,
       "member %0 is a function; did you mean to call it?", (DeclName))
+ERROR(expected_parens_in_contextual_member_type,none,
+      "member %0 is a function that produces expected type %1; did you mean to "
+      "call it?", (DeclName, Type))
 
 ERROR(expected_result_in_contextual_member,none,
       "member %0 in %2 produces result of type %1, but context expects %2",
@@ -452,6 +455,10 @@ ERROR(cannot_convert_closure_result_nil,none,
       "'nil' is not compatible with closure result type %0", (Type))
 ERROR(cannot_convert_parent_type,none,
       "cannot convert parent type %0 to expected type %1",
+      (Type, Type))
+ERROR(cannot_convert_chain_result_type,none,
+      "member chain produces result of type %0 but contextual base was "
+      "inferred as %1",
       (Type, Type))
 
 NOTE(generic_argument_mismatch,none,
@@ -1082,6 +1089,9 @@ NOTE(unwrap_with_guard,none,
 ERROR(optional_base_not_unwrapped,none,
       "value of optional type %0 must be unwrapped to refer to member %1 of "
       "wrapped base type %2", (Type, DeclNameRef, Type))
+ERROR(invalid_optional_infered_keypath_root, none,
+      "key path root inferred as optional type %0 must be unwrapped to refer to member %1 "
+      "of unwrapped type %2", (Type, DeclNameRef, Type))
 NOTE(optional_base_chain,none,
      "chain the optional using '?' to access member %0 only for non-'nil' "
      "base values", (DeclNameRef))
@@ -1089,6 +1099,12 @@ NOTE(optional_base_remove_optional_for_keypath_root, none,
      "use unwrapped type %0 as key path root", (Type))
 NOTE(optional_keypath_application_base, none,
      "use '?' to access key path subscript only for non-'nil' base values", ())
+NOTE(optional_key_path_root_base_chain, none,
+     "chain the optional using '?.' to access unwrapped type member %0",
+     (DeclNameRef))
+NOTE(optional_key_path_root_base_unwrap, none,
+     "unwrap the optional using '!.' to access unwrapped type member %0",
+     (DeclNameRef))
     
 ERROR(missing_unwrap_optional_try,none,
       "value of optional type %0 not unwrapped; did you mean to use 'try!' "

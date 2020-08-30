@@ -415,11 +415,12 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
       SILFunctionType::ExtInfoBuilder(SILFunctionTypeRepresentation::Thin,
                                       /*pseudogeneric*/ false,
                                       /*non-escaping*/ false,
+                                      /*async*/ false,
                                       DifferentiabilityKind::NonDifferentiable,
                                       /*clangFunctionType*/ nullptr)
           .build();
 
-  auto functionTy = SILFunctionType::get(sig, extInfo, /*isAsync*/ false,
+  auto functionTy = SILFunctionType::get(sig, extInfo,
                                          SILCoroutineKind::YieldOnce,
                                          ParameterConvention::Direct_Unowned,
                                          params,
@@ -482,7 +483,7 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   };
 
   CanSILFunctionType topLevelType = SILFunctionType::get(nullptr, extInfo,
-                                   /*isAsync*/ false, SILCoroutineKind::None,
+                                   SILCoroutineKind::None,
                                    ParameterConvention::Direct_Unowned,
                                    params, /*yields*/ {},
                                    SILResultInfo(Int32Ty,
@@ -1367,6 +1368,7 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   auto *f = builder.createFunction(
       SILLinkage::Private, funcName, initSILType, nullptr, SILLocation(binding),
       IsNotBare, IsNotTransparent, IsNotSerialized, IsNotDynamic);
+  f->setSpecialPurpose(SILFunction::Purpose::GlobalInitOnceFunction);
   f->setDebugScope(new (M) SILDebugScope(RegularLocation(binding), f));
   auto dc = binding->getDeclContext();
   SILGenFunction(*this, *f, dc).emitLazyGlobalInitializer(binding, pbdEntry);

@@ -62,6 +62,7 @@ namespace swift {
   class BoundGenericType;
   class ClangModuleLoader;
   class ClangNode;
+  class ClangTypeConverter;
   class ConcreteDeclRef;
   class ConstructorDecl;
   class Decl;
@@ -618,6 +619,10 @@ public:
   Type getBridgedToObjC(const DeclContext *dc, Type type,
                         Type *bridgedValueType = nullptr) const;
 
+private:
+  ClangTypeConverter &getClangTypeConverter();
+
+public:
   /// Get the Clang type corresponding to a Swift function type.
   ///
   /// \param params The function parameters.
@@ -626,6 +631,14 @@ public:
   const clang::Type *
   getClangFunctionType(ArrayRef<AnyFunctionType::Param> params, Type resultTy,
                        FunctionTypeRepresentation trueRep);
+
+  /// Get the canonical Clang type corresponding to a SIL function type.
+  ///
+  /// SIL analog of \c ASTContext::getClangFunctionType .
+  const clang::Type *
+  getCanonicalClangFunctionType(
+    ArrayRef<SILParameterInfo> params, Optional<SILResultInfo> result,
+    SILFunctionType::Representation trueRep);
 
   /// Get the Swift declaration that a Clang declaration was exported from,
   /// if applicable.

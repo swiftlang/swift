@@ -126,7 +126,7 @@ namespace {
 } // end anonymous namespace
 
 void Expr::setType(Type T) {
-  assert(!T || !T->hasTypeVariable());
+  assert(!T || !T->hasTypeVariable() || !T->hasHole());
   Ty = T;
 }
 
@@ -288,6 +288,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
     return cast<ParenExpr>(this)
                ->getSubExpr()->getReferencedDecl(stopAtParenExpr);
 
+  PASS_THROUGH_REFERENCE(UnresolvedMemberChainResult, getSubExpr);
   PASS_THROUGH_REFERENCE(DotSelf, getSubExpr);
   PASS_THROUGH_REFERENCE(Await, getSubExpr);
   PASS_THROUGH_REFERENCE(Try, getSubExpr);
@@ -606,6 +607,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
 
   case ExprKind::Paren:
   case ExprKind::DotSelf:
+  case ExprKind::UnresolvedMemberChainResult:
   case ExprKind::Tuple:
   case ExprKind::Array:
   case ExprKind::Dictionary:
@@ -1606,61 +1608,6 @@ DynamicSubscriptExpr::create(ASTContext &ctx, Expr *base, Expr *index,
                                            hasTrailingClosure, decl, implicit);
 }
 
-UnresolvedMemberExpr::UnresolvedMemberExpr(SourceLoc dotLoc,
-                                           DeclNameLoc nameLoc,
-                                           DeclNameRef name, Expr *argument,
-                                           ArrayRef<Identifier> argLabels,
-                                           ArrayRef<SourceLoc> argLabelLocs,
-                                           bool hasTrailingClosure,
-                                           bool implicit)
-  : Expr(ExprKind::UnresolvedMember, implicit),
-    DotLoc(dotLoc), NameLoc(nameLoc), Name(name), Argument(argument) {
-  Bits.UnresolvedMemberExpr.HasArguments = (argument != nullptr);
-  Bits.UnresolvedMemberExpr.NumArgLabels = argLabels.size();
-  Bits.UnresolvedMemberExpr.HasArgLabelLocs = !argLabelLocs.empty();
-  Bits.UnresolvedMemberExpr.HasTrailingClosure = hasTrailingClosure;
-  initializeCallArguments(argLabels, argLabelLocs);
-}
-
-UnresolvedMemberExpr *UnresolvedMemberExpr::create(ASTContext &ctx,
-                                                   SourceLoc dotLoc,
-                                                   DeclNameLoc nameLoc,
-                                                   DeclNameRef name,
-                                                   bool implicit) {
-  size_t size = totalSizeToAlloc({ }, { });
-
-  void *memory = ctx.Allocate(size, alignof(UnresolvedMemberExpr));
-  return new (memory) UnresolvedMemberExpr(dotLoc, nameLoc, name, nullptr,
-                                           { }, { },
-                                           /*hasTrailingClosure=*/false,
-                                           implicit);
-}
-
-UnresolvedMemberExpr *
-UnresolvedMemberExpr::create(ASTContext &ctx, SourceLoc dotLoc,
-                             DeclNameLoc nameLoc, DeclNameRef name,
-                             SourceLoc lParenLoc,
-                             ArrayRef<Expr *> args,
-                             ArrayRef<Identifier> argLabels,
-                             ArrayRef<SourceLoc> argLabelLocs,
-                             SourceLoc rParenLoc,
-                             ArrayRef<TrailingClosure> trailingClosures,
-                             bool implicit) {
-  SmallVector<Identifier, 4> argLabelsScratch;
-  SmallVector<SourceLoc, 4> argLabelLocsScratch;
-  Expr *arg = packSingleArgument(ctx, lParenLoc, args, argLabels, argLabelLocs,
-                                 rParenLoc, trailingClosures, implicit,
-                                 argLabelsScratch, argLabelLocsScratch);
-
-  size_t size = totalSizeToAlloc(argLabels, argLabelLocs);
-
-  void *memory = ctx.Allocate(size, alignof(UnresolvedMemberExpr));
-  return new (memory) UnresolvedMemberExpr(dotLoc, nameLoc, name, arg,
-                                           argLabels, argLabelLocs,
-                                           trailingClosures.size() == 1,
-                                           implicit);
-}
-
 ArrayRef<Identifier> ApplyExpr::getArgumentLabels(
     SmallVectorImpl<Identifier> &scratch) const {
   // Unary operators and 'self' applications have a single, unlabeled argument.
@@ -2001,7 +1948,7 @@ bool ClosureExpr::capturesSelfEnablingImplictSelf() const {
 }
 
 void ClosureExpr::setExplicitResultType(Type ty) {
-  assert(ty && !ty->hasTypeVariable());
+  assert(ty && !ty->hasTypeVariable() && !ty->hasHole());
   ExplicitResultTypeAndBodyState.getPointer()
       ->setType(MetatypeType::get(ty));
 }

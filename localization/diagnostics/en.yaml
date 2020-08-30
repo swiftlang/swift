@@ -2224,6 +2224,10 @@
 - id: expected_parens_in_contextual_member
   msg: "member %0 is a function; did you mean to call it?"
 
+- id: expected_parens_in_contextual_member_type
+  msg: >-
+    member %0 is a function that produces expected type %1; did you mean to call it?
+
 - id: expected_result_in_contextual_member
   msg: "member %0 in %2 produces result of type %1, but context expects %2"
 
@@ -2517,6 +2521,10 @@
 
 - id: cannot_convert_parent_type
   msg: "cannot convert parent type %0 to expected type %1"
+
+- id: cannot_convert_chain_result_type
+  msg: >-
+    member chain produces result of type %0 but contextual base was inferred as %1
 
 - id: generic_argument_mismatch
   msg: "arguments to generic parameter %0 (%1 and %2) are expected to be equal"
@@ -3136,6 +3144,9 @@
 - id: optional_base_not_unwrapped
   msg: "value of optional type %0 must be unwrapped to refer to member %1 of wrapped base type %2"
 
+- id: invalid_optional_infered_keypath_root
+  msg: "key path root inferred as optional type %0 must be unwrapped to refer to member %1 of unwrapped type %2"
+
 - id: optional_base_chain
   msg: "chain the optional using '?' to access member %0 only for non-'nil' base values"
 
@@ -3144,6 +3155,12 @@
 
 - id: optional_keypath_application_base
   msg: "use '?' to access key path subscript only for non-'nil' base values"
+
+- id: optional_key_path_root_base_chain
+  msg: "chain the optional using '?.' to access unwrapped type member %0"
+
+- id: optional_key_path_root_base_unwrap
+  msg: "unwrap the optional using '!.' to access unwrapped type member %0"
 
 - id: missing_unwrap_optional_try
   msg: "value of optional type %0 not unwrapped; did you mean to use 'try!' or chain with '?'?"

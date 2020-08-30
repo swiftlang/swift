@@ -4290,14 +4290,18 @@ public:
     if (!T->mayHaveMembers())
       return;
 
-    DeclContext *DC = const_cast<DeclContext *>(CurrDeclContext);
-
     // We can only say .foo where foo is a static member of the contextual
     // type and has the same type (or if the member is a function, then the
     // same result type) as the contextual type.
     FilteredDeclConsumer consumer(*this, [=](ValueDecl *VD,
                                              DeclVisibilityKind Reason) {
-      return isReferenceableByImplicitMemberExpr(CurrModule, DC, T, VD);
+      if (T->getOptionalObjectType() &&
+          VD->getModuleContext()->isStdlibModule()) {
+        // In optional context, ignore '.init(<some>)', 'init(nilLiteral:)',
+        if (isa<ConstructorDecl>(VD))
+          return false;
+      }
+      return true;
     });
 
     auto baseType = MetatypeType::get(T);

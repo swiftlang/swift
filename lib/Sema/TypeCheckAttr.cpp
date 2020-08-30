@@ -2904,18 +2904,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   auto nominal = evaluateOrDefault(
     Ctx.evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
 
-  // If there is no nominal type with this name, complain about this being
-  // an unknown attribute.
   if (!nominal) {
-    std::string typeName;
-    if (auto typeRepr = attr->getTypeRepr()) {
-      llvm::raw_string_ostream out(typeName);
-      typeRepr->print(out);
-    } else {
-      typeName = attr->getType().getString();
-    }
-
-    diagnose(attr->getLocation(), diag::unknown_attribute, typeName);
     attr->setInvalid();
     return;
   }

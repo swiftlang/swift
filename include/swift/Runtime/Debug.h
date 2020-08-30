@@ -21,7 +21,6 @@
 #include "swift/Runtime/Unreachable.h"
 #include <atomic>
 #include <cstdarg>
-#include <cstdio>
 #include <functional>
 #include <stdint.h>
 
@@ -247,39 +246,6 @@ std::atomic<const void *> _swift_debug_metadataAllocationBacktraceList;
 
 SWIFT_RUNTIME_STDLIB_SPI
 const void * const _swift_debug_protocolConformanceStatePointer;
-
-SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
-inline static int swift_asprintf(char **strp, const char *fmt, ...) {
-  va_list args;
-  va_start(args, fmt);
-#if defined(_WIN32)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wuninitialized"
-  int len = _vscprintf(fmt, args);
-#pragma GCC diagnostic pop
-  if (len < 0) {
-    va_end(args);
-    return -1;
-  }
-  char *buffer = static_cast<char *>(malloc(len + 1));
-  if (!buffer) {
-    va_end(args);
-    return -1;
-  }
-  int result = vsprintf(buffer, fmt, args);
-  if (result < 0) {
-    va_end(args);
-    free(buffer);
-    return -1;
-  }
-  *strp = buffer;
-#else
-  int result = vasprintf(strp, fmt, args);
-#endif
-  va_end(args);
-  return result;
-}
-
 
 // namespace swift
 }

@@ -298,11 +298,11 @@ CanSILFunctionType BridgedProperty::getOutlinedFunctionType(SILModule &M) {
   auto ExtInfo = SILFunctionType::ExtInfoBuilder(
                      SILFunctionType::Representation::Thin,
                      /*pseudogeneric*/ false, /*noescape*/ false,
-                     DifferentiabilityKind::NonDifferentiable,
+                     /*async*/ false, DifferentiabilityKind::NonDifferentiable,
                      /*clangFunctionType*/ nullptr)
                      .build();
   auto FunctionType = SILFunctionType::get(
-      nullptr, ExtInfo, /*isAsync*/ false, SILCoroutineKind::None,
+      nullptr, ExtInfo, SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned, Parameters, /*yields*/ {},
       Results, None,
       SubstitutionMap(), SubstitutionMap(),
@@ -1181,6 +1181,7 @@ CanSILFunctionType ObjCMethodCall::getOutlinedFunctionType(SILModule &M) {
       SILFunctionType::ExtInfoBuilder(SILFunctionType::Representation::Thin,
                                       /*pseudogeneric*/ false,
                                       /*noescape*/ false,
+                                      /*async*/ false,
                                       DifferentiabilityKind::NonDifferentiable,
                                       /*clangFunctionType*/ nullptr)
           .build();
@@ -1203,7 +1204,7 @@ CanSILFunctionType ObjCMethodCall::getOutlinedFunctionType(SILModule &M) {
         SILResultInfo(BridgedReturn.getReturnType(), ResultConvention::Owned));
   }
   auto FunctionType = SILFunctionType::get(
-      nullptr, ExtInfo, /*isAsync*/ false, SILCoroutineKind::None,
+      nullptr, ExtInfo, SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned, Parameters, {},
       Results, None,
       SubstitutionMap(), SubstitutionMap(),

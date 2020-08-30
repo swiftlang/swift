@@ -690,9 +690,10 @@ bool swift::scanClangDependencies(CompilerInstance &instance) {
                                   .InputsAndOutputs.getSingleOutputFilename());
 }
 
-bool swift::batchScanModuleDependencies(CompilerInvocation &invok,
-                                        CompilerInstance &instance,
+bool swift::batchScanModuleDependencies(CompilerInstance &instance,
                                         llvm::StringRef batchInputFile) {
+  const CompilerInvocation &invok = instance.getInvocation();
+
   (void)instance.getMainModule();
   llvm::BumpPtrAllocator alloc;
   llvm::StringSaver saver(alloc);
