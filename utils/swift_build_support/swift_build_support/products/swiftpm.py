@@ -97,16 +97,23 @@ class SwiftPM(product.Product):
     def should_install(self, host_target):
         return self.args.install_swiftpm
 
+    @classmethod
     def has_cross_compile_hosts(self):
         return self.args.cross_compile_hosts
 
+    @classmethod
+    def get_install_destdir(self, args, host_target, build_dir):
+        install_destdir = args.install_destdir
+        if self.has_cross_compile_hosts(args):
+            build_root = os.path.dirname(build_dir)
+            install_destdir = '%s/intermediate-install/%s/' % (build_root, host_target)
+        return install_destdir
+
     def install(self, host_target):
-        if self.has_cross_compile_hosts():
-            build_root = os.path.dirname(self.build_dir)
-            install_prefix = ('%s/intermediate-install/%s/%s'
-                              % (build_root, host_target, self.args.install_prefix))
-        else:
-            install_prefix = self.args.install_destdir + self.args.install_prefix
+        install_destdir = self.get_install_destdir(self.args,
+                                                   host_target,
+                                                   self.build_dir)
+        install_prefix = install_destdir + self.args.install_prefix
 
         self.run_bootstrap_script('install', host_target, [
             '--prefix', install_prefix
