@@ -1175,6 +1175,11 @@ public:
   ParserResult<TypeRepr> parseType(Diag<> MessageID,
                                    bool HandleCodeCompletion = true,
                                    bool IsSILFuncDecl = false);
+  
+  ParserResult<TypeRepr>
+    parseTypeNotAllowingFunctionType(Diag<> MessageID,
+                                     bool HandleCodeCompletion = true,
+                                     bool IsSILFuncDecl = false);
 
   ParserResult<TypeRepr>
     parseTypeSimpleOrComposition(Diag<> MessageID,
@@ -1377,6 +1382,8 @@ public:
   void parseAsyncThrows(
       SourceLoc existingArrowLoc, SourceLoc &asyncLoc, SourceLoc &throwsLoc, TypeRepr *&throwsType,
       bool *rethrows);
+  
+  ParserResult<TypeRepr> parseThrowsType();
 
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
