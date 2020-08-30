@@ -30,6 +30,9 @@ ninja -v install
 if [[ "$(uname)" == "Darwin" ]]; then
   mv $DESTINATION_TOOLCHAIN/usr/lib/swift_static/CoreFoundation \
     $DESTINATION_TOOLCHAIN/usr/lib/swift/wasi/wasm32/CoreFoundation
+else
+  mv $DESTINATION_TOOLCHAIN/usr/lib/swift_static/CoreFoundation \
+    $DESTINATION_TOOLCHAIN/usr/lib/swift/CoreFoundation
 fi
 
 # .swiftdoc and .swiftmodule files should live in `swift`, not in `swift_static`
