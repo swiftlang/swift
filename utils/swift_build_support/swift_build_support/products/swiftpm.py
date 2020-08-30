@@ -40,7 +40,7 @@ class SwiftPM(product.Product):
     def run_bootstrap_script(self, action, host_target, additional_params=[]):
         script_path = os.path.join(
             self.source_dir, 'Utilities', 'bootstrap')
-        toolchain_path = self.install_toolchain_path()
+        toolchain_path = self.install_toolchain_path(host_target)
         swiftc = os.path.join(toolchain_path, "bin", "swiftc")
 
         # FIXME: We require llbuild build directory in order to build. Is
