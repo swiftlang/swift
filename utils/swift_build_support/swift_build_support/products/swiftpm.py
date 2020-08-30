@@ -98,8 +98,8 @@ class SwiftPM(product.Product):
         return self.args.install_swiftpm
 
     @classmethod
-    def has_cross_compile_hosts(self):
-        return self.args.cross_compile_hosts
+    def has_cross_compile_hosts(self, args):
+        return args.cross_compile_hosts
 
     @classmethod
     def get_install_destdir(self, args, host_target, build_dir):
