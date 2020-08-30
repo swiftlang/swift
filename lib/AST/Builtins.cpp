@@ -1781,7 +1781,7 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::Vector: {
     Type eltType = decodeImmediate();
     if (!eltType) return Type();
-    return makeVector(eltType, D.Vector_Width.Min);
+    return makeVector(eltType, D.Vector_Width.getKnownMinValue());
   }
 
   // A pointer to an immediate type.
