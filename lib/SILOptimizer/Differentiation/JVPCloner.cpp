@@ -739,6 +739,7 @@ public:
                                "with the returned differential type");
     }
 
+    // Destroy and deallocate local allocations.
     for (auto alloc : differentialLocalAllocations) {
       // Assert that local allocations have at least one use.
       // Buffers should not be allocated needlessly.
@@ -750,6 +751,7 @@ public:
       }
       differentialBuilder.createDeallocStack(loc, alloc);
     }
+    // Emit zero into uninitialized indirect results.
     for (auto &diffIndResult : getDifferential().getIndirectResults()) {
       auto &initializationInfo = tangentBufferInitializationInfo[diffIndResult];
       if (initializationInfo == NotInitialized) {
