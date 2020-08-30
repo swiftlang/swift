@@ -377,44 +377,6 @@ bool SemanticARCOptVisitor::processWorklist() {
 }
 
 //===----------------------------------------------------------------------===//
-//                     Redundant Borrow Scope Elimination
-//===----------------------------------------------------------------------===//
-
-bool SemanticARCOptVisitor::visitBeginBorrowInst(BeginBorrowInst *bbi) {
-  auto kind = bbi->getOperand().getOwnershipKind();
-  SmallVector<EndBorrowInst *, 16> endBorrows;
-  for (auto *op : bbi->getUses()) {
-    if (!op->isConsumingUse()) {
-      // Make sure that this operand can accept our arguments kind.
-      auto map = op->getOwnershipKindMap();
-      if (map.canAcceptKind(kind))
-        continue;
-      return false;
-    }
-
-    // Otherwise, this borrow is being consumed. See if our consuming inst is an
-    // end_borrow. If it isn't, then return false, this scope is
-    // needed. Otherwise, add the end_borrow to our list of end borrows.
-    auto *ebi = dyn_cast<EndBorrowInst>(op->getUser());
-    if (!ebi) {
-      return false;
-    }
-    endBorrows.push_back(ebi);
-  }
-
-  // At this point, we know that the begin_borrow's operand can be
-  // used as an argument to all non-end borrow uses. Eliminate the
-  // begin borrow and end borrows.
-  while (!endBorrows.empty()) {
-    auto *ebi = endBorrows.pop_back_val();
-    eraseInstruction(ebi);
-  }
-
-  eraseAndRAUWSingleValueInstruction(bbi, bbi->getOperand());
-  return true;
-}
-
-//===----------------------------------------------------------------------===//
 //                    CopyValue Optimizations Elimination
 //===----------------------------------------------------------------------===//
 
