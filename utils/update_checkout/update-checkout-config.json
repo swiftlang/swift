@@ -62,7 +62,7 @@
                 "llbuild": "master",
                 "swift-tools-support-core": "master",
                 "swiftpm": "swiftwasm",
-                "swift-argument-parser": "0.0.6",
+                "swift-argument-parser": "0.3.0",
                 "swift-driver": "master",
                 "swift-syntax": "master",
                 "swift-stress-tester": "master",
