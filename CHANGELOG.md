@@ -38,10 +38,10 @@ Swift Next
   let milkyChance: UIColor? = .init(named: "white")?.withAlphaComponent(0.5)
   ```
   
-  As is the case with the existing implicit member expression, resulting type of the chain must be the same as the (implicit) base, so it is not well-formed to write:
+  As is the case with the existing implicit member expression syntax, the resulting type of the chain must be the same as the (implicit) base, so it is not well-formed to write:
   
   ```swift
-  let cgMilky: UIColor = .white.withAlphaComponent(0.5).cgColor
+  let cgMilky: CGColor = .white.withAlphaComponent(0.5).cgColor
   ```
   
   (Unless, of course, appropriate `white` and `withAlphaComponent` members were defined on `CGColor`.)
