@@ -56,7 +56,11 @@ using StaticInfixWitness = SWIFT_CC(swift) bool(OpaqueValue *, OpaqueValue *,
 // MachO doesn't support @GOT like relocations for 32 bit x86.
 #define INDIRECT_RELREF_GOTPCREL(SYMBOL) "L" SYMBOL "$non_lazy_ptr - . + 1"
 #endif
+#endif
 
+// Windows native indirect symbol references.
+#if defined(_WIN32)
+#define INDIRECT_RELREF_GOTPCREL(SYMBOL) "__imp_" SYMBOL " - . + 1"
 #endif
 
 //===----------------------------------------------------------------------===//
@@ -97,6 +101,10 @@ __asm(
   #elif defined(__MACH__)
   "  .zerofill __DATA, __bss, __swift_tupleEquatable_private, 128, 4\n"
   "  .section __TEXT, __const\n"
+  #elif defined(_WIN32)
+  "  .lcomm __swift_tupleEquatable_private, 128, 16\n"
+  "  .section .rdata, \"dr\"\n"
+  #pragma comment(linker, "/EXPORT:_swift_tupleEquatable_conf,DATA")
   #endif
   "  .globl " TUPLE_EQUATABLE_CONF "\n"
   "  .p2align 2\n"
@@ -135,7 +143,7 @@ __asm(
   #endif
 );
 
-extern const ProtocolConformanceDescriptor _swift_tupleEquatable_conf;
+extern "C" const ProtocolConformanceDescriptor _swift_tupleEquatable_conf;
 
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 bool swift::_swift_tupleEquatable_equals(OpaqueValue *tuple1,
@@ -225,6 +233,9 @@ __asm(
   "  .section __TEXT, __swift5_typeref\n"
   "  .globl \"" TUPLE_COMPARABLE_ASSOCIATEDCONFORMANCE "\"\n"
   "  .weak_definition \"" TUPLE_COMPARABLE_ASSOCIATEDCONFORMANCE "\"\n"
+  #elif defined(_WIN32)
+  "  .section .sw5tyrf$B, \"dr\", discard, \"" TUPLE_COMPARABLE_ASSOCIATEDCONFORMANCE "\"\n"
+  "  .globl \"" TUPLE_COMPARABLE_ASSOCIATEDCONFORMANCE "\"\n"
   #endif
   "  .p2align 1\n"
   "\"" TUPLE_COMPARABLE_ASSOCIATEDCONFORMANCE "\":\n"
@@ -253,6 +264,10 @@ __asm(
   #elif defined(__MACH__)
   "  .zerofill __DATA, __bss, __swift_tupleComparable_private, 128, 4\n"
   "  .section __TEXT, __const\n"
+  #elif defined(_WIN32)
+  "  .lcomm __swift_tupleComparable_private, 128, 16\n"
+  "  .section .rdata, \"dr\"\n"
+  #pragma comment(linker, "/EXPORT:_swift_tupleComparable_conf,DATA")
   #endif
   "  .globl " TUPLE_COMPARABLE_CONF "\n"
   "  .p2align 2\n"
@@ -615,6 +630,10 @@ __asm(
   #elif defined(__MACH__)
   "  .zerofill __DATA, __bss, __swift_tupleHashable_private, 128, 4\n"
   "  .section __TEXT, __const\n"
+  #elif defined(_WIN32)
+  "  .lcomm __swift_tupleHashable_private, 128, 16\n"
+  "  .section .rdata, \"dr\"\n"
+  #pragma comment(linker, "/EXPORT:_swift_tupleHashable_conf,DATA")
   #endif
   "  .globl " TUPLE_HASHABLE_CONF "\n"
   "  .p2align 2\n"

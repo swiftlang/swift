@@ -1,8 +1,8 @@
 // RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
 
-// CHECK-LABEL: @_swift_tupleEquatable_conf = external global %swift.protocol_conformance_descriptor
-// CHECK-LABEL: @_swift_tupleComparable_conf = external global %swift.protocol_conformance_descriptor
-// CHECK-LABEL: @_swift_tupleHashable_conf = external global %swift.protocol_conformance_descriptor
+// CHECK-LABEL: @_swift_tupleEquatable_conf = external{{( dllimport)?}} global %swift.protocol_conformance_descriptor
+// CHECK-LABEL: @_swift_tupleComparable_conf = external{{( dllimport)?}} global %swift.protocol_conformance_descriptor
+// CHECK-LABEL: @_swift_tupleHashable_conf = external{{( dllimport)?}} global %swift.protocol_conformance_descriptor
 
 struct Wrapper<T> {
   let value: T

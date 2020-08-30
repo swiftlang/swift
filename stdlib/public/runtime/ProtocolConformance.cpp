@@ -376,9 +376,9 @@ searchInConformanceCache(const Metadata *type,
   return {false, nullptr};
 }
 
-extern const ProtocolDescriptor EQUATABLE_DESCRIPTOR;
-extern const ProtocolDescriptor COMPARABLE_DESCRIPTOR;
-extern const ProtocolDescriptor HASHABLE_DESCRIPTOR;
+extern "C" const ProtocolDescriptor EQUATABLE_DESCRIPTOR;
+extern "C" const ProtocolDescriptor COMPARABLE_DESCRIPTOR;
+extern "C" const ProtocolDescriptor HASHABLE_DESCRIPTOR;
 
 static bool tupleConformsToProtocol(const Metadata *type,
                                     const ProtocolDescriptor *protocol) {
@@ -401,9 +401,9 @@ static bool tupleConformsToProtocol(const Metadata *type,
   return true;
 }
 
-extern const ProtocolConformanceDescriptor _swift_tupleEquatable_conf;
-extern const ProtocolConformanceDescriptor _swift_tupleComparable_conf;
-extern const ProtocolConformanceDescriptor _swift_tupleHashable_conf;
+extern "C" const ProtocolConformanceDescriptor _swift_tupleEquatable_conf;
+extern "C" const ProtocolConformanceDescriptor _swift_tupleComparable_conf;
+extern "C" const ProtocolConformanceDescriptor _swift_tupleHashable_conf;
 
 static const ProtocolConformanceDescriptor *getTupleConformanceDescriptor(
                                            const ProtocolDescriptor *protocol) {
