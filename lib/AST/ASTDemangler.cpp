@@ -200,21 +200,16 @@ createSubstitutionMapFromGenericArgs(GenericSignature genericSig,
   if (!genericSig)
     return SubstitutionMap();
   
-  SmallVector<GenericTypeParamType *, 4> genericParams;
-  genericSig->forEachParam([&](GenericTypeParamType *gp, bool canonical) {
-    if (canonical)
-      genericParams.push_back(gp);
-  });
-  if (genericParams.size() != args.size())
+  if (genericSig->getGenericParams().size() != args.size())
     return SubstitutionMap();
 
   return SubstitutionMap::get(
       genericSig,
       [&](SubstitutableType *t) -> Type {
-        for (unsigned i = 0, e = genericParams.size(); i < e; ++i) {
-          if (t->isEqual(genericParams[i]))
-            return args[i];
-        }
+        auto *gp = cast<GenericTypeParamType>(t);
+        unsigned ordinal = genericSig->getGenericParamOrdinal(gp);
+        if (ordinal < args.size())
+          return args[ordinal];
         return Type();
       },
       LookUpConformanceInModule(moduleDecl));
