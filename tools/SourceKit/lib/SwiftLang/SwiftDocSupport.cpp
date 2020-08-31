@@ -40,10 +40,6 @@ using namespace SourceKit;
 using namespace swift;
 using namespace ide;
 
-static ModuleDecl *getModuleByFullName(ASTContext &Ctx, Identifier ModuleName) {
-  return Ctx.getModule(ImportPath::Module::Builder(ModuleName).get());
-}
-
 namespace {
 struct TextRange {
   unsigned Offset;
@@ -1012,7 +1008,7 @@ static void reportSourceAnnotations(const SourceTextInfo &IFaceInfo,
 static bool getModuleInterfaceInfo(ASTContext &Ctx, StringRef ModuleName,
                                    SourceTextInfo &Info) {
   // Load standard library so that Clang importer can use it.
-  auto *Stdlib = getModuleByFullName(Ctx, Ctx.StdlibModuleName);
+  auto *Stdlib = Ctx.getModuleByIdentifier(Ctx.StdlibModuleName);
   if (!Stdlib)
     return true;
 
@@ -1539,7 +1535,7 @@ findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
 
   // Load standard library so that Clang importer can use it.
   ASTContext &Ctx = CI.getASTContext();
-  auto *Stdlib = getModuleByFullName(Ctx, Ctx.StdlibModuleName);
+  auto *Stdlib = Ctx.getModuleByIdentifier(Ctx.StdlibModuleName);
   if (!Stdlib) {
     Error = "Cannot load stdlib.";
     Receiver(RequestResult<ArrayRef<StringRef>>::fromError(Error));

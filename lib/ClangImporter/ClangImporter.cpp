@@ -3414,8 +3414,7 @@ ModuleDecl *ClangModuleUnit::getOverlayModule() const {
     // FIXME: Include proper source location.
     ModuleDecl *M = getParentModule();
     ASTContext &Ctx = M->getASTContext();
-    auto overlay = Ctx.getModule(
-                       ImportPath::Module::Builder(M->getName()).get());
+    auto overlay = Ctx.getModuleByIdentifier(M->getName());
     if (overlay == M) {
       overlay = nullptr;
     } else {

@@ -1921,15 +1921,18 @@ ModuleDecl *ASTContext::getModuleByName(StringRef ModuleName) {
   return getModule(builder.get());
 }
 
+ModuleDecl *ASTContext::getModuleByIdentifier(Identifier ModuleID) {
+  ImportPath::Module::Builder builder(ModuleID);
+  return getModule(builder.get());
+}
+
 ModuleDecl *ASTContext::getStdlibModule(bool loadIfAbsent) {
   if (TheStdlibModule)
     return TheStdlibModule;
 
   if (loadIfAbsent) {
     auto mutableThis = const_cast<ASTContext*>(this);
-    TheStdlibModule =
-      mutableThis->getModule(
-                           ImportPath::Module::Builder(StdlibModuleName).get());
+    TheStdlibModule = mutableThis->getModuleByIdentifier(StdlibModuleName);
   } else {
     TheStdlibModule = getLoadedModule(StdlibModuleName);
   }

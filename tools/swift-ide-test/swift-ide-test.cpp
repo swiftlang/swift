@@ -2118,8 +2118,7 @@ static ModuleDecl *getModuleByFullName(ASTContext &Context, StringRef ModuleName
 }
 
 static ModuleDecl *getModuleByFullName(ASTContext &Context, Identifier ModuleName) {
-  ModuleDecl *Result = Context.getModule(
-                             ImportPath::Module::Builder(ModuleName).get());
+  ModuleDecl *Result = Context.getModuleByIdentifier(ModuleName);
   if (!Result || Result->failedToLoad())
     return nullptr;
   return Result;

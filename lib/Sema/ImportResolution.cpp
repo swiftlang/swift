@@ -447,8 +447,7 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
 
   // Add any modules we were asked to implicitly import.
   for (auto moduleName : importInfo.ModuleNames) {
-    auto *importModule = ctx.getModule(
-        ImportPath::Module::Builder(moduleName).get());
+    auto *importModule = ctx.getModuleByIdentifier(moduleName);
     if (!importModule) {
       ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import, moduleName.str());
       if (ctx.SearchPathOpts.SDKPath.empty() &&

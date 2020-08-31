@@ -91,10 +91,6 @@ typedef SwiftInterfaceGenContext::Implementation::TextReference TextReference;
 typedef SwiftInterfaceGenContext::Implementation::TextDecl TextDecl;
 typedef SwiftInterfaceGenContext::Implementation::SourceTextInfo SourceTextInfo;
 
-static ModuleDecl *getModuleByFullName(ASTContext &Ctx, Identifier ModuleName) {
-  return Ctx.getModule(ImportPath::Module::Builder(ModuleName).get());
-}
-
 namespace {
 class AnnotatingPrinter : public StreamPrinter {
   SourceTextInfo &Info;
@@ -383,7 +379,7 @@ SwiftInterfaceGenContext::create(StringRef DocumentName,
   CloseClangModuleFiles scopedCloseFiles(*Ctx.getClangModuleLoader());
 
   // Load standard library so that Clang importer can use it.
-  auto *Stdlib = getModuleByFullName(Ctx, Ctx.StdlibModuleName);
+  auto *Stdlib = Ctx.getModuleByIdentifier(Ctx.StdlibModuleName);
   if (!Stdlib) {
     ErrMsg = "Could not load the stdlib module";
     return nullptr;
@@ -443,7 +439,7 @@ SwiftInterfaceGenContext::createForTypeInterface(CompilerInvocation Invocation,
   CloseClangModuleFiles scopedCloseFiles(*Ctx.getClangModuleLoader());
 
   // Load standard library so that Clang importer can use it.
-  auto *Stdlib = getModuleByFullName(Ctx, Ctx.StdlibModuleName);
+  auto *Stdlib = Ctx.getModuleByIdentifier(Ctx.StdlibModuleName);
   if (!Stdlib) {
     ErrorMsg = "Could not load the stdlib module";
     return nullptr;
