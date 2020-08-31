@@ -187,24 +187,17 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc) {
       continue;
     }
 
-    StringRef modulePathStr = dependency.Core.RawPath;
-    StringRef scopePath;
-    if (dependency.isScoped()) {
-      auto splitPoint = modulePathStr.find_last_of('\0');
-      assert(splitPoint != StringRef::npos);
-      scopePath = modulePathStr.substr(splitPoint+1);
-      modulePathStr = modulePathStr.slice(0, splitPoint);
+    ImportPath::Builder builder(ctx, dependency.Core.RawPath,
+                                /*separator=*/'\0');
+    for (const auto &elem : builder) {
+      assert(!elem.Item.empty() && "invalid import path name");
     }
 
-    // TODO: Further simplification is possible by unifying scopePath above with
-    // this.
-    ImportPath::Module::Builder modulePath(ctx, modulePathStr,
-                                           /*separator=*/'\0');
-    for (const auto &elem : modulePath) {
-      assert(!elem.Item.empty() &&
-             "invalid module name (submodules not yet supported)");
-    }
-    auto module = getModule(modulePath.get(), /*allowLoading*/true);
+    auto importPath = builder.copyTo(ctx);
+    auto modulePath = importPath.getModulePath(dependency.isScoped());
+    auto accessPath = importPath.getAccessPath(dependency.isScoped());
+
+    auto module = getModule(modulePath, /*allowLoading*/true);
     if (!module || module->failedToLoad()) {
       // If we're missing the module we're an overlay for, treat that specially.
       if (modulePath.size() == 1 &&
@@ -219,16 +212,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc) {
       continue;
     }
 
-    if (scopePath.empty()) {
-      dependency.Import =
-          ModuleDecl::ImportedModule{ImportPath::Access(), module};
-    } else {
-      auto scopeID = ctx.getIdentifier(scopePath);
-      assert(!scopeID.empty() &&
-             "invalid decl name (non-top-level decls not supported)");
-      dependency.Import = ModuleDecl::ImportedModule{
-          ImportPath::Access::Builder(scopeID).copyTo(ctx), module};
-    }
+    dependency.Import = ModuleDecl::ImportedModule{accessPath, module};
 
     // SPI
     StringRef spisStr = dependency.Core.RawSPIs;
