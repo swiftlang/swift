@@ -802,8 +802,6 @@ ParserResult<Expr> Parser::parseExprSelector() {
     parseExpr(selectorKind == ObjCSelectorExpr::Method
                 ? diag::expr_selector_expected_method_expr
                 : diag::expr_selector_expected_property_expr);
-  if (subExpr.hasCodeCompletion())
-    return makeParserCodeCompletionResult<Expr>();
 
   // Parse the closing ')'.
   SourceLoc rParenLoc;
@@ -819,7 +817,7 @@ ParserResult<Expr> Parser::parseExprSelector() {
   }
 
   // If the subexpression was in error, just propagate the error.
-  if (subExpr.isParseError())
+  if (subExpr.isParseError() && !subExpr.hasCodeCompletion())
     return makeParserResult<Expr>(
       new (Context) ErrorExpr(SourceRange(keywordLoc, rParenLoc)));
 

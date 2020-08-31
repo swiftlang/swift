@@ -1857,6 +1857,7 @@ SwiftNameLookupExtension::hashExtension(llvm::hash_code code) const {
                             SWIFT_LOOKUP_TABLE_VERSION_MAJOR,
                             SWIFT_LOOKUP_TABLE_VERSION_MINOR,
                             inferImportAsMember,
+                            swiftCtx.LangOpts.EnableExperimentalConcurrency,
                             version::getSwiftFullVersion());
 }
 

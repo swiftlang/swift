@@ -101,6 +101,11 @@ void swift::ide::typeCheckContextAt(DeclContext *DC, SourceLoc Loc) {
             typeCheckPatternBinding(PBD, i);
         }
       }
+    } else if (auto *defaultArg = dyn_cast<DefaultArgumentInitializer>(DC)) {
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(defaultArg->getParent())) {
+        auto *Param = AFD->getParameters()->get(defaultArg->getIndex());
+        (void)Param->getTypeCheckedDefaultExpr();
+      }
     }
     break;
 

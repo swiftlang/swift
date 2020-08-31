@@ -400,27 +400,33 @@ getFieldAt(const Metadata *base, unsigned index) {
   auto typeName = field.getMangledTypeName();
 
   SubstGenericParametersFromMetadata substitutions(base);
-  auto typeInfo = swift_getTypeByMangledName(MetadataState::Complete,
-   typeName,
-   substitutions.getGenericArgs(),
-   [&substitutions](unsigned depth, unsigned index) {
-     return substitutions.getMetadata(depth, index);
-   },
-   [&substitutions](const Metadata *type, unsigned index) {
-     return substitutions.getWitnessTable(type, index);
-   });
+  auto result = swift_getTypeByMangledName(
+      MetadataState::Complete, typeName, substitutions.getGenericArgs(),
+      [&substitutions](unsigned depth, unsigned index) {
+        return substitutions.getMetadata(depth, index);
+      },
+      [&substitutions](const Metadata *type, unsigned index) {
+        return substitutions.getWitnessTable(type, index);
+      });
 
   // If demangling the type failed, pretend it's an empty type instead with
   // a log message.
-  if (!typeInfo.getMetadata()) {
+  TypeInfo typeInfo;
+  if (result.isError()) {
     typeInfo = TypeInfo({&METADATA_SYM(EMPTY_TUPLE_MANGLING),
                          MetadataState::Complete}, {});
+
+    auto *error = result.getError();
+    char *str = error->copyErrorString();
     missing_reflection_metadata_warning(
-      "warning: the Swift runtime was unable to demangle the type "
-      "of field '%*s'. the mangled type name is '%*s'. this field will "
-      "show up as an empty tuple in Mirrors\n",
-      (int)name.size(), name.data(),
-      (int)typeName.size(), typeName.data());
+        "warning: the Swift runtime was unable to demangle the type "
+        "of field '%*s'. the mangled type name is '%*s': %s. this field will "
+        "show up as an empty tuple in Mirrors\n",
+        (int)name.size(), name.data(), (int)typeName.size(), typeName.data(),
+        str);
+    error->freeErrorString(str);
+  } else {
+    typeInfo = result.getType();
   }
 
   auto fieldType = FieldType(typeInfo.getMetadata());
