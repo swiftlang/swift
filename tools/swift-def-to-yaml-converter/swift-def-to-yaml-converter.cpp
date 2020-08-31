@@ -53,6 +53,11 @@ static llvm::cl::opt<std::string>
                     llvm::cl::desc("Directory for the output file"),
                     llvm::cl::cat(Category));
 
+static llvm::cl::opt<std::string>
+    OutputFilename("output-filename",
+                   llvm::cl::desc("Filename for the output file"),
+                   llvm::cl::cat(Category));
+
 } // namespace options
 
 int main(int argc, char *argv[]) {
@@ -62,18 +67,25 @@ int main(int argc, char *argv[]) {
   llvm::cl::ParseCommandLineOptions(argc, argv,
                                     "Swift `.def` to YAML Converter\n");
 
-  // The default language for localization is English
-  std::string defaultLocaleCode = "en";
-  llvm::SmallString<128> LocalizedFilePath(options::OutputDirectory);
-  llvm::sys::path::append(LocalizedFilePath, defaultLocaleCode);
-  llvm::sys::path::replace_extension(LocalizedFilePath, ".yaml");
+  llvm::SmallString<128> LocalizedFilePath;
+  if (options::OutputFilename.empty()) {
+    // The default language for localization is English
+    std::string defaultLocaleCode = "en";
+    LocalizedFilePath = options::OutputDirectory;
+    llvm::sys::path::append(LocalizedFilePath, defaultLocaleCode);
+    llvm::sys::path::replace_extension(LocalizedFilePath, ".yaml");
+  } else {
+    LocalizedFilePath = options::OutputFilename;
+  }
 
   std::error_code error;
   llvm::raw_fd_ostream OS(LocalizedFilePath.str(), error,
                           llvm::sys::fs::F_None);
 
   if (OS.has_error() || error) {
-    llvm::errs() << LocalizedFilePath.str() << " does not exist\n";
+    llvm::errs() << "Error has occurred while trying to write to "
+                 << LocalizedFilePath.str()
+                 << " with error code: " << error.message() << "\n";
     return EXIT_FAILURE;
   }
 
