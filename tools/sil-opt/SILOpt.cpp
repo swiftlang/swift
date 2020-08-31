@@ -403,7 +403,6 @@ int main(int argc, char **argv) {
   }
 
   SILOpts.EnableSpeculativeDevirtualization = EnableSpeculativeDevirtualization;
-  printf("%d\n", (bool)IgnoreAlwaysInline);
   SILOpts.IgnoreAlwaysInline = IgnoreAlwaysInline;
 
   serialization::ExtendedValidationInfo extendedInfo;
