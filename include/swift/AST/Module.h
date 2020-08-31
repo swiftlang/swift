@@ -203,8 +203,6 @@ class ModuleDecl : public DeclContext, public TypeDecl {
   friend class DirectPrecedenceGroupLookupRequest;
 
 public:
-  LLVM_ATTRIBUTE_DEPRECATED(typedef ArrayRef<Located<Identifier>> AccessPathTy,
-                            "use ImportPath types instead");
   /// Convenience struct to keep track of a module along with its access path.
   struct alignas(uint64_t) ImportedModule {
     /// The access path from an import: `import Foo.Bar` -> `Foo.Bar`.
@@ -225,16 +223,6 @@ public:
              (this->accessPath == other.accessPath);
     }
   };
-
-  LLVM_ATTRIBUTE_DEPRECATED(
-    static bool matchesAccessPath(AccessPathTy AccessPath, DeclName Name),
-    "use ImportPath::Access::matches() instead")
-  {
-    assert(AccessPath.size() <= 1 && "can only refer to top-level decls");
-  
-    return AccessPath.empty()
-      || DeclName(AccessPath.front().Item).matchesRef(Name);
-  }
 
   /// Arbitrarily orders ImportedModule records, for inclusion in sets and such.
   class OrderImportedModules {
@@ -756,14 +744,6 @@ public:
   /// Generate the list of libraries needed to link this module, based on its
   /// imports.
   void collectLinkLibraries(LinkLibraryCallback callback) const;
-
-  /// Returns true if the two access paths contain the same chain of
-  /// identifiers.
-  ///
-  /// Source locations are ignored here.
-  LLVM_ATTRIBUTE_DEPRECATED(
-    static bool isSameAccessPath(AccessPathTy lhs, AccessPathTy rhs),
-    "use ImportPath::Access::isSameAs() instead");
 
   /// Get the path for the file that this module came from, or an empty
   /// string if this is not applicable.

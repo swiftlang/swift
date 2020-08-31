@@ -1221,17 +1221,6 @@ void ModuleDecl::getImportedModulesForLookup(
   FORWARD(getImportedModulesForLookup, (modules));
 }
 
-bool ModuleDecl::isSameAccessPath(AccessPathTy lhs, AccessPathTy rhs) {
-  using AccessPathElem = Located<Identifier>;
-  if (lhs.size() != rhs.size())
-    return false;
-  return std::equal(lhs.begin(), lhs.end(), rhs.begin(),
-                    [](const AccessPathElem &lElem,
-                       const AccessPathElem &rElem) {
-    return lElem.Item == rElem.Item;
-  });
-}
-
 ModuleDecl::ReverseFullNameIterator::ReverseFullNameIterator(
     const ModuleDecl *M) {
   assert(M);

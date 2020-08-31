@@ -1464,11 +1464,7 @@ class ImportDecl final : public Decl,
     private llvm::TrailingObjects<ImportDecl, ImportPath::Element> {
   friend TrailingObjects;
   friend class Decl;
-public:
-  LLVM_ATTRIBUTE_DEPRECATED(typedef ImportPath::Element AccessPathElement,
-                            "use ImportPath::Element instead");
 
-private:
   SourceLoc ImportLoc;
   SourceLoc KindLoc;
 
@@ -1505,10 +1501,6 @@ public:
     return ImportPath({ getTrailingObjects<ImportPath::Element>(),
                         static_cast<size_t>(Bits.ImportDecl.NumPathElements) });
   }
-
-  LLVM_ATTRIBUTE_DEPRECATED(
-    ArrayRef<ImportPath::Element> getFullAccessPath() const,
-    "use getImportPath() instead") { return getImportPath().getRaw(); }
 
   ImportPath::Module getModulePath() const {
     return getImportPath().getModulePath(getImportKind());
