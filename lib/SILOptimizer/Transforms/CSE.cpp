@@ -834,6 +834,14 @@ static bool isLazyPropertyGetter(ApplyInst *ai) {
       !callee->isLazyPropertyGetter())
     return false;
 
+  // Only handle classes, but not structs.
+  // Lazy property getters of structs have an indirect inout self parameter.
+  // We don't know if the whole struct is overwritten between two getter calls.
+  // In such a case, the lazy property could be reset to an Optional.none.
+  // TODO: We could check this case with AliasAnalysis.
+  if (ai->getArgument(0)->getType().isAddress())
+    return false;
+
   // Check if the first block has a switch_enum of an Optional.
   // We don't handle getters of generic types, which have a switch_enum_addr.
   // This will be obsolete with opaque values anyway.

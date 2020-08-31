@@ -1312,3 +1312,53 @@ bb0(%0 : $@thick SpecialEnum.Type):
   %4 = struct $Bool (%3 : $Builtin.Int1)
   return %4 : $Bool
 }
+
+struct StructWithLazyProperty {
+  var lazyProperty: Int64 { mutating get set }
+  @_hasStorage @_hasInitialValue var lazyPropertyStorage : Int64? { get set }
+}
+
+sil private [lazy_getter] [noinline] @lazy_getter : $@convention(method) (@inout StructWithLazyProperty) -> Int64 {
+bb0(%0 : $*StructWithLazyProperty):
+  %2 = struct_element_addr %0 : $*StructWithLazyProperty, #StructWithLazyProperty.lazyPropertyStorage 
+  %3 = load %2 : $*Optional<Int64>
+  switch_enum %3 : $Optional<Int64>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%5 : $Int64):
+  br bb3(%5 : $Int64)
+
+bb2:
+  %9 = integer_literal $Builtin.Int64, 27
+  %10 = struct $Int64 (%9 : $Builtin.Int64)
+  %12 = enum $Optional<Int64>, #Optional.some!enumelt, %10 : $Int64
+  store %12 to %2 : $*Optional<Int64>
+  br bb3(%10 : $Int64)
+
+bb3(%15 : $Int64):
+  return %15 : $Int64
+}
+
+sil @take_int : $@convention(thin) (Int64) -> ()
+
+// CHECK-LABEL: sil @dont_cse_lazy_property_of_overwritten_struct : $@convention(thin) () -> () {
+// CHECK:   [[GETTER:%[0-9]+]] = function_ref @lazy_getter
+// CHECK:   apply [[GETTER]]
+// CHECK:   apply [[GETTER]]
+// CHECK: } // end sil function 'dont_cse_lazy_property_of_overwritten_struct'
+sil @dont_cse_lazy_property_of_overwritten_struct : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $StructWithLazyProperty
+  %4 = enum $Optional<Int64>, #Optional.none!enumelt
+  %5 = struct $StructWithLazyProperty (%4 : $Optional<Int64>)
+  store %5 to %0 : $*StructWithLazyProperty
+  %7 = function_ref @lazy_getter : $@convention(method) (@inout StructWithLazyProperty) -> Int64
+  %8 = apply %7(%0) : $@convention(method) (@inout StructWithLazyProperty) -> Int64
+  %9 = function_ref @take_int : $@convention(thin) (Int64) -> ()
+  %10 = apply %9(%8) : $@convention(thin) (Int64) -> ()
+  store %5 to %0 : $*StructWithLazyProperty
+  %18 = apply %7(%0) : $@convention(method) (@inout StructWithLazyProperty) -> Int64
+  %20 = apply %9(%18) : $@convention(thin) (Int64) -> ()
+  dealloc_stack %0 : $*StructWithLazyProperty
+  %22 = tuple ()
+  return %22 : $()
+}
