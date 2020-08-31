@@ -1597,6 +1597,30 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
   return false;
 }
 
+bool ClangImporter::runPreprocessor(StringRef inputPath, StringRef outputPath) {
+  auto emitInstance = cloneCompilerInstanceForPrecompiling();
+  auto &invocation = emitInstance->getInvocation();
+  auto LangOpts = invocation.getLangOpts();
+  auto &OutputOpts = invocation.getPreprocessorOutputOpts();
+  OutputOpts.ShowCPP = 1;
+  OutputOpts.ShowComments = 0;
+  OutputOpts.ShowLineMarkers = 0;
+  OutputOpts.ShowMacros = 0;
+  OutputOpts.ShowMacroComments = 0;
+  auto language = getLanguageFromOptions(LangOpts);
+  auto inputFile = clang::FrontendInputFile(inputPath, language);
+
+  auto &FrontendOpts = invocation.getFrontendOpts();
+  FrontendOpts.Inputs = {inputFile};
+  FrontendOpts.OutputFile = outputPath.str();
+  FrontendOpts.ProgramAction = clang::frontend::PrintPreprocessedInput;
+
+  auto action = wrapActionForIndexingIfEnabled(
+      FrontendOpts, std::make_unique<clang::PrintPreprocessedAction>());
+  emitInstance->ExecuteAction(*action);
+  return emitInstance->getDiagnostics().hasErrorOccurred();
+}
+
 bool ClangImporter::emitPrecompiledModule(StringRef moduleMapPath,
                                           StringRef moduleName,
                                           StringRef outputPath) {
