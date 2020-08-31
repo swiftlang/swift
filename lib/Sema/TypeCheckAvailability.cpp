@@ -170,13 +170,26 @@ private:
     // The potential versions in the declaration are constrained by both
     // the declared availability of the declaration and the potential versions
     // of its lexical context.
-    AvailabilityContext DeclInfo =
+    AvailabilityContext ExplicitDeclInfo =
         swift::AvailabilityInference::availableRange(D, Context);
-    DeclInfo.intersectWith(getCurrentTRC()->getAvailabilityInfo());
+    ExplicitDeclInfo.intersectWith(
+        getCurrentTRC()->getAvailabilityInfoExplicit());
+    AvailabilityContext DeclInfo = ExplicitDeclInfo;
+
+    // When the body is inlinable consider only the explicitly declared range
+    // for checking availability. Otherwise, use the parent range which may
+    // begin at the minimum deployment target.
+    bool isInlinable = D->getAttrs().hasAttribute<InlinableAttr>() ||
+                       D->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>();
+    if (!isInlinable)) {
+      DeclInfo.intersectWith(
+          getCurrentTRC()->getAvailabilityInfo());
+    }
 
     TypeRefinementContext *NewTRC =
         TypeRefinementContext::createForDecl(Context, D, getCurrentTRC(),
                                              DeclInfo,
+                                             ExplicitDeclInfo,
                                              refinementSourceRangeForDecl(D));
     
     // Record the TRC for this storage declaration so that
@@ -198,8 +211,10 @@ private:
     }
     
     // No need to introduce a context if the declaration does not have an
-    // availability attribute.
-    if (!hasActiveAvailableAttribute(D, Context)) {
+    // availability or inlinable attribute.
+    if (!hasActiveAvailableAttribute(D, Context) &&
+        !D->getAttrs().hasAttribute<InlinableAttr>() &&
+        !D->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
       return false;
     }
     
@@ -674,9 +689,7 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
   // refined. For now, this is fine -- but if we ever synthesize #available(),
   // this will be a real problem.
 
-  // We can assume we are running on at least the minimum deployment target.
-  auto OverApproximateContext =
-    AvailabilityContext::forDeploymentTarget(Context);
+  auto OverApproximateContext = AvailabilityContext::alwaysAvailable();
   auto isInvalidLoc = [SF](SourceLoc loc) {
     return SF ? loc.isInvalid() : true;
   };
