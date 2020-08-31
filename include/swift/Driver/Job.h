@@ -37,6 +37,10 @@ namespace driver {
 class Job;
 class JobAction;
 
+namespace parseable_output {
+struct JobInfo;
+}
+
 /// \file Job.h
 ///
 ///Some terminology for the following sections (and especially Driver.cpp):
@@ -399,6 +403,8 @@ public:
   /// Assumes that, if a compile job, has one primary swift input
   /// May return empty if none.
   StringRef getFirstSwiftPrimaryInput() const;
+
+  operator parseable_output::JobInfo() const;
 };
 
 /// A BatchJob comprises a _set_ of jobs, each of which is sufficiently similar

@@ -18,33 +18,52 @@
 #ifndef SWIFT_DRIVER_PARSEABLEOUTPUT_H
 #define SWIFT_DRIVER_PARSEABLEOUTPUT_H
 
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/TaskQueue.h"
 
 namespace swift {
 namespace driver {
 
-class Job;
-
 namespace parseable_output {
 
+struct CommandInput {
+  std::string Path;
+  CommandInput() {}
+  CommandInput(StringRef Path) : Path(Path) {}
+};
+
+using OutputPair = std::pair<file_types::ID, std::string>;
+
+/// Information about a job to be reported.
+struct JobInfo {
+  std::string Executable;
+  SmallVector<std::string, 16> Arguments;
+  std::string CommandLine;
+  SmallVector<CommandInput, 4> Inputs;
+  SmallVector<OutputPair, 8> Outputs;
+};
+
 /// Emits a "began" message to the given stream.
-void emitBeganMessage(raw_ostream &os, const Job &Cmd, int64_t Pid,
-                      sys::TaskProcessInformation ProcInfo);
+void emitBeganMessage(
+    raw_ostream &os, StringRef name, const JobInfo &info, int64_t pid,
+    sys::TaskProcessInformation procInfo);
 
 /// Emits a "finished" message to the given stream.
-void emitFinishedMessage(raw_ostream &os, const Job &Cmd, int64_t Pid,
-                         int ExitStatus, StringRef Output,
-                         sys::TaskProcessInformation ProcInfo);
+void emitFinishedMessage(
+    raw_ostream &os, StringRef name, const JobInfo &info, int64_t pid,
+    int exitStatus, StringRef output,
+    sys::TaskProcessInformation procInfo);
 
 /// Emits a "signalled" message to the given stream.
-void emitSignalledMessage(raw_ostream &os, const Job &Cmd, int64_t Pid,
-                          StringRef ErrorMsg, StringRef Output,
-                          Optional<int> Signal,
-                          sys::TaskProcessInformation ProcInfo);
+void emitSignalledMessage(
+    raw_ostream &os, StringRef name, const JobInfo &info, int64_t pid,
+    StringRef errorMsg, StringRef output,
+    Optional<int> signal,
+    sys::TaskProcessInformation procInfo);
 
 /// Emits a "skipped" message to the given stream.
-void emitSkippedMessage(raw_ostream &os, const Job &Cmd);
+void emitSkippedMessage(raw_ostream &os, StringRef name, const JobInfo &info);
 
 } // end namespace parseable_output
 } // end namespace driver

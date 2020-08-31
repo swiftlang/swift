@@ -425,8 +425,9 @@ namespace driver {
         break;
       case OutputLevel::Parseable:
         BeganCmd->forEachContainedJobAndPID(Pid, [&](const Job *J, Job::PID P) {
-          parseable_output::emitBeganMessage(llvm::errs(), *J, P,
-                                             TaskProcessInformation(Pid));
+          parseable_output::emitBeganMessage(
+              llvm::errs(), J->getSource().getClassName(), *J, P,
+              TaskProcessInformation(Pid));
         });
         break;
       }
@@ -614,12 +615,13 @@ namespace driver {
           // Simulate SIGINT-interruption to parseable-output consumer for any
           // constituent of a failing batch job that produced no errors of its
           // own.
-          parseable_output::emitSignalledMessage(llvm::errs(), *J, P,
-                                                 "cancelled batch constituent",
-                                                 "", SIGINT, ProcInfo);
+          parseable_output::emitSignalledMessage(
+              llvm::errs(), J->getSource().getClassName(), *J, P,
+              "cancelled batch constituent", "", SIGINT, ProcInfo);
         } else {
-          parseable_output::emitFinishedMessage(llvm::errs(), *J, P, ReturnCode,
-                                                Output, ProcInfo);
+          parseable_output::emitFinishedMessage(
+              llvm::errs(), J->getSource().getClassName(), *J, P, ReturnCode,
+              Output, ProcInfo);
         }
       });
     }
@@ -787,8 +789,9 @@ namespace driver {
         // Parseable output was requested.
         SignalledCmd->forEachContainedJobAndPID(Pid, [&](const Job *J,
                                                          Job::PID P) {
-          parseable_output::emitSignalledMessage(llvm::errs(), *J, P, ErrorMsg,
-                                                 Output, Signal, ProcInfo);
+          parseable_output::emitSignalledMessage(
+              llvm::errs(), J->getSource().getClassName(), *J, P, ErrorMsg,
+              Output, Signal, ProcInfo);
         });
       } else {
         // Otherwise, send the buffered output to stderr, though only if we
@@ -1457,7 +1460,8 @@ namespace driver {
           if (Comp.getOutputLevel() == OutputLevel::Parseable) {
             // Provide output indicating this command was skipped if parseable
             // output was requested.
-            parseable_output::emitSkippedMessage(llvm::errs(), *Cmd);
+            parseable_output::emitSkippedMessage(
+                llvm::errs(), Cmd->getSource().getClassName(), *Cmd);
           }
           ScheduledCommands.insert(Cmd);
           markFinished(Cmd, /*Skipped=*/true);

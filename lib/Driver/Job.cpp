@@ -13,6 +13,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Driver/DriverIncrementalRanges.h"
 #include "swift/Driver/Job.h"
+#include "swift/Driver/ParseableOutput.h"
 #include "swift/Driver/PrettyStackTrace.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Option/Arg.h"
@@ -24,6 +25,7 @@
 
 using namespace swift;
 using namespace swift::driver;
+using namespace parseable_output;
 
 CommandOutput::CommandOutput(StringRef dummyBase, OutputFileMap &dummyOFM)
     : Inputs({CommandInputPair(dummyBase, "")}), DerivedOutputMap(dummyOFM) {
@@ -448,6 +450,54 @@ StringRef Job::getFirstSwiftPrimaryInput() const {
   if (auto *inputInput = dyn_cast<InputAction>(firstInput))
     return inputInput->getInputArg().getValue();
   return StringRef();
+}
+
+Job::operator JobInfo() const {
+  JobInfo info;
+
+  info.Executable = getExecutable();
+  for (const auto &A : getArguments()) {
+    info.Arguments.push_back(A);
+  }
+
+  {
+    llvm::raw_string_ostream wrapper(info.CommandLine);
+    printCommandLine(wrapper, "");
+    wrapper.flush();
+  }
+
+  for (const Action *A : getSource().getInputs()) {
+    if (const auto *IA = dyn_cast<InputAction>(A))
+      info.Inputs.push_back(CommandInput(IA->getInputArg().getValue()));
+  }
+
+  for (const Job *J : getInputs()) {
+    auto OutFiles = J->getOutput().getPrimaryOutputFilenames();
+    if (const auto *BJAction = dyn_cast<BackendJobAction>(&getSource())) {
+      info.Inputs.push_back(CommandInput(OutFiles[BJAction->getInputIndex()]));
+    } else {
+      for (llvm::StringRef FileName : OutFiles) {
+        info.Inputs.push_back(CommandInput(FileName));
+      }
+    }
+  }
+
+  // TODO: set up Outputs appropriately.
+  file_types::ID PrimaryOutputType = getOutput().getPrimaryOutputType();
+  if (PrimaryOutputType != file_types::TY_Nothing) {
+    for (llvm::StringRef OutputFileName :
+         getOutput().getPrimaryOutputFilenames()) {
+      info.Outputs.push_back(
+          OutputPair(PrimaryOutputType, OutputFileName.str()));
+    }
+  }
+  file_types::forAllTypes([&](file_types::ID Ty) {
+    for (auto Output : getOutput().getAdditionalOutputsForType(Ty)) {
+      info.Outputs.push_back(OutputPair(Ty, Output.str()));
+    }
+  });
+
+  return info;
 }
 
 BatchJob::BatchJob(const JobAction &Source,
