@@ -19,6 +19,16 @@ namespace swift {
     /// for the purpose of determining dependencies, but does not attempt to
     /// load the module files.
     class ModuleDependencyScanner : public SerializedModuleLoaderBase {
+    public:
+      enum ScannerKind {
+        MDS_plain,
+        MDS_placeholder
+      };
+
+    private:
+      /// The kind of scanner this is (LLVM-style RTTI)
+      const ScannerKind kind;
+
       /// The module we're scanning dependencies of.
       Identifier moduleName;
 
@@ -36,10 +46,11 @@ namespace swift {
       ModuleDependencyScanner(
           ASTContext &ctx, ModuleLoadingMode LoadMode, Identifier moduleName,
           InterfaceSubContextDelegate &astDelegate,
-          ModuleDependenciesKind dependencyKind = ModuleDependenciesKind::Swift)
+          ModuleDependenciesKind dependencyKind = ModuleDependenciesKind::Swift,
+          ScannerKind kind = MDS_plain)
           : SerializedModuleLoaderBase(ctx, nullptr, LoadMode,
                                        /*IgnoreSwiftSourceInfoFile=*/true),
-            moduleName(moduleName), astDelegate(astDelegate),
+            kind(kind), moduleName(moduleName), astDelegate(astDelegate),
             dependencyKind(dependencyKind) {}
 
       std::error_code findModuleFilesInDirectory(
@@ -54,6 +65,11 @@ namespace swift {
       virtual void collectVisibleTopLevelModuleNames(
           SmallVectorImpl<Identifier> &names) const override {
         llvm_unreachable("Not used");
+      }
+
+      ScannerKind getKind() const { return kind; }
+      static bool classof(const ModuleDependencyScanner *MDS) {
+        return MDS->getKind() == MDS_plain;
       }
     };
 
@@ -90,7 +106,8 @@ namespace swift {
                                     StringRef PlaceholderDependencyModuleMap,
                                     InterfaceSubContextDelegate &astDelegate)
           : ModuleDependencyScanner(ctx, LoadMode, moduleName, astDelegate,
-                                    ModuleDependenciesKind::SwiftPlaceholder) {
+                                    ModuleDependenciesKind::SwiftPlaceholder,
+                                    MDS_placeholder) {
 
         // FIXME: Find a better place for this map to live, to avoid
         // doing the parsing on every module.
@@ -106,5 +123,9 @@ namespace swift {
           std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
           std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
                                                  bool IsFramework) override;
+
+      static bool classof(const ModuleDependencyScanner *MDS) {
+        return MDS->getKind() == MDS_placeholder;
+      }
     };
 }
