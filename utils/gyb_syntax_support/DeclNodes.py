@@ -71,6 +71,15 @@ DECL_NODES = [
              Child('ReturnType', kind='Type'),
          ]),
 
+    Node('ThrowsSyntax', kind='Syntax',
+          children=[
+                Child('ThrowsToken', kind='ThrowsKeyword'),
+                Child('LeftParen', kind='LeftParenToken', is_optional=True),
+                Child('ThrowsType', kind='Type', is_optional=True),
+                Child('RightParen', kind='RightParenToken', is_optional=True) 
+          ]),
+
+
     # function-signature ->
     #   '(' parameter-list? ')' async? (throws type? | rethrows)? '->'? type?
     Node('FunctionSignature', kind='Syntax',
@@ -85,7 +94,7 @@ DECL_NODES = [
                        'ThrowsToken',
                        'RethrowsToken',
                    ]),
-             Child('ThrowsType', kind='Type', is_optional=True),
+             Child('TypedThrows', kind='ThrowsSyntax', is_optional=True),
              Child('Output', kind='ReturnClause', is_optional=True),
          ]),
 
@@ -429,7 +438,7 @@ DECL_NODES = [
                        'ThrowsToken',
                        'RethrowsToken',
                    ]),
-             Child('ThrowsType', kind='Type', is_optional=True),
+             Child('TypedThrows', kind='ThrowsSyntax', is_optional=True),
              Child('GenericWhereClause', kind='GenericWhereClause',
                    is_optional=True),
              # the body is not necessary inside a protocol definition
