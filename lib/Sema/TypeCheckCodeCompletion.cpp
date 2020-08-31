@@ -938,7 +938,52 @@ void DotExprLookup::sawSolution(const constraints::Solution &S) {
   GotCallback = true;
   auto &CS = S.getConstraintSystem();
 
-  auto GetType = [&](Expr *E) { return S.getResolvedType(E); };
+  auto GetType = [&](Expr *E) {
+    // To aid code completion, we need to attempt to convert type holes
+    // back into underlying generic parameters if possible, since type
+    // of the code completion expression is used as "expected" (or contextual)
+    // type so it's helpful to know what requirements it has to filter
+    // the list of possible member candidates e.g.
+    //
+    // \code
+    // func test<T: P>(_: [T]) {}
+    //
+    // test(42.#^MEMBERS^#)
+    // \code
+    //
+    // It's impossible to resolve `T` in this case but code completion
+    // expression should still have a type of `[T]` instead of `[<<hole>>]`
+    // because it helps to produce correct contextual member list based on
+    // a conformance requirement associated with generic parameter `T`.
+    if (isa<CodeCompletionExpr>(E)) {
+      auto completionTy = S.getType(E).transform([&](Type type) -> Type {
+        if (auto *typeVar = type->getAs<TypeVariableType>())
+          return S.getFixedType(typeVar);
+        return type;
+      });
+
+      return S.simplifyType(completionTy.transform([&](Type type) {
+        if (auto *hole = type->getAs<HoleType>()) {
+          if (auto *typeVar =
+                  hole->getOriginatorType().dyn_cast<TypeVariableType *>()) {
+            if (auto *GP = typeVar->getImpl().getGenericParameter()) {
+              // Code completion depends on generic parameter type being
+              // represented in terms of `ArchetypeType` since it's easy
+              // to extract protocol requirements from it.
+              if (auto *GPD = GP->getDecl())
+                return GPD->getInnermostDeclContext()->mapTypeIntoContext(GP);
+            }
+          }
+
+          return Type(CS.getASTContext().TheUnresolvedType);
+        }
+
+        return type;
+      }));
+    }
+
+    return S.getResolvedType(E);
+  };
 
   auto *ParsedExpr = CompletionExpr->getBase();
   auto *SemanticExpr = ParsedExpr->getSemanticsProvidingExpr();
