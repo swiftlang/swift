@@ -848,7 +848,7 @@ void CompilerInstance::setMainModule(ModuleDecl *newMod) {
   Context->addLoadedModule(newMod);
 }
 
-void CompilerInstance::performParseAndResolveImportsOnly() {
+bool CompilerInstance::performParseAndResolveImportsOnly() {
   FrontendStatsTracer tracer(getStatsReporter(), "parse-and-resolve-imports");
 
   // Resolve imports for all the source files.
@@ -867,6 +867,7 @@ void CompilerInstance::performParseAndResolveImportsOnly() {
   mainModule->setHasResolvedImports();
 
   bindExtensions(*mainModule);
+  return Context->hadError();
 }
 
 void CompilerInstance::performSema() {

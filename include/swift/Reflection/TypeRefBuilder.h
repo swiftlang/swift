@@ -618,8 +618,8 @@ public:
       }),
       OpaqueUnderlyingTypeReader(
       [&reader](uint64_t descriptorAddr, unsigned ordinal) -> const TypeRef* {
-        return reader.readUnderlyingTypeForOpaqueTypeDescriptor(descriptorAddr,
-                                                                ordinal);
+        return reader.readUnderlyingTypeForOpaqueTypeDescriptor(
+          descriptorAddr, ordinal).getType();
       })
   {}
 

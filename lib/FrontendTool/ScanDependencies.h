@@ -21,8 +21,7 @@ class CompilerInvocation;
 class CompilerInstance;
 
 /// Batch scan the dependencies for modules specified in \c batchInputFile.
-bool batchScanModuleDependencies(CompilerInvocation &invok,
-                                 CompilerInstance &instance,
+bool batchScanModuleDependencies(CompilerInstance &instance,
                                  llvm::StringRef batchInputFile);
 
 /// Scans the dependencies of the main module of \c instance.
