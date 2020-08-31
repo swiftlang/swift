@@ -72,6 +72,8 @@ class HostSpecificConfiguration(object):
         self.swift_test_run_targets = []
         self.swift_benchmark_build_targets = []
         self.swift_benchmark_run_targets = []
+        self.swift_flags = ''
+        self.cmake_options = ''
         for deployment_target_name in stdlib_targets_to_configure:
             # Get the target object.
             deployment_target = StdlibDeploymentTarget.get_target_for_name(
@@ -202,6 +204,16 @@ class HostSpecificConfiguration(object):
                     self.swift_test_run_targets.append(
                         "check-swift{}-optimize_none_with_implicit_dynamic-{}"
                         .format(subset_suffix, name))
+
+            # Only pull in these flags when cross-compiling with
+            # --cross-compile-hosts.
+            if deployment_target_name != args.host_target and \
+               host_target != args.host_target:
+                self.add_flags_for_cross_compilation(args, deployment_target)
+
+    def add_flags_for_cross_compilation(self, args, deployment_target):
+        self.swift_flags = deployment_target.platform.swift_flags(args)
+        self.cmake_options = deployment_target.platform.cmake_options(args)
 
     def __platforms_to_skip_build(self, args):
         platforms_to_skip_build = set()
