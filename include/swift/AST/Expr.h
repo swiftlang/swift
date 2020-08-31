@@ -4848,20 +4848,21 @@ public:
 class ArrowExpr : public Expr {
   SourceLoc AsyncLoc;
   SourceLoc ThrowsLoc;
+  TypeRepr *ThrowsType;
   SourceLoc ArrowLoc;
   Expr *Args;
   Expr *Result;
 public:
-  ArrowExpr(Expr *Args, SourceLoc AsyncLoc, SourceLoc ThrowsLoc,
+  ArrowExpr(Expr *Args, SourceLoc AsyncLoc, SourceLoc ThrowsLoc, TypeRepr *ThrowsType,
             SourceLoc ArrowLoc, Expr *Result)
     : Expr(ExprKind::Arrow, /*implicit=*/false, Type()),
-      AsyncLoc(AsyncLoc), ThrowsLoc(ThrowsLoc), ArrowLoc(ArrowLoc), Args(Args),
+      AsyncLoc(AsyncLoc), ThrowsLoc(ThrowsLoc), ThrowsType(ThrowsType), ArrowLoc(ArrowLoc), Args(Args),
       Result(Result)
   { }
 
-  ArrowExpr(SourceLoc AsyncLoc, SourceLoc ThrowsLoc, SourceLoc ArrowLoc)
+  ArrowExpr(SourceLoc AsyncLoc, SourceLoc ThrowsLoc, TypeRepr *ThrowsType, SourceLoc ArrowLoc)
     : Expr(ExprKind::Arrow, /*implicit=*/false, Type()),
-      AsyncLoc(AsyncLoc), ThrowsLoc(ThrowsLoc), ArrowLoc(ArrowLoc),
+      AsyncLoc(AsyncLoc), ThrowsLoc(ThrowsLoc), ThrowsType(ThrowsType), ArrowLoc(ArrowLoc),
       Args(nullptr), Result(nullptr)
   { }
 
@@ -4871,6 +4872,7 @@ public:
   void setResultExpr(Expr *E) { Result = E; }
   SourceLoc getAsyncLoc() const { return AsyncLoc; }
   SourceLoc getThrowsLoc() const { return ThrowsLoc; }
+  TypeRepr *getThrowsType() const { return ThrowsType; }
   SourceLoc getArrowLoc() const { return ArrowLoc; }
   bool isFolded() const { return Args != nullptr && Result != nullptr; }
 

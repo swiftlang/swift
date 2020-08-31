@@ -140,7 +140,7 @@ ParserResult<Expr> Parser::parseExprArrow() {
 
   parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, throwsType, /*rethrows=*/nullptr);
 
-  auto arrow = new (Context) ArrowExpr(asyncLoc, throwsLoc, arrowLoc);
+  auto arrow = new (Context) ArrowExpr(asyncLoc, throwsLoc, throwsType, arrowLoc);
   return makeParserResult(arrow);
 }
 

@@ -544,6 +544,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       ParsedFunctionTypeSyntaxBuilder Builder(*SyntaxContext);
       Builder.useReturnType(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
       Builder.useArrow(SyntaxContext->popToken());
+      Builder.useTypedThrows(std::move(*SyntaxContext->popIf<ParsedThrowsDeclSyntax>()));
       if (throwsLoc.isValid())
         Builder.useThrowsOrRethrowsKeyword(SyntaxContext->popToken());
       if (asyncLoc.isValid())
@@ -657,7 +658,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       }
     }
 
-    tyR = new (Context) FunctionTypeRepr(generics, argsTyR, asyncLoc, throwsLoc,
+    tyR = new (Context) FunctionTypeRepr(generics, argsTyR, asyncLoc, throwsLoc, throwsType,
                                          arrowLoc, SecondHalf.get(),
                                          patternGenerics, patternSubsTypes,
                                          invocationSubsTypes);
