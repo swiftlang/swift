@@ -196,7 +196,7 @@ EXPR_NODES = [
              Child('AsyncKeyword', kind='IdentifierToken',
                    classification='Keyword',
                    text_choices=['async'], is_optional=True),
-             Child('TypedThrows', kind='ThrowsSyntax', is_optional=True),
+             Child('TypedThrows', kind='ThrowsDecl', is_optional=True),
              Child('ArrowToken', kind='ArrowToken'),
          ]),
 
@@ -394,7 +394,7 @@ EXPR_NODES = [
              Child('AsyncKeyword', kind='IdentifierToken',
                    classification='Keyword',
                    text_choices=['async'], is_optional=True),
-             Child('TypedThrows', kind='ThrowsSyntax', is_optional=True),
+             Child('TypedThrows', kind='ThrowsDecl', is_optional=True),
              Child('Output', kind='ReturnClause', is_optional=True),
              Child('InTok', kind='InToken'),
          ]),

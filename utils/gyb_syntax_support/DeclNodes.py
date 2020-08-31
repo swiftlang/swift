@@ -71,14 +71,13 @@ DECL_NODES = [
              Child('ReturnType', kind='Type'),
          ]),
 
-    Node('ThrowsSyntax', kind='Syntax',
+    Node('ThrowsDecl', kind='Syntax',
           children=[
-                Child('ThrowsToken', kind='ThrowsKeyword'),
-                Child('LeftParen', kind='LeftParenToken', is_optional=True),
-                Child('ThrowsType', kind='Type', is_optional=True),
-                Child('RightParen', kind='RightParenToken', is_optional=True) 
+             Child('ThrowsOrRethrowsKeyword', kind='Token', token_choices=['ThrowsToken']),
+             Child('LeftParen', kind='LeftParenToken', is_optional=True),
+             Child('ThrowsType', kind='Type', is_optional=True),
+             Child('RightParen', kind='RightParenToken', is_optional=True),
           ]),
-
 
     # function-signature ->
     #   '(' parameter-list? ')' async? (throws type? | rethrows)? '->'? type?
@@ -94,7 +93,7 @@ DECL_NODES = [
                        'ThrowsToken',
                        'RethrowsToken',
                    ]),
-             Child('TypedThrows', kind='ThrowsSyntax', is_optional=True),
+             Child('TypedThrows', kind='ThrowsDecl', is_optional=True),
              Child('Output', kind='ReturnClause', is_optional=True),
          ]),
 
@@ -438,7 +437,7 @@ DECL_NODES = [
                        'ThrowsToken',
                        'RethrowsToken',
                    ]),
-             Child('TypedThrows', kind='ThrowsSyntax', is_optional=True),
+             Child('TypedThrows', kind='ThrowsDecl', is_optional=True),
              Child('GenericWhereClause', kind='GenericWhereClause',
                    is_optional=True),
              # the body is not necessary inside a protocol definition
