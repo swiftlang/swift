@@ -40,16 +40,6 @@ using namespace SourceKit;
 using namespace swift;
 using namespace ide;
 
-static ModuleDecl *getModuleByFullName(ASTContext &Ctx, StringRef ModuleName) {
-  ImportPath::Module::Builder modulePath;
-  while (!ModuleName.empty()) {
-    StringRef SubModuleName;
-    std::tie(SubModuleName, ModuleName) = ModuleName.split('.');
-    modulePath.push_back(Ctx.getIdentifier(SubModuleName));
-  }
-  return Ctx.getModule(modulePath.get());
-}
-
 static ModuleDecl *getModuleByFullName(ASTContext &Ctx, Identifier ModuleName) {
   return Ctx.getModule(ImportPath::Module::Builder(ModuleName).get());
 }
@@ -1026,7 +1016,7 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx, StringRef ModuleName,
   if (!Stdlib)
     return true;
 
-  auto *M = getModuleByFullName(Ctx, ModuleName);
+  auto *M = Ctx.getModuleByName(ModuleName);
   if (!M)
     return true;
 
@@ -1555,7 +1545,7 @@ findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
     Receiver(RequestResult<ArrayRef<StringRef>>::fromError(Error));
     return;
   }
-  auto *M = getModuleByFullName(Ctx, ModuleName);
+  auto *M = Ctx.getModuleByName(ModuleName);
   if (!M) {
     Error = "Cannot find the module.";
     Receiver(RequestResult<ArrayRef<StringRef>>::fromError(Error));

@@ -2111,13 +2111,7 @@ static int doInputCompletenessTest(StringRef SourceFilename) {
 //===----------------------------------------------------------------------===//
 
 static ModuleDecl *getModuleByFullName(ASTContext &Context, StringRef ModuleName) {
-  ImportPath::Module::Builder builder;
-  while (!ModuleName.empty()) {
-    StringRef SubModuleName;
-    std::tie(SubModuleName, ModuleName) = ModuleName.split('.');
-    builder.push_back(Context.getIdentifier(SubModuleName));
-  }
-  ModuleDecl *Result = Context.getModule(builder.get());
+  ModuleDecl *Result = Context.getModuleByName(ModuleName);
   if (!Result || Result->failedToLoad())
     return nullptr;
   return Result;

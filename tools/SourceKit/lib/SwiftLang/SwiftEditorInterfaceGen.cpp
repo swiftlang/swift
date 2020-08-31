@@ -91,16 +91,6 @@ typedef SwiftInterfaceGenContext::Implementation::TextReference TextReference;
 typedef SwiftInterfaceGenContext::Implementation::TextDecl TextDecl;
 typedef SwiftInterfaceGenContext::Implementation::SourceTextInfo SourceTextInfo;
 
-static ModuleDecl *getModuleByFullName(ASTContext &Ctx, StringRef ModuleName) {
-  ImportPath::Module::Builder builder;
-  while (!ModuleName.empty()) {
-    StringRef SubModuleName;
-    std::tie(SubModuleName, ModuleName) = ModuleName.split('.');
-    builder.push_back(Ctx.getIdentifier(SubModuleName));
-  }
-  return Ctx.getModule(builder.get());
-}
-
 static ModuleDecl *getModuleByFullName(ASTContext &Ctx, Identifier ModuleName) {
   return Ctx.getModule(ImportPath::Module::Builder(ModuleName).get());
 }
@@ -293,7 +283,7 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx,
   }
 
   // Get the (sub)module to generate.
-  Mod = getModuleByFullName(Ctx, ModuleName);
+  Mod = Ctx.getModuleByName(ModuleName);
   if (!Mod) {
     ErrMsg = "Could not load module: ";
     ErrMsg += ModuleName;
