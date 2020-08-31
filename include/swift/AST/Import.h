@@ -229,7 +229,7 @@ public:
   ///
   /// \c ImportPath::Access is essentially a wrapper around \c ArrayRef and does
   /// not own its elements, so something else needs to manage their lifetime.
-  /// \c ImportDecl owns the memory backing \c ImportDecl::getDeclPath().
+  /// \c ImportDecl owns the memory backing \c ImportDecl::getAccessPath().
   class Access : public detail::ImportPathBase<Access> {
   public:
     /// A helper type which encapsulates a temporary vector and can produce a

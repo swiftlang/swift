@@ -75,8 +75,8 @@ struct UnboundImport {
   /// If this is a scoped import, the names of the declaration being imported;
   /// otherwise empty. (Currently the compiler doesn't support nested scoped
   /// imports, so there should always be zero or one elements, but
-  /// \c AccessPathTy is the common currency type for this.)
-  ImportPath::Access declPath;
+  /// \c ImportPath::Access is the common currency type for this.)
+  ImportPath::Access accessPath;
 
   // Names of explicitly imported SPI groups via @_spi.
   ArrayRef<Identifier> spiGroups;
@@ -141,7 +141,7 @@ struct UnboundImport {
   /// Create an \c ImportedModuleDesc from the information in this
   /// UnboundImport.
   ImportedModuleDesc makeDesc(ModuleDecl *module) const {
-    return ImportedModuleDesc({ declPath, module }, options,
+    return ImportedModuleDesc({ accessPath, module }, options,
                               privateImportFileName, spiGroups);
   }
 
@@ -501,7 +501,7 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
 /// Create an UnboundImport for a user-written import declaration.
 UnboundImport::UnboundImport(ImportDecl *ID)
   : importLoc(ID->getLoc()), options(), privateImportFileName(),
-    modulePath(ID->getModulePath()), declPath(ID->getDeclPath()),
+    modulePath(ID->getModulePath()), accessPath(ID->getAccessPath()),
     importOrUnderlyingModuleDecl(ID)
 {
   if (ID->isExported())
@@ -850,7 +850,7 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
   /// we've performed import resolution, since that can introduce additional
   /// imports (such as cross-import overlays) which could provide the declaration.
   auto &ctx = module->getASTContext();
-  auto declPath = import->getDeclPath();
+  auto accessPath = import->getAccessPath();
   auto modulePath = import->getModulePath();
   auto *topLevelModule = module->getTopLevelModule();
 
@@ -858,9 +858,9 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
   // the Clang importer currently handles submodules by importing their decls
   // into the top-level module.
   // FIXME: Doesn't handle scoped testable imports correctly.
-  assert(declPath.size() == 1 && "can't handle sub-decl imports");
+  assert(accessPath.size() == 1 && "can't handle sub-decl imports");
   SmallVector<ValueDecl *, 8> decls;
-  lookupInModule(topLevelModule, declPath.front().Item, decls,
+  lookupInModule(topLevelModule, accessPath.front().Item, decls,
                  NLKind::QualifiedLookup, ResolutionKind::Overloadable,
                  import->getDeclContext()->getModuleScopeContext());
 
@@ -868,8 +868,8 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
   if (decls.empty()) {
     ctx.Diags.diagnose(importLoc, diag::decl_does_not_exist_in_module,
                        static_cast<unsigned>(importKind),
-                       declPath.front().Item, modulePath.front().Item)
-      .highlight(declPath.getSourceRange());
+                       accessPath.front().Item, modulePath.front().Item)
+      .highlight(accessPath.getSourceRange());
     return ArrayRef<ValueDecl *>();
   }
 
@@ -877,7 +877,7 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
   if (!actualKind.hasValue()) {
     // FIXME: print entire module name?
     ctx.Diags.diagnose(importLoc, diag::ambiguous_decl_in_module,
-                       declPath.front().Item, module->getName());
+                       accessPath.front().Item, module->getName());
     for (auto next : decls)
       ctx.Diags.diagnose(next, diag::found_candidate);
 
@@ -899,7 +899,7 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
     } else {
       emittedDiag.emplace(ctx.Diags.diagnose(
           importLoc, diag::imported_decl_is_wrong_kind,
-          declPath.front().Item, getImportKindString(importKind),
+          accessPath.front().Item, getImportKindString(importKind),
           static_cast<unsigned>(*actualKind)));
     }
 
@@ -940,7 +940,7 @@ UnboundImport::UnboundImport(ASTContext &ctx, const UnboundImport &base,
                     .copyTo(ctx)),
       // If the declaring import was scoped, inherit that scope in the
       // overlay's import.
-      declPath(declaringImport.module.accessPath),
+      accessPath(declaringImport.module.accessPath),
       importOrUnderlyingModuleDecl(declaringImport.module.importedModule)
 {
   // A cross-import is never private or testable, and never comes from a private

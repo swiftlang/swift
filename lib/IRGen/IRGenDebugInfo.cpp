@@ -2089,7 +2089,7 @@ void IRGenDebugInfoImpl::emitImport(ImportDecl *D) {
     return;
 
   assert(D->getModule() && "compiler-synthesized ImportDecl is incomplete");
-  ModuleDecl::ImportedModule Imported = { D->getDeclPath(), D->getModule() };
+  ModuleDecl::ImportedModule Imported = { D->getAccessPath(), D->getModule() };
   auto DIMod = getOrCreateModule(Imported);
   auto L = getDebugLoc(*this, D);
   auto *File = getOrCreateFile(L.Filename);

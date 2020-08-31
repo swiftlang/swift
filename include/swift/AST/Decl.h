@@ -1514,7 +1514,7 @@ public:
     return getImportPath().getModulePath(getImportKind());
   }
 
-  ImportPath::Access getDeclPath() const {
+  ImportPath::Access getAccessPath() const {
     return getImportPath().getAccessPath(getImportKind());
   }
 
