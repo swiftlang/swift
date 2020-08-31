@@ -76,6 +76,12 @@ bool ARCSequenceDataflowEvaluator::processBBTopDown(ARCBBState &BBState) {
     }
   }
 
+  std::function<bool(SILInstruction *)> checkIfRefCountInstIsMatched =
+      [&DecToIncStateMap = DecToIncStateMap](SILInstruction *Inst) {
+        assert(isa<StrongReleaseInst>(Inst) || isa<ReleaseValueInst>(Inst));
+        return DecToIncStateMap.find(Inst) != DecToIncStateMap.end();
+      };
+
   // For each instruction I in BB...
   for (auto &I : BB) {
 
@@ -94,7 +100,7 @@ bool ARCSequenceDataflowEvaluator::processBBTopDown(ARCBBState &BBState) {
 
     // This SILValue may be null if we were unable to find a specific RCIdentity
     // that the instruction "visits".
-    SILValue Op = Result.RCIdentity;
+    SILValue CurrentRC = Result.RCIdentity;
 
     // For all other [(SILValue, TopDownState)] we are tracking...
     for (auto &OtherState : BBState.getTopDownStates()) {
@@ -105,10 +111,12 @@ bool ARCSequenceDataflowEvaluator::processBBTopDown(ARCBBState &BBState) {
       // If we visited an increment or decrement successfully (and thus Op is
       // set), if this is the state for this operand, skip it. We already
       // processed it.
-      if (Op && OtherState->first == Op)
+      if (CurrentRC && OtherState->first == CurrentRC)
         continue;
 
       OtherState->second.updateForSameLoopInst(&I, AA);
+      OtherState->second.checkAndResetKnownSafety(
+          &I, OtherState->first, checkIfRefCountInstIsMatched, RCIA, AA);
     }
   }
 
@@ -221,6 +229,12 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
       RCIA, EAFI, BBState, FreezeOwnedArgEpilogueReleases, IncToDecStateMap,
       SetFactory);
 
+  std::function<bool(SILInstruction *)> checkIfRefCountInstIsMatched =
+      [&IncToDecStateMap = IncToDecStateMap](SILInstruction *Inst) {
+        assert(isa<StrongRetainInst>(Inst) || isa<RetainValueInst>(Inst));
+        return IncToDecStateMap.find(Inst) != IncToDecStateMap.end();
+      };
+
   auto II = BB.rbegin();
   if (!isARCSignificantTerminator(&cast<TermInst>(*II))) {
     II++;
@@ -246,7 +260,7 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
 
     // This SILValue may be null if we were unable to find a specific RCIdentity
     // that the instruction "visits".
-    SILValue Op = Result.RCIdentity;
+    SILValue CurrentRC = Result.RCIdentity;
 
     // For all other (reference counted value, ref count state) we are
     // tracking...
@@ -257,10 +271,12 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
 
       // If this is the state associated with the instruction that we are
       // currently visiting, bail.
-      if (Op && OtherState->first == Op)
+      if (CurrentRC && OtherState->first == CurrentRC)
         continue;
 
       OtherState->second.updateForSameLoopInst(&I, AA);
+      OtherState->second.checkAndResetKnownSafety(
+          &I, OtherState->first, checkIfRefCountInstIsMatched, RCIA, AA);
     }
   }
 

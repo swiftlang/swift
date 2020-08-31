@@ -14,12 +14,13 @@
 #define SWIFT_SILOPTIMIZER_PASSMANAGER_ARC_REFCOUNTSTATE_H
 
 #include "RCStateTransition.h"
-#include "swift/Basic/type_traits.h"
+#include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/ImmutablePointerSet.h"
-#include "swift/SIL/SILInstruction.h"
+#include "swift/Basic/type_traits.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
-#include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/EpilogueARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
@@ -134,6 +135,8 @@ public:
   void updateKnownSafe(bool NewValue) {
     KnownSafe |= NewValue;
   }
+
+  void clearKnownSafe() { KnownSafe = false; }
 };
 
 //===----------------------------------------------------------------------===//
@@ -189,6 +192,13 @@ public:
   void
   updateForSameLoopInst(SILInstruction *I,
                         AliasAnalysis *AA);
+  /// Remove "KnownSafe" on the BottomUpRefCountState, if we find a retain
+  /// instruction with another RCIdentity can pair with the previously visited
+  /// retain instruction.
+  void checkAndResetKnownSafety(
+      SILInstruction *I, SILValue VisitedRC,
+      std::function<bool(SILInstruction *)> checkIfRefCountInstIsMatched,
+      RCIdentityFunctionInfo *RCIA, AliasAnalysis *AA);
 
   /// Update this reference count's state given the instruction \p I.
   //
@@ -327,6 +337,13 @@ public:
   void
   updateForSameLoopInst(SILInstruction *I,
                         AliasAnalysis *AA);
+  /// Remove "KnownSafe" on the TopDownRefCountState, if we find a retain
+  /// instruction with another RCIdentity can pair with the previously visited
+  /// retain instruction.
+  void checkAndResetKnownSafety(
+      SILInstruction *I, SILValue VisitedRC,
+      std::function<bool(SILInstruction *)> checkIfRefCountInstIsMatched,
+      RCIdentityFunctionInfo *RCIA, AliasAnalysis *AA);
 
   /// Update this reference count's state given the instruction \p I.
   ///

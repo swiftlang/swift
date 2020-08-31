@@ -118,7 +118,7 @@ bool BottomUpRefCountState::mightRemoveMutators() {
 
   // We will not remove mutators if we have a might be decremented value that
   // is not known safe.
-  return LatState != LatticeState::MightBeDecremented || isKnownSafe();
+  return isCodeMotionSafe() || isKnownSafe();
 }
 
 /// Uninitialize the current state.
@@ -460,6 +460,37 @@ void BottomUpRefCountState::updateForSameLoopInst(SILInstruction *I,
     return;
   LLVM_DEBUG(llvm::dbgs() << "    Found Potential Use:\n        "
                           << getRCRoot());
+}
+
+// Remove "KnownSafe" on the BottomUpRefCountState. If we find another unmatched
+// retain instruction with a different aliasing RCIdentity or the same
+// RCIdentity in the child region in the loop case.
+void BottomUpRefCountState::checkAndResetKnownSafety(
+    SILInstruction *I, SILValue VisitedRC,
+    std::function<bool(SILInstruction *)> checkIfRefCountInstIsMatched,
+    RCIdentityFunctionInfo *RCIA, AliasAnalysis *AA) {
+  assert(VisitedRC);
+  // If the RefCountState was not marked "KnownSafe", there is nothing to do.
+  if (!isKnownSafe())
+    return;
+  assert(Transition.getKind() == RCStateTransitionKind::StrongDecrement);
+  // We only care about retain instructions that can potentially pair with a
+  // previously visited release.
+  if (!(isa<StrongRetainInst>(I) || isa<RetainValueInst>(I)))
+    return;
+  SILValue VisitingRC = RCIA->getRCIdentityRoot(I->getOperand(0));
+  assert(VisitingRC);
+  // If the visiting retain instruction was not already pair with a release
+  // instruction, return.
+  if (checkIfRefCountInstIsMatched(I))
+    return;
+  // If the VisitingRC and VisitedRC do not alias, they cannot be incorrectly
+  // paired.
+  if (AA->isNoAlias(VisitingRC, VisitedRC))
+    return;
+  LLVM_DEBUG(llvm::dbgs() << "Clearing KnownSafe for: ");
+  LLVM_DEBUG(VisitedRC->dump());
+  clearKnownSafe();
 }
 
 void BottomUpRefCountState::updateForDifferentLoopInst(SILInstruction *I,
@@ -853,6 +884,37 @@ void TopDownRefCountState::updateForSameLoopInst(SILInstruction *I,
     return;
   LLVM_DEBUG(llvm::dbgs() << "    Found Potential Use:\n        "
                           << getRCRoot());
+}
+
+// Remove "KnownSafe" on the TopDownRefCountState. If we find another unmatched
+// release instruction with a different aliasing RCIdentity or the same
+// RCIdentity in the child region in the loop case.
+void TopDownRefCountState::checkAndResetKnownSafety(
+    SILInstruction *I, SILValue VisitedRC,
+    std::function<bool(SILInstruction *)> checkIfRefCountInstIsMatched,
+    RCIdentityFunctionInfo *RCIA, AliasAnalysis *AA) {
+  assert(VisitedRC);
+  // If the RefCountState was not marked "KnownSafe", there is nothing to do.
+  if (!isKnownSafe())
+    return;
+  assert(Transition.getKind() == RCStateTransitionKind::StrongIncrement);
+  // We only care about release instructions that can potentially pair with a
+  // previously visited retain.
+  if (!(isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I)))
+    return;
+  SILValue VisitingRC = RCIA->getRCIdentityRoot(I->getOperand(0));
+  assert(VisitingRC);
+  // If the visiting release instruction was already pair with a retain
+  // instruction, return.
+  if (checkIfRefCountInstIsMatched(I))
+    return;
+  // If the VisitingRC and VisitedRC do not alias, they cannot be incorrectly
+  // paired.
+  if (AA->isNoAlias(VisitingRC, VisitedRC))
+    return;
+  LLVM_DEBUG(llvm::dbgs() << "Clearing KnownSafe for: ");
+  LLVM_DEBUG(VisitedRC->dump());
+  clearKnownSafe();
 }
 
 void TopDownRefCountState::updateForDifferentLoopInst(SILInstruction *I,

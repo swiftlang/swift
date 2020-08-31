@@ -72,6 +72,9 @@ class LoopARCSequenceDataflowEvaluator {
   /// Stashed information for each region.
   llvm::DenseMap<const LoopRegion *, ARCRegionState *> RegionStateInfo;
 
+  /// Set of unmatched RefCountInsts
+  llvm::DenseSet<SILInstruction *> UnmatchedRefCountInsts;
+
 public:
   LoopARCSequenceDataflowEvaluator(
       SILFunction &F, AliasAnalysis *AA, LoopRegionFunctionInfo *LRFI,
@@ -107,6 +110,10 @@ public:
 
   /// Remove \p I from the interesting instruction list of its parent block.
   void removeInterestingInst(SILInstruction *I);
+
+  /// Compute if a RefCountInst was unmatched and populate the persistent
+  /// UnmatchedRefCountInsts set.
+  void saveMatchingInfo(const LoopRegion *R);
 
   /// Clear the folding node set of the set factory we have stored internally.
   void clearSetFactory() {

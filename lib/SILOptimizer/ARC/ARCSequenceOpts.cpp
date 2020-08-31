@@ -156,6 +156,7 @@ bool LoopARCPairingContext::processRegion(const LoopRegion *Region,
     }
 
     MadeChange |= MatchedPair;
+    Evaluator.saveMatchingInfo(Region);
     Evaluator.clearLoopState(Region);
     Context.DecToIncStateMap.clear();
     Context.IncToDecStateMap.clear();

@@ -204,6 +204,12 @@ bool ARCRegionState::processBlockBottomUp(
     // that the instruction "visits".
     SILValue Op = Result.RCIdentity;
 
+    std::function<bool(SILInstruction *)> checkIfRefCountInstIsMatched =
+        [&IncToDecStateMap](SILInstruction *Inst) {
+          assert(isa<StrongRetainInst>(Inst) || isa<RetainValueInst>(Inst));
+          return IncToDecStateMap.find(Inst) != IncToDecStateMap.end();
+        };
+
     // For all other (reference counted value, ref count state) we are
     // tracking...
     for (auto &OtherState : getBottomupStates()) {
@@ -217,6 +223,8 @@ bool ARCRegionState::processBlockBottomUp(
         continue;
 
       OtherState->second.updateForSameLoopInst(I, AA);
+      OtherState->second.checkAndResetKnownSafety(
+          I, OtherState->first, checkIfRefCountInstIsMatched, RCIA, AA);
     }
   }
 
@@ -245,8 +253,9 @@ static bool hasEarlyExits(
 
 bool ARCRegionState::processLoopBottomUp(
     const LoopRegion *R, AliasAnalysis *AA, LoopRegionFunctionInfo *LRFI,
+    RCIdentityFunctionInfo *RCIA,
     llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo,
-    ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
+    llvm::DenseSet<SILInstruction *> &UnmatchedRefCountInsts) {
   ARCRegionState *State = RegionStateInfo[R];
 
   // If we find that we have non-leaking early exits, clear state
@@ -256,14 +265,23 @@ bool ARCRegionState::processLoopBottomUp(
     return false;
   }
 
+  std::function<bool(SILInstruction *)> checkIfRefCountInstIsMatched =
+      [&UnmatchedRefCountInsts](SILInstruction *Inst) {
+        assert(isa<StrongRetainInst>(Inst) || isa<RetainValueInst>(Inst));
+        return UnmatchedRefCountInsts.find(Inst) == UnmatchedRefCountInsts.end();
+      };
+
   // For each state that we are currently tracking, apply our summarized
   // instructions to it.
   for (auto &OtherState : getBottomupStates()) {
     if (!OtherState.hasValue())
       continue;
 
-    for (auto *I : State->getSummarizedInterestingInsts())
+    for (auto *I : State->getSummarizedInterestingInsts()) {
       OtherState->second.updateForDifferentLoopInst(I, AA);
+      OtherState->second.checkAndResetKnownSafety(
+          I, OtherState->first, checkIfRefCountInstIsMatched, RCIA, AA);
+    }
   }
 
   return false;
@@ -273,6 +291,7 @@ bool ARCRegionState::processBottomUp(
     AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
     EpilogueARCFunctionInfo *EAFI, LoopRegionFunctionInfo *LRFI,
     bool FreezeOwnedArgEpilogueReleases,
+    llvm::DenseSet<SILInstruction *> &UnmatchedRefCountInsts,
     BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap,
     llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo,
     ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
@@ -281,7 +300,8 @@ bool ARCRegionState::processBottomUp(
   // We only process basic blocks for now. This ensures that we always propagate
   // the empty set from loops.
   if (!R->isBlock())
-    return processLoopBottomUp(R, AA, LRFI, RegionStateInfo, SetFactory);
+    return processLoopBottomUp(R, AA, LRFI, RCIA, RegionStateInfo,
+                               UnmatchedRefCountInsts);
 
   return processBlockBottomUp(R, AA, RCIA, EAFI, LRFI, FreezeOwnedArgEpilogueReleases,
                               IncToDecStateMap, SetFactory);
@@ -337,6 +357,12 @@ bool ARCRegionState::processBlockTopDown(
     // that the instruction "visits".
     SILValue Op = Result.RCIdentity;
 
+    std::function<bool(SILInstruction *)> checkIfRefCountInstIsMatched =
+        [&DecToIncStateMap](SILInstruction *Inst) {
+          assert(isa<StrongReleaseInst>(Inst) || isa<ReleaseValueInst>(Inst));
+          return DecToIncStateMap.find(Inst) != DecToIncStateMap.end();
+        };
+
     // For all other [(SILValue, TopDownState)] we are tracking...
     for (auto &OtherState : getTopDownStates()) {
       // If the other state's value is blotted, skip it.
@@ -350,6 +376,8 @@ bool ARCRegionState::processBlockTopDown(
         continue;
 
       OtherState->second.updateForSameLoopInst(I, AA);
+      OtherState->second.checkAndResetKnownSafety(
+          I, OtherState->first, checkIfRefCountInstIsMatched, RCIA, AA);
     }
   }
 
@@ -358,8 +386,8 @@ bool ARCRegionState::processBlockTopDown(
 
 bool ARCRegionState::processLoopTopDown(
     const LoopRegion *R, ARCRegionState *State, AliasAnalysis *AA,
-    LoopRegionFunctionInfo *LRFI,
-    ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
+    LoopRegionFunctionInfo *LRFI, RCIdentityFunctionInfo *RCIA,
+    llvm::DenseSet<SILInstruction *> &UnmatchedRefCountInsts) {
 
   assert(R->isLoop() && "We assume we are processing a loop");
 
@@ -375,14 +403,23 @@ bool ARCRegionState::processLoopTopDown(
   assert(PredRegion->isBlock() && "Expected the predecessor region to be a "
                                   "block");
 
+  std::function<bool(SILInstruction *)> checkIfRefCountInstIsMatched =
+      [&UnmatchedRefCountInsts](SILInstruction *Inst) {
+        assert(isa<StrongReleaseInst>(Inst) || isa<ReleaseValueInst>(Inst));
+        return UnmatchedRefCountInsts.find(Inst) == UnmatchedRefCountInsts.end();
+      };
+
   // For each state that we are currently tracking, apply our summarized
   // instructions to it.
   for (auto &OtherState : getTopDownStates()) {
     if (!OtherState.hasValue())
       continue;
 
-    for (auto *I : State->getSummarizedInterestingInsts())
+    for (auto *I : State->getSummarizedInterestingInsts()) {
       OtherState->second.updateForDifferentLoopInst(I, AA);
+      OtherState->second.checkAndResetKnownSafety(
+          I, OtherState->first, checkIfRefCountInstIsMatched, RCIA, AA);
+    }
   }
 
   return false;
@@ -391,6 +428,7 @@ bool ARCRegionState::processLoopTopDown(
 bool ARCRegionState::processTopDown(
     AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
     LoopRegionFunctionInfo *LRFI,
+    llvm::DenseSet<SILInstruction *> &UnmatchedRefCountInsts,
     BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
     llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo,
     ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
@@ -399,7 +437,8 @@ bool ARCRegionState::processTopDown(
   // We only process basic blocks for now. This ensures that we always propagate
   // the empty set from loops.
   if (!R->isBlock())
-    return processLoopTopDown(R, RegionStateInfo[R], AA, LRFI, SetFactory);
+    return processLoopTopDown(R, RegionStateInfo[R], AA, LRFI, RCIA,
+                              UnmatchedRefCountInsts);
 
   return processBlockTopDown(*R->getBlock(), AA, RCIA, DecToIncStateMap,
                              SetFactory);
