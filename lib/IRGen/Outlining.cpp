@@ -399,7 +399,8 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedDestroyFunction(
 
 llvm::Constant *IRGenModule::getOrCreateRetainFunction(const TypeInfo &ti,
                                                        SILType t,
-                                                       llvm::Type *llvmType) {
+                                                       llvm::Type *llvmType,
+                                                       irgen::Atomicity atomicity) {
   auto *loadableTI = cast<LoadableTypeInfo>(&ti);
   IRGenMangler mangler;
   auto manglingBits =
@@ -415,7 +416,7 @@ llvm::Constant *IRGenModule::getOrCreateRetainFunction(const TypeInfo &ti,
         Explosion loaded;
         loadableTI->loadAsTake(IGF, addr, loaded);
         Explosion out;
-        loadableTI->copy(IGF, loaded, out, irgen::Atomicity::Atomic);
+        loadableTI->copy(IGF, loaded, out, atomicity);
         (void)out.claimAll();
         IGF.Builder.CreateRet(addr.getAddress());
       },
@@ -425,7 +426,8 @@ llvm::Constant *IRGenModule::getOrCreateRetainFunction(const TypeInfo &ti,
 llvm::Constant *
 IRGenModule::getOrCreateReleaseFunction(const TypeInfo &ti,
                                         SILType t,
-                                        llvm::Type *llvmType) {
+                                        llvm::Type *llvmType,
+                                        irgen::Atomicity atomicity) {
   auto *loadableTI = cast<LoadableTypeInfo>(&ti);
   IRGenMangler mangler;
   auto manglingBits =
@@ -440,7 +442,7 @@ IRGenModule::getOrCreateReleaseFunction(const TypeInfo &ti,
         Address addr(&*it++, loadableTI->getFixedAlignment());
         Explosion loaded;
         loadableTI->loadAsTake(IGF, addr, loaded);
-        loadableTI->consume(IGF, loaded, irgen::Atomicity::Atomic);
+        loadableTI->consume(IGF, loaded, atomicity);
         IGF.Builder.CreateRet(addr.getAddress());
       },
       true /*setIsNoInline*/);
