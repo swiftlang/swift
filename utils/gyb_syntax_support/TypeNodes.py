@@ -176,7 +176,7 @@ TYPE_NODES = [
                        'ThrowsToken',
                        'RethrowsToken',
                    ]),
-             Child('TypedThrows', kind='ThrowsSyntax', is_optional=True),
+             Child('TypedThrows', kind='ThrowsDecl', is_optional=True),
              Child('Arrow', kind='ArrowToken'),
              Child('ReturnType', kind='Type'),
          ]),
