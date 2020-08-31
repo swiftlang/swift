@@ -2221,6 +2221,32 @@ static SILValue testControlVariableBit(SILLocation Loc,
                          {}, CondVal);
 }
 
+/// Test if all bits in the control variable are set at the current
+/// insertion point.
+static SILValue testAllControlVariableBits(SILLocation Loc,
+                                           SILValue ControlVariableAddr,
+                                           Identifier &CmpEqFn,
+                                           SILBuilder &B) {
+  SILValue ControlVariable =
+        B.createLoad(Loc, ControlVariableAddr, LoadOwnershipQualifier::Trivial);
+
+  SILValue CondVal = ControlVariable;
+  CanBuiltinIntegerType IVType = CondVal->getType().castTo<BuiltinIntegerType>();
+
+  if (IVType->getFixedWidth() == 1)
+    return CondVal;
+
+  SILValue AllBitsSet = B.createIntegerLiteral(Loc, CondVal->getType(), -1);
+  if (!CmpEqFn.get())
+    CmpEqFn = getBinaryFunction("cmp_eq", CondVal->getType(),
+                                B.getASTContext());
+  SILValue Args[] = { CondVal, AllBitsSet };
+
+  return B.createBuiltin(Loc, CmpEqFn,
+                         SILType::getBuiltinIntegerType(1, B.getASTContext()),
+                         {}, Args);
+}
+
 /// handleConditionalInitAssign - This memory object has some stores
 /// into (some element of) it that is either an init or an assign based on the
 /// control flow path through the function, or have a destroy event that happens
@@ -2398,7 +2424,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
 void LifetimeChecker::
 handleConditionalDestroys(SILValue ControlVariableAddr) {
   SILBuilderWithScope B(TheMemory.getUninitializedValue());
-  Identifier ShiftRightFn, TruncateFn;
+  Identifier ShiftRightFn, TruncateFn, CmpEqFn;
 
   unsigned NumMemoryElements = TheMemory.getNumElements();
 
@@ -2525,12 +2551,50 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
     // Just conditionally destroy each memory element, and for classes,
     // also free the partially initialized object.
     if (!TheMemory.isNonRootClassSelf()) {
-      destroyMemoryElements(Loc, Availability);
-      processUninitializedRelease(Release, false, B.getInsertionPoint());
+      assert(!Availability.isAllYes() &&
+             "Should not end up here if fully initialized");
 
-      // The original strong_release or destroy_addr instruction is
-      // always dead at this point.
-      deleteDeadRelease(CDElt.ReleaseID);
+      // For root class initializers, we check if all proeprties were
+      // dynamically initialized, and if so, treat this as a release of
+      // an initialized 'self', instead of tearing down the fields
+      // one by one and deallocating memory.
+      //
+      // This is required for correctness, since the condition that
+      // allows 'self' to escape is that all stored properties were
+      // initialized. So we cannot deallocate the memory if 'self' may
+      // have escaped.
+      //
+      // This also means the deinitializer will run if all stored
+      // properties were initialized.
+      if (TheMemory.isClassInitSelf() &&
+          Availability.hasAny(DIKind::Partial)) {
+        auto CondVal = testAllControlVariableBits(Loc, ControlVariableAddr,
+                                                  CmpEqFn, B);
+
+        SILBasicBlock *ReleaseBlock, *DeallocBlock, *ContBlock;
+
+        InsertCFGDiamond(CondVal, Loc, B,
+                         ReleaseBlock, DeallocBlock, ContBlock);
+
+        // If true, self was fully initialized and must be released.
+        B.setInsertionPoint(ReleaseBlock->begin());
+        B.setCurrentDebugScope(ReleaseBlock->begin()->getDebugScope());
+        Release->moveBefore(&*B.getInsertionPoint());
+
+        // If false, self is uninitialized and must be freed.
+        B.setInsertionPoint(DeallocBlock->begin());
+        B.setCurrentDebugScope(DeallocBlock->begin()->getDebugScope());
+        destroyMemoryElements(Loc, Availability);
+        processUninitializedRelease(Release, false, B.getInsertionPoint());
+      } else {
+        destroyMemoryElements(Loc, Availability);
+        processUninitializedRelease(Release, false, B.getInsertionPoint());
+
+        // The original strong_release or destroy_addr instruction is
+        // always dead at this point.
+        deleteDeadRelease(CDElt.ReleaseID);
+      }
+
       continue;
     }
 
