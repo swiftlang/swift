@@ -564,11 +564,13 @@ TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
                                     RightParen,
                                     None,
                                     Throws,
+                                    LeftParen
                                     Error,
+                                    RightParen,
                                     Arrow,
                                     Int)
       .print(OS);
-    ASSERT_EQ(OS.str().str(), "(x: Int, y: Int) throws Error -> Int");
+    ASSERT_EQ(OS.str().str(), "(x: Int, y: Int) throws (Error) -> Int");
   }
   {
     SmallString<48> Scratch;
@@ -661,11 +663,13 @@ TEST(TypeSyntaxTests, FunctionTypeWithAPIs) {
       .addArgument(yArg)
       .withRightParen(RightParen)
       .withThrowsOrRethrowsKeyword(Throws)
+      .withLeftParen(LeftParen)
       .withThrowsType(Error)
+      .withRightParen(RightParen)
       .withArrow(Arrow)
       .withReturnType(Int)
       .print(OS);
-    ASSERT_EQ(OS.str().str(), "(x: Int, y: Int) throws Error -> Int");
+    ASSERT_EQ(OS.str().str(), "(x: Int, y: Int) throws (Error) -> Int");
 
 
   }
