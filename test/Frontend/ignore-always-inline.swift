@@ -1,12 +1,71 @@
-// RUN: %target-swift-frontend %s -Onone -emit-sil -emit-sorted-sil                       | %FileCheck %s -check-prefix=REGULAR
-// RUN: %target-swift-frontend %s -Onone -emit-sil -emit-sorted-sil -ignore-always-inline | %FileCheck %s -check-prefix=IGNORED
+// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -dce 						 | %FileCheck %s -check-prefix=REGULAR
+// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -dce -ignore-always-inline | %FileCheck %s -check-prefix=IGNORED
 
-@inline(__always)
-func foo() {
+sil_stage canonical
+
+// REGULAR: sil [Osize] @caller
+// IGNORED: sil [Osize] @caller
+sil [Osize] @caller : $@convention(thin) () -> () {
+bb0:
+  // REGULAR-NOT: function_ref @callee
+  // REGULAR:     function_ref @foobar
+  // IGNORED:     function_ref @callee
+  %d1 = function_ref @callee : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+
+  %9999 = tuple()
+  return %9999 : $()
 }
 
-// REGULAR: {{^}}@inline(__always) func foo()
-// REGULAR: sil hidden [always_inline] @$s4main3fooyyF
+sil @foobar : $@convention(thin) () -> ()
 
-// IGNORED: {{^}}@inline(__always) func foo()
-// IGNORED: sil hidden @$s4main3fooyyF
+// callee is "expensive" enough to not get inlined unless [always_inline] is used
+// REGULAR: sil [always_inline] [Osize] @callee
+// IGNORED: sil [always_inline] [Osize] @callee
+sil [always_inline] [Osize] @callee : $@convention(thin) () -> () {
+bb0:
+  %d1 = function_ref @foobar : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+
+  %9999 = tuple()
+  return %9999 : $()
+}

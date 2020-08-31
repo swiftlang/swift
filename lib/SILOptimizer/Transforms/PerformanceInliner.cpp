@@ -563,7 +563,7 @@ static bool isInlineAlwaysCallSite(SILFunction *Callee) {
   if (Callee->isTransparent())
     return true;
   if (Callee->getInlineStrategy() == AlwaysInline)
-    if (!Callee->getASTContext().LangOpts.IgnoreAlwaysInline)
+    if (!Callee->getModule().getOptions().IgnoreAlwaysInline)
       return true;
   return false;
 }

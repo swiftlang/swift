@@ -385,9 +385,6 @@ namespace swift {
     /// Load swiftmodule files in memory as volatile and avoid mmap.
     bool EnableVolatileModules = false;
 
-    /// Turn @inline(__always) attributes into no-ops.
-    bool IgnoreAlwaysInline = false;
-
     /// Allow deserializing implementation only dependencies. This should only
     /// be set true by lldb and other tooling, so that deserilization
     /// recovery issues won't bring down the debugger.
