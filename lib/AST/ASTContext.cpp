@@ -654,6 +654,12 @@ swift::detail::ImportPathBuilder_copyToImpl(ASTContext &ctx,
   return ctx.AllocateCopy(raw);
 }
 
+Identifier
+swift::detail::ImportPathBuilder_getIdentifierImpl(ASTContext &ctx,
+                                                   StringRef string) {
+  return ctx.getIdentifier(string);
+}
+
 /// Set a new stats reporter.
 void ASTContext::setStatsReporter(UnifiedStatsReporter *stats) {
   if (stats) {
@@ -1911,12 +1917,7 @@ ASTContext::getModule(ImportPath::Module ModulePath) {
 }
 
 ModuleDecl *ASTContext::getModuleByName(StringRef ModuleName) {
-  ImportPath::Module::Builder builder;
-  while (!ModuleName.empty()) {
-    StringRef SubModuleName;
-    std::tie(SubModuleName, ModuleName) = ModuleName.split('.');
-    builder.push_back(getIdentifier(SubModuleName));
-  }
+  ImportPath::Module::Builder builder(*this, ModuleName, /*separator=*/'.');
   return getModule(builder.get());
 }
 

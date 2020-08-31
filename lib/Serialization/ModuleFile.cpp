@@ -196,12 +196,12 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc) {
       modulePathStr = modulePathStr.slice(0, splitPoint);
     }
 
-    ImportPath::Module::Builder modulePath;
-    while (!modulePathStr.empty()) {
-      StringRef nextComponent;
-      std::tie(nextComponent, modulePathStr) = modulePathStr.split('\0');
-      modulePath.push_back(ctx.getIdentifier(nextComponent));
-      assert(!modulePath.back().Item.empty() &&
+    // TODO: Further simplification is possible by unifying scopePath above with
+    // this.
+    ImportPath::Module::Builder modulePath(ctx, modulePathStr,
+                                           /*separator=*/'\0');
+    for (const auto &elem : modulePath) {
+      assert(!elem.Item.empty() &&
              "invalid module name (submodules not yet supported)");
     }
     auto module = getModule(modulePath.get(), /*allowLoading*/true);
@@ -474,14 +474,7 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
       if (Dep.isHeader())
         continue;
 
-      ImportPath::Builder importPath;
-
-      StringRef ModulePathStr = Dep.Core.RawPath;
-      while (!ModulePathStr.empty()) {
-        StringRef NextComponent;
-        std::tie(NextComponent, ModulePathStr) = ModulePathStr.split('\0');
-        importPath.push_back(Ctx.getIdentifier(NextComponent));
-      }
+      ImportPath::Builder importPath(Ctx, Dep.Core.RawPath, /*separator=*/'\0');
 
       if (importPath.size() == 1
           && importPath.front().Item == Ctx.StdlibModuleName)

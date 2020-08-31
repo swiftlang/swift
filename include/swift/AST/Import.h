@@ -22,6 +22,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/Located.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/STLExtras.h"
 
@@ -108,8 +109,11 @@ namespace detail {
     }
   };
 
+  // These shims avoid circularity between ASTContext.h and Import.h.
   ImportPathRaw ImportPathBuilder_copyToImpl(ASTContext &ctx,
                                              ImportPathRaw raw);
+  Identifier ImportPathBuilder_getIdentifierImpl(ASTContext &ctx,
+                                                 StringRef string);
 
   template<typename Subclass>
   class ImportPathBuilder {
@@ -137,6 +141,21 @@ namespace detail {
     template<typename Range>
     ImportPathBuilder(Range collection)
         : scratch(collection.begin(), collection.end()) { }
+
+    /// Parses \p text into elements separated by \p separator, with identifiers
+    /// from \p ctx and invalid SourceLocs.
+    ///
+    /// \warning This is not very robust; for instance, it doesn't check the
+    /// validity of the identifiers.
+    ImportPathBuilder(ASTContext &ctx, StringRef text, char separator)
+        : scratch()
+    {
+      while (!text.empty()) {
+        StringRef next;
+        std::tie(next, text) = text.split(separator);
+        push_back(ImportPathBuilder_getIdentifierImpl(ctx, next));
+      }
+    }
 
     void push_back(const ImportPathElement &elem) { scratch.push_back(elem); }
     void push_back(Identifier name, SourceLoc loc = SourceLoc()) {
