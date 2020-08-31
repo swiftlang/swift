@@ -6799,6 +6799,16 @@ bool AbstractFunctionDecl::isAsyncHandler() const {
                            false);
 }
 
+Type AbstractFunctionDecl::getThrowsInterfaceType() const {
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
+  if (auto type = evaluateOrDefault(ctx.evaluator,
+                           ThrowsTypeRequest{mutableThis},
+                           Type()))
+    return type;
+  return ErrorType::get(ctx);
+}
+
 BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {
   if ((getBodyKind() == BodyKind::Synthesize ||
        getBodyKind() == BodyKind::Unparsed) &&

@@ -3484,6 +3484,7 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
       doDiag = true;
     break;
   case TypeResolverContext::FunctionInput:
+  case TypeResolverContext::FunctionThrows:
   case TypeResolverContext::FunctionResult:
   case TypeResolverContext::PatternBindingDecl:
     doDiag = !isDirect;

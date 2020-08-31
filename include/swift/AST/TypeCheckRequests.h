@@ -1456,6 +1456,27 @@ public:
   void cacheResult(ParamSpecifier value) const;
 };
 
+/// Determines the throws type of a function.
+class ThrowsTypeRequest
+    : public SimpleRequest<ThrowsTypeRequest,
+                           Type(AbstractFunctionDecl *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Type evaluate(Evaluator &evaluator, AbstractFunctionDecl *decl) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
+};
+
 /// Determines the result type of a function or element type of a subscript.
 class ResultTypeRequest
     : public SimpleRequest<ResultTypeRequest,

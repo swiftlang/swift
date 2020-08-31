@@ -5758,6 +5758,7 @@ public:
 /// Base class for function-like declarations.
 class AbstractFunctionDecl : public GenericContext, public ValueDecl {
   friend class NeedsNewVTableEntryRequest;
+  friend class ThrowsTypeRequest;
 
 public:
   enum class BodyKind {
@@ -5855,7 +5856,7 @@ protected:
   SourceLoc ThrowsLoc;
   
   /// Location of the type of the 'throws'.
-  TypeRepr *ThrowsType;
+  TypeLoc ThrowsType;
 
   struct {
     unsigned NeedsNewVTableEntryComputed : 1;
@@ -5955,9 +5956,6 @@ public:
 
   /// Returns true if the function body throws.
   bool hasThrows() const { return Bits.AbstractFunctionDecl.Throws; }
-  
-  /// Returns true if the function has a typed throw.
-  bool hasTypedThrows() const { return (Bits.AbstractFunctionDecl.Throws && ThrowsType != nullptr); }
 
   TypeLoc getTypedThrow() const { return TypeLoc(ThrowsType); }
 

@@ -932,6 +932,25 @@ void ParamSpecifierRequest::cacheResult(ParamSpecifier specifier) const {
 }
 
 //----------------------------------------------------------------------------//
+// ThrowsTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<Type> ThrowsTypeRequest::getCachedResult() const {
+  auto *const decl = std::get<0>(getStorage());
+
+  if (auto type = cast<AbstractFunctionDecl>(decl)->ThrowsType.getType())
+    return type;
+
+  return None;
+}
+
+void ThrowsTypeRequest::cacheResult(Type type) const {
+  auto *const decl = std::get<0>(getStorage());
+
+  cast<AbstractFunctionDecl>(decl)->ThrowsType.setType(type);
+}
+
+//----------------------------------------------------------------------------//
 // ResultTypeRequest computation.
 //----------------------------------------------------------------------------//
 

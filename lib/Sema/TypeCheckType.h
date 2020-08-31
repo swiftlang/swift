@@ -90,6 +90,9 @@ enum class TypeResolverContext : uint8_t {
   /// Whether this is a variadic function input.
   VariadicFunctionInput,
 
+  /// Whether we are in the throws type of a function
+  FunctionThrows,
+
   /// Whether we are in the result type of a function, including multi-level
   /// tuple return values. See also: TypeResolutionFlags::Direct
   FunctionResult,
@@ -203,6 +206,7 @@ public:
     case Context::None:
     case Context::FunctionInput:
     case Context::VariadicFunctionInput:
+    case Context::FunctionThrows:
     case Context::FunctionResult:
     case Context::ExtensionBinding:
     case Context::SubscriptDecl:

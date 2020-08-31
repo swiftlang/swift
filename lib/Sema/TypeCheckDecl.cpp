@@ -1966,6 +1966,31 @@ static Type buildAddressorResultType(AccessorDecl *addressor,
   return valueType->wrapInPointer(pointerKind);
 }
 
+Type ThrowsTypeRequest::evaluate(Evaluator &evaluator,
+                                 AbstractFunctionDecl *decl) const {
+  auto &ctx = decl->getASTContext();
+
+  // Return Swift.Never, if the function doesnt throw.
+  if (!decl->hasThrows())
+    return ctx.getNeverType();
+
+  TypeRepr *throwsTyRepr = decl->getThrowsTypeRepr();
+
+  // If no type is specified, default to Swift.Error
+  if (throwsTyRepr == nullptr)
+    return ctx.getErrorDecl()->getInterfaceType();
+
+  const auto options =
+      TypeResolutionOptions(TypeResolverContext::FunctionThrows);
+  auto *const dc = decl->getInnermostDeclContext();
+  auto type = TypeResolution::forInterface(dc, options, /*unboundTyOpener*/ nullptr)
+      .resolveType(throwsTyRepr);
+
+
+
+  return type;
+}
+
 Type
 ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   auto &ctx = decl->getASTContext();
@@ -2302,6 +2327,9 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       assert(isa<DestructorDecl>(D));
       resultTy = TupleType::getEmpty(AFD->getASTContext());
     }
+
+    // Throws type
+    Type throwsTy = AFD->getThrowsInterfaceType();
 
     // (Args...) -> Result
     Type funcTy;

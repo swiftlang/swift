@@ -1929,9 +1929,9 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
       context, StaticSpellingKind::KeywordStatic,
       DeclName(context, DeclBaseName(context.Id_MainEntryPoint),
                ParameterList::createEmpty(context)),
-      /*NameLoc=*/SourceLoc(),
-      /*Async=*/false,
-      /*Throws=*/mainFunction->hasThrows(), /*ThrowsType=*/mainFunction->typedThrow(),
+      /*NameLoc=*/SourceLoc(), /*Async=*/false,
+      /*Throws=*/mainFunction->hasThrows(),
+      /*ThrowsType=*/mainFunction->getThrowsTypeRepr(),
       /*GenericParams=*/nullptr, ParameterList::createEmpty(context),
       /*FnRetType=*/TupleType::getEmpty(context), declContext);
   func->setSynthesized(true);
