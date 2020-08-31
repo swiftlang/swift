@@ -2186,12 +2186,12 @@ static void updateControlVariable(SILLocation Loc,
 }
 
 /// Test a bit in the control variable at the current insertion point.
-static SILValue testControlVariable(SILLocation Loc,
-                                    unsigned Elt,
-                                    SILValue ControlVariableAddr,
-                                    Identifier &ShiftRightFn,
-                                    Identifier &TruncateFn,
-                                    SILBuilder &B) {
+static SILValue testControlVariableBit(SILLocation Loc,
+                                       unsigned Elt,
+                                       SILValue ControlVariableAddr,
+                                       Identifier &ShiftRightFn,
+                                       Identifier &TruncateFn,
+                                       SILBuilder &B) {
   SILValue ControlVariable =
         B.createLoad(Loc, ControlVariableAddr, LoadOwnershipQualifier::Trivial);
 
@@ -2324,9 +2324,9 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
     // initialization.
     for (unsigned Elt = Use.FirstElement, e = Elt+Use.NumElements;
          Elt != e; ++Elt) {
-      auto CondVal = testControlVariable(Loc, Elt, ControlVariableAddr,
-                                         ShiftRightFn, TruncateFn,
-                                         B);
+      auto CondVal = testControlVariableBit(Loc, Elt, ControlVariableAddr,
+                                            ShiftRightFn, TruncateFn,
+                                            B);
       
       SILBasicBlock *TrueBB, *FalseBB, *ContBB;
       InsertCFGDiamond(CondVal, Loc, B,
@@ -2465,9 +2465,9 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
 
       // Insert a load of the liveness bitmask and split the CFG into a diamond
       // right before the destroy_addr, if we haven't already loaded it.
-      auto CondVal = testControlVariable(Loc, Elt, ControlVariableAddr,
-                                         ShiftRightFn, TruncateFn,
-                                         B);
+      auto CondVal = testControlVariableBit(Loc, Elt, ControlVariableAddr,
+                                            ShiftRightFn, TruncateFn,
+                                            B);
 
       SILBasicBlock *ReleaseBlock, *DeallocBlock, *ContBlock;
 
@@ -2486,11 +2486,11 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
   // depending on if the self box was initialized or not.
   auto emitReleaseOfSelfWhenNotConsumed = [&](SILLocation Loc,
                                               SILInstruction *Release) {
-    auto CondVal = testControlVariable(Loc, SelfInitializedElt,
-                                       ControlVariableAddr,
-                                       ShiftRightFn,
-                                       TruncateFn,
-                                       B);
+    auto CondVal = testControlVariableBit(Loc, SelfInitializedElt,
+                                          ControlVariableAddr,
+                                          ShiftRightFn,
+                                          TruncateFn,
+                                          B);
 
     SILBasicBlock *ReleaseBlock, *ConsumedBlock, *ContBlock;
 
@@ -2573,11 +2573,11 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
         // self.init or super.init may or may not have been called.
         // We have not yet stored 'self' into the box.
 
-        auto CondVal = testControlVariable(Loc, SuperInitElt,
-                                           ControlVariableAddr,
-                                           ShiftRightFn,
-                                           TruncateFn,
-                                           B);
+        auto CondVal = testControlVariableBit(Loc, SuperInitElt,
+                                              ControlVariableAddr,
+                                              ShiftRightFn,
+                                              TruncateFn,
+                                              B);
 
         SILBasicBlock *ConsumedBlock, *DeallocBlock, *ContBlock;
 
@@ -2607,11 +2607,11 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
         // self.init or super.init may or may not have been called.
         // We may or may have stored 'self' into the box.
 
-        auto CondVal = testControlVariable(Loc, SuperInitElt,
-                                           ControlVariableAddr,
-                                           ShiftRightFn,
-                                           TruncateFn,
-                                           B);
+        auto CondVal = testControlVariableBit(Loc, SuperInitElt,
+                                              ControlVariableAddr,
+                                              ShiftRightFn,
+                                              TruncateFn,
+                                              B);
 
         SILBasicBlock *LiveBlock, *DeallocBlock, *ContBlock;
 
