@@ -360,12 +360,16 @@ class ASTExtInfo {
 
   ASTExtInfoBuilder builder;
 
+  // Only for use by ASTExtInfoBuilder::build. Don't use it elsewhere!
   ASTExtInfo(ASTExtInfoBuilder builder) : builder(builder) {}
+
   ASTExtInfo(unsigned bits, ClangTypeInfo clangTypeInfo)
-      : builder(bits, clangTypeInfo){};
+      : builder(bits, clangTypeInfo) {
+    builder.checkInvariants();
+  };
 
 public:
-  ASTExtInfo() : builder(){};
+  ASTExtInfo() : builder() { builder.checkInvariants(); };
 
   /// Create a builder with the same state as \c this.
   ASTExtInfoBuilder intoBuilder() const { return builder; }
@@ -654,12 +658,16 @@ class SILExtInfo {
 
   SILExtInfoBuilder builder;
 
+  // Only for use by SILExtInfoBuilder::build. Don't use it elsewhere!
   SILExtInfo(SILExtInfoBuilder builder) : builder(builder) {}
+
   SILExtInfo(unsigned bits, ClangTypeInfo clangTypeInfo)
-      : builder(bits, clangTypeInfo){};
+      : builder(bits, clangTypeInfo) {
+    builder.checkInvariants();
+  };
 
 public:
-  SILExtInfo() : builder(){};
+  SILExtInfo() : builder() { builder.checkInvariants(); };
 
   static SILExtInfo getThin() {
     return SILExtInfoBuilder(SILExtInfoBuilder::Representation::Thin, false,
