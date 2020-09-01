@@ -478,6 +478,8 @@ TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
   auto Rethrows = SyntaxFactory::makeRethrowsKeyword({},
                                                        { Trivia::spaces(1) });
   auto Arrow = SyntaxFactory::makeArrowToken({}, Trivia::spaces(1));
+  
+  auto TypedThrow = SyntaxFactory::makeThrowsDecl(Throws, LeftParen, Error, RightParen);
 
   {
     SmallString<48> Scratch;
@@ -541,7 +543,7 @@ TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
     ASSERT_EQ(OS.str().str(), "(x: Int, y: Int) throws -> Int");
   }
   {
-    SmallString<48> Scratch;
+    SmallString<64> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
 
     auto x = SyntaxFactory::makeIdentifier("x", {}, {});
@@ -563,10 +565,9 @@ TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
                                     TypeList,
                                     RightParen,
                                     None,
-                                    Throws,
-                                    LeftParen
-                                    Error,
-                                    RightParen,
+                                    TokenSyntax::missingToken(tok::kw_throws,
+                                                              "throws"),
+                                    TypedThrow,
                                     Arrow,
                                     Int)
       .print(OS);
@@ -620,6 +621,8 @@ TEST(TypeSyntaxTests, FunctionTypeWithAPIs) {
   auto Rethrows = SyntaxFactory::makeRethrowsKeyword({},
                                                        { Trivia::spaces(1) });
   auto Arrow = SyntaxFactory::makeArrowToken({}, { Trivia::spaces(1) });
+  
+  auto TypedThrow = SyntaxFactory::makeThrowsDecl(Throws, LeftParen, Error, RightParen);
 
   {
     SmallString<48> Scratch;
@@ -662,10 +665,7 @@ TEST(TypeSyntaxTests, FunctionTypeWithAPIs) {
       .addArgument(xArg)
       .addArgument(yArg)
       .withRightParen(RightParen)
-      .withThrowsOrRethrowsKeyword(Throws)
-      .withLeftParen(LeftParen)
-      .withThrowsType(Error)
-      .withRightParen(RightParen)
+      .withTypedThrows(TypedThrow)
       .withArrow(Arrow)
       .withReturnType(Int)
       .print(OS);
