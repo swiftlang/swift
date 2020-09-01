@@ -39,268 +39,230 @@ using namespace swift::silverifier;
 //                               Write Gatherer
 //===----------------------------------------------------------------------===//
 
-// Helper for gatherAddressWrites.
-static bool gatherBuiltinWrites(Operand *op, BuiltinInst *bi,
-                                SmallVectorImpl<Operand *> &writeAccumulator) {
-  // If we definitely do not write to memory, just return true early.
-  if (!bi->mayWriteToMemory()) {
+namespace {
+
+// Visitor for visitAccessPathUses().
+class GatherWritesVisitor : public AccessUseVisitor {
+  // Result: writes to the AccessPath being visited.
+  SmallVectorImpl<Operand *> &writeAccumulator;
+
+public:
+  GatherWritesVisitor(SmallVectorImpl<Operand *> &writes)
+      : AccessUseVisitor(AccessUseType::Overlapping,
+                         NestedAccessType::StopAtAccessBegin),
+        writeAccumulator(writes) {}
+
+  bool visitUse(Operand *op, AccessUseType useTy);
+};
+
+// Functor for MultiMapCache construction.
+struct GatherWrites {
+  const SILFunction *function;
+  GatherWrites(const SILFunction *function) : function(function) {}
+
+  bool operator()(const AccessPath &accessPath,
+                  SmallVectorImpl<Operand *> &writeAccumulator) {
+    GatherWritesVisitor visitor(writeAccumulator);
+    return visitAccessPathUses(visitor, accessPath,
+                               const_cast<SILFunction *>(function));
+  }
+};
+
+} // end anonymous namespace
+
+// Filter out recognized uses that do not write to memory.
+//
+// TODO: Ensure that all of the conditional-write logic below is encapsulated in
+// mayWriteToMemory and just call that instead. Possibly add additional
+// verification that visitAccessPathUses recognizes all instructions that may
+// propagate pointers (even though they don't write).
+bool GatherWritesVisitor::visitUse(Operand *op, AccessUseType useTy) {
+  // If this operand is for a dependent type, then it does not actually access
+  // the operand's address value. It only uses the metatype defined by the
+  // operation (e.g. open_existential).
+  if (op->isTypeDependent()) {
+    return true;
+  }
+  SILInstruction *user = op->getUser();
+  if (isIncidentalUse(user)) {
+    return true;
+  }
+  switch (user->getKind()) {
+
+  // Known reads...
+  case SILInstructionKind::LoadBorrowInst:
+  case SILInstructionKind::SelectEnumAddrInst:
+  case SILInstructionKind::SwitchEnumAddrInst:
+  case SILInstructionKind::DeallocStackInst:
+  case SILInstructionKind::DeallocBoxInst:
+  case SILInstructionKind::WitnessMethodInst:
+  case SILInstructionKind::ExistentialMetatypeInst:
+    return true;
+
+  // Known writes...
+  case SILInstructionKind::DestroyAddrInst:
+  case SILInstructionKind::DestroyValueInst:
+  case SILInstructionKind::InjectEnumAddrInst:
+  case SILInstructionKind::StoreInst:
+  case SILInstructionKind::AssignInst:
+  case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
+  case SILInstructionKind::MarkFunctionEscapeInst:
+    writeAccumulator.push_back(op);
+    return true;
+
+  // Load/Store variations...
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, NAME)      \
+  case SILInstructionKind::Load##Name##Inst:                                   \
+    if (cast<Load##Name##Inst>(user)->isTake() == IsTake) {                    \
+      writeAccumulator.push_back(op);                                          \
+    }                                                                          \
+    return true;                                                               \
+                                                                               \
+  case SILInstructionKind::Store##Name##Inst:                                  \
+    writeAccumulator.push_back(op);                                            \
+    return true;
+#include "swift/AST/ReferenceStorage.def"
+
+  // Ignored pointer uses...
+
+  // Allow store_borrow within the load_borrow scope.
+  // FIXME: explain why.
+  case SILInstructionKind::StoreBorrowInst:
+  // Returns are never in scope.
+  case SILInstructionKind::ReturnInst:
+    return true;
+
+  // Reads that may perform a "take"...
+
+  case SILInstructionKind::LoadInst:
+    if (cast<LoadInst>(user)->getOwnershipQualifier()
+        == LoadOwnershipQualifier::Take) {
+      writeAccumulator.push_back(op);
+    }
+    return true;
+
+  case SILInstructionKind::UnconditionalCheckedCastAddrInst:
+    return true;
+
+  case SILInstructionKind::CheckedCastAddrBranchInst: {
+    auto *ccbi = cast<CheckedCastAddrBranchInst>(user);
+    if (ccbi->getConsumptionKind() != CastConsumptionKind::CopyOnSuccess) {
+      writeAccumulator.push_back(op);
+    }
     return true;
   }
 
-  // TODO: Should we make this an exhaustive list so that when new builtins are
-  // added, they need to actually update this code?
-  writeAccumulator.push_back(op);
-  return true;
-}
+  // Conditional writes...
 
-/// Returns true if we were able to ascertain that either the initialValue has
-/// no write uses or all of the write uses were writes that we could understand.
-static bool
-gatherAddressWrites(SILValue address,
-                         SmallVectorImpl<Operand *> &writeAccumulator) {
-  SmallVector<Operand *, 8> worklist(address->getUses());
-
-  while (!worklist.empty()) {
-    auto *op = worklist.pop_back_val();
-
-    // Skip type dependent operands.
-    if (op->isTypeDependent()) {
-      continue;
-    }
-
-    SILInstruction *user = op->getUser();
-
-    if (Projection::isAddressProjection(user) ||
-        isa<ProjectBlockStorageInst>(user)) {
-      for (SILValue r : user->getResults()) {
-        llvm::copy(r->getUses(), std::back_inserter(worklist));
-      }
-      continue;
-    }
-
-    if (auto *oeai = dyn_cast<OpenExistentialAddrInst>(user)) {
-      // Mutable access!
-      if (oeai->getAccessKind() != OpenedExistentialAccess::Immutable) {
-        writeAccumulator.push_back(op);
-      }
-
-      //  Otherwise, look through it and continue.
-      llvm::copy(oeai->getUses(), std::back_inserter(worklist));
-      continue;
-    }
-
-    // Add any destroy_addrs to the resultAccumulator.
-    if (isa<DestroyAddrInst>(user) || isa<DestroyValueInst>(user)) {
+  case SILInstructionKind::CopyAddrInst:
+    if (cast<CopyAddrInst>(user)->getDest() == op->get()) {
       writeAccumulator.push_back(op);
-      continue;
+      return true;
     }
-
-    // load_borrow, load_weak, load_unowned and incidental uses are fine as
-    // well.
-    if (isa<LoadBorrowInst>(user) || isIncidentalUse(user)) {
-      continue;
-    }
-
-    if (auto *mdi = dyn_cast<MarkDependenceInst>(user)) {
-      if (mdi->getValue() == op->get()) {
-        writeAccumulator.push_back(op);
-      }
-      continue;
-    }
-
-    if (isa<InjectEnumAddrInst>(user)) {
+    // This operand is the copy source. Check if it is taken.
+    if (cast<CopyAddrInst>(user)->isTakeOfSrc()) {
       writeAccumulator.push_back(op);
-      continue;
     }
+    return true;
 
-    // switch_enum_addr never writes to memory.
-    if (isa<SwitchEnumAddrInst>(user)) {
-      continue;
+  // If this value is dependent on another, conservatively consider it a write.
+  //
+  // FIXME: explain why a mark_dependence effectively writes to storage.
+  case SILInstructionKind::MarkDependenceInst:
+    if (cast<MarkDependenceInst>(user)->getValue() == op->get()) {
+      writeAccumulator.push_back(op);
     }
+    return true;
 
-    if (auto *ccbi = dyn_cast<CheckedCastAddrBranchInst>(user)) {
-      if (ccbi->getConsumptionKind() == CastConsumptionKind::TakeAlways ||
-          ccbi->getConsumptionKind() == CastConsumptionKind::TakeOnSuccess) {
-        writeAccumulator.push_back(op);
-        continue;
-      }
+  // Check for mutable existentials.
+  case SILInstructionKind::OpenExistentialAddrInst:
+    if (cast<OpenExistentialAddrInst>(user)->getAccessKind()
+        != OpenedExistentialAccess::Immutable) {
+      writeAccumulator.push_back(op);
     }
+    return true;
 
-    if (isa<PointerToAddressInst>(user)) {
-      continue;
+  case SILInstructionKind::BeginAccessInst:
+    if (cast<BeginAccessInst>(user)->getAccessKind() != SILAccessKind::Read) {
+      writeAccumulator.push_back(op);
     }
+    return true;
 
-    // Skip store_borrow.
-    if (isa<StoreBorrowInst>(user)) {
-      continue;
+  case SILInstructionKind::BuiltinInst:
+    if (!cast<BuiltinInst>(user)->mayWriteToMemory()) {
+      return true;
     }
+    writeAccumulator.push_back(op);
+    return true;
 
-    // Look through immutable begin_access.
-    if (auto *bai = dyn_cast<BeginAccessInst>(user)) {
-      // If we do not have a read, mark this as a write.
-      if (bai->getAccessKind() != SILAccessKind::Read) {
-        writeAccumulator.push_back(op);
-      }
-
-      // Otherwise, add the users to the worklist and continue.
-      llvm::copy(bai->getUses(), std::back_inserter(worklist));
-      continue;
+  case SILInstructionKind::YieldInst: {
+    SILYieldInfo info = cast<YieldInst>(user)->getYieldInfoForOperand(*op);
+    if (info.isIndirectInGuaranteed()) {
+      return true;
     }
-
-    // If we have a load, we just need to mark the load [take] as a write.
-    if (auto *li = dyn_cast<LoadInst>(user)) {
-      if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
-        writeAccumulator.push_back(op);
-      }
-      continue;
+    if (info.isIndirectMutating() || info.isConsumed()) {
+      writeAccumulator.push_back(op);
+      return true;
     }
-
-#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, NAME)      \
-  if (auto *li = dyn_cast<Load##Name##Inst>(user)) {                           \
-    if (li->isTake() == IsTake) {                                              \
-      writeAccumulator.push_back(op);                               \
-    }                                                                          \
-    continue;                                                                  \
-  }                                                                            \
-  if (isa<Store##Name##Inst>(user)) {                                          \
-    writeAccumulator.push_back(op);                                 \
-    continue;                                                                  \
+    break; // unknown yield convention
   }
-#include "swift/AST/ReferenceStorage.def"
 
-    // If we have a FullApplySite, see if we use the value as an
-    // indirect_guaranteed parameter. If we use it as inout, we need
-    // interprocedural analysis that we do not perform here.
-    if (auto fas = FullApplySite::isa(user)) {
-      if (fas.isIndirectResultOperand(*op)) {
-        writeAccumulator.push_back(op);
-        continue;
-      }
+  default:
+    break;
+  } // end switch(user->getKind())
 
-      auto argConv = fas.getArgumentConvention(*op);
-
-      // We should have an indirect convention here.
-      if (!argConv.isIndirectConvention()) {
-        llvm::errs() << "Full apply site taking non-indirect operand: "
-                     << *user;
-        return false;
-      }
-
-      if (argConv == SILArgumentConvention::Indirect_In_Guaranteed) {
-        continue;
-      }
-
-      if (argConv.isInoutConvention()) {
-        writeAccumulator.push_back(op);
-        continue;
-      }
-
-      if (argConv.isOwnedConvention()) {
-        writeAccumulator.push_back(op);
-        continue;
-      }
-
-      // Otherwise, be conservative and return that we had a write that we did
-      // not understand.
-      llvm::errs() << "Full apply site not understood: " << *user;
-      return false;
-    }
-
-    if (auto as = ApplySite::isa(user)) {
+  // If we have a FullApplySite, see if we use the value as an
+  // indirect_guaranteed parameter. If we use it as inout, we need
+  // interprocedural analysis that we do not perform here.
+  if (auto fas = FullApplySite::isa(user)) {
+    if (fas.isIndirectResultOperand(*op)) {
       writeAccumulator.push_back(op);
-      continue;
+      return true;
     }
+    auto argConv = fas.getArgumentConvention(*op);
 
-    // Copy addr that read are just loads.
-    if (auto *cai = dyn_cast<CopyAddrInst>(user)) {
-      // If our value is the destination, this is a write.
-      if (cai->getDest() == op->get()) {
-        writeAccumulator.push_back(op);
-        continue;
-      }
-
-      // Ok, so we are Src by process of elimination. Make sure we are not being
-      // taken.
-      if (cai->isTakeOfSrc()) {
-        writeAccumulator.push_back(op);
-        continue;
-      }
-
-      // Otherwise, we are safe and can continue.
-      continue;
-    }
-
-    if (isa<StoreInst>(user) || isa<AssignInst>(user)) {
+    // A box or pointer value may be passed directly. Consider that a write.
+    if (!argConv.isIndirectConvention()) {
       writeAccumulator.push_back(op);
-      continue;
+      return true;
     }
-
-    if (isa<DeallocStackInst>(user)) {
-      continue;
+    if (argConv == SILArgumentConvention::Indirect_In_Guaranteed) {
+      return true;
     }
-
-    if (isa<WitnessMethodInst>(user)) {
-      continue;
-    }
-
-    if (isa<SelectEnumAddrInst>(user)) {
-      continue;
-    }
-
-    // We consider address_to_pointer to be an escape from our system. The
-    // frontend must protect the uses of the load_borrow as appropriate in other
-    // ways (for instance by using a mark_dependence).
-    if (isa<AddressToPointerInst>(user)) {
-      continue;
-    }
-
-    if (auto *yi = dyn_cast<YieldInst>(user)) {
-      auto info = yi->getYieldInfoForOperand(*op);
-      if (info.isIndirectInGuaranteed()) {
-        continue;
-      }
-
-      if (info.isIndirectMutating() || info.isConsumed()) {
-        writeAccumulator.push_back(op);
-        continue;
-      }
-    }
-
-    // Existential metatype doesnt write to memory.
-    if (isa<ExistentialMetatypeInst>(user)) {
-      continue;
-    }
-
-    // unconditional_checked_cast_addr does a take on its input memory.
-    if (isa<UnconditionalCheckedCastAddrInst>(user)) {
+    if (argConv.isInoutConvention()) {
       writeAccumulator.push_back(op);
-      continue;
+      return true;
     }
-
-    if (auto *ccabi = dyn_cast<CheckedCastAddrBranchInst>(user)) {
-      if (ccabi->getConsumptionKind() != CastConsumptionKind::CopyOnSuccess) {
-        writeAccumulator.push_back(op);
-      }
-      continue;
+    if (argConv.isOwnedConvention()) {
+      writeAccumulator.push_back(op);
+      return true;
     }
-
-    if (auto *bi = dyn_cast<BuiltinInst>(user)) {
-      if (gatherBuiltinWrites(op, bi, writeAccumulator)) {
-        continue;
-      }
-    }
-
-    // If we did not recognize the user, just return conservatively that it was
-    // written to in a way we did not understand.
-    llvm::errs() << "Function: " << user->getFunction()->getName() << "\n";
-    llvm::errs() << "Value: " << op->get();
-    llvm::errs() << "Unknown instruction!: " << *user;
-    // llvm::report_fatal_error("Unable to handle instruction?!");
+    // Otherwise, be conservative and return that we had a write that we did
+    // not understand.
+    llvm::errs() << "Full apply site not understood: " << *user;
     return false;
   }
 
-  // Ok, we finished our worklist and this address is not being written to.
-  return true;
+  // Handle a capture-by-address like a write.
+  if (auto as = ApplySite::isa(user)) {
+    writeAccumulator.push_back(op);
+    return true;
+  }
+  // We don't have an inclusive list of all use patterns for non-address
+  // values. References and pointers can be passed to almost anything that takes
+  // a value. We assume that visitAccessPathUses has already looked past
+  // operations that can propagate a reference or pointer, and simply check that
+  // the leaf use that it returned cannot itself write to memory.
+  if (!op->get()->getType().isAddress() && !user->mayWriteToMemory()) {
+    return true;
+  }
+  // If we did not recognize the user, just return conservatively that it was
+  // written to in a way we did not understand.
+  llvm::errs() << "Function: " << user->getFunction()->getName() << "\n";
+  llvm::errs() << "Value: " << op->get();
+  llvm::errs() << "Unknown instruction: " << *user;
+  llvm::report_fatal_error("Unexpected instruction using borrowed address?!");
+  return false;
 }
 
 //===----------------------------------------------------------------------===//
@@ -308,27 +270,24 @@ gatherAddressWrites(SILValue address,
 //===----------------------------------------------------------------------===//
 
 LoadBorrowImmutabilityAnalysis::LoadBorrowImmutabilityAnalysis(
-    DeadEndBlocks &deadEndBlocks)
-    : cache(gatherAddressWrites), deadEndBlocks(deadEndBlocks) {}
+    DeadEndBlocks &deadEndBlocks, const SILFunction *f)
+    : cache(GatherWrites(f)), deadEndBlocks(deadEndBlocks) {}
 
 // \p address may be an address, pointer, or box type.
-bool LoadBorrowImmutabilityAnalysis::
-    doesAddressHaveWriteThatInvalidatesLoadBorrow(
-        LoadBorrowInst *lbi, ArrayRef<Operand *> endBorrowUses,
-        SILValue address) {
+bool LoadBorrowImmutabilityAnalysis::isImmutableInScope(
+    LoadBorrowInst *lbi, ArrayRef<Operand *> endBorrowUses,
+    AccessPath accessPath) {
+
   SmallPtrSet<SILBasicBlock *, 8> visitedBlocks;
   LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
-  auto writes = cache.get(address);
+  auto writes = cache.get(accessPath);
 
   // Treat None as a write.
   if (!writes) {
-    llvm::errs() << "Failed to find cached writes for: " << *address;
-    return true;
+    llvm::errs() << "Failed to find cached writes for: ";
+    accessPath.getStorage().print(llvm::errs());
+    return false;
   }
-
-  auto lbiProjPath =
-      ProjectionPath::getProjectionPath(address, lbi->getOperand());
-
   // Then for each write...
   for (auto *op : *writes) {
     visitedBlocks.clear();
@@ -337,140 +296,38 @@ bool LoadBorrowImmutabilityAnalysis::
     if (deadEndBlocks.isDeadEnd(op->getUser()->getParent())) {
       continue;
     }
-
     // See if the write is within the load borrow's lifetime. If it isn't, we
     // don't have to worry about it.
     if (!checker.validateLifetime(lbi, endBorrowUses, op)) {
       continue;
     }
-
-    // Ok, we found a write that overlaps with our load_borrow. We now need to
-    // prove that the write is to an address that can not trivially alias our
-    // load_borrow.
-    //
-    // First we check if we were actually able to compute a projection path to
-    // our address from lbiProjPath. If not, we have to a
-    if (!lbiProjPath) {
-      llvm::errs() << "Couldn't find path root for load_borrow: " << *lbi;
-      return true;
-    }
-
-    auto writePath = ProjectionPath::getProjectionPath(address, op->get());
-    if (!writePath) {
-      llvm::errs() << "Couldn't find path root for write: " << *op->getUser();
-      return true;
-    }
-
-    // The symmetric difference of two projection paths consists of the parts of
-    // two projection paths that are unique to each of the two. Naturally, if
-    // such a thing exists we must have that the two values can not alias.
-    if (writePath->hasNonEmptySymmetricDifference(*lbiProjPath)) {
-      continue;
-    }
-
     llvm::errs() << "Write: " << *op->getUser();
-    return true;
+    return false;
   }
-
   // Ok, we are good.
-  return false;
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
-bool LoadBorrowImmutabilityAnalysis::
-    doesBoxHaveWritesThatInvalidateLoadBorrow(LoadBorrowInst *lbi,
-                                              ArrayRef<Operand *> endBorrowUses,
-                                              SILValue originalBox) {
-  SILValue box = originalBox;
-  SmallVector<ProjectBoxInst *, 2> otherProjBoxInsts;
-  SmallVector<SILInstruction *, 16> worklist;
-
-  // First walk up use->def from our project_box's operand to the actual box. As
-  // we do the walk, we gather up any project_box that we see (for later write
-  // checking) and then if we are either a copy_value or a begin_borrow strip
-  // the value and continue.
-  //
-  // So by the end of this loop, the worklist will contain not the copy_value,
-  // begin_borrow that we stripped, but rather any uses of those copy_value,
-  // begin_borrow that we stripped. This is to make sure we find project_box
-  // from webs of copy_value, begin_borrow.
-  do {
-    for (auto *use : box->getUses()) {
-      auto *user = use->getUser();
-      if (auto *pbi = dyn_cast<ProjectBoxInst>(user)) {
-        otherProjBoxInsts.push_back(pbi);
-        continue;
-      }
-
-      if (isa<CopyValueInst>(user) || isa<BeginBorrowInst>(user)) {
-        worklist.push_back(user);
-      }
-    }
-
-    if (isa<CopyValueInst>(box) || isa<BeginBorrowInst>(box)) {
-      box = cast<SingleValueInstruction>(box)->getOperand(0);
-      continue;
-    }
-  } while (false);
-
-  // Now that we finished our walk and gathered up copy_value, begin_borrow,
-  // visit each of those instructions recursively def->use, looking through
-  // further copy_value, begin_borrow and stashing any project_box we see for
-  // later write checking.
-  while (!worklist.empty()) {
-    auto *inst = worklist.pop_back_val();
-    for (SILValue result : inst->getResults()) {
-      for (auto *use : result->getUses()) {
-        auto *user = use->getUser();
-        if (auto *pbi = dyn_cast<ProjectBoxInst>(user)) {
-          otherProjBoxInsts.push_back(pbi);
-          continue;
-        }
-
-        if (isa<CopyValueInst>(user) || isa<BeginBorrowInst>(user)) {
-          worklist.push_back(user);
-        }
-      }
-    }
-  }
-
-  // Ok! We now know that we have all project_box from the "local phi" web of
-  // the alloc_box our project_box is from. Now check that none of those have
-  // simple aliasing writes when our load_borrow is live.
-  while (!otherProjBoxInsts.empty()) {
-    auto *otherProjBox = otherProjBoxInsts.pop_back_val();
-
-    if (doesAddressHaveWriteThatInvalidatesLoadBorrow(lbi, endBorrowUses,
-                                                      otherProjBox)) {
-      return true;
-    }
-  }
-
-  return false;
-}
-bool LoadBorrowImmutabilityAnalysis::isInvalidated(
-    LoadBorrowInst *lbi) {
+bool LoadBorrowImmutabilityAnalysis::isImmutable(LoadBorrowInst *lbi) {
+  // Find either the enclosing access scope or a single base address.
 
   // FIXME: To be reenabled separately in a follow-on commit.
   return true;
 
-  SILValue address = getAccessScope(lbi->getOperand());
-  if (!address)
-    return false;
-
-  auto storage = AccessedStorage::compute(address);
-  // If we couldn't find an access storage, return that we are assumed to write.
-  if (!storage) {
-    llvm::errs() << "Couldn't compute access storage?!\n";
-    return false;
+  AccessPath accessPath = AccessPath::computeInScope(lbi->getOperand());
+  // Bail on an invalid AccessPath. AccessPath completeness is verified
+  // independently--it may be invalid in extraordinary situations. When
+  // AccessPath is valid, we know all its uses are recognizable.
+  if (!accessPath.isValid()) {
+    return true;
   }
-
   // If we have a let address, then we are already done.
-  if (storage.isLetAccess()) {
-    return false;
+  if (accessPath.getStorage().isLetAccess()) {
+    return true;
   }
   // At this point, we know that we /may/ have writes. Now we go through various
   // cases to try and exhaustively identify if those writes overlap with our
@@ -480,105 +337,38 @@ bool LoadBorrowImmutabilityAnalysis::isInvalidated(
             std::back_inserter(endBorrowUses),
             [](EndBorrowInst *ebi) { return &ebi->getAllOperands()[0]; });
 
-  // If we have a begin_access and...
-  if (auto *bai = dyn_cast<BeginAccessInst>(address)) {
+  switch (accessPath.getStorage().getKind()) {
+  case AccessedStorage::Nested: {
+    // If we have a begin_access and...
+    auto *bai = cast<BeginAccessInst>(accessPath.getStorage().getValue());
     // We do not have a modify, assume we are correct.
     if (bai->getAccessKind() != SILAccessKind::Modify) {
-      return false;
+      return true;
     }
-
     // Otherwise, validate that any writes to our begin_access is not when the
     // load_borrow's result is live.
     //
-    // FIXME: do we verify that the load_borrow scope is always nested within
-    // the begin_access scope (to ensure no aliasing access)?
-    return doesAddressHaveWriteThatInvalidatesLoadBorrow(lbi, endBorrowUses,
-                                                         bai);
-  }
-
-  // FIXME: the subsequent checks appear to assume that 'address' is not aliased
-  // within the scope of the load_borrow. This can only be assumed when either
-  // the load_borrow is nested within an access scope or when the
-  // storage.isUniquelyIdentified() and all uses of storage.getRoot() have been
-  // analyzed. The later can be done with AccessPath::collectUses().
-
-  // Check if our unidentified access storage is a project_box. In such a case,
-  // validate that all uses of the project_box are not writes that overlap with
-  // our load_borrow's result. These are things that may not be a formal access
-  // base.
-  //
-  // FIXME: Remove this PointerToAddress check. It appears to be incorrect. we
-  // don't verify anywhere that a pointer_to_address cannot itself be derived
-  // from another address that is accessible in the same function, either
-  // because it was returned from a call or directly address_to_pointer'd.
-  if (isa<PointerToAddressInst>(address)) {
-    return doesAddressHaveWriteThatInvalidatesLoadBorrow(lbi, endBorrowUses,
-                                                         address);
-  }
-
-  // FIXME: This ProjectBoxInst
-  // If we have a project_box, we need to see if our base, modulo begin_borrow,
-  // copy_value have any other project_box that we need to analyze.
-  if (auto *pbi = dyn_cast<ProjectBoxInst>(address)) {
-    return doesBoxHaveWritesThatInvalidateLoadBorrow(lbi, endBorrowUses,
-                                                     pbi->getOperand());
-  }
-
-
-  switch (storage.getKind()) {
-  case AccessedStorage::Stack: {
-    // For now assume that stack is safe.
-    return doesAddressHaveWriteThatInvalidatesLoadBorrow(lbi, endBorrowUses,
-                                                         address);
+    // TODO: As a separate analysis, verify that the load_borrow scope is always
+    // nested within the begin_access scope (to ensure no aliasing access).
+    return isImmutableInScope(lbi, endBorrowUses, accessPath);
   }
   case AccessedStorage::Argument: {
-    auto *arg = cast<SILFunctionArgument>(storage.getArgument());
-    if (arg->hasConvention(SILArgumentConvention::Indirect_In_Guaranteed))
-      return false;
-    return doesAddressHaveWriteThatInvalidatesLoadBorrow(lbi, endBorrowUses,
-                                                         arg);
+    auto *arg =
+        cast<SILFunctionArgument>(accessPath.getStorage().getArgument());
+    if (arg->hasConvention(SILArgumentConvention::Indirect_In_Guaranteed)) {
+      return true;
+    }
+    return isImmutableInScope(lbi, endBorrowUses, accessPath);
   }
-  case AccessedStorage::Yield: {
-    // For now, do this. Otherwise, check for in_guaranteed, etc.
-    //
-    // FIXME: The yielded address could overlap with another address in this
-    // function.
-    return false;
-  }
-  case AccessedStorage::Box: {
-    return doesAddressHaveWriteThatInvalidatesLoadBorrow(lbi, endBorrowUses,
-                                                         address);
-  }
-  case AccessedStorage::Class: {
-    // Check that the write to the class's memory doesn't overlap with our
-    // load_borrow.
-    //
-    // FIXME: how do we know that other projections of the same object don't
-    // occur within the same function?
-    return doesAddressHaveWriteThatInvalidatesLoadBorrow(lbi, endBorrowUses,
-                                                         address);
-  }
-  case AccessedStorage::Tail: {
-    // This should be as strong as the Class address case, but to handle it we
-    // need to find all aliases of the object and all tail projections within
-    // that object.
-    return false;
-  }
-  case AccessedStorage::Global: {
-    // Check that the write to the class's memory doesn't overlap with our
-    // load_borrow.
-    return doesAddressHaveWriteThatInvalidatesLoadBorrow(lbi, endBorrowUses,
-                                                         address);
-  }
-  case AccessedStorage::Unidentified: {
-    // Otherwise, we didn't understand this, so bail.
-    llvm::errs() << "Unidentified access storage: ";
-    storage.dump();
-    return false;
-  }
-  case AccessedStorage::Nested: {
-    llvm_unreachable("Should have been handled above");
-  }
+  // FIXME: A yielded address could overlap with another in this function.
+  case AccessedStorage::Yield:
+  case AccessedStorage::Stack:
+  case AccessedStorage::Box:
+  case AccessedStorage::Class:
+  case AccessedStorage::Tail:
+  case AccessedStorage::Global:
+  case AccessedStorage::Unidentified:
+    return isImmutableInScope(lbi, endBorrowUses, accessPath);
   }
   llvm_unreachable("Covered switch isn't covered?!");
 }

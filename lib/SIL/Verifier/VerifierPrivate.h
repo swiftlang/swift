@@ -14,6 +14,7 @@
 #define SWIFT_SIL_VERIFIER_VERIFIERPRIVATE_H
 
 #include "swift/Basic/MultiMapCache.h"
+#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILValue.h"
 
 namespace swift {
@@ -26,21 +27,21 @@ class Operand;
 namespace silverifier {
 
 class LoadBorrowImmutabilityAnalysis {
-  SmallMultiMapCache<SILValue, Operand *> cache;
+  SmallMultiMapCache<AccessPath, Operand *> cache;
   DeadEndBlocks &deadEndBlocks;
 
 public:
-  LoadBorrowImmutabilityAnalysis(DeadEndBlocks &deadEndBlocks);
+  LoadBorrowImmutabilityAnalysis(DeadEndBlocks &deadEndBlocks,
+                                 const SILFunction *f);
 
   /// Returns true if exhaustively lbi is guaranteed to never be invalidated by
   /// local writes.
-  bool isInvalidated(LoadBorrowInst *lbi);
+  bool isImmutable(LoadBorrowInst *lbi);
 
 private:
-  bool doesAddressHaveWriteThatInvalidatesLoadBorrow(
-      LoadBorrowInst *lbi, ArrayRef<Operand *> endBorrowUses, SILValue address);
-  bool doesBoxHaveWritesThatInvalidateLoadBorrow(
-      LoadBorrowInst *lbi, ArrayRef<Operand *> endBorrowUses, SILValue box);
+  bool isImmutableInScope(LoadBorrowInst *lbi,
+                          ArrayRef<Operand *> endBorrowUses,
+                          AccessPath accessPath);
 };
 
 } // namespace silverifier

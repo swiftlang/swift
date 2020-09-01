@@ -664,7 +664,7 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   llvm::DenseMap<const SILInstruction *, unsigned> InstNumbers;
   
   DeadEndBlocks DEBlocks;
-  LoadBorrowImmutabilityAnalysis loadBorrowNeverInvalidatedAnalysis;
+  LoadBorrowImmutabilityAnalysis loadBorrowImmutabilityAnalysis;
   bool SingleFunction = true;
 
   SILVerifier(const SILVerifier&) = delete;
@@ -863,7 +863,7 @@ public:
         fnConv(F.getConventionsInContext()), TC(F.getModule().Types),
         OpenedArchetypes(&F), Dominance(nullptr),
         InstNumbers(numInstsInFunction(F)), DEBlocks(&F),
-        loadBorrowNeverInvalidatedAnalysis(DEBlocks),
+        loadBorrowImmutabilityAnalysis(DEBlocks, &F),
         SingleFunction(SingleFunction) {
     if (F.isExternalDeclaration())
       return;
@@ -1881,7 +1881,7 @@ public:
     requireSameType(LBI->getOperand()->getType().getObjectType(),
                     LBI->getType(),
                     "Load operand type and result type mismatch");
-    require(!loadBorrowNeverInvalidatedAnalysis.isInvalidated(LBI),
+    require(loadBorrowImmutabilityAnalysis.isImmutable(LBI),
             "Found load borrow that is invalidated by a local write?!");
   }
 
