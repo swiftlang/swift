@@ -1554,6 +1554,14 @@ AllowKeyPathWithoutComponents::create(ConstraintSystem &cs,
 
 bool IgnoreInvalidFunctionBuilderBody::diagnose(const Solution &solution,
                                                 bool asNote) const {
+  switch (Phase) {
+  // Handled below
+  case ErrorInPhase::PreCheck:
+    break;
+  case ErrorInPhase::ConstraintGeneration:
+    return true; // Already diagnosed by `matchFunctionBuilder`.
+  }
+
   auto *S = getAnchor().get<Stmt *>();
 
   class PreCheckWalker : public ASTWalker {
@@ -1590,8 +1598,8 @@ bool IgnoreInvalidFunctionBuilderBody::diagnose(const Solution &solution,
   return walker.diagnosed();
 }
 
-IgnoreInvalidFunctionBuilderBody *
-IgnoreInvalidFunctionBuilderBody::create(ConstraintSystem &cs,
-                                         ConstraintLocator *locator) {
-  return new (cs.getAllocator()) IgnoreInvalidFunctionBuilderBody(cs, locator);
+IgnoreInvalidFunctionBuilderBody *IgnoreInvalidFunctionBuilderBody::create(
+    ConstraintSystem &cs, ErrorInPhase phase, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreInvalidFunctionBuilderBody(cs, phase, locator);
 }
