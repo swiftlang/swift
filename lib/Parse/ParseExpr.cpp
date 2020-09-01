@@ -2879,7 +2879,6 @@ ParserResult<Expr> Parser::parseExprClosure() {
   // may be incomplete and the type mismatch in return statement will just
   // confuse the type checker.
   bool hasSingleExpressionBody = false;
-  // FIXME: make this change separately
   if (!missingRBrace && bodyElements.size() == 1 &&
       (!Status.hasCodeCompletion() || isMemberCompletion(bodyElements[0]))) {
     // If the closure's only body element is a single return statement,

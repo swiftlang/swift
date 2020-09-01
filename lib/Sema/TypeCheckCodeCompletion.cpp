@@ -1007,12 +1007,12 @@ void DotExprLookup::sawSolution(const constraints::Solution &S) {
     ReferencedDecl = SelectedOverload->choice.getDeclOrNull();
 
   auto Key = std::make_pair(BaseTy, ReferencedDecl);
-  auto Ret = ResultToIndex.insert({Key, Solutions.size()});
+  auto Ret = BaseToSolutionIdx.insert({Key, Solutions.size()});
   if (!Ret.second && ExpectedTy) {
     Solutions[Ret.first->getSecond()].ExpectedTypes.push_back(ExpectedTy);
   } else {
     bool ISDMT = S.isStaticallyDerivedMetatype(ParsedExpr);
-    bool ISEC = false;
+    bool SingleExprBody = false;
     bool DisallowVoid = ExpectedTy
                             ? !ExpectedTy->isVoid()
                             : !ParentExpr && CS.getContextualTypePurpose(
@@ -1020,18 +1020,18 @@ void DotExprLookup::sawSolution(const constraints::Solution &S) {
 
     if (!ParentExpr) {
       if (CS.getContextualTypePurpose(CompletionExpr) == CTP_ReturnSingleExpr)
-        ISEC = true;
+        SingleExprBody = true;
     } else if (auto *ParentCE = dyn_cast<ClosureExpr>(ParentExpr)) {
       if (ParentCE->hasSingleExpressionBody() &&
           ParentCE->getSingleExpressionBody() == CompletionExpr) {
         ASTNode Last = ParentCE->getBody()->getLastElement();
         if (!Last.isStmt(StmtKind::Return) || Last.isImplicit())
-          ISEC = true;
+          SingleExprBody = true;
       }
     }
 
     Solutions.push_back(
-        {BaseTy, ReferencedDecl, {}, DisallowVoid, ISDMT, ISEC});
+        {BaseTy, ReferencedDecl, {}, DisallowVoid, ISDMT, SingleExprBody});
     if (ExpectedTy)
       Solutions.back().ExpectedTypes.push_back(ExpectedTy);
   }

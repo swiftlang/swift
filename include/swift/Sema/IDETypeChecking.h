@@ -64,20 +64,19 @@ namespace swift {
 
   class DotExprLookup: public CompletionCollector {
     struct SolutionInfo {
-      Type Ty;
-      ValueDecl* ReferencedDecl;
+      Type BaseTy;
+      ValueDecl* BaseDecl;
       SmallVector<Type, 4> ExpectedTypes;
       bool ExpectsNonVoid;
       bool BaseIsStaticMetaType;
-      bool IsSingleExpressionClosure;
+      bool IsSingleExpressionBody;
     };
 
     SourceLoc DotLoc;
     DeclContext *DC;
     CodeCompletionExpr *CompletionExpr;
-
-    llvm::DenseMap<std::pair<Type, Decl*>, size_t> ResultToIndex;
     SmallVector<SolutionInfo, 4> Solutions;
+    llvm::DenseMap<std::pair<Type, Decl*>, size_t> BaseToSolutionIdx;
     bool GotCallback = false;
 
   public:
@@ -85,13 +84,22 @@ namespace swift {
                   CodeCompletionExpr *CompletionExpr)
       : DotLoc(DotLoc), DC(DC), CompletionExpr(CompletionExpr) {}
 
+    /// Lookup the completion members on the base expressions extracted from the
+    /// solutions seen so far and pass them to the given \c Consumer.
     void performLookup(ide::CodeCompletionContext &CompletionCtx,
                        ide::CodeCompletionConsumer &Consumer,
                        bool isInSelector) const;
+
+    /// True if a solution was passed via the \c sawSolution callback.
     bool gotCallback() const { return GotCallback; }
+
+    /// Typecheck the code completion expression in isolation, calling
+    /// \c sawSolution for each solution formed.
     void fallbackTypeCheck();
 
   private:
+    /// Called for each solution produced while  type-checking an expression containing a code
+    /// completion expression.
     void sawSolution(const constraints::Solution &solution) override;
   };
 
