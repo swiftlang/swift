@@ -239,6 +239,9 @@ public:
   /// output path is configured.
   Optional<IntermoduleDepTrackingMode> IntermoduleDependencyTracking;
 
+  /// Should we emit the cType when printing @convention(c) or no?
+  bool PrintFullConvention = false;
+
   /// Should we serialize the hashes of dependencies (vs. the modification
   /// times) when compiling a module interface?
   bool SerializeModuleInterfaceDependencyHashes = false;
