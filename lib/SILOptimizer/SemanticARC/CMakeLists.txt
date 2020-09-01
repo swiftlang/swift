@@ -3,4 +3,5 @@ target_sources(swiftSILOptimizer PRIVATE
   OwnershipLiveRange.cpp
   LoadCopyToLoadBorrowOpt.cpp
   BorrowScopeOpts.cpp
-  CopyValueOpts.cpp)
+  CopyValueOpts.cpp
+  OwnedToGuaranteedPhiOpt.cpp)
