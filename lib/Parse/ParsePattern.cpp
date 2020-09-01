@@ -915,13 +915,6 @@ ParserResult<TypeRepr> Parser::parseThrowsType() {
     
     // Parse the closing ')'.
     SourceLoc rParenLoc;
-//    if (Tok.is(tok::r_paren)) {
-//      parseMatchingToken(tok::r_paren, rParenLoc, diag::expected_rparen_thrown_type, lParenLoc);
-//    } else {
-//      rParenLoc = PreviousLoc;
-//    }
-    
-//    diagnose(rParenLoc, diag::expected_rparen_thrown_type);
     parseMatchingToken(tok::r_paren, rParenLoc, diag::expected_rparen_thrown_type, lParenLoc);
     
     return throwsTypeRepr;
