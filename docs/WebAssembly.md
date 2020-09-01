@@ -7,8 +7,9 @@ While it's a virtual machine, there are considerations to be taken into account 
 available yet, specifically:
   1. `wasm64` variant is not specified yet, only the 32-bit `wasm32` variant is supported in WebAssembly
   hosts such as browsers.
-  2. While a preview of multi-threading and atomics is available in some browsers, [the corresponding
-  proposal](https://github.com/WebAssembly/threads/) haven't formally reached the implementation phase yet.
+  2. While a preview of multi-threading and atomics is available in some browsers and stand-alone 
+  WebAssembly hosts, [the corresponding proposal](https://github.com/WebAssembly/threads/) haven't 
+  formally reached the implementation phase yet.
   3. Dynamic linking is not formally specified and tooling for it is not available yet.
 * Binary size is a high priority requirement. Since WebAssembly payloads are usually served in browsers,
 one wouldn't want end users to download multi-megabyte binaries.
