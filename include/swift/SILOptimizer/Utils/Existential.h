@@ -49,6 +49,8 @@ struct OpenedArchetypeInfo {
     assert(!OpenedArchetype || (OpenedArchetypeValue && ExistentialValue));
     return OpenedArchetype;
   }
+  
+  void dump() const;
 };
 
 /// Record conformance and concrete type info derived from an init_existential
@@ -102,6 +104,8 @@ struct ConcreteExistentialInfo {
     CanType selfTy = P->getSelfInterfaceType()->getCanonicalType();
     return ExistentialSubs.lookupConformance(selfTy, P);
   }
+  
+  void dump() const;
 
 private:
   void initializeSubstitutionMap(
@@ -131,6 +135,8 @@ struct ConcreteOpenedExistentialInfo {
     assert(CEI->isValid());
     return true;
   }
+  
+  void dump() const;
 };
 
 } // end namespace swift
