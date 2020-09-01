@@ -793,6 +793,14 @@ DeclRange IterableDeclContext::getMembers() const {
   return getCurrentMembersWithoutLoading();
 }
 
+ArrayRef<Decl *> IterableDeclContext::getSemanticMembers() const {
+  ASTContext &ctx = getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator,
+      EmittedMembersRequest{const_cast<IterableDeclContext *>(this)},
+      ArrayRef<Decl *>());
+}
+
 /// Add a member to this context.
 void IterableDeclContext::addMember(Decl *member, Decl *Hint) {
   // Add the member to the list of declarations without notification.

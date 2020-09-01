@@ -4074,10 +4074,6 @@ public:
   /// Record the presence of an @objc method with the given selector.
   void recordObjCMethod(AbstractFunctionDecl *method, ObjCSelector selector);
 
-  /// Get all the members of this class, synthesizing any implicit members
-  /// that appear in the vtable if needed.
-  ArrayRef<Decl *> getEmittedMembers() const;
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Class;

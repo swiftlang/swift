@@ -2507,59 +2507,51 @@ struct SortedFuncList {
 
 ArrayRef<Decl *>
 EmittedMembersRequest::evaluate(Evaluator &evaluator,
-                                ClassDecl *CD) const {
-  auto &Context = CD->getASTContext();
+                                IterableDeclContext *idc) const {
+  auto dc = cast<DeclContext>(idc->getDecl());
+  auto &Context = dc->getASTContext();
   SmallVector<Decl *, 8> result;
 
-  if (!CD->getParentSourceFile()) {
-    auto members = CD->getMembers();
+  if (!dc->getParentSourceFile()) {
+    auto members = idc->getMembers();
     result.append(members.begin(), members.end());
     return Context.AllocateCopy(result);
   }
 
-  // We need to add implicit initializers because they
-  // affect vtable layout.
-  TypeChecker::addImplicitConstructors(CD);
+  auto nominal = dyn_cast<NominalTypeDecl>(idc);
 
-  auto forceConformance = [&](ProtocolDecl *protocol) {
-    auto ref = CD->getParentModule()->lookupConformance(
-        CD->getDeclaredInterfaceType(), protocol);
-    if (ref.isInvalid()) {
-      return;
-    }
+  if (nominal) {
+    // We need to add implicit initializers because they
+    // affect vtable layout.
+    TypeChecker::addImplicitConstructors(nominal);
+  }
 
-    auto conformance = ref.getConcrete();
-    if (conformance->getDeclContext() == CD &&
-        conformance->getState() == ProtocolConformanceState::Incomplete) {
+  // Force any derivable conformances in this context. This ensures that any
+  // synthesized members will approach in the member list.
+  for (auto conformance : idc->getLocalConformances()) {
+    if (conformance->getState() == ProtocolConformanceState::Incomplete &&
+        conformance->getProtocol()->getKnownDerivableProtocolKind())
       TypeChecker::checkConformance(conformance->getRootNormalConformance());
-    }
-  };
+  }
 
-  // If the class is Encodable, Decodable or Hashable, force those
-  // conformances to ensure that the synthesized members appear in the vtable.
-  //
-  // FIXME: Generalize this to other protocols for which
-  // we can derive conformances.
-  forceConformance(Context.getProtocol(KnownProtocolKind::Decodable));
-  forceConformance(Context.getProtocol(KnownProtocolKind::Encodable));
-  forceConformance(Context.getProtocol(KnownProtocolKind::Hashable));
-  forceConformance(Context.getProtocol(KnownProtocolKind::Differentiable));
-
-  // If the class conforms to Encodable or Decodable, even via an extension,
+  // If the type conforms to Encodable or Decodable, even via an extension,
   // the CodingKeys enum is synthesized as a member of the type itself.
   // Force it into existence.
-  (void) evaluateOrDefault(Context.evaluator,
-                           ResolveImplicitMemberRequest{CD,
-                                      ImplicitMemberAction::ResolveCodingKeys},
-                           {});
+  if (nominal) {
+    (void) evaluateOrDefault(Context.evaluator,
+                             ResolveImplicitMemberRequest{nominal,
+                                        ImplicitMemberAction::ResolveCodingKeys},
+                             {});
+  }
 
-  // If the class has a @main attribute, we need to force synthesis of the
+  // If the decl has a @main attribute, we need to force synthesis of the
   // $main function.
-  (void) evaluateOrDefault(Context.evaluator,
-                           SynthesizeMainFunctionRequest{CD},
-                           nullptr);
+  (void) evaluateOrDefault(
+      Context.evaluator,
+      SynthesizeMainFunctionRequest{const_cast<Decl *>(idc->getDecl())},
+      nullptr);
 
-  for (auto *member : CD->getMembers()) {
+  for (auto *member : idc->getMembers()) {
     if (auto *var = dyn_cast<VarDecl>(member)) {
       // The projected storage wrapper ($foo) might have dynamically-dispatched
       // accessors, so force them to be synthesized.
@@ -2570,7 +2562,7 @@ EmittedMembersRequest::evaluate(Evaluator &evaluator,
 
   SortedFuncList synthesizedMembers;
 
-  for (auto *member : CD->getMembers()) {
+  for (auto *member : idc->getMembers()) {
     if (auto *afd = dyn_cast<AbstractFunctionDecl>(member)) {
       // Add synthesized members to a side table and sort them by their mangled
       // name, since they could have been added to the class in any order.

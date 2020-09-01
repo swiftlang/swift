@@ -2017,7 +2017,7 @@ public:
 
     TypeChecker::checkDeclAttributes(CD);
 
-    for (Decl *Member : CD->getEmittedMembers())
+    for (Decl *Member : CD->getSemanticMembers())
       visit(Member);
 
     TypeChecker::checkPatternBindingCaptures(CD);
