@@ -3167,21 +3167,14 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     return CheckedCastKind::ValueCast;
   };
 
-  // Strip optional wrappers off of the destination type in sync with
-  // stripping them off the origin type.
+  // TODO: Explore optionals using the same strategy used by the
+  // runtime.
+  // For now, if the target is more optional than the source,
+  // just defer it out for the runtime to handle.
   while (auto toValueType = toType->getOptionalObjectType()) {
-    // Complain if we're trying to increase optionality, e.g.
-    // casting an NSObject? to an NSString??.  That's not a subtype
-    // relationship.
     auto fromValueType = fromType->getOptionalObjectType();
     if (!fromValueType) {
-      if (!suppressDiagnostics) {
-        diags.diagnose(diagLoc, diag::downcast_to_more_optional,
-                       origFromType, origToType)
-          .highlight(diagFromRange)
-          .highlight(diagToRange);
-      }
-      return CheckedCastKind::Unresolved;
+      return CheckedCastKind::ValueCast;
     }
 
     toType = toValueType;
