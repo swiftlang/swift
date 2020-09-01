@@ -99,14 +99,6 @@ class SILValueOwnershipChecker {
   /// is successful.
   SmallVector<Operand *, 16> regularUsers;
 
-  /// The list of implicit non lifetime ending users that we found. This
-  /// consists of instructions like end_borrow that end a scoped lifetime. We
-  /// must treat those as regular uses and ensure that our value is not
-  /// destroyed while that sub-scope is valid.
-  ///
-  /// TODO: Rename to SubBorrowScopeUsers?
-  SmallVector<Operand *, 4> implicitRegularUsers;
-
   /// The set of blocks that we have visited.
   SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks;
 
@@ -133,13 +125,10 @@ private:
   bool isCompatibleDefUse(Operand *op, ValueOwnershipKind ownershipKind);
 
   bool gatherUsers(SmallVectorImpl<Operand *> &lifetimeEndingUsers,
-                   SmallVectorImpl<Operand *> &regularUsers,
-                   SmallVectorImpl<Operand *> &implicitRegularUsers);
+                   SmallVectorImpl<Operand *> &regularUsers);
 
-  bool
-  gatherNonGuaranteedUsers(SmallVectorImpl<Operand *> &lifetimeEndingUsers,
-                           SmallVectorImpl<Operand *> &regularUsers,
-                           SmallVectorImpl<Operand *> &implicitRegularUsers);
+  bool gatherNonGuaranteedUsers(SmallVectorImpl<Operand *> &lifetimeEndingUsers,
+                                SmallVectorImpl<Operand *> &regularUsers);
 
   bool checkValueWithoutLifetimeEndingUses();
 
@@ -169,7 +158,6 @@ bool SILValueOwnershipChecker::check() {
   llvm::copy(lifetimeEndingUsers, std::back_inserter(allLifetimeEndingUsers));
   SmallVector<Operand *, 32> allRegularUsers;
   llvm::copy(regularUsers, std::back_inserter(allRegularUsers));
-  llvm::copy(implicitRegularUsers, std::back_inserter(allRegularUsers));
 
   LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
   auto linearLifetimeResult = checker.checkValue(value, allLifetimeEndingUsers,
@@ -223,8 +211,7 @@ bool SILValueOwnershipChecker::isCompatibleDefUse(
 
 bool SILValueOwnershipChecker::gatherNonGuaranteedUsers(
     SmallVectorImpl<Operand *> &lifetimeEndingUsers,
-    SmallVectorImpl<Operand *> &nonLifetimeEndingUsers,
-    SmallVectorImpl<Operand *> &implicitRegularUsers) {
+    SmallVectorImpl<Operand *> &nonLifetimeEndingUsers) {
   bool foundError = false;
 
   auto ownershipKind = value.getOwnershipKind();
@@ -289,7 +276,7 @@ bool SILValueOwnershipChecker::gatherNonGuaranteedUsers(
       });
     };
     foundError |=
-        initialScopedOperand->getImplicitUses(implicitRegularUsers, &error);
+        initialScopedOperand->getImplicitUses(nonLifetimeEndingUsers, &error);
   }
 
   return foundError;
@@ -297,16 +284,15 @@ bool SILValueOwnershipChecker::gatherNonGuaranteedUsers(
 
 bool SILValueOwnershipChecker::gatherUsers(
     SmallVectorImpl<Operand *> &lifetimeEndingUsers,
-    SmallVectorImpl<Operand *> &nonLifetimeEndingUsers,
-    SmallVectorImpl<Operand *> &implicitRegularUsers) {
+    SmallVectorImpl<Operand *> &nonLifetimeEndingUsers) {
 
   // See if Value is guaranteed. If we are guaranteed and not forwarding, then
   // we need to look through subobject uses for more uses. Otherwise, if we are
   // forwarding, we do not create any lifetime ending users/non lifetime ending
   // users since we verify against our base.
   if (value.getOwnershipKind() != ValueOwnershipKind::Guaranteed) {
-    return !gatherNonGuaranteedUsers(
-        lifetimeEndingUsers, nonLifetimeEndingUsers, implicitRegularUsers);
+    return !gatherNonGuaranteedUsers(lifetimeEndingUsers,
+                                     nonLifetimeEndingUsers);
   }
 
   // Ok, we have a value with guarantee ownership. Before we continue, check if
@@ -387,7 +373,7 @@ bool SILValueOwnershipChecker::gatherUsers(
           });
         };
         foundError |=
-            scopedOperand->getImplicitUses(implicitRegularUsers, &onError);
+            scopedOperand->getImplicitUses(nonLifetimeEndingUsers, &onError);
       }
 
       // Next see if our use is an interior pointer operand. If we have an
@@ -404,7 +390,7 @@ bool SILValueOwnershipChecker::gatherUsers(
           });
         };
         foundError |= interiorPointerOperand->getImplicitUses(
-            implicitRegularUsers, &onError);
+            nonLifetimeEndingUsers, &onError);
       }
 
       // Finally add the op to the non lifetime ending user list.
@@ -621,7 +607,7 @@ bool SILValueOwnershipChecker::checkUses() {
   // 1. Verify that none of the uses are in the same block. This would be an
   // overconsume so in this case we assert.
   // 2. Verify that the uses are compatible with our ownership convention.
-  if (!gatherUsers(lifetimeEndingUsers, regularUsers, implicitRegularUsers)) {
+  if (!gatherUsers(lifetimeEndingUsers, regularUsers)) {
     // Silently return false if this fails.
     //
     // If the user pass in a ErrorBehaviorKind that will assert, we
