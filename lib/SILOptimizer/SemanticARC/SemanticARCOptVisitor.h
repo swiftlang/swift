@@ -13,6 +13,8 @@
 #ifndef SWIFT_SILOPTIMIZER_SEMANTICARC_SEMANTICARCOPTVISITOR_H
 #define SWIFT_SILOPTIMIZER_SEMANTICARC_SEMANTICARCOPTVISITOR_H
 
+#include "OwnershipLiveRange.h"
+
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/MultiMapCache.h"
