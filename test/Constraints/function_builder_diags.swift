@@ -606,6 +606,14 @@ struct MyView {
     } // expected-error {{expected identifier after '.' expression}}
   }
 
+  @TupleBuilder var invalidCaseWithoutDot: some P {
+    switch Optional.some(1) {
+    case none: 42 // expected-error {{cannot find 'none' in scope}}
+    case .some(let x):
+      0
+    }
+  }
+
   @TupleBuilder var invalidConversion: Int {
     "" // expected-error {{cannot convert value of type 'String' to specified type 'Int'}}
   }

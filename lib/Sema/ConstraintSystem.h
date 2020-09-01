@@ -1727,6 +1727,13 @@ private:
   /// from declared parameters/result and body.
   llvm::MapVector<const ClosureExpr *, FunctionType *> ClosureTypes;
 
+  /// This is a *global* list of all function builder bodies that have
+  /// been determined to be incorrect by failing constraint generation.
+  ///
+  /// Tracking this information is useful to avoid producing duplicate
+  /// diagnostics when function builder has multiple overloads.
+  llvm::SmallDenseSet<AnyFunctionRef> InvalidFunctionBuilderBodies;
+
   /// Maps node types used within all portions of the constraint
   /// system, instead of directly using the types on the
   /// nodes themselves. This allows us to typecheck and

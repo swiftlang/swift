@@ -1844,9 +1844,17 @@ class SpecifyKeyPathRootType final : public ConstraintFix {
 };
 
 class IgnoreInvalidFunctionBuilderBody final : public ConstraintFix {
-  IgnoreInvalidFunctionBuilderBody(ConstraintSystem &cs,
+  enum class ErrorInPhase {
+    PreCheck,
+    ConstraintGeneration,
+  };
+
+  ErrorInPhase Phase;
+
+  IgnoreInvalidFunctionBuilderBody(ConstraintSystem &cs, ErrorInPhase phase,
                                    ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::IgnoreInvalidFunctionBuilderBody, locator) {}
+      : ConstraintFix(cs, FixKind::IgnoreInvalidFunctionBuilderBody, locator),
+        Phase(phase) {}
 
 public:
   std::string getName() const override {
@@ -1859,8 +1867,19 @@ public:
     return diagnose(*commonFixes.front().first);
   }
 
-  static IgnoreInvalidFunctionBuilderBody *create(ConstraintSystem &cs,
-                                                  ConstraintLocator *locator);
+  static IgnoreInvalidFunctionBuilderBody *
+  duringPreCheck(ConstraintSystem &cs, ConstraintLocator *locator) {
+    return create(cs, ErrorInPhase::PreCheck, locator);
+  }
+
+  static IgnoreInvalidFunctionBuilderBody *
+  duringConstraintGeneration(ConstraintSystem &cs, ConstraintLocator *locator) {
+    return create(cs, ErrorInPhase::ConstraintGeneration, locator);
+  }
+
+private:
+  static IgnoreInvalidFunctionBuilderBody *
+  create(ConstraintSystem &cs, ErrorInPhase phase, ConstraintLocator *locator);
 };
 
 } // end namespace constraints
