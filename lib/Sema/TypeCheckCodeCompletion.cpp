@@ -988,46 +988,51 @@ void DotExprLookup::sawSolution(const constraints::Solution &S) {
   auto *ParsedExpr = CompletionExpr->getBase();
   auto *SemanticExpr = ParsedExpr->getSemanticsProvidingExpr();
 
-  if (Type BaseTy = GetType(ParsedExpr)) {
-    auto *Locator = CS.getConstraintLocator(SemanticExpr);
-    Type ExpectedTy = GetType(CompletionExpr);
-    Expr *ParentExpr = CS.getParentExpr(CompletionExpr);
-    if (!ParentExpr)
-      ExpectedTy = CS.getContextualType(CompletionExpr);
+  auto BaseTy = GetType(ParsedExpr);
+  // If base type couldn't be determined (e.g. because base expression
+  // is an invalid reference), let's not attempt to do a lookup since
+  // it wouldn't produce any useful results anyway.
+  if (!BaseTy || BaseTy->is<UnresolvedType>())
+    return;
 
-    auto *CalleeLocator = S.getCalleeLocator(Locator);
-    ValueDecl *ReferencedDecl = nullptr;
-    if (auto SelectedOverload = S.getOverloadChoiceIfAvailable(CalleeLocator))
-      ReferencedDecl = SelectedOverload->choice.getDeclOrNull();
+  auto *Locator = CS.getConstraintLocator(SemanticExpr);
+  Type ExpectedTy = GetType(CompletionExpr);
+  Expr *ParentExpr = CS.getParentExpr(CompletionExpr);
+  if (!ParentExpr)
+    ExpectedTy = CS.getContextualType(CompletionExpr);
 
-    auto Key = std::make_pair(BaseTy, ReferencedDecl);
-    auto Ret = ResultToIndex.insert({Key, Solutions.size()});
-    if (!Ret.second && ExpectedTy) {
-      Solutions[Ret.first->getSecond()].ExpectedTypes.push_back(ExpectedTy);
-    } else {
-      bool ISDMT = S.isStaticallyDerivedMetatype(ParsedExpr);
-      bool ISEC = false;
-      bool DisallowVoid = ExpectedTy
-        ? !ExpectedTy->isVoid()
-        : !ParentExpr && CS.getContextualTypePurpose(CompletionExpr) != CTP_Unused;
+  auto *CalleeLocator = S.getCalleeLocator(Locator);
+  ValueDecl *ReferencedDecl = nullptr;
+  if (auto SelectedOverload = S.getOverloadChoiceIfAvailable(CalleeLocator))
+    ReferencedDecl = SelectedOverload->choice.getDeclOrNull();
 
-      if (!ParentExpr) {
-        if (CS.getContextualTypePurpose(CompletionExpr) == CTP_ReturnSingleExpr)
+  auto Key = std::make_pair(BaseTy, ReferencedDecl);
+  auto Ret = ResultToIndex.insert({Key, Solutions.size()});
+  if (!Ret.second && ExpectedTy) {
+    Solutions[Ret.first->getSecond()].ExpectedTypes.push_back(ExpectedTy);
+  } else {
+    bool ISDMT = S.isStaticallyDerivedMetatype(ParsedExpr);
+    bool ISEC = false;
+    bool DisallowVoid = ExpectedTy
+                            ? !ExpectedTy->isVoid()
+                            : !ParentExpr && CS.getContextualTypePurpose(
+                                                 CompletionExpr) != CTP_Unused;
+
+    if (!ParentExpr) {
+      if (CS.getContextualTypePurpose(CompletionExpr) == CTP_ReturnSingleExpr)
+        ISEC = true;
+    } else if (auto *ParentCE = dyn_cast<ClosureExpr>(ParentExpr)) {
+      if (ParentCE->hasSingleExpressionBody() &&
+          ParentCE->getSingleExpressionBody() == CompletionExpr) {
+        ASTNode Last = ParentCE->getBody()->getLastElement();
+        if (!Last.isStmt(StmtKind::Return) || Last.isImplicit())
           ISEC = true;
-      } else if (auto *ParentCE = dyn_cast<ClosureExpr>(ParentExpr)) {
-        if (ParentCE->hasSingleExpressionBody() &&
-            ParentCE->getSingleExpressionBody() == CompletionExpr) {
-          ASTNode Last = ParentCE->getBody()->getLastElement();
-          if (!Last.isStmt(StmtKind::Return) || Last.isImplicit())
-            ISEC = true;
-        }
       }
-
-      Solutions.push_back({
-        BaseTy, ReferencedDecl, {}, DisallowVoid, ISDMT, ISEC
-      });
-      if (ExpectedTy)
-        Solutions.back().ExpectedTypes.push_back(ExpectedTy);
     }
+
+    Solutions.push_back(
+        {BaseTy, ReferencedDecl, {}, DisallowVoid, ISDMT, ISEC});
+    if (ExpectedTy)
+      Solutions.back().ExpectedTypes.push_back(ExpectedTy);
   }
 }
