@@ -24,3 +24,8 @@ static inline void log_a_thing(const a_thing thing) {
 static inline unsigned int return7(void) {
   return 7;
 }
+
+static inline int getExternGlobal() {
+  extern int global;
+  return global;
+}

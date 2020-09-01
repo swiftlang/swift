@@ -35,3 +35,8 @@ func test_indirect_by_val_alignment() {
 // i386: define hidden swiftcc void  @"$s11c_functions30test_indirect_by_val_alignmentyyF"()
 // s390x: define hidden swiftcc void  @"$s11c_functions30test_indirect_by_val_alignmentyyF"()
 // powerpc64le: define hidden swiftcc void  @"$s11c_functions30test_indirect_by_val_alignmentyyF"()
+
+
+func dontAssertOnExternLocal() {
+  let x = getExternGlobal()
+}

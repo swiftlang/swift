@@ -76,6 +76,12 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
 
   ClangDeclRefFinder refFinder([&](const clang::DeclRefExpr *DRE) {
     const clang::Decl *D = DRE->getDecl();
+
+    // Ignore local declarations.
+    if (auto varDecl = dyn_cast<clang::VarDecl>(D))
+      if (!varDecl->isFileVarDecl() && !varDecl->isStaticDataMember())
+        return;
+
     // Check that this is a file-level declaration and not inside a function.
     // If it's a member of a file-level decl, like a C++ static member variable,
     // we want to add the entire file-level declaration because Clang doesn't
