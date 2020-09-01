@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -dce 						 | %FileCheck %s -check-prefix=REGULAR
+// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -dce | %FileCheck %s -check-prefix=REGULAR
 // RUN: %target-sil-opt -enable-sil-verify-all %s -inline -dce -ignore-always-inline | %FileCheck %s -check-prefix=IGNORED
 
 sil_stage canonical
