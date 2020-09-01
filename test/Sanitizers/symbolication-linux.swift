@@ -11,23 +11,25 @@
 // symbolication.  Note that `llvm-symbolizer` does not demangle Swift symbol
 // names, so we use `swift demangle`.
 
+@inline(never)
 func foo() {
   let x = UnsafeMutablePointer<Int>.allocate(capacity: 1)
   x.deallocate()
   print(x.pointee)
 }
 
+@inline(never)
 func bar() {
   foo()
+  print("Prevent tail call optimization")
 }
 
 bar()
 
-
 // Out-of-process
-// OOP:      #0 0x{{[0-9a-f]+}} in main.foo() -> () {{.*}}symbolication-linux.swift:[[@LINE-11]]
+// OOP:      #0 0x{{[0-9a-f]+}} in main.foo() -> () {{.*}}symbolication-linux.swift:[[@LINE-12]]
 // OOP-NEXT: #1 0x{{[0-9a-f]+}} in main.bar() -> () {{.*}}symbolication-linux.swift:[[@LINE-8]]
-// OOP-NEXT: #2 0x{{[0-9a-f]+}} in main {{.*}}symbolication-linux.swift:[[@LINE-6]]
+// OOP-NEXT: #2 0x{{[0-9a-f]+}} in main {{.*}}symbolication-linux.swift:[[@LINE-5]]
 
 // In-process
 // IP:      #0 0x{{[0-9a-f]+}} in main.foo() -> ()+0x
