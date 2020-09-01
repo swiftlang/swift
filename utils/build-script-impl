@@ -1579,6 +1579,8 @@ for host in "${ALL_HOSTS[@]}"; do
                     "${cmake_options[@]}"
                     -DCMAKE_C_FLAGS="$(llvm_c_flags ${host})"
                     -DCMAKE_CXX_FLAGS="$(llvm_c_flags ${host})"
+                    -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
+                    -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
                     -DCMAKE_BUILD_TYPE:STRING="${LLVM_BUILD_TYPE}"
                     -DLLVM_TOOL_SWIFT_BUILD:BOOL=NO
                     -DLLVM_TOOL_LLD_BUILD:BOOL=TRUE
