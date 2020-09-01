@@ -24,4 +24,5 @@ add_dependencies(swiftDriver
 target_link_libraries(swiftDriver PRIVATE
   swiftAST
   swiftBasic
+  swiftFrontend
   swiftOption)

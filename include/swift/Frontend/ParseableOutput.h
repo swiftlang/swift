@@ -11,7 +11,9 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// Helpers for emitting the compiler's parseable output.
+/// Helpers for emitting the compiler's parseable output. Build systems
+/// (such as SwiftPM) can parse this output to get more fine-grained information
+/// about what files are being compiled at a given time.
 ///
 //===----------------------------------------------------------------------===//
 
