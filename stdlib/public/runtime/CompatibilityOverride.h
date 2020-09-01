@@ -48,7 +48,7 @@ namespace swift {
   Override_ ## name getOverride_ ## name();
 #include "CompatibilityOverride.def"
 
-#ifndef __wasm__
+
 /// Used to define an override point. The override point #defines the appropriate
 /// OVERRIDE macro from CompatibilityOverride.def to this macro, then includes
 /// the file to generate the override points. The original implementation of the
@@ -64,20 +64,6 @@ namespace swift {
       return Override(COMPATIBILITY_UNPAREN namedArgs, swift_ ## name ## Impl);   \
     return swift_ ## name ## Impl namedArgs; \
   }
-#else
-// WebAssembly: hack: change to swift_once_real
-#define COMPATIBILITY_OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
-  attrs ccAttrs ret namespace swift_ ## name typedArgs {                          \
-    static Override_ ## name Override;                                            \
-    static swift_once_t Predicate;                                                \
-    swift_once_real(&Predicate, [](void *) {                                           \
-      Override = getOverride_ ## name();                                          \
-    }, nullptr);                                                                  \
-    if (Override != nullptr)                                                      \
-      return Override(COMPATIBILITY_UNPAREN namedArgs, swift_ ## name ## Impl);   \
-    return swift_ ## name ## Impl namedArgs; \
-  }
-#endif
 
 #endif // #else SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
 
