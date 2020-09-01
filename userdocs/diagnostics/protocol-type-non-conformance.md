@@ -31,7 +31,7 @@ print(Cat.species)    // Prints "Felis catus"
 print(Animal.species) // Error
 ```
 
-Since a type conforms to a protocol only when it satisfies _all_ of that protocol's requirements, the existential type `Animal` does not conform to the protocol `Animal` because it cannot satisfy its own requirement for the static property `species`:
+Since a type conforms to a protocol only when it satisfies _all_ of that protocol's requirements, the existential type `Animal` does not conform to the protocol `Animal` because it cannot satisfy the protocol's requirement for the static property `species`:
 
 ```swift
 func declareAnimalSpecies<T: Animal>(_ animal: T) {
@@ -53,6 +53,8 @@ In general, any initializers, static members, and associated types required by a
 Currently, even if a protocol `P` requires no initializers or static members, the existential type `P` does not conform to `P` (with exceptions below). This restriction allows library authors to add such requirements (initializers or static members) to an existing protocol without breaking their users' source code.
 
 Concrete types that _do_ conform to protocols can provide functionality similar to that of existential types. For example, the standard library provides the `AnyHashable` type for `Hashable` values. Manual implementation of such __type erasure__ can require specific knowledge of the semantic requirements for each protocol involved and is beyond the scope of this discussion.
+
+For more on using existential types, see [Protocols as Types](https://docs.swift.org/swift-book/LanguageGuide/Protocols.html#ID275) in _The Swift Programming Language_.
 
 ## Exceptions
 
