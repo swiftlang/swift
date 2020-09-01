@@ -128,7 +128,8 @@ public:
   /// Assume that code will be executed in a single-threaded environment.
   bool AssumeSingleThreaded = false;
 
-  /// Turn @inline(__always) attributes into no-ops.
+  /// Turn @inline(__always) attributes into no-ops. For experimentation
+  /// around code size reduction.
   bool IgnoreAlwaysInline = false;
 
   /// Indicates which sanitizer is turned on.
