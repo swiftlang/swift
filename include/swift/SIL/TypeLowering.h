@@ -992,7 +992,6 @@ public:
   /// Given a function type, yield its bridged formal type.
   CanAnyFunctionType getBridgedFunctionType(AbstractionPattern fnPattern,
                                             CanAnyFunctionType fnType,
-                                            AnyFunctionType::ExtInfo extInfo,
                                             Bridgeability bridging);
 
   /// Given a referenced value and the substituted formal type of a
