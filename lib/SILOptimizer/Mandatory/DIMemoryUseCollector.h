@@ -176,6 +176,11 @@ public:
            MemoryInst->isDerivedClassSelfOnly();
   }
 
+  /// True if this memory object is the 'self' of a root class init method.
+  bool isRootClassSelf() const {
+    return isClassInitSelf() && MemoryInst->isRootSelf();
+  }
+
   /// True if this memory object is the 'self' of a non-root class init method.
   bool isNonRootClassSelf() const {
     return isClassInitSelf() && !MemoryInst->isRootSelf();
