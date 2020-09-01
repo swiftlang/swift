@@ -1719,7 +1719,7 @@ ConstraintSystem::matchFunctionBuilder(
     if (!applied)
       return getTypeMatchFailure(locator);
 
-    if (transaction.hasDiagnostics()) {
+    if (transaction.hasErrors()) {
       if (recordFix(
               IgnoreInvalidFunctionBuilderBody::duringConstraintGeneration(
                   *this, getConstraintLocator(fn.getBody()))))
@@ -1814,7 +1814,7 @@ public:
 
       HasError |= ConstraintSystem::preCheckExpression(
           E, DC, /*replaceInvalidRefsWithErrors=*/false);
-      HasError |= transaction.hasDiagnostics();
+      HasError |= transaction.hasErrors();
 
       if (SuppressDiagnostics)
         transaction.abort();

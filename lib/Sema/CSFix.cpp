@@ -1588,7 +1588,7 @@ bool IgnoreInvalidFunctionBuilderBody::diagnose(const Solution &solution,
     }
 
     bool diagnosed() const {
-      return Transaction.hasDiagnostics();
+      return Transaction.hasErrors();
     }
   };
 
