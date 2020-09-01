@@ -87,20 +87,42 @@ func test_no_hoisting(_ c: Myclass, _ b: Bool) -> Int {
   return v
 }
 
+// This test is disabled, because for structs, it does not work yet.
+// CSE is too conservative to handle indirect getter arguments currently.
+
 // CHECK-LABEL: sil {{.*}} @$s4test0A7_structySiAA8MystructVF
-// CHECK:   [[GETTER:%[0-9]+]] = function_ref @$s4test8MystructV4lvarSivg
-// CHECK:   [[V1:%[0-9]+]] = apply [[GETTER]]({{.*}})
-// CHECK:   [[V2OPT:%[0-9]+]] = load
-// CHECK:   [[V2:%[0-9]+]] = unchecked_enum_data [[V2OPT]]
-// CHECK:   [[V1VAL:%[0-9]+]] = struct_extract [[V1]]
-// CHECK:   [[V2VAL:%[0-9]+]] = struct_extract [[V2]]
-// CHECK:   builtin "sadd{{.*}}"([[V1VAL]] {{.*}}, [[V2VAL]]
-// CHECK: } // end sil function '$s4test0A7_structySiAA8MystructVF'
+// CHECK-DISABLED:   [[GETTER:%[0-9]+]] = function_ref @$s4test8MystructV4lvarSivg
+// CHECK-DISABLED:   [[V1:%[0-9]+]] = apply [[GETTER]]({{.*}})
+// CHECK-DISABLED:   [[V2OPT:%[0-9]+]] = load
+// CHECK-DISABLED:   [[V2:%[0-9]+]] = unchecked_enum_data [[V2OPT]]
+// CHECK-DISABLED:   [[V1VAL:%[0-9]+]] = struct_extract [[V1]]
+// CHECK-DISABLED:   [[V2VAL:%[0-9]+]] = struct_extract [[V2]]
+// CHECK-DISABLED:   builtin "sadd{{.*}}"([[V1VAL]] {{.*}}, [[V2VAL]]
+// CHECK-DISABLED: } // end sil function '$s4test0A7_structySiAA8MystructVF'
 @inline(never)
 func test_struct(_ s: Mystruct) -> Int {
   var sm = s
   g = 42
   let v1 = sm.lvar
+  let v2 = sm.lvar
+  return v1 &+ v2
+}
+
+// CHECK-LABEL: sil {{.*}} @$s4test0A19_overwritten_structySiAA8MystructVF
+// CHECK:   [[GETTER:%[0-9]+]] = function_ref @$s4test8MystructV4lvarSivg
+// CHECK:   [[V1:%[0-9]+]] = apply [[GETTER]]({{.*}})
+// CHECK:   [[V2:%[0-9]+]] = apply [[GETTER]]({{.*}})
+// CHECK:   [[V1VAL:%[0-9]+]] = struct_extract [[V1]]
+// CHECK:   [[V2VAL:%[0-9]+]] = struct_extract [[V2]]
+// CHECK:   builtin "sadd{{.*}}"([[V1VAL]] {{.*}}, [[V2VAL]]
+// CHECK: } // end sil function '$s4test0A19_overwritten_structySiAA8MystructVF'
+@inline(never)
+func test_overwritten_struct(_ s: Mystruct) -> Int {
+  var sm = s
+  g = 42
+  let v1 = sm.lvar
+  sm = s
+  g = 43
   let v2 = sm.lvar
   return v1 &+ v2
 }
@@ -132,6 +154,13 @@ func calltests() {
   // CHECK-OUTPUT-NEXT:  lvar init
   // CHECK-OUTPUT-NEXT:  84
   print(test_struct(Mystruct()))
+
+  // CHECK-OUTPUT-LABEL: test_overwritten_struct
+  print("test_overwritten_struct")
+  // CHECK-OUTPUT-NEXT:  lvar init
+  // CHECK-OUTPUT-NEXT:  lvar init
+  // CHECK-OUTPUT-NEXT:  85
+  print(test_overwritten_struct(Mystruct()))
 }
 
 calltests()
