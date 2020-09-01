@@ -1071,7 +1071,13 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
     // it for later.   Once we've collected all of the conditional init/assigns,
     // we can insert a single control variable for the memory object for the
     // whole function.
-    if (!Use.onlyTouchesTrivialElements(TheMemory))
+    //
+    // For root class initializers, we must keep track of initializations of
+    // trivial stored properties also, since we need to know when the object
+    // has been fully initialized when deciding if a strong_release should
+    // lower to a partial_dealloc_ref.
+    if (TheMemory.isRootClassSelf() ||
+        !Use.onlyTouchesTrivialElements(TheMemory))
       HasConditionalInitAssign = true;
     return;
   }
@@ -2177,12 +2183,12 @@ static void updateControlVariable(SILLocation Loc,
 }
 
 /// Test a bit in the control variable at the current insertion point.
-static SILValue testControlVariable(SILLocation Loc,
-                                    unsigned Elt,
-                                    SILValue ControlVariableAddr,
-                                    Identifier &ShiftRightFn,
-                                    Identifier &TruncateFn,
-                                    SILBuilder &B) {
+static SILValue testControlVariableBit(SILLocation Loc,
+                                       unsigned Elt,
+                                       SILValue ControlVariableAddr,
+                                       Identifier &ShiftRightFn,
+                                       Identifier &TruncateFn,
+                                       SILBuilder &B) {
   SILValue ControlVariable =
         B.createLoad(Loc, ControlVariableAddr, LoadOwnershipQualifier::Trivial);
 
@@ -2213,6 +2219,32 @@ static SILValue testControlVariable(SILLocation Loc,
   return B.createBuiltin(Loc, TruncateFn,
                          SILType::getBuiltinIntegerType(1, B.getASTContext()),
                          {}, CondVal);
+}
+
+/// Test if all bits in the control variable are set at the current
+/// insertion point.
+static SILValue testAllControlVariableBits(SILLocation Loc,
+                                           SILValue ControlVariableAddr,
+                                           Identifier &CmpEqFn,
+                                           SILBuilder &B) {
+  SILValue ControlVariable =
+        B.createLoad(Loc, ControlVariableAddr, LoadOwnershipQualifier::Trivial);
+
+  SILValue CondVal = ControlVariable;
+  CanBuiltinIntegerType IVType = CondVal->getType().castTo<BuiltinIntegerType>();
+
+  if (IVType->getFixedWidth() == 1)
+    return CondVal;
+
+  SILValue AllBitsSet = B.createIntegerLiteral(Loc, CondVal->getType(), -1);
+  if (!CmpEqFn.get())
+    CmpEqFn = getBinaryFunction("cmp_eq", CondVal->getType(),
+                                B.getASTContext());
+  SILValue Args[] = { CondVal, AllBitsSet };
+
+  return B.createBuiltin(Loc, CmpEqFn,
+                         SILType::getBuiltinIntegerType(1, B.getASTContext()),
+                         {}, Args);
 }
 
 /// handleConditionalInitAssign - This memory object has some stores
@@ -2276,7 +2308,13 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
     // If this ambiguous store is only of trivial types, then we don't need to
     // do anything special.  We don't even need keep the init bit for the
     // element precise.
-    if (Use.onlyTouchesTrivialElements(TheMemory))
+    //
+    // For root class initializers, we must keep track of initializations of
+    // trivial stored properties also, since we need to know when the object
+    // has been fully initialized when deciding if a strong_release should
+    // lower to a partial_dealloc_ref.
+    if (!TheMemory.isRootClassSelf() &&
+        Use.onlyTouchesTrivialElements(TheMemory))
       continue;
     
     B.setInsertionPoint(Use.Inst);
@@ -2315,9 +2353,9 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
     // initialization.
     for (unsigned Elt = Use.FirstElement, e = Elt+Use.NumElements;
          Elt != e; ++Elt) {
-      auto CondVal = testControlVariable(Loc, Elt, ControlVariableAddr,
-                                         ShiftRightFn, TruncateFn,
-                                         B);
+      auto CondVal = testControlVariableBit(Loc, Elt, ControlVariableAddr,
+                                            ShiftRightFn, TruncateFn,
+                                            B);
       
       SILBasicBlock *TrueBB, *FalseBB, *ContBB;
       InsertCFGDiamond(CondVal, Loc, B,
@@ -2386,7 +2424,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
 void LifetimeChecker::
 handleConditionalDestroys(SILValue ControlVariableAddr) {
   SILBuilderWithScope B(TheMemory.getUninitializedValue());
-  Identifier ShiftRightFn, TruncateFn;
+  Identifier ShiftRightFn, TruncateFn, CmpEqFn;
 
   unsigned NumMemoryElements = TheMemory.getNumElements();
 
@@ -2456,9 +2494,9 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
 
       // Insert a load of the liveness bitmask and split the CFG into a diamond
       // right before the destroy_addr, if we haven't already loaded it.
-      auto CondVal = testControlVariable(Loc, Elt, ControlVariableAddr,
-                                         ShiftRightFn, TruncateFn,
-                                         B);
+      auto CondVal = testControlVariableBit(Loc, Elt, ControlVariableAddr,
+                                            ShiftRightFn, TruncateFn,
+                                            B);
 
       SILBasicBlock *ReleaseBlock, *DeallocBlock, *ContBlock;
 
@@ -2477,11 +2515,11 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
   // depending on if the self box was initialized or not.
   auto emitReleaseOfSelfWhenNotConsumed = [&](SILLocation Loc,
                                               SILInstruction *Release) {
-    auto CondVal = testControlVariable(Loc, SelfInitializedElt,
-                                       ControlVariableAddr,
-                                       ShiftRightFn,
-                                       TruncateFn,
-                                       B);
+    auto CondVal = testControlVariableBit(Loc, SelfInitializedElt,
+                                          ControlVariableAddr,
+                                          ShiftRightFn,
+                                          TruncateFn,
+                                          B);
 
     SILBasicBlock *ReleaseBlock, *ConsumedBlock, *ContBlock;
 
@@ -2513,12 +2551,50 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
     // Just conditionally destroy each memory element, and for classes,
     // also free the partially initialized object.
     if (!TheMemory.isNonRootClassSelf()) {
-      destroyMemoryElements(Loc, Availability);
-      processUninitializedRelease(Release, false, B.getInsertionPoint());
+      assert(!Availability.isAllYes() &&
+             "Should not end up here if fully initialized");
 
-      // The original strong_release or destroy_addr instruction is
-      // always dead at this point.
-      deleteDeadRelease(CDElt.ReleaseID);
+      // For root class initializers, we check if all proeprties were
+      // dynamically initialized, and if so, treat this as a release of
+      // an initialized 'self', instead of tearing down the fields
+      // one by one and deallocating memory.
+      //
+      // This is required for correctness, since the condition that
+      // allows 'self' to escape is that all stored properties were
+      // initialized. So we cannot deallocate the memory if 'self' may
+      // have escaped.
+      //
+      // This also means the deinitializer will run if all stored
+      // properties were initialized.
+      if (TheMemory.isClassInitSelf() &&
+          Availability.hasAny(DIKind::Partial)) {
+        auto CondVal = testAllControlVariableBits(Loc, ControlVariableAddr,
+                                                  CmpEqFn, B);
+
+        SILBasicBlock *ReleaseBlock, *DeallocBlock, *ContBlock;
+
+        InsertCFGDiamond(CondVal, Loc, B,
+                         ReleaseBlock, DeallocBlock, ContBlock);
+
+        // If true, self was fully initialized and must be released.
+        B.setInsertionPoint(ReleaseBlock->begin());
+        B.setCurrentDebugScope(ReleaseBlock->begin()->getDebugScope());
+        Release->moveBefore(&*B.getInsertionPoint());
+
+        // If false, self is uninitialized and must be freed.
+        B.setInsertionPoint(DeallocBlock->begin());
+        B.setCurrentDebugScope(DeallocBlock->begin()->getDebugScope());
+        destroyMemoryElements(Loc, Availability);
+        processUninitializedRelease(Release, false, B.getInsertionPoint());
+      } else {
+        destroyMemoryElements(Loc, Availability);
+        processUninitializedRelease(Release, false, B.getInsertionPoint());
+
+        // The original strong_release or destroy_addr instruction is
+        // always dead at this point.
+        deleteDeadRelease(CDElt.ReleaseID);
+      }
+
       continue;
     }
 
@@ -2564,11 +2640,11 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
         // self.init or super.init may or may not have been called.
         // We have not yet stored 'self' into the box.
 
-        auto CondVal = testControlVariable(Loc, SuperInitElt,
-                                           ControlVariableAddr,
-                                           ShiftRightFn,
-                                           TruncateFn,
-                                           B);
+        auto CondVal = testControlVariableBit(Loc, SuperInitElt,
+                                              ControlVariableAddr,
+                                              ShiftRightFn,
+                                              TruncateFn,
+                                              B);
 
         SILBasicBlock *ConsumedBlock, *DeallocBlock, *ContBlock;
 
@@ -2598,11 +2674,11 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
         // self.init or super.init may or may not have been called.
         // We may or may have stored 'self' into the box.
 
-        auto CondVal = testControlVariable(Loc, SuperInitElt,
-                                           ControlVariableAddr,
-                                           ShiftRightFn,
-                                           TruncateFn,
-                                           B);
+        auto CondVal = testControlVariableBit(Loc, SuperInitElt,
+                                              ControlVariableAddr,
+                                              ShiftRightFn,
+                                              TruncateFn,
+                                              B);
 
         SILBasicBlock *LiveBlock, *DeallocBlock, *ContBlock;
 
