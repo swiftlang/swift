@@ -357,7 +357,7 @@ ModuleFile::getModuleName(ASTContext &Ctx, StringRef modulePath,
                       nullptr,
                       nullptr,
                       /*isFramework*/isFramework, loadedModuleFile,
-                      &ExtInfo);
+                      ExtInfo);
   Name = loadedModuleFile->Name.str();
   return std::move(moduleBuf.get());
 }

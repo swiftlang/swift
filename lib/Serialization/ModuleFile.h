@@ -438,11 +438,31 @@ public:
     return Core->CompatibilityVersion;
   }
 
+  /// Whether this module is compiled with `-enable-private-imports`.
+  bool arePrivateImportsEnabled() const {
+    return Core->Bits.ArePrivateImportsEnabled;
+  }
+
   /// Is this module file actually a .sib file? .sib files are serialized SIL at
   /// arbitrary granularity and arbitrary stage; unlike serialized Swift
   /// modules, which are assumed to contain canonical SIL for an entire module.
   bool isSIB() const {
-    return Core->IsSIB;
+    return Core->Bits.IsSIB;
+  }
+
+  /// Whether this module file is compiled with '-enable-testing'.
+  bool isTestable() const {
+    return Core->Bits.IsTestable;
+  }
+
+  /// Whether the module is resilient. ('-enable-library-evolution')
+  ResilienceStrategy getResilienceStrategy() const {
+    return ResilienceStrategy(Core->Bits.ResilienceStrategy);
+  }
+
+  /// Whether this module is compiled with implicit dynamic.
+  bool isImplicitDynamicEnabled() const {
+    return Core->Bits.IsImplicitDynamicEnabled;
   }
 
   /// Associates this module file with the AST node representing it.

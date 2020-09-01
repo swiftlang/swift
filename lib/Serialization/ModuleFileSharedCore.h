@@ -69,11 +69,6 @@ class ModuleFileSharedCore {
   /// The data blob containing all of the module's identifiers.
   StringRef IdentifierData;
 
-  /// Is this module file actually a .sib file? .sib files are serialized SIL at
-  /// arbitrary granularity and arbitrary stage; unlike serialized Swift
-  /// modules, which are assumed to contain canonical SIL for an entire module.
-  bool IsSIB = false;
-
   // Full blob from the misc. version field of the metadata block. This should
   // include the version string of the compiler that built the module.
   StringRef MiscVersion;
@@ -307,6 +302,21 @@ private:
     /// Whether an error has been detected setting up this module file.
     unsigned HasError : 1;
 
+    /// Whether this module is `-enable-private-imports`.
+    unsigned ArePrivateImportsEnabled : 1;
+
+    /// Whether this module file is actually a .sib file.
+    unsigned IsSIB: 1;
+
+    /// Whether this module file is compiled with '-enable-testing'.
+    unsigned IsTestable : 1;
+
+    /// Discriminator for resilience strategy.
+    unsigned ResilienceStrategy : 2;
+
+    /// Whether this module is compiled with implicit dynamic.
+    unsigned IsImplicitDynamicEnabled: 1;
+
     // Explicitly pad out to the next word boundary.
     unsigned : 0;
   } Bits = {};
@@ -327,7 +337,7 @@ private:
                  std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
                  std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
                  bool isFramework, serialization::ValidationInfo &info,
-                 serialization::ExtendedValidationInfo *extInfo);
+                 serialization::ExtendedValidationInfo &extInfo);
 
   /// Change the status of the current module.
   Status error(Status issue) {
@@ -456,7 +466,7 @@ public:
        std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
        bool isFramework, std::shared_ptr<const ModuleFileSharedCore> &theModule,
-       serialization::ExtendedValidationInfo *extInfo = nullptr) {
+       serialization::ExtendedValidationInfo &extInfo) {
     serialization::ValidationInfo info;
     auto *core = new ModuleFileSharedCore(
         std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),

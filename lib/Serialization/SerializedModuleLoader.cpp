@@ -394,7 +394,7 @@ llvm::ErrorOr<ModuleDependencies> SerializedModuleLoaderBase::scanModuleFile(
                        nullptr,
                        nullptr,
                        isFramework, loadedModuleFile,
-                       &extInfo);
+                       extInfo);
 
   // Map the set of dependencies over to the "module dependencies".
   auto dependencies = ModuleDependencies::forSwiftModule(modulePath.str(), isFramework);
@@ -704,19 +704,19 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
                        std::move(moduleDocInputBuffer),
                        std::move(moduleSourceInfoInputBuffer),
                        isFramework, loadedModuleFileCore,
-                       &extendedInfo);
+                       extendedInfo);
   if (loadInfo.status == serialization::Status::Valid) {
     loadedModuleFile =
         std::make_unique<ModuleFile>(std::move(loadedModuleFileCore));
-    M.setResilienceStrategy(extendedInfo.getResilienceStrategy());
+    M.setResilienceStrategy(loadedModuleFile->getResilienceStrategy());
 
     // We've loaded the file. Now try to bring it into the AST.
     auto fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile);
-    if (extendedInfo.isTestable())
+    if (loadedModuleFile->isTestable())
       M.setTestingEnabled();
-    if (extendedInfo.arePrivateImportsEnabled())
+    if (loadedModuleFile->arePrivateImportsEnabled())
       M.setPrivateImportsEnabled();
-    if (extendedInfo.isImplicitDynamicEnabled())
+    if (loadedModuleFile->isImplicitDynamicEnabled())
       M.setImplicitDynamicEnabled();
 
     auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
