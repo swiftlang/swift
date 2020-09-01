@@ -1071,7 +1071,13 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
     // it for later.   Once we've collected all of the conditional init/assigns,
     // we can insert a single control variable for the memory object for the
     // whole function.
-    if (!Use.onlyTouchesTrivialElements(TheMemory))
+    //
+    // For root class initializers, we must keep track of initializations of
+    // trivial stored properties also, since we need to know when the object
+    // has been fully initialized when deciding if a strong_release should
+    // lower to a partial_dealloc_ref.
+    if (TheMemory.isRootClassSelf() ||
+        !Use.onlyTouchesTrivialElements(TheMemory))
       HasConditionalInitAssign = true;
     return;
   }
@@ -2276,7 +2282,13 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
     // If this ambiguous store is only of trivial types, then we don't need to
     // do anything special.  We don't even need keep the init bit for the
     // element precise.
-    if (Use.onlyTouchesTrivialElements(TheMemory))
+    //
+    // For root class initializers, we must keep track of initializations of
+    // trivial stored properties also, since we need to know when the object
+    // has been fully initialized when deciding if a strong_release should
+    // lower to a partial_dealloc_ref.
+    if (!TheMemory.isRootClassSelf() &&
+        Use.onlyTouchesTrivialElements(TheMemory))
       continue;
     
     B.setInsertionPoint(Use.Inst);
