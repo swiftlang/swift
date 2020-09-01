@@ -804,10 +804,12 @@ ArrayRef<Decl *> IterableDeclContext::getParsedMembers() const {
 
 ArrayRef<Decl *> IterableDeclContext::getSemanticMembers() const {
   ASTContext &ctx = getASTContext();
-  return evaluateOrDefault(
+  auto result = evaluateOrDefault(
       ctx.evaluator,
       SemanticMembersRequest{const_cast<IterableDeclContext *>(this)},
       ArrayRef<Decl *>());
+  assert(result.size() <= getMemberCount());
+  return result;
 }
 
 /// Add a member to this context.

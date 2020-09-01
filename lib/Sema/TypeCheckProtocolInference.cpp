@@ -439,7 +439,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
   const llvm::SetVector<AssociatedTypeDecl *> &assocTypes)
 {
   InferredAssociatedTypes result;
-  for (auto member : proto->getMembers()) {
+  for (auto member : proto->getSemanticMembers()) {
     auto req = dyn_cast<ValueDecl>(member);
     if (!req || !req->isProtocolRequirement())
       continue;

@@ -513,7 +513,7 @@ ExistentialConformsToSelfRequest::evaluate(Evaluator &evaluator,
     return decl->requiresSelfConformanceWitnessTable();
 
   // Check whether this protocol conforms to itself.
-  for (auto member : decl->getMembers()) {
+  for (auto member : decl->getSemanticMembers()) {
     if (member->isInvalid()) continue;
 
     if (auto vd = dyn_cast<ValueDecl>(member)) {
@@ -539,7 +539,7 @@ ExistentialTypeSupportedRequest::evaluate(Evaluator &evaluator,
   if (decl->isObjC())
     return true;
 
-  for (auto member : decl->getMembers()) {
+  for (auto member : decl->getSemanticMembers()) {
     // Existential types cannot be used if the protocol has an associated type.
     if (isa<AssociatedTypeDecl>(member))
       return false;

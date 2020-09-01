@@ -361,7 +361,7 @@ public:
     }
 
     // Recurse to find any nested types.
-    for (const Decl *member : memberContext->getMembers())
+    for (const Decl *member : memberContext->getSemanticMembers())
       collectProtocols(map, member);
   }
 

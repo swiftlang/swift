@@ -157,7 +157,7 @@ public:
   }
 
   bool isEmptyExtensionDecl(const ExtensionDecl *ED) {
-    auto members = ED->getMembers();
+    auto members = ED->getSemanticMembers();
     auto hasMembers = std::any_of(members.begin(), members.end(),
                                   [this](const Decl *D) -> bool {
       if (auto VD = dyn_cast<ValueDecl>(D))
@@ -327,7 +327,7 @@ private:
       os << " : " << getNameForObjC(superDecl);
     printProtocols(CD->getLocalProtocols(ConformanceLookupKind::OnlyExplicit));
     os << "\n";
-    printMembers(CD->getMembers());
+    printMembers(CD->getSemanticMembers());
     os << "@end\n";
   }
 
@@ -344,7 +344,7 @@ private:
     os << " (SWIFT_EXTENSION(" << ED->getModuleContext()->getName() << "))";
     printProtocols(ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit));
     os << "\n";
-    printMembers(ED->getMembers());
+    printMembers(ED->getSemanticMembers());
     os << "@end\n";
   }
 
@@ -365,7 +365,7 @@ private:
 
     printProtocols(PD->getInheritedProtocols());
     os << "\n";
-    printMembers(PD->getMembers());
+    printMembers(PD->getSemanticMembers());
     os << "@end\n";
   }
 

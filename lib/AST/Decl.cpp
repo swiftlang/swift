@@ -4419,7 +4419,7 @@ static ValueDecl *findOverridingDecl(const ClassDecl *C,
                                      const ValueDecl *Base) {
   // FIXME: This is extremely inefficient. The SILOptimizer should build a
   // reverse lookup table to answer these types of queries.
-  for (auto M : C->getMembers()) {
+  for (auto M : C->getSemanticMembers()) {
     if (auto *Derived = dyn_cast<ValueDecl>(M))
       if (::isOverridingDecl(Derived, Base))
         return Derived;
@@ -4647,7 +4647,7 @@ ProtocolDecl::getAssociatedTypeMembers() const {
     return result;
 
   // Find the associated type declarations.
-  for (auto member : getMembers()) {
+  for (auto member : getParsedMembers()) {
     if (auto ATD = dyn_cast<AssociatedTypeDecl>(member)) {
       result.push_back(ATD);
     }
@@ -7957,7 +7957,7 @@ Type TypeBase::getSwiftNewtypeUnderlyingType() {
     return {};
 
   // Underlying type is the type of rawValue
-  for (auto member : structDecl->getMembers())
+  for (auto member : structDecl->getSemanticMembers())
     if (auto varDecl = dyn_cast<VarDecl>(member))
       if (varDecl->getName() == getASTContext().Id_rawValue)
         return varDecl->getType();

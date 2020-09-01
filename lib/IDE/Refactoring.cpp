@@ -3275,7 +3275,7 @@ class AddEquatableContext {
   ArrayRef<VarDecl *> StoredProperties;
 
   /// Range of internal members in declaration
-  DeclRange Range;
+  ArrayRef<Decl *> Range;
 
   bool conformsToEquatableProtocol() {
     for (ProtocolDecl *Protocol : Protocols) {
@@ -3312,14 +3312,16 @@ public:
   Adopter(Decl->getDeclaredType()), StartLoc(Decl->getBraces().Start),
   ProtocolsLocations(Decl->getInherited()),
   Protocols(Decl->getAllProtocols()), ProtInsertStartLoc(Decl->getNameLoc()),
-  StoredProperties(Decl->getStoredProperties()), Range(Decl->getMembers()) {};
+  StoredProperties(Decl->getStoredProperties()),
+  Range(Decl->getSemanticMembers()) {};
 
   AddEquatableContext(ExtensionDecl *Decl) : DC(Decl),
   Adopter(Decl->getExtendedType()), StartLoc(Decl->getBraces().Start),
   ProtocolsLocations(Decl->getInherited()),
   Protocols(Decl->getExtendedNominal()->getAllProtocols()),
   ProtInsertStartLoc(Decl->getExtendedTypeRepr()->getEndLoc()),
-  StoredProperties(Decl->getExtendedNominal()->getStoredProperties()), Range(Decl->getMembers()) {};
+  StoredProperties(Decl->getExtendedNominal()->getStoredProperties()),
+  Range(Decl->getSemanticMembers()) {};
 
   AddEquatableContext() : DC(nullptr), Adopter(), ProtocolsLocations(),
   Protocols(), StoredProperties(), Range(nullptr, nullptr) {};
@@ -3427,7 +3429,7 @@ std::vector<ValueDecl *> AddEquatableContext::
 getProtocolRequirements() {
   std::vector<ValueDecl *> Collection;
   auto Proto = DC->getASTContext().getProtocol(KnownProtocolKind::Equatable);
-  for (auto Member : Proto->getMembers()) {
+  for (auto Member : Proto->getSemanticMembers()) {
     auto Req = dyn_cast<ValueDecl>(Member);
     if (!Req || Req->isInvalid() || !Req->isProtocolRequirement()) {
       continue;

@@ -118,7 +118,7 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
       N = findIndexInRange(D, parentSF->getTopLevelDecls());
     } else if (auto parentIDC = dyn_cast_or_null<IterableDeclContext>(
                    parentDC->getAsDecl())) {
-      N = findIndexInRange(D, parentIDC->getMembers());
+      N = findIndexInRange(D, parentIDC->getParsedMembers());
     } else {
 #ifndef NDEBUG
       llvm_unreachable("invalid DC kind for finding equivalent DC (indexpath)");
@@ -146,7 +146,7 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
     if (auto parentSF = dyn_cast<SourceFile>(newDC))
       D = getElementAt(parentSF->getTopLevelDecls(), N);
     else if (auto parentIDC = dyn_cast<IterableDeclContext>(newDC->getAsDecl()))
-      D = getElementAt(parentIDC->getMembers(), N);
+      D = getElementAt(parentIDC->getParsedMembers(), N);
     else
       llvm_unreachable("invalid DC kind for finding equivalent DC (query)");
 

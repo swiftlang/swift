@@ -6240,7 +6240,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   
   // Fill in opaque value witnesses if we need to.
   if (needToFillInOpaqueValueWitnesses) {
-    for (auto member : proto->getMembers()) {
+    for (auto member : proto->getSemanticMembers()) {
       // We only care about non-associated-type requirements.
       auto valueMember = dyn_cast<ValueDecl>(member);
       if (!valueMember || !valueMember->isProtocolRequirement()

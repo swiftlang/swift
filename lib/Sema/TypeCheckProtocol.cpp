@@ -1567,7 +1567,7 @@ void MultiConformanceChecker::checkAllConformances() {
       continue;
     // Check whether there are any unsatisfied requirements.
     auto proto = conformance->getProtocol();
-    for (auto member : proto->getMembers()) {
+    for (auto member : proto->getSemanticMembers()) {
       auto req = dyn_cast<ValueDecl>(member);
       if (!req || !req->isProtocolRequirement()) continue;
 
@@ -4146,7 +4146,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
 #pragma mark Protocol conformance checking
 
 void ConformanceChecker::resolveValueWitnesses() {
-  for (auto member : Proto->getMembers()) {
+  for (auto member : Proto->getSemanticMembers()) {
     auto requirement = dyn_cast<ValueDecl>(member);
     if (!requirement)
       continue;
@@ -5343,7 +5343,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
       // Complain about any declarations in this extension whose names match
       // a requirement in that protocol.
       SmallPtrSet<DeclName, 4> diagnosedNames;
-      for (auto decl : idc->getMembers()) {
+      for (auto decl : idc->getParsedMembers()) {
         if (decl->isImplicit())
           continue;
 
@@ -5856,7 +5856,7 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
     return {defaultType, defaultedAssocType};
   };
 
-  for (auto *requirement : proto->getMembers()) {
+  for (auto *requirement : proto->getSemanticMembers()) {
     if (requirement->isInvalid())
       continue;
 

@@ -320,7 +320,7 @@ bool ide::printExtensionUSR(const ExtensionDecl *ED, raw_ostream &OS) {
 
   // We make up a unique usr for each extension by combining a prefix
   // and the USR of the first value member of the extension.
-  for (auto D : ED->getMembers()) {
+  for (auto D : ED->getParsedMembers()) {
     if (auto VD = dyn_cast<ValueDecl>(D)) {
       OS << getUSRSpacePrefix() << "e:";
       return printValueDeclUSR(VD, OS);

@@ -7213,7 +7213,7 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
 
     } else {
       // Otherwise, import all mirrored members.
-      for (auto *member : proto->getMembers())
+      for (auto *member : proto->getSemanticMembers())
         importProtocolRequirement(member);
     }
   }
@@ -8020,7 +8020,7 @@ static void finishMissingOptionalWitnesses(
     NormalProtocolConformance *conformance) {
   auto *proto = conformance->getProtocol();
 
-  for (auto req : proto->getMembers()) {
+  for (auto req : proto->getSemanticMembers()) {
     auto valueReq = dyn_cast<ValueDecl>(req);
     if (!valueReq)
       continue;
@@ -8807,7 +8807,8 @@ static void loadMembersOfBaseImportedFromClang(ExtensionDecl *ext) {
   // loading the original class's members. Right now we only check if this
   // happens on the first member.
   if (auto *clangContainer = dyn_cast<clang::ObjCContainerDecl>(clangBase))
-    assert((clangContainer->decls_empty() || !base->getMembers().empty()) &&
+    assert((clangContainer->decls_empty() ||
+            !base->getParsedMembers().empty()) &&
            "can't load extension members before base has finished");
 }
 

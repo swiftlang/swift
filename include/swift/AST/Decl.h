@@ -4406,7 +4406,7 @@ public:
   /// This can occur, for example, if the protocol is an Objective-C protocol
   /// with requirements that cannot be represented in Swift.
   bool hasMissingRequirements() const {
-    (void)getMembers();
+    (void)getSemanticMembers();
     return Bits.ProtocolDecl.HasMissingRequirements;
   }
 

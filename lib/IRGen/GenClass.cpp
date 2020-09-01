@@ -920,7 +920,7 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
 
   IRGen.addClassForEagerInitialization(D);
 
-  emitNestedTypeDecls(D->getMembers());
+  emitNestedTypeDecls(D->getSemanticMembers());
 }
 
 namespace {
@@ -1083,7 +1083,7 @@ namespace {
 
       visitConformances(theExtension);
 
-      for (Decl *member : TheExtension->getMembers())
+      for (Decl *member : TheExtension->getSemanticMembers())
         visit(member);
     }
 
@@ -1109,7 +1109,7 @@ namespace {
         Protocols.push_back(proto);
       }
 
-      for (Decl *member : theProtocol->getMembers())
+      for (Decl *member : theProtocol->getSemanticMembers())
         visit(member);
     }
 

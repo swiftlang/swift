@@ -110,7 +110,7 @@ void CalleeCache::computeClassMethodCallees() {
   for (auto &VTable : M.getVTables()) {
     assert(!VTable->getClass()->hasClangNode());
 
-    for (Decl *member : VTable->getClass()->getMembers()) {
+    for (Decl *member : VTable->getClass()->getSemanticMembers()) {
       if (auto *afd = dyn_cast<AbstractFunctionDecl>(member)) {
         // If a method implementation might be overridden in another translation
         // unit, also mark all the base methods as 'unknown'.

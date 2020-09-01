@@ -1191,7 +1191,7 @@ static bool requiresIVarInitialization(SILGenModule &SGM, ClassDecl *cd) {
   if (!cd->requiresStoredPropertyInits())
     return false;
 
-  for (Decl *member : cd->getMembers()) {
+  for (Decl *member : cd->getSemanticMembers()) {
     auto pbd = dyn_cast<PatternBindingDecl>(member);
     if (!pbd) continue;
 
@@ -1204,7 +1204,7 @@ static bool requiresIVarInitialization(SILGenModule &SGM, ClassDecl *cd) {
 }
 
 bool SILGenModule::hasNonTrivialIVars(ClassDecl *cd) {
-  for (Decl *member : cd->getMembers()) {
+  for (Decl *member : cd->getSemanticMembers()) {
     auto *vd = dyn_cast<VarDecl>(member);
     if (!vd || !vd->hasStorage()) continue;
 

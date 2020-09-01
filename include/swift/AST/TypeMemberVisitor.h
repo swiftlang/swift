@@ -53,9 +53,9 @@ public:
     return RetTy();
   }
 
-  /// A convenience method to visit all the members.
+  /// A convenience method to visit all the semantic members.
   void visitMembers(NominalTypeDecl *D) {
-    for (Decl *member : D->getMembers()) {
+    for (Decl *member : D->getSemanticMembers()) {
       asImpl().visit(member);
     }
   }

@@ -1036,16 +1036,13 @@ public:
   void emitType() {
     SGM.emitLazyConformancesForType(theType);
 
+    for (Decl *member : theType->getSemanticMembers())
+      visit(member);
+
     // Build a vtable if this is a class.
     if (auto theClass = dyn_cast<ClassDecl>(theType)) {
-      for (Decl *member : theClass->getSemanticMembers())
-        visit(member);
-
       SILGenVTable genVTable(SGM, theClass);
       genVTable.emitVTable();
-    } else {
-      for (Decl *member : theType->getMembers())
-        visit(member);
     }
 
     // Build a default witness table if this is a protocol that needs one.
@@ -1181,7 +1178,7 @@ public:
 
   /// Emit SIL functions for all the members of the extension.
   void emitExtension(ExtensionDecl *e) {
-    for (Decl *member : e->getMembers())
+    for (Decl *member : e->getSemanticMembers())
       visit(member);
 
     if (!isa<ProtocolDecl>(e->getExtendedNominal())) {

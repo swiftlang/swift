@@ -5085,7 +5085,7 @@ public:
     if (!CD->hasSuperclass())
       return;
     CD = CD->getSuperclassDecl();
-    for (const auto *Member : CD->getMembers()) {
+    for (const auto *Member : CD->getSemanticMembers()) {
       const auto *Constructor = dyn_cast<ConstructorDecl>(Member);
       if (!Constructor)
         continue;

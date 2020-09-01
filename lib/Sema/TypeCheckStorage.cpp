@@ -1000,7 +1000,7 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   //- (id)copyWithZone:(NSZone *)zone;
   DeclName copyWithZoneName(Ctx, Ctx.getIdentifier("copy"), { Ctx.Id_with });
   FuncDecl *copyMethod = nullptr;
-  for (auto member : conformance.getRequirement()->getMembers()) {
+  for (auto member : conformance.getRequirement()->getSemanticMembers()) {
     if (auto func = dyn_cast<FuncDecl>(member)) {
       if (func->getName() == copyWithZoneName) {
         copyMethod = func;

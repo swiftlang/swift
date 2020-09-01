@@ -886,7 +886,7 @@ HasUserDefinedDesignatedInitRequest::evaluate(Evaluator &evaluator,
 
   for (auto *member : decl->getMembers())
     if (auto *ctor = dyn_cast<ConstructorDecl>(member))
-      if (ctor->isDesignatedInit() && !ctor->isSynthesized())
+      if (ctor->isDesignatedInit())
         return true;
   return false;
 }

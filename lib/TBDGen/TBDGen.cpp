@@ -820,7 +820,7 @@ void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
   // There are symbols associated with any protocols this type conforms to.
   addConformances(NTD);
 
-  for (auto member : NTD->getMembers())
+  for (auto member : NTD->getSemanticMembers())
     visit(member);
 }
 
@@ -947,7 +947,7 @@ void TBDGenVisitor::visitExtensionDecl(ExtensionDecl *ED) {
     addConformances(ED);
   }
 
-  for (auto member : ED->getMembers())
+  for (auto member : ED->getSemanticMembers())
     visit(member);
 }
 
@@ -1044,7 +1044,7 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
   // individual protocols, each conforming type has to handle them individually
   // (NB. anything within an active IfConfigDecls also appears outside). Let's
   // assert this fact:
-  for (auto *member : PD->getMembers()) {
+  for (auto *member : PD->getSemanticMembers()) {
     assert(isValidProtocolMemberForTBDGen(member) &&
            "unexpected member of protocol during TBD generation");
   }

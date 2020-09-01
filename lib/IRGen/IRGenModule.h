@@ -1357,7 +1357,7 @@ public:
   void emitSILStaticInitializers();
   llvm::Constant *emitFixedTypeLayout(CanType t, const FixedTypeInfo &ti);
   void emitProtocolConformance(const ConformanceDescription &record);
-  void emitNestedTypeDecls(DeclRange members);
+  void emitNestedTypeDecls(ArrayRef<Decl *> members);
   void emitClangDecl(const clang::Decl *decl);
   void finalizeClangCodeGen();
   void finishEmitAfterTopLevel();

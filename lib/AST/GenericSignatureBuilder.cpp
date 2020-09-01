@@ -3895,7 +3895,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
         [&](ProtocolDecl *inheritedProto) -> TypeWalker::Action {
       if (inheritedProto == proto) return TypeWalker::Action::Continue;
 
-      for (auto req : inheritedProto->getMembers()) {
+      for (auto req : inheritedProto->getSemanticMembers()) {
         if (auto typeReq = dyn_cast<TypeDecl>(req)) {
           // Ignore generic types
           if (auto genReq = dyn_cast<GenericTypeDecl>(req))

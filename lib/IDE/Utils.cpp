@@ -1155,7 +1155,7 @@ ClangNode swift::ide::extensionGetClangNode(const ExtensionDecl *ext) {
     return ClangNode();
 
   // It may have a global imported as a member.
-  for (auto member : ext->getMembers()) {
+  for (auto member : ext->getParsedMembers()) {
     if (auto clangNode = getEffectiveClangNode(member))
       return clangNode;
   }

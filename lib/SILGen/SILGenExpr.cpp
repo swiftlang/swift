@@ -2543,7 +2543,7 @@ RValue RValueEmitter::visitObjCSelectorExpr(ObjCSelectorExpr *e, SGFContext C) {
 
   // Dig out the type of its pointer.
   Type selectorMemberTy;
-  for (auto member : selectorDecl->getMembers()) {
+  for (auto member : selectorDecl->getSemanticMembers()) {
     if (auto var = dyn_cast<VarDecl>(member)) {
       if (!var->isStatic() && var->hasStorage()) {
         selectorMemberTy = var->getInterfaceType();

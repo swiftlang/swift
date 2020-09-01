@@ -73,7 +73,7 @@ static std::string mangleTypeAsContext(const NominalTypeDecl *NTD) {
 /// files.
 static bool allMembersArePrivate(const ExtensionDecl *ED) {
   return std::all_of(
-      ED->getMembers().begin(), ED->getMembers().end(),
+      ED->getParsedMembers().begin(), ED->getParsedMembers().end(),
       [](const Decl *d) { return d->isPrivateToEnclosingFile(); });
 }
 
@@ -413,21 +413,21 @@ private:
         ED && !allInheritedProtocolsArePrivate(ED);
     if (ED && !includePrivateDecls && !exposedProtocolIsExtended &&
         std::all_of(
-            ED->getMembers().begin(), ED->getMembers().end(),
+            ED->getSemanticMembers().begin(), ED->getSemanticMembers().end(),
             [&](const Decl *D) { return D->isPrivateToEnclosingFile(); })) {
       return;
     }
     if (includePrivateDecls || !ED || exposedProtocolIsExtended)
       allNominals.push_back(NTD);
     potentialMemberHolders.push_back(NTD);
-    findNominalsAndOperatorsInMembers(ED ? ED->getMembers()
-                                         : NTD->getMembers());
+    findNominalsAndOperatorsInMembers(ED ? ED->getSemanticMembers()
+                                         : NTD->getSemanticMembers());
   }
 
   /// Search through the members to find nominals and operators.
   /// (indirectly recursive)
   /// TODO: clean this up, maybe recurse separately for each purpose.
-  void findNominalsAndOperatorsInMembers(const DeclRange members) {
+  void findNominalsAndOperatorsInMembers(ArrayRef<Decl *> members) {
     for (const Decl *const D : members) {
       auto *VD = dyn_cast<ValueDecl>(D);
       if (!VD || excludeIfPrivate(VD))
@@ -448,7 +448,7 @@ private:
       if (!includePrivateDecls &&
           (!allInheritedProtocolsArePrivate(ED) || allMembersArePrivate(ED)))
         continue;
-      for (const auto *member : ED->getMembers())
+      for (const auto *member : ED->getSemanticMembers())
         if (const auto *VD = dyn_cast<ValueDecl>(member))
           if (VD->hasName() &&
               (includePrivateDecls || !VD->isPrivateToEnclosingFile())) {

@@ -104,9 +104,10 @@ struct SynthesizedExtensionAnalyzer::Implementation {
 
   static bool isExtensionFavored(const NominalTypeDecl* Target,
                                  const ExtensionDecl *ED) {
-    return std::find_if(ED->getMembers().begin(), ED->getMembers().end(),
+    return std::find_if(
+      ED->getParsedMembers().begin(), ED->getParsedMembers().end(),
       [&](DeclIterator It) {
-        return isMemberFavored(Target, *It);}) != ED->getMembers().end();
+        return isMemberFavored(Target, *It);}) != ED->getParsedMembers().end();
   }
 
   struct SynthesizedExtensionInfo {
@@ -571,7 +572,7 @@ hasMergeGroup(MergeGroupKind Kind) {
 void swift::
 collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                     llvm::SmallDenseMap<ValueDecl*, ValueDecl*> &DefaultMap) {
-  auto HandleMembers = [&](DeclRange Members) {
+  auto HandleMembers = [&](ArrayRef<Decl *> Members) {
     for (Decl *D : Members) {
       auto *VD = dyn_cast<ValueDecl>(D);
 
@@ -592,12 +593,12 @@ collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
   };
 
   // Collect the default implementations for the members in this given protocol.
-  HandleMembers(PD->getMembers());
+  HandleMembers(PD->getSemanticMembers());
 
   // Collect the default implementations for the members in the inherited
   // protocols.
   for (auto *IP : PD->getInheritedProtocols())
-    HandleMembers(IP->getMembers());
+    HandleMembers(IP->getSemanticMembers());
 }
 
 /// This walker will traverse the AST and report types for every expression.

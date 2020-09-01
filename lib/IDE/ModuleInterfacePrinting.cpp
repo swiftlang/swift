@@ -277,7 +277,7 @@ static bool printModuleInterfaceDecl(Decl *D,
         SubDecls.pop();
 
         // Add sub-types of NTD.
-        for (auto Sub : NTD->getMembers())
+        for (auto Sub : NTD->getSemanticMembers())
           if (auto N = dyn_cast<NominalTypeDecl>(Sub))
             SubDecls.push(N);
 
@@ -296,7 +296,7 @@ static bool printModuleInterfaceDecl(Decl *D,
             Ext->print(Printer, Options);
             Printer << "\n";
           }
-          for (auto Sub : Ext->getMembers())
+          for (auto Sub : Ext->getSemanticMembers())
             if (auto N = dyn_cast<NominalTypeDecl>(Sub))
               SubDecls.push(N);
         }

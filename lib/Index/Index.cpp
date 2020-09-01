@@ -399,7 +399,7 @@ private:
       return;
 
     unsigned CurLabel = 0;
-    for (auto Member : TypeContext->getMembers()) {
+    for (auto Member : TypeContext->getSemanticMembers()) {
       auto Prop = dyn_cast<VarDecl>(Member);
       if (!Prop)
         continue;

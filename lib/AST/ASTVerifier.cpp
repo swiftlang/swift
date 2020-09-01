@@ -2620,7 +2620,7 @@ public:
       }
 
       // Check that a normal protocol conformance is complete.
-      for (auto member : proto->getMembers()) {
+      for (auto member : proto->getSemanticMembers()) {
         if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
           if (!normal->hasTypeWitness(assocType)) {
             dumpRef(decl);
@@ -3173,7 +3173,7 @@ public:
       
       if (!CD->hasLazyMembers()) {
         unsigned NumDestructors = 0;
-        for (auto Member : CD->getMembers()) {
+        for (auto Member : CD->getSemanticMembers()) {
           if (isa<DestructorDecl>(Member)) {
             ++NumDestructors;
           }

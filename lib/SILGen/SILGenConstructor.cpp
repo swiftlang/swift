@@ -974,7 +974,7 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
                                             NominalTypeDecl *nominal) {
   auto subs = getSubstitutionsForPropertyInitializer(dc, nominal);
 
-  for (auto member : nominal->getMembers()) {
+  for (auto member : nominal->getSemanticMembers()) {
     // Find instance pattern binding declarations that have initializers.
     if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
       if (pbd->isStatic()) continue;

@@ -984,7 +984,7 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
     emitFieldDescriptor(st);
   }
 
-  emitNestedTypeDecls(st->getMembers());
+  emitNestedTypeDecls(st->getSemanticMembers());
 }
 
 void IRGenModule::maybeEmitOpaqueTypeDecl(OpaqueTypeDecl *opaque) {

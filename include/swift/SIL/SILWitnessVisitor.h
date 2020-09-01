@@ -104,7 +104,7 @@ public:
       return;
 
     // Visit the witnesses for the direct members of a protocol.
-    for (Decl *member : protocol->getMembers()) {
+    for (Decl *member : protocol->getSemanticMembers()) {
       ASTVisitor<T>::visit(member);
     }
   }

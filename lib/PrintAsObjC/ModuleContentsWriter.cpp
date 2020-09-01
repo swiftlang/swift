@@ -235,7 +235,8 @@ public:
     });
   }
 
-  bool forwardDeclareMemberTypes(DeclRange members, const Decl *container) {
+  bool forwardDeclareMemberTypes(
+      ArrayRef<Decl *> members, const Decl *container) {
     PrettyStackTraceDecl
         entry("printing forward declarations needed by members of", container);
     switch (container->getKind()) {
@@ -368,7 +369,7 @@ public:
     if (!allRequirementsSatisfied)
       return false;
 
-    (void)forwardDeclareMemberTypes(CD->getMembers(), CD);
+    (void)forwardDeclareMemberTypes(CD->getSemanticMembers(), CD);
     seenTypes[CD] = { EmissionState::Defined, true };
     os << '\n';
     printer.print(CD);
@@ -400,7 +401,7 @@ public:
     if (!allRequirementsSatisfied)
       return false;
 
-    if (!forwardDeclareMemberTypes(PD->getMembers(), PD))
+    if (!forwardDeclareMemberTypes(PD->getSemanticMembers(), PD))
       return false;
 
     seenTypes[PD] = { EmissionState::Defined, true };
@@ -427,7 +428,7 @@ public:
     // This isn't rolled up into the previous set of requirements because
     // it /also/ prints forward declarations, and the header is a little
     // prettier if those are as close as possible to the necessary extension.
-    if (!forwardDeclareMemberTypes(ED->getMembers(), ED))
+    if (!forwardDeclareMemberTypes(ED->getSemanticMembers(), ED))
       return false;
 
     os << '\n';
@@ -519,8 +520,8 @@ public:
       // Break ties in extensions by putting smaller extensions last (in reverse
       // order).
       // FIXME: This will end up taking linear time.
-      auto lhsMembers = cast<ExtensionDecl>(*lhs)->getMembers();
-      auto rhsMembers = cast<ExtensionDecl>(*rhs)->getMembers();
+      auto lhsMembers = cast<ExtensionDecl>(*lhs)->getSemanticMembers();
+      auto rhsMembers = cast<ExtensionDecl>(*rhs)->getSemanticMembers();
       unsigned numLHSMembers = std::distance(lhsMembers.begin(),
                                              lhsMembers.end());
       unsigned numRHSMembers = std::distance(rhsMembers.begin(),

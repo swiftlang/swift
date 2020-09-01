@@ -254,7 +254,7 @@ void SymbolGraph::recordSuperclassSynthesizedMemberRelationships(Symbol S) {
     SmallPtrSet<const ValueDecl *, 32> SuperClassMembers;
     const auto *Super = C->getSuperclassDecl();
     while (Super) {
-      for (const auto *SuperMember : Super->getMembers()) {
+      for (const auto *SuperMember : Super->getSemanticMembers()) {
         if (const auto *SuperMemberVD = dyn_cast<ValueDecl>(SuperMember)) {
           SuperClassMembers.insert(SuperMemberVD);
         }
@@ -262,7 +262,7 @@ void SymbolGraph::recordSuperclassSynthesizedMemberRelationships(Symbol S) {
       Super = Super->getSuperclassDecl();
     }
     // Remove any that are overridden by this class.
-    for (const auto *DerivedMember : C->getMembers()) {
+    for (const auto *DerivedMember : C->getSemanticMembers()) {
       if (const auto *DerivedMemberVD = dyn_cast<ValueDecl>(DerivedMember)) {
         if (const auto *Overridden = DerivedMemberVD->getOverriddenDecl()) {
           SuperClassMembers.erase(Overridden);
@@ -345,7 +345,7 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
         continue;
       }
 
-      for (const auto ExtensionMember : Info.Ext->getMembers()) {
+      for (const auto ExtensionMember : Info.Ext->getSemanticMembers()) {
         if (const auto SynthMember = dyn_cast<ValueDecl>(ExtensionMember)) {
           if (SynthMember->isObjC()) {
             continue;
@@ -408,7 +408,7 @@ void SymbolGraph::recordDefaultImplementationRelationships(Symbol S) {
   /// Claim a protocol `P`'s members as default implementation targets
   /// for `VD`.
   auto HandleProtocol = [=](const ProtocolDecl *P) {
-    for (const auto *Member : P->getMembers()) {
+    for (const auto *Member : P->getSemanticMembers()) {
       if (const auto *MemberVD = dyn_cast<ValueDecl>(Member)) {
         if (MemberVD->getName().compare(VD->getName()) == 0) {
           recordEdge(Symbol(this, VD, nullptr),

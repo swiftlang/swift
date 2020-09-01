@@ -133,7 +133,7 @@ public:
   }
   
   void visitMembers(ExtensionDecl *ext) {
-    for (Decl *member : ext->getMembers())
+    for (Decl *member : ext->getSemanticMembers())
       visit(member);
   }
 
@@ -319,7 +319,7 @@ public:
     }
     
     // Add the members.
-    for (Decl *member : proto->getMembers())
+    for (Decl *member : proto->getSemanticMembers())
       visit(member);
     
     // Register it.
@@ -4468,7 +4468,7 @@ Address IRGenModule::getAddrOfEnumCase(EnumElementDecl *Case,
   return addr;
 }
 
-void IRGenModule::emitNestedTypeDecls(DeclRange members) {
+void IRGenModule::emitNestedTypeDecls(ArrayRef<Decl *> members) {
   for (Decl *member : members) {
     switch (member->getKind()) {
     case DeclKind::Import:
@@ -4532,7 +4532,7 @@ static bool shouldEmitCategory(IRGenModule &IGM, ExtensionDecl *ext) {
       return true;
   }
 
-  for (auto member : ext->getMembers()) {
+  for (auto member : ext->getSemanticMembers()) {
     if (auto func = dyn_cast<FuncDecl>(member)) {
       if (requiresObjCMethodDescriptor(func))
         return true;
@@ -4552,7 +4552,7 @@ static bool shouldEmitCategory(IRGenModule &IGM, ExtensionDecl *ext) {
 }
 
 void IRGenModule::emitExtension(ExtensionDecl *ext) {
-  emitNestedTypeDecls(ext->getMembers());
+  emitNestedTypeDecls(ext->getSemanticMembers());
 
   addLazyConformances(ext);
 

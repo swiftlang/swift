@@ -207,7 +207,7 @@ public:
   template<typename F>
   void forEachNonWitnessedRequirement(F f) const {
     const ProtocolDecl *protocol = getProtocol();
-    for (auto req : protocol->getMembers()) {
+    for (auto req : protocol->getSemanticMembers()) {
       auto valueReq = dyn_cast<ValueDecl>(req);
       if (!valueReq || valueReq->isInvalid())
         continue;
@@ -361,7 +361,7 @@ public:
   template<typename F>
   void forEachValueWitness(F f, bool useResolver=false) const {
     const ProtocolDecl *protocol = getProtocol();
-    for (auto req : protocol->getMembers()) {
+    for (auto req : protocol->getSemanticMembers()) {
       auto valueReq = dyn_cast<ValueDecl>(req);
       if (!valueReq || isa<AssociatedTypeDecl>(valueReq) ||
           valueReq->isInvalid())

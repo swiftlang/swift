@@ -6946,7 +6946,7 @@ void IRGenModule::emitEnumDecl(EnumDecl *theEnum) {
     emitFieldDescriptor(theEnum);
   }
 
-  emitNestedTypeDecls(theEnum->getMembers());
+  emitNestedTypeDecls(theEnum->getSemanticMembers());
 
   if (!isResilient(theEnum, ResilienceExpansion::Minimal))
     return;

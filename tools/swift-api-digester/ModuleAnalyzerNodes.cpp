@@ -1171,7 +1171,7 @@ static Optional<uint8_t> getSimilarMemberCount(NominalTypeDecl *NTD,
                                         llvm::function_ref<bool(Decl*)> Check) {
   if (!Check(VD))
     return None;
-  auto Members = NTD->getMembers();
+  auto Members = NTD->getSemanticMembers();
   auto End = std::find(Members.begin(), Members.end(), VD);
   assert(End != Members.end());
   return std::count_if(Members.begin(), End, Check);
@@ -1749,7 +1749,7 @@ SwiftDeclCollector::constructSubscriptDeclNode(SubscriptDecl *SD) {
 
 void swift::ide::api::
 SwiftDeclCollector::addMembersToRoot(SDKNode *Root, IterableDeclContext *Context) {
-  for (auto *Member : Context->getMembers()) {
+  for (auto *Member : Context->getSemanticMembers()) {
     if (Ctx.shouldIgnore(Member, Context->getDecl()))
       continue;
     if (auto Func = dyn_cast<FuncDecl>(Member)) {

@@ -2609,7 +2609,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
   /// \param members The decls within the context.
   /// \param isClass True if the context could be a class context (class,
   ///        class extension, or protocol).
-  void writeMembers(DeclID parentID, DeclRange members, bool isClass) {
+  void writeMembers(DeclID parentID, ArrayRef<Decl *> members, bool isClass) {
     using namespace decls_block;
 
     SmallVector<DeclID, 16> memberIDs;
@@ -2744,7 +2744,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
     SmallVector<DeclID, 16> witnessIDs;
 
-    for (auto member : proto->getMembers()) {
+    for (auto member : proto->getSemanticMembers()) {
       if (auto *value = dyn_cast<ValueDecl>(member)) {
         auto witness = proto->getDefaultWitness(value);
         if (!witness)
@@ -2905,7 +2905,7 @@ public:
     for (auto *genericParams : llvm::reverse(allGenericParams))
       writeGenericParams(genericParams);
 
-    writeMembers(id, extension->getMembers(), isClassExtension);
+    writeMembers(id, extension->getSemanticMembers(), isClassExtension);
     S.writeConformances(conformances, S.DeclTypeAbbrCodes);
   }
 
@@ -3121,7 +3121,7 @@ public:
 
 
     writeGenericParams(theStruct->getGenericParams());
-    writeMembers(id, theStruct->getMembers(), false);
+    writeMembers(id, theStruct->getSemanticMembers(), false);
     S.writeConformances(conformances, S.DeclTypeAbbrCodes);
   }
 
@@ -3178,7 +3178,7 @@ public:
                             inheritedAndDependencyTypes);
 
     writeGenericParams(theEnum->getGenericParams());
-    writeMembers(id, theEnum->getMembers(), false);
+    writeMembers(id, theEnum->getSemanticMembers(), false);
     S.writeConformances(conformances, S.DeclTypeAbbrCodes);
   }
 
@@ -3237,7 +3237,7 @@ public:
                             inheritedAndDependencyTypes);
 
     writeGenericParams(theClass->getGenericParams());
-    writeMembers(id, theClass->getMembers(), true);
+    writeMembers(id, theClass->getSemanticMembers(), true);
     S.writeConformances(conformances, S.DeclTypeAbbrCodes);
   }
 
@@ -3286,7 +3286,7 @@ public:
     writeGenericParams(proto->getGenericParams());
     S.writeGenericRequirements(
       proto->getRequirementSignature(), S.DeclTypeAbbrCodes);
-    writeMembers(id, proto->getMembers(), true);
+    writeMembers(id, proto->getSemanticMembers(), true);
     writeDefaultWitnessTable(proto);
   }
 
@@ -4985,7 +4985,7 @@ static void collectInterestingNestedDeclarations(
 
     // Recurse into nested declarations.
     if (auto iterable = dyn_cast<IterableDeclContext>(member)) {
-      collectInterestingNestedDeclarations(S, iterable->getMembers(),
+      collectInterestingNestedDeclarations(S, iterable->getSemanticMembers(),
                                            operatorMethodDecls,
                                            objcMethods, nestedTypeDecls,
                                            derivativeConfigs,
@@ -5061,7 +5061,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       // derived conformance (for example, ==), force them to be
       // serialized.
       if (auto IDC = dyn_cast<IterableDeclContext>(D)) {
-        collectInterestingNestedDeclarations(*this, IDC->getMembers(),
+        collectInterestingNestedDeclarations(*this, IDC->getSemanticMembers(),
                                              operatorMethodDecls, objcMethods,
                                              nestedTypeDecls,
                                              uniquedDerivativeConfigs);
@@ -5091,7 +5091,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       localTypeGenerator.insert(MangledName, addDeclRef(TD));
 
       if (auto IDC = dyn_cast<IterableDeclContext>(TD)) {
-        collectInterestingNestedDeclarations(*this, IDC->getMembers(),
+        collectInterestingNestedDeclarations(*this, IDC->getSemanticMembers(),
                                              operatorMethodDecls, objcMethods,
                                              nestedTypeDecls,
                                              uniquedDerivativeConfigs,

@@ -358,7 +358,7 @@ public:
         }
       }
     } else if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
-      for (Decl *Member : NTD->getMembers()) {
+      for (Decl *Member : NTD->getSemanticMembers()) {
         transformDecl(Member);
       }
     }
