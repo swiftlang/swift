@@ -584,6 +584,8 @@ void SILCombiner::buildConcreteOpenedExistentialInfos(
       // BuilderContext before rewriting any uses of the ConcreteType.
       OpenedArchetypesTracker.addOpenedArchetypeDef(
           cast<ArchetypeType>(CEI.ConcreteType), CEI.ConcreteTypeDef);
+    } else if (auto *I = CEI.ConcreteValue->getDefiningInstruction()) {
+      OpenedArchetypesTracker.registerUsedOpenedArchetypes(I);
     }
   }
 }
