@@ -25,7 +25,6 @@
 #include "TypeCheckType.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
@@ -2463,21 +2462,16 @@ namespace {
 // Utility class for deterministically ordering vtable entries for
 // synthesized methods.
 struct SortedFuncList {
-  using Entry = std::pair<std::string, AbstractFunctionDecl *>;
+  using Key = std::tuple<DeclName, std::string>;
+  using Entry = std::pair<Key, AbstractFunctionDecl *>;
   SmallVector<Entry, 2> elts;
   bool sorted = false;
 
   void add(AbstractFunctionDecl *afd) {
-    Mangle::ASTMangler mangler;
-    std::string mangledName;
-    if (auto *cd = dyn_cast<ConstructorDecl>(afd))
-      mangledName = mangler.mangleConstructorEntity(cd, /*allocator=*/false);
-    else if (auto *dd = dyn_cast<DestructorDecl>(afd))
-      mangledName = mangler.mangleDestructorEntity(dd, /*deallocating=*/false);
-    else
-      mangledName = mangler.mangleEntity(afd);
+    assert(!isa<AccessorDecl>(afd));
 
-    elts.push_back(std::make_pair(mangledName, afd));
+    Key key{afd->getName(), afd->getInterfaceType().getString()};
+    elts.emplace_back(key, afd);
   }
 
   bool empty() { return elts.empty(); }
