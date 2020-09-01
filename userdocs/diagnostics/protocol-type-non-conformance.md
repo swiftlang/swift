@@ -28,7 +28,7 @@ Notice that it is possible to invoke the method `makeNoise()` on a value of type
 ```swift
 print(Dog.species)    // Prints "Canus familiaris"
 print(Cat.species)    // Prints "Felis catus"
-print(Animal.species) // Error
+print(Animal.species) // error: static member 'species' cannot be used...
 ```
 
 Since a type conforms to a protocol only when it satisfies _all_ of that protocol's requirements, the existential type `Animal` does not conform to the protocol `Animal` because it cannot satisfy the protocol's requirement for the static property `species`:
@@ -45,7 +45,7 @@ declareAnimalSpecies(dog)
 // "Woof"
 // "My species is known as Canus familiaris"
 declareAnimalSpecies(animal)
-// Error: protocol type 'Animal' cannot conform to 'Animal'...
+// error: protocol type 'Animal' cannot conform to 'Animal'...
 ```
 
 In general, any initializers, static members, and associated types required by a protocol can be used only via conforming concrete types. Although Swift allows a protocol that requires initializers or static members to be used as a type, that type _does not and cannot_ conform to the protocol itself.
@@ -58,4 +58,4 @@ For more on using existential types, see [Protocols as Types](https://docs.swift
 
 ## Exceptions
 
-The Swift protocol `Error` has no requirements and, when used as a type, conforms to itself; `@objc` protocols with no static requirements can also be used as types that conform to themselves.
+The Swift protocol `Error` has no required members and, when used as a type, conforms to itself; `@objc` protocols with no static requirements can also be used as types that conform to themselves.
