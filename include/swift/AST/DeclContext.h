@@ -783,6 +783,11 @@ public:
   /// Retrieve the set of members in this context.
   DeclRange getMembers() const;
 
+  /// Get the members that were syntactically present in the source code,
+  /// and will not contain any members that are implicitly synthesized by
+  /// the implementation.
+  ArrayRef<Decl *> getParsedMembers() const;
+
   /// Get all the members that are semantically within this context,
   /// including any implicitly-synthesized members.
   /// The resulting list of members will be stable across translation units.
