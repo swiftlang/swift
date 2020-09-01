@@ -96,6 +96,12 @@ macro(swift_swap_compiler_if_needed target)
         set(CMAKE_C_COMPILER ${CLANG_LOCATION}/clang${CMAKE_EXECUTABLE_SUFFIX})
         set(CMAKE_CXX_COMPILER ${CLANG_LOCATION}/clang++${CMAKE_EXECUTABLE_SUFFIX})
       endif()
+
+      # Add a workaround for older clang-cl with a newer MSVC runtime.  MSVC
+      # 16.27 ships with a C++ compiler that enables conditional explicit from
+      # C++20 unconditionally.  Newer clang supports this, but the 5.3 release
+      # branch clang does not.  Add a workaround.
+      add_compile_definitions($<$<OR:$<COMPILE_LANGUAGE:C>,$<COMPILE_LANGUAGE:CXX>>:_HAS_CONDITIONAL_EXPLICIT=0>)
     else()
       message(SEND_ERROR "${target} requires a clang based compiler")
     endif()
