@@ -1080,8 +1080,8 @@ public:
   void cacheResult(AccessorDecl *value) const;
 };
 
-class EmittedMembersRequest :
-    public SimpleRequest<EmittedMembersRequest,
+class SemanticMembersRequest :
+    public SimpleRequest<SemanticMembersRequest,
                          ArrayRef<Decl *>(IterableDeclContext *),
                          RequestFlags::Cached> {
 public:

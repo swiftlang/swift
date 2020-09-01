@@ -2506,7 +2506,7 @@ struct SortedFuncList {
 } // end namespace
 
 ArrayRef<Decl *>
-EmittedMembersRequest::evaluate(Evaluator &evaluator,
+SemanticMembersRequest::evaluate(Evaluator &evaluator,
                                 IterableDeclContext *idc) const {
   auto dc = cast<DeclContext>(idc->getDecl());
   auto &Context = dc->getASTContext();

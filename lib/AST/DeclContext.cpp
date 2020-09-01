@@ -797,7 +797,7 @@ ArrayRef<Decl *> IterableDeclContext::getSemanticMembers() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(
       ctx.evaluator,
-      EmittedMembersRequest{const_cast<IterableDeclContext *>(this)},
+      SemanticMembersRequest{const_cast<IterableDeclContext *>(this)},
       ArrayRef<Decl *>());
 }
 

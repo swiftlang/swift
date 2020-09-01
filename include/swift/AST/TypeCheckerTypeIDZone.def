@@ -65,7 +65,7 @@ SWIFT_REQUEST(TypeChecker, TypeEraserHasViableInitRequest,
 SWIFT_REQUEST(TypeChecker, DynamicallyReplacedDeclRequest,
               ValueDecl *(ValueDecl *),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, EmittedMembersRequest,
+SWIFT_REQUEST(TypeChecker, SemanticMembersRequest,
               ArrayRef<Decl *>(IterableDeclContext *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, EnumRawValuesRequest,
               evaluator::SideEffect (EnumDecl *, TypeResolutionStage),

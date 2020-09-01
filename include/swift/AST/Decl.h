@@ -3886,7 +3886,7 @@ class ClassDecl final : public NominalTypeDecl {
 
   friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
-  friend class EmittedMembersRequest;
+  friend class SemanticMembersRequest;
   friend class HasMissingDesignatedInitializersRequest;
   friend class InheritsSuperclassInitializersRequest;
 
