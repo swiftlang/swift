@@ -63,7 +63,9 @@ constructValuesForKey(SILValue initialValue,
   while (!worklist.empty()) {
     auto *op = worklist.pop_back_val();
 
-    // Skip type dependent operands.
+    // Skip type dependent operands
+    //
+    // FIXME: explain why
     if (op->isTypeDependent()) {
       continue;
     }
@@ -90,7 +92,7 @@ constructValuesForKey(SILValue initialValue,
     }
 
     // Add any destroy_addrs to the resultAccumulator.
-    if (isa<DestroyAddrInst>(user)) {
+    if (isa<DestroyAddrInst>(user) || isa<DestroyValueInst>(user)) {
       wellBehavedWriteAccumulator.push_back(op);
       continue;
     }
@@ -124,10 +126,6 @@ constructValuesForKey(SILValue initialValue,
         wellBehavedWriteAccumulator.push_back(op);
         continue;
       }
-    }
-
-    if (isa<PointerToAddressInst>(user)) {
-      continue;
     }
 
     // Skip store_borrow.
@@ -290,6 +288,15 @@ constructValuesForKey(SILValue initialValue,
       }
     }
 
+    // Bypass any storage casts bypassed by getAccessBegin and not already
+    // handled above.
+    if (auto *svi = dyn_cast<SingleValueInstruction>(user)) {
+      if (isAccessedStorageCast(svi) && op->getOperandNumber() == 0) {
+        llvm::copy(svi->getUses(), std::back_inserter(worklist));
+        continue;
+      }
+    }
+
     // If we did not recognize the user, just return conservatively that it was
     // written to in a way we did not understand.
     llvm::errs() << "Function: " << user->getFunction()->getName() << "\n";
@@ -311,6 +318,7 @@ LoadBorrowNeverInvalidatedAnalysis::LoadBorrowNeverInvalidatedAnalysis(
     DeadEndBlocks &deadEndBlocks)
     : cache(constructValuesForKey), deadEndBlocks(deadEndBlocks) {}
 
+// \p address may be an address, pointer, or box type.
 bool LoadBorrowNeverInvalidatedAnalysis::
     doesAddressHaveWriteThatInvalidatesLoadBorrow(
         LoadBorrowInst *lbi, ArrayRef<Operand *> endBorrowUses,
@@ -493,35 +501,11 @@ bool LoadBorrowNeverInvalidatedAnalysis::isNeverInvalidated(
                                                          bai);
   }
 
-  // FIXME: the subsequent checks appear to assume that 'address' is not aliased
-  // within the scope of the load_borrow. This can only be assumed when either
-  // the load_borrow is nested within an access scope or when the
+  // FIXME: the subsequent checks assume that 'address' is not aliased within
+  // the scope of the load_borrow. This can only be assumed when either the
+  // load_borrow is nested within an access scope (handled above) or when
   // storage.isUniquelyIdentified() and all uses of storage.getRoot() have been
   // analyzed. The later can be done with AccessPath::collectUses().
-
-  // Check if our unidentified access storage is a project_box. In such a case,
-  // validate that all uses of the project_box are not writes that overlap with
-  // our load_borrow's result. These are things that may not be a formal access
-  // base.
-  //
-  // FIXME: Remove this PointerToAddress check. It appears to be incorrect. we
-  // don't verify anywhere that a pointer_to_address cannot itself be derived
-  // from another address that is accessible in the same function, either
-  // because it was returned from a call or directly address_to_pointer'd.
-  if (isa<PointerToAddressInst>(address)) {
-    return doesAddressHaveWriteThatInvalidatesLoadBorrow(lbi, endBorrowUses,
-                                                         address);
-  }
-
-  // FIXME: This ProjectBoxInst
-  // If we have a project_box, we need to see if our base, modulo begin_borrow,
-  // copy_value have any other project_box that we need to analyze.
-  if (auto *pbi = dyn_cast<ProjectBoxInst>(address)) {
-    return doesBoxHaveWritesThatInvalidateLoadBorrow(lbi, endBorrowUses,
-                                                     pbi->getOperand());
-  }
-
-
   switch (storage.getKind()) {
   case AccessedStorage::Stack: {
     // For now assume that stack is safe.
@@ -532,8 +516,6 @@ bool LoadBorrowNeverInvalidatedAnalysis::isNeverInvalidated(
     auto *arg = cast<SILFunctionArgument>(storage.getArgument());
     // We return false if visit a non-address here. Object args are things like
     // pointer_to_address that we handle earlier.
-    if (!arg->getType().isAddress())
-      return false;
     if (arg->hasConvention(SILArgumentConvention::Indirect_In_Guaranteed))
       return true;
     return doesAddressHaveWriteThatInvalidatesLoadBorrow(lbi, endBorrowUses,
@@ -572,14 +554,43 @@ bool LoadBorrowNeverInvalidatedAnalysis::isNeverInvalidated(
                                                          address);
   }
   case AccessedStorage::Unidentified: {
-    // Otherwise, we didn't understand this, so bail.
-    llvm::errs() << "Unidentified access storage: ";
-    storage.dump();
-    return false;
+    return isUnidentifiedBorrowInvalidated(lbi, endBorrowUses, address);
   }
   case AccessedStorage::Nested: {
     llvm_unreachable("Should have been handled above");
   }
   }
   llvm_unreachable("Covered switch isn't covered?!");
+}
+
+// Perform partial verification of a borrow from an unidentified address,
+// pointer, or box. We can only find writes derived from the borrowed
+// pointer. There may be other writes to the same memory via pointer aliasing
+// that we ignore.
+bool LoadBorrowNeverInvalidatedAnalysis::
+isUnidentifiedBorrowInvalidated(LoadBorrowInst *lbi,
+                                ArrayRef<Operand *> endBorrowUses,
+                                SILValue pointerBase) {
+  // Identified boxes are handled separately for AccessedStorage::Box. This
+  // check only performs partial verification of a single box value, which may
+  // be aliased.
+  //
+  //   bb0(%0 : @guaranteed $RefEnum):
+  //     switch_enum %0 : $RefEnum, case #RefEnum.ref!enumelt: bb1
+  //   bb1(%3 : @guaranteed ${ var BaseClass }):
+  //     %4 = project_box %3 : ${ var BaseClass }, 0
+  //     %5 = load_borrow %4 : $*BaseClass
+  //
+  // In the above indirect enum example, the base is a Box value,
+  // but AccessedStorage is:
+  //   Unidentified %3 = argument of bb1 : ${ var BaseClass }
+  if (isa<SILBoxType>(pointerBase->getType().getASTType())) {
+    return doesBoxHaveWritesThatInvalidateLoadBorrow(lbi, endBorrowUses,
+                                                     pointerBase);
+  }
+
+  // All other unknown pointers are partially verified as if they were uniquely
+  // identified.
+  return doesAddressHaveWriteThatInvalidatesLoadBorrow(lbi, endBorrowUses,
+                                                       pointerBase);
 }

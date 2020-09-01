@@ -41,6 +41,9 @@ private:
       LoadBorrowInst *lbi, ArrayRef<Operand *> endBorrowUses, SILValue address);
   bool doesBoxHaveWritesThatInvalidateLoadBorrow(
       LoadBorrowInst *lbi, ArrayRef<Operand *> endBorrowUses, SILValue box);
+  bool isUnidentifiedBorrowInvalidated(LoadBorrowInst *lbi,
+                                       ArrayRef<Operand *> endBorrowUses,
+                                       SILValue pointerBase);
 };
 
 } // namespace silverifier
