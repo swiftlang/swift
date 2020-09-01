@@ -281,3 +281,5 @@ SWIFT_REQUEST(TypeChecker, SimpleDidSetRequest,
               bool(AccessorDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SynthesizeMainFunctionRequest,
               FuncDecl *(Decl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ThrowsTypeRequest,
+              AbstractFunctionDecl *(Decl *), Cached, NoLocationInfo)
