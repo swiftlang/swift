@@ -380,10 +380,13 @@ struct PrintOptions {
   /// has no associated doc-comment by itself.
   bool CascadeDocComment = false;
 
+  static const std::function<bool(const ExtensionDecl *)>
+      defaultPrintExtensionContentAsMembers;
+
   /// Whether to print the content of an extension decl inside the type decl where it
   /// extends from.
   std::function<bool(const ExtensionDecl *)> printExtensionContentAsMembers =
-    [] (const ExtensionDecl *) { return false; };
+    PrintOptions::defaultPrintExtensionContentAsMembers;
 
   /// How to print the keyword argument and parameter name in functions.
   ArgAndParamPrintingMode ArgAndParamPrinting =

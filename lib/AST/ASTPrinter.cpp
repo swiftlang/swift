@@ -58,6 +58,11 @@
 
 using namespace swift;
 
+// Defined here to avoid repeatedly paying the price of template instantiation.
+const std::function<bool(const ExtensionDecl *)>
+    PrintOptions::defaultPrintExtensionContentAsMembers
+        = [] (const ExtensionDecl *) { return false; };
+
 void PrintOptions::setBaseType(Type T) {
   if (T->is<ErrorType>())
     return;
