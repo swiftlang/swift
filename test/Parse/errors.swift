@@ -3,14 +3,15 @@
 struct SomeError: Error {}
 
 func hasThrownType() throws (SomeError) -> Int {
+  throw SomeError()
   return 1
 }
 
 protocol TestProtocol {
   func missingClosingParenAndType() throws ( -> Int
-  // expected-error @-1 {{expected a parenthesized type after 'throws'}} {{45-45- <#type#>}}
-  // expected-error @-2 {{expected ')' at end of thrown type}}
-  // expected-note {{to match this opening '('}}
+  // expected-error@-1 {{expected a parenthesized type after 'throws'}} {{45-45= <#type#>}}
+  // expected-error@-2 {{expected ')' at end of thrown type}}
+  // expected-note@-3 {{to match this opening '('}}
 
   func noType(x: Int) throws
 
@@ -18,20 +19,20 @@ protocol TestProtocol {
   var x : Int {get}
 
   func missingClosingParen() throws (SomeError
-  // expected-error {{expected ')' at end of thrown type}}
-  // expected-note {{to match this opening '('}}
+  // expected-error@-1 {{expected ')' at end of thrown type}}
+  // expected-note@-2 {{to match this opening '('}}
   var z: Int { get set }
 }
 
 
-func missingTrownType() throws () {} // expected-error {{expected a parenthesized type after 'throws'}} {{33-33- <#type#>}}
+func missingTrownType() throws () {} // expected-error {{expected a parenthesized type after 'throws'}} {{33-33= <#type#>}}
 
 func missingClosingParenAmbiguous1() throws (Int -> () -> Int {}
-// expected-error {{expected ')' at end of thrown type}}
-// expected-note {{to match this opening '('}}
+// expected-error@-1 {{expected ')' at end of thrown type}}
+// expected-note@-2 {{to match this opening '('}}
 func missingClosingParenAmbiguous2() throws ((Int) -> () -> Int {}
-// expected-error {{expected ')' at end of thrown type}}
-// expected-note {{to match this opening '('}}
+// expected-error@-1 {{expected ')' at end of thrown type}}
+// expected-note@-2 {{to match this opening '('}}
 
 func typedRethrows(_ fn: () throws (SomeError) -> ()) rethrows (SomeError) {}
 
@@ -39,19 +40,19 @@ func typedRethrows(_ fn: () throws (SomeError) -> ()) rethrows (SomeError) {}
 var functionTypeWithThrownType: (Int) throws (SomeError) -> Int
 
 var typeWithThrownType: (Int) throws (SomeError)
-// expected-error @-1 {{consecutive statements on a line must be separated by ';'}}
-// expected-error @-2 {{expected expression}}
+// expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+// expected-error@-2 {{expected expression}}
 
 var functionTypeMissingClosingParen: (Int) throws (SomeError -> Int
-// expected-error {{expected ')' at end of thrown type}}
-// expected-note {{to match this opening '('}}
+// expected-error@-1 {{expected ')' at end of thrown type}}
+// expected-note@-2 {{to match this opening '('}}
 
-var functionTypeMissingThrownType: (Int) throws () -> Int // expected-error {{expected a parenthesized type after 'throws'}} {{50-50- <#type#>}}
+var functionTypeMissingThrownType: (Int) throws () -> Int // expected-error {{expected a parenthesized type after 'throws'}} {{50-50= <#type#>}}
 
 var functionTypeMissingClosingParenAndType: (Int) throws ( -> Int
-// expected-error @-1 {{expected a parenthesized type after 'throws'}} {{59-59- <#type#>}}
-// expected-error @-2 {{expected ')' at end of thrown type}}
-// expected-note {{to match this opening '('}}
+// expected-error@-1 {{expected a parenthesized type after 'throws'}} {{59-59= <#type#>}}
+// expected-error@-2 {{expected ')' at end of thrown type}}
+// expected-note@-3 {{to match this opening '('}}
 
 
 enum MSV : Error {

@@ -730,9 +730,9 @@ ERROR(rethrowing_function_type,none,
 ERROR(async_or_throws_in_wrong_position,none,
       "%select{'throws'|'rethrows'|'async'}0 may only occur before '->'",
       (unsigned))
-ERROR(expected_parenthesized_type_after_throws,none,
+ERROR(expected_parenthesized_type_after_throws,PointsToFirstBadToken,
       "expected a parenthesized type after 'throws'",())
-ERROR(expected_rparen_thrown_type,none,
+ERROR(expected_rparen_thrown_type,PointsToFirstBadToken,
       "expected ')' at end of thrown type",())
 ERROR(throw_in_function_type,none,
       "expected throwing specifier; did you mean 'throws'?", ())

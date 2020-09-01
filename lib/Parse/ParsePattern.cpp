@@ -895,6 +895,8 @@ ParserResult<TypeRepr> Parser::parseThrowsType() {
     
     // we parse every type (including function types)
     ParserResult<TypeRepr> throwsTypeRepr = parseType(diag::expected_parenthesized_type_after_throws);
+    if (throwsTypeRepr.hasCodeCompletion())
+      return makeParserCodeCompletionResult<TypeRepr>();
     
     // if the closing parenthesis is missing, we backtrack and parse the type
     // again, this time excluding function types
@@ -903,6 +905,8 @@ ParserResult<TypeRepr> Parser::parseThrowsType() {
         backtracking.reset();
         
         throwsTypeRepr = parseTypeNotAllowingFunctionType(diag::expected_parenthesized_type_after_throws);
+        if (throwsTypeRepr.hasCodeCompletion())
+          return makeParserCodeCompletionResult<TypeRepr>();
       }
     }
     
@@ -911,6 +915,13 @@ ParserResult<TypeRepr> Parser::parseThrowsType() {
     
     // Parse the closing ')'.
     SourceLoc rParenLoc;
+//    if (Tok.is(tok::r_paren)) {
+//      parseMatchingToken(tok::r_paren, rParenLoc, diag::expected_rparen_thrown_type, lParenLoc);
+//    } else {
+//      rParenLoc = PreviousLoc;
+//    }
+    
+//    diagnose(rParenLoc, diag::expected_rparen_thrown_type);
     parseMatchingToken(tok::r_paren, rParenLoc, diag::expected_rparen_thrown_type, lParenLoc);
     
     return throwsTypeRepr;
