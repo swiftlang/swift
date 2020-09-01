@@ -300,6 +300,7 @@ void TypeRefinementContext::print(raw_ostream &OS, SourceManager &SrcMgr,
   OS << "(" << getReasonName(getReason());
 
   OS << " versions=" << AvailabilityInfo.getOSVersion().getAsString();
+  OS << " explicit=" << AvailabilityInfoExplicit.getOSVersion().getAsString();
 
   if (getReason() == Reason::Decl) {
     Decl *D = Node.getAsDecl();
