@@ -768,6 +768,24 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
       return None;
   }
 
+  // If subtyping is allowed and this is a result of an implicit member chain,
+  // let's delay binding it to an optional until its object type resolved too or
+  // it has been determined that there is no possibility to resolve it. Otherwise
+  // we might end up missing solutions since it's allowed to implicitly unwrap
+  // base type of the chain but it can't be done early - type variable
+  // representing chain's result type has a different l-valueness comparing
+  // to generic parameter of the optional.
+  if (kind == AllowedBindingKind::Subtypes) {
+    auto *locator = typeVar->getImpl().getLocator();
+    if (locator &&
+        locator->isLastElement<LocatorPathElt::UnresolvedMemberChainResult>()) {
+      auto objectType = type->getOptionalObjectType();
+      if (objectType && objectType->isTypeVariableOrMember()) {
+        result.PotentiallyIncomplete = true;
+      }
+    }
+  }
+
   if (type->is<InOutType>() && !typeVar->getImpl().canBindToInOut())
     type = LValueType::get(type->getInOutObjectType());
   if (type->is<LValueType>() && !typeVar->getImpl().canBindToLValue())
