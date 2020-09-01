@@ -81,6 +81,12 @@ class SwiftPM(product.Product):
                 "--foundation-build-dir", foundation_build_dir
             ]
 
+        # Pass Cross compile host info
+        if self.has_cross_compile_hosts(self.args):
+            helper_cmd += ['--cross-compile-hosts']
+            for cross_compile_host in self.args.cross_compile_hosts:
+                helper_cmd += [cross_compile_host]
+
         helper_cmd.extend(additional_params)
 
         shell.call(helper_cmd)
