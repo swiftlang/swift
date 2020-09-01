@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Driver/ParseableOutput.h"
+#include "swift/Frontend/ParseableOutput.h"
 
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/JSONSerialization.h"
@@ -18,8 +18,7 @@
 #include "llvm/Option/Arg.h"
 #include "llvm/Support/raw_ostream.h"
 
-using namespace swift::driver::parseable_output;
-using namespace swift::driver;
+using namespace swift::parseable_output;
 using namespace swift::sys;
 using namespace swift;
 

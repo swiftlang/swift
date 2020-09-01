@@ -32,14 +32,15 @@
 #include <memory>
 
 namespace swift {
-namespace driver {
-
-class Job;
-class JobAction;
 
 namespace parseable_output {
 struct JobInfo;
 }
+
+namespace driver {
+
+class Job;
+class JobAction;
 
 /// \file Job.h
 ///

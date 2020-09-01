@@ -11,19 +11,18 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// Helpers for emitting the driver's parseable output.
+/// Helpers for emitting the compiler's parseable output.
 ///
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_DRIVER_PARSEABLEOUTPUT_H
-#define SWIFT_DRIVER_PARSEABLEOUTPUT_H
+#ifndef SWIFT_FRONTEND_PARSEABLEOUTPUT_H
+#define SWIFT_FRONTEND_PARSEABLEOUTPUT_H
 
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/TaskQueue.h"
 
 namespace swift {
-namespace driver {
 
 namespace parseable_output {
 
@@ -66,7 +65,6 @@ void emitSignalledMessage(
 void emitSkippedMessage(raw_ostream &os, StringRef name, const JobInfo &info);
 
 } // end namespace parseable_output
-} // end namespace driver
 } // end namespace swift
 
 #endif
