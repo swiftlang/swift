@@ -15,6 +15,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Localization/LocalizationFormat.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
@@ -89,25 +91,12 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
-  for (unsigned i = 0; i < LocalDiagID::NumDiags; ++i) {
-    OS << "- id: " << diagnosticID[i] << "\n";
-    std::string msg = diagnosticMessages[i];
-    std::string finalMsg = "";
+  llvm::ArrayRef<const char *> ids(diagnosticID, LocalDiagID::NumDiags);
+  llvm::ArrayRef<const char *> messages(diagnosticMessages,
+                                        LocalDiagID::NumDiags);
 
-    // Add an escape character before a double quote `"` or a backslash `\`.
-    for (unsigned j = 0; j < msg.length(); ++j) {
-      if (msg[j] == '"') {
-        finalMsg += '\\';
-        finalMsg += '"';
-      } else if (msg[j] == '\\') {
-        finalMsg += '\\';
-        finalMsg += '\\';
-      } else {
-        finalMsg += msg[j];
-      }
-    }
-    OS << "  msg: \"" << finalMsg << "\"\r\n";
-  }
+  swift::diag::DefToYAMLConverter converter(ids, messages);
+  converter.convert(OS);
 
   return EXIT_SUCCESS;
 }
