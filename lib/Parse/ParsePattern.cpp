@@ -1110,8 +1110,7 @@ ParserResult<Pattern> Parser::parsePatternTuple() {
 ///  pattern-type-annotation ::= (':' type)?
 ///
 ParserResult<Pattern> Parser::
-parseOptionalPatternTypeAnnotation(ParserResult<Pattern> result,
-                                   bool isOptional) {
+parseOptionalPatternTypeAnnotation(ParserResult<Pattern> result) {
   if (!Tok.is(tok::colon))
     return result;
 
@@ -1137,15 +1136,6 @@ parseOptionalPatternTypeAnnotation(ParserResult<Pattern> result,
   TypeRepr *repr = Ty.getPtrOrNull();
   if (!repr)
     repr = new (Context) ErrorTypeRepr(PreviousLoc);
-
-  // In an if-let, the actual type of the expression is Optional of whatever
-  // was written.
-  // FIXME: This is not good, `TypeRepr`s are supposed to represent what the
-  // user actually wrote in source (that's why they don't have any `isImplicit`
-  // bit). This synthesized `OptionalTypeRepr` leads to workarounds in other
-  // parts where we want to reason about the types as perceived by the user.
-  if (isOptional)
-    repr = new (Context) OptionalTypeRepr(repr, SourceLoc());
 
   return makeParserResult(status, new (Context) TypedPattern(P, repr));
 }

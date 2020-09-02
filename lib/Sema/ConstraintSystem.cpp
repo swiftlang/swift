@@ -4295,7 +4295,7 @@ SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
     bool bindPatternVarsOneWay) {
   // Determine the contextual type for the initialization.
   TypeLoc contextualType;
-  if (!isa<OptionalSomePattern>(pattern) &&
+  if (!(isa<OptionalSomePattern>(pattern) && !pattern->isImplicit()) &&
       patternType && !patternType->isHole()) {
     contextualType = TypeLoc::withoutLoc(patternType);
 

@@ -3791,10 +3791,9 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
     // checking for a type, which forced it to be promoted to a double optional
     // type.
     if (auto ooType = subExpr->getType()->getOptionalObjectType()) {
-      if (auto TP = dyn_cast<TypedPattern>(p))
+      if (auto OSP = dyn_cast<OptionalSomePattern>(p)) {
         // Check for 'if let' to produce a tuned diagnostic.
-        if (isa<OptionalSomePattern>(TP->getSubPattern()) &&
-            TP->getSubPattern()->isImplicit()) {
+        if (auto *TP = dyn_cast<TypedPattern>(OSP->getSubPattern())) {
           ctx.Diags.diagnose(cond.getIntroducerLoc(),
                              diag::optional_check_promotion,
                              subExpr->getType())
@@ -3803,6 +3802,7 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
                           ooType->getString());
           return;
         }
+      }
       ctx.Diags.diagnose(cond.getIntroducerLoc(),
                          diag::optional_pattern_match_promotion,
                          subExpr->getType(), cond.getInitializer()->getType())

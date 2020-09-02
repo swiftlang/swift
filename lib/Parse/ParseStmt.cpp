@@ -1498,8 +1498,7 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
       P->setImplicit();
   }
 
-  ThePattern = parseOptionalPatternTypeAnnotation(ThePattern,
-                                                  BindingKindStr != "case");
+  ThePattern = parseOptionalPatternTypeAnnotation(ThePattern);
   if (ThePattern.hasCodeCompletion()) {
     Status.setHasCodeCompletion();
 
@@ -2121,7 +2120,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
     llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
       T(InVarOrLetPattern, Parser::IVOLP_InMatchingPattern);
     pattern = parseMatchingPattern(/*isExprBasic*/true);
-    pattern = parseOptionalPatternTypeAnnotation(pattern, /*isOptional*/false);
+    pattern = parseOptionalPatternTypeAnnotation(pattern);
   } else if (!IsCStyleFor || Tok.is(tok::kw_var)) {
     // Change the parser state to know that the pattern we're about to parse is
     // implicitly mutable.  Bound variables can be changed to mutable explicitly

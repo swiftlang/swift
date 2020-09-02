@@ -655,12 +655,8 @@ Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC,
 
     // "if let" implicitly looks inside of an optional, so wrap it in an
     // OptionalSome pattern.
-    InnerP = new (Context) OptionalSomePattern(InnerP, InnerP->getEndLoc(),
-                                               true);
-    if (auto *TP = dyn_cast<TypedPattern>(P))
-      TP->setSubPattern(InnerP);
-    else
-      P = InnerP;
+    P = new (Context) OptionalSomePattern(P, P->getEndLoc(), /*implicit*/ true);
+    P->setImplicit();
   }
 
   return P;
@@ -811,9 +807,24 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
   //
   // Refutable patterns occur when checking the PatternBindingDecls in if/let,
   // while/let, and let/else conditions.
+  case PatternKind::OptionalSome: {
+    // Annotated if-let patterns are rewritten by TypeChecker::resolvePattern
+    // to have an enclosing implicit (...)? pattern. If we can resolve the inner
+    // typed pattern, the resulting pattern must have optional type.
+    auto somePat = cast<OptionalSomePattern>(P);
+    if (somePat->isImplicit() && isa<TypedPattern>(somePat->getSubPattern())) {
+      auto resolution = TypeResolution::forContextual(dc);
+      TypedPattern *TP = cast<TypedPattern>(somePat->getSubPattern());
+      auto type = validateTypedPattern(resolution, TP, options);
+      if (type && !type->hasError()) {
+        return OptionalType::get(type);
+      }
+    }
+    LLVM_FALLTHROUGH;
+  }
+
   case PatternKind::Is:
   case PatternKind::EnumElement:
-  case PatternKind::OptionalSome:
   case PatternKind::Bool:
   case PatternKind::Expr:
     // In a let/else, these always require an initial value to match against.

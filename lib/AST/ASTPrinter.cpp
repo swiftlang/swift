@@ -2642,18 +2642,10 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   Printer << ": ";
   TypeLoc tyLoc;
   if (auto *repr = decl->getTypeReprOrParentPatternTypeRepr()) {
-    // Workaround for if-let statements. The parser creates a `OptionalTypeRepr`
-    // even though the user-written declared type for the if-let variable
-    // is non-optional. Get the non-optional type so we can print it correctly.
-    if (auto *optRepr = dyn_cast<OptionalTypeRepr>(repr)) {
-      if (type && !isa<OptionalType>(type.getPointer())) {
-        repr = optRepr->getBase();
-      }
-    }
     tyLoc = TypeLoc(repr, type);
-  } else
+  } else {
     tyLoc = TypeLoc::withoutLoc(type);
-
+  }
   Printer.printDeclResultTypePre(decl, tyLoc);
 
   // HACK: When printing result types for vars with opaque result types,
