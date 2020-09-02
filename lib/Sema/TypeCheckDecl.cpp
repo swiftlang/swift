@@ -2523,9 +2523,17 @@ SemanticMembersRequest::evaluate(Evaluator &evaluator,
   // Force any derivable conformances in this context. This ensures that any
   // synthesized members will approach in the member list.
   for (auto conformance : idc->getLocalConformances()) {
-    if (conformance->getState() == ProtocolConformanceState::Incomplete &&
-        conformance->getProtocol()->getKnownDerivableProtocolKind())
+    if (conformance->getState() != ProtocolConformanceState::Incomplete)
+      continue;
+
+    auto protocol = conformance->getProtocol();
+    if (protocol->getKnownDerivableProtocolKind()) {
       TypeChecker::checkConformance(conformance->getRootNormalConformance());
+    } else {
+      // Resolve the type witnesses, which may synthesize typealiases.
+      for (auto assocType : protocol->getAssociatedTypeMembers())
+        (void)conformance->getTypeWitness(assocType);
+    }
   }
 
   // If the type conforms to Encodable or Decodable, even via an extension,
