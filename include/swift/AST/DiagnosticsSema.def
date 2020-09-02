@@ -1223,9 +1223,6 @@ NOTE(candidate_with_extraneous_args,none,
 ERROR(no_accessible_initializers,none,
       "%0 cannot be constructed because it has no accessible initializers",
       (Type))
-ERROR(non_nominal_no_initializers,none,
-      "non-nominal type %0 does not support explicit initialization",
-      (Type))
 ERROR(unbound_generic_parameter,none,
       "generic parameter %0 could not be inferred", (Type))
 ERROR(unbound_generic_parameter_cast,none,
