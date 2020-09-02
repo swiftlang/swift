@@ -98,6 +98,8 @@ class PruneVTables : public SILModuleTransform {
   }
   
   void run() override {
+    return;
+
     SILModule *M = getModule();
     
     for (auto &vtable : M->getVTables()) {
