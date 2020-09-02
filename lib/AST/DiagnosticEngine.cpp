@@ -660,6 +660,10 @@ static void formatDiagnosticArgument(StringRef Modifier,
     Out << FormatOpts.OpeningQuotationMark << Arg.getAsLayoutConstraint()
         << FormatOpts.ClosingQuotationMark;
     break;
+  case DiagnosticArgumentKind::TypeKind:
+    assert(Modifier.empty() && "Improper modifier for TypeKind argument");
+    Out << TypeBase::getKindName(Arg.getAsTypeKind());
+    break;
   }
 }
 

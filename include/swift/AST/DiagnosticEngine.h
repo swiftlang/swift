@@ -21,6 +21,7 @@
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/AST/Types.h"
 #include "swift/Localization/LocalizationFormat.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
@@ -93,6 +94,7 @@ namespace swift {
     DeclAttribute,
     VersionTuple,
     LayoutConstraint,
+    TypeKind,
   };
 
   namespace diag {
@@ -122,6 +124,7 @@ namespace swift {
       const DeclAttribute *DeclAttributeVal;
       llvm::VersionTuple VersionVal;
       LayoutConstraint LayoutConstraintVal;
+      TypeKind TypeKindVal;
     };
     
   public:
@@ -209,6 +212,9 @@ namespace swift {
     DiagnosticArgument(LayoutConstraint L)
       : Kind(DiagnosticArgumentKind::LayoutConstraint), LayoutConstraintVal(L) {
     }
+
+    DiagnosticArgument(TypeKind K)
+        : Kind(DiagnosticArgumentKind::TypeKind), TypeKindVal(K) {}
     /// Initializes a diagnostic argument using the underlying type of the
     /// given enum.
     template<
@@ -298,6 +304,11 @@ namespace swift {
     LayoutConstraint getAsLayoutConstraint() const {
       assert(Kind == DiagnosticArgumentKind::LayoutConstraint);
       return LayoutConstraintVal;
+    }
+
+    TypeKind getAsTypeKind() const {
+      assert(Kind == DiagnosticArgumentKind::TypeKind);
+      return TypeKindVal;
     }
   };
   
