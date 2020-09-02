@@ -1042,6 +1042,8 @@ SourceRange MemberAccessOnOptionalBaseFailure::getSourceRange() const {
     if (componentPathElt->getIndex() == 0) {
       if (auto rootType = keyPathExpr->getRootType()) {
         return rootType->getSourceRange();
+      } else {
+        return keyPathExpr->getComponents().front().getLoc();
       }
     } else {
       auto componentIdx = componentPathElt->getIndex() - 1;
