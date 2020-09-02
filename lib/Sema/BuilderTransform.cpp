@@ -1655,6 +1655,13 @@ ConstraintSystem::matchFunctionBuilder(
   assert(builder && "Bad function builder type");
   assert(builder->getAttrs().hasAttribute<FunctionBuilderAttr>());
 
+  if (InvalidFunctionBuilderBodies.count(fn)) {
+    (void)recordFix(
+        IgnoreInvalidFunctionBuilderBody::duringConstraintGeneration(
+            *this, getConstraintLocator(fn.getBody())));
+    return getTypeMatchSuccess();
+  }
+
   // Pre-check the body: pre-check any expressions in it and look
   // for return statements.
   auto request =
@@ -1720,6 +1727,8 @@ ConstraintSystem::matchFunctionBuilder(
       return getTypeMatchFailure(locator);
 
     if (transaction.hasErrors()) {
+      InvalidFunctionBuilderBodies.insert(fn);
+
       if (recordFix(
               IgnoreInvalidFunctionBuilderBody::duringConstraintGeneration(
                   *this, getConstraintLocator(fn.getBody()))))
