@@ -31,6 +31,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
+#include "swift/Serialization/ModuleFileSharedCoreRegistryModuleLoader.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/ModuleDependencyScanner.h"
@@ -477,6 +478,13 @@ bool CompilerInstance::setUpModuleLoaders() {
         *Context, getDependencyTracker(), MLM, IgnoreSourceInfoFile);
     this->MemoryBufferLoader = MemoryBufferLoader.get();
     Context->addModuleLoader(std::move(MemoryBufferLoader));
+  }
+
+  if (Invocation.getLangOptions().EnableModuleFileSharedCoreRegistryImporter) {
+    auto SharedCoreLoader = ModuleFileSharedCoreRegistryModuleLoader::create(
+        *Context, getDependencyTracker());
+    this->ModuleFileSharedCoreLoader = SharedCoreLoader.get();
+    Context->addModuleLoader(std::move(SharedCoreLoader));
   }
 
   // Wire up the Clang importer. If the user has specified an SDK, use it.

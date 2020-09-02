@@ -491,6 +491,13 @@ public:
   ArrayRef<Dependency> getDependencies() const {
     return Dependencies;
   }
+
+  StringRef getModuleFilename() const {
+    if (!ModuleInterfacePath.empty())
+      return ModuleInterfacePath;
+    // FIXME: This seems fragile, maybe store the filename separately ?
+    return ModuleInputBuffer->getBufferIdentifier();
+  }
 };
 
 template <typename T, typename RawData>

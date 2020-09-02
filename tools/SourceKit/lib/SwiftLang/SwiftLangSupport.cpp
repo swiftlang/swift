@@ -266,6 +266,7 @@ configureCompletionInstance(std::shared_ptr<CompletionInstance> CompletionInst,
                             std::shared_ptr<GlobalConfig> GlobalConfig) {
   auto Opts = GlobalConfig->getCompletionOpts();
   CompletionInst->setOptions({
+    Opts.ReuseLoadedModules,
     Opts.MaxASTContextReuseCount,
     Opts.CheckDependencyInterval
   });

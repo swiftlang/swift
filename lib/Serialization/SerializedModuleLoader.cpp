@@ -673,6 +673,42 @@ getOSAndVersionForDiagnostics(const llvm::Triple &triple) {
   return {osName, version};
 }
 
+serialization::Status SerializedModuleLoaderBase::loadAST(
+    ModuleDecl &M, Optional<SourceLoc> diagLoc,
+    std::unique_ptr<ModuleFile> &loadedModuleFile, FileUnit *&fileUnit) {
+  M.setResilienceStrategy(loadedModuleFile->getResilienceStrategy());
+  if (loadedModuleFile->isTestable())
+    M.setTestingEnabled();
+  if (loadedModuleFile->arePrivateImportsEnabled())
+    M.setPrivateImportsEnabled();
+  if (loadedModuleFile->isImplicitDynamicEnabled())
+    M.setImplicitDynamicEnabled();
+
+  // Now try to bring it into the AST.
+  fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile);
+
+  auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
+  serialization::Status status =
+      loadedModuleFile->associateWithFileContext(fileUnit, diagLocOrInvalid);
+
+  // FIXME: This seems wrong. Overlay for system Clang module doesn't
+  // necessarily mean it's "system" module. User can make their own overlay
+  // in non-system directory.
+  // Remove this block after we fix the test suite.
+  if (auto shadowed = loadedModuleFile->getUnderlyingModule())
+    if (shadowed->isSystemModule())
+      M.setIsSystemModule(true);
+
+  if (status == serialization::Status::Valid) {
+    Ctx.bumpGeneration();
+    LoadedModuleFiles.emplace_back(std::move(loadedModuleFile),
+                                   Ctx.getCurrentGeneration());
+    findOverlayFiles(diagLoc.getValueOr(SourceLoc()), &M, fileUnit);
+  }
+
+  return status;
+}
+
 FileUnit *SerializedModuleLoaderBase::loadAST(
     ModuleDecl &M, Optional<SourceLoc> diagLoc,
     StringRef moduleInterfacePath,
@@ -693,7 +729,7 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
     return nullptr;
   }
 
-  std::unique_ptr<ModuleFile> loadedModuleFile;
+  // Load 'ModuleFileSharedCore'.
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFileCore;
   serialization::ValidationInfo loadInfo =
       ModuleFileSharedCore::load(moduleInterfacePath,
@@ -701,39 +737,16 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
                        std::move(moduleDocInputBuffer),
                        std::move(moduleSourceInfoInputBuffer),
                        isFramework, loadedModuleFileCore);
+
+  // Bring the 'ModuleFileSharedCore' into the AST.
+  std::unique_ptr<ModuleFile> loadedModuleFile;
   if (loadInfo.status == serialization::Status::Valid) {
     loadedModuleFile =
         std::make_unique<ModuleFile>(std::move(loadedModuleFileCore));
-    M.setResilienceStrategy(loadedModuleFile->getResilienceStrategy());
-
-    // We've loaded the file. Now try to bring it into the AST.
-    auto fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile);
-    if (loadedModuleFile->isTestable())
-      M.setTestingEnabled();
-    if (loadedModuleFile->arePrivateImportsEnabled())
-      M.setPrivateImportsEnabled();
-    if (loadedModuleFile->isImplicitDynamicEnabled())
-      M.setImplicitDynamicEnabled();
-
-    auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
-    loadInfo.status =
-        loadedModuleFile->associateWithFileContext(fileUnit, diagLocOrInvalid);
-
-    // FIXME: This seems wrong. Overlay for system Clang module doesn't
-    // necessarily mean it's "system" module. User can make their own overlay
-    // in non-system directory.
-    // Remove this block after we fix the test suite.
-    if (auto shadowed = loadedModuleFile->getUnderlyingModule())
-      if (shadowed->isSystemModule())
-        M.setIsSystemModule(true);
-
-    if (loadInfo.status == serialization::Status::Valid) {
-      Ctx.bumpGeneration();
-      LoadedModuleFiles.emplace_back(std::move(loadedModuleFile),
-                                     Ctx.getCurrentGeneration());
-      findOverlayFiles(diagLoc.getValueOr(SourceLoc()), &M, fileUnit);
+    FileUnit *fileUnit;
+    loadInfo.status = loadAST(M, diagLoc, loadedModuleFile, fileUnit);
+    if (loadInfo.status == serialization::Status::Valid)
       return fileUnit;
-    }
   }
 
   // From here on is the failure path.

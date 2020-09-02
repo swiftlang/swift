@@ -428,6 +428,10 @@ public:
   // Out of line to avoid instantiation OnDiskChainedHashTable here.
   ~ModuleFile();
 
+  std::shared_ptr<const ModuleFileSharedCore> getCore() const {
+    return Core;
+  }
+
   /// The name of the module.
   StringRef getName() const {
     return Core->Name;
@@ -622,10 +626,7 @@ public:
   void getDisplayDecls(SmallVectorImpl<Decl*> &results);
 
   StringRef getModuleFilename() const {
-    if (!Core->ModuleInterfacePath.empty())
-      return Core->ModuleInterfacePath;
-    // FIXME: This seems fragile, maybe store the filename separately ?
-    return Core->ModuleInputBuffer->getBufferIdentifier();
+    return Core->getModuleFilename();
   }
 
   StringRef getTargetTriple() const {

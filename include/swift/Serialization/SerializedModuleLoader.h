@@ -16,10 +16,14 @@
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
+#include "swift/Serialization/Validation.h"
 #include "llvm/Support/MemoryBuffer.h"
 
 namespace swift {
 class ModuleFile;
+class ModuleFileSharedCore;
+class ModuleFileSharedCoreRegistry;
+
 namespace file_types {
   enum ID : uint8_t;
 }
@@ -149,6 +153,10 @@ public:
   SerializedModuleLoaderBase(SerializedModuleLoaderBase &&) = delete;
   SerializedModuleLoaderBase &operator=(const SerializedModuleLoaderBase &) = delete;
   SerializedModuleLoaderBase &operator=(SerializedModuleLoaderBase &&) = delete;
+
+  serialization::Status loadAST(ModuleDecl &M, Optional<SourceLoc> diagLoc,
+                                std::unique_ptr<ModuleFile> &loadedModuleFile,
+                                FileUnit *&fileUnit);
 
   /// Attempt to load a serialized AST into the given module.
   ///
@@ -324,6 +332,7 @@ class SerializedASTFile final : public LoadedFile {
   friend class SerializedModuleLoaderBase;
   friend class SerializedSILLoader;
   friend class ModuleFile;
+  friend class ModuleFileSharedCoreRegistry;
 
   ModuleFile &File;
 

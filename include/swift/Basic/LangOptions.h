@@ -133,6 +133,9 @@ namespace swift {
     /// Only used by lldb-moduleimport-test.
     bool EnableMemoryBufferImporter = false;
 
+    /// Enable the ModuleFileSharedCoreRegistryImporter.
+    bool EnableModuleFileSharedCoreRegistryImporter = false;
+
     /// Allows using identifiers with a leading dollar.
     bool EnableDollarIdentifiers = false;
 

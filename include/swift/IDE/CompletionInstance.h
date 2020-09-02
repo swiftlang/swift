@@ -14,6 +14,7 @@
 #define SWIFT_IDE_COMPLETIONINSTANCE_H
 
 #include "swift/Frontend/Frontend.h"
+#include "swift/Serialization/ModuleFileSharedCoreRegistryModuleLoader.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringRef.h"
@@ -38,11 +39,15 @@ makeCodeCompletionMemoryBuffer(const llvm::MemoryBuffer *origBuf,
 /// Manages \c CompilerInstance for completion like operations.
 class CompletionInstance {
   struct Options {
+    bool ReuseLoadedModules = true;
     unsigned MaxASTReuseCount = 100;
     unsigned DependencyCheckIntervalSecond = 5;
   } Opts;
 
   std::mutex mtx;
+
+  std::shared_ptr<ModuleFileSharedCoreRegistry> ModuleRegistry =
+      std::make_shared<ModuleFileSharedCoreRegistry>();
 
   std::unique_ptr<CompilerInstance> CachedCI;
   llvm::hash_code CachedArgHash;
@@ -55,12 +60,18 @@ class CompletionInstance {
 
   bool shouldCheckDependencies() const;
 
+  enum class CachedOperationResult {
+    Done,
+    NeedNewASTContext,
+    UpdatedDependency,
+  };
+
   /// Calls \p Callback with cached \c CompilerInstance if it's usable for the
   /// specified completion request.
   /// Returns \c if the callback was called. Returns \c false if the compiler
   /// argument has changed, primary file is not the same, the \c Offset is not
   /// in function bodies, or the interface hash of the file has changed.
-  bool performCachedOperationIfPossible(
+  CachedOperationResult performCachedOperationIfPossible(
       llvm::hash_code ArgsHash,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
@@ -71,13 +82,16 @@ class CompletionInstance {
   /// request. The \c CompilerInstace passed to the callback already performed
   /// the first pass.
   /// Returns \c false if it fails to setup the \c CompilerInstance.
-  bool performNewOperation(
-      llvm::Optional<llvm::hash_code> ArgsHash,
+  std::unique_ptr<swift::CompilerInstance> performNewOperation(
       swift::CompilerInvocation &Invocation,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
       std::string &Error, DiagnosticConsumer *DiagC,
       llvm::function_ref<void(CompilerInstance &, bool)> Callback);
+
+  void clearModuleFileSharedCoreRegistry();
+
+  void updateModuleFileSharedCoreRegistry(swift::CompilerInstance &CI);
 
 public:
   CompletionInstance() {}

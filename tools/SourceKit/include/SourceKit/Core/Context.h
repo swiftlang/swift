@@ -38,6 +38,9 @@ public:
     bool OptimizeForIDE = false;
 
     struct CompletionOptions {
+      /// When true, code completion tries to reuse loaded modules across
+      /// ASTContext sessions.
+      bool ReuseLoadedModules = false;
 
       /// Max count of reusing ASTContext for cached code completion.
       unsigned MaxASTContextReuseCount = 100;
@@ -53,6 +56,7 @@ private:
 
 public:
   Settings update(Optional<bool> OptimizeForIDE,
+                  Optional<bool> CompletionReuseLoadedModules,
                   Optional<unsigned> CompletionMaxASTContextReuseCount,
                   Optional<unsigned> CompletionCheckDependencyInterval);
   bool shouldOptimizeForIDE() const;
