@@ -198,6 +198,11 @@ func functionWithWhile() {
 public func olderFunction() {
 }
 
+// CHECK-NEXT: {{^}}  (decl versions=empty explicit=empty decl=unavailableFunction()
+@available(macOS, unavailable)
+public func unavailableFunction() {
+}
+
 // CHECK-NEXT: {{^}}  (decl versions=[10.10,+Inf) explicit=[10.10,+Inf) decl=inlinableFunction()
 // CHECK-NEXT: {{^}}    (condition_following_availability versions=[10.55,+Inf) explicit=[10.55,+Inf)
 // CHECK-NEXT: {{^}}    (if_then versions=[10.55,+Inf) explicit=[10.55,+Inf)

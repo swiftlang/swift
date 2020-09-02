@@ -788,21 +788,21 @@ class UnavailableClassExtendingUnavailableClass : ClassAvailableOn10_51 {
 // Method availability is contravariant
 
 class SuperWithAlwaysAvailableMembers {
-  func shouldAlwaysBeAvailableMethod() { // expected-note {{overridden declaration is here}}
+  func shouldAlwaysBeAvailableMethod() { // expected-note 2 {{overridden declaration is here}}
   }
   
-  var shouldAlwaysBeAvailableProperty: Int { // expected-note {{overridden declaration is here}}
+  var shouldAlwaysBeAvailableProperty: Int { // expected-note 2 {{overridden declaration is here}}
     get { return 9 }
     set(newVal) {}
   }
 
   var setterShouldAlwaysBeAvailableProperty: Int {
     get { return 9 }
-    set(newVal) {} // expected-note {{overridden declaration is here}}
+    set(newVal) {} // expected-note 2 {{overridden declaration is here}}
   }
 
   var getterShouldAlwaysBeAvailableProperty: Int {
-    get { return 9 } // expected-note {{overridden declaration is here}}
+    get { return 9 } // expected-note 2 {{overridden declaration is here}}
     set(newVal) {}
   }
 }
@@ -827,6 +827,31 @@ class SubWithLimitedMemberAvailability : SuperWithAlwaysAvailableMembers {
 
   override var getterShouldAlwaysBeAvailableProperty: Int {
     @available(OSX, introduced: 10.51)
+    get { return 9 } // expected-error {{overriding getter for 'getterShouldAlwaysBeAvailableProperty' must be as available as declaration it overrides}}
+    set(newVal) {}
+  }
+}
+
+class SubWithUnavailableMembers : SuperWithAlwaysAvailableMembers {
+  @available(OSX, unavailable)
+  override func shouldAlwaysBeAvailableMethod() { // expected-error {{overriding 'shouldAlwaysBeAvailableMethod' must be as available as declaration it overrides}}
+  }
+
+  @available(OSX, unavailable)
+  override var shouldAlwaysBeAvailableProperty: Int { // expected-error {{overriding 'shouldAlwaysBeAvailableProperty' must be as available as declaration it overrides}}
+    get { return 10 }
+    set(newVal) {}
+  }
+
+  override var setterShouldAlwaysBeAvailableProperty: Int {
+    get { return 9 }
+    @available(OSX, unavailable)
+    set(newVal) {} // expected-error {{overriding setter for 'setterShouldAlwaysBeAvailableProperty' must be as available as declaration it overrides}}
+    // This is a terrible diagnostic. rdar://problem/20427938
+  }
+
+  override var getterShouldAlwaysBeAvailableProperty: Int {
+    @available(OSX, unavailable)
     get { return 9 } // expected-error {{overriding getter for 'getterShouldAlwaysBeAvailableProperty' must be as available as declaration it overrides}}
     set(newVal) {}
   }
