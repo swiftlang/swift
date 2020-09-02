@@ -4181,13 +4181,6 @@ DestructorDecl *ClassDecl::getDestructor() const {
                            nullptr);
 }
 
-ArrayRef<Decl *> ClassDecl::getEmittedMembers() const {
-  ASTContext &ctx = getASTContext();
-  return evaluateOrDefault(ctx.evaluator,
-                           EmittedMembersRequest{const_cast<ClassDecl *>(this)},
-                           ArrayRef<Decl *>());
-}
-
 /// Synthesizer callback for an empty implicit function body.
 static std::pair<BraceStmt *, bool>
 synthesizeEmptyFunctionBody(AbstractFunctionDecl *afd, void *context) {
