@@ -4853,16 +4853,17 @@ class ArrowExpr : public Expr {
   Expr *Args;
   Expr *Result;
 public:
-  ArrowExpr(Expr *Args, SourceLoc AsyncLoc, SourceLoc ThrowsLoc, TypeRepr *ThrowsType,
-            SourceLoc ArrowLoc, Expr *Result)
-    : Expr(ExprKind::Arrow, /*implicit=*/false, Type()),
-      AsyncLoc(AsyncLoc), ThrowsLoc(ThrowsLoc), ThrowsType(ThrowsType), ArrowLoc(ArrowLoc), Args(Args),
-      Result(Result)
+  ArrowExpr(Expr *Args, SourceLoc AsyncLoc, SourceLoc ThrowsLoc,
+            TypeRepr *ThrowsType, SourceLoc ArrowLoc, Expr *Result)
+    : Expr(ExprKind::Arrow, /*implicit=*/false, Type()), AsyncLoc(AsyncLoc),
+      ThrowsLoc(ThrowsLoc), ThrowsType(ThrowsType), ArrowLoc(ArrowLoc),
+      Args(Args), Result(Result)
   { }
 
-  ArrowExpr(SourceLoc AsyncLoc, SourceLoc ThrowsLoc, TypeRepr *ThrowsType, SourceLoc ArrowLoc)
-    : Expr(ExprKind::Arrow, /*implicit=*/false, Type()),
-      AsyncLoc(AsyncLoc), ThrowsLoc(ThrowsLoc), ThrowsType(ThrowsType), ArrowLoc(ArrowLoc),
+  ArrowExpr(SourceLoc AsyncLoc, SourceLoc ThrowsLoc, TypeRepr *ThrowsType,
+            SourceLoc ArrowLoc)
+    : Expr(ExprKind::Arrow, /*implicit=*/false, Type()), AsyncLoc(AsyncLoc),
+      ThrowsLoc(ThrowsLoc), ThrowsType(ThrowsType), ArrowLoc(ArrowLoc),
       Args(nullptr), Result(nullptr)
   { }
 

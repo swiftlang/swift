@@ -1726,7 +1726,8 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
 
     auto NewTypeRepr = new (ctx)
         FunctionTypeRepr(nullptr, ArgsTypeRepr, AE->getAsyncLoc(),
-                         AE->getThrowsLoc(), AE->getThrowsType(), AE->getArrowLoc(), ResultTypeRepr);
+                         AE->getThrowsLoc(), AE->getThrowsType(),
+                         AE->getArrowLoc(), ResultTypeRepr);
     return new (ctx) TypeExpr(NewTypeRepr);
   }
   

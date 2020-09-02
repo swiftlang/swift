@@ -122,11 +122,12 @@ ParserResult<Expr> Parser::parseExprAs() {
 /// parseExprArrow
 ///
 ///   expr-arrow:
-///     'async'? 'throws'?  type? '->'
+///     'async'? ('throws' ('(' type ')')?)? '->'
 ParserResult<Expr> Parser::parseExprArrow() {
   SourceLoc asyncLoc, throwsLoc, arrowLoc;
   TypeRepr *throwsType;
-  parseAsyncThrows(SourceLoc(), asyncLoc, throwsLoc, throwsType, /*rethrows=*/nullptr);
+  parseAsyncThrows(SourceLoc(), asyncLoc, throwsLoc, throwsType,
+                   /*rethrows=*/nullptr);
 
   if (Tok.isNot(tok::arrow)) {
     assert(throwsLoc.isValid() || asyncLoc.isValid());
@@ -138,9 +139,11 @@ ParserResult<Expr> Parser::parseExprArrow() {
 
   arrowLoc = consumeToken(tok::arrow);
 
-  parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, throwsType, /*rethrows=*/nullptr);
+  parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, throwsType,
+                   /*rethrows=*/nullptr);
 
-  auto arrow = new (Context) ArrowExpr(asyncLoc, throwsLoc, throwsType, arrowLoc);
+  auto arrow =
+      new (Context) ArrowExpr(asyncLoc, throwsLoc, throwsType, arrowLoc);
   return makeParserResult(arrow);
 }
 

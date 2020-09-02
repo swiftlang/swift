@@ -489,8 +489,8 @@ class FunctionTypeRepr : public TypeRepr {
 
 public:
   FunctionTypeRepr(GenericParamList *genericParams, TupleTypeRepr *argsTy,
-                   SourceLoc asyncLoc, SourceLoc throwsLoc, TypeRepr *throwsType, SourceLoc arrowLoc,
-                   TypeRepr *retTy,
+                   SourceLoc asyncLoc, SourceLoc throwsLoc,
+                   TypeRepr *throwsType, SourceLoc arrowLoc, TypeRepr *retTy,
                    GenericParamList *patternGenericParams = nullptr,
                    ArrayRef<TypeRepr *> patternSubs = {},
                    ArrayRef<TypeRepr *> invocationSubs = {})
@@ -498,9 +498,9 @@ public:
       GenericParams(genericParams), GenericEnv(nullptr),
       InvocationSubs(invocationSubs),
       PatternGenericParams(patternGenericParams), PatternGenericEnv(nullptr),
-      PatternSubs(patternSubs),
-      ArgsTy(argsTy), RetTy(retTy),
-      AsyncLoc(asyncLoc), ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc) {
+      PatternSubs(patternSubs), ArgsTy(argsTy), RetTy(retTy),
+      AsyncLoc(asyncLoc), ThrowsLoc(throwsLoc), ThrowsType(throwsType),
+      ArrowLoc(arrowLoc) {
   }
 
   GenericParamList *getGenericParams() const { return GenericParams; }
@@ -532,7 +532,7 @@ public:
   TypeRepr *getResultTypeRepr() const { return RetTy; }
   bool isAsync() const { return AsyncLoc.isValid(); }
   bool isThrowing() const { return ThrowsLoc.isValid(); }
-  bool isTypedThrowing() const { return ThrowsLoc.isValid() && ThrowsType != nullptr; }
+  bool hasTypedThrows() const { return isThrowing() && ThrowsType; }
   TypeRepr *getThrowsType() const { return ThrowsType; }
 
   SourceLoc getAsyncLoc() const { return AsyncLoc; }
