@@ -384,23 +384,15 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
         supersetConfig = witnessConfig;
     }
     if (!foundExactConfig) {
-      bool success = false;
       // If no exact witness derivative configuration was found, check
       // conditions for creating an implicit witness `@differentiable` attribute
-      // with the exact derivative configuration:
-      // - If the witness has a "superset" derivative configuration.
-      // - If the witness is less than public and is declared in the same file
-      //   as the conformance.
-      //   - `@differentiable` attributes are really only significant for public
-      //     declarations: it improves usability to not require explicit
-      //     `@differentiable` attributes for less-visible declarations.
-      bool createImplicitWitnessAttribute =
-          supersetConfig || witness->getFormalAccess() < AccessLevel::Public;
-      // If the witness has less-than-public visibility and is declared in a
-      // different file than the conformance, produce an error.
-      if (!supersetConfig && witness->getFormalAccess() < AccessLevel::Public &&
-          dc->getModuleScopeContext() !=
-              witness->getDeclContext()->getModuleScopeContext()) {
+      // with the exact derivative configuration.
+
+      // If witness is declared in a different file as the conformance, we
+      // should not create an implicit `@differentiable` attribute on the
+      // witness. Produce an error.
+      if (dc->getModuleScopeContext() !=
+          witness->getDeclContext()->getModuleScopeContext()) {
         // FIXME(TF-1014): `@differentiable` attribute diagnostic does not
         // appear if associated type inference is involved.
         if (auto *vdWitness = dyn_cast<VarDecl>(witness)) {
@@ -412,6 +404,20 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
                                   reqDiffAttr);
         }
       }
+
+      // Otherwise, the witness must:
+      // - Have a "superset" derivative configuration.
+      // - Have less than public visibility.
+      //   - `@differentiable` attributes are really only significant for
+      //     public declarations: it improves usability to not require
+      //     explicit `@differentiable` attributes for less-visible
+      //     declarations.
+      //
+      // If these conditions are met, an implicit `@differentiable` attribute
+      // with the exact derivative configuration can be created.
+      bool success = false;
+      bool createImplicitWitnessAttribute =
+          supersetConfig || witness->getFormalAccess() < AccessLevel::Public;
       if (createImplicitWitnessAttribute) {
         auto derivativeGenSig = witnessAFD->getGenericSignature();
         if (supersetConfig)
@@ -2448,16 +2454,15 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     llvm::raw_string_ostream os(reqDiffAttrString);
     reqAttr->print(os, req, omitWrtClause);
     os.flush();
-    // If the witness has less-than-public visibility and is declared in a
-    // different file than the conformance, emit a specialized diagnostic.
-    if (witness->getFormalAccess() < AccessLevel::Public &&
-        conformance->getDeclContext()->getModuleScopeContext() !=
+    // If the witness is declared in a different file than the conformance, emit
+    // a specialized diagnostic.
+    if (conformance->getDeclContext()->getModuleScopeContext() !=
             witness->getDeclContext()->getModuleScopeContext()) {
       diags
           .diagnose(
               witness,
               diag::
-                  protocol_witness_missing_differentiable_attr_nonpublic_other_file,
+                  protocol_witness_missing_differentiable_attr_other_file,
               reqDiffAttrString, witness->getDescriptiveKind(),
               witness->getName(), req->getDescriptiveKind(),
               req->getName(), conformance->getType(),
