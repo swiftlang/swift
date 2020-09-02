@@ -562,7 +562,7 @@ private:
   ///
   /// This method first tries to find an existing entry in the adjoint buffer
   /// mapping. If no entry exists, creates a zero adjoint buffer.
-  SILValue &getAdjointBuffer(SILBasicBlock *origBB, SILValue originalValue) {
+  SILValue getAdjointBuffer(SILBasicBlock *origBB, SILValue originalValue) {
     assert(getTangentValueCategory(originalValue) == SILValueCategory::Address);
     assert(originalValue->getFunction() == &getOriginal());
     auto insertion = bufferMap.try_emplace({origBB, originalValue}, SILValue());
@@ -1470,7 +1470,7 @@ public:
   ///    Adjoint: adj[x] += load adj[y]; adj[y] = 0
   void visitStoreOperation(SILBasicBlock *bb, SILLocation loc, SILValue origSrc,
                            SILValue origDest) {
-    auto &adjBuf = getAdjointBuffer(bb, origDest);
+    auto adjBuf = getAdjointBuffer(bb, origDest);
     switch (getTangentValueCategory(origSrc)) {
     case SILValueCategory::Object: {
       auto adjVal = builder.emitLoadValueOperation(
@@ -1502,7 +1502,7 @@ public:
   ///    Adjoint: adj[x] += adj[y]; adj[y] = 0
   void visitCopyAddrInst(CopyAddrInst *cai) {
     auto *bb = cai->getParent();
-    auto &adjDest = getAdjointBuffer(bb, cai->getDest());
+    auto adjDest = getAdjointBuffer(bb, cai->getDest());
     auto destType = remapType(adjDest->getType());
     addToAdjointBuffer(bb, cai->getSrc(), adjDest, cai->getLoc());
     builder.emitDestroyAddrAndFold(cai->getLoc(), adjDest);
@@ -1521,7 +1521,7 @@ public:
       break;
     }
     case SILValueCategory::Address: {
-      auto &adjDest = getAdjointBuffer(bb, cvi);
+      auto adjDest = getAdjointBuffer(bb, cvi);
       auto destType = remapType(adjDest->getType());
       addToAdjointBuffer(bb, cvi->getOperand(), adjDest, cvi->getLoc());
       builder.emitDestroyAddrAndFold(cvi->getLoc(), adjDest);
@@ -1543,7 +1543,7 @@ public:
       break;
     }
     case SILValueCategory::Address: {
-      auto &adjDest = getAdjointBuffer(bb, bbi);
+      auto adjDest = getAdjointBuffer(bb, bbi);
       auto destType = remapType(adjDest->getType());
       addToAdjointBuffer(bb, bbi->getOperand(), adjDest, bbi->getLoc());
       builder.emitDestroyAddrAndFold(bbi->getLoc(), adjDest);
@@ -1582,8 +1582,8 @@ public:
   void visitUnconditionalCheckedCastAddrInst(
       UnconditionalCheckedCastAddrInst *uccai) {
     auto *bb = uccai->getParent();
-    auto &adjDest = getAdjointBuffer(bb, uccai->getDest());
-    auto &adjSrc = getAdjointBuffer(bb, uccai->getSrc());
+    auto adjDest = getAdjointBuffer(bb, uccai->getDest());
+    auto adjSrc = getAdjointBuffer(bb, uccai->getSrc());
     auto destType = remapType(adjDest->getType());
     auto castBuf = builder.createAllocStack(uccai->getLoc(), adjSrc->getType());
     builder.createUnconditionalCheckedCastAddr(
@@ -1612,7 +1612,7 @@ public:
       break;
     }
     case SILValueCategory::Address: {
-      auto &adjDest = getAdjointBuffer(bb, urci);
+      auto adjDest = getAdjointBuffer(bb, urci);
       auto destType = remapType(adjDest->getType());
       addToAdjointBuffer(bb, urci->getOperand(), adjDest, urci->getLoc());
       builder.emitDestroyAddrAndFold(urci->getLoc(), adjDest);
@@ -1639,7 +1639,7 @@ public:
       break;
     }
     case SILValueCategory::Address: {
-      auto &adjDest = getAdjointBuffer(bb, ui);
+      auto adjDest = getAdjointBuffer(bb, ui);
       auto destType = remapType(adjDest->getType());
       addToAdjointBuffer(bb, ui->getOperand(), adjDest, ui->getLoc());
       builder.emitDestroyAddrAndFold(ui->getLoc(), adjDest);
