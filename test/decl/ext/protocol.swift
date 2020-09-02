@@ -971,7 +971,7 @@ extension BadProto4 { } // okay
 typealias RawRepresentableAlias = RawRepresentable
 extension RawRepresentableAlias { } // okay
 
-extension AnyObject { } // expected-error{{non-nominal type 'AnyObject' cannot be extended}}
+extension AnyObject { } // expected-error{{builtin type 'AnyObject' cannot be extended}}
 
 // Members of protocol extensions cannot be overridden.
 // rdar://problem/21075287

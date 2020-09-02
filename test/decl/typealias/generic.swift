@@ -328,7 +328,7 @@ typealias Y = ErrorA<ErrorB>
 
 typealias Id<T> = T
 
-extension Id {} // expected-error {{non-nominal type 'Id' cannot be extended}}
+extension Id {} // expected-error {{generic type 'Id' cannot be extended}}
 
 class OuterGeneric<T> {
   typealias Alias<T> = AnotherGeneric<T>

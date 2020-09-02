@@ -78,7 +78,7 @@ protocol P8 {
 }
 
 struct B : P8 { // expected-error {{type 'B' does not conform to protocol 'P8'}}
-    func g(t: (Int, String)) {} // expected-note {{candidate can not infer 'T' = '(Int, String)' because '(Int, String)' is not a nominal type and so can't conform to 'P7'}}
+    func g(t: (Int, String)) {} // expected-note {{candidate can not infer 'T' = '(Int, String)' because '(Int, String)' is not a struct, class or enum type and so can't conform to 'P7'}}
 }
 
 protocol P9 {
@@ -107,7 +107,7 @@ protocol P12 {
 extension Int : P11 {}
 struct S3 : P12 { // expected-error {{type 'S3' does not conform to protocol 'P12'}}
     func bar() -> P11 { return 0 }
-    // expected-note@-1 {{candidate can not infer 'A' = 'P11' because 'P11' is not a nominal type and so can't conform to 'P11'}}
+    // expected-note@-1 {{candidate can not infer 'A' = 'P11' because 'P11' is not a struct, class or enum type and so can't conform to 'P11'}}
 }
 
 // SR-12759
