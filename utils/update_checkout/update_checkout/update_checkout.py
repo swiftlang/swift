@@ -122,7 +122,7 @@ def get_branch_for_repo(config, repo_name, scheme_name, scheme_map,
 
 def update_single_repository(pool_args):
     source_root, config, repo_name, scheme_name, scheme_map, tag, timestamp, \
-        reset_to_remote, should_clean, cross_repos_pr = pool_args
+        reset_to_remote, should_clean, cross_repos_pr, quiet = pool_args
     repo_path = os.path.join(source_root, repo_name)
     if not os.path.isdir(repo_path) or os.path.islink(repo_path):
         return
@@ -172,8 +172,10 @@ def update_single_repository(pool_args):
             # It's important that we checkout, fetch, and rebase, in order.
             # .git/FETCH_HEAD updates the not-for-merge attributes based on
             # which branch was checked out during the fetch.
-            shell.run(["git", "fetch", "--recurse-submodules=yes", "--tags"],
-                      echo=True)
+            fetch_args = ["--recurse-submodules=yes", "--tags"]
+            if quiet:
+                fetch_args.append("--quiet")
+            shell.run(["git", "fetch"] + fetch_args, echo=True)
 
             # If we were asked to reset to the specified branch, do the hard
             # reset and return.
@@ -253,7 +255,8 @@ def update_all_repositories(args, config, scheme_name, cross_repos_pr):
                    timestamp,
                    args.reset_to_remote,
                    args.clean,
-                   cross_repos_pr]
+                   cross_repos_pr,
+                   args.quiet]
         pool_args.append(my_args)
 
     return run_parallel(update_single_repository, pool_args, args.n_processes)
@@ -462,6 +465,10 @@ def main():
 By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM
 repositories.
 """)
+    parser.add_argument(
+        "-q", "--quiet",
+        help="Perform operations in quiet mode",
+        action="store_true")
     parser.add_argument(
         "--clone",
         help="Obtain Sources for Swift and Related Projects",
