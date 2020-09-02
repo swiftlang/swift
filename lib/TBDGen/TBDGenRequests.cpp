@@ -22,7 +22,7 @@
 #include "llvm/TextAPI/MachO/InterfaceFile.h"
 
 using namespace swift;
-
+ 
 namespace swift {
 // Implement the TBDGen type zone (zone 14).
 #define SWIFT_TYPEID_ZONE TBDGen
