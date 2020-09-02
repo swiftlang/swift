@@ -505,7 +505,8 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
     // function type
     BacktrackingScope backtrack(*this);
     
-    throwsLoc = consumeToken();
+    if (Tok.is(tok::kw_throws))
+      throwsLoc = consumeToken();
     
     ParserResult<TypeRepr> throwsTypeResult = parseThrowsType();
     

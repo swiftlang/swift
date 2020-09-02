@@ -851,13 +851,14 @@ void Parser::parseAsyncThrows(SourceLoc existingArrowLoc, SourceLoc &asyncLoc,
     StringRef keyword;
     
     keyword = Tok.getText();
-    throwsLoc = consumeToken();
+    if (Tok.is(tok::kw_throws))
+      throwsLoc = consumeToken();
     
     ParserResult<TypeRepr> throwsTypeResult = parseThrowsType();
     
     throwsType = throwsTypeResult.getPtrOrNull();
     
-    if (existingArrowLoc.isValid()) {
+    if (existingArrowLoc.isValid() && throwsLoc.isValid()) {
       diagnose(throwsLoc, diag::async_or_throws_in_wrong_position,
                rethrows ? (*rethrows ? 1 : 0) : 0)
         .fixItRemove(throwsLoc)
