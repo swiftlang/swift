@@ -11,6 +11,7 @@
 # ----------------------------------------------------------------------------
 
 import abc
+import os
 
 from .. import cmake
 from .. import targets
@@ -136,13 +137,17 @@ class Product(object):
         """
         return is_release_variant(self.args.build_variant)
 
-    def install_toolchain_path(self):
+    def install_toolchain_path(self, host_target):
         """toolchain_path() -> string
 
         Returns the path to the toolchain that is being created as part of this
         build.
         """
-        return targets.toolchain_path(self.args.install_destdir,
+        install_destdir = self.args.install_destdir
+        if self.args.cross_compile_hosts:
+            build_root = os.path.dirname(self.build_dir)
+            install_destdir = '%s/intermediate-install/%s' % (build_root, host_target)
+        return targets.toolchain_path(install_destdir,
                                       self.args.install_prefix)
 
 
