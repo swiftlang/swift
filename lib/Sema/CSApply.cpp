@@ -3790,16 +3790,13 @@ namespace {
       };
 
       // There's nothing special to do if the operand isn't optional
-      // and we don't need any bridging.
-      if (srcOptionals.empty()) {
+      // (or is insufficiently optional) and we don't need any bridging.
+      if (srcOptionals.empty()
+          || (srcOptionals.size() < destOptionals.size() - destExtraOptionals)) {
         Expr *result = buildInnerOperation(subExpr, finalResultType);
         if (!result) return nullptr;
         return addFinalOptionalInjections(result);
       }
-
-      // The result type (without the final optional) is a subtype of
-      // the operand type, so it will never have a higher depth.
-      assert(destOptionals.size() - destExtraOptionals <= srcOptionals.size());
 
       // The outermost N levels of optionals on the operand must all
       // be present or the cast fails.  The innermost M levels of
@@ -5572,7 +5569,7 @@ Expr *ExprRewriter::coerceCallArguments(
     SmallVector<LocatorPathElt, 4> path;
     auto anchor = locator.getLocatorParts(path);
     if (!path.empty() && path.back().is<LocatorPathElt::ApplyArgument>() &&
-        (anchor.isExpr(ExprKind::Call) || anchor.isExpr(ExprKind::Subscript))) {
+        !anchor.isExpr(ExprKind::UnresolvedDot)) {
       auto locatorPtr = cs.getConstraintLocator(locator);
       assert(solution.trailingClosureMatchingChoices.count(locatorPtr) == 1);
       trailingClosureMatching = solution.trailingClosureMatchingChoices.find(

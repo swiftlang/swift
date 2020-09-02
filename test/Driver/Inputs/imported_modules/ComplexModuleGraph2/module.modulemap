@@ -14,7 +14,11 @@ module CoreDaemon {
 }
 
 module DaemonKit {
-  header "DaemonKit.h"
+  umbrella header "DaemonKit/DaemonKit.h"
+  explicit module ViolateSecondLawOfThermodynamics {
+    header "DaemonKit/ViolateSecondLawOfThermodynamics.h"
+    export *
+  }
   export *
 }
 

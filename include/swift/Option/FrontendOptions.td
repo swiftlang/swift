@@ -601,6 +601,9 @@ def disable_incremental_llvm_codegeneration :
   Flag<["-"], "disable-incremental-llvm-codegen">,
        HelpText<"Disable incremental llvm code generation.">;
 
+def ignore_always_inline : Flag<["-"], "ignore-always-inline">,
+  HelpText<"Ignore @inline(__always) attributes.">;
+
 def emit_sorted_sil : Flag<["-"], "emit-sorted-sil">,
   HelpText<"When printing SIL, print out all sil entities sorted by name to "
            "ease diffing">;

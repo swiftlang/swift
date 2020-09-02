@@ -20,11 +20,18 @@ sil @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> 
 sil @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
 sil @get_owned_obj : $@convention(thin) () -> @owned Builtin.NativeObject
 sil @unreachable_guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+sil @inout_user : $@convention(thin) (@inout FakeOptional<NativeObjectPair>) -> ()
 
 struct NativeObjectPair {
   var obj1 : Builtin.NativeObject
   var obj2 : Builtin.NativeObject
 }
+
+struct FakeOptionalNativeObjectPairPair {
+  var pair1 : FakeOptional<NativeObjectPair>
+  var pair2 : FakeOptional<NativeObjectPair>
+}
+sil @inout_user2 : $@convention(thin) (@inout FakeOptionalNativeObjectPairPair) -> ()
 
 sil @get_nativeobject_pair : $@convention(thin) () -> @owned NativeObjectPair
 
@@ -2639,3 +2646,84 @@ bb6:
   inject_enum_addr %0 : $*FakeOptional<Klass>, #FakeOptional.none!enumelt
   br bb5
 }
+
+// CHECK-LABEL: sil [ossa] @destructure_with_differing_lifetimes_inout_1 : $@convention(thin) (@inout FakeOptionalNativeObjectPairPair) -> () {
+// CHECK-NOT: load_borrow
+// CHECK: } // end sil function 'destructure_with_differing_lifetimes_inout_1'
+sil [ossa] @destructure_with_differing_lifetimes_inout_1 : $@convention(thin) (@inout FakeOptionalNativeObjectPairPair) -> () {
+bb0(%0 : $*FakeOptionalNativeObjectPairPair):
+  %0a = struct_element_addr %0 : $*FakeOptionalNativeObjectPairPair, #FakeOptionalNativeObjectPairPair.pair1
+  %1 = load [copy] %0a : $*FakeOptional<NativeObjectPair>
+  switch_enum %1 : $FakeOptional<NativeObjectPair>, case #FakeOptional.some!enumelt: bb1, default bb2
+
+bb2(%2 : @owned $FakeOptional<NativeObjectPair>):
+  destroy_value %2 : $FakeOptional<NativeObjectPair>
+  br bbEnd
+
+bb1(%3 : @owned $NativeObjectPair):
+  (%3a, %3b) = destructure_struct %3 : $NativeObjectPair
+  cond_br undef, bb1a, bb1b
+
+bb1a:
+  destroy_value %3a : $Builtin.NativeObject
+  destroy_value %3b : $Builtin.NativeObject
+  br bbEnd
+
+bb1b:
+  destroy_value %3a : $Builtin.NativeObject
+  %f = function_ref @inout_user2 : $@convention(thin) (@inout FakeOptionalNativeObjectPairPair) -> ()
+  apply %f(%0) : $@convention(thin) (@inout FakeOptionalNativeObjectPairPair) -> ()
+  destroy_value %3b : $Builtin.NativeObject
+  br bbEnd
+
+bbEnd:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @destructure_with_differing_lifetimes_inout_2 : $@convention(thin) (@inout FakeOptionalNativeObjectPairPair) -> () {
+// CHECK-NOT: load_borrow
+// CHECK: } // end sil function 'destructure_with_differing_lifetimes_inout_2'
+sil [ossa] @destructure_with_differing_lifetimes_inout_2 : $@convention(thin) (@inout FakeOptionalNativeObjectPairPair) -> () {
+bb0(%0 : $*FakeOptionalNativeObjectPairPair):
+  %0a = struct_element_addr %0 : $*FakeOptionalNativeObjectPairPair, #FakeOptionalNativeObjectPairPair.pair1
+  %1 = load [copy] %0a : $*FakeOptional<NativeObjectPair>
+  switch_enum %1 : $FakeOptional<NativeObjectPair>, case #FakeOptional.some!enumelt: bb1, default bb2
+
+bb2(%2 : @owned $FakeOptional<NativeObjectPair>):
+  destroy_value %2 : $FakeOptional<NativeObjectPair>
+  br bbEnd
+
+bb1(%3 : @owned $NativeObjectPair):
+  (%3a, %3b) = destructure_struct %3 : $NativeObjectPair
+  cond_br undef, bb1a, bb1b
+
+bb1a:
+  destroy_value %3a : $Builtin.NativeObject
+  br bb1ab
+
+bb1ab:
+  destroy_value %3b : $Builtin.NativeObject
+  br bbEnd
+
+bb1b:
+  destroy_value %3a : $Builtin.NativeObject
+  %f = function_ref @inout_user2 : $@convention(thin) (@inout FakeOptionalNativeObjectPairPair) -> ()
+  apply %f(%0) : $@convention(thin) (@inout FakeOptionalNativeObjectPairPair) -> ()
+  cond_br undef, bb1ba, bb1bb
+
+bb1ba:
+  br bb1baEnd
+
+bb1bb:
+  br bb1baEnd
+
+bb1baEnd:
+  destroy_value %3b : $Builtin.NativeObject
+  br bbEnd
+
+bbEnd:
+  %9999 = tuple()
+  return %9999 : $()
+}
+

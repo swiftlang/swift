@@ -1129,6 +1129,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.AssumeSingleThreaded = true;
   }
 
+  Opts.IgnoreAlwaysInline |= Args.hasArg(OPT_ignore_always_inline);
+
   // Parse the assert configuration identifier.
   if (const Arg *A = Args.getLastArg(OPT_AssertConfig)) {
     StringRef Configuration = A->getValue();

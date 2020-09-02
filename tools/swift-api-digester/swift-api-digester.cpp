@@ -264,6 +264,11 @@ SerializedDiagPath("serialize-diagnostics-path",
                    llvm::cl::desc("Serialize diagnostics to a path"),
                    llvm::cl::cat(Category));
 
+static llvm::cl::opt<std::string>
+BreakageAllowlistPath("breakage-allowlist-path",
+                      llvm::cl::desc("An allowlist of breakages to not complain about"),
+                      llvm::cl::cat(Category));
+
 } // namespace options
 
 namespace {
@@ -2320,6 +2325,49 @@ createDiagConsumer(llvm::raw_ostream &OS, bool &FailOnError) {
   }
 }
 
+static int readFileLineByLine(StringRef Path, llvm::StringSet<> &Lines) {
+  auto FileBufOrErr = llvm::MemoryBuffer::getFile(Path);
+  if (!FileBufOrErr) {
+    llvm::errs() << "error opening file '" << Path << "': "
+      << FileBufOrErr.getError().message() << '\n';
+    return 1;
+  }
+
+  StringRef BufferText = FileBufOrErr.get()->getBuffer();
+  while (!BufferText.empty()) {
+    StringRef Line;
+    std::tie(Line, BufferText) = BufferText.split('\n');
+    Line = Line.trim();
+    if (Line.empty())
+      continue;
+    if (Line.startswith("// ")) // comment.
+      continue;
+    Lines.insert(Line);
+  }
+  return 0;
+}
+
+static bool readBreakageAllowlist(SDKContext &Ctx, llvm::StringSet<> &lines) {
+  if (options::BreakageAllowlistPath.empty())
+    return 0;
+  CompilerInstance instance;
+  CompilerInvocation invok;
+  invok.setModuleName("ForClangImporter");
+  if (instance.setup(invok))
+    return 1;
+  auto importer = ClangImporter::create(instance.getASTContext());
+  SmallString<128> preprocessedFilePath;
+  if (auto error = llvm::sys::fs::createTemporaryFile(
+    "breakage-allowlist-", "txt", preprocessedFilePath)) {
+    return 1;
+  }
+  if (importer->runPreprocessor(options::BreakageAllowlistPath,
+                                preprocessedFilePath.str())) {
+    return 1;
+  }
+  return readFileLineByLine(preprocessedFilePath, lines);
+}
+
 static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
                              SDKNodeRoot *RightModule, StringRef OutputPath,
                              llvm::StringSet<> ProtocolReqAllowlist) {
@@ -2337,9 +2385,14 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
     OS = FileOS.get();
   }
   bool FailOnError;
-  std::unique_ptr<DiagnosticConsumer> pConsumer =
-    createDiagConsumer(*OS, FailOnError);
-
+  auto allowedBreakages = std::make_unique<llvm::StringSet<>>();
+  if (readBreakageAllowlist(Ctx, *allowedBreakages)) {
+    Ctx.getDiags().diagnose(SourceLoc(), diag::cannot_read_allowlist,
+                            options::BreakageAllowlistPath);
+  }
+  auto pConsumer = std::make_unique<FilteringDiagnosticConsumer>(
+    createDiagConsumer(*OS, FailOnError), std::move(allowedBreakages));
+  SWIFT_DEFER { pConsumer->finishProcessing(); };
   Ctx.addDiagConsumer(*pConsumer);
   Ctx.setCommonVersion(std::min(LeftModule->getJsonFormatVersion(),
                                 RightModule->getJsonFormatVersion()));
@@ -2352,7 +2405,7 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
   // Find member hoist changes to help refine diagnostics.
   findTypeMemberDiffs(LeftModule, RightModule, Ctx.getTypeMemberDiffs());
   DiagnosisEmitter::diagnosis(LeftModule, RightModule, Ctx);
-  return FailOnError && Ctx.getDiags().hadAnyError() ? 1 : 0;
+  return FailOnError && pConsumer->hasError() ? 1 : 0;
 }
 
 static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
@@ -2490,28 +2543,6 @@ static int generateMigrationScript(StringRef LeftPath, StringRef RightPath,
   serializeDiffs(Fs, typeMemberDiffs);
   serializeDiffs(Fs, AllNoEscapingFuncs);
   serializeDiffs(Fs, Overloads);
-  return 0;
-}
-
-static int readFileLineByLine(StringRef Path, llvm::StringSet<> &Lines) {
-  auto FileBufOrErr = llvm::MemoryBuffer::getFile(Path);
-  if (!FileBufOrErr) {
-    llvm::errs() << "error opening file '" << Path << "': "
-      << FileBufOrErr.getError().message() << '\n';
-    return 1;
-  }
-
-  StringRef BufferText = FileBufOrErr.get()->getBuffer();
-  while (!BufferText.empty()) {
-    StringRef Line;
-    std::tie(Line, BufferText) = BufferText.split('\n');
-    Line = Line.trim();
-    if (Line.empty())
-      continue;
-    if (Line.startswith("// ")) // comment.
-      continue;
-    Lines.insert(Line);
-  }
   return 0;
 }
 

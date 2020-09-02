@@ -252,11 +252,11 @@ func test_coercions_with_overloaded_operator(str: String, optStr: String?, veryO
 
   _ = (str ?? "") as Int // expected-error {{cannot convert value of type 'String' to type 'Int' in coercion}}
   _ = (optStr ?? "") as Int // expected-error {{cannot convert value of type 'String' to type 'Int' in coercion}}
-  _ = (optStr ?? "") as Int? // expected-error {{cannot convert value of type 'String' to type 'Int?' in coercion}}
+  _ = (optStr ?? "") as Int? // expected-error {{'String' is not convertible to 'Int?'; did you mean to use 'as!' to force downcast?}}
 
   _ = (str ^^^ "") as Int // expected-error {{cannot convert value of type 'String' to type 'Int' in coercion}}
   _ = (optStr ^^^ "") as Int // expected-error {{cannot convert value of type 'String' to type 'Int' in coercion}}
-  _ = (optStr ^^^ "") as Int? // expected-error {{cannot convert value of type 'String' to type 'Int?' in coercion}}
+  _ = (optStr ^^^ "") as Int? // expected-error {{'String' is not convertible to 'Int?'; did you mean to use 'as!' to force downcast?}}
 
   _ = ([] ?? []) as String // expected-error {{cannot convert value of type '[Any]' to type 'String' in coercion}}
   _ = ([""] ?? []) as [Int: Int] // expected-error {{cannot convert value of type '[String]' to type '[Int : Int]' in coercion}}
@@ -290,7 +290,7 @@ func test_compatibility_coercions(_ arr: [Int], _ optArr: [Int]?, _ dict: [Strin
   // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
   _ = dict as [String: String] // expected-error {{cannot convert value of type '[String : Int]' to type '[String : String]' in coercion}}
   // expected-note@-1 {{arguments to generic parameter 'Value' ('Int' and 'String') are expected to be equal}}
-  _ = dict as [String: String]? // expected-error {{cannot convert value of type '[String : Int]' to type '[String : String]?' in coercion}}
+  _ = dict as [String: String]? // expected-error {{'[String : Int]' is not convertible to '[String : String]?'; did you mean to use 'as!' to force downcast?}}
   _ = (dict as [String: Int]?) as [String: Int] // expected-error {{value of optional type '[String : Int]?' must be unwrapped to a value of type '[String : Int]'}}
   // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
   // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}

@@ -214,7 +214,9 @@ class ASTContext final {
   void operator=(const ASTContext&) = delete;
 
   ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
-             SearchPathOptions &SearchPathOpts, SourceManager &SourceMgr,
+             SearchPathOptions &SearchPathOpts,
+             ClangImporterOptions &ClangImporterOpts,
+             SourceManager &SourceMgr,
              DiagnosticEngine &Diags);
 
 public:
@@ -228,6 +230,7 @@ public:
 
   static ASTContext *get(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
                          SearchPathOptions &SearchPathOpts,
+                         ClangImporterOptions &ClangImporterOpts,
                          SourceManager &SourceMgr, DiagnosticEngine &Diags);
   ~ASTContext();
 
@@ -245,6 +248,9 @@ public:
 
   /// The search path options used by this AST context.
   SearchPathOptions &SearchPathOpts;
+
+  /// The clang importer options used by this AST context.
+  ClangImporterOptions &ClangImporterOpts;
 
   /// The source manager object.
   SourceManager &SourceMgr;

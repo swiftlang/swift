@@ -29,7 +29,6 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/StringExtras.h"
-#include "swift/ClangImporter/ClangImporterOptions.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
