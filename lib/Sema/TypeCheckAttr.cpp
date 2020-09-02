@@ -320,14 +320,17 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
     llvm_unreachable("unhandled attribute kind");
   }
 
+  auto DC = FD->getDeclContext();
   // mutation attributes may only appear in type context.
-  if (auto contextTy = FD->getDeclContext()->getDeclaredInterfaceType()) {
+  if (auto contextTy = DC->getDeclaredInterfaceType()) {
     // 'mutating' and 'nonmutating' are not valid on types
     // with reference semantics.
     if (contextTy->hasReferenceSemantics()) {
-      if (attrModifier != SelfAccessKind::Consuming)
+      if (attrModifier != SelfAccessKind::Consuming) {
         diagnoseAndRemoveAttr(attr, diag::mutating_invalid_classes,
-                              attrModifier);
+                              attrModifier, FD->getDescriptiveKind(),
+                              DC->getSelfProtocolDecl() != nullptr);
+      }
     }
   } else {
     diagnoseAndRemoveAttr(attr, diag::mutating_invalid_global_scope,
@@ -2901,18 +2904,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   auto nominal = evaluateOrDefault(
     Ctx.evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
 
-  // If there is no nominal type with this name, complain about this being
-  // an unknown attribute.
   if (!nominal) {
-    std::string typeName;
-    if (auto typeRepr = attr->getTypeRepr()) {
-      llvm::raw_string_ostream out(typeName);
-      typeRepr->print(out);
-    } else {
-      typeName = attr->getType().getString();
-    }
-
-    diagnose(attr->getLocation(), diag::unknown_attribute, typeName);
     attr->setInvalid();
     return;
   }

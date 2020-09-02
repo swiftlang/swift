@@ -715,6 +715,12 @@ passReference(ValueDecl *D, Type Ty, SourceLoc BaseNameLoc, SourceRange Range,
     }
   }
 
+  if (D == nullptr) {
+    // FIXME: When does this happen?
+    assert(false && "unhandled reference");
+    return true;
+  }
+
   CharSourceRange CharRange =
     Lexer::getCharSourceRangeFromSourceRange(D->getASTContext().SourceMgr,
                                              Range);

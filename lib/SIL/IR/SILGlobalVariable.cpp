@@ -272,7 +272,7 @@ SILFunction *swift::findInitializer(SILFunction *AddrF,
   if (!CallToOnce)
     return nullptr;
   SILFunction *callee = getCalleeOfOnceCall(CallToOnce);
-  if (!callee->getName().startswith("globalinit_"))
+  if (!callee->isGlobalInitOnceFunction())
     return nullptr;
   return callee;
 }

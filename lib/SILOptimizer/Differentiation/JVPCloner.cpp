@@ -553,9 +553,14 @@ public:
               if (!originalFnTy->getParameters()[paramIndex]
                        .getSILStorageInterfaceType()
                        .isDifferentiable(getModule())) {
-                context.emitNondifferentiabilityError(
-                    ai->getArgumentsWithoutIndirectResults()[paramIndex],
-                    invoker, diag::autodiff_nondifferentiable_argument);
+                auto arg = ai->getArgumentsWithoutIndirectResults()[paramIndex];
+                auto startLoc = arg.getLoc().getStartSourceLoc();
+                auto endLoc = arg.getLoc().getEndSourceLoc();
+                context
+                    .emitNondifferentiabilityError(
+                        arg, invoker, diag::autodiff_nondifferentiable_argument)
+                    .fixItInsert(startLoc, "withoutDerivative(at: ")
+                    .fixItInsertAfter(endLoc, ")");
                 errorOccurred = true;
                 return true;
               }
@@ -573,9 +578,14 @@ public:
                                          .getSILStorageInterfaceType();
               }
               if (!remappedResultType.isDifferentiable(getModule())) {
-                context.emitNondifferentiabilityError(
-                    origCallee, invoker,
-                    diag::autodiff_nondifferentiable_result);
+                auto startLoc = ai->getLoc().getStartSourceLoc();
+                auto endLoc = ai->getLoc().getEndSourceLoc();
+                context
+                    .emitNondifferentiabilityError(
+                        origCallee, invoker,
+                        diag::autodiff_nondifferentiable_result)
+                    .fixItInsert(startLoc, "withoutDerivative(at: ")
+                    .fixItInsertAfter(endLoc, ")");
                 errorOccurred = true;
                 return true;
               }
@@ -1587,10 +1597,10 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   auto *diffGenericEnv =
       diffGenericSig ? diffGenericSig->getGenericEnvironment() : nullptr;
   auto diffType = SILFunctionType::get(
-      diffGenericSig, origTy->getExtInfo(), origTy->isAsync(),
-      origTy->getCoroutineKind(), origTy->getCalleeConvention(), dfParams, {},
-      dfResults, None, origTy->getPatternSubstitutions(),
-      origTy->getInvocationSubstitutions(), original->getASTContext());
+      diffGenericSig, origTy->getExtInfo(), origTy->getCoroutineKind(),
+      origTy->getCalleeConvention(), dfParams, {}, dfResults, None,
+      origTy->getPatternSubstitutions(), origTy->getInvocationSubstitutions(),
+      original->getASTContext());
 
   SILOptFunctionBuilder fb(context.getTransform());
   auto linkage = jvp->isSerialized() ? SILLinkage::Public : SILLinkage::Hidden;

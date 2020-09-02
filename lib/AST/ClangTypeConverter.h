@@ -74,6 +74,11 @@ public:
     ArrayRef<AnyFunctionType::Param> params, Type resultTy,
     AnyFunctionType::Representation repr);
 
+  /// Compute the C function type for a SIL function type.
+  const clang::Type *getFunctionType(
+    ArrayRef<SILParameterInfo> params, Optional<SILResultInfo> result,
+    SILFunctionType::Representation repr);
+
   /// Check whether the given Clang declaration is an export of a Swift
   /// declaration introduced by this converter, and if so, return the original
   /// Swift declaration.

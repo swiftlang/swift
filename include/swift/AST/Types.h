@@ -148,7 +148,10 @@ public:
     /// This type contains an OpaqueTypeArchetype.
     HasOpaqueArchetype   = 0x400,
 
-    Last_Property = HasOpaqueArchetype
+    /// This type contains a type hole.
+    HasTypeHole          = 0x800,
+
+    Last_Property = HasTypeHole
   };
   enum { BitWidth = countBitsUsed(Property::Last_Property) };
 
@@ -202,6 +205,10 @@ public:
   /// Does a type with these properties structurally contain an unbound
   /// generic type?
   bool hasUnboundGeneric() const { return Bits & HasUnboundGeneric; }
+
+  /// Does a type with these properties structurally contain a
+  /// type hole?
+  bool hasTypeHole() const { return Bits & HasTypeHole; }
 
   /// Returns the set of properties present in either set.
   friend RecursiveTypeProperties operator|(Property lhs, Property rhs) {
@@ -308,7 +315,7 @@ class alignas(1 << TypeAlignInBits) TypeBase {
 
 protected:
   enum { NumAFTExtInfoBits = 9 };
-  enum { NumSILExtInfoBits = 8 };
+  enum { NumSILExtInfoBits = 9 };
   union { uint64_t OpaqueBits;
 
   SWIFT_INLINE_BITFIELD_BASE(TypeBase, bitmax(NumTypeKindBits,8) +
@@ -362,12 +369,11 @@ protected:
     ID : 32
   );
 
-  SWIFT_INLINE_BITFIELD(SILFunctionType, TypeBase, NumSILExtInfoBits+1+3+1+1+2+1+1,
+  SWIFT_INLINE_BITFIELD(SILFunctionType, TypeBase, NumSILExtInfoBits+1+3+1+2+1+1,
     ExtInfoBits : NumSILExtInfoBits,
     HasClangTypeInfo : 1,
     CalleeConvention : 3,
     HasErrorResult : 1,
-    IsAsync : 1,
     CoroutineKind : 2,
     HasInvocationSubs : 1,
     HasPatternSubs : 1
@@ -574,9 +580,7 @@ public:
   }
 
   /// Determine whether this type involves a hole.
-  bool hasHole() const {
-    return getRecursiveProperties().hasUnresolvedType();
-  }
+  bool hasHole() const { return getRecursiveProperties().hasTypeHole(); }
 
   /// Determine whether the type involves a context-dependent archetype.
   bool hasArchetype() const {
@@ -2873,7 +2877,7 @@ protected:
                   unsigned NumParams, ExtInfo Info)
   : TypeBase(Kind, CanTypeContext, properties), Output(Output) {
     Bits.AnyFunctionType.ExtInfoBits = Info.getBits();
-    Bits.AnyFunctionType.HasClangTypeInfo = Info.getClangTypeInfo().hasValue();
+    Bits.AnyFunctionType.HasClangTypeInfo = !Info.getClangTypeInfo().empty();
     Bits.AnyFunctionType.NumParams = NumParams;
     assert(Bits.AnyFunctionType.NumParams == NumParams && "Params dropped!");
     // The use of both assert() and static_assert() is intentional.
@@ -3980,7 +3984,7 @@ private:
              + 1);
   }
 
-  SILFunctionType(GenericSignature genericSig, ExtInfo ext, bool isAsync,
+  SILFunctionType(GenericSignature genericSig, ExtInfo ext,
                   SILCoroutineKind coroutineKind,
                   ParameterConvention calleeConvention,
                   ArrayRef<SILParameterInfo> params,
@@ -3994,8 +3998,7 @@ private:
 
 public:
   static CanSILFunctionType
-  get(GenericSignature genericSig, ExtInfo ext, bool isAsync,
-      SILCoroutineKind coroutineKind,
+  get(GenericSignature genericSig, ExtInfo ext, SILCoroutineKind coroutineKind,
       ParameterConvention calleeConvention,
       ArrayRef<SILParameterInfo> interfaceParams,
       ArrayRef<SILYieldInfo> interfaceYields,
@@ -4048,7 +4051,7 @@ public:
     return SILCoroutineKind(Bits.SILFunctionType.CoroutineKind);
   }
 
-  bool isAsync() const { return Bits.SILFunctionType.IsAsync; }
+  bool isAsync() const { return getExtInfo().isAsync(); }
 
   /// Return the array of all the yields.
   ArrayRef<SILYieldInfo> getYields() const {
@@ -4577,14 +4580,14 @@ public:
                                     
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getInvocationGenericSignature(),
-            getExtInfo(), isAsync(), getCoroutineKind(), getCalleeConvention(),
+            getExtInfo(), getCoroutineKind(), getCalleeConvention(),
             getParameters(), getYields(), getResults(),
             getOptionalErrorResult(), getWitnessMethodConformanceOrInvalid(),
             getPatternSubstitutions(), getInvocationSubstitutions());
   }
   static void
   Profile(llvm::FoldingSetNodeID &ID, GenericSignature genericSig, ExtInfo info,
-          bool isAsync, SILCoroutineKind coroutineKind, ParameterConvention calleeConvention,
+          SILCoroutineKind coroutineKind, ParameterConvention calleeConvention,
           ArrayRef<SILParameterInfo> params, ArrayRef<SILYieldInfo> yields,
           ArrayRef<SILResultInfo> results, Optional<SILResultInfo> errorResult,
           ProtocolConformanceRef conformance,
@@ -5727,6 +5730,31 @@ public:
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(TypeVariableType, Type)
+
+/// HoleType - This represents a placeholder type for a type variable
+/// or dependent member type that cannot be resolved to a concrete type
+/// because the expression is ambiguous. This type is only used by the
+/// constraint solver and transformed into UnresolvedType to be used in AST.
+class HoleType : public TypeBase {
+  using OriginatorType =
+      llvm::PointerUnion<TypeVariableType *, DependentMemberType *>;
+
+  OriginatorType Originator;
+
+  HoleType(ASTContext &C, OriginatorType originator,
+           RecursiveTypeProperties properties)
+      : TypeBase(TypeKind::Hole, &C, properties), Originator(originator) {}
+
+public:
+  static Type get(ASTContext &ctx, OriginatorType originatorType);
+
+  OriginatorType getOriginatorType() const { return Originator; }
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Hole;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(HoleType, Type)
 
 inline bool TypeBase::isTypeVariableOrMember() {
   if (is<TypeVariableType>())

@@ -714,8 +714,7 @@ bool importer::isUnavailableInSwift(
   return false;
 }
 
-OptionalTypeKind importer::getParamOptionality(version::Version swiftVersion,
-                                               const clang::ParmVarDecl *param,
+OptionalTypeKind importer::getParamOptionality(const clang::ParmVarDecl *param,
                                                bool knownNonNull) {
   auto &clangCtx = param->getASTContext();
 

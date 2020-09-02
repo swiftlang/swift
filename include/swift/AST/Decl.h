@@ -63,6 +63,7 @@ namespace swift {
   class Type;
   class Expr;
   class DeclRefExpr;
+  class ForeignAsyncConvention;
   class ForeignErrorConvention;
   class LiteralExpr;
   class BraceStmt;
@@ -6171,7 +6172,15 @@ public:
   /// being dropped altogether. `None` is returned for a normal function
   /// or method.
   Optional<int> getForeignFunctionAsMethodSelfParameterIndex() const;
-  
+
+  /// Set information about the foreign async convention used by this
+  /// declaration.
+  void setForeignAsyncConvention(const ForeignAsyncConvention &convention);
+
+  /// Get information about the foreign async convention used by this
+  /// declaration, given that it is @objc and 'async'.
+  Optional<ForeignAsyncConvention> getForeignAsyncConvention() const;
+
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractFunctionDecl &&
            D->getKind() <= DeclKind::Last_AbstractFunctionDecl;
@@ -6300,7 +6309,8 @@ public:
                                   DeclContext *Parent);
 
   static FuncDecl *createImported(ASTContext &Context, SourceLoc FuncLoc,
-                                  DeclName Name, SourceLoc NameLoc, bool Throws,
+                                  DeclName Name, SourceLoc NameLoc,
+                                  bool Async, bool Throws,
                                   ParameterList *BodyParams, Type FnRetType,
                                   DeclContext *Parent, ClangNode ClangN);
 

@@ -26,11 +26,13 @@
 #include "llvm/ADT/StringRef.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Casting.h"
+#include "swift/Runtime/Debug.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/Heap.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/ObjCBridge.h"
+#include "swift/Runtime/Portability.h"
 #include "swift/Strings.h"
 #include "../SwiftShims/RuntimeShims.h"
 #include "../SwiftShims/AssertionReporting.h"
@@ -39,7 +41,6 @@
 #include "Private.h"
 #include "SwiftObject.h"
 #include "WeakReference.h"
-#include "swift/Runtime/Debug.h"
 #if SWIFT_OBJC_INTEROP
 #include <dlfcn.h>
 #endif

@@ -3629,7 +3629,7 @@ void printCType(ASTContext &Ctx, ASTPrinter &Printer, ExtInfo &info) {
   auto *cml = Ctx.getClangModuleLoader();
   SmallString<64> buf;
   llvm::raw_svector_ostream os(buf);
-  info.getClangTypeInfo().getValue().printType(cml, os);
+  info.getClangTypeInfo().printType(cml, os);
   Printer << ", cType: " << QuotedString(os.str());
 }
 
@@ -3827,6 +3827,17 @@ public:
       Printer << "<<unresolvedtype>>";
     else
       Printer << "_";
+  }
+
+  void visitHoleType(HoleType *T) {
+    if (Options.PrintTypesForDebugging) {
+      Printer << "<<hole for ";
+      auto originatorTy = T->getOriginatorType();
+      visit(Type(reinterpret_cast<TypeBase *>(originatorTy.getOpaqueValue())));
+      Printer << ">>";
+    } else {
+      Printer << "<<hole>>";
+    }
   }
 
 #ifdef ASTPRINTER_HANDLE_BUILTINTYPE
@@ -4070,7 +4081,7 @@ public:
       case SILFunctionType::Representation::CFunctionPointer:
         Printer << "c";
         // [TODO: Clang-type-plumbing] Remove the second check.
-        if (printNameOnly || !info.getClangTypeInfo().hasValue())
+        if (printNameOnly || info.getClangTypeInfo().empty())
           break;
         printCType(Ctx, Printer, info);
         break;
@@ -4136,7 +4147,7 @@ public:
       case SILFunctionType::Representation::CFunctionPointer:
         Printer << "c";
         // [TODO: Clang-type-plumbing] Remove the second check.
-        if (printNameOnly || !info.getClangTypeInfo().hasValue())
+        if (printNameOnly || info.getClangTypeInfo().empty())
           break;
         printCType(Ctx, Printer, info);
         break;
@@ -4166,6 +4177,9 @@ public:
     }
     if (info.isNoEscape()) {
       Printer.printSimpleAttr("@noescape") << " ";
+    }
+    if (info.isAsync()) {
+      Printer.printSimpleAttr("@async") << " ";
     }
   }
 
@@ -4311,7 +4325,6 @@ public:
 
   void visitSILFunctionType(SILFunctionType *T) {
     printSILCoroutineKind(T->getCoroutineKind());
-    printSILAsyncAttr(T->isAsync());
     printFunctionExtInfo(T->getASTContext(), T->getExtInfo(),
                          T->getWitnessMethodConformanceOrInvalid());
     printCalleeConvention(T->getCalleeConvention());

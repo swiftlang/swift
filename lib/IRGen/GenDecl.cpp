@@ -3941,32 +3941,14 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
     return cast<llvm::GlobalValue>(addr);
   }
 
-  /// For concrete metadata, we want to use the initializer on the
-  /// "full metadata", and define the "direct" address point as an alias.
-  TypeMetadataAddress addrKind;
-  unsigned adjustmentIndex;
-
-  auto nominal = concreteType->getAnyNominal();
-
-  // Native Swift class metadata has a destructor before the address point.
-  // Foreign class metadata candidates do not, and neither does value type
-  // metadata.
-  if (nominal && isa<ClassDecl>(nominal) &&
-      !requiresForeignTypeMetadata(nominal)) {
-    addrKind = TypeMetadataAddress::FullMetadata;
-    adjustmentIndex = MetadataAdjustmentIndex::Class;
-  } else {
-    addrKind = TypeMetadataAddress::FullMetadata;
-    adjustmentIndex = MetadataAdjustmentIndex::ValueType;
-  }
-
   auto entity =
       (isPrespecialized &&
        !irgen::isCanonicalInitializableTypeMetadataStaticallyAddressable(
            *this, concreteType))
           ? LinkEntity::forNoncanonicalSpecializedGenericTypeMetadata(
                 concreteType)
-          : LinkEntity::forTypeMetadata(concreteType, addrKind);
+          : LinkEntity::forTypeMetadata(concreteType,
+                                        TypeMetadataAddress::FullMetadata);
 
   auto DbgTy = DebugTypeInfo::getMetadata(MetatypeType::get(concreteType),
     entity.getDefaultDeclarationType(*this)->getPointerTo(),
@@ -3984,30 +3966,35 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
   if (link.isUsed())
     addUsedGlobal(var);
 
-  // Keep type metadata around for all types.
-  if (nominal)
+  /// For concrete metadata, we want to use the initializer on the
+  /// "full metadata", and define the "direct" address point as an alias.
+  unsigned adjustmentIndex = MetadataAdjustmentIndex::ValueType;
+
+  if (auto nominal = concreteType->getAnyNominal()) {
+    // Keep type metadata around for all types.
     addRuntimeResolvableType(nominal);
 
-  // Don't define the alias for foreign type metadata or prespecialized generic
-  // metadata, since neither is ABI.
-  if ((nominal && requiresForeignTypeMetadata(nominal)) || isPrespecialized)
-    return var;
+    // Don't define the alias for foreign type metadata or prespecialized
+    // generic metadata, since neither is ABI.
+    if (requiresForeignTypeMetadata(nominal) || isPrespecialized)
+      return var;
+
+    // Native Swift class metadata has a destructor before the address point.
+    if (isa<ClassDecl>(nominal)) {
+      adjustmentIndex = MetadataAdjustmentIndex::Class;
+    }
+  }
+
+  llvm::Constant *indices[] = {
+      llvm::ConstantInt::get(Int32Ty, 0),
+      llvm::ConstantInt::get(Int32Ty, adjustmentIndex)};
+  auto addr = llvm::ConstantExpr::getInBoundsGetElementPtr(/*Ty=*/nullptr, var,
+                                                           indices);
+  addr = llvm::ConstantExpr::getBitCast(addr, TypeMetadataPtrTy);
 
   // For concrete metadata, declare the alias to its address point.
-  auto directEntity = LinkEntity::forTypeMetadata(concreteType,
-                                             TypeMetadataAddress::AddressPoint);
-
-  llvm::Constant *addr = var;
-  // Do an adjustment if necessary.
-  if (adjustmentIndex) {
-    llvm::Constant *indices[] = {
-      llvm::ConstantInt::get(Int32Ty, 0),
-      llvm::ConstantInt::get(Int32Ty, adjustmentIndex)
-    };
-    addr = llvm::ConstantExpr::getInBoundsGetElementPtr(/*Ty=*/nullptr,
-                                                        addr, indices);
-  }
-  addr = llvm::ConstantExpr::getBitCast(addr, TypeMetadataPtrTy);
+  auto directEntity = LinkEntity::forTypeMetadata(
+      concreteType, TypeMetadataAddress::AddressPoint);
   return defineAlias(directEntity, addr);
 }
 
@@ -4028,15 +4015,17 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 
   auto nominal = concreteType->getAnyNominal();
 
-  llvm::Type *defaultVarTy;
-  unsigned adjustmentIndex;
-
   bool foreign = nominal && requiresForeignTypeMetadata(nominal);
+
+  // Foreign classes and prespecialized generic types do not use an alias into
+  // the full metadata and therefore require a GEP.
   bool fullMetadata =
       foreign || (concreteType->getAnyGeneric() &&
                   concreteType->getAnyGeneric()->isGenericContext());
 
-  // Foreign classes reference the full metadata with a GEP.
+  llvm::Type *defaultVarTy;
+  unsigned adjustmentIndex;
+
   if (fullMetadata) {
     defaultVarTy = FullTypeMetadataStructTy;
     if (concreteType->getClassOrBoundGenericClass() && !foreign) {
@@ -4044,9 +4033,9 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
     } else {
       adjustmentIndex = MetadataAdjustmentIndex::ValueType;
     }
-  // The symbol for other nominal type metadata is generated at the address
-  // point.
   } else if (nominal) {
+    // The symbol for native non-generic nominal type metadata is generated at
+    // the aliased address point (see defineTypeMetadata() above).
     assert(!nominal->hasClangNode());
 
     defaultVarTy = TypeMetadataStructTy;
@@ -4080,13 +4069,9 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 
   switch (canonicality) {
   case TypeMetadataCanonicality::Canonical:
-    if (fullMetadata) {
-      entity = LinkEntity::forTypeMetadata(concreteType,
-                                           TypeMetadataAddress::FullMetadata);
-    } else {
-      entity = LinkEntity::forTypeMetadata(concreteType,
-                                           TypeMetadataAddress::AddressPoint);
-    }
+    entity = LinkEntity::forTypeMetadata(
+        concreteType, fullMetadata ? TypeMetadataAddress::FullMetadata
+                                   : TypeMetadataAddress::AddressPoint);
     break;
   case TypeMetadataCanonicality::Noncanonical:
     entity =

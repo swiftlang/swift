@@ -44,7 +44,7 @@ Type swift::Demangle::getTypeForMangling(ASTContext &ctx,
     return Type();
 
   ASTBuilder builder(ctx);
-  return swift::Demangle::decodeMangledType(builder, node);
+  return swift::Demangle::decodeMangledType(builder, node).getType();
 }
 
 TypeDecl *swift::Demangle::getTypeDeclForMangling(ASTContext &ctx,
@@ -530,7 +530,7 @@ Type ASTBuilder::createImplFunctionType(
 
   // [TODO: Store-SIL-Clang-type]
   auto einfo = SILExtInfoBuilder(representation, flags.isPseudogeneric(),
-                                 !flags.isEscaping(), diffKind,
+                                 !flags.isEscaping(), flags.isAsync(), diffKind,
                                  /*clangFunctionType*/ nullptr)
                    .build();
 
@@ -558,8 +558,7 @@ Type ASTBuilder::createImplFunctionType(
     auto conv = getResultConvention(errorResult->getConvention());
     funcErrorResult.emplace(type, conv);
   }
-  return SILFunctionType::get(genericSig, einfo,
-                              /*isAsync*/ false, funcCoroutineKind,
+  return SILFunctionType::get(genericSig, einfo, funcCoroutineKind,
                               funcCalleeConvention, funcParams, funcYields,
                               funcResults, funcErrorResult,
                               SubstitutionMap(), SubstitutionMap(), Ctx);
@@ -847,8 +846,8 @@ CanGenericSignature ASTBuilder::demangleGenericSignature(
 
     if (child->getNumChildren() != 2)
       return CanGenericSignature();
-    auto subjectType = swift::Demangle::decodeMangledType(
-        *this, child->getChild(0));
+    auto subjectType =
+        swift::Demangle::decodeMangledType(*this, child->getChild(0)).getType();
     if (!subjectType)
       return CanGenericSignature();
 
@@ -857,8 +856,9 @@ CanGenericSignature ASTBuilder::demangleGenericSignature(
           Demangle::Node::Kind::DependentGenericConformanceRequirement ||
         child->getKind() ==
           Demangle::Node::Kind::DependentGenericSameTypeRequirement) {
-      constraintType = swift::Demangle::decodeMangledType(
-        *this, child->getChild(1));
+      constraintType =
+          swift::Demangle::decodeMangledType(*this, child->getChild(1))
+              .getType();
       if (!constraintType)
         return CanGenericSignature();
     }

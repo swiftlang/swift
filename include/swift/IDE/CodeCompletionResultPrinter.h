@@ -34,6 +34,12 @@ void printCodeCompletionResultTypeName(
 void printCodeCompletionResultTypeNameAnnotated(
     const CodeCompletionResult &Result, llvm::raw_ostream &OS);
 
+void printCodeCompletionResultSourceText(
+    const CodeCompletionResult &Result, llvm::raw_ostream &OS);
+
+void printCodeCompletionResultFilterName(
+    const CodeCompletionResult &Result, llvm::raw_ostream &OS);
+
 } // namespace ide
 } // namespace swift
 

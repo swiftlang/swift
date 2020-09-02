@@ -3245,9 +3245,9 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   
   // The type of the thunk function.
   return SILFunctionType::get(
-      genericSig, extInfoBuilder.build(), expectedType->isAsync(),
-      expectedType->getCoroutineKind(), ParameterConvention::Direct_Unowned,
-      interfaceParams, interfaceYields, interfaceResults, interfaceErrorResult,
+      genericSig, extInfoBuilder.build(), expectedType->getCoroutineKind(),
+      ParameterConvention::Direct_Unowned, interfaceParams, interfaceYields,
+      interfaceResults, interfaceErrorResult,
       expectedType->getPatternSubstitutions(), SubstitutionMap(),
       getASTContext());
 }

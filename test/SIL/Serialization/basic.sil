@@ -15,7 +15,7 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   return undef : $()
 }
 
-// CHECK-LABEL: sil @async_test : $@async @convention(thin)
+// CHECK-LABEL: sil @async_test : $@convention(thin) @async
 sil @async_test : $@async () -> () {
 bb0:
   %0 = tuple ()

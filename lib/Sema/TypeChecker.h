@@ -1208,6 +1208,11 @@ bool requirePointerArgumentIntrinsics(ASTContext &ctx, SourceLoc loc);
 /// Require that the library intrinsics for creating
 /// array literals exist.
 bool requireArrayLiteralIntrinsics(ASTContext &ctx, SourceLoc loc);
+
+/// Gets the \c UnresolvedMemberExpr at the base of a chain of member accesses.
+/// If \c expr is not part of a member chain or the base is something other than
+/// an \c UnresolvedMemberExpr, \c nullptr is returned.
+UnresolvedMemberExpr *getUnresolvedMemberChainBase(Expr *expr);
 }; // namespace TypeChecker
 
 /// Temporary on-stack storage and unescaping for encoded diagnostic

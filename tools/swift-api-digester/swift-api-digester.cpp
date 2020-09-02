@@ -72,7 +72,7 @@ ModuleList("module-list-file",
            llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
-ProtReqWhiteList("protocol-requirement-white-list",
+ProtReqAllowList("protocol-requirement-allow-list",
            llvm::cl::desc("File containing a new-line separated list of protocol names"),
            llvm::cl::cat(Category));
 
@@ -1057,6 +1057,17 @@ void swift::ide::api::SDKNodeTypeFunc::diagnose(SDKNode *Right) {
 }
 
 namespace {
+static void diagnoseRemovedDecl(const SDKNodeDecl *D) {
+  if (D->getSDKContext().checkingABI()) {
+    // Don't complain about removing @_alwaysEmitIntoClient if we are checking ABI.
+    // We shouldn't include these decls in the ABI baseline file. This line is
+    // added so the checker is backward compatible.
+    if (D->hasDeclAttribute(DeclAttrKind::DAK_AlwaysEmitIntoClient))
+      return;
+  }
+  D->emitDiag(SourceLoc(), diag::removed_decl, D->isDeprecated());
+}
+
 // This is first pass on two given SDKNode trees. This pass removes the common part
 // of two versions of SDK, leaving only the changed part.
 class PrunePass : public MatchedNodeListener, public SDKTreeDiffPass {
@@ -1074,7 +1085,7 @@ class PrunePass : public MatchedNodeListener, public SDKTreeDiffPass {
 
   SDKContext &Ctx;
   UpdatedNodesMap &UpdateMap;
-  llvm::StringSet<> ProtocolReqWhitelist;
+  llvm::StringSet<> ProtocolReqAllowlist;
   SDKNodeRoot *LeftRoot;
   SDKNodeRoot *RightRoot;
 
@@ -1123,10 +1134,10 @@ class PrunePass : public MatchedNodeListener, public SDKTreeDiffPass {
 
 public:
   PrunePass(SDKContext &Ctx): Ctx(Ctx), UpdateMap(Ctx.getNodeUpdateMap()) {}
-  PrunePass(SDKContext &Ctx, llvm::StringSet<> prWhitelist):
+  PrunePass(SDKContext &Ctx, llvm::StringSet<> prAllowlist):
     Ctx(Ctx),
     UpdateMap(Ctx.getNodeUpdateMap()),
-    ProtocolReqWhitelist(std::move(prWhitelist)) {}
+    ProtocolReqAllowlist(std::move(prAllowlist)) {}
 
   void diagnoseMissingAvailable(SDKNodeDecl *D) {
     // For extensions of external types, we diagnose individual member's missing
@@ -1178,7 +1189,7 @@ public:
               ShouldComplain = false;
           }
           if (ShouldComplain &&
-              ProtocolReqWhitelist.count(getParentProtocolName(D))) {
+              ProtocolReqAllowlist.count(getParentProtocolName(D))) {
             // Ignore protocol requirement additions if the protocol has been added
             // to the allowlist.
             ShouldComplain = false;
@@ -1241,7 +1252,7 @@ public:
                      TD->isProtocol());
       }
       if (auto *Acc = dyn_cast<SDKNodeDeclAccessor>(Left)) {
-        Acc->emitDiag(SourceLoc(), diag::removed_decl, Acc->isDeprecated());
+        diagnoseRemovedDecl(Acc);
       }
       return;
     case NodeMatchReason::FuncToProperty:
@@ -2084,7 +2095,7 @@ static bool diagnoseRemovedExtensionMembers(const SDKNode *Node) {
     if (DT->isExtension()) {
       for (auto *C: DT->getChildren()) {
         auto *MD = cast<SDKNodeDecl>(C);
-        MD->emitDiag(SourceLoc(), diag::removed_decl, MD->isDeprecated());
+        diagnoseRemovedDecl(MD);
       }
       return true;
     }
@@ -2161,7 +2172,7 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
     }
     bool handled = diagnoseRemovedExtensionMembers(Node);
     if (!handled)
-      Node->emitDiag(SourceLoc(), diag::removed_decl, Node->isDeprecated());
+      diagnoseRemovedDecl(Node);
     return;
   }
   case NodeAnnotation::Rename: {
@@ -2311,7 +2322,7 @@ createDiagConsumer(llvm::raw_ostream &OS, bool &FailOnError) {
 
 static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
                              SDKNodeRoot *RightModule, StringRef OutputPath,
-                             llvm::StringSet<> ProtocolReqWhitelist) {
+                             llvm::StringSet<> ProtocolReqAllowlist) {
   assert(LeftModule);
   assert(RightModule);
   llvm::raw_ostream *OS = &llvm::errs();
@@ -2334,7 +2345,7 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
                                 RightModule->getJsonFormatVersion()));
   TypeAliasDiffFinder(LeftModule, RightModule,
                       Ctx.getTypeAliasUpdateMap()).search();
-  PrunePass Prune(Ctx, std::move(ProtocolReqWhitelist));
+  PrunePass Prune(Ctx, std::move(ProtocolReqAllowlist));
   Prune.pass(LeftModule, RightModule);
   ChangeRefinementPass RefinementPass(Ctx.getNodeUpdateMap());
   RefinementPass.pass(LeftModule, RightModule);
@@ -2347,7 +2358,7 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
 static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
                                 StringRef OutputPath,
                                 CheckerOptions Opts,
-                                llvm::StringSet<> ProtocolReqWhitelist) {
+                                llvm::StringSet<> ProtocolReqAllowlist) {
   if (!fs::exists(LeftPath)) {
     llvm::errs() << LeftPath << " does not exist\n";
     return 1;
@@ -2362,7 +2373,7 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
   SwiftDeclCollector RightCollector(Ctx);
   RightCollector.deSerialize(RightPath);
   diagnoseModuleChange(Ctx, LeftCollector.getSDKRoot(), RightCollector.getSDKRoot(),
-                       OutputPath, std::move(ProtocolReqWhitelist));
+                       OutputPath, std::move(ProtocolReqAllowlist));
   return options::CompilerStyleDiags && Ctx.getDiags().hadAnyError() ? 1 : 0;
 }
 
@@ -2837,9 +2848,9 @@ int main(int argc, char *argv[]) {
   case ActionType::MigratorGen:
   case ActionType::DiagnoseSDKs: {
     ComparisonInputMode Mode = checkComparisonInputMode();
-    llvm::StringSet<> protocolWhitelist;
-    if (!options::ProtReqWhiteList.empty()) {
-      if (readFileLineByLine(options::ProtReqWhiteList, protocolWhitelist))
+    llvm::StringSet<> protocolAllowlist;
+    if (!options::ProtReqAllowList.empty()) {
+      if (readFileLineByLine(options::ProtReqAllowList, protocolAllowlist))
           return 1;
     }
     if (options::Action == ActionType::MigratorGen) {
@@ -2853,21 +2864,21 @@ int main(int argc, char *argv[]) {
       return diagnoseModuleChange(options::SDKJsonPaths[0],
                                   options::SDKJsonPaths[1],
                                   options::OutputFile, Opts,
-                                  std::move(protocolWhitelist));
+                                  std::move(protocolAllowlist));
     }
     case ComparisonInputMode::BaselineJson: {
       SDKContext Ctx(Opts);
       return diagnoseModuleChange(Ctx, getBaselineFromJson(argv[0], Ctx),
                                   getSDKRoot(argv[0], Ctx, false),
                                   options::OutputFile,
-                                  std::move(protocolWhitelist));
+                                  std::move(protocolAllowlist));
     }
     case ComparisonInputMode::BothLoad: {
       SDKContext Ctx(Opts);
       return diagnoseModuleChange(Ctx, getSDKRoot(argv[0], Ctx, true),
                                   getSDKRoot(argv[0], Ctx, false),
                                   options::OutputFile,
-                                  std::move(protocolWhitelist));
+                                  std::move(protocolAllowlist));
     }
     }
   }

@@ -336,21 +336,29 @@ std::string ASTMangler::mangleKeyPathHashHelper(ArrayRef<CanType> indices,
   return finalize();
 }
 
-std::string ASTMangler::mangleGlobalInit(const VarDecl *decl, int counter,
+std::string ASTMangler::mangleGlobalInit(const PatternBindingDecl *pd,
+                                         unsigned pbdEntry,
                                          bool isInitFunc) {
-  auto topLevelContext = decl->getDeclContext()->getModuleScopeContext();
-  auto fileUnit = cast<FileUnit>(topLevelContext);
-  Identifier discriminator = fileUnit->getDiscriminatorForPrivateValue(decl);
-  assert(!discriminator.empty());
-  assert(!isNonAscii(discriminator.str()) &&
-         "discriminator contains non-ASCII characters");
-  assert(!clang::isDigit(discriminator.str().front()) &&
-         "not a valid identifier");
-
-  Buffer << "globalinit_";
-  appendIdentifier(discriminator.str());
-  Buffer << (isInitFunc ? "_func" : "_token");
-  Buffer << counter;
+  beginMangling();
+  
+  Pattern *pattern = pd->getPattern(pbdEntry);
+  bool first = true;
+  pattern->forEachVariable([&](VarDecl *D) {
+    if (first) {
+      appendContextOf(D);
+      first = false;
+    }
+    appendDeclName(D);
+    appendListSeparator();
+  });
+  assert(!first && "no variables in pattern binding?!");
+  
+  if (isInitFunc) {
+    appendOperator("WZ");
+  } else {
+    appendOperator("Wz");
+  }
+  
   return finalize();
 }
 
@@ -915,6 +923,7 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
   TypeBase *tybase = type.getPointer();
   switch (type->getKind()) {
     case TypeKind::TypeVariable:
+    case TypeKind::Hole:
       llvm_unreachable("mangling type variable");
 
     case TypeKind::Module:

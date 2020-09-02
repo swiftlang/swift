@@ -3932,6 +3932,10 @@ public:
     llvm_unreachable("should not serialize an invalid type");
   }
 
+  void visitHoleType(const HoleType *) {
+    llvm_unreachable("should not serialize an invalid type");
+  }
+
   void visitModuleType(const ModuleType *) {
     llvm_unreachable("modules are currently not first-class values");
   }

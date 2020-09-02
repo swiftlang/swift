@@ -1034,8 +1034,8 @@ struct SemanticARCOptVisitor
 } // end anonymous namespace
 
 static llvm::cl::opt<bool>
-VerifyAfterTransform("sil-semantic-arc-opts-verify-after-transform",
-                     llvm::cl::init(false), llvm::cl::Hidden);
+    VerifyAfterTransform("sil-semantic-arc-opts-verify-after-transform",
+                         llvm::cl::init(false), llvm::cl::Hidden);
 
 static bool canEliminatePhi(
     SemanticARCOptVisitor::FrozenMultiMapRange optimizableIntroducerRange,
@@ -1436,7 +1436,8 @@ bool SemanticARCOptVisitor::visitBeginBorrowInst(BeginBorrowInst *bbi) {
 // are within the borrow scope.
 //
 // TODO: This needs a better name.
-bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst *cvi) {
+bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
+    CopyValueInst *cvi) {
   // For now, do not run this optimization. This is just to be careful.
   if (onlyGuaranteedOpts)
     return false;
@@ -1617,7 +1618,8 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
 
 /// If cvi only has destroy value users, then cvi is a dead live range. Lets
 /// eliminate all such dead live ranges.
-bool SemanticARCOptVisitor::eliminateDeadLiveRangeCopyValue(CopyValueInst *cvi) {
+bool SemanticARCOptVisitor::eliminateDeadLiveRangeCopyValue(
+    CopyValueInst *cvi) {
   // This is a cheap optimization generally.
 
   // See if we are lucky and have a simple case.
@@ -1857,8 +1859,7 @@ namespace {
 /// written to again. In both cases, we can convert load [copy] -> load_borrow
 /// safely.
 class StorageGuaranteesLoadVisitor
-  : public AccessUseDefChainVisitor<StorageGuaranteesLoadVisitor>
-{
+    : public AccessUseDefChainVisitor<StorageGuaranteesLoadVisitor> {
   // The outer SemanticARCOptVisitor.
   SemanticARCOptVisitor &ARCOpt;
 
@@ -1867,7 +1868,7 @@ class StorageGuaranteesLoadVisitor
 
   // The current address being visited.
   SILValue currentAddress;
-  
+
   Optional<bool> isWritten;
 
 public:
@@ -1880,11 +1881,9 @@ public:
     currentAddress = nullptr;
     isWritten = written;
   }
-  
-  void next(SILValue address) {
-    currentAddress = address;
-  }
-  
+
+  void next(SILValue address) { currentAddress = address; }
+
   void visitNestedAccess(BeginAccessInst *access) {
     // First see if we have read/modify. If we do not, just look through the
     // nested access.
@@ -1901,9 +1900,7 @@ public:
     // scope. If so, we may be able to use a load_borrow here!
     SmallVector<Operand *, 8> endScopeUses;
     transform(access->getEndAccesses(), std::back_inserter(endScopeUses),
-              [](EndAccessInst *eai) {
-                return &eai->getAllOperands()[0];
-              });
+              [](EndAccessInst *eai) { return &eai->getAllOperands()[0]; });
     SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
     LinearLifetimeChecker checker(visitedBlocks, ARCOpt.getDeadEndBlocks());
     if (!checker.validateLifetime(access, endScopeUses,
@@ -1930,7 +1927,7 @@ public:
 
     return answer(true);
   }
-  
+
   void visitArgumentAccess(SILFunctionArgument *arg) {
     // If this load_copy is from an indirect in_guaranteed argument, then we
     // know for sure that it will never be written to.
@@ -2007,15 +2004,15 @@ public:
     //    able to also to promote load [copy] from such args to load_borrow.
     return answer(true);
   }
-  
+
   void visitGlobalAccess(SILValue global) {
     return answer(!AccessedStorage(global, AccessedStorage::Global)
-                    .isLetAccess(&ARCOpt.F));
+                       .isLetAccess(&ARCOpt.F));
   }
-  
+
   void visitClassAccess(RefElementAddrInst *field) {
     currentAddress = nullptr;
-    
+
     // We know a let property won't be written to if the base object is
     // guaranteed for the duration of the access.
     // For non-let properties conservatively assume they may be written to.
@@ -2071,15 +2068,13 @@ public:
         baseObject, endScopeInsts, liveRange.getAllConsumingUses());
     return answer(foundError);
   }
-  
+
   // TODO: Handle other access kinds?
   void visitBase(SILValue base, AccessedStorage::Kind kind) {
     return answer(true);
   }
 
-  void visitNonAccess(SILValue addr) {
-    return answer(true);
-  }
+  void visitNonAccess(SILValue addr) { return answer(true); }
 
   void visitCast(SingleValueInstruction *cast, Operand *parentAddr) {
     return next(parentAddr->get());

@@ -413,7 +413,7 @@ function(_compile_swift_files
     # SWIFT_ENABLE_TENSORFLOW END
   endif()
 
-  if(SWIFT_STDLIB_USE_NONATOMIC_RC)
+  if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
     list(APPEND swift_flags "-Xfrontend" "-assume-single-threaded")
   endif()
 

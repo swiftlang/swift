@@ -130,8 +130,10 @@ static ParserStatus parseDefaultArgument(
   
   defaultArgs->HasDefaultArgument = true;
 
-  if (initR.hasCodeCompletion())
+  if (initR.hasCodeCompletion()) {
+    init = initR.get();
     return makeParserCodeCompletionStatus();
+  }
 
   if (initR.isNull())
     return makeParserError();

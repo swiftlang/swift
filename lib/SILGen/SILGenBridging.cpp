@@ -350,8 +350,7 @@ getParameterTypes(AnyFunctionType::CanParamArrayRef params) {
 static CanAnyFunctionType getBridgedBlockType(SILGenModule &SGM,
                                               CanAnyFunctionType blockType) {
   return SGM.Types.getBridgedFunctionType(AbstractionPattern(blockType),
-                                         blockType, blockType->getExtInfo(),
-                                         Bridgeability::Full);
+                                          blockType, Bridgeability::Full);
 }
 
 static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
@@ -578,7 +577,7 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   }
 
   auto invokeTy = SILFunctionType::get(
-      genericSig, extInfo, /*isAsync*/ false, SILCoroutineKind::None,
+      genericSig, extInfo, SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned, params, 
       /*yields*/ {}, blockInterfaceTy->getResults(),
       blockInterfaceTy->getOptionalErrorResult(),

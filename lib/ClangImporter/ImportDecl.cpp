@@ -160,6 +160,7 @@ static FuncDecl *createFuncOrAccessor(ASTContext &ctx, SourceLoc funcLoc,
                                       DeclName name, SourceLoc nameLoc,
                                       ParameterList *bodyParams,
                                       Type resultTy,
+                                      bool async,
                                       bool throws,
                                       DeclContext *dc,
                                       ClangNode clangNode) {
@@ -176,7 +177,7 @@ static FuncDecl *createFuncOrAccessor(ASTContext &ctx, SourceLoc funcLoc,
                                 bodyParams,
                                 resultTy, dc, clangNode);
   } else {
-    return FuncDecl::createImported(ctx, funcLoc, name, nameLoc, throws,
+    return FuncDecl::createImported(ctx, funcLoc, name, nameLoc, async, throws,
                                     bodyParams, resultTy, dc, clangNode);
   }
 }
@@ -2254,7 +2255,7 @@ namespace {
     /// Whether the names we're importing are from the language version the user
     /// requested, or if these are decls from another version
     bool isActiveSwiftVersion() const {
-      return getVersion() == getActiveSwiftVersion();
+      return getVersion().withConcurrency(false) == getActiveSwiftVersion().withConcurrency(false);
     }
 
     void recordMemberInContext(const DeclContext *dc, ValueDecl *member) {
@@ -2300,7 +2301,7 @@ namespace {
         return canonicalName;
       }
 
-      // Special handling when we import using the older Swift name.
+      // Special handling when we import using the alternate Swift name.
       //
       // Import using the alternate Swift name. If that fails, or if it's
       // identical to the active Swift name, we won't introduce an alternate
@@ -2308,6 +2309,19 @@ namespace {
       auto alternateName = Impl.importFullName(D, getVersion());
       if (!alternateName)
         return ImportedName();
+
+      // Importing for concurrency is special in that the same declaration
+      // is imported both with a completion handler parameter and as 'async',
+      // creating two separate declarations.
+      if (getVersion().supportsConcurrency()) {
+        // If the resulting name isn't special for concurrency, it's not
+        // different.
+        if (!alternateName.getAsyncInfo())
+          return ImportedName();
+
+        // Otherwise, it's a legitimately different import.
+        return alternateName;
+      }
 
       if (alternateName.getDeclName() == canonicalName.getDeclName() &&
           alternateName.getEffectiveContext().equalsWithoutResolving(
@@ -2468,6 +2482,13 @@ namespace {
 
         if (getVersion() >= getActiveSwiftVersion())
           return;
+      }
+
+      // If this the active and current Swift versions differ based on
+      // concurrency, it's not actually a variant.
+      if (getVersion().supportsConcurrency() !=
+            getActiveSwiftVersion().supportsConcurrency()) {
+        return;
       }
 
       // TODO: some versions should be deprecated instead of unavailable
@@ -3843,9 +3864,10 @@ namespace {
 
       // FIXME: Poor location info.
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
-      result = createFuncOrAccessor(Impl.SwiftContext, loc, accessorInfo, name,
-                                    nameLoc, bodyParams, resultTy,
-                                    /*throws*/ false, dc, decl);
+      result = createFuncOrAccessor(
+          Impl.SwiftContext, loc, accessorInfo, name,
+          nameLoc, bodyParams, resultTy,
+          /*async*/ false, /*throws*/ false, dc, decl);
 
       if (!dc->isModuleScopeContext()) {
         if (selfIsInOut)
@@ -4416,6 +4438,16 @@ namespace {
         }
       }
 
+      // Determine whether the function is throwing and/or async.
+      bool throws = importedName.getErrorInfo().hasValue();
+      bool async = false;
+      auto asyncConvention = importedName.getAsyncInfo();
+      if (asyncConvention) {
+        async = true;
+        if (asyncConvention->isThrowing())
+          throws = true;
+      }
+
       auto resultTy = importedType.getType();
       auto isIUO = importedType.isImplicitlyUnwrapped();
 
@@ -4445,8 +4477,7 @@ namespace {
                                          importedName.getDeclName(),
                                          /*nameLoc*/SourceLoc(),
                                          bodyParams, resultTy,
-                                         importedName.getErrorInfo().hasValue(),
-                                         dc, decl);
+                                         async, throws, dc, decl);
 
       result->setAccess(getOverridableAccessLevel(dc));
 
@@ -4476,6 +4507,11 @@ namespace {
       // Record the error convention.
       if (errorConvention) {
         result->setForeignErrorConvention(*errorConvention);
+      }
+
+      // Record the async convention.
+      if (asyncConvention) {
+        result->setForeignAsyncConvention(*asyncConvention);
       }
 
       // Handle attributes.
@@ -4509,6 +4545,7 @@ namespace {
             Impl.addAlternateDecl(result, cast<ValueDecl>(imported));
         }
       }
+
       return result;
     }
 
@@ -6449,6 +6486,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
     return known->second;
 
   // Create the actual constructor.
+  assert(!importedName.getAsyncInfo());
   auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
       objcMethod, AccessLevel::Public, importedName.getDeclName(),
       /*NameLoc=*/SourceLoc(), failability, /*FailabilityLoc=*/SourceLoc(),
@@ -7149,6 +7187,11 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
         return;
 
       if (isa<AccessorDecl>(afd))
+        return;
+
+      // Asynch methods are also always imported without async, so don't
+      // record them here.
+      if (afd->hasAsync())
         return;
 
       auto objcMethod =

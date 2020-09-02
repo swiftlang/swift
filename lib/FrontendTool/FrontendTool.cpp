@@ -1229,7 +1229,7 @@ static void verifyGenericSignaturesIfNeeded(const CompilerInvocation &Invocation
     GenericSignatureBuilder::verifyGenericSignaturesInModule(module);
 }
 
-static void dumpAndPrintScopeMap(const CompilerInstance &Instance,
+static bool dumpAndPrintScopeMap(const CompilerInstance &Instance,
                                  SourceFile *SF) {
   // Not const because may require reexpansion
   ASTScope &scope = SF->getScope();
@@ -1239,13 +1239,14 @@ static void dumpAndPrintScopeMap(const CompilerInstance &Instance,
     llvm::errs() << "***Complete scope map***\n";
     scope.buildFullyExpandedTree();
     scope.print(llvm::errs());
-    return;
+    return Instance.getASTContext().hadError();
   }
   // Probe each of the locations, and dump what we find.
   for (auto lineColumn : opts.DumpScopeMapLocations) {
     scope.buildFullyExpandedTree();
     scope.dumpOneScopeMapLocation(lineColumn);
   }
+  return Instance.getASTContext().hadError();
 }
 
 static SourceFile *
@@ -1260,7 +1261,7 @@ getPrimaryOrMainSourceFile(const CompilerInstance &Instance) {
 
 /// Dumps the AST of all available primary source files. If corresponding output
 /// files were specified, use them; otherwise, dump the AST to stdout.
-static void dumpAST(CompilerInstance &Instance) {
+static bool dumpAST(CompilerInstance &Instance) {
   auto primaryFiles = Instance.getPrimarySourceFiles();
   if (!primaryFiles.empty()) {
     for (SourceFile *sourceFile: primaryFiles) {
@@ -1275,55 +1276,7 @@ static void dumpAST(CompilerInstance &Instance) {
     auto *SF = getPrimaryOrMainSourceFile(Instance);
     SF->dump(llvm::outs(), /*parseIfNeeded*/ true);
   }
-}
-
-/// We may have been told to dump the AST (either after parsing or
-/// type-checking, which is already differentiated in
-/// CompilerInstance::performSema()), so dump or print the main source file and
-/// return.
-
-static Optional<bool> dumpASTIfNeeded(CompilerInstance &Instance) {
-  const auto &opts = Instance.getInvocation().getFrontendOptions();
-  const FrontendOptions::ActionType Action = opts.RequestedAction;
-  ASTContext &Context = Instance.getASTContext();
-  switch (Action) {
-  default:
-    return None;
-
-  case FrontendOptions::ActionType::PrintAST:
-    getPrimaryOrMainSourceFile(Instance)
-        ->print(llvm::outs(), PrintOptions::printEverything());
-    break;
-
-  case FrontendOptions::ActionType::DumpScopeMaps:
-    dumpAndPrintScopeMap(Instance, getPrimaryOrMainSourceFile(Instance));
-    break;
-
-  case FrontendOptions::ActionType::DumpTypeRefinementContexts:
-    getPrimaryOrMainSourceFile(Instance)
-        ->getTypeRefinementContext()
-        ->dump(llvm::errs(), Context.SourceMgr);
-    break;
-
-  case FrontendOptions::ActionType::DumpInterfaceHash:
-    getPrimaryOrMainSourceFile(Instance)->dumpInterfaceHash(llvm::errs());
-    break;
-
-  case FrontendOptions::ActionType::EmitSyntax:
-    emitSyntax(getPrimaryOrMainSourceFile(Instance),
-               opts.InputsAndOutputs.getSingleOutputFilename());
-    break;
-
-  case FrontendOptions::ActionType::DumpParse:
-  case FrontendOptions::ActionType::DumpAST:
-    dumpAST(Instance);
-    break;
-
-  case FrontendOptions::ActionType::EmitImportedModules:
-    emitImportedModules(Context, Instance.getMainModule(), opts);
-    break;
-  }
-  return Context.hadError();
+  return Instance.getASTContext().hadError();
 }
 
 static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
@@ -1700,6 +1653,7 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   // it's -emit-imported-modules, which can load modules.
   auto action = opts.RequestedAction;
   if (FrontendOptions::shouldActionOnlyParse(action) &&
+      !ctx.getLoadedModules().empty() &&
       action != FrontendOptions::ActionType::EmitImportedModules) {
     assert(ctx.getNumLoadedModules() == 1 &&
            "Loaded a module during parse-only");
@@ -1736,9 +1690,15 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
     }
   }
 
-  // Emit dependencies and index data.
+  // FIXME: This predicate matches the status quo, but there's no reason
+  // indexing cannot run for actions that do not require stdlib e.g. to better
+  // facilitate tests.
+  if (FrontendOptions::doesActionRequireSwiftStandardLibrary(action)) {
+    emitIndexData(Instance);
+  }
+
+  // Emit dependencies.
   emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
-  emitIndexData(Instance);
   emitMakeDependenciesIfNeeded(Instance.getDiags(),
                                Instance.getDependencyTracker(), opts);
 
@@ -1747,39 +1707,190 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   emitCompiledSourceForAllPrimaryInputsIfNeeded(Instance);
 }
 
+static bool printSwiftVersion(const CompilerInvocation &Invocation) {
+  llvm::outs() << version::getSwiftFullVersion(
+                      version::Version::getCurrentLanguageVersion())
+               << '\n';
+  llvm::outs() << "Target: " << Invocation.getLangOptions().Target.str()
+               << '\n';
+  return false;
+}
+
+static bool
+withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
+                     llvm::function_ref<bool(CompilerInstance &)> cont) {
+  const auto &Invocation = Instance.getInvocation();
+  const auto &opts = Invocation.getFrontendOptions();
+  assert(!FrontendOptions::shouldActionOnlyParse(opts.RequestedAction) &&
+         "Action may only parse, but has requested semantic analysis!");
+
+  Instance.performSema();
+  if (observer)
+    observer->performedSemanticAnalysis(Instance);
+
+  switch (opts.CrashMode) {
+  case FrontendOptions::DebugCrashMode::AssertAfterParse:
+    debugFailWithAssertion();
+    return true;
+  case FrontendOptions::DebugCrashMode::CrashAfterParse:
+    debugFailWithCrash();
+    return true;
+  case FrontendOptions::DebugCrashMode::None:
+    break;
+  }
+
+  (void)migrator::updateCodeAndEmitRemapIfNeeded(&Instance);
+
+  if (Instance.getASTContext().hadError())
+    return true;
+
+  return cont(Instance);
+}
+
+static bool performScanDependencies(CompilerInstance &Instance) {
+  auto batchScanInput =
+      Instance.getASTContext().SearchPathOpts.BatchScanInputFilePath;
+  if (batchScanInput.empty()) {
+    return scanDependencies(Instance);
+  } else {
+    return batchScanModuleDependencies(Instance, batchScanInput);
+  }
+}
+
+static bool performParseOnly(ModuleDecl &MainModule) {
+  // A -parse invocation only cares about the side effects of parsing, so
+  // force the parsing of all the source files.
+  for (auto *file : MainModule.getFiles()) {
+    if (auto *SF = dyn_cast<SourceFile>(file))
+      (void)SF->getTopLevelDecls();
+  }
+  return MainModule.getASTContext().hadError();
+}
+
+static bool performAction(CompilerInstance &Instance,
+                          int &ReturnValue,
+                          FrontendObserver *observer) {
+  const auto &opts = Instance.getInvocation().getFrontendOptions();
+  auto &Context = Instance.getASTContext();
+  switch (Instance.getInvocation().getFrontendOptions().RequestedAction) {
+  // MARK: Trivial Actions
+  case FrontendOptions::ActionType::NoneAction:
+    return Context.hadError();
+  case FrontendOptions::ActionType::PrintVersion:
+    return printSwiftVersion(Instance.getInvocation());
+  case FrontendOptions::ActionType::REPL:
+    llvm::report_fatal_error("Compiler-internal integrated REPL has been "
+                             "removed; use the LLDB-enhanced REPL instead.");
+
+  // MARK: Actions for Clang and Clang Modules
+  // We've been asked to precompile a bridging header or module; we want to
+  // avoid touching any other inputs and just parse, emit and exit.
+  case FrontendOptions::ActionType::EmitPCH:
+    return precompileBridgingHeader(Instance);
+  case FrontendOptions::ActionType::EmitPCM:
+    return precompileClangModule(Instance);
+  case FrontendOptions::ActionType::DumpPCM:
+    return dumpPrecompiledClangModule(Instance);
+
+  // MARK: Module Interface Actions
+  case FrontendOptions::ActionType::CompileModuleFromInterface:
+  case FrontendOptions::ActionType::TypecheckModuleFromInterface:
+    return buildModuleFromInterface(Instance);
+
+  // MARK: Actions that Dump
+  case FrontendOptions::ActionType::DumpParse:
+    return dumpAST(Instance);
+  case FrontendOptions::ActionType::DumpAST: {
+    // FIXME: -dump-ast expects to be able to write output even if type checking
+    // fails which does not cleanly fit the model \c withSemanticAnalysis is
+    // trying to impose. Once there is a request for the "semantic AST", this
+    // point is moot.
+    Instance.performSema();
+    return dumpAST(Instance);
+  }
+  case FrontendOptions::ActionType::PrintAST:
+    return withSemanticAnalysis(
+        Instance, observer, [](CompilerInstance &Instance) {
+          getPrimaryOrMainSourceFile(Instance)->print(
+              llvm::outs(), PrintOptions::printEverything());
+          return Instance.getASTContext().hadError();
+        });
+  case FrontendOptions::ActionType::DumpScopeMaps:
+    return withSemanticAnalysis(
+        Instance, observer, [](CompilerInstance &Instance) {
+          return dumpAndPrintScopeMap(Instance,
+                                      getPrimaryOrMainSourceFile(Instance));
+        });
+  case FrontendOptions::ActionType::DumpTypeRefinementContexts:
+    return withSemanticAnalysis(
+        Instance, observer, [](CompilerInstance &Instance) {
+          getPrimaryOrMainSourceFile(Instance)
+              ->getTypeRefinementContext()
+              ->dump(llvm::errs(), Instance.getASTContext().SourceMgr);
+          return Instance.getASTContext().hadError();
+        });
+  case FrontendOptions::ActionType::DumpInterfaceHash:
+    getPrimaryOrMainSourceFile(Instance)->dumpInterfaceHash(llvm::errs());
+    return Context.hadError();
+  case FrontendOptions::ActionType::EmitSyntax:
+    return emitSyntax(getPrimaryOrMainSourceFile(Instance),
+                      opts.InputsAndOutputs.getSingleOutputFilename());
+  case FrontendOptions::ActionType::EmitImportedModules:
+    return emitImportedModules(Instance.getMainModule(), opts);
+
+  // MARK: Dependency Scanning Actions
+  case FrontendOptions::ActionType::ScanDependencies:
+    return performScanDependencies(Instance);
+  case FrontendOptions::ActionType::ScanClangDependencies:
+    return scanClangDependencies(Instance);
+
+  // MARK: General Compilation Actions
+  case FrontendOptions::ActionType::Parse:
+    return performParseOnly(*Instance.getMainModule());
+  case FrontendOptions::ActionType::ResolveImports:
+    return Instance.performParseAndResolveImportsOnly();
+  case FrontendOptions::ActionType::Typecheck:
+    return withSemanticAnalysis(Instance, observer,
+                                [](CompilerInstance &Instance) {
+                                  return Instance.getASTContext().hadError();
+                                });
+  case FrontendOptions::ActionType::EmitSILGen:
+  case FrontendOptions::ActionType::EmitSIBGen:
+  case FrontendOptions::ActionType::EmitSIL:
+  case FrontendOptions::ActionType::EmitSIB:
+  case FrontendOptions::ActionType::EmitModuleOnly:
+  case FrontendOptions::ActionType::MergeModules:
+  case FrontendOptions::ActionType::Immediate:
+  case FrontendOptions::ActionType::EmitAssembly:
+  case FrontendOptions::ActionType::EmitIR:
+  case FrontendOptions::ActionType::EmitBC:
+  case FrontendOptions::ActionType::EmitObject:
+  case FrontendOptions::ActionType::DumpTypeInfo:
+    return withSemanticAnalysis(
+        Instance, observer, [&](CompilerInstance &Instance) {
+          assert(FrontendOptions::doesActionGenerateSIL(opts.RequestedAction) &&
+                 "All actions not requiring SILGen must have been handled!");
+          return performCompileStepsPostSema(Instance, ReturnValue, observer);
+        });
+  }
+
+  assert(false && "Unhandled case in performCompile!");
+  return Context.hadError();
+}
+
 /// Performs the compile requested by the user.
 /// \param Instance Will be reset after performIRGeneration when the verifier
 ///                 mode is NoVerify and there were no errors.
 /// \returns true on error
-static bool performCompile(CompilerInvocation &Invok,
-                           CompilerInstance &Instance,
-                           ArrayRef<const char *> Args,
+static bool performCompile(CompilerInstance &Instance,
                            int &ReturnValue,
                            FrontendObserver *observer) {
   const auto &Invocation = Instance.getInvocation();
   const auto &opts = Invocation.getFrontendOptions();
   const FrontendOptions::ActionType Action = opts.RequestedAction;
 
-  // We've been asked to precompile a bridging header or module; we want to
-  // avoid touching any other inputs and just parse, emit and exit.
-  if (Action == FrontendOptions::ActionType::EmitPCH)
-    return precompileBridgingHeader(Instance);
-  if (Action == FrontendOptions::ActionType::EmitPCM)
-    return precompileClangModule(Instance);
-  if (Action == FrontendOptions::ActionType::DumpPCM)
-    return dumpPrecompiledClangModule(Instance);
-  if (Action == FrontendOptions::ActionType::PrintVersion) {
-    llvm::outs() << version::getSwiftFullVersion(
-      version::Version::getCurrentLanguageVersion()) << '\n';
-    llvm::outs() << "Target: "
-      << Invocation.getLangOptions().Target.str() << '\n';
-    return false;
-  }
-  if (Action == FrontendOptions::ActionType::CompileModuleFromInterface ||
-      Action == FrontendOptions::ActionType::TypecheckModuleFromInterface)
-    return buildModuleFromInterface(Instance);
-
-  if (Invocation.getInputKind() == InputFileKind::LLVM)
+  // To compile LLVM IR, just pass it off unmodified.
+  if (Instance.getInvocation().getInputKind() == InputFileKind::LLVM)
     return compileLLVMIR(Instance);
 
   // If we aren't in a parse-only context and expect an implicit stdlib import,
@@ -1788,100 +1899,33 @@ static bool performCompile(CompilerInvocation &Invok,
   // trigger a bunch of other errors due to the stdlib being missing, or at
   // worst crash downstream as many call sites don't currently handle a missing
   // stdlib.
-  if (!FrontendOptions::shouldActionOnlyParse(Action)) {
+  if (FrontendOptions::doesActionRequireSwiftStandardLibrary(Action)) {
     if (Instance.loadStdlibIfNeeded())
       return true;
   }
 
-  bool didFinishPipeline = false;
-  SWIFT_DEFER {
-    assert(didFinishPipeline && "Returned without calling finishPipeline");
-  };
-
-  auto finishPipeline = [&](bool hadError) -> bool {
-    // We might have freed the ASTContext already, but in that case we would
-    // have already performed these actions.
-    if (Instance.hasASTContext()) {
-      performEndOfPipelineActions(Instance);
-      hadError |= Instance.getASTContext().hadError();
+  assert([&]() -> bool {
+    if (FrontendOptions::shouldActionOnlyParse(Action)) {
+      // Parsing gets triggered lazily, but let's make sure we have the right
+      // input kind.
+      auto kind = Invocation.getInputKind();
+      return kind == InputFileKind::Swift ||
+             kind == InputFileKind::SwiftLibrary ||
+             kind == InputFileKind::SwiftModuleInterface;
     }
-    didFinishPipeline = true;
-    return hadError;
-  };
+    return true;
+  }() && "Only supports parsing .swift files");
 
-  auto &Context = Instance.getASTContext();
-  if (FrontendOptions::shouldActionOnlyParse(Action)) {
-    // Parsing gets triggered lazily, but let's make sure we have the right
-    // input kind.
-    auto kind = Invocation.getInputKind();
-    assert((kind == InputFileKind::Swift ||
-            kind == InputFileKind::SwiftLibrary ||
-            kind == InputFileKind::SwiftModuleInterface) &&
-           "Only supports parsing .swift files");
-    (void)kind;
-  } else if (Action == FrontendOptions::ActionType::ResolveImports) {
-    Instance.performParseAndResolveImportsOnly();
-    return finishPipeline(Context.hadError());
-  } else {
-    Instance.performSema();
+  bool hadError = performAction(Instance, ReturnValue, observer);
+
+  // We might have freed the ASTContext already, but in that case we would
+  // have already performed these actions.
+  if (Instance.hasASTContext() &&
+      FrontendOptions::doesActionRequireInputs(Action)) {
+    performEndOfPipelineActions(Instance);
+    hadError |= Instance.getASTContext().hadError();
   }
-
-  if (Action == FrontendOptions::ActionType::Parse) {
-    // A -parse invocation only cares about the side effects of parsing, so
-    // force the parsing of all the source files.
-    for (auto *file : Instance.getMainModule()->getFiles()) {
-      if (auto *SF = dyn_cast<SourceFile>(file))
-        (void)SF->getTopLevelDecls();
-    }
-    return finishPipeline(Context.hadError());
-  }
-
-  if (Action == FrontendOptions::ActionType::ScanDependencies) {
-    auto batchScanInput = Instance.getASTContext().SearchPathOpts.BatchScanInputFilePath;
-    if (batchScanInput.empty())
-      return finishPipeline(scanDependencies(Instance));
-    else
-      return finishPipeline(batchScanModuleDependencies(Invok,
-                                                        Instance,
-                                                        batchScanInput));
-  }
-
-  if (Action == FrontendOptions::ActionType::ScanClangDependencies)
-    return finishPipeline(scanClangDependencies(Instance));
-
-  if (observer)
-    observer->performedSemanticAnalysis(Instance);
-
-  {
-    FrontendOptions::DebugCrashMode CrashMode = opts.CrashMode;
-    if (CrashMode == FrontendOptions::DebugCrashMode::AssertAfterParse)
-      debugFailWithAssertion();
-    else if (CrashMode == FrontendOptions::DebugCrashMode::CrashAfterParse)
-      debugFailWithCrash();
-  }
-
-  (void)migrator::updateCodeAndEmitRemapIfNeeded(&Instance);
-
-  if (Action == FrontendOptions::ActionType::REPL) {
-    llvm::report_fatal_error("Compiler-internal integrated REPL has been "
-                             "removed; use the LLDB-enhanced REPL instead.");
-  }
-
-  if (auto r = dumpASTIfNeeded(Instance))
-    return finishPipeline(*r);
-
-  if (Context.hadError())
-    return finishPipeline(/*hadError*/ true);
-
-  // We've just been told to perform a typecheck, so we can return now.
-  if (Action == FrontendOptions::ActionType::Typecheck)
-    return finishPipeline(/*hadError*/ false);
-
-  assert(FrontendOptions::doesActionGenerateSIL(Action) &&
-         "All actions not requiring SILGen must have been handled!");
-
-  return finishPipeline(
-      performCompileStepsPostSema(Instance, ReturnValue, observer));
+  return hadError;
 }
 
 static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
@@ -2655,7 +2699,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   }
 
   int ReturnValue = 0;
-  bool HadError = performCompile(Invocation, *Instance, Args, ReturnValue, observer);
+  bool HadError = performCompile(*Instance, ReturnValue, observer);
 
   if (verifierEnabled) {
     DiagnosticEngine &diags = Instance->getDiags();

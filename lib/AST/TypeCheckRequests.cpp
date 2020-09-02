@@ -1018,6 +1018,7 @@ void InterfaceTypeRequest::cacheResult(Type type) const {
   auto *decl = std::get<0>(getStorage());
   if (type) {
     assert(!type->hasTypeVariable() && "Type variable in interface type");
+    assert(!type->hasHole() && "Type hole in interface type");
     assert(!type->is<InOutType>() && "Interface type must be materializable");
     assert(!type->hasArchetype() && "Archetype in interface type");
   }

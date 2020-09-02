@@ -403,7 +403,7 @@ ExistentialTransform::createExistentialSpecializedFunctionType() {
 
   /// Return the new signature.
   return SILFunctionType::get(
-      NewGenericSig, ExtInfo, FTy->isAsync(), FTy->getCoroutineKind(),
+      NewGenericSig, ExtInfo, FTy->getCoroutineKind(),
       FTy->getCalleeConvention(), InterfaceParams, FTy->getYields(),
       FTy->getResults(), InterfaceErrorResult,
       SubstitutionMap(), SubstitutionMap(),
