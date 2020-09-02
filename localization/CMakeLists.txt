@@ -14,6 +14,7 @@ add_custom_command(TARGET diagnostic-database
 
 add_dependencies(swift-frontend diagnostic-database)
 add_dependencies(diagnostic-database swift-serialize-diagnostics)
+add_dependencies(diagnostic-database swift-def-to-yaml-converter)
 
 swift_install_in_component(
   DIRECTORY ${CMAKE_BINARY_DIR}/share/swift/diagnostics/
