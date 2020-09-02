@@ -990,10 +990,8 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
   Ctx.addLoadedModule(M);
   SWIFT_DEFER { M->setHasResolvedImports(); };
 
-  StringRef moduleInterfacePathStr =
-    Ctx.AllocateCopy(moduleInterfacePath.str());
   auto *file =
-      loadAST(*M, moduleID.Loc, moduleInterfacePathStr,
+      loadAST(*M, moduleID.Loc, moduleInterfacePath,
               std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
               std::move(moduleSourceInfoInputBuffer), isFramework);
   if (file) {
