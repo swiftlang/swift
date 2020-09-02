@@ -4063,38 +4063,7 @@ public:
   }
 
   void visitIdentTypeRepr(IdentTypeRepr *T) {
-    if (T->isInvalid())
-      return;
-    
-    auto comp = T->getComponentRange().back();
-    if (auto *proto = dyn_cast_or_null<ProtocolDecl>(comp->getBoundDecl())) {
-      if (!proto->existentialTypeSupported()) {
-        Ctx.Diags.diagnose(comp->getNameLoc(),
-                           diag::unsupported_existential_type,
-                           proto->getName());
-        T->setInvalid();
-      }
-    } else if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(comp->getBoundDecl())) {
-      auto type = Type(alias->getDeclaredInterfaceType()->getDesugaredType());
-      type.findIf([&](Type type) -> bool {
-        if (T->isInvalid())
-          return false;
-        if (type->isExistentialType()) {
-          auto layout = type->getExistentialLayout();
-          for (auto *proto : layout.getProtocols()) {
-            auto *protoDecl = proto->getDecl();
-            if (protoDecl->existentialTypeSupported())
-              continue;
-            
-            Ctx.Diags.diagnose(comp->getNameLoc(),
-                               diag::unsupported_existential_type,
-                               protoDecl->getName());
-            T->setInvalid();
-          }
-        }
-        return false;
-      });
-    }
+    return;
   }
 
   void visitRequirements(ArrayRef<RequirementRepr> reqts) {
