@@ -452,6 +452,9 @@ public:
   /// getKind - Return what kind of type this is.
   TypeKind getKind() const { return static_cast<TypeKind>(Bits.TypeBase.Kind); }
 
+  // Return a descriptive name for this type.
+  static StringRef getKindName(TypeKind K);
+
   /// isCanonical - Return true if this is a canonical type.
   bool isCanonical() const { return Bits.TypeBase.IsCanonical; }
   

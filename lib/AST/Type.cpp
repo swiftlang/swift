@@ -1137,6 +1137,79 @@ getCanonicalParams(AnyFunctionType *funcType,
   }
 }
 
+StringRef TypeBase::getKindName(TypeKind K) {
+#define ENTRY(Kind, String)                                                    \
+  case TypeKind::Kind:                                                         \
+    return String
+  switch (K) {
+    ENTRY(Error, "error type");
+    ENTRY(Unresolved, "unresolved type");
+    ENTRY(Hole, "hole type");
+    ENTRY(TypeVariable, "type variable type");
+
+    ENTRY(BuiltinInteger, "builtin type");
+    ENTRY(BuiltinIntegerLiteral, "builtin type");
+    ENTRY(BuiltinFloat, "builtin type");
+    ENTRY(BuiltinRawPointer, "builtin type");
+    ENTRY(BuiltinNativeObject, "builtin type");
+    ENTRY(BuiltinUnsafeValueBuffer, "builtin type");
+    ENTRY(BuiltinVector, "builtin type");
+    ENTRY(BuiltinBridgeObject, "builtin type");
+
+    ENTRY(Tuple, "tuple type");
+
+    ENTRY(WeakStorage, "reference storage type");
+    ENTRY(UnownedStorage, "reference storage type");
+    ENTRY(UnmanagedStorage, "reference storage type");
+
+    ENTRY(Enum, "enum type");
+    ENTRY(Struct, "struct type");
+    ENTRY(Class, "class type");
+    ENTRY(Protocol, "protocol type");
+
+    ENTRY(BoundGenericClass, "class type");
+    ENTRY(BoundGenericEnum, "enum type");
+    ENTRY(BoundGenericStruct, "struct type");
+
+    ENTRY(UnboundGeneric, "generic type");
+
+    ENTRY(Metatype, "metatype type");
+    ENTRY(ExistentialMetatype, "metatype type");
+
+    ENTRY(Module, "module type");
+
+    ENTRY(DynamicSelf, "dynamic self type");
+
+    ENTRY(PrimaryArchetype, "archetype type");
+    ENTRY(OpaqueTypeArchetype, "archetype type");
+    ENTRY(OpenedArchetype, "archetype type");
+    ENTRY(NestedArchetype, "archetype type");
+
+    ENTRY(GenericTypeParam, "generic parameter type");
+    ENTRY(DependentMember, "dependent member type");
+
+    ENTRY(Function, "function type");
+    ENTRY(GenericFunction, "function type");
+
+    ENTRY(SILFunction, "SIL function type");
+    ENTRY(SILBlockStorage, "SIL block storage type");
+    ENTRY(SILBox, "SIL box type");
+    ENTRY(SILToken, "SIL token type");
+
+    ENTRY(ProtocolComposition, "protocol composition type");
+    ENTRY(LValue, "lvalue type");
+    ENTRY(InOut, "inout type");
+
+    ENTRY(Paren, "paren type");
+    ENTRY(TypeAlias, "typealias type");
+    ENTRY(ArraySlice, "array slice type");
+    ENTRY(Optional, "optional type");
+    ENTRY(Dictionary, "dictionary type");
+  }
+#undef ENTRY
+  llvm_unreachable("bad TypeKind");
+}
+
 CanType TypeBase::computeCanonicalType() {
   assert(!hasCanonicalTypeComputed() && "called unnecessarily");
 
