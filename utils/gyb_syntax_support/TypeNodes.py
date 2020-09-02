@@ -157,9 +157,8 @@ TYPE_NODES = [
              Child('RightParen', kind='RightParenToken'),
          ]),
 
-    # throwing-specifier -> 'throws' (type)? | 'rethrows'
     # function-type -> attribute-list '(' function-type-argument-list ')'
-    #   async? ( throwing-specifier? | throwing-specifier? '(' throwing-type ')'? ) '->'? type?
+    #   async? ('throws'|'throws' '(' type ')')? '->' type
     Node('FunctionType', kind='Type',
          traits=['Parenthesized'],
          children=[
@@ -170,13 +169,16 @@ TYPE_NODES = [
              Child('AsyncKeyword', kind='IdentifierToken',
                    classification='Keyword',
                    text_choices=['async'], is_optional=True),
-             Child('ThrowsOrRethrowsKeyword', kind='Token',
+             Child('ThrowsOrRethrows', kind='Syntax',
                    is_optional=True,
-                   token_choices=[
-                       'ThrowsToken',
-                       'RethrowsToken',
+                   node_choices=[
+                       Child('ThrowsOrRethrowsKeyword', kind='Token',
+                             token_choices=[
+                                 'ThrowsToken',
+                                 'RethrowsToken',
+                             ]),
+                       Child('TypedThrowsOrRethrows', kind='TypedThrowsOrRethrowsClause'),
                    ]),
-             Child('TypedThrows', kind='ThrowsDecl', is_optional=True),
              Child('Arrow', kind='ArrowToken'),
              Child('ReturnType', kind='Type'),
          ]),
