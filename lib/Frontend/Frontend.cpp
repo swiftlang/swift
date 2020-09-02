@@ -204,7 +204,9 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
 
   Context.reset(ASTContext::get(
       Invocation.getLangOptions(), Invocation.getTypeCheckerOptions(),
-      Invocation.getSearchPathOptions(), SourceMgr, Diagnostics));
+      Invocation.getSearchPathOptions(),
+      Invocation.getClangImporterOptions(),
+      SourceMgr, Diagnostics));
   registerParseRequestFunctions(Context->evaluator);
   registerTypeCheckerRequestFunctions(Context->evaluator);
   registerSILGenRequestFunctions(Context->evaluator);
@@ -481,8 +483,8 @@ bool CompilerInstance::setUpModuleLoaders() {
   // Otherwise, we just keep it around as our interface to Clang's ABI
   // knowledge.
   std::unique_ptr<ClangImporter> clangImporter =
-    ClangImporter::create(*Context, Invocation.getClangImporterOptions(),
-                          Invocation.getPCHHash(), getDependencyTracker());
+    ClangImporter::create(*Context, Invocation.getPCHHash(),
+                          getDependencyTracker());
   if (!clangImporter) {
     Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
     return true;
