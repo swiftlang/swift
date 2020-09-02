@@ -98,7 +98,9 @@ class PruneVTables : public SILModuleTransform {
   }
   
   void run() override {
+    // SWIFT_ENABLE_TENSORFLOW
     return;
+    // SWIFT_ENABLE_TENSORFLOW END
 
     SILModule *M = getModule();
     
