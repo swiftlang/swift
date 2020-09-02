@@ -2432,7 +2432,7 @@ public:
                         canExtType->getString());
       } else if (!wasAlreadyInvalid) {
         // If nothing else applies, fall back to a generic diagnostic.
-        ED->diagnose(diag::non_nominal_extension, extType);
+        ED->diagnose(diag::non_nominal_extension, extType->getKind(), extType);
       }
       return;
     }

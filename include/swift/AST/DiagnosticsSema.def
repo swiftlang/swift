@@ -1783,7 +1783,7 @@ ERROR(inferred_opaque_type,none,
 
 // Extensions
 ERROR(non_nominal_extension,none,
-      "non-nominal type %0 cannot be extended", (Type))
+      "%0 %1 cannot be extended", (TypeKind, Type))
 WARNING(composition_in_extended_type,none,
         "extending a protocol composition is not supported; extending %0 "
         "instead", (Type))
@@ -2127,7 +2127,7 @@ NOTE(associated_type_deduction_witness_failed,none,
      (Identifier, Type, Type, bool))
 NOTE(associated_type_witness_conform_impossible,none,
      "candidate can not infer %0 = %1 because %1 "
-     "is not a nominal type and so can't conform to %2",
+     "is not a struct, class or enum type and so can't conform to %2",
      (Identifier, Type, Type))
 NOTE(associated_type_witness_inherit_impossible,none,
      "candidate can not infer %0 = %1 because %1 "
