@@ -87,22 +87,8 @@ enum EError : P { // expected-error{{type 'EError' does not conform to protocol 
   func f() -> Int { 0 } // expected-note{{candidate has non-matching type '() -> Int'}}
 }
 
-
-// Settable storage declaration requirements with a 'Self' result type may not
-// be used with an existential base.
-protocol P2 {
-  subscript() -> Self { get set }
-}
-protocol P3 {
-  var prop: Self { get set }
-}
-protocol P4 {
-  subscript<T: Sequence>() -> T where T.Element == Self { get set }
-}
-func takesP2P3P4(p2: P2, p3: P3, p4: P4) { }
-// expected-error@-1{{protocol 'P2' can only be used as a generic constraint because it has Self or associated type requirements}}
-// expected-error@-2{{protocol 'P3' can only be used as a generic constraint because it has Self or associated type requirements}}
-
+// Settable storage members with a 'Self' result type may not be used with an
+// existential base.
 protocol P5 {
 }
 extension P5 {
