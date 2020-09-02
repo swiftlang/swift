@@ -385,11 +385,18 @@ FunctionSignatureSyntax getCannedFunctionSignature() {
   auto RParen = SyntaxFactory::makeRightParenToken({}, Trivia::spaces(1));
   auto Parameter = SyntaxFactory::makeParameterClause(LParen, List, RParen);
   auto Throws = SyntaxFactory::makeThrowsKeyword({}, Trivia::spaces(1));
+  auto Error = SyntaxFactory::makeTypeIdentifier("Error", {}, {});
   auto Arrow = SyntaxFactory::makeArrowToken({}, Trivia::spaces(1));
   auto Int = SyntaxFactory::makeTypeIdentifier("Int", {}, Trivia::spaces(1));
   auto Return = SyntaxFactory::makeReturnClause(Arrow, Int);
 
-  return SyntaxFactory::makeFunctionSignature(Parameter, None, Throws, None , Return);
+  auto TypedThrows = SyntaxFactory::makeTypedThrowsOrRethrowsClause(Throws,
+                                                                    LParen,
+                                                                    Error,
+                                                                    RParen);
+
+  return
+    SyntaxFactory::makeFunctionSignature(Parameter, None, TypedThrows, Return);
 }
 
 TEST(DeclSyntaxTests, FunctionSignatureMakeAPIs) {
@@ -406,7 +413,7 @@ TEST(DeclSyntaxTests, FunctionSignatureMakeAPIs) {
     ASSERT_EQ(OS.str().str(),
       "(with radius: Int = -1, "
       "with radius: Int = -1, "
-      "with radius: Int = -1, ) throws -> Int ");
+      "with radius: Int = -1, ) throws (Error) -> Int ");
   }
 }
 
@@ -426,7 +433,7 @@ TEST(DeclSyntaxTests, FunctionSignatureGetAPIs) {
 
   auto Sig = SyntaxFactory::makeFunctionSignature(
     SyntaxFactory::makeParameterClause(LParen, List, RParen),
-    None, Throws, None,
+    None, Throws,
     SyntaxFactory::makeReturnClause(Arrow, Int));
 
   ASSERT_EQ(LParen.getRaw(), Sig.getInput().getLeftParen().getRaw());
@@ -445,8 +452,8 @@ TEST(DeclSyntaxTests, FunctionSignatureGetAPIs) {
   }
 
   ASSERT_EQ(RParen.getRaw(), Sig.getInput().getRightParen().getRaw());
-  ASSERT_EQ(Throws.getRaw(), Sig.getThrowsOrRethrowsKeyword()->getRaw());
-  ASSERT_EQ(Sig.getThrowsOrRethrowsKeyword()->getTokenKind(), tok::kw_throws);
+  ASSERT_EQ(Throws.getRaw(), Sig.getThrowsOrRethrows()->getAs<TokenSyntax>()->getRaw());
+  ASSERT_EQ(Sig.getThrowsOrRethrows()->getAs<TokenSyntax>()->getTokenKind(), tok::kw_throws);
   ASSERT_EQ(Arrow.getRaw(), Sig.getOutput()->getArrow().getRaw());
 
   {
@@ -479,7 +486,7 @@ TEST(DeclSyntaxTests, FunctionSignatureWithAPIs) {
   llvm::raw_svector_ostream OS(Scratch);
   SyntaxFactory::makeBlankFunctionSignature()
     .withInput(Parameter)
-    .withThrowsOrRethrowsKeyword(Throws)
+    .withThrowsOrRethrows(Throws)
     .withOutput(Return)
     .print(OS);
   ASSERT_EQ(OS.str().str(),
@@ -592,7 +599,7 @@ TEST(DeclSyntaxTests, FunctionDeclMakeAPIs) {
               "(with radius: Int = -1, "
               "with radius: Int = -1, "
               "with radius: Int = -1, ) "
-              "throws -> Int "
+              "throws (Error) -> Int "
               "where T == Int {\n"
               "  return1\n"
               "}");

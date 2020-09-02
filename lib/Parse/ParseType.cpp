@@ -544,9 +544,18 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       ParsedFunctionTypeSyntaxBuilder Builder(*SyntaxContext);
       Builder.useReturnType(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
       Builder.useArrow(SyntaxContext->popToken());
-      Builder.useTypedThrows(std::move(*SyntaxContext->popIf<ParsedThrowsDeclSyntax>()));
-      if (throwsLoc.isValid())
-        Builder.useThrowsOrRethrowsKeyword(SyntaxContext->popToken());
+      if (throwsLoc.isValid()) {
+        if (throwsType) {
+          ParsedTypedThrowsOrRethrowsClauseSyntaxBuilder ThrowsBuilder(*SyntaxContext);
+          ThrowsBuilder.useRightParen(SyntaxContext->popToken());
+          ThrowsBuilder.useThrowsType(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
+          ThrowsBuilder.useLeftParen(SyntaxContext->popToken());
+          ThrowsBuilder.useThrowsOrRethrowsKeyword(SyntaxContext->popToken());
+          Builder.useThrowsOrRethrows(ThrowsBuilder.build());
+        } else {
+          Builder.useThrowsOrRethrows(SyntaxContext->popToken());
+        }
+      }
       if (asyncLoc.isValid())
         Builder.useAsyncKeyword(SyntaxContext->popToken());
 
