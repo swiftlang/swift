@@ -3124,8 +3124,11 @@ function build_and_test_installable_package() {
             with_pushd "${PKG_TESTS_SANDBOX_PARENT}" \
                 call tar xzf "${package_for_host}"
 
+            if python -c import psutil ; then
+              TIMEOUT_ARGS=--timeout=3000 # 50 minutes
+            fi
             with_pushd "${PKG_TESTS_SOURCE_DIR}" \
-                call python "${LIT_EXECUTABLE_PATH}" . -sv --param package-path="${PKG_TESTS_SANDBOX}" --param test-exec-root="${PKG_TESTS_TEMPS}" --param llvm-bin-dir="${LLVM_BIN_DIR}"
+                call python "${LIT_EXECUTABLE_PATH}" . -sv --param package-path="${PKG_TESTS_SANDBOX}" --param test-exec-root="${PKG_TESTS_TEMPS}" --param llvm-bin-dir="${LLVM_BIN_DIR}" ${TIMEOUT_ARGS}
         fi
     fi
 }
