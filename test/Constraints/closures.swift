@@ -1030,3 +1030,15 @@ func sr12815() {
      .doesntExist2() { $0 }
   }
 }
+
+// Make sure we can infer generic arguments in an explicit result type.
+let explicitUnboundResult1 = { () -> Array in [0] }
+let explicitUnboundResult2: (Array<Bool>) -> Array<Int> = {
+  (arr: Array) -> Array in [0]
+}
+// FIXME: Should we prioritize the contextual result type and infer Array<Int>
+// rather than using a type variable in these cases?
+// expected-error@+1 {{unable to infer closure type in the current context}}
+let explicitUnboundResult3: (Array<Bool>) -> Array<Int> = {
+  (arr: Array) -> Array in [true]
+}

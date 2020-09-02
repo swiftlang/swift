@@ -203,7 +203,7 @@ void Parser::performCodeCompletionSecondPassImpl(
 
   case CodeCompletionDelayedDeclKind::FunctionBody: {
     auto *AFD = cast<AbstractFunctionDecl>(DC);
-    AFD->setBodyParsed(parseAbstractFunctionBodyImpl(AFD).getPtrOrNull());
+    (void)parseAbstractFunctionBodyImpl(AFD);
     break;
   }
   }

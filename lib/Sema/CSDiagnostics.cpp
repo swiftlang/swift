@@ -643,7 +643,7 @@ Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
 
 void GenericArgumentsMismatchFailure::emitNoteForMismatch(int position) {
   auto *locator = getLocator();
-  // Since there could be implicit conversions assoicated with argument
+  // Since there could be implicit conversions associated with argument
   // to parameter conversions, let's use parameter type as a source of
   // generic parameter information.
   auto paramSourceTy =
