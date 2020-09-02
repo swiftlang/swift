@@ -55,11 +55,6 @@ struct TypeWitnessAndDecl;
 class ValueDecl;
 enum class OpaqueReadOwnership: uint8_t;
 class StorageImplInfo;
-class CompletionCollector;
-
-namespace constraints {
-  class Solution;
-}
 
 /// Display a nominal type or extension thereof.
 void simple_display(
@@ -931,8 +926,6 @@ private:
   // Evaluation.
   bool evaluate(Evaluator &evaluator, DeclContext *DC, SourceLoc Loc) const;
 };
-
-void simple_display(llvm::raw_ostream &out, CompletionCollector *collector);
 
 /// Request to obtain a list of stored properties in a nominal type.
 ///
