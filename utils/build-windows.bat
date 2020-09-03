@@ -176,6 +176,7 @@ cmake^
     -DLLVM_ENABLE_OCAMLDOC:BOOL=NO^
     -DLLVM_ENABLE_LIBXML2:BOOL=NO^
     -DLLVM_ENABLE_ZLIB:BOOL=NO^
+    -DLLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN=ON^
     -DENABLE_X86_RELAX_RELOCATIONS:BOOL=YES^
     -DLLVM_INSTALL_BINUTILS_SYMLINKS:BOOL=YES^
     -DLLVM_INSTALL_TOOLCHAIN_ONLY:BOOL=YES^
@@ -232,6 +233,7 @@ cmake^
     -DSWIFT_PATH_TO_CMARK_SOURCE:PATH=%source_root%\cmark^
     -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE:PATH=%source_root%\swift-corelibs-libdispatch^
     -DLLVM_DIR:PATH=%build_root%\llvm\lib\cmake\llvm^
+    -DLLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN=ON^
     -DSWIFT_INCLUDE_DOCS:BOOL=NO^
     -DSWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE:PATH=%source_root%\icu-%icu_version%\include\unicode^
     -DSWIFT_WINDOWS_x86_64_ICU_UC:PATH=%source_root%\icu-%icu_version%\lib64\icuuc.lib^
@@ -277,8 +279,8 @@ cmake^
     -B "%build_root%\lldb"^
     -G Ninja^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
-    -DCMAKE_C_COMPILER=clang-cl^
-    -DCMAKE_CXX_COMPILER=clang-cl^
+    -DCMAKE_C_COMPILER=cl^
+    -DCMAKE_CXX_COMPILER=cl^
     -DCMAKE_INSTALL_PREFIX:PATH=%install_directory%^
     -DLLVM_DIR:PATH=%build_root%\llvm\lib\cmake\llvm^
     -DClang_DIR:PATH=%build_root%\llvm\lib\cmake\clang^
@@ -291,6 +293,7 @@ cmake^
     -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
     -DLLDB_DISABLE_PYTHON=YES^
     -DLLDB_INCLUDE_TESTS:BOOL=NO^
+    -DLLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN=ON^
     -S "%source_root%\lldb" %exitOnError%
 
 cmake --build "%build_root%\lldb" %exitOnError%
