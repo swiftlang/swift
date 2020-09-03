@@ -1319,6 +1319,19 @@ ForwardModeTests.test("ForceUnwrapping") {
   expectEqual(5, forceUnwrap(Float(2)))
 }
 
+ForwardModeTests.test("NonActiveIndirectResult") {
+  func identity<T: Differentiable>(_ x: T) -> T { x }
+
+  @_silgen_name("foo")
+  @differentiable
+  func applyNonactiveArgumentActiveIndirectResult(_ x: Tracked<Float>) -> Tracked<Float> {
+    var y = identity(0 as Tracked<Float>)
+    y = x
+    return y
+  }
+  expectEqual(1.0, derivative(at: 2, in: applyNonactiveArgumentActiveIndirectResult))
+}
+
 //===----------------------------------------------------------------------===//
 // Array methods from ArrayDifferentiation.swift
 //===----------------------------------------------------------------------===//

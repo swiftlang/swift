@@ -77,11 +77,6 @@ private:
   /// tangent values.
   llvm::DenseMap<SILValue, AdjointValue> tangentValueMap;
 
-  enum IsInitialized_t : bool { NotInitialized, Initialized };
-  /// Mapping from tangent buffers to their initialization info. Used to keep
-  /// track of whether a tangent buffer is initalized of not.
-  llvm::DenseMap<SILValue, IsInitialized_t> tangentBufferInitializationInfo;
-
   /// Mapping from original basic blocks and original buffers to corresponding
   /// tangent buffers.
   llvm::DenseMap<std::pair<SILBasicBlock *, SILValue>, SILValue> bufferMap;
@@ -315,52 +310,22 @@ private:
   //--------------------------------------------------------------------------//
 
   void setTangentBuffer(SILBasicBlock *origBB, SILValue originalBuffer,
-                        SILValue tangentBuffer, IsInitialized_t initInfo) {
+                        SILValue tangentBuffer) {
     assert(originalBuffer->getType().isAddress());
     auto insertion =
         bufferMap.try_emplace({origBB, originalBuffer}, tangentBuffer);
     assert(insertion.second && "Tangent buffer already exists");
-    assert(tangentBuffer->getType().isAddress());
-    tangentBufferInitializationInfo[tangentBuffer] = initInfo;
     (void)insertion;
   }
 
-  IsInitialized_t &getTangentBufferInitializationInfo(SILValue tangentBuffer) {
-    auto it = tangentBufferInitializationInfo.find(tangentBuffer);
-    assert(it != tangentBufferInitializationInfo.end());
-    return it->second;
-  }
-
-  void setTangentBufferInitializationInfo(SILValue tangentBuffer,
-                                          IsInitialized_t initInfo) {
-    assert(tangentBuffer->getType().isAddress());
-    tangentBufferInitializationInfo[tangentBuffer] = initInfo;
-  }
-
-  enum InitializationRequired_t : bool {
-    InitializationNotRequired,
-    InitializationRequired
-  };
-  /// Returns a tangent buffer for a provided original buffer. If
-  /// `InitializationRequired` is specified, the tangent buffer is initialized
-  /// with zero and its initialization info in `tangentBufferInitializationInfo`
-  /// map is set to `Initialized`.
-  SILValue &getTangentBuffer(SILBasicBlock *origBB, SILValue originalBuffer,
-                             InitializationRequired_t initializationRequired =
-                                 InitializationNotRequired) {
+  /// Returns a tangent buffer for a provided original buffer.
+  SILValue &getTangentBuffer(SILBasicBlock *origBB, SILValue originalBuffer) {
     assert(originalBuffer->getType().isAddress());
     assert(originalBuffer->getFunction() == original);
     auto insertion =
         bufferMap.try_emplace({origBB, originalBuffer}, SILValue());
     assert(!insertion.second && "Tangent buffer should already exist");
     auto &tanBuf = insertion.first->getSecond();
-    assert(tangentBufferInitializationInfo.count(tanBuf) &&
-           "Initialization info must exist");
-    auto &initializationInfo = getTangentBufferInitializationInfo(tanBuf);
-    if (initializationRequired && (initializationInfo == NotInitialized)) {
-      emitZeroIndirect(tanBuf->getType().getASTType(), tanBuf, tanBuf.getLoc());
-      initializationInfo = Initialized;
-    }
     return tanBuf;
   }
 
@@ -483,9 +448,21 @@ public:
   // If an `apply` has active results or active inout parameters, replace it
   // with an `apply` of its JVP.
   void visitApplyInst(ApplyInst *ai) {
+    bool shouldDifferentiate =
+        differentialInfo.shouldDifferentiateApplySite(ai);
+    // If the function has no active arguments and results, zero-initialize
+    // tangent buffers for the indirect results.
+    if (!shouldDifferentiate) {
+      for (auto indResult : ai->getIndirectSILResults())
+        if (activityInfo.isActive(indResult, getIndices())) {
+          auto &tanBuf = getTangentBuffer(ai->getParent(), indResult);
+          emitZeroIndirect(tanBuf->getType().getASTType(), tanBuf,
+                           tanBuf.getLoc());
+        }
+    }
     // If the function should not be differentiated or its the array literal
     // initialization intrinsic, just do standard cloning.
-    if (!differentialInfo.shouldDifferentiateApplySite(ai) ||
+    if (!shouldDifferentiate ||
         ArraySemanticsCall(ai, semantics::ARRAY_UNINITIALIZED_INTRINSIC)) {
       LLVM_DEBUG(getADDebugStream() << "No active results:\n" << *ai << '\n');
       TypeSubstCloner::visitApplyInst(ai);
@@ -753,22 +730,8 @@ public:
       // Assert that local allocations have at least one use.
       // Buffers should not be allocated needlessly.
       assert(!alloc->use_empty());
-      auto &initializationInfo = getTangentBufferInitializationInfo(alloc);
-      if (initializationInfo == Initialized) {
-        differentialBuilder.emitDestroyAddrAndFold(loc, alloc);
-        initializationInfo = NotInitialized;
-      }
+      differentialBuilder.emitDestroyAddrAndFold(loc, alloc);
       differentialBuilder.createDeallocStack(loc, alloc);
-    }
-    // Emit zero into uninitialized indirect results.
-    for (auto &diffIndResult : getDifferential().getIndirectResults()) {
-      auto &initializationInfo =
-          getTangentBufferInitializationInfo(diffIndResult);
-      if (initializationInfo == NotInitialized) {
-        emitZeroIndirect(diffIndResult->getType().getASTType(), diffIndResult,
-                         loc);
-        initializationInfo = Initialized;
-      }
     }
     // Return a tuple of the original result and differential.
     SmallVector<SILValue, 8> directResults;
@@ -853,12 +816,24 @@ public:
   /// Handle `load` instruction.
   ///   Original: y = load x
   ///    Tangent: tan[y] = load tan[x]
-  CLONE_AND_EMIT_TANGENT(Load, li) {
+  void visitLoadInst(LoadInst *li) {
+    TypeSubstCloner::visitLoadInst(li);
+    // If an active buffer is loaded (take) to a non-active value
+    // we have to uninitialized the buffer.
+    if (!differentialInfo.shouldDifferentiateInstruction(li)) {
+      auto isTake =
+          (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take);
+      // Destroy `tanBuf`.
+      if (isTake && activityInfo.isActive(li->getOperand(), getIndices())) {
+        auto &tanBuf = getTangentBuffer(li->getParent(), li->getOperand());
+        getDifferentialBuilder().emitDestroyOperation(tanBuf.getLoc(), tanBuf);
+      }
+      return;
+    }
     auto &diffBuilder = getDifferentialBuilder();
     auto *bb = li->getParent();
     auto loc = li->getLoc();
-    auto tanBuf =
-        getTangentBuffer(bb, li->getOperand(), InitializationRequired);
+    auto tanBuf = getTangentBuffer(bb, li->getOperand());
     auto tanVal = diffBuilder.emitLoadValueOperation(
         loc, tanBuf, li->getOwnershipQualifier());
     setTangentValue(bb, li, makeConcreteTangentValue(tanVal));
@@ -871,8 +846,7 @@ public:
     auto &diffBuilder = getDifferentialBuilder();
     auto *bb = lbi->getParent();
     auto loc = lbi->getLoc();
-    auto tanBuf =
-        getTangentBuffer(bb, lbi->getOperand(), InitializationRequired);
+    auto tanBuf = getTangentBuffer(bb, lbi->getOperand());
     auto tanVal = diffBuilder.emitLoadBorrowOperation(loc, tanBuf);
     setTangentValue(bb, lbi, makeConcreteTangentValue(tanVal));
   }
@@ -880,45 +854,82 @@ public:
   /// Handle `store` instruction in the differential.
   ///   Original: store x to y
   ///     Tangent: store tan[x] to tan[y]
-  CLONE_AND_EMIT_TANGENT(Store, si) {
+  void visitStoreInst(StoreInst *si) {
+    TypeSubstCloner::visitStoreInst(si);
+    // If a non-active value is stored into an active buffer,
+    // we have to zero-initialized the buffer.
+    if (!differentialInfo.shouldDifferentiateInstruction(si)) {
+      // Zero-initialize `tanBufDest`.
+      if (activityInfo.isActive(si->getDest(), getIndices())) {
+        auto &tanBufDest = getTangentBuffer(si->getParent(), si->getDest());
+        emitZeroIndirect(tanBufDest->getType().getASTType(), tanBufDest,
+                         tanBufDest.getLoc());
+      }
+      return;
+    }
     auto &diffBuilder = getDifferentialBuilder();
     auto loc = si->getLoc();
     auto tanValSrc = materializeTangent(getTangentValue(si->getSrc()), loc);
     auto &tanValDest = getTangentBuffer(si->getParent(), si->getDest());
     diffBuilder.emitStoreValueOperation(loc, tanValSrc, tanValDest,
                                         si->getOwnershipQualifier());
-    setTangentBufferInitializationInfo(tanValDest, Initialized);
   }
 
   /// Handle `store_borrow` instruction in the differential.
   ///   Original: store_borrow x to y
   ///    Tangent: store_borrow tan[x] to tan[y]
-  CLONE_AND_EMIT_TANGENT(StoreBorrow, sbi) {
+  void visitStoreBorrowInst(StoreBorrowInst *sbi) {
+    TypeSubstCloner::visitStoreBorrowInst(sbi);
+    // If a non-active value is stored into an active buffer,
+    // we have to zero-initialized the buffer.
+    if (!differentialInfo.shouldDifferentiateInstruction(sbi)) {
+      // Zero-initialize `tanBufDest`.
+      if (activityInfo.isActive(sbi->getDest(), getIndices())) {
+        auto &tanBufDest = getTangentBuffer(sbi->getParent(), sbi->getDest());
+        emitZeroIndirect(tanBufDest->getType().getASTType(), tanBufDest,
+                         tanBufDest.getLoc());
+      }
+      return;
+    }
     auto &diffBuilder = getDifferentialBuilder();
     auto loc = sbi->getLoc();
     auto tanValSrc = materializeTangent(getTangentValue(sbi->getSrc()), loc);
     auto &tanValDest = getTangentBuffer(sbi->getParent(), sbi->getDest());
     diffBuilder.createStoreBorrow(loc, tanValSrc, tanValDest);
-    setTangentBufferInitializationInfo(tanValDest, Initialized);
   }
 
   /// Handle `copy_addr` instruction.
   ///   Original: copy_addr x to y
   ///    Tangent: copy_addr tan[x] to tan[y]
-  CLONE_AND_EMIT_TANGENT(CopyAddr, cai) {
+  void visitCopyAddrInst(CopyAddrInst *cai) {
+    TypeSubstCloner::visitCopyAddrInst(cai);
+    // If a non-active buffer is copied into an active buffer,
+    // we have to zero-initialized the buffer.
+    // If an active buffer is copied (take) into a non-active buffer,
+    // we have to uninitialize the buffer.
+    if (!differentialInfo.shouldDifferentiateInstruction(cai)) {
+      // Zero-initialize `tanBufDest`.
+      if (activityInfo.isActive(cai->getDest(), getIndices())) {
+        auto &tanBufDest = getTangentBuffer(cai->getParent(), cai->getDest());
+        emitZeroIndirect(tanBufDest->getType().getASTType(), tanBufDest,
+                         tanBufDest.getLoc());
+      }
+      // Destroy `tanBufSrc`.
+      if (cai->isTakeOfSrc() &&
+          activityInfo.isActive(cai->getSrc(), getIndices())) {
+        auto &tanBufSrc = getTangentBuffer(cai->getParent(), cai->getSrc());
+        getDifferentialBuilder().emitDestroyOperation(tanBufSrc.getLoc(),
+                                                      tanBufSrc);
+      }
+      return;
+    }
     auto diffBuilder = getDifferentialBuilder();
     auto loc = cai->getLoc();
     auto *bb = cai->getParent();
-    auto &tanSrc = getTangentBuffer(bb, cai->getSrc(), InitializationRequired);
+    auto &tanSrc = getTangentBuffer(bb, cai->getSrc());
     auto tanDest = getTangentBuffer(bb, cai->getDest());
-    auto &destInitInfo = getTangentBufferInitializationInfo(tanDest);
     diffBuilder.createCopyAddr(loc, tanSrc, tanDest, cai->isTakeOfSrc(),
-                               (destInitInfo == NotInitialized)
-                                   ? IsInitialization
-                                   : IsNotInitialization);
-    destInitInfo = Initialized;
-    if (cai->isTakeOfSrc())
-      setTangentBufferInitializationInfo(tanSrc, NotInitialized);
+                               cai->isInitializationOfDest());
   }
 
   /// Handle `unconditional_checked_cast_addr` instruction.
@@ -929,14 +940,12 @@ public:
     auto diffBuilder = getDifferentialBuilder();
     auto loc = uccai->getLoc();
     auto *bb = uccai->getParent();
-    auto &tanSrc =
-        getTangentBuffer(bb, uccai->getSrc(), InitializationRequired);
+    auto &tanSrc = getTangentBuffer(bb, uccai->getSrc());
     auto tanDest = getTangentBuffer(bb, uccai->getDest());
 
     diffBuilder.createUnconditionalCheckedCastAddr(
         loc, tanSrc, tanSrc->getType().getASTType(), tanDest,
         tanDest->getType().getASTType());
-    setTangentBufferInitializationInfo(tanDest, Initialized);
   }
 
   /// Handle `begin_access` instruction (and do differentiability checks).
@@ -968,9 +977,7 @@ public:
     auto *tanDest = diffBuilder.createBeginAccess(
         bai->getLoc(), tanSrc, bai->getAccessKind(), bai->getEnforcement(),
         bai->hasNoNestedConflict(), bai->isFromBuiltin());
-    setTangentBuffer(
-        bb, bai, tanDest,
-        /* isInitialized */ tangentBufferInitializationInfo[tanSrc]);
+    setTangentBuffer(bb, bai, tanDest);
   }
 
   /// Handle `end_access` instruction.
@@ -982,9 +989,6 @@ public:
     auto loc = eai->getLoc();
     auto tanOperand = getTangentBuffer(bb, eai->getOperand());
     diffBuilder.createEndAccess(loc, tanOperand, eai->isAborting());
-    auto tanSrc = getTangentBuffer(bb, eai->getSource());
-    setTangentBufferInitializationInfo(
-        tanSrc, getTangentBufferInitializationInfo(tanOperand));
   }
 
   /// Handle `alloc_stack` instruction.
@@ -995,8 +999,7 @@ public:
     auto *mappedAllocStackInst = diffBuilder.createAllocStack(
         asi->getLoc(), getRemappedTangentType(asi->getElementType()),
         asi->getVarInfo());
-    setTangentBuffer(asi->getParent(), asi, mappedAllocStackInst,
-                     NotInitialized);
+    setTangentBuffer(asi->getParent(), asi, mappedAllocStackInst);
   }
 
   /// Handle `dealloc_stack` instruction.
@@ -1014,11 +1017,7 @@ public:
   CLONE_AND_EMIT_TANGENT(DestroyAddr, dai) {
     auto &diffBuilder = getDifferentialBuilder();
     auto tanBuf = getTangentBuffer(dai->getParent(), dai->getOperand());
-    auto &initInfo = getTangentBufferInitializationInfo(tanBuf);
-    if (initInfo == Initialized) {
-      diffBuilder.createDestroyAddr(dai->getLoc(), tanBuf);
-      initInfo = NotInitialized;
-    }
+    diffBuilder.createDestroyAddr(dai->getLoc(), tanBuf);
   }
 
   /// Handle `struct` instruction.
@@ -1090,9 +1089,7 @@ public:
     auto tangentInst =
         diffBuilder.createStructElementAddr(loc, tanOperand, tanField);
     // Update tangent buffer map for `struct_element_addr`.
-    setTangentBuffer(
-        bb, seai, tangentInst,
-        /* isInitialized */ tangentBufferInitializationInfo[tanOperand]);
+    setTangentBuffer(bb, seai, tangentInst);
   }
 
   /// Handle `tuple` instruction.
@@ -1161,8 +1158,7 @@ public:
         ++tanIndex;
     }
     auto tanType = getRemappedTangentType(teai->getType());
-    auto tanSource = getTangentBuffer(teai->getParent(), teai->getOperand(),
-                                      InitializationRequired);
+    auto tanSource = getTangentBuffer(teai->getParent(), teai->getOperand());
     SILValue tanBuf;
     // If the tangent buffer of the source does not have a tuple type, then
     // it must represent a "single element tuple type". Use it directly.
@@ -1172,7 +1168,7 @@ public:
       tanBuf = diffBuilder.createTupleElementAddr(teai->getLoc(), tanSource,
                                                   tanIndex, tanType);
     }
-    setTangentBuffer(teai->getParent(), teai, tanBuf, Initialized);
+    setTangentBuffer(teai->getParent(), teai, tanBuf);
   }
 
   /// Handle `destructure_tuple` instruction.
@@ -1234,7 +1230,7 @@ public:
     SmallVector<SILValue, 8> diffArgs;
 
     for (auto indRes : ai->getIndirectSILResults())
-      diffArgs.push_back(getTangentBuffer(bb, indRes, InitializationRequired));
+      diffArgs.push_back(getTangentBuffer(bb, indRes));
 
     auto paramArgs = ai->getArgumentsWithoutIndirectResults();
     // Get the tangent value of the original arguments.
@@ -1271,8 +1267,7 @@ public:
         if (origArg->getType().isObject()) {
           tanParam = materializeTangent(getTangentValue(origArg), loc);
         } else {
-          tanParam = getTangentBuffer(ai->getParent(), origArg,
-                                      InitializationRequired);
+          tanParam = getTangentBuffer(ai->getParent(), origArg);
         }
         diffArgs.push_back(tanParam);
         if (errorOccurred)
@@ -1546,7 +1541,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
     auto *origArg = origParamArgs[*diffParamsIt];
     ++diffParamsIt;
     if (diffArg->getType().isAddress()) {
-      setTangentBuffer(origEntry, origArg, diffArg, Initialized);
+      setTangentBuffer(origEntry, origArg, diffArg);
     } else {
       setTangentValue(origEntry, origArg, makeConcreteTangentValue(diffArg));
     }
@@ -1579,19 +1574,13 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
       auto tangentSILType = getRemappedTangentType(origSILType);
       auto *tanBuf = differentialBuilder.createAllocStack(
           differential.getLocation(), tangentSILType);
-      setTangentBuffer(origEntry, origParam, tanBuf, NotInitialized);
+      setTangentBuffer(origEntry, origParam, tanBuf);
       differentialLocalAllocations.push_back(tanBuf);
     }
   }
   for (auto &origBB : *original)
     for (auto i : indices(origIndResults))
-      setTangentBuffer(&origBB, origIndResults[i], diffIndResults[i],
-                       NotInitialized);
-  // Set initialization info for differential indirect result that potentially
-  // do not correspond to any index of original indirect results (e.g. non wrt
-  // inout params).
-  for (auto &diffIndResult : diffIndResults)
-    setTangentBufferInitializationInfo(diffIndResult, NotInitialized);
+      setTangentBuffer(&origBB, origIndResults[i], diffIndResults[i]);
 }
 
 /*static*/ SILFunction *JVPCloner::Implementation::createEmptyDifferential(
@@ -1621,7 +1610,6 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   auto origParams = origTy->getParameters();
   auto indices = witness->getSILAutoDiffIndices();
 
-
   for (auto resultIndex : indices.results->getIndices()) {
     if (resultIndex < origTy->getNumResults()) {
       // Handle formal original result.
@@ -1634,17 +1622,16 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
                             ->getType()
                             ->getCanonicalType(witnessCanGenSig),
                         origResult.getConvention()));
-    }
-    else {
+    } else {
       // Handle original `inout` parameter.
       auto inoutParamIndex = resultIndex - origTy->getNumResults();
       auto inoutParamIt = std::next(
           origTy->getIndirectMutatingParameters().begin(), inoutParamIndex);
       auto paramIndex =
           std::distance(origTy->getParameters().begin(), &*inoutParamIt);
-      // If the original `inout` parameter is a differentiability parameter, then
-      // it already has a corresponding differential parameter. Skip adding a
-      // corresponding differential result.
+      // If the original `inout` parameter is a differentiability parameter,
+      // then it already has a corresponding differential parameter. Skip adding
+      // a corresponding differential result.
       if (indices.parameters->contains(paramIndex))
         continue;
       auto inoutParam = origTy->getParameters()[paramIndex];
