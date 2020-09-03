@@ -611,19 +611,23 @@ EffectsKind SILDeclRef::getEffectsAttribute() const {
 }
 
 bool SILDeclRef::isForeignToNativeThunk() const {
+  // If this isn't a native entry-point, it's not a foreign-to-native thunk.
+  if (isForeign)
+    return false;
+
   // Non-decl entry points are never natively foreign, so they would never
   // have a foreign-to-native thunk.
   if (!hasDecl())
     return false;
   if (requiresForeignToNativeThunk(getDecl()))
-    return !isForeign;
+    return true;
   // ObjC initializing constructors and factories are foreign.
   // We emit a special native allocating constructor though.
   if (isa<ConstructorDecl>(getDecl())
       && (kind == Kind::Initializer
           || cast<ConstructorDecl>(getDecl())->isFactoryInit())
       && getDecl()->hasClangNode())
-    return !isForeign;
+    return true;
   return false;
 }
 
