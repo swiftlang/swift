@@ -446,7 +446,7 @@ InitKindRequest::evaluate(Evaluator &evaluator, ConstructorDecl *decl) const {
     // If we implement the ability for extensions defined in the same module
     // (or the same file) to add vtable entries, we can re-evaluate this
     // restriction.
-    if (isa<ClassDecl>(nominal) && !decl->isSynthesized() &&
+    if (isa<ClassDecl>(nominal) && !decl->isImplicit() &&
         isa<ExtensionDecl>(decl->getDeclContext()) &&
         !(decl->getAttrs().hasAttribute<DynamicReplacementAttr>())) {
       if (cast<ClassDecl>(nominal)->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
