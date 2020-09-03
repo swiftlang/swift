@@ -16,6 +16,7 @@
 
 #include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckAccess.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
@@ -171,7 +172,8 @@ static bool diagnoseDeclExportability(SourceLoc loc, const ValueDecl *D,
 static bool
 diagnoseGenericArgumentsExportability(SourceLoc loc,
                                       SubstitutionMap subs,
-                                      const SourceFile &userSF) {
+                                      const SourceFile &userSF,
+                                      const DeclContext *userDC) {
   bool hadAnyIssues = false;
   for (ProtocolConformanceRef conformance : subs.getConformances()) {
     if (!conformance.isConcrete())
@@ -180,18 +182,23 @@ diagnoseGenericArgumentsExportability(SourceLoc loc,
 
     SubstitutionMap subConformanceSubs =
         concreteConf->getSubstitutions(userSF.getParentModule());
-    diagnoseGenericArgumentsExportability(loc, subConformanceSubs, userSF);
+    diagnoseGenericArgumentsExportability(loc, subConformanceSubs, userSF, userDC);
 
     const RootProtocolConformance *rootConf =
         concreteConf->getRootConformance();
     ModuleDecl *M = rootConf->getDeclContext()->getParentModule();
-    if (!userSF.isImportedImplementationOnly(M))
+
+    auto originKind = getDisallowedOriginKind(
+        rootConf->getDeclContext()->getAsDecl(),
+        userSF, userDC->getInnermostDeclarationDeclContext());
+    if (originKind == DisallowedOriginKind::None)
       continue;
 
     ASTContext &ctx = M->getASTContext();
     ctx.Diags.diagnose(loc, diag::conformance_from_implementation_only_module,
                        rootConf->getType(),
-                       rootConf->getProtocol()->getName(), 0, M->getName());
+                       rootConf->getProtocol()->getName(), 0, M->getName(),
+                       static_cast<unsigned>(originKind));
     hadAnyIssues = true;
   }
   return hadAnyIssues;
@@ -209,10 +216,10 @@ void TypeChecker::diagnoseGenericTypeExportability(SourceLoc Loc, Type T,
   if (auto *BGT = dyn_cast<BoundGenericType>(T.getPointer())) {
     ModuleDecl *useModule = SF->getParentModule();
     auto subs = T->getContextSubstitutionMap(useModule, BGT->getDecl());
-    (void)diagnoseGenericArgumentsExportability(Loc, subs, *SF);
+    (void)diagnoseGenericArgumentsExportability(Loc, subs, *SF, DC);
   } else if (auto *TAT = dyn_cast<TypeAliasType>(T.getPointer())) {
     auto subs = TAT->getSubstitutionMap();
-    (void)diagnoseGenericArgumentsExportability(Loc, subs, *SF);
+    (void)diagnoseGenericArgumentsExportability(Loc, subs, *SF, DC);
   }
 }
 
@@ -226,19 +233,11 @@ TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
   if (!userSF)
     return false;
 
-  // If the source file doesn't have any implementation-only imports,
-  // we can fast-path this.  In the current language design, we never
-  // need to consider the possibility of implementation-only imports
-  // from other source files in the module (or indirectly in other modules).
-  // TODO: maybe check whether D is from a bridging header?
-  if (!userSF->hasImplementationOnlyImports())
-    return false;
-
   const ValueDecl *D = declRef.getDecl();
   if (diagnoseDeclExportability(loc, D, *userSF, fragileKind))
     return true;
   if (diagnoseGenericArgumentsExportability(loc, declRef.getSubstitutions(),
-                                            *userSF)) {
+                                            *userSF, DC)) {
     return true;
   }
   return false;

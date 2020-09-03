@@ -2739,13 +2739,17 @@ WARNING(decl_from_hidden_module_warn,none,
 ERROR(conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 %select{here|as property wrapper here|"
       "in an extension with public or '@usableFromInline' members|"
-      "in an extension with conditional conformances}2; %3 has been imported "
-      "as implementation-only",
-      (Type, Identifier, unsigned, Identifier))
+      "in an extension with conditional conformances}2; "
+      "%select{%3 has been imported as implementation-only|"
+      "the conformance is declared as SPI in %3|"
+      "the conformance is declared as SPI}4",
+      (Type, Identifier, unsigned, Identifier, unsigned))
 ERROR(assoc_conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 in associated type %3 (inferred as "
-      "%4); %2 has been imported as implementation-only",
-      (Type, Identifier, Identifier, Type, Type))
+      "%4); %select{%2 has been imported as implementation-only|"
+      "the conformance is declared as SPI in %2|"
+      "the conformance is declared as SPI}5",
+      (Type, Identifier, Identifier, Type, Type, unsigned))
 ERROR(unexportable_clang_function_type,none,
       "cannot export the underlying C type of the function type %0; "
       "it may use anonymous types or types defined outside of a module",
