@@ -679,6 +679,14 @@ void SILGenModule::visitFuncDecl(FuncDecl *fd) { emitFunction(fd); }
 void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
   switch (constant.kind) {
   case SILDeclRef::Kind::Func: {
+    if (auto *ce = constant.getAbstractClosureExpr()) {
+      preEmitFunction(constant, f, ce);
+      PrettyStackTraceSILFunction X("silgen closureexpr", f);
+      SILGenFunction(*this, *f, ce).emitClosure(ce);
+      postEmitFunction(constant, f);
+      break;
+    }
+
     auto *fd = cast<FuncDecl>(constant.getDecl());
 
     preEmitFunction(constant, f, fd);
@@ -1207,10 +1215,8 @@ SILFunction *SILGenModule::emitClosure(AbstractClosureExpr *ce) {
   // initializer of the containing type.
   if (!f->isExternalDeclaration())
     return f;
-  preEmitFunction(constant, f, ce);
-  PrettyStackTraceSILFunction X("silgen closureexpr", f);
-  SILGenFunction(*this, *f, ce).emitClosure(ce);
-  postEmitFunction(constant, f);
+
+  emitFunctionDefinition(constant, f);
   return f;
 }
 
