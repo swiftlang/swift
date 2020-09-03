@@ -461,8 +461,11 @@ public:
     auto *core = new ModuleFileSharedCore(
         std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
         std::move(moduleSourceInfoInputBuffer), isFramework, info, extInfo);
-    if (!moduleInterfacePath.empty())
-      core->ModuleInterfacePath = moduleInterfacePath;
+    if (!moduleInterfacePath.empty()) {
+      ArrayRef<char> path;
+      core->allocateBuffer(path, moduleInterfacePath);
+      core->ModuleInterfacePath = StringRef(path.data(), path.size());
+    }
     theModule.reset(core);
     return info;
   }

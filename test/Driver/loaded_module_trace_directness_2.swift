@@ -114,7 +114,7 @@ public func runBoth(_ pair: DaemonKit.DaemonPair) {
   #endif
   #if V2
     import DaemonKit
-    public func noop(_: CoreDaemon.Daemon) {}
+    public func noop(_: CoreDaemon.Daemon, _: MaxwellsDaemon) {}
   #endif
   #if V3
     import CoreDaemon

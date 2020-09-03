@@ -27,6 +27,8 @@
 namespace swift {
 namespace semanticarc {
 
+extern bool VerifyAfterTransform;
+
 bool constructCacheValue(
     SILValue initialValue,
     SmallVectorImpl<Operand *> &wellBehavedWriteAccumulator);

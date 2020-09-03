@@ -313,7 +313,7 @@ class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation
   using Version = importer::ImportNameVersion;
 
 public:
-  Implementation(ASTContext &ctx, const ClangImporterOptions &opts,
+  Implementation(ASTContext &ctx,
                  DWARFImporterDelegate *dwarfImporterDelegate);
   ~Implementation();
 
@@ -393,8 +393,6 @@ private:
   /// Clang arguments used to create the Clang invocation.
   std::vector<std::string> ClangArgs;
 
-  /// Extra clang args specified via "-Xcc"
-  std::vector<std::string> ExtraClangArgs;
 public:
   /// Mapping of already-imported declarations.
   llvm::DenseMap<std::pair<const clang::Decl *, Version>, Decl *> ImportedDecls;
@@ -1430,13 +1428,11 @@ bool isSpecialUIKitStructZeroProperty(const clang::NamedDecl *decl);
 
 /// Add command-line arguments for a normal import of Clang code.
 void getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
-                                  ASTContext &ctx,
-                                  const ClangImporterOptions &importerOpts);
+                                  ASTContext &ctx);
 
 /// Add command-line arguments common to all imports of Clang code.
 void addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
-                                  ASTContext &ctx,
-                                  const ClangImporterOptions &importerOpts);
+                                  ASTContext &ctx);
 
 /// Finds a particular kind of nominal by looking through typealiases.
 template <typename T>

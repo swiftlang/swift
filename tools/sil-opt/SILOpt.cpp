@@ -274,6 +274,11 @@ static llvm::cl::opt<bool>
                      llvm::cl::desc("Enable C++ interop."),
                      llvm::cl::init(false));
 
+static llvm::cl::opt<bool>
+    IgnoreAlwaysInline("ignore-always-inline",
+                       llvm::cl::desc("Ignore [always_inline] attribute."),
+                       llvm::cl::init(false));
+
 static void runCommandLineSelectedPasses(SILModule *Module,
                                          irgen::IRGenModule *IRGenMod) {
   auto &opts = Module->getOptions();
@@ -398,6 +403,7 @@ int main(int argc, char **argv) {
   }
 
   SILOpts.EnableSpeculativeDevirtualization = EnableSpeculativeDevirtualization;
+  SILOpts.IgnoreAlwaysInline = IgnoreAlwaysInline;
 
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =

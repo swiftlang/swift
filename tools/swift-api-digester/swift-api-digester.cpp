@@ -2355,8 +2355,7 @@ static bool readBreakageAllowlist(SDKContext &Ctx, llvm::StringSet<> &lines) {
   invok.setModuleName("ForClangImporter");
   if (instance.setup(invok))
     return 1;
-  ClangImporterOptions impOpts;
-  auto importer = ClangImporter::create(instance.getASTContext(), impOpts);
+  auto importer = ClangImporter::create(instance.getASTContext());
   SmallString<128> preprocessedFilePath;
   if (auto error = llvm::sys::fs::createTemporaryFile(
     "breakage-allowlist-", "txt", preprocessedFilePath)) {
@@ -2426,9 +2425,8 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
   LeftCollector.deSerialize(LeftPath);
   SwiftDeclCollector RightCollector(Ctx);
   RightCollector.deSerialize(RightPath);
-  diagnoseModuleChange(Ctx, LeftCollector.getSDKRoot(), RightCollector.getSDKRoot(),
-                       OutputPath, std::move(ProtocolReqAllowlist));
-  return options::CompilerStyleDiags && Ctx.getDiags().hadAnyError() ? 1 : 0;
+  return diagnoseModuleChange(Ctx, LeftCollector.getSDKRoot(),
+    RightCollector.getSDKRoot(), OutputPath, std::move(ProtocolReqAllowlist));
 }
 
 static void populateAliasChanges(NodeMap &AliasMap, DiffVector &AllItems,
