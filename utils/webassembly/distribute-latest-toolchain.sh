@@ -29,7 +29,14 @@ get_artifact_url() {
 
 download_artifact() {
   local name=$1
-  github -L "$(get_artifact_url $name)" --fail -o "$name.zip"
+  local artifact_url="$(get_artifact_url $name)"
+
+  if [ -z "$artifact_url" ] || [ "$artifact_url" == "null" ]; then
+    echo "No successfully built artifacts available for $name"
+    exit 0
+  fi
+
+  github -L "$artifact_url" --fail -o "$name.zip"
 }
 
 is_released() {
