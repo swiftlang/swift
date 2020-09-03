@@ -1523,6 +1523,14 @@ ConstraintSystem::matchFunctionBuilder(
   assert(builder && "Bad function builder type");
   assert(builder->getAttrs().hasAttribute<FunctionBuilderAttr>());
 
+  if (InvalidFunctionBuilderBodies.count(fn)) {
+    auto *closure = cast<ClosureExpr>(fn.getAbstractClosureExpr());
+    (void)recordFix(
+        IgnoreInvalidFunctionBuilderBody::duringConstraintGeneration(
+            *this, getConstraintLocator(closure)));
+    return getTypeMatchSuccess();
+  }
+
   // Pre-check the body: pre-check any expressions in it and look
   // for return statements.
   auto request = PreCheckFunctionBuilderRequest{fn, fn.getBody(),
@@ -1539,7 +1547,7 @@ ConstraintSystem::matchFunctionBuilder(
 
     if (auto *closure =
             dyn_cast_or_null<ClosureExpr>(fn.getAbstractClosureExpr())) {
-      auto failed = recordFix(IgnoreInvalidFunctionBuilderBody::create(
+      auto failed = recordFix(IgnoreInvalidFunctionBuilderBody::duringPreCheck(
           *this, getConstraintLocator(closure)));
       return failed ? getTypeMatchFailure(locator) : getTypeMatchSuccess();
     }
@@ -1598,9 +1606,27 @@ ConstraintSystem::matchFunctionBuilder(
   BuilderClosureVisitor visitor(getASTContext(), this, dc, builderType,
                                 bodyResultType);
 
-  auto applied = visitor.apply(fn.getBody());
-  if (!applied)
-    return getTypeMatchFailure(locator);
+  Optional<AppliedBuilderTransform> applied = None;
+  {
+    DiagnosticTransaction transaction(dc->getASTContext().Diags);
+
+    applied = visitor.apply(fn.getBody());
+    if (!applied)
+      return getTypeMatchFailure(locator);
+
+    if (transaction.hasErrors()) {
+      if (auto *closure =
+              dyn_cast_or_null<ClosureExpr>(fn.getAbstractClosureExpr())) {
+        InvalidFunctionBuilderBodies.insert(fn);
+        auto failed = recordFix(
+            IgnoreInvalidFunctionBuilderBody::duringConstraintGeneration(
+                *this, getConstraintLocator(closure)));
+        return failed ? getTypeMatchFailure(locator) : getTypeMatchSuccess();
+      }
+
+      return getTypeMatchFailure(locator);
+    }
+  }
 
   Type transformedType = getType(applied->returnExpr);
   assert(transformedType && "Missing type");
@@ -1687,7 +1713,7 @@ public:
 
       HasError |= ConstraintSystem::preCheckExpression(
           E, DC, /*replaceInvalidRefsWithErrors=*/false);
-      HasError |= transaction.hasDiagnostics();
+      HasError |= transaction.hasErrors();
 
       if (SuppressDiagnostics)
         transaction.abort();
