@@ -284,7 +284,7 @@ class alignas(1 << DeclAlignInBits) Decl {
 protected:
   union { uint64_t OpaqueBits;
 
-  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1,
+  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1,
     Kind : bitmax(NumDeclKindBits,8),
 
     /// Whether this declaration is invalid.
@@ -301,7 +301,13 @@ protected:
 
     /// Whether this declaration was added to the surrounding
     /// DeclContext of an active #if config clause.
-    EscapedFromIfConfig : 1
+    EscapedFromIfConfig : 1,
+
+    /// Whether this declaration is syntactically scoped inside of
+    /// a local context, but should behave like a top-level
+    /// declaration for name lookup purposes. This is used by
+    /// lldb.
+    Hoisted : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(PatternBindingDecl, Decl, 1+2+16,
@@ -690,6 +696,7 @@ protected:
     Bits.Decl.Implicit = false;
     Bits.Decl.FromClang = false;
     Bits.Decl.EscapedFromIfConfig = false;
+    Bits.Decl.Hoisted = false;
   }
 
   /// Get the Clang node associated with this declaration.
@@ -836,6 +843,16 @@ public:
 
   /// Mark this declaration as implicit.
   void setImplicit(bool implicit = true) { Bits.Decl.Implicit = implicit; }
+
+  /// Determine whether this declaration is syntactically scoped inside of
+  /// a local context, but should behave like a top-level declaration
+  /// for name lookup purposes. This is used by lldb.
+  bool isHoisted() const { return Bits.Decl.Hoisted; }
+
+  /// Set whether this declaration should be syntactically scoped inside
+  /// of a local context, but should behave like a top-level declaration,
+  /// but should behave like a top-level declaration. This is used by lldb.
+  void setHoisted(bool hoisted = true) { Bits.Decl.Hoisted = hoisted; }
 
 public:
   bool escapedFromIfConfig() const {

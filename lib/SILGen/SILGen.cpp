@@ -1889,6 +1889,12 @@ public:
       SGM.visit(D);
     }
 
+    for (Decl *D : sf->getHoistedDecls()) {
+      FrontendStatsTracer StatsTracer(SGM.getASTContext().Stats,
+                                      "SILgen-decl", D);
+      SGM.visit(D);
+    }
+
     for (TypeDecl *TD : sf->LocalTypeDecls) {
       FrontendStatsTracer StatsTracer(SGM.getASTContext().Stats,
                                       "SILgen-tydecl", TD);
