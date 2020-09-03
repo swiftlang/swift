@@ -108,8 +108,7 @@ void CompilerInvocation::setDefaultPrebuiltCacheIfNecessary() {
     llvm::sys::path::append(defaultPrebuiltPathWithSDKVer, ver->getAsString());
     // If the versioned prebuilt module cache exists in the disk, use it.
     if (llvm::sys::fs::exists(defaultPrebuiltPathWithSDKVer)) {
-      FrontendOpts.PrebuiltModuleCachePath =
-          std::string(defaultPrebuiltPathWithSDKVer.str());
+      FrontendOpts.PrebuiltModuleCachePath = std::string(defaultPrebuiltPathWithSDKVer.str());
       return;
     }
   }

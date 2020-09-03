@@ -969,10 +969,6 @@ ClangImporter::createClangInvocation(ClangImporter *importer,
                                                 nullptr, false, CC1Args);
 }
 
-ArrayRef<std::string> ClangImporter::getExtraClangArgs() const {
-  return Impl.ExtraClangArgs;
-}
-
 std::unique_ptr<ClangImporter>
 ClangImporter::create(ASTContext &ctx,
                       std::string swiftPCHHash, DependencyTracker *tracker,
@@ -982,7 +978,6 @@ ClangImporter::create(ASTContext &ctx,
   auto &importerOpts = ctx.ClangImporterOpts;
   importer->Impl.ClangArgs = getClangArguments(ctx);
   ArrayRef<std::string> invocationArgStrs = importer->Impl.ClangArgs;
-  importer->Impl.ExtraClangArgs = importerOpts.ExtraArgs;
   if (importerOpts.DumpClangDiagnostics) {
     llvm::errs() << "'";
     llvm::interleave(
