@@ -64,10 +64,8 @@ MOCK_CONFIG = {
 
 
 def call_quietly(*args, **kwargs):
-    with open(os.devnull, 'w') as f:
-        kwargs['stdout'] = f
-        kwargs['stderr'] = f
-        subprocess.check_call(*args, **kwargs)
+    result = subprocess.run(*args, capture_output=True, **kwargs)
+    return (result.stdout, result.stderr)
 
 
 def create_dir(d):
@@ -156,4 +154,4 @@ class SchemeMockTestCase(unittest.TestCase):
 
     def call(self, *args, **kwargs):
         kwargs['cwd'] = self.source_root
-        call_quietly(*args, **kwargs)
+        return call_quietly(*args, **kwargs)

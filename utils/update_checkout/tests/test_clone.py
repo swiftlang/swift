@@ -23,3 +23,11 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
                    '--config', self.config_path,
                    '--source-root', self.source_root,
                    '--clone'])
+
+    def test_quiet_clone(self):
+        _, stderr = self.call([self.update_checkout_path,
+                               '--quiet',
+                               '--config', self.config_path,
+                               '--source-root', self.source_root,
+                               '--clone'])
+        self.assertRegex(stderr.decode(), 'git fetch .*--quiet')
