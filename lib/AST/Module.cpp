@@ -2342,6 +2342,10 @@ ArrayRef<Decl *> SourceFile::getTopLevelDecls() const {
                            {}).TopLevelDecls;
 }
 
+ArrayRef<Decl *> SourceFile::getHoistedDecls() const {
+  return Hoisted;
+}
+
 bool FileUnit::walk(ASTWalker &walker) {
   SmallVector<Decl *, 64> Decls;
   getTopLevelDecls(Decls);

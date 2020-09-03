@@ -585,6 +585,9 @@ namespace {
       if (D->isImplicit())
         PrintWithColorRAII(OS, DeclModifierColor) << " implicit";
 
+      if (D->isHoisted())
+        PrintWithColorRAII(OS, DeclModifierColor) << " hoisted";
+
       auto R = D->getSourceRange();
       if (R.isValid()) {
         PrintWithColorRAII(OS, RangeColor) << " range=";
