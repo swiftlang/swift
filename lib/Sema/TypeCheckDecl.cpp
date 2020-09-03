@@ -2459,6 +2459,18 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
 
 namespace {
 
+/// A kind that's used to roughly sort the members of
+enum class SortedDeclKind: uint8_t {
+  EnumCase,
+  Type,
+  Initializer,
+  Deinitializer,
+  Property,
+  Function,
+  Operator,
+  Other
+};
+
 // Utility class for deterministically ordering implicit entries.
 struct SortedDeclList {
   using Entry = std::pair<ValueDecl *, std::string>;
@@ -2475,17 +2487,109 @@ struct SortedDeclList {
 
   bool empty() { return elts.empty(); }
 
+  static SortedDeclKind getSortedDeclKind(ValueDecl *valueDecl){
+    switch (valueDecl->getKind()) {
+      case DeclKind::EnumCase:
+      case DeclKind::EnumElement:
+        return SortedDeclKind::EnumCase;
+
+      case DeclKind::AssociatedType:
+      case DeclKind::Class:
+      case DeclKind::Enum:
+      case DeclKind::GenericTypeParam:
+      case DeclKind::OpaqueType:
+      case DeclKind::Protocol:
+      case DeclKind::Struct:
+      case DeclKind::TypeAlias:
+        return SortedDeclKind::Type;
+
+      case DeclKind::Constructor:
+        return SortedDeclKind::Initializer;
+
+      case DeclKind::Destructor:
+        return SortedDeclKind::Deinitializer;
+
+      case DeclKind::Param:
+      case DeclKind::PatternBinding:
+      case DeclKind::Var:
+        return SortedDeclKind::Property;
+
+      case DeclKind::Accessor:
+        return SortedDeclKind::Function;
+
+      case DeclKind::Func:
+        return cast<FuncDecl>(valueDecl)->isOperator()
+            ? SortedDeclKind::Operator
+            : SortedDeclKind::Function;
+
+
+      case DeclKind::InfixOperator:
+      case DeclKind::PrecedenceGroup:
+      case DeclKind::PrefixOperator:
+      case DeclKind::PostfixOperator:
+      case DeclKind::Subscript:
+        return SortedDeclKind::Operator;
+
+      case DeclKind::Extension:
+      case DeclKind::IfConfig:
+      case DeclKind::Import:
+      case DeclKind::MissingMember:
+      case DeclKind::Module:
+      case DeclKind::TopLevelCode:
+      case DeclKind::PoundDiagnostic:
+        return SortedDeclKind::Other;
+    }
+  }
+
+  /// Categorizes the prefix of a given name.
+  enum class NamePrefix {
+    Unadorned,
+    Underscore,
+    Dollar
+  };
+
+  static std::pair<StringRef, NamePrefix> getNameWithPrefix(StringRef name) {
+    if (name.empty())
+      return { name, NamePrefix::Unadorned };
+
+    if (name[0] == '_')
+      return { name.drop_front(), NamePrefix::Underscore };
+
+    if (name[0] == '$')
+      return { name.drop_front(), NamePrefix::Dollar };
+
+    return { name, NamePrefix::Unadorned };
+  }
+
+  static bool namePrecedes(DeclName lhs, DeclName rhs) {
+    auto lhsBaseName = lhs.getBaseName();
+    auto rhsBaseName = rhs.getBaseName();
+    if (lhsBaseName == rhsBaseName)
+      return lhs < rhs;
+
+    auto lhsUserFacing = getNameWithPrefix(lhsBaseName.userFacingName());
+    auto rhsUserFacing = getNameWithPrefix(rhsBaseName.userFacingName());
+    return lhsUserFacing < rhsUserFacing;
+  }
+
   void sort() {
     assert(!sorted);
     sorted = true;
     std::sort(elts.begin(),
               elts.end(),
               [](Entry &lhs, Entry &rhs) -> bool {
+                auto lhsSortedKind = getSortedDeclKind(lhs.first);
+                auto rhsSortedKind = getSortedDeclKind(rhs.first);
+                if (lhsSortedKind != rhsSortedKind)
+                  return lhsSortedKind < rhsSortedKind;
+
                 if (lhs.first->getKind() != rhs.first->getKind())
                   return lhs.first->getKind() < rhs.first->getKind();
 
-                if (lhs.first->getName() != rhs.first->getName())
-                  return lhs.first->getName() < rhs.first->getName();
+                if (lhs.first->getName() != rhs.first->getName()) {
+                  return namePrecedes(
+                      lhs.first->getName(), rhs.first->getName());
+                }
 
                 Type lhsType = lhs.first->getInterfaceType();
                 Type rhsType = rhs.first->getInterfaceType();

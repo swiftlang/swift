@@ -45,8 +45,8 @@
 // CHECK-SAME: SWIFT_AVAILABILITY(macos,unavailable,message="'unavailableOnMacOSPropertyInFavorOfCount' has been renamed to 'count': This property is unavailable in favor to the old count property");
 
 // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
-// CHECK-NEXT: - (nonnull instancetype)initWithObjects:(id _Nonnull const * _Nullable)objects count:(NSUInteger)cnt OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: - (nullable instancetype)initWithCoder:(NSCoder * _Nonnull){{[a-zA-Z]+}} OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (nonnull instancetype)initWithObjects:(id _Nonnull const * _Nullable)objects count:(NSUInteger)cnt OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: @end
 
 

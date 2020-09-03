@@ -382,14 +382,14 @@ public class E2_InitializerStub : InitializerWithDisappearingType {
 
 // CHECK-LABEL: class E2_InitializerStub : InitializerWithDisappearingType {
 // CHECK-NEXT: init(unrelatedValue: Int)
-// CHECK-NEXT: init(boxedInt box: BoxedInt)
 // CHECK-NEXT: init()
+// CHECK-NEXT: init(boxedInt box: BoxedInt)
 // CHECK-NEXT: {{^}$}}
 
 // CHECK-RECOVERY-LABEL: class E2_InitializerStub : InitializerWithDisappearingType {
 // CHECK-RECOVERY-NEXT: init(unrelatedValue: Int)
-// CHECK-RECOVERY-NEXT: /* placeholder for init(boxedInt:) */
 // CHECK-RECOVERY-NEXT: init()
+// CHECK-RECOVERY-NEXT: /* placeholder for init(boxedInt:) */
 // CHECK-RECOVERY-NEXT: {{^}$}}
 
 #endif // TEST

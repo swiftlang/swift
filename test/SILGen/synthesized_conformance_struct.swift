@@ -7,18 +7,18 @@ struct Struct<T> {
 
 // CHECK-LABEL: struct Struct<T> {
 // CHECK:   @_hasStorage var x: T { get set }
-// CHECK:   init(x: T)
 // CHECK:   enum CodingKeys : CodingKey {
 // CHECK:     case x
-// CHECK-FRAGILE:   @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: Struct<T>.CodingKeys, _ b: Struct<T>.CodingKeys) -> Bool
-// CHECK-RESILIENT: static func == (a: Struct<T>.CodingKeys, b: Struct<T>.CodingKeys) -> Bool
-// CHECK:     var hashValue: Int { get }
-// CHECK:     func hash(into hasher: inout Hasher)
-// CHECK:     var stringValue: String { get }
-// CHECK:     init?(stringValue: String)
-// CHECK:     var intValue: Int? { get }
 // CHECK:     init?(intValue: Int)
+// CHECK:     init?(stringValue: String)
+// CHECK:     var hashValue: Int { get }
+// CHECK:     var intValue: Int? { get }
+// CHECK:     var stringValue: String { get }
+// CHECK-FRAGILE:   @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: Struct<T>.CodingKeys, _ b: Struct<T>.CodingKeys) -> Bool
+// CHECK:     func hash(into hasher: inout Hasher)
+// CHECK-RESILIENT: static func == (a: Struct<T>.CodingKeys, b: Struct<T>.CodingKeys) -> Bool
 // CHECK:   }
+// CHECK:   init(x: T)
 // CHECK: }
 // CHECK-LABEL: extension Struct : Equatable where T : Equatable {
 // CHECK-FRAGILE:   @_implements(Equatable, ==(_:_:)) static func __derived_struct_equals(_ a: Struct<T>, _ b: Struct<T>) -> Bool

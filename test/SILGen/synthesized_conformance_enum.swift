@@ -13,10 +13,10 @@ enum NoValues {
 }
 // CHECK-LABEL: enum NoValues {
 // CHECK:   case a, b
-// CHECK-FRAGILE:   @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: NoValues, _ b: NoValues) -> Bool
-// CHECK-RESILIENT: static func == (a: NoValues, b: NoValues) -> Bool
 // CHECK:   var hashValue: Int { get }
+// CHECK-FRAGILE:   @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: NoValues, _ b: NoValues) -> Bool
 // CHECK:   func hash(into hasher: inout Hasher)
+// CHECK-RESILIENT: static func == (a: NoValues, b: NoValues) -> Bool
 // CHECK: }
 
 // CHECK-LABEL: extension Enum : Equatable where T : Equatable {

@@ -175,8 +175,8 @@ class DiscardableResult : NSObject {
 // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: - (nonnull instancetype)initWithFloat:(float)f SWIFT_UNAVAILABLE;
 // CHECK-NEXT: - (nonnull instancetype)initWithMoreFun SWIFT_UNAVAILABLE;
-// CHECK-NEXT: - (nonnull instancetype)initForFun SWIFT_UNAVAILABLE;
 // CHECK-NEXT: - (nonnull instancetype)initWithEvenMoreFun SWIFT_UNAVAILABLE;
+// CHECK-NEXT: - (nonnull instancetype)initForFun SWIFT_UNAVAILABLE;
 // CHECK-NEXT: @end
 @objc class InheritedInitializers : Initializers {
   override init() {

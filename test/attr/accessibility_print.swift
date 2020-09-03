@@ -29,8 +29,8 @@ struct BA_DefaultStruct {
 private struct BB_PrivateStruct {
   // CHECK: internal var x
   var x = 0
-  // CHECK: internal init(x: Int = 0)
   // CHECK: internal init()
+  // CHECK: internal init(x: Int = 0)
 } // CHECK: {{^[}]}}
 
 // CHECK-LABEL: internal{{(\*/)?}} struct BC_InternalStruct {
@@ -44,24 +44,24 @@ internal struct BC_InternalStruct {
 public struct BD_PublicStruct {
   // CHECK: internal var x
   var x = 0
-  // CHECK: internal init(x: Int = 0)
   // CHECK: internal init()
+  // CHECK: internal init(x: Int = 0)
 } // CHECK: {{^[}]}}
 
 // CHECK-LABEL: public{{(\*/)?}} struct BE_PublicStructPrivateMembers {
 public struct BE_PublicStructPrivateMembers {
   // CHECK: private{{(\*/)?}} var x
   private var x = 0
-  // CHECK: private init(x: Int = 0)
   // CHECK: internal init()
+  // CHECK: private init(x: Int = 0)
 } // CHECK: {{^[}]}}
 
 // CHECK-LABEL: {{^}}fileprivate{{(\*/)?}} struct BF_FilePrivateStruct {
 fileprivate struct BF_FilePrivateStruct {
   // CHECK: {{^}} internal var x
   var x = 0
-  // CHECK: {{^}} internal init(x: Int = 0)
   // CHECK: {{^}} internal init()
+  // CHECK: {{^}} internal init(x: Int = 0)
 } // CHECK: {{^[}]}}
 
 

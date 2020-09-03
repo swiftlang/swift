@@ -176,9 +176,9 @@
 // CHECK-NEXT: - (nonnull instancetype)initWithX:(NSInteger)x SWIFT_UNAVAILABLE;
 // CHECK-NEXT: - (nonnull instancetype)initWithDeprecatedZ:(NSInteger)deprecatedZ OBJC_DESIGNATED_INITIALIZER SWIFT_DEPRECATED_MSG("init(deprecatedZ:) was deprecated. Use the new one instead", "initWithNewZ:")
 // CHECK-NEXT: - (nonnull instancetype)initWithNewZ:(NSInteger)z OBJC_DESIGNATED_INITIALIZER;
-// CHECK-NEXT: - (nonnull instancetype)initWithFirst:(NSInteger)first second:(NSInteger)second SWIFT_UNAVAILABLE;
 // CHECK-NEXT: - (nonnull instancetype)initWithDeprecatedFirst:(NSInteger)first second:(NSInteger)second SWIFT_UNAVAILABLE;
 // CHECK-NEXT: - (nonnull instancetype)initWithDeprecatedOnMacOSFirst:(NSInteger)first second:(NSInteger)second SWIFT_UNAVAILABLE;
+// CHECK-NEXT: - (nonnull instancetype)initWithFirst:(NSInteger)first second:(NSInteger)second SWIFT_UNAVAILABLE;
 // CHECK: @end
 
 // CHECK-LABEL: SWIFT_AVAILABILITY(macos,deprecated=0.0.1,message="'DeprecatedAvailability' has been renamed to 'SWTReplacementAvailable'")

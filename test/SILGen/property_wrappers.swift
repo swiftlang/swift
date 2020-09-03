@@ -84,16 +84,6 @@ func forceHasMemberwiseInit() {
 // CHECK: function_ref @$sSb22_builtinBooleanLiteralSbBi1__tcfC : $@convention(method) (Builtin.Int1, @thin Bool.Type) -> Bool
 // CHECK: return {{%.*}} : $Bool
 
-// default argument 0 of HasMemberwiseInit.init(x:y:z:)
-// CHECK: sil hidden [ossa] @$s17property_wrappers17HasMemberwiseInitV1x1y1zACyxGAA7WrapperVySbG_xAA0F16WithInitialValueVySiGtcfcfA_ : $@convention(thin) <T where T : DefaultInit> () -> Wrapper<Bool> 
-
-// default argument 1 of HasMemberwiseInit.init(x:y:z:)
-// CHECK: sil hidden [ossa] @$s17property_wrappers17HasMemberwiseInitV1x1y1zACyxGAA7WrapperVySbG_xAA0F16WithInitialValueVySiGtcfcfA0_ : $@convention(thin) <T where T : DefaultInit> () -> @out T {
-
-// default argument 2 of HasMemberwiseInit.init(x:y:z:)
-// CHECK: sil hidden [ossa] @$s17property_wrappers17HasMemberwiseInitV1x1y1zACyxGAA7WrapperVySbG_xAA0F16WithInitialValueVySiGtcfcfA1_ : $@convention(thin) <T where T : DefaultInit> () -> WrapperWithInitialValue<Int> {
-
-
 // HasMemberwiseInit.init()
 // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers17HasMemberwiseInitVACyxGycfC : $@convention(method) <T where T : DefaultInit> (@thin HasMemberwiseInit<T>.Type) -> @out HasMemberwiseInit<T> {
 
@@ -116,6 +106,15 @@ func forceHasMemberwiseInit() {
 // CHECK: function_ref @$s17property_wrappers17HasMemberwiseInitV2_p33_{{.*}}23WrapperWithInitialValueVySbGvpfi : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> () -> Bool
 // CHECK-NOT: return
 // CHECK: function_ref @$s17property_wrappers17HasMemberwiseInitV1p33_{{.*}} : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> (Bool) -> WrapperWithInitialValue<Bool>
+
+// default argument 0 of HasMemberwiseInit.init(x:y:z:)
+// CHECK: sil hidden [ossa] @$s17property_wrappers17HasMemberwiseInitV1x1y1zACyxGAA7WrapperVySbG_xAA0F16WithInitialValueVySiGtcfcfA_ : $@convention(thin) <T where T : DefaultInit> () -> Wrapper<Bool> 
+
+// default argument 1 of HasMemberwiseInit.init(x:y:z:)
+// CHECK: sil hidden [ossa] @$s17property_wrappers17HasMemberwiseInitV1x1y1zACyxGAA7WrapperVySbG_xAA0F16WithInitialValueVySiGtcfcfA0_ : $@convention(thin) <T where T : DefaultInit> () -> @out T {
+
+// default argument 2 of HasMemberwiseInit.init(x:y:z:)
+// CHECK: sil hidden [ossa] @$s17property_wrappers17HasMemberwiseInitV1x1y1zACyxGAA7WrapperVySbG_xAA0F16WithInitialValueVySiGtcfcfA1_ : $@convention(thin) <T where T : DefaultInit> () -> WrapperWithInitialValue<Int> {
 
 // CHECK: return
 
@@ -412,9 +411,9 @@ struct CompositionMembers {
   // CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers18CompositionMembersV3_p233_{{.*}}8WrapperAVyAA0N1BVyAA0N1CVySSGGGvpfi : $@convention(thin) () -> @owned Optional<String> {
   // CHECK: %0 = string_literal utf8 "Hello"
 
-  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers18CompositionMembersV2p12p2ACSiSg_SSSgtcfC : $@convention(method) (Optional<Int>, @owned Optional<String>, @thin CompositionMembers.Type) -> @owned CompositionMembers
   // CHECK: s17property_wrappers18CompositionMembersV3_p233_{{.*}}8WrapperAVyAA0N1BVyAA0N1CVySSGGGvpfi
 
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers18CompositionMembersV2p12p2ACSiSg_SSSgtcfC : $@convention(method) (Optional<Int>, @owned Optional<String>, @thin CompositionMembers.Type) -> @owned CompositionMembers
 }
 
 func testComposition() {

@@ -15,13 +15,6 @@ enum E {
   case E3
 }
 
-// Check if the == comparison can be compiled to a simple icmp instruction.
-
-// CHECK-NORMAL-LABEL:define hidden swiftcc i1 @"$s12enum_derived1EO02__b1_A7_equalsySbAC_ACtFZ"(i8 %0, i8 %1)
-// CHECK-TESTABLE-LABEL:define{{( dllexport)?}}{{( protected)?}} swiftcc i1 @"$s12enum_derived1EO02__b1_A7_equalsySbAC_ACtFZ"(i8 %0, i8 %1)
-// CHECK: %2 = icmp eq i8 %0, %1
-// CHECK: ret i1 %2
-
 // Check for the presence of the hashValue getter, calling Hasher.init() and
 // Hasher.finalize().
 
@@ -31,6 +24,14 @@ enum E {
 // CHECK: call swiftcc i{{[0-9]+}} @"$ss6HasherV9_finalizeSiyF"(%Ts6HasherV* {{.*}})
 // CHECK: ret i{{[0-9]+}} %{{[0-9]+}}
 
+// Check if the == comparison can be compiled to a simple icmp instruction.
+
+// CHECK-NORMAL-LABEL:define hidden swiftcc i1 @"$s12enum_derived1EO02__b1_A7_equalsySbAC_ACtFZ"(i8 %0, i8 %1)
+// CHECK-TESTABLE-LABEL:define{{( dllexport)?}}{{( protected)?}} swiftcc i1 @"$s12enum_derived1EO02__b1_A7_equalsySbAC_ACtFZ"(i8 %0, i8 %1)
+// CHECK: %2 = icmp eq i8 %0, %1
+// CHECK: ret i1 %2
+
+// Derived conformances from extensions
 // Check if the hash(into:) method can be compiled to a simple zext instruction
 // followed by a call to Hasher._combine(_:).
 
@@ -40,7 +41,6 @@ enum E {
 // CHECK: tail call swiftcc void @"$ss6HasherV8_combineyySuF"(i{{.*}} [[V]], %Ts6HasherV*
 // CHECK: ret void
 
-// Derived conformances from extensions
 // The actual enums are in Inputs/def_enum.swift
 
 extension def_enum.TrafficLight : Error {}
