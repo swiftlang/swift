@@ -4840,8 +4840,8 @@ VarDecl *VarDecl::getOriginalWrappedProperty(
   case PropertyWrapperSynthesizedPropertyKind::Backing:
     return this == wrapperInfo.backingVar ? original : nullptr;
 
-  case PropertyWrapperSynthesizedPropertyKind::StorageWrapper:
-    return this == wrapperInfo.storageWrapperVar ? original : nullptr;
+  case PropertyWrapperSynthesizedPropertyKind::Projection:
+    return this == wrapperInfo.projectionVar ? original : nullptr;
   }
   llvm_unreachable("covered switch");
 }

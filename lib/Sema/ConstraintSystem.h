@@ -3436,9 +3436,9 @@ public:
                       ConstraintLocator::PathElementKind kind) const;
 
   /// Gets the VarDecl associateed with resolvedOverload, and the type of the
-  /// storage wrapper if the decl has an associated storage wrapper.
+  /// projection if the decl has an associated property wrapper with a projectedValue.
   Optional<std::pair<VarDecl *, Type>>
-  getStorageWrapperInformation(SelectedOverload resolvedOverload);
+  getPropertyWrapperProjectionInfo(SelectedOverload resolvedOverload);
 
   /// Gets the VarDecl associateed with resolvedOverload, and the type of the
   /// backing storage if the decl has an associated property wrapper.

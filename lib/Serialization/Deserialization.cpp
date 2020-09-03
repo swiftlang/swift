@@ -2905,13 +2905,13 @@ public:
       }
 
       VarDecl *backingVar = cast<VarDecl>(backingDecl.get());
-      VarDecl *storageWrapperVar = nullptr;
+      VarDecl *projectionVar = nullptr;
       if (numBackingProperties > 1) {
-        storageWrapperVar = cast<VarDecl>(MF.getDecl(backingPropertyIDs[1]));
+        projectionVar = cast<VarDecl>(MF.getDecl(backingPropertyIDs[1]));
       }
 
       PropertyWrapperBackingPropertyInfo info(
-          backingVar, storageWrapperVar, nullptr, nullptr);
+          backingVar, projectionVar, nullptr, nullptr);
       ctx.evaluator.cacheOutput(
           PropertyWrapperBackingPropertyInfoRequest{var}, std::move(info));
       ctx.evaluator.cacheOutput(
@@ -2919,8 +2919,8 @@ public:
           backingVar->getInterfaceType());
       backingVar->setOriginalWrappedProperty(var);
 
-      if (storageWrapperVar)
-        storageWrapperVar->setOriginalWrappedProperty(var);
+      if (projectionVar)
+        projectionVar->setOriginalWrappedProperty(var);
     }
 
     return var;

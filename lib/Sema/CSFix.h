@@ -799,15 +799,15 @@ public:
 
 class UsePropertyWrapper final : public ConstraintFix {
   VarDecl *Wrapped;
-  bool UsingStorageWrapper;
+  bool UsingProjection;
   Type Base;
   Type Wrapper;
 
   UsePropertyWrapper(ConstraintSystem &cs, VarDecl *wrapped,
-                     bool usingStorageWrapper, Type base, Type wrapper,
+                     bool usingProjection, Type base, Type wrapper,
                      ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::UsePropertyWrapper, locator),
-        Wrapped(wrapped), UsingStorageWrapper(usingStorageWrapper), Base(base),
+        Wrapped(wrapped), UsingProjection(usingProjection), Base(base),
         Wrapper(wrapper) {}
 
 public:
@@ -822,7 +822,7 @@ public:
   }
 
   static UsePropertyWrapper *create(ConstraintSystem &cs, VarDecl *wrapped,
-                                    bool usingStorageWrapper, Type base,
+                                    bool usingProjection, Type base,
                                     Type wrapper, ConstraintLocator *locator);
 };
 
@@ -836,7 +836,7 @@ class UseWrappedValue final : public ConstraintFix {
       : ConstraintFix(cs, FixKind::UseWrappedValue, locator),
         PropertyWrapper(propertyWrapper), Base(base), Wrapper(wrapper) {}
 
-  bool usingStorageWrapper() const {
+  bool usingProjection() const {
     auto nameStr = PropertyWrapper->getName().str();
     return !nameStr.startswith("_");
   }

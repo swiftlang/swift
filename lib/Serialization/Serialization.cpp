@@ -3312,9 +3312,9 @@ public:
         ++numBackingProperties;
         arrayFields.push_back(S.addDeclRef(backingInfo.backingVar));
       }
-      if (backingInfo.storageWrapperVar) {
+      if (backingInfo.projectionVar) {
         ++numBackingProperties;
-        arrayFields.push_back(S.addDeclRef(backingInfo.storageWrapperVar));
+        arrayFields.push_back(S.addDeclRef(backingInfo.projectionVar));
       }
     }
     for (Type dependency : collectDependenciesFromType(ty->getCanonicalType()))

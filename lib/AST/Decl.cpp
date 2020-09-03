@@ -5908,8 +5908,8 @@ VarDecl::getPropertyWrapperSynthesizedPropertyKind() const {
           PropertyWrapperSynthesizedPropertyKind::Backing))
     return PropertyWrapperSynthesizedPropertyKind::Backing;
   if (getOriginalWrappedProperty(
-          PropertyWrapperSynthesizedPropertyKind::StorageWrapper))
-    return PropertyWrapperSynthesizedPropertyKind::StorageWrapper;
+          PropertyWrapperSynthesizedPropertyKind::Projection))
+    return PropertyWrapperSynthesizedPropertyKind::Projection;
   return None;
 }
 
@@ -5917,8 +5917,8 @@ VarDecl *VarDecl::getPropertyWrapperBackingProperty() const {
   return getPropertyWrapperBackingPropertyInfo().backingVar;
 }
 
-VarDecl *VarDecl::getPropertyWrapperStorageWrapper() const {
-  return getPropertyWrapperBackingPropertyInfo().storageWrapperVar;
+VarDecl *VarDecl::getPropertyWrapperProjectionVar() const {
+  return getPropertyWrapperBackingPropertyInfo().projectionVar;
 }
 
 VarDecl *VarDecl::getLazyStorageProperty() const {
