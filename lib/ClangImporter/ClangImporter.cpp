@@ -461,6 +461,41 @@ getGlibcModuleMapPath(SearchPathOptions& Opts, llvm::Triple triple,
   return None;
 }
 
+static Optional<StringRef>
+getWasiLibcModuleMapPath(SearchPathOptions& Opts, llvm::Triple triple,
+                         SmallVectorImpl<char> &buffer) {
+  StringRef platform = swift::getPlatformNameForTriple(triple);
+  StringRef arch = swift::getMajorArchitectureName(triple);
+
+  if (!Opts.SDKPath.empty()) {
+    buffer.clear();
+    buffer.append(Opts.SDKPath.begin(), Opts.SDKPath.end());
+    llvm::sys::path::append(buffer, "usr", "lib", "swift");
+    llvm::sys::path::append(buffer, platform, arch, "wasi.modulemap");
+
+    // Only specify the module map if that file actually exists.  It may not;
+    // for example in the case that `swiftc -target x86_64-unknown-linux-gnu
+    // -emit-ir` is invoked using a Swift compiler not built for Linux targets.
+    if (llvm::sys::fs::exists(buffer))
+      return StringRef(buffer.data(), buffer.size());
+  }
+
+  if (!Opts.RuntimeResourcePath.empty()) {
+    buffer.clear();
+    buffer.append(Opts.RuntimeResourcePath.begin(),
+                  Opts.RuntimeResourcePath.end());
+    llvm::sys::path::append(buffer, platform, arch, "wasi.modulemap");
+
+    // Only specify the module map if that file actually exists.  It may not;
+    // for example in the case that `swiftc -target x86_64-unknown-linux-gnu
+    // -emit-ir` is invoked using a Swift compiler not built for Linux targets.
+    if (llvm::sys::fs::exists(buffer))
+      return StringRef(buffer.data(), buffer.size());
+  }
+
+  return None;
+}
+
 void
 importer::getNormalInvocationArguments(
     std::vector<std::string> &invocationArgStrs,
@@ -604,6 +639,10 @@ importer::getNormalInvocationArguments(
 
     if (triple.isOSWASI()) {
       invocationArgStrs.insert(invocationArgStrs.end(), {"-D_WASI_EMULATED_MMAN"});
+      SmallString<128> buffer;
+      if (auto path = getWasiLibcModuleMapPath(searchPathOpts, triple, buffer)) {
+        invocationArgStrs.push_back((Twine("-fmodule-map-file=") + *path).str());
+      }
     }
 
     if (triple.isOSWindows()) {

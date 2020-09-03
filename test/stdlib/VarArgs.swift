@@ -9,6 +9,9 @@ import Swift
 #elseif canImport(Glibc)
   import Glibc
   typealias CGFloat = Double
+#elseif os(WASI)
+  import WASILibc
+  typealias CGFloat = Double
 #elseif os(Windows)
   import MSVCRT
   #if arch(x86_64) || arch(arm64)
