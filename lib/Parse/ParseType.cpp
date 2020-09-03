@@ -505,8 +505,8 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
     // function type
     BacktrackingScope backtrack(*this);
     
-    if (Tok.is(tok::kw_throws))
-      throwsLoc = consumeToken();
+    throwsLoc = consumeToken();
+    
     
     ParserResult<TypeRepr> throwsTypeResult = parseThrowsType();
     
@@ -546,15 +546,20 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       Builder.useReturnType(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
       Builder.useArrow(SyntaxContext->popToken());
       if (throwsLoc.isValid()) {
+        Builder.useThrowsOrRethrowsKeyword(SyntaxContext->popToken());
         if (throwsType) {
-          ParsedTypedThrowsOrRethrowsClauseSyntaxBuilder ThrowsBuilder(*SyntaxContext);
-          ThrowsBuilder.useRightParen(SyntaxContext->popToken());
-          ThrowsBuilder.useThrowsType(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
-          ThrowsBuilder.useLeftParen(SyntaxContext->popToken());
-          ThrowsBuilder.useThrowsOrRethrowsKeyword(SyntaxContext->popToken());
-          Builder.useThrowsOrRethrows(ThrowsBuilder.build());
-        } else {
-          Builder.useThrowsOrRethrows(SyntaxContext->popToken());
+          auto InputNode(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
+          if (auto ParenthesizedTypeNode = InputNode.getAs<ParsedParenthesizedExpressionSyntax>()) {
+            auto LeftParen = ParenthesizedTypeNode->getDeferredLeftParen();
+            auto Type = ParenthesizedTypeNode->getDeferredThrowsType();
+            auto RightParen = ParenthesizedTypeNode->getDeferredRightParen();
+            
+            ParsedParenthesizedExpressionSyntaxBuilder ThrowTypeBuilder(*SyntaxContext);
+            ThrowTypeBuilder.useLeftParen(std::move(LeftParen));
+            ThrowTypeBuilder.useThrowsType(std::move(Type));
+            ThrowTypeBuilder.useRightParen(std::move(RightParen));
+            Builder.useThrowsOrRethrowsType(ThrowTypeBuilder.build());
+          }
         }
       }
       if (asyncLoc.isValid())

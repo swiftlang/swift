@@ -394,9 +394,10 @@ FunctionSignatureSyntax getCannedFunctionSignature() {
                                                                     LParen,
                                                                     Error,
                                                                     RParen);
+  auto TypedThrow = SyntaxFactory::makeParenthesizedExpression(LParen, Error, RParen);
 
   return
-    SyntaxFactory::makeFunctionSignature(Parameter, None, TypedThrows, Return);
+    SyntaxFactory::makeFunctionSignature(Parameter, None, Throws, TypedThrow, Return);
 }
 
 TEST(DeclSyntaxTests, FunctionSignatureMakeAPIs) {
@@ -433,7 +434,7 @@ TEST(DeclSyntaxTests, FunctionSignatureGetAPIs) {
 
   auto Sig = SyntaxFactory::makeFunctionSignature(
     SyntaxFactory::makeParameterClause(LParen, List, RParen),
-    None, Throws,
+    None, Throws, None,
     SyntaxFactory::makeReturnClause(Arrow, Int));
 
   ASSERT_EQ(LParen.getRaw(), Sig.getInput().getLeftParen().getRaw());
@@ -452,8 +453,8 @@ TEST(DeclSyntaxTests, FunctionSignatureGetAPIs) {
   }
 
   ASSERT_EQ(RParen.getRaw(), Sig.getInput().getRightParen().getRaw());
-  ASSERT_EQ(Throws.getRaw(), Sig.getThrowsOrRethrows()->getAs<TokenSyntax>()->getRaw());
-  ASSERT_EQ(Sig.getThrowsOrRethrows()->getAs<TokenSyntax>()->getTokenKind(), tok::kw_throws);
+  ASSERT_EQ(Throws.getRaw(), Sig.getThrowsOrRethrowsKeyword()->getRaw());
+  ASSERT_EQ(Sig.getThrowsOrRethrowsKeyword()->getTokenKind(), tok::kw_throws);
   ASSERT_EQ(Arrow.getRaw(), Sig.getOutput()->getArrow().getRaw());
 
   {
@@ -486,7 +487,7 @@ TEST(DeclSyntaxTests, FunctionSignatureWithAPIs) {
   llvm::raw_svector_ostream OS(Scratch);
   SyntaxFactory::makeBlankFunctionSignature()
     .withInput(Parameter)
-    .withThrowsOrRethrows(Throws)
+    .withThrowsOrRethrowsKeyword(Throws)
     .withOutput(Return)
     .print(OS);
   ASSERT_EQ(OS.str().str(),

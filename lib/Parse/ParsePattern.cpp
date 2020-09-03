@@ -851,8 +851,7 @@ void Parser::parseAsyncThrows(SourceLoc existingArrowLoc, SourceLoc &asyncLoc,
     StringRef keyword;
     
     keyword = Tok.getText();
-    if (Tok.is(tok::kw_throws))
-      throwsLoc = consumeToken();
+    throwsLoc = consumeToken();
     
     ParserResult<TypeRepr> throwsTypeResult = parseThrowsType();
     

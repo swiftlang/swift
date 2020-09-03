@@ -254,7 +254,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'PoundFileIDExpr': 247,
     # relocated: 'AwaitExpr': 248,
     # relocated: 'TypedThrowsClause': 249,
-    # relocated: 'TypedThrowsOrRethrowsClause': 250,
+    'ParenthesizedExpression': 251,
 }
 
 
