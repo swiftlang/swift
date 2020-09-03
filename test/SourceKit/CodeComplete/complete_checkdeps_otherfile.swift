@@ -29,7 +29,7 @@ func foo() {
 // RUN: %target-swift-frontend -emit-module -module-name SwiftFW -o %t/Frameworks/SwiftFW.framework/Modules/SwiftFW.swiftmodule/%target-swiftmodule-name $INPUT_DIR/SwiftFW_src/Funcs.swift
 
 // RUN: %sourcekitd-test \
-// RUN:   -req=global-config -completion-check-dependency-interval ${DEPCHECK_INTERVAL} == \
+// RUN:   -req=global-config -req-opts=completion_check_dependency_interval=${DEPCHECK_INTERVAL} == \
 
 // RUN:   -shell -- echo "### Initial" == \
 // RUN:   -req=complete -pos=5:3 %s -- ${COMPILER_ARGS[@]} == \
