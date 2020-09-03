@@ -420,8 +420,8 @@ public:
                                   DiagnosticEngine &Diags,
                                   const SearchPathOptions &searchPathOpts,
                                   const LangOptions &langOpts,
+                                  const ClangImporterOptions &clangImporterOpts,
                                   ModuleInterfaceLoaderOptions LoaderOpts,
-                                  ClangModuleLoader *clangImporter,
                                   bool buildModuleCacheDirIfAbsent,
                                   StringRef moduleCachePath,
                                   StringRef prebuiltCachePath,
@@ -448,7 +448,6 @@ public:
                                     llvm::SmallString<256> &OutPath,
                                     StringRef &CacheHash);
   std::string getCacheHash(StringRef useInterfacePath);
-  void addExtraClangArg(StringRef Arg);
 };
 }
 

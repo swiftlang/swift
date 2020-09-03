@@ -393,8 +393,6 @@ private:
   /// Clang arguments used to create the Clang invocation.
   std::vector<std::string> ClangArgs;
 
-  /// Extra clang args specified via "-Xcc"
-  std::vector<std::string> ExtraClangArgs;
 public:
   /// Mapping of already-imported declarations.
   llvm::DenseMap<std::pair<const clang::Decl *, Version>, Decl *> ImportedDecls;
