@@ -11,9 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Localization/LocalizationFormat.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/ToolOutputFile.h"
@@ -35,37 +37,75 @@ enum LocalDiagID : uint32_t {
   NumDiags
 };
 
+static constexpr const char *const diagnosticID[] = {
+#define DIAG(KIND, ID, Options, Text, Signature) #ID,
+#include "swift/AST/DiagnosticsAll.def"
+};
+
 static constexpr const char *const diagnosticMessages[] = {
 #define DIAG(KIND, ID, Options, Text, Signature) Text,
 #include "swift/AST/DiagnosticsAll.def"
 };
 
 static std::string getMainExecutablePath() {
-  std::string libPath = llvm::sys::path::parent_path(SWIFTLIB_DIR);
+  llvm::StringRef libPath = llvm::sys::path::parent_path(SWIFTLIB_DIR);
   llvm::SmallString<128> MainExecutablePath(libPath);
   llvm::sys::path::remove_filename(MainExecutablePath); // Remove /lib
   llvm::sys::path::remove_filename(MainExecutablePath); // Remove /.
-  return std::string(MainExecutablePath.str());
+  return std::string(MainExecutablePath);
 }
 
 static std::string getDefaultLocalizationPath() {
   llvm::SmallString<128> DefaultDiagnosticMessagesDir(getMainExecutablePath());
   llvm::sys::path::append(DefaultDiagnosticMessagesDir, "share", "swift",
                           "diagnostics");
-  return std::string(DefaultDiagnosticMessagesDir.str());
+  return std::string(DefaultDiagnosticMessagesDir);
 }
 
-static std::string getDefToYAMLConverterPath() {
-  llvm::SmallString<128> defYAMLConverter(getMainExecutablePath());
-  llvm::sys::path::append(defYAMLConverter, "bin",
-                          "swift-def-to-yaml-converter");
-  return std::string(defYAMLConverter.str());
-}
+struct DefToYAMLConverterTest : public ::testing::Test {
+  std::string YAMLPath;
 
-/// Random number in [0,n)
-unsigned randNum(unsigned n) { return unsigned(rand()) % n; }
+public:
+  DefToYAMLConverterTest() {
+    llvm::SmallString<128> tempFilename;
+    std::error_code error =
+        llvm::sys::fs::createTemporaryFile("en", "yaml", tempFilename);
+    assert(!error);
 
-TEST(DefToYAMLConverterTest, missingLocalizationFiles) {
+    YAMLPath = std::string(tempFilename);
+  }
+
+  void SetUp() override {
+    bool failed = convertDefIntoYAML(YAMLPath);
+    assert(!failed && "failed to generate a YAML file");
+  }
+
+  void TearDown() override { llvm::sys::fs::remove(YAMLPath); }
+
+  /// Random number in [0,n)
+  unsigned RandNumber(unsigned n) { return unsigned(rand()) % n; }
+
+protected:
+  static bool convertDefIntoYAML(std::string outputPath) {
+    std::error_code error;
+    llvm::raw_fd_ostream OS(outputPath, error, llvm::sys::fs::F_None);
+    if (OS.has_error() || error)
+      return true;
+
+    llvm::ArrayRef<const char *> ids(diagnosticID, LocalDiagID::NumDiags);
+    llvm::ArrayRef<const char *> messages(diagnosticMessages,
+                                          LocalDiagID::NumDiags);
+
+    DefToYAMLConverter converter(ids, messages);
+    converter.convert(OS);
+
+    OS.flush();
+
+    return OS.has_error();
+  }
+};
+
+TEST_F(DefToYAMLConverterTest, MissingLocalizationFiles) {
   ASSERT_TRUE(llvm::sys::fs::exists(getDefaultLocalizationPath()));
   llvm::SmallString<128> EnglishLocalization(getDefaultLocalizationPath());
   llvm::sys::path::append(EnglishLocalization, "en");
@@ -75,45 +115,23 @@ TEST(DefToYAMLConverterTest, missingLocalizationFiles) {
   ASSERT_TRUE(llvm::sys::fs::exists(EnglishLocalization));
 }
 
-TEST(DefToYAMLConverterTest, matchDiagnosticMessagesSequentially) {
-  llvm::SmallString<128> defYAMLConverter(getDefToYAMLConverterPath());
-  defYAMLConverter.append(" --output-filename=");
-
-  llvm::SmallString<128> tempFilename;
-  std::error_code EC =
-      llvm::sys::fs::createTemporaryFile("en", "yaml", tempFilename);
-  ASSERT_FALSE(EC);
-  llvm::sys::RemoveFileOnSignal(tempFilename);
-  defYAMLConverter.append(tempFilename);
-  std::system(defYAMLConverter.c_str());
-
-  YAMLLocalizationProducer yaml(tempFilename.str());
+TEST_F(DefToYAMLConverterTest, MatchDiagnosticMessagesSequentially) {
+  YAMLLocalizationProducer yaml(YAMLPath);
   yaml.forEachAvailable([](swift::DiagID id, llvm::StringRef translation) {
     llvm::StringRef msg = diagnosticMessages[static_cast<uint32_t>(id)];
     ASSERT_EQ(msg, translation);
   });
 }
 
-TEST(DefToYAMLConverterTest, matchDiagnosticMessagesRandomly) {
-  llvm::SmallString<128> defYAMLConverter(getDefToYAMLConverterPath());
-  defYAMLConverter.append(" --output-filename=");
-
-  llvm::SmallString<128> tempFilename;
-  std::error_code EC =
-      llvm::sys::fs::createTemporaryFile("en", "yaml", tempFilename);
-  ASSERT_FALSE(EC);
-  llvm::sys::RemoveFileOnSignal(tempFilename);
-  defYAMLConverter.append(tempFilename);
-  std::system(defYAMLConverter.c_str());
-
-  YAMLLocalizationProducer yaml(tempFilename.str());
+TEST_F(DefToYAMLConverterTest, MatchDiagnosticMessagesRandomly) {
+  YAMLLocalizationProducer yaml(YAMLPath);
 
   std::random_device rd;
   std::mt19937 gen(rd());
   std::uniform_int_distribution<> distr(50, LocalDiagID::NumDiags);
   unsigned numberOfQueries = distr(gen);
   while (numberOfQueries--) {
-    unsigned randomNum = randNum(LocalDiagID::NumDiags);
+    unsigned randomNum = RandNumber(LocalDiagID::NumDiags);
     DiagID randomId = static_cast<DiagID>(randomNum);
     llvm::StringRef msg = diagnosticMessages[randomNum];
     llvm::StringRef translation = yaml.getMessageOr(randomId, "");
