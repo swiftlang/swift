@@ -270,7 +270,10 @@ public:
   /// curried functions, curried entry point Functions are also generated and
   /// added to the current SILModule.
   void emitFunction(FuncDecl *fd);
-  
+
+  /// Emits the function definition for a given SILDeclRef.
+  void emitFunctionDefinition(SILDeclRef constant, SILFunction *f);
+
   /// Generates code for the given closure expression and adds the
   /// SILFunction to the current SILModule under the name SILDeclRef(ce).
   SILFunction *emitClosure(AbstractClosureExpr *ce);
