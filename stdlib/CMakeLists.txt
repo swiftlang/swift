@@ -25,6 +25,10 @@ option(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
     "Build the standard libraries assuming that they will be used in an environment with only a single thread."
     FALSE)
 
+option(SWIFT_STDLIB_OS_VERSIONING
+    "Build stdlib with availability based on OS versions (Darwin only)."
+    TRUE)
+
 #
 # End of user-configurable options.
 #
