@@ -3,7 +3,9 @@
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=SIMPLE_MEMBERS | %FileCheck %s --check-prefix=SIMPLE
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=RELATED | %FileCheck %s --check-prefix=RELATED
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=RELATED_EXTRAARG | %FileCheck %s --check-prefix=RELATED
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=RELATED_INERROREXPR | %FileCheck %s --check-prefix=RELATED
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=GENERIC | %FileCheck %s --check-prefix=GENERIC
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=GENERIC_MISSINGARG | %FileCheck %s --check-prefix=NORESULTS
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=CLOSURE_MISSINGARG | %FileCheck %s --check-prefix=POINT_MEMBER
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=CLOSURE_NORETURN | %FileCheck %s --check-prefix=POINT_MEMBER
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=CLOSURE_FUNCBUILDER | %FileCheck %s --check-prefix=POINT_MEMBER
@@ -46,6 +48,10 @@ let x: A = overloadedReturn(1).#^RELATED_EXTRAARG^#
 // RELATED-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: doBThings()[#Void#]{{; name=.+$}}
 // RELATED: End completions
 
+func takesA(_ callback: () -> A) -> B {}
+func takesB(_ item: B) {}
+
+takesB((takesA { return overloadedReturn().#^RELATED_INERROREXPR^# }).)
 
 protocol C {
   associatedtype Element
@@ -78,8 +84,9 @@ genericReturn(CDStruct()).#^GENERIC^#
 // GENERIC-DAG: Decl[InstanceMethod]/CurrNominal:   doAThings()[#A#]{{; name=.+$}}
 // GENERIC: End completions
 
-// FIXME: this takes 19 seconds to determine there are no results.
 genericReturn().#^GENERIC_MISSINGARG^#
+
+// NORESULTS-NOT: Begin completions
 
 struct Point {
     let x: Int
@@ -120,7 +127,7 @@ struct ThingBuilder {
 }
 func CreateThings(@ThingBuilder makeThings: () -> [Thing]) {}
 
-// FIXME: only works in single expression closure
+// FIXME: only works if the first call to Thing is passed a single expression closure
 CreateThings {
     Thing { point in
       point.#^CLOSURE_FUNCBUILDER^#

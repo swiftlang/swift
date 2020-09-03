@@ -603,7 +603,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
     return false;
 
   // First of all, let's check whether given target expression
-  // does indeed have a code completion token in it.
+  // does indeed have the code completion location in it.
   {
     auto range = expr->getSourceRange();
     if (range.isInvalid() ||
@@ -623,7 +623,8 @@ bool TypeChecker::typeCheckForCodeCompletion(
     Application,
     StringInterpolation,
     SingleStmtClosure,
-    MultiStmtClosure
+    MultiStmtClosure,
+    ErrorExpression
   };
 
   class ContextFinder : public ASTWalker {
@@ -632,7 +633,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
     // Stack of all "interesting" contexts up to code completion expression.
     llvm::SmallVector<Context, 4> Contexts;
 
-    Expr *CompletionExpr;
+    Expr *CompletionExpr = nullptr;
 
   public:
     ContextFinder(Expr *E) {
@@ -660,12 +661,20 @@ bool TypeChecker::typeCheckForCodeCompletion(
         return std::make_pair(false, nullptr);
       }
 
+      if (auto *Error = dyn_cast<ErrorExpr>(E)) {
+        Contexts.push_back(std::make_pair(ContextKind::ErrorExpression, E));
+        if (auto *OrigExpr = Error->getOriginalExpr()) {
+          OrigExpr->walk(*this);
+          return std::make_pair(false, hasCompletionExpr() ? nullptr : E);
+        }
+      }
+
       return std::make_pair(true, E);
     }
 
     Expr *walkToExprPost(Expr *E) override {
       if (isa<ClosureExpr>(E) || isa<InterpolatedStringLiteralExpr>(E) ||
-          isa<ApplyExpr>(E))
+          isa<ApplyExpr>(E) || isa<ErrorExpr>(E))
         Contexts.pop_back();
       return E;
     }
@@ -680,9 +689,21 @@ bool TypeChecker::typeCheckForCodeCompletion(
       return hasContext(ContextKind::StringInterpolation);
     }
 
+    bool hasCompletionExpr() const {
+      return CompletionExpr;
+    }
+
     Expr *getCompletionExpr() const {
       assert(CompletionExpr);
       return CompletionExpr;
+    }
+
+    ErrorExpr *getInnermostErrorExpr() const {
+      for (const Context &curr : llvm::reverse(Contexts)) {
+        if (curr.first == ContextKind::ErrorExpression)
+          return cast<ErrorExpr>(curr.second);
+      }
+      return nullptr;
     }
 
     ClosureExpr *getOutermostMultiStmtClosure() const {
@@ -716,6 +737,25 @@ bool TypeChecker::typeCheckForCodeCompletion(
 
   ContextFinder contextAnalyzer(expr);
   expr->walk(contextAnalyzer);
+
+  // If there was no completion expr (e.g. if the code completion location is
+  // within an ErrorExpr without an valid subexpr due to parser error recovery)
+  // bail.
+  if (!contextAnalyzer.hasCompletionExpr())
+    return false;
+
+  // If the completion expression is in a valid subexpression of an ErrorExpr,
+  // fallback to trying the valid subexpression without any context. This can
+  // happen for cases like `expectsBoolArg(foo.<complete>).` which becomes an
+  // ErrorExpr due to the missing member name after the final dot.
+  if (auto *errorExpr = contextAnalyzer.getInnermostErrorExpr()) {
+    if (auto *origExpr = errorExpr->getOriginalExpr()) {
+      SolutionApplicationTarget completionTarget(origExpr, DC, CTP_Unused,
+                                                 /*contextualType=*/Type(),
+                                                 /*isDiscarded=*/true);
+      return typeCheckForCodeCompletion(completionTarget, callback);
+    }
+  }
 
   // Interpolation components are type-checked separately.
   if (contextAnalyzer.locatedInStringIterpolation())
