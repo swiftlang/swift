@@ -38,7 +38,7 @@ struct ConditionPlatformHelper {
   static void notifyOne(ConditionHandle &condition) {}
   static void notifyAll(ConditionHandle &condition) {}
   static void wait(ConditionHandle &condition, MutexHandle &mutex) {
-    fatalError(0, "cannot wait for condition");
+    fatalError(0, "single-threaded runtime cannot wait for condition");
   }
 };
 
