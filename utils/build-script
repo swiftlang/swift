@@ -464,13 +464,7 @@ class BuildScriptInvocation(object):
         ]
 
         # Compute any product specific cmake arguments.
-        #
-        # NOTE: The sum(list(...)) is b/c compute_product_classes returns a
-        # tuple of lists of which the first is the build-script-impl products
-        # and the second is the non-build-script-impl-products. It guarantees
-        # that when we concatenate these two lists together we get a valid
-        # dependency graph.
-        for product_class in sum(list(self.compute_product_classes()), []):
+        for product_class in self.compute_product_classes():
             if not product_class.is_build_script_impl_product():
                 continue
 
@@ -778,20 +772,16 @@ class BuildScriptInvocation(object):
         return options
 
     def compute_product_classes(self):
-        """compute_product_classes() -> (list, list)
+        """compute_product_classes() -> list
 
-        Compute the list first of all build-script-impl products and then all
-        non-build-script-impl products. It is assumed that concatenating the two
-        lists together will result in a valid dependency graph for the
-        compilation.
+        Compute the list all products. It is assumed that the list is a valid
+        dependency graph for the compilation.
 
         """
 
         # FIXME: This is a weird division (returning a list of class objects),
         # but it matches the existing structure of the `build-script-impl`.
         impl_product_classes = []
-        if self.args.build_cmark:
-            impl_product_classes.append(products.CMark)
 
         # If --skip-build-llvm is passed in, LLVM cannot be completely disabled, as
         # Swift still needs a few LLVM targets like tblgen to be built for it to be
@@ -819,6 +809,8 @@ class BuildScriptInvocation(object):
             assert(prod.is_build_script_impl_product())
 
         product_classes = []
+        if self.args.build_cmark:
+            product_classes.append(products.CMark)
         if self.args.build_swiftpm:
             product_classes.append(products.SwiftPM)
         if self.args.build_swift_driver:
@@ -851,39 +843,26 @@ class BuildScriptInvocation(object):
         # Now that we have our two lists of product_classes, if we are asked to
         # infer dependencies, infer the dependencies now and then re-split the
         # list.
-        if self.args.infer_dependencies:
-            combined = impl_product_classes + product_classes
-            if self.args.verbose_build:
-                print("-- Build Graph Inference --")
-                print("Initial Product List:")
-                for p in combined:
-                    print("    {}".format(p.product_name()))
+        combined = impl_product_classes + product_classes
+        if self.args.verbose_build:
+            print("-- Build Graph Inference --")
+            print("Initial Product List:")
+            for p in combined:
+                print("    {}".format(p.product_name()))
 
-            # Now that we have produced the schedule, resplit. We require our
-            # dependencies to respect our build-script-impl property. This means
-            # that no build-script-impl products can have dependencies on
-            # non-build-script-impl products. Otherwise, it would be unsafe to
-            # re-order build-script-impl products in front of non
-            # build-script-impl products.
-            impl_product_classes = []
-            product_classes = []
-            is_darwin = platform.system() == 'Darwin'
-            final_schedule = build_graph.produce_scheduled_build(combined)[0]
+        # Now that we have produced the schedule, resplit. We require our
+        # dependencies to respect our build-script-impl property. This means
+        # that no build-script-impl products can have dependencies on
+        # non-build-script-impl products. Otherwise, it would be unsafe to
+        # re-order build-script-impl products in front of non
+        # build-script-impl products.
+        is_darwin = platform.system() == 'Darwin'
+        final_schedule = build_graph.produce_scheduled_build(combined)[0]
+        if self.args.verbose_build:
+            print("Final Build Order:")
             for p in final_schedule:
-                if is_darwin and p.is_nondarwin_only_build_product():
-                    continue
-
-                if p.is_build_script_impl_product():
-                    impl_product_classes.append(p)
-                else:
-                    product_classes.append(p)
-            if self.args.verbose_build:
-                print("Final Build Order:")
-                for p in impl_product_classes:
-                    print("    {}".format(p.product_name()))
-                for p in product_classes:
-                    print("    {}".format(p.product_name()))
-        return (impl_product_classes, product_classes)
+                print("    {}".format(p.product_name()))
+        return final_schedule
 
     def execute(self):
         """Execute the invocation with the configured arguments."""
@@ -911,7 +890,7 @@ class BuildScriptInvocation(object):
         #
         # FIXME: This should really be per-host, but the current structure
         # matches that of `build-script-impl`.
-        (impl_product_classes, product_classes) = self.compute_product_classes()
+        product_classes = self.compute_product_classes()
 
         # Execute each "pass".
 
@@ -932,55 +911,45 @@ class BuildScriptInvocation(object):
                 print("Running Swift benchmarks for: {}".format(
                     " ".join(config.swift_benchmark_run_targets)))
 
-            for product_class in impl_product_classes:
-                self._execute_build_action(host_target, product_class)
-
-        # Test...
-        for host_target in all_hosts:
-            for product_class in impl_product_classes:
-                self._execute_test_action(host_target, product_class)
-
-        # Install...
-        for host_target in all_hosts:
-            for product_class in impl_product_classes:
-                self._execute_install_action(host_target, product_class)
+            for product_class in product_classes:
+                if product_class.is_build_script_impl_product():
+                    # Build...
+                    self._execute_build_action(host_target, product_class)
+                    # Test...
+                    self._execute_test_action(host_target, product_class)
+                    # Install...
+                    self._execute_install_action(host_target, product_class)
+                elif host_target.name == self.args.host_target:
+                    product_source = product_class.product_source_name()
+                    product_name = product_class.product_name()
+                    if product_class.is_swiftpm_unified_build_product():
+                        build_dir = self.workspace.swiftpm_unified_build_dir(
+                            host_target)
+                    else:
+                        build_dir = self.workspace.build_dir(
+                            host_target.name, product_name)
+                    product = product_class(
+                        args=self.args,
+                        toolchain=self.toolchain,
+                        source_dir=self.workspace.source_dir(product_source),
+                        build_dir=build_dir)
+                    if product.should_clean(host_target):
+                        print("--- Cleaning %s ---" % product_name)
+                        product.clean(host_target)
+                    if product.should_build(host_target):
+                        print("--- Building %s ---" % product_name)
+                        product.build(host_target)
+                    if product.should_test(host_target):
+                        print("--- Running tests for %s ---" % product_name)
+                        product.test(host_target)
+                        print("--- Finished tests for %s ---" % product_name)
+                    if product.should_install(host_target) or \
+                       (self.install_all and product.should_build(host_target)):
+                        print("--- Installing %s ---" % product_name)
+                        product.install(host_target)
 
         # Core Lipo...
         self._execute_merged_host_lipo_core_action()
-
-        # Non-build-script-impl products...
-        # Note: currently only supports building for the host.
-        for host_target in [self.args.host_target]:
-            for product_class in product_classes:
-                if product_class.is_build_script_impl_product():
-                    continue
-                product_source = product_class.product_source_name()
-                product_name = product_class.product_name()
-                if product_class.is_swiftpm_unified_build_product():
-                    build_dir = self.workspace.swiftpm_unified_build_dir(
-                        host_target)
-                else:
-                    build_dir = self.workspace.build_dir(
-                        host_target, product_name)
-                product = product_class(
-                    args=self.args,
-                    toolchain=self.toolchain,
-                    source_dir=self.workspace.source_dir(product_source),
-                    build_dir=build_dir)
-                if product.should_clean(host_target):
-                    print("--- Cleaning %s ---" % product_name)
-                    product.clean(host_target)
-                if product.should_build(host_target):
-                    print("--- Building %s ---" % product_name)
-                    product.build(host_target)
-                if product.should_test(host_target):
-                    print("--- Running tests for %s ---" % product_name)
-                    product.test(host_target)
-                    print("--- Finished tests for %s ---" % product_name)
-                if product.should_install(host_target) or \
-                   (self.install_all and product.should_build(host_target)):
-                    print("--- Installing %s ---" % product_name)
-                    product.install(host_target)
 
         # Extract symbols...
         for host_target in all_hosts:
