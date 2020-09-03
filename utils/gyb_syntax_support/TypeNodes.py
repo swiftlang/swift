@@ -169,16 +169,13 @@ TYPE_NODES = [
              Child('AsyncKeyword', kind='IdentifierToken',
                    classification='Keyword',
                    text_choices=['async'], is_optional=True),
-             Child('ThrowsOrRethrows', kind='Syntax',
-                   is_optional=True,
-                   node_choices=[
-                       Child('ThrowsOrRethrowsKeyword', kind='Token',
-                             token_choices=[
-                                 'ThrowsToken',
-                                 'RethrowsToken',
-                             ]),
-                       Child('TypedThrowsOrRethrows', kind='TypedThrowsOrRethrowsClause'),
-                   ]),
+             Child('ThrowsOrRethrowsKeyword', kind='Token', is_optional=True,
+                    token_choices=[
+                        'ThrowsToken',
+                        'RethrowsToken',
+                        'ThrowToken',
+                    ]),
+             Child('ThrowsOrRethrowsType', kind='ParenthesizedExpression', is_optional=True),
              Child('Arrow', kind='ArrowToken'),
              Child('ReturnType', kind='Type'),
          ]),

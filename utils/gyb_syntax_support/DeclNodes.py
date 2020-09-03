@@ -83,6 +83,14 @@ DECL_NODES = [
              Child('RightParen', kind='RightParenToken'),
           ]),
 
+    Node('ParenthesizedExpression', kind='Syntax',
+        children=[
+            Child('LeftParen', kind='LeftParenToken'),
+            Child('ThrowsType', kind='Type'),
+            Child('RightParen', kind='RightParenToken'),
+        ]
+    ),
+
     # function-signature ->
     #   '(' parameter-list? ')' async? ('throws'|'throws' '(' type ')')? ('->' type)?
     Node('FunctionSignature', kind='Syntax',
@@ -91,16 +99,12 @@ DECL_NODES = [
              Child('AsyncKeyword', kind='IdentifierToken',
                    classification='Keyword',
                    text_choices=['async'], is_optional=True),
-             Child('ThrowsOrRethrows', kind='Syntax',
-                   is_optional=True,
-                   node_choices=[
-                       Child('ThrowsOrRethrowsKeyword', kind='Token',
-                             token_choices=[
-                                 'ThrowsToken',
-                                 'RethrowsToken',
-                             ]),
-                       Child('TypedThrowsOrRethrows', kind='TypedThrowsOrRethrowsClause'),
-                   ]),
+             Child('ThrowsOrRethrowsKeyword', kind='Token', is_optional=True,
+                    token_choices=[
+                        'ThrowsToken',
+                        'RethrowsToken',
+                    ]),
+             Child('ThrowsOrRethrowsType', kind='ParenthesizedExpression', is_optional=True),
              Child('Output', kind='ReturnClause', is_optional=True),
          ]),
 
@@ -438,16 +442,12 @@ DECL_NODES = [
              Child('GenericParameterClause', kind='GenericParameterClause',
                    is_optional=True),
              Child('Parameters', kind='ParameterClause'),
-             Child('ThrowsOrRethrows', kind='Syntax',
-                   is_optional=True,
-                   node_choices=[
-                       Child('ThrowsOrRethrowsKeyword', kind='Token',
-                             token_choices=[
-                                 'ThrowsToken',
-                                 'RethrowsToken',
-                             ]),
-                       Child('TypedThrowsOrRethrows', kind='TypedThrowsOrRethrowsClause'),
-                   ]),
+             Child('ThrowsOrRethrowsKeyword', kind='Token', is_optional=True,
+                    token_choices=[
+                        'ThrowsToken',
+                        'RethrowsToken',
+                    ]),
+             Child('ThrowsOrRethrowsType', kind='ParenthesizedExpression', is_optional=True),
              Child('GenericWhereClause', kind='GenericWhereClause',
                    is_optional=True),
              # the body is not necessary inside a protocol definition
