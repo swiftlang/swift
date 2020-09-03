@@ -187,6 +187,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.EnableSourceImport |= Args.hasArg(OPT_enable_source_import);
   Opts.ImportUnderlyingModule |= Args.hasArg(OPT_import_underlying_module);
   Opts.EnableIncrementalDependencyVerifier |= Args.hasArg(OPT_verify_incremental_dependencies);
+  Opts.UseSharedResourceFolder = !Args.hasArg(OPT_use_static_resource_dir);
 
   computeImportObjCHeaderOptions();
   computeImplicitImportModuleNames();
