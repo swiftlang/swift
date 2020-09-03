@@ -266,8 +266,13 @@ public:
     return next(parentAddr->get());
   }
 
-  void visitPathComponent(SingleValueInstruction *projectedAddr,
-                          Operand *parentAddr) {
+  void visitStorageCast(SingleValueInstruction *projectedAddr,
+                        Operand *parentAddr) {
+    return next(parentAddr->get());
+  }
+
+  void visitAccessProjection(SingleValueInstruction *projectedAddr,
+                             Operand *parentAddr) {
     return next(parentAddr->get());
   }
 
