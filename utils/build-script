@@ -919,6 +919,9 @@ class BuildScriptInvocation(object):
             for product_class in impl_product_classes:
                 self._execute_install_action(host_target, product_class)
 
+        # Lipo...
+        self._execute_merged_host_lipo_action()
+
         # Non-build-script-impl products...
         # Note: currently only supports building for the host.
         for host_target in [self.args.host_target]:
@@ -956,9 +959,6 @@ class BuildScriptInvocation(object):
         # Package...
         for host_target in all_hosts:
             self._execute_package_action(host_target)
-
-        # Lipo...
-        self._execute_merged_host_lipo_action()
 
     def _execute_build_action(self, host_target, product_class):
         action_name = "{}-{}-build".format(host_target.name,
