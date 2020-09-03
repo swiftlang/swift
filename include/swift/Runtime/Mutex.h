@@ -214,7 +214,11 @@ public:
   ///
   /// Precondition: Mutex held by this thread, undefined otherwise.
   void wait(ConditionVariable &condition) {
+#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+    fatalError(0, "cannot wait for condition");
+#else
     ConditionPlatformHelper::wait(condition.Handle, Handle);
+#endif
   }
 
   /// Acquires lock before calling the supplied critical section and releases
@@ -613,7 +617,11 @@ public:
 
   /// See Mutex::wait
   void wait(StaticConditionVariable &condition) {
+#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+    fatalError(0, "cannot wait for condition");
+#else
     ConditionPlatformHelper::wait(condition.Handle, Handle);
+#endif
   }
 
   /// See Mutex::lock
