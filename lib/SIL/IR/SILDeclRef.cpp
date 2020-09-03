@@ -247,11 +247,6 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   if (isForeignToNativeThunk())
     return SILLinkage::Shared;
 
-  // If a function declares a @_cdecl name, its native-to-foreign thunk
-  // is exported with the visibility of the function.
-  if (isNativeToForeignThunk() && !d->getAttrs().hasAttribute<CDeclAttr>())
-    return SILLinkage::Shared;
-
   // Declarations imported from Clang modules have shared linkage.
   if (isClangImported())
     return SILLinkage::Shared;
@@ -327,11 +322,19 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     }
   }
 
-  // Forced-static-dispatch functions are created on-demand and have
-  // at best shared linkage.
   if (auto fn = dyn_cast<FuncDecl>(d)) {
+    // Forced-static-dispatch functions are created on-demand and have
+    // at best shared linkage.
     if (fn->hasForcedStaticDispatch()) {
       limit = Limit::OnDemand;
+    }
+
+    // Native-to-foreign thunks for top-level decls are created on-demand,
+    // unless they are marked @_cdecl, in which case they expose a dedicated
+    // entry-point with the visibility of the function.
+    if (isNativeToForeignThunk() && !fn->getAttrs().hasAttribute<CDeclAttr>()) {
+      if (fn->getDeclContext()->isModuleScopeContext())
+        limit = Limit::OnDemand;
     }
   }
 
@@ -632,17 +635,21 @@ bool SILDeclRef::isForeignToNativeThunk() const {
 }
 
 bool SILDeclRef::isNativeToForeignThunk() const {
+  // If this isn't a foreign entry-point, it's not a native-to-foreign thunk.
+  if (!isForeign)
+    return false;
+
   // We can have native-to-foreign thunks over closures.
   if (!hasDecl())
-    return isForeign;
-  // We can have native-to-foreign thunks over global or local native functions.
-  // TODO: Static functions too.
-  if (auto func = dyn_cast<FuncDecl>(getDecl())) {
-    if (!func->getDeclContext()->isTypeContext()
-        && !func->hasClangNode())
-      return isForeign;
-  }
-  return false;
+    return true;
+
+  // A decl with a clang node doesn't have a native entry-point to forward onto.
+  if (getDecl()->hasClangNode())
+    return false;
+
+  // Only certain kinds of SILDeclRef can expose native-to-foreign thunks.
+  return kind == Kind::Func || kind == Kind::Initializer ||
+         kind == Kind::Deallocator;
 }
 
 /// Use the Clang importer to mangle a Clang declaration.
