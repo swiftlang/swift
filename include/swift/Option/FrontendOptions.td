@@ -719,4 +719,8 @@ def target_sdk_version : Separate<["-"], "target-sdk-version">,
 def target_variant_sdk_version : Separate<["-"], "target-variant-sdk-version">,
   HelpText<"The version of target variant SDK used for compilation">;
 
+
+def use_static_resource_dir
+  : Flag<["-"], "use-static-resource-dir">,
+    HelpText<"Use resources in the static resource directory">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

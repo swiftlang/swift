@@ -2078,17 +2078,18 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   }
 
   CompilerInvocation Invocation;
-  std::string MainExecutablePath = llvm::sys::fs::getMainExecutable(Argv0,
-                                                                    MainAddr);
-  Invocation.setMainExecutablePath(MainExecutablePath);
 
   SmallString<128> workingDirectory;
   llvm::sys::fs::current_path(workingDirectory);
 
+  std::string MainExecutablePath =
+      llvm::sys::fs::getMainExecutable(Argv0, MainAddr);
+
   // Parse arguments.
   SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 4> configurationFileBuffers;
   if (Invocation.parseArgs(Args, Instance->getDiags(),
-                           &configurationFileBuffers, workingDirectory)) {
+                           &configurationFileBuffers, workingDirectory,
+                           MainExecutablePath)) {
     return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
 

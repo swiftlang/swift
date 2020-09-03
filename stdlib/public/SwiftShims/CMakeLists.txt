@@ -55,10 +55,18 @@ set(sources
   module.modulemap
   )
 set(output_dir "${SWIFTLIB_DIR}/shims")
+set(output_dir_static "${SWIFTSTATICLIB_DIR}/shims")
 
 add_custom_command(
     OUTPUT "${output_dir}"
     COMMAND ${CMAKE_COMMAND} "-E" "make_directory" "${output_dir}")
+
+if(SWIFT_BUILD_STATIC_STDLIB)
+  add_custom_command(
+      OUTPUT "${output_dir_static}"
+      COMMAND ${CMAKE_COMMAND} "-E" "make_directory" "${output_dir_static}")
+endif()
+
 set(outputs)
 foreach(input ${sources})
   add_custom_command(
@@ -70,6 +78,18 @@ foreach(input ${sources})
         "${output_dir}/${input}"
       COMMENT "Copying ${input} to ${output_dir}")
   list(APPEND outputs "${output_dir}/${input}")
+
+  if(SWIFT_BUILD_STATIC_STDLIB)
+    add_custom_command(
+        OUTPUT "${output_dir_static}/${input}"
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${input}"
+        COMMAND
+          "${CMAKE_COMMAND}" "-E" "copy_if_different"
+          "${CMAKE_CURRENT_SOURCE_DIR}/${input}"
+          "${output_dir_static}/${input}"
+        COMMENT "Copying ${input} to ${output_dir_static}")
+    list(APPEND outputs "${output_dir_static}/${input}")
+  endif()
 endforeach()
 # Put the output dir itself last so that it isn't considered the primary output.
 list(APPEND outputs "${output_dir}")
@@ -121,7 +141,24 @@ add_custom_command_target(unused_var
     CUSTOM_TARGET_NAME "symlink_clang_headers"
     OUTPUT "${SWIFTLIB_DIR}/clang"
     COMMENT "Symlinking Clang resource headers into ${SWIFTLIB_DIR}/clang")
+
 add_dependencies(copy_shim_headers symlink_clang_headers)
+
+if(SWIFT_BUILD_STATIC_STDLIB)
+  add_custom_command_target(unused_var
+      COMMAND
+        "${CMAKE_COMMAND}" "-E" "make_directory" "${SWIFTSTATICLIB_DIR}"
+      COMMAND
+        "${CMAKE_COMMAND}" "-E" "${cmake_symlink_option}"
+        "${clang_headers_location}"
+        "${SWIFTSTATICLIB_DIR}/clang"
+
+      CUSTOM_TARGET_NAME "symlink_clang_headers_static"
+      OUTPUT "${SWIFTSTATICLIB_DIR}/clang"
+      COMMENT "Symlinking Clang resource headers into ${SWIFTSTATICLIB_DIR}/clang")
+
+      add_dependencies(copy_shim_headers symlink_clang_headers_static)
+endif()
 
 if(NOT SWIFT_BUILT_STANDALONE)
   if(TARGET clang-resource-headers) # LLVM > 8
@@ -146,6 +183,12 @@ swift_install_in_component(FILES ${sources}
                            DESTINATION "lib/swift/shims"
                            COMPONENT stdlib)
 
+if(SWIFT_BUILD_STATIC_STDLIB)
+  swift_install_in_component(FILES ${sources}
+                             DESTINATION "lib/swift_static/shims"
+                             COMPONENT stdlib)
+endif()
+
 # Install Clang headers under the Swift library so that an installed Swift's
 # module importer can find the compiler headers corresponding to its Clang.
 swift_install_in_component(DIRECTORY "${clang_headers_location}/"
@@ -153,10 +196,25 @@ swift_install_in_component(DIRECTORY "${clang_headers_location}/"
                            COMPONENT clang-builtin-headers
                            PATTERN "*.h")
 
+if(SWIFT_BUILD_STATIC_STDLIB)
+  swift_install_in_component(DIRECTORY "${clang_headers_location}/"
+                             DESTINATION "lib/swift_static/clang"
+                             COMPONENT clang-builtin-headers
+                             PATTERN "*.h")
+endif()
+
+
 swift_install_symlink_component(clang-resource-dir-symlink
   LINK_NAME clang
   TARGET ../clang/${CLANG_VERSION}
   DESTINATION "lib/swift")
+
+if(SWIFT_BUILD_STATIC_STDLIB)
+  swift_install_symlink_component(clang-resource-dir-symlink
+    LINK_NAME clang
+    TARGET ../clang/${CLANG_VERSION}
+    DESTINATION "lib/swift_static")
+endif()
 
 # Possibly install Clang headers under Clang's resource directory in case we
 # need to use a different version of the headers than the installed Clang. This
