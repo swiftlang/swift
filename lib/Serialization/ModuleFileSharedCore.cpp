@@ -1087,8 +1087,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
-    bool isFramework, serialization::ValidationInfo &info,
-    serialization::ExtendedValidationInfo &extInfo)
+    bool isFramework, serialization::ValidationInfo &info)
     : ModuleInputBuffer(std::move(moduleInputBuffer)),
       ModuleDocInputBuffer(std::move(moduleDocInputBuffer)),
       ModuleSourceInfoInputBuffer(std::move(moduleSourceInfoInputBuffer)) {
@@ -1134,6 +1133,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
         return;
       }
 
+      ExtendedValidationInfo extInfo;
       info = validateControlBlock(cursor, scratch,
                                   {SWIFTMODULE_VERSION_MAJOR,
                                    SWIFTMODULE_VERSION_MINOR},

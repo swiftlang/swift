@@ -336,8 +336,7 @@ private:
   ModuleFileSharedCore(std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
                  std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
                  std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
-                 bool isFramework, serialization::ValidationInfo &info,
-                 serialization::ExtendedValidationInfo &extInfo);
+                 bool isFramework, serialization::ValidationInfo &info);
 
   /// Change the status of the current module.
   Status error(Status issue) {
@@ -465,12 +464,12 @@ public:
        std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
-       bool isFramework, std::shared_ptr<const ModuleFileSharedCore> &theModule,
-       serialization::ExtendedValidationInfo &extInfo) {
+       bool isFramework,
+       std::shared_ptr<const ModuleFileSharedCore> &theModule) {
     serialization::ValidationInfo info;
     auto *core = new ModuleFileSharedCore(
         std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
-        std::move(moduleSourceInfoInputBuffer), isFramework, info, extInfo);
+        std::move(moduleSourceInfoInputBuffer), isFramework, info);
     if (!moduleInterfacePath.empty()) {
       ArrayRef<char> path;
       core->allocateBuffer(path, moduleInterfacePath);

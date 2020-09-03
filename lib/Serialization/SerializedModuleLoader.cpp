@@ -387,14 +387,12 @@ llvm::ErrorOr<ModuleDependencies> SerializedModuleLoaderBase::scanModuleFile(
   // Load the module file without validation.
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
   bool isFramework = false;
-  serialization::ExtendedValidationInfo extInfo;
   serialization::ValidationInfo loadInfo =
       ModuleFileSharedCore::load(modulePath.str(),
                        std::move(moduleBuf.get()),
                        nullptr,
                        nullptr,
-                       isFramework, loadedModuleFile,
-                       extInfo);
+                       isFramework, loadedModuleFile);
 
   // Map the set of dependencies over to the "module dependencies".
   auto dependencies = ModuleDependencies::forSwiftModule(modulePath.str(), isFramework);
@@ -695,7 +693,6 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
     return nullptr;
   }
 
-  serialization::ExtendedValidationInfo extendedInfo;
   std::unique_ptr<ModuleFile> loadedModuleFile;
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFileCore;
   serialization::ValidationInfo loadInfo =
@@ -703,8 +700,7 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
                        std::move(moduleInputBuffer),
                        std::move(moduleDocInputBuffer),
                        std::move(moduleSourceInfoInputBuffer),
-                       isFramework, loadedModuleFileCore,
-                       extendedInfo);
+                       isFramework, loadedModuleFileCore);
   if (loadInfo.status == serialization::Status::Valid) {
     loadedModuleFile =
         std::make_unique<ModuleFile>(std::move(loadedModuleFileCore));
@@ -744,7 +740,7 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
 
   if (diagLoc)
     serialization::diagnoseSerializedASTLoadFailure(
-        Ctx, *diagLoc, loadInfo, extendedInfo, moduleBufferID,
+        Ctx, *diagLoc, loadInfo, moduleBufferID,
         moduleDocBufferID, loadedModuleFile.get(), M.getName());
 
   // Even though the module failed to load, it's possible its contents include
@@ -761,7 +757,6 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
 void swift::serialization::diagnoseSerializedASTLoadFailure(
     ASTContext &Ctx, SourceLoc diagLoc,
     const serialization::ValidationInfo &loadInfo,
-    const serialization::ExtendedValidationInfo &extendedInfo,
     StringRef moduleBufferID, StringRef moduleDocBufferID,
     ModuleFile *loadedModuleFile, Identifier ModuleName) {
   auto diagnoseDifferentLanguageVersion = [&](StringRef shortVersion) -> bool {
