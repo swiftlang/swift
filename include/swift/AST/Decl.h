@@ -386,7 +386,7 @@ protected:
   SWIFT_INLINE_BITFIELD(SubscriptDecl, VarDecl, 2,
     StaticSpelling : 2
   );
-  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+1+1+1+1+1,
     /// \see AbstractFunctionDecl::BodyKind
     BodyKind : 3,
 
@@ -404,10 +404,6 @@ protected:
 
     /// Whether the function body throws.
     Throws : 1,
-
-    /// Whether this member was synthesized as part of a derived
-    /// protocol conformance.
-    Synthesized : 1,
 
     /// Whether this member's body consists of a single expression.
     HasSingleExpressionBody : 1
@@ -5862,7 +5858,6 @@ protected:
     Bits.AbstractFunctionDecl.Overridden = false;
     Bits.AbstractFunctionDecl.Async = Async;
     Bits.AbstractFunctionDecl.Throws = Throws;
-    Bits.AbstractFunctionDecl.Synthesized = false;
     Bits.AbstractFunctionDecl.HasSingleExpressionBody = false;
   }
 
@@ -6047,14 +6042,6 @@ public:
   /// For a method of a class, checks whether it will require a new entry in the
   /// vtable.
   bool needsNewVTableEntry() const;
-
-  bool isSynthesized() const {
-    return Bits.AbstractFunctionDecl.Synthesized;
-  }
-
-  void setSynthesized(bool value = true) {
-    Bits.AbstractFunctionDecl.Synthesized = value;
-  }
 
 public:
   /// Retrieve the source range of the function body.

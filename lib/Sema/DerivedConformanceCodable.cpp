@@ -631,7 +631,6 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
       /*Async=*/false,
       /*Throws=*/true, /*GenericParams=*/nullptr, params, returnType,
       conformanceDC);
-  encodeDecl->setSynthesized();
   encodeDecl->setBodySynthesizer(deriveBodyEncodable_encode);
 
   // This method should be marked as 'override' for classes inheriting Encodable
@@ -958,7 +957,6 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
                               /*Throws=*/true, SourceLoc(), paramList,
                               /*GenericParams=*/nullptr, conformanceDC);
   initDecl->setImplicit();
-  initDecl->setSynthesized();
   initDecl->setBodySynthesizer(&deriveBodyDecodable_init);
 
   // This constructor should be marked as `required` for non-final classes.

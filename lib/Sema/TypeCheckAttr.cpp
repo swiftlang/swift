@@ -1921,7 +1921,6 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
       /*Throws=*/mainFunction->hasThrows(),
       /*GenericParams=*/nullptr, ParameterList::createEmpty(context),
       /*FnRetType=*/TupleType::getEmpty(context), declContext);
-  func->setSynthesized(true);
 
   auto *params = context.Allocate<MainTypeAttrParams>();
   params->mainFunction = mainFunction;
