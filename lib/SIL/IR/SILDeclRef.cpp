@@ -233,13 +233,11 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     return forDefinition ? linkage : addExternalToLinkage(linkage);
   };
 
-  // Native function-local declarations have shared linkage.
-  // FIXME: @objc declarations should be too, but we currently have no way
-  // of marking them "used" other than making them external.
+  // Function-local declarations have private linkage, unless serialized.
   ValueDecl *d = getDecl();
   DeclContext *moduleContext = d->getDeclContext();
   while (!moduleContext->isModuleScopeContext()) {
-    if (!isForeign && moduleContext->isLocalContext()) {
+    if (moduleContext->isLocalContext()) {
       return isSerialized() ? SILLinkage::Shared : SILLinkage::Private;
     }
     moduleContext = moduleContext->getParent();
