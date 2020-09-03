@@ -2648,6 +2648,9 @@ SemanticMembersRequest::evaluate(Evaluator &evaluator,
 
   // Force any derivable conformances in this context. This ensures that any
   // synthesized members will approach in the member list.
+  using AssociatedTypeEntry =
+      std::pair<ProtocolConformance *, AssociatedTypeDecl *>;
+  SmallVector<AssociatedTypeEntry, 4> associatedTypes;
   for (auto conformance : idc->getLocalConformances()) {
     if (conformance->getState() != ProtocolConformanceState::Incomplete)
       continue;
@@ -2656,9 +2659,45 @@ SemanticMembersRequest::evaluate(Evaluator &evaluator,
     if (protocol->getKnownDerivableProtocolKind()) {
       TypeChecker::checkConformance(conformance->getRootNormalConformance());
     } else {
-      // Resolve the type witnesses, which may synthesize typealiases.
+      // Track associated types that might synthesize typealiases.
       for (auto assocType : protocol->getAssociatedTypeMembers())
-        (void)conformance->getTypeWitness(assocType);
+        associatedTypes.push_back({conformance, assocType});
+    }
+  }
+
+  // If there were any associated types that might need inference, try harder
+  // to determine which ones might result in synthesizing a typealias.
+  if (!associatedTypes.empty()) {
+    // First, gather the names of types declared directly in this context.
+    SmallPtrSet<Identifier, 4> typeNames;
+    for (auto member : idc->getMembers()) {
+      if (auto typeDecl = dyn_cast<TypeDecl>(member))
+        typeNames.insert(typeDecl->getName());
+    }
+
+    // Remove any associated types whose name matches a type member. We won't
+    // be inserting a typealias for those.
+    associatedTypes.erase(
+        std::remove_if(associatedTypes.begin(), associatedTypes.end(),
+                       [&](const AssociatedTypeEntry &entry) {
+                         return typeNames.count(entry.second->getName()) > 0;
+                       }),
+        associatedTypes.end());
+
+    // If some associated types remain that still might need inference...
+    if (!associatedTypes.empty()) {
+      // Compute the interface types of each declaration in this context. This
+      // works around ordering dependencies with associated type inference.
+      for (auto member : idc->getMembers()) {
+        if (auto valueDecl = dyn_cast<ValueDecl>(member))
+          valueDecl->getInterfaceType();
+      }
+
+      // Retrieve the type witneses for each remaining associated type, which
+      // will add any inferred typealiases.
+      for (const auto &entry : associatedTypes) {
+        (void)entry.first->getTypeWitness(entry.second);
+      }
     }
   }
 
