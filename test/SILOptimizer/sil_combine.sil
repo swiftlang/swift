@@ -3189,6 +3189,33 @@ bb0(%0 : $VV):
   return %26 : $()
 }
 
+sil @any_to_object : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @owned AnyObject
+
+// CHECK-LABEL: sil @dont_crash_when_propagating_existentials
+// CHECK:   [[EM:%[0-9]+]] = init_existential_metatype %0
+// CHECK:   [[S:%[0-9]+]] = alloc_stack $Any
+// CHECK:   [[M:%[0-9]+]] = open_existential_metatype [[EM]]
+// CHECK:   [[E:%[0-9]+]] = init_existential_addr [[S]]
+// CHECK:   store [[M]] to [[E]]
+// CHECK:   apply {{%[0-9]+}}<(@opened("5F99B72C-EC40-11EA-9534-8C8590A6A134") AnyObject).Type>([[E]])
+// CHECK: } // end sil function 'dont_crash_when_propagating_existentials'
+sil @dont_crash_when_propagating_existentials : $@convention(thin) () -> @owned AnyObject {
+bb0:
+  %0 = metatype $@thick C.Type
+  %1 = init_existential_metatype %0 : $@thick C.Type, $@thick AnyObject.Type
+  %3 = alloc_stack $Any, let, name "object"
+  %4 = open_existential_metatype %1 : $@thick AnyObject.Type to $@thick (@opened("5F99B72C-EC40-11EA-9534-8C8590A6A134") AnyObject).Type
+  %5 = init_existential_addr %3 : $*Any, $(@opened("5F99B72C-EC40-11EA-9534-8C8590A6A134") AnyObject).Type
+  store %4 to %5 : $*@thick (@opened("5F99B72C-EC40-11EA-9534-8C8590A6A134") AnyObject).Type
+  %7 = open_existential_addr immutable_access %3 : $*Any to $*@opened("5F9F1B04-EC40-11EA-9534-8C8590A6A134") Any
+  %8 = function_ref @any_to_object : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @owned AnyObject
+  %9 = apply %8<@opened("5F9F1B04-EC40-11EA-9534-8C8590A6A134") Any>(%7) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @owned AnyObject
+  destroy_addr %3 : $*Any
+  dealloc_stack %3 : $*Any
+  return %9 : $AnyObject
+}
+
+
 // CHECK-LABEL: sil @remove_unused_alloc_ref
 // CHECK-NEXT: bb0
 // CHECK-NEXT: %0 = tuple ()
