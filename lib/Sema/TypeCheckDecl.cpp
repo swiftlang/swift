@@ -2501,6 +2501,8 @@ struct SortedDeclList {
 
                 // Can only happen on erroneous code.
                 assert(lhs.first == rhs.first ||
+                       lhs.first->getInterfaceType()->hasError() ||
+                       rhs.first->getInterfaceType()->hasError() ||
                        lhs.first->getASTContext().Diags.hadAnyError());
                 return false;
               });
@@ -2575,10 +2577,14 @@ SemanticMembersRequest::evaluate(Evaluator &evaluator,
 
   for (auto *member : idc->getMembers()) {
     if (auto *var = dyn_cast<VarDecl>(member)) {
-      // The projected storage wrapper ($foo) might have dynamically-dispatched
-      // accessors, so force them to be synthesized.
+      // Ensure that the storage property for lazy propeties has been created.
+      if (var->getAttrs().hasAttribute<LazyAttr>())
+        (void)var->getLazyStorageProperty();
+
+      // Ensure that the backing property (_prop) and projected storage wrapper
+      // ($prop) have been created.
       if (var->hasAttachedPropertyWrapper())
-        (void) var->getPropertyWrapperBackingProperty();
+        (void)var->getPropertyWrapperBackingPropertyInfo();
     }
   }
 
@@ -2587,7 +2593,7 @@ SemanticMembersRequest::evaluate(Evaluator &evaluator,
   for (auto *member : idc->getMembers()) {
     if (auto *value = dyn_cast<ValueDecl>(member)) {
       // Add implicit members to a side table and sort them, since they could
-      // have been added to the class in any order.
+      // have been added to the context in any order.
       if (value->isImplicit()) {
         synthesizedMembers.add(value);
         continue;
