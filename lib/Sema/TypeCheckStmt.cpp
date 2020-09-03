@@ -303,11 +303,6 @@ static bool isDefer(DeclContext *dc) {
 /// same label.
 static void checkLabeledStmtShadowing(
     ASTContext &ctx, SourceFile *sourceFile, LabeledStmt *ls) {
-  // If ASTScope lookup is disabled, don't do this check at all.
-  // FIXME: Enable ASTScope lookup everywhere.
-  if (!ctx.LangOpts.EnableASTScopeLookup)
-    return;
-
   auto name = ls->getLabelInfo().Name;
   if (name.empty() || !sourceFile || ls->getStartLoc().isInvalid())
     return;
@@ -411,13 +406,7 @@ static LabeledStmt *findBreakOrContinueStmtTarget(
   // FIXME: Once everything uses ASTScope lookup, \c oldActiveLabeledStmts
   // can go away.
   SmallVector<LabeledStmt *, 4> activeLabeledStmts;
-  if (ctx.LangOpts.EnableASTScopeLookup) {
-    activeLabeledStmts = ASTScope::lookupLabeledStmts(sourceFile, loc);
-  } else {
-    activeLabeledStmts.insert(
-        activeLabeledStmts.end(),
-        oldActiveLabeledStmts.rbegin(), oldActiveLabeledStmts.rend());
-  }
+  activeLabeledStmts = ASTScope::lookupLabeledStmts(sourceFile, loc);
 
   // Handle an unlabeled break separately; that's the easy case.
   if (targetName.empty()) {
@@ -620,16 +609,11 @@ static bool checkFallthroughStmt(
   CaseStmt *fallthroughSource;
   CaseStmt *fallthroughDest;
   ASTContext &ctx = dc->getASTContext();
-  if (ctx.LangOpts.EnableASTScopeLookup) {
-    auto sourceFile = dc->getParentSourceFile();
-    std::tie(fallthroughSource, fallthroughDest) =
-        ASTScope::lookupFallthroughSourceAndDest(sourceFile, stmt->getLoc());
-    assert(fallthroughSource == oldFallthroughSource);
-    assert(fallthroughDest == oldFallthroughDest);
-  } else {
-    fallthroughSource = oldFallthroughSource;
-    fallthroughDest = oldFallthroughDest;
-  }
+  auto sourceFile = dc->getParentSourceFile();
+  std::tie(fallthroughSource, fallthroughDest) =
+      ASTScope::lookupFallthroughSourceAndDest(sourceFile, stmt->getLoc());
+  assert(fallthroughSource == oldFallthroughSource);
+  assert(fallthroughDest == oldFallthroughDest);
 
   if (!fallthroughSource) {
     ctx.Diags.diagnose(stmt->getLoc(), diag::fallthrough_outside_switch);
@@ -690,7 +674,6 @@ public:
       // Verify that the ASTScope-based query for active labeled statements
       // is equivalent to what we have here.
       if (LS->getStartLoc().isValid() && sourceFile &&
-          SC.getASTContext().LangOpts.EnableASTScopeLookup &&
           !SC.getASTContext().Diags.hadAnyError() &&
           !SC.LeaveBraceStmtBodyUnchecked) {
         // The labeled statements from ASTScope lookup have the
@@ -2080,8 +2063,7 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
   // Typechecking, in particular ApplySolution is going to replace closures
   // with OpaqueValueExprs and then try to do lookups into the closures.
   // So, build out the body now.
-  if (ctx.LangOpts.EnableASTScopeLookup)
-    ASTScope::expandFunctionBody(AFD);
+  ASTScope::expandFunctionBody(AFD);
 
   // Type check the function body if needed.
   bool hadError = false;

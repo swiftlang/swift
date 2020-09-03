@@ -259,8 +259,6 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_debug_diagnostic_names);
   inputArgs.AddLastArg(arguments, options::OPT_print_educational_notes);
   inputArgs.AddLastArg(arguments, options::OPT_diagnostic_style);
-  inputArgs.AddLastArg(arguments, options::OPT_enable_astscope_lookup);
-  inputArgs.AddLastArg(arguments, options::OPT_disable_astscope_lookup);
   inputArgs.AddLastArg(arguments, options::OPT_disable_parser_lookup);
   inputArgs.AddLastArg(arguments,
                        options::OPT_enable_experimental_concise_pound_file);
