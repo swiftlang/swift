@@ -305,11 +305,7 @@ public:
   /// Emits a thunk from a Swift function to the native Swift convention.
   void emitNativeToForeignThunk(SILDeclRef thunk);
 
-  void preEmitFunction(SILDeclRef constant,
-                       llvm::PointerUnion<ValueDecl *,
-                                          Expr *> astNode,
-                       SILFunction *F,
-                       SILLocation L);
+  void preEmitFunction(SILDeclRef constant, SILFunction *F, SILLocation L);
   void postEmitFunction(SILDeclRef constant, SILFunction *F);
   
   /// Add a global variable to the SILModule.

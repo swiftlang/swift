@@ -95,7 +95,7 @@ void SILGenModule::emitForeignToNativeThunk(SILDeclRef thunk) {
   f->setThunk(IsThunk);
   if (thunk.asForeign().isClangGenerated())
     f->setSerialized(IsSerializable);
-  preEmitFunction(thunk, thunk.getDecl(), f, thunk.getDecl());
+  preEmitFunction(thunk, f, thunk.getDecl());
   PrettyStackTraceSILFunction X("silgen emitForeignToNativeThunk", f);
   SILGenFunction(*this, *f, SwiftModule).emitForeignToNativeThunk(thunk);
   postEmitFunction(thunk, f);
@@ -107,10 +107,9 @@ void SILGenModule::emitNativeToForeignThunk(SILDeclRef thunk) {
   
   SILFunction *f = getFunction(thunk, ForDefinition);
   if (thunk.hasDecl())
-    preEmitFunction(thunk, thunk.getDecl(), f, thunk.getDecl());
+    preEmitFunction(thunk, f, thunk.getDecl());
   else
-    preEmitFunction(thunk, thunk.getAbstractClosureExpr(), f,
-                    thunk.getAbstractClosureExpr());
+    preEmitFunction(thunk, f, thunk.getAbstractClosureExpr());
   PrettyStackTraceSILFunction X("silgen emitNativeToForeignThunk", f);
   f->setBare(IsBare);
   f->setThunk(IsThunk);
