@@ -17,6 +17,8 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 
+#include "llvm/Support/Host.h"
+
 namespace swift {
 namespace unittest {
 

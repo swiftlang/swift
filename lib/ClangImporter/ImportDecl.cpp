@@ -16,7 +16,6 @@
 
 #include "CFTypeInfo.h"
 #include "ImporterImpl.h"
-#include "swift/Strings.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Attr.h"
@@ -36,15 +35,19 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Stmt.h"
-#include "swift/AST/Types.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/PrettyStackTrace.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/Parse/Lexer.h"
 #include "swift/Config.h"
+#include "swift/Parse/Lexer.h"
+#include "swift/Strings.h"
+
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
+#include "clang/AST/DeclObjCCommon.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/Basic/CharInfo.h"
 #include "swift/Basic/Statistic.h"
@@ -374,6 +377,7 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
       case clang::TargetInfo::VoidPtrBuiltinVaList:
       case clang::TargetInfo::PowerABIBuiltinVaList:
       case clang::TargetInfo::AAPCSABIBuiltinVaList:
+      case clang::TargetInfo::HexagonBuiltinVaList:
         assert(ClangCtx.getTypeSize(ClangCtx.VoidPtrTy) == ClangTypeSize &&
                "expected va_list type to be sizeof(void *)");
         break;
@@ -1212,15 +1216,16 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                          fieldType,
                                                          clang::VK_RValue,
                                                          clang::SourceLocation());
-    
-    auto cSetterExpr = new (Ctx) clang::BinaryOperator(cSetterMemberExpr,
-                                                       cSetterValueExpr,
-                                                       clang::BO_Assign,
-                                                       fieldType,
-                                                       clang::VK_RValue,
-                                                       clang::OK_Ordinary,
-                                                       clang::SourceLocation(),
-                                                       clang::FPOptions());
+
+    auto cSetterExpr = clang::BinaryOperator::Create(Ctx,
+                                                     cSetterMemberExpr,
+                                                     cSetterValueExpr,
+                                                     clang::BO_Assign,
+                                                     fieldType,
+                                                     clang::VK_RValue,
+                                                     clang::OK_Ordinary,
+                                                     clang::SourceLocation(),
+                                                     clang::FPOptionsOverride());
     
     cSetterDecl->setBody(cSetterExpr);
   }
@@ -2058,7 +2063,7 @@ classImplementsProtocol(const clang::ObjCInterfaceDecl *constInterface,
 
 static void
 applyPropertyOwnership(VarDecl *prop,
-                       clang::ObjCPropertyDecl::PropertyAttributeKind attrs) {
+                       clang::ObjCPropertyAttribute::Kind attrs) {
   Type ty = prop->getInterfaceType();
   if (auto innerTy = ty->getOptionalObjectType())
     ty = innerTy;
@@ -2066,19 +2071,19 @@ applyPropertyOwnership(VarDecl *prop,
     return;
 
   ASTContext &ctx = prop->getASTContext();
-  if (attrs & clang::ObjCPropertyDecl::OBJC_PR_copy) {
+  if (attrs & clang::ObjCPropertyAttribute::kind_copy) {
     prop->getAttrs().add(new (ctx) NSCopyingAttr(false));
     return;
   }
-  if (attrs & clang::ObjCPropertyDecl::OBJC_PR_weak) {
+  if (attrs & clang::ObjCPropertyAttribute::kind_weak) {
     prop->getAttrs().add(new (ctx)
                              ReferenceOwnershipAttr(ReferenceOwnership::Weak));
     prop->setInterfaceType(WeakStorageType::get(
         prop->getInterfaceType(), ctx));
     return;
   }
-  if ((attrs & clang::ObjCPropertyDecl::OBJC_PR_assign) ||
-      (attrs & clang::ObjCPropertyDecl::OBJC_PR_unsafe_unretained)) {
+  if ((attrs & clang::ObjCPropertyAttribute::kind_assign) ||
+      (attrs & clang::ObjCPropertyAttribute::kind_unsafe_unretained)) {
     prop->getAttrs().add(
         new (ctx) ReferenceOwnershipAttr(ReferenceOwnership::Unmanaged));
     prop->setInterfaceType(UnmanagedStorageType::get(

@@ -68,6 +68,7 @@
 #include "swift/TBDGen/TBDGen.h"
 
 #include "clang/AST/ASTContext.h"
+#include "clang/Basic/Module.h"
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/LLVMContext.h"
@@ -180,14 +181,14 @@ static bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
     reversePathSortedFilenames(opts.InputsAndOutputs.getInputFilenames());
   for (auto const &path : inputPaths) {
     dependencyString.push_back(' ');
-    dependencyString.append(frontend::utils::escapeForMake(path, buffer));
+    dependencyString.append(frontend::utils::escapeForMake(path, buffer).str());
   }
   // Then print dependencies we've picked up during compilation.
   auto dependencyPaths =
     reversePathSortedFilenames(depTracker->getDependencies());
   for (auto const &path : dependencyPaths) {
     dependencyString.push_back(' ');
-    dependencyString.append(frontend::utils::escapeForMake(path, buffer));
+    dependencyString.append(frontend::utils::escapeForMake(path, buffer).str());
   }
   
   // FIXME: Xcode can't currently handle multiple targets in a single
@@ -1597,7 +1598,7 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
         llvm::SmallString<32> Buffer(*opts.BridgingHeaderDirForPrint);
         llvm::sys::path::append(Buffer,
           llvm::sys::path::filename(opts.ImplicitObjCHeaderPath));
-        BridgingHeaderPathForPrint = Buffer.str();
+        BridgingHeaderPathForPrint = (std::string)Buffer;
       } else {
         // By default, include the given bridging header path directly.
         BridgingHeaderPathForPrint = opts.ImplicitObjCHeaderPath;

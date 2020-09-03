@@ -263,7 +263,7 @@ static void discoverCrosssImportOverlayDependencies(
     dummyMainDependencies.addModuleDependency(modName.str());
     mainDep.addModuleDependency(modName.str());
   });
-  cache.updateDependencies({mainModuleName, ModuleDependenciesKind::Swift}, mainDep);
+  cache.updateDependencies({mainModuleName.str(), ModuleDependenciesKind::Swift}, mainDep);
 
   // Record the dummy main module's direct dependencies. The dummy main module
   // only directly depend on these newly discovered overlay modules.

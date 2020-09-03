@@ -624,7 +624,7 @@ class ModuleInterfaceLoaderImpl {
 
     if (shouldLoadAdjacentModule) {
       if (fs.exists(modulePath)) {
-        result.first = modulePath;
+        result.first = modulePath.str();
       }
     }
 
@@ -641,7 +641,7 @@ class ModuleInterfaceLoaderImpl {
       }
       if (path) {
         if (fs.exists(*path)) {
-          result.second = *path;
+          result.second = path->str();
         }
       }
     }
@@ -1197,7 +1197,7 @@ bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
 
   if (CompRe.match(SB, &CompMatches)) {
     assert(CompMatches.size() == 2);
-    CompilerVersion = ArgSaver.save(CompMatches[1]);
+    CompilerVersion = ArgSaver.save(CompMatches[1]).str();
   }
   else {
     // Don't diagnose; handwritten module interfaces don't include this field.
@@ -1273,7 +1273,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   // FIXME: we shouldn't need this. Remove it?
   StringRef explictSwiftModuleMap = searchPathOpts.ExplicitSwiftModuleMap;
   genericSubInvocation.getSearchPathOptions().ExplicitSwiftModuleMap =
-    explictSwiftModuleMap;
+    explictSwiftModuleMap.str();
   auto &subClangImporterOpts = genericSubInvocation.getClangImporterOptions();
   // Respect the detailed-record preprocessor setting of the parent context.
   // This, and the "raw" clang module format it implicitly enables, are

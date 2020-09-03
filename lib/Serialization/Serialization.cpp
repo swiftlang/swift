@@ -46,6 +46,7 @@
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Strings.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Bitcode/RecordLayout.h"
@@ -609,7 +610,8 @@ serialization::ClangTypeID Serializer::addClangTypeRef(const clang::Type *ty) {
     isSerializable = false;
   }
   if (!isSerializable) {
-    PrettyStackTraceClangType trace("staging a serialized reference to", ty);
+    PrettyStackTraceClangType trace(loader->getClangASTContext(),
+                                    "staging a serialized reference to", ty);
     llvm::report_fatal_error("Clang function type is not serializable");
   }
 
@@ -4411,7 +4413,8 @@ public:
 
 void Serializer::writeASTBlockEntity(const clang::Type *ty) {
   using namespace decls_block;
-  PrettyStackTraceClangType traceRAII("serializing clang type", ty);
+  auto &ctx = getASTContext().getClangModuleLoader()->getClangASTContext();
+  PrettyStackTraceClangType traceRAII(ctx, "serializing clang type", ty);
   assert(ClangTypesToSerialize.hasRef(ty));
 
   // Serialize the type as an opaque sequence of data.
@@ -5159,7 +5162,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     DerivativeFunctionConfigTable derivativeConfigs;
     for (auto entry : uniquedDerivativeConfigs) {
       for (auto config : entry.second) {
-        auto paramIndices = config.first.str();
+        std::string paramIndices = config.first.str().str();
         auto genSigID = addGenericSignatureRef(config.second);
         derivativeConfigs[entry.first].push_back({paramIndices, genSigID});
       }

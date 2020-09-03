@@ -59,6 +59,7 @@
 #include "swift/Demangling/ManglingMacros.h"
 
 #include "clang/Basic/CharInfo.h"
+#include "clang/Basic/Module.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 
