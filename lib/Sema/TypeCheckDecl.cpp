@@ -2459,19 +2459,18 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
 
 namespace {
 
-// Utility class for deterministically ordering vtable entries for
-// synthesized methods.
-struct SortedFuncList {
-  using Key = std::tuple<DeclName, std::string>;
-  using Entry = std::pair<Key, AbstractFunctionDecl *>;
+// Utility class for deterministically ordering implicit entries.
+struct SortedDeclList {
+  using Entry = std::pair<ValueDecl *, std::string>;
   SmallVector<Entry, 2> elts;
   bool sorted = false;
 
-  void add(AbstractFunctionDecl *afd) {
-    assert(!isa<AccessorDecl>(afd));
-
-    Key key{afd->getName(), afd->getInterfaceType().getString()};
-    elts.emplace_back(key, afd);
+  void add(ValueDecl *value) {
+    assert(!isa<AccessorDecl>(value));
+    assert(std::find_if(elts.begin(), elts.end(), [&](const Entry &entry) {
+      return entry.first == value;
+    }) == elts.end());
+    elts.push_back({value, std::string()});
   }
 
   bool empty() { return elts.empty(); }
@@ -2481,8 +2480,29 @@ struct SortedFuncList {
     sorted = true;
     std::sort(elts.begin(),
               elts.end(),
-              [](const Entry &lhs, const Entry &rhs) -> bool {
-                return lhs.first < rhs.first;
+              [](Entry &lhs, Entry &rhs) -> bool {
+                if (lhs.first->getKind() != rhs.first->getKind())
+                  return lhs.first->getKind() < rhs.first->getKind();
+
+                if (lhs.first->getName() != rhs.first->getName())
+                  return lhs.first->getName() < rhs.first->getName();
+
+                Type lhsType = lhs.first->getInterfaceType();
+                Type rhsType = rhs.first->getInterfaceType();
+                if (lhsType.getPointer() != rhsType.getPointer()) {
+                  std::string &lhsName = lhs.second;
+                  if (lhsName.empty())
+                    lhsName = lhsType.getString();
+                  std::string &rhsName = rhs.second;
+                  if (rhsName.empty())
+                    rhsName = rhsType.getString();
+                  return lhsName < rhsName;
+                }
+
+                // Can only happen on erroneous code.
+                assert(lhs.first == rhs.first ||
+                       lhs.first->getASTContext().Diags.hadAnyError());
+                return false;
               });
   }
 
@@ -2562,14 +2582,14 @@ SemanticMembersRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  SortedFuncList synthesizedMembers;
+  SortedDeclList synthesizedMembers;
 
   for (auto *member : idc->getMembers()) {
-    if (auto *afd = dyn_cast<AbstractFunctionDecl>(member)) {
-      // Add synthesized members to a side table and sort them by their mangled
-      // name, since they could have been added to the class in any order.
-      if (afd->isSynthesized()) {
-        synthesizedMembers.add(afd);
+    if (auto *value = dyn_cast<ValueDecl>(member)) {
+      // Add implicit members to a side table and sort them, since they could
+      // have been added to the class in any order.
+      if (value->isImplicit()) {
+        synthesizedMembers.add(value);
         continue;
       }
     }
@@ -2581,7 +2601,7 @@ SemanticMembersRequest::evaluate(Evaluator &evaluator,
     synthesizedMembers.sort();
 
     for (const auto &pair : synthesizedMembers)
-      result.push_back(pair.second);
+      result.push_back(pair.first);
   }
 
   return Context.AllocateCopy(result);
