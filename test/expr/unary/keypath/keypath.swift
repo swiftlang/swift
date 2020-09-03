@@ -1012,6 +1012,11 @@ func testMemberAccessOnOptionalKeyPathComponent() {
   let _ : KeyPath<String?, Int> = \.count // expected-error {{key path root inferred as optional type 'String?' must be unwrapped to refer to member 'count' of unwrapped type 'String'}}
   // expected-note@-1 {{chain the optional using '?.' to access unwrapped type member 'count'}} {{37-37=?.}}
   // expected-note@-2 {{unwrap the optional using '!.' to access unwrapped type member 'count'}} {{37-37=!.}}
+
+  let _ : KeyPath<String?, Int> = \.utf8.count 
+  // expected-error@-1 {{key path root inferred as optional type 'String?' must be unwrapped to refer to member 'utf8' of unwrapped type 'String'}}
+  // expected-note@-2 {{chain the optional using '?.' to access unwrapped type member 'utf8'}} {{37-37=?.}}
+  // expected-note@-3 {{unwrap the optional using '!.' to access unwrapped type member 'utf8'}} {{37-37=!.}}
 }
 
 func testSyntaxErrors() {
