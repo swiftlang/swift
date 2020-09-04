@@ -2299,7 +2299,7 @@ public:
       FD->diagnose(diag::func_decl_without_brace);
     } else if (FD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
-      TypeChecker::typeCheckAbstractFunctionBody(FD);
+      (void)FD->getTypecheckedBody();
     } else if (shouldSkipBodyTypechecking(FD)) {
       FD->setBodySkipped(FD->getBodySourceRange());
     } else {
@@ -2642,7 +2642,7 @@ public:
       CD->diagnose(diag::missing_initializer_def);
     } else if (CD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
-      TypeChecker::typeCheckAbstractFunctionBody(CD);
+      (void)CD->getTypecheckedBody();
     } else if (shouldSkipBodyTypechecking(CD)) {
       CD->setBodySkipped(CD->getBodySourceRange());
     } else {
@@ -2657,7 +2657,7 @@ public:
 
     if (DD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
-      TypeChecker::typeCheckAbstractFunctionBody(DD);
+      (void)DD->getTypecheckedBody();
     } else if (shouldSkipBodyTypechecking(DD)) {
       DD->setBodySkipped(DD->getBodySourceRange());
     } else {

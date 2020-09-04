@@ -6779,6 +6779,13 @@ BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {
                            nullptr);
 }
 
+BraceStmt *AbstractFunctionDecl::getTypecheckedBody() const {
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<AbstractFunctionDecl *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator, TypeCheckFunctionBodyRequest{mutableThis}, nullptr);
+}
+
 void AbstractFunctionDecl::setBody(BraceStmt *S, BodyKind NewBodyKind) {
   assert(getBodyKind() != BodyKind::Skipped &&
          "cannot set a body if it was skipped");

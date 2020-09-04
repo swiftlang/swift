@@ -473,8 +473,6 @@ Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
 void typeCheckASTNode(ASTNode &node, DeclContext *DC,
                       bool LeaveBodyUnchecked = false);
 
-bool typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);
-
 /// Try to apply the function builder transform of the given builder type
 /// to the body of the function.
 ///
