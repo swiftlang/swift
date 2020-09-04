@@ -1319,10 +1319,9 @@ ForwardModeTests.test("ForceUnwrapping") {
   expectEqual(5, forceUnwrap(Float(2)))
 }
 
-ForwardModeTests.test("NonActiveIndirectResult") {
+ForwardModeTests.test("ApplyNonActiveIndirectResult") {
   func identity<T: Differentiable>(_ x: T) -> T { x }
 
-  @_silgen_name("foo")
   @differentiable
   func applyNonactiveArgumentActiveIndirectResult(_ x: Tracked<Float>) -> Tracked<Float> {
     var y = identity(0 as Tracked<Float>)
