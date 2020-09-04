@@ -101,10 +101,6 @@ void walkOverriddenDecls(const ValueDecl *VD,
 
 void collectModuleNames(StringRef SDKPath, std::vector<std::string> &Modules);
 
-std::string getSDKName(StringRef Path);
-
-std::string getSDKVersion(StringRef Path);
-
 struct PlaceholderOccurrence {
   /// The complete placeholder string.
   StringRef FullPlaceholder;
