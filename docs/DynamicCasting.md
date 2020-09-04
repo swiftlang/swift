@@ -355,9 +355,9 @@ Implementation Note: `AnyObject` is represented in memory as a pointer to a refc
 
 ### Error (SE-0112)
 
-The Error type behaves like an ordinary existential type for casting purposes.
+The `Error` type behaves like an ordinary existential type for casting purposes.
 
-(See "Note: 'Self-conforming' protocols" below for additional details relevant to the Error protocol.)
+(See "Note: 'Self-conforming' protocols" below for additional details relevant to the `Error` protocol.)
 
 ### AnyHashable (SE-0131)
 
@@ -377,7 +377,7 @@ protocol P {}
 ```
 
 As a result of this definition, there is an existential type (also called `P`).
-This existential type is also known as a "protocol witness" type since it exposes exactly the capabilities that are defined by the protocol.
+This existential type is also known as a "protocol witness type" since it exposes exactly the capabilities that are defined by the protocol.
 Other capabilities of the type `T` are not accessible from a `P` instance.
 Any Swift instance of a concrete type `T` can be cast to the type `P` iff `T` conforms to the protocol `P`.
 
