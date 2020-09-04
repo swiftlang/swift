@@ -115,63 +115,6 @@ func activeInoutParamMutatingMethod(_ x: Mut) -> Mut {
   return result
 }
 
-@differentiable(wrt: x)
-func nonWrtInoutParam<T: Differentiable>(_ x: T, _ y: inout T) {
-  y = x
-}
-
-@differentiable
-func wrtInoutParam<T: Differentiable>(_ x: T, _ y: inout T) {
-  y = x
-}
-
-@differentiable(wrt: x)
-func nonWrtInoutParamNonVaried<T: Differentiable>(_ x: T, _ y: inout T) {}
-
-@differentiable(wrt: x)
-func wrtInoutParamNonVaried<T: Differentiable>(_ x: T, _ y: inout T) {}
-
-@differentiable
-func variedResultTracked(_ x: Tracked<Float>) -> Tracked<Float> {
-  var result: Tracked<Float> = 0
-  nonWrtInoutParam(x, &result)
-  return result
-}
-
-@differentiable
-func variedResultTracked2(_ x: Tracked<Float>) -> Tracked<Float> {
-  var result: Tracked<Float> = 0
-  wrtInoutParam(x, &result)
-  return result
-}
-
-@differentiable
-func nonVariedResultTracked(_ x: Tracked<Float>) -> Tracked<Float> {
-  var result: Tracked<Float> = 0
-  nonWrtInoutParamNonVaried(x, &result)
-  return result
-}
-
-@differentiable
-func nonVariedResultTracked2(_ x: Tracked<Float>) -> Tracked<Float> {
-  // expected-warning @+1 {{variable 'result' was never mutated}}
-  var result: Tracked<Float> = 0
-  return result
-}
-
-@differentiable
-func nonVariedResultTracked3(_ x: Tracked<Float>) -> Tracked<Float> {
-  return 0
-}
-
-@differentiable
-func nonVariedResultTracked4(_ x: Tracked<Float>) -> Tracked<Float> {
-  var result: Tracked<Float> = 0
-  wrtInoutParamNonVaried(x, &result)
-  return result
-}
-
-
 //===----------------------------------------------------------------------===//
 // Subset parameter differentiation thunks
 //===----------------------------------------------------------------------===//
