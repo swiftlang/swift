@@ -2646,8 +2646,10 @@ SemanticMembersRequest::evaluate(Evaluator &evaluator,
     TypeChecker::addImplicitConstructors(nominal);
   }
 
-  // Force any derivable conformances in this context. This ensures that any
-  // synthesized members will approach in the member list.
+  // Look through the conformances in this context. Both derivable conformances
+  // and associated type inference can introduce additional members that
+  // need to be part of the set of semantic members, so force those to be
+  // created now.
   using AssociatedTypeEntry =
       std::pair<ProtocolConformance *, AssociatedTypeDecl *>;
   SmallVector<AssociatedTypeEntry, 4> associatedTypes;
