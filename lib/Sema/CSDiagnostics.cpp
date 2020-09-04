@@ -3171,7 +3171,7 @@ bool MissingCallFailure::diagnoseAsError() {
 }
 
 bool ExtraneousPropertyWrapperUnwrapFailure::diagnoseAsError() {
-  auto newPrefix = usingStorageWrapper() ? "$" : "_";
+  auto newPrefix = usingProjection() ? "$" : "_";
 
   if (auto *member = getReferencedMember()) {
     emitDiagnostic(diag::incorrect_property_wrapper_reference_member,

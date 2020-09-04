@@ -582,7 +582,7 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
       // Property wrapper storage wrappers are final if the original property
       // is final.
       if (auto *original = VD->getOriginalWrappedProperty(
-            PropertyWrapperSynthesizedPropertyKind::StorageWrapper)) {
+            PropertyWrapperSynthesizedPropertyKind::Projection)) {
         if (original->isFinal())
           return true;
       }

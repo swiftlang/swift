@@ -534,22 +534,22 @@ InsertExplicitCall *InsertExplicitCall::create(ConstraintSystem &cs,
 
 bool UsePropertyWrapper::diagnose(const Solution &solution, bool asNote) const {
   ExtraneousPropertyWrapperUnwrapFailure failure(
-      solution, Wrapped, UsingStorageWrapper, Base, Wrapper, getLocator());
+      solution, Wrapped, UsingProjection, Base, Wrapper, getLocator());
   return failure.diagnose(asNote);
 }
 
 UsePropertyWrapper *UsePropertyWrapper::create(ConstraintSystem &cs,
                                                VarDecl *wrapped,
-                                               bool usingStorageWrapper,
+                                               bool usingProjection,
                                                Type base, Type wrapper,
                                                ConstraintLocator *locator) {
   return new (cs.getAllocator()) UsePropertyWrapper(
-      cs, wrapped, usingStorageWrapper, base, wrapper, locator);
+      cs, wrapped, usingProjection, base, wrapper, locator);
 }
 
 bool UseWrappedValue::diagnose(const Solution &solution, bool asNote) const {
   MissingPropertyWrapperUnwrapFailure failure(solution, PropertyWrapper,
-                                              usingStorageWrapper(), Base,
+                                              usingProjection(), Base,
                                               Wrapper, getLocator());
   return failure.diagnose(asNote);
 }

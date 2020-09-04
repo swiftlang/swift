@@ -4883,9 +4883,9 @@ enum class PropertyWrapperSynthesizedPropertyKind {
   /// The backing storage property, which is a stored property of the
   /// wrapper type.
   Backing,
-  /// A storage wrapper (e.g., `$foo`), which is a wrapper over the
-  /// wrapper instance's `projectedValue` property.
-  StorageWrapper,
+  /// A projection (e.g., `$foo`), which is a computed property to access the
+  /// wrapper instance's \c projectedValue property.
+  Projection,
 };
 
 /// VarDecl - 'var' and 'let' declarations.
@@ -5208,9 +5208,9 @@ public:
   /// bound generic version.
   VarDecl *getPropertyWrapperBackingProperty() const;
 
-  /// Retreive the storage wrapper for a property that has an attached
-  /// property wrapper.
-  VarDecl *getPropertyWrapperStorageWrapper() const;
+  /// Retreive the projection var for a property that has an attached
+  /// property wrapper with a \c projectedValue .
+  VarDecl *getPropertyWrapperProjectionVar() const;
 
   /// Retrieve the backing storage property for a lazy property.
   VarDecl *getLazyStorageProperty() const;
