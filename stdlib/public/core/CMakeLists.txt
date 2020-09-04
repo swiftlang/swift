@@ -82,7 +82,6 @@ set(SWIFTLIB_ESSENTIAL
   Indices.swift
   InputStream.swift
   IntegerParsing.swift
-  Integers.swift
   Join.swift
   KeyPath.swift
   KeyValuePairs.swift
@@ -197,6 +196,7 @@ set(SWIFTLIB_ESSENTIAL_GYB_SOURCES
   FloatingPointTypes.swift.gyb
   FloatingPoint.swift.gyb
   IntegerTypes.swift.gyb
+  Integers.swift.gyb
   UnsafeBufferPointer.swift.gyb
   UnsafeRawBufferPointer.swift.gyb
   )

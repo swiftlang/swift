@@ -1,4 +1,4 @@
-//===--- Integers.swift ---------------------------------------------------===//
+//===--- Integers.swift.gyb ------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,6 +9,15 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+
+
+%{
+from __future__ import division
+from SwiftIntTypes import all_integer_types
+from SwiftFloatingPointTypes import all_floating_point_types
+
+word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
+}%
 
 //===----------------------------------------------------------------------===//
 //===--- Bits for the Stdlib ----------------------------------------------===//
@@ -3051,6 +3060,25 @@ extension FixedWidthInteger {
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @inline(__always)
   public init<T: BinaryFloatingPoint>(_ source: T) {
+%   for float_type in all_floating_point_types():
+%   if float_type.bits == 16:
+#if !os(macOS) && !targetEnvironment(macCatalyst)
+%   elif float_type.bits == 80:
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+%end
+    if let source = source as? ${float_type.stdlib_name} {
+%   for int_type in all_integer_types(word_bits):
+      if ${int_type.stdlib_name}.self == Self.self {
+        self = ${int_type.stdlib_name}(source) as! Self
+        return
+      }
+%     end
+    }
+%   if float_type.bits == 16 or float_type.bits == 80:
+#endif
+%end
+%   end
+
     guard let value = Self._convert(from: source).value else {
       fatalError("""
         \(T.self) value cannot be converted to \(Self.self) because it is \
@@ -3077,6 +3105,29 @@ extension FixedWidthInteger {
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @inlinable
   public init?<T: BinaryFloatingPoint>(exactly source: T) {
+%   for float_type in all_floating_point_types():
+%   if float_type.bits == 16:
+#if !os(macOS) && !targetEnvironment(macCatalyst)
+%   elif float_type.bits == 80:
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+%end
+    if let source = source as? ${float_type.stdlib_name} {
+%   for int_type in all_integer_types(word_bits):
+      if ${int_type.stdlib_name}.self == Self.self {
+        if let converted = ${int_type.stdlib_name}(exactly: source) {
+          self = converted as! Self
+          return
+        } else {
+          return nil
+        }
+      }
+%     end
+    }
+%   if float_type.bits == 16 or float_type.bits == 80:
+#endif
+%end
+%   end
+
     let (temporary, exact) = Self._convert(from: source)
     guard exact, let value = temporary else {
       return nil
