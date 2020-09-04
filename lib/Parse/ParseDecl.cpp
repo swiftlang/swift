@@ -104,30 +104,24 @@ namespace {
     template <typename T>
     ParserResult<T>
     fixupParserResult(T *D) {
-      if (movedToTopLevel()) {
-        D->setHoisted();
-        SF->addHoistedDecl(D);
-        getDebuggerClient()->didGlobalize(D);
-      }
+      if (movedToTopLevel())
+        hoistDecl(D);
       return ParserResult<T>(D);
     }
     
     template <typename T>
     ParserResult<T>
     fixupParserResult(ParserStatus Status, T *D) {
-      if (movedToTopLevel()) {
-        D->setHoisted();
-        SF->addHoistedDecl(D);
-        getDebuggerClient()->didGlobalize(D);
-      }
+      if (movedToTopLevel())
+        hoistDecl(D);
       return makeParserResult(Status, D);
     }
 
     // The destructor doesn't need to do anything, the CC's destructor will
     // pop the context if we set it.
     ~DebuggerContextChange () {}
-  protected:
-  
+
+  private:
     DebuggerClient *getDebuggerClient() {
       ModuleDecl *M = P.CurDeclContext->getParentModule();
       return M->getDebugClient();
@@ -151,6 +145,13 @@ namespace {
     void switchContext() {
       SF = P.CurDeclContext->getParentSourceFile();
       CC.emplace(P, SF);
+    }
+
+    template<typename T>
+    void hoistDecl(T *D) {
+      D->setHoisted();
+      SF->addHoistedDecl(D);
+      getDebuggerClient()->didGlobalize(D);
     }
   };
 } // end anonymous namespace
