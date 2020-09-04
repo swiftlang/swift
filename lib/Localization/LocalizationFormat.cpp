@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Range.h"
 #include "swift/Localization/LocalizationFormat.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
@@ -188,6 +189,29 @@ operator>>(LocalizationInput &yin, T &diagnostics) {
     readYAML(yin, diagnostics, yin.unknownIDs, true, Ctx);
   }
   return yin;
+}
+
+void DefToYAMLConverter::convert(llvm::raw_ostream &out) {
+  for (auto i : swift::indices(IDs)) {
+    out << "- id: " << IDs[i] << "\n";
+
+    const std::string &msg = Messages[i];
+
+    out << "  msg: \"";
+    // Add an escape character before a double quote `"` or a backslash `\`.
+    for (unsigned j = 0; j < msg.length(); ++j) {
+      if (msg[j] == '"') {
+        out << '\\';
+        out << '"';
+      } else if (msg[j] == '\\') {
+        out << '\\';
+        out << '\\';
+      } else {
+        out << msg[j];
+      }
+    }
+    out << "\"\r\n";
+  }
 }
 
 } // namespace diag
