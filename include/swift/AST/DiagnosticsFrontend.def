@@ -366,6 +366,9 @@ ERROR(error_extracting_flags_from_module_interface,none,
       "error extracting flags from module interface", ())
 REMARK(rebuilding_module_from_interface,none,
        "rebuilding module '%0' from interface '%1'", (StringRef, StringRef))
+NOTE(sdk_version_pbm_version,none,
+     "SDK build version is '%0'; prebuilt modules were "
+     "built using SDK build version: '%1'", (StringRef, StringRef))
 NOTE(out_of_date_module_here,none,
      "%select{compiled|cached|forwarding|prebuilt}0 module is out of date: '%1'",
      (unsigned, StringRef))

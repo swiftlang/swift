@@ -26,6 +26,7 @@
 // can be reflected as source-breaking changes for API users. If they are,
 // the output of api-digester will include such changes.
 
+#include "swift/Basic/Platform.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
 #include "swift/AST/DiagnosticsModuleDiffer.h"
@@ -2704,7 +2705,7 @@ static CheckerOptions getCheckOpts(int argc, char *argv[]) {
     Opts.ToolArgs.push_back(argv[i]);
 
   if (!options::SDK.empty()) {
-    auto Ver = getSDKVersion(options::SDK);
+    auto Ver = getSDKBuildVersion(options::SDK);
     if (!Ver.empty()) {
       Opts.ToolArgs.push_back("-sdk-version");
       Opts.ToolArgs.push_back(Ver);
