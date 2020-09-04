@@ -111,6 +111,11 @@ the AST level. See also [witness table](#witness-table).
    context. This type may contain [archetypes](#archetype) and cannot be
    used directly from outside the context. Compare with [interface type](#interface-type).
 
+## critical edge
+
+An edge in a control flow graph where the destination has multiple predecessors
+and the source has multiple successors.
+
 ## customization point
 
 Informal term for a protocol requirement that has a default implementation,

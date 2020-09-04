@@ -956,7 +956,7 @@ getPropertyWrapperInformationFromOverload(
 }
 
 Optional<std::pair<VarDecl *, Type>>
-ConstraintSystem::getStorageWrapperInformation(
+ConstraintSystem::getPropertyWrapperProjectionInfo(
     SelectedOverload resolvedOverload) {
   return getPropertyWrapperInformationFromOverload(
       resolvedOverload, DC,
@@ -964,12 +964,12 @@ ConstraintSystem::getStorageWrapperInformation(
         if (!decl->hasAttachedPropertyWrapper())
           return None;
 
-        auto storageWrapper = decl->getPropertyWrapperStorageWrapper();
-        if (!storageWrapper)
+        auto projectionVar = decl->getPropertyWrapperProjectionVar();
+        if (!projectionVar)
           return None;
 
-        return std::make_pair(storageWrapper,
-                              storageWrapper->getInterfaceType());
+        return std::make_pair(projectionVar,
+                              projectionVar->getInterfaceType());
       });
 }
 

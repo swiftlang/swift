@@ -449,13 +449,15 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
   // Emit types and other global decls.
   for (auto *decl : SF.getTopLevelDecls())
     emitGlobalDecl(decl);
+  for (auto *decl : SF.getHoistedDecls())
+    emitGlobalDecl(decl);
   for (auto *localDecl : SF.LocalTypeDecls)
     emitGlobalDecl(localDecl);
   for (auto *opaqueDecl : SF.getOpaqueReturnTypeDecls())
     maybeEmitOpaqueTypeDecl(opaqueDecl);
 
   SF.collectLinkLibraries([this](LinkLibrary linkLib) {
-      this->addLinkLibrary(linkLib);
+    this->addLinkLibrary(linkLib);
   });
 
   if (ObjCInterop)

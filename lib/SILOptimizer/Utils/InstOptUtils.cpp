@@ -48,6 +48,27 @@ static llvm::cl::opt<bool> KeepWillThrowCall(
     llvm::cl::desc(
       "Keep calls to swift_willThrow, even if the throw is optimized away"));
 
+// Defined here to avoid repeatedly paying the price of template instantiation.
+const std::function<void(SILInstruction *)>
+    InstModCallbacks::defaultDeleteInst
+        = [](SILInstruction *inst) {
+          inst->eraseFromParent();
+        };
+const std::function<void(SILInstruction *)>
+    InstModCallbacks::defaultCreatedNewInst
+        = [](SILInstruction *) {};
+const std::function<void(SILValue, SILValue)>
+    InstModCallbacks::defaultReplaceValueUsesWith
+        = [](SILValue oldValue, SILValue newValue) {
+          oldValue->replaceAllUsesWith(newValue);
+        };
+const std::function<void(SingleValueInstruction *, SILValue)>
+    InstModCallbacks::defaultEraseAndRAUWSingleValueInst
+        = [](SingleValueInstruction *i, SILValue newValue) {
+          i->replaceAllUsesWith(newValue);
+          i->eraseFromParent();
+        };
+
 /// Creates an increment on \p Ptr before insertion point \p InsertPt that
 /// creates a strong_retain if \p Ptr has reference semantics itself or a
 /// retain_value if \p Ptr is a non-trivial value without reference-semantics.
