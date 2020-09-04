@@ -323,8 +323,10 @@ bool CompletionInstance::performCachedOperationIfPossible(
   TypeCheckerOptions typeckOpts = CI.getASTContext().TypeCheckerOpts;
   SearchPathOptions searchPathOpts = CI.getASTContext().SearchPathOpts;
   DiagnosticEngine tmpDiags(tmpSM);
+  ClangImporterOptions clangOpts;
   std::unique_ptr<ASTContext> tmpCtx(
-      ASTContext::get(langOpts, typeckOpts, searchPathOpts, tmpSM, tmpDiags));
+      ASTContext::get(langOpts, typeckOpts, searchPathOpts, clangOpts, tmpSM,
+                      tmpDiags));
   registerParseRequestFunctions(tmpCtx->evaluator);
   registerIDERequestFunctions(tmpCtx->evaluator);
   registerTypeCheckerRequestFunctions(tmpCtx->evaluator);
@@ -485,8 +487,6 @@ bool CompletionInstance::performCachedOperationIfPossible(
   }
 
   CachedReuseCount += 1;
-  cacheDependencyHashIfNeeded(CI, SM.getCodeCompletionBufferID(),
-                              InMemoryDependencyHash);
 
   return true;
 }

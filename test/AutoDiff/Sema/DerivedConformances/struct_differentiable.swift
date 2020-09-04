@@ -11,6 +11,35 @@ func testEmpty() {
   assertConformsToAdditiveArithmetic(Empty.TangentVector.self)
 }
 
+struct EmptyWithConcreteNonmutatingMoveAlong: Differentiable {
+  typealias TangentVector = Empty.TangentVector
+  var zeroTangentVectorInitializer: () -> TangentVector { { .init() } }
+  func move(along _: TangentVector) {}
+  static func proof_that_i_have_nonmutating_move_along() {
+    let empty = Self()
+    empty.move(along: .init())
+  }
+}
+
+protocol DifferentiableWithNonmutatingMoveAlong: Differentiable {}
+extension DifferentiableWithNonmutatingMoveAlong {
+  func move(along _: TangentVector) {}
+}
+
+struct EmptyWithInheritedNonmutatingMoveAlong: DifferentiableWithNonmutatingMoveAlong {
+  typealias TangentVector = Empty.TangentVector
+  var zeroTangentVectorInitializer: () -> TangentVector { { .init() } }
+  static func proof_that_i_have_nonmutating_move_along() {
+    let empty = Self()
+    empty.move(along: .init())
+  }
+}
+
+class EmptyClass: Differentiable {}
+func testEmptyClass() {
+  assertConformsToAdditiveArithmetic(EmptyClass.TangentVector.self)
+}
+
 // Test interaction with `AdditiveArithmetic` derived conformances.
 // Previously, this crashed due to duplicate memberwise initializer synthesis.
 struct EmptyAdditiveArithmetic: AdditiveArithmetic, Differentiable {}
@@ -21,14 +50,24 @@ struct EmptyAdditiveArithmetic: AdditiveArithmetic, Differentiable {}
 struct ImmutableStoredProperties: Differentiable {
   var okay: Float
 
-  // expected-warning @+1 {{stored property 'nondiff' has no derivative because 'Int' does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute, or conform 'ImmutableStoredProperties' to 'AdditiveArithmetic'}} {{3-3=@noDerivative }}
+  // expected-warning @+1 {{stored property 'nondiff' has no derivative because 'Int' does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}} {{3-3=@noDerivative }}
   let nondiff: Int
 
-  // expected-warning @+1 {{synthesis of the 'Differentiable.move(along:)' requirement for 'ImmutableStoredProperties' requires all stored properties not marked with `@noDerivative` to be mutable; use 'var' instead, or add an explicit '@noDerivative' attribute, or conform 'ImmutableStoredProperties' to 'AdditiveArithmetic}} {{3-3=@noDerivative }}
+  // expected-warning @+1 {{synthesis of the 'Differentiable.move(along:)' requirement for 'ImmutableStoredProperties' requires all stored properties not marked with `@noDerivative` to be mutable or have a non-mutating 'move(along:)'; use 'var' instead, or add an explicit '@noDerivative' attribute}} {{3-3=@noDerivative }}
   let diff: Float
+
+  let nonmutatingMoveAlongStruct: EmptyWithConcreteNonmutatingMoveAlong
+
+  let inheritedNonmutatingMoveAlongStruct: EmptyWithInheritedNonmutatingMoveAlong
+  
+  let diffClass: EmptyClass // No error on class-bound `let` with a non-mutating `move(along:)`.
 }
 func testImmutableStoredProperties() {
-  _ = ImmutableStoredProperties.TangentVector(okay: 1)
+  _ = ImmutableStoredProperties.TangentVector(
+    okay: 1, 
+    nonmutatingMoveAlongStruct: Empty.TangentVector(), 
+    inheritedNonmutatingMoveAlongStruct: Empty.TangentVector(),
+    diffClass: EmptyClass.TangentVector())
 }
 struct MutableStoredPropertiesWithInitialValue: Differentiable {
   var x = Float(1)
@@ -36,7 +75,7 @@ struct MutableStoredPropertiesWithInitialValue: Differentiable {
 }
 // Test struct with both an empty constructor and memberwise initializer.
 struct AllMixedStoredPropertiesHaveInitialValue: Differentiable {
-  // expected-warning @+1 {{synthesis of the 'Differentiable.move(along:)' requirement for 'AllMixedStoredPropertiesHaveInitialValue' requires all stored properties not marked with `@noDerivative` to be mutable; use 'var' instead, or add an explicit '@noDerivative' attribute}} {{3-3=@noDerivative }}
+  // expected-warning @+1 {{synthesis of the 'Differentiable.move(along:)' requirement for 'AllMixedStoredPropertiesHaveInitialValue' requires all stored properties not marked with `@noDerivative` to be mutable or have a non-mutating 'move(along:)'; use 'var' instead, or add an explicit '@noDerivative' attribute}} {{3-3=@noDerivative }}
   let x = Float(1)
   var y = Float(1)
   // Memberwise initializer should be `init(y:)` since `x` is immutable.
@@ -363,7 +402,7 @@ struct Generic<T> {}
 extension Generic: Differentiable where T: Differentiable {}
 
 struct WrappedProperties: Differentiable {
-  // expected-warning @+1 {{synthesis of the 'Differentiable.move(along:)' requirement for 'WrappedProperties' requires 'wrappedValue' in property wrapper 'ImmutableWrapper' to be mutable; add an explicit '@noDerivative' attribute}}
+  // expected-warning @+1 {{synthesis of the 'Differentiable.move(along:)' requirement for 'WrappedProperties' requires 'wrappedValue' in property wrapper 'ImmutableWrapper' to be mutable or have a non-mutating 'move(along:)'; add an explicit '@noDerivative' attribute}}
   @ImmutableWrapper var immutableInt: Generic<Int>
 
   // expected-warning @+1 {{stored property 'mutableInt' has no derivative because 'Generic<Int>' does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}

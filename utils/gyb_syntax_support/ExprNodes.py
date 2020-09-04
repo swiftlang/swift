@@ -189,15 +189,33 @@ EXPR_NODES = [
              Child('OperatorToken', kind='BinaryOperatorToken'),
          ]),
 
-    # arrow-expr -> 'async'? 'throws'? '->'
+    Node('TypedThrowsClause', kind='Syntax',
+          children=[
+             Child('ThrowsKeyword', kind='Token',
+                   token_choices=[
+                       'ThrowsToken',
+                   ]),
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('ThrowsType', kind='Type'),
+             Child('RightParen', kind='RightParenToken'),
+          ]),
+
+    # arrow-expr -> 'async'? ('throws'|'throws' '(' type ')')? '->'
     # NOTE: This appears only in SequenceExpr.
     Node('ArrowExpr', kind='Expr',
          children=[
              Child('AsyncKeyword', kind='IdentifierToken',
                    classification='Keyword',
                    text_choices=['async'], is_optional=True),
-             Child('ThrowsToken', kind='ThrowsToken',
-                   is_optional=True),
+             Child('Throws', kind='Syntax',
+                   is_optional=True,
+                   node_choices=[
+                       Child('ThrowsKeyword', kind='Token',
+                             token_choices=[
+                                 'ThrowsToken',
+                             ]),
+                       Child('TypedThrows', kind='TypedThrowsClause'),
+                   ]),
              Child('ArrowToken', kind='ArrowToken'),
          ]),
 
@@ -395,7 +413,15 @@ EXPR_NODES = [
              Child('AsyncKeyword', kind='IdentifierToken',
                    classification='Keyword',
                    text_choices=['async'], is_optional=True),
-             Child('ThrowsTok', kind='ThrowsToken', is_optional=True),
+             Child('Throws', kind='Syntax',
+                   is_optional=True,
+                   node_choices=[
+                       Child('ThrowsKeyword', kind='Token',
+                             token_choices=[
+                                 'ThrowsToken',
+                             ]),
+                       Child('TypedThrows', kind='TypedThrowsClause'),
+                   ]),
              Child('Output', kind='ReturnClause', is_optional=True),
              Child('InTok', kind='InToken'),
          ]),

@@ -249,17 +249,8 @@ protected:
     NumArgLabels : 16
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(UnresolvedMemberExpr, Expr, 1+1+1+16,
-    /// Whether the UnresolvedMemberExpr has arguments.
-    HasArguments : 1,
-    /// Whether the UnresolvedMemberExpr also has source locations for the
-    /// argument label.
-    HasArgLabelLocs : 1,
-    /// Whether the last argument is a trailing closure.
-    HasTrailingClosure : 1,
-    : NumPadBits,
-    /// # of argument labels stored after the UnresolvedMemberExpr.
-    NumArgLabels : 16
+  SWIFT_INLINE_BITFIELD_FULL(UnresolvedMemberExpr, Expr, 2,
+    FunctionRefKind : 2
   );
 
   SWIFT_INLINE_BITFIELD(OverloadSetRefExpr, Expr, 2,
@@ -1841,71 +1832,49 @@ public:
 /// member, which is to be resolved with context sensitive type information into
 /// bar.foo.  These always have unresolved type.
 class UnresolvedMemberExpr final
-    : public Expr,
-      public TrailingCallArguments<UnresolvedMemberExpr> {
+    : public Expr {
   SourceLoc DotLoc;
   DeclNameLoc NameLoc;
   DeclNameRef Name;
-  Expr *Argument;
-
-  UnresolvedMemberExpr(SourceLoc dotLoc, DeclNameLoc nameLoc,
-                       DeclNameRef name, Expr *argument,
-                       ArrayRef<Identifier> argLabels,
-                       ArrayRef<SourceLoc> argLabelLocs,
-                       bool hasTrailingClosure,
-                       bool implicit);
 
 public:
-  /// Create a new unresolved member expression with no arguments.
-  static UnresolvedMemberExpr *create(ASTContext &ctx, SourceLoc dotLoc,
-                                      DeclNameLoc nameLoc, DeclNameRef name,
-                                      bool implicit);
-
-  /// Create a new unresolved member expression.
-  static UnresolvedMemberExpr *create(ASTContext &ctx, SourceLoc dotLoc,
-                                      DeclNameLoc nameLoc, DeclNameRef name,
-                                      SourceLoc lParenLoc,
-                                      ArrayRef<Expr *> args,
-                                      ArrayRef<Identifier> argLabels,
-                                      ArrayRef<SourceLoc> argLabelLocs,
-                                      SourceLoc rParenLoc,
-                                      ArrayRef<TrailingClosure> trailingClosures,
-                                      bool implicit);
+  UnresolvedMemberExpr(SourceLoc dotLoc, DeclNameLoc nameLoc, DeclNameRef name,
+                       bool implicit)
+    : Expr(ExprKind::UnresolvedMember, implicit), DotLoc(dotLoc),
+      NameLoc(nameLoc), Name(name) {
+    // FIXME: Really, we should be setting this to `FunctionRefKind::Compound`
+    // if `NameLoc` is compound, but this would be a source break for cases like
+    // ```
+    // struct S {
+    //   static func makeS(_: Int) -> S! { S() }
+    // }
+    //
+    // let s: S = .makeS(_:)(0)
+    // ```
+    // Instead, we should store compound-ness as a separate bit from applied/
+    // unapplied.
+    Bits.UnresolvedMemberExpr.FunctionRefKind =
+        static_cast<unsigned>(FunctionRefKind::Unapplied);
+  }
 
   DeclNameRef getName() const { return Name; }
   DeclNameLoc getNameLoc() const { return NameLoc; }
   SourceLoc getDotLoc() const { return DotLoc; }
-  Expr *getArgument() const { return Argument; }
-  void setArgument(Expr *argument) { Argument = argument; }
-
-  /// Whether this reference has arguments.
-  bool hasArguments() const {
-    return Bits.UnresolvedMemberExpr.HasArguments;
-  }
-
-  unsigned getNumArguments() const {
-    return Bits.UnresolvedMemberExpr.NumArgLabels;
-  }
-
-  bool hasArgumentLabelLocs() const {
-    return Bits.UnresolvedMemberExpr.HasArgLabelLocs;
-  }
-
-  /// Whether this call with written with a trailing closure.
-  bool hasTrailingClosure() const {
-    return Bits.UnresolvedMemberExpr.HasTrailingClosure;
-  }
-
-  /// Return the index of the unlabeled trailing closure argument.
-  Optional<unsigned> getUnlabeledTrailingClosureIndex() const {
-    return getArgument()->getUnlabeledTrailingClosureIndexOfPackedArgument();
-  }
 
   SourceLoc getLoc() const { return NameLoc.getBaseNameLoc(); }
 
   SourceLoc getStartLoc() const { return DotLoc; }
-  SourceLoc getEndLoc() const {
-    return (Argument ? Argument->getEndLoc() : NameLoc.getSourceRange().End);
+  SourceLoc getEndLoc() const { return NameLoc.getSourceRange().End; }
+
+  /// Retrieve the kind of function reference.
+  FunctionRefKind getFunctionRefKind() const {
+    return static_cast<FunctionRefKind>(
+        Bits.UnresolvedMemberExpr.FunctionRefKind);
+  }
+
+  /// Set the kind of function reference.
+  void setFunctionRefKind(FunctionRefKind refKind) {
+    Bits.UnresolvedMemberExpr.FunctionRefKind = static_cast<unsigned>(refKind);
   }
   
   static bool classof(const Expr *E) {
@@ -2087,6 +2056,31 @@ public:
   }
 
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Paren; }
+};
+
+/// Represents the result of a chain of accesses or calls hanging off of an
+/// \c UnresolvedMemberExpr at the root. This is only used during type checking
+/// to give the result type of such a chain representation in the AST. This
+/// expression type is always implicit.
+class UnresolvedMemberChainResultExpr : public IdentityExpr {
+  /// The base of this chain of member accesses.
+  UnresolvedMemberExpr *ChainBase;
+public:
+  UnresolvedMemberChainResultExpr(Expr *subExpr, UnresolvedMemberExpr *base,
+                                  Type ty = Type())
+    : IdentityExpr(ExprKind::UnresolvedMemberChainResult, subExpr, ty,
+                   /*isImplicit=*/true),
+      ChainBase(base) {
+    assert(base);
+  }
+
+  UnresolvedMemberExpr *getChainBase() const { return ChainBase; }
+
+  SWIFT_FORWARD_SOURCE_LOCS_TO(getSubExpr())
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::UnresolvedMemberChainResult;
+  }
 };
   
 /// AwaitExpr - An 'await' surrounding an expression, marking that the
@@ -4848,20 +4842,22 @@ public:
 class ArrowExpr : public Expr {
   SourceLoc AsyncLoc;
   SourceLoc ThrowsLoc;
+  TypeRepr *ThrowsType;
   SourceLoc ArrowLoc;
   Expr *Args;
   Expr *Result;
 public:
   ArrowExpr(Expr *Args, SourceLoc AsyncLoc, SourceLoc ThrowsLoc,
-            SourceLoc ArrowLoc, Expr *Result)
-    : Expr(ExprKind::Arrow, /*implicit=*/false, Type()),
-      AsyncLoc(AsyncLoc), ThrowsLoc(ThrowsLoc), ArrowLoc(ArrowLoc), Args(Args),
-      Result(Result)
+            TypeRepr *ThrowsType, SourceLoc ArrowLoc, Expr *Result)
+    : Expr(ExprKind::Arrow, /*implicit=*/false, Type()), AsyncLoc(AsyncLoc),
+      ThrowsLoc(ThrowsLoc), ThrowsType(ThrowsType), ArrowLoc(ArrowLoc),
+      Args(Args), Result(Result)
   { }
 
-  ArrowExpr(SourceLoc AsyncLoc, SourceLoc ThrowsLoc, SourceLoc ArrowLoc)
-    : Expr(ExprKind::Arrow, /*implicit=*/false, Type()),
-      AsyncLoc(AsyncLoc), ThrowsLoc(ThrowsLoc), ArrowLoc(ArrowLoc),
+  ArrowExpr(SourceLoc AsyncLoc, SourceLoc ThrowsLoc, TypeRepr *ThrowsType,
+            SourceLoc ArrowLoc)
+    : Expr(ExprKind::Arrow, /*implicit=*/false, Type()), AsyncLoc(AsyncLoc),
+      ThrowsLoc(ThrowsLoc), ThrowsType(ThrowsType), ArrowLoc(ArrowLoc),
       Args(nullptr), Result(nullptr)
   { }
 
@@ -4871,6 +4867,7 @@ public:
   void setResultExpr(Expr *E) { Result = E; }
   SourceLoc getAsyncLoc() const { return AsyncLoc; }
   SourceLoc getThrowsLoc() const { return ThrowsLoc; }
+  TypeRepr *getThrowsType() const { return ThrowsType; }
   SourceLoc getArrowLoc() const { return ArrowLoc; }
   bool isFolded() const { return Args != nullptr && Result != nullptr; }
 

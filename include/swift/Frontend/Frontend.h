@@ -30,7 +30,6 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
-#include "swift/ClangImporter/ClangImporterOptions.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
@@ -621,7 +620,7 @@ public:
   ///
   /// This is similar to a parse-only invocation, but module imports will also
   /// be processed.
-  void performParseAndResolveImportsOnly();
+  bool performParseAndResolveImportsOnly();
 
   /// Performs mandatory, diagnostic, and optimization passes over the SIL.
   /// \param silModule The SIL module that was generated during SILGen.

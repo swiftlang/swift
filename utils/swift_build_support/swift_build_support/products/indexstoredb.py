@@ -76,7 +76,12 @@ def run_build_script_helper(action, host_target, product, args,
     script_path = os.path.join(
         product.source_dir, 'Utilities', 'build-script-helper.py')
 
-    toolchain_path = targets.toolchain_path(args.install_destdir,
+    install_destdir = args.install_destdir
+    if swiftpm.SwiftPM.has_cross_compile_hosts(args):
+        install_destdir = swiftpm.SwiftPM.get_install_destdir(args,
+                                                              host_target,
+                                                              product.build_dir)
+    toolchain_path = targets.toolchain_path(install_destdir,
                                             args.install_prefix)
     is_release = product.is_release()
     configuration = 'release' if is_release else 'debug'

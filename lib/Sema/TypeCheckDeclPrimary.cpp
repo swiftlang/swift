@@ -1853,9 +1853,11 @@ public:
     if (auto rawTy = ED->getRawType()) {
       // The raw type must be one of the blessed literal convertible types.
       if (!computeAutomaticEnumValueKind(ED)) {
-        DE.diagnose(ED->getInherited().front().getSourceRange().Start,
-                    diag::raw_type_not_literal_convertible, rawTy);
-        ED->getInherited().front().setType(ErrorType::get(getASTContext()));
+        if (!rawTy->is<ErrorType>()) {
+          DE.diagnose(ED->getInherited().front().getSourceRange().Start,
+                      diag::raw_type_not_literal_convertible, rawTy);
+          ED->getInherited().front().setType(ErrorType::get(getASTContext()));
+        }
       }
       
       // We need at least one case to have a raw value.
@@ -2015,7 +2017,7 @@ public:
 
     TypeChecker::checkDeclAttributes(CD);
 
-    for (Decl *Member : CD->getEmittedMembers())
+    for (Decl *Member : CD->getSemanticMembers())
       visit(Member);
 
     TypeChecker::checkPatternBindingCaptures(CD);

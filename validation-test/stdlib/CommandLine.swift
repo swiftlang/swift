@@ -8,7 +8,7 @@
 // RUN: %target-run %t/CommandLineStressTest foo bar baz qux quux corge grault garply waldo fred plugh xyzzy and thud
 // REQUIRES: executable_test
 // REQUIRES: stress_test
-// UNSUPPORTED: nonatomic_rc
+// UNSUPPORTED: single_threaded_runtime
 
 // This file is an empty stub to call into the command line stress test which
 // houses `main`.

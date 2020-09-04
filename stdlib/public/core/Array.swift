@@ -852,14 +852,14 @@ extension Array: RangeReplaceableCollection {
   /// `LazyMapCollection<Dictionary<String, Int>, Int>` to a simple
   /// `[String]`.
   ///
-  ///     func cacheImagesWithNames(names: [String]) {
+  ///     func cacheImages(withNames names: [String]) {
   ///         // custom image loading and caching
   ///      }
   ///
   ///     let namedHues: [String: Int] = ["Vermillion": 18, "Magenta": 302,
   ///             "Gold": 50, "Cerise": 320]
   ///     let colorNames = Array(namedHues.keys)
-  ///     cacheImagesWithNames(colorNames)
+  ///     cacheImages(withNames: colorNames)
   ///
   ///     print(colorNames)
   ///     // Prints "["Gold", "Cerise", "Magenta", "Vermillion"]"

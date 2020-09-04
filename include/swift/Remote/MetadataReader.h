@@ -463,7 +463,8 @@ public:
   }
 
   /// Given a demangle tree, attempt to turn it into a type.
-  BuiltType decodeMangledType(NodePointer Node) {
+  TypeLookupErrorOr<typename BuilderType::BuiltType>
+  decodeMangledType(NodePointer Node) {
     return swift::Demangle::decodeMangledType(Builder, Node);
   }
 
@@ -925,8 +926,8 @@ public:
     swift_runtime_unreachable("Unhandled MetadataKind in switch");
   }
 
-  BuiltType readTypeFromMangledName(const char *MangledTypeName,
-                                    size_t Length) {
+  TypeLookupErrorOr<typename BuilderType::BuiltType>
+  readTypeFromMangledName(const char *MangledTypeName, size_t Length) {
     Demangle::Demangler Dem;
     Demangle::NodePointer Demangled =
       Dem.demangleSymbol(StringRef(MangledTypeName, Length));
@@ -1183,14 +1184,14 @@ public:
                                 MangledNameKind::Type, Dem);
   }
 
-  BuiltType
+  TypeLookupErrorOr<typename BuilderType::BuiltType>
   readUnderlyingTypeForOpaqueTypeDescriptor(StoredPointer contextAddr,
                                             unsigned ordinal) {
     Demangle::Demangler Dem;
     auto node = readUnderlyingTypeManglingForOpaqueTypeDescriptor(contextAddr,
                                                                   ordinal, Dem);
     if (!node)
-      return BuiltType();
+      return TypeLookupError("Failed to read type mangling for descriptor.");
     return decodeMangledType(node);
   }
 

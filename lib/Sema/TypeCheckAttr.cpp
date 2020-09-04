@@ -2901,18 +2901,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   auto nominal = evaluateOrDefault(
     Ctx.evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
 
-  // If there is no nominal type with this name, complain about this being
-  // an unknown attribute.
   if (!nominal) {
-    std::string typeName;
-    if (auto typeRepr = attr->getTypeRepr()) {
-      llvm::raw_string_ostream out(typeName);
-      typeRepr->print(out);
-    } else {
-      typeName = attr->getType().getString();
-    }
-
-    diagnose(attr->getLocation(), diag::unknown_attribute, typeName);
     attr->setInvalid();
     return;
   }
@@ -4656,7 +4645,8 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
     if (originalAFD->getFormalAccess() == derivative->getFormalAccess())
       return true;
     return originalAFD->getFormalAccess() == AccessLevel::Public &&
-           derivative->getEffectiveAccess() == AccessLevel::Public;
+           (derivative->getFormalAccess() == AccessLevel::Public ||
+            derivative->isUsableFromInline());
   };
 
   // Check access level compatibility for original and derivative functions.

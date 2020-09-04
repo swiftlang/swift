@@ -1211,7 +1211,7 @@ public protocol BinaryInteger :
   ///
   /// - Parameter rhs: The value to divide this value by.
   /// - Returns: A tuple containing the quotient and remainder of this value
-  ///   divided by `rhs`. The remainder has the same sign as `rhs`.
+  ///   divided by `rhs`. The remainder has the same sign as `lhs`.
   func quotientAndRemainder(dividingBy rhs: Self)
     -> (quotient: Self, remainder: Self)
 

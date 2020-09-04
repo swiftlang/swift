@@ -35,8 +35,8 @@ namespace  {
     return MetadataResponse{nullptr, MetadataState::Complete};
   }
 
-  template<>
-  TypeInfo getEmptyValue<TypeInfo>() {
+  template <>
+  TypeLookupErrorOr<TypeInfo> getEmptyValue<TypeLookupErrorOr<TypeInfo>>() {
     return TypeInfo();
   }
 }
@@ -172,13 +172,13 @@ TEST_F(CompatibilityOverrideTest, test_swift_getTypeByMangledNode) {
   Demangler demangler;
   auto Result = swift_getTypeByMangledNode(MetadataState::Abstract,
                                            demangler, nullptr, nullptr, nullptr,nullptr);
-  ASSERT_EQ(Result.getMetadata(), nullptr);
+  ASSERT_EQ(Result.getType().getMetadata(), nullptr);
 }
 
 TEST_F(CompatibilityOverrideTest, test_swift_getTypeByMangledName) {
   auto Result = swift_getTypeByMangledName(MetadataState::Abstract,
                                            "", nullptr, nullptr, nullptr);
-  ASSERT_EQ(Result.getMetadata(), nullptr);
+  ASSERT_EQ(Result.getType().getMetadata(), nullptr);
 }
 
 TEST_F(CompatibilityOverrideTest, test_swift_getAssociatedTypeWitnessSlow) {

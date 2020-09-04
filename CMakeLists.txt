@@ -914,7 +914,6 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   endif()
 endif()
 
-find_package(Python2 COMPONENTS Interpreter REQUIRED)
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
 
 #

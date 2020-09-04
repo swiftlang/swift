@@ -1080,9 +1080,9 @@ public:
   void cacheResult(AccessorDecl *value) const;
 };
 
-class EmittedMembersRequest :
-    public SimpleRequest<EmittedMembersRequest,
-                         ArrayRef<Decl *>(ClassDecl *),
+class SemanticMembersRequest :
+    public SimpleRequest<SemanticMembersRequest,
+                         ArrayRef<Decl *>(IterableDeclContext *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1092,7 +1092,7 @@ private:
 
   // Evaluation.
   ArrayRef<Decl *>
-  evaluate(Evaluator &evaluator, ClassDecl *classDecl) const;
+  evaluate(Evaluator &evaluator, IterableDeclContext *idc) const;
 
 public:
   bool isCached() const { return true; }

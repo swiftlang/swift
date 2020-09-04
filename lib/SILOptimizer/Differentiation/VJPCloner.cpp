@@ -457,9 +457,14 @@ public:
             if (!originalFnTy->getParameters()[paramIndex]
                      .getSILStorageInterfaceType()
                      .isDifferentiable(getModule())) {
-              context.emitNondifferentiabilityError(
-                  ai->getArgumentsWithoutIndirectResults()[paramIndex], invoker,
-                  diag::autodiff_nondifferentiable_argument);
+              auto arg = ai->getArgumentsWithoutIndirectResults()[paramIndex];
+              auto startLoc = arg.getLoc().getStartSourceLoc();
+              auto endLoc = arg.getLoc().getEndSourceLoc();
+              context
+                  .emitNondifferentiabilityError(
+                      arg, invoker, diag::autodiff_nondifferentiable_argument)
+                  .fixItInsert(startLoc, "withoutDerivative(at: ")
+                  .fixItInsertAfter(endLoc, ")");
               errorOccurred = true;
               return true;
             }
@@ -477,8 +482,14 @@ public:
                                        .getSILStorageInterfaceType();
             }
             if (!remappedResultType.isDifferentiable(getModule())) {
-              context.emitNondifferentiabilityError(
-                  origCallee, invoker, diag::autodiff_nondifferentiable_result);
+              auto startLoc = ai->getLoc().getStartSourceLoc();
+              auto endLoc = ai->getLoc().getEndSourceLoc();
+              context
+                  .emitNondifferentiabilityError(
+                      origCallee, invoker,
+                      diag::autodiff_nondifferentiable_result)
+                  .fixItInsert(startLoc, "withoutDerivative(at: ")
+                  .fixItInsertAfter(endLoc, ")");
               errorOccurred = true;
               return true;
             }
@@ -744,6 +755,8 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
         pattern, tanType, TypeExpansionContext::minimal());
     ParameterConvention conv;
     switch (origResConv) {
+    case ResultConvention::Unowned:
+    case ResultConvention::UnownedInnerPointer:
     case ResultConvention::Owned:
     case ResultConvention::Autoreleased:
       if (tl.isAddressOnly()) {
@@ -752,10 +765,6 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
         conv = tl.isTrivial() ? ParameterConvention::Direct_Unowned
                               : ParameterConvention::Direct_Guaranteed;
       }
-      break;
-    case ResultConvention::Unowned:
-    case ResultConvention::UnownedInnerPointer:
-      conv = ParameterConvention::Direct_Unowned;
       break;
     case ResultConvention::Indirect:
       conv = ParameterConvention::Indirect_In_Guaranteed;

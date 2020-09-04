@@ -56,8 +56,33 @@ void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
 
     auto &bindings = relatedBindings->getSecond();
 
-    // Infer transitive protocol requirements.
-    llvm::copy(bindings.Protocols, std::back_inserter(Protocols));
+    // FIXME: This is a workaround necessary because solver doesn't filter
+    // bindings based on protocol requirements placed on a type variable.
+    //
+    // Forward propagate (subtype -> supertype) only literal conformance
+    // requirements since that helps solver to infer more types at
+    // parameter positions.
+    //
+    // \code
+    // func foo<T: ExpressibleByStringLiteral>(_: String, _: T) -> T {
+    //   fatalError()
+    // }
+    //
+    // func bar(_: Any?) {}
+    //
+    // func test() {
+    //   bar(foo("", ""))
+    // }
+    // \endcode
+    //
+    // If one of the literal arguments doesn't propagate its
+    // `ExpressibleByStringLiteral` conformance, we'd end up picking
+    // `T` with only one type `Any?` which is incorrect.
+    llvm::copy_if(bindings.Protocols, std::back_inserter(Protocols),
+                  [](const Constraint *protocol) {
+                    return protocol->getKind() ==
+                           ConstraintKind::LiteralConformsTo;
+                  });
 
     // Infer transitive defaults.
     llvm::copy(bindings.Defaults, std::back_inserter(Defaults));
@@ -335,7 +360,7 @@ void ConstraintSystem::PotentialBindings::finalize(
     if (locator->isLastElement<LocatorPathElt::MemberRefBase>())
       PotentiallyIncomplete = true;
 
-    addPotentialBinding(PotentialBinding::forHole(cs.getASTContext(), locator));
+    addPotentialBinding(PotentialBinding::forHole(TypeVar, locator));
   }
 
   // Let's always consider `Any` to be a last resort binding because
@@ -481,6 +506,7 @@ void ConstraintSystem::PotentialBindings::addPotentialBinding(
   if (binding.Kind == AllowedBindingKind::Supertypes &&
       !binding.BindingType->hasUnresolvedType() &&
       !binding.BindingType->hasTypeVariable() &&
+      !binding.BindingType->hasHole() &&
       !binding.BindingType->hasUnboundGenericType() &&
       !binding.hasDefaultedLiteralProtocol() &&
       !binding.isDefaultableBinding() && allowJoinMeet) {
@@ -742,6 +768,24 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
       return None;
   }
 
+  // If subtyping is allowed and this is a result of an implicit member chain,
+  // let's delay binding it to an optional until its object type resolved too or
+  // it has been determined that there is no possibility to resolve it. Otherwise
+  // we might end up missing solutions since it's allowed to implicitly unwrap
+  // base type of the chain but it can't be done early - type variable
+  // representing chain's result type has a different l-valueness comparing
+  // to generic parameter of the optional.
+  if (kind == AllowedBindingKind::Subtypes) {
+    auto *locator = typeVar->getImpl().getLocator();
+    if (locator &&
+        locator->isLastElement<LocatorPathElt::UnresolvedMemberChainResult>()) {
+      auto objectType = type->getOptionalObjectType();
+      if (objectType && objectType->isTypeVariableOrMember()) {
+        result.PotentiallyIncomplete = true;
+      }
+    }
+  }
+
   if (type->is<InOutType>() && !typeVar->getImpl().canBindToInOut())
     type = LValueType::get(type->getInOutObjectType());
   if (type->is<LValueType>() && !typeVar->getImpl().canBindToLValue())
@@ -905,15 +949,7 @@ bool ConstraintSystem::PotentialBindings::infer(
 
   case ConstraintKind::ConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:
-    // Swift 3 allowed the use of default types for normal conformances
-    // to expressible-by-literal protocols.
-    if (cs.getASTContext().LangOpts.EffectiveLanguageVersion[0] >= 4)
-      return false;
-
-    if (!constraint->getSecondType()->is<ProtocolType>())
-      return false;
-
-    LLVM_FALLTHROUGH;
+    return false;
 
   case ConstraintKind::LiteralConformsTo: {
     // Record constraint where protocol requirement originated

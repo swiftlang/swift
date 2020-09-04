@@ -2897,7 +2897,7 @@ static ConstraintFix *fixPropertyWrapperFailure(
     return nullptr;
 
   enum class Fix : uint8_t {
-    StorageWrapper,
+    ProjectedValue,
     PropertyWrapper,
     WrappedValue,
   };
@@ -2916,9 +2916,9 @@ static ConstraintFix *fixPropertyWrapperFailure(
       return nullptr;
 
     switch (fix) {
-    case Fix::StorageWrapper:
+    case Fix::ProjectedValue:
     case Fix::PropertyWrapper:
-      return UsePropertyWrapper::create(cs, decl, fix == Fix::StorageWrapper,
+      return UsePropertyWrapper::create(cs, decl, fix == Fix::ProjectedValue,
                                         baseTy, toType.getValueOr(type),
                                         locator);
 
@@ -2929,10 +2929,10 @@ static ConstraintFix *fixPropertyWrapperFailure(
     llvm_unreachable("Unhandled Fix type in switch");
   };
 
-  if (auto storageWrapper =
-          cs.getStorageWrapperInformation(*resolvedOverload)) {
-    if (auto *fix = applyFix(Fix::StorageWrapper, storageWrapper->first,
-                             storageWrapper->second))
+  if (auto projection =
+          cs.getPropertyWrapperProjectionInfo(*resolvedOverload)) {
+    if (auto *fix = applyFix(Fix::ProjectedValue, projection->first,
+                             projection->second))
       return fix;
   }
 
@@ -4306,22 +4306,18 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
-  // Unresolved member type mismatches are handled when
-  // r-value adjustment constraint fails.
-  case ConstraintLocator::UnresolvedMember:
+  case ConstraintLocator::RValueAdjustment:
     return true;
 
-  case ConstraintLocator::RValueAdjustment: {
-    if (!isExpr<UnresolvedMemberExpr>(anchor))
-      break;
-
+  case ConstraintLocator::UnresolvedMemberChainResult: {
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
       break;
 
-    // r-value adjustment is used to connect base type of
-    // unresolved member to its output type, if there is
-    // a type mismatch here it's contextual e.g.
+    if (repairByTreatingRValueAsLValue(lhs, rhs))
+      break;
+
+    // If there is a type mismatch here it's contextual e.g.,
     // `let x: E = .foo(42)`, where `.foo` is a member of `E`
     // but produces an incorrect type.
     auto *fix = IgnoreContextualType::create(*this, lhs, rhs,
@@ -4434,6 +4430,12 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::FunctionBuilderBodyResult: {
+    // If result type of the body couldn't be determined
+    // there is going to be other fix available to diagnose
+    // the underlying issue.
+    if (lhs->isHole())
+      return true;
+
     conversionsOrFixes.push_back(ContextualMismatch::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
     break;
@@ -4686,6 +4688,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::Error:
     case TypeKind::Unresolved:
       return getTypeMatchFailure(locator);
+
+    case TypeKind::Hole: {
+      // If it's allowed to attempt fixes, let's delegate
+      // decision to `repairFailures`, since depending on
+      // locator we might either ignore such a mismatch,
+      // or record a specialized fix.
+      if (shouldAttemptFixes())
+        break;
+
+      return getTypeMatchFailure(locator);
+    }
 
     case TypeKind::GenericTypeParam:
       llvm_unreachable("unmapped dependent type in type checker");
@@ -5366,6 +5379,7 @@ ConstraintSystem::simplifyConstructionConstraint(
     
   case TypeKind::Unresolved:
   case TypeKind::Error:
+  case TypeKind::Hole:
     return SolutionKind::Error;
 
   case TypeKind::GenericFunction:
@@ -6759,28 +6773,39 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
   } else if (auto *CE = getAsExpr<CallExpr>(anchor)) {
     baseExpr = CE->getFn();
     baseType = getType(baseExpr);
-    // If this is an initializer call without explicit mention
-    // of `.init` on metatype value.
-    if (auto *AMT = baseType->getAs<AnyMetatypeType>()) {
-      auto instanceType = AMT->getInstanceType()->getWithoutParens();
-      if (!cs.isTypeReference(baseExpr)) {
-        if (baseType->is<MetatypeType>() &&
-            instanceType->isAnyExistentialType()) {
-          return AllowInvalidInitRef::onProtocolMetatype(
-              cs, baseType, init, cs.isStaticallyDerivedMetatype(baseExpr),
-              baseExpr->getSourceRange(), locator);
-        }
+    // FIXME: Historically, UnresolvedMemberExprs have allowed implicit
+    // construction through a metatype value, but this should probably be
+    // illegal.
+    if (!isa<UnresolvedMemberExpr>(baseExpr)) {
+      // If this is an initializer call without explicit mention
+      // of `.init` on metatype value.
+      if (auto *AMT = baseType->getAs<AnyMetatypeType>()) {
+        auto instanceType = AMT->getInstanceType()->getWithoutParens();
+        if (!cs.isTypeReference(baseExpr)) {
+          if (baseType->is<MetatypeType>() &&
+              instanceType->isAnyExistentialType()) {
+            return AllowInvalidInitRef::onProtocolMetatype(
+                cs, baseType, init, cs.isStaticallyDerivedMetatype(baseExpr),
+                baseExpr->getSourceRange(), locator);
+          }
 
-        if (!instanceType->isExistentialType() ||
-            instanceType->isAnyExistentialType()) {
-          return AllowInvalidInitRef::onNonConstMetatype(cs, baseType, init,
-                                                         locator);
+          if (!instanceType->isExistentialType() ||
+              instanceType->isAnyExistentialType()) {
+            return AllowInvalidInitRef::onNonConstMetatype(cs, baseType, init,
+                                                           locator);
+          }
         }
       }
     }
     // Initializer reference which requires contextual base type e.g.
-    // `.init(...)`.
+    // `.init(...)`. Could also be a nested type or typealias being constructed
+    // via implicit member syntax, e.g., `let _: Base = .Nested()` where
+    // `Base.Nested: Base`.
   } else if (auto *UME = getAsExpr<UnresolvedMemberExpr>(anchor)) {
+    // If we're accessing a nested type to perform the construction implicitly,
+    // then the type we're constructing may not actually be the base of the
+    // UnresolvedMemberExpr--instead, it will be the type of the nested type
+    // member.
     // We need to find type variable which represents contextual base.
     auto *baseLocator = cs.getConstraintLocator(
         UME, locatorEndsWith(locator, ConstraintLocator::ConstructorMember)

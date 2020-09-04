@@ -37,3 +37,8 @@ module I {
   header "I.h"
   export *
 }
+
+module X {
+  header "X.h"
+  export *
+}

@@ -450,11 +450,11 @@ ConstraintSystem::SolverState::~SolverState() {
   // Update the "largest" statistics if this system is larger than the
   // previous one.  
   // FIXME: This is not at all thread-safe.
-  if (NumStatesExplored > LargestNumStatesExplored.Value) {
-    LargestSolutionAttemptNumber.Value = SolutionAttempt-1;
+  if (NumStatesExplored > LargestNumStatesExplored.getValue()) {
+    LargestSolutionAttemptNumber = SolutionAttempt-1;
     ++LargestSolutionAttemptNumber;
     #define CS_STATISTIC(Name, Description) \
-      JOIN2(Largest,Name).Value = Name-1; \
+      JOIN2(Largest,Name) = Name-1; \
       ++JOIN2(Largest,Name);
     #include "ConstraintSolverStats.def"
   }

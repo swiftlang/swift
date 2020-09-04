@@ -517,7 +517,7 @@ public:
       auto *newStorage = Storage::allocate(newCapacity);
       if (storage) {
         std::copy(storage->data(), storage->data() + count, newStorage->data());
-        newStorage->Count.store(count, std::memory_order_relaxed);
+        newStorage->Count.store(count, std::memory_order_release);
         FreeList.push_back(storage);
       }
       
@@ -635,30 +635,49 @@ private:
     std::atomic<Index> &at(size_t i) { return (&Mask)[i]; }
   };
 
+  /// A simple linked list representing pointers that need to be freed.
+  struct FreeListNode {
+    FreeListNode *Next;
+    void *Ptr;
+
+    static void add(FreeListNode **head, void *ptr) {
+      auto *newNode = new FreeListNode{*head, ptr};
+      *head = newNode;
+    }
+
+    static void freeAll(FreeListNode **head) {
+      auto *node = *head;
+      while (node) {
+        auto *next = node->Next;
+        free(node->Ptr);
+        delete node;
+        node = next;
+      }
+      *head = nullptr;
+    }
+  };
+
   /// The number of readers currently active, equal to the number of snapshot
   /// objects currently alive.
-  std::atomic<size_t> ReaderCount;
+  std::atomic<uint32_t> ReaderCount{0};
 
   /// The number of elements in the elements array.
-  std::atomic<size_t> ElementCount;
+  std::atomic<uint32_t> ElementCount{0};
 
   /// The array of elements.
-  std::atomic<ElemTy *> Elements;
+  std::atomic<ElemTy *> Elements{nullptr};
 
   /// The array of indices.
-  std::atomic<IndexStorage *> Indices;
+  std::atomic<IndexStorage *> Indices{nullptr};
 
   /// The writer lock, which must be taken before any mutation of the table.
   Mutex WriterLock;
 
   /// The maximum number of elements that the current elements array can hold.
-  size_t ElementCapacity;
+  uint32_t ElementCapacity{0};
 
-  /// The list of element arrays to be freed once no readers are active.
-  std::vector<ElemTy *> ElementFreeList;
-
-  /// The list of index arrays to be freed once no readers are active.
-  std::vector<IndexStorage *> IndicesFreeList;
+  /// The list of pointers to be freed once no readers are active.
+  FreeListNode *FreeList{nullptr};
 
   void incrementReaders() {
     ReaderCount.fetch_add(1, std::memory_order_acquire);
@@ -668,24 +687,11 @@ private:
     ReaderCount.fetch_sub(1, std::memory_order_release);
   }
 
-  /// Free all the arrays in the free lists.
-  void deallocateFreeList() {
-    for (auto *storage : ElementFreeList)
-      free(storage);
-    ElementFreeList.clear();
-    ElementFreeList.shrink_to_fit();
-
-    for (auto *indices : IndicesFreeList)
-      free(indices);
-    IndicesFreeList.clear();
-    IndicesFreeList.shrink_to_fit();
-  }
-
   /// Free all the arrays in the free lists if there are no active readers. If
   /// there are active readers, do nothing.
   void deallocateFreeListIfSafe() {
     if (ReaderCount.load(std::memory_order_acquire) == 0)
-      deallocateFreeList();
+      FreeListNode::freeAll(&FreeList);
   }
 
   /// Grow the elements array, adding the old array to the free list and
@@ -702,7 +708,7 @@ private:
     ElemTy *newElements = static_cast<ElemTy *>(malloc(newSize));
     if (elements) {
       memcpy(newElements, elements, elementCount * sizeof(ElemTy));
-      ElementFreeList.push_back(elements);
+      FreeListNode::add(&FreeList, elements);
     }
 
     ElementCapacity = newCapacity;
@@ -739,7 +745,7 @@ private:
 
     Indices.store(newIndices, std::memory_order_release);
 
-    IndicesFreeList.push_back(indices);
+    FreeListNode::add(&FreeList, indices);
 
     return newIndices;
   }
@@ -792,7 +798,7 @@ public:
   ~ConcurrentReadableHashMap() {
     assert(ReaderCount.load(std::memory_order_acquire) == 0 &&
            "deallocating ConcurrentReadableHashMap with outstanding snapshots");
-    deallocateFreeList();
+    FreeListNode::freeAll(&FreeList);
   }
 
   /// Readers take a snapshot of the hash map, then work with the snapshot.
@@ -943,8 +949,8 @@ public:
     Elements.store(nullptr, std::memory_order_relaxed);
     ElementCapacity = 0;
 
-    IndicesFreeList.push_back(indices);
-    ElementFreeList.push_back(elements);
+    FreeListNode::add(&FreeList, indices);
+    FreeListNode::add(&FreeList, elements);
 
     deallocateFreeListIfSafe();
   }

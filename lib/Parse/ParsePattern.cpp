@@ -131,8 +131,10 @@ static ParserStatus parseDefaultArgument(
   
   defaultArgs->HasDefaultArgument = true;
 
-  if (initR.hasCodeCompletion())
+  if (initR.hasCodeCompletion()) {
+    init = initR.get();
     return makeParserCodeCompletionStatus();
+  }
 
   if (initR.isNull())
     return makeParserError();
@@ -823,9 +825,9 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   return Status;
 }
 
-void Parser::parseAsyncThrows(
-    SourceLoc existingArrowLoc, SourceLoc &asyncLoc, SourceLoc &throwsLoc, TypeRepr *&throwsType,
-    bool *rethrows) {
+void Parser::parseAsyncThrows(SourceLoc existingArrowLoc, SourceLoc &asyncLoc,
+                              SourceLoc &throwsLoc, TypeRepr *&throwsType,
+                              bool *rethrows) {
   if (shouldParseExperimentalConcurrency() &&
       Tok.isContextualKeyword("async")) {
     asyncLoc = consumeToken();
@@ -849,26 +851,15 @@ void Parser::parseAsyncThrows(
         .fixItReplace(Tok.getLoc(), "throws");
     }
     StringRef keyword;
-    if (Tok.isKeyword() && Tok.is(tok::kw_throws)) {
-      keyword = Tok.getText();
-      throwsLoc = consumeToken();
-      ASTContext &Ctx = SF.getASTContext();
-      DiagnosticSuppression SuppressedDiags(Ctx.Diags);
-      bool hasType = false;
-      {
-        BacktrackingScope backtrack(*this);
-        hasType = canParseType();
-      }
-      if (hasType) {
-        ParserResult<TypeRepr> result = parseType();
-        throwsType = result.getPtrOrNull();
-      }
-    } else {
-      keyword = Tok.getText();
-      throwsLoc = consumeToken();
-    }
-
-    if (existingArrowLoc.isValid()) {
+    
+    keyword = Tok.getText();
+    throwsLoc = consumeToken();
+    
+    ParserResult<TypeRepr> throwsTypeResult = parseThrowsType();
+    
+    throwsType = throwsTypeResult.getPtrOrNull();
+    
+    if (existingArrowLoc.isValid() && throwsLoc.isValid()) {
       diagnose(throwsLoc, diag::async_or_throws_in_wrong_position,
                rethrows ? (*rethrows ? 1 : 0) : 0)
         .fixItRemove(throwsLoc)
@@ -885,6 +876,52 @@ void Parser::parseAsyncThrows(
           existingArrowLoc.isValid() ? existingArrowLoc : throwsLoc, "async ");
     }
   }
+}
+
+/// Parse a type in parentheses after a `throws` or `rethrows`
+///   throws-type:
+///     '(' type ')'
+/// Parses a parenthesized type. If the closing parenthesis is missing, it
+/// backtracks and parses a type, that is not a function type, to preserve
+/// the return type of the throwing function
+ParserResult<TypeRepr> Parser::parseThrowsType() {
+  // look for the left paren for throws (_type_)
+  
+  // backtracking, in case the closing parenthesis is missing
+  Optional<BacktrackingScope> backtracking;
+  
+  if (Tok.is(tok::l_paren)) {
+    SourceLoc lParenLoc = consumeToken();
+    
+    backtracking.emplace(*this);
+    
+    // we parse every type (including function types)
+    ParserResult<TypeRepr> throwsTypeRepr = parseType(diag::expected_parenthesized_type_after_throws);
+
+    // if the closing parenthesis is missing, we backtrack and parse the type
+    // again, this time excluding function types
+    if (auto typeRepr = throwsTypeRepr.getPtrOrNull()) {
+      if (isa<FunctionTypeRepr>(typeRepr) && !Tok.is(tok::r_paren)) {
+        backtracking.reset();
+        
+        throwsTypeRepr = parseTypeNotAllowingFunctionType(diag::expected_parenthesized_type_after_throws);
+      }
+    }
+    
+    // otherwise we cancel the backtrack
+    if (backtracking) backtracking->cancelBacktrack();
+    
+    // Parse the closing ')'.
+    SourceLoc rParenLoc;
+    parseMatchingToken(tok::r_paren, rParenLoc, diag::expected_rparen_thrown_type, lParenLoc);
+    
+    if (throwsTypeRepr.hasCodeCompletion())
+      return makeParserCodeCompletionResult<TypeRepr>();
+    
+    return throwsTypeRepr;
+  }
+  
+  return nullptr;
 }
 
 /// Parse a pattern with an optional type annotation.

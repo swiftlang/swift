@@ -2606,6 +2606,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   case SILFunction::Purpose::GlobalInit:
     OS << "[global_init] ";
     break;
+  case SILFunction::Purpose::GlobalInitOnceFunction:
+    OS << "[global_init_once_fn] ";
+    break;
   case SILFunction::Purpose::LazyPropertyGetter:
     OS << "[lazy_getter] ";
     break;

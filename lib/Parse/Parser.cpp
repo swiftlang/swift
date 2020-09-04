@@ -203,7 +203,7 @@ void Parser::performCodeCompletionSecondPassImpl(
 
   case CodeCompletionDelayedDeclKind::FunctionBody: {
     auto *AFD = cast<AbstractFunctionDecl>(DC);
-    AFD->setBodyParsed(parseAbstractFunctionBodyImpl(AFD).getPtrOrNull());
+    (void)parseAbstractFunctionBodyImpl(AFD);
     break;
   }
   }
@@ -1190,6 +1190,7 @@ struct ParserUnit::Implementation {
   LangOptions LangOpts;
   TypeCheckerOptions TypeCheckerOpts;
   SearchPathOptions SearchPathOpts;
+  ClangImporterOptions clangImporterOpts;
   DiagnosticEngine Diags;
   ASTContext &Ctx;
   SourceFile *SF;
@@ -1201,8 +1202,8 @@ struct ParserUnit::Implementation {
                  std::shared_ptr<SyntaxParseActions> spActions)
       : SPActions(std::move(spActions)), LangOpts(Opts),
         TypeCheckerOpts(TyOpts), Diags(SM),
-        Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SearchPathOpts, SM,
-                             Diags)) {
+        Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SearchPathOpts,
+                             clangImporterOpts, SM, Diags)) {
     auto parsingOpts = SourceFile::getDefaultParsingOptions(LangOpts);
     parsingOpts |= ParsingFlags::DisableDelayedBodies;
     parsingOpts |= ParsingFlags::DisablePoundIfEvaluation;

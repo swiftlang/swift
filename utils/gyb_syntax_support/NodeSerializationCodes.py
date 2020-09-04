@@ -30,7 +30,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'InOutExpr': 25,
     'PoundColumnExpr': 26,
     'TryExpr': 27,
-    'AwaitExpr': 249,
+    'AwaitExpr': 248,
     'IdentifierExpr': 28,
     'SuperRefExpr': 29,
     'NilLiteralExpr': 30,
@@ -112,6 +112,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'TypeInitializerClause': 107,
     'ParameterClause': 108,
     'ReturnClause': 109,
+    'TypedThrowsOrRethrowsClause': 250,
     'FunctionSignature': 110,
     'IfConfigClause': 111,
     'PoundSourceLocationArgs': 112,
@@ -224,6 +225,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'ImplicitlyUnwrappedOptionalType': 219,
     'CompositionType': 220,
     'TupleType': 221,
+    'TypedThrowsClause': 249,
     'FunctionType': 222,
     'AttributedType': 223,
     'YieldStmt': 224,
@@ -250,6 +252,9 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'MultipleTrailingClosureElementList': 245,
     'MultipleTrailingClosureElement': 246,
     'PoundFileIDExpr': 247,
+    # relocated: 'AwaitExpr': 248,
+    # relocated: 'TypedThrowsClause': 249,
+    'ParenthesizedExpression': 251,
 }
 
 

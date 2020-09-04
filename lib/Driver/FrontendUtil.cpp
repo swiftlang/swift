@@ -20,6 +20,7 @@
 #include "swift/Driver/ToolChain.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Host.h"
 #include "llvm/Support/StringSaver.h"
 
 using namespace swift;

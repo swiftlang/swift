@@ -1655,6 +1655,13 @@ ConstraintSystem::matchFunctionBuilder(
   assert(builder && "Bad function builder type");
   assert(builder->getAttrs().hasAttribute<FunctionBuilderAttr>());
 
+  if (InvalidFunctionBuilderBodies.count(fn)) {
+    (void)recordFix(
+        IgnoreInvalidFunctionBuilderBody::duringConstraintGeneration(
+            *this, getConstraintLocator(fn.getBody())));
+    return getTypeMatchSuccess();
+  }
+
   // Pre-check the body: pre-check any expressions in it and look
   // for return statements.
   auto request =
@@ -1669,7 +1676,7 @@ ConstraintSystem::matchFunctionBuilder(
     if (!shouldAttemptFixes())
       return getTypeMatchFailure(locator);
 
-    if (recordFix(IgnoreInvalidFunctionBuilderBody::create(
+    if (recordFix(IgnoreInvalidFunctionBuilderBody::duringPreCheck(
             *this, getConstraintLocator(fn.getBody()))))
       return getTypeMatchFailure(locator);
 
@@ -1711,9 +1718,25 @@ ConstraintSystem::matchFunctionBuilder(
   BuilderClosureVisitor visitor(getASTContext(), this, dc, builderType,
                                 bodyResultType);
 
-  auto applied = visitor.apply(fn.getBody());
-  if (!applied)
-    return getTypeMatchFailure(locator);
+  Optional<AppliedBuilderTransform> applied = None;
+  {
+    DiagnosticTransaction transaction(dc->getASTContext().Diags);
+
+    applied = visitor.apply(fn.getBody());
+    if (!applied)
+      return getTypeMatchFailure(locator);
+
+    if (transaction.hasErrors()) {
+      InvalidFunctionBuilderBodies.insert(fn);
+
+      if (recordFix(
+              IgnoreInvalidFunctionBuilderBody::duringConstraintGeneration(
+                  *this, getConstraintLocator(fn.getBody()))))
+        return getTypeMatchFailure(locator);
+
+      return getTypeMatchSuccess();
+    }
+  }
 
   Type transformedType = getType(applied->returnExpr);
   assert(transformedType && "Missing type");
@@ -1800,7 +1823,7 @@ public:
 
       HasError |= ConstraintSystem::preCheckExpression(
           E, DC, /*replaceInvalidRefsWithErrors=*/false);
-      HasError |= transaction.hasDiagnostics();
+      HasError |= transaction.hasErrors();
 
       if (SuppressDiagnostics)
         transaction.abort();

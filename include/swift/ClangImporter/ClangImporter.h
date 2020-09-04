@@ -115,7 +115,7 @@ public:
 private:
   Implementation &Impl;
 
-  ClangImporter(ASTContext &ctx, const ClangImporterOptions &clangImporterOpts,
+  ClangImporter(ASTContext &ctx,
                 DependencyTracker *tracker,
                 DWARFImporterDelegate *dwarfImporterDelegate);
 
@@ -137,8 +137,6 @@ public:
   /// \param ctx The ASTContext into which the module will be imported.
   /// The ASTContext's SearchPathOptions will be used for the Clang importer.
   ///
-  /// \param importerOpts The options to use for the Clang importer.
-  ///
   /// \param swiftPCHHash A hash of Swift's various options in a compiler
   /// invocation, used to create a unique Bridging PCH if requested.
   ///
@@ -150,12 +148,12 @@ public:
   /// \returns a new Clang module importer, or null (with a diagnostic) if
   /// an error occurred.
   static std::unique_ptr<ClangImporter>
-  create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
+  create(ASTContext &ctx,
          std::string swiftPCHHash = "", DependencyTracker *tracker = nullptr,
          DWARFImporterDelegate *dwarfImporterDelegate = nullptr);
 
   static std::vector<std::string>
-  getClangArguments(ASTContext &ctx, const ClangImporterOptions &importerOpts);
+  getClangArguments(ASTContext &ctx);
 
   static std::unique_ptr<clang::CompilerInvocation>
   createClangInvocation(ClangImporter *importer,
@@ -378,6 +376,7 @@ public:
   /// construction of the replica.
   bool dumpPrecompiledModule(StringRef modulePath, StringRef outputPath);
 
+  bool runPreprocessor(StringRef inputPath, StringRef outputPath);
   const clang::Module *getClangOwningModule(ClangNode Node) const;
   bool hasTypedef(const clang::Decl *typeDecl) const;
 
@@ -473,7 +472,6 @@ public:
 
   bool isSerializable(const clang::Type *type,
                       bool checkCanonical) const override;
-  ArrayRef<std::string> getExtraClangArgs() const;
 };
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,

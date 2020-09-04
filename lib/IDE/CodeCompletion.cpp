@@ -3725,8 +3725,12 @@ public:
       llvm::SaveAndRestore<bool> ChangeNeedOptionalUnwrap(NeedOptionalUnwrap,
                                                           true);
       if (DotLoc.isValid()) {
+        // Let's not erase the dot if the completion is after a swift key path
+        // root because \A?.?.member is the correct way to access wrapped type
+        // member from an optional key path root.
+        auto loc = IsAfterSwiftKeyPathRoot ? DotLoc.getAdvancedLoc(1) : DotLoc;
         NumBytesToEraseForOptionalUnwrap = Ctx.SourceMgr.getByteDistance(
-            DotLoc, Ctx.SourceMgr.getCodeCompletionLoc());
+            loc, Ctx.SourceMgr.getCodeCompletionLoc());
       } else {
         NumBytesToEraseForOptionalUnwrap = 0;
       }
@@ -4284,14 +4288,18 @@ public:
     if (!T->mayHaveMembers())
       return;
 
-    DeclContext *DC = const_cast<DeclContext *>(CurrDeclContext);
-
     // We can only say .foo where foo is a static member of the contextual
     // type and has the same type (or if the member is a function, then the
     // same result type) as the contextual type.
     FilteredDeclConsumer consumer(*this, [=](ValueDecl *VD,
                                              DeclVisibilityKind Reason) {
-      return isReferenceableByImplicitMemberExpr(CurrModule, DC, T, VD);
+      if (T->getOptionalObjectType() &&
+          VD->getModuleContext()->isStdlibModule()) {
+        // In optional context, ignore '.init(<some>)', 'init(nilLiteral:)',
+        if (isa<ConstructorDecl>(VD))
+          return false;
+      }
+      return true;
     });
 
     auto baseType = MetatypeType::get(T);
@@ -5930,7 +5938,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     if (!OnRoot && KPE->getComponents().back().getKind() ==
                        KeyPathExpr::Component::Kind::OptionalWrap) {
       // KeyPath expr with '?' (e.g. '\Ty.[0].prop?.another').
-      // Althogh expected type is optional, we should unwrap it because it's
+      // Although expected type is optional, we should unwrap it because it's
       // unwrapped.
       baseType = baseType->getOptionalObjectType();
     }

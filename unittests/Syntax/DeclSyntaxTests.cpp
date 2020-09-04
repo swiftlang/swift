@@ -385,11 +385,19 @@ FunctionSignatureSyntax getCannedFunctionSignature() {
   auto RParen = SyntaxFactory::makeRightParenToken({}, Trivia::spaces(1));
   auto Parameter = SyntaxFactory::makeParameterClause(LParen, List, RParen);
   auto Throws = SyntaxFactory::makeThrowsKeyword({}, Trivia::spaces(1));
+  auto Error = SyntaxFactory::makeTypeIdentifier("Error", {}, {});
   auto Arrow = SyntaxFactory::makeArrowToken({}, Trivia::spaces(1));
   auto Int = SyntaxFactory::makeTypeIdentifier("Int", {}, Trivia::spaces(1));
   auto Return = SyntaxFactory::makeReturnClause(Arrow, Int);
 
-  return SyntaxFactory::makeFunctionSignature(Parameter, None, Throws, None , Return);
+  auto TypedThrows = SyntaxFactory::makeTypedThrowsOrRethrowsClause(Throws,
+                                                                    LParen,
+                                                                    Error,
+                                                                    RParen);
+  auto TypedThrow = SyntaxFactory::makeParenthesizedExpression(LParen, Error, RParen);
+
+  return
+    SyntaxFactory::makeFunctionSignature(Parameter, None, Throws, TypedThrow, Return);
 }
 
 TEST(DeclSyntaxTests, FunctionSignatureMakeAPIs) {
@@ -406,7 +414,7 @@ TEST(DeclSyntaxTests, FunctionSignatureMakeAPIs) {
     ASSERT_EQ(OS.str().str(),
       "(with radius: Int = -1, "
       "with radius: Int = -1, "
-      "with radius: Int = -1, ) throws -> Int ");
+      "with radius: Int = -1, ) throws (Error) -> Int ");
   }
 }
 
@@ -592,7 +600,7 @@ TEST(DeclSyntaxTests, FunctionDeclMakeAPIs) {
               "(with radius: Int = -1, "
               "with radius: Int = -1, "
               "with radius: Int = -1, ) "
-              "throws -> Int "
+              "throws (Error) -> Int "
               "where T == Int {\n"
               "  return1\n"
               "}");

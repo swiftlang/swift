@@ -19,6 +19,7 @@
 #include "DerivedConformances.h"
 #include "MiscDiagnostics.h"
 #include "TypeAccessScopeChecker.h"
+#include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckObjC.h"
 #include "swift/AST/ASTContext.h"
@@ -4039,7 +4040,8 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
 static void checkExportability(Type depTy, Type replacementTy,
                                const ProtocolConformance *conformance,
                                NormalProtocolConformance *conformanceBeingChecked,
-                               SourceFile *SF) {
+                               DeclContext *DC) {
+  SourceFile *SF = DC->getParentSourceFile();
   if (!SF)
     return;
 
@@ -4049,13 +4051,17 @@ static void checkExportability(Type depTy, Type replacementTy,
     if (!subConformance.isConcrete())
       continue;
     checkExportability(depTy, replacementTy, subConformance.getConcrete(),
-                       conformanceBeingChecked, SF);
+                       conformanceBeingChecked, DC);
   }
 
   const RootProtocolConformance *rootConformance =
       conformance->getRootConformance();
   ModuleDecl *M = rootConformance->getDeclContext()->getParentModule();
-  if (!SF->isImportedImplementationOnly(M))
+
+  auto originKind = getDisallowedOriginKind(
+      rootConformance->getDeclContext()->getAsDecl(),
+      *SF, DC->getAsDecl());
+  if (originKind == DisallowedOriginKind::None)
     return;
 
   ASTContext &ctx = SF->getASTContext();
@@ -4066,14 +4072,16 @@ static void checkExportability(Type depTy, Type replacementTy,
         conformanceBeingChecked->getLoc(),
         diag::conformance_from_implementation_only_module,
         rootConformance->getType(),
-        rootConformance->getProtocol()->getName(), 0, M->getName());
+        rootConformance->getProtocol()->getName(), 0, M->getName(),
+        static_cast<unsigned>(originKind));
   } else {
     ctx.Diags.diagnose(
         conformanceBeingChecked->getLoc(),
         diag::assoc_conformance_from_implementation_only_module,
         rootConformance->getType(),
         rootConformance->getProtocol()->getName(), M->getName(),
-        depTy, replacementTy->getCanonicalType());
+        depTy, replacementTy->getCanonicalType(),
+        static_cast<unsigned>(originKind));
   }
 }
 
@@ -4122,11 +4130,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
 
   // Now check that our associated conformances are at least as visible as
   // the conformance itself.
-  //
-  // FIXME: Do we need to check SPI here too?
   if (getRequiredAccessScope().isPublic() || isUsableFromInlineRequired()) {
-    auto *fileForCheckingExportability = DC->getParentSourceFile();
-
     for (auto req : proto->getRequirementSignature()) {
       if (req.getKind() == RequirementKind::Conformance) {
         auto depTy = req.getFirstType();
@@ -4136,7 +4140,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
           auto *concrete = conformance.getConcrete();
           auto replacementTy = DC->mapTypeIntoContext(concrete->getType());
           checkExportability(depTy, replacementTy, concrete,
-                             Conformance, fileForCheckingExportability);
+                             Conformance, DC);
         }
       }
     }

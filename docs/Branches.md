@@ -18,11 +18,11 @@ To switch from one set of branches to another, you can use `utils/update-checkou
 
 ## The Release Branches
 
-| Swift            | LLVM Project
-| ---------------- | ----------------------
-| swift-x.y-branch | swift/swift-x.y-branch
+| Swift       | LLVM Project
+| ----------- | -----------------
+| release/x.y | swift/release/x.y
 
-At some point before a release, a *release branch* will be created in every repository with a name like `swift-4.0-branch`. (The actual number is chosen by Apple.) After the branch has been created, commits must make it to this branch to make it into the release. In some cases, the [release manager][] for the branch will decide to merge in all additional changes from `master`; otherwise, cherry-picking changes and making a new pull request is the way to go. If there are any "patch" releases (e.g. Swift 4.0.1), they will also come from this branch.
+At some point before a release, a *release branch* will be created in every repository with a name like `release/5.3`. (The actual number is chosen by Apple.) After the branch has been created, commits must make it to this branch to make it into the release. In some cases, the [release manager][] for the branch will decide to merge in all additional changes from `master`; otherwise, cherry-picking changes and making a new pull request is the way to go. If there are any "patch" releases (e.g. Swift 5.3.1), they will also come from this branch.
 
 Note that these branches come not from the "development" branches (above), but the "upstream" branches (below). This is because they need to contain the latest changes not just from Swift, but from the LLVM project as well. For some releases, the release branch for the LLVM project will be timed to coincide with the corresponding llvm.org release branch.
 
@@ -35,7 +35,7 @@ Note that these branches come not from the "development" branches (above), but t
 
 `swift/master-next` is a branch for LLVM that includes all changes necessary to support Swift. Changes from llvm.org's master branch are automatically merged in. Why isn't this just `swift/master`? Well, because LLVM changes *very* rapidly, and that wouldn't be very stable. However, we do want to make sure the Swift stuff keeps working.
 
-If you are making changes to LLVM to support Swift, you'll probably need to work on them in `swift/master` to test them against Swift itself, but they should be committed to `swift/master-next`, and cherry-picked to the current release branch (`swift/swift-x.y-branch`) if needed. Remember, the release branches are automerged into `swift/master` on a regular basis.
+If you are making changes to LLVM to support Swift, you'll probably need to work on them in `swift/master` to test them against Swift itself, but they should be committed to `swift/master-next`, and cherry-picked to the current release branch (`swift/release/x.y`) if needed. Remember, the release branches are automerged into `swift/master` on a regular basis.
 
 (If you're making changes to LLVM Project that *aren't* about Swift, they should generally be made on llvm.org instead, then cherry-picked to the active release branch or `swift/master`.)
 
@@ -83,6 +83,6 @@ Some branches are *automerged* into other branches, to keep them in sync. This i
 - `master` is automerged into `master-next`
 
 ### LLVM Project
-- `swift/swift-x.y-branch` (the *latest* release branch) is automerged into `swift/master`
+- `swift/release/x.y` (the *latest* release branch) is automerged into `swift/master`
 - llvm.org's `master` is automerged into `swift/master-next`
-- llvm.org's release branch *may* be automerged into `swift/swift-x.y-branch`, if they are in sync
+- llvm.org's release branch *may* be automerged into `swift/release/x.y`, if they are in sync

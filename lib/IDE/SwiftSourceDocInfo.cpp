@@ -24,6 +24,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
+#include "clang/Basic/SourceManager.h"
 #include "clang/Index/USRGeneration.h"
 #include "clang/Lex/Lexer.h"
 #include "clang/Basic/CharInfo.h"
@@ -282,10 +283,6 @@ Stmt *NameMatcher::walkToStmtPost(Stmt *S) {
 }
 
 Expr *NameMatcher::getApplicableArgFor(Expr *E) {
-  if (auto *UME = dyn_cast<UnresolvedMemberExpr>(E)) {
-    if (auto *Arg = UME->getArgument())
-      return Arg;
-  }
   if (ParentCalls.empty())
     return nullptr;
   auto &Last = ParentCalls.back();

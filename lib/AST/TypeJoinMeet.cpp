@@ -87,6 +87,9 @@ public:
     assert(!first->hasTypeVariable() && !second->hasTypeVariable() &&
            "Cannot compute join of types involving type variables");
 
+    assert(!first->hasHole() && !second->hasHole() &&
+           "Cannot compute join of types involving type holes");
+
     assert(first->getWithoutSpecifierType()->isEqual(first) &&
            "Expected simple type!");
     assert(second->getWithoutSpecifierType()->isEqual(second) &&

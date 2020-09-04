@@ -725,12 +725,16 @@ public:
   
   struct AddSwitchNest {
     StmtChecker &SC;
+    CaseStmt *OuterFallthroughSource;
     CaseStmt *OuterFallthroughDest;
-    AddSwitchNest(StmtChecker &SC) : SC(SC),
+    AddSwitchNest(StmtChecker &SC)
+      : SC(SC),
+        OuterFallthroughSource(SC.FallthroughSource),
         OuterFallthroughDest(SC.FallthroughDest) {
     }
     
     ~AddSwitchNest() {
+      SC.FallthroughSource = OuterFallthroughSource;
       SC.FallthroughDest = OuterFallthroughDest;
     }
   };

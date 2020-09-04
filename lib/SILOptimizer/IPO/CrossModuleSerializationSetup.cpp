@@ -337,9 +337,6 @@ bool CrossModuleSerializationSetup::canSerialize(SILInstruction *inst,
         });
     return canUse;
   }
-  if (auto *GAI = dyn_cast<GlobalAddrInst>(inst)) {
-    return !GAI->getReferencedGlobal()->getName().startswith("globalinit_");
-  }
   if (auto *MI = dyn_cast<MethodInst>(inst)) {
     return !MI->getMember().isForeign;
   }

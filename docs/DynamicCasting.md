@@ -43,7 +43,12 @@ a as? Int // Succeeds
 a as! Int == a // true
 ```
 
-## Classes
+## Class and Foreign Types
+
+Class types generally follow standard object-oriented casting conventions.
+Objective-C and CoreFoundation (CF) types follow the behaviors expected from Objective-C.
+
+### Classes
 
 Casting among class types follows standard object-oriented programming conventions:
 
@@ -62,31 +67,80 @@ Invariants:
 * For any class type `C`: `c is C` iff `(c as! AnyObject) is C`
 * For any class type `C`: if `c is C`, then `(c as! AnyObject) as! C === c`
 
-## Structs and Enums
+### CoreFoundation types
+
+* If `CF` is a CoreFoundation type, `cf` is an instance of `CF`, and `NS` is the corresponding Objective-C type, then `cf is NS == true`
+* Further, since every Objective-C type inherits from `NSObject`, `cf is NSObject == true`
+* In the above situation, if `T` is some other type and `cf is NS == true`, then `cf as! NS is T` iff `cf is T`.
+
+The intention of the above is to treat instances of CoreFoundation types as being simultaneously instances of the corresponding Objective-C type, in keeping with the general dual nature of these types.
+In particular, if a protocol conformance is declared on the Objective-C type, then instances of the CoreFoundation type can be cast to the protocol type directly.
+
+XXX TODO: Converse?  If ObjC instance has CF equivalent and CF type is extended, ... ??
+
+### Objective-C types
+
+The following discussion applies in three different cases:
+* _Explicit_ conversions from use of the `is`, `as?`, and `as!` operators.
+* _Implicit_ conversions from Swift to Objective-C:  These conversions are generated automatically when Swift code calls an Objective-C function or method with an argument that is not already of an Objective-C type, or when a Swift function returns a value to an Objective-C caller.
+* _Implicit_ conversions from Objective-C to Swift:  These are generated automatically when arguments are passed from an Objective-C caller to a Swift function, or when an Objective-C function returns a value to a Swift caller.
+Unless stated otherwise, all of the following cases apply equally to all three of the above cases.
+
+Explicit casts among Swift and Objective-C class types follow the same general rules described earlier for class types in general.
+Likewise, explicitly casting a class instance to an Objective-C protocol type follows the general rules for casts to protocol types.
+
+XXX TODO EXPLAIN Implicit conversions from Objective-C types to Swift types XXXX.
+
+CoreFoundation types can be explicitly cast to and from their corresponding Objective-C types as described above.
+
+Objective-C types and protocols
+* `T` is an Objective-C class type iff `T.self is NSObject.Type`
+* `P` is an Objective-C protocol iff XXX TODO XXX
+
+### The `_ObjectiveCBridgeable` Protocol
+
+The `_ObjectiveCBridgeable` protocol allows certain types to opt into custom casting behavior.
+Note that although this mechanism was explicitly designed to simplify Swift interoperability with Objective-C, it is not necessarily tied to Objective-C.
+
+The `_ObjectiveCBridgeable` protocol defines an associated reference type `_ObjectiveCType`, along with a collection of methods that support casting to and from the associated `_ObjectiveCType`.
+This protocol allows library code to provide tailored mechanisms for casting Swift types to reference types.
+When casting to `AnyObject`, the casting logic prefers this tailored mechanism to the general `_SwiftValue` container mentioned above.
+
+Note: The associated `_ObjectiveCType` is constrained to be a subtype of `AnyObject`; it is not limited to being an actual Objective-C type.
+In particular, this mechanism is equally available to the Swift implementation of Foundation on non-Apple platforms and the Objective-C Foundation on Apple platforms.
+
+Example #1:  Foundation extends the `Array` type in the standard library with an `_ObjectiveCBridgeable` conformance to `NSArray`.  This allows Swift arrays to be cast to and from Foundation `NSArray` instances.
+```
+let a = [1, 2, 3] // Array<Int>
+let b = a as? AnyObject // casts to NSArray
+```
+
+Example #2:  Foundation also extends each Swift numeric type with an `_ObjectiveCBridgeable` conformance to `NSNumber`.
+```
+let a = 1 // Int
+// After the next line, b is an Optional<AnyObject>
+// holding a reference to an NSNumber
+let b = a as? AnyObject
+// NSNumber is bridgeable to Double
+let c = b as? Double
+```
+
+## Other Concrete Types
+
+In addition to the class types described earlier, Swift has several other kinds of concrete types.
+
+Casting between the different kinds described below (such as casting an enum to a tuple) will always fail.
+
+### Structs and Enums
 
 You cannot cast between different concrete struct or enum types.
 More formally:
 
 * If `S` and `T` are struct or enum types and `s is S == true`, then `s is T` iff `S.self == T.self`.
 
-## Tuples
+Struct or enum types can be cast to class types if the struct or enum implements the `_ObjectiveCBridgeable` protocol as described earlier.
 
-Casting from a tuple type T1 to a tuple type T2 will succeed iff the following hold:
-* T1 and T2 have the same number of elements
-* If an element has a label in both T1 and T2, the labels are identical
-* Each element of T1 can be individually cast to the corresponding type of T2
-
-## Functions
-
-Casting from a function type F1 to a function type F2 will succeed iff the following hold:
-* The two types have the same number of arguments
-* Corresponding arguments have identical types
-* The return types are identical
-* If F1 is a throwing function type, then F2 must be a throwing function type.  If F1 is not throwing, then F2 may be a throwing or non-throwing function type.
-
-Note that it is _not_ sufficient for argument and return types to be castable; they must actually be identical.
-
-## Optionals
+### Optionals
 
 Casting to and from optional types will transparently unwrap optionals as much as necessary, including nested optional types.
 
@@ -156,92 +210,7 @@ t1 as? U? // Produces .some(.none)
 t4 as? U?? // Produces .some(.none)
 ```
 
-## Any
-
-Any Swift instance can be cast to the type `Any`.
-An instance of `Any` has no useful methods or properties; to utilize the contents, you must cast it to another type.
-Every type identifier is an instance of the metatype `Any.Type`.
-
-Invariants
-* If `t` is any instance, then `t is Any == true`
-* If `t` is any instance, `t as! Any` always succeeds
-* For every type `T` (including protocol types), `T.self is Any.Type`
-* If `t` is any instance and `U` is any `Equatable` type, then `t as? U == (t as! Any) as? U`.
-
-This last invariant deserves some explanation, as a similar pattern appears repeatedly throughout this document.
-In essence, this invariant just says that putting something into an "Any box" (`t as! Any`) and taking it out again (`as? U`) does not change the result.
-The requirement that `U` be `Equatable` is a technical necessity for using `==` in this statement.
-
-Note that in many cases, we've shortened such invariants to the form `t is U == (t as! Any) is U`.
-Using `is` here simply avoids the technical necessity that `U` be `Equatable` but except where explicitly called out, the intention in every case is that such casting does not change the value.
-
-## AnyObject
-
-Any class, enum, struct, tuple, function, metatype, or existential metatype instance can be cast to `AnyObject`.
-
-XXX TODO The runtime logic has code to cast protocol types to `AnyObject` only if they are compatible with `__SwiftValue`.  What is the practical effect of this logic?  Does it mean that casting a protocol type to `AnyObject` will sometimes unwrap (if the protocol is incompatible) and sometimes not?  What protocols are affected by this?
-
-The contents of an `AnyObject` container can be accessed by casting to another type:
-* If `t` is any instance, `U` is any type, `t is AnyObject` and `t is U`, then `(t as! AnyObject) is U`.
-
-Implementation Note: `AnyObject` is represented in memory as a pointer to a refcounted object.  The dynamic type of the object can be recovered from the "isa" field of the object.  The optional form `AnyObject?` is the same except that it allows null.  Reference types (class, metatype, or existential metatype instances) can be directly assigned to an `AnyObject` without any conversion.  For non-reference types -- including struct, enum, and tuple types -- the casting logic will first look for an `_ObjectiveCBridgeable` conformance that it can use to convert the source into a tailored reference type.  If that fails, the value will be copied into an opaque `_SwiftValue` container.
-
-(See "The _ObjectiveCBridgeable Protocol" below for more details.)
-
-### Objective-C Interactions
-
-Note the invariant above cannot be an equality because Objective-C bridging allows libraries to introduce new relationships that can alter the behavior of seemingly-unrelated casts.
-One example of this is Foundation's `Number` (or `NSNumber`) type which conditionally bridges to several Swift numeric types.
-As a result, when Foundation is in scope, `Int(7) is Double == false` but `(Int(7) as! AnyObject) is Double == true`.
-In general, the ability to add new bridging behaviors from a single type to several distinct types implies that Swift casting cannot be transitive.
-
-## Error (SE-0112)
-
-Although the Error protocol is specially handled by the Swift compiler and runtime (as detailed in [SE-0112](https://github.com/apple/swift-evolution/blob/master/proposals/0112-nserror-bridging.md)), it behaves like an ordinary protocol type for casting purposes.
-
-(See "Note: 'Self-conforming' protocols" below for additional details relevant to the Error protocol.)
-
-## AnyHashable (SE-0131)
-
-For casting purposes, `AnyHashable` behaves like a protocol type.
-
-## Existential/Protocol types
-
-Caveat:
-Protocols that have `associatedtype` properties or which make use of the `Self` typealias cannot be used as independent types.
-As such, the discussion below does not apply to them.
-
-Any Swift instance of a concrete type `T` can be cast to `P` iff `T` conforms to `P`.
-The result is a "protocol witness" instance that provides access only to those methods and properties defined on `P`.
-Other capabilities of the type `T` are not accessible from a `P` instance.
-
-The contents of a protocol witness can be accessed by casting to some other appropriate type:
-* For any protocol `P`, instance `t`, and type `U`, if `t is P`, then `t as? U == (t as! P) as? U`
-
-XXX TODO: The invariant above does not apply to AnyObject, AnyHashable.
-Does it suffice to explicitly exclude those two, or do other protocols share that behavior?  The alternative would seem to be to change the equality here into an implication.
-
-In addition to the protocol witness type, every Swift protocol `P` implicitly defines two other types:
-`P.Protocol` is the "protocol metatype", the type of `P.self`.
-`P.Type` is the "protocol existential metatype".
-These are described in more detail below.
-
-Regarding Protocol casts and Optionals
-
-When casting an Optional to a protocol type, the optional is preserved if possible.
-Given an instance `o` of type `Optional<T>` and a protocol `P`, the cast request `o as? P` will produce different results depending on whether `Optional<T>` directly conforms to `P`:
-
-* If `Optional<T>` conforms to `P`, then the result will be a protocol witness wrapping the `o` instance.  In this case, a subsequent cast to `Optional<T>` will restore the original instance.  In particular, this case will preserve `nil` instances.
-
-* If `Optional<T>` does not directly conform, then `o` will be unwrapped and the cast will be attempted with the contained object.  If `o == nil`, this will fail.  In the case of a nested optional `T???` this will result in fully unwrapping the inner non-optional.
-
-* If all of the above fail, then the cast will fail.
-
-For example, `Optional` conforms to `CustomDebugStringConvertible` but not to `CustomStringConvertible`.
-Casting an optional instance to the first of these protocols will result in an item whose `.debugDescription` will describe the optional instance.
-Casting an optional instance to the second will provide an instance whose `.description` property describes the inner non-Optional instance.
-
-## Array/Set/Dictionary Casts
+### Array/Set/Dictionary Casts
 
 For Array, Set, or Dictionary types, you can use the casting operators to translate to another instance of the same outer container (Array, Set, or Dictionary respectively) with a different component type.
 Note that the following discussion applies only to these specific types.
@@ -307,7 +276,7 @@ func dictionaryCast<K,V,K2,V2>(source: Dictionary<K,V>) -> Optional<Dictionary<K
 }
 ```
 
-### Collection Casting performance and `as!`
+#### Collection Casting performance and `as!`
 
 For `as?` casts, the casting behavior above requires that every element be converted separately.
 This can be a particular bottleneck when trying to share large containers between Swift and Objective-C code.
@@ -317,7 +286,122 @@ The implementation is allowed (but not required) to exploit this by deferring th
 Such lazy conversion can provide a significant performance improvement in cases where the data is known (by the programmer) to be safe and where the inner component casts are non-trivial.
 However, if the conversion cannot be completed, it is indeterminate whether the cast request will fail immediately or whether the program will fail at some later point.
 
+### Tuples
+
+Casting from a tuple type T1 to a tuple type T2 will succeed iff the following hold:
+* T1 and T2 have the same number of elements
+* If an element has a label in both T1 and T2, the labels are identical
+* Each element of T1 can be individually cast to the corresponding type of T2
+
+### Functions
+
+Casting from a function type F1 to a function type F2 will succeed iff the following hold:
+* The two types have the same number of arguments
+* Corresponding arguments have identical types
+* The return types are identical
+* If F1 is a throwing function type, then F2 must be a throwing function type.  If F1 is not throwing, then F2 may be a throwing or non-throwing function type.
+
+Note that it is _not_ sufficient for argument and return types to be castable; they must actually be identical.
+
+## Existential Types
+
+Conceptually, an "existential type" is an opaque wrapper that carries a type and an instance of that type.
+The various existential types differ in what kinds of types they can hold (for example, `AnyObject` can only hold reference types) and in the capabilities exposed by the container (`AnyHashable` exposes equality testing and hashing).
+
+### Any
+
+Any Swift instance can be cast to the type `Any`.
+An instance of `Any` has no useful methods or properties; to utilize the contents, you must cast it to another type.
+Every type identifier is an instance of the metatype `Any.Type`.
+
+Invariants
+* If `t` is any instance, then `t is Any == true`
+* If `t` is any instance, `t as! Any` always succeeds
+* For every type `T` (including protocol types), `T.self is Any.Type`
+* If `t` is any instance and `U` is any `Equatable` type, then `t as? U == (t as! Any) as? U`.
+
+This last invariant deserves some explanation, as a similar pattern appears repeatedly throughout this document.
+In essence, this invariant just says that putting something into an "Any box" (`t as! Any`) and taking it out again (`as? U`) does not change the result.
+The requirement that `U` be `Equatable` is a technical necessity for using `==` in this statement.
+
+Note that in many cases, we've shortened such invariants to the form `t is U == (t as! Any) is U`.
+Using `is` here simply avoids the technical necessity that `U` be `Equatable` but except where explicitly called out, the intention in every case is that such casting does not change the value.
+
+### AnyObject
+
+Any class, enum, struct, tuple, function, metatype, or existential metatype instance can be cast to `AnyObject`.
+
+XXX TODO The runtime logic has code to cast protocol types to `AnyObject` only if they are compatible with `__SwiftValue`.  What is the practical effect of this logic?  Does it mean that casting a protocol type to `AnyObject` will sometimes unwrap (if the protocol is incompatible) and sometimes not?  What protocols are affected by this?
+
+The contents of an `AnyObject` container can be accessed by casting to another type:
+* If `t` is any instance, `U` is any type, `t is AnyObject` and `t is U`, then `(t as! AnyObject) is U`.
+
+Implementation Note: `AnyObject` is represented in memory as a pointer to a refcounted object.  The dynamic type of the object can be recovered from the "isa" field of the object.  The optional form `AnyObject?` is the same except that it allows null.  Reference types (class, metatype, or existential metatype instances) can be directly assigned to an `AnyObject` without any conversion.  For non-reference types -- including struct, enum, and tuple types -- the casting logic will first look for an `_ObjectiveCBridgeable` conformance that it can use to convert the source into a tailored reference type.  If that fails, the value will be copied into an opaque `_SwiftValue` container.
+
+(See "The _ObjectiveCBridgeable Protocol" below for more details.)
+
+### Objective-C Interactions
+
+Note the invariant above cannot be an equality because Objective-C bridging allows libraries to introduce new relationships that can alter the behavior of seemingly-unrelated casts.
+One example of this is Foundation's `NSNumber` type which conditionally bridges to several Swift numeric types.
+As a result, when Foundation is in scope, `Int(7) is Double == false` but `(Int(7) as! AnyObject) is Double == true`.
+In general, the ability to add new bridging behaviors from a single type to several distinct types implies that Swift casting cannot be transitive.
+
+### Error (SE-0112)
+
+Although the Error protocol is specially handled by the Swift compiler and runtime (as detailed in [SE-0112](https://github.com/apple/swift-evolution/blob/master/proposals/0112-nserror-bridging.md)), it behaves like an ordinary protocol type for casting purposes.
+
+(See "Note: 'Self-conforming' protocols" below for additional details relevant to the Error protocol.)
+
+### AnyHashable (SE-0131)
+
+For casting purposes, `AnyHashable` behaves like an existential type.
+
+However, note that `AnyHashable` does not act like an existential for other purposes.
+For example, it's metatype is named `AnyHashable.Type` and it does not have an existential metatype.
+
+### Protocol Witness types
+
+Caveat:
+Protocols that have `associatedtype` properties or which make use of the `Self` typealias cannot be used as independent types.
+As such, the discussion below does not apply to them.
+
+Any Swift instance of a concrete type `T` can be cast to `P` iff `T` conforms to `P`.
+The result is a "protocol witness" instance that provides access only to those methods and properties defined on `P`.
+Other capabilities of the type `T` are not accessible from a `P` instance.
+
+The contents of a protocol witness can be accessed by casting to some other appropriate type:
+* For any protocol `P`, instance `t`, and type `U`, if `t is P`, then `t as? U == (t as! P) as? U`
+
+XXX TODO: The invariant above does not apply to AnyObject, AnyHashable.
+Does it suffice to explicitly exclude those two, or do other protocols share that behavior?  The alternative would seem to be to change the equality here into an implication.
+
+In addition to the protocol witness type, every Swift protocol `P` implicitly defines two other types:
+`P.Protocol` is the "protocol metatype", the type of `P.self`.
+`P.Type` is the "protocol existential metatype".
+These are described in more detail below.
+
+Regarding Protocol casts and Optionals
+
+When casting an Optional to a protocol type, the optional is preserved if possible.
+Given an instance `o` of type `Optional<T>` and a protocol `P`, the cast request `o as? P` will produce different results depending on whether `Optional<T>` directly conforms to `P`:
+
+* If `Optional<T>` conforms to `P`, then the result will be a protocol witness wrapping the `o` instance.  In this case, a subsequent cast to `Optional<T>` will restore the original instance.  In particular, this case will preserve `nil` instances.
+
+* If `Optional<T>` does not directly conform, then `o` will be unwrapped and the cast will be attempted with the contained object.  If `o == nil`, this will fail.  In the case of a nested optional `T???` this will result in fully unwrapping the inner non-optional.
+
+* If all of the above fail, then the cast will fail.
+
+For example, `Optional` conforms to `CustomDebugStringConvertible` but not to `CustomStringConvertible`.
+Casting an optional instance to the first of these protocols will result in an item whose `.debugDescription` will describe the optional instance.
+Casting an optional instance to the second will provide an instance whose `.description` property describes the inner non-Optional instance.
+
 ## Metatypes
+
+Swift supports two kinds of metatypes:
+In addition to the regular metatypes supported by many other languages, it also has _existential_ metatypes that can be used to access static protocol requirements.
+
+### Metatypes
 
 For every type `T`, there is a unique instance `T.self` that represents the type at runtime.
 As with all instances, `T.self` has a type.
@@ -352,7 +436,7 @@ let s = S()
 type(of: s) == S.self // always true
 type(of: S.self) == S.Type.self
 
-// Metatype of a protocol type
+// Metatype of a protocol (or other existential) type
 protocol P {}
 P.self is P.Protocol // always true
 // P.Protocol is a metatype, not a protocol, so:
@@ -377,7 +461,7 @@ Invariants
 * Subtypes define metatype subtypes: if `T` and `U` are non-protocol types, `T.self is U.Type == T.Type.self is U.Type.Type`
 * Subtypes define metatype subtypes: if `T` is a non-protocol type and `P` is a protocol type, `T.self is P.Protocol == T.Type.self is P.Protocol.Type`
 
-## Existential Metatypes
+### Existential Metatypes
 
 Protocols can specify constraints and provide default implementations for instances of types.
 They can also specify constraints and provide default implementations for static members of types.
@@ -407,11 +491,12 @@ S.self.svar // 2
 ```
 
 Invariants
-* If `T` conforms to `P` and `t` is an instance of `T`, then `t is P`, and `T.self is P.Type`
+* If `T` conforms to `P` and `t` is an instance of `T`, then `t is P` and `T.self is P.Type`
+* If `P` is a sub-protocol of `P1` and `T` is any type, then `T.self is P.Type` implies that `T.self is P1.Type`
 * Since every type `T` conforms to `Any`, `T.self is Any.Type` is always true
-* `Any` self-conforms:  `Any.self is Any.Type == true`
+* Since every class type `C` conforms to `AnyObject`, `C.self is AnyObject.Type` is always true (this includes Objective-C class types)
 
-### Note: "Self conforming" protocols
+### Note: "Self conforming" existential types
 
 As mentioned above, a protocol definition for `P` implicitly defines types `P.Type` (the existential metatype) and `P.Protocol` (the metatype).
 It also defines an associated type called `P` which is the type of a container that can hold any object whose concrete type conforms to the protocol `P`.
@@ -437,70 +522,17 @@ let a : P
 let b : MyGenericType(a)
 ```
 As above, since `a` has type `P`, this code is instantiating `MyGenericType` with `T = P`, which is only valid if `P` conforms to `P`.
-
 Note that any protocol that specifies static methods, static properties, associated types, or initializers cannot possibly be self-conforming.
-As of Swift 5.3, there are only three kinds of self-conforming protocols:
-* `Any` must be self-conforming since every `T.self` is an instance of `Any.Type`
-* `Error` is a self-conforming protocol
-* Objective-C protocols that have no static requirements are self-conforming
 
-## CoreFoundation types
+Although the discussion above specifically talks about protocols, it applies equally well to other existential types.
+As of Swift 5.3, the only self-conforming existential types are `Any`, `Error`, and Objective-C protocols that have no static requirements.
 
-* If `CF` is a CoreFoundation type, `cf` is an instance of `CF`, and `NS` is the corresponding Objective-C type, then `cf is NS == true`
-* Further, since every Objective-C type inherits from `NSObject`, `cf is NSObject == true`
-* In the above situation, if `T` is some other type and `cf is NS == true`, then `cf as! NS is T` iff `cf is T`.
+Invariants
+* `Any` self-conforms: `Any.self is Any.Type == true`
+* `Error` self-conforms: `Error.self is Error.Type == true`
+* If `P` self-conforms and is a sub-protocol of `P1`, then `P.self is P1.Type == true`
 
-The intention of the above is to treat instances of CoreFoundation types as being simultaneously instances of the corresponding Objective-C type, in keeping with the general dual nature of these types.
-In particular, if a protocol conformance is declared on the Objective-C type, then instances of the CoreFoundation type can be cast to the protocol type directly.
-
-XXX TODO: Converse?  If ObjC instance has CF equivalent and CF type is extended, ... ??
-
-## Objective-C types
-
-The following discussion applies in three different cases:
-* _Explicit_ conversions from use of the `is`, `as?`, and `as!` operators.
-* _Implicit_ conversions from Swift to Objective-C:  These conversions are generated automatically when Swift code calls an Objective-C function or method with an argument that is not already of an Objective-C type, or when a Swift function returns a value to an Objective-C caller.
-* _Implicit_ conversions from Objective-C to Swift:  These are generated automatically when arguments are passed from an Objective-C caller to a Swift function, or when an Objective-C function returns a value to a Swift caller.
-Unless stated otherwise, all of the following cases apply equally to all three of the above cases.
-
-Explicit casts among Swift and Objective-C class types follow the same general rules described earlier for class types in general.
-Likewise, explicitly casting a class instance to an Objective-C protocol type follows the general rules for casts to protocol types.
-
-XXX TODO EXPLAIN Implicit conversions from Objective-C types to Swift types XXXX.
-
-CoreFoundation types can be explicitly cast to and from their corresponding Objective-C types as described above.
-
-Objective-C types and protocols
-* `T` is an Objective-C class type iff `T.self is NSObject.Type`
-* `P` is an Objective-C protocol iff XXX TODO XXX
-
-## The `_ObjectiveCBridgeable` Protocol
-
-The `_ObjectiveCBridgeable` protocol allows certain types to opt into custom casting behavior.
-Note that although this mechanism was explicitly designed to simplify Swift interoperability with Objective-C, it is not necessarily tied to Objective-C.
-
-The `_ObjectiveCBridgeable` protocol defines an associated reference type `_ObjectiveCType`, along with a collection of methods that support casting to and from the associated `_ObjectiveCType`.
-This protocol allows library code to provide tailored mechanisms for casting Swift types to reference types.
-When casting to `AnyObject`, the casting logic prefers this tailored mechanism to the general `_SwiftValue` container mentioned above.
-
-Note: The associated `_ObjectiveCType` is constrained to be a subtype of `AnyObject`; it is not limited to being an actual Objective-C type.
-In particular, this mechanism is equally available to the Swift implementation of Foundation on non-Apple platforms and the Objective-C Foundation on Apple platforms.
-
-Example #1:  Foundation extends the `Array` type in the standard library with an `_ObjectiveCBridgeable` conformance to `NSArray`.  This allows Swift arrays to be cast to and from Foundation `NSArray` instances.
-```
-let a = [1, 2, 3] // Array<Int>
-let b = a as? AnyObject // casts to NSArray
-```
-
-Example #2:  Foundation also extends each Swift numeric type with an `_ObjectiveCBridgeable` conformance to `NSNumber`.
-```
-let a = 1 // Int
-// After the next line, b is an Optional<AnyObject>
-// holding a reference to an NSNumber
-let b = a as? AnyObject
-// NSNumber is bridgeable to Double
-let c = b as? Double
-```
+For example, the last invariant here implies that for any Objective-C protocol `OP` that has no static requirements, `OP.self is AnyObject.Type`.  This follows from the fact that `OP` self-conforms and that every Objective-C protocol has `AnyObject` as an implicit parent protocol.
 
 ## Implementation Notes
 

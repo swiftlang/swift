@@ -112,6 +112,9 @@ ERROR(expected_argument_in_contextual_member,none,
       "member %0 expects argument of type %1", (DeclName, Type))
 ERROR(expected_parens_in_contextual_member,none,
       "member %0 is a function; did you mean to call it?", (DeclName))
+ERROR(expected_parens_in_contextual_member_type,none,
+      "member %0 is a function that produces expected type %1; did you mean to "
+      "call it?", (DeclName, Type))
 
 ERROR(expected_result_in_contextual_member,none,
       "member %0 in %2 produces result of type %1, but context expects %2",
@@ -452,6 +455,10 @@ ERROR(cannot_convert_closure_result_nil,none,
       "'nil' is not compatible with closure result type %0", (Type))
 ERROR(cannot_convert_parent_type,none,
       "cannot convert parent type %0 to expected type %1",
+      (Type, Type))
+ERROR(cannot_convert_chain_result_type,none,
+      "member chain produces result of type %0 but contextual base was "
+      "inferred as %1",
       (Type, Type))
 
 NOTE(generic_argument_mismatch,none,
@@ -1038,9 +1045,6 @@ WARNING(downcast_to_unrelated,none,
         "cast from %0 to unrelated type %1 always fails", (Type, Type))
 NOTE(downcast_to_unrelated_fixit,none,
      "did you mean to call %0 with '()'?", (Identifier))
-ERROR(downcast_to_more_optional,none,
-      "cannot downcast from %0 to a more optional type %1",
-      (Type, Type))
 ERROR(optional_chain_noop,none,
       "optional chain has no effect, expression already produces %0",
       (Type))
@@ -1082,6 +1086,9 @@ NOTE(unwrap_with_guard,none,
 ERROR(optional_base_not_unwrapped,none,
       "value of optional type %0 must be unwrapped to refer to member %1 of "
       "wrapped base type %2", (Type, DeclNameRef, Type))
+ERROR(invalid_optional_infered_keypath_root, none,
+      "key path root inferred as optional type %0 must be unwrapped to refer to member %1 "
+      "of unwrapped type %2", (Type, DeclNameRef, Type))
 NOTE(optional_base_chain,none,
      "chain the optional using '?' to access member %0 only for non-'nil' "
      "base values", (DeclNameRef))
@@ -1089,6 +1096,12 @@ NOTE(optional_base_remove_optional_for_keypath_root, none,
      "use unwrapped type %0 as key path root", (Type))
 NOTE(optional_keypath_application_base, none,
      "use '?' to access key path subscript only for non-'nil' base values", ())
+NOTE(optional_key_path_root_base_chain, none,
+     "chain the optional using '?.' to access unwrapped type member %0",
+     (DeclNameRef))
+NOTE(optional_key_path_root_base_unwrap, none,
+     "unwrap the optional using '!.' to access unwrapped type member %0",
+     (DeclNameRef))
     
 ERROR(missing_unwrap_optional_try,none,
       "value of optional type %0 not unwrapped; did you mean to use 'try!' "
@@ -2726,13 +2739,17 @@ WARNING(decl_from_hidden_module_warn,none,
 ERROR(conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 %select{here|as property wrapper here|"
       "in an extension with public or '@usableFromInline' members|"
-      "in an extension with conditional conformances}2; %3 has been imported "
-      "as implementation-only",
-      (Type, Identifier, unsigned, Identifier))
+      "in an extension with conditional conformances}2; "
+      "%select{%3 has been imported as implementation-only|"
+      "the conformance is declared as SPI in %3|"
+      "the conformance is declared as SPI}4",
+      (Type, Identifier, unsigned, Identifier, unsigned))
 ERROR(assoc_conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 in associated type %3 (inferred as "
-      "%4); %2 has been imported as implementation-only",
-      (Type, Identifier, Identifier, Type, Type))
+      "%4); %select{%2 has been imported as implementation-only|"
+      "the conformance is declared as SPI in %2|"
+      "the conformance is declared as SPI}5",
+      (Type, Identifier, Identifier, Type, Type, unsigned))
 ERROR(unexportable_clang_function_type,none,
       "cannot export the underlying C type of the function type %0; "
       "it may use anonymous types or types defined outside of a module",
@@ -2807,15 +2824,16 @@ WARNING(differentiable_nondiff_type_implicit_noderivative_fixit,none,
        /*nominalCanDeriveAdditiveArithmetic*/ bool))
 WARNING(differentiable_immutable_wrapper_implicit_noderivative_fixit,none,
       "synthesis of the 'Differentiable.move(along:)' requirement for %1 "
-      "requires 'wrappedValue' in property wrapper %0 to be mutable; "
-      "add an explicit '@noDerivative' attribute"
+      "requires 'wrappedValue' in property wrapper %0 to be mutable or have a "
+      "non-mutating 'move(along:)'; add an explicit '@noDerivative' attribute"
       "%select{|, or conform %1 to 'AdditiveArithmetic'}2",
       (/*wrapperType*/ Identifier, /*nominalName*/ Identifier,
        /*nominalCanDeriveAdditiveArithmetic*/ bool))
 WARNING(differentiable_let_property_implicit_noderivative_fixit,none,
       "synthesis of the 'Differentiable.move(along:)' requirement for %0 "
       "requires all stored properties not marked with `@noDerivative` to be "
-      "mutable; use 'var' instead, or add an explicit '@noDerivative' attribute"
+      "mutable or have a non-mutating 'move(along:)'; use 'var' instead, or "
+      "add an explicit '@noDerivative' attribute "
       "%select{|, or conform %0 to 'AdditiveArithmetic'}1",
       (/*nominalName*/ Identifier, /*nominalCanDeriveAdditiveArithmetic*/ bool))
 
