@@ -1890,11 +1890,15 @@ extension BinaryFloatingPoint {
   /// - Parameter value: A floating-point value to be converted.
   @inlinable
   public init<Source: BinaryFloatingPoint>(_ value: Source) {
-    switch value {
 #if !os(macOS) && !(os(iOS) && targetEnvironment(macCatalyst))
-    case let value_ as Float16:
-      self = Self(Float(value_))
+    if #available(iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+      if case let value_ as Float16 = value {
+        self = Self(Float(value_))
+        return
+      }
+    }
 #endif
+    switch value {
     case let value_ as Float:
       self = Self(value_)
     case let value_ as Double:
