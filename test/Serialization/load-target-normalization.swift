@@ -2,7 +2,7 @@
 // RUN: touch %t/ForeignModule.swiftmodule/garbage-garbage-garbage.swiftmodule
 
 // SR-12363: This test crashes on master-next.
-// XFAIL: *
+// XFAIL: asserts
 
 // Test format: We try to import ForeignModule with architectures besides
 // garbage-garbage-garbage and check the target triple listed in the error

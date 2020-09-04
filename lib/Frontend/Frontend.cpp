@@ -538,8 +538,8 @@ bool CompilerInstance::setUpModuleLoaders() {
     ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
     InterfaceSubContextDelegateImpl ASTDelegate(Context->SourceMgr, Context->Diags,
                                                 Context->SearchPathOpts, Context->LangOpts,
+                                                Context->ClangImporterOpts,
                                                 LoaderOpts,
-                                                Context->getClangModuleLoader(),
                                                 /*buildModuleCacheDirIfAbsent*/false,
                                                 ModuleCachePath,
                                                 FEOpts.PrebuiltModuleCachePath,
