@@ -1891,6 +1891,10 @@ extension BinaryFloatingPoint {
   @inlinable
   public init<Source: BinaryFloatingPoint>(_ value: Source) {
     switch value {
+#if !os(macOS) && !(os(iOS) && targetEnvironment(macCatalyst))
+    case let value_ as Float16:
+      self = Self(Float(value_))
+#endif
     case let value_ as Float:
       self = Self(value_)
     case let value_ as Double:
