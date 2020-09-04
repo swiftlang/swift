@@ -2694,6 +2694,14 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
 
   // Cannot extend function types, tuple types, etc.
   if (!extendedType->getAnyNominal()) {
+    // Emit tailored diagnostic for 'AnyObject' since we don't want to
+    // mention "typealias" or "protocol composition type" in the
+    // diagnostic.
+    if (extendedType->isAnyObject()) {
+      diags.diagnose(ext->getLoc(), diag::anyobject_extension)
+          .highlight(extendedRepr->getSourceRange());
+      return error();
+    }
     diags
         .diagnose(ext->getLoc(), diag::non_nominal_extension,
                   extendedType->getCanonicalType()->getKind(), extendedType)

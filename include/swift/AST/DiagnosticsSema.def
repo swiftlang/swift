@@ -1784,6 +1784,8 @@ ERROR(inferred_opaque_type,none,
 // Extensions
 ERROR(non_nominal_extension,none,
       "%0 %1 cannot be extended", (TypeKind, Type))
+ERROR(anyobject_extension,none,
+      "'AnyObject' cannot be extended", ())
 WARNING(composition_in_extended_type,none,
         "extending a protocol composition is not supported; extending %0 "
         "instead", (Type))
