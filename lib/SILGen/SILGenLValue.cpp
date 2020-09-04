@@ -1335,10 +1335,7 @@ namespace {
         // the argument types of the setter and initializer shall be
         // different, so we don't rewrite an assignment into an
         // initialization.
-        if (VD->isInnermostPropertyWrapperInitUsesEscapingAutoClosure())
-          return false;
-
-        return true;
+        return !wrapperInfo.wrappedValuePlaceholder->isAutoClosure();
       }
 
       return false;
@@ -1463,7 +1460,7 @@ namespace {
         auto setterInfo =
             SGF.getConstantInfo(SGF.getTypeExpansionContext(), setter);
         SILValue setterFRef;
-        if (setter.hasDecl() && setter.getDecl()->isObjCDynamic()) {
+        if (setter.hasDecl() && setter.getDecl()->shouldUseObjCDispatch()) {
           // Emit a thunk we might have to bridge arguments.
           auto foreignSetterThunk = setter.asForeign(false);
           setterFRef =

@@ -208,7 +208,7 @@ private:
     }
 
     llvm::errs() << "Found ownership error?!\n";
-    llvm::report_fatal_error("triggering standard assertion failure routine");
+    llvm_unreachable("triggering standard assertion failure routine");
   }
 };
 

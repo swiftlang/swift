@@ -28,15 +28,23 @@ enum class SemanticContextKind;
 
 /// Type check parent contexts of the given decl context, and the body of the
 /// given context until \c Loc if the context is a function body.
-void typeCheckContextUntil(DeclContext *DC, SourceLoc Loc);
+void typeCheckContextAt(DeclContext *DC, SourceLoc Loc);
 
 /// From \p DC, find and returns the outer most expression which source range is
 /// exact the same as \p TargetRange. Returns \c nullptr if not found.
 Expr *findParsedExpr(const DeclContext *DC, SourceRange TargetRange);
 
-/// Returns expected return type of the given decl context.
+/// Remove \c CodeCompletionExpr from \p expr . Returns \c true if it actually
+/// mutated the expression.
+///
+/// NOTE: Currently, this only removes CodeCompletionExpr at call argument
+///       position.
+bool removeCodeCompletionExpr(ASTContext &Ctx, Expr *&expr);
+
+/// Collects possible expected return types of the given decl context.
 /// \p DC should be an \c AbstractFunctionDecl or an \c AbstractClosureExpr.
-Type getReturnTypeFromContext(const DeclContext *DC);
+void collectPossibleReturnTypesFromContext(DeclContext *DC,
+                                           SmallVectorImpl<Type> &candidates);
 
 struct FunctionTypeAndDecl {
   AnyFunctionType *Type;
@@ -105,10 +113,6 @@ public:
     return AnalyzedExpr;
   }
 };
-
-/// Returns whether \p VD is referenceable with implicit member expression.
-bool isReferenceableByImplicitMemberExpr(
-    ModuleDecl *CurrModule, DeclContext *DC, Type T, ValueDecl *VD);
 
 } // namespace ide
 } // namespace swift

@@ -78,7 +78,7 @@ ParserResult<Expr> Parser::parseExprIs() {
   if (type.isNull())
     return nullptr;
 
-  return makeParserResult(new (Context) IsExpr(isLoc, type.get()));
+  return makeParserResult(IsExpr::create(Context, isLoc, type.get()));
 }
 
 /// parseExprAs
@@ -108,12 +108,13 @@ ParserResult<Expr> Parser::parseExprAs() {
 
   Expr *parsed;
   if (questionLoc.isValid()) {
-    parsed = new (Context) ConditionalCheckedCastExpr(asLoc, questionLoc,
-                                                      type.get());
+    parsed = ConditionalCheckedCastExpr::create(Context, asLoc, questionLoc,
+                                                type.get());
   } else if (exclaimLoc.isValid()) {
-    parsed = new (Context) ForcedCheckedCastExpr(asLoc, exclaimLoc, type.get());
+    parsed = ForcedCheckedCastExpr::create(Context, asLoc, exclaimLoc,
+                                           type.get());
   } else {
-    parsed = new (Context) CoerceExpr(asLoc, type.get());
+    parsed = CoerceExpr::create(Context, asLoc, type.get());
   }
   return makeParserResult(parsed);
 }
@@ -121,23 +122,25 @@ ParserResult<Expr> Parser::parseExprAs() {
 /// parseExprArrow
 ///
 ///   expr-arrow:
-///     '->'
-///     'throws' '->'
+///     'async'? 'throws'? '->'
 ParserResult<Expr> Parser::parseExprArrow() {
-  SourceLoc throwsLoc, arrowLoc;
-  if (Tok.is(tok::kw_throws)) {
-    throwsLoc = consumeToken(tok::kw_throws);
-    if (!Tok.is(tok::arrow)) {
-      diagnose(throwsLoc, diag::throws_in_wrong_position);
-      return nullptr;
-    }
+  SourceLoc asyncLoc, throwsLoc, arrowLoc;
+
+  parseAsyncThrows(SourceLoc(), asyncLoc, throwsLoc, /*rethrows=*/nullptr);
+
+  if (Tok.isNot(tok::arrow)) {
+    assert(throwsLoc.isValid() || asyncLoc.isValid());
+    diagnose(throwsLoc.isValid() ? throwsLoc : asyncLoc,
+             diag::async_or_throws_in_wrong_position,
+             throwsLoc.isValid() ? 0 : 2);
+    return nullptr;
   }
+
   arrowLoc = consumeToken(tok::arrow);
-  if (Tok.is(tok::kw_throws)) {
-    diagnose(Tok.getLoc(), diag::throws_in_wrong_position);
-    throwsLoc = consumeToken(tok::kw_throws);
-  }
-  auto arrow = new (Context) ArrowExpr(throwsLoc, arrowLoc);
+
+  parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, /*rethrows=*/nullptr);
+
+  auto arrow = new (Context) ArrowExpr(asyncLoc, throwsLoc, arrowLoc);
   return makeParserResult(arrow);
 }
 
@@ -324,6 +327,17 @@ parse_operator:
       goto parse_operator;
     }
 
+    case tok::identifier: {
+      // 'async' followed by 'throws' or '->' implies that we have an arrow
+      // expression.
+      if (!(shouldParseExperimentalConcurrency() &&
+            Tok.isContextualKeyword("async") &&
+            peekToken().isAny(tok::arrow, tok::kw_throws)))
+        goto done;
+
+      LLVM_FALLTHROUGH;
+    }
+
     case tok::arrow:
     case tok::kw_throws: {
       SyntaxParsingContext ArrowContext(SyntaxContext, SyntaxKind::ArrowExpr);
@@ -365,9 +379,10 @@ done:
 /// parseExprSequenceElement
 ///
 ///   expr-sequence-element(Mode):
-///     'try' expr-unary(Mode)
-///     'try' '?' expr-unary(Mode)
-///     'try' '!' expr-unary(Mode)
+///     'await' expr-sequence-element(Mode)
+///     'try' expr-sequence-element(Mode)
+///     'try' '?' expr-sequence-element(Mode)
+///     'try' '!' expr-sequence-element(Mode)
 ///     expr-unary(Mode)
 ///
 /// 'try' is not actually allowed at an arbitrary position of a
@@ -376,6 +391,18 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
                                                     bool isExprBasic) {
   SyntaxParsingContext ElementContext(SyntaxContext,
                                       SyntaxContextKind::Expr);
+
+  if (shouldParseExperimentalConcurrency() && Tok.isContextualKeyword("await")) {
+    SourceLoc awaitLoc = consumeToken();
+    ParserResult<Expr> sub = parseExprUnary(message, isExprBasic);
+    if (!sub.hasCodeCompletion() && !sub.isNull()) {
+      ElementContext.setCreateSyntax(SyntaxKind::AwaitExpr);
+      sub = makeParserResult(new (Context) AwaitExpr(awaitLoc, sub.get()));
+    }
+
+    return sub;
+  }
+
   SourceLoc tryLoc;
   bool hadTry = consumeIf(tok::kw_try, tryLoc);
   Optional<Token> trySuffix;
@@ -775,8 +802,6 @@ ParserResult<Expr> Parser::parseExprSelector() {
     parseExpr(selectorKind == ObjCSelectorExpr::Method
                 ? diag::expr_selector_expected_method_expr
                 : diag::expr_selector_expected_property_expr);
-  if (subExpr.hasCodeCompletion())
-    return makeParserCodeCompletionResult<Expr>();
 
   // Parse the closing ')'.
   SourceLoc rParenLoc;
@@ -792,7 +817,7 @@ ParserResult<Expr> Parser::parseExprSelector() {
   }
 
   // If the subexpression was in error, just propagate the error.
-  if (subExpr.isParseError())
+  if (subExpr.isParseError() && !subExpr.hasCodeCompletion())
     return makeParserResult<Expr>(
       new (Context) ErrorExpr(SourceRange(keywordLoc, rParenLoc)));
 
@@ -1018,29 +1043,32 @@ static bool isValidTrailingClosure(bool isExprBasic, Parser &P){
 /// Map magic literal tokens such as #file to their
 /// MagicIdentifierLiteralExpr kind.
 static MagicIdentifierLiteralExpr::Kind
-getMagicIdentifierLiteralKind(tok Kind) {
+getMagicIdentifierLiteralKind(tok Kind, const LangOptions &Opts) {
   switch (Kind) {
-  case tok::kw___COLUMN__:
-  case tok::pound_column:
-    return MagicIdentifierLiteralExpr::Kind::Column;
-  case tok::kw___FILE__:
   case tok::pound_file:
-    return MagicIdentifierLiteralExpr::Kind::File;
-  case tok::pound_filePath:
-    return MagicIdentifierLiteralExpr::Kind::FilePath;
-  case tok::kw___FUNCTION__:
-  case tok::pound_function:
-    return MagicIdentifierLiteralExpr::Kind::Function;
-  case tok::kw___LINE__:
-  case tok::pound_line:
-    return MagicIdentifierLiteralExpr::Kind::Line;
-  case tok::kw___DSO_HANDLE__:
-  case tok::pound_dsohandle:
-    return MagicIdentifierLiteralExpr::Kind::DSOHandle;
-
+    // TODO: Enable by default at the next source break. (SR-13199)
+    return Opts.EnableConcisePoundFile
+         ? MagicIdentifierLiteralExpr::FileIDSpelledAsFile
+         : MagicIdentifierLiteralExpr::FilePathSpelledAsFile;
+#define MAGIC_IDENTIFIER_TOKEN(NAME, TOKEN) \
+  case tok::TOKEN: \
+    return MagicIdentifierLiteralExpr::Kind::NAME;
+#include "swift/AST/MagicIdentifierKinds.def"
   default:
     llvm_unreachable("not a magic literal");
   }
+}
+
+/// Map magic literal kinds such as #file to their SyntaxKind.
+static SyntaxKind
+getMagicIdentifierSyntaxKind(MagicIdentifierLiteralExpr::Kind LiteralKind) {
+  switch (LiteralKind) {
+#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+  case MagicIdentifierLiteralExpr::NAME: \
+    return SyntaxKind::SYNTAX_KIND;
+#include "swift/AST/MagicIdentifierKinds.def"
+  }
+  llvm_unreachable("not a magic literal kind");
 }
 
 ParserResult<Expr>
@@ -1132,10 +1160,9 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         if (CodeCompletion) {
           CodeCompletion->completeDotExpr(Result.get(), /*DotLoc=*/TokLoc);
         }
-        // Eat the code completion token because we handled it.
-        consumeToken(tok::code_complete);
-        Result.setHasCodeCompletion();
-        return Result;
+        auto CCExpr = new (Context) CodeCompletionExpr(Result.get(),
+                                                       consumeToken(tok::code_complete));
+        return makeParserCodeCompletionResult(CCExpr);
       }
 
       DeclNameLoc NameLoc;
@@ -1448,20 +1475,12 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
                                 BooleanLiteralExpr(isTrue, consumeToken()));
   }
 
-  case tok::kw___FILE__:
-  case tok::kw___LINE__:
-  case tok::kw___COLUMN__:
-  case tok::kw___FUNCTION__:
-  case tok::kw___DSO_HANDLE__: {
-    StringRef replacement = "";
-    switch (Tok.getKind()) {
-    default: llvm_unreachable("can't get here");
-    case tok::kw___FILE__: replacement = "#file"; break;
-    case tok::kw___LINE__: replacement = "#line"; break;
-    case tok::kw___COLUMN__: replacement = "#column"; break;
-    case tok::kw___FUNCTION__:  replacement = "#function"; break;
-    case tok::kw___DSO_HANDLE__: replacement = "#dsohandle"; break;
-    }
+  // Cases for deprecated magic identifier tokens
+#define MAGIC_IDENTIFIER_DEPRECATED_TOKEN(NAME, TOKEN) case tok::TOKEN:
+#include "swift/AST/MagicIdentifierKinds.def"
+  {
+    auto Kind = getMagicIdentifierLiteralKind(Tok.getKind(), Context.LangOpts);
+    auto replacement = MagicIdentifierLiteralExpr::getKindString(Kind);
 
     diagnose(Tok.getLoc(), diag::snake_case_deprecated,
              Tok.getText(), replacement)
@@ -1469,26 +1488,18 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     LLVM_FALLTHROUGH;
   }
 
-  case tok::pound_column:
+  // Cases for non-deprecated magic identifier tokens
   case tok::pound_file:
-  case tok::pound_filePath:
-  case tok::pound_function:
-  case tok::pound_line:
-  case tok::pound_dsohandle: {
-    SyntaxKind SKind = SyntaxKind::UnknownExpr;
-    switch (Tok.getKind()) {
-    case tok::pound_column: SKind = SyntaxKind::PoundColumnExpr; break;
-    case tok::pound_file: SKind = SyntaxKind::PoundFileExpr; break;
-    case tok::pound_filePath: SKind = SyntaxKind::PoundFilePathExpr; break;
-    case tok::pound_function: SKind = SyntaxKind::PoundFunctionExpr; break;
-    // FIXME: #line was renamed to #sourceLocation
-    case tok::pound_line: SKind = SyntaxKind::PoundLineExpr; break;
-    case tok::pound_dsohandle: SKind = SyntaxKind::PoundDsohandleExpr; break;
-    default: break;
-    }
+#define MAGIC_IDENTIFIER_DEPRECATED_TOKEN(NAME, TOKEN)
+#define MAGIC_IDENTIFIER_TOKEN(NAME, TOKEN) case tok::TOKEN:
+#include "swift/AST/MagicIdentifierKinds.def"
+  {
+    auto Kind = getMagicIdentifierLiteralKind(Tok.getKind(), Context.LangOpts);
+    SyntaxKind SKind = getMagicIdentifierSyntaxKind(Kind);
+
     ExprContext.setCreateSyntax(SKind);
-    auto Kind = getMagicIdentifierLiteralKind(Tok.getKind());
     SourceLoc Loc = consumeToken();
+
     return makeParserResult(new (Context) MagicIdentifierLiteralExpr(
         Kind, Loc, /*implicit=*/false));
   }
@@ -1599,60 +1610,8 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       return makeParserErrorResult(new (Context) ErrorExpr(DotLoc));
     SyntaxContext->createNodeInPlace(SyntaxKind::MemberAccessExpr);
 
-    // Check for a () suffix, which indicates a call when constructing
-    // this member.  Note that this cannot be the start of a new line.
-    if (Tok.isFollowingLParen()) {
-      SourceLoc lParenLoc, rParenLoc;
-      SmallVector<Expr *, 2> args;
-      SmallVector<Identifier, 2> argLabels;
-      SmallVector<SourceLoc, 2> argLabelLocs;
-      SmallVector<TrailingClosure, 2> trailingClosures;
-      
-      ParserStatus status = parseExprList(tok::l_paren, tok::r_paren,
-                                          /*isPostfix=*/true, isExprBasic,
-                                          lParenLoc, args, argLabels,
-                                          argLabelLocs,
-                                          rParenLoc,
-                                          trailingClosures,
-                                          SyntaxKind::TupleExprElementList);
-      SyntaxContext->createNodeInPlace(SyntaxKind::FunctionCallExpr);
-      return makeParserResult(
-                 status,
-                 UnresolvedMemberExpr::create(Context, DotLoc, NameLoc, Name,
-                                              lParenLoc, args, argLabels,
-                                              argLabelLocs, rParenLoc,
-                                              trailingClosures,
-                                              /*implicit=*/false));
-    }
-
-    // Check for a trailing closure, if allowed.
-    if (Tok.is(tok::l_brace) && isValidTrailingClosure(isExprBasic, *this)) {
-      if (SyntaxContext->isEnabled()) {
-        // Add dummy blank argument list to the call expression syntax.
-        SyntaxContext->addSyntax(
-            ParsedSyntaxRecorder::makeBlankTupleExprElementList(
-                leadingTriviaLoc(), *SyntaxContext));
-      }
-
-      SmallVector<TrailingClosure, 2> trailingClosures;
-      auto result = parseTrailingClosures(isExprBasic, NameLoc.getSourceRange(),
-                                          trailingClosures);
-      if (trailingClosures.empty())
-        return nullptr;
-
-      SyntaxContext->createNodeInPlace(SyntaxKind::FunctionCallExpr);
-      // Handle .foo by just making an AST node.
-      return makeParserResult(
-          result, UnresolvedMemberExpr::create(Context, DotLoc, NameLoc, Name,
-                                               SourceLoc(), {}, {}, {},
-                                               SourceLoc(), trailingClosures,
-                                               /*implicit=*/false));
-    }
-
-    // Handle .foo by just making an AST node.
-    return makeParserResult(
-               UnresolvedMemberExpr::create(Context, DotLoc, NameLoc, Name,
-                                            /*implicit=*/false));
+    return makeParserResult(new (Context) UnresolvedMemberExpr(
+        DotLoc, NameLoc, Name, /*implicit=*/false));
   }
       
   case tok::kw_super: // 'super'
@@ -2418,7 +2377,8 @@ bool Parser::
 parseClosureSignatureIfPresent(SourceRange &bracketRange,
                                SmallVectorImpl<CaptureListEntry> &captureList,
                                VarDecl *&capturedSelfDecl,
-                               ParameterList *&params, SourceLoc &throwsLoc,
+                               ParameterList *&params,
+                               SourceLoc &asyncLoc, SourceLoc &throwsLoc,
                                SourceLoc &arrowLoc,
                                TypeExpr *&explicitResultType, SourceLoc &inLoc){
   // Clear out result parameters.
@@ -2429,6 +2389,24 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
   arrowLoc = SourceLoc();
   explicitResultType = nullptr;
   inLoc = SourceLoc();
+
+  // Consume 'async', 'throws', and 'rethrows', but in any order.
+  auto consumeAsyncThrows = [&] {
+    bool hadAsync = false;
+    if (shouldParseExperimentalConcurrency() &&
+        Tok.isContextualKeyword("async")) {
+      consumeToken();
+      hadAsync = true;
+    }
+
+    if (!consumeIf(tok::kw_throws) && !consumeIf(tok::kw_rethrows))
+      return;
+
+    if (shouldParseExperimentalConcurrency() && !hadAsync &&
+        Tok.isContextualKeyword("async")) {
+      consumeToken();
+    }
+  };
 
   // If we have a leading token that may be part of the closure signature, do a
   // speculative parse to validate it and look for 'in'.
@@ -2451,7 +2429,8 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
 
       // Consume the ')', if it's there.
       if (consumeIf(tok::r_paren)) {
-        consumeIf(tok::kw_throws) || consumeIf(tok::kw_rethrows);
+        consumeAsyncThrows();
+
         // Parse the func-signature-result, if present.
         if (consumeIf(tok::arrow)) {
           if (!canParseType())
@@ -2471,8 +2450,8 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
 
         return false;
       }
-      
-      consumeIf(tok::kw_throws) || consumeIf(tok::kw_rethrows);
+
+      consumeAsyncThrows();
 
       // Parse the func-signature-result, if present.
       if (consumeIf(tok::arrow)) {
@@ -2668,11 +2647,10 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
 
       params = ParameterList::create(Context, elements);
     }
-    
-    if (Tok.is(tok::kw_throws)) {
-      throwsLoc = consumeToken();
-    } else if (Tok.is(tok::kw_rethrows)) {
-      throwsLoc = consumeToken();
+
+    bool rethrows = false;
+    parseAsyncThrows(SourceLoc(), asyncLoc, throwsLoc, &rethrows);
+    if (rethrows) {
       diagnose(throwsLoc, diag::rethrowing_function_type)
         .fixItReplace(throwsLoc, "throws");
     }
@@ -2789,13 +2767,14 @@ ParserResult<Expr> Parser::parseExprClosure() {
   SmallVector<CaptureListEntry, 2> captureList;
   VarDecl *capturedSelfDecl;
   ParameterList *params = nullptr;
+  SourceLoc asyncLoc;
   SourceLoc throwsLoc;
   SourceLoc arrowLoc;
   TypeExpr *explicitResultType;
   SourceLoc inLoc;
-  parseClosureSignatureIfPresent(bracketRange, captureList,
-                                 capturedSelfDecl, params, throwsLoc,
-                                 arrowLoc, explicitResultType, inLoc);
+  parseClosureSignatureIfPresent(
+      bracketRange, captureList, capturedSelfDecl, params, asyncLoc, throwsLoc,
+      arrowLoc, explicitResultType, inLoc);
 
   // If the closure was created in the context of an array type signature's
   // size expression, there will not be a local context. A parse error will
@@ -2810,10 +2789,9 @@ ParserResult<Expr> Parser::parseExprClosure() {
   unsigned discriminator = CurLocalContext->claimNextClosureDiscriminator();
 
   // Create the closure expression and enter its context.
-  auto *closure = new (Context) ClosureExpr(bracketRange, capturedSelfDecl,
-                                            params, throwsLoc, arrowLoc, inLoc,
-                                            explicitResultType, discriminator,
-                                            CurDeclContext);
+  auto *closure = new (Context) ClosureExpr(
+      bracketRange, capturedSelfDecl, params, asyncLoc, throwsLoc, arrowLoc,
+      inLoc, explicitResultType, discriminator, CurDeclContext);
   // The arguments to the func are defined in their own scope.
   Scope S(this, ScopeKind::ClosureParams);
   ParseFunctionBody cc(*this, closure);
@@ -3213,12 +3191,29 @@ Parser::parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
       if (!Tok.is(tok::code_complete))
         break;
 
+      // FIXME: Additional trailing closure completion on newline positions.
+      //   let foo = SomeThing {
+      //     ...
+      //   }
+      //   <HERE>
+      // This was previously enabled, but it failed to suggest 'foo' because
+      // the token was considered a part of the initializer.
+      if (Tok.isAtStartOfLine())
+        break;
+
+      // If the current completion mode doesn't support trailing closure
+      // completion, leave the token here and let "postfix completion" to
+      // handle it.
+      if (CodeCompletion &&
+          !CodeCompletion->canPerformCompleteLabeledTrailingClosure())
+        break;
+
       // foo() {} <token>
       auto CCExpr = new (Context) CodeCompletionExpr(Tok.getLoc());
       if (CodeCompletion)
         CodeCompletion->completeLabeledTrailingClosure(CCExpr, Tok.isAtStartOfLine());
       consumeToken(tok::code_complete);
-      result.hasCodeCompletion();
+      result.setHasCodeCompletion();
       closures.push_back({Identifier(), SourceLoc(), CCExpr});
       continue;
     }
@@ -3805,6 +3800,11 @@ Parser::parsePlatformVersionConstraintSpec() {
   // Register the platform name as a keyword token.
   TokReceiver->registerTokenKindChange(PlatformLoc, tok::contextual_keyword);
 
+  // Keep the original version around for run-time checks to support
+  // macOS Big Sur betas that report 10.16 at
+  // run time.
+  llvm::VersionTuple RuntimeVersion = Version;
+  Version = canonicalizePlatformVersion(*Platform, Version);
   return makeParserResult(new (Context) PlatformVersionConstraintAvailabilitySpec(
-      Platform.getValue(), PlatformLoc, Version, VersionRange));
+      Platform.getValue(), PlatformLoc, Version, RuntimeVersion, VersionRange));
 }

@@ -16,6 +16,11 @@ struct GS<Base> {
 
 class Klass {}
 
+struct Str {
+  var kl: Klass
+  var _value: Builtin.Int64
+}
+
 sil @unknown : $@convention(thin) () -> ()
 
 sil @inguaranteed_user_without_result : $@convention(thin) (@in_guaranteed Klass) -> () {
@@ -32,6 +37,8 @@ bb0(%0 : $*Klass, %1 : $*Klass):
 }
 
 sil @throwing_function : $@convention(thin) (@in_guaranteed Klass) -> ((), @error Error)
+
+sil [ossa] @takeStr : $@convention(thin) (@owned Str) -> ()
 
 ///////////
 // Tests //
@@ -124,6 +131,26 @@ bb0(%0 : $*B, %1 : $*GS<B>):
   return %9999 : $()
 }
 
+// Check that we don't cause a memory lifetime failure with load [take]
+
+// CHECK-LABEL: sil [ossa] @take_from_source
+// CHECK: alloc_stack
+// CHECK: copy_addr
+// CHECK: load
+// CHECK: load
+// CHECK: } // end sil function 'take_from_source'
+sil [ossa] @take_from_source : $@convention(thin) (@in Str) -> @owned Str {
+bb0(%0 : $*Str):
+  %1 = alloc_stack $Str
+  copy_addr %0 to [initialization] %1 : $*Str
+  %3 = load [take] %0 : $*Str
+  %4 = load [copy] %1 : $*Str
+  %f = function_ref @takeStr : $@convention(thin) (@owned Str) -> ()
+  %a = apply %f(%4) : $@convention(thin) (@owned Str) -> ()
+  destroy_addr %1 : $*Str
+  dealloc_stack %1 : $*Str
+  return %3 : $Str
+}
 // CHECK-LABEL: sil @load_in_wrong_block
 // CHECK:      bb0(%0 : $*GS<B>):
 // CHECK-NEXT:   alloc_stack

@@ -19,6 +19,7 @@
 #include "swift/Strings.h"
 
 #include <vector>
+#include <inttypes.h>
 
 #if SWIFT_OBJC_INTEROP
 #include <objc/runtime.h>
@@ -560,8 +561,10 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     result->addChild(resultTy, Dem);
     
     auto funcNode = Dem.createNode(kind);
-    if (func->throws())
+    if (func->isThrowing())
       funcNode->addChild(Dem.createNode(Node::Kind::ThrowsAnnotation), Dem);
+    if (func->isAsync())
+      funcNode->addChild(Dem.createNode(Node::Kind::AsyncAnnotation), Dem);
     funcNode->addChild(parameters, Dem);
     funcNode->addChild(result, Dem);
     return funcNode;

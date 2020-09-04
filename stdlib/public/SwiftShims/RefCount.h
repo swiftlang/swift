@@ -1271,6 +1271,11 @@ class RefCounts {
   // Note that this is not equal to the number of outstanding weak pointers.
   uint32_t getWeakCount() const;
 
+#ifndef NDEBUG
+  bool isImmutableCOWBuffer();
+  bool setIsImmutableCOWBuffer(bool immutable);
+#endif
+
   // DO NOT TOUCH.
   // This exists for the benefits of the Refcounting.cpp tests. Do not use it
   // elsewhere.
@@ -1300,6 +1305,11 @@ class HeapObjectSideTableEntry {
   // FIXME: does object need to be atomic?
   std::atomic<HeapObject*> object;
   SideTableRefCounts refCounts;
+
+#ifndef NDEBUG
+  // Used for runtime consistency checking of COW buffers.
+  bool immutableCOWBuffer = false;
+#endif
 
   public:
   HeapObjectSideTableEntry(HeapObject *newObject)
@@ -1455,6 +1465,16 @@ class HeapObjectSideTableEntry {
   void *getSideTable() {
     return refCounts.getSideTable();
   }
+  
+#ifndef NDEBUG
+  bool isImmutableCOWBuffer() const {
+    return immutableCOWBuffer;
+  }
+  
+  void setIsImmutableCOWBuffer(bool immutable) {
+    immutableCOWBuffer = immutable;
+  }
+#endif
 };
 
 

@@ -1,9 +1,9 @@
 // RUN: %target-run-simple-swiftgyb(-Xfrontend -enable-experimental-forward-mode-differentiation)
 // REQUIRES: executable_test
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if canImport(Darwin)
   import Darwin.C.tgmath
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#elseif canImport(Glibc)
   import Glibc
 #elseif os(Windows)
   import MSVCRT

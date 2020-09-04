@@ -142,7 +142,7 @@ public:
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:
     case RequirementKind::SameType:
-      second = hash_value(requirement.getSecondType());
+      second = hash_value(requirement.getSecondType().getPointer());
       break;
 
     case RequirementKind::Layout:

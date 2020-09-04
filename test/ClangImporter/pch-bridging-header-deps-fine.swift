@@ -10,13 +10,13 @@
 // RUN: %target-swift-frontend -emit-pch -o %t.pch %/S/Inputs/chained-unit-test-bridging-header-to-pch.h
 // RUN: %target-swift-frontend -module-name test -c -emit-dependencies-path %t.d -emit-reference-dependencies-path %t.swiftdeps -primary-file %s -import-objc-header %t.pch
 // RUN: %FileCheck --check-prefix CHECK-DEPS %s < %t.d
-// RUN: %S/../Inputs/process_fine_grained_swiftdeps.sh <%t.swiftdeps >%t-processed.swiftdeps
+// RUN: %S/../Inputs/process_fine_grained_swiftdeps.sh %swift-dependency-tool %t.swiftdeps %t-processed.swiftdeps
 // RUN: %FileCheck --check-prefix CHECK-SWIFTDEPS --enable-yaml-compatibility %s < %t-processed.swiftdeps
 // RUN: %FileCheck --check-prefix CHECK-SWIFTDEPS2 --enable-yaml-compatibility %s < %t-processed.swiftdeps
 
 // RUN: %target-swift-frontend -module-name test -c -emit-dependencies-path %t.persistent.d -emit-reference-dependencies-path %t.persistent.swiftdeps -primary-file %s -import-objc-header %/S/Inputs/chained-unit-test-bridging-header-to-pch.h -pch-output-dir %t/pch
 // RUN: %FileCheck --check-prefix CHECK-DEPS %s < %t.persistent.d
-// RUN: %S/../Inputs/process_fine_grained_swiftdeps.sh <%t.persistent.swiftdeps >%t-processed.persistent.swiftdeps
+// RUN: %S/../Inputs/process_fine_grained_swiftdeps.sh %swift-dependency-tool %t.persistent.swiftdeps %t-processed.persistent.swiftdeps
 // RUN: %FileCheck --check-prefix CHECK-SWIFTDEPS  --enable-yaml-compatibility %s < %t-processed.persistent.swiftdeps
 // RUN: %FileCheck --check-prefix CHECK-SWIFTDEPS2 --enable-yaml-compatibility %s < %t-processed.persistent.swiftdeps
 

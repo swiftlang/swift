@@ -7,7 +7,7 @@ func readStaticMember() -> CInt {
 }
 
 // CHECK: // clang name: WithInlineStaticMember::staticMember
-// CHECK: sil_global @{{_ZN22WithInlineStaticMember12staticMemberE|\?staticMember@WithInlineStaticMember@@2HA}} : $Int32
+// CHECK: sil_global public_external @{{_ZN22WithInlineStaticMember12staticMemberE|\?staticMember@WithInlineStaticMember@@2HA}} : $Int32
 
 // CHECK: sil hidden @$s4main16readStaticMembers5Int32VyF : $@convention(thin) () -> Int32
 // CHECK: [[ADDR:%.*]] = global_addr @{{_ZN22WithInlineStaticMember12staticMemberE|\?staticMember@WithInlineStaticMember@@2HA}} : $*Int32

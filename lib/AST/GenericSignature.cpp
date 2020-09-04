@@ -76,18 +76,22 @@ GenericSignatureImpl::GenericSignatureImpl(
 
 TypeArrayView<GenericTypeParamType>
 GenericSignatureImpl::getInnermostGenericParams() const {
-  auto params = getGenericParams();
+  const auto params = getGenericParams();
 
-  // Find the point at which the depth changes.
-  unsigned depth = params.back()->getDepth();
-  for (unsigned n = params.size(); n > 0; --n) {
-    if (params[n-1]->getDepth() != depth) {
-      return params.slice(n);
-    }
+  const unsigned maxDepth = params.back()->getDepth();
+  if (params.front()->getDepth() == maxDepth)
+    return params;
+
+  // There is a depth change. Count the number of elements
+  // to slice off the front.
+  unsigned sliceCount = params.size() - 1;
+  while (true) {
+    if (params[sliceCount - 1]->getDepth() != maxDepth)
+      break;
+    --sliceCount;
   }
 
-  // All parameters are at the same depth.
-  return params;
+  return params.slice(sliceCount);
 }
 
 void GenericSignatureImpl::forEachParam(
@@ -232,18 +236,27 @@ CanGenericSignature::getCanonical(TypeArrayView<GenericTypeParamType> params,
              "Left-hand side is not canonical");
       break;
 
-    case RequirementKind::SameType:
-      assert(reqt.getFirstType()->isTypeParameter() &&
-             "Left-hand side must be a type parameter");
+    case RequirementKind::SameType: {
+      auto isCanonicalAnchor = [&](Type type) {
+        if (auto *dmt = type->getAs<DependentMemberType>())
+          return canSig->isCanonicalTypeInContext(dmt->getBase());
+        return type->is<GenericTypeParamType>();
+      };
+
+      auto firstType = reqt.getFirstType();
+      auto secondType = reqt.getSecondType();
+      assert(isCanonicalAnchor(firstType));
+
       if (reqt.getSecondType()->isTypeParameter()) {
-        assert(compareDependentTypes(reqt.getFirstType(), reqt.getSecondType())
-                 < 0 &&
+        assert(isCanonicalAnchor(secondType));
+        assert(compareDependentTypes(firstType, secondType) < 0 &&
                "Out-of-order type parameters in same-type constraint");
       } else {
-        assert(canSig->isCanonicalTypeInContext(reqt.getSecondType()) &&
+        assert(canSig->isCanonicalTypeInContext(secondType) &&
                "Concrete same-type isn't canonical in its own context");
       }
       break;
+    }
 
     case RequirementKind::Conformance:
       assert(reqt.getFirstType()->isTypeParameter() &&
@@ -390,16 +403,6 @@ bool GenericSignatureImpl::requiresClass(Type type) const {
 
   // If there is a layout constraint, it might be a class.
   if (equivClass->layout && equivClass->layout->isClass()) return true;
-
-  // If there is a superclass bound, then obviously it must be a class.
-  // FIXME: We shouldn't need this?
-  if (equivClass->superclass) return true;
-
-  // If any of the protocols are class-bound, then it must be a class.
-  // FIXME: We shouldn't need this?
-  for (const auto &conforms : equivClass->conformsTo) {
-    if (conforms.first->requiresClass()) return true;
-  }
 
   return false;
 }
@@ -1034,10 +1037,27 @@ SubstitutionMap GenericSignatureImpl::getIdentitySubstitutionMap() const {
                               MakeAbstractConformanceForGenericType());
 }
 
+GenericTypeParamType *GenericSignatureImpl::getSugaredType(
+    GenericTypeParamType *type) const {
+  unsigned ordinal = getGenericParamOrdinal(type);
+  return getGenericParams()[ordinal];
+}
+
+Type GenericSignatureImpl::getSugaredType(Type type) const {
+  if (!type->hasTypeParameter())
+    return type;
+
+  return type.transform([this](Type Ty) -> Type {
+    if (auto GP = dyn_cast<GenericTypeParamType>(Ty.getPointer())) {
+      return Type(getSugaredType(GP));
+    }
+    return Ty;
+  });
+}
+
 unsigned GenericSignatureImpl::getGenericParamOrdinal(
     GenericTypeParamType *param) const {
-  return GenericParamKey(param->getDepth(), param->getIndex())
-    .findIndexIn(getGenericParams());
+  return GenericParamKey(param).findIndexIn(getGenericParams());
 }
 
 bool GenericSignatureImpl::hasTypeVariable() const {

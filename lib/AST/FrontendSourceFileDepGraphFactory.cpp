@@ -27,6 +27,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/FineGrainedDependencies.h"
+#include "swift/AST/FineGrainedDependencyFormat.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
@@ -291,13 +292,7 @@ bool fine_grained_dependencies::emitReferenceDependencies(
                              SF, outputPath, depTracker, alsoEmitDotFile)
                               .construct();
 
-  const bool hadError =
-      withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
-        out << g.yamlProlog(SF->getASTContext().hadError());
-        llvm::yaml::Output yamlWriter(out);
-        yamlWriter << g;
-        return false;
-      });
+  bool hadError = writeFineGrainedDependencyGraph(diags, outputPath, g);
 
   // If path is stdout, cannot read it back, so check for "-"
   assert(outputPath == "-" || g.verifyReadsWhatIsWritten(outputPath));

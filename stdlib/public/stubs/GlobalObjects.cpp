@@ -20,6 +20,7 @@
 #include "../SwiftShims/Random.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Debug.h"
+#include "swift/Runtime/EnvironmentVariables.h"
 #include <stdlib.h>
 
 namespace swift {
@@ -113,13 +114,12 @@ static swift::_SwiftHashingParameters initializeHashingParameters() {
   // results are repeatable, e.g., in certain test environments.  (Note that
   // even if the seed override is enabled, hash values aren't guaranteed to
   // remain stable across even minor stdlib releases.)
-  auto determinism = getenv("SWIFT_DETERMINISTIC_HASHING");
-  if (determinism && 0 == strcmp(determinism, "1")) {
+  if (swift::runtime::environment::SWIFT_DETERMINISTIC_HASHING()) {
     return { 0, 0, true };
   }
   __swift_uint64_t seed0 = 0, seed1 = 0;
-  swift::swift_stdlib_random(&seed0, sizeof(seed0));
-  swift::swift_stdlib_random(&seed1, sizeof(seed1));
+  swift_stdlib_random(&seed0, sizeof(seed0));
+  swift_stdlib_random(&seed1, sizeof(seed1));
   return { seed0, seed1, false };
 }
 

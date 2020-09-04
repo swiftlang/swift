@@ -140,12 +140,9 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
       return false;
     };
 
-    if (auto AF = dyn_cast<AbstractFunctionDecl>(VD)) {
-      if (ReportParamList(AF->getParameters()))
-        return false;
-    }
-    if (auto SD = dyn_cast<SubscriptDecl>(VD)) {
-      if (ReportParamList(SD->getIndices()))
+    if (isa<AbstractFunctionDecl>(VD) || isa<SubscriptDecl>(VD)) {
+      auto ParamList = getParameterList(VD);
+      if (ReportParamList(ParamList))
         return false;
     }
   } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
@@ -415,6 +412,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       case KeyPathExpr::Component::Kind::OptionalWrap:
       case KeyPathExpr::Component::Kind::OptionalForce:
       case KeyPathExpr::Component::Kind::Identity:
+      case KeyPathExpr::Component::Kind::DictionaryKey:
         break;
       }
     }
@@ -598,7 +596,7 @@ bool SemaAnnotator::handleCustomAttributes(Decl *D) {
     }
   }
   for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr, true>()) {
-    if (auto *Repr = customAttr->getTypeLoc().getTypeRepr()) {
+    if (auto *Repr = customAttr->getTypeRepr()) {
       if (!Repr->walk(*this))
         return false;
     }
@@ -687,7 +685,7 @@ bool SemaAnnotator::
 passReference(ValueDecl *D, Type Ty, DeclNameLoc Loc, ReferenceMetaData Data) {
   SourceManager &SM = D->getASTContext().SourceMgr;
   SourceLoc BaseStart = Loc.getBaseNameLoc(), BaseEnd = BaseStart;
-  if (SM.extractText({BaseStart, 1}) == "`")
+  if (BaseStart.isValid() && SM.extractText({BaseStart, 1}) == "`")
     BaseEnd = Lexer::getLocForEndOfToken(SM, BaseStart.getAdvancedLoc(1));
   return passReference(D, Ty, BaseStart, {BaseStart, BaseEnd}, Data);
 }
@@ -715,6 +713,12 @@ passReference(ValueDecl *D, Type Ty, SourceLoc BaseNameLoc, SourceRange Range,
         ExtDecl = ExtDecls.back();
       }
     }
+  }
+
+  if (D == nullptr) {
+    // FIXME: When does this happen?
+    assert(false && "unhandled reference");
+    return true;
   }
 
   CharSourceRange CharRange =

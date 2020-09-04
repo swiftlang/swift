@@ -9,7 +9,7 @@ let number⁚ Int
 // CHECK-NEXT: [[@LINE+2]]:3 Error: invalid character in source file
 // CHECK-NEXT: ([[@LINE+1]]:3,[[@LINE+1]]:6) Fixit: " "
 5 ‒ 5
-// CHECK-NEXT: [[@LINE-1]]:3 Note: unicode character '‒' looks similar to '-'; did you mean to use '-'?
+// CHECK-NEXT: [[@LINE-1]]:3 Note: unicode character '‒' (Figure Dash) looks similar to '-' (Hyphen Minus); did you mean to use '-' (Hyphen Minus)?
 // CHECK-NEXT: ([[@LINE-2]]:3,[[@LINE-2]]:6) Fixit: "-"
 // CHECK-NEXT: [[@LINE-3]]:2 Error: consecutive statements on a line must be separated by ';'
 // CHECK-NEXT: ([[@LINE-4]]:2,[[@LINE-4]]:2) Fixit: ";"
@@ -21,7 +21,7 @@ if (true ꝸꝸꝸ false) {}
 if (5 ‒ 5) == 0 {}
 // CHECK-NEXT: [[@LINE-1]]:7 Error: invalid character in source file
 // CHECK-NEXT: ([[@LINE-2]]:7,[[@LINE-2]]:10) Fixit: " "
-// CHECK-NEXT: [[@LINE-3]]:7 Note: unicode character '‒' looks similar to '-'; did you mean to use '-'?
+// CHECK-NEXT: [[@LINE-3]]:7 Note: unicode character '‒' (Figure Dash) looks similar to '-' (Hyphen Minus); did you mean to use '-' (Hyphen Minus)?
 // CHECK-NEXT: ([[@LINE-4]]:7,[[@LINE-4]]:10) Fixit: "-"
 // CHECK-NEXT: [[@LINE-5]]:11 Error: expected ',' separator
 // CHECK-NEXT: ([[@LINE-6]]:6,[[@LINE-6]]:6) Fixit: ","

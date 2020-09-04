@@ -24,7 +24,7 @@
 
 namespace swift {
 class ASTPrinter;
-class GenericEnvironment;
+class GenericSignatureImpl;
 class CanType;
 class Decl;
 class Pattern;
@@ -327,8 +327,7 @@ struct PrintOptions {
   };
 
   /// Whether to print function @convention attribute on function types.
-  // FIXME: [clang-function-type-serialization] Once we start serializing Clang
-  // types, we should also start printing the full type in the swiftinterface.
+  // [TODO: Clang-type-plumbing] Print the full type in the swiftinterface.
   FunctionRepresentationMode PrintFunctionRepresentationAttrs =
     FunctionRepresentationMode::NameOnly;
 
@@ -381,10 +380,13 @@ struct PrintOptions {
   /// has no associated doc-comment by itself.
   bool CascadeDocComment = false;
 
+  static const std::function<bool(const ExtensionDecl *)>
+      defaultPrintExtensionContentAsMembers;
+
   /// Whether to print the content of an extension decl inside the type decl where it
   /// extends from.
   std::function<bool(const ExtensionDecl *)> printExtensionContentAsMembers =
-    [] (const ExtensionDecl *) { return false; };
+    PrintOptions::defaultPrintExtensionContentAsMembers;
 
   /// How to print the keyword argument and parameter name in functions.
   ArgAndParamPrintingMode ArgAndParamPrinting =
@@ -424,8 +426,8 @@ struct PrintOptions {
   /// Replaces the name of private and internal properties of types with '_'.
   bool OmitNameOfInaccessibleProperties = false;
 
-  /// Print dependent types as references into this generic environment.
-  GenericEnvironment *GenericEnv = nullptr;
+  /// Use this signature to re-sugar dependent types.
+  const GenericSignatureImpl *GenericSig = nullptr;
 
   /// Print types with alternative names from their canonical names.
   llvm::DenseMap<CanType, Identifier> *AlternativeTypeNames = nullptr;
@@ -449,6 +451,9 @@ struct PrintOptions {
   
   /// Whether to print parameter specifiers as 'let' and 'var'.
   bool PrintParameterSpecifiers = false;
+
+  /// Whether to print inheritance lists for types.
+  bool PrintInherited = true;
 
   /// \see ShouldQualifyNestedDeclarations
   enum class QualifyNestedDeclarations {

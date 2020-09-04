@@ -89,18 +89,18 @@ nonTrailingAndTrailing2(a: <#T##() -> ()#>, b: <#T##Int#> c: <#T##() -> ()#>)
 
 
 withTypesAndLabels1(a: <#T##(_ booly: Bool, inty: Int) -> ()#>, b: <#T##(solo: Xyz) -> ()#>)
-// CHECK:      withTypesAndLabels1 { (booly, inty) in
+// CHECK:      withTypesAndLabels1 { booly, inty in
 // CHECK-NEXT: <#code#>
-// CHECK-NEXT: } b: { (solo) in
+// CHECK-NEXT: } b: { solo in
 // CHECK-NEXT: <#code#>
 // CHECK-NEXT: }
 
 func reset_parser1() {}
 
 withTypes1(a: <#T##(Bool, Int) -> ()#>, b: <#T##() -> Int#>)
-// CHECK:      withTypes1 { (<#Bool#>, <#Int#>) in
+// CHECK:      withTypes1 { <#Bool#>, <#Int#> in
 // CHECK-NEXT: <#code#>
-// CHECK-NEXT: } b: { () -> Int in
+// CHECK-NEXT: } b: {
 // CHECK-NEXT: <#code#>
 // CHECK-NEXT: }
 

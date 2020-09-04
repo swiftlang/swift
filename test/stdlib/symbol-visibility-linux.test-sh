@@ -1,0 +1,70 @@
+// Ensure that we do not export any weak symbols from the dylibs.
+//
+// Weak symbols require additional work from the loader to resolve the symbol at
+// load time and can cause ODR violations as well as unexpected symbol
+// satisfaction because the weak symbol may be used from a separate module.
+
+// NOTE: this test is fragile.  It is dependent on the specifics of the GNU C++
+// runtime.  The C++ headers from the runtime explicitly force the weak symbols
+// to be publicly visible without allowing the user to control the visibility.
+// We explicitly filter out the ones that we see being leaked after manually
+// validating that they are being leaked because of the forceful nature of
+// libstdc++.
+
+// RUN: %empty-directory(%t)
+
+// RUN: %llvm-nm --defined-only --extern-only %platform-dylib-dir/%target-library-name(swiftCore) \
+// RUN:   | grep -v -e _ZNSt6vectorIjSaIjEE6insertEN9__gnu_cxx17__normal_iteratorIPKjS1_EERS4_ \
+// RUN:             -e _ZNSt6vectorIjSaIjEE13_M_insert_auxIJRKjEEEvN9__gnu_cxx17__normal_iteratorIPjS1_EEDpOT_ \
+// RUN:             -e _ZNSt6vectorIjSaIjEE13_M_insert_auxIJjEEEvN9__gnu_cxx17__normal_iteratorIPjS1_EEDpOT_ \
+// RUN:             -e _ZNSt6vectorISt10unique_ptrIKvSt8functionIFvPS1_EEESaIS6_EE19_M_emplace_back_auxIJS6_EEEvDpOT_ \
+// RUN:             -e _ZNSt6vectorISt10unique_ptrIKvSt8functionIFvPS1_EEESaIS6_EE17_M_realloc_insertIJS6_EEEvN9__gnu_cxx17__normal_iteratorIPS6_S8_EEDpOT_ \
+// RUN:             -e _ZNSt3_V28__rotateIPcEET_S2_S2_S2_St26random_access_iterator_tag \
+// RUN:             -e _ZN9__gnu_cxx12__to_xstringINSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEcEET_PFiPT0_mPKS8_P13__va_list_tagEmSB_z \
+// RUN:             -e _ZZNSt19_Sp_make_shared_tag5_S_tiEvE5__tag \
+// RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEDnEEEvv \
+// RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA1_cEEEvv \
+// RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA8_cEEEvv \
+// RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA24_cEEEvv \
+// RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA32_cEEEvv \
+// RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA40_cEEEvv \
+// RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA80_cEEEvv \
+// RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA88_cEEEvv \
+// RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA104_cEEEvv \
+// RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA168_cEEEvv \
+// RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA216_cEEEvv \
+// RUN:             -e _ZN9__gnu_cxx12__to_xstringISscEET_PFiPT0_mPKS2_P13__va_list_tagEmS5_z \
+// RUN:   > %t/swiftCore-all.txt
+// RUN: %llvm-nm --defined-only --extern-only --no-weak %platform-dylib-dir/%target-library-name(swiftCore) > %t/swiftCore-no-weak.txt
+// RUN: diff -u %t/swiftCore-all.txt %t/swiftCore-no-weak.txt
+
+// RUN: %llvm-nm --defined-only --extern-only %platform-dylib-dir/%target-library-name(swiftRemoteMirror) \
+// RUN:   | grep -v -e _ZNSt6vectorIjSaIjEE6insertEN9__gnu_cxx17__normal_iteratorIPKjS1_EERS4_ \
+// RUN:             -e _ZNSt6vectorIjSaIjEE13_M_insert_auxIJRKjEEEvN9__gnu_cxx17__normal_iteratorIPjS1_EEDpOT_ \
+// RUN:             -e _ZNSt6vectorIjSaIjEE13_M_insert_auxIJjEEEvN9__gnu_cxx17__normal_iteratorIPjS1_EEDpOT_ \
+// RUN:             -e _ZNSt6vectorISt10unique_ptrIKvSt8functionIFvPS1_EEESaIS6_EE19_M_emplace_back_auxIJS6_EEEvDpOT_ \
+// RUN:             -e _ZNSt6vectorISt10unique_ptrIKvSt8functionIFvPS1_EEESaIS6_EE17_M_realloc_insertIJS6_EEEvN9__gnu_cxx17__normal_iteratorIPS6_S8_EEDpOT_ \
+// RUN:             -e _ZNSt3_V28__rotateIPcEET_S2_S2_S2_St26random_access_iterator_tag \
+// RUN:             -e _ZN9__gnu_cxx12__to_xstringINSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEcEET_PFiPT0_mPKS8_P13__va_list_tagEmSB_z \
+// RUN:             -e _ZZNSt19_Sp_make_shared_tag5_S_tiEvE5__tag \
+// RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEDnEEEvv \
+// RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA1_cEEEvv \
+// RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA8_cEEEvv \
+// RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA24_cEEEvv \
+// RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA32_cEEEvv \
+// RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA40_cEEEvv \
+// RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA80_cEEEvv \
+// RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA88_cEEEvv \
+// RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA104_cEEEvv \
+// RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA168_cEEEvv \
+// RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA216_cEEEvv \
+// RUN:             -e _ZN9__gnu_cxx12__to_xstringISscEET_PFiPT0_mPKS2_P13__va_list_tagEmS5_z \
+// RUN:   > %t/swiftRemoteMirror-all.txt
+// RUN: %llvm-nm --defined-only --extern-only --no-weak %platform-dylib-dir/%target-library-name(swiftRemoteMirror) > %t/swiftRemoteMirror-no-weak.txt
+// RUN: diff -u %t/swiftRemoteMirror-all.txt %t/swiftRemoteMirror-no-weak.txt
+
+// NOTE: swiftDemanging is not checked because it is incorportated into
+// swiftCore and swiftRemoteMirror.  Both of those checks ensure that the
+// symbols are handled properly.
+
+// REQUIRES: OS=linux-gnu

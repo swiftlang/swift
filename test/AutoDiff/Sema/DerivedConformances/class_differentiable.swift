@@ -29,26 +29,62 @@ func testEmpty() {
   assertConformsToAdditiveArithmetic(Empty.TangentVector.self)
 }
 
+protocol DifferentiableWithNonmutatingMoveAlong: Differentiable {}
+extension DifferentiableWithNonmutatingMoveAlong {
+  func move(along _: TangentVector) {}
+}
+
+class EmptyWithInheritedNonmutatingMoveAlong: DifferentiableWithNonmutatingMoveAlong {
+  typealias TangentVector = Empty.TangentVector
+  var zeroTangentVectorInitializer: () -> TangentVector { { .init() } }
+  static func proof_that_i_have_nonmutating_move_along() {
+    let empty = EmptyWithInheritedNonmutatingMoveAlong()
+    empty.move(along: .init())
+  }
+}
+
+class EmptyWrapper<T: Differentiable & AnyObject>: Differentiable {}
+func testEmptyWrapper() {
+  assertConformsToAdditiveArithmetic(Empty.TangentVector.self)
+  assertConformsToAdditiveArithmetic(EmptyWrapper<Empty>.TangentVector.self)
+}
+
 // Test structs with `let` stored properties.
 // Derived conformances fail because `mutating func move` requires all stored
 // properties to be mutable.
-class ImmutableStoredProperties: Differentiable {
+class ImmutableStoredProperties<T: Differentiable & AnyObject>: Differentiable {
   var okay: Float
 
   // expected-warning @+1 {{stored property 'nondiff' has no derivative because 'Int' does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}} {{3-3=@noDerivative }}
   let nondiff: Int
 
-  // expected-warning @+1 {{synthesis of the 'Differentiable.move(along:)' requirement for 'ImmutableStoredProperties' requires all stored properties not marked with `@noDerivative` to be mutable; use 'var' instead, or add an explicit '@noDerivative' attribute}} {{3-3=@noDerivative }}
+  // expected-warning @+1 {{synthesis of the 'Differentiable.move(along:)' requirement for 'ImmutableStoredProperties' requires all stored properties not marked with `@noDerivative` to be mutable or have a non-mutating 'move(along:)'; use 'var' instead, or add an explicit '@noDerivative' attribute}} {{3-3=@noDerivative }}
   let diff: Float
 
-  init() {
+  let letClass: Empty // No error on class-bound differentiable `let` with a non-mutating 'move(along:)'.
+
+  let letClassWithInheritedNonmutatingMoveAlong: EmptyWithInheritedNonmutatingMoveAlong
+
+  // expected-warning @+1 {{synthesis of the 'Differentiable.move(along:)' requirement for 'ImmutableStoredProperties' requires all stored properties not marked with `@noDerivative` to be mutable or have a non-mutating 'move(along:)'; use 'var' instead, or add an explicit '@noDerivative' attribute}} {{3-3=@noDerivative }}
+  let letClassGeneric: T // Error due to lack of non-mutating 'move(along:)'.
+
+  let letClassWrappingGeneric: EmptyWrapper<T> // No error on class-bound differentiable `let` with a non-mutating 'move(along:)'.
+
+  init(letClassGeneric: T) {
     okay = 0
     nondiff = 0
     diff = 0
+    letClass = Empty()
+    self.letClassGeneric = letClassGeneric
+    self.letClassWrappingGeneric = EmptyWrapper<T>()
   }
 }
 func testImmutableStoredProperties() {
-  _ = ImmutableStoredProperties.TangentVector(okay: 1)
+  _ = ImmutableStoredProperties<Empty>.TangentVector(
+    okay: 1, 
+    letClass: Empty.TangentVector(), 
+    letClassWithInheritedNonmutatingMoveAlong: Empty.TangentVector(), 
+    letClassWrappingGeneric: EmptyWrapper<Empty>.TangentVector())
 }
 class MutableStoredPropertiesWithInitialValue: Differentiable {
   var x = Float(1)
@@ -56,7 +92,7 @@ class MutableStoredPropertiesWithInitialValue: Differentiable {
 }
 // Test class with both an empty constructor and memberwise initializer.
 class AllMixedStoredPropertiesHaveInitialValue: Differentiable {
-  // expected-warning @+1 {{synthesis of the 'Differentiable.move(along:)' requirement for 'AllMixedStoredPropertiesHaveInitialValue' requires all stored properties not marked with `@noDerivative` to be mutable; use 'var' instead, or add an explicit '@noDerivative' attribute}} {{3-3=@noDerivative }}
+  // expected-warning @+1 {{synthesis of the 'Differentiable.move(along:)' requirement for 'AllMixedStoredPropertiesHaveInitialValue' requires all stored properties not marked with `@noDerivative` to be mutable or have a non-mutating 'move(along:)'; use 'var' instead, or add an explicit '@noDerivative' attribute}} {{3-3=@noDerivative }}
   let x = Float(1)
   var y = Float(1)
   // Memberwise initializer should be `init(y:)` since `x` is immutable.
@@ -525,7 +561,6 @@ class SR_12793: Differentiable {
 }
 
 // Test property wrappers.
-// TF-1190: Test `@noDerivative` warning for property wrapper backing storage properties.
 
 @propertyWrapper
 struct ImmutableWrapper<Value> {
@@ -551,7 +586,7 @@ struct Generic<T> {}
 extension Generic: Differentiable where T: Differentiable {}
 
 class WrappedProperties: Differentiable {
-  // expected-warning @+1 {{synthesis of the 'Differentiable.move(along:)' requirement for 'WrappedProperties' requires 'wrappedValue' in property wrapper 'ImmutableWrapper' to be mutable; add an explicit '@noDerivative' attribute}}
+  // expected-warning @+1 {{synthesis of the 'Differentiable.move(along:)' requirement for 'WrappedProperties' requires 'wrappedValue' in property wrapper 'ImmutableWrapper' to be mutable or have a non-mutating 'move(along:)'; add an explicit '@noDerivative' attribute}}
   @ImmutableWrapper var immutableInt: Generic<Int> = Generic()
 
   // expected-warning @+1 {{stored property 'mutableInt' has no derivative because 'Generic<Int>' does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
@@ -559,19 +594,22 @@ class WrappedProperties: Differentiable {
 
   @Wrapper var float: Generic<Float> = Generic()
   @ClassWrapper var float2: Generic<Float> = Generic()
+  // SR-13071: Test `@differentiable` wrapped property.
+  @differentiable @Wrapper var float3: Generic<Float> = Generic()
+
   @noDerivative @ImmutableWrapper var nondiff: Generic<Int> = Generic()
 
   static func testTangentMemberwiseInitializer() {
-    _ = TangentVector(float: .init(), float2: .init())
+    _ = TangentVector(float: .init(), float2: .init(), float3: .init())
   }
 }
 
 // Test derived conformances in disallowed contexts.
 
-// expected-error @+2 {{type 'OtherFileNonconforming' does not conform to protocol 'Differentiable'}}
-// expected-error @+1 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
 extension OtherFileNonconforming: Differentiable {}
+// expected-error @-1 {{extension outside of file declaring class 'OtherFileNonconforming' prevents automatic synthesis of 'move(along:)' for protocol 'Differentiable'}}
+// expected-error @-2 {{extension outside of file declaring class 'OtherFileNonconforming' prevents automatic synthesis of 'zeroTangentVectorInitializer' for protocol 'Differentiable'}}
 
-// expected-error @+2 {{type 'GenericOtherFileNonconforming<T>' does not conform to protocol 'Differentiable'}}
-// expected-error @+1 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
 extension GenericOtherFileNonconforming: Differentiable {}
+// expected-error @-1 {{extension outside of file declaring generic class 'GenericOtherFileNonconforming' prevents automatic synthesis of 'move(along:)' for protocol 'Differentiable'}}
+// expected-error @-2 {{extension outside of file declaring generic class 'GenericOtherFileNonconforming' prevents automatic synthesis of 'zeroTangentVectorInitializer' for protocol 'Differentiable'}}

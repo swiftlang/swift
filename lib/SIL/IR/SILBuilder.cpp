@@ -62,11 +62,14 @@ SILType SILBuilder::getPartialApplyResultType(
   auto params = FTI->getParameters();
   auto newParams = params.slice(0, params.size() - argCount);
 
-  auto extInfo = FTI->getExtInfo()
-    .withRepresentation(SILFunctionType::Representation::Thick)
-    .withIsPseudogeneric(false);
+  auto extInfoBuilder =
+      FTI->getExtInfo()
+          .intoBuilder()
+          .withRepresentation(SILFunctionType::Representation::Thick)
+          .withIsPseudogeneric(false);
   if (onStack)
-    extInfo = extInfo.withNoEscape();
+    extInfoBuilder = extInfoBuilder.withNoEscape();
+  auto extInfo = extInfoBuilder.build();
 
   // If the original method has an @unowned_inner_pointer return, the partial
   // application thunk will lifetime-extend 'self' for us, converting the
@@ -141,7 +144,8 @@ SILBuilder::createClassifyBridgeObject(SILLocation Loc, SILValue value) {
 
 // Create the appropriate cast instruction based on result type.
 SingleValueInstruction *
-SILBuilder::createUncheckedBitCast(SILLocation Loc, SILValue Op, SILType Ty) {
+SILBuilder::createUncheckedReinterpretCast(SILLocation Loc, SILValue Op,
+                                           SILType Ty) {
   assert(isLoadableOrOpaque(Ty));
   if (Ty.isTrivial(getFunction()))
     return insert(UncheckedTrivialBitCastInst::create(
@@ -154,6 +158,26 @@ SILBuilder::createUncheckedBitCast(SILLocation Loc, SILValue Op, SILType Ty) {
   // type, so RC identity cannot be assumed.
   return insert(UncheckedBitwiseCastInst::create(
       getSILDebugLocation(Loc), Op, Ty, getFunction(), C.OpenedArchetypes));
+}
+
+// Create the appropriate cast instruction based on result type.
+SingleValueInstruction *
+SILBuilder::createUncheckedBitCast(SILLocation Loc, SILValue Op, SILType Ty) {
+  // Without ownership, delegate to unchecked reinterpret cast.
+  if (!hasOwnership())
+    return createUncheckedReinterpretCast(Loc, Op, Ty);
+
+  assert(isLoadableOrOpaque(Ty));
+  if (Ty.isTrivial(getFunction()))
+    return insert(UncheckedTrivialBitCastInst::create(
+        getSILDebugLocation(Loc), Op, Ty, getFunction(), C.OpenedArchetypes));
+
+  if (SILType::canRefCast(Op->getType(), Ty, getModule()))
+    return createUncheckedRefCast(Loc, Op, Ty);
+
+  // The destination type is nontrivial, and may be smaller than the source
+  // type, so RC identity cannot be assumed.
+  return createUncheckedValueCast(Loc, Op, Ty);
 }
 
 BranchInst *SILBuilder::createBranch(SILLocation Loc,

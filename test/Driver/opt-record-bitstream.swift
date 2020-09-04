@@ -3,7 +3,7 @@
 // RUN: llvm-bcanalyzer -dump %t/optrecordmod.opt.bitstream | %FileCheck -check-prefix=BITSTREAM %s
 // RUN: otool -l %t/opt-record.o | %FileCheck -check-prefix=OBJ %s
 
-// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos
+// REQUIRES: VENDOR=apple
 
 // Ensure we emitted the appropriate section
 

@@ -30,6 +30,7 @@
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Metadata.h"
 #include <memory>
+#include <inttypes.h>
 #include <stdio.h>
 
 // Pick a return-address strategy
@@ -249,7 +250,14 @@ public:
 // Each of these cases should define a function with this prototype:
 //   AccessSets &getAllSets();
 
-#if SWIFT_TLS_HAS_RESERVED_PTHREAD_SPECIFIC
+#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+
+static SwiftTLSContext &getTLSContext() {
+  static SwiftTLSContext TLSContext;
+  return TLSContext;
+}
+
+#elif SWIFT_TLS_HAS_RESERVED_PTHREAD_SPECIFIC
 // Use the reserved TSD key if possible.
 
 static SwiftTLSContext &getTLSContext() {

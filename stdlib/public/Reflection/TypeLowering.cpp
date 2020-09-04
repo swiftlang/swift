@@ -317,13 +317,13 @@ public:
 
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
                        remote::RemoteAddress address,
-                       int *index) const {
+                       int *index) const override {
     return false;
   }
 
   bool projectEnumValue(remote::MemoryReader &reader,
                        remote::RemoteAddress address,
-                       int *CaseIndex) const {
+                       int *CaseIndex) const override {
     return false;
   }
 };
@@ -337,13 +337,13 @@ public:
 
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
                        remote::RemoteAddress address,
-                       int *index) const {
+                       int *index) const override {
     return false;
   }
 
   bool projectEnumValue(remote::MemoryReader &reader,
                        remote::RemoteAddress address,
-                       int *CaseIndex) const {
+                       int *CaseIndex) const override {
     return false;
   }
 };
@@ -361,14 +361,14 @@ public:
 
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
                        remote::RemoteAddress address,
-                       int *index) const {
+                       int *index) const override {
     *index = -1;
     return true;
   }
 
   bool projectEnumValue(remote::MemoryReader &reader,
                        remote::RemoteAddress address,
-                       int *CaseIndex) const {
+                       int *CaseIndex) const override {
     *CaseIndex = 0;
     return true;
   }
@@ -389,7 +389,7 @@ public:
 
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
                        remote::RemoteAddress address,
-                       int *index) const {
+                       int *index) const override {
     uint32_t tag = 0;
     if (!reader.readInteger(address, getSize(), &tag)) {
       return false;
@@ -404,7 +404,7 @@ public:
 
   bool projectEnumValue(remote::MemoryReader &reader,
                        remote::RemoteAddress address,
-                       int *CaseIndex) const {
+                       int *CaseIndex) const override {
     uint32_t tag = 0;
     if (!reader.readInteger(address, getSize(), &tag)) {
       return false;
@@ -433,7 +433,7 @@ public:
 
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
                        remote::RemoteAddress address,
-                       int *extraInhabitantIndex) const {
+                       int *extraInhabitantIndex) const override {
     FieldInfo PayloadCase = getCases()[0];
     if (getSize() < PayloadCase.TI.getSize()) {
       // Single payload enums that use a separate tag don't export any XIs
@@ -464,7 +464,7 @@ public:
 
   bool projectEnumValue(remote::MemoryReader &reader,
                        remote::RemoteAddress address,
-                       int *CaseIndex) const {
+                       int *CaseIndex) const override {
     auto PayloadCase = getCases()[0];
     auto PayloadSize = PayloadCase.TI.getSize();
     auto DiscriminatorAddress = address + PayloadSize;
@@ -550,7 +550,7 @@ public:
 
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
                        remote::RemoteAddress address,
-                       int *extraInhabitantIndex) const {
+                       int *extraInhabitantIndex) const override {
     unsigned long PayloadSize = getPayloadSize();
     unsigned PayloadCount = getNumPayloadCases();
     unsigned TagSize = getSize() - PayloadSize;
@@ -573,7 +573,7 @@ public:
 
   bool projectEnumValue(remote::MemoryReader &reader,
                         remote::RemoteAddress address,
-                        int *CaseIndex) const {
+                        int *CaseIndex) const override {
     unsigned long PayloadSize = getPayloadSize();
     unsigned PayloadCount = getNumPayloadCases();
     unsigned NumCases = getNumCases();
@@ -802,7 +802,7 @@ public:
 
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
                        remote::RemoteAddress address,
-                       int *extraInhabitantIndex) const {
+                       int *extraInhabitantIndex) const override {
     unsigned long payloadSize = getPayloadSize();
 
     // Multi payload enums that use spare bits export unused tag values as XIs.
@@ -879,7 +879,7 @@ public:
 
   bool projectEnumValue(remote::MemoryReader &reader,
                         remote::RemoteAddress address,
-                        int *CaseIndex) const {
+                        int *CaseIndex) const override {
     unsigned long payloadSize = getPayloadSize();
     unsigned NumPayloadCases = getNumPayloadCases();
 

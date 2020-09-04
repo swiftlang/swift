@@ -10,92 +10,101 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticSuppression.h"
+#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/FileTypes.h"
+#include "swift/Frontend/ModuleInterfaceLoader.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
+#include "swift/Serialization/ModuleDependencyScanner.h"
 #include "swift/Subsystems.h"
 using namespace swift;
 using llvm::ErrorOr;
 
-namespace {
 
-/// A module "loader" that looks for .swiftinterface and .swiftmodule files
-/// for the purpose of determining dependencies, but does not attempt to
-/// load the module files.
-class ModuleDependencyScanner : public SerializedModuleLoaderBase {
-  /// The module we're scanning dependencies of.
-  Identifier moduleName;
+std::error_code ModuleDependencyScanner::findModuleFilesInDirectory(
+                                      AccessPathElem ModuleID,
+                                      const SerializedModuleBaseName &BaseName,
+                                      SmallVectorImpl<char> *ModuleInterfacePath,
+                                      std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+                                      std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+                                      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+                                      bool IsFramework) {
+  using namespace llvm::sys;
 
-  /// Scan the given interface file to determine dependencies.
-  ErrorOr<ModuleDependencies> scanInterfaceFile(
-      Twine moduleInterfacePath);
+  auto &fs = *Ctx.SourceMgr.getFileSystem();
 
-  InterfaceSubContextDelegate &astDelegate;
-public:
-  Optional<ModuleDependencies> dependencies;
+  auto ModPath = BaseName.getName(file_types::TY_SwiftModuleFile);
+  auto InPath = BaseName.getName(file_types::TY_SwiftModuleInterfaceFile);
 
-  ModuleDependencyScanner(ASTContext &ctx, ModuleLoadingMode LoadMode,
-                          Identifier moduleName,
-                          InterfaceSubContextDelegate &astDelegate)
-      : SerializedModuleLoaderBase(ctx, nullptr, LoadMode,
-                                   /*IgnoreSwiftSourceInfoFile=*/true),
-        moduleName(moduleName), astDelegate(astDelegate) { }
-
-  virtual std::error_code findModuleFilesInDirectory(
-      AccessPathElem ModuleID,
-      const SerializedModuleBaseName &BaseName,
-      SmallVectorImpl<char> *ModuleInterfacePath,
-      std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-      std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) override {
-    using namespace llvm::sys;
-
-    auto &fs = *Ctx.SourceMgr.getFileSystem();
-
-    // Compute the full path of the module we're looking for.
-    auto ModPath = BaseName.getName(file_types::TY_SwiftModuleFile);
-    if (LoadMode == ModuleLoadingMode::OnlySerialized) {
-      // If there is no module file, there's nothing we can do.
-      if (!fs.exists(ModPath))
-        return std::make_error_code(std::errc::no_such_file_or_directory);
-
+  if (LoadMode == ModuleLoadingMode::OnlySerialized || !fs.exists(InPath)) {
+    if (fs.exists(ModPath)) {
       // The module file will be loaded directly.
       auto dependencies = scanModuleFile(ModPath);
       if (dependencies) {
         this->dependencies = std::move(dependencies.get());
         return std::error_code();
       }
-
       return dependencies.getError();
-    }
-
-    // Check whether the .swiftinterface exists.
-    auto InPath = BaseName.getName(file_types::TY_SwiftModuleInterfaceFile);
-
-    if (!fs.exists(InPath))
+    } else {
       return std::make_error_code(std::errc::no_such_file_or_directory);
-
-    auto dependencies = scanInterfaceFile(InPath);
-    if (dependencies) {
-      this->dependencies = std::move(dependencies.get());
-      return std::error_code();
     }
-
-    return dependencies.getError();
+  }
+  assert(fs.exists(InPath));
+  // Use the private interface file if exits.
+  auto PrivateInPath =
+  BaseName.getName(file_types::TY_PrivateSwiftModuleInterfaceFile);
+  if (fs.exists(PrivateInPath)) {
+    InPath = PrivateInPath;
+  }
+  auto dependencies = scanInterfaceFile(InPath, IsFramework);
+  if (dependencies) {
+    this->dependencies = std::move(dependencies.get());
+    return std::error_code();
   }
 
-  virtual void collectVisibleTopLevelModuleNames(
-      SmallVectorImpl<Identifier> &names) const override {
-    llvm_unreachable("Not used");
+  return dependencies.getError();
+}
+
+
+std::error_code PlaceholderSwiftModuleScanner::findModuleFilesInDirectory(
+    AccessPathElem ModuleID, const SerializedModuleBaseName &BaseName,
+    SmallVectorImpl<char> *ModuleInterfacePath,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+    bool IsFramework) {
+  StringRef moduleName = ModuleID.Item.str();
+  auto it = PlaceholderDependencyModuleMap.find(moduleName);
+  // If no placeholder module stub path is given matches the name, return with an
+  // error code.
+  if (it == PlaceholderDependencyModuleMap.end()) {
+    return std::make_error_code(std::errc::not_supported);
   }
-};
+  auto &moduleInfo = it->getValue();
+  assert(!moduleInfo.moduleBuffer &&
+         "Placeholder dependency module stubs cannot have an associated buffer");
+
+  auto dependencies = ModuleDependencies::forPlaceholderSwiftModuleStub(
+      moduleInfo.modulePath, moduleInfo.moduleDocPath,
+      moduleInfo.moduleSourceInfoPath);
+  this->dependencies = std::move(dependencies);
+  return std::error_code{};
+}
+
+static std::vector<std::string> getCompiledCandidates(ASTContext &ctx,
+                                                      StringRef moduleName,
+                                                      StringRef interfacePath) {
+  return static_cast<SerializedModuleLoaderBase*>(ctx
+    .getModuleInterfaceLoader())->getCompiledModuleCandidatesForInterface(
+      moduleName.str(), interfacePath);
 }
 
 ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
-    Twine moduleInterfacePath) {
+    Twine moduleInterfacePath, bool isFramework) {
   // Create a module filename.
   // FIXME: Query the module interface loader to determine an appropriate
   // name for the module, which includes an appropriate hash.
@@ -103,22 +112,29 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
   llvm::SmallString<32> modulePath = moduleName.str();
   llvm::sys::path::replace_extension(modulePath, newExt);
   Optional<ModuleDependencies> Result;
-  std::error_code code;
-  auto hasError = astDelegate.runInSubContext(moduleName.str(),
+  std::error_code code =
+    astDelegate.runInSubContext(moduleName.str(),
                                               moduleInterfacePath.str(),
                                               StringRef(),
                                               SourceLoc(),
-                [&](ASTContext &Ctx, ArrayRef<StringRef> Args, StringRef Hash) {
-    Result = ModuleDependencies::forSwiftInterface(modulePath.str().str(),
-                                                   moduleInterfacePath.str(),
+                [&](ASTContext &Ctx, ModuleDecl *mainMod,
+                    ArrayRef<StringRef> Args,
+                    ArrayRef<StringRef> PCMArgs, StringRef Hash) {
+    assert(mainMod);
+    std::string InPath = moduleInterfacePath.str();
+    auto compiledCandidates = getCompiledCandidates(Ctx, moduleName.str(),
+                                                    InPath);
+    Result = ModuleDependencies::forSwiftInterface(InPath,
+                                                   compiledCandidates,
                                                    Args,
-                                                   Hash);
+                                                   PCMArgs,
+                                                   Hash,
+                                                   isFramework);
     // Open the interface file.
     auto &fs = *Ctx.SourceMgr.getFileSystem();
     auto interfaceBuf = fs.getBufferForFile(moduleInterfacePath);
     if (!interfaceBuf) {
-      code = interfaceBuf.getError();
-      return true;
+      return interfaceBuf.getError();
     }
 
     // Create a source file.
@@ -130,10 +146,17 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
     // Walk the source file to find the import declarations.
     llvm::StringSet<> alreadyAddedModules;
     Result->addModuleDependencies(*sourceFile, alreadyAddedModules);
-    return false;
+
+    // Collect implicitly imported modules in case they are not explicitly
+    // printed in the interface file, e.g. SwiftOnoneSupport.
+    auto &imInfo = mainMod->getImplicitImportInfo();
+    for (auto name: imInfo.ModuleNames) {
+      Result->addModuleDependency(name.str(), &alreadyAddedModules);
+    }
+    return std::error_code();
   });
 
-  if (hasError) {
+  if (code) {
     return code;
   }
   return *Result;
@@ -146,15 +169,34 @@ Optional<ModuleDependencies> SerializedModuleLoaderBase::getModuleDependencies(
   if (auto found = cache.findDependencies(
           moduleName, ModuleDependenciesKind::Swift))
     return found;
+  if (auto found =
+          cache.findDependencies(moduleName, ModuleDependenciesKind::SwiftPlaceholder))
+    return found;
+
+  auto moduleId = Ctx.getIdentifier(moduleName);
+  // Instantiate dependency scanning "loaders".
+  SmallVector<std::unique_ptr<ModuleDependencyScanner>, 2> scanners;
+  // Placeholder dependencies must be resolved first, to prevent the ModuleDependencyScanner
+  // from first discovering artifacts of a previous build. Such artifacts are captured
+  // as compiledModuleCandidates in the dependency graph of the placeholder dependency module
+  // itself.
+  scanners.push_back(std::make_unique<PlaceholderSwiftModuleScanner>(
+      Ctx, LoadMode, moduleId, Ctx.SearchPathOpts.PlaceholderDependencyModuleMap,
+      delegate));
+  scanners.push_back(std::make_unique<ModuleDependencyScanner>(
+      Ctx, LoadMode, moduleId, delegate));
 
   // Check whether there is a module with this name that we can import.
-  auto moduleId = Ctx.getIdentifier(moduleName);
-  ModuleDependencyScanner scanner(Ctx, LoadMode, moduleId, delegate);
-  if (!scanner.canImportModule({moduleId, SourceLoc()}))
-    return None;
+  assert(isa<PlaceholderSwiftModuleScanner>(scanners[0].get()) &&
+         "Expected PlaceholderSwiftModuleScanner as the first dependency scanner loader.");
+  for (auto &scanner : scanners) {
+    if (scanner->canImportModule({moduleId, SourceLoc()})) {
+      // Record the dependencies.
+      cache.recordDependencies(moduleName, *(scanner->dependencies),
+                               scanner->dependencyKind);
+      return std::move(scanner->dependencies);
+    }
+  }
 
-  // Record the dependencies.
-  cache.recordDependencies(moduleName, *scanner.dependencies,
-                           ModuleDependenciesKind::Swift);
-  return std::move(scanner.dependencies);
+  return None;
 }

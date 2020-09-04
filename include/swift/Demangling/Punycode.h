@@ -28,11 +28,13 @@
 #define SWIFT_DEMANGLING_PUNYCODE_H
 
 #include "llvm/ADT/StringRef.h"
+#include "swift/Demangling/NamespaceMacros.h"
 #include <vector>
 #include <cstdint>
 
 namespace swift {
 namespace Punycode {
+SWIFT_BEGIN_INLINE_NAMESPACE
 
 using llvm::StringRef;
 
@@ -58,6 +60,7 @@ bool encodePunycodeUTF8(StringRef InputUTF8, std::string &OutPunycode,
 
 bool decodePunycodeUTF8(StringRef InputPunycode, std::string &OutUTF8);
 
+SWIFT_END_INLINE_NAMESPACE
 } // end namespace Punycode
 } // end namespace swift
 

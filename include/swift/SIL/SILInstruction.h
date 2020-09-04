@@ -375,6 +375,12 @@ public:
     /// The instruction may read memory.
     MayRead,
     /// The instruction may write to memory.
+    /// This includes destroying or taking from memory (e.g. destroy_addr,
+    /// copy_addr [take], load [take]).
+    /// Although, physically, destroying or taking does not modify the memory,
+    /// it is important to model it is a write. Optimizations must not assume
+    /// that the value stored in memory is still available for loading after
+    /// the memory is destroyed or taken.
     MayWrite,
     /// The instruction may read or write memory.
     MayReadWrite,
@@ -3207,6 +3213,20 @@ public:
       : InstructionBase(DebugLoc, Ty, nullptr) {}
 };
 
+/// Creates a base address for offset calculations.
+class BaseAddrForOffsetInst
+    : public InstructionBase<SILInstructionKind::BaseAddrForOffsetInst,
+                             LiteralInst> {
+  friend SILBuilder;
+
+  BaseAddrForOffsetInst(SILDebugLocation DebugLoc, SILType Ty)
+      : InstructionBase(DebugLoc, Ty) {}
+
+public:
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
+};
+
 /// Gives the value of a global variable.
 ///
 /// The referenced global variable must be a statically initialized object.
@@ -3287,7 +3307,6 @@ public:
   enum class Encoding {
     Bytes,
     UTF8,
-    UTF16,
     /// UTF-8 encoding of an Objective-C selector.
     ObjCSelector,
   };
@@ -4556,6 +4575,23 @@ class UncheckedBitwiseCastInst final
          SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
 };
 
+/// Bitwise copy a value into another value of the same size.
+class UncheckedValueCastInst final
+    : public UnaryInstructionWithTypeDependentOperandsBase<
+          SILInstructionKind::UncheckedValueCastInst, UncheckedValueCastInst,
+          OwnershipForwardingConversionInst> {
+  friend SILBuilder;
+
+  UncheckedValueCastInst(SILDebugLocation DebugLoc, SILValue Operand,
+                         ArrayRef<SILValue> TypeDependentOperands, SILType Ty)
+      : UnaryInstructionWithTypeDependentOperandsBase(
+            DebugLoc, Operand, TypeDependentOperands, Ty,
+            Operand.getOwnershipKind()) {}
+  static UncheckedValueCastInst *
+  create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
+         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+};
+
 /// Build a Builtin.BridgeObject from a heap object reference by bitwise-or-ing
 /// in bits from a word.
 class RefToBridgeObjectInst
@@ -5750,6 +5786,13 @@ public:
     auto s = getOperand(0)->getType().getNominalOrBoundGenericNominal();
     assert(s);
     return s;
+  }
+
+  static bool classof(const SILNode *node) {
+    SILNodeKind kind = node->getKind();
+    return kind == SILNodeKind::StructExtractInst ||
+           kind == SILNodeKind::StructElementAddrInst ||
+           kind == SILNodeKind::RefElementAddrInst;
   }
 
 private:
@@ -8165,17 +8208,21 @@ private:
   friend SILBuilder;
   /// Differentiability parameter indices.
   IndexSubset *ParameterIndices;
+  /// Differentiability result indices.
+  IndexSubset *ResultIndices;
   /// Indicates whether derivative function operands (JVP/VJP) exist.
   bool HasDerivativeFunctions;
 
   DifferentiableFunctionInst(SILDebugLocation DebugLoc,
                              IndexSubset *ParameterIndices,
+                             IndexSubset *ResultIndices,
                              SILValue OriginalFunction,
                              ArrayRef<SILValue> DerivativeFunctions,
                              bool HasOwnership);
 
   static SILType getDifferentiableFunctionType(SILValue OriginalFunction,
-                                               IndexSubset *ParameterIndices);
+                                               IndexSubset *ParameterIndices,
+                                               IndexSubset *ResultIndices);
 
   static ValueOwnershipKind
   getMergedOwnershipKind(SILValue OriginalFunction,
@@ -8184,7 +8231,7 @@ private:
 public:
   static DifferentiableFunctionInst *
   create(SILModule &Module, SILDebugLocation Loc, IndexSubset *ParameterIndices,
-         SILValue OriginalFunction,
+         IndexSubset *ResultIndices, SILValue OriginalFunction,
          Optional<std::pair<SILValue, SILValue>> VJPAndJVPFunctions,
          bool HasOwnership);
 
@@ -8193,6 +8240,9 @@ public:
 
   /// Returns differentiability parameter indices.
   IndexSubset *getParameterIndices() const { return ParameterIndices; }
+
+  /// Returns differentiability result indices.
+  IndexSubset *getResultIndices() const { return ResultIndices; }
 
   /// Returns true if derivative functions (JVP/VJP) exist.
   bool hasDerivativeFunctions() const { return HasDerivativeFunctions; }
@@ -8314,14 +8364,11 @@ public:
 /// representing a bundle of the original function and the transpose function,
 /// extract the specified function.
 class LinearFunctionExtractInst
-    : public InstructionBase<
-          SILInstructionKind::LinearFunctionExtractInst,
-          SingleValueInstruction> {
+    : public UnaryInstructionBase<SILInstructionKind::LinearFunctionExtractInst,
+                                  SingleValueInstruction> {
 private:
   /// The extractee.
   LinearDifferentiableFunctionTypeComponent extractee;
-  /// The list containing the `@differentiable(linear)` function operand.
-  FixedOperandList<1> operands;
 
   static SILType
   getExtracteeType(SILValue function,
@@ -8337,10 +8384,6 @@ public:
   LinearDifferentiableFunctionTypeComponent getExtractee() const {
     return extractee;
   }
-
-  SILValue getFunctionOperand() const { return operands[0].get(); }
-  ArrayRef<Operand> getAllOperands() const { return operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return operands.asArray(); }
 };
 
 /// DifferentiabilityWitnessFunctionInst - Looks up a differentiability witness

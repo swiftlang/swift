@@ -25,8 +25,6 @@ protocol P {
 sil hidden @nrvo : $@convention(thin) <T where T : P> (Bool) -> @out T {
 bb0(%0 : $*T, %1 : $Bool):
   %2 = alloc_stack $T, var, name "ro"                 // users: %9, %15, %17, %19
-  debug_value_addr %0 : $*T
-  debug_value_addr %2 : $*T
   %3 = struct_extract %1 : $Bool, #Bool._value     // user: %4
   cond_br %3, bb1, bb2                            // id: %4
 
@@ -50,7 +48,6 @@ bb3:                                              // Preds: bb1 bb2
   copy_addr [take] %2 to [initialization] %0 : $*T // id: %17
   %18 = tuple ()                                  // user: %20
   debug_value_addr %0 : $*T
-  debug_value_addr %2 : $*T
   dealloc_stack %2 : $*T         // id: %19
   return %18 : $()                                // id: %20
 }
@@ -94,6 +91,8 @@ bb0(%0 : $*T):
   %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   debug_value_addr %l1 : $*T
   dealloc_stack %l1 : $*T
+  // forwardPropagateCopy should cleanup debug_value_addr. See rdar://66000188
+
   debug_value_addr %0 : $*T
   destroy_addr %0 : $*T
   %r1 = tuple ()
@@ -152,8 +151,6 @@ bb0(%0 : $*T):
   copy_addr [take] %0 to [initialization] %l1 : $*T
   %f1 = function_ref @f_in : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
-  debug_value_addr %0 : $*T
-  debug_value_addr %l1 : $*T
   dealloc_stack %l1 : $*T
   %r1 = tuple ()
   return %r1 : $()
@@ -172,8 +169,6 @@ bb0(%0 : $*T):
   copy_addr [take] %0 to %l1 : $*T
   %f2 = function_ref @f_in : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   %c2 = apply %f2<T>(%l1) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
-  debug_value_addr %0 : $*T
-  debug_value_addr %l1 : $*T
   dealloc_stack %l1 : $*T
   %r1 = tuple ()
   return %r1 : $()
@@ -192,6 +187,7 @@ bb0(%0 : $*T):
   debug_value_addr %l1 : $*T
   copy_addr %l1 to [initialization] %0 : $*T
   debug_value_addr %0 : $*T
+  // backwardPropagateCopy should cleanup debug_value_addr. See rdar://66000188
   debug_value_addr %l1 : $*T
   destroy_addr %l1 : $*T
   dealloc_stack %l1 : $*T
@@ -209,10 +205,10 @@ br bb1(%0: $*T)
 bb1(%1 : $*T):
   %f1 = function_ref @f_out : $@convention(thin) <τ_0_0> () -> @out τ_0_0
   %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> () -> @out τ_0_0
-  debug_value_addr %0 : $*T
+  debug_value_addr %1 : $*T
   debug_value_addr %l1 : $*T
-  copy_addr %l1 to [initialization] %0 : $*T
-  debug_value_addr %0 : $*T
+  copy_addr %l1 to [initialization] %1 : $*T
+  debug_value_addr %1 : $*T
   debug_value_addr %l1 : $*T
   destroy_addr %l1 : $*T
   dealloc_stack %l1 : $*T
@@ -613,6 +609,7 @@ public struct S<T> {
 // CHECK-LABEL: deadtemp
 // CHECK: %[[G:.*]] = struct_element_addr %0 : $*S<T>, #S.g
 // CHECK-NOT: copy_addr
+// CHECK-NOT: debug_value_addr
 // CHECK: %[[F:.*]] = struct_element_addr %0 : $*S<T>, #S.f
 // CHECK: copy_addr %[[G]] to %[[F]] : $*T
 // CHECK: return
@@ -621,6 +618,7 @@ bb0(%0 : $*S<T>):
   %1 = struct_element_addr %0 : $*S<T>, #S.g
   %2 = alloc_stack $T
   copy_addr %1 to [initialization] %2 : $*T
+  debug_value_addr %2 : $*T
   %4 = struct_element_addr %0 : $*S<T>, #S.f
   copy_addr [take] %2 to %4 : $*T
   dealloc_stack %2 : $*T
@@ -914,4 +912,44 @@ bb1:
   release_value %obj : $AClass
   %v = tuple ()
   return %v : $()
+}
+
+// Test an "illegal" reinitialization of a stack location. This
+// happens because lowering .int_fma_FPIEEE32 knows that the type is
+// trivial, so avoids deinitialization. rdar://64671864.
+//
+// Note: we have given up on enforcing known SIL-patterns in
+// CopyForwarding. Instead, we just remove restructions whenever we see
+// unexpected patterns. Eventually, we will replace it with an OSSA
+// pass and enforce all assumptions about SIL patterns in the verifier.
+
+// CHECK-LABEL: sil @testCPF : $@convention(thin) (Float) -> @out Float {
+// CHECK: bb0(%0 : $*Float, %1 : $Float):
+// CHECK:   [[TMP1:%.*]] = alloc_stack $Float
+// CHECK:   store %1 to [[TMP1]] : $*Float
+// CHECK:   [[TMP2:%.*]] = alloc_stack $Float
+// CHECK-NOT: copy_addr
+// CHECK:   [[FMA:%.*]] = builtin "int_fma_FPIEEE32"
+// CHECK:   [[RESULT:%.*]] = struct $Float ([[FMA]] : $Builtin.FPIEEE32)
+// CHECK:   store [[RESULT]] to %0 : $*Float
+// CHECK-NOT: copy_addr
+// CHECK-NOT: destroy_addr
+// CHECK-LABEL: } // end sil function 'testCPF'
+sil @testCPF : $@convention(thin) (Float) -> @out Float {
+bb0(%0 : $*Float, %1 : $Float):
+  %2 = alloc_stack $Float
+  store %1 to %2 : $*Float
+  %4 = alloc_stack $Float
+  copy_addr %2 to [initialization] %4 : $*Float
+  %6 = struct_extract %1 : $Float, #Float._value
+  %7 = builtin "int_fma_FPIEEE32"(%6 : $Builtin.FPIEEE32, %6 : $Builtin.FPIEEE32, %6 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+  %8 = struct $Float (%7 : $Builtin.FPIEEE32)
+  store %8 to %4 : $*Float
+  copy_addr %4 to [initialization] %0 : $*Float
+  destroy_addr %4 : $*Float
+  dealloc_stack %4 : $*Float
+  destroy_addr %2 : $*Float
+  dealloc_stack %2 : $*Float
+  %15 = tuple ()
+  return %15 : $()
 }

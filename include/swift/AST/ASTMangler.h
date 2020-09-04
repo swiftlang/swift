@@ -101,7 +101,8 @@ public:
                            SymbolKind SKind = SymbolKind::Default);
 
   std::string mangleDestructorEntity(const DestructorDecl *decl,
-                                     bool isDeallocating, SymbolKind SKind);
+                                     bool isDeallocating,
+                                     SymbolKind SKind = SymbolKind::Default);
 
   std::string mangleConstructorEntity(const ConstructorDecl *ctor,
                                       bool isAllocating,
@@ -120,11 +121,11 @@ public:
 
   std::string mangleDefaultArgumentEntity(const DeclContext *func,
                                           unsigned index,
-                                          SymbolKind SKind);
+                                          SymbolKind SKind = SymbolKind::Default);
 
   std::string mangleInitializerEntity(const VarDecl *var, SymbolKind SKind);
   std::string mangleBackingInitializerEntity(const VarDecl *var,
-                                             SymbolKind SKind);
+                                             SymbolKind SKind = SymbolKind::Default);
 
   std::string mangleNominalType(const NominalTypeDecl *decl);
 
@@ -145,7 +146,8 @@ public:
 
   std::string mangleGlobalVariableFull(const VarDecl *decl);
 
-  std::string mangleGlobalInit(const VarDecl *decl, int counter,
+  std::string mangleGlobalInit(const PatternBindingDecl *decl,
+                               unsigned entry,
                                bool isInitFunc);
 
   std::string mangleReabstractionThunkHelper(CanSILFunctionType ThunkType,
@@ -211,6 +213,9 @@ public:
                                       ResilienceExpansion expansion);
 
   std::string mangleTypeForDebugger(Type decl, const DeclContext *DC);
+
+  /// Create a mangled name to be used for _typeName constant propagation.
+  std::string mangleTypeForTypeName(Type type);
 
   std::string mangleOpaqueTypeDescriptor(const OpaqueTypeDecl *decl);
   

@@ -24,18 +24,22 @@ class raw_ostream;
 namespace swift {
 class FileUnit;
 class ModuleDecl;
+class TBDGenDescriptor;
 
 /// Options for controlling the exact set of symbols included in the TBD
 /// output.
 struct TBDGenOptions {
   /// Whether this compilation has multiple IRGen instances.
-  bool HasMultipleIGMs;
+  bool HasMultipleIGMs = false;
 
   /// Whether this compilation is producing a TBD for InstallAPI.
-  bool IsInstallAPI;
+  bool IsInstallAPI = false;
 
   /// Only collect linker directive symbols.
   bool LinkerDirectivesOnly = false;
+
+  /// Whether to include only symbols with public linkage.
+  bool PublicSymbolsOnly = true;
 
   /// The install_name to use in the TBD file.
   std::string InstallName;
@@ -65,6 +69,7 @@ struct TBDGenOptions {
     return lhs.HasMultipleIGMs == rhs.HasMultipleIGMs &&
            lhs.IsInstallAPI == rhs.IsInstallAPI &&
            lhs.LinkerDirectivesOnly == rhs.LinkerDirectivesOnly &&
+           lhs.PublicSymbolsOnly == rhs.PublicSymbolsOnly &&
            lhs.InstallName == rhs.InstallName &&
            lhs.ModuleLinkName == rhs.ModuleLinkName &&
            lhs.CurrentVersion == rhs.CurrentVersion &&
@@ -81,17 +86,15 @@ struct TBDGenOptions {
     using namespace llvm;
     return hash_combine(
         opts.HasMultipleIGMs, opts.IsInstallAPI, opts.LinkerDirectivesOnly,
-        opts.InstallName, opts.ModuleLinkName, opts.CurrentVersion,
-        opts.CompatibilityVersion, opts.ModuleInstallNameMapPath,
+        opts.PublicSymbolsOnly, opts.InstallName, opts.ModuleLinkName,
+        opts.CurrentVersion, opts.CompatibilityVersion,
+        opts.ModuleInstallNameMapPath,
         hash_combine_range(opts.embedSymbolsFromModules.begin(),
                            opts.embedSymbolsFromModules.end()));
   }
 };
 
-void enumeratePublicSymbols(FileUnit *module, llvm::StringSet<> &symbols,
-                            const TBDGenOptions &opts);
-void enumeratePublicSymbols(ModuleDecl *module, llvm::StringSet<> &symbols,
-                            const TBDGenOptions &opts);
+std::vector<std::string> getPublicSymbols(TBDGenDescriptor desc);
 
 void writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
                   const TBDGenOptions &opts);

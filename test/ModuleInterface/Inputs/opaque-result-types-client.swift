@@ -20,7 +20,7 @@ func someTypeIsTheSame() {
   a = foo("") // expected-error{{cannot assign value of type 'some Foo' (result of 'foo') to type 'some Foo' (result of 'foo')}}
 
   var b = foo("")
-  b = foo(0) // expected-error{{cannot assign value of type 'some Foo' (result of 'foo') to type 'some Foo' (result of 'foo')}}
+  b = foo(0) // expected-error{{no 'foo' candidates produce the expected contextual result type 'some Foo'}}
   b = foo("")
 
   var c = foo(MyFoo())
@@ -33,7 +33,7 @@ func someTypeIsTheSame() {
 
   var d = barInt.foo(0)
   d = barInt.foo(0)
-  d = barString.foo(0) // expected-error{{cannot assign}}
+  d = barString.foo(0) // expected-error{{no 'foo' candidates produce the expected contextual result type 'some Foo'}}
   d = getAssocType(barInt)
   d = getAssocType(barString) // expected-error{{cannot assign}}
   
@@ -50,7 +50,7 @@ func someTypeIsTheSame() {
   d3 = getAssocSubscriptType(barString) // expected-error{{cannot assign}}
 
   var e = barString.foo(0)
-  e = barInt.foo(0) // expected-error{{cannot assign}}
+  e = barInt.foo(0) // expected-error{{no 'foo' candidates produce the expected contextual result type 'some Foo'}}
   e = barString.foo(0)
   e = getAssocType(barInt) // expected-error{{cannot assign}}
   e = getAssocType(barString)

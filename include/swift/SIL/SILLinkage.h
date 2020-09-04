@@ -15,6 +15,9 @@
 
 #include "llvm/Support/ErrorHandling.h"
 
+// FIXME: Remove after fixmeWitnessHasLinkageThatNeedsToBePublic is removed.
+#include "swift/SIL/SILDeclRef.h"
+
 namespace swift {
 
 class ValueDecl;
@@ -263,6 +266,22 @@ inline SILLinkage effectiveLinkageForClassMember(SILLinkage linkage,
     break;
   }
   return linkage;
+}
+
+// FIXME: This should not be necessary, but it looks like visibility rules for
+// extension members are slightly bogus, and so some protocol witness thunks
+// need to be public.
+//
+// We allow a 'public' member of an extension to witness a public
+// protocol requirement, even if the extended type is not public;
+// then SILGen gives the member private linkage, ignoring the more
+// visible access level it was given in the AST.
+inline bool
+fixmeWitnessHasLinkageThatNeedsToBePublic(SILDeclRef witness) {
+  auto witnessLinkage = witness.getLinkage(ForDefinition);
+  return !hasPublicVisibility(witnessLinkage)
+         && (!hasSharedVisibility(witnessLinkage)
+             || !witness.isSerialized());
 }
 
 } // end swift namespace

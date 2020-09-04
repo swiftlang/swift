@@ -118,15 +118,17 @@ public:
     }
   }
 
-  /// Returns true if there is a single address user of the value.
-  bool hasSingleAddressUse(SILInstruction *SingleAddressUser) {
+  /// Returns true if there are only address users of the value.
+  bool hasOnlyAddressUses(ApplyInst *use1, ApplyInst *use2) {
     if (!AggregateAddressUsers.empty())
       return false;
     if (!ElementAddressUsers.empty())
       return false;
-    if (StructAddressUsers.size() != 1)
-      return false;
-    return StructAddressUsers[0] == SingleAddressUser;
+    for (SILInstruction *user : StructAddressUsers) {
+      if (user != use1 && user != use2)
+        return false;
+    }
+    return true;
   }
 
 protected:

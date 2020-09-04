@@ -51,14 +51,15 @@ struct SerializedModuleBaseName {
   std::string getName(file_types::ID fileTy) const;
 };
 
-/// Common functionality shared between \c SerializedModuleLoader,
-/// \c ModuleInterfaceLoader and \c MemoryBufferSerializedModuleLoader.
+/// Common functionality shared between \c ImplicitSerializedModuleLoader,
+/// \c ModuleInterfaceLoader, \c ExplicitSwiftModuleLoader
+/// and \c MemoryBufferSerializedModuleLoader.
 class SerializedModuleLoaderBase : public ModuleLoader {
   /// A { module, generation # } pair.
   using LoadedModulePair = std::pair<std::unique_ptr<ModuleFile>, unsigned>;
   std::vector<LoadedModulePair> LoadedModuleFiles;
 
-  SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 2> OrphanedMemoryBuffers;
+  SmallVector<std::unique_ptr<ModuleFile>, 2> OrphanedModuleFiles;
 
 protected:
   ASTContext &Ctx;
@@ -72,12 +73,12 @@ protected:
                                              StringRef extension) const;
 
   using AccessPathElem = Located<Identifier>;
-  bool findModule(AccessPathElem moduleID,
-                  SmallVectorImpl<char> *moduleInterfacePath,
-                  std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
-                  std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
-                  std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-                  bool &isFramework, bool &isSystemModule);
+  virtual bool findModule(AccessPathElem moduleID,
+                          SmallVectorImpl<char> *moduleInterfacePath,
+                          std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
+                          std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
+                          std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
+                          bool &isFramework, bool &isSystemModule);
 
   /// Attempts to search the provided directory for a loadable serialized
   /// .swiftmodule with the provided `ModuleFilename`. Subclasses must
@@ -97,7 +98,8 @@ protected:
       SmallVectorImpl<char> *ModuleInterfacePath,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) = 0;
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+      bool IsFramework) = 0;
 
   std::error_code
   openModuleFile(
@@ -138,6 +140,9 @@ protected:
   /// Scan the given serialized module file to determine dependencies.
   llvm::ErrorOr<ModuleDependencies> scanModuleFile(Twine modulePath);
 
+  /// Load the module file into a buffer and also collect its module name.
+  static std::unique_ptr<llvm::MemoryBuffer>
+  getModuleName(ASTContext &Ctx, StringRef modulePath, std::string &Name);
 public:
   virtual ~SerializedModuleLoaderBase();
   SerializedModuleLoaderBase(const SerializedModuleLoaderBase &) = delete;
@@ -197,12 +202,24 @@ public:
   virtual Optional<ModuleDependencies> getModuleDependencies(
       StringRef moduleName, ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate) override;
+
+  virtual std::vector<std::string>
+  getCompiledModuleCandidatesForInterface(StringRef moduleName,
+                                          StringRef interfacePath) {
+    return std::vector<std::string>();
+  }
+  virtual bool tryEmitForwardingModule(StringRef moduleName,
+                                       StringRef interfacePath,
+                                       ArrayRef<std::string> candidates,
+                                       StringRef outPath) {
+    return false;
+  }
 };
 
 /// Imports serialized Swift modules into an ASTContext.
-class SerializedModuleLoader : public SerializedModuleLoaderBase {
+class ImplicitSerializedModuleLoader : public SerializedModuleLoaderBase {
 
-  SerializedModuleLoader(ASTContext &ctx, DependencyTracker *tracker,
+  ImplicitSerializedModuleLoader(ASTContext &ctx, DependencyTracker *tracker,
                          ModuleLoadingMode loadMode, bool IgnoreSwiftSourceInfo)
     : SerializedModuleLoaderBase(ctx, tracker, loadMode, IgnoreSwiftSourceInfo)
   {}
@@ -213,7 +230,8 @@ class SerializedModuleLoader : public SerializedModuleLoaderBase {
       SmallVectorImpl<char> *ModuleInterfacePath,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) override;
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+      bool IsFramework) override;
 
   bool maybeDiagnoseTargetMismatch(
       SourceLoc sourceLocation,
@@ -221,7 +239,7 @@ class SerializedModuleLoader : public SerializedModuleLoaderBase {
       const SerializedModuleBaseName &BaseName) override;
 
 public:
-  virtual ~SerializedModuleLoader();
+  virtual ~ImplicitSerializedModuleLoader();
 
   /// Append visible module names to \p names. Note that names are possibly
   /// duplicated, and not guaranteed to be ordered in any way.
@@ -230,12 +248,12 @@ public:
 
   /// Create a new importer that can load serialized Swift modules
   /// into the given ASTContext.
-  static std::unique_ptr<SerializedModuleLoader>
+  static std::unique_ptr<ImplicitSerializedModuleLoader>
   create(ASTContext &ctx, DependencyTracker *tracker = nullptr,
          ModuleLoadingMode loadMode = ModuleLoadingMode::PreferSerialized,
          bool IgnoreSwiftSourceInfo = false) {
-    return std::unique_ptr<SerializedModuleLoader>{
-      new SerializedModuleLoader(ctx, tracker, loadMode, IgnoreSwiftSourceInfo)
+    return std::unique_ptr<ImplicitSerializedModuleLoader>{
+      new ImplicitSerializedModuleLoader(ctx, tracker, loadMode, IgnoreSwiftSourceInfo)
     };
   }
 };
@@ -258,7 +276,8 @@ class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
       SmallVectorImpl<char> *ModuleInterfacePath,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) override;
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+      bool IsFramework) override;
 
   bool maybeDiagnoseTargetMismatch(
       SourceLoc sourceLocation,

@@ -18,8 +18,5 @@
 // RUN: not %api-digester -diagnose-sdk -print-module -baseline-dir %t.baseline -module cake -I %t.mod2 -I %S/Inputs/APINotesLeft -module-cache-path %t.module-cache %clang-importer-sdk-nosource -abi -o %t.result -compiler-style-diags 2> %t.abi.compiler.diags
 // RUN: %FileCheck %s < %t.abi.compiler.diags
 
-// CHECK: cake_current/cake.swift:31:14: error: cake: Class C4 has changed its super class from APINotesTest.OldType to APINotesTest.NewType
-// CHECK: cake_current/cake.swift:33:14: error: cake: Class C5 is now without @objc
-// CHECK: cake_current/cake.swift:35:23: error: cake: Func C5.dy_foo() is now with dynamic
 // CHECK: cake_current/cake.swift:39:15: error: cake: Struct C6 is now with @frozen
 // CHECK: cake_current/cake.swift:41:13: error: cake: Enum IceKind is now without @frozen

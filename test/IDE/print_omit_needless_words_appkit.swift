@@ -18,7 +18,7 @@
 // CHECK-APPKIT: func same() -> Self
 
 // Note: Unsafe(Mutable)Pointers don't get defaulted to 'nil'
-// CHECK-APPKIT: func getRGBAComponents(_: UnsafeMutablePointer<Int8>?)
+// CHECK-APPKIT: func getRGBAComponents(_: UnsafeMutablePointer<CChar>?)
 
 // Note: Skipping over "3D"
 // CHECK-APPKIT: func drawInAir(at: Point3D)

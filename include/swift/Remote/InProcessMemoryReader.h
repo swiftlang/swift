@@ -38,7 +38,7 @@ class InProcessMemoryReader final : public MemoryReader {
 #else
     auto applePlatform = false;
 #endif
-#if defined(__APPLE__) && __APPLE__ && ((defined(TARGET_OS_IOS) && TARGET_OS_IOS) || (defined(TARGET_OS_IOS) && TARGET_OS_WATCH) || (defined(TARGET_OS_TV) && TARGET_OS_TV))
+#if defined(__APPLE__) && __APPLE__ && ((defined(TARGET_OS_IOS) && TARGET_OS_IOS) || (defined(TARGET_OS_IOS) && TARGET_OS_WATCH) || (defined(TARGET_OS_TV) && TARGET_OS_TV) || defined(__arm64__))
     auto iosDerivedPlatform = true;
 #else
     auto iosDerivedPlatform = false;
@@ -67,7 +67,7 @@ class InProcessMemoryReader final : public MemoryReader {
     case DLQ_GetObjCReservedLowBits: {
       auto result = static_cast<uint8_t *>(outBuffer);
       if (applePlatform && !iosDerivedPlatform && (sizeof(void *) == 8)) {
-        // Obj-C reserves low bit on 64-bit macOS only.
+        // Obj-C reserves low bit on 64-bit Intel macOS only.
         // Other Apple platforms don't reserve this bit (even when
         // running on x86_64-based simulators).
         *result = 1;

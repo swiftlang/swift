@@ -496,17 +496,28 @@ NOTE(autodiff_cannot_differentiate_through_multiple_results,none,
      "cannot differentiate through multiple results", ())
 NOTE(autodiff_cannot_differentiate_through_inout_arguments,none,
      "cannot differentiate through 'inout' arguments", ())
-// TODO(TF-1149): Remove this diagnostic.
-NOTE(autodiff_loadable_value_addressonly_tangent_unsupported,none,
-     "cannot yet differentiate value whose type %0 has a compile-time known "
-     "size, but whose 'TangentVector' contains stored properties of unknown "
-     "size; consider modifying %1 to use fewer generic parameters in stored "
-     "properties", (Type, Type))
 NOTE(autodiff_enums_unsupported,none,
      "differentiating enum values is not yet supported", ())
+NOTE(autodiff_stored_property_parent_not_differentiable,none,
+     "cannot differentiate access to property '%0.%1' because '%0' does not "
+     "conform to 'Differentiable'", (StringRef, StringRef))
+NOTE(autodiff_stored_property_not_differentiable,none,
+     "cannot differentiate access to property '%0.%1' because property type %2 "
+     "does not conform to 'Differentiable'", (StringRef, StringRef, Type))
+NOTE(autodiff_stored_property_tangent_not_struct,none,
+     "cannot differentiate access to property '%0.%1' because "
+     "'%0.TangentVector' is not a struct", (StringRef, StringRef))
 NOTE(autodiff_stored_property_no_corresponding_tangent,none,
-     "property cannot be differentiated because '%0.TangentVector' does not "
-     "have a member named '%1'", (StringRef, StringRef))
+     "cannot differentiate access to property '%0.%1' because "
+     "'%0.TangentVector' does not have a stored property named '%1'",
+     (StringRef, StringRef))
+NOTE(autodiff_tangent_property_wrong_type,none,
+     "cannot differentiate access to property '%0.%1' because "
+     "'%0.TangentVector.%1' does not have expected type %2",
+     (StringRef, StringRef, /*originalPropertyTanType*/ Type))
+NOTE(autodiff_tangent_property_not_stored,none,
+     "cannot differentiate access to property '%0.%1' because "
+     "'%0.TangentVector.%1' is not a stored property", (StringRef, StringRef))
 NOTE(autodiff_coroutines_not_supported,none,
      "differentiation of coroutine calls is not yet supported", ())
 NOTE(autodiff_cannot_differentiate_writes_to_global_variables,none,
@@ -525,6 +536,7 @@ ERROR(non_borrowed_indirect_addressof,none,
 
 REMARK(opt_remark_passed, none, "%0", (StringRef))
 REMARK(opt_remark_missed, none, "%0", (StringRef))
+NOTE(opt_remark_note, none, "%0", (StringRef))
 
 // Float-point to integer conversions
 ERROR(float_to_int_overflow, none,

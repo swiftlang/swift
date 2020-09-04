@@ -1,4 +1,5 @@
 // Test the -require-explicit-availability flag
+// REQUIRES: OS=macosx
 
 // RUN: %swiftc_driver -typecheck -parse-stdlib -target x86_64-apple-macosx10.10 -Xfrontend -verify -require-explicit-availability -require-explicit-availability-target "macOS 10.10"  %s
 // RUN: %swiftc_driver -typecheck -parse-stdlib -target x86_64-apple-macosx10.10 -warnings-as-errors %s

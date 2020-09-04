@@ -76,7 +76,6 @@ getIndirectApplyAbstractionPattern(SILGenFunction &SGF,
     // bridged to a foreign type.
     auto bridgedType =
       SGF.SGM.Types.getBridgedFunctionType(pattern, fnType,
-                                           fnType->getExtInfo(),
                                            Bridgeability::Full);
     pattern.rewriteType(CanGenericSignature(), bridgedType);
     return pattern;
@@ -131,8 +130,11 @@ getDynamicMethodLoweredType(SILModule &M,
                             SILDeclRef constant,
                             CanAnyFunctionType substMemberTy) {
   assert(constant.isForeign);
-  auto objcFormalTy = substMemberTy.withExtInfo(substMemberTy->getExtInfo()
-             .withSILRepresentation(SILFunctionTypeRepresentation::ObjCMethod));
+  auto objcFormalTy = substMemberTy.withExtInfo(
+      substMemberTy->getExtInfo()
+          .intoBuilder()
+          .withSILRepresentation(SILFunctionTypeRepresentation::ObjCMethod)
+          .build());
   return SILType::getPrimitiveObjectType(
       M.Types.getUncachedSILFunctionTypeForConstant(
           TypeExpansionContext::minimal(), constant, objcFormalTy));
@@ -315,7 +317,8 @@ private:
   CanFunctionType SubstFormalInterfaceType;
 
   /// The substitutions applied to OrigFormalInterfaceType to produce
-  /// SubstFormalInterfaceType.
+  /// SubstFormalInterfaceType, substituted into the current type expansion
+  /// context.
   SubstitutionMap Substitutions;
 
   /// The list of values captured by our callee.
@@ -351,14 +354,14 @@ private:
   /// Constructor for Callee::forDirect.
   Callee(SILGenFunction &SGF, SILDeclRef standaloneFunction,
          AbstractionPattern origFormalType, CanAnyFunctionType substFormalType,
-         SubstitutionMap subs, SILLocation l,
+         SubstitutionMap subs, SubstitutionMap formalSubs, SILLocation l,
          bool callDynamicallyReplaceableImpl = false)
       : kind(callDynamicallyReplaceableImpl
                  ? Kind::StandaloneFunctionDynamicallyReplaceableImpl
                  : Kind::StandaloneFunction),
         Constant(standaloneFunction), OrigFormalInterfaceType(origFormalType),
         SubstFormalInterfaceType(
-            getSubstFormalInterfaceType(substFormalType, subs)),
+            getSubstFormalInterfaceType(substFormalType, formalSubs)),
         Substitutions(subs), Loc(l) {}
 
   /// Constructor called by all for* factory methods except forDirect and
@@ -387,7 +390,9 @@ public:
     auto &ci = SGF.getConstantInfo(SGF.getTypeExpansionContext(), c);
     return Callee(
         SGF, c, ci.FormalPattern, ci.FormalType,
-        subs.mapIntoTypeExpansionContext(SGF.getTypeExpansionContext()), l,
+        subs.mapIntoTypeExpansionContext(SGF.getTypeExpansionContext()),
+        subs,
+        l,
         callPreviousDynamicReplaceableImpl);
   }
 
@@ -1005,7 +1010,7 @@ public:
       // @objc dynamic initializers are statically dispatched (we're
       // calling the allocating entry point, which is a thunk that
       // does the dynamic dispatch for us).
-      if (ctor->isObjCDynamic())
+      if (ctor->shouldUseObjCDispatch())
         return false;
 
       // Required constructors are statically dispatched when the 'self'
@@ -1340,8 +1345,8 @@ public:
           && loweredResultTy.getASTType()->hasDynamicSelfType()) {
         assert(selfMetaTy);
         selfValue = SGF.emitManagedRValueWithCleanup(
-          SGF.B.createUncheckedBitCast(loc, selfValue.forward(SGF),
-                                       loweredResultTy));
+            SGF.B.createUncheckedReinterpretCast(loc, selfValue.forward(SGF),
+                                                 loweredResultTy));
       } else {
         selfValue = SGF.emitManagedRValueWithCleanup(
             SGF.B.createUpcast(loc, selfValue.forward(SGF), loweredResultTy));
@@ -1622,11 +1627,6 @@ static PreparedArguments emitStringLiteral(SILGenFunction &SGF, Expr *E,
     Length = Str.size();
     break;
 
-  case StringLiteralExpr::UTF16: {
-    instEncoding = StringLiteralInst::Encoding::UTF16;
-    Length = unicode::getUTF16Length(Str);
-    break;
-  }
   case StringLiteralExpr::OneUnicodeScalar: {
     SILType Int32Ty = SILType::getBuiltinIntegerType(32, SGF.getASTContext());
     SILValue UnicodeScalarValue =
@@ -1668,11 +1668,6 @@ static PreparedArguments emitStringLiteral(SILGenFunction &SGF, Expr *E,
   ArrayRef<ManagedValue> Elts;
   ArrayRef<AnyFunctionType::Param> TypeElts;
   switch (instEncoding) {
-  case StringLiteralInst::Encoding::UTF16:
-    Elts = llvm::makeArrayRef(EltsArray).slice(0, 2);
-    TypeElts = llvm::makeArrayRef(TypeEltsArray).slice(0, 2);
-    break;
-
   case StringLiteralInst::Encoding::UTF8:
     Elts = EltsArray;
     TypeElts = TypeEltsArray;
@@ -3857,7 +3852,7 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
     auto emitter = specializedEmitter.getEarlyEmitter();
 
     assert(uncurriedSites.size() == 1);
-    assert(!formalType->getExtInfo().throws());
+    assert(!formalType->getExtInfo().isThrowing());
     SILLocation uncurriedLoc = uncurriedSites[0].Loc;
 
     // We should be able to enforce that these arguments are
@@ -4610,11 +4605,11 @@ StringRef SILGenFunction::getMagicFilePathString(SourceLoc loc) {
   return getSourceManager().getDisplayNameForLoc(loc);
 }
 
-std::string SILGenFunction::getMagicFileString(SourceLoc loc) {
+std::string SILGenFunction::getMagicFileIDString(SourceLoc loc) {
   auto path = getMagicFilePathString(loc);
 
-  auto result = SGM.MagicFileStringsByFilePath.find(path);
-  if (result != SGM.MagicFileStringsByFilePath.end())
+  auto result = SGM.FileIDsByFilePath.find(path);
+  if (result != SGM.FileIDsByFilePath.end())
     return std::get<0>(result->second);
 
   return path.str();
@@ -4848,8 +4843,9 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
 
     auto magicLiteral = cast<MagicIdentifierLiteralExpr>(literal);
     switch (magicLiteral->getKind()) {
-    case MagicIdentifierLiteralExpr::File: {
-      std::string value = loc.isValid() ? getMagicFileString(loc) : "";
+    case MagicIdentifierLiteralExpr::FileIDSpelledAsFile:
+    case MagicIdentifierLiteralExpr::FileID: {
+      std::string value = loc.isValid() ? getMagicFileIDString(loc) : "";
       builtinLiteralArgs = emitStringLiteral(*this, literal, value, C,
                                              magicLiteral->getStringEncoding());
       builtinInit = magicLiteral->getBuiltinInitializer();
@@ -4857,6 +4853,7 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
       break;
     }
 
+    case MagicIdentifierLiteralExpr::FilePathSpelledAsFile:
     case MagicIdentifierLiteralExpr::FilePath: {
       StringRef value = loc.isValid() ? getMagicFilePathString(loc) : "";
       builtinLiteralArgs = emitStringLiteral(*this, literal, value, C,
@@ -4960,6 +4957,31 @@ void SILGenFunction::emitUninitializedArrayDeallocation(SILLocation loc,
   emitApplyOfLibraryIntrinsic(loc, deallocate, subMap,
                               ManagedValue::forUnmanaged(array),
                               SGFContext());
+}
+
+ManagedValue SILGenFunction::emitUninitializedArrayFinalization(SILLocation loc,
+                                                      ManagedValue array) {
+  auto &Ctx = getASTContext();
+  FuncDecl *finalize = Ctx.getFinalizeUninitializedArray();
+  
+  // The _finalizeUninitializedArray function only needs to be called if the
+  // library contains it.
+  // The Array implementation in the stdlib <= 5.3 does not use SIL COW
+  // support yet and therefore does not provide the _finalizeUninitializedArray
+  // intrinsic function.
+  if (!finalize)
+    return array;
+
+  SILValue arrayVal = array.forward(*this);
+  CanType arrayTy = arrayVal->getType().getASTType();
+
+  // Invoke the intrinsic.
+  auto subMap = arrayTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
+                                                   Ctx.getArrayDecl());
+  RValue result = emitApplyOfLibraryIntrinsic(loc, finalize, subMap,
+                              ManagedValue::forUnmanaged(arrayVal),
+                              SGFContext());
+  return std::move(result).getScalarValue();
 }
 
 namespace {
@@ -5411,7 +5433,7 @@ RValue SILGenFunction::emitGetAccessor(SILLocation loc, SILDeclRef get,
     subscriptIndices.emplace({});
 
   emission.addCallSite(loc, std::move(subscriptIndices),
-                       accessType->throws());
+                       accessType->isThrowing());
 
   // T
   return emission.apply(c);
@@ -5453,8 +5475,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
     }
   }
   assert(values.isValid());
-  emission.addCallSite(loc, std::move(values),
-                       accessType->throws());
+  emission.addCallSite(loc, std::move(values), accessType->isThrowing());
   // ()
   emission.apply();
 }
@@ -5488,7 +5509,7 @@ ManagedValue SILGenFunction::emitAddressorAccessor(
     subscriptIndices.emplace({});
 
   emission.addCallSite(loc, std::move(subscriptIndices),
-                       accessType->throws());
+                       accessType->isThrowing());
 
   // Unsafe{Mutable}Pointer<T> or
   // (Unsafe{Mutable}Pointer<T>, Builtin.UnknownPointer) or
@@ -5550,7 +5571,7 @@ SILGenFunction::emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
     subscriptIndices.emplace({});
 
   emission.addCallSite(loc, std::move(subscriptIndices),
-                       accessType->throws());
+                       accessType->isThrowing());
 
   auto endApplyHandle = emission.applyCoroutine(yields);
 

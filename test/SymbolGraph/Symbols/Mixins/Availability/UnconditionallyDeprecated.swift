@@ -6,5 +6,9 @@
 @available(*, deprecated)
 public struct UnconditionallyDeprecated {}
 
-// CHECK-NOT: domain
-// CHECK: "isUnconditionallyDeprecated": true
+// CHECK: "availability": [
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "domain": "*",
+// CHECK-NEXT:     "isUnconditionallyDeprecated": true
+// CHECK-NEXT:   }
+// CHECK-NEXT: ]

@@ -66,18 +66,20 @@ bool isOwnedForwardingInstruction(SILInstruction *inst);
 /// previous terminator.
 bool isOwnedForwardingValue(SILValue value);
 
-struct BorrowingOperandKind {
-  enum Kind {
+class BorrowingOperandKind {
+public:
+  enum Kind : uint8_t {
     BeginBorrow,
     BeginApply,
     Branch,
   };
 
+private:
   Kind value;
 
+public:
   BorrowingOperandKind(Kind newValue) : value(newValue) {}
-  BorrowingOperandKind(const BorrowingOperandKind &other)
-      : value(other.value) {}
+
   operator Kind() const { return value; }
 
   static Optional<BorrowingOperandKind> get(SILInstructionKind kind) {
@@ -194,6 +196,18 @@ struct BorrowingOperand {
   void visitConsumingUsesOfBorrowIntroducingUserResults(
       function_ref<void(Operand *)> visitor) const;
 
+  /// Compute the implicit uses that this borrowing operand "injects" into the
+  /// set of its operands uses.
+  ///
+  /// E.x.: end_apply uses.
+  ///
+  /// \p errorFunction a callback that if non-null is passed an operand that
+  /// triggers a mal-formed SIL error. This is just needed for the ownership
+  /// verifier to emit good output.
+  bool getImplicitUses(
+      SmallVectorImpl<Operand *> &foundUses,
+      std::function<void(Operand *)> *errorFunction = nullptr) const;
+
   void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 
@@ -207,15 +221,20 @@ private:
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const BorrowingOperand &operand);
 
-struct BorrowedValueKind {
+class BorrowedValueKind {
+public:
   /// Enum we use for exhaustive pattern matching over borrow scope introducers.
-  enum Kind {
+  enum Kind : uint8_t {
     LoadBorrow,
     BeginBorrow,
     SILFunctionArgument,
     Phi,
   };
 
+private:
+  Kind value;
+
+public:
   static Optional<BorrowedValueKind> get(SILValue value) {
     if (value.getOwnershipKind() != ValueOwnershipKind::Guaranteed)
       return None;
@@ -240,10 +259,8 @@ struct BorrowedValueKind {
     }
   }
 
-  Kind value;
-
   BorrowedValueKind(Kind newValue) : value(newValue) {}
-  BorrowedValueKind(const BorrowedValueKind &other) : value(other.value) {}
+
   operator Kind() const { return value; }
 
   /// Is this a borrow scope that begins and ends within the same function and
@@ -383,18 +400,20 @@ bool getAllBorrowIntroducingValues(SILValue value,
 /// introducer, then we return a .some(BorrowScopeIntroducingValue).
 Optional<BorrowedValue> getSingleBorrowIntroducingValue(SILValue inputValue);
 
-struct InteriorPointerOperandKind {
+class InteriorPointerOperandKind {
+public:
   enum Kind : uint8_t {
     RefElementAddr,
     RefTailAddr,
     OpenExistentialBox,
   };
 
+private:
   Kind value;
 
+public:
   InteriorPointerOperandKind(Kind newValue) : value(newValue) {}
-  InteriorPointerOperandKind(const InteriorPointerOperandKind &other)
-      : value(other.value) {}
+
   operator Kind() const { return value; }
 
   static Optional<InteriorPointerOperandKind> get(Operand *use) {
@@ -460,6 +479,16 @@ struct InteriorPointerOperand {
     llvm_unreachable("Covered switch isn't covered?!");
   }
 
+  /// Compute the list of implicit uses that this interior pointer operand puts
+  /// on its parent guaranted value.
+  ///
+  /// Example: Uses of a ref_element_addr can not occur outside of the lifetime
+  /// of the instruction's operand. The uses of that address act as liveness
+  /// requirements to ensure that the underlying class is alive at all use
+  /// points.
+  bool getImplicitUses(SmallVectorImpl<Operand *> &foundUses,
+                       std::function<void(Operand *)> *onError = nullptr);
+
 private:
   /// Internal constructor for failable static constructor. Please do not expand
   /// its usage since it assumes the code passed in is well formed.
@@ -467,8 +496,9 @@ private:
       : operand(op), kind(kind) {}
 };
 
-struct OwnedValueIntroducerKind {
-  enum Kind {
+class OwnedValueIntroducerKind {
+public:
+  enum Kind : uint8_t {
     /// An owned value that is a result of an Apply.
     Apply,
 
@@ -498,6 +528,14 @@ struct OwnedValueIntroducerKind {
     /// branch predecessors.
     Phi,
 
+    /// An owned value that is from a struct that has multiple operands that are
+    /// owned.
+    Struct,
+
+    /// An owned value that is from a tuple that has multiple operands that are
+    /// owned.
+    Tuple,
+
     /// An owned value that is a function argument.
     FunctionArgument,
 
@@ -511,6 +549,10 @@ struct OwnedValueIntroducerKind {
     AllocRefInit,
   };
 
+private:
+  Kind value;
+
+public:
   static Optional<OwnedValueIntroducerKind> get(SILValue value) {
     if (value.getOwnershipKind() != ValueOwnershipKind::Owned)
       return None;
@@ -522,6 +564,10 @@ struct OwnedValueIntroducerKind {
       return OwnedValueIntroducerKind(Apply);
     case ValueKind::BeginApplyResult:
       return OwnedValueIntroducerKind(BeginApply);
+    case ValueKind::StructInst:
+      return OwnedValueIntroducerKind(Struct);
+    case ValueKind::TupleInst:
+      return OwnedValueIntroducerKind(Tuple);
     case ValueKind::SILPhiArgument: {
       auto *phiArg = cast<SILPhiArgument>(value);
       if (dyn_cast_or_null<TryApplyInst>(phiArg->getSingleTerminator())) {
@@ -557,11 +603,8 @@ struct OwnedValueIntroducerKind {
     llvm_unreachable("Default should have caught this");
   }
 
-  Kind value;
-
   OwnedValueIntroducerKind(Kind newValue) : value(newValue) {}
-  OwnedValueIntroducerKind(const OwnedValueIntroducerKind &other)
-      : value(other.value) {}
+
   operator Kind() const { return value; }
 
   void print(llvm::raw_ostream &os) const;
@@ -598,8 +641,12 @@ struct OwnedValueIntroducer {
   }
 
   /// Returns true if this owned introducer is able to be converted into a
-  /// guaranteed form if none of its uses are consuming uses (looking through
-  /// forwarding uses).
+  /// guaranteed form if none of its direct uses are consuming uses (looking
+  /// through forwarding uses).
+  ///
+  /// NOTE: Since the direct uses must be non-consuming, this means that any
+  /// "ownership phis" (e.x. branch, struct) must return false here since we can
+  /// not analyze them without analyzing their operands/incoming values.
   bool isConvertableToGuaranteed() const {
     switch (kind) {
     case OwnedValueIntroducerKind::Copy:
@@ -610,6 +657,8 @@ struct OwnedValueIntroducer {
     case OwnedValueIntroducerKind::TryApply:
     case OwnedValueIntroducerKind::LoadTake:
     case OwnedValueIntroducerKind::Phi:
+    case OwnedValueIntroducerKind::Struct:
+    case OwnedValueIntroducerKind::Tuple:
     case OwnedValueIntroducerKind::FunctionArgument:
     case OwnedValueIntroducerKind::PartialApplyInit:
     case OwnedValueIntroducerKind::AllocBoxInit:
@@ -617,6 +666,30 @@ struct OwnedValueIntroducer {
       return false;
     }
     llvm_unreachable("Covered switch isn't covered?!");
+  }
+
+  /// Returns true if this introducer when converted to guaranteed is expected
+  /// to have guaranteed operands that are consumed by the instruction.
+  ///
+  /// E.x.: phi, struct.
+  bool hasConsumingGuaranteedOperands() const {
+    switch (kind) {
+    case OwnedValueIntroducerKind::Phi:
+      return true;
+    case OwnedValueIntroducerKind::Struct:
+    case OwnedValueIntroducerKind::Tuple:
+    case OwnedValueIntroducerKind::Copy:
+    case OwnedValueIntroducerKind::LoadCopy:
+    case OwnedValueIntroducerKind::Apply:
+    case OwnedValueIntroducerKind::BeginApply:
+    case OwnedValueIntroducerKind::TryApply:
+    case OwnedValueIntroducerKind::LoadTake:
+    case OwnedValueIntroducerKind::FunctionArgument:
+    case OwnedValueIntroducerKind::PartialApplyInit:
+    case OwnedValueIntroducerKind::AllocBoxInit:
+    case OwnedValueIntroducerKind::AllocRefInit:
+      return false;
+    }
   }
 
   bool operator==(const OwnedValueIntroducer &other) const {

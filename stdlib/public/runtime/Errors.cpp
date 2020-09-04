@@ -137,7 +137,7 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName,
 
 void swift::dumpStackTraceEntry(unsigned index, void *framePC,
                                 bool shortOutput) {
-#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
+#if SWIFT_SUPPORTS_BACKTRACE_REPORTING && !defined(SWIFT_RUNTIME_MACHO_NO_DYLD)
   SymbolInfo syminfo;
 
   // 0 is failure for lookupSymbol
@@ -223,8 +223,8 @@ static _Unwind_Reason_Code SwiftUnwindFrame(struct _Unwind_Context *context, voi
 }
 #endif
 
-SWIFT_NOINLINE
-void swift::printCurrentBacktrace(unsigned framesToSkip) {
+SWIFT_ALWAYS_INLINE
+static bool withCurrentBacktraceImpl(std::function<void(void **, int)> call) {
 #if SWIFT_SUPPORTS_BACKTRACE_REPORTING
   constexpr unsigned maxSupportedStackDepth = 128;
   void *addrs[maxSupportedStackDepth];
@@ -237,12 +237,27 @@ void swift::printCurrentBacktrace(unsigned framesToSkip) {
 #else
   int symbolCount = backtrace(addrs, maxSupportedStackDepth);
 #endif
-  for (int i = framesToSkip; i < symbolCount; ++i) {
-    dumpStackTraceEntry(i - framesToSkip, addrs[i]);
-  }
+  call(addrs, symbolCount);
+  return true;
 #else
-  fprintf(stderr, "<backtrace unavailable>\n");
+  return false;
 #endif
+}
+
+SWIFT_NOINLINE
+bool swift::withCurrentBacktrace(std::function<void(void **, int)> call) {
+  return withCurrentBacktraceImpl(call);
+}
+
+SWIFT_NOINLINE
+void swift::printCurrentBacktrace(unsigned framesToSkip) {
+  bool success = withCurrentBacktraceImpl([&](void **addrs, int symbolCount) {
+    for (int i = framesToSkip; i < symbolCount; ++i) {
+      dumpStackTraceEntry(i - framesToSkip, addrs[i]);
+    }
+  });
+  if (!success)
+    fprintf(stderr, "<backtrace unavailable>\n");
 }
 
 #ifdef SWIFT_HAVE_CRASHREPORTERCLIENT

@@ -1,3 +1,3 @@
 @_exported import CoreFoundation
 
-protocol _CFObject {}
+protocol _CFObject: Hashable {}

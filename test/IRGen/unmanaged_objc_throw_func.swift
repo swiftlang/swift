@@ -15,11 +15,11 @@ import Foundation
     // CHECK-NEXT: %[[T2:.+]] = extractvalue { %swift.bridge*, i8* } %[[T0]], 1
     // CHECK-NEXT: %[[T3:.+]] = bitcast i8* %[[T2]] to %TSi*
     // CHECK-NEXT: %._value = getelementptr inbounds %TSi, %TSi* %[[T3]], i32 0, i32 0
-    // CHECK-NEXT: store i{{32|64}} 1, i{{32|64}}* %._value, align {{[0-9]+}}
-    // CHECK-NEXT: %[[T4:.+]] = call swiftcc %TSo7NSArrayC* @"$sSa10FoundationE19_bridgeToObjectiveCSo7NSArrayCyF"(%swift.bridge* %[[T1]], %swift.type* @"$sSiN")
+    // CHECK:      %[[T7:.+]] = call swiftcc %swift.bridge* @"$ss27_finalizeUninitializedArrayySayxGABnlF"(%swift.bridge* %[[T1]], %swift.type* @"$sSiN")
+    // CHECK:      %[[T4:.+]] = call swiftcc %TSo7NSArrayC* @"$sSa10FoundationE19_bridgeToObjectiveCSo7NSArrayCyF"(%swift.bridge* %[[T7]], %swift.type* @"$sSiN")
     // CHECK-NEXT: %[[T5:.+]] = bitcast %TSo7NSArrayC* %[[T4]] to %TSo10CFArrayRefa*
     // CHECK-NEXT: store %TSo10CFArrayRefa* %[[T5]]
-    // CHECK-NEXT: call void @swift_bridgeObjectRelease(%swift.bridge* %[[T1]]) #{{[0-9]+}}
+    // CHECK-NEXT: call void @swift_bridgeObjectRelease(%swift.bridge* %{{[0-9]+}}) #{{[0-9]+}}
     // CHECK-NEXT: %[[T6:.+]] = bitcast %TSo10CFArrayRefa* %[[T5]] to i8*
     // CHECK-NEXT: call void @llvm.objc.release(i8* %[[T6]])
     // CHECK-NEXT: ret %TSo10CFArrayRefa* %[[T5]]

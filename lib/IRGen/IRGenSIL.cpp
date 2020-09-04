@@ -37,6 +37,7 @@
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVisitor.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "llvm/ADT/MapVector.h"
@@ -696,6 +697,29 @@ public:
     return !isa<llvm::Constant>(Storage);
   }
 
+#ifndef NDEBUG
+  /// Check if \p Val can be stored into \p Alloca, and emit some diagnostic
+  /// info if it can't.
+  bool canAllocaStoreValue(Address Alloca, llvm::Value *Val,
+                           SILDebugVariable VarInfo,
+                           const SILDebugScope *Scope) {
+    bool canStore =
+        cast<llvm::PointerType>(Alloca->getType())->getElementType() ==
+        Val->getType();
+    if (canStore)
+      return true;
+    llvm::errs() << "Invalid shadow copy:\n"
+                 << "  Value : " << *Val << "\n"
+                 << "  Alloca: " << *Alloca.getAddress() << "\n"
+                 << "---\n"
+                 << "Previous shadow copy into " << VarInfo.Name
+                 << " in the same scope!\n"
+                 << "Scope:\n";
+    Scope->print(getSILModule());
+    return false;
+  }
+#endif
+
   /// Unconditionally emit a stack shadow copy of an \c llvm::Value.
   llvm::Value *emitShadowCopy(llvm::Value *Storage, const SILDebugScope *Scope,
                               SILDebugVariable VarInfo, llvm::Optional<Alignment> _Align) {
@@ -706,7 +730,8 @@ public:
     if (!Alloca.isValid())
       Alloca = createAlloca(Storage->getType(), Align, VarInfo.Name + ".debug");
     zeroInit(cast<llvm::AllocaInst>(Alloca.getAddress()));
-
+    assert(canAllocaStoreValue(Alloca, Storage, VarInfo, Scope) &&
+           "bad scope?");
     ArtificialLocation AutoRestore(Scope, IGM.DebugInfo.get(), Builder);
     Builder.CreateStore(Storage, Alloca.getAddress(), Align);
     return Alloca.getAddress();
@@ -793,6 +818,17 @@ public:
                                     SILType SILTy, const SILDebugScope *DS,
                                     VarDecl *VarDecl, SILDebugVariable VarInfo,
                                     IndirectionKind Indirection = DirectValue) {
+    // TODO: fix demangling for C++ types (SR-13223).
+    if (swift::TypeBase *ty = SILTy.getASTType().getPointer()) {
+      if (MetatypeType *metaTy = dyn_cast<MetatypeType>(ty))
+        ty = metaTy->getRootClass().getPointer();
+      if (ty->getStructOrBoundGenericStruct() &&
+          ty->getStructOrBoundGenericStruct()->getClangDecl() &&
+          isa<clang::CXXRecordDecl>(
+              ty->getStructOrBoundGenericStruct()->getClangDecl()))
+        return;
+    }
+
     assert(IGM.DebugInfo && "debug info not enabled");
     if (VarInfo.ArgNo) {
       PrologueLocation AutoRestore(IGM.DebugInfo.get(), Builder);
@@ -844,6 +880,7 @@ public:
   void visitAllocGlobalInst(AllocGlobalInst *i);
   void visitGlobalAddrInst(GlobalAddrInst *i);
   void visitGlobalValueInst(GlobalValueInst *i);
+  void visitBaseAddrForOffsetInst(BaseAddrForOffsetInst *i);
 
   void visitIntegerLiteralInst(IntegerLiteralInst *i);
   void visitFloatLiteralInst(FloatLiteralInst *i);
@@ -1001,6 +1038,9 @@ public:
   void visitUncheckedAddrCastInst(UncheckedAddrCastInst *i);
   void visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *i);
   void visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *i);
+  void visitUncheckedValueCastInst(UncheckedValueCastInst *i) {
+    llvm_unreachable("Should never be seen in Lowered SIL");
+  }
   void visitRefToRawPointerInst(RefToRawPointerInst *i);
   void visitRawPointerToRefInst(RawPointerToRefInst *i);
   void visitThinToThickFunctionInst(ThinToThickFunctionInst *i);
@@ -1852,7 +1892,8 @@ void IRGenSILFunction::visitDifferentiableFunctionInst(
     auto origFnType =
         i->getOriginalFunction()->getType().castTo<SILFunctionType>();
     auto derivativeFnType = origFnType->getAutoDiffDerivativeFunctionType(
-        i->getParameterIndices(), /*resultIndex*/ 0, kind, i->getModule().Types,
+        i->getParameterIndices(), i->getResultIndices(), kind,
+        i->getModule().Types,
         LookUpConformanceInModule(i->getModule().getSwiftModule()));
     auto *undef = SILUndef::get(
         SILType::getPrimitiveObjectType(derivativeFnType), *i->getFunction());
@@ -1896,12 +1937,12 @@ void IRGenSILFunction::
 visitLinearFunctionExtractInst(LinearFunctionExtractInst *i) {
   unsigned structFieldOffset = i->getExtractee().rawValue;
   unsigned fieldSize = 1;
-  auto fnRepr = i->getFunctionOperand()->getType().getFunctionRepresentation();
+  auto fnRepr = i->getOperand()->getType().getFunctionRepresentation();
   if (fnRepr == SILFunctionTypeRepresentation::Thick) {
     structFieldOffset *= 2;
     fieldSize = 2;
   }
-  auto diffFnExp = getLoweredExplosion(i->getFunctionOperand());
+  auto diffFnExp = getLoweredExplosion(i->getOperand());
   assert(diffFnExp.size() == fieldSize * 2);
   Explosion e;
   e.add(diffFnExp.getRange(structFieldOffset, structFieldOffset + fieldSize));
@@ -2047,6 +2088,12 @@ void IRGenSILFunction::visitGlobalValueInst(GlobalValueInst *i) {
   Explosion e;
   e.add(InitRef);
   setLoweredExplosion(i, e);
+}
+
+void IRGenSILFunction::visitBaseAddrForOffsetInst(BaseAddrForOffsetInst *i) {
+  auto storagePtrTy = IGM.getStoragePointerType(i->getType());
+  llvm::Value *addr = llvm::ConstantPointerNull::get(storagePtrTy);
+  setLoweredAddress(i, Address(addr, Alignment()));
 }
 
 void IRGenSILFunction::visitMetatypeInst(swift::MetatypeInst *i) {

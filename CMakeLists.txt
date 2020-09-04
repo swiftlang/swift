@@ -54,6 +54,10 @@ include(CheckSymbolExists)
 # This is primarily to support building smaller or faster project files.
 #
 
+option(SWIFT_APPEND_VC_REV
+  "Embed the version control system revision in Swift"
+  TRUE)
+
 option(SWIFT_INCLUDE_TOOLS
     "Generate build targets for swift tools"
     TRUE)
@@ -365,6 +369,10 @@ option(SWIFT_REPORT_STATISTICS
     "Create json files which contain internal compilation statistics"
     FALSE)
 
+option(SWIFT_DISABLE_OBJC_INTEROP
+    "Disable Objective-C interoperability even on platforms what would normally have it"
+    FALSE)
+
 #
 # User-configurable experimental options.  Do not use in production builds.
 #
@@ -382,10 +390,6 @@ option(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
   "Should the runtime be built with support for non-thread-safe leak detecting entrypoints"
   FALSE)
 
-option(SWIFT_STDLIB_USE_NONATOMIC_RC
-    "Build the standard libraries and overlays with nonatomic reference count operations enabled"
-    FALSE)
-
 option(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS
   "Enable runtime function counters and expose the API."
   FALSE)
@@ -396,6 +400,10 @@ option(SWIFT_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING
 
 option(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING
   "Enable experimental Swift differentiable programming features"
+  FALSE)
+
+option(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+  "Enable experimental Swift concurrency model"
   FALSE)
 
 #
@@ -458,6 +466,12 @@ if(SWIFT_PATH_TO_CMARK_BUILD)
 endif()
 message(STATUS "")
 
+if("${SWIFT_NATIVE_LLVM_TOOLS_PATH}" STREQUAL "")
+  set(SWIFT_CROSS_COMPILING FALSE)
+else()
+  set(SWIFT_CROSS_COMPILING TRUE)
+endif()
+
 include(SwiftSharedCMakeConfig)
 
 # NOTE: We include this before SwiftComponents as it relies on some LLVM CMake
@@ -485,16 +499,6 @@ swift_configure_components()
 include(SwiftToolchainUtils)
 if(NOT SWIFT_LIPO)
   find_toolchain_tool(SWIFT_LIPO "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" lipo)
-endif()
-
-# Reset CMAKE_SYSTEM_PROCESSOR if not cross-compiling.
-# CMake refuses to use `uname -m` on OS X
-# http://public.kitware.com/Bug/view.php?id=10326
-if(NOT CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_PROCESSOR STREQUAL "i386")
-  execute_process(
-      COMMAND "uname" "-m"
-      OUTPUT_VARIABLE CMAKE_SYSTEM_PROCESSOR
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
 endif()
 
 get_filename_component(SWIFT_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR} REALPATH)
@@ -623,6 +627,22 @@ swift_common_cxx_warnings()
 # Check if we're build with MSVC or Clang-cl, as these compilers have similar command line arguments.
 if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC" OR "${CMAKE_CXX_SIMULATE_ID}" STREQUAL "MSVC")
   set(SWIFT_COMPILER_IS_MSVC_LIKE TRUE)
+endif()
+
+if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+  # CMake's default for CMAKE_CXX_FLAGS_RELEASE is "-O3 -DNDEBUG". Let's avoid "-O3" for consistency
+  # between Release and RelWithDebInfo. Dropping -DNDEBUG from this setting is blocked by triggering
+  # a test failure of Swift-Unit :: Syntax/./SwiftSyntaxTests/TypeSyntaxTests.MetatypeTypeWithAPIs
+  # because unit tests don't currently explicitly set -DNDEBUG/-UNDEBUG.
+  set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG")
+
+  _compute_lto_flag("${SWIFT_TOOLS_ENABLE_LTO}" _lto_flag_out)
+  if(_lto_flag_out)
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_RELEASE} -gline-tables-only")
+    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -gline-tables-only")
+  endif()
+else()
+  
 endif()
 
 #
@@ -852,6 +872,7 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "")
 
   message(STATUS "Differentiable Programming Support: ${SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING}")
+  message(STATUS "Concurrency Support: ${SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY}")
   message(STATUS "")
 else()
   message(STATUS "Not building Swift standard library, SDK overlays, and runtime")
@@ -893,14 +914,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   endif()
 endif()
 
-find_package(Python2 COMPONENTS Interpreter REQUIRED)
-find_package(Python3 COMPONENTS Interpreter)
-if(NOT Python3_Interpreter_FOUND)
-  message(WARNING "Python3 not found, using python2 as a fallback")
-  add_executable(Python3::Interpreter IMPORTED)
-  set_target_properties(Python3::Interpreter PROPERTIES
-    IMPORTED_LOCATION ${Python2_EXECUTABLE})
-endif()
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
 
 #
 # Find optional dependencies.
@@ -1111,6 +1125,15 @@ if(SWIFT_INCLUDE_TOOLS)
   # Refer to the large comment above the add_subdirectory(stdlib) call.
   # https://bugs.swift.org/browse/SR-5975
   add_subdirectory(tools)
+
+  # Localization targets are configured in a way that assume the swift
+  # frontend is being built, so trying to include them for other builds
+  # (like stdlib) fail!
+  #
+  # Diagnostics information is only useful for the frontend compiler
+  # anyway, so let's only include it if the compiler is being built,
+  # which at the moment seems like if SWIFT_INCLUDE_TOOLS is defined.
+  add_subdirectory(localization)
 endif()
 
 add_subdirectory(utils)

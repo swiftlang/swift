@@ -14,8 +14,8 @@
 #ifndef LLVM_SUPPORT_POINTERLIKETYPETRAITS_H
 #define LLVM_SUPPORT_POINTERLIKETYPETRAITS_H
 
-#include "llvm/Support/DataTypes.h"
 #include <cassert>
+#include <cstdint>
 #include <type_traits>
 
 inline namespace __swift { inline namespace __runtime {

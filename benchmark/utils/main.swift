@@ -96,18 +96,19 @@ import LuhnAlgoEager
 import LuhnAlgoLazy
 import MapReduce
 import Memset
+import Mirror
 import MonteCarloE
 import MonteCarloPi
 import NibbleSort
 import NIOChannelPipeline
 import NSDictionaryCastToSwift
 import NSError
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if canImport(Darwin)
 import NSStringConversion
 #endif
 import NopDeinit
 import ObjectAllocation
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if canImport(Darwin)
 import ObjectiveCBridging
 import ObjectiveCBridgingStubs
 #if !(SWIFT_PACKAGE || Xcode)
@@ -130,6 +131,7 @@ import PrefixWhile
 import Prims
 import PrimsNonStrongRef
 import PrimsSplit
+import ProtocolConformance
 import ProtocolDispatch
 import ProtocolDispatch2
 import Queue
@@ -281,18 +283,19 @@ registerBenchmark(LuhnAlgoEager)
 registerBenchmark(LuhnAlgoLazy)
 registerBenchmark(MapReduce)
 registerBenchmark(Memset)
+registerBenchmark(MirrorDefault)
 registerBenchmark(MonteCarloE)
 registerBenchmark(MonteCarloPi)
 registerBenchmark(NSDictionaryCastToSwift)
 registerBenchmark(NSErrorTest)
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if canImport(Darwin)
 registerBenchmark(NSStringConversion)
 #endif
 registerBenchmark(NibbleSort)
 registerBenchmark(NIOChannelPipeline)
 registerBenchmark(NopDeinit)
 registerBenchmark(ObjectAllocation)
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if canImport(Darwin)
 registerBenchmark(ObjectiveCBridging)
 registerBenchmark(ObjectiveCBridgingStubs)
 #if !(SWIFT_PACKAGE || Xcode)
@@ -315,6 +318,7 @@ registerBenchmark(PrefixWhile)
 registerBenchmark(Prims)
 registerBenchmark(PrimsNonStrongRef)
 registerBenchmark(PrimsSplit)
+registerBenchmark(ProtocolConformance)
 registerBenchmark(ProtocolDispatch)
 registerBenchmark(ProtocolDispatch2)
 registerBenchmark(QueueGeneric)
@@ -366,6 +370,7 @@ registerBenchmark(Suffix)
 registerBenchmark(SuperChars)
 registerBenchmark(TwoSum)
 registerBenchmark(TypeFlood)
+registerBenchmark(TypeName)
 registerBenchmark(UTF8Decode)
 registerBenchmark(Walsh)
 registerBenchmark(WordCount)

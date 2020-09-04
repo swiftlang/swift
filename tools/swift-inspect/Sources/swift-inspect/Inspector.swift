@@ -67,11 +67,19 @@ class Inspector {
   }
   
   func getAddr(symbolName: String) -> swift_addr_t {
-    let symbol = CSSymbolOwnerGetSymbolWithMangledName(swiftCore, symbolName)
+    let symbol = CSSymbolOwnerGetSymbolWithMangledName(swiftCore,
+                                                       "_" + symbolName)
     let range = CSSymbolGetRange(symbol)
     return swift_addr_t(range.location)
   }
-  
+
+  func getSymbol(address: swift_addr_t) -> (name: String?, library: String?) {
+    let symbol = CSSymbolicatorGetSymbolWithAddressAtTime(symbolicator, address,
+                                                          kCSNow)
+    return (CSSymbolGetName(symbol),
+            CSSymbolOwnerGetName(CSSymbolGetSymbolOwner(symbol)))
+  }
+
   enum Callbacks {
     static let QueryDataLayout: @convention(c)
       (UnsafeMutableRawPointer?,
@@ -113,13 +121,39 @@ private func QueryDataLayoutFn(context: UnsafeMutableRawPointer?,
                               type: DataLayoutQueryType,
                               inBuffer: UnsafeMutableRawPointer?,
                               outBuffer: UnsafeMutableRawPointer?) -> CInt {
+  let is64 = MemoryLayout<UnsafeRawPointer>.stride == 8
+
   switch type {
-    case DLQ_GetPointerSize:
-      let size = UInt8(MemoryLayout<UnsafeRawPointer>.stride)
-      outBuffer!.storeBytes(of: size, toByteOffset: 0, as: UInt8.self)
-      return 1
-    default:
-      return 0
+  case DLQ_GetPointerSize, DLQ_GetSizeSize:
+    let size = UInt8(MemoryLayout<UnsafeRawPointer>.stride)
+    outBuffer!.storeBytes(of: size, toByteOffset: 0, as: UInt8.self)
+    return 1
+  case DLQ_GetPtrAuthMask:
+    let mask = GetPtrauthMask()
+    outBuffer!.storeBytes(of: mask, toByteOffset: 0, as: UInt.self)
+    return 1
+  case DLQ_GetObjCReservedLowBits:
+    var size: UInt8 = 0
+#if os(macOS)
+    // The low bit is reserved only on 64-bit macOS.
+    if is64 {
+      size = 1
+    }
+#endif
+    outBuffer!.storeBytes(of: size, toByteOffset: 0, as: UInt8.self)
+    return 1
+  case DLQ_GetLeastValidPointerValue:
+    var value: UInt64 = 0x1000
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+    // 64-bit Apple platforms reserve the low 4GB.
+    if is64 {
+      value = 0x100000000
+    }
+#endif
+    outBuffer!.storeBytes(of: value, toByteOffset: 0, as: UInt64.self)
+    return 1
+  default:
+    return 0
   }
 }
 

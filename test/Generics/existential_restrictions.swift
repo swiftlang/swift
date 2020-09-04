@@ -23,7 +23,7 @@ func fAOE(_ t: AnyObject) { }
 func fT<T>(_ t: T) { }
 
 func testPassExistential(_ p: P, op: OP, opp: OP & P, cp: CP, sp: SP, any: Any, ao: AnyObject) {
-  fP(p) // expected-error{{value of protocol type 'P' cannot conform to 'P'; only struct/enum/class types can conform to protocols}}
+  fP(p) // expected-error{{protocol 'P' as a type cannot conform to the protocol itself; only concrete types such as structs, enums and classes can conform to protocols}}
   fAO(p) // expected-error{{global function 'fAO' requires that 'P' be a class type}}
   fAOE(p) // expected-error{{argument type 'P' expected to be an instance of a class or class-constrained type}}
   fT(p)
@@ -37,8 +37,8 @@ func testPassExistential(_ p: P, op: OP, opp: OP & P, cp: CP, sp: SP, any: Any, 
   fAOE(cp)
   fT(cp)
 
-  fP(opp) // expected-error{{value of protocol type 'OP & P' cannot conform to 'P'; only struct/enum/class types can conform to protocols}}
-  fOP(opp) // expected-error{{value of protocol type 'OP & P' cannot conform to 'OP'; only struct/enum/class types can conform to protocols}}
+  fP(opp) // expected-error{{protocol 'OP & P' as a type cannot conform to 'P'; only concrete types such as structs, enums and classes can conform to protocols}}
+  fOP(opp) // expected-error{{protocol 'OP & P' as a type cannot conform to 'OP'; only concrete types such as structs, enums and classes can conform to protocols}}
   fAO(opp) // expected-error{{global function 'fAO' requires that 'OP & P' be a class type}}
   fAOE(opp)
   fT(opp)
@@ -64,9 +64,9 @@ class GAO<T : AnyObject> {} // expected-note 2{{requirement specified as 'T' : '
 func blackHole(_ t: Any) {}
 
 func testBindExistential() {
-  blackHole(GP<P>()) // expected-error{{value of protocol type 'P' cannot conform to 'P'; only struct/enum/class types can conform to protocols}}
+  blackHole(GP<P>()) // expected-error{{protocol 'P' as a type cannot conform to the protocol itself; only concrete types such as structs, enums and classes can conform to protocols}}
   blackHole(GOP<OP>())
-  blackHole(GCP<CP>()) // expected-error{{value of protocol type 'CP' cannot conform to 'CP'; only struct/enum/class types can conform to protocols}}
+  blackHole(GCP<CP>()) // expected-error{{protocol 'CP' as a type cannot conform to the protocol itself; only concrete types such as structs, enums and classes can conform to protocols}}
   blackHole(GAO<P>()) // expected-error{{'GAO' requires that 'P' be a class type}}
   blackHole(GAO<OP>())
   blackHole(GAO<CP>()) // expected-error{{'GAO' requires that 'CP' be a class type}}
@@ -92,5 +92,5 @@ func foo() {
   // generic no overloads error path. The error should actually talk
   // about the return type, and this can happen in other contexts as well;
   // <rdar://problem/21900971> tracks improving QoI here.
-  allMine.takeAll() // expected-error{{value of protocol type 'Mine' cannot conform to 'Mine'; only struct/enum/class types can conform to protocols}}
+  allMine.takeAll() // expected-error{{protocol 'Mine' as a type cannot conform to the protocol itself; only concrete types such as structs, enums and classes can conform to protocols}}
 }

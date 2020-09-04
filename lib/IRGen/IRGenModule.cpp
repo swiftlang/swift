@@ -90,26 +90,11 @@ static llvm::PointerType *createStructPointerType(IRGenModule &IGM,
   return createStructType(IGM, name, types)->getPointerTo(DefaultAS);
 };
 
-static clang::CodeGenOptions::FramePointerKind
-shouldUseFramePointer(const IRGenOptions &Opts, const llvm::Triple &triple) {
-  if (Opts.DisableFPElim) {
-    // General frame pointer elimination is disabled.
-    // Should we at least eliminate in leaf functions?
-    // Currently we only do that on arm64 (this matches the behavior of clang).
-    return Opts.DisableFPElimLeaf
-               ? clang::CodeGenOptions::FramePointerKind::All
-               : triple.isAArch64()
-                     ? clang::CodeGenOptions::FramePointerKind::NonLeaf
-                     : clang::CodeGenOptions::FramePointerKind::All;
-  }
-
-  return clang::CodeGenOptions::FramePointerKind::None;
-}
-
-static clang::CodeGenerator *
-createClangCodeGenerator(ASTContext &Context, llvm::LLVMContext &LLVMContext,
-                         const IRGenOptions &Opts, StringRef ModuleName,
-                         StringRef PD, const llvm::Triple &triple) {
+static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
+                                                 llvm::LLVMContext &LLVMContext,
+                                                      const IRGenOptions &Opts,
+                                                      StringRef ModuleName,
+                                                      StringRef PD) {
   auto Loader = Context.getClangModuleLoader();
   auto *Importer = static_cast<ClangImporter*>(&*Loader);
   assert(Importer && "No clang module loader!");
@@ -117,7 +102,7 @@ createClangCodeGenerator(ASTContext &Context, llvm::LLVMContext &LLVMContext,
 
   auto &CGO = Importer->getClangCodeGenOpts();
   CGO.OptimizationLevel = Opts.shouldOptimize() ? 3 : 0;
-  CGO.setFramePointer(shouldUseFramePointer(Opts, triple));
+
   CGO.DiscardValueNames = !Opts.shouldProvideValueNames();
   switch (Opts.DebugInfoLevel) {
   case IRGenDebugInfoLevel::None:
@@ -207,17 +192,17 @@ static void sanityCheckStdlib(IRGenModule &IGM) {
 
 IRGenModule::IRGenModule(IRGenerator &irgen,
                          std::unique_ptr<llvm::TargetMachine> &&target,
-                         SourceFile *SF, StringRef ModuleName,
-                         StringRef OutputFilename,
+                         SourceFile *SF,
+                         StringRef ModuleName, StringRef OutputFilename,
                          StringRef MainInputFilenameForDebugInfo,
                          StringRef PrivateDiscriminator)
-    : LLVMContext(new llvm::LLVMContext()), IRGen(irgen),
-      Context(irgen.SIL.getASTContext()),
+    : LLVMContext(new llvm::LLVMContext()),
+      IRGen(irgen), Context(irgen.SIL.getASTContext()),
       // The LLVMContext (and the IGM itself) will get deleted by the IGMDeleter
       // as long as the IGM is registered with the IRGenerator.
-      ClangCodeGen(createClangCodeGenerator(Context, *LLVMContext, irgen.Opts,
-                                            ModuleName, PrivateDiscriminator,
-                                            irgen.getEffectiveClangTriple())),
+      ClangCodeGen(createClangCodeGenerator(Context, *LLVMContext,
+                                            irgen.Opts,
+                                            ModuleName, PrivateDiscriminator)),
       Module(*ClangCodeGen->GetModule()),
       DataLayout(irgen.getClangDataLayout()),
       Triple(irgen.getEffectiveClangTriple()), TargetMachine(std::move(target)),
@@ -286,6 +271,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     MetadataKindTy          // MetadataKind Kind;
   });
   TypeMetadataPtrTy = TypeMetadataStructTy->getPointerTo(DefaultAS);
+  TypeMetadataPtrPtrTy = TypeMetadataPtrTy->getPointerTo(DefaultAS);
 
   TypeMetadataResponseTy = createStructType(*this, "swift.metadata_response", {
     TypeMetadataPtrTy,
@@ -665,6 +651,36 @@ namespace RuntimeConstants {
     }
     return RuntimeAvailability::AlwaysAvailable;
   }
+
+  RuntimeAvailability
+  CompareTypeContextDescriptorsAvailability(ASTContext &Context) {
+    auto featureAvailability =
+        Context.getCompareTypeContextDescriptorsAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability
+  CompareProtocolConformanceDescriptorsAvailability(ASTContext &Context) {
+    auto featureAvailability =
+        Context.getCompareProtocolConformanceDescriptorsAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability
+  GetCanonicalSpecializedMetadataAvailability(ASTContext &context) {
+    auto featureAvailability =
+        context.getIntermodulePrespecializedGenericMetadataAvailability();
+    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
 } // namespace RuntimeConstants
 
 // We don't use enough attributes to justify generalizing the
@@ -929,6 +945,7 @@ GeneratedModule IRGenModule::intoGeneratedModule() && {
   return GeneratedModule{
     std::move(LLVMContext),
     std::unique_ptr<llvm::Module>{ClangCodeGen->ReleaseModule()},
+    std::move(TargetMachine)
   };
 }
 
@@ -999,28 +1016,13 @@ bool swift::irgen::shouldRemoveTargetFeature(StringRef feature) {
   return feature == "+thumb-mode";
 }
 
-void IRGenModule::setHasFramePointer(llvm::AttrBuilder &Attrs,
-                                     bool HasFramePointer) {
-  if (!HasFramePointer) {
-    Attrs.addAttribute("frame-pointer", "none");
-    return;
-  }
-  if (IRGen.Opts.DisableFPElimLeaf) {
-    Attrs.addAttribute("frame-pointer", "all");
-    return;
-  }
-
-  // We omit frame pointers for leaf functions only for arm64 for now (matching
-  // clang's behavior).
-  auto framePointer =
-      IRGen.getEffectiveClangTriple().isAArch64() ? "non-leaf" : "all";
-  Attrs.addAttribute("frame-pointer", framePointer);
+void IRGenModule::setHasNoFramePointer(llvm::AttrBuilder &Attrs) {
+  Attrs.addAttribute("frame-pointer", "none");
 }
 
-void IRGenModule::setHasFramePointer(llvm::Function *F,
-                                     bool HasFramePointer) {
+void IRGenModule::setHasNoFramePointer(llvm::Function *F) {
   llvm::AttrBuilder b;
-  setHasFramePointer(b, HasFramePointer);
+  setHasNoFramePointer(b);
   F->addAttributes(llvm::AttributeList::FunctionIndex, b);
 }
 
@@ -1030,10 +1032,6 @@ void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
   // Add the default attributes for the Clang configuration.
   clang::CodeGen::addDefaultFunctionDefinitionAttributes(getClangCGM(), Attrs);
 
-  // Add frame pointer attributes.
-  // FIXME: why are we doing this?
-  setHasFramePointer(Attrs, IRGen.Opts.DisableFPElim);
-  
   // Add/remove MinSize based on the appropriate setting.
   if (FuncOptMode == OptimizationMode::NotSet)
     FuncOptMode = IRGen.Opts.OptMode;
@@ -1122,8 +1120,6 @@ llvm::SmallString<32> getTargetDependentLibraryOption(const llvm::Triple &T,
 }
 
 void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
-  llvm::LLVMContext &ctx = Module.getContext();
-
   // The debugger gets the autolink information directly from
   // the LinkLibraries of the module, so there's no reason to
   // emit it into the IR of debugger expressions.
@@ -1132,10 +1128,7 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
   
   switch (linkLib.getKind()) {
   case LibraryKind::Library: {
-    llvm::SmallString<32> opt =
-        getTargetDependentLibraryOption(Triple, linkLib.getName());
-    AutolinkEntries.push_back(
-        llvm::MDNode::get(ctx, llvm::MDString::get(ctx, opt)));
+    AutolinkEntries.emplace_back(linkLib);
     break;
   }
   case LibraryKind::Framework: {
@@ -1144,12 +1137,7 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
     if (std::find(frameworks.begin(), frameworks.end(), linkLib.getName())
           != frameworks.end())
       return;
-
-    llvm::Metadata *args[] = {
-      llvm::MDString::get(ctx, "-framework"),
-      llvm::MDString::get(ctx, linkLib.getName())
-    };
-    AutolinkEntries.push_back(llvm::MDNode::get(ctx, args));
+    AutolinkEntries.emplace_back(linkLib);
     break;
   }
   }
@@ -1219,38 +1207,132 @@ static bool isFirstObjectFileInModule(IRGenModule &IGM) {
   return containingModule->getFiles().front() == file;
 }
 
-void IRGenModule::emitAutolinkInfo() {
-  // Collect the linker options already in the module (from ClangCodeGen).
+static bool
+doesTargetAutolinkUsingAutolinkExtract(const SwiftTargetInfo &TargetInfo,
+                                       const llvm::Triple &Triple) {
+  if (TargetInfo.OutputObjectFormat == llvm::Triple::ELF && !Triple.isPS4())
+    return true;
+
+  if (TargetInfo.OutputObjectFormat == llvm::Triple::Wasm)
+    return true;
+
+  if (Triple.isOSCygMing())
+    return true;
+
+  return false;
+}
+
+namespace {
+
+struct AutolinkKind {
+  enum ValueTy {
+    LLVMLinkerOptions,
+    LLVMDependentLibraries,
+    SwiftAutoLinkExtract,
+  };
+
+  ValueTy Value;
+
+  AutolinkKind(ValueTy value) : Value(value) {}
+  AutolinkKind(const AutolinkKind &kind) : Value(kind.Value) {}
+
+  StringRef getSectionNameMetadata();
+
+  template <typename Vector, typename Set>
+  void collectEntriesFromLibraries(llvm::SetVector<llvm::MDNode *, Vector, Set> &Entries,
+                                   ArrayRef<LinkLibrary> AutolinkEntries,
+                                   IRGenModule &IGM);
+
+  template <typename Vector, typename Set>
+  void writeEntries(llvm::SetVector<llvm::MDNode *, Vector, Set> Entries,
+                    llvm::NamedMDNode *Metadata, IRGenModule &IGM);
+
+  static AutolinkKind create(const SwiftTargetInfo &TargetInfo,
+                             llvm::Triple Triple, IRGenLLVMLTOKind LLVMLTOKind);
+};
+
+} // anonymous namespace
+
+StringRef AutolinkKind::getSectionNameMetadata() {
   // FIXME: This constant should be vended by LLVM somewhere.
-  auto *Metadata = Module.getOrInsertNamedMetadata("llvm.linker.options");
-  for (llvm::MDNode *LinkOption : Metadata->operands())
-    AutolinkEntries.push_back(LinkOption);
+  switch (Value) {
+  case AutolinkKind::LLVMDependentLibraries:
+    return "llvm.dependent-libraries";
+  case AutolinkKind::LLVMLinkerOptions:
+  case AutolinkKind::SwiftAutoLinkExtract:
+    return "llvm.linker.options";
+  }
 
-  // Remove duplicates.
-  llvm::SmallPtrSet<llvm::MDNode *, 4> knownAutolinkEntries;
-  AutolinkEntries.erase(std::remove_if(AutolinkEntries.begin(),
-                                       AutolinkEntries.end(),
-                                       [&](llvm::MDNode *entry) -> bool {
-                                         return !knownAutolinkEntries.insert(
-                                                   entry).second;
-                                       }),
-                        AutolinkEntries.end());
+  llvm_unreachable("Unhandled AutolinkKind in switch.");
+}
 
-  const bool AutolinkExtractRequired =
-      (TargetInfo.OutputObjectFormat == llvm::Triple::ELF && !Triple.isPS4()) ||
-      TargetInfo.OutputObjectFormat == llvm::Triple::Wasm ||
-      Triple.isOSCygMing();
+template <typename Vector, typename Set>
+void AutolinkKind::collectEntriesFromLibraries(
+    llvm::SetVector<llvm::MDNode *, Vector, Set> &Entries,
+    ArrayRef<LinkLibrary> AutolinkEntries, IRGenModule &IGM) {
+  llvm::LLVMContext &ctx = IGM.getLLVMContext();
 
-  if (!AutolinkExtractRequired) {
+  switch (Value) {
+  case AutolinkKind::LLVMLinkerOptions:
+  case AutolinkKind::SwiftAutoLinkExtract: {
+    // On platforms that support autolinking, continue to use the metadata.
+    for (LinkLibrary linkLib : AutolinkEntries) {
+      switch (linkLib.getKind()) {
+      case LibraryKind::Library: {
+        llvm::SmallString<32> opt =
+            getTargetDependentLibraryOption(IGM.Triple, linkLib.getName());
+        Entries.insert(llvm::MDNode::get(ctx, llvm::MDString::get(ctx, opt)));
+        continue;
+      }
+      case LibraryKind::Framework: {
+        llvm::Metadata *args[] = {llvm::MDString::get(ctx, "-framework"),
+                                  llvm::MDString::get(ctx, linkLib.getName())};
+        Entries.insert(llvm::MDNode::get(ctx, args));
+        continue;
+      }
+      }
+      llvm_unreachable("Unhandled LibraryKind in switch.");
+    }
+    return;
+  }
+  case AutolinkKind::LLVMDependentLibraries: {
+    for (LinkLibrary linkLib : AutolinkEntries) {
+      switch (linkLib.getKind()) {
+      case LibraryKind::Library: {
+        Entries.insert(llvm::MDNode::get(
+            ctx, llvm::MDString::get(ctx, linkLib.getName())));
+        continue;
+      }
+      case LibraryKind::Framework: {
+        llvm_unreachable(
+            "llvm.dependent-libraries doesn't support framework dependency");
+      }
+      }
+      llvm_unreachable("Unhandled LibraryKind in switch.");
+    }
+    return;
+  }
+  }
+  llvm_unreachable("Unhandled AutolinkKind in switch.");
+}
+
+template <typename Vector, typename Set>
+void AutolinkKind::writeEntries(llvm::SetVector<llvm::MDNode *, Vector, Set> Entries,
+                                llvm::NamedMDNode *Metadata, IRGenModule &IGM) {
+  switch (Value) {
+  case AutolinkKind::LLVMLinkerOptions:
+  case AutolinkKind::LLVMDependentLibraries: {
     // On platforms that support autolinking, continue to use the metadata.
     Metadata->clearOperands();
-    for (auto *Entry : AutolinkEntries)
+    for (auto *Entry : Entries)
       Metadata->addOperand(Entry);
-  } else {
+    return;
+  }
+  case AutolinkKind::SwiftAutoLinkExtract: {
     // Merge the entries into null-separated string.
     llvm::SmallString<64> EntriesString;
-    for (auto &EntryNode : AutolinkEntries) {
-      const llvm::MDNode *MD = cast<llvm::MDNode>(EntryNode);
+    for (auto EntryNode : Entries) {
+      const auto *MD = cast<llvm::MDNode>(EntryNode);
       for (auto &Entry : MD->operands()) {
         const llvm::MDString *MS = cast<llvm::MDString>(Entry);
         EntriesString += MS->getString();
@@ -1258,24 +1340,64 @@ void IRGenModule::emitAutolinkInfo() {
       }
     }
     auto EntriesConstant = llvm::ConstantDataArray::getString(
-        getLLVMContext(), EntriesString, /*AddNull=*/false);
+        IGM.getLLVMContext(), EntriesString, /*AddNull=*/false);
     // Mark the swift1_autolink_entries section with the SHF_EXCLUDE attribute
     // to get the linker to drop it in the final linked binary.
-    // LLVM doesn't provide an interface to specify section attributs in the IR
-    // so we pass the attribute with inline assembly.
-    if (TargetInfo.OutputObjectFormat == llvm::Triple::ELF)
-      Module.appendModuleInlineAsm(".section .swift1_autolink_entries,"
-                                   "\"0x80000000\"");
+    // LLVM doesn't provide an interface to specify section attributs in the
+    // IR so we pass the attribute with inline assembly.
+    if (IGM.TargetInfo.OutputObjectFormat == llvm::Triple::ELF)
+      IGM.Module.appendModuleInlineAsm(".section .swift1_autolink_entries,"
+                                       "\"0x80000000\"");
     auto var =
-        new llvm::GlobalVariable(*getModule(), EntriesConstant->getType(), true,
-                                 llvm::GlobalValue::PrivateLinkage,
+        new llvm::GlobalVariable(*IGM.getModule(), EntriesConstant->getType(),
+                                 true, llvm::GlobalValue::PrivateLinkage,
                                  EntriesConstant, "_swift1_autolink_entries");
     var->setSection(".swift1_autolink_entries");
-    var->setAlignment(llvm::MaybeAlign(getPointerAlignment().getValue()));
+    var->setAlignment(llvm::MaybeAlign(IGM.getPointerAlignment().getValue()));
 
-    disableAddressSanitizer(*this, var);
-    addUsedGlobal(var);
+    disableAddressSanitizer(IGM, var);
+    IGM.addUsedGlobal(var);
+    return;
   }
+  }
+  llvm_unreachable("Unhandled AutolinkKind in switch.");
+}
+
+AutolinkKind AutolinkKind::create(const SwiftTargetInfo &TargetInfo,
+                                  llvm::Triple Triple,
+                                  IRGenLLVMLTOKind LLVMLTOKind) {
+  // When performing LTO, we always use lld that supports auto linking
+  // mechanism with ELF. So embed dependent libraries names in
+  // "llvm.dependent-libraries" instead of "llvm.linker.options".
+  if (TargetInfo.OutputObjectFormat == llvm::Triple::ELF &&
+      LLVMLTOKind != IRGenLLVMLTOKind::None) {
+    return AutolinkKind::LLVMDependentLibraries;
+  }
+
+  if (doesTargetAutolinkUsingAutolinkExtract(TargetInfo, Triple)) {
+    return AutolinkKind::SwiftAutoLinkExtract;
+  }
+
+  return AutolinkKind::LLVMLinkerOptions;
+}
+
+void IRGenModule::emitAutolinkInfo() {
+  auto Autolink =
+      AutolinkKind::create(TargetInfo, Triple, IRGen.Opts.LLVMLTOKind);
+
+  StringRef AutolinkSectionName = Autolink.getSectionNameMetadata();
+
+  auto *Metadata = Module.getOrInsertNamedMetadata(AutolinkSectionName);
+  llvm::SmallSetVector<llvm::MDNode *, 4> Entries;
+
+  // Collect the linker options already in the module (from ClangCodeGen).
+  for (auto Entry : Metadata->operands()) {
+    Entries.insert(Entry);
+  }
+
+  Autolink.collectEntriesFromLibraries(Entries, AutolinkEntries, *this);
+
+  Autolink.writeEntries(Entries, Metadata, *this);
 
   if (!IRGen.Opts.ForceLoadSymbolName.empty() &&
       (Triple.supportsCOMDAT() || isFirstObjectFileInModule(*this))) {
@@ -1285,6 +1407,7 @@ void IRGenModule::emitAutolinkInfo() {
         llvm::Function::Create(llvm::FunctionType::get(VoidTy, false),
                                llvm::GlobalValue::ExternalLinkage, buf,
                                &Module);
+    ForceImportThunk->setAttributes(constructInitialAttributes());
     ApplyIRLinkage(IRLinkage::ExternalExport).to(ForceImportThunk);
     if (Triple.supportsCOMDAT())
       if (auto *GO = cast<llvm::GlobalObject>(ForceImportThunk))

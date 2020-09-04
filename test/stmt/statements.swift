@@ -280,7 +280,7 @@ func RepeatWhileStmt4() {
 
 func brokenSwitch(_ x: Int) -> Int {
   switch x {
-  case .Blah(var rep): // expected-error{{pattern cannot match values of type 'Int'}}
+  case .Blah(var rep): // expected-error{{type 'Int' has no member 'Blah'}}
     return rep
   }
 }

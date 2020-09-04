@@ -20,11 +20,18 @@ sil @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> 
 sil @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
 sil @get_owned_obj : $@convention(thin) () -> @owned Builtin.NativeObject
 sil @unreachable_guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+sil @inout_user : $@convention(thin) (@inout FakeOptional<NativeObjectPair>) -> ()
 
 struct NativeObjectPair {
   var obj1 : Builtin.NativeObject
   var obj2 : Builtin.NativeObject
 }
+
+struct FakeOptionalNativeObjectPairPair {
+  var pair1 : FakeOptional<NativeObjectPair>
+  var pair2 : FakeOptional<NativeObjectPair>
+}
+sil @inout_user2 : $@convention(thin) (@inout FakeOptionalNativeObjectPairPair) -> ()
 
 sil @get_nativeobject_pair : $@convention(thin) () -> @owned NativeObjectPair
 
@@ -32,7 +39,10 @@ protocol MyFakeAnyObject : Klass {
   func myFakeMethod()
 }
 
-final class Klass {}
+final class Klass {
+  var base: Klass
+}
+
 extension Klass : MyFakeAnyObject {
   func myFakeMethod()
 }
@@ -347,13 +357,7 @@ bb0(%0 : @guaranteed $StructMemberTest):
   return %7 : $Builtin.Int32
 }
 
-// Make sure that in a case where we have multiple non-trivial values passed to
-// a forwarding instruction we do not optimize... but if we only have one (and
-// multiple trivial arguments), we can.
-//
 // CHECK-LABEL: sil [ossa] @multiple_arg_forwarding_inst_test : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject, Builtin.Int32) -> () {
-// CHECK: copy_value
-// CHECK: copy_value
 // CHECK-NOT: copy_value
 // CHECK: } // end sil function 'multiple_arg_forwarding_inst_test'
 sil [ossa] @multiple_arg_forwarding_inst_test : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject, Builtin.Int32) -> () {
@@ -1518,6 +1522,31 @@ bb3:
   return %9999 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @switch_enum_test_loadcopy_with_leaked_enum_case : $@convention(thin) (@owned FakeOptional<Builtin.NativeObject>) -> () {
+// CHECK-NOT: load [copy]
+// CHECK: load_borrow
+// CHECK-NOT: load [copy]
+// CHECK: } // end sil function 'switch_enum_test_loadcopy_with_leaked_enum_case'
+sil [ossa] @switch_enum_test_loadcopy_with_leaked_enum_case : $@convention(thin) (@owned FakeOptional<Builtin.NativeObject>) -> () {
+bb0(%0 : @owned $FakeOptional<Builtin.NativeObject>):
+  %0a = alloc_stack $FakeOptional<Builtin.NativeObject>
+  store %0 to [init] %0a : $*FakeOptional<Builtin.NativeObject>
+  %1 = load [copy] %0a : $*FakeOptional<Builtin.NativeObject>
+  switch_enum %1 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1(%2 : @owned $Builtin.NativeObject):
+  unreachable
+
+bb2:
+  br bb3
+
+bb3:
+  destroy_addr %0a : $*FakeOptional<Builtin.NativeObject>
+  dealloc_stack %0a : $*FakeOptional<Builtin.NativeObject>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
 // CHECK-LABEL: sil [ossa] @switch_enum_test_copyvalue_no_default : $@convention(thin) (@guaranteed FakeOptional<Builtin.NativeObject>) -> () {
 // CHECK-NOT: copy_value
 // CHECK: } // end sil function 'switch_enum_test_copyvalue_no_default'
@@ -2548,3 +2577,153 @@ bb1:
 bb2(%39 : @owned $Klass):
   unreachable
 }
+
+// CHECK-LABEL: sil [ossa] @struct_with_multiple_nontrivial_operands : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'struct_with_multiple_nontrivial_operands'
+sil [ossa] @struct_with_multiple_nontrivial_operands : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject, %1 : @guaranteed $Builtin.NativeObject):
+  %0a = copy_value %0 : $Builtin.NativeObject
+  %1a = copy_value %1 : $Builtin.NativeObject
+  %2 = struct $NativeObjectPair(%0a : $Builtin.NativeObject, %1a : $Builtin.NativeObject)
+  destroy_value %2 : $NativeObjectPair
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @tuple_with_multiple_nontrivial_operands : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'tuple_with_multiple_nontrivial_operands'
+sil [ossa] @tuple_with_multiple_nontrivial_operands : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject, %1 : @guaranteed $Builtin.NativeObject):
+  %0a = copy_value %0 : $Builtin.NativeObject
+  %1a = copy_value %1 : $Builtin.NativeObject
+  %2 = tuple (%0a : $Builtin.NativeObject, %1a : $Builtin.NativeObject)
+  destroy_value %2 : $(Builtin.NativeObject, Builtin.NativeObject)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure that we properly handle this case with out parameters and don't
+// crash due to the SILArgument in bb3.
+//
+// CHECK-LABEL: sil [ossa] @iterated_transforming_terminator : $@convention(method) (@guaranteed Builtin.NativeObject) -> @out FakeOptional<Klass> {
+// CHECK-NOT: copy_value
+// CHECK-NOT: @owned
+// CHECK: } // end sil function 'iterated_transforming_terminator'
+sil [ossa] @iterated_transforming_terminator : $@convention(method) (@guaranteed Builtin.NativeObject) -> @out FakeOptional<Klass> {
+bb0(%0 : $*FakeOptional<Klass>, %1 : @guaranteed $Builtin.NativeObject):
+  %3 = init_enum_data_addr %0 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt
+  %4 = copy_value %1 : $Builtin.NativeObject
+  checked_cast_br %4 : $Builtin.NativeObject to Klass, bb1, bb2
+
+bb1(%7 : @owned $Klass):
+  %8 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %7 : $Klass
+  br bb3(%8 : $FakeOptional<Klass>)
+
+bb2(%10 : @owned $Builtin.NativeObject):
+  destroy_value %10 : $Builtin.NativeObject
+  %12 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bb3(%12 : $FakeOptional<Klass>)
+
+bb3(%14 : @owned $FakeOptional<Klass>):
+  switch_enum %14 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb4, case #FakeOptional.none!enumelt: bb6
+
+bb4(%16 : @owned $Klass):
+  %17 = begin_borrow %16 : $Klass
+  %18 = ref_element_addr %17 : $Klass, #Klass.base
+  copy_addr %18 to [initialization] %3 : $*Klass
+  end_borrow %17 : $Klass
+  destroy_value %16 : $Klass
+  inject_enum_addr %0 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt
+  br bb5
+
+bb5:
+  %24 = tuple ()
+  return %24 : $()
+
+bb6:
+  inject_enum_addr %0 : $*FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bb5
+}
+
+// CHECK-LABEL: sil [ossa] @destructure_with_differing_lifetimes_inout_1 : $@convention(thin) (@inout FakeOptionalNativeObjectPairPair) -> () {
+// CHECK-NOT: load_borrow
+// CHECK: } // end sil function 'destructure_with_differing_lifetimes_inout_1'
+sil [ossa] @destructure_with_differing_lifetimes_inout_1 : $@convention(thin) (@inout FakeOptionalNativeObjectPairPair) -> () {
+bb0(%0 : $*FakeOptionalNativeObjectPairPair):
+  %0a = struct_element_addr %0 : $*FakeOptionalNativeObjectPairPair, #FakeOptionalNativeObjectPairPair.pair1
+  %1 = load [copy] %0a : $*FakeOptional<NativeObjectPair>
+  switch_enum %1 : $FakeOptional<NativeObjectPair>, case #FakeOptional.some!enumelt: bb1, default bb2
+
+bb2(%2 : @owned $FakeOptional<NativeObjectPair>):
+  destroy_value %2 : $FakeOptional<NativeObjectPair>
+  br bbEnd
+
+bb1(%3 : @owned $NativeObjectPair):
+  (%3a, %3b) = destructure_struct %3 : $NativeObjectPair
+  cond_br undef, bb1a, bb1b
+
+bb1a:
+  destroy_value %3a : $Builtin.NativeObject
+  destroy_value %3b : $Builtin.NativeObject
+  br bbEnd
+
+bb1b:
+  destroy_value %3a : $Builtin.NativeObject
+  %f = function_ref @inout_user2 : $@convention(thin) (@inout FakeOptionalNativeObjectPairPair) -> ()
+  apply %f(%0) : $@convention(thin) (@inout FakeOptionalNativeObjectPairPair) -> ()
+  destroy_value %3b : $Builtin.NativeObject
+  br bbEnd
+
+bbEnd:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @destructure_with_differing_lifetimes_inout_2 : $@convention(thin) (@inout FakeOptionalNativeObjectPairPair) -> () {
+// CHECK-NOT: load_borrow
+// CHECK: } // end sil function 'destructure_with_differing_lifetimes_inout_2'
+sil [ossa] @destructure_with_differing_lifetimes_inout_2 : $@convention(thin) (@inout FakeOptionalNativeObjectPairPair) -> () {
+bb0(%0 : $*FakeOptionalNativeObjectPairPair):
+  %0a = struct_element_addr %0 : $*FakeOptionalNativeObjectPairPair, #FakeOptionalNativeObjectPairPair.pair1
+  %1 = load [copy] %0a : $*FakeOptional<NativeObjectPair>
+  switch_enum %1 : $FakeOptional<NativeObjectPair>, case #FakeOptional.some!enumelt: bb1, default bb2
+
+bb2(%2 : @owned $FakeOptional<NativeObjectPair>):
+  destroy_value %2 : $FakeOptional<NativeObjectPair>
+  br bbEnd
+
+bb1(%3 : @owned $NativeObjectPair):
+  (%3a, %3b) = destructure_struct %3 : $NativeObjectPair
+  cond_br undef, bb1a, bb1b
+
+bb1a:
+  destroy_value %3a : $Builtin.NativeObject
+  br bb1ab
+
+bb1ab:
+  destroy_value %3b : $Builtin.NativeObject
+  br bbEnd
+
+bb1b:
+  destroy_value %3a : $Builtin.NativeObject
+  %f = function_ref @inout_user2 : $@convention(thin) (@inout FakeOptionalNativeObjectPairPair) -> ()
+  apply %f(%0) : $@convention(thin) (@inout FakeOptionalNativeObjectPairPair) -> ()
+  cond_br undef, bb1ba, bb1bb
+
+bb1ba:
+  br bb1baEnd
+
+bb1bb:
+  br bb1baEnd
+
+bb1baEnd:
+  destroy_value %3b : $Builtin.NativeObject
+  br bbEnd
+
+bbEnd:
+  %9999 = tuple()
+  return %9999 : $()
+}
+

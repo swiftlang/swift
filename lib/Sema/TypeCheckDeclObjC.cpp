@@ -179,7 +179,7 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
 
       if (!PD->isObjC()) {
         diags.diagnose(TypeRange.Start, diag::not_objc_protocol,
-                       PD->getDeclaredType());
+                       PD->getDeclaredInterfaceType());
         return;
       }
     }
@@ -200,7 +200,13 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   }
 
   if (auto fnTy = T->getAs<FunctionType>()) {
-    if (fnTy->getExtInfo().throws() ) {
+    if (fnTy->getExtInfo().isAsync()) {
+      diags.diagnose(TypeRange.Start, diag::not_objc_function_type_async)
+        .highlight(TypeRange);
+      return;
+    }
+
+    if (fnTy->getExtInfo().isThrowing()) {
       diags.diagnose(TypeRange.Start, diag::not_objc_function_type_throwing)
         .highlight(TypeRange);
       return;
@@ -437,6 +443,14 @@ static bool checkObjCInExtensionContext(const ValueDecl *value,
       }
 
       if (classDecl->isGenericContext()) {
+        // We do allow one special case. A @_dynamicReplacement(for:) function.
+        // Currently, this is only supported if the replaced decl is from a
+        // module compiled with -enable-implicit-dynamic.
+        if (value->getDynamicallyReplacedDecl() &&
+            value->getDynamicallyReplacedDecl()
+                ->getModuleContext()
+                ->isImplicitDynamicEnabled())
+          return false;
         if (!classDecl->usesObjCGenericsModel()) {
           if (diagnose) {
             value->diagnose(diag::objc_in_generic_extension,
@@ -590,13 +604,22 @@ bool swift::isRepresentableInObjC(
       if (Diagnose) {
         AFD->diagnose(diag::objc_invalid_on_func_result_type,
                       getObjCDiagnosticAttrKind(Reason));
-        SourceRange Range =
-            FD->getBodyResultTypeLoc().getTypeRepr()->getSourceRange();
-        diagnoseTypeNotRepresentableInObjC(FD, ResultType, Range);
+        diagnoseTypeNotRepresentableInObjC(FD, ResultType,
+                                           FD->getResultTypeSourceRange());
         describeObjCReason(FD, Reason);
       }
       return false;
     }
+  }
+
+  // Async functions cannot be mapped into Objective-C.
+  if (AFD->hasAsync()) {
+    if (Diagnose) {
+      AFD->diagnose(diag::not_objc_function_async)
+        .highlight(AFD->getAsyncLoc());
+      describeObjCReason(AFD, Reason);
+    }
+    return false;
   }
 
   // Throwing functions must map to a particular error convention.
@@ -648,7 +671,7 @@ bool swift::isRepresentableInObjC(
         return false;
       }
 
-      errorResultType = boolDecl->getDeclaredType()->getCanonicalType();
+      errorResultType = boolDecl->getDeclaredInterfaceType()->getCanonicalType();
     } else if (!resultType->getOptionalObjectType() &&
                isValidObjectiveCErrorResultType(dc, resultType)) {
       // Functions that return a (non-optional) type bridged to Objective-C
@@ -904,7 +927,7 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   if (!IndexResult)
     TypeRange = SD->getIndices()->getSourceRange();
   else
-    TypeRange = SD->getElementTypeLoc().getSourceRange();
+    TypeRange = SD->getElementTypeSourceRange();
   SD->diagnose(diag::objc_invalid_on_subscript,
                getObjCDiagnosticAttrKind(Reason))
     .highlight(TypeRange);
@@ -1321,8 +1344,8 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
       for (auto inherited : proto->getInheritedProtocols()) {
         if (!inherited->isObjC()) {
           proto->diagnose(diag::objc_protocol_inherits_non_objc_protocol,
-                          proto->getDeclaredType(),
-                          inherited->getDeclaredType());
+                          proto->getDeclaredInterfaceType(),
+                          inherited->getDeclaredInterfaceType());
           inherited->diagnose(diag::kind_declname_declared_here,
                               DescriptiveDeclKind::Protocol,
                               inherited->getName());

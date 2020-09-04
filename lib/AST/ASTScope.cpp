@@ -54,6 +54,16 @@ Optional<bool> ASTScope::computeIsCascadingUse(
   return ASTScopeImpl::computeIsCascadingUse(history, initialIsCascadingUse);
 }
 
+llvm::SmallVector<LabeledStmt *, 4> ASTScope::lookupLabeledStmts(
+    SourceFile *sourceFile, SourceLoc loc) {
+  return ASTScopeImpl::lookupLabeledStmts(sourceFile, loc);
+}
+
+std::pair<CaseStmt *, CaseStmt *> ASTScope::lookupFallthroughSourceAndDest(
+    SourceFile *sourceFile, SourceLoc loc) {
+  return ASTScopeImpl::lookupFallthroughSourceAndDest(sourceFile, loc);
+}
+
 #if SWIFT_COMPILER_IS_MSVC
 #pragma warning(push)
 #pragma warning(disable : 4996)
@@ -99,9 +109,9 @@ AttachedPropertyWrapperScope::getSourceRangeOfVarDecl(const VarDecl *const vd) {
   SourceRange sr;
   for (auto *attr : vd->getAttrs().getAttributes<CustomAttr>()) {
     if (sr.isInvalid())
-      sr = attr->getTypeLoc().getSourceRange();
+      sr = attr->getTypeRepr()->getSourceRange();
     else
-      sr.widen(attr->getTypeLoc().getSourceRange());
+      sr.widen(attr->getTypeRepr()->getSourceRange());
   }
   return sr;
 }
@@ -237,6 +247,7 @@ DEFINE_GET_CLASS_NAME(WhileStmtScope)
 DEFINE_GET_CLASS_NAME(GuardStmtScope)
 DEFINE_GET_CLASS_NAME(LookupParentDiversionScope)
 DEFINE_GET_CLASS_NAME(RepeatWhileScope)
+DEFINE_GET_CLASS_NAME(DoStmtScope)
 DEFINE_GET_CLASS_NAME(DoCatchStmtScope)
 DEFINE_GET_CLASS_NAME(SwitchStmtScope)
 DEFINE_GET_CLASS_NAME(ForEachStmtScope)

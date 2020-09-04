@@ -12,10 +12,7 @@
 # RUN: test ! -e %t/failures.txt || \
 # RUN:   diff %t/filter.txt %t/failures.txt
 
-# REQUIRES: nonexecutable_test
-
-# rdar://problem/50648519
-# XFAIL: asan
+# REQUIRES: nonexecutable_test, no_asan
 
 # Expected failures by platform
 # -----------------------------

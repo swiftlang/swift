@@ -225,18 +225,20 @@ evaluator::DependencySource GetDestructorRequest::readDependencySource(
 
 Optional<GenericParamList *> GenericParamListRequest::getCachedResult() const {
   auto *decl = std::get<0>(getStorage());
-  if (!decl->GenericParamsAndBit.getInt()) {
-    return None;
-  }
-  return decl->GenericParamsAndBit.getPointer();
+  if (auto *params = decl->GenericParamsAndBit.getPointer())
+    return params;
+
+  if (decl->GenericParamsAndBit.getInt())
+    return nullptr;
+
+  return None;
 }
 
 void GenericParamListRequest::cacheResult(GenericParamList *params) const {
   auto *context = std::get<0>(getStorage());
-  if (params) {
-    for (auto param : *params)
-      param->setDeclContext(context);
-  }
+  if (params)
+    params->setDeclContext(context);
+
   context->GenericParamsAndBit.setPointerAndInt(params, true);
 }
 
@@ -317,6 +319,24 @@ void DirectLookupRequest::writeDependencySink(
     TinyPtrVector<ValueDecl *> result) const {
   auto &desc = std::get<0>(getStorage());
   tracker.addUsedMember(desc.DC, desc.Name.getBaseName());
+}
+
+//----------------------------------------------------------------------------//
+// LookupInModuleRequest computation.
+//----------------------------------------------------------------------------//
+
+void LookupInModuleRequest::writeDependencySink(
+    evaluator::DependencyCollector &reqTracker, QualifiedLookupResult l) const {
+  auto *module = std::get<0>(getStorage());
+  auto member = std::get<1>(getStorage());
+  auto *DC = std::get<4>(getStorage());
+
+  // Decline to record lookups outside our module.
+  if (!DC->getParentSourceFile() ||
+      module->getParentModule() != DC->getParentModule()) {
+    return;
+  }
+  reqTracker.addTopLevelName(member.getBaseName());
 }
 
 //----------------------------------------------------------------------------//

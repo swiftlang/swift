@@ -6,6 +6,7 @@
 // RUN: %swift -sdk %sdk -target arm64-apple-ios10 -compile-module-from-interface %s -o %t/NoWrongSDKWarning.swiftmodule 2>&1 | %FileCheck -allow-empty %s
 
 // REQUIRES: OS=macosx
+// REQUIRES: CPU=x86_64
 
 public func empty()
 

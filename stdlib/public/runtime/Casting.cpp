@@ -339,6 +339,15 @@ _dynamicCastClassMetatype(const ClassMetadata *sourceType,
   return nullptr;
 }
 
+#if !SWIFT_OBJC_INTEROP // __SwiftValue is a native class
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+bool swift_unboxFromSwiftValueWithType(OpaqueValue *source,
+                                       OpaqueValue *result,
+                                       const Metadata *destinationType);
+/// Nominal type descriptor for Swift.__SwiftValue
+extern "C" const ClassDescriptor NOMINAL_TYPE_DESCR_SYM(s12__SwiftValueC);
+#endif
+
 /// Dynamically cast a class instance to a Swift class type.
 static const void *swift_dynamicCastClassImpl(const void *object,
                                               const ClassMetadata *targetType) {
@@ -351,10 +360,28 @@ static const void *swift_dynamicCastClassImpl(const void *object,
   }
 #endif
 
-  auto isa = _swift_getClassOfAllocated(object);
+  auto srcType = _swift_getClassOfAllocated(object);
 
-  if (_dynamicCastClassMetatype(isa, targetType))
+  if (_dynamicCastClassMetatype(srcType, targetType))
     return object;
+
+#if !SWIFT_OBJC_INTEROP // __SwiftValue is a native class on Linux
+  if (srcType->getKind() == MetadataKind::Class
+      && targetType->getKind() == MetadataKind::Class) {
+    auto srcClassType = cast<ClassMetadata>(srcType);
+    auto srcDescr = srcClassType->getDescription();
+    if (srcDescr == &NOMINAL_TYPE_DESCR_SYM(s12__SwiftValueC)) {
+      auto srcValue = reinterpret_cast<OpaqueValue *>(&object);
+      void *result;
+      auto destLocation = reinterpret_cast<OpaqueValue *>(&result);
+      if (swift_unboxFromSwiftValueWithType(srcValue, destLocation, targetType)) {
+        swift_unknownObjectRelease(const_cast<void *>(object));
+        return result;
+      }
+    }
+  }
+#endif
+
   return nullptr;
 }
 
@@ -1183,13 +1210,6 @@ swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
     }
     break;
 
-  case MetadataKind::Existential: {
-    auto targetTypeAsExistential = static_cast<const ExistentialTypeMetadata *>(targetType);
-    if (_conformsToProtocols(nullptr, sourceType, targetTypeAsExistential, nullptr))
-      return origSourceType;
-    return nullptr;
-  }
-
   default:
     return nullptr;
   }
@@ -1835,7 +1855,7 @@ static bool _dynamicCastToFunction(OpaqueValue *dest,
       return _fail(src, srcType, targetType, flags);
     
     // If the target type can't throw, neither can the source.
-    if (srcFn->throws() && !targetFn->throws())
+    if (srcFn->isThrowing() && !targetFn->isThrowing())
       return _fail(src, srcType, targetType, flags);
     
     // The result and argument types must match.
@@ -3269,3 +3289,30 @@ HeapObject *_swift_bridgeToObjectiveCUsingProtocolIfPossible(
 #define OVERRIDE_CASTING COMPATIBILITY_OVERRIDE
 #include "CompatibilityOverride.def"
 
+// XXX TODO XXX REMOVE XXX TRANSITION SHIM XXX
+// XXX TODO XXX REMOVE XXX TRANSITION SHIM XXX
+// XXX TODO XXX REMOVE XXX TRANSITION SHIM XXX
+
+// A way for the new implementation to call the old one, so we
+// can support switching between the two until the new one is
+// fully settled.
+
+// XXX TODO XXX Once the new implementation is stable, remove the following,
+// swift_dynamicCastImpl above, and all the other code above that only exists to
+// support that.  (Don't forget _dynamicCastToExistential!!)  This file should
+// be only ~1400 lines when you're done.
+
+extern "C" {
+  bool swift_dynamicCast_OLD(OpaqueValue *destLocation,
+                             OpaqueValue *srcValue,
+                             const Metadata *srcType,
+                             const Metadata *destType,
+                             DynamicCastFlags flags)
+  {
+    return swift_dynamicCastImpl(destLocation, srcValue, srcType, destType, flags);
+  }
+}
+
+// XXX TODO XXX REMOVE XXX TRANSITION SHIM XXX
+// XXX TODO XXX REMOVE XXX TRANSITION SHIM XXX
+// XXX TODO XXX REMOVE XXX TRANSITION SHIM XXX

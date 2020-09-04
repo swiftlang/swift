@@ -304,9 +304,9 @@ func testFixitsInStatementsWithPatterns(_ a : Int?) {
 
 // <rdar://22774938> QoI: "never used" in an "if let" should rewrite expression to use != nil
 func test(_ a : Int?, b : Any) {
-  if true == true, let x = a {   // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{24-25=_}}
+  if true == true, let x = a {   // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{20-25=_}}
   }
-  if let x = a, let y = a {  // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{10-11=_}}
+  if let x = a, let y = a {  // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{6-11=_}}
     _ = y
   }
 
@@ -446,4 +446,52 @@ func testForwardReferenceCapture() {
   var x: Int = 1
   innerFunc()
   print(x)
+}
+
+// rdar://47240768 Expand the definition of "simple" pattern to variables bound in patterns
+func testVariablesBoundInPatterns() {
+  enum StringB {
+    case simple(b: Bool)
+    case tuple(b: (Bool, Bool))
+    case optional(b: Bool?)
+  }
+
+  // Because Swift enables all kinds of creative binding forms, make sure that
+  // variable patterns occuring directly under a `let` or `var` have that
+  // introducer stripped by the fixit. All other cases are currently too
+  // complicated for the VarDeclUsageChecker.
+  switch StringB.simple(b: true) {
+  case .simple(b: let b) where false: // expected-warning {{immutable value 'b' was never used; consider replacing with '_' or removing it}} {{19-24=_}}
+    break
+  case .simple(b: var b) where false: // expected-warning {{variable 'b' was never used; consider replacing with '_' or removing it}} {{19-24=_}}
+    break
+  case var .simple(b: b): // expected-warning {{variable 'b' was never used; consider replacing with '_' or removing it}} {{23-24=_}}
+    break
+  case .tuple(b: let (b1, b2)) where false:
+    // expected-warning@-1 {{immutable value 'b1' was never used; consider replacing with '_' or removing it}} {{23-25=_}}
+    // expected-warning@-2 {{immutable value 'b2' was never used; consider replacing with '_' or removing it}} {{27-29=_}}
+    break
+  case .tuple(b: (let b1, let b2)) where false:
+    // expected-warning@-1 {{immutable value 'b1' was never used; consider replacing with '_' or removing it}} {{19-25=_}}
+    // expected-warning@-2 {{immutable value 'b2' was never used; consider replacing with '_' or removing it}} {{27-33=_}}
+    break
+  case .tuple(b: (var b1, var b2)) where false:
+    // expected-warning@-1 {{variable 'b1' was never used; consider replacing with '_' or removing it}} {{19-25=_}}
+    // expected-warning@-2 {{variable 'b2' was never used; consider replacing with '_' or removing it}} {{27-33=_}}
+    break
+  case var .tuple(b: (b1, b2)) where false:
+    // expected-warning@-1 {{variable 'b1' was never used; consider replacing with '_' or removing it}} {{23-25=_}}
+    // expected-warning@-2 {{variable 'b2' was never used; consider replacing with '_' or removing it}} {{27-29=_}}
+    break
+  case .tuple(b: let b): // expected-warning {{immutable value 'b' was never used; consider replacing with '_' or removing it}} {{18-23=_}}
+    break
+  case .optional(b: let x?) where false: // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{25-26=_}}
+    break
+  case .optional(b: let .some(x)) where false: // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{31-32=_}}
+    break
+  case let .optional(b: x?): // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{25-26=_}}
+    break
+  case let .optional(b: .none): // expected-warning {{'let' pattern has no effect; sub-pattern didn't bind any variables}} {{8-12=}}
+    break
+  }
 }

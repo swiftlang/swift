@@ -196,20 +196,20 @@ extension Bool: ExtraHashable {}
 public struct CoolTVType: PrivateSubProto {}
 // CHECK: public struct CoolTVType {
 // CHECK-END: @available(iOS, unavailable)
-// CHECK-END-NEXT: @available(OSX, unavailable)
+// CHECK-END-NEXT: @available(macOS, unavailable)
 // CHECK-END-NEXT: extension conformances.CoolTVType : conformances.PublicBaseProto {}
 
 @available(macOS 10.99, *)
 public struct VeryNewMacType: PrivateSubProto {}
 // CHECK: public struct VeryNewMacType {
-// CHECK-END: @available(OSX 10.99, *)
+// CHECK-END: @available(macOS 10.99, *)
 // CHECK-END-NEXT: extension conformances.VeryNewMacType : conformances.PublicBaseProto {}
 
 public struct VeryNewMacProto {}
 @available(macOS 10.98, *)
 extension VeryNewMacProto: PrivateSubProto {}
 // CHECK: public struct VeryNewMacProto {
-// CHECK-END: @available(OSX 10.98, *)
+// CHECK-END: @available(macOS 10.98, *)
 // CHECK-END-NEXT: extension conformances.VeryNewMacProto : conformances.PublicBaseProto {}
 
 public struct PrivateProtoConformer {}
@@ -237,7 +237,7 @@ public struct NestedAvailabilityOuter {
 }
 
 // CHECK-END: @available(swift 4.2.123)
-// CHECK-END-NEXT: @available(OSX 10.97, iOS 23, *)
+// CHECK-END-NEXT: @available(macOS 10.97, iOS 23, *)
 // CHECK-END-NEXT: @available(tvOS, unavailable)
 // CHECK-END-NEXT: extension conformances.NestedAvailabilityOuter.Inner : conformances.PublicBaseProto {}
 

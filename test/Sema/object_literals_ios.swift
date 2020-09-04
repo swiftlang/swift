@@ -8,9 +8,12 @@ struct S: _ExpressibleByColorLiteral {
 let y: S = #colorLiteral(red: 1, green: 0, blue: 0, alpha: 1)
 let y2 = #colorLiteral(red: 1, green: 0, blue: 0, alpha: 1) // expected-error{{could not infer type of color literal}}
 // expected-note@-1{{import UIKit to use 'UIColor' as the default color literal type}}
-let y3 = #colorLiteral(red: 1, bleen: 0, grue: 0, alpha: 1) // expected-error{{incorrect argument labels in call (have 'red:bleen:grue:alpha:', expected 'red:green:blue:alpha:')}}
+let y3 = #colorLiteral(red: 1, bleen: 0, grue: 0, alpha: 1)
 // expected-error@-1 {{could not infer type of color literal}}
 // expected-note@-2 {{import UIKit to use 'UIColor' as the default color literal type}}
+
+let _: S = #colorLiteral(red: 1, bleen: 0, grue: 0, alpha: 1)
+// expected-error@-1{{incorrect argument labels in call (have 'red:bleen:grue:alpha:', expected 'red:green:blue:alpha:')}} {{34-39=green}} {{44-48=blue}}
 
 struct I: _ExpressibleByImageLiteral {
   init(imageLiteralResourceName: String) {}

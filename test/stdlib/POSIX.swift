@@ -3,9 +3,9 @@
 // UNSUPPORTED: OS=windows-msvc
 
 import StdlibUnittest
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if canImport(Darwin)
   import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku) || os(WASI)
+#elseif canImport(Glibc)
   import Glibc
 #else
 #error("Unsupported platform")

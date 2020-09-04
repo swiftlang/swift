@@ -34,6 +34,35 @@ using namespace swift;
 
 namespace {
 
+/// Find available closure discriminators.
+///
+/// The parser typically takes care of assigning unique discriminators to
+/// closures, but the parser is unavailable during semantic analysis.
+class DiscriminatorFinder : public ASTWalker {
+  unsigned NextDiscriminator = 0;
+
+public:
+  Expr *walkToExprPost(Expr *E) override {
+    auto *ACE = dyn_cast<AbstractClosureExpr>(E);
+    if (!ACE)
+      return E;
+
+    unsigned Discriminator = ACE->getDiscriminator();
+    assert(Discriminator != AbstractClosureExpr::InvalidDiscriminator &&
+           "Existing closures should have valid discriminators");
+    if (Discriminator >= NextDiscriminator)
+      NextDiscriminator = Discriminator + 1;
+    return E;
+  }
+
+  // Get the next available closure discriminator.
+  unsigned getNextDiscriminator() {
+    if (NextDiscriminator == AbstractClosureExpr::InvalidDiscriminator)
+      llvm::report_fatal_error("Out of valid closure discriminators");
+    return NextDiscriminator++;
+  }
+};
+
 /// Instrument decls with sanity-checks which the debugger can evaluate.
 class DebuggerTestingTransform : public ASTWalker {
   ASTContext &Ctx;
@@ -198,8 +227,8 @@ private:
     auto *Params = ParameterList::createEmpty(Ctx);
     auto *Closure = new (Ctx)
         ClosureExpr(SourceRange(), nullptr, Params, SourceLoc(), SourceLoc(),
-                    SourceLoc(), nullptr, DF.getNextDiscriminator(),
-                    getCurrentDeclContext());
+                    SourceLoc(), SourceLoc(), nullptr,
+                    DF.getNextDiscriminator(), getCurrentDeclContext());
     Closure->setImplicit(true);
 
     // TODO: Save and return the value of $OriginalExpr.

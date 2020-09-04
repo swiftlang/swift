@@ -21,12 +21,15 @@ bits = self_type.bits
 
 def Availability(bits):
     if bits == 16:
-        return '@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)'
+        return '@available(iOS 14.0, tvOS 14.0, watchOS 7.0, *)'
     return ''
 }%
 
 % if bits == 80:
 #if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+% end
+% if bits == 16:
+#if !os(macOS) && !(os(iOS) && targetEnvironment(macCatalyst))
 % end
 
 //===----------------------------------------------------------------------===//
@@ -202,8 +205,9 @@ extension ${Self} {
   static func _jvpMultiplyAssign(_ lhs: inout ${Self}, _ rhs: ${Self}) -> (
     value: Void, differential: (inout ${Self}, ${Self}) -> Void
   ) {
+    let oldLhs = lhs
     lhs *= rhs
-    return ((), { $0 *= $1 })
+    return ((), { $0 = $0 * rhs + oldLhs * $1 })
   }
 
   ${Availability(bits)}
@@ -248,12 +252,13 @@ extension ${Self} {
   static func _jvpDivideAssign(_ lhs: inout ${Self}, _ rhs: ${Self}) -> (
     value: Void, differential: (inout ${Self}, ${Self}) -> Void
   ) {
+    let oldLhs = lhs
     lhs /= rhs
-    return ((), { $0 /= $1 })
+    return ((), { $0 = ($0 * rhs - oldLhs * $1) / (rhs * rhs)  })
   }
 }
 
-% if bits == 80:
+% if bits == 80 or bits == 16:
 #endif
 % end
 % end

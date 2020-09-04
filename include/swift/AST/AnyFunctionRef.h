@@ -53,6 +53,20 @@ public:
     }
   }
 
+  /// Construct an AnyFunctionRef from a decl context that might be
+  /// some sort of function.
+  static Optional<AnyFunctionRef> fromDeclContext(DeclContext *dc) {
+    if (auto fn = dyn_cast<AbstractFunctionDecl>(dc)) {
+      return AnyFunctionRef(fn);
+    }
+
+    if (auto ace = dyn_cast<AbstractClosureExpr>(dc)) {
+      return AnyFunctionRef(ace);
+    }
+
+    return None;
+  }
+
   CaptureInfo getCaptureInfo() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getCaptureInfo();
@@ -87,20 +101,6 @@ public:
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getSingleExpressionBody();
     return TheFunction.get<AbstractClosureExpr *>()->getSingleExpressionBody();
-  }
-
-  void setSingleExpressionBody(Expr *expr) {
-    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
-      AFD->setSingleExpressionBody(expr);
-      return;
-    }
-
-    auto ACE = TheFunction.get<AbstractClosureExpr *>();
-    if (auto CE = dyn_cast<ClosureExpr>(ACE)) {
-      CE->setSingleExpressionBody(expr);
-    } else {
-      cast<AutoClosureExpr>(ACE)->setBody(expr);
-    }
   }
 
   Type getType() const {

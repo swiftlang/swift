@@ -52,7 +52,7 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
   Opts.PrintPropertyAccessors = true;
   Opts.PrintSubscriptAccessors = true;
   Opts.SkipUnderscoredKeywords = true;
-  Opts.SkipAttributes = true;
+  Opts.SkipAttributes = false;
   Opts.PrintOverrideKeyword = true;
   Opts.PrintImplicitAttrs = false;
   Opts.PrintFunctionRepresentationAttrs =
@@ -60,13 +60,39 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
   Opts.PrintUserInaccessibleAttrs = false;
   Opts.SkipPrivateStdlibDecls = true;
   Opts.SkipUnderscoredStdlibProtocols = true;
-  Opts.PrintGenericRequirements = false;
+  Opts.PrintGenericRequirements = true;
+  Opts.PrintInherited = false;
 
   Opts.ExclusiveAttrList.clear();
 
-#define DECL_ATTR(SPELLING, CLASS, OPTIONS, CODE) Opts.ExcludeAttrList.push_back(DAK_##CLASS);
-#define TYPE_ATTR(X) Opts.ExcludeAttrList.push_back(TAK_##X);
+  llvm::StringMap<AnyAttrKind> ExcludeAttrs;
+
+#define DECL_ATTR(SPELLING, CLASS, OPTIONS, CODE) \
+  if (StringRef(#SPELLING).startswith("_")) \
+    ExcludeAttrs.insert(std::make_pair("DAK_" #CLASS, DAK_##CLASS));
+#define TYPE_ATTR(X) ExcludeAttrs.insert(std::make_pair("TAK_" #X, TAK_##X));
 #include "swift/AST/Attr.def"
+
+  // Allow the following type attributes:
+  ExcludeAttrs.erase("TAK_autoclosure");
+  ExcludeAttrs.erase("TAK_convention");
+  ExcludeAttrs.erase("TAK_noescape");
+  ExcludeAttrs.erase("TAK_escaping");
+  ExcludeAttrs.erase("TAK_inout");
+
+  // Don't allow the following decl attributes:
+  // These can be large and are already included elsewhere in
+  // symbol graphs.
+  ExcludeAttrs.insert(std::make_pair("DAK_Available", DAK_Available));
+  ExcludeAttrs.insert(std::make_pair("DAK_Inline", DAK_Inline));
+  ExcludeAttrs.insert(std::make_pair("DAK_Inlinable", DAK_Inlinable));
+  ExcludeAttrs.insert(std::make_pair("DAK_Prefix", DAK_Prefix));
+  ExcludeAttrs.insert(std::make_pair("DAK_Postfix", DAK_Postfix));
+  ExcludeAttrs.insert(std::make_pair("DAK_Infix", DAK_Infix));
+
+  for (const auto &Entry : ExcludeAttrs) {
+    Opts.ExcludeAttrList.push_back(Entry.getValue());
+  }
 
   return Opts;
 }
@@ -86,10 +112,25 @@ SymbolGraph::getSubHeadingDeclarationFragmentsPrintOptions() const {
   Options.PrintSubscriptAccessors = false;
   //--------------------------------------------------------------------------//
 
+  Options.SkipAttributes = true;
   Options.VarInitializers = false;
   Options.PrintDefaultArgumentValue = false;
   Options.PrintEmptyArgumentNames = false;
   Options.PrintOverrideKeyword = false;
+  Options.PrintGenericRequirements = false;
+
+  #define DECL_ATTR(SPELLING, CLASS, OPTIONS, CODE) \
+    Options.ExcludeAttrList.push_back(DAK_##CLASS);
+  #define TYPE_ATTR(X) \
+    Options.ExcludeAttrList.push_back(TAK_##X);
+  #include "swift/AST/Attr.def"
+
+  // Don't include these attributes in subheadings.
+  Options.ExcludeAttrList.push_back(DAK_Final);
+  Options.ExcludeAttrList.push_back(DAK_Mutating);
+  Options.ExcludeAttrList.push_back(DAK_NonMutating);
+  Options.ExcludeAttrList.push_back(TAK_escaping);
+
   return Options;
 }
 
@@ -517,7 +558,7 @@ void
 SymbolGraph::serializeDeclarationFragments(StringRef Key,
                                            const Symbol &S,
                                            llvm::json::OStream &OS) {
-  DeclarationFragmentPrinter Printer(OS, Key);
+  DeclarationFragmentPrinter Printer(this, OS, Key);
   auto Options = getDeclarationFragmentsPrintOptions();
   if (S.getSynthesizedBaseType()) {
     Options.setBaseType(S.getSynthesizedBaseType());
@@ -529,7 +570,7 @@ void
 SymbolGraph::serializeNavigatorDeclarationFragments(StringRef Key,
                                                     const Symbol &S,
                                                     llvm::json::OStream &OS) {
-  DeclarationFragmentPrinter Printer(OS, Key);
+  DeclarationFragmentPrinter Printer(this, OS, Key);
 
   if (const auto *TD = dyn_cast<GenericTypeDecl>(S.getSymbolDecl())) {
     Printer.printAbridgedType(TD, /*PrintKeyword=*/false);
@@ -546,7 +587,7 @@ void
 SymbolGraph::serializeSubheadingDeclarationFragments(StringRef Key,
                                                      const Symbol &S,
                                                      llvm::json::OStream &OS) {
-  DeclarationFragmentPrinter Printer(OS, Key);
+  DeclarationFragmentPrinter Printer(this, OS, Key);
 
   if (const auto *TD = dyn_cast<GenericTypeDecl>(S.getSymbolDecl())) {
     Printer.printAbridgedType(TD, /*PrintKeyword=*/true);
@@ -562,7 +603,7 @@ SymbolGraph::serializeSubheadingDeclarationFragments(StringRef Key,
 void
 SymbolGraph::serializeDeclarationFragments(StringRef Key, Type T,
                                             llvm::json::OStream &OS) {
-  DeclarationFragmentPrinter Printer(OS, Key);
+  DeclarationFragmentPrinter Printer(this, OS, Key);
   T->print(Printer, getDeclarationFragmentsPrintOptions());
 }
 

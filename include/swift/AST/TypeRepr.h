@@ -48,7 +48,7 @@ enum : unsigned { NumTypeReprKindBits =
   countBitsUsed(static_cast<unsigned>(TypeReprKind::Last_TypeRepr)) };
 
 /// Representation of a type as written in source.
-class alignas(8) TypeRepr {
+class alignas(1 << TypeReprAlignInBits) TypeRepr {
   TypeRepr(const TypeRepr&) = delete;
   void operator=(const TypeRepr&) = delete;
 
@@ -482,12 +482,14 @@ class FunctionTypeRepr : public TypeRepr {
 
   TupleTypeRepr *ArgsTy;
   TypeRepr *RetTy;
-  SourceLoc ArrowLoc;
+  SourceLoc AsyncLoc;
   SourceLoc ThrowsLoc;
+  SourceLoc ArrowLoc;
 
 public:
   FunctionTypeRepr(GenericParamList *genericParams, TupleTypeRepr *argsTy,
-                   SourceLoc throwsLoc, SourceLoc arrowLoc, TypeRepr *retTy,
+                   SourceLoc asyncLoc, SourceLoc throwsLoc, SourceLoc arrowLoc,
+                   TypeRepr *retTy,
                    GenericParamList *patternGenericParams = nullptr,
                    ArrayRef<TypeRepr *> patternSubs = {},
                    ArrayRef<TypeRepr *> invocationSubs = {})
@@ -497,7 +499,7 @@ public:
       PatternGenericParams(patternGenericParams), PatternGenericEnv(nullptr),
       PatternSubs(patternSubs),
       ArgsTy(argsTy), RetTy(retTy),
-      ArrowLoc(arrowLoc), ThrowsLoc(throwsLoc) {
+      AsyncLoc(asyncLoc), ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc) {
   }
 
   GenericParamList *getGenericParams() const { return GenericParams; }
@@ -527,10 +529,12 @@ public:
 
   TupleTypeRepr *getArgsTypeRepr() const { return ArgsTy; }
   TypeRepr *getResultTypeRepr() const { return RetTy; }
-  bool throws() const { return ThrowsLoc.isValid(); }
+  bool isAsync() const { return AsyncLoc.isValid(); }
+  bool isThrowing() const { return ThrowsLoc.isValid(); }
 
-  SourceLoc getArrowLoc() const { return ArrowLoc; }
+  SourceLoc getAsyncLoc() const { return AsyncLoc; }
   SourceLoc getThrowsLoc() const { return ThrowsLoc; }
+  SourceLoc getArrowLoc() const { return ArrowLoc; }
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Function;

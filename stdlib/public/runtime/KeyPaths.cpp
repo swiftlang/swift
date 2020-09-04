@@ -68,7 +68,7 @@ namespace {
 }
 
 // These functions are all implemented in the stdlib.  Their type
-// parameters are passed impliictly in the isa of the key path.
+// parameters are passed implicitly in the isa of the key path.
 
 extern "C"
 SWIFT_CC(swift) void

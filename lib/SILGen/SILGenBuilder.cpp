@@ -610,7 +610,7 @@ ManagedValue SILGenBuilder::createUncheckedBitCast(SILLocation loc,
                                                    ManagedValue value,
                                                    SILType type) {
   CleanupCloner cloner(*this, value);
-  SILValue cast = createUncheckedBitCast(loc, value.getValue(), type);
+  SILValue cast = createUncheckedReinterpretCast(loc, value.getValue(), type);
 
   // Currently createUncheckedBitCast only produces these
   // instructions. We assert here to make sure if this changes, this code is
@@ -772,6 +772,13 @@ BranchInst *SILGenBuilder::createBranch(SILLocation loc,
 ReturnInst *SILGenBuilder::createReturn(SILLocation loc,
                                         ManagedValue returnValue) {
   return createReturn(loc, returnValue.forward(SGF));
+}
+
+ReturnInst *
+SILGenBuilder::createReturn(SILLocation loc, SILValue returnValue,
+                            AssertingManualScope &&functionLevelScope) {
+  std::move(functionLevelScope).pop();
+  return createReturn(loc, returnValue);
 }
 
 ManagedValue SILGenBuilder::createTuple(SILLocation loc, SILType type,

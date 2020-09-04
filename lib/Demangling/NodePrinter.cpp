@@ -248,6 +248,8 @@ private:
         return Options.DisplayStdlibModule;
       if (Context->getText() == swift::MANGLING_MODULE_OBJC)
         return Options.DisplayObjCModule;
+      if (Context->getText() == Options.HidingCurrentModule)
+        return false;
       if (Context->getText().startswith(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX))
         return Options.DisplayDebuggerGeneratedModule;
     }
@@ -452,6 +454,7 @@ private:
     case Node::Kind::PropertyDescriptor:
     case Node::Kind::ProtocolConformance:
     case Node::Kind::ProtocolConformanceDescriptor:
+    case Node::Kind::MetadataInstantiationCache:
     case Node::Kind::ProtocolDescriptor:
     case Node::Kind::ProtocolRequirementsBaseDescriptor:
     case Node::Kind::ProtocolSelfConformanceDescriptor:
@@ -507,6 +510,7 @@ private:
     case Node::Kind::ReflectionMetadataSuperclassDescriptor:
     case Node::Kind::ResilientProtocolWitnessTable:
     case Node::Kind::GenericTypeParamDecl:
+    case Node::Kind::AsyncAnnotation:
     case Node::Kind::ThrowsAnnotation:
     case Node::Kind::EmptyList:
     case Node::Kind::FirstElementMarker:
@@ -546,6 +550,11 @@ private:
     case Node::Kind::OpaqueReturnTypeOf:
     case Node::Kind::CanonicalSpecializedGenericMetaclass:
     case Node::Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction:
+    case Node::Kind::NoncanonicalSpecializedGenericTypeMetadata:
+    case Node::Kind::NoncanonicalSpecializedGenericTypeMetadataCache:
+    case Node::Kind::GlobalVariableOnceDeclList:
+    case Node::Kind::GlobalVariableOnceFunction:
+    case Node::Kind::GlobalVariableOnceToken:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -740,13 +749,20 @@ private:
   }
 
   void printFunctionType(NodePointer LabelList, NodePointer node) {
-    if (node->getNumChildren() != 2 && node->getNumChildren() != 3) {
+    if (node->getNumChildren() < 2 || node->getNumChildren() > 4) {
       setInvalid();
       return;
     }
     unsigned startIndex = 0;
-    if (node->getChild(0)->getKind() == Node::Kind::ThrowsAnnotation)
-      startIndex = 1;
+    bool isAsync = false, isThrows = false;
+    if (node->getChild(startIndex)->getKind() == Node::Kind::ThrowsAnnotation) {
+      ++startIndex;
+      isThrows = true;
+    }
+    if (node->getChild(startIndex)->getKind() == Node::Kind::AsyncAnnotation) {
+      ++startIndex;
+      isAsync = true;
+    }
 
     printFunctionParameters(LabelList, node->getChild(startIndex),
                             Options.ShowFunctionArgumentTypes);
@@ -754,7 +770,10 @@ private:
     if (!Options.ShowFunctionArgumentTypes)
       return;
 
-    if (startIndex == 1)
+    if (isAsync)
+      Printer << " async";
+
+    if (isThrows)
       Printer << " throws";
 
     print(node->getChild(startIndex + 1));
@@ -1126,8 +1145,12 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       Printer << "):";
     }
     print(Node->getChild(1));
-    if (Node->getNumChildren() == 3)
-      print(Node->getChild(2));
+    if (Node->getNumChildren() == 3) {
+      // Currently the runtime does not mangle the generic signature.
+      // This is an open to-do in swift::_buildDemanglingForContext().
+      if (!Options.PrintForTypeName)
+        print(Node->getChild(2));
+    }
     return nullptr;
   case Node::Kind::Variable:
     return printEntity(Node, asPrefixContext, TypePrinting::WithColon,
@@ -1198,7 +1221,8 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
                        /*hasName*/true);
   case Node::Kind::LocalDeclName:
     print(Node->getChild(1));
-    Printer << " #" << (Node->getChild(0)->getIndex() + 1);
+    if (Options.DisplayLocalNameContexts)
+      Printer << " #" << (Node->getChild(0)->getIndex() + 1);
     return nullptr;
   case Node::Kind::PrivateDeclName:
     if (Node->getNumChildren() > 1) {
@@ -2086,6 +2110,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     printChildren(Node, " ");
     return nullptr;
   case Node::Kind::ImplParameter:
+  case Node::Kind::ImplResult:
     // Children: `convention, differentiability?, type`
     // Print convention.
     print(Node->getChild(0));
@@ -2095,9 +2120,6 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       print(Node->getChild(1));
     // Print type.
     print(Node->getLastChild());
-    return nullptr;
-  case Node::Kind::ImplResult:
-    printChildren(Node, " ");
     return nullptr;
   case Node::Kind::ImplFunctionType:
     printImplFunctionType(Node);
@@ -2268,6 +2290,9 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     print(Node->getChild(0));
     return nullptr;
 
+  case Node::Kind::AsyncAnnotation:
+    Printer<< " async ";
+    return nullptr;
   case Node::Kind::ThrowsAnnotation:
     Printer<< " throws ";
     return nullptr;
@@ -2432,6 +2457,40 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "canonical specialized generic type metadata accessor for ";
     print(Node->getChild(0));
     return nullptr;
+  case Node::Kind::MetadataInstantiationCache:
+    Printer << "metadata instantiation cache for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::NoncanonicalSpecializedGenericTypeMetadata:
+    Printer << "noncanonical specialized generic type metadata for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::NoncanonicalSpecializedGenericTypeMetadataCache:
+    Printer << "cache variable for noncanonical specialized generic type metadata for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::GlobalVariableOnceToken:
+  case Node::Kind::GlobalVariableOnceFunction:
+    Printer << (kind == Node::Kind::GlobalVariableOnceToken
+                  ? "one-time initialization token for "
+                  : "one-time initialization function for ");
+    printContext(Node->getChild(0));
+    print(Node->getChild(1));
+    return nullptr;
+  case Node::Kind::GlobalVariableOnceDeclList:
+    if (Node->getNumChildren() == 1) {
+      print(Node->getChild(0));
+    } else {
+      Printer << '(';
+      for (unsigned i = 0, e = Node->getNumChildren(); i < e; ++i) {
+        if (i != 0) {
+          Printer << ", ";
+        }
+        print(Node->getChild(i));
+      }
+      Printer << ')';
+    }
+    return nullptr;
   }
   printer_unreachable("bad node kind!");
 }
@@ -2468,8 +2527,9 @@ printEntity(NodePointer Entity, bool asPrefixContext, TypePrinting TypePr,
   bool MultiWordName = ExtraName.contains(' ');
   // Also a local name (e.g. Mystruct #1) does not look good if its context is
   // printed in prefix form.
-  if (hasName &&
-      Entity->getChild(1)->getKind() == Node::Kind::LocalDeclName)
+  bool LocalName =
+      hasName && Entity->getChild(1)->getKind() == Node::Kind::LocalDeclName;
+  if (LocalName && Options.DisplayLocalNameContexts)
     MultiWordName = true;
 
   if (asPrefixContext && (TypePr != TypePrinting::NoType || MultiWordName)) {
@@ -2554,7 +2614,8 @@ printEntity(NodePointer Entity, bool asPrefixContext, TypePrinting TypePr,
       printEntityType(Entity, type, genericFunctionTypeList);
     }
   }
-  if (!asPrefixContext && PostfixContext) {
+  if (!asPrefixContext && PostfixContext &&
+      (!LocalName || Options.DisplayLocalNameContexts)) {
     // Print any left over context which couldn't be printed in prefix form.
     if (Entity->getKind() == Node::Kind::DefaultArgumentInitializer ||
         Entity->getKind() == Node::Kind::Initializer ||

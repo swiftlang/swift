@@ -222,13 +222,18 @@ classes.
   record is stored at **offset 0**, in place of an integer kind discriminator.
 - The **super pointer** pointing to the metadata record for the superclass is
   stored at **offset 1**. If the class is a root class, it is null.
-- Two words are reserved for use by the Objective-C runtime at **offset 2**
-  and **offset 3**.
-- The **rodata pointer** is stored at **offset 4**; it points to an Objective-C
-  compatible rodata record for the class. This pointer value includes a tag.
+- On platforms which support Objective-C interoperability, two words are
+  reserved for use by the Objective-C runtime at **offset 2** and **offset
+  3**; on other platforms, nothing is reserved.
+- On platforms which support Objective-C interoperability, the **rodata 
+  pointer** is stored at **offset 4**; on other platforms, it is not present. 
+  The rodata pointer points to an Objective-C compatible rodata record for the 
+  class. This pointer value includes a tag.
   The **low bit is always set to 1** for Swift classes and always set to 0 for
   Objective-C classes.
-- The **class flags** are a 32-bit field at **offset 5**.
+- The **class flags** are a 32-bit field at **offset 5** on platforms which 
+  support Objective-C interoperability; on other platforms, the field is at 
+  **offset 2**.
 - The **instance address point** is a 32-bit field following the class flags.
   A pointer to an instance of this class points this number of bytes after the
   beginning of the instance.
@@ -246,8 +251,11 @@ classes.
   object size.  This is the number of bytes of storage in the class metadata
   object.
 - The `nominal type descriptor`_ for the most-derived class type is referenced
-  at an offset immediately following the class object address point. This is
-  **offset 8** on a 64-bit platform or **offset 11** on a 32-bit platform.
+  at an offset immediately following the class object address point. On 64-bit
+  and 32-bit platforms which support Objective-C interoperability, this is,
+  respectively, at **offset 8** and at **offset 11**; in platforms that do not
+  support Objective-C interoperability, this is, respectively, at **offset 5** 
+  and at **offset 8**.
 - For each Swift class in the class's inheritance hierarchy, in order starting
   from the root class and working down to the most derived class, the following
   fields are present:

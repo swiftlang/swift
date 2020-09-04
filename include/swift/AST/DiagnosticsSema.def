@@ -88,12 +88,22 @@ ERROR(could_not_find_subscript_member_did_you_mean,none,
       "did you mean to use the subscript operator?",
       (Type))
 
+ERROR(could_not_find_subscript_member_tuple, none,
+      "cannot access element using subscript for tuple type %0; "
+      "use '.' notation instead", (Type))
+ERROR(could_not_find_subscript_member_tuple_did_you_mean_use_dot, none,
+      "cannot access element using subscript for tuple type %0; "
+      "did you mean to use '.%1'?", (Type, StringRef))
+
 ERROR(could_not_find_enum_case,none,
       "enum type %0 has no case %1; did you mean %2?",
       (Type, DeclNameRef, DeclName))
 
 NOTE(did_you_mean_raw_type,none,
      "did you mean to specify a raw type on the enum declaration?", ())
+     
+NOTE(did_you_mean_generic_param_as_conformance,none,
+     "did you mean to declare %0 as a protocol conformance for %1?", (DeclName, Type))
 
 NOTE(any_as_anyobject_fixit, none,
      "cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members", ())
@@ -102,6 +112,9 @@ ERROR(expected_argument_in_contextual_member,none,
       "member %0 expects argument of type %1", (DeclName, Type))
 ERROR(expected_parens_in_contextual_member,none,
       "member %0 is a function; did you mean to call it?", (DeclName))
+ERROR(expected_parens_in_contextual_member_type,none,
+      "member %0 is a function that produces expected type %1; did you mean to "
+      "call it?", (DeclName, Type))
 
 ERROR(expected_result_in_contextual_member,none,
       "member %0 in %2 produces result of type %1, but context expects %2",
@@ -249,6 +262,10 @@ ERROR(cannot_call_non_function_value,none,
 ERROR(no_candidates_match_result_type,none,
       "no '%0' candidates produce the expected contextual result type %1",
       (StringRef, Type))
+
+ERROR(no_candidates_match_argument_type,none,
+      "no '%0' candidates produce the expected type %1 for parameter #%2",
+      (StringRef, Type, unsigned))
 
 ERROR(cannot_infer_closure_parameter_type,none,
       "unable to infer type of a closure parameter %0 in the current context",
@@ -438,6 +455,10 @@ ERROR(cannot_convert_closure_result_nil,none,
       "'nil' is not compatible with closure result type %0", (Type))
 ERROR(cannot_convert_parent_type,none,
       "cannot convert parent type %0 to expected type %1",
+      (Type, Type))
+ERROR(cannot_convert_chain_result_type,none,
+      "member chain produces result of type %0 but contextual base was "
+      "inferred as %1",
       (Type, Type))
 
 NOTE(generic_argument_mismatch,none,
@@ -694,12 +715,12 @@ ERROR(sema_opening_import,Fatal,
 ERROR(serialization_load_failed,Fatal,
       "failed to load module '%0'", (StringRef))
 ERROR(module_interface_build_failed,Fatal,
-      "failed to build module '%0' from its module interface; "
-      "%select{the compiler that produced it, '%2', may have used features "
-      "that aren't supported by this compiler, '%3'"
-      "|it may have been damaged or it may have triggered a bug in the Swift "
-      "compiler when it was produced}1",
-      (StringRef, bool, StringRef, StringRef))
+      "failed to %select{build module '%1' from its module interface|verify "
+      "module interface of '%1'}0; %select{the compiler that produced it, "
+      "'%3', may have used features that aren't supported by this compiler, "
+      "'%4'|it may have been damaged or it may have triggered a bug in the "
+      "Swift compiler when it was produced}2",
+      (bool, StringRef, bool, StringRef, StringRef))
 ERROR(serialization_malformed_module,Fatal,
       "malformed compiled module: %0", (StringRef))
 ERROR(serialization_module_too_new,Fatal,
@@ -825,6 +846,9 @@ NOTE(confusable_character,none,
       "%select{identifier|operator}0 '%1' contains possibly confused characters; "
       "did you mean to use '%2'?",
       (bool, StringRef, StringRef))
+NOTE(single_confusable_character,none,
+      "%select{identifier|operator}0 '%1' (%2) looks similar to '%3' (%4); did you mean '%3' (%4)?",
+      (bool, StringRef, StringRef, StringRef, StringRef))
 ERROR(cannot_find_type_in_scope,none,
       "cannot find type %0 in scope", (DeclNameRef))
 ERROR(cannot_find_type_in_scope_did_you_mean,none,
@@ -1021,9 +1045,6 @@ WARNING(downcast_to_unrelated,none,
         "cast from %0 to unrelated type %1 always fails", (Type, Type))
 NOTE(downcast_to_unrelated_fixit,none,
      "did you mean to call %0 with '()'?", (Identifier))
-ERROR(downcast_to_more_optional,none,
-      "cannot downcast from %0 to a more optional type %1",
-      (Type, Type))
 ERROR(optional_chain_noop,none,
       "optional chain has no effect, expression already produces %0",
       (Type))
@@ -1065,9 +1086,23 @@ NOTE(unwrap_with_guard,none,
 ERROR(optional_base_not_unwrapped,none,
       "value of optional type %0 must be unwrapped to refer to member %1 of "
       "wrapped base type %2", (Type, DeclNameRef, Type))
+ERROR(invalid_optional_infered_keypath_root, none,
+      "key path root inferred as optional type %0 must be unwrapped to refer to member %1 "
+      "of unwrapped type %2", (Type, DeclNameRef, Type))
 NOTE(optional_base_chain,none,
      "chain the optional using '?' to access member %0 only for non-'nil' "
      "base values", (DeclNameRef))
+NOTE(optional_base_remove_optional_for_keypath_root, none,
+     "use unwrapped type %0 as key path root", (Type))
+NOTE(optional_keypath_application_base, none,
+     "use '?' to access key path subscript only for non-'nil' base values", ())
+NOTE(optional_key_path_root_base_chain, none,
+     "chain the optional using '?.' to access unwrapped type member %0",
+     (DeclNameRef))
+NOTE(optional_key_path_root_base_unwrap, none,
+     "unwrap the optional using '!.' to access unwrapped type member %0",
+     (DeclNameRef))
+    
 ERROR(missing_unwrap_optional_try,none,
       "value of optional type %0 not unwrapped; did you mean to use 'try!' "
       "or chain with '?'?",
@@ -1174,6 +1209,12 @@ ERROR(extra_trailing_closure_in_call,none,
 ERROR(trailing_closure_bad_param,none,
       "trailing closure passed to parameter of type %0 that does not "
       "accept a closure", (Type))
+WARNING(unlabeled_trailing_closure_deprecated,none,
+        "backward matching of the unlabeled trailing closure is deprecated; label the argument with %0 to suppress this warning",
+        (Identifier))
+NOTE(decl_multiple_defaulted_closure_parameters,none,
+     "%0 contains defaulted closure parameters %1 and %2",
+     (DeclName, Identifier, Identifier))
 NOTE(candidate_with_extraneous_args,none,
       "candidate %0 requires %1 argument%s1, "
       "but %2 %select{were|was}3 %select{provided|used in closure body}4",
@@ -1266,8 +1307,9 @@ ERROR(nominal_type_not_attribute,none,
 
 ERROR(mutating_invalid_global_scope,none, "%0 is only valid on methods",
       (SelfAccessKind))
-ERROR(mutating_invalid_classes,none, "%0 isn't valid on methods in "
-      "classes or class-bound protocols", (SelfAccessKind))
+ERROR(mutating_invalid_classes,none, "%0 is not valid on %1s in " 
+      "%select{classes|class-bound protocols}2",
+      (SelfAccessKind, DescriptiveDeclKind, bool))
 
 ERROR(functions_mutating_and_not,none,
       "method must not be declared both %0 and %1",
@@ -1791,11 +1833,11 @@ ERROR(type_cannot_conform_to_nsobject,none,
 
 ERROR(use_of_equal_instead_of_equality,none,
       "use of '=' in a boolean context, did you mean '=='?", ())
-
 ERROR(type_cannot_conform, none,
-      "%select{|value of protocol }0type %1 cannot conform to %2; "
-      "only struct/enum/class types can conform to protocols",
-      (bool, Type, Type))
+      "%select{type %1|protocol %1 as a type}0 cannot conform to "
+      "%select{%3|the protocol itself}2; "
+      "only concrete types such as structs, enums and classes can conform to protocols",
+      (bool, Type, bool, Type))
 NOTE(required_by_opaque_return,none,
     "required by opaque return type of %0 %1", (DescriptiveDeclKind, DeclName))
 NOTE(required_by_decl,none,
@@ -2403,6 +2445,9 @@ NOTE(multiple_override_prev,none,
 ERROR(override_unavailable, none,
       "cannot override %0 which has been marked unavailable%select{|: %1}1",
       (DeclBaseName, StringRef))
+NOTE(suggest_removing_override, none,
+     "remove 'override' modifier to declare a new %0",
+     (DeclBaseName))
 
 ERROR(override_less_available,none,
       "overriding %0 must be as available as declaration it overrides",
@@ -2427,14 +2472,14 @@ ERROR(override_of_non_open,none,
       (DescriptiveDeclKind))
 
 ERROR(method_does_not_override,none,
-      "method does not override any method from its superclass", ())
+      "method does not override any method from its %select{parent protocol|superclass}0", (bool))
 ERROR(property_does_not_override,none,
-      "property does not override any property from its superclass", ())
+      "property does not override any property from its %select{parent protocol|superclass}0", (bool))
 ERROR(subscript_does_not_override,none,
-      "subscript does not override any subscript from its superclass", ())
+      "subscript does not override any subscript from its %select{parent protocol|superclass}0", (bool))
 ERROR(initializer_does_not_override,none,
       "initializer does not override a designated initializer from its "
-      "superclass", ())
+      "%select{parent protocol|superclass}0", (bool))
 ERROR(failable_initializer_override,none,
       "failable initializer %0 cannot override a non-failable initializer",
       (DeclName))
@@ -2665,6 +2710,9 @@ ERROR(enum_non_integer_convertible_raw_type_no_value,none,
       "expressible by integer or string literal", ())
 ERROR(enum_raw_value_not_unique,none,
       "raw value for enum case is not unique", ())
+ERROR(enum_raw_value_magic_literal,none,
+      "use of '%0' literal as raw value for enum case is not supported",
+      (StringRef))
 NOTE(enum_raw_value_used_here,none,
      "raw value previously used here", ())
 NOTE(enum_raw_value_incrementing_from_here,none,
@@ -2679,18 +2727,29 @@ ERROR(decl_from_hidden_module,none,
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances}2; "
       "%select{%3 has been imported as implementation-only|"
-      "it is an SPI imported from %3}4",
+      "it is an SPI imported from %3|"
+      "it is SPI}4",
+      (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
+WARNING(decl_from_hidden_module_warn,none,
+      "cannot use %0 %1 %select{in SPI|as property wrapper in SPI|"
+      "in an extension with public or '@usableFromInline' members|"
+      "in an extension with conditional conformances}2; "
+      "%select{%3 has been imported as implementation-only}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 ERROR(conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 %select{here|as property wrapper here|"
       "in an extension with public or '@usableFromInline' members|"
-      "in an extension with conditional conformances}2; %3 has been imported "
-      "as implementation-only",
-      (Type, Identifier, unsigned, Identifier))
+      "in an extension with conditional conformances}2; "
+      "%select{%3 has been imported as implementation-only|"
+      "the conformance is declared as SPI in %3|"
+      "the conformance is declared as SPI}4",
+      (Type, Identifier, unsigned, Identifier, unsigned))
 ERROR(assoc_conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 in associated type %3 (inferred as "
-      "%4); %2 has been imported as implementation-only",
-      (Type, Identifier, Identifier, Type, Type))
+      "%4); %select{%2 has been imported as implementation-only|"
+      "the conformance is declared as SPI in %2|"
+      "the conformance is declared as SPI}5",
+      (Type, Identifier, Identifier, Type, Type, unsigned))
 ERROR(unexportable_clang_function_type,none,
       "cannot export the underlying C type of the function type %0; "
       "it may use anonymous types or types defined outside of a module",
@@ -2721,8 +2780,9 @@ ERROR(cannot_synthesize_init_in_extension_of_nonfinal,none,
       "be satisfied by a 'required' initializer in the class definition",
       (Type, DeclName))
 ERROR(cannot_synthesize_in_crossfile_extension,none,
-      "implementation of %0 cannot be automatically synthesized in an extension "
-      "in a different file to the type", (Type))
+      "extension outside of file declaring %0 %1 prevents automatic synthesis "
+      "of %2 for protocol %3",
+      (DescriptiveDeclKind, DeclName, DeclName, Type))
 
 ERROR(broken_additive_arithmetic_requirement,none,
       "AdditiveArithmetic protocol is broken: unexpected requirement", ())
@@ -2764,24 +2824,26 @@ WARNING(differentiable_nondiff_type_implicit_noderivative_fixit,none,
        /*nominalCanDeriveAdditiveArithmetic*/ bool))
 WARNING(differentiable_immutable_wrapper_implicit_noderivative_fixit,none,
       "synthesis of the 'Differentiable.move(along:)' requirement for %1 "
-      "requires 'wrappedValue' in property wrapper %0 to be mutable; "
-      "add an explicit '@noDerivative' attribute"
+      "requires 'wrappedValue' in property wrapper %0 to be mutable or have a "
+      "non-mutating 'move(along:)'; add an explicit '@noDerivative' attribute"
       "%select{|, or conform %1 to 'AdditiveArithmetic'}2",
       (/*wrapperType*/ Identifier, /*nominalName*/ Identifier,
        /*nominalCanDeriveAdditiveArithmetic*/ bool))
 WARNING(differentiable_let_property_implicit_noderivative_fixit,none,
       "synthesis of the 'Differentiable.move(along:)' requirement for %0 "
       "requires all stored properties not marked with `@noDerivative` to be "
-      "mutable; use 'var' instead, or add an explicit '@noDerivative' attribute"
+      "mutable or have a non-mutating 'move(along:)'; use 'var' instead, or "
+      "add an explicit '@noDerivative' attribute "
       "%select{|, or conform %0 to 'AdditiveArithmetic'}1",
       (/*nominalName*/ Identifier, /*nominalCanDeriveAdditiveArithmetic*/ bool))
 
 NOTE(codable_extraneous_codingkey_case_here,none,
      "CodingKey case %0 does not match any stored properties", (Identifier))
 NOTE(codable_non_conforming_property_here,none,
-     "cannot automatically synthesize %0 because %1 does not conform to %0", (Type, Type))
+     "cannot automatically synthesize %0 because %1 does not conform to %0", (Type, TypeLoc))
 NOTE(codable_non_decoded_property_here,none,
-     "cannot automatically synthesize %0 because %1 does not have a matching CodingKey and does not have a default value", (Type, Identifier))
+     "cannot automatically synthesize %0 because %1 does not have a matching "
+     "CodingKey and does not have a default value", (Type, Identifier))
 NOTE(codable_codingkeys_type_is_not_an_enum_here,none,
      "cannot automatically synthesize %0 because 'CodingKeys' is not an enum", (Type))
 NOTE(codable_codingkeys_type_does_not_conform_here,none,
@@ -2819,9 +2881,12 @@ NOTE(missing_member_type_conformance_prevents_synthesis, none,
      "protocol %2, preventing synthesized conformance "
      "of %3 to %2",
      (unsigned, Type, Type, Type))
-NOTE(classes_automatic_protocol_synthesis,none,
-    "automatic synthesis of '%0' is not supported for classes",
-    (StringRef))
+NOTE(automatic_protocol_synthesis_unsupported,none,
+    "automatic synthesis of '%0' is not supported for %select{classes|structs}1",
+    (StringRef, unsigned))
+NOTE(comparable_synthesis_raw_value_not_allowed, none,
+     "enum declares raw type %0, preventing synthesized conformance of %1 to %2", 
+     (Type, Type, Type))
 
 // Dynamic Self
 ERROR(dynamic_self_non_method,none,
@@ -2984,6 +3049,8 @@ ERROR(lazy_must_be_property,none,
       "lazy is only valid for members of a struct or class", ())
 ERROR(lazy_not_strong,none,
       "lazy properties cannot be %0", (ReferenceOwnership))
+ERROR(lazy_var_storage_access,none,
+     "access to the underlying storage of a lazy property is not allowed", ())
 
 // Debugger function attribute.
 ERROR(attr_for_debugger_support_only,none,
@@ -3081,6 +3148,16 @@ ERROR(derivative_attr_class_member_dynamic_self_result_unsupported,none,
 ERROR(derivative_attr_nonfinal_class_init_unsupported,none,
       "cannot register derivative for 'init' in a non-final class; consider "
       "making %0 final", (Type))
+ERROR(derivative_attr_unsupported_accessor_kind,none,
+      "cannot register derivative for %0", (/*accessorKind*/ DescriptiveDeclKind))
+// TODO(SR-13096): Remove this temporary diagnostic.
+ERROR(derivative_attr_class_setter_unsupported,none,
+      "cannot yet register derivative for class property or subscript setters",
+      ())
+// TODO(TF-982): Remove this temporary diagnostic.
+NOTE(derivative_attr_protocol_requirement_unsupported,none,
+     "cannot yet register derivative default implementation for protocol "
+     "requirements", ())
 ERROR(derivative_attr_original_already_has_derivative,none,
       "a derivative already exists for %0", (DeclName))
 NOTE(derivative_attr_duplicate_note,none,
@@ -3116,13 +3193,25 @@ NOTE(transpose_attr_wrt_self_self_type_mismatch_note,none,
      "%1", (Type, Type))
 
 // Automatic differentiation attributes
-ERROR(autodiff_attr_original_decl_invalid_kind,none,
-      "%0 is not a 'func', 'init', 'subscript', or 'var' computed property "
-      "declaration", (DeclNameRef))
-ERROR(autodiff_attr_original_decl_none_valid_found,none,
-      "could not find function %0 with expected type %1", (DeclNameRef, Type))
-ERROR(autodiff_attr_original_decl_not_same_type_context,none,
-      "%0 is not defined in the current type context", (DeclNameRef))
+ERROR(autodiff_attr_original_decl_ambiguous,none,
+      "referenced declaration %0 is ambiguous", (DeclNameRef))
+NOTE(autodiff_attr_original_decl_ambiguous_candidate,none,
+     "candidate %0 found here", (DescriptiveDeclKind))
+ERROR(autodiff_attr_original_decl_none_valid,none,
+      "referenced declaration %0 could not be resolved", (DeclNameRef))
+NOTE(autodiff_attr_original_decl_invalid_kind,none,
+     "candidate %0 is not a 'func', 'init', 'subscript', or 'var' computed "
+     "property declaration", (DescriptiveDeclKind))
+NOTE(autodiff_attr_original_decl_missing_accessor,none,
+     "candidate %0 does not have a %1",
+     (DescriptiveDeclKind, /*accessorDeclKind*/ DescriptiveDeclKind))
+NOTE(autodiff_attr_original_decl_type_mismatch,none,
+     "candidate %0 does not have "
+     "%select{expected type|type equal to or less constrained than}2 %1",
+     (DescriptiveDeclKind, Type, /*hasGenericSignature*/ bool))
+NOTE(autodiff_attr_original_decl_not_same_type_context,none,
+     "candidate %0 is not defined in the current type context",
+     (DescriptiveDeclKind))
 ERROR(autodiff_attr_original_void_result,none,
       "cannot differentiate void function %0", (DeclName))
 ERROR(autodiff_attr_original_multiple_semantic_results,none,
@@ -3131,6 +3220,8 @@ ERROR(autodiff_attr_original_multiple_semantic_results,none,
 ERROR(autodiff_attr_result_not_differentiable,none,
       "can only differentiate functions with results that conform to "
       "'Differentiable', but %0 does not conform to 'Differentiable'", (Type))
+ERROR(autodiff_attr_opaque_result_type_unsupported,none,
+      "cannot differentiate functions returning opaque result types", ())
 
 // differentiation `wrt` parameters clause
 ERROR(diff_function_no_parameters,none,
@@ -3260,7 +3351,7 @@ ERROR(missing_builtin_precedence_group,none,
       (Identifier))
 
 // If you change this, also change enum TryKindForDiagnostics.
-#define TRY_KIND_SELECT(SUB) "%select{try|try!|try?}" #SUB
+#define TRY_KIND_SELECT(SUB) "%select{try|try!|try?|await}" #SUB
 
 ERROR(try_rhs,none,
       "'" TRY_KIND_SELECT(0) "' cannot appear to the right of a "
@@ -3942,10 +4033,13 @@ ERROR(throw_in_nonexhaustive_catch,none,
       "error is not handled because the enclosing catch is not exhaustive", ())
 
 ERROR(throwing_call_in_illegal_context,none,
-      "call can throw, but errors cannot be thrown out of %0",
-      (StringRef))
+      "call can throw, but errors cannot be thrown out of "
+      "%select{<<ERROR>>|a default argument|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
+      (unsigned))
 ERROR(throw_in_illegal_context,none,
-      "errors cannot be thrown out of %0", (StringRef))
+      "errors cannot be thrown out of "
+      "%select{<<ERROR>>|a default argument|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
+      (unsigned))
 
 ERROR(throwing_operator_without_try,none,
       "operator can throw but expression is not marked with 'try'", ())
@@ -3965,6 +4059,63 @@ WARNING(no_throw_in_try,none,
 
 WARNING(no_throw_in_do_with_catch,none,
         "'catch' block is unreachable because no errors are thrown in 'do' block", ())
+
+//------------------------------------------------------------------------------
+// MARK: Concurrency
+//------------------------------------------------------------------------------
+ERROR(async_call_without_await,none,
+      "call is 'async' but is not marked with 'await'", ())
+ERROR(async_call_without_await_in_autoclosure,none,
+      "call is 'async' in an autoclosure argument that is not marked with 'await'", ())
+WARNING(no_async_in_await,none,
+        "no calls to 'async' functions occur within 'await' expression", ())
+ERROR(async_call_in_illegal_context,none,
+      "'async' call cannot occur in "
+      "%select{<<ERROR>>|a default argument|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
+      (unsigned))
+ERROR(await_in_illegal_context,none,
+      "'await' operation cannot occur in "
+      "%select{<<ERROR>>|a default argument|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
+      (unsigned))
+ERROR(async_in_nonasync_function,none,
+      "%select{'async'|'await'}0 in %select{a function|an autoclosure}1 that "
+      "does not support concurrency",
+      (bool, bool))
+NOTE(note_add_async_to_function,none,
+     "add 'async' to function %0 to make it asynchronous", (DeclName))
+NOTE(note_add_asynchandler_to_function,none,
+     "add '@asyncHandler' to function %0 to create an implicit asynchronous context", (DeclName))
+ERROR(not_objc_function_async,none,
+      "'async' function cannot be represented in Objective-C", ())
+NOTE(not_objc_function_type_async,none,
+      "'async' function types cannot be represented in Objective-C", ())
+NOTE(protocol_witness_async_conflict,none,
+     "candidate is %select{not |}0'async', but protocol requirement is%select{| not}0",
+     (bool))
+ERROR(async_autoclosure_nonasync_function,none,
+      "'async' autoclosure parameter in a non-'async' function", ())
+
+ERROR(asynchandler_attr_requires_concurrency,none,
+      "'@asyncHandler' is only valid when experimental concurrency is enabled",
+      ())
+ERROR(asynchandler_non_func,none,
+      "'@asyncHandler' can only be applied to functions",
+      ())
+ERROR(asynchandler_returns_value,none,
+      "'@asyncHandler' function can only return 'Void'",
+      ())
+ERROR(asynchandler_throws,none,
+      "'@asyncHandler' function cannot throw",
+      ())
+ERROR(asynchandler_async,none,
+      "'@asyncHandler' function cannot be 'async' itself",
+      ())
+ERROR(asynchandler_inout_parameter,none,
+      "'inout' parameter is not allowed in '@asyncHandler' function",
+      ())
+ERROR(asynchandler_mutating,none,
+      "'@asyncHandler' function cannot be 'mutating'",
+      ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Types
@@ -4583,12 +4734,23 @@ ERROR(availability_decl_unavailable, none,
       "%select{ in %3|}2%select{|: %4}4",
       (unsigned, DeclName, bool, StringRef, StringRef))
 
+WARNING(availability_decl_unavailable_warn, none,
+        "%select{getter for |setter for |}0%1 is unavailable"
+        "%select{ in %3|}2%select{|: %4}4",
+        (unsigned, DeclName, bool, StringRef, StringRef))
+
 #define REPLACEMENT_DECL_KIND_SELECT "select{| instance method| property}"
 ERROR(availability_decl_unavailable_rename, none,
       "%select{getter for |setter for |}0%1 has been "
       "%select{renamed to|replaced by}2%" REPLACEMENT_DECL_KIND_SELECT "3 "
       "'%4'%select{|: %5}5",
       (unsigned, DeclName, bool, unsigned, StringRef, StringRef))
+
+WARNING(availability_decl_unavailable_rename_warn, none,
+        "%select{getter for |setter for |}0%1 has been "
+        "%select{renamed to|replaced by}2%" REPLACEMENT_DECL_KIND_SELECT "3 "
+        "'%4'%select{|: %5}5",
+        (unsigned, DeclName, bool, unsigned, StringRef, StringRef))
 
 NOTE(availability_marked_unavailable, none,
      "%select{getter for |setter for |}0%1 has been explicitly marked "
@@ -4753,7 +4915,8 @@ WARNING(resilience_decl_unavailable_warn,
 ERROR(inlinable_decl_ref_from_hidden_module,
       none, "%0 %1 cannot be used in " FRAGILE_FUNC_KIND "2 "
       "because %select{%3 was imported implementation-only|"
-      "it is an SPI imported from %3}4",
+      "it is an SPI imported from %3|"
+      "it is SPI}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 
 #undef FRAGILE_FUNC_KIND
@@ -4997,6 +5160,12 @@ NOTE(property_wrapper_direct_init,none,
 ERROR(property_wrapper_incompatible_property, none,
       "property type %0 does not match that of the 'wrappedValue' property of "
       "its wrapper type %1", (Type, Type))
+ERROR(wrapped_value_mismatch, none,
+      "property type %0 does not match 'wrappedValue' type %1",
+      (Type, Type))
+ERROR(composed_property_wrapper_mismatch, none,
+      "composed wrapper type %0 does not match former 'wrappedValue' type %1",
+      (Type, Type))
 
 ERROR(property_wrapper_type_access,none,
       "%select{%select{variable|constant}0|property}1 "
@@ -5075,8 +5244,12 @@ ERROR(function_builder_infer_ambig, none,
 NOTE(function_builder_infer_add_return, none,
      "add an explicit 'return' statement to not use a function builder", ())
 NOTE(function_builder_infer_pick_specific, none,
-     "apply function builder %0 (inferred from protocol %1)",
-     (Type, DeclName))
+     "apply function builder %0 (inferred from %select{protocol|dynamic replacement of}1 %2)",
+     (Type, unsigned, DeclName))
+WARNING(function_builder_missing_limited_availability, none,
+        "function builder %0 does not implement 'buildLimitedAvailability'; "
+        "this code may crash on earlier versions of the OS",
+        (Type))
 
 //------------------------------------------------------------------------------
 // MARK: Tuple Shuffle Diagnostics

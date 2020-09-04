@@ -45,34 +45,25 @@
 #endif
 
 #include "LLVMRevision.inc"
-#include "ClangRevision.inc"
 #include "SwiftRevision.inc"
 
 namespace swift {
 namespace version {
 
-/// Print a string of the form "LLVM xxxxx, Clang yyyyy, Swift zzzzz",
-/// where each placeholder is the revision for the associated repository.
+/// Print a string of the form "LLVM xxxxx, Swift zzzzz", where each placeholder
+/// is the revision for the associated repository.
 static void printFullRevisionString(raw_ostream &out) {
-  // Arbitrarily truncate to 10 characters. This should be enough to unique
-  // Git hashes for the time being, and certainly enough for SVN revisions,
-  // while keeping the version string from being ridiculously long.
+  // Arbitrarily truncate to 15 characters. This should be enough to unique Git
+  // hashes while keeping the REPL version string from overflowing 80 columns.
 #if defined(LLVM_REVISION)
-  out << "LLVM " << StringRef(LLVM_REVISION).slice(0, 10);
-# if defined(CLANG_REVISION) || defined(SWIFT_REVISION)
-  out << ", ";
-# endif
-#endif
-
-#if defined(CLANG_REVISION)
-  out << "Clang " << StringRef(CLANG_REVISION).slice(0, 10);
+  out << "LLVM " << StringRef(LLVM_REVISION).slice(0, 15);
 # if defined(SWIFT_REVISION)
   out << ", ";
 # endif
 #endif
 
 #if defined(SWIFT_REVISION)
-  out << "Swift " << StringRef(SWIFT_REVISION).slice(0, 10);
+  out << "Swift " << StringRef(SWIFT_REVISION).slice(0, 15);
 #endif
 }
 
@@ -414,7 +405,7 @@ std::string getSwiftFullVersion(Version effectiveVersion) {
   OS << "-dev";
 #endif
 
-  if (!(effectiveVersion == Version::getCurrentLanguageVersion())) {
+  if (effectiveVersion != Version::getCurrentLanguageVersion()) {
     OS << " effective-" << effectiveVersion;
   }
 
@@ -424,8 +415,7 @@ std::string getSwiftFullVersion(Version effectiveVersion) {
   OS << " clang-" CLANG_COMPILER_VERSION;
 #endif
   OS << ")";
-#elif defined(LLVM_REVISION) || defined(CLANG_REVISION) || \
-      defined(SWIFT_REVISION)
+#elif defined(LLVM_REVISION) || defined(SWIFT_REVISION)
   OS << " (";
   printFullRevisionString(OS);
   OS << ")";

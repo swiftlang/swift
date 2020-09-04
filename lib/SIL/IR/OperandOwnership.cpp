@@ -123,6 +123,7 @@ SHOULD_NEVER_VISIT_INST(DynamicFunctionRef)
 SHOULD_NEVER_VISIT_INST(PreviousDynamicFunctionRef)
 SHOULD_NEVER_VISIT_INST(GlobalAddr)
 SHOULD_NEVER_VISIT_INST(GlobalValue)
+SHOULD_NEVER_VISIT_INST(BaseAddrForOffset)
 SHOULD_NEVER_VISIT_INST(IntegerLiteral)
 SHOULD_NEVER_VISIT_INST(Metatype)
 SHOULD_NEVER_VISIT_INST(ObjCProtocol)
@@ -349,6 +350,7 @@ FORWARD_ANY_OWNERSHIP_INST(DestructureTuple)
 FORWARD_ANY_OWNERSHIP_INST(InitExistentialRef)
 FORWARD_ANY_OWNERSHIP_INST(DifferentiableFunction)
 FORWARD_ANY_OWNERSHIP_INST(LinearFunction)
+FORWARD_ANY_OWNERSHIP_INST(UncheckedValueCast)
 #undef FORWARD_ANY_OWNERSHIP_INST
 
 // An instruction that forwards a constant ownership or trivial ownership.
@@ -1011,6 +1013,7 @@ ANY_OWNERSHIP_BUILTIN(Swift3ImplicitObjCEntrypoint)
 ANY_OWNERSHIP_BUILTIN(PoundAssert)
 ANY_OWNERSHIP_BUILTIN(GlobalStringTablePointer)
 ANY_OWNERSHIP_BUILTIN(TypePtrAuthDiscriminator)
+ANY_OWNERSHIP_BUILTIN(IntInstrprofIncrement)
 #undef ANY_OWNERSHIP_BUILTIN
 
 // This is correct today since we do not have any builtins which return

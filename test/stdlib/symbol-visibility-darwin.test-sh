@@ -1,0 +1,21 @@
+// Ensure that we do not export any weak symbols from the dylibs.
+//
+// Weak symbols require additional work from the loader to resolve the symbol at
+// load time and can cause ODR violations as well as unexpected symbol
+// satisfaction because the weak symbol may be used from a separate module.
+
+// RUN: %empty-directory(%t)
+
+// RUN: %llvm-nm --defined-only --extern-only --demangle %platform-dylib-dir/%target-library-name(swiftCore) > %t/swiftCore-all.txt
+// RUN: %llvm-nm --defined-only --extern-only --no-weak --demangle %platform-dylib-dir/%target-library-name(swiftCore) > %t/swiftCore-no-weak.txt
+// RUN: diff -u %t/swiftCore-all.txt %t/swiftCore-no-weak.txt
+
+// RUN: %llvm-nm --defined-only --extern-only --demangle %platform-dylib-dir/%target-library-name(swiftRemoteMirror) > %t/swiftRemoteMirror-all.txt
+// RUN: %llvm-nm --defined-only --extern-only --no-weak --demangle %platform-dylib-dir/%target-library-name(swiftRemoteMirror) > %t/swiftRemoteMirror-no-weak.txt
+// RUN: diff -u %t/swiftRemoteMirror-all.txt %t/swiftRemoteMirror-no-weak.txt
+
+// NOTE: swiftDemanging is not checked because it is incorportated into
+// swiftCore and swiftRemoteMirror.  Both of those checks ensure that the
+// symbols are handled properly.
+
+// REQUIRES: VENDOR=apple

@@ -89,9 +89,7 @@ void ContextInfoCallbacks::doneParsing() {
   if (!ParsedExpr)
     return;
 
-  typeCheckContextUntil(
-      CurDeclContext,
-      CurDeclContext->getASTContext().SourceMgr.getCodeCompletionLoc());
+  typeCheckContextAt(CurDeclContext, ParsedExpr->getLoc());
 
   ExprContextInfo Info(CurDeclContext, ParsedExpr);
 
@@ -160,7 +158,7 @@ void ContextInfoCallbacks::getImplicitMembers(
         : DC(DC), CurModule(DC->getParentModule()), T(T), Result(Result) {}
 
     void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
-                   DynamicLookupInfo) {
+                   DynamicLookupInfo) override {
       if (canBeImplictMember(VD) && !VD->shouldHideFromEditor())
         Result.push_back(VD);
     }

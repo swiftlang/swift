@@ -105,7 +105,7 @@ macro(configure_build)
 endmacro()
 
 macro(configure_sdks_darwin)
-  set(macosx_arch "x86_64")
+  set(macosx_arch "x86_64" "arm64")
   set(iphoneos_arch "arm64" "arm64e" "armv7")
   set(appletvos_arch "arm64")
   set(watchos_arch "armv7k")
@@ -367,12 +367,17 @@ function (swift_benchmark_compile_archopts)
       "-F" "${sdk}/../../../Developer/Library/Frameworks"
       "-sdk" "${sdk}"
       "-no-link-objc-runtime")
+
+    # If we are not compiling at -Onone and are performing WMO, always emit
+    # optimization-records.
+    if(NOT ${optflag} STREQUAL "Onone" AND "${bench_flags}" MATCHES "-whole-module.*")
+      list(APPEND common_options "-save-optimization-record=bitstream")
+    endif()
   endif()
 
   set(opt_view_main_dir)
   if(SWIFT_BENCHMARK_GENERATE_OPT_VIEW AND LLVM_HAVE_OPT_VIEWER_MODULES)
     if(NOT ${optflag} STREQUAL "Onone" AND "${bench_flags}" MATCHES "-whole-module.*")
-      list(APPEND common_options "-save-optimization-record")
       set(opt_view_main_dir "${objdir}/opt-view")
     endif()
   endif()
@@ -609,11 +614,7 @@ function (swift_benchmark_compile_archopts)
 
   if(is_darwin)
     # If host == target.
-    if("${BENCH_COMPILE_ARCHOPTS_PLATFORM}" STREQUAL "macosx")
-      set(OUTPUT_EXEC "${benchmark-bin-dir}/Benchmark_${BENCH_COMPILE_ARCHOPTS_OPT}")
-    else()
-      set(OUTPUT_EXEC "${benchmark-bin-dir}/Benchmark_${BENCH_COMPILE_ARCHOPTS_OPT}-${target}")
-    endif()
+    set(OUTPUT_EXEC "${benchmark-bin-dir}/Benchmark_${BENCH_COMPILE_ARCHOPTS_OPT}-${target}")
   else()
     # If we are on Linux, we do not support cross compiling.
     set(OUTPUT_EXEC "${benchmark-bin-dir}/Benchmark_${BENCH_COMPILE_ARCHOPTS_OPT}")
@@ -660,8 +661,11 @@ function (swift_benchmark_compile_archopts)
           "-m${triple_platform}-version-min=${ver}"
           "-lobjc"
           "-L${SWIFT_LIBRARY_PATH}/${BENCH_COMPILE_ARCHOPTS_PLATFORM}"
+          "-L${sdk}/usr/lib/swift"
           "-Xlinker" "-rpath"
           "-Xlinker" "${SWIFT_LINK_RPATH}"
+          "-Xlinker" "-rpath"
+          "-Xlinker" "/usr/lib/swift"
           ${bench_library_objects}
           ${bench_driver_objects}
           ${ld64_add_ast_path_opts}
@@ -694,7 +698,7 @@ function(swift_benchmark_compile)
   cmake_parse_arguments(SWIFT_BENCHMARK_COMPILE "" "PLATFORM" "" ${ARGN})
 
   if(NOT SWIFT_BENCHMARK_BUILT_STANDALONE)
-    set(stdlib_dependencies "swift")
+    set(stdlib_dependencies "swift-frontend")
     foreach(stdlib_dependency ${UNIVERSAL_LIBRARY_NAMES_${SWIFT_BENCHMARK_COMPILE_PLATFORM}})
       string(FIND "${stdlib_dependency}" "Unittest" find_output)
       if("${find_output}" STREQUAL "-1")
@@ -738,11 +742,13 @@ function(swift_benchmark_compile)
       add_custom_target("check-${executable_target}"
           COMMAND "${swift-bin-dir}/Benchmark_Driver" "run"
                   "-o" "O" "--output-dir" "${CMAKE_CURRENT_BINARY_DIR}/logs"
+                  "--architecture" "${arch}"
                   "--swift-repo" "${SWIFT_SOURCE_DIR}"
                   "--independent-samples" "${SWIFT_BENCHMARK_NUM_O_ITERATIONS}"
           COMMAND "${swift-bin-dir}/Benchmark_Driver" "run"
                   "-o" "Onone" "--output-dir" "${CMAKE_CURRENT_BINARY_DIR}/logs"
                   "--swift-repo" "${SWIFT_SOURCE_DIR}"
+                  "--architecture" "${arch}"
                   "--independent-samples" "${SWIFT_BENCHMARK_NUM_ONONE_ITERATIONS}"
           COMMAND "${swift-bin-dir}/Benchmark_Driver" "compare"
                   "--log-dir" "${CMAKE_CURRENT_BINARY_DIR}/logs"

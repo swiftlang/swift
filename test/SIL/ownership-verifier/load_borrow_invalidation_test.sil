@@ -8,6 +8,8 @@ import Builtin
 // patterns look next door for verifier error checks.
 
 sil @inoutCallee : $@convention(thin) (@inout Builtin.NativeObject) -> ()
+sil @guaranteedUser : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+sil @useRawPointer : $@convention(thin) (Builtin.RawPointer) -> ()
 
 //////////////////////////
 // InOut Argument Tests //
@@ -372,6 +374,24 @@ bb3:
   dealloc_stack %stack0 : $*Builtin.NativeObject
   end_borrow %0a : $Builtin.NativeObject
   destroy_addr %0 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @pointer_to_address_is_assumed_to_be_safe : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = alloc_stack $Builtin.NativeObject
+  store %0 to [init] %1 : $*Builtin.NativeObject
+  %2 = load_borrow %1 : $*Builtin.NativeObject
+  %gUser = function_ref @guaranteedUser : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %gUser(%2) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %2 : $Builtin.NativeObject
+  %3 = address_to_pointer %1 : $*Builtin.NativeObject to $Builtin.RawPointer
+  %4 = mark_dependence %3 : $Builtin.RawPointer on %1 : $*Builtin.NativeObject
+  %rawPointerUser = function_ref @useRawPointer : $@convention(thin) (Builtin.RawPointer) -> ()
+  apply %rawPointerUser(%4) : $@convention(thin) (Builtin.RawPointer) -> ()
+  destroy_addr %1 : $*Builtin.NativeObject
+  dealloc_stack %1 : $*Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
 }

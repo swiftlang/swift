@@ -234,15 +234,13 @@ static bool makeParserAST(CompilerInstance &CI, StringRef Text,
   Invocation.getFrontendOptions().InputsAndOutputs.clearInputs();
   Invocation.setModuleName("main");
   Invocation.setInputKind(InputFileKind::Swift);
+  Invocation.getLangOptions().DisablePoundIfEvaluation = true;
 
   std::unique_ptr<llvm::MemoryBuffer> Buf;
   Buf = llvm::MemoryBuffer::getMemBuffer(Text, "<module-interface>");
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
       InputFile(Buf.get()->getBufferIdentifier(), false, Buf.get()));
-  if (CI.setup(Invocation))
-    return true;
-  CI.performParseOnly();
-  return false;
+  return CI.setup(Invocation);
 }
 
 static void reportSyntacticAnnotations(CompilerInstance &CI,

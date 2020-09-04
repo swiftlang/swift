@@ -135,6 +135,15 @@ Solution ConstraintSystem::finalize() {
     solution.DisjunctionChoices.insert(choice);
   }
 
+  // Remember all of the trailing closure matching choices we made.
+  for (auto &trailingClosureMatch : trailingClosureMatchingChoices) {
+    auto inserted = solution.trailingClosureMatchingChoices.insert(
+        trailingClosureMatch);
+    assert((inserted.second ||
+            inserted.first->second == trailingClosureMatch.second));
+    (void)inserted;
+  }
+
   // Remember the opened types.
   for (const auto &opened : OpenedTypes) {
     // We shouldn't ever register opened types multiple times,
@@ -215,6 +224,11 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   // Register the solution's disjunction choices.
   for (auto &choice : solution.DisjunctionChoices) {
     DisjunctionChoices.push_back(choice);
+  }
+
+  // Remember all of the trailing closure matching choices we made.
+  for (auto &trailingClosureMatch : solution.trailingClosureMatchingChoices) {
+    trailingClosureMatchingChoices.push_back(trailingClosureMatch);
   }
 
   // Register the solution's opened types.
@@ -436,11 +450,11 @@ ConstraintSystem::SolverState::~SolverState() {
   // Update the "largest" statistics if this system is larger than the
   // previous one.  
   // FIXME: This is not at all thread-safe.
-  if (NumStatesExplored > LargestNumStatesExplored.Value) {
-    LargestSolutionAttemptNumber.Value = SolutionAttempt-1;
+  if (NumStatesExplored > LargestNumStatesExplored.getValue()) {
+    LargestSolutionAttemptNumber = SolutionAttempt-1;
     ++LargestSolutionAttemptNumber;
     #define CS_STATISTIC(Name, Description) \
-      JOIN2(Largest,Name).Value = Name-1; \
+      JOIN2(Largest,Name) = Name-1; \
       ++JOIN2(Largest,Name);
     #include "ConstraintSolverStats.def"
   }
@@ -456,6 +470,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numFixes = cs.Fixes.size();
   numFixedRequirements = cs.FixedRequirements.size();
   numDisjunctionChoices = cs.DisjunctionChoices.size();
+  numTrailingClosureMatchingChoices = cs.trailingClosureMatchingChoices.size();
   numOpenedTypes = cs.OpenedTypes.size();
   numOpenedExistentialTypes = cs.OpenedExistentialTypes.size();
   numDefaultedConstraints = cs.DefaultedConstraints.size();
@@ -509,6 +524,10 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any disjunction choices.
   truncate(cs.DisjunctionChoices, numDisjunctionChoices);
+
+  // Remove any trailing closure matching choices;
+  truncate(
+      cs.trailingClosureMatchingChoices, numTrailingClosureMatchingChoices);
 
   // Remove any opened types.
   truncate(cs.OpenedTypes, numOpenedTypes);
@@ -800,6 +819,12 @@ void ConstraintSystem::shrink(Expr *expr) {
         return {false, expr};
       }
 
+      // Similar to 'ClosureExpr', 'TapExpr' has a 'VarDecl' the type of which
+      // is determined by type checking the parent interpolated string literal.
+      if (isa<TapExpr>(expr)) {
+        return {false, expr};
+      }
+
       if (auto coerceExpr = dyn_cast<CoerceExpr>(expr)) {
         if (coerceExpr->isLiteralInit())
           ApplyExprs.push_back({coerceExpr, 1});
@@ -988,12 +1013,17 @@ void ConstraintSystem::shrink(Expr *expr) {
         // let's allow collector discover it with assigned contextual type
         // of coercion, which allows collections to be solved in parts.
         if (auto collectionExpr = dyn_cast<CollectionExpr>(childExpr)) {
-          auto castTypeLoc = coerceExpr->getCastTypeLoc();
-          auto typeRepr = castTypeLoc.getTypeRepr();
+          auto *const typeRepr = coerceExpr->getCastTypeRepr();
 
           if (typeRepr && isSuitableCollection(typeRepr)) {
-            auto resolution = TypeResolution::forContextual(CS.DC, None);
-            auto coercionType = resolution.resolveType(typeRepr);
+            const auto coercionType =
+                TypeResolution::forContextual(
+                    CS.DC, None,
+                    // FIXME: Should we really be unconditionally complaining
+                    // about unbound generics here? For example:
+                    // let foo: [Array<Float>] = [[0], [1], [2]] as [Array]
+                    /*unboundTyOpener*/ nullptr)
+                    .resolveType(typeRepr);
 
             // Looks like coercion type is invalid, let's skip this sub-tree.
             if (coercionType->hasError())
@@ -1376,6 +1406,50 @@ void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {
   }
 }
 
+void ConstraintSystem::solveForCodeCompletion(
+    Expr *expr, DeclContext *DC, Type contextualType, ContextualTypePurpose CTP,
+    llvm::function_ref<void(const Solution &)> callback) {
+  // First, pre-check the expression, validating any types that occur in the
+  // expression and folding sequence expressions.
+  if (ConstraintSystem::preCheckExpression(
+          expr, DC, /*replaceInvalidRefsWithErrors=*/true))
+    return;
+
+  ConstraintSystemOptions options;
+  options |= ConstraintSystemFlags::AllowFixes;
+  options |= ConstraintSystemFlags::SuppressDiagnostics;
+
+  ConstraintSystem cs(DC, options);
+
+  if (CTP != ContextualTypePurpose::CTP_Unused)
+    cs.setContextualType(expr, TypeLoc::withoutLoc(contextualType), CTP);
+
+  // Set up the expression type checker timer.
+  cs.Timer.emplace(expr, cs);
+
+  cs.shrink(expr);
+
+  if (!cs.generateConstraints(expr, DC))
+    return;
+
+  llvm::SmallVector<Solution, 4> solutions;
+
+  {
+    SolverState state(cs, FreeTypeVariableBinding::Disallow);
+
+    // Enable "diagnostic mode" by default, this means that
+    // solver would produce "fixed" solutions alongside valid
+    // ones, which helps code completion to rank choices.
+    state.recordFixes = true;
+
+    cs.solveImpl(solutions);
+  }
+
+  for (const auto &solution : solutions) {
+    callback(solution);
+  }
+}
+
 void ConstraintSystem::collectDisjunctions(
     SmallVectorImpl<Constraint *> &disjunctions) {
   for (auto &constraint : InactiveConstraints) {
@@ -1688,6 +1762,7 @@ void ConstraintSystem::ArgumentInfoCollector::walk(Type argType) {
       case ConstraintKind::ConformsTo:
       case ConstraintKind::Defaultable:
       case ConstraintKind::OneWayEqual:
+      case ConstraintKind::OneWayBindParam:
       case ConstraintKind::DefaultClosureType:
         break;
       }
@@ -2325,7 +2400,7 @@ void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
   if (typeVar->getImpl().getFixedType(nullptr))
     return;
 
-  auto bindings = cs.getPotentialBindings(typeVar);
+  auto bindings = cs.inferBindingsFor(typeVar);
   if (bindings.InvolvesTypeVariables || bindings.Bindings.size() != 1)
     return;
 

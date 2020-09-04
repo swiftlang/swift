@@ -572,6 +572,15 @@ bb0:
   return %6 : $()
 }
 
+// CHECK-LABEL: @base_addr : $@convention(thin) () -> ()
+sil private @base_addr : $() -> () {
+bb0:
+  // CHECK: base_addr_for_offset $*Int
+  %0 = base_addr_for_offset $*Int
+  %1 = tuple ()
+  return %1 : $()
+}
+
 protocol SomeProtocol {
 }
 class SomeClass : SomeProtocol {
@@ -1688,11 +1697,22 @@ bb0:
   return %1 : $()
 }
 
+class Foo2: Foo {}
+
 // CHECK-LABEL: sil_vtable Foo {
-// CHECK: #Foo.subscript!getter: {{.*}} : @Foo_subscript_getter
-// CHECK: #Foo.subscript!setter: {{.*}} : @Foo_subscript_setter [override]
+// CHECK: #Foo.subscript!getter: {{.*}} : @Foo_subscript_getter [nonoverridden]
+// CHECK: #Foo.subscript!setter: {{.*}} : @Foo_subscript_setter
 // CHECK: }
 sil_vtable Foo {
-  #Foo.subscript!getter: @Foo_subscript_getter
+  #Foo.subscript!getter: @Foo_subscript_getter [nonoverridden]
+  #Foo.subscript!setter: @Foo_subscript_setter 
+}
+
+// CHECK-LABEL: sil_vtable Foo2 {
+// CHECK: #Foo.subscript!getter: {{.*}} : @Foo_subscript_getter [inherited] [nonoverridden]
+// CHECK: #Foo.subscript!setter: {{.*}} : @Foo_subscript_setter [override]
+// CHECK: }
+sil_vtable Foo2 {
+  #Foo.subscript!getter: @Foo_subscript_getter [inherited] [nonoverridden]
   #Foo.subscript!setter: @Foo_subscript_setter [override]
 }

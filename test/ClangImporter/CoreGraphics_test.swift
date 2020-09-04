@@ -4,6 +4,7 @@
 import CoreGraphics
 
 // REQUIRES: OS=macosx
+// REQUIRES: CPU=x86_64
 
 // CHECK: [[SWITCHTABLE:@.*]] = private unnamed_addr constant [8 x i64] [i64 0, i64 12, i64 23, i64 34, i64 45, i64 55, i64 67, i64 71]
 

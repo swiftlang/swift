@@ -214,6 +214,24 @@ def disable_objc_attr_requires_foundation_module :
 def enable_resilience : Flag<["-"], "enable-resilience">,
    HelpText<"Deprecated, use -enable-library-evolution instead">;
 
+def disable_implicit_swift_modules: Flag<["-"], "disable-implicit-swift-modules">,
+  HelpText<"Disable building Swift modules explicitly by the compiler">;
+
+def swift_module_file
+  : Separate<["-"], "swift-module-file">, MetaVarName<"<path>">,
+    HelpText<"Specify Swift module explicitly built from textual interface">;
+
+def explict_swift_module_map
+  : Separate<["-"], "explicit-swift-module-map-file">, MetaVarName<"<path>">,
+    HelpText<"Specify a JSON file containing information of explict Swift modules">;
+
+def placeholder_dependency_module_map
+  : Separate<["-"], "placeholder-dependency-module-map-file">, MetaVarName<"<path>">,
+    HelpText<"Specify a JSON file containing information of external Swift module dependencies">;
+
+def batch_scan_input_file
+  : Separate<["-"], "batch-scan-input-file">, MetaVarName<"<path>">,
+    HelpText<"Specify a JSON file containing modules to perform batch dependencies scanning">;
 }
 
 
@@ -242,6 +260,9 @@ def debug_forbid_typecheck_prefix : Separate<["-"], "debug-forbid-typecheck-pref
   HelpText<"Triggers llvm fatal_error if typechecker tries to typecheck a decl "
            "with the provided prefix name">;
 
+def debug_emit_invalid_swiftinterface_syntax : Flag<["-"], "debug-emit-invalid-swiftinterface-syntax">,
+  HelpText<"Write an invalid declaration into swiftinterface files">;
+
 def debug_cycles : Flag<["-"], "debug-cycles">,
   HelpText<"Print out debug dumps when cycles are detected in evaluation">;
 def build_request_dependency_graph : Flag<["-"], "build-request-dependency-graph">,
@@ -249,8 +270,6 @@ def build_request_dependency_graph : Flag<["-"], "build-request-dependency-graph
 def output_request_graphviz : Separate<["-"], "output-request-graphviz">,
   HelpText<"Emit GraphViz output visualizing the request dependency graph">;
 
-def debug_time_compilation : Flag<["-"], "debug-time-compilation">,
-  HelpText<"Prints the time taken by each compilation phase">;
 def debug_time_function_bodies : Flag<["-"], "debug-time-function-bodies">,
   HelpText<"Dumps the time it takes to type-check each function body">;
 def debug_time_expression_type_checking : Flag<["-"], "debug-time-expression-type-checking">,
@@ -282,10 +301,6 @@ def disable_sil_partial_apply : Flag<["-"], "disable-sil-partial-apply">,
 
 def enable_spec_devirt : Flag<["-"], "enable-spec-devirt">,
   HelpText<"Enable speculative devirtualization pass.">;
-
-def enable_ownership_stripping_after_serialization
-  : Flag<["-"], "enable-ownership-stripping-after-serialization">,
-  HelpText<"Strip ownership after serialization">;
 
 def disable_access_control : Flag<["-"], "disable-access-control">,
   HelpText<"Don't respect access control restrictions">;
@@ -320,6 +335,9 @@ def disable_llvm_verify : Flag<["-"], "disable-llvm-verify">,
 
 def disable_llvm_value_names : Flag<["-"], "disable-llvm-value-names">,
   HelpText<"Don't add names to local values in LLVM IR">;
+
+def dump_jit : JoinedOrSeparate<["-"], "dump-jit">,
+  HelpText<"Dump JIT contents">;
 
 def enable_llvm_value_names : Flag<["-"], "enable-llvm-value-names">,
   HelpText<"Add names to local values in LLVM IR">;
@@ -376,6 +394,10 @@ def enable_large_loadable_types : Flag<["-"], "enable-large-loadable-types">,
 def enable_experimental_static_assert :
   Flag<["-"], "enable-experimental-static-assert">,
   HelpText<"Enable experimental #assert">;
+
+def enable_experimental_concurrency :
+  Flag<["-"], "enable-experimental-concurrency">,
+  HelpText<"Enable experimental concurrency model">;
 
 def enable_subst_sil_function_types_for_function_values :
   Flag<["-"], "enable-subst-sil-function-types-for-function-values">,
@@ -450,6 +472,9 @@ def warn_long_expression_type_checking_EQ : Joined<["-"], "warn-long-expression-
 
 def Rmodule_interface_rebuild : Flag<["-"], "Rmodule-interface-rebuild">,
   HelpText<"Emits a remark if an imported module needs to be re-compiled from its module interface">;
+
+def enable_volatile_modules : Flag<["-"], "enable-volatile-modules">,
+  HelpText<"Load Swift modules in memory">;
 
 def solver_expression_time_threshold_EQ : Joined<["-"], "solver-expression-time-threshold=">;
 
@@ -548,9 +573,6 @@ def sil_unroll_threshold : Separate<["-"], "sil-unroll-threshold">,
   MetaVarName<"<250>">,
   HelpText<"Controls the aggressiveness of loop unrolling">;
 
-def sil_merge_partial_modules : Flag<["-"], "sil-merge-partial-modules">,
-  HelpText<"Merge SIL from all partial swiftmodules into the final module">;
-
 def sil_verify_all : Flag<["-"], "sil-verify-all">,
   HelpText<"Verify SIL after each transform">;
   
@@ -578,6 +600,9 @@ def print_llvm_inline_tree : Flag<["-"], "print-llvm-inline-tree">,
 def disable_incremental_llvm_codegeneration :
   Flag<["-"], "disable-incremental-llvm-codegen">,
        HelpText<"Disable incremental llvm code generation.">;
+
+def ignore_always_inline : Flag<["-"], "ignore-always-inline">,
+  HelpText<"Ignore @inline(__always) attributes.">;
 
 def emit_sorted_sil : Flag<["-"], "emit-sorted-sil">,
   HelpText<"When printing SIL, print out all sil entities sorted by name to "
@@ -626,15 +651,28 @@ def build_module_from_parseable_interface :
   Alias<compile_module_from_interface>,
   ModeOpt;
 
+def typecheck_module_from_interface :
+  Flag<["-"], "typecheck-module-from-interface">,
+  HelpText<"Treat the (single) input as a swiftinterface and typecheck it">,
+  ModeOpt;
+
 def module_interface_preserve_types_as_written :
   Flag<["-"], "module-interface-preserve-types-as-written">,
   HelpText<"When emitting a module interface, preserve types as they were "
            "written in the source">;
 
+def experimental_spi_imports :
+  Flag<["-"], "experimental-spi-imports">,
+  HelpText<"Enable experimental support for SPI imports">;
+
 def experimental_print_full_convention :
  Flag<["-"], "experimental-print-full-convention">,
  HelpText<"When emitting a module interface, emit additional @convention "
           "arguments, regardless of whether they were written in the source">;
+
+def experimental_one_way_closure_params :
+  Flag<["-"], "experimental-one-way-closure-params">,
+  HelpText<"Enable experimental support for one-way closure parameters">;
 
 def prebuilt_module_cache_path :
   Separate<["-"], "prebuilt-module-cache-path">,
@@ -712,4 +750,14 @@ def target_sdk_version : Separate<["-"], "target-sdk-version">,
 def target_variant_sdk_version : Separate<["-"], "target-variant-sdk-version">,
   HelpText<"The version of target variant SDK used for compilation">;
 
+def extra_clang_options_only : Flag<["-"], "only-use-extra-clang-opts">,
+  HelpText<"Options passed via -Xcc are sufficient for Clang configuration">;
+
+def candidate_module_file
+  : Separate<["-"], "candidate-module-file">, MetaVarName<"<path>">,
+    HelpText<"Specify Swift module may be ready to use for an interface">;
+
+def use_static_resource_dir
+  : Flag<["-"], "use-static-resource-dir">,
+    HelpText<"Use resources in the static resource directory">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

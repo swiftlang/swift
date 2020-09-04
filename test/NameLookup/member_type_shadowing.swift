@@ -29,3 +29,17 @@ class B: A {
     _ = B.Reusable.option2 // expected-error {{type 'B.Reusable' has no member 'option2'; did you mean 'option1'?}}
   }
 }
+
+protocol Q {
+  typealias A = Int
+}
+
+struct S : Q {
+  typealias A = String
+}
+
+func usesA(_: S.A) {} // should resolve to the typealias inside S
+
+func callsA() {
+  usesA("hello")
+}

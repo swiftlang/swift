@@ -23,7 +23,7 @@
 #include "Visibility.h"
 
 #ifdef __cplusplus
-namespace swift { extern "C" {
+extern "C" {
 #endif
 
 #ifdef __OBJC2__
@@ -78,7 +78,7 @@ _swift_stdlib_dyld_is_objc_constant_string(const void * _Nonnull addr);
 #endif // __OBJC2__
 
 #ifdef __cplusplus
-}} // extern "C", namespace swift
+} // extern "C"
 #endif
 
 #endif // SWIFT_STDLIB_SHIMS_COREFOUNDATIONSHIMS_H

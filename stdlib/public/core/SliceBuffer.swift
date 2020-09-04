@@ -176,17 +176,9 @@ internal struct _SliceBuffer<Element>
     minimumCapacity: Int
   ) -> NativeBuffer? {
     _invariantCheck()
-    // This is a performance optimization that was put in to ensure that at
-    // -Onone, copy of self we make to call _hasNativeBuffer is destroyed before
-    // we call isUniquelyReferenced. Otherwise, isUniquelyReferenced will always
-    // fail causing us to always copy.
-    //
-    // if _fastPath(_hasNativeBuffer && isUniquelyReferenced) {
-    //
-    // SR-6437
-    let native = _hasNativeBuffer
-    let unique = isUniquelyReferenced()
-    if _fastPath(native && unique) {
+    // Note: with COW support it's already guaranteed to have a uniquely
+    // referenced buffer. This check is only needed for backward compatibility.
+    if _fastPath(isUniquelyReferenced()) {
       if capacity >= minimumCapacity {
         // Since we have the last reference, drop any inaccessible
         // trailing elements in the underlying storage.  That will
@@ -275,7 +267,7 @@ internal struct _SliceBuffer<Element>
     set {
       let growth = newValue - count
       if growth != 0 {
-        nativeBuffer.count += growth
+        nativeBuffer.mutableCount += growth
         self.endIndex += growth
       }
       _invariantCheck()
@@ -304,9 +296,50 @@ internal struct _SliceBuffer<Element>
     return count
   }
 
+  /// Returns `true` iff this buffer's storage is uniquely-referenced.
+  ///
+  /// This function should only be used for internal sanity checks and for
+  /// backward compatibility.
+  /// To guard a buffer mutation, use `beginCOWMutation`.
   @inlinable
   internal mutating func isUniquelyReferenced() -> Bool {
     return isKnownUniquelyReferenced(&owner)
+  }
+
+  /// Returns `true` and puts the buffer in a mutable state iff the buffer's
+  /// storage is uniquely-referenced.
+  ///
+  /// - Precondition: The buffer must be immutable.
+  ///
+  /// - Warning: It's a requirement to call `beginCOWMutation` before the buffer
+  ///   is mutated.
+  @_alwaysEmitIntoClient
+  internal mutating func beginCOWMutation() -> Bool {
+    if !_hasNativeBuffer {
+      return false
+    }
+    if Bool(Builtin.beginCOWMutation(&owner)) {
+#if INTERNAL_CHECKS_ENABLED
+      nativeBuffer.isImmutable = false
+#endif
+      return true
+    }
+    return false;
+  }
+
+  /// Puts the buffer in an immutable state.
+  ///
+  /// - Precondition: The buffer must be mutable.
+  ///
+  /// - Warning: After a call to `endCOWMutation` the buffer must not be mutated
+  ///   until the next call of `beginCOWMutation`.
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal mutating func endCOWMutation() {
+#if INTERNAL_CHECKS_ENABLED
+    nativeBuffer.isImmutable = true
+#endif
+    Builtin.endCOWMutation(&owner)
   }
 
   @inlinable

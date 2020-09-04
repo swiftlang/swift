@@ -211,6 +211,7 @@ set(SWIFTLIB_SOURCES
   CollectionOfOne.swift
   DiscontiguousSlice.swift
   Diffing.swift
+  FloatingPointRandom.swift
   Mirror.swift
   PlaygroundDisplay.swift
   CommandLine.swift
@@ -287,11 +288,16 @@ if(SWIFT_STDLIB_SIL_DEBUGGING)
   list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-gsil")
 endif()
 
-list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-inline-generics")
-list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
+if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel")
+  list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-inline-generics")
+  list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
+endif()
 if(SWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING)
   list(APPEND swift_stdlib_compile_flags "-enforce-exclusivity=checked")
 endif()
+
+# STAGING: Temporarily avoids having to write #fileID in Swift.swiftinterface.
+list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-experimental-concise-pound-file")
 
 if(SWIFT_CHECK_ESSENTIAL_STDLIB)
   add_swift_target_library(swift_stdlib_essential ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE

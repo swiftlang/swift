@@ -72,7 +72,8 @@ func test_powl() {
 }
 #endif
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+#if !os(macOS) && !(os(iOS) && targetEnvironment(macCatalyst))
+@available(iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 func test_f16() {
   var x = Float16.zero
   f16ptrfunc(&x)
@@ -80,6 +81,7 @@ func test_f16() {
   f16func(x)
   #endif
 }
+#endif
 
 func test_puts(_ s: String) {
   _ = s.withCString { puts($0) + 32 };

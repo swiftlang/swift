@@ -28,6 +28,7 @@
 #include "Varargs.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Expr.h"
@@ -1867,7 +1868,7 @@ RValue SILGenFunction::emitAnyHashableErasure(SILLocation loc,
   auto convertFn = SGM.getConvertToAnyHashable(loc);
   if (!convertFn)
     return emitUndefRValue(
-        loc, getASTContext().getAnyHashableDecl()->getDeclaredType());
+        loc, getASTContext().getAnyHashableDecl()->getDeclaredInterfaceType());
 
   // Construct the substitution for T: Hashable.
   auto subMap = SubstitutionMap::getProtocolSubstitutions(
@@ -1972,7 +1973,7 @@ static RValue emitBoolLiteral(SILGenFunction &SGF, SILLocation loc,
 }
 RValue RValueEmitter::visitIsExpr(IsExpr *E, SGFContext C) {
   SILValue isa = emitIsa(SGF, E, E->getSubExpr(),
-                         E->getCastTypeLoc().getType(), E->getCastKind());
+                         E->getCastType(), E->getCastKind());
   return emitBoolLiteral(SGF, E, isa, C);
 }
 
@@ -2065,8 +2066,8 @@ RValue RValueEmitter::visitUnderlyingToOpaqueExpr(UnderlyingToOpaqueExpr *E,
   if (value.getType() == opaqueTL.getLoweredType())
     return RValue(SGF, E, value);
 
-  auto cast = SGF.B.createUncheckedBitCast(E, value.forward(SGF),
-                                           opaqueTL.getLoweredType());
+  auto cast = SGF.B.createUncheckedReinterpretCast(E, value.forward(SGF),
+                                                   opaqueTL.getLoweredType());
   value = SGF.emitManagedRValueWithCleanup(cast);
 
   return RValue(SGF, E, value);
@@ -2108,15 +2109,25 @@ VarargsInfo Lowering::emitBeginVarargs(SILGenFunction &SGF, SILLocation loc,
 }
 
 ManagedValue Lowering::emitEndVarargs(SILGenFunction &SGF, SILLocation loc,
-                                      VarargsInfo &&varargs) {
+                                      VarargsInfo &&varargs,
+                                      unsigned numElements) {
   // Kill the abort cleanup.
   SGF.Cleanups.setCleanupState(varargs.getAbortCleanup(), CleanupState::Dead);
 
   // Reactivate the result cleanup.
-  auto result = varargs.getArray();
-  if (result.hasCleanup())
-    SGF.Cleanups.setCleanupState(result.getCleanup(), CleanupState::Active);
-  return result;
+  auto array = varargs.getArray();
+  if (array.hasCleanup())
+    SGF.Cleanups.setCleanupState(array.getCleanup(), CleanupState::Active);
+
+  // Array literals only need to be finalized, if the array is really allocated.
+  // In case of zero elements, no allocation is done, but the empty-array
+  // singleton is used. "Finalization" means to emit an end_cow_mutation
+  // instruction on the array. As the empty-array singleton is a read-only and
+  // shared object, it's not legal to do a end_cow_mutation on it.
+  if (numElements == 0)
+    return array;
+    
+  return SGF.emitUninitializedArrayFinalization(loc, std::move(array));
 }
 
 RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
@@ -2731,7 +2742,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
     params.push_back({loweredBaseTy, paramConvention});
     auto &C = SGM.getASTContext();
     if (!indexes.empty())
-      params.push_back({C.getUnsafeRawPointerDecl()->getDeclaredType()
+      params.push_back({C.getUnsafeRawPointerDecl()->getDeclaredInterfaceType()
                                                    ->getCanonicalType(),
                         ParameterConvention::Direct_Unowned});
     
@@ -2882,7 +2893,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
                         : paramConvention});
     // indexes
     if (!indexes.empty())
-      params.push_back({C.getUnsafeRawPointerDecl()->getDeclaredType()
+      params.push_back({C.getUnsafeRawPointerDecl()->getDeclaredInterfaceType()
                                                    ->getCanonicalType(),
                         ParameterConvention::Direct_Unowned});
     
@@ -3029,10 +3040,10 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
   }
 
   auto &C = SGM.getASTContext();
-  auto unsafeRawPointerTy = C.getUnsafeRawPointerDecl()->getDeclaredType()
+  auto unsafeRawPointerTy = C.getUnsafeRawPointerDecl()->getDeclaredInterfaceType()
                                                        ->getCanonicalType();
-  auto boolTy = C.getBoolDecl()->getDeclaredType()->getCanonicalType();
-  auto intTy = C.getIntDecl()->getDeclaredType()->getCanonicalType();
+  auto boolTy = C.getBoolDecl()->getDeclaredInterfaceType()->getCanonicalType();
+  auto intTy = C.getIntDecl()->getDeclaredInterfaceType()->getCanonicalType();
 
   auto hashableProto = C.getProtocol(KnownProtocolKind::Hashable);
 
@@ -3723,6 +3734,11 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
     case KeyPathExpr::Component::Kind::UnresolvedProperty:
     case KeyPathExpr::Component::Kind::UnresolvedSubscript:
       llvm_unreachable("not resolved");
+      break;
+
+    case KeyPathExpr::Component::Kind::DictionaryKey:
+      llvm_unreachable("DictionaryKey only valid in #keyPath");
+      break;
     }
   }
   
@@ -3760,12 +3776,12 @@ visitKeyPathApplicationExpr(KeyPathApplicationExpr *E, SGFContext C) {
 RValue RValueEmitter::
 visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
   switch (E->getKind()) {
-  case MagicIdentifierLiteralExpr::File:
-  case MagicIdentifierLiteralExpr::FilePath:
-  case MagicIdentifierLiteralExpr::Function:
-  case MagicIdentifierLiteralExpr::Line:
-  case MagicIdentifierLiteralExpr::Column:
+#define MAGIC_POINTER_IDENTIFIER(NAME, STRING, SYNTAX_KIND)
+#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+  case MagicIdentifierLiteralExpr::NAME:
+#include "swift/AST/MagicIdentifierKinds.def"
     return SGF.emitLiteral(E, C);
+    
   case MagicIdentifierLiteralExpr::DSOHandle: {
     auto SILLoc = SILLocation(E);
     auto UnsafeRawPointer = SGF.getASTContext().getUnsafeRawPointerDecl();
@@ -3868,7 +3884,7 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
     SGF.Cleanups.setCleanupState(destCleanup, CleanupState::Dead);
 
   RValue array(SGF, loc, arrayType,
-             emitEndVarargs(SGF, loc, std::move(varargsInfo)));
+        emitEndVarargs(SGF, loc, std::move(varargsInfo), E->getNumElements()));
 
   array = scope.popPreservingValue(std::move(array));
 
@@ -5451,7 +5467,8 @@ RValue RValueEmitter::visitDifferentiableFunctionExpr(
   auto origFunc = SGF.emitRValueAsSingleValue(E->getSubExpr());
   auto destTy = SGF.getLoweredType(E->getType()).castTo<SILFunctionType>();
   auto *diffFunc = SGF.B.createDifferentiableFunction(
-      E, destTy->getDifferentiabilityParameterIndices(), origFunc.forward(SGF));
+      E, destTy->getDifferentiabilityParameterIndices(),
+      destTy->getDifferentiabilityResultIndices(), origFunc.forward(SGF));
   return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(diffFunc));
 }
 

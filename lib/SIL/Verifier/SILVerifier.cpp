@@ -546,6 +546,7 @@ struct ImmutableAddressUseVerifier {
       case SILInstructionKind::FixLifetimeInst:
       case SILInstructionKind::KeyPathInst:
       case SILInstructionKind::SwitchEnumAddrInst:
+      case SILInstructionKind::SelectEnumAddrInst:
         break;
       case SILInstructionKind::AddressToPointerInst:
         // We assume that the user is attempting to do something unsafe since we
@@ -908,7 +909,7 @@ public:
     return InstNumbers[a] < InstNumbers[b];
   }
 
-  // FIXME: For sanity, address-type block args should be prohibited at all SIL
+  // FIXME: For sanity, address-type phis should be prohibited at all SIL
   // stages. However, the optimizer currently breaks the invariant in three
   // places:
   // 1. Normal Simplify CFG during conditional branch simplification
@@ -916,17 +917,14 @@ public:
   // 2. Simplify CFG via Jump Threading.
   // 3. Loop Rotation.
   //
+  // BasicBlockCloner::canCloneInstruction and sinkAddressProjections is
+  // designed to avoid this issue, we just need to make sure all passes use it
+  // correctly.
   //
-  bool prohibitAddressBlockArgs() {
-    // If this function was deserialized from canonical SIL, this invariant may
-    // already have been violated regardless of this module's SIL stage or
-    // exclusivity enforcement level. Presumably, access markers were already
-    // removed prior to serialization.
-    if (F.wasDeserializedCanonical())
-      return false;
-
-    SILModule &M = F.getModule();
-    return M.getStage() == SILStage::Raw;
+  // Minimally, we must prevent address-type phis as long as access markers are
+  // preserved. A goal is to preserve access markers in OSSA.
+  bool prohibitAddressPhis() {
+    return F.hasOwnership();
   }
 
   void visitSILPhiArgument(SILPhiArgument *arg) {
@@ -942,9 +940,9 @@ public:
       }
     } else {
     }
-    if (arg->isPhiArgument() && prohibitAddressBlockArgs()) {
-      // As a property of well-formed SIL, we disallow address-type block
-      // arguments. Supporting them would prevent reliably reasoning about the
+    if (arg->isPhiArgument() && prohibitAddressPhis()) {
+      // As a property of well-formed SIL, we disallow address-type
+      // phis. Supporting them would prevent reliably reasoning about the
       // underlying storage of memory access. This reasoning is important for
       // diagnosing violations of memory access rules and supporting future
       // optimizations such as bitfield packing. Address-type block arguments
@@ -1750,8 +1748,9 @@ public:
               "[dynamically_replaceable] function");
 
     // In canonical SIL, direct reference to a shared_external declaration
-    // is an error; we should have deserialized a body. In raw SIL, we may
-    // not have deserialized the body yet.
+    // is an error; we should have deserialized a body. In raw SIL, including
+    // the merge-modules phase, we may not have deserialized the body yet as we
+    // may not have run the SILLinker pass.
     if (F.getModule().getStage() >= SILStage::Canonical) {
       if (RefF->isExternalDeclaration()) {
         require(SingleFunction ||
@@ -1902,6 +1901,12 @@ public:
         "Inst with qualified ownership in a function that is not qualified");
   }
 
+  void checkUncheckedValueCastInst(UncheckedValueCastInst *) {
+    require(
+        F.hasOwnership(),
+        "Inst with qualified ownership in a function that is not qualified");
+  }
+
   template <class AI>
   void checkAccessEnforcement(AI *AccessInst) {
     if (AccessInst->getModule().getStage() != SILStage::Raw) {
@@ -1931,29 +1936,29 @@ public:
     }
 
     // Verify that all formal accesses patterns are recognized as part of a
-    // whitelist. The presence of an unknown pattern means that analysis will
+    // allowlist. The presence of an unknown pattern means that analysis will
     // silently fail, and the compiler may be introducing undefined behavior
     // with no other way to detect it.
     //
     // For example, AccessEnforcementWMO runs very late in the
     // pipeline and assumes valid storage for all dynamic Read/Modify access. It
-    // also requires that Unidentified access fit a whitelist on known
+    // also requires that Unidentified access fit a allowlist on known
     // non-internal globals or class properties.
     //
-    // First check that findAccessedStorage returns without asserting. For
+    // First check that identifyFormalAccess returns without asserting. For
     // Unsafe enforcement, that is sufficient. For any other enforcement
     // level also require that it returns a valid AccessedStorage object.
     // Unsafe enforcement is used for some unrecognizable access patterns,
     // like debugger variables. The compiler never cares about the source of
     // those accesses.
-    findAccessedStorage(BAI->getSource());
+    identifyFormalAccess(BAI);
     // FIXME: rdar://57291811 - the following check for valid storage will be
     // reenabled shortly. A fix is planned. In the meantime, the possiblity that
     // a real miscompilation could be caused by this failure is insignificant.
     // I will probably enable a much broader SILVerification of address-type
     // block arguments first to ensure we never hit this check again.
     /*
-    AccessedStorage storage = findAccessedStorage(BAI->getSource());
+    AccessedStorage storage = identifyFormalAccess(BAI);
     if (BAI->getEnforcement() != SILAccessEnforcement::Unsafe)
       require(storage, "Unknown formal access pattern");
     */
@@ -1992,8 +1997,8 @@ public:
       break;
     }
 
-    // First check that findAccessedStorage never asserts.
-    AccessedStorage storage = findAccessedStorage(BUAI->getSource());
+    // First check that identifyFormalAccess never asserts.
+    AccessedStorage storage = identifyFormalAccess(BUAI);
     // Only allow Unsafe and Builtin access to have invalid storage.
     if (BUAI->getEnforcement() != SILAccessEnforcement::Unsafe
         && !BUAI->isFromBuiltin()) {
@@ -3709,10 +3714,14 @@ public:
 
     auto adjustedOperandExtInfo =
         opFTy->getExtInfo()
+            .intoBuilder()
             .withRepresentation(SILFunctionType::Representation::Thick)
-            .withNoEscape(resFTy->isNoEscape());
-    require(adjustedOperandExtInfo == resFTy->getExtInfo(),
-            "operand and result of thin_to_think_function must agree in particulars");
+            .withNoEscape(resFTy->isNoEscape())
+            .build();
+    require(adjustedOperandExtInfo.isEqualTo(resFTy->getExtInfo(),
+                                             useClangTypes(opFTy)),
+            "operand and result of thin_to_think_function must agree in "
+            "particulars");
   }
 
   void checkThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCI) {
@@ -4659,7 +4668,7 @@ public:
       require(!jvpType->isDifferentiable(),
               "The JVP function must not be @differentiable");
       auto expectedJVPType = origTy->getAutoDiffDerivativeFunctionType(
-          dfi->getParameterIndices(), /*resultIndex*/ 0,
+          dfi->getParameterIndices(), dfi->getResultIndices(),
           AutoDiffDerivativeFunctionKind::JVP, TC,
           LookUpConformanceInModule(M));
       requireSameType(SILType::getPrimitiveObjectType(jvpType),
@@ -4671,7 +4680,7 @@ public:
       require(!vjpType->isDifferentiable(),
               "The VJP function must not be @differentiable");
       auto expectedVJPType = origTy->getAutoDiffDerivativeFunctionType(
-          dfi->getParameterIndices(), /*resultIndex*/ 0,
+          dfi->getParameterIndices(), dfi->getResultIndices(),
           AutoDiffDerivativeFunctionKind::VJP, TC,
           LookUpConformanceInModule(M));
       requireSameType(SILType::getPrimitiveObjectType(vjpType),
@@ -4721,7 +4730,7 @@ public:
   }
 
   void checkLinearFunctionExtractInst(LinearFunctionExtractInst *lfei) {
-    auto fnTy = lfei->getFunctionOperand()->getType().getAs<SILFunctionType>();
+    auto fnTy = lfei->getOperand()->getType().getAs<SILFunctionType>();
     require(fnTy, "The function operand must have a function type");
     require(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Linear,
             "The function operand must be a '@differentiable(linear)' "
@@ -5360,13 +5369,31 @@ void SILProperty::verify(const SILModule &M) const {
 void SILVTable::verify(const SILModule &M) const {
   if (!verificationEnabled(M))
     return;
-
-  for (auto &entry : getEntries()) {
+  
+  // Compare against the base class vtable if there is one.
+  const SILVTable *superVTable = nullptr;
+  auto superclass = getClass()->getSuperclassDecl();
+  if (superclass) {
+    for (auto &vt : M.getVTables()) {
+      if (vt->getClass() == superclass) {
+        superVTable = vt;
+        break;
+      }
+    }
+  }
+  
+  for (unsigned i : indices(getEntries())) {
+    auto &entry = getEntries()[i];
+    
+    // Make sure the module's lookup cache is consistent.
+    assert(entry == *getEntry(const_cast<SILModule &>(M), entry.getMethod())
+           && "vtable entry is out of sync with method's vtable cache");
+    
     // All vtable entries must be decls in a class context.
-    assert(entry.Method.hasDecl() && "vtable entry is not a decl");
-    auto baseInfo =
-        M.Types.getConstantInfo(TypeExpansionContext::minimal(), entry.Method);
-    ValueDecl *decl = entry.Method.getDecl();
+    assert(entry.getMethod().hasDecl() && "vtable entry is not a decl");
+    auto baseInfo = M.Types.getConstantInfo(TypeExpansionContext::minimal(),
+                                            entry.getMethod());
+    ValueDecl *decl = entry.getMethod().getDecl();
 
     assert((!isa<AccessorDecl>(decl)
             || !cast<AccessorDecl>(decl)->isObservingAccessor())
@@ -5374,7 +5401,7 @@ void SILVTable::verify(const SILModule &M) const {
 
     // For ivar destroyers, the decl is the class itself.
     ClassDecl *theClass;
-    if (entry.Method.kind == SILDeclRef::Kind::IVarDestroyer)
+    if (entry.getMethod().kind == SILDeclRef::Kind::IVarDestroyer)
       theClass = dyn_cast<ClassDecl>(decl);
     else
       theClass = dyn_cast<ClassDecl>(decl->getDeclContext());
@@ -5386,22 +5413,77 @@ void SILVTable::verify(const SILModule &M) const {
            "vtable entry must refer to a member of the vtable's class");
 
     // Foreign entry points shouldn't appear in vtables.
-    assert(!entry.Method.isForeign && "vtable entry must not be foreign");
-    
+    assert(!entry.getMethod().isForeign && "vtable entry must not be foreign");
+
     // The vtable entry must be ABI-compatible with the overridden vtable slot.
     SmallString<32> baseName;
     {
       llvm::raw_svector_ostream os(baseName);
-      entry.Method.print(os);
+      entry.getMethod().print(os);
     }
 
     if (M.getStage() != SILStage::Lowered) {
-      SILVerifier(*entry.Implementation)
+      SILVerifier(*entry.getImplementation())
           .requireABICompatibleFunctionTypes(
               baseInfo.getSILType().castTo<SILFunctionType>(),
-              entry.Implementation->getLoweredFunctionType(),
+              entry.getImplementation()->getLoweredFunctionType(),
               "vtable entry for " + baseName + " must be ABI-compatible",
-              *entry.Implementation);
+              *entry.getImplementation());
+    }
+    
+    // Validate the entry against its superclass vtable.
+    if (!superclass) {
+      // Root methods should not have inherited or overridden entries.
+      bool validKind;
+      switch (entry.getKind()) {
+      case Entry::Normal:
+        validKind = true;
+        break;
+        
+      case Entry::Inherited:
+      case Entry::Override:
+        validKind = false;
+        break;
+      }
+      assert(validKind && "vtable entry in root class must not be inherited or override");
+    } else if (superVTable) {
+      // Validate the entry against the matching entry from the superclass
+      // vtable.
+
+      const Entry *superEntry = nullptr;
+      for (auto &se : superVTable->getEntries()) {
+        if (se.getMethod().getOverriddenVTableEntry() ==
+            entry.getMethod().getOverriddenVTableEntry()) {
+          superEntry = &se;
+          break;
+        }
+      }
+
+      switch (entry.getKind()) {
+      case Entry::Normal:
+        assert(!superEntry && "non-root vtable entry must be inherited or override");
+        break;
+
+      case Entry::Inherited:
+        if (!superEntry)
+          break;
+
+        assert(entry.isNonOverridden() == superEntry->isNonOverridden()
+               && "inherited vtable entry must share overridden-ness of superclass entry");
+        break;
+          
+      case Entry::Override:
+        assert(!entry.isNonOverridden()
+               && "override entry can't claim to be nonoverridden");
+        if (!superEntry)
+          break;
+
+        // The superclass entry must not prohibit overrides.
+        assert(!superEntry->isNonOverridden()
+               && "vtable entry overrides an entry that claims to have no overrides");
+        // TODO: Check the root vtable entry for the method too.
+        break;
+      }
     }
   }
 }
@@ -5490,20 +5572,13 @@ void SILModule::verify() const {
   // Uniquing set to catch symbol name collisions.
   llvm::DenseSet<StringRef> symbolNames;
 
-  // When merging partial modules, we only link functions from the current
-  // module, without enabling "LinkAll" mode or running the SILLinker pass;
-  // in this case, we need to relax some of the checks.
-  bool SingleFunction = false;
-  if (getOptions().MergePartialModules)
-    SingleFunction = true;
-
   // Check all functions.
   for (const SILFunction &f : *this) {
     if (!symbolNames.insert(f.getName()).second) {
       llvm::errs() << "Symbol redefined: " << f.getName() << "!\n";
       assert(false && "triggering standard assertion failure routine");
     }
-    f.verify(SingleFunction);
+    f.verify(/*singleFunction*/ false);
   }
 
   // Check all globals.
@@ -5518,17 +5593,19 @@ void SILModule::verify() const {
   // Check all vtables and the vtable cache.
   llvm::DenseSet<ClassDecl*> vtableClasses;
   unsigned EntriesSZ = 0;
-  for (const SILVTable &vt : getVTables()) {
-    if (!vtableClasses.insert(vt.getClass()).second) {
-      llvm::errs() << "Vtable redefined: " << vt.getClass()->getName() << "!\n";
+  for (const auto &vt : getVTables()) {
+    if (!vtableClasses.insert(vt->getClass()).second) {
+      llvm::errs() << "Vtable redefined: " << vt->getClass()->getName() << "!\n";
       assert(false && "triggering standard assertion failure routine");
     }
-    vt.verify(*this);
+    vt->verify(*this);
     // Check if there is a cache entry for each vtable entry
-    for (auto entry : vt.getEntries()) {
-      if (VTableEntryCache.find({&vt, entry.Method}) == VTableEntryCache.end()) {
+    for (auto entry : vt->getEntries()) {
+      if (VTableEntryCache.find({vt, entry.getMethod()}) ==
+          VTableEntryCache.end()) {
         llvm::errs() << "Vtable entry for function: "
-                     << entry.Implementation->getName() << "not in cache!\n";
+                     << entry.getImplementation()->getName()
+                     << "not in cache!\n";
         assert(false && "triggering standard assertion failure routine");
       }
       ++EntriesSZ;

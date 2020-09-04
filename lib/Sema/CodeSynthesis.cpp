@@ -253,8 +253,9 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
         // type.
         if (var->isPropertyMemberwiseInitializedWithWrappedType()) {
           varInterfaceType = var->getPropertyWrapperInitValueInterfaceType();
-          isAutoClosure =
-            var->isInnermostPropertyWrapperInitUsesEscapingAutoClosure();
+
+          auto wrapperInfo = var->getPropertyWrapperBackingPropertyInfo();
+          isAutoClosure = wrapperInfo.wrappedValuePlaceholder->isAutoClosure();
         } else {
           varInterfaceType = backingPropertyType;
         }
@@ -322,11 +323,11 @@ synthesizeStubBody(AbstractFunctionDecl *fn, void *) {
   }
 
   auto *staticStringDecl = ctx.getStaticStringDecl();
-  auto staticStringType = staticStringDecl->getDeclaredType();
+  auto staticStringType = staticStringDecl->getDeclaredInterfaceType();
   auto staticStringInit = ctx.getStringBuiltinInitDecl(staticStringDecl);
 
   auto *uintDecl = ctx.getUIntDecl();
-  auto uintType = uintDecl->getDeclaredType();
+  auto uintType = uintDecl->getDeclaredInterfaceType();
   auto uintInit = ctx.getIntBuiltinInitDecl(uintDecl);
 
   // Create a call to Swift._unimplementedInitializer
@@ -355,7 +356,7 @@ synthesizeStubBody(AbstractFunctionDecl *fn, void *) {
   initName->setBuiltinInitializer(staticStringInit);
 
   auto *file = new (ctx) MagicIdentifierLiteralExpr(
-    MagicIdentifierLiteralExpr::File, loc, /*Implicit=*/true);
+    MagicIdentifierLiteralExpr::FileID, loc, /*Implicit=*/true);
   file->setType(staticStringType);
   file->setBuiltinInitializer(staticStringInit);
 
@@ -910,8 +911,8 @@ static bool canInheritDesignatedInits(Evaluator &eval, ClassDecl *decl) {
 
 static void collectNonOveriddenSuperclassInits(
     ClassDecl *subclass, SmallVectorImpl<ConstructorDecl *> &results) {
-  auto superclassTy = subclass->getSuperclass();
-  assert(superclassTy);
+  auto *superclassDecl = subclass->getSuperclassDecl();
+  assert(superclassDecl);
 
   // Record all of the initializers the subclass has overriden, excluding stub
   // overrides, which we don't want to consider as viable delegates for
@@ -923,11 +924,17 @@ static void collectNonOveriddenSuperclassInits(
         if (auto overridden = ctor->getOverriddenDecl())
           overriddenInits.insert(overridden);
 
-  auto superclassCtors = TypeChecker::lookupConstructors(
-      subclass, superclassTy, NameLookupFlags::IgnoreAccessControl);
+  superclassDecl->synthesizeSemanticMembersIfNeeded(
+    DeclBaseName::createConstructor());
 
-  for (auto memberResult : superclassCtors) {
-    auto superclassCtor = cast<ConstructorDecl>(memberResult.getValueDecl());
+  NLOptions subOptions = (NL_QualifiedDefault | NL_IgnoreAccessControl);
+  SmallVector<ValueDecl *, 4> lookupResults;
+  subclass->lookupQualified(
+      superclassDecl, DeclNameRef::createConstructor(),
+      subOptions, lookupResults);
+
+  for (auto decl : lookupResults) {
+    auto superclassCtor = cast<ConstructorDecl>(decl);
 
     // Skip invalid superclass initializers.
     if (superclassCtor->isInvalid())
@@ -957,12 +964,7 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
   decl->setAddedImplicitInitializers();
 
   // We can only inherit initializers if we have a superclass.
-  // FIXME: We should be bailing out earlier in the function, but unfortunately
-  // that currently regresses associated type inference for cases like
-  // compiler_crashers_2_fixed/0124-sr5825.swift due to the fact that we no
-  // longer eagerly compute the interface types of the other constructors.
-  auto superclassTy = decl->getSuperclass();
-  if (!superclassTy)
+  if (!decl->getSuperclassDecl() || !decl->getSuperclass())
     return;
 
   // Check whether the user has defined a designated initializer for this class,
@@ -1413,23 +1415,4 @@ void swift::addFixedLayoutAttr(NominalTypeDecl *nominal) {
   }
   // Add `@_fixed_layout` to the nominal.
   nominal->getAttrs().add(new (C) FixedLayoutAttr(/*Implicit*/ true));
-}
-
-Expr *DiscriminatorFinder::walkToExprPost(Expr *E) {
-  auto *ACE = dyn_cast<AbstractClosureExpr>(E);
-  if (!ACE)
-    return E;
-
-  unsigned Discriminator = ACE->getDiscriminator();
-  assert(Discriminator != AbstractClosureExpr::InvalidDiscriminator &&
-         "Existing closures should have valid discriminators");
-  if (Discriminator >= NextDiscriminator)
-    NextDiscriminator = Discriminator + 1;
-  return E;
-}
-
-unsigned DiscriminatorFinder::getNextDiscriminator() {
-  if (NextDiscriminator == AbstractClosureExpr::InvalidDiscriminator)
-    llvm::report_fatal_error("Out of valid closure discriminators");
-  return NextDiscriminator++;
 }

@@ -33,7 +33,9 @@ set(swift_runtime_sources
     CompatibilityOverride.cpp
     CygwinPort.cpp
     Demangle.cpp
+    DynamicCast.cpp
     Enum.cpp
+    EnvironmentVariables.cpp
     ErrorObjectCommon.cpp
     ErrorObjectConstants.cpp
     ErrorObjectNative.cpp
@@ -42,11 +44,14 @@ set(swift_runtime_sources
     Exclusivity.cpp
     ExistentialContainer.cpp
     Float16Support.cpp
+    FoundationSupport.cpp
     Heap.cpp
     HeapObject.cpp
+    ImageInspectionCommon.cpp
     ImageInspectionMachO.cpp
     ImageInspectionELF.cpp
     ImageInspectionCOFF.cpp
+    ImageInspectionStatic.cpp
     KeyPaths.cpp
     KnownMetadata.cpp
     Metadata.cpp
@@ -148,16 +153,12 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
     INSTALL_IN_COMPONENT never_install)
 endif()
 
-if(SWIFT_STDLIB_USE_NONATOMIC_RC)
-  set(_RUNTIME_NONATOMIC_FLAGS -DSWIFT_STDLIB_USE_NONATOMIC_RC)
-endif()
 add_swift_target_library(swiftRuntime OBJECT_LIBRARY
   ${swift_runtime_sources}
   ${swift_runtime_objc_sources}
   ${swift_runtime_leaks_sources}
   C_COMPILE_FLAGS
     ${swift_runtime_library_compile_flags}
-    ${_RUNTIME_NONATOMIC_FLAGS}
   LINK_FLAGS ${swift_runtime_linker_flags}
   SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
   INSTALL_IN_COMPONENT never_install)

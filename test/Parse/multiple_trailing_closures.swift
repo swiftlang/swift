@@ -68,12 +68,12 @@ func bar(_ s: S) {
   }
 }
 
-func multiple_trailing_with_defaults(
+func multiple_trailing_with_defaults( // expected-note{{declared here}}
   duration: Int,
   animations: (() -> Void)? = nil,
   completion: (() -> Void)? = nil) {}
 
-multiple_trailing_with_defaults(duration: 42) {}
+multiple_trailing_with_defaults(duration: 42) {} // expected-warning{{backward matching of the unlabeled trailing closure is deprecated; label the argument with 'completion' to suppress this warning}}
 
 multiple_trailing_with_defaults(duration: 42) {} completion: {}
 
@@ -82,7 +82,7 @@ func test_multiple_trailing_syntax_without_labels() {
 
   fn {} g: {} // Ok
 
-  fn {} _: {} // expected-error {{extra argument in call}}
+  fn {} _: {} // expected-error {{missing argument labels 'f:g:' in call}}
 
   fn {} g: <#T##() -> Void#> // expected-error {{editor placeholder in source file}}
 
@@ -90,16 +90,15 @@ func test_multiple_trailing_syntax_without_labels() {
 
   multiple {} _: { }
 
-  func mixed_args_1(a: () -> Void, _: () -> Void) {} // expected-note {{'mixed_args_1(a:_:)' declared here}}
-  func mixed_args_2(_: () -> Void, a: () -> Void, _: () -> Void) {} // expected-note 2 {{'mixed_args_2(_:a:_:)' declared here}}
+  func mixed_args_1(a: () -> Void, _: () -> Void) {}
+  func mixed_args_2(_: () -> Void, a: () -> Void, _: () -> Void) {} // expected-note {{'mixed_args_2(_:a:_:)' declared here}}
 
   mixed_args_1
     {}
     _: {}
 
-  // FIXME: not a good diagnostic
   mixed_args_1
-    {}  // expected-error {{extra argument in call}} expected-error {{missing argument for parameter #2 in call}}
+    {}  // expected-error {{incorrect argument labels in call (have '_:a:', expected 'a:_:')}}
     a: {}
 
   mixed_args_2
@@ -107,14 +106,13 @@ func test_multiple_trailing_syntax_without_labels() {
     a: {}
     _: {}
 
-  // FIXME: not a good diagnostic
   mixed_args_2
-    {} // expected-error {{missing argument for parameter #1 in call}}
+    {} // expected-error {{missing argument for parameter 'a' in call}}
     _: {}
 
   // FIXME: not a good diagnostic
   mixed_args_2
-    {}  // expected-error {{extra argument in call}} expected-error {{missing argument for parameter 'a' in call}}
+    {}  // expected-error {{missing argument label 'a:' in call}}
     _: {}
     _: {}
 }
@@ -123,5 +121,5 @@ func produce(fn: () -> Int?, default d: () -> Int) -> Int { // expected-note {{d
   return fn() ?? d()
 }
 // TODO: The diagnostics here are perhaps a little overboard.
-_ = produce { 0 } default: { 1 } // expected-error {{missing argument for parameter 'fn' in call}} expected-error {{consecutive statements}} expected-error {{'default' label can only appear inside a 'switch' statement}} expected-error {{top-level statement cannot begin with a closure expression}} expected-error {{closure expression is unused}} expected-note {{did you mean to use a 'do' statement?}}
+_ = produce { 0 } default: { 1 } // expected-error {{missing argument for parameter 'default' in call}} expected-error {{consecutive statements}} expected-error {{'default' label can only appear inside a 'switch' statement}} expected-error {{top-level statement cannot begin with a closure expression}} expected-error {{closure expression is unused}} expected-note {{did you mean to use a 'do' statement?}}
 _ = produce { 2 } `default`: { 3 }

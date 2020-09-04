@@ -10,8 +10,18 @@
 #
 # ----------------------------------------------------------------------------
 
+from . import cmark
+from . import foundation
 from . import indexstoredb
+from . import libcxx
+from . import libdispatch
+from . import libicu
+from . import llbuild
+from . import llvm
 from . import product
+from . import swift
+from . import swiftpm
+from . import xctest
 
 
 class SourceKitLSP(product.Product):
@@ -44,3 +54,16 @@ class SourceKitLSP(product.Product):
     def install(self, host_target):
         indexstoredb.run_build_script_helper(
             'install', host_target, self, self.args)
+
+    @classmethod
+    def get_dependencies(cls):
+        return [cmark.CMark,
+                llvm.LLVM,
+                libcxx.LibCXX,
+                libicu.LibICU,
+                swift.Swift,
+                libdispatch.LibDispatch,
+                foundation.Foundation,
+                xctest.XCTest,
+                llbuild.LLBuild,
+                swiftpm.SwiftPM]

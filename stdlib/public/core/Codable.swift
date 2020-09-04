@@ -471,7 +471,7 @@ public protocol KeyedEncodingContainerProtocol {
     forKey key: Key
   ) -> UnkeyedEncodingContainer
 
-  /// Stores a new nested container for the default `super` key and returns A
+  /// Stores a new nested container for the default `super` key and returns a
   /// new encoder instance for encoding `super` into that container.
   ///
   /// Equivalent to calling `superEncoder(forKey:)` with
@@ -480,7 +480,7 @@ public protocol KeyedEncodingContainerProtocol {
   /// - returns: A new encoder to pass to `super.encode(to:)`.
   mutating func superEncoder() -> Encoder
 
-  /// Stores a new nested container for the given key and returns A new encoder
+  /// Stores a new nested container for the given key and returns a new encoder
   /// instance for encoding `super` into that container.
   ///
   /// - parameter key: The key to encode `super` for.
@@ -911,7 +911,7 @@ public struct KeyedEncodingContainer<K: CodingKey> :
     return _box.nestedUnkeyedContainer(forKey: key)
   }
 
-  /// Stores a new nested container for the default `super` key and returns A
+  /// Stores a new nested container for the default `super` key and returns a
   /// new encoder instance for encoding `super` into that container.
   ///
   /// Equivalent to calling `superEncoder(forKey:)` with
@@ -922,7 +922,7 @@ public struct KeyedEncodingContainer<K: CodingKey> :
     return _box.superEncoder()
   }
 
-  /// Stores a new nested container for the given key and returns A new encoder
+  /// Stores a new nested container for the given key and returns a new encoder
   /// instance for encoding `super` into that container.
   ///
   /// - parameter key: The key to encode `super` for.
@@ -4730,7 +4730,9 @@ extension RawRepresentable where RawValue == Float, Self: Decodable {
   }
 }
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+@available(macOS, unavailable)
+@available(macCatalyst, unavailable)
 extension Float16: Codable {
   /// Creates a new instance by decoding from the given decoder.
   ///

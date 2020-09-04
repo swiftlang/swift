@@ -22,6 +22,7 @@
 #include "SwiftTargetInfo.h"
 #include "TypeLayout.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ReferenceCounting.h"
 #include "swift/AST/SourceFile.h"
@@ -105,6 +106,7 @@ namespace swift {
   class SILModule;
   class SILProperty;
   class SILType;
+  class SILVTable;
   class SILWitnessTable;
   class SourceLoc;
   class SourceFile;
@@ -190,6 +192,11 @@ enum RequireMetadata_t : bool {
   RequireMetadata = true
 };
 
+enum class TypeMetadataCanonicality : bool {
+  Noncanonical,
+  Canonical,
+};
+
 /// The principal singleton which manages all of IR generation.
 ///
 /// The IRGenerator delegates the emission of different top-level entities
@@ -257,17 +264,22 @@ private:
   /// queued up.
   llvm::SmallPtrSet<NominalTypeDecl *, 4> LazilyEmittedFieldMetadata;
 
-  /// Maps every generic type that is specialized within the module to its
-  /// specializations.
-  llvm::DenseMap<NominalTypeDecl *, llvm::SmallVector<CanType, 4>>
-      CanonicalSpecializationsForGenericTypes;
+  /// Maps every generic type whose metadata is specialized within the module
+  /// to its specializations.
+  llvm::DenseMap<
+      NominalTypeDecl *,
+      llvm::SmallVector<std::pair<CanType, TypeMetadataCanonicality>, 4>>
+      MetadataPrespecializationsForGenericTypes;
 
   llvm::DenseMap<NominalTypeDecl *, llvm::SmallVector<CanType, 4>>
       CanonicalSpecializedAccessorsForGenericTypes;
 
   /// The queue of specialized generic types whose prespecialized metadata to
   /// emit.
-  llvm::SmallVector<CanType, 4> LazySpecializedTypeMetadataRecords;
+  llvm::SmallVector<std::pair<CanType, TypeMetadataCanonicality>, 4>
+      LazySpecializedTypeMetadataRecords;
+
+  llvm::SmallPtrSet<NominalTypeDecl *, 4> LazilyReemittedTypeContextDescriptors;
 
   /// The queue of metadata accessors to emit.
   ///
@@ -374,7 +386,7 @@ public:
   
   /// Emit functions, variables and tables which are needed anyway, e.g. because
   /// they are externally visible.
-  void emitGlobalTopLevel(llvm::StringSet<> *LinkerDirectives);
+  void emitGlobalTopLevel(const std::vector<std::string> &LinkerDirectives);
 
   /// Emit references to each of the protocol descriptors defined in this
   /// IR module.
@@ -398,6 +410,9 @@ public:
   // Emit the code to replace dynamicReplacement(for:) functions.
   void emitDynamicReplacements();
 
+  // Emit info that describes the entry point to the module, if it has one.
+  void emitEntryPointInfo();
+
   /// Checks if metadata for this type can be emitted lazily. This is true for
   /// non-public types as well as imported types, except for classes and
   /// protocols which are always emitted eagerly.
@@ -418,9 +433,18 @@ public:
 
   void ensureRelativeSymbolCollocation(SILDefaultWitnessTable &wt);
 
-  llvm::SmallVector<CanType, 4>
-  canonicalSpecializationsForType(NominalTypeDecl *type) {
-    return CanonicalSpecializationsForGenericTypes.lookup(type);
+  llvm::SmallVector<std::pair<CanType, TypeMetadataCanonicality>, 4>
+  metadataPrespecializationsForType(NominalTypeDecl *type) {
+    return MetadataPrespecializationsForGenericTypes.lookup(type);
+  }
+
+  void noteLazyReemissionOfNominalTypeDescriptor(NominalTypeDecl *decl) {
+    LazilyReemittedTypeContextDescriptors.insert(decl);
+  }
+
+  bool isLazilyReemittingNominalTypeDescriptor(NominalTypeDecl *decl) {
+    return LazilyReemittedTypeContextDescriptors.find(decl) !=
+           std::end(LazilyReemittedTypeContextDescriptors);
   }
 
   void noteUseOfMetadataAccessor(NominalTypeDecl *decl) {
@@ -433,7 +457,8 @@ public:
     noteUseOfTypeGlobals(type, true, RequireMetadata);
   }
 
-  void noteUseOfSpecializedGenericTypeMetadata(CanType type);
+  void noteUseOfSpecializedGenericTypeMetadata(
+      IRGenModule &IGM, CanType theType, TypeMetadataCanonicality canonicality);
   void noteUseOfCanonicalSpecializedMetadataAccessor(CanType forType);
 
   void noteUseOfTypeMetadata(CanType type) {
@@ -634,6 +659,7 @@ public:
   llvm::FunctionType *DeallocatingDtorTy; /// void (%swift.refcounted*)
   llvm::StructType *TypeMetadataStructTy; /// %swift.type = type { ... }
   llvm::PointerType *TypeMetadataPtrTy;/// %swift.type*
+  llvm::PointerType *TypeMetadataPtrPtrTy; /// %swift.type**
   union {
     llvm::StructType *TypeMetadataResponseTy;   /// { %swift.type*, iSize }
     llvm::StructType *TypeMetadataDependencyTy; /// { %swift.type*, iSize }
@@ -1045,7 +1071,6 @@ private:
   llvm::StringMap<llvm::Constant*> GlobalUTF16Strings;
   llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
     StringsForTypeRef;
-  llvm::DenseMap<CanType, llvm::GlobalVariable*> TypeRefs;
   llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>> FieldNames;
   llvm::StringMap<llvm::Constant*> ObjCSelectorRefs;
   llvm::StringMap<llvm::Constant*> ObjCMethodNames;
@@ -1077,7 +1102,7 @@ private:
   SmallVector<llvm::WeakTrackingVH, 4> LLVMCompilerUsed;
 
   /// Metadata nodes for autolinking info.
-  SmallVector<llvm::MDNode *, 32> AutolinkEntries;
+  SmallVector<LinkLibrary, 32> AutolinkEntries;
 
   /// List of Objective-C classes, bitcast to i8*.
   SmallVector<llvm::WeakTrackingVH, 4> ObjCClasses;
@@ -1313,8 +1338,8 @@ public:
   void constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
                                     OptimizationMode FuncOptMode =
                                       OptimizationMode::NotSet);
-  void setHasFramePointer(llvm::AttrBuilder &Attrs, bool HasFP);
-  void setHasFramePointer(llvm::Function *F, bool HasFP);
+  void setHasNoFramePointer(llvm::AttrBuilder &Attrs);
+  void setHasNoFramePointer(llvm::Function *F);
   llvm::AttributeList constructInitialAttributes();
 
   void emitProtocolDecl(ProtocolDecl *D);
@@ -1367,6 +1392,8 @@ public:
                                             llvm::Constant *definition);
   llvm::Constant *getAddrOfMethodDescriptor(SILDeclRef declRef,
                                             ForDefinition_t forDefinition);
+  void emitNonoverriddenMethodDescriptor(const SILVTable *VTable,
+                                         SILDeclRef declRef);
 
   Address getAddrOfEnumCase(EnumElementDecl *Case,
                             ForDefinition_t forDefinition);
@@ -1391,9 +1418,14 @@ public:
 
   TypeEntityReference getTypeEntityReference(GenericTypeDecl *D);
 
-  llvm::Constant *getAddrOfTypeMetadata(CanType concreteType);
-  ConstantReference getAddrOfTypeMetadata(CanType concreteType,
-                                          SymbolReferenceKind kind);
+  llvm::Constant *
+  getAddrOfTypeMetadata(CanType concreteType,
+                        TypeMetadataCanonicality canonicality =
+                            TypeMetadataCanonicality::Canonical);
+  ConstantReference
+  getAddrOfTypeMetadata(CanType concreteType, SymbolReferenceKind kind,
+                        TypeMetadataCanonicality canonicality =
+                            TypeMetadataCanonicality::Canonical);
   llvm::Constant *getAddrOfTypeMetadataPattern(NominalTypeDecl *D);
   llvm::Constant *getAddrOfTypeMetadataPattern(NominalTypeDecl *D,
                                                ConstantInit init,
@@ -1419,6 +1451,7 @@ public:
   llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type);
   llvm::Constant *getAddrOfTypeMetadataDemanglingCacheVariable(CanType type,
                                                        ConstantInit definition);
+  llvm::Constant *getAddrOfNoncanonicalSpecializedGenericTypeMetadataCacheVariable(CanType type);
 
   llvm::Constant *getAddrOfClassMetadataBounds(ClassDecl *D,
                                                ForDefinition_t forDefinition);

@@ -303,7 +303,9 @@ internal func _float16ToStringImpl(
   _ debug: Bool
 ) -> Int
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+@available(macOS, unavailable)
+@available(macCatalyst, unavailable)
 internal func _float16ToString(
   _ value: Float16,
   debug: Bool

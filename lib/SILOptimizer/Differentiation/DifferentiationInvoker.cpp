@@ -28,6 +28,8 @@ SourceLoc DifferentiationInvoker::getLocation() const {
   switch (kind) {
   case Kind::DifferentiableFunctionInst:
     return getDifferentiableFunctionInst()->getLoc().getSourceLoc();
+  case Kind::LinearFunctionInst:
+    return getLinearFunctionInst()->getLoc().getSourceLoc();
   case Kind::IndirectDifferentiation:
     return getIndirectDifferentiation().first->getLoc().getSourceLoc();
   case Kind::SILDifferentiabilityWitnessInvoker:
@@ -36,7 +38,7 @@ SourceLoc DifferentiationInvoker::getLocation() const {
         ->getLocation()
         .getSourceLoc();
   }
-  llvm_unreachable("invalid differentation invoker kind");
+  llvm_unreachable("Invalid invoker kind"); // silences MSVC C4715
 }
 
 void DifferentiationInvoker::print(llvm::raw_ostream &os) const {
@@ -45,6 +47,9 @@ void DifferentiationInvoker::print(llvm::raw_ostream &os) const {
   case Kind::DifferentiableFunctionInst:
     os << "differentiable_function_inst=(" << *getDifferentiableFunctionInst()
        << ")";
+    break;
+  case Kind::LinearFunctionInst:
+    os << "linear_function_inst=(" << *getLinearFunctionInst() << ")";
     break;
   case Kind::IndirectDifferentiation: {
     auto indDiff = getIndirectDifferentiation();

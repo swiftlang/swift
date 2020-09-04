@@ -17,8 +17,10 @@
 | **OS** | **Architecture** | **Build** |
 |---|:---:|:---:|
 |**[Ubuntu 16.04 ](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/ppc64le_ubuntu_16_04.json)** | PPC64LE |[![Build Status](https://ci-external.swift.org/job/oss-swift-5.1-RA-linux-ubuntu-16.04-ppc64le/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-5.1-RA-linux-ubuntu-16.04-ppc64le)|
-|**[Ubuntu 16.04 ](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/aarch64_ubuntu_16.04.json)** | AArch64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-aarch64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-aarch64)|
-|**[Ubuntu 18.04 ](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/aarch64_ubuntu_18.04.json)** | AArch64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-18.04-aarch64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-18.04-aarch64)|
+|**[Ubuntu 18.04](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/aarch64_ubuntu_18.04_docker.json)** | AArch64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-ubuntu-18.04-aarch64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-ubuntu-18.04-aarch64)|
+|**[Ubuntu 20.04](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/aarch64_ubuntu_20.04_docker.json)** | AArch64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-ubuntu-20.04-aarch64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-ubuntu-20.04-aarch64)|
+|**[CentOS 8 ](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/aarch64_centos_8_docker.json)** | AArch64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-centos8-aarch64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-centos8-aarch64)|
+|**[Amazon Linux 2](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/aarch64_amazon_linux_2_docker.json)** | AArch64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-amazon-linux-2-aarch64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-amazon-linux-2-aarch64)|
 |**[Android](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_16_04_LTS_android.json)** | ARMv7 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android)|
 |**[Android](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_16_04_LTS_android.json)** | AArch64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android-arm64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android-arm64)|
 |**[Windows 2019 (VS 2017)](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_windows_2019.json)** | x86_64 | [![Build Status](https://ci-external.swift.org/job/oss-swift-windows-x86_64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-windows-x86_64)|
@@ -97,10 +99,18 @@ Please make sure you use Python 2.x. Python 3.x is not supported currently.
 
 #### macOS
 
-To build for macOS, you need [Xcode 11.4](https://developer.apple.com/xcode/resources/).
+To build for macOS, you need [Xcode 12 beta 3](https://developer.apple.com/xcode/resources/).
 The required version of Xcode changes frequently, and is often a beta release.
 Check this document or the host information on <https://ci.swift.org> for the
 current required version.
+
+Swift's build tooling is meant to support spaces in the paths passed to them,
+but using spaces sometimes tickles bugs in Swift's build scripts or the tools
+they rely on. For example, [SR-13441](https://bugs.swift.org/browse/SR-13441)
+is caused by a space in the Xcode path used on macOS. If you see Swift's build
+tooling misbehave due to a space in a path, please
+[report the bug on the Swift bug tracker](https://swift.org/contributing/#reporting-bugs)
+and then change the path to work around it.
 
 You will also need [CMake](https://cmake.org) and [Ninja](https://ninja-build.org),
 which can be installed via a package manager:
@@ -241,7 +251,7 @@ various products. These incremental builds are a big timesaver when developing
 and debugging.
 
     cd ${SWIFT_BUILD_DIR}
-    ninja swift
+    ninja swift-frontend
 
 This will build the Swift compiler, but will not rebuild the standard library or
 any other target. Building the `swift-stdlib` target as an additional layer of
@@ -258,7 +268,7 @@ To open the Swift project in Xcode, open `${SWIFT_BUILD_DIR}/Swift.xcodeproj`.
 It will auto-create a *lot* of schemes for all of the available targets. A
 common debug flow would involve:
 
- - Select the 'swift' scheme.
+ - Select the 'swift-frontend' scheme.
  - Pull up the scheme editor (⌘⇧<).
  - Select the 'Arguments' tab and click the '+'.
  - Add the command line options.

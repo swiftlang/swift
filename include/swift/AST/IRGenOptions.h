@@ -65,6 +65,12 @@ enum class IRGenDebugInfoFormat : unsigned {
   CodeView
 };
 
+enum class IRGenLLVMLTOKind : unsigned {
+  None,
+  Thin,
+  Full,
+};
+
 enum class IRGenEmbedMode : unsigned {
   None,
   EmbedMarker,
@@ -117,6 +123,12 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
   /// Type descriptor data pointers when passed as arguments.
   PointerAuthSchema TypeDescriptorsAsArguments;
 
+  /// Protocol conformance descriptors.
+  PointerAuthSchema ProtocolConformanceDescriptors;
+
+  /// Protocol conformance descriptors when passed as arguments.
+  PointerAuthSchema ProtocolConformanceDescriptorsAsArguments;
+
   /// Resumption functions from yield-once coroutines.
   PointerAuthSchema YieldOnceResumeFunctions;
 
@@ -125,6 +137,12 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
 
   /// Resilient class stub initializer callbacks.
   PointerAuthSchema ResilientClassStubInitCallbacks;
+};
+
+enum class JITDebugArtifact : unsigned {
+  None,   ///< None
+  LLVMIR, ///< LLVM IR
+  Object, ///< Object File
 };
 
 /// The set of options supported by IR generation.
@@ -169,6 +187,9 @@ public:
   /// Path prefixes that should be rewritten in debug info.
   PathRemapper DebugPrefixMap;
 
+  /// Path prefixes that should be rewritten in coverage info.
+  PathRemapper CoveragePrefixMap;
+
   /// What level of debug info to generate.
   IRGenDebugInfoLevel DebugInfoLevel : 2;
 
@@ -190,10 +211,6 @@ public:
   /// Whether we should run LLVM SLP vectorizer.
   unsigned DisableLLVMSLPVectorizer : 1;
 
-  /// Disable frame pointer elimination?
-  unsigned DisableFPElimLeaf : 1;
-  unsigned DisableFPElim : 1;
-  
   /// Special codegen for playgrounds.
   unsigned Playground : 1;
 
@@ -220,6 +237,8 @@ public:
 
   /// Whether we should embed the bitcode file.
   IRGenEmbedMode EmbedMode : 2;
+
+  IRGenLLVMLTOKind LLVMLTOKind : 2;
 
   /// Add names to LLVM values.
   unsigned HasValueNamesSetting : 1;
@@ -285,6 +304,9 @@ public:
   /// Whether to disable using mangled names for accessing concrete type metadata.
   unsigned DisableConcreteTypeMetadataMangledNameAccessors : 1;
 
+  /// The number of threads for multi-threaded code generation.
+  unsigned NumThreads = 0;
+
   /// Path to the profdata file to be used for PGO, or the empty string.
   std::string UseProfile = "";
 
@@ -310,6 +332,8 @@ public:
   Optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityLibraryVersion;
   Optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion;
 
+  JITDebugArtifact DumpJIT = JITDebugArtifact::None;
+
   IRGenOptions()
       : DWARFVersion(2), OutputKind(IRGenOutputKind::LLVMAssembly),
         Verify(true), OptMode(OptimizationMode::NotSet),
@@ -318,22 +342,21 @@ public:
         DebugInfoLevel(IRGenDebugInfoLevel::None),
         DebugInfoFormat(IRGenDebugInfoFormat::None),
         DisableClangModuleSkeletonCUs(false), UseJIT(false),
-        DisableLLVMOptzns(false),
-        DisableSwiftSpecificLLVMOptzns(false), DisableLLVMSLPVectorizer(false),
-        DisableFPElimLeaf(false),
-        DisableFPElim(true), Playground(false), EmitStackPromotionChecks(false),
-        FunctionSections(false), PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
-        HasValueNamesSetting(false), ValueNames(false),
-        EnableReflectionMetadata(true), EnableReflectionNames(true),
-        EnableAnonymousContextMangledNames(false), ForcePublicLinkage(false),
-        LazyInitializeClassMetadata(false),
+        DisableLLVMOptzns(false), DisableSwiftSpecificLLVMOptzns(false),
+        DisableLLVMSLPVectorizer(false), Playground(false),
+        EmitStackPromotionChecks(false), FunctionSections(false),
+        PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
+        LLVMLTOKind(IRGenLLVMLTOKind::None), HasValueNamesSetting(false),
+        ValueNames(false), EnableReflectionMetadata(true),
+        EnableReflectionNames(true), EnableAnonymousContextMangledNames(false),
+        ForcePublicLinkage(false), LazyInitializeClassMetadata(false),
         LazyInitializeProtocolConformances(false), DisableLegacyTypeInfo(false),
         PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
-        UseSwiftCall(false), UseTypeLayoutValueHandling(true), GenerateProfile(false),
-        EnableDynamicReplacementChaining(false),
+        UseSwiftCall(false), UseTypeLayoutValueHandling(true),
+        GenerateProfile(false), EnableDynamicReplacementChaining(false),
         DisableRoundTripDebugTypes(false), DisableDebuggerShadowCopies(false),
-        DisableConcreteTypeMetadataMangledNameAccessors(false),
-        CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()),
+        DisableConcreteTypeMetadataMangledNameAccessors(false), CmdArgs(),
+        SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {}
 
   /// Appends to \p os an arbitrary string representing all options which
@@ -385,6 +408,10 @@ public:
   llvm::hash_code getPCHHashComponents() const {
     return llvm::hash_value(0);
   }
+
+  bool hasMultipleIRGenThreads() const { return NumThreads > 1; }
+  bool shouldPerformIRGenerationInParallel() const { return NumThreads != 0; }
+  bool hasMultipleIGMs() const { return hasMultipleIRGenThreads(); }
 };
 
 } // end namespace swift

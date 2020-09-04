@@ -24,14 +24,13 @@ SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
                                              SILType loweredType,
                                              Optional<SILLocation> loc,
                                              VarDecl *Decl) {
-  // Get a StringMapEntry for the variable.  As a sop to error cases,
-  // allow the name to have an empty string.
+  // Get a StringMapEntry for the variable.
   llvm::StringMapEntry<SILGlobalVariable*> *entry = nullptr;
-  if (!name.empty()) {
-    entry = &*M.GlobalVariableMap.insert(std::make_pair(name, nullptr)).first;
-    assert(!entry->getValue() && "global variable already exists");
-    name = entry->getKey();
-  }
+  assert(!name.empty() && "Name required");
+
+  entry = &*M.GlobalVariableMap.insert(std::make_pair(name, nullptr)).first;
+  assert(!entry->getValue() && "global variable already exists");
+  name = entry->getKey();
 
   auto var = new (M) SILGlobalVariable(M, linkage, isSerialized, name,
                                        loweredType, loc, Decl);
@@ -48,8 +47,9 @@ SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
   : Module(Module),
     Name(Name),
     LoweredType(LoweredType),
-    Location(Loc),
+    Location(Loc.getValueOr(SILLocation::invalid())),
     Linkage(unsigned(Linkage)),
+    HasLocation(Loc.hasValue()),
     VDecl(Decl) {
   setSerialized(isSerialized);
   IsDeclaration = isAvailableExternally(Linkage);
@@ -136,6 +136,8 @@ bool SILGlobalVariable::isValidStaticInitializerInst(const SILInstruction *I,
           auto *TE = bi->getSingleUserOfType<TupleExtractInst>();
           return TE && getOffsetSubtract(TE, M);
         }
+        case BuiltinValueKind::OnFastPath:
+          return true;
         default:
           break;
       }
@@ -155,7 +157,6 @@ bool SILGlobalVariable::isValidStaticInitializerInst(const SILInstruction *I,
       switch (cast<StringLiteralInst>(I)->getEncoding()) {
         case StringLiteralInst::Encoding::Bytes:
         case StringLiteralInst::Encoding::UTF8:
-        case StringLiteralInst::Encoding::UTF16:
           return true;
         case StringLiteralInst::Encoding::ObjCSelector:
           // Objective-C selector string literals cannot be used in static
@@ -218,9 +219,9 @@ SILGlobalVariable *swift::getVariableOfGlobalInit(SILFunction *AddrF) {
   // and the globalinit_func is called by "once" from a single location,
   // continue; otherwise bail.
   BuiltinInst *CallToOnce;
-  auto *InitF = findInitializer(&AddrF->getModule(), AddrF, CallToOnce);
+  auto *InitF = findInitializer(AddrF, CallToOnce);
 
-  if (!InitF || !InitF->getName().startswith("globalinit_"))
+  if (!InitF)
     return nullptr;
 
   // If the globalinit_func is trivial, continue; otherwise bail.
@@ -245,8 +246,8 @@ SILFunction *swift::getCalleeOfOnceCall(BuiltinInst *BI) {
 }
 
 // Find the globalinit_func by analyzing the body of the addressor.
-SILFunction *swift::findInitializer(SILModule *Module, SILFunction *AddrF,
-                             BuiltinInst *&CallToOnce) {
+SILFunction *swift::findInitializer(SILFunction *AddrF,
+                                    BuiltinInst *&CallToOnce) {
   // We only handle a single SILBasicBlock for now.
   if (AddrF->size() != 1)
     return nullptr;
@@ -270,7 +271,10 @@ SILFunction *swift::findInitializer(SILModule *Module, SILFunction *AddrF,
   }
   if (!CallToOnce)
     return nullptr;
-  return getCalleeOfOnceCall(CallToOnce);
+  SILFunction *callee = getCalleeOfOnceCall(CallToOnce);
+  if (!callee->isGlobalInitOnceFunction())
+    return nullptr;
+  return callee;
 }
 
 SILGlobalVariable *

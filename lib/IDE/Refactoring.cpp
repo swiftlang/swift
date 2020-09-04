@@ -1174,12 +1174,11 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
       InputFile("<extract>", true, InputBuffer.get()));
   Invocation.getFrontendOptions().ModuleName = "extract";
+  Invocation.getLangOptions().DisablePoundIfEvaluation = true;
 
   auto Instance = std::make_unique<swift::CompilerInstance>();
   if (Instance->setup(Invocation))
     llvm_unreachable("Failed setup");
-
-  Instance->performParseOnly();
 
   unsigned BufferId = Instance->getPrimarySourceFile()->getBufferID().getValue();
   SourceManager &SM = Instance->getSourceMgr();
@@ -1712,7 +1711,7 @@ class FindAllSubDecls : public SourceEntityWalker {
   FindAllSubDecls(llvm::SmallPtrSetImpl<Decl *> &found)
     : Found(found) {}
 
-  bool walkToDeclPre(Decl *D, CharSourceRange range) {
+  bool walkToDeclPre(Decl *D, CharSourceRange range) override {
     // Record this Decl, and skip its contents if we've already touched it.
     if (!Found.insert(D).second)
       return false;
@@ -1847,11 +1846,7 @@ findConcatenatedExpressions(ResolvedRangeInfo Info, ASTContext &Ctx) {
 
   switch (Info.Kind) {
   case RangeKind::SingleExpression:
-    // FIXME: the range info kind should imply non-empty list.
-    if (!Info.ContainedNodes.empty())
-      E = Info.ContainedNodes[0].get<Expr*>();
-    else
-      return nullptr;
+    E = Info.ContainedNodes[0].get<Expr*>();
     break;
   case RangeKind::PartOfExpression:
     E = Info.CommonExprParent;
@@ -1881,7 +1876,7 @@ findConcatenatedExpressions(ResolvedRangeInfo Info, ASTContext &Ctx) {
       return true;
     }
 
-    bool walkToExprPre(Expr *E) {
+    bool walkToExprPre(Expr *E) override {
       if (E->isImplicit())
         return true;
       // FIXME: we should have ErrorType instead of null.
@@ -2006,13 +2001,13 @@ class ExpandableAssignTernaryExprInfo: public ExpandableTernaryExprInfo {
 public:
   ExpandableAssignTernaryExprInfo(AssignExpr *Assign): Assign(Assign) {}
 
-  IfExpr *getIf() {
+  IfExpr *getIf() override {
     if (!Assign)
       return nullptr;
     return dyn_cast_or_null<IfExpr>(Assign->getSrc());
   }
 
-  SourceRange getNameRange() {
+  SourceRange getNameRange() override {
     auto Invalid = SourceRange();
 
     if (!Assign)
@@ -2024,7 +2019,7 @@ public:
     return Invalid;
   }
 
-  Type getType() {
+  Type getType() override {
     return nullptr;
   }
 
@@ -2040,7 +2035,7 @@ public:
   ExpandableBindingTernaryExprInfo(PatternBindingDecl *Binding):
   Binding(Binding) {}
 
-  IfExpr *getIf() {
+  IfExpr *getIf() override {
     if (Binding && Binding->getNumPatternEntries() == 1) {
       if (auto *Init = Binding->getInit(0)) {
         return dyn_cast<IfExpr>(Init);
@@ -2050,14 +2045,14 @@ public:
     return nullptr;
   }
 
-  SourceRange getNameRange() {
+  SourceRange getNameRange() override {
     if (auto Pattern = getNamePattern())
       return Pattern->getSourceRange();
 
     return SourceRange();
   }
 
-  Type getType() {
+  Type getType() override {
     if (auto Pattern = getNamePattern())
       return Pattern->getType();
 
@@ -2352,7 +2347,7 @@ isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
     bool ConditionUseOnlyAllowedFunctions = false;
     StringRef ExpectName;
 
-    Expr *walkToExprPost(Expr *E) {
+    Expr *walkToExprPost(Expr *E) override {
       if (E->getKind() != ExprKind::DeclRef)
         return E;
       auto D = dyn_cast<DeclRefExpr>(E)->getDecl();
@@ -2451,7 +2446,7 @@ bool RefactoringActionConvertToSwitchStmt::performChange() {
   public:
     std::string VarName;
 
-    Expr *walkToExprPost(Expr *E) {
+    Expr *walkToExprPost(Expr *E) override {
       if (E->getKind() != ExprKind::DeclRef)
         return E;
       auto D = dyn_cast<DeclRefExpr>(E)->getDecl();
@@ -2468,7 +2463,7 @@ bool RefactoringActionConvertToSwitchStmt::performChange() {
 
     SmallString<64> ConditionalPattern = SmallString<64>();
 
-    Expr *walkToExprPost(Expr *E) {
+    Expr *walkToExprPost(Expr *E) override {
       if (E->getKind() != ExprKind::Binary)
         return E;
       auto BE = dyn_cast<BinaryExpr>(E);
@@ -2477,7 +2472,7 @@ bool RefactoringActionConvertToSwitchStmt::performChange() {
       return E;
     }
 
-    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) {
+    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
       ConditionalPattern.append(Lexer::getCharSourceRangeFromSourceRange(SM, P->getSourceRange()).str());
       if (P->getKind() == PatternKind::OptionalSome)
         ConditionalPattern.append("?");
@@ -2710,7 +2705,7 @@ findConvertToTernaryExpression(ResolvedRangeInfo Info) {
         walk(S);
     }
 
-    virtual bool walkToExprPre(Expr *E) {
+    virtual bool walkToExprPre(Expr *E) override {
       Assign = dyn_cast<AssignExpr>(E);
       return false;
     }
@@ -3091,7 +3086,7 @@ static Expr *findLocalizeTarget(ResolvedCursorInfo CursorInfo) {
     SourceLoc StartLoc;
     Expr *Target;
     StringLiteralFinder(SourceLoc StartLoc): StartLoc(StartLoc), Target(nullptr) {}
-    bool walkToExprPre(Expr *E) {
+    bool walkToExprPre(Expr *E) override {
       if (E->getStartLoc() != StartLoc)
         return false;
       if (E->getKind() == ExprKind::InterpolatedStringLiteral)
@@ -3127,7 +3122,7 @@ struct MemberwiseParameter {
   Expr *DefaultExpr;
 
   MemberwiseParameter(Identifier name, Type type, Expr *initialExpr)
-    : Name(name), MemberType(type), DefaultExpr(initialExpr) {}
+      : Name(name), MemberType(type), DefaultExpr(initialExpr) {}
 };
 
 static void generateMemberwiseInit(SourceEditConsumer &EditConsumer,
@@ -3140,7 +3135,16 @@ static void generateMemberwiseInit(SourceEditConsumer &EditConsumer,
   EditConsumer.accept(SM, targetLocation, "\ninternal init(");
   auto insertMember = [&SM](const MemberwiseParameter &memberData,
                             llvm::raw_ostream &OS, bool wantsSeparator) {
-    OS << memberData.Name << ": " << memberData.MemberType.getString();
+    {
+      OS << memberData.Name << ": ";
+      // Unconditionally print '@escaping' if we print out a function type -
+      // the assignments we generate below will escape this parameter.
+      if (isa<AnyFunctionType>(memberData.MemberType->getCanonicalType())) {
+        OS << "@" << TypeAttributes::getAttrName(TAK_escaping) << " ";
+      }
+      OS << memberData.MemberType.getString();
+    }
+
     if (auto *expr = memberData.DefaultExpr) {
       if (isa<NilLiteralExpr>(expr)) {
         OS << " = nil";
@@ -3443,7 +3447,9 @@ getDeclarationContextFromInfo(ResolvedCursorInfo Info) {
       return AddEquatableContext(NomDecl);
     }
   } else if (auto *ExtDecl = Info.ExtTyRef) {
-    return AddEquatableContext(ExtDecl);
+    if (ExtDecl->getExtendedNominal()) {
+      return AddEquatableContext(ExtDecl);
+    }
   }
   return AddEquatableContext();
 }
@@ -3659,16 +3665,25 @@ static CallExpr *findTrailingClosureTarget(SourceManager &SM,
            return N.isStmt(StmtKind::Brace) || N.isExpr(ExprKind::Call);
          });
   Finder.resolve();
-  if (Finder.getContexts().empty()
-      || !Finder.getContexts().back().is<Expr*>())
+  auto contexts = Finder.getContexts();
+  if (contexts.empty())
     return nullptr;
-  CallExpr *CE = cast<CallExpr>(Finder.getContexts().back().get<Expr*>());
+
+  // If the innermost context is a statement (which will be a BraceStmt per
+  // the filtering condition above), drop it.
+  if (contexts.back().is<Stmt *>()) {
+    contexts = contexts.drop_back();
+  }
+
+  if (contexts.empty() || !contexts.back().is<Expr*>())
+    return nullptr;
+  CallExpr *CE = cast<CallExpr>(contexts.back().get<Expr*>());
 
   if (CE->hasTrailingClosure())
     // Call expression already has a trailing closure.
     return nullptr;
 
-  // The last arugment is a closure?
+  // The last argument is a closure?
   Expr *Args = CE->getArg();
   if (!Args)
     return nullptr;

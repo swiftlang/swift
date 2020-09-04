@@ -9,7 +9,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %{python} %S/../gen-output-file-map.py -o %t %S
-// RUN: cd %t && %target-swiftc_driver -typecheck -output-file-map %t/output.json -incremental -module-name main -experimental-private-intransitive-dependencies -verify-incremental-dependencies %s
+// RUN: cd %t && %target-swiftc_driver -typecheck -output-file-map %t/output.json -incremental -module-name main -enable-direct-intramodule-dependencies -verify-incremental-dependencies %s
 
 import Foundation
 
@@ -25,7 +25,6 @@ import Foundation
 // expected-private-conformance {{Swift.CVarArg}}
 // expected-private-conformance {{Swift.CustomStringConvertible}}
 // expected-private-member {{Swift._ExpressibleByBuiltinIntegerLiteral.init}}
-// expected-private-superclass {{main.LookupFactory}}
 @objc private class LookupFactory: NSObject {
   // expected-provides {{AssignmentPrecedence}}
   // expected-provides {{IntegerLiteralType}}

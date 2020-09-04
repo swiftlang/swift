@@ -1,3 +1,0 @@
-# Dependencies before compilation:
-provides-nominal: [c]
-depends-nominal: [b]

@@ -272,7 +272,7 @@ class CMake(object):
             cmake_binary = 'cmake'
 
         installed_ver = self.installed_cmake_version(cmake_binary)
-        if installed_ver > self.cmake_source_version(cmake_source_dir):
+        if installed_ver >= self.cmake_source_version(cmake_source_dir):
             return
         else:
             # Build CMake from source and return the path to the executable.

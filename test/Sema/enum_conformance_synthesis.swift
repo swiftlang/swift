@@ -174,7 +174,7 @@ func genericNotHashable() {
 }
 
 // An enum with no cases should also derive conformance.
-enum NoCases: Hashable, Comparable {}
+enum NoCases: Hashable {}
 
 // rdar://19773050
 private enum Bar<T> {
@@ -224,7 +224,12 @@ enum Complex2 {
 }
 extension Complex2 : Hashable {}
 extension Complex2 : CaseIterable {}  // expected-error {{type 'Complex2' does not conform to protocol 'CaseIterable'}}
-extension FromOtherFile: CaseIterable {} // expected-error {{cannot be automatically synthesized in an extension in a different file to the type}} expected-error {{does not conform to protocol 'CaseIterable'}}
+extension FromOtherFile: CaseIterable {} // expected-error {{extension outside of file declaring enum 'FromOtherFile' prevents automatic synthesis of 'allCases' for protocol 'CaseIterable'}}
+extension CaseIterableAcrossFiles: CaseIterable {
+  public static var allCases: [CaseIterableAcrossFiles] {
+    return [ .A ]
+  }
+}
 
 // No explicit conformance and it cannot be derived.
 enum NotExplicitlyHashableAndCannotDerive {
@@ -243,7 +248,7 @@ extension OtherFileNonconforming: Hashable {
   func hash(into hasher: inout Hasher) {}
 }
 // ...but synthesis in a type defined in another file doesn't work yet.
-extension YetOtherFileNonconforming: Equatable {} // expected-error {{cannot be automatically synthesized in an extension in a different file to the type}}
+extension YetOtherFileNonconforming: Equatable {} // expected-error {{extension outside of file declaring enum 'YetOtherFileNonconforming' prevents automatic synthesis of '==' for protocol 'Equatable'}}
 extension YetOtherFileNonconforming: CaseIterable {} // expected-error {{does not conform}}
 
 // Verify that an indirect enum doesn't emit any errors as long as its "leaves"
@@ -314,7 +319,7 @@ extension UnusedGenericDeriveExtension: Hashable {}
 // Cross-file synthesis is disallowed for conditional cases just as it is for
 // non-conditional ones.
 extension GenericOtherFileNonconforming: Equatable where T: Equatable {}
-// expected-error@-1{{implementation of 'Equatable' cannot be automatically synthesized in an extension in a different file to the type}}
+// expected-error@-1{{extension outside of file declaring generic enum 'GenericOtherFileNonconforming' prevents automatic synthesis of '==' for protocol 'Equatable'}}
 
 // rdar://problem/41852654
 
@@ -327,47 +332,6 @@ enum ImpliedMain: ImplierMain {
 }
 extension ImpliedOther: ImplierMain {}
 
-// Comparable enum synthesis
-enum Angel: Comparable {
-  case lily, elsa, karlie 
-}
-
-func pit(_ a: Angel, against b: Angel) -> Bool {
-  return a < b
-}
-
-// enums with non-conforming payloads don’t get synthesized Comparable 
-enum Notice: Comparable { // expected-error{{type 'Notice' does not conform to protocol 'Comparable'}} expected-error{{type 'Notice' does not conform to protocol 'Equatable'}} 
-  case taylor((Int, Int)), taylornation(Int) // expected-note{{associated value type '(Int, Int)' does not conform to protocol 'Equatable', preventing synthesized conformance of 'Notice' to 'Equatable'}} 
-}
-
-// neither do enums with raw values 
-enum Track: Int, Comparable { // expected-error{{type 'Track' does not conform to protocol 'Comparable'}} 
-  case four = 4
-  case five = 5 
-  case six  = 6
-}
-
-// synthesized Comparable must be explicit 
-enum Publicist {
-  case thow, paine 
-}
-
-func miss(_ a: Publicist, outsold b: Publicist) -> Bool {
-  return b < a // expected-error{{binary operator '<' cannot be applied to two 'Publicist' operands}}
-}
-
-// can synthesize Comparable conformance through extension 
-enum Birthyear {
-  case eighties(Int)
-  case nineties(Int)
-  case twothousands(Int)
-}
-extension Birthyear: Comparable {
-}
-func canEatHotChip(_ birthyear:Birthyear) -> Bool {
-  return birthyear > .nineties(3)
-}
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected note produced: candidate has non-matching type '(Foo, Foo) -> Bool'
 // <unknown>:0: error: unexpected note produced: candidate has non-matching type '<T> (Generic<T>, Generic<T>) -> Bool'

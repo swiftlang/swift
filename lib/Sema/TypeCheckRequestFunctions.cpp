@@ -25,36 +25,36 @@
 
 using namespace swift;
 
-Type
-InheritedTypeRequest::evaluate(
-    Evaluator &evaluator, llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-    unsigned index,
-    TypeResolutionStage stage) const {
+Type InheritedTypeRequest::evaluate(
+    Evaluator &evaluator,
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
+    unsigned index, TypeResolutionStage stage) const {
   // Figure out how to resolve types.
   TypeResolutionOptions options = None;
   DeclContext *dc;
-  if (auto typeDecl = decl.dyn_cast<TypeDecl *>()) {
+  if (auto typeDecl = decl.dyn_cast<const TypeDecl *>()) {
     if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
-      dc = nominal;
+      dc = (DeclContext *)nominal;
 
       options |= TypeResolutionFlags::AllowUnavailableProtocol;
     } else {
       dc = typeDecl->getDeclContext();
     }
   } else {
-    auto ext = decl.get<ExtensionDecl *>();
-    dc = ext;
+    dc = (DeclContext *)decl.get<const ExtensionDecl *>();
     options |= TypeResolutionFlags::AllowUnavailableProtocol;
   }
 
   Optional<TypeResolution> resolution;
   switch (stage) {
   case TypeResolutionStage::Structural:
-    resolution = TypeResolution::forStructural(dc, options);
+    resolution =
+        TypeResolution::forStructural(dc, options, /*unboundTyOpener*/ nullptr);
     break;
 
   case TypeResolutionStage::Interface:
-    resolution = TypeResolution::forInterface(dc, options);
+    resolution =
+        TypeResolution::forInterface(dc, options, /*unboundTyOpener*/ nullptr);
     break;
 
   case TypeResolutionStage::Contextual: {
@@ -69,7 +69,7 @@ InheritedTypeRequest::evaluate(
   }
   }
 
-  TypeLoc &typeLoc = getInheritedTypeLocAtIndex(decl, index);
+  const TypeLoc &typeLoc = getInheritedTypeLocAtIndex(decl, index);
 
   Type inheritedType;
   if (typeLoc.getTypeRepr())
@@ -210,45 +210,109 @@ static Type inferFunctionBuilderType(ValueDecl *decl)  {
     lookupDecl = accessor->getStorage();
   }
 
+  // Find all of the potentially inferred function builder types.
+  struct Match {
+    enum Kind {
+      Conformance,
+      DynamicReplacement,
+    } kind;
+
+    union {
+      struct {
+        ProtocolConformance *conformance;
+        ValueDecl *requirement;
+      } conformanceMatch;
+
+      ValueDecl *dynamicReplacement;
+    };
+
+    Type functionBuilderType;
+
+    static Match forConformance(
+        ProtocolConformance *conformance,
+        ValueDecl *requirement,
+        Type functionBuilderType) {
+      Match match;
+      match.kind = Conformance;
+      match.conformanceMatch.conformance = conformance;
+      match.conformanceMatch.requirement = requirement;
+      match.functionBuilderType = functionBuilderType;
+      return match;
+    }
+
+    static Match forDynamicReplacement(
+        ValueDecl *dynamicReplacement, Type functionBuilderType) {
+      Match match;
+      match.kind = DynamicReplacement;
+      match.dynamicReplacement = dynamicReplacement;
+      match.functionBuilderType = functionBuilderType;
+      return match;
+    }
+
+    DeclName getSourceName() const {
+      switch (kind) {
+      case Conformance:
+        return conformanceMatch.conformance->getProtocol()->getName();
+
+      case DynamicReplacement:
+        return dynamicReplacement->getName();
+      }
+    }
+  };
+
+  // The set of matches from which we can infer function builder types.
+  SmallVector<Match, 2> matches;
+
   // Determine all of the conformances within the same context as
   // this declaration. If this declaration is a witness to any
   // requirement within one of those protocols that has a function builder
   // attached, use that function builder type.
-  auto idc = cast<IterableDeclContext>(dc->getAsDecl());
-  auto conformances = evaluateOrDefault(
-      dc->getASTContext().evaluator,
-      LookupAllConformancesInContextRequest{idc}, { });
+  auto addConformanceMatches = [&matches](ValueDecl *lookupDecl) {
+    DeclContext *dc = lookupDecl->getDeclContext();
+    auto idc = cast<IterableDeclContext>(dc->getAsDecl());
+    auto conformances = evaluateOrDefault(
+        dc->getASTContext().evaluator,
+        LookupAllConformancesInContextRequest{idc}, { });
 
-  // Find all of the potentially inferred function builder types.
-  struct Match {
-    ProtocolConformance *conformance;
-    ValueDecl *requirement;
-    Type functionBuilderType;
+    for (auto conformance : conformances) {
+      auto protocol = conformance->getProtocol();
+      for (auto found : protocol->lookupDirect(lookupDecl->getName())) {
+        if (!isa<ProtocolDecl>(found->getDeclContext()))
+          continue;
+
+        auto requirement = dyn_cast<ValueDecl>(found);
+        if (!requirement)
+          continue;
+
+        Type functionBuilderType = requirement->getFunctionBuilderType();
+        if (!functionBuilderType)
+          continue;
+
+        auto witness = conformance->getWitnessDecl(requirement);
+        if (witness != lookupDecl)
+          continue;
+
+        // Substitute into the function builder type.
+        auto subs =
+            conformance->getSubstitutions(lookupDecl->getModuleContext());
+        Type subFunctionBuilderType = functionBuilderType.subst(subs);
+
+        matches.push_back(
+            Match::forConformance(
+              conformance, requirement, subFunctionBuilderType));
+      }
+    }
   };
-  SmallVector<Match, 2> matches;
-  for (auto conformance : conformances) {
-    auto protocol = conformance->getProtocol();
-    for (auto found : protocol->lookupDirect(lookupDecl->getName())) {
-      if (!isa<ProtocolDecl>(found->getDeclContext()))
-        continue;
 
-      auto requirement = dyn_cast<ValueDecl>(found);
-      if (!requirement)
-        continue;
+  addConformanceMatches(lookupDecl);
 
-      Type functionBuilderType = requirement->getFunctionBuilderType();
-      if (!functionBuilderType)
-        continue;
-
-      auto witness = conformance->getWitnessDecl(requirement);
-      if (witness != lookupDecl)
-        continue;
-
-      // Substitute into the function builder type.
-      auto subs = conformance->getSubstitutions(decl->getModuleContext());
-      Type subFunctionBuilderType = functionBuilderType.subst(subs);
-
-      matches.push_back({conformance, requirement, subFunctionBuilderType});
+  // Look for function builder types inferred through dynamic replacements.
+  if (auto replaced = lookupDecl->getDynamicallyReplacedDecl()) {
+    if (auto functionBuilderType = replaced->getFunctionBuilderType()) {
+      matches.push_back(
+        Match::forDynamicReplacement(replaced, functionBuilderType));
+    } else {
+      addConformanceMatches(replaced);
     }
   }
 
@@ -274,7 +338,8 @@ static Type inferFunctionBuilderType(ValueDecl *decl)  {
       decl->diagnose(
           diag::function_builder_infer_pick_specific,
           match.functionBuilderType,
-          match.conformance->getProtocol()->getName())
+          static_cast<unsigned>(match.kind),
+          match.getSourceName())
         .fixItInsert(
           lookupDecl->getAttributeInsertionLoc(false),
           "@" + match.functionBuilderType.getString() + " ");
@@ -297,9 +362,11 @@ Type FunctionBuilderTypeRequest::evaluate(Evaluator &evaluator,
   auto mutableAttr = const_cast<CustomAttr*>(attr);
   auto dc = decl->getDeclContext();
   auto &ctx = dc->getASTContext();
-  Type type = resolveCustomAttrType(mutableAttr, dc,
-                                    CustomAttrTypeKind::NonGeneric);
-  if (!type) return Type();
+  Type type = evaluateOrDefault(
+      evaluator,
+      CustomAttrTypeRequest{mutableAttr, dc, CustomAttrTypeKind::NonGeneric},
+      Type());
+  if (!type || type->hasError()) return Type();
 
   auto nominal = type->getAnyNominal();
   if (!nominal) {

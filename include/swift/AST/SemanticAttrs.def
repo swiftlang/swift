@@ -30,6 +30,7 @@ SEMANTICS_ATTR(STRING_ESCAPE_PERCENT_GET, "string.escapePercent.get")
 SEMANTICS_ATTR(STRING_CONCAT, "string.concat")
 SEMANTICS_ATTR(STRING_APPEND, "string.append")
 SEMANTICS_ATTR(STRING_INIT_EMPTY, "string.init_empty")
+SEMANTICS_ATTR(STRING_INIT_EMPTY_WITH_CAPACITY, "string.init_empty_with_capacity")
 SEMANTICS_ATTR(STRING_PLUS_EQUALS, "string.plusequals")
 SEMANTICS_ATTR(FIND_STRING_SWITCH_CASE, "findStringSwitchCase")
 SEMANTICS_ATTR(FIND_STRING_SWITCH_CASE_WITH_CACHE, "findStringSwitchCaseWithCache")
@@ -60,8 +61,10 @@ SEMANTICS_ATTR(ARRAY_WITH_UNSAFE_MUTABLE_BUFFER_POINTER, "array.withUnsafeMutabl
 SEMANTICS_ATTR(ARRAY_COUNT, "array.count")
 SEMANTICS_ATTR(ARRAY_DEALLOC_UNINITIALIZED, "array.dealloc_uninitialized")
 SEMANTICS_ATTR(ARRAY_UNINITIALIZED_INTRINSIC, "array.uninitialized_intrinsic")
+SEMANTICS_ATTR(ARRAY_FINALIZE_INTRINSIC, "array.finalize_intrinsic")
 
 SEMANTICS_ATTR(SEQUENCE_FOR_EACH, "sequence.forEach")
+SEMANTICS_ATTR(TYPENAME, "typeName")
 
 SEMANTICS_ATTR(OPTIMIZE_SIL_SPECIALIZE_GENERIC_NEVER, "optimize.sil.specialize.generic.never")
 SEMANTICS_ATTR(OPTIMIZE_SIL_SPECIALIZE_GENERIC_PARTIAL_NEVER,
@@ -91,6 +94,17 @@ SEMANTICS_ATTR(PROGRAMTERMINATION_POINT, "programtermination_point")
 SEMANTICS_ATTR(CONVERT_TO_OBJECTIVE_C, "convertToObjectiveC")
 
 SEMANTICS_ATTR(KEYPATH_KVC_KEY_PATH_STRING, "keypath.kvcKeyPathString")
+
+/// The prefix used to force opt-remarks to be emitted in a specific function.
+///
+/// If used just by itself "optremark", it is assumed that /all/ opt remarks
+/// should be emitted. Otherwise, one can add a suffix after a '.' that
+/// specifies a pass to emit opt-remarks from. So for instance to get just
+/// information from 'sil-opt-remark-gen', one would write:
+/// "optremark.sil-opt-remark-gen". One can add as many as one wishes. Keep in
+/// mind that if the function itself is inlined, one will lose the optremark so
+/// consider inlining where to put these.
+SEMANTICS_ATTR(FORCE_EMIT_OPT_REMARK_PREFIX, "optremark")
 
 #undef SEMANTICS_ATTR
 

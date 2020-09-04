@@ -692,15 +692,14 @@ extension Unicode.Scalar.Properties {
   /// all current case mappings. In the event more space is needed, it will be
   /// allocated on the heap.
   internal func _applyMapping(_ u_strTo: _U_StrToX) -> String {
-    // TODO(String performance): Stack buffer first and then detect real count
-    let count = 64
-    var array = Array<UInt16>(repeating: 0, count: count)
-    let len: Int = array.withUnsafeMutableBufferPointer { bufPtr in
+    // Allocate 16 code units on the stack.
+    var fixedArray = _FixedArray16<UInt16>(allZeros: ())
+    let count: Int = fixedArray.withUnsafeMutableBufferPointer { buf in
       return _scalar.withUTF16CodeUnits { utf16 in
         var err = __swift_stdlib_U_ZERO_ERROR
         let correctSize = u_strTo(
-          bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
-          Int32(bufPtr.count),
+          buf.baseAddress._unsafelyUnwrappedUnchecked,
+          Int32(buf.count),
           utf16.baseAddress._unsafelyUnwrappedUnchecked,
           Int32(utf16.count),
           "",
@@ -708,13 +707,36 @@ extension Unicode.Scalar.Properties {
         guard err.isSuccess else {
           fatalError("Unexpected error case-converting Unicode scalar.")
         }
-        // TODO: _internalInvariant(count == correctSize, "inconsistent ICU behavior")
         return Int(correctSize)
       }
     }
-    // TODO: replace `len` with `count`
-    return array[..<len].withUnsafeBufferPointer {
-      return String._uncheckedFromUTF16($0)
+    if _fastPath(count <= 16) {
+      fixedArray.count = count
+      return fixedArray.withUnsafeBufferPointer {
+        String._uncheckedFromUTF16($0)
+      }
+    }
+    // Allocate `count` code units on the heap.
+    let array = Array<UInt16>(unsafeUninitializedCapacity: count) {
+      buf, initializedCount in
+      _scalar.withUTF16CodeUnits { utf16 in
+        var err = __swift_stdlib_U_ZERO_ERROR
+        let correctSize = u_strTo(
+          buf.baseAddress._unsafelyUnwrappedUnchecked,
+          Int32(buf.count),
+          utf16.baseAddress._unsafelyUnwrappedUnchecked,
+          Int32(utf16.count),
+          "",
+          &err)
+        guard err.isSuccess else {
+          fatalError("Unexpected error case-converting Unicode scalar.")
+        }
+        _internalInvariant(count == correctSize, "inconsistent ICU behavior")
+        initializedCount = count
+      }
+    }
+    return array.withUnsafeBufferPointer {
+      String._uncheckedFromUTF16($0)
     }
   }
 
@@ -1091,27 +1113,29 @@ extension Unicode.Scalar.Properties {
   internal func _scalarName(
     _ choice: __swift_stdlib_UCharNameChoice
   ) -> String? {
-    var err = __swift_stdlib_U_ZERO_ERROR
-    let count = Int(__swift_stdlib_u_charName(icuValue, choice, nil, 0, &err))
+    var error = __swift_stdlib_U_ZERO_ERROR
+    let count = Int(__swift_stdlib_u_charName(icuValue, choice, nil, 0, &error))
     guard count > 0 else { return nil }
 
     // ICU writes a trailing null, so we have to save room for it as well.
-    var array = Array<UInt8>(repeating: 0, count: count + 1)
-    return array.withUnsafeMutableBufferPointer { bufPtr in
-      var err = __swift_stdlib_U_ZERO_ERROR
+    let array = Array<UInt8>(unsafeUninitializedCapacity: count + 1) {
+      buffer, initializedCount in
+      var error = __swift_stdlib_U_ZERO_ERROR
       let correctSize = __swift_stdlib_u_charName(
         icuValue,
         choice,
-        UnsafeMutableRawPointer(bufPtr.baseAddress._unsafelyUnwrappedUnchecked)
+        UnsafeMutableRawPointer(buffer.baseAddress._unsafelyUnwrappedUnchecked)
           .assumingMemoryBound(to: Int8.self),
-        Int32(bufPtr.count),
-        &err)
-      guard err.isSuccess else {
+        Int32(buffer.count),
+        &error)
+      guard error.isSuccess else {
         fatalError("Unexpected error case-converting Unicode scalar.")
       }
       _internalInvariant(count == correctSize, "inconsistent ICU behavior")
-      return String._fromASCII(
-        UnsafeBufferPointer(rebasing: bufPtr[..<count]))
+      initializedCount = count + 1
+    }
+    return array.withUnsafeBufferPointer { buffer in
+      String._fromASCII(UnsafeBufferPointer(rebasing: buffer[..<count]))
     }
   }
 

@@ -44,13 +44,13 @@
 #ifndef LLVM_ADT_HASHING_H
 #define LLVM_ADT_HASHING_H
 
-#include "llvm/Support/DataTypes.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/SwapByteOrder.h"
 #include "llvm/Support/type_traits.h"
 #include <algorithm>
 #include <cassert>
 #include <cstring>
+#include <cstdint>
 #include <string>
 #include <utility>
 

@@ -200,7 +200,7 @@ public:
 
 /// Gather all instructions that use the given `address`
 ///
-/// "Normal" uses are a whitelisted set of uses that guarantees the address is
+/// "Normal" uses are a allowlisted set of uses that guarantees the address is
 /// only used as if it refers to a single value and all uses are accounted for
 /// (no address projections).
 ///
@@ -322,6 +322,9 @@ namespace {
 /// This returns false and sets Oper to a valid operand if the instruction is a
 /// projection of the value at the given address. The assumption is that we
 /// cannot deinitialize memory via projections.
+///
+/// This returns true with Oper == nullptr for trivial stores (without a proper
+/// deinit).
 class AnalyzeForwardUse
     : public SILInstructionVisitor<AnalyzeForwardUse, bool> {
 public:
@@ -352,7 +355,10 @@ public:
     return true;
   }
   bool visitStoreInst(StoreInst *Store) {
-    llvm_unreachable("illegal reinitialization or store of an address");
+    // Trivial values may be stored prior to the next deinit. A store is an
+    // implicit "deinit" with no operand to replace.
+    assert(Store->getOperand(0)->getType().isTrivial(*Store->getFunction()));
+    return true;
   }
   bool visitDestroyAddrInst(DestroyAddrInst *UserInst) {
     Oper = &UserInst->getOperandRef();
@@ -531,7 +537,7 @@ class CopyForwarding {
   public:
     CopySrcUserVisitor(CopyForwarding &CPF) : CPF(CPF) {}
 
-    virtual bool visitNormalUse(SILInstruction *user) {
+    virtual bool visitNormalUse(SILInstruction *user) override {
       if (isa<LoadInst>(user))
         CPF.IsSrcLoadedFrom = true;
 
@@ -543,18 +549,18 @@ class CopyForwarding {
       // Bail on multiple uses in the same instruction to avoid complexity.
       return CPF.SrcUserInsts.insert(user).second;
     }
-    virtual bool visitTake(CopyAddrInst *take) {
+    virtual bool visitTake(CopyAddrInst *take) override {
       if (take->getSrc() == take->getDest())
         return false;
 
       CPF.TakePoints.push_back(take);
       return true;
     }
-    virtual bool visitDestroy(DestroyAddrInst *destroy) {
+    virtual bool visitDestroy(DestroyAddrInst *destroy) override {
       CPF.DestroyPoints.push_back(destroy);
       return true;
     }
-    virtual bool visitDebugValue(DebugValueAddrInst *debugValue) {
+    virtual bool visitDebugValue(DebugValueAddrInst *debugValue) override {
       return CPF.SrcDebugValueInsts.insert(debugValue).second;
     }
   };
@@ -606,8 +612,10 @@ public:
 
 protected:
   bool propagateCopy(CopyAddrInst *CopyInst, bool hoistingDestroy);
-  CopyAddrInst *findCopyIntoDeadTemp(CopyAddrInst *destCopy);
-  bool forwardDeadTempCopy(CopyAddrInst *srcCopy, CopyAddrInst *destCopy);
+  CopyAddrInst *findCopyIntoDeadTemp(
+      CopyAddrInst *destCopy,
+      SmallVectorImpl<DebugValueAddrInst *> &debugInstsToDelete);
+  bool forwardDeadTempCopy(CopyAddrInst *destCopy);
   bool forwardPropagateCopy();
   bool backwardPropagateCopy();
   bool hoistDestroy(SILInstruction *DestroyPoint, SILLocation DestroyLoc);
@@ -627,17 +635,17 @@ public:
   CopyDestUserVisitor(SmallPtrSetImpl<SILInstruction *> &DestUsers)
       : DestUsers(DestUsers) {}
 
-  virtual bool visitNormalUse(SILInstruction *user) {
+  virtual bool visitNormalUse(SILInstruction *user) override {
     // Bail on multiple uses in the same instruction to avoid complexity.
     return DestUsers.insert(user).second;
   }
-  virtual bool visitTake(CopyAddrInst *take) {
+  virtual bool visitTake(CopyAddrInst *take) override {
     return DestUsers.insert(take).second;
   }
-  virtual bool visitDestroy(DestroyAddrInst *destroy) {
+  virtual bool visitDestroy(DestroyAddrInst *destroy) override {
     return DestUsers.insert(destroy).second;
   }
-  virtual bool visitDebugValue(DebugValueAddrInst *debugValue) {
+  virtual bool visitDebugValue(DebugValueAddrInst *debugValue) override {
     return DestUsers.insert(debugValue).second;
   }
 };
@@ -675,12 +683,10 @@ propagateCopy(CopyAddrInst *CopyInst, bool hoistingDestroy) {
   // Handle copy-of-copy without analyzing uses.
   // Assumes that CurrentCopy->getSrc() is dead after CurrentCopy.
   assert(CurrentCopy->isTakeOfSrc() || hoistingDestroy);
-  if (auto *srcCopy = findCopyIntoDeadTemp(CurrentCopy)) {
-    if (forwardDeadTempCopy(srcCopy, CurrentCopy)) {
-      HasChanged = true;
-      ++NumDeadTemp;
-      return true;
-    }
+  if (forwardDeadTempCopy(CurrentCopy)) {
+    HasChanged = true;
+    ++NumDeadTemp;
+    return true;
   }
 
   if (forwardPropagateCopy()) {
@@ -731,7 +737,9 @@ propagateCopy(CopyAddrInst *CopyInst, bool hoistingDestroy) {
 /// Unlike the forward and backward propagation that finds all use points, this
 /// handles copies of address projections. By conservatively checking all
 /// intervening instructions, it avoids the need to analyze projection paths.
-CopyAddrInst *CopyForwarding::findCopyIntoDeadTemp(CopyAddrInst *destCopy) {
+CopyAddrInst *CopyForwarding::findCopyIntoDeadTemp(
+    CopyAddrInst *destCopy,
+    SmallVectorImpl<DebugValueAddrInst *> &debugInstsToDelete) {
   auto tmpVal = destCopy->getSrc();
   assert(tmpVal == CurrentDef);
   assert(isIdentifiedSourceValue(tmpVal));
@@ -744,8 +752,20 @@ CopyAddrInst *CopyForwarding::findCopyIntoDeadTemp(CopyAddrInst *destCopy) {
       if (srcCopy->getDest() == tmpVal)
         return srcCopy;
     }
+    // 'SrcUserInsts' consists of all users of the 'temp'
     if (SrcUserInsts.count(UserInst))
       return nullptr;
+
+    // Collect all debug_value_addr instructions between temp to dest copy and
+    // src to temp copy. On success, these debug_value_addr instructions should
+    // be deleted.
+    if (auto *debugUser = dyn_cast<DebugValueAddrInst>(UserInst)) {
+      // 'SrcDebugValueInsts' consists of all the debug users of 'temp'
+      if (SrcDebugValueInsts.count(debugUser))
+        debugInstsToDelete.push_back(debugUser);
+      continue;
+    }
+
     if (UserInst->mayWriteToMemory())
       return nullptr;
   }
@@ -774,12 +794,16 @@ CopyAddrInst *CopyForwarding::findCopyIntoDeadTemp(CopyAddrInst *destCopy) {
 /// - %temp is uninitialized following `srcCopy` and subsequent instruction
 ///   attempts to destroy this uninitialized value.
 bool CopyForwarding::
-forwardDeadTempCopy(CopyAddrInst *srcCopy, CopyAddrInst *destCopy) {
+forwardDeadTempCopy(CopyAddrInst *destCopy) {
+  SmallVector<DebugValueAddrInst*, 2> debugInstsToDelete;
+  auto *srcCopy = findCopyIntoDeadTemp(CurrentCopy, debugInstsToDelete);
+  if (!srcCopy)
+    return false;
+
   LLVM_DEBUG(llvm::dbgs() << "  Temp Copy:" << *srcCopy
                           << "         to " << *destCopy);
 
   assert(srcCopy->getDest() == destCopy->getSrc());
-  
   // This pattern can be trivially folded without affecting %temp destroys:
   // copy_addr [...] %src, [init] %temp
   // copy_addr [take] %temp, [...] %dest
@@ -790,6 +814,11 @@ forwardDeadTempCopy(CopyAddrInst *srcCopy, CopyAddrInst *destCopy) {
   if (!srcCopy->isInitializationOfDest()) {
     SILBuilderWithScope(srcCopy)
       .createDestroyAddr(srcCopy->getLoc(), srcCopy->getDest());
+  }
+
+  // Delete all dead debug_value_addr instructions
+  for (auto *deadDebugUser : debugInstsToDelete) {
+    deadDebugUser->eraseFromParent();
   }
 
   // Either `destCopy` is a take, or the caller is hoisting a destroy:
@@ -1011,15 +1040,17 @@ bool CopyForwarding::forwardPropagateCopy() {
       continue;
 
     AnalyzeForwardUse AnalyzeUse(CopyDest);
-    bool seenDeinit = AnalyzeUse.visit(UserInst);
-    // If this use cannot be analyzed, then abort.
+    bool seenDeinitOrStore = AnalyzeUse.visit(UserInst);
+    if (AnalyzeUse.Oper)
+      ValueUses.push_back(AnalyzeUse.Oper);
+
+    // If this is a deinit or store, we're done searching.
+    if (seenDeinitOrStore)
+      break;
+
+    // If this non-deinit instruction wasn't fully analyzed, bail-out.
     if (!AnalyzeUse.Oper)
       return false;
-    // Otherwise record the operand.
-    ValueUses.push_back(AnalyzeUse.Oper);
-    // If this is a deinit, we're done searching.
-    if (seenDeinit)
-      break;
   }
   if (SI == SE)
     return false;
@@ -1475,10 +1506,6 @@ class CopyForwardingPass : public SILFunctionTransform
 {
   void run() override {
     if (!EnableCopyForwarding && !EnableDestroyHoisting)
-      return;
-
-    // FIXME: We should be able to support [ossa].
-    if (getFunction()->hasOwnership())
       return;
 
     LLVM_DEBUG(llvm::dbgs() << "Copy Forwarding in Func "

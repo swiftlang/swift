@@ -22,7 +22,7 @@ class ToplevelClass3 {}
 @available(OSX 13.10, *)
 @_originallyDefinedIn(module: "foo", * 13.13) // expected-warning {{* as platform name has no effect}} expected-error {{expected at least one platform version in @_originallyDefinedIn}}
 @_originallyDefinedIn(module: "foo", OSX 13.13, iOS 7.0)
-@_originallyDefinedIn(module: "foo", OSX 13.14, * 7.0) // expected-warning {{* as platform name has no effect}} expected-error {{duplicate version number for platform OSX}}
+@_originallyDefinedIn(module: "foo", OSX 13.14, * 7.0) // expected-warning {{* as platform name has no effect}} expected-error {{duplicate version number for platform macOS}}
 class ToplevelClass4 {
 	@_originallyDefinedIn(module: "foo", OSX 13.13) // expected-error {{'@_originallyDefinedIn' attribute cannot be applied to this declaration}}
 	subscript(index: Int) -> Int {

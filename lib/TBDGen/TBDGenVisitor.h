@@ -40,7 +40,9 @@ class DataLayout;
 
 namespace swift {
 
+class TBDGenDescriptor;
 struct TBDGenOptions;
+class SymbolSource;
 
 namespace tbdgen {
 
@@ -60,15 +62,21 @@ struct InstallNameStore {
 };
 
 class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
-public:
-  llvm::MachO::InterfaceFile &Symbols;
-  llvm::MachO::TargetList Targets;
-  StringSet *StringSymbols;
-  const llvm::DataLayout &DataLayout;
+#ifndef NDEBUG
+  /// Tracks the symbols emitted to ensure we don't emit any duplicates.
+  llvm::StringSet<> DuplicateSymbolChecker;
+#endif
 
-  const UniversalLinkageInfo &UniversalLinkInfo;
+  const llvm::DataLayout &DataLayout;
+  UniversalLinkageInfo UniversalLinkInfo;
   ModuleDecl *SwiftModule;
   const TBDGenOptions &Opts;
+
+  using SymbolKind = llvm::MachO::SymbolKind;
+  using SymbolCallbackFn =
+      llvm::function_ref<void(StringRef, SymbolKind, SymbolSource)>;
+
+  SymbolCallbackFn SymbolCallback;
 
   /// A set of original function and derivative configuration pairs for which
   /// derivative symbols have been emitted.
@@ -78,18 +86,17 @@ public:
   llvm::DenseSet<std::pair<AbstractFunctionDecl *, AutoDiffConfig>>
       AddedDerivatives;
 
-private:
   std::vector<Decl*> DeclStack;
   std::unique_ptr<std::map<std::string, InstallNameStore>>
     previousInstallNameMap;
   std::unique_ptr<std::map<std::string, InstallNameStore>>
     parsePreviousModuleInstallNameMap();
   void addSymbolInternal(StringRef name, llvm::MachO::SymbolKind kind,
-                         bool isLinkerDirective = false);
+                         SymbolSource source);
   void addLinkerDirectiveSymbolsLdHide(StringRef name, llvm::MachO::SymbolKind kind);
   void addLinkerDirectiveSymbolsLdPrevious(StringRef name, llvm::MachO::SymbolKind kind);
-  void addSymbol(StringRef name, llvm::MachO::SymbolKind kind =
-                                     llvm::MachO::SymbolKind::GlobalSymbol);
+  void addSymbol(StringRef name, SymbolSource source,
+                 SymbolKind kind = SymbolKind::GlobalSymbol);
 
   void addSymbol(SILDeclRef declRef);
 
@@ -135,15 +142,18 @@ private:
                                   AutoDiffConfig config);
 
 public:
-  TBDGenVisitor(llvm::MachO::InterfaceFile &symbols,
-                llvm::MachO::TargetList targets, StringSet *stringSymbols,
-                const llvm::DataLayout &dataLayout,
-                const UniversalLinkageInfo &universalLinkInfo,
-                ModuleDecl *swiftModule, const TBDGenOptions &opts)
-      : Symbols(symbols), Targets(targets), StringSymbols(stringSymbols),
-        DataLayout(dataLayout), UniversalLinkInfo(universalLinkInfo),
-        SwiftModule(swiftModule), Opts(opts),
-        previousInstallNameMap(parsePreviousModuleInstallNameMap())  {}
+  TBDGenVisitor(const llvm::Triple &target, const llvm::DataLayout &dataLayout,
+                ModuleDecl *swiftModule, const TBDGenOptions &opts,
+                SymbolCallbackFn symbolCallback)
+      : DataLayout(dataLayout),
+        UniversalLinkInfo(target, opts.HasMultipleIGMs, /*forcePublic*/ false),
+        SwiftModule(swiftModule), Opts(opts), SymbolCallback(symbolCallback),
+        previousInstallNameMap(parsePreviousModuleInstallNameMap()) {}
+
+  /// Create a new visitor using the target and layout information from a
+  /// TBDGenDescriptor.
+  TBDGenVisitor(const TBDGenDescriptor &desc, SymbolCallbackFn symbolCallback);
+
   ~TBDGenVisitor() { assert(DeclStack.empty()); }
   void addMainIfNecessary(FileUnit *file) {
     // HACK: 'main' is a special symbol that's always emitted in SILGen if
@@ -152,8 +162,9 @@ public:
     //
     // Make sure to only add the main symbol for the module that we're emitting
     // TBD for, and not for any statically linked libraries.
+    // FIXME: We should have a SymbolSource for main.
     if (file->hasEntryPoint() && file->getParentModule() == SwiftModule)
-      addSymbol("main");
+      addSymbol("main", SymbolSource::forUnknown());
   }
 
   /// Adds the global symbols associated with the first file.
@@ -190,6 +201,12 @@ public:
   void visitDecl(Decl *D) {}
 
   void visit(Decl *D);
+
+  /// Visit the symbols in a given file unit.
+  void visitFile(FileUnit *file);
+
+  /// Visit the files specified by a given TBDGenDescriptor.
+  void visit(const TBDGenDescriptor &desc);
 };
 } // end namespace tbdgen
 } // end namespace swift

@@ -1331,7 +1331,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
       SugaredGenericSig(Ctx.checkingABI()?
                         printGenericSignature(Ctx, D, /*Canonical*/false):
                         StringRef()),
-      IntromacOS(Ctx.getPlatformIntroVersion(D, PlatformKind::OSX)),
+      IntromacOS(Ctx.getPlatformIntroVersion(D, PlatformKind::macOS)),
       IntroiOS(Ctx.getPlatformIntroVersion(D, PlatformKind::iOS)),
       IntrotvOS(Ctx.getPlatformIntroVersion(D, PlatformKind::tvOS)),
       IntrowatchOS(Ctx.getPlatformIntroVersion(D, PlatformKind::watchOS)),
@@ -1518,7 +1518,7 @@ SwiftDeclCollector::constructTypeNode(Type T, TypeInitInfo Info) {
     Root->addChild(constructTypeNode(MTT->getInstanceType()));
   } else if (auto ATT = T->getAs<ArchetypeType>()) {
     for (auto Pro : ATT->getConformsTo()) {
-      Root->addChild(constructTypeNode(Pro->getDeclaredType()));
+      Root->addChild(constructTypeNode(Pro->getDeclaredInterfaceType()));
     }
   }
   return Root;
@@ -1573,6 +1573,7 @@ SwiftDeclCollector::constructInitNode(ConstructorDecl *CD) {
 bool swift::ide::api::
 SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
   // Exclude all clang nodes if we're comparing Swift decls specifically.
+  // FIXME: isFromClang also excludes Swift decls with @objc. We should allow those.
   if (Opts.SwiftOnly && isFromClang(D)) {
     return true;
   }
@@ -1595,13 +1596,18 @@ SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
   if (checkingABI()) {
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       // Private vars with fixed binary orders can have ABI-impact, so we should
-      // whitelist them if we're checking ABI.
+      // allowlist them if we're checking ABI.
       if (getFixedBinaryOrder(VD).hasValue())
         return false;
       // Typealias should have no impact on ABI.
       if (isa<TypeAliasDecl>(VD))
         return true;
     }
+    // Exclude decls with @_alwaysEmitIntoClient if we are checking ABI.
+    // These decls are considered effectively public because they are usable
+    // from inline, so we have to manually exclude them here.
+    if (D->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+      return true;
   } else {
     if (D->isPrivateStdlibDecl(false))
       return true;

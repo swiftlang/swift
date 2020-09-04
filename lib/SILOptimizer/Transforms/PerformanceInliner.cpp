@@ -298,6 +298,13 @@ bool SILPerformanceInliner::isProfitableToInline(
   // It is always OK to inline a simple call.
   // TODO: May be consider also the size of the callee?
   if (isPureCall(AI, SEA)) {
+    OptRemark::Emitter::emitOrDebug(DEBUG_TYPE, &ORE, [&]() {
+      using namespace OptRemark;
+      return RemarkPassed("Inline", *AI.getInstruction())
+             << "Pure call. Always profitable to inline "
+             << NV("Callee", Callee);
+    });
+
     LLVM_DEBUG(dumpCaller(AI.getFunction());
                llvm::dbgs() << "    pure-call decision " << Callee->getName()
                             << '\n');
@@ -432,11 +439,8 @@ bool SILPerformanceInliner::isProfitableToInline(
           // The access is dynamic and has no nested conflict
           // See if the storage location is considered by
           // access enforcement optimizations
-          AccessedStorage storage =
-              findAccessedStorageNonNested(BAI->getSource());
-          if (BAI->hasNoNestedConflict() &&
-              (storage.isUniquelyIdentified() ||
-               storage.getKind() == AccessedStorage::Class)) {
+          AccessedStorage storage = findAccessedStorage(BAI->getSource());
+          if (BAI->hasNoNestedConflict() && (storage.isFormalAccessBase())) {
             BlockW.updateBenefit(ExclusivityBenefitWeight,
                                  ExclusivityBenefitBase);
           } else {
@@ -490,9 +494,24 @@ bool SILPerformanceInliner::isProfitableToInline(
   auto *bb = AI.getInstruction()->getParent();
   auto bbIt = BBToWeightMap.find(bb);
   if (bbIt != BBToWeightMap.end()) {
-    return profileBasedDecision(AI, Benefit, Callee, CalleeCost,
-                                NumCallerBlocks, bbIt);
+    if (profileBasedDecision(AI, Benefit, Callee, CalleeCost, NumCallerBlocks,
+                             bbIt)) {
+      OptRemark::Emitter::emitOrDebug(DEBUG_TYPE, &ORE, [&]() {
+        using namespace OptRemark;
+        return RemarkPassed("Inline", *AI.getInstruction())
+               << "Profitable due to provided profile";
+      });
+      return true;
+    }
+
+    OptRemark::Emitter::emitOrDebug(DEBUG_TYPE, &ORE, [&]() {
+      using namespace OptRemark;
+      return RemarkMissed("Inline", *AI.getInstruction())
+             << "Not profitable due to provided profile";
+    });
+    return false;
   }
+
   if (isClassMethodAtOsize && Benefit > OSizeClassMethodBenefit) {
     Benefit = OSizeClassMethodBenefit;
   }
@@ -501,7 +520,7 @@ bool SILPerformanceInliner::isProfitableToInline(
   if (CalleeCost > Benefit) {
     OptRemark::Emitter::emitOrDebug(DEBUG_TYPE, &ORE, [&]() {
       using namespace OptRemark;
-      return RemarkMissed("NoInlinedCost", *AI.getInstruction())
+      return RemarkMissed("Inline", *AI.getInstruction())
              << "Not profitable to inline function " << NV("Callee", Callee)
              << " (cost = " << NV("Cost", CalleeCost)
              << ", benefit = " << NV("Benefit", Benefit) << ")";
@@ -540,6 +559,15 @@ static bool returnsClosure(SILFunction *F) {
   return false;
 }
 
+static bool isInlineAlwaysCallSite(SILFunction *Callee) {
+  if (Callee->isTransparent())
+    return true;
+  if (Callee->getInlineStrategy() == AlwaysInline)
+    if (!Callee->getModule().getOptions().IgnoreAlwaysInline)
+      return true;
+  return false;
+}
+
 /// Checks if a given generic apply should be inlined unconditionally, i.e.
 /// without any complex analysis using e.g. a cost model.
 /// It returns true if a function should be inlined.
@@ -566,7 +594,7 @@ static Optional<bool> shouldInlineGeneric(FullApplySite AI) {
 
   // Always inline generic functions which are marked as
   // AlwaysInline or transparent.
-  if (Callee->getInlineStrategy() == AlwaysInline || Callee->isTransparent())
+  if (isInlineAlwaysCallSite(Callee))
     return true;
 
   // If all substitutions are concrete, then there is no need to perform the
@@ -613,7 +641,7 @@ bool SILPerformanceInliner::decideInWarmBlock(
 
   SILFunction *Callee = AI.getReferencedFunctionOrNull();
 
-  if (Callee->getInlineStrategy() == AlwaysInline || Callee->isTransparent()) {
+  if (isInlineAlwaysCallSite(Callee)) {
     LLVM_DEBUG(dumpCaller(AI.getFunction());
                llvm::dbgs() << "    always-inline decision "
                             << Callee->getName() << '\n');
@@ -636,7 +664,7 @@ bool SILPerformanceInliner::decideInColdBlock(FullApplySite AI,
     return false;
   }
 
-  if (Callee->getInlineStrategy() == AlwaysInline || Callee->isTransparent()) {
+  if (isInlineAlwaysCallSite(Callee)) {
     LLVM_DEBUG(dumpCaller(AI.getFunction());
                llvm::dbgs() << "    always-inline decision "
                             << Callee->getName() << '\n');
@@ -696,10 +724,6 @@ addToBBCounts(llvm::DenseMap<SILBasicBlock *, uint64_t> &BBToWeightMap,
            "Expected to find block in map");
     BBToWeightMap[currBB] += numToAdd;
   }
-}
-
-static bool isInlineAlwaysCallSite(SILFunction *Callee) {
-  return Callee->getInlineStrategy() == AlwaysInline || Callee->isTransparent();
 }
 
 static void
@@ -1011,7 +1035,7 @@ public:
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
     SideEffectAnalysis *SEA = PM->getAnalysis<SideEffectAnalysis>();
-    OptRemark::Emitter ORE(DEBUG_TYPE, getFunction()->getModule());
+    OptRemark::Emitter ORE(DEBUG_TYPE, *getFunction());
 
     if (getOptions().InlineThreshold == 0) {
       return;

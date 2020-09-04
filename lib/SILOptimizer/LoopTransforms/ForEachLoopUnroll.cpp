@@ -323,8 +323,15 @@ void ArrayInfo::classifyUsesOfArray(SILValue arrayValue) {
     // as the array itself is not modified (which is possible with reference
     // types).
     ArraySemanticsCall arrayOp(user);
-    if (!arrayOp.doesNotChangeArray())
-      mayBeWritten = true;
+    if (arrayOp.doesNotChangeArray())
+      continue;
+    
+    if (arrayOp.getKind() == swift::ArrayCallKind::kArrayFinalizeIntrinsic) {
+      classifyUsesOfArray((ApplyInst *)arrayOp);
+      continue;
+    }
+    
+    mayBeWritten = true;
   }
 }
 

@@ -362,7 +362,7 @@ UnsafeMutableBufferPointerTestSuite.test("withContiguous(Mutable)StorageIfAvaila
 }
 
 UnsafeMutableBufferPointerTestSuite.test("Slice.withContiguousStorageIfAvailable") {
-  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
+  guard #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) else {
     return
   }
 
@@ -425,7 +425,7 @@ for testIndex in (0..<bufCount) {
     defer { allocated.deallocate() }
 
     let buffer = ${Type}(start: allocated, count: bufCount)
-    ${'var' if mutable and action <> 'read' else 'let'} slice = buffer[sliceRange]
+    ${'var' if mutable and action != 'read' else 'let'} slice = buffer[sliceRange]
 
     if _isDebugAssertConfiguration(),
        testIndex < sliceRange.lowerBound ||
@@ -466,7 +466,7 @@ for testRange in testRanges {
     defer { allocated.deallocate() }
 
     let buffer = ${Type}(start: allocated, count: bufCount+2)
-    ${'var' if mutable and action <> 'read' else 'let'} slice = buffer[sliceRange]
+    ${'var' if mutable and action != 'read' else 'let'} slice = buffer[sliceRange]
 
     if _isDebugAssertConfiguration(),
       testRange.lowerBound < sliceRange.lowerBound ||

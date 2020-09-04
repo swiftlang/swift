@@ -6,10 +6,6 @@ enum Either<T,U> {
   case second(U)
 }
 
-struct Do<T> {
-  var value: T
-}
-
 @_functionBuilder
 struct TupleBuilder {
   static func buildBlock<T1>(_ t1: T1) -> (T1) {
@@ -36,19 +32,6 @@ struct TupleBuilder {
     return (t1, t2, t3, t4, t5)
   }
 
-  static func buildDo<T1>(_ t1: T1) -> Do<(T1)> {
-    .init(value: t1)
-  }
-
-  static func buildDo<T1, T2>(_ t1: T1, _ t2: T2) -> Do<(T1, T2)> {
-    .init(value: (t1, t2))
-  }
-  
-  static func buildDo<T1, T2, T3>(_ t1: T1, _ t2: T2, _ t3: T3)
-      -> Do<(T1, T2, T3)> {
-    .init(value: (t1, t2, t3))
-  }
-
   static func buildIf<T>(_ value: T?) -> T? { return value }
 
   static func buildEither<T,U>(first value: T) -> Either<T,U> {
@@ -61,11 +44,11 @@ struct TupleBuilder {
   static func buildArray<T>(_ array: [T]) -> [T] { return array }
 }
 
-func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) {
-  print(body(cond))
+func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) throws -> T) rethrows {
+  print(try body(cond))
 }
 
-// CHECK: (17, 3.14159, "Hello, DSL", main.Do<(Swift.Array<Swift.String>, Swift.Int)>(value: (["nested", "do"], 6)), Optional((2.71828, ["if", "stmt"])))
+// CHECK: (17, 3.14159, "Hello, DSL", (["nested", "do"], 6), Optional((2.71828, ["if", "stmt"])))
 let name = "dsl"
 tuplify(true) {
   17
@@ -664,7 +647,6 @@ struct TupleBuilderWithOpt {
     return (t1, t2, t3, t4, t5)
   }
 
-  static func buildDo<T>(_ value: T) -> T { return value }
   static func buildOptional<T>(_ value: T?) -> T? { return value }
 
   static func buildEither<T,U>(first value: T) -> Either<T,U> {
@@ -703,5 +685,85 @@ tuplify(true) { c in
   }
 }
 
+// Test the use of function builders partly implemented through a protocol.
+indirect enum FunctionBuilder<Expression> {
+    case expression(Expression)
+    case block([FunctionBuilder])
+    case either(Either<FunctionBuilder, FunctionBuilder>)
+    case optional(FunctionBuilder?)
+}
+
+protocol FunctionBuilderProtocol {
+    associatedtype Expression
+    typealias Component = FunctionBuilder<Expression>
+    associatedtype Return
+
+    static func buildExpression(_ expression: Expression) -> Component
+    static func buildBlock(_ components: Component...) -> Component
+    static func buildOptional(_ optional: Component?) -> Component
+    static func buildArray(_ components: [Component]) -> Component
+    static func buildLimitedAvailability(_ component: Component) -> Component
+
+    static func buildFinalResult(_ components: Component) -> Return
+}
+
+extension FunctionBuilderProtocol {
+    static func buildExpression(_ expression: Expression) -> Component { .expression(expression) }
+    static func buildBlock(_ components: Component...) -> Component { .block(components) }
+    static func buildOptional(_ optional: Component?) -> Component { .optional(optional) }
+    static func buildArray(_ components: [Component]) -> Component { .block(components) }
+    static func buildLimitedAvailability(_ component: Component) -> Component { component }
+}
+
+@_functionBuilder
+enum ArrayBuilder<E>: FunctionBuilderProtocol {
+    typealias Expression = E
+    typealias Component = FunctionBuilder<E>
+    typealias Return = [E]
+
+    static func buildFinalResult(_ components: Component) -> Return {
+        switch components {
+        case .expression(let e): return [e]
+        case .block(let children): return children.flatMap(buildFinalResult)
+        case .either(.first(let child)): return buildFinalResult(child)
+        case .either(.second(let child)): return buildFinalResult(child)
+        case .optional(let child?): return buildFinalResult(child)
+        case .optional(nil): return []
+        }
+    }
+}
 
 
+func buildArray(@ArrayBuilder<String> build: () -> [String]) -> [String] {
+    return build()
+}
+
+
+let a = buildArray {
+    "1"
+    "2"
+    if Bool.random() {
+        "maybe 3"
+    }
+}
+// CHECK: ["1", "2"
+print(a)
+
+// Throwing in function builders.
+enum MyError: Error {
+  case boom
+}
+
+// CHECK: testThrow
+do {
+  print("testThrow")
+  try tuplify(true) { c in
+    "ready to throw"
+    throw MyError.boom
+  }
+} catch MyError.boom {
+  // CHECK: caught it!
+  print("caught it!")
+} catch {
+  fatalError("Threw something else?")
+}

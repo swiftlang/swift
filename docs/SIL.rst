@@ -962,13 +962,13 @@ called within the addressor.
 
 The function is a getter of a lazy property for which the backing storage is
 an ``Optional`` of the property's type. The getter contains a top-level
-``switch_enum`` (or ``switch_enum_addr``), which tests if the lazy property
+`switch_enum`_ (or `switch_enum_addr`_), which tests if the lazy property
 is already computed. In the ``None``-case, the property is computed and stored
 to the backing storage of the property.
 
 After the first call of a lazy property getter, it is guaranteed that the
 property is computed and consecutive calls always execute the ``Some``-case of
-the top-level ``switch_enum``.
+the top-level `switch_enum`_.
 ::
 
   sil-function-attribute ::= '[weak_imported]'
@@ -1035,7 +1035,10 @@ Basic Blocks
 
   sil-basic-block ::= sil-label sil-instruction-def* sil-terminator
   sil-label ::= sil-identifier ('(' sil-argument (',' sil-argument)* ')')? ':'
-  sil-argument ::= sil-value-name ':' sil-type
+  sil-value-ownership-kind ::= @owned
+  sil-value-ownership-kind ::= @guaranteed
+  sil-value-ownership-kind ::= @unowned
+  sil-argument ::= sil-value-name ':' sil-value-ownership-kind? sil-type
 
   sil-instruction-result ::= sil-value-name
   sil-instruction-result ::= '(' (sil-value-name (',' sil-value-name)*)? ')'
@@ -1067,12 +1070,12 @@ block::
 Arguments to the entry point basic block, which has no predecessor,
 are bound by the function's caller::
 
-  sil @foo : $(Int) -> Int {
+  sil @foo : $@convention(thin) (Int) -> Int {
   bb0(%x : $Int):
     return %x : $Int
   }
 
-  sil @bar : $(Int, Int) -> () {
+  sil @bar : $@convention(thin) (Int, Int) -> () {
   bb0(%x : $Int, %y : $Int):
     %foo = function_ref @foo
     %1 = apply %foo(%x) : $(Int) -> Int
@@ -1081,6 +1084,17 @@ are bound by the function's caller::
     return %3 : $()
   }
 
+When a function is in Ownership SSA, arguments additionally have an explicit
+annotated convention that describe the ownership semantics of the argument
+value::
+
+  sil [ossa] @baz : $@convention(thin) (Int, @owned String, @guaranteed String, @unowned String) -> () {
+  bb0(%x : $Int, %y : @owned $String, %z : @guaranteed $String, %w : @unowned $String):
+    ...
+  }
+
+Note that the first argument (``%x``) has an implicit ownership kind of
+``@none`` since all trivial values have ``@none`` ownership.
 
 Debug Information
 ~~~~~~~~~~~~~~~~~
@@ -1578,6 +1592,249 @@ basic blocks, or ``unreachable`` instructions may be dominated by applications
 of functions returning uninhabited types. An ``unreachable`` instruction that
 survives guaranteed DCE and is not immediately preceded by a no-return
 application is a dataflow error.
+
+Ownership SSA
+-------------
+
+A SILFunction marked with the ``[ossa]`` function attribute is considered to be
+in Ownership SSA form. Ownership SSA is an augmented version of SSA that
+enforces ownership invariants by imbuing value-operand edges with semantic
+ownership information. All SIL values are statically assigned an ownership kind
+that defines the ownership semantics that the value models. All SIL operands
+that use a SIL value are required to be able to be semantically partitioned in
+between "normal uses" that just require the value to be live and "consuming
+uses" that end the lifetime of the value and after which the value can no longer
+be used. Since operands that are consuming uses end a value's lifetime,
+naturally we must have that the consuming use points jointly post-dominate all
+non-consuming use points and that a value must be consumed exactly once along
+all reachable program paths, preventing leaks and use-after-frees. As an
+example, consider the following SIL example with partitioned defs/uses annotated
+inline::
+
+  sil @stash_and_cast : $@convention(thin) (@owned Klass) -> @owned SuperKlass {
+  bb0(%kls1 : @owned $Klass): // Definition of %kls1
+
+    // "Normal Use" kls1.
+    // Definition of %kls2.
+    %kls2 = copy_value %kls1 : $Klass
+
+    // "Consuming Use" of %kls2 to store it into a global. Stores in ossa are
+    // consuming since memory is generally assumed to have "owned"
+    // semantics. After this instruction executes, we can no longer use %kls2
+    // without triggering an ownership violation.
+    store %kls2 to [init] %globalMem : $*Klass
+
+    // "Consuming Use" of %kls1.
+    // Definition of %kls1Casted.
+    %kls1Casted = upcast %kls1 : $Klass to $SuperKlass
+
+    // "Consuming Use" of %kls1Casted
+    return %kls1Casted : $SuperKlass
+  }
+
+Notice how every value in the SIL above has a partionable set of uses with
+normal uses always before consuming uses. Any such violations of ownership
+semantics would trigger a static SILVerifier error allowing us to know that we
+do not have any leaks or use-after-frees in the above code.
+
+The semantics in the previous example is of just one form of ownership semantics
+supported: "owned" semantics. In SIL, we allow for values to have one of four
+different ownership kinds:
+
+* **None**. This is used to represent values that do not require memory
+  management and are outside of Ownership SSA invariants. Examples: trivial
+  values (e.x.: Int, Float), non-payloaded cases of non-trivial enums (e.x.:
+  Optional<T>.none), all address types.
+
+* **Owned**. A value that exists independently of any other value and is
+  consumed exactly once along all paths through a function by either a
+  destroy_value (actually destroying the value) or by a consuming instruction
+  that rebinds the value in some manner (e.x.: apply, casts, store).
+
+* **Guaranteed**. A value with a scoped lifetime whose liveness is dependent on
+  the lifetime of some other "base" owned or guaranteed value. Consumed by
+  instructions like `end_borrow`_. The "base" value is statically guaranteed to
+  be live at all of the value's paired end_borrow instructions.
+
+* **Unowned**. A value that is only guaranteed to be instantaneously valid and
+  must be copied before the value is used in an ``@owned`` or ``@guaranteed``
+  context. This is needed both to model argument values with the ObjC unsafe
+  unowned argument convention and also to model the ownership resulting from
+  bitcasting a trivial type to a non-trivial type. This value should never be
+  consumed.
+
+We describe each of these semantics in more detail below.
+
+Value Ownership Kind
+~~~~~~~~~~~~~~~~~~~~
+
+Owned
+`````
+
+Owned ownership models "move only" values. We require that each such value is
+consumed exactly once along all program paths. The IR verifier will flag values
+that are not consumed along a path as a leak and any double consumes as
+use-after-frees. We model move operations via "forwarding uses" such as casts
+and transforming terminators (e.x.: `switch_enum`_, `checked_cast_br`_) that
+transform the input value, consuming it in the process, and producing a new
+transformed owned value as a result.
+
+Putting this all together, one can view each owned SIL value as being
+effectively a "move only value" except when explicitly copied by a
+copy_value. This of course implies that ARC operations can be assumed to only
+semantically effect the specific value that they are applied to /and/ that each
+ARC constraint is able to be verified independently for each owned SILValue
+derived from the ARC object. As an example, consider the following Swift/SIL::
+
+  // testcase.swift.
+  func doSomething(x : Klass) -> OtherKlass? {
+    return x as? OtherKlass
+  }
+
+  // testcase.sil. A possible SILGen lowering
+  sil [ossa] @doSomething : $@convention(thin) (@guaranteed Klass) -> () {
+  bb0(%0 : @guaranteed Klass):
+    // Definition of '%1'
+    %1 = copy_value %0 : $Klass
+    
+    // Consume '%1'. This means '%1' can no longer be used after this point. We
+    // rebind '%1' in the destination blocks (bbYes, bbNo).
+    checked_cast_br %1 : $Klass to $OtherKlass, bbYes, bbNo
+
+  bbYes(%2 : @owned $OtherKlass): // On success, the checked_cast_br forwards
+                                  // '%1' into '%2' after casting to OtherKlass.
+
+    // Forward '%2' into '%3'. '%2' can not be used past this point in the
+    // function.
+    %3 = enum $Optional<OtherKlass>, case #Optional.some!enumelt, %2 : $OtherKlass
+
+    // Forward '%3' into the branch. '%3' can not be used past this point.
+    br bbEpilog(%3 : $Optional<OtherKlass>)
+
+  bbNo(%3 : @owned $Klass): // On failure, since we consumed '%1' already, we
+                            // return the original '%1' as a new value '%3'
+                            // so we can use it below.
+    // Actually destroy the underlying copy (``%1``) created by the copy_value
+    // in bb0.
+    destroy_value %3 : $Klass
+
+    // We want to return nil here. So we create a new non-payloaded enum and
+    // pass it off to bbEpilog.
+    %4 = enum $Optional<OtherKlass>, case #Optional.none!enumelt
+    br bbEpilog(%4 : $Optional<OtherKlass>)
+
+  bbEpilog(%5 : @owned $Optional<OtherKlass>):
+    // Consumes '%5' to return to caller.
+    return %5 : $Optional<OtherKlass>
+  }
+
+Notice how our individual copy (``%1``) threads its way through the IR using
+forwarding of ``@owned`` ownership. These forwarding operations partition the
+lifetime of the result of the copy_value into a set of disjoint individual owned
+lifetimes (``%2``, ``%3``, ``%5``).
+
+Guaranteed
+``````````
+
+Guaranteed ownership models values that have a scoped dependent lifetime on a
+"base value" with owned or guaranteed ownership. Due to this lifetime
+dependence, the base value is required to be statically live over the entire
+scope where the guaranteed value is valid.
+
+These explicit scopes are introduced into SIL by begin scope instructions (e.x.:
+`begin_borrow`_, `load_borrow`_) that are paired with sets of jointly
+post-dominating scope ending instructions (e.x.: `end_borrow`_)::
+
+  sil [ossa] @guaranteed_values : $@convention(thin) (@owned Klass) -> () {
+  bb0(%0 : @owned $Klass):
+    %1 = begin_borrow %0 : $Klass
+    cond_br ..., bb1, bb2
+
+  bb1:
+    ...
+    end_borrow %1 : $Klass
+    destroy_value %0 : $Klass
+    br bb3
+
+  bb2:
+    ...
+    end_borrow %1 : $Klass
+    destroy_value %0 : $Klass
+    br bb3
+
+  bb3:
+    ...
+  }
+
+Notice how the `end_borrow`_ allow for a SIL generator to communicate to
+optimizations that they can never shrink the lifetime of ``%0`` by moving
+`destroy_value`_ above ``%1``.
+
+Values with guaranteed ownership follow a dataflow rule that states that
+non-consuming "forwarding" uses of the guaranteed value are also guaranteed and
+are recursively validated as being in the original values scope. This was a
+choice we made to reduce idempotent scopes in the IR::
+
+  sil [ossa] @get_first_elt : $@convention(thin) (@guaranteed (String, String)) -> @owned String {
+  bb0(%0 : @guaranteed $(String, String)):
+    // %1 is validated as if it was apart of %0 and does not need its own begin_borrow/end_borrow.
+    %1 = tuple_extract %0 : $(String, String)
+    // So this copy_value is treated as a use of %0.
+    %2 = copy_value %1 : $String
+    return %2 : $String
+  }
+
+None
+````
+
+Values with None ownership are inert values that exist outside of the guarantees
+of Ownership SSA. Some examples of such values are:
+
+* Trivially typed values such as: Int, Float, Double
+* Non-payloaded non-trivial enums.
+* Address types.
+
+Since values with none ownership exist outside of ownership SSA, they can be
+used like normal SSA without violating ownership SSA invariants. This does not
+mean that code does not potentially violate other SIL rules (consider memory
+lifetime invariants)::
+
+    sil @none_values : $@convention(thin) (Int, @in Klass) -> Int {
+    bb0(%0 : $Int, %1 : $*Klass):
+
+      // %0, %1 are normal SSA values that can be used anywhere in the function
+      // without breaking Ownership SSA invariants. It could violate other
+      // invariants if for instance, we load from %1 after we destroy the object
+      // there.
+      destroy_addr %1 : $*Klass
+
+      // If uncommented, this would violate memory lifetime invariants due to
+      // the ``destroy_addr %1`` above. But this would not violate the rules of
+      // Ownership SSA since addresses exist outside of the guarantees of
+      // Ownership SSA.
+      //
+      // %2 = load [take] %1 : $*Klass
+
+      // I can return this object without worrying about needing to copy since
+      // none objects can be arbitrarily returned.
+      return %0 : $Int
+    }
+
+Unowned
+```````
+
+This is a form of ownership that is used to model two different use cases:
+
+* Arguments of functions with ObjC convention. This convention requires the
+  callee to copy the value before using it (preferably before any other code
+  runs). We do not model this flow sensitive property in SIL today, but we do
+  not allow for unowned values to be passed as owned or guaranteed values
+  without copying it first.
+
+* Values that are a conversion from a trivial value with None ownership to a
+  non-trivial value. As an example of this consider an unsafe bit cast of a
+  trivial pointer to a class. In that case, since we have no reason to assume
+  that the object will remain alive, we need to make a copy of the value.
 
 Runtime Failure
 ---------------
@@ -2592,6 +2849,11 @@ by an ``end_borrow`` instruction. All ``load_borrow`` instructions must be
 paired with exactly one ``end_borrow`` instruction along any path through the
 program. Until ``end_borrow``, it is illegal to invalidate or store to ``%0``.
 
+begin_borrow
+````````````
+
+TODO
+
 end_borrow
 ``````````
 
@@ -3572,6 +3834,20 @@ literal syntax (though ``\()`` interpolations are not allowed). When
 the encoding is ``objc_selector``, the string literal produces a
 reference to a UTF-8-encoded Objective-C selector in the Objective-C
 method name segment.
+
+base_addr_for_offset
+````````````````````
+::
+
+  sil-instruction ::= 'base_addr_for_offset' sil-type
+
+  %1 = base_addr_for_offset $*S
+  // %1 has type $*S
+
+Creates a base address for offset calculations. The result can be used by
+address projections, like ``struct_element_addr``, which themselves return the
+offset of the projected fields.
+IR generation simply creates a null pointer for ``base_addr_for_offset``.
 
 Dynamic Dispatch
 ~~~~~~~~~~~~~~~~
@@ -4587,7 +4863,7 @@ but turns the control flow dependency into a data flow dependency.
 For address-only enums, `select_enum_addr`_ offers the same functionality for
 an indirectly referenced enum value in memory.
 
-Like `switch_enum`_, ``select_enum`` must have a ``default`` case unless the
+Like `switch_enum`_, `select_enum`_ must have a ``default`` case unless the
 enum can be exhaustively switched in the current function.
 
 select_enum_addr
@@ -4612,7 +4888,7 @@ Selects one of the "case" or "default" operands based on the case of the
 referenced enum value. This is the address-only counterpart to
 `select_enum`_.
 
-Like `switch_enum_addr`_, ``select_enum_addr`` must have a ``default`` case
+Like `switch_enum_addr`_, `select_enum_addr`_ must have a ``default`` case
 unless the enum can be exhaustively switched in the current function.
 
 Protocol and Protocol Composition Types
@@ -4636,10 +4912,10 @@ container may use one of several representations:
   type are class protocols, then the existential container for that type is
   address-only and referred to in the implementation as an *opaque existential
   container*. The value semantics of the existential container propagate to the
-  contained concrete value. Applying ``copy_addr`` to an opaque existential
+  contained concrete value. Applying `copy_addr`_ to an opaque existential
   container copies the contained concrete value, deallocating or reallocating
   the destination container's owned buffer if necessary. Applying
-  ``destroy_addr`` to an opaque existential container destroys the concrete
+  `destroy_addr`_ to an opaque existential container destroys the concrete
   value and deallocates any buffers owned by the existential container. The
   following instructions manipulate opaque existential containers:
 
@@ -4691,8 +4967,8 @@ Some existential types may additionally support specialized representations
 when they contain certain known concrete types. For example, when Objective-C
 interop is available, the ``Error`` protocol existential supports
 a class existential container representation for ``NSError`` objects, so it
-can be initialized from one using ``init_existential_ref`` instead of the
-more expensive ``alloc_existential_box``::
+can be initialized from one using `init_existential_ref`_ instead of the
+more expensive `alloc_existential_box`_::
 
   bb(%nserror: $NSError):
     // The slow general way to form an Error, allocating a box and
@@ -4725,9 +5001,9 @@ instruction is an address referencing the storage for the contained value, which
 remains uninitialized. The contained value must be ``store``-d or
 ``copy_addr``-ed to in order for the existential value to be fully initialized.
 If the existential container needs to be destroyed while the contained value
-is uninitialized, ``deinit_existential_addr`` must be used to do so. A fully
-initialized existential container can be destroyed with ``destroy_addr`` as
-usual. It is undefined behavior to ``destroy_addr`` a partially-initialized
+is uninitialized, `deinit_existential_addr`_ must be used to do so. A fully
+initialized existential container can be destroyed with `destroy_addr`_ as
+usual. It is undefined behavior to `destroy_addr`_ a partially-initialized
 existential container.
 
 init_existential_value
@@ -4756,10 +5032,10 @@ deinit_existential_addr
   // composition type P
 
 Undoes the partial initialization performed by
-``init_existential_addr``.  ``deinit_existential_addr`` is only valid for
+`init_existential_addr`_.  `deinit_existential_addr`_ is only valid for
 existential containers that have been partially initialized by
-``init_existential_addr`` but haven't had their contained value initialized.
-A fully initialized existential must be destroyed with ``destroy_addr``.
+`init_existential_addr`_ but haven't had their contained value initialized.
+A fully initialized existential must be destroyed with `destroy_addr`_.
 
 deinit_existential_value
 ````````````````````````
@@ -4772,10 +5048,10 @@ deinit_existential_value
   // composition type P
 
 Undoes the partial initialization performed by
-``init_existential_value``.  ``deinit_existential_value`` is only valid for
+`init_existential_value`_.  `deinit_existential_value`_ is only valid for
 existential containers that have been partially initialized by
-``init_existential_value`` but haven't had their contained value initialized.
-A fully initialized existential must be destroyed with ``destroy_value``.
+`init_existential_value`_ but haven't had their contained value initialized.
+A fully initialized existential must be destroyed with `destroy_value`_.
 
 open_existential_addr
 `````````````````````
@@ -4852,7 +5128,7 @@ Extracts the class instance reference from a class existential
 container. The protocol conformances associated with this existential
 container are associated directly with the archetype ``@opened P``. This
 pointer can be used with any operation on archetypes, such as
-``witness_method``. When the operand is of metatype type, the result
+`witness_method`_. When the operand is of metatype type, the result
 will be the metatype of the opened archetype.
 
 init_existential_metatype
@@ -4902,9 +5178,9 @@ alloc_existential_box
 Allocates a boxed existential container of type ``$P`` with space to hold a
 value of type ``$T'``. The box is not fully initialized until a valid value
 has been stored into the box. If the box must be deallocated before it is
-fully initialized, ``dealloc_existential_box`` must be used. A fully
+fully initialized, `dealloc_existential_box`_ must be used. A fully
 initialized box can be ``retain``-ed and ``release``-d like any
-reference-counted type.  The ``project_existential_box`` instruction is used
+reference-counted type.  The `project_existential_box`_ instruction is used
 to retrieve the address of the value inside the container.
 
 project_existential_box
@@ -4922,7 +5198,7 @@ project_existential_box
 Projects the address of the value inside a boxed existential container.
 The address is dependent on the lifetime of the owner reference ``%0``.
 It is undefined behavior if the concrete type ``$T`` is not the same type for
-which the box was allocated with ``alloc_existential_box``.
+which the box was allocated with `alloc_existential_box`_.
 
 open_existential_box
 ````````````````````
@@ -4973,7 +5249,7 @@ Deallocates a boxed existential container. The value inside the existential
 buffer is not destroyed; either the box must be uninitialized, or the value
 must have been projected out and destroyed beforehand. It is undefined behavior
 if the concrete type ``$T`` is not the same type for which the box was
-allocated with ``alloc_existential_box``.
+allocated with `alloc_existential_box`_.
 
 Blocks
 ~~~~~~
@@ -5038,7 +5314,7 @@ pointer_to_address
 
 Creates an address value corresponding to the ``Builtin.RawPointer`` value
 ``%0``.  Converting a ``RawPointer`` back to an address of the same type as
-its originating ``address_to_pointer`` instruction gives back an equivalent
+its originating `address_to_pointer`_ instruction gives back an equivalent
 address. It is undefined behavior to cast the ``RawPointer`` back to any type
 other than its original address type or `layout compatible types`_. It is
 also undefined behavior to cast a ``RawPointer`` from a heap object to any
@@ -5134,6 +5410,21 @@ unchecked_bitwise_cast
 Bitwise copies an object of type ``A`` into a new object of type ``B``
 of the same size or smaller.
 
+unchecked_value_cast
+````````````````````
+::
+
+   sil-instruction ::= 'unchecked_value_cast' sil-operand 'to' sil-type
+
+   %1 = unchecked_value_cast %0 : $A to $B
+
+Bitwise copies an object of type ``A`` into a new layout-compatible object of
+type ``B`` of the same size.
+
+This instruction is assumed to forward a fixed ownership (set upon its
+construction) and lowers to 'unchecked_bitwise_cast' in non-ossa code. This
+causes the cast to lose its guarantee of layout-compatibility.
+
 ref_to_raw_pointer
 ``````````````````
 ::
@@ -5147,7 +5438,7 @@ ref_to_raw_pointer
 Converts a heap object reference to a ``Builtin.RawPointer``. The ``RawPointer``
 result can be cast back to the originating class type but does not have
 ownership semantics. It is undefined behavior to cast a ``RawPointer`` from a
-heap object reference to an address using ``pointer_to_address``.
+heap object reference to an address using `pointer_to_address`_.
 
 raw_pointer_to_ref
 ``````````````````

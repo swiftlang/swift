@@ -566,8 +566,7 @@ bool AccessConflictAndMergeAnalysis::identifyBeginAccesses() {
       // now, since this optimization runs at the end of the pipeline, we
       // gracefully ignore unrecognized source address patterns, which show up
       // here as an invalid `storage` value.
-      AccessedStorage storage =
-          findAccessedStorageNonNested(beginAccess->getSource());
+      AccessedStorage storage = findAccessedStorage(beginAccess->getSource());
 
       auto iterAndInserted = storageSet.insert(storage);
 
@@ -744,6 +743,7 @@ void AccessConflictAndMergeAnalysis::visitMayRelease(SILInstruction *instr,
   // accesses can be affected by a deinitializer.
   auto isHeapAccess = [](AccessedStorage::Kind accessKind) {
     return accessKind == AccessedStorage::Class
+           || accessKind == AccessedStorage::Class
            || accessKind == AccessedStorage::Global;
   };
   // Mark the in-scope accesses as having a nested conflict
@@ -1020,7 +1020,7 @@ static bool mergeAccesses(
   info.id = 0;
   for (auto sccIt = scc_begin(F); !sccIt.isAtEnd(); ++sccIt) {
     ++info.id;
-    info.hasLoop = sccIt.hasLoop();
+    info.hasLoop = sccIt.hasCycle();
     for (auto *bb : *sccIt) {
       blockToSCCMap.insert(std::make_pair(bb, info));
     }

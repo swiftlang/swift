@@ -10,7 +10,7 @@
 // optimization passes don't run when compiling a .swiftinterface that was
 // generated with -Onone.
 
-// OPT: EagerSpecializer
-// UNOPT-NOT: EagerSpecializer
+// OPT: GlobalOpt
+// UNOPT-NOT: GlobalOpt
 public func f() {}
 

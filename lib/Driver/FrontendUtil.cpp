@@ -19,13 +19,17 @@
 #include "swift/Driver/Job.h"
 #include "swift/Driver/ToolChain.h"
 #include "llvm/Option/ArgList.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Host.h"
+#include "llvm/Support/StringSaver.h"
 
 using namespace swift;
 using namespace swift::driver;
 
 bool swift::driver::getSingleFrontendInvocationFromDriverArguments(
     ArrayRef<const char *> Argv, DiagnosticEngine &Diags,
-    llvm::function_ref<bool(ArrayRef<const char *> FrontendArgs)> Action) {
+    llvm::function_ref<bool(ArrayRef<const char *> FrontendArgs)> Action,
+    bool ForceNoOutputs) {
   SmallVector<const char *, 16> Args;
   Args.push_back("<swiftc>"); // FIXME: Remove dummy argument.
   Args.insert(Args.end(), Argv.begin(), Argv.end());
@@ -45,6 +49,16 @@ bool swift::driver::getSingleFrontendInvocationFromDriverArguments(
   Args.push_back("-driver-filelist-threshold");
   Args.push_back(neverThreshold.c_str());
 
+  // Expand any file list args.
+  llvm::BumpPtrAllocator Allocator;
+  llvm::StringSaver Saver(Allocator);
+  llvm::cl::ExpandResponseFiles(
+      Saver,
+      llvm::Triple(llvm::sys::getProcessTriple()).isOSWindows()
+          ? llvm::cl::TokenizeWindowsCommandLine
+          : llvm::cl::TokenizeGNUCommandLine,
+      Args);
+
   // Force the driver into batch mode by specifying "swiftc" as the name.
   Driver TheDriver("swiftc", "swiftc", Args, Diags);
 
@@ -56,6 +70,20 @@ bool swift::driver::getSingleFrontendInvocationFromDriverArguments(
     TheDriver.parseArgStrings(ArrayRef<const char *>(Args).slice(1));
   if (Diags.hadAnyError())
     return true;
+
+  if (ForceNoOutputs) {
+    // Clear existing output modes and supplementary outputs.
+    ArgList->eraseArg(options::OPT_modes_Group);
+    ArgList->eraseArgIf([](const llvm::opt::Arg *A) {
+      return A && A->getOption().hasFlag(options::SupplementaryOutput);
+    });
+
+    unsigned index = ArgList->MakeIndex("-typecheck");
+    // Takes ownership of the Arg.
+    ArgList->append(new llvm::opt::Arg(
+        TheDriver.getOpts().getOption(options::OPT_typecheck),
+        ArgList->getArgString(index), index));
+  }
 
   std::unique_ptr<ToolChain> TC = TheDriver.buildToolChain(*ArgList);
   if (Diags.hadAnyError())

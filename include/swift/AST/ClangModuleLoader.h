@@ -109,7 +109,7 @@ public:
 
 class ClangModuleLoader : public ModuleLoader {
 private:
-  virtual void anchor();
+  virtual void anchor() override;
 
 protected:
   using ModuleLoader::ModuleLoader;

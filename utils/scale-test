@@ -16,6 +16,7 @@ from __future__ import print_function
 
 import argparse
 import functools
+import io
 import json
 import math
 import os
@@ -55,14 +56,14 @@ def has_debuginfo(swiftc):
 def write_input_file(args, ast, d, n):
     fname = "in%d.swift" % n
     pathname = os.path.join(d, fname)
-    with open(pathname, 'w+') as f:
+    with io.open(pathname, 'w+', encoding='utf-8', newline='\n') as f:
         f.write(gyb.execute_template(ast, '', N=n))
     return fname
 
 
 def ensure_tmpdir(d):
     if d is not None and not os.path.exists(d):
-        os.makedirs(d, 0700)
+        os.makedirs(d, 0o700)
     return tempfile.mkdtemp(dir=d)
 
 
@@ -74,7 +75,7 @@ def supports_stats_output_dir(args):
     sd = os.path.join(d, "stats-probe")
 
     try:
-        os.makedirs(sd, 0700)
+        os.makedirs(sd, 0o700)
         # Write a trivial test program and try running with
         # -stats-output-dir
         testpath = os.path.join(sd, "test.swift")
@@ -217,7 +218,11 @@ def run_many(args):
             print("**************************************************")
             args.llvm_stat_reporter = True
 
-    ast = gyb.parse_template(args.file.name, args.file.read())
+    if args.file == '-':
+        ast = gyb.parse_template('stdin', sys.stdin.read())
+    else:
+        with io.open(args.file, 'r', encoding='utf-8') as f:
+            ast = gyb.parse_template(args.file, f.read())
     rng = range(args.begin, args.end, args.step)
     if args.step > (args.end - args.begin):
         print("Step value", args.step,
@@ -281,7 +286,7 @@ def Nelder_Mead_simplex(objective, params, bounds, epsilon=1.0e-6):
     locs = [tuple(random.uniform(*b) for b in bounds)
             for _ in range(ndim + 1)]
     SimplexPoint = namedtuple("SimplexPoint", ["loc", "val"])
-    simplex = [SimplexPoint(loc=l, val=f(l)) for l in locs]
+    simplex = [SimplexPoint(loc=loc, val=f(loc)) for loc in locs]
 
     # Algorithm parameters
     alpha = 1.0
@@ -337,8 +342,8 @@ def Nelder_Mead_simplex(objective, params, bounds, epsilon=1.0e-6):
 
         # 6. Shrink
         simplex = (simplex[:1] +
-                   [SimplexPoint(loc=l, val=f(l))
-                    for l in [tup_add(xb, tup_mul(sigma, tup_sub(p.loc, xb)))
+                   [SimplexPoint(loc=L, val=f(L))
+                    for L in [tup_add(xb, tup_mul(sigma, tup_sub(p.loc, xb)))
                               for p in simplex[1:]]])
 
 
@@ -361,7 +366,7 @@ def fit_function_to_data_by_least_squares(objective, params, bounds, xs, ys):
     assert(len(ys) > 0)
     mean_y = sum(ys) / len(ys)
     ss_total = sum((y - mean_y) ** 2 for y in ys)
-    data = zip(xs, ys)
+    data = list(zip(xs, ys))
 
     def inner(ps):
         s = 0.0
@@ -695,7 +700,7 @@ def report(args, rng, runs):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        'file', type=argparse.FileType(),
+        'file', type=str,
         help='Path to GYB template file (defaults to stdin)', nargs='?',
         default=sys.stdin)
     parser.add_argument(

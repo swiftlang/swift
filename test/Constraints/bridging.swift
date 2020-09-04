@@ -180,7 +180,7 @@ func dictionaryToNSDictionary() {
 // In this case, we should not implicitly convert Dictionary to NSDictionary.
 struct NotEquatable {}
 func notEquatableError(_ d: Dictionary<Int, NotEquatable>) -> Bool {
-  return d == d // expected-error{{operator function '==' requires that 'NotEquatable' conform to 'Equatable'}}
+  return d == d // expected-error{{referencing operator function '==' on 'Dictionary' requires that 'NotEquatable' conform to 'Equatable'}}
 }
 
 // NSString -> String

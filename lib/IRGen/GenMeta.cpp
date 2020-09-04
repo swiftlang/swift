@@ -180,7 +180,7 @@ static void emitMetadataCompletionFunction(IRGenModule &IGM,
     IGM.getAddrOfTypeMetadataCompletionFunction(typeDecl, ForDefinition);
   f->setAttributes(IGM.constructInitialAttributes());
   f->setDoesNotThrow();
-  IGM.setHasFramePointer(f, false);
+  IGM.setHasNoFramePointer(f);
 
   IRGenFunction IGF(IGM, f);
 
@@ -261,6 +261,60 @@ static Flags getMethodDescriptorFlags(ValueDecl *fn) {
     llvm_unreachable("bad kind");
   }();
   return Flags(kind).withIsInstance(!fn->isStatic());
+}
+
+static void buildMethodDescriptorFields(IRGenModule &IGM,
+                             const SILVTable *VTable,
+                             SILDeclRef fn,
+                             ConstantStructBuilder &descriptor) {
+  auto *func = cast<AbstractFunctionDecl>(fn.getDecl());
+  // Classify the method.
+  using Flags = MethodDescriptorFlags;
+  auto flags = getMethodDescriptorFlags<Flags>(func);
+
+  // Remember if the declaration was dynamic.
+  if (func->shouldUseObjCDispatch())
+    flags = flags.withIsDynamic(true);
+
+  // Include the pointer-auth discriminator.
+  if (auto &schema = IGM.getOptions().PointerAuth.SwiftClassMethods) {
+    auto discriminator =
+      PointerAuthInfo::getOtherDiscriminator(IGM, schema, fn);
+    flags = flags.withExtraDiscriminator(discriminator->getZExtValue());
+  }
+
+  // TODO: final? open?
+  descriptor.addInt(IGM.Int32Ty, flags.getIntValue());
+
+  if (auto entry = VTable->getEntry(IGM.getSILModule(), fn)) {
+    assert(entry->getKind() == SILVTable::Entry::Kind::Normal);
+    auto *implFn = IGM.getAddrOfSILFunction(entry->getImplementation(),
+                                            NotForDefinition);
+    descriptor.addRelativeAddress(implFn);
+  } else {
+    // The method is removed by dead method elimination.
+    // It should be never called. We add a pointer to an error function.
+    descriptor.addRelativeAddressOrNull(nullptr);
+  }
+}
+
+void IRGenModule::emitNonoverriddenMethodDescriptor(const SILVTable *VTable,
+                                                    SILDeclRef declRef) {
+  auto entity = LinkEntity::forMethodDescriptor(declRef);
+  auto *var = cast<llvm::GlobalVariable>(getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo()));
+  if (!var->isDeclaration()) {
+    assert(IRGen.isLazilyReemittingNominalTypeDescriptor(VTable->getClass()));
+    return;
+  }
+
+  ConstantInitBuilder ib(*this);
+  ConstantStructBuilder sb(ib.beginStruct(MethodDescriptorStructTy));
+
+  buildMethodDescriptorFields(*this, VTable, declRef, sb);
+  
+  auto init = sb.finishAndCreateFuture();
+  
+  getAddrOfLLVMVariable(entity, init, DebugTypeInfo());
 }
 
 namespace {
@@ -612,7 +666,7 @@ namespace {
     ProtocolDescriptorBuilder(IRGenModule &IGM, ProtocolDecl *Proto,
                                      SILDefaultWitnessTable *defaultWitnesses)
       : super(IGM), Proto(Proto), DefaultWitnesses(defaultWitnesses),
-        Resilient(IGM.isResilient(Proto, ResilienceExpansion::Minimal)) {}
+        Resilient(IGM.getSwiftModule()->isResilient()) {}
 
     void layout() {
       super::layout();
@@ -739,6 +793,9 @@ namespace {
                            isa<ConstructorDecl>(func.getDecl())
                              ? SILDeclRef::Kind::Allocator
                              : SILDeclRef::Kind::Func);
+        if (entry.getFunction().isAutoDiffDerivativeFunction())
+          declRef = declRef.asAutoDiffDerivativeFunction(
+              entry.getFunction().getAutoDiffDerivativeFunctionIdentifier());
         addDiscriminator(flags, schema, declRef);
       }
 
@@ -1163,6 +1220,7 @@ namespace {
     void setCommonFlags(TypeContextDescriptorFlags &flags) {
       setClangImportedFlags(flags);
       setMetadataInitializationKind(flags);
+      setHasCanonicalMetadataPrespecializations(flags);
     }
     
     void setClangImportedFlags(TypeContextDescriptorFlags &flags) {
@@ -1194,6 +1252,19 @@ namespace {
 
     void setMetadataInitializationKind(TypeContextDescriptorFlags &flags) {
       flags.setMetadataInitialization(MetadataInitialization);
+    }
+
+    void setHasCanonicalMetadataPrespecializations(TypeContextDescriptorFlags &flags) {
+      flags.setHasCanonicalMetadataPrespecializations(hasCanonicalMetadataPrespecializations());
+    }
+
+    bool hasCanonicalMetadataPrespecializations() {
+      return IGM.shouldPrespecializeGenericMetadata() &&
+             llvm::any_of(IGM.IRGen.metadataPrespecializationsForType(Type),
+                          [](auto pair) {
+                            return pair.second ==
+                                   TypeMetadataCanonicality::Canonical;
+                          });
     }
 
     void maybeAddMetadataInitialization() {
@@ -1255,6 +1326,28 @@ namespace {
       addIncompleteMetadata();
     }
 
+    void maybeAddCanonicalMetadataPrespecializations() {
+      if (Type->isGenericContext() && hasCanonicalMetadataPrespecializations()) {
+        asImpl().addCanonicalMetadataPrespecializations();
+      }
+    }
+
+    void addCanonicalMetadataPrespecializations() {
+      auto specializations = IGM.IRGen.metadataPrespecializationsForType(Type);
+      auto count = llvm::count_if(specializations, [](auto pair) {
+        return pair.second == TypeMetadataCanonicality::Canonical;
+      });
+      B.addInt32(count);
+      for (auto pair : specializations) {
+        if (pair.second != TypeMetadataCanonicality::Canonical) {
+          continue;
+        }
+        auto specialization = pair.first;
+        auto *metadata = IGM.getAddrOfTypeMetadata(specialization);
+        B.addRelativeAddress(metadata);
+      }
+    }
+
     // Subclasses should provide:
     // ContextDescriptorKind getContextKind();
     // void addLayoutInfo();
@@ -1280,6 +1373,11 @@ namespace {
     {
       auto &layout = IGM.getMetadataLayout(getType());
       FieldVectorOffset = layout.getFieldOffsetVectorOffset().getStatic();
+    }
+
+    void layout() {
+      super::layout();
+      maybeAddCanonicalMetadataPrespecializations();
     }
 
     ContextDescriptorKind getContextKind() {
@@ -1341,6 +1439,11 @@ namespace {
       auto &layout = IGM.getMetadataLayout(getType());
       if (layout.hasPayloadSizeOffset())
         PayloadSizeOffset = layout.getPayloadSizeOffset().getStatic();
+    }
+
+    void layout() {
+      super::layout();
+      maybeAddCanonicalMetadataPrespecializations();
     }
     
     ContextDescriptorKind getContextKind() {
@@ -1413,6 +1516,7 @@ namespace {
 
     SILVTable *VTable;
     bool Resilient;
+    bool HasNonoverriddenMethods = false;
 
     SmallVector<SILDeclRef, 8> VTableEntries;
     SmallVector<std::pair<SILDeclRef, SILDeclRef>, 8> OverrideTableEntries;
@@ -1437,7 +1541,13 @@ namespace {
     }
 
     void addMethod(SILDeclRef fn) {
-      VTableEntries.push_back(fn);
+      if (!VTable || methodRequiresReifiedVTableEntry(IGM, VTable, fn)) {
+        VTableEntries.push_back(fn);
+      } else {
+        // Emit a stub method descriptor and lookup function for nonoverridden
+        // methods so that resilient code sequences can still use them.
+        emitNonoverriddenMethod(fn);
+      }
     }
 
     void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {
@@ -1449,6 +1559,7 @@ namespace {
       addVTable();
       addOverrideTable();
       addObjCResilientClassStubInfo();
+      maybeAddCanonicalMetadataPrespecializations();
     }
 
     void addIncompleteMetadataOrRelocationFunction() {
@@ -1521,9 +1632,6 @@ namespace {
     }
     
     void addVTable() {
-      if (VTableEntries.empty())
-        return;
-      
       LLVM_DEBUG(
         llvm::dbgs() << "VTable entries for " << getType()->getName() << ":\n";
         for (auto entry : VTableEntries) {
@@ -1534,10 +1642,14 @@ namespace {
       );
 
       // Only emit a method lookup function if the class is resilient
-      // and has a non-empty vtable.
-      if (IGM.hasResilientMetadata(getType(), ResilienceExpansion::Minimal))
+      // and has a non-empty vtable, as well as no elided methods.
+      if (IGM.hasResilientMetadata(getType(), ResilienceExpansion::Minimal)
+          && (HasNonoverriddenMethods || !VTableEntries.empty()))
         IGM.emitMethodLookupFunction(getType());
 
+      if (VTableEntries.empty())
+        return;
+      
       auto offset = MetadataLayout->hasResilientSuperclass()
                       ? MetadataLayout->getRelativeVTableOffset()
                       : MetadataLayout->getStaticVTableOffset();
@@ -1549,54 +1661,60 @@ namespace {
     }
 
     void emitMethodDescriptor(SILDeclRef fn) {
+
       // Define the method descriptor to point to the current position in the
-      // nominal type descriptor.
+      // nominal type descriptor, if it has a well-defined symbol name.
       IGM.defineMethodDescriptor(fn, Type,
                       B.getAddrOfCurrentPosition(IGM.MethodDescriptorStructTy));
 
       // Actually build the descriptor.
-      auto *func = cast<AbstractFunctionDecl>(fn.getDecl());
       auto descriptor = B.beginStruct(IGM.MethodDescriptorStructTy);
-
-      // Classify the method.
-      using Flags = MethodDescriptorFlags;
-      auto flags = getMethodDescriptorFlags<Flags>(func);
-
-      // Remember if the declaration was dynamic.
-      if (func->isObjCDynamic())
-        flags = flags.withIsDynamic(true);
-
-      // Include the pointer-auth discriminator.
-      if (auto &schema = IGM.getOptions().PointerAuth.SwiftClassMethods) {
-        auto discriminator =
-          PointerAuthInfo::getOtherDiscriminator(IGM, schema, fn);
-        flags = flags.withExtraDiscriminator(discriminator->getZExtValue());
-      }
-
-      // TODO: final? open?
-      descriptor.addInt(IGM.Int32Ty, flags.getIntValue());
-
-      if (auto entry = VTable->getEntry(IGM.getSILModule(), fn)) {
-        assert(entry->TheKind == SILVTable::Entry::Kind::Normal);
-        auto *implFn = IGM.getAddrOfSILFunction(entry->Implementation,
-                                                NotForDefinition);
-        descriptor.addRelativeAddress(implFn);
-      } else {
-        // The method is removed by dead method elimination.
-        // It should be never called. We add a pointer to an error function.
-        descriptor.addRelativeAddressOrNull(nullptr);
-      }
-
+      buildMethodDescriptorFields(IGM, VTable, fn, descriptor);
       descriptor.finishAndAddTo(B);
 
       // Emit method dispatch thunk if the class is resilient.
+      auto *func = cast<AbstractFunctionDecl>(fn.getDecl());
       if (Resilient &&
           func->getEffectiveAccess() >= AccessLevel::Public) {
         IGM.emitDispatchThunk(fn);
       }
     }
+    
+    void emitNonoverriddenMethod(SILDeclRef fn) {
+      // TODO: Derivative functions do not distinguish themselves in the mangled
+      // names of method descriptor symbols yet, causing symbol name collisions.
+      if (fn.derivativeFunctionIdentifier)
+        return;
+
+     HasNonoverriddenMethods = true;
+      // Although this method is non-overridden and therefore left out of the
+      // vtable, we still need to maintain the ABI of a potentially-overridden
+      // method for external clients.
+      
+      // Emit method dispatch thunk.
+      if (hasPublicVisibility(fn.getLinkage(NotForDefinition))) {
+        IGM.emitDispatchThunk(fn);
+      }
+      
+      // Emit a freestanding method descriptor structure. This doesn't have to
+      // exist in the table in the class's context descriptor since it isn't
+      // in the vtable, but external clients need to be able to link against the
+      // symbol.
+      IGM.emitNonoverriddenMethodDescriptor(VTable, fn);
+    }
 
     void addOverrideTable() {
+      LLVM_DEBUG(
+        llvm::dbgs() << "Override Table entries for " << getType()->getName() << ":\n";
+        for (auto entry : OverrideTableEntries) {
+          llvm::dbgs() << "  ";
+          entry.first.print(llvm::dbgs());
+          llvm::dbgs() << " -> ";
+          entry.second.print(llvm::dbgs());
+          llvm::dbgs() << '\n';
+        }
+      );
+
       if (OverrideTableEntries.empty())
         return;
 
@@ -1625,8 +1743,8 @@ namespace {
 
       // The implementation of the override.
       if (auto entry = VTable->getEntry(IGM.getSILModule(), baseRef)) {
-        assert(entry->TheKind == SILVTable::Entry::Kind::Override);
-        auto *implFn = IGM.getAddrOfSILFunction(entry->Implementation,
+        assert(entry->getKind() == SILVTable::Entry::Kind::Override);
+        auto *implFn = IGM.getAddrOfSILFunction(entry->getImplementation(),
                                                 NotForDefinition);
         descriptor.addRelativeAddress(implFn);
       } else {
@@ -1713,6 +1831,19 @@ namespace {
         IGM.getAddrOfObjCResilientClassStub(
           getType(), NotForDefinition,
           TypeMetadataAddress::AddressPoint));
+    }
+
+    void addCanonicalMetadataPrespecializations() {
+      super::addCanonicalMetadataPrespecializations();
+      auto specializations = IGM.IRGen.metadataPrespecializationsForType(Type);
+      for (auto pair : specializations) {
+        if (pair.second != TypeMetadataCanonicality::Canonical) {
+          continue;
+        }
+        auto specialization = pair.first;
+        auto *function = IGM.getAddrOfCanonicalSpecializedGenericTypeMetadataAccessFunction(specialization, NotForDefinition);
+        B.addRelativeAddress(function);
+      }
     }
   };
   
@@ -1951,8 +2082,9 @@ void irgen::emitLazySpecializedGenericTypeMetadata(IRGenModule &IGM,
                                         *type.getClassOrBoundGenericClass());
     break;
   default:
-    llvm_unreachable("Cannot statically specialize types of kind other than "
-                     "struct and enum.");
+    llvm_unreachable(
+        "Cannot statically specialize metadata for generic types of"
+        "kind other than struct, enum, and class.");
   }
 }
 
@@ -2270,7 +2402,7 @@ namespace {
         IGM.getAddrOfTypeMetadataInstantiationFunction(Target, ForDefinition);
       f->setAttributes(IGM.constructInitialAttributes());
       f->setDoesNotThrow();
-      IGM.setHasFramePointer(f, false);
+      IGM.setHasNoFramePointer(f);
 
       IRGenFunction IGF(IGM, f);
 
@@ -2702,12 +2834,12 @@ namespace {
     using super::asImpl;
     using super::IGM;
     using super::Target;
+    using super::VTable;
 
     ConstantStructBuilder &B;
 
     const ClassLayout &FieldLayout;
     const ClassMetadataLayout &MetadataLayout;
-    const SILVTable *VTable;
 
     Size AddressPoint;
 
@@ -2717,8 +2849,7 @@ namespace {
                              const ClassLayout &fieldLayout)
       : super(IGM, theClass), B(builder),
         FieldLayout(fieldLayout),
-        MetadataLayout(IGM.getClassMetadataLayout(theClass)),
-        VTable(IGM.getSILModule().lookUpVTable(theClass)) {}
+        MetadataLayout(IGM.getClassMetadataLayout(theClass)) {}
 
   public:
     SILType getLoweredType() {
@@ -2854,7 +2985,7 @@ namespace {
                            PointerAuthEntity::Special::HeapDestructor);
       } else {
         // In case the optimizer removed the function. See comment in
-        // addMethod().
+        // addReifiedVTableEntry().
         B.addNullPointer(IGM.FunctionPtrTy);
       }
     }
@@ -2973,7 +3104,7 @@ namespace {
       B.add(data);
     }
 
-    void addMethod(SILDeclRef fn) {
+    void addReifiedVTableEntry(SILDeclRef fn) {
       // Find the vtable entry.
       assert(VTable && "no vtable?!");
       auto entry = VTable->getEntry(IGM.getSILModule(), fn);
@@ -2981,7 +3112,7 @@ namespace {
       // The class is fragile. Emit a direct reference to the vtable entry.
       llvm::Constant *ptr;
       if (entry) {
-        ptr = IGM.getAddrOfSILFunction(entry->Implementation,
+        ptr = IGM.getAddrOfSILFunction(entry->getImplementation(),
                                        NotForDefinition);
       } else {
         // The method is removed by dead method elimination.
@@ -3451,7 +3582,9 @@ namespace {
       MetadataTrailingFlags flags = super::getTrailingFlags();
 
       flags.setIsStaticSpecialization(true);
-      flags.setIsCanonicalStaticSpecialization(true);
+      flags.setIsCanonicalStaticSpecialization(
+          irgen::isCanonicalInitializableTypeMetadataStaticallyAddressable(
+              IGM, type));
 
       return flags;
     }
@@ -3567,7 +3700,7 @@ static void emitObjCClassSymbol(IRGenModule &IGM,
       ptrTy->getElementType(), ptrTy->getAddressSpace(), link.getLinkage(),
       link.getName(), metadata, &IGM.Module);
   ApplyIRLinkage({link.getLinkage(), link.getVisibility(), link.getDLLStorage()})
-      .to(alias);
+      .to(alias, link.isForDefinition());
 }
 
 /// Emit the type metadata or metadata template for a class.
@@ -5074,4 +5207,66 @@ llvm::Value *irgen::emitMetatypeInstanceType(IRGenFunction &IGF,
 void IRGenModule::emitOpaqueTypeDecl(OpaqueTypeDecl *D) {
   // Emit the opaque type descriptor.
   OpaqueTypeDescriptorBuilder(*this, D).emit();
+}
+
+bool irgen::methodRequiresReifiedVTableEntry(IRGenModule &IGM,
+                                             const SILVTable *vtable,
+                                             SILDeclRef method) {
+  Optional<SILVTable::Entry> entry
+    = vtable->getEntry(IGM.getSILModule(), method);
+  LLVM_DEBUG(llvm::dbgs() << "looking at vtable:\n";
+             vtable->print(llvm::dbgs()));
+  if (!entry) {
+    LLVM_DEBUG(llvm::dbgs() << "vtable entry in "
+                            << vtable->getClass()->getName()
+                            << " for ";
+               method.print(llvm::dbgs());
+               llvm::dbgs() << " is not available\n");
+    return true;
+  }
+  LLVM_DEBUG(llvm::dbgs() << "entry: ";
+             entry->print(llvm::dbgs());
+             llvm::dbgs() << "\n");
+  
+  // We may be able to elide the vtable entry, ABI permitting, if it's not
+  // overridden.
+  if (!entry->isNonOverridden()) {
+    LLVM_DEBUG(llvm::dbgs() << "vtable entry in "
+                            << vtable->getClass()->getName()
+                            << " for ";
+               method.print(llvm::dbgs());
+               llvm::dbgs() << " is overridden\n");
+    return true;
+  }
+  
+  // Does the ABI require a vtable entry to exist? If the class the vtable
+  // entry originates from is public,
+  // and it's either marked fragile or part of a non-resilient module, then
+  // other modules will directly address vtable offsets and we can't remove
+  // vtable entries.
+  auto originatingClass =
+    cast<ClassDecl>(method.getOverriddenVTableEntry().getDecl()->getDeclContext());
+
+  if (originatingClass->getEffectiveAccess() >= AccessLevel::Public) {
+    // If the class is public,
+    // and it's either marked fragile or part of a non-resilient module, then
+    // other modules will directly address vtable offsets and we can't remove
+    // vtable entries.
+    if (!originatingClass->isResilient()) {
+      LLVM_DEBUG(llvm::dbgs() << "vtable entry in "
+                              << vtable->getClass()->getName()
+                              << " for ";
+                 method.print(llvm::dbgs());
+                 llvm::dbgs() << " originates from a public fragile class\n");
+      return true;
+    }
+  }
+    
+  // Otherwise, we can leave this method out of the runtime vtable.
+  LLVM_DEBUG(llvm::dbgs() << "vtable entry in "
+                          << vtable->getClass()->getName()
+                          << " for ";
+             method.print(llvm::dbgs());
+             llvm::dbgs() << " can be elided\n");
+  return false;
 }

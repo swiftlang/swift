@@ -26,6 +26,8 @@ constexpr static const StringLiteral SWIFT_ONONE_SUPPORT = "SwiftOnoneSupport";
 constexpr static const StringLiteral SWIFT_SHIMS_NAME = "SwiftShims";
 /// The name of the Builtin module, which contains Builtin functions.
 constexpr static const StringLiteral BUILTIN_NAME = "Builtin";
+/// The name of the clang imported header module.
+constexpr static const StringLiteral CLANG_HEADER_MODULE_NAME = "__ObjC";
 /// The prefix of module names used by LLDB to capture Swift expressions
 constexpr static const StringLiteral LLDB_EXPRESSIONS_MODULE_NAME_PREFIX =
     "__lldb_expr_";
@@ -35,6 +37,10 @@ constexpr static const StringLiteral MANGLING_MODULE_OBJC = "__C";
 /// The name of the fake module used to hold synthesized ClangImporter things.
 constexpr static const StringLiteral MANGLING_MODULE_CLANG_IMPORTER =
     "__C_Synthesized";
+
+/// The name prefix for C++ template instantiation imported as a Swift struct.
+constexpr static const StringLiteral CXX_TEMPLATE_INST_PREFIX =
+    "__CxxTemplateInst";
 
 constexpr static const StringLiteral SEMANTICS_PROGRAMTERMINATION_POINT =
     "programtermination_point";

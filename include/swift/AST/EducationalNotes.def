@@ -59,11 +59,26 @@ EDUCATIONAL_NOTES(property_wrapper_failable_init,
 EDUCATIONAL_NOTES(property_wrapper_type_requirement_not_accessible,
                   "property-wrapper-requirements.md")
 
+EDUCATIONAL_NOTES(opaque_type_var_no_init, "opaque-type-inference.md")
+EDUCATIONAL_NOTES(opaque_type_no_underlying_type_candidates,
+                  "opaque-type-inference.md")
+EDUCATIONAL_NOTES(opaque_type_mismatched_underlying_type_candidates,
+                  "opaque-type-inference.md")
+EDUCATIONAL_NOTES(opaque_type_self_referential_underlying_type,
+                  "opaque-type-inference.md")
+EDUCATIONAL_NOTES(opaque_type_var_no_underlying_type,
+                  "opaque-type-inference.md")
+
+
 EDUCATIONAL_NOTES(missing_append_interpolation,
                   "string-interpolation-conformance.md")
 EDUCATIONAL_NOTES(append_interpolation_static,
                   "string-interpolation-conformance.md")
 EDUCATIONAL_NOTES(append_interpolation_void_or_discardable,
                   "string-interpolation-conformance.md")
+EDUCATIONAL_NOTES(type_cannot_conform, "protocol-type-non-conformance.md")
+
+EDUCATIONAL_NOTES(unlabeled_trailing_closure_deprecated,
+                  "trailing-closure-matching.md")
 
 #undef EDUCATIONAL_NOTES

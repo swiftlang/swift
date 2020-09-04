@@ -48,8 +48,7 @@ public struct S<A: P> where A.T == S<A> { // expected-error {{circular reference
 // expected-error@-2 {{generic struct 'S' references itself}}
 // expected-note@-3 {{while resolving type 'S<A>'}}
   func f(a: A.T) {
-    g(a: id(t: a))
-    // expected-error@-1 {{type of expression is ambiguous without more context}}
+    g(a: id(t: a)) // `a` has error type which is diagnosed as circular reference
     _ = A.T.self
   }
 

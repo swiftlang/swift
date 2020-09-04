@@ -73,3 +73,8 @@ let cc = SR8563 { (_: (Int)) in }
 
 cc((1)) // Ok
 cc(1) // Ok
+
+// SR-12955
+func SR12955() {
+  let f: @convention(c) (T) -> Void // expected-error {{cannot find type 'T' in scope}}
+}

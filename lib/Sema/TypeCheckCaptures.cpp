@@ -525,12 +525,11 @@ public:
     if (auto cast = dyn_cast<CheckedCastExpr>(E)) {
       // If we failed to resolve the written type, we've emitted an
       // earlier diagnostic and should bail.
-      auto toTy = cast->getCastTypeLoc().getType();
+      const auto toTy = cast->getCastType();
       if (!toTy || toTy->hasError())
         return false;
 
-      if (auto clas = dyn_cast_or_null<ClassDecl>(
-                         cast->getCastTypeLoc().getType()->getAnyNominal())) {
+      if (auto clas = dyn_cast_or_null<ClassDecl>(toTy->getAnyNominal())) {
         if (clas->usesObjCGenericsModel()) {
           return false;
         }
@@ -558,7 +557,7 @@ public:
     }
 
     if (auto *ECE = dyn_cast<ExplicitCastExpr>(E)) {
-      checkType(ECE->getCastTypeLoc().getType(), ECE->getLoc());
+      checkType(ECE->getCastType(), ECE->getLoc());
       return { true, E };
     }
 

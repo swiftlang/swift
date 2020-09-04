@@ -46,6 +46,7 @@ class MyArrayStorage {
 }
 
 sil [_semantics "array.make_mutable"] @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+sil [_semantics "array.end_mutation"] @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
 sil [_semantics "array.get_count"] @guaranteed_array_get_count : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
 sil [_semantics "array.get_capacity"] @guaranteed_array_get_capacity : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
 sil [_semantics "array.mutate_unknown"] @array_unknown_mutate : $@convention(method) (@inout MyArray<MyStruct>) -> ()
@@ -59,11 +60,14 @@ sil @unknown : $@convention(thin) () -> ()
 
 // CHECK-LABEL: sil @simple_hoist
 // CHECK: bb0([[ARRAY:%[0-9]+]]
-// CHECK: [[FUN:%[0-9]+]] = function_ref @array_make_mutable
-// CHECK: apply [[FUN]]([[ARRAY]]
-// CHECK: bb1
-// CHECK-NOT: array_make_mutable
-// CHECK-NOT: apply [[FUN]]
+// CHECK:   [[MM:%[0-9]+]] = function_ref @array_make_mutable
+// CHECK:   apply [[MM]]([[ARRAY]]
+// CHECK:   [[EM:%[0-9]+]] = function_ref @array_end_mutation
+// CHECK:   apply [[EM]]([[ARRAY]]
+// CHECK: bb1:
+// CHECK:   apply [[MM]]([[ARRAY]]
+// CHECK:   apply [[EM]]([[ARRAY]]
+// CHECK: } // end sil function 'simple_hoist'
 sil @simple_hoist : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
 bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
   debug_value_addr %0 : $*MyArray<MyStruct>
@@ -73,24 +77,29 @@ bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
 bb1:
   %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %6 = apply %5(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %7 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %8 = apply %7(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   cond_br undef, bb1, bb2
 
 bb2:
-  %7 = tuple()
-  return %7 : $()
+  %r = tuple()
+  return %r : $()
 }
 
 
 // CHECK-LABEL: sil @hoist_ignoring_paired_retain_release_and_hoist
-// CHECK: bb0(
-// CHECK-NOT: br bb
-// CHECK: [[MM:%.*]] = function_ref @array_make_mutable
-// CHECK-NOT: br bb
-// CHECK: apply [[MM]]
-// CHECK: br bb1
+// CHECK: bb0([[ARRAY:%[0-9]+]]
+// CHECK:   [[MM:%[0-9]+]] = function_ref @array_make_mutable
+// CHECK:   apply [[MM]]([[ARRAY]]
+// CHECK:   [[EM:%[0-9]+]] = function_ref @array_end_mutation
+// CHECK:   apply [[EM]]([[ARRAY]]
 // CHECK: bb1:
-// CHECK-NOT: apply
+// CHECK:   retain
+// CHECK:   release
+// CHECK:   apply [[MM]]([[ARRAY]]
+// CHECK:   apply [[EM]]([[ARRAY]]
 // CHECK:  cond_br {{.*}}, bb1
+// CHECK: } // end sil function 'hoist_ignoring_paired_retain_release_and_hoist'
 sil @hoist_ignoring_paired_retain_release_and_hoist : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
 bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
   %2 = load %0 : $*MyArray<MyStruct>
@@ -103,11 +112,13 @@ bb1:
   release_value %2 : $MyArray<MyStruct>
   %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %6 = apply %5(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %7 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %8 = apply %7(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   cond_br %3, bb1, bb2
 
 bb2:
-  %7 = tuple()
-  return %7 : $()
+  %r = tuple()
+  return %r : $()
 }
 
 // CHECK-LABEL: sil @hoist_blocked_by_unpaired_retain_release_1
@@ -129,11 +140,13 @@ bb1:
   %4 = load %0 : $*MyArray<MyStruct>
   %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %6 = apply %5(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %7 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %8 = apply %7(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   cond_br %3, bb1, bb2
 
 bb2:
-  %7 = tuple()
-  return %7 : $()
+  %r = tuple()
+  return %r : $()
 }
 
 // CHECK-LABEL: sil @hoist_blocked_by_unpaired_retain_release_2
@@ -151,32 +164,37 @@ bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
 bb1:
   %10 = load %0 : $*MyArray<MyStruct>
   %11 = load %0 : $*MyArray<MyStruct>
-  %8 = struct_extract  %10 : $MyArray<MyStruct>, #MyArray.buffer
-  %9 = struct_extract  %11 : $MyArray<MyStruct>, #MyArray.buffer
-  retain_value %8 : $ArrayIntBuffer
-  retain_value %9 : $ArrayIntBuffer
-  release_value %9 : $ArrayIntBuffer
+  %12 = struct_extract  %10 : $MyArray<MyStruct>, #MyArray.buffer
+  %13 = struct_extract  %11 : $MyArray<MyStruct>, #MyArray.buffer
+  retain_value %12 : $ArrayIntBuffer
+  retain_value %13 : $ArrayIntBuffer
+  release_value %13 : $ArrayIntBuffer
   %3 = load %1 : $*Builtin.Int1
   %4 = load %0 : $*MyArray<MyStruct>
   %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %6 = apply %5(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %7 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %8 = apply %7(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   cond_br %3, bb1, bb2
 
 bb2:
-  %7 = tuple()
-  return %7 : $()
+  %r = tuple()
+  return %r : $()
 }
 
 // CHECK-LABEL: sil @hoist_not_blocked_by_unpaired_release
-// CHECK: bb0(
-// CHECK-NOT: br bb
-// CHECK: [[MM:%.*]] = function_ref @array_make_mutable
-// CHECK-NOT: br bb
-// CHECK: apply [[MM]]
-// CHECK: br bb1
+// CHECK: bb0([[ARRAY:%[0-9]+]]
+// CHECK:   [[MM:%[0-9]+]] = function_ref @array_make_mutable
+// CHECK:   apply [[MM]]([[ARRAY]]
+// CHECK:   [[EM:%[0-9]+]] = function_ref @array_end_mutation
+// CHECK:   apply [[EM]]([[ARRAY]]
 // CHECK: bb1:
-// CHECK-NOT: apply
-// CHECK:  cond_br {{.*}}, bb1
+// CHECK:   load
+// CHECK:   load
+// CHECK:   release
+// CHECK:   apply [[MM]]([[ARRAY]]
+// CHECK:   apply [[EM]]([[ARRAY]]
+// CHECK: } // end sil function 'hoist_not_blocked_by_unpaired_release'
 sil @hoist_not_blocked_by_unpaired_release : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
 bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
   %2 = load %0 : $*MyArray<MyStruct>
@@ -188,11 +206,13 @@ bb1:
   release_value %2 : $MyArray<MyStruct>
   %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %6 = apply %5(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %7 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %8 = apply %7(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   cond_br %3, bb1, bb2
 
 bb2:
-  %7 = tuple()
-  return %7 : $()
+  %r = tuple()
+  return %r : $()
 }
 
 // CHECK-LABEL: sil @dont_hoist_if_executed_conditionally
@@ -215,8 +235,10 @@ bb2:
   // If this block is never taken, then hoisting to bb0 would change the value of %p3.
   %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %6 = apply %5(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-  %7 = load %0 : $*MyArray<MyStruct>
-  br bb4(%7 : $MyArray<MyStruct>)
+  %7 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %8 = apply %7(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %9 = load %0 : $*MyArray<MyStruct>
+  br bb4(%9 : $MyArray<MyStruct>)
 
 bb3:
   br bb4(%p1 : $MyArray<MyStruct>)
@@ -229,15 +251,20 @@ bb5(%p3 : $MyArray<MyStruct>):
 }
 
 // CHECK-LABEL: sil @cow_should_ignore_mark_dependence_addrproj_use : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
-// CHECK: bb0(
-// CHECK-NOT: br bb
-// CHECK: [[MM:%.*]] = function_ref @array_make_mutable
-// CHECK-NOT: br bb
-// CHECK: apply [[MM]]
-// CHECK: br bb1
+// CHECK: bb0([[ARRAY:%[0-9]+]]
+// CHECK:   [[MM:%[0-9]+]] = function_ref @array_make_mutable
+// CHECK:   apply [[MM]]([[ARRAY]]
+// CHECK:   [[EM:%[0-9]+]] = function_ref @array_end_mutation
+// CHECK:   apply [[EM]]([[ARRAY]]
 // CHECK: bb1:
-// CHECK-NOT: apply
-// CHECK:  cond_br {{.*}}, bb1
+// CHECK:   retain
+// CHECK:   load
+// CHECK:   load
+// CHECK:   release
+// CHECK:   apply [[MM]]([[ARRAY]]
+// CHECK:   apply [[EM]]([[ARRAY]]
+// CHECK:   mark_dependence
+// CHECK: } // end sil function 'cow_should_ignore_mark_dependence_addrproj_use'
 sil @cow_should_ignore_mark_dependence_addrproj_use : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
 bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
   %999 = struct_element_addr %0 : $*MyArray<MyStruct>, #MyArray.buffer
@@ -253,24 +280,31 @@ bb1:
   release_value %2 : $MyArray<MyStruct>
   %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %6 = apply %5(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %7 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %8 = apply %7(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   mark_dependence %1 : $*Builtin.Int1 on %99999 : $Builtin.NativeObject
   cond_br %3, bb1, bb2
 
 bb2:
-  %7 = tuple()
-  return %7 : $()
+  %r = tuple()
+  return %r : $()
 }
 
 // CHECK-LABEL: sil @cow_should_ignore_mark_dependence_value : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
-// CHECK: bb0(
-// CHECK-NOT: br bb
-// CHECK: [[MM:%.*]] = function_ref @array_make_mutable
-// CHECK-NOT: br bb
-// CHECK: apply [[MM]]
-// CHECK: br bb1
+// CHECK: bb0([[ARRAY:%[0-9]+]]
+// CHECK:   [[MM:%[0-9]+]] = function_ref @array_make_mutable
+// CHECK:   apply [[MM]]([[ARRAY]]
+// CHECK:   [[EM:%[0-9]+]] = function_ref @array_end_mutation
+// CHECK:   apply [[EM]]([[ARRAY]]
 // CHECK: bb1:
-// CHECK-NOT: apply
-// CHECK:  cond_br {{.*}}, bb1
+// CHECK:   retain
+// CHECK:   load
+// CHECK:   load
+// CHECK:   release
+// CHECK:   apply [[MM]]([[ARRAY]]
+// CHECK:   apply [[EM]]([[ARRAY]]
+// CHECK:   mark_dependence
+// CHECK: } // end sil function 'cow_should_ignore_mark_dependence_value'
 sil @cow_should_ignore_mark_dependence_value : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
 bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
   %2 = load %0 : $*MyArray<MyStruct>
@@ -283,24 +317,32 @@ bb1:
   release_value %2 : $MyArray<MyStruct>
   %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %6 = apply %5(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %7 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %8 = apply %7(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   mark_dependence %1 : $*Builtin.Int1 on %2 : $MyArray<MyStruct>
   cond_br %3, bb1, bb2
 
 bb2:
-  %7 = tuple()
-  return %7 : $()
+  %r = tuple()
+  return %r : $()
 }
 
 // CHECK-LABEL: sil @cow_should_ignore_enum : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
-// CHECK: bb0(
-// CHECK-NOT: br bb
-// CHECK: [[MM:%.*]] = function_ref @array_make_mutable
-// CHECK-NOT: br bb
-// CHECK: apply [[MM]]
-// CHECK: br bb1
+// CHECK: bb0([[ARRAY:%[0-9]+]]
+// CHECK:   [[MM:%[0-9]+]] = function_ref @array_make_mutable
+// CHECK:   apply [[MM]]([[ARRAY]]
+// CHECK:   [[EM:%[0-9]+]] = function_ref @array_end_mutation
+// CHECK:   apply [[EM]]([[ARRAY]]
 // CHECK: bb1:
-// CHECK-NOT: apply
-// CHECK:  cond_br {{.*}}, bb1
+// CHECK:   retain
+// CHECK:   load
+// CHECK:   load
+// CHECK:   release
+// CHECK:   apply [[MM]]([[ARRAY]]
+// CHECK:   enum
+// CHECK:   mark_dependence
+// CHECK:   apply [[EM]]([[ARRAY]]
+// CHECK: } // end sil function 'cow_should_ignore_enum'
 sil @cow_should_ignore_enum : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
 bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
   %2 = load %0 : $*MyArray<MyStruct>
@@ -313,32 +355,25 @@ bb1:
   release_value %2 : $MyArray<MyStruct>
   %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %6 = apply %5(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-  %8 = enum $Optional<MyArray<MyStruct>>, #Optional.some!enumelt, %2 : $MyArray<MyStruct>
-  mark_dependence %1 : $*Builtin.Int1 on %8 : $Optional<MyArray<MyStruct>>
+  %e = enum $Optional<MyArray<MyStruct>>, #Optional.some!enumelt, %2 : $MyArray<MyStruct>
+  mark_dependence %1 : $*Builtin.Int1 on %e : $Optional<MyArray<MyStruct>>
+  %7 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %8 = apply %7(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   cond_br %3, bb1, bb2
 
 bb2:
-  %7 = tuple()
-  return %7 : $()
+  %r = tuple()
+  return %r : $()
 }
 
 // CHECK-LABEL: sil @cow_should_ignore_guaranteed_semantic_call_sequence : $@convention(thin) (@guaranteed MyArrayContainer<MyStruct>, Builtin.NativeObject) -> () {
 // CHECK: bb0
-// CHECK: [[F:%.*]] = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-// CHECK: apply [[F]](
+// CHECK-DAG:   [[MM:%[0-9]+]] = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+// CHECK-DAG:   [[EM:%[0-9]+]] = function_ref @array_end_mutation
+// CHECK:   apply [[MM]](
+// CHECK:   apply [[EM]](
 // CHECK: bb1:
-// CHECK: bb2:
-// CHECK-NOT: apply [[F]](
-// CHECK: bb3:
-// CHECK: bb4:
-// CHECK-NOT: apply [[F]](
-// CHECK: bb5:
-// CHECK: bb6:
-// CHECK-NOT: apply [[F]](
-// CHECK: bb7:
-// CHECK: bb8:
-// CHECK-NOT: apply [[F]](
-// CHECK: bb9:
+// CHECK: } // end sil function 'cow_should_ignore_guaranteed_semantic_call_sequence'
 sil @cow_should_ignore_guaranteed_semantic_call_sequence : $@convention(thin) (@guaranteed MyArrayContainer<MyStruct>, Builtin.NativeObject) -> () {
 bb0(%0 : $MyArrayContainer<MyStruct>, %00 : $Builtin.NativeObject):
   %1 = ref_element_addr %0 : $MyArrayContainer<MyStruct>, #MyArrayContainer.array
@@ -347,6 +382,7 @@ bb0(%0 : $MyArrayContainer<MyStruct>, %00 : $Builtin.NativeObject):
   %4 = function_ref @guaranteed_array_get_capacity : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
   %5 = function_ref @unknown : $@convention(thin) () -> ()
   %6 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %7 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   br bb1
 
 bb1:
@@ -356,6 +392,7 @@ bb1:
   apply %4(%2) : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
   release_value %2 : $MyArray<MyStruct>
   apply %6(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  apply %7(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   cond_br undef, bb1, bb2
 
 bb2:
@@ -369,6 +406,7 @@ bb3:
   fix_lifetime %0 : $MyArrayContainer<MyStruct>
   release_value %2 : $MyArray<MyStruct>
   apply %6(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  apply %7(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   cond_br undef, bb4, bb3
 
 bb4:
@@ -382,6 +420,7 @@ bb5:
   apply %4(%2) : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
   release_value %2 : $MyArray<MyStruct>
   apply %6(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  apply %7(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   cond_br undef, bb5, bb6
 
 bb6:
@@ -395,6 +434,7 @@ bb7:
   apply %4(%2) : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
   release_value %2 : $MyArray<MyStruct>
   apply %6(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  apply %7(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   cond_br undef, bb7, bb8
 
 bb8:
@@ -409,21 +449,30 @@ bb9:
   release_value %00 : $Builtin.NativeObject
   release_value %2 : $MyArray<MyStruct>
   apply %6(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  apply %7(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   cond_br undef, bb9, bb10
 
 bb10:
-  %7 = tuple()
-  return %7 : $()
+  %r = tuple()
+  return %r : $()
 }
 
 // CHECK: sil @cow_handle_array_address_load
-// CHECK: bb0({{.*}}):
-// CHECK:   apply
-// CHECK: br bb1
+// CHECK: bb0([[ARRAY:%[0-9]+]]
+// CHECK:   [[MM:%[0-9]+]] = function_ref @array_make_mutable
+// CHECK:   apply [[MM]]([[ARRAY]]
+// CHECK:   [[EM:%[0-9]+]] = function_ref @array_end_mutation
+// CHECK:   apply [[EM]]([[ARRAY]]
 // CHECK: bb1:
-// CHECK-NOT: apply
-// CHECK: bb2
-
+// CHECK:   load
+// CHECK:   retain
+// CHECK:   load
+// CHECK:   release
+// CHECK:   apply [[MM]]([[ARRAY]]
+// CHECK:   enum
+// CHECK:   mark_dependence
+// CHECK:   apply [[EM]]([[ARRAY]]
+// CHECK: } // end sil function 'cow_handle_array_address_load'
 sil @cow_handle_array_address_load : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
 bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
   %2 = load %0 : $*MyArray<MyStruct>
@@ -434,13 +483,15 @@ bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
 bb1:
   %6 = load %4 : $*Builtin.NativeObject
   strong_retain %6 : $Builtin.NativeObject
-  %8 = load %1 : $*Builtin.Int1
+  %l = load %1 : $*Builtin.Int1
   strong_release %6 : $Builtin.NativeObject
   %10 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %11 = apply %10(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %12 = enum $Optional<MyArray<MyStruct>>, #Optional.some!enumelt, %2 : $MyArray<MyStruct>
   %13 = mark_dependence %1 : $*Builtin.Int1 on %12 : $Optional<MyArray<MyStruct>>
-  cond_br %8, bb1, bb2
+  %7 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %8 = apply %7(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  cond_br %l, bb1, bb2
 
 bb2:
   %15 = tuple ()
@@ -468,6 +519,7 @@ bb0(%0 : $MyArrayContainer<MyStruct>, %00 : $Builtin.NativeObject):
   %5 = function_ref @unknown : $@convention(thin) () -> ()
   %6 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %7 = function_ref @array_unknown_mutate : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %9 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   br bb1
 
 bb1:
@@ -478,6 +530,7 @@ bb1:
   apply %4(%2) : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
   release_value %2 : $MyArray<MyStruct>
   apply %6(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  apply %9(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   cond_br undef, bb1, bb2
 
 bb2:
@@ -490,6 +543,7 @@ bb3:
   apply %4(%2) : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
   release_value %2 : $MyArray<MyStruct>
   apply %6(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  apply %9(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   cond_br undef, bb3, bb4
 
 bb4:
@@ -516,14 +570,18 @@ struct MyInt {
 }
 
 // CHECK-LABEL: sil @hoist_projections
-// CHECK: bb0([[CONTAINER:%[0-9]+]]
-// CHECK: [[CONTAINER2:%.*]] = struct_element_addr [[CONTAINER]] : $*ContainerContainer
-// CHECK: [[ARRAY:%.*]] = struct_element_addr [[CONTAINER2]] : $*Container,
-// CHECK: [[FUN:%[0-9]+]] = function_ref @array_make_mutable
-// CHECK: apply [[FUN]]([[ARRAY]]
-// CHECK: bb1
-// CHECK-NOT: array_make_mutable
-// CHECK-NOT: apply [[FUN]]
+// CHECK: bb0
+// CHECK:   [[SE:%[0-9]+]] = struct_element_addr %0
+// CHECK:   [[ARRAY:%[0-9]+]] = struct_element_addr [[SE]]
+// CHECK:   [[MM:%[0-9]+]] = function_ref @array_make_mutable
+// CHECK:   apply [[MM]]([[ARRAY]]
+// CHECK:   [[EM:%[0-9]+]] = function_ref @array_end_mutation
+// CHECK:   apply [[EM]]([[ARRAY]]
+// CHECK: bb1:
+// CHECK: bb2({{.*}}):
+// CHECK:   apply [[MM]]([[ARRAY]]
+// CHECK:   apply [[EM]]([[ARRAY]]
+// CHECK: } // end sil function 'hoist_projections'
 sil @hoist_projections : $@convention(thin) (@inout ContainerContainer, @inout Builtin.Int1) -> () {
 bb0(%0 : $*ContainerContainer, %1 : $*Builtin.Int1):
   br bb1
@@ -536,19 +594,29 @@ bb3(%3: $*Container):
   %4 = struct_element_addr %3 : $*Container, #Container.array
   %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %6 = apply %5(%4) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %7 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %8 = apply %7(%4) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   cond_br undef, bb1, bb2
 
 bb2:
-  %7 = tuple()
-  return %7 : $()
+  %r = tuple()
+  return %r : $()
 }
 
 // CHECK-LABEL: sil @hoist_non_unary_projections
-// CHECK: index_addr
-// CHECK: struct_element_addr
+// CHECK: bb0
+// CHECK:   [[SE:%[0-9]+]] = struct_element_addr %0
+// CHECK:   [[IA:%[0-9]+]] = index_addr [[SE]]
+// CHECK:   [[ARRAY:%[0-9]+]] = struct_element_addr [[IA]]
+// CHECK:   [[MM:%[0-9]+]] = function_ref @array_make_mutable
+// CHECK:   apply [[MM]]([[ARRAY]]
+// CHECK:   [[EM:%[0-9]+]] = function_ref @array_end_mutation
+// CHECK:   apply [[EM]]([[ARRAY]]
 // CHECK: bb1:
-// CHECK-NOT: index_addr
-// CHECK-NOT: struct_element_addr
+// CHECK: bb2({{.*}}):
+// CHECK:   apply [[MM]]([[ARRAY]]
+// CHECK:   apply [[EM]]([[ARRAY]]
+// CHECK: } // end sil function 'hoist_non_unary_projections'
 sil @hoist_non_unary_projections : $@convention(thin) (@inout ContainerContainer, @inout Builtin.Int1) -> () {
 bb0(%0 : $*ContainerContainer, %1 : $*Builtin.Int1):
   %i = integer_literal $Builtin.Int32, 0
@@ -563,22 +631,28 @@ bb2(%3: $*Container):
   %4 = struct_element_addr %3i : $*Container, #Container.array
   %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %6 = apply %5(%4) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %7 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %8 = apply %7(%4) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   cond_br undef, bb1, bb3
 
 bb3:
-  %7 = tuple()
-  return %7 : $()
+  %r = tuple()
+  return %r : $()
 }
 
 // CHECK-LABEL: sil @hoist_projections2
-// CHECK: bb0([[CONTAINER:%[0-9]+]]
-// CHECK: [[CONTAINER2:%.*]] = struct_element_addr [[CONTAINER]] : $*ContainerContainer
-// CHECK: [[ARRAY:%.*]] = struct_element_addr [[CONTAINER2]] : $*Container,
-// CHECK: [[FUN:%[0-9]+]] = function_ref @array_make_mutable
-// CHECK: apply [[FUN]]([[ARRAY]]
-// CHECK: bb1
-// CHECK-NOT: array_make_mutable
-// CHECK-NOT: apply [[FUN]]
+// CHECK: bb0
+// CHECK:   [[SE:%[0-9]+]] = struct_element_addr %0
+// CHECK:   [[ARRAY:%[0-9]+]] = struct_element_addr [[SE]]
+// CHECK:   [[MM:%[0-9]+]] = function_ref @array_make_mutable
+// CHECK:   apply [[MM]]([[ARRAY]]
+// CHECK:   [[EM:%[0-9]+]] = function_ref @array_end_mutation
+// CHECK:   apply [[EM]]([[ARRAY]]
+// CHECK: bb1:
+// CHECK: bb2({{.*}}):
+// CHECK:   apply [[MM]]([[ARRAY]]
+// CHECK:   apply [[EM]]
+// CHECK: } // end sil function 'hoist_projections2'
 sil @hoist_projections2 : $@convention(thin) (@inout ContainerContainer, @inout Builtin.Int1) -> () {
 bb0(%0 : $*ContainerContainer, %1 : $*Builtin.Int1):
   br bb1
@@ -591,22 +665,27 @@ bb1:
 bb3(%4 : $*MyArray<MyStruct>):
   %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %6 = apply %5(%4) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %7 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %8 = apply %7(%4) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   cond_br undef, bb1, bb2
 
 bb2:
-  %7 = tuple()
-  return %7 : $()
+  %r = tuple()
+  return %r : $()
 }
 
 // CHECK-LABEL: sil @hoist_projections3
-// CHECK: bb0([[CONTAINER:%[0-9]+]]
-// CHECK: [[CONTAINER2:%.*]] = struct_element_addr [[CONTAINER]] : $*ContainerContainer
-// CHECK: [[ARRAY:%.*]] = struct_element_addr [[CONTAINER2]] : $*Container,
-// CHECK: [[FUN:%[0-9]+]] = function_ref @array_make_mutable
-// CHECK: apply [[FUN]]([[ARRAY]]
-// CHECK: bb1
-// CHECK-NOT: array_make_mutable
-// CHECK-NOT: apply [[FUN]]
+// CHECK: bb0
+// CHECK:   [[SE:%[0-9]+]] = struct_element_addr %0
+// CHECK:   [[ARRAY:%[0-9]+]] = struct_element_addr [[SE]]
+// CHECK:   [[MM:%[0-9]+]] = function_ref @array_make_mutable
+// CHECK:   apply [[MM]]([[ARRAY]]
+// CHECK:   [[EM:%[0-9]+]] = function_ref @array_end_mutation
+// CHECK:   apply [[EM]]([[ARRAY]]
+// CHECK: bb1:
+// CHECK:   apply [[MM]]([[ARRAY]]
+// CHECK:   apply [[EM]]([[ARRAY]]
+// CHECK: } // end sil function 'hoist_projections3'
 sil @hoist_projections3 : $@convention(thin) (@inout ContainerContainer, @inout Builtin.Int1) -> () {
 bb0(%0 : $*ContainerContainer, %1 : $*Builtin.Int1):
   br bb1
@@ -616,26 +695,35 @@ bb1:
   %3 = struct_element_addr %2 : $*Container, #Container.array
   %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %6 = apply %5(%3) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %7 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %8 = apply %7(%3) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   cond_br undef, bb1, bb2
 
 bb2:
-  %7 = tuple()
-  return %7 : $()
+  %r = tuple()
+  return %r : $()
 }
 
 // CHECK-LABEL: sil @hoist_array2d
-// CHECK:      bb0({{.*}}):
-// CHECK:        apply
-// CHECK-NEXT:   load
-// CHECK-NEXT:   struct_extract
-// CHECK-NEXT:   struct_extract
-// CHECK-NEXT:   unchecked_ref_cast
-// CHECK-NEXT:   ref_tail_addr
-// CHECK-NEXT:   index_addr
-// CHECK-NEXT:   apply
-// CHECK-NEXT:   br bb1
-// CHECK:      bb1:
-// CHECK-NOT:    apply
+// CHECK: bb0
+// CHECK-DAG:   [[MM:%[0-9]+]] = function_ref @array_make_mutable
+// CHECK-DAG:   [[EM:%[0-9]+]] = function_ref @array_end_mutation
+// CHECK:   apply [[MM]](%0)
+// CHECK:   apply [[EM]](%0)
+// CHECK:   [[L:%[0-9]+]] = load %0
+// CHECK:   [[SE1:%[0-9]+]] = struct_extract [[L]]
+// CHECK:   [[SE2:%[0-9]+]] = struct_extract [[SE1]]
+// CHECK:   [[CAST:%[0-9]+]] = unchecked_ref_cast [[SE2]]
+// CHECK:   [[TA:%[0-9]+]] = ref_tail_addr [[CAST]]
+// CHECK:   [[ARR2:%[0-9]+]] = index_addr [[TA]]
+// CHECK:   apply [[MM]]([[ARR2]]
+// CHECK:   apply [[EM]]([[ARR2]]
+// CHECK: bb1:
+// CHECK:   apply [[MM]](%0)
+// CHECK:   apply [[MM]]([[ARR2]]
+// CHECK:   apply [[EM]]([[ARR2]]
+// CHECK:   apply [[EM]](%0)
+// CHECK: } // end sil function 'hoist_array2d'
 sil @hoist_array2d : $@convention(thin) (@inout MyArray<MyStruct>) -> () {
 bb0(%0 : $*MyArray<MyStruct>):
   %2 = load %0 : $*MyArray<MyStruct>
@@ -652,6 +740,9 @@ bb1:
   %11 = ref_tail_addr %10 : $MyArrayStorage, $MyArray<MyStruct>
   %12 = index_addr %11 : $*MyArray<MyStruct>, %3 : $Builtin.Word
   %13 = apply %5(%12) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %14 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %15 = apply %14(%12) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %16 = apply %14(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   cond_br undef, bb1, bb2
 
 bb2:
@@ -660,14 +751,23 @@ bb2:
 }
 
 // CHECK-LABEL: sil @dont_hoist_inner_mutating_outer
-// CHECK:     bb0({{.*}}):
-// CHECK:       apply
-// CHECK-NOT:   apply
-// CHECK:     bb1:
-// CHECK:       apply
-// CHECK:       apply
-// CHECK-NOT:   apply
-// CHECK:       return
+// CHECK: bb0
+// CHECK-DAG:   [[MM:%[0-9]+]] = function_ref @array_make_mutable
+// CHECK:   apply [[MM]](%0)
+// CHECK-DAG:   [[EM:%[0-9]+]] = function_ref @array_end_mutation
+// CHECK:   apply [[EM]](%0)
+// CHECK: bb1:
+// CHECK:   apply [[MM]](%0)
+// CHECK:   [[L:%[0-9]+]] = load %0
+// CHECK:   [[SE1:%[0-9]+]] = struct_extract [[L]]
+// CHECK:   [[SE2:%[0-9]+]] = struct_extract [[SE1]]
+// CHECK:   [[CAST:%[0-9]+]] = unchecked_ref_cast [[SE2]]
+// CHECK:   [[TA:%[0-9]+]] = ref_tail_addr [[CAST]]
+// CHECK:   [[ARR2:%[0-9]+]] = index_addr [[TA]]
+// CHECK:   apply [[MM]]([[ARR2]]
+// CHECK:   apply [[EM]]([[ARR2]]
+// CHECK:   apply [[EM]](%0)
+// CHECK: } // end sil function 'dont_hoist_inner_mutating_outer'
 sil @dont_hoist_inner_mutating_outer : $@convention(thin) (@inout MyArray<MyStruct>) -> () {
 bb0(%0 : $*MyArray<MyStruct>):
   %2 = load %0 : $*MyArray<MyStruct>
@@ -685,7 +785,10 @@ bb1:
   %11 = ref_tail_addr %10 : $MyArrayStorage, $MyArray<MyStruct>
   %12 = index_addr %11 : $*MyArray<MyStruct>, %3 : $Builtin.Word
   %13 = apply %5(%12) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-  apply %4(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %14 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %15 = apply %14(%12) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %16 = apply %4(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %17 = apply %14(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   cond_br undef, bb1, bb2
 
 bb2:
@@ -694,13 +797,23 @@ bb2:
 }
 
 // CHECK-LABEL: sil @dont_hoist_inner_variant_index
-// CHECK:     bb0({{.*}}):
-// CHECK:       apply
-// CHECK-NOT:   apply
-// CHECK:     bb1:
-// CHECK:       apply
-// CHECK-NOT:   apply
-// CHECK:       return
+// CHECK: bb0
+// CHECK-DAG:   [[MM:%[0-9]+]] = function_ref @array_make_mutable
+// CHECK:   apply [[MM]](%0)
+// CHECK-DAG:   [[EM:%[0-9]+]] = function_ref @array_end_mutation
+// CHECK:   apply [[EM]](%0)
+// CHECK: bb1:
+// CHECK:   apply [[MM]](%0)
+// CHECK:   [[L:%[0-9]+]] = load %0
+// CHECK:   [[SE1:%[0-9]+]] = struct_extract [[L]]
+// CHECK:   [[SE2:%[0-9]+]] = struct_extract [[SE1]]
+// CHECK:   [[CAST:%[0-9]+]] = unchecked_ref_cast [[SE2]]
+// CHECK:   [[TA:%[0-9]+]] = ref_tail_addr [[CAST]]
+// CHECK:   [[ARR2:%[0-9]+]] = index_addr [[TA]]
+// CHECK:   apply [[MM]]([[ARR2]]
+// CHECK:   apply [[EM]]([[ARR2]]
+// CHECK:   apply [[EM]](%0)
+// CHECK: } // end sil function 'dont_hoist_inner_variant_index'
 sil @dont_hoist_inner_variant_index : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Word) -> () {
 bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Word):
   %2 = load %0 : $*MyArray<MyStruct>
@@ -717,6 +830,9 @@ bb1:
   %11 = ref_tail_addr %10 : $MyArrayStorage, $MyArray<MyStruct>
   %12 = index_addr %11 : $*MyArray<MyStruct>, %4 : $Builtin.Word
   %13 = apply %5(%12) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %14 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %15 = apply %14(%12) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %17 = apply %14(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   cond_br undef, bb1, bb2
 
 bb2:

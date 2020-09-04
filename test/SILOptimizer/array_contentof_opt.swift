@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -sil-verify-all -emit-sil -Xllvm '-sil-inline-never-functions=$sSa6appendyy' %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -sil-verify-all -emit-sil -Xllvm '-sil-inline-never-functions=$sSa6appendyy' -Xllvm -sil-inline-never-function='$sSa6append10contentsOfyqd__n_t7ElementQyd__RszSTRd__lFSi_SaySiGTg5' %s | %FileCheck %s
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 
 // This is an end-to-end test of the Array.append(contentsOf:) ->

@@ -13,7 +13,8 @@
       key.name: "test_takesNoParams_andReturnsVoid_butIsNotAnInstanceMethod()",
       key.usr: "s:28index_is_test_candidate_objc0C54_takesNoParams_andReturnsVoid_butIsNotAnInstanceMethodyyF",
       key.line: 9,
-      key.column: 6
+      key.column: 6,
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.decl.struct,
@@ -27,16 +28,19 @@
           key.name: "test_startsWithTest_takesNoParams_returnsVoid_butIsDefinedOnAStruct()",
           key.usr: "s:28index_is_test_candidate_objc8MyStructV0C63_startsWithTest_takesNoParams_returnsVoid_butIsDefinedOnAStructyyF",
           key.line: 12,
-          key.column: 8
+          key.column: 8,
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.decl.function.constructor,
           key.usr: "s:28index_is_test_candidate_objc8MyStructVACycfc",
           key.line: 11,
           key.column: 8,
-          key.is_implicit: 1
+          key.is_implicit: 1,
+          key.effective_access: source.decl.effective_access.internal
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.decl.class,
@@ -50,9 +54,11 @@
           key.usr: "s:28index_is_test_candidate_objc10XCTestCaseCACycfc",
           key.line: 14,
           key.column: 7,
-          key.is_implicit: 1
+          key.is_implicit: 1,
+          key.effective_access: source.decl.effective_access.internal
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.decl.class,
@@ -84,7 +90,8 @@
           key.line: 16,
           key.column: 8,
           key.is_dynamic: 1,
-          key.is_test_candidate: 1
+          key.is_test_candidate: 1,
+          key.effective_access: source.decl.effective_access.fileprivate
         },
         {
           key.kind: source.lang.swift.decl.function.constructor,
@@ -103,7 +110,8 @@
             {
               key.attribute: source.decl.attribute.override
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
         }
       ],
       key.attributes: [
@@ -111,7 +119,8 @@
           key.attribute: source.decl.attribute.private
         }
       ],
-      key.is_test_candidate: 1
+      key.is_test_candidate: 1,
+      key.effective_access: source.decl.effective_access.fileprivate
     },
     {
       key.kind: source.lang.swift.decl.class,
@@ -142,7 +151,8 @@
           key.usr: "s:28index_is_test_candidate_objc7MyClassC20doesNotStartWithTestyyF",
           key.line: 20,
           key.column: 8,
-          key.is_dynamic: 1
+          key.is_dynamic: 1,
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
@@ -159,7 +169,8 @@
               key.line: 21,
               key.column: 50
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
@@ -176,7 +187,8 @@
               key.line: 22,
               key.column: 68
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
@@ -190,7 +202,8 @@
               key.attribute: source.decl.attribute.private
             }
           ],
-          key.is_test_candidate: 1
+          key.is_test_candidate: 1,
+          key.effective_access: source.decl.effective_access.less_than_fileprivate
         },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
@@ -199,7 +212,8 @@
           key.line: 24,
           key.column: 8,
           key.is_dynamic: 1,
-          key.is_test_candidate: 1
+          key.is_test_candidate: 1,
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
@@ -208,7 +222,8 @@
           key.line: 25,
           key.column: 8,
           key.is_dynamic: 1,
-          key.is_test_candidate: 1
+          key.is_test_candidate: 1,
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.decl.function.constructor,
@@ -227,7 +242,8 @@
             {
               key.attribute: source.decl.attribute.override
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         }
       ],
       key.attributes: [
@@ -235,7 +251,8 @@
           key.attribute: source.decl.attribute.public
         }
       ],
-      key.is_test_candidate: 1
+      key.is_test_candidate: 1,
+      key.effective_access: source.decl.effective_access.public
     }
   ]
 }

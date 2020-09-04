@@ -34,12 +34,13 @@ class Traversal : public TypeVisitor<Traversal, bool>
 
   bool visitErrorType(ErrorType *ty) { return false; }
   bool visitUnresolvedType(UnresolvedType *ty) { return false; }
+  bool visitHoleType(HoleType *ty) { return false; }
   bool visitBuiltinType(BuiltinType *ty) { return false; }
   bool visitTypeAliasType(TypeAliasType *ty) {
     if (auto parent = ty->getParent())
       if (doIt(parent)) return true;
 
-    for (auto arg : ty->getInnermostGenericArgs())
+    for (const auto &arg : ty->getDirectGenericArgs())
       if (doIt(arg))
         return true;
     

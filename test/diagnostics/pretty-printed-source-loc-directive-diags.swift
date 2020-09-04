@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend -diagnostic-style=swift -typecheck %s 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend -diagnostic-style=swift -typecheck %/s 2>&1 | %FileCheck %s
 
 // Error split between the real file and a virtual one.
 #sourceLocation(file: "abc.swift", line: 9)

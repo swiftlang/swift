@@ -68,8 +68,10 @@ PASS(CrossModuleSerializationSetup, "cross-module-serialization-setup",
      "Setup serialization flags for cross-module optimization")
 PASS(AccessSummaryDumper, "access-summary-dump",
      "Dump Address Parameter Access Summary")
+PASS(AccessedStorageAnalysisDumper, "accessed-storage-analysis-dump",
+     "Dump Accessed Storage Analysis Summaries")
 PASS(AccessedStorageDumper, "accessed-storage-dump",
-     "Dump Accessed Storage Summary")
+     "Dump Accessed Storage Information")
 PASS(AccessMarkerElimination, "access-marker-elim",
      "Access Marker Elimination.")
 PASS(AddressLowering, "address-lowering",
@@ -248,6 +250,9 @@ PASS(OwnershipModelEliminator, "ownership-model-eliminator",
 PASS(NonTransparentFunctionOwnershipModelEliminator,
      "non-transparent-func-ownership-model-eliminator",
      "Eliminate Ownership Annotations from non-transparent SIL Functions")
+PASS(NonStdlibNonTransparentFunctionOwnershipModelEliminator,
+     "non-stdlib-non-transparent-func-ownership-model-eliminator",
+     "Eliminate Ownership Annotations from non-transparent SIL Functions only when not processing the stdlib.")
 PASS(RCIdentityDumper, "rc-id-dumper",
      "Print Reference Count Identities")
 PASS(AlwaysInlineInliner, "always-inline",
@@ -280,6 +285,8 @@ PASS(PerformanceSILLinker, "performance-linker",
      "Deserialize all referenced SIL functions")
 PASS(RawSILInstLowering, "raw-sil-inst-lowering",
      "Lower all raw SIL instructions to canonical equivalents.")
+PASS(TempLValueOpt, "temp-lvalue-opt",
+     "Remove short-lived immutable temporary l-values")
 PASS(TempRValueOpt, "temp-rvalue-opt",
      "Remove short-lived immutable temporary copies")
 PASS(SideEffectsDumper, "side-effects-dump",
@@ -292,6 +299,8 @@ PASS(SILCombine, "sil-combine",
      "Combine SIL Instructions via Peephole Optimization")
 PASS(SILDebugInfoGenerator, "sil-debuginfo-gen",
      "Generate Debug Information with Source Locations into Textual SIL")
+PASS(EarlySROA, "early-sroa",
+     "Scalar Replacement of Aggregate Stack Objects on high-level SIL")
 PASS(SROA, "sroa",
      "Scalar Replacement of Aggregate Stack Objects")
 PASS(SROABBArgs, "sroa-bb-args",
@@ -310,6 +319,8 @@ PASS(StackPromotion, "stack-promotion",
      "Stack Promotion of Class Objects")
 PASS(StripDebugInfo, "strip-debug-info",
      "Strip Debug Information")
+PASS(StringOptimization, "string-optimization",
+     "Optimization for String operations")
 PASS(SwiftArrayPropertyOpt, "array-property-opt",
      "Loop Specialization for Array Properties")
 PASS(UnsafeGuaranteedPeephole, "unsafe-guaranteed-peephole",
@@ -340,7 +351,11 @@ PASS(MandatoryCombine, "mandatory-combine",
     "Perform mandatory peephole combines")
 PASS(BugReducerTester, "bug-reducer-tester",
      "sil-bug-reducer Tool Testing by Asserting on a Sentinel Function")
-PASS_RANGE(AllPasses, AADumper, BugReducerTester)
+PASS(OptRemarkGenerator, "sil-opt-remark-generator",
+     "Emit small peephole opt remarks that do not use large analyses")
+PASS(PruneVTables, "prune-vtables",
+     "Mark class methods that do not require vtable dispatch")
+PASS_RANGE(AllPasses, AADumper, PruneVTables)
 
 #undef IRGEN_PASS
 #undef PASS

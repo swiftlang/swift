@@ -150,6 +150,10 @@ public:
   /// generic parameters.
   ArrayRef<Type> getReplacementTypes() const;
 
+  /// Retrieve the array of replacement types for the innermost generic
+  /// parameters.
+  ArrayRef<Type> getInnermostReplacementTypes() const;
+
   /// Query whether any replacement types in the map contain archetypes.
   bool hasArchetypes() const;
 
@@ -281,6 +285,12 @@ private:
   /// instead, since that will resolve member types also.
   Type lookupSubstitution(CanSubstitutableType type) const;
 };
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
+                                     const SubstitutionMap &subs) {
+  subs.dump(OS);
+  return OS;
+}
 
 /// A function object suitable for use as a \c TypeSubstitutionFn that
 /// queries an underlying \c SubstitutionMap.

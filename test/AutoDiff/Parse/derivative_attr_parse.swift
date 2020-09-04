@@ -26,6 +26,27 @@ func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })
 }
 
+@derivative(of: property.get) // ok
+func dPropertyGetter() -> ()
+
+@derivative(of: subscript.get) // ok
+func dSubscriptGetter() -> ()
+
+@derivative(of: subscript(_:label:).get) // ok
+func dLabeledSubscriptGetter() -> ()
+
+@derivative(of: property.set) // ok
+func dPropertySetter() -> ()
+
+@derivative(of: subscript.set) // ok
+func dSubscriptSetter() -> ()
+
+@derivative(of: subscript(_:label:).set) // ok
+func dLabeledSubscriptSetter() -> ()
+
+@derivative(of: nestedType.name) // ok
+func dNestedTypeFunc() -> ()
+
 /// Bad
 
 // expected-error @+2 {{expected an original function name}}
@@ -98,3 +119,16 @@ func testLocalDerivativeRegistration() {
   @derivative(of: sin)
   func dsin()
 }
+
+
+func testLocalDerivativeRegistration() {
+  // expected-error @+1 {{attribute '@derivative' can only be used in a non-local scope}}
+  @derivative(of: sin)
+  func dsin()
+}
+
+// expected-error @+2 {{expected ',' separator}}
+// expected-error @+1 {{expected declaration}}
+@derivative(of: nestedType.name.set)
+func dNestedTypePropertySetter() -> ()
+

@@ -98,7 +98,7 @@
 ///         }
 ///     }
 ///     print(longestAnimal)
-///     // Prints "Butterfly"
+///     // Prints Optional("Butterfly")
 ///
 /// Using Multiple Iterators
 /// ========================

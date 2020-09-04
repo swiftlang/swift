@@ -81,6 +81,14 @@ SourceCompleteResult
 isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf, SourceFileKind SFKind);
 SourceCompleteResult isSourceInputComplete(StringRef Text, SourceFileKind SFKind);
 
+bool initCompilerInvocation(
+    CompilerInvocation &Invocation, ArrayRef<const char *> OrigArgs,
+    DiagnosticEngine &Diags, StringRef UnresolvedPrimaryFile,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    const std::string &runtimeResourcePath,
+    const std::string &diagnosticDocumentationPath,
+    bool shouldOptimizeForIDE, time_t sessionTimestamp, std::string &Error);
+
 bool initInvocationByClangArguments(ArrayRef<const char *> ArgList,
                                     CompilerInvocation &Invok,
                                     std::string &Error);
@@ -280,8 +288,6 @@ class NameMatcher: public ASTWalker {
   bool walkToDeclPost(Decl *D) override;
   std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) override;
   Stmt* walkToStmtPost(Stmt *S) override;
-  bool walkToTypeLocPre(TypeLoc &TL) override;
-  bool walkToTypeLocPost(TypeLoc &TL) override;
   bool walkToTypeReprPre(TypeRepr *T) override;
   bool walkToTypeReprPost(TypeRepr *T) override;
   std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override;

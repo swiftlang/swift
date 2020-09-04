@@ -153,5 +153,5 @@ sil_vtable B {
 }
 
 sil_vtable C {
-  #B.foo: @_TZFC4metaP33_7026FC13D35FB9700BACF693F51A99011B3foofMS0_FT_Si
+  #B.foo: @_TZFC4metaP33_7026FC13D35FB9700BACF693F51A99011B3foofMS0_FT_Si [inherited]
 }

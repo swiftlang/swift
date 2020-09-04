@@ -309,6 +309,9 @@ PointerAuthEntity::getDeclDiscriminator(IRGenModule &IGM) const {
       case Special::TypeDescriptor:
       case Special::TypeDescriptorAsArgument:
         return SpecialPointerAuthDiscriminators::TypeDescriptor;
+      case Special::ProtocolConformanceDescriptor:
+      case Special::ProtocolConformanceDescriptorAsArgument:
+        return SpecialPointerAuthDiscriminators::ProtocolConformanceDescriptor;
       case Special::PartialApplyCapture:
         return PointerAuthDiscriminator_PartialApplyCapture;
       case Special::KeyPathDestroy:

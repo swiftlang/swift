@@ -16,6 +16,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/SourceManager.h"
+#include "AvailabilityMixin.h"
 #include "JSON.h"
 #include "Symbol.h"
 #include "SymbolGraph.h"
@@ -124,8 +125,22 @@ void Symbol::serializeNames(llvm::json::OStream &OS) const {
   OS.attributeObject("names", [&](){
     SmallVector<SmallString<32>, 8> PathComponents;
     getPathComponents(PathComponents);
-    
-    OS.attribute("title", PathComponents.back());
+
+    if (isa<GenericTypeDecl>(VD)) {    
+      SmallString<64> FullyQualifiedTitle;
+
+      for (const auto *It = PathComponents.begin(); It != PathComponents.end(); ++It) {
+        if (It != PathComponents.begin()) {
+          FullyQualifiedTitle.push_back('.');
+        }
+        FullyQualifiedTitle.append(*It);
+      }
+      
+      OS.attribute("title", FullyQualifiedTitle.str());
+    } else {
+      OS.attribute("title", PathComponents.back());
+    }
+
     Graph->serializeNavigatorDeclarationFragments("navigator", *this, OS);
     Graph->serializeSubheadingDeclarationFragments("subHeading", *this, OS);
     // "prose": null
@@ -265,8 +280,8 @@ void Symbol::serializeSwiftGenericMixin(llvm::json::OStream &OS) const {
       }
 
       filterGenericRequirements(Generics->getRequirements(),
-                         Self,
-                         FilteredRequirements);
+                                Self,
+                                FilteredRequirements);
 
       if (FilteredParams.empty() && FilteredRequirements.empty()) {
         return;
@@ -325,98 +340,89 @@ void Symbol::serializeLocationMixin(llvm::json::OStream &OS) const {
   });
 }
 
-llvm::Optional<StringRef>
-Symbol::getDomain(PlatformAgnosticAvailabilityKind AgnosticKind,
-                  PlatformKind Kind) const {
-  switch (AgnosticKind) {
-    // SPM- and Swift-specific availability.
-    case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
-      return { "SwiftPM" };
-    case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
-    case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
-      return { "Swift" };
-    // Although these are in the agnostic kinds, they are actually a signal
-    // that there is either platform-specific or completely platform-agnostic.
-    // They'll be handled below.
-    case PlatformAgnosticAvailabilityKind::Deprecated:
-    case PlatformAgnosticAvailabilityKind::Unavailable:
-    case PlatformAgnosticAvailabilityKind::None:
-      break;
-  }
-
-  // Platform-specific availability.
-  switch (Kind) {
-    case swift::PlatformKind::iOS:
-      return { "iOS" };
-    case swift::PlatformKind::macCatalyst:
-      return { "macCatalyst" };
-    case swift::PlatformKind::OSX:
-      return { "macOS" };
-    case swift::PlatformKind::tvOS:
-      return { "tvOS" };
-    case swift::PlatformKind::watchOS:
-      return { "watchOS" };
-    case swift::PlatformKind::iOSApplicationExtension:
-      return { "iOSAppExtension" };
-    case swift::PlatformKind::macCatalystApplicationExtension:
-      return { "macCatalystAppExtension" };
-    case swift::PlatformKind::OSXApplicationExtension:
-      return { "macOSAppExtension" };
-    case swift::PlatformKind::tvOSApplicationExtension:
-      return { "tvOSAppExtension" };
-    case swift::PlatformKind::watchOSApplicationExtension:
-      return { "watchOSAppExtension" };
-    // Platform-agnostic availability, such as "unconditionally deprecated"
-    // or "unconditionally obsoleted".
-    case swift::PlatformKind::none:
-      return None;
-  }
-  llvm_unreachable("invalid platform kind");
-}
-
-void Symbol::serializeAvailabilityMixin(llvm::json::OStream &OS) const {
-  SmallVector<const AvailableAttr *, 4> Availabilities;
-  for (const auto *Attr : VD->getAttrs()) {
+namespace {
+/// Get the availabilities for each domain on a declaration without walking
+/// up the parent hierarchy.
+///
+/// \param D The declaration whose availabilities the method will collect.
+/// \param Availabilities The domain -> availability map that will be updated.
+/// \param IsParent If \c true\c, will update or fill availabilities for a given
+/// domain with different "inheriting" rules rather than filling from
+/// duplicate \c \@available attributes on the same declaration.
+void getAvailabilities(const Decl *D,
+                       llvm::StringMap<Availability> &Availabilities,
+                       bool IsParent) {
+  // DeclAttributes is a linked list in reverse order from where they
+  // appeared in the source. Let's re-reverse them.
+  SmallVector<const AvailableAttr *, 4> AvAttrs;
+  for (const auto *Attr : D->getAttrs()) {
     if (const auto *AvAttr = dyn_cast<AvailableAttr>(Attr)) {
-      Availabilities.push_back(AvAttr);
+      AvAttrs.push_back(AvAttr);
     }
   }
+  std::reverse(AvAttrs.begin(), AvAttrs.end());
+
+  // Now go through them in source order.
+  for (auto *AvAttr : AvAttrs) {
+    Availability NewAvailability(*AvAttr);
+    if (NewAvailability.empty()) {
+      continue;
+    }
+    auto ExistingAvailability = Availabilities.find(NewAvailability.Domain);
+    if (ExistingAvailability != Availabilities.end()) {
+      // There are different rules for filling in missing components
+      // or replacing existing components from a parent's @available
+      // attribute compared to duplicate @available attributes on the
+      // same declaration.
+      // See the respective methods below for an explanation for the
+      // replacement/filling rules.
+      if (IsParent) {
+        ExistingAvailability->getValue().updateFromParent(NewAvailability);
+      } else {
+        ExistingAvailability->getValue().updateFromDuplicate(NewAvailability);
+      }
+    } else {
+      // There are no availabilities for this domain yet, so either
+      // inherit the parent's in its entirety or set it from this declaration.
+      Availabilities.insert(std::make_pair(NewAvailability.Domain,
+                                           NewAvailability));
+    }
+  }
+}
+
+/// Get the availabilities of a declaration, considering all of its
+/// parent context's except for the module.
+void getInheritedAvailabilities(const Decl *D,
+llvm::StringMap<Availability> &Availabilities) {
+  getAvailabilities(D, Availabilities, /*IsParent*/false);
+
+  auto CurrentContext = D->getDeclContext();
+  while (CurrentContext) {
+    if (const auto *Parent = CurrentContext->getAsDecl()) {
+      if (isa<ModuleDecl>(Parent)) {
+        return;
+      }
+      getAvailabilities(Parent, Availabilities, /*IsParent*/true);
+    }
+    CurrentContext = CurrentContext->getParent();
+  }
+}
+
+} // end anonymous namespace
+
+void Symbol::serializeAvailabilityMixin(llvm::json::OStream &OS) const {
+  llvm::StringMap<Availability> Availabilities;
+  getInheritedAvailabilities(VD, Availabilities);
+
   if (Availabilities.empty()) {
     return;
   }
 
-  OS.attributeArray("availability", [&](){
-    for (const auto *AvAttr : Availabilities) {
-      OS.object([&](){
-        auto Domain = getDomain(AvAttr->getPlatformAgnosticAvailability(),
-                                AvAttr->Platform);
-        if (Domain) {
-          OS.attribute("domain", *Domain);
-        }
-        if (AvAttr->Introduced) {
-          AttributeRAII Introduced("introduced", OS);
-          symbolgraphgen::serialize(*AvAttr->Introduced, OS);
-        }
-        if (AvAttr->Deprecated) {
-          AttributeRAII Deprecated("deprecated", OS);
-          symbolgraphgen::serialize(*AvAttr->Deprecated, OS);
-        }
-        if (AvAttr->Obsoleted) {
-          AttributeRAII Obsoleted("obsoleted", OS);
-          symbolgraphgen::serialize(*AvAttr->Obsoleted, OS);
-        }
-        if (!AvAttr->Message.empty()) {
-          OS.attribute("message", AvAttr->Message);
-        }
-        if (!AvAttr->Rename.empty()) {
-          OS.attribute("renamed", AvAttr->Rename);
-        }
-        if (AvAttr->isUnconditionallyDeprecated()) {
-          OS.attribute("isUnconditionallyDeprecated", true);
-        }
-      }); // end availability object
+  OS.attributeArray("availability", [&]{
+    for (const auto &Availability : Availabilities) {
+      Availability.getValue().serialize(OS);
     }
-  }); // end availability: []
+  });
 }
 
 void Symbol::serialize(llvm::json::OStream &OS) const {

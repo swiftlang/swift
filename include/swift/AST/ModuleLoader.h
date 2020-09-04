@@ -24,6 +24,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "swift/AST/ModuleDependencies.h"
+#include <system_error>
 
 namespace llvm {
 class FileCollector;
@@ -60,13 +61,22 @@ enum class Bridgeability : unsigned {
   Full
 };
 
+/// Specifies which dependencies the intermodule dependency tracker records.
+enum class IntermoduleDepTrackingMode {
+  /// Records both system and non-system dependencies.
+  IncludeSystem,
+
+  /// Records only non-system dependencies.
+  ExcludeSystem,
+};
+
 /// Records dependencies on files outside of the current module;
 /// implemented in terms of a wrapped clang::DependencyCollector.
 class DependencyTracker {
   std::shared_ptr<clang::DependencyCollector> clangCollector;
 public:
   explicit DependencyTracker(
-      bool TrackSystemDeps,
+      IntermoduleDepTrackingMode Mode,
       std::shared_ptr<llvm::FileCollector> FileCollector = {});
 
   /// Adds a file as a dependency.
@@ -89,20 +99,23 @@ struct SubCompilerInstanceInfo {
   CompilerInstance* Instance;
   StringRef Hash;
   ArrayRef<StringRef> BuildArguments;
+  ArrayRef<StringRef> ExtraPCMArgs;
 };
 
 /// Abstract interface to run an action in a sub ASTContext.
 struct InterfaceSubContextDelegate {
-  virtual bool runInSubContext(StringRef moduleName,
-                               StringRef interfacePath,
-                               StringRef outputPath,
-                               SourceLoc diagLoc,
-  llvm::function_ref<bool(ASTContext&,ArrayRef<StringRef>, StringRef)> action) = 0;
-  virtual bool runInSubCompilerInstance(StringRef moduleName,
-                                        StringRef interfacePath,
-                                        StringRef outputPath,
-                                        SourceLoc diagLoc,
-                    llvm::function_ref<bool(SubCompilerInstanceInfo&)> action) = 0;
+  virtual std::error_code runInSubContext(StringRef moduleName,
+                                          StringRef interfacePath,
+                                          StringRef outputPath,
+                                          SourceLoc diagLoc,
+    llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*,
+                                       ArrayRef<StringRef>,
+                                       ArrayRef<StringRef>, StringRef)> action) = 0;
+  virtual std::error_code runInSubCompilerInstance(StringRef moduleName,
+                                                   StringRef interfacePath,
+                                                   StringRef outputPath,
+                                                   SourceLoc diagLoc,
+    llvm::function_ref<std::error_code(SubCompilerInstanceInfo&)> action) = 0;
 
   virtual ~InterfaceSubContextDelegate() = default;
 };

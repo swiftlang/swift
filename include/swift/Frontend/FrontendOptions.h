@@ -27,7 +27,7 @@ namespace llvm {
 }
 
 namespace swift {
-
+enum class IntermoduleDepTrackingMode;
 
 /// Options for controlling the behavior of the frontend.
 class FrontendOptions {
@@ -116,6 +116,8 @@ public:
 
     /// Build from a swiftinterface, as close to `import` as possible
     CompileModuleFromInterface,
+    /// Same as CompileModuleFromInterface, but stopping after typechecking
+    TypecheckModuleFromInterface,
 
     EmitSIBGen, ///< Emit serialized AST + raw SIL
     EmitSIB,    ///< Emit serialized AST + canonical SIL
@@ -133,7 +135,9 @@ public:
     EmitPCM, ///< Emit precompiled Clang module from a module map
     DumpPCM, ///< Dump information about a precompiled Clang module
 
-    ScanDependencies,   ///< Scan dependencies of Swift source files
+    ScanDependencies,        ///< Scan dependencies of Swift source files
+    ScanClangDependencies,   ///< Scan dependencies of a Clang module
+    PrintVersion,       ///< Print version information.
   };
 
   /// Indicates the action the user requested that the frontend perform.
@@ -159,12 +163,6 @@ public:
 
   /// If set, dumps wall time taken to check each expression.
   bool DebugTimeExpressionTypeChecking = false;
-
-  /// If set, prints the time taken in each major compilation phase to 
-  /// llvm::errs().
-  ///
-  /// \sa swift::SharedTimer
-  bool DebugTimeCompilation = false;
 
   /// The path to which we should output statistics files.
   std::string StatsOutputDir;
@@ -236,9 +234,10 @@ public:
   /// See the \ref SILOptions.EmitSortedSIL flag.
   bool EmitSortedSIL = false;
 
-  /// Indicates whether the dependency tracker should track system
-  /// dependencies as well.
-  bool TrackSystemDeps = false;
+  /// Specifies the collection mode for the intermodule dependency tracker.
+  /// Note that if set, the dependency tracker will be enabled even if no
+  /// output path is configured.
+  Optional<IntermoduleDepTrackingMode> IntermoduleDependencyTracking;
 
   /// Should we serialize the hashes of dependencies (vs. the modification
   /// times) when compiling a module interface?
@@ -254,9 +253,16 @@ public:
   /// Should we enable the dependency verifier for all primary files known to this frontend?
   bool EnableIncrementalDependencyVerifier = false;
 
+  /// The path of the swift-frontend executable.
+  std::string MainExecutablePath;
+
   /// The directory path we should use when print #include for the bridging header.
   /// By default, we include ImplicitObjCHeaderPath directly.
   llvm::Optional<std::string> BridgingHeaderDirForPrint;
+
+  /// Disable implicitly built Swift modules because they are explicitly
+  /// built and given to the compiler invocation.
+  bool DisableImplicitModules = false;
 
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {
@@ -283,11 +289,20 @@ public:
   /// -dump-scope-maps.
   SmallVector<std::pair<unsigned, unsigned>, 2> DumpScopeMapLocations;
 
-  /// Indicates whether the action will immediately run code.
-  static bool isActionImmediate(ActionType);
+  /// Determines whether the static or shared resource folder is used.
+  /// When set to `true`, the default resource folder will be set to
+  /// '.../lib/swift', otherwise '.../lib/swift_static'.
+  bool UseSharedResourceFolder = true;
 
-  /// \return true if action only parses without doing other compilation steps.
+  /// \return true if the given action only parses without doing other compilation steps.
   static bool shouldActionOnlyParse(ActionType);
+
+  /// \return true if the given action requires the standard library to be
+  /// loaded before it is run.
+  static bool doesActionRequireSwiftStandardLibrary(ActionType);
+
+  /// \return true if the given action requires input files to be provided.
+  static bool doesActionRequireInputs(ActionType action);
 
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
@@ -312,6 +327,9 @@ public:
   ArrayRef<std::string> getImplicitImportModuleNames() const {
     return ImplicitImportModuleNames;
   }
+
+  /// Whether we're configured to track system intermodule dependencies.
+  bool shouldTrackSystemDependencies() const;
 
 private:
   static bool canActionEmitDependencies(ActionType);

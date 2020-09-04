@@ -19,7 +19,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Pattern.h"
-#include "swift/AST/TypeLoc.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/Basic/SourceLoc.h"
 
 using namespace swift;
@@ -33,8 +33,8 @@ SourceRange ASTNode::getSourceRange() const {
     return D->getSourceRange();
   if (const auto *P = this->dyn_cast<Pattern*>())
     return P->getSourceRange();
-  if (const auto *L = this->dyn_cast<TypeLoc *>())
-    return L->getSourceRange();
+  if (const auto *T = this->dyn_cast<TypeRepr *>())
+    return T->getSourceRange();
   llvm_unreachable("unsupported AST node");
 }
 
@@ -71,7 +71,7 @@ bool ASTNode::isImplicit() const {
     return D->isImplicit();
   if (const auto *P = this->dyn_cast<Pattern*>())
     return P->isImplicit();
-  if (const auto *L = this->dyn_cast<TypeLoc*>())
+  if (const auto *T = this->dyn_cast<TypeRepr*>())
     return false;
   llvm_unreachable("unsupported AST node");
 }
@@ -85,6 +85,8 @@ void ASTNode::walk(ASTWalker &Walker) {
     D->walk(Walker);
   else if (auto *P = this->dyn_cast<Pattern*>())
     P->walk(Walker);
+  else if (auto *T = this->dyn_cast<TypeRepr*>())
+    T->walk(Walker);
   else
     llvm_unreachable("unsupported AST node");
 }
@@ -98,8 +100,10 @@ void ASTNode::dump(raw_ostream &OS, unsigned Indent) const {
     D->dump(OS, Indent);
   else if (auto P = dyn_cast<Pattern*>())
     P->dump(OS, Indent);
+  else if (auto T = dyn_cast<TypeRepr*>())
+    T->print(OS);
   else
-    OS << "<null>";
+    llvm_unreachable("unsupported AST node");
 }
 
 void ASTNode::dump() const {

@@ -33,8 +33,7 @@ public func testPartialApply(_ obj: Test) {
     // CHECK: [[PROP1_OBJ_COPY:%.*]] = copy_value [[PROP1_OBJ]]
     // CHECK: [[PROP1_PARTIAL:%.+]] = partial_apply [callee_guaranteed] [[PROP1_METHOD]]([[PROP1_OBJ_COPY]]) : $@convention(objc_method) (@opened([[PROP1_EXISTENTIAL]]) Test) -> @autoreleased AnyObject
     // CHECK: [[PROP1_PARTIAL_COPY:%.*]] = copy_value [[PROP1_PARTIAL]]
-    // CHECK: [[PROP1_PARTIAL_COPY_BORROW:%.*]] = begin_borrow [[PROP1_PARTIAL_COPY]]
-    // CHECK: = apply [[PROP1_PARTIAL_COPY_BORROW]]() : $@callee_guaranteed () -> @owned AnyObject
+    // CHECK: = apply [[PROP1_PARTIAL_COPY]]() : $@callee_guaranteed () -> @owned AnyObject
     _ = prop1
   }
   if let prop2 = obj.innerPointerProp {
@@ -43,8 +42,7 @@ public func testPartialApply(_ obj: Test) {
     // CHECK: [[PROP2_TRUE]]([[PROP2_METHOD:%.+]] : $@convention(objc_method) (@opened([[PROP2_EXISTENTIAL]]) Test) -> @unowned_inner_pointer UnsafeMutableRawPointer):
     // CHECK: [[PROP2_OBJ_COPY:%.*]] = copy_value [[PROP2_OBJ]]
     // CHECK: [[PROP2_PARTIAL:%.+]] = partial_apply [callee_guaranteed] [[PROP2_METHOD]]([[PROP2_OBJ_COPY]]) : $@convention(objc_method) (@opened([[PROP2_EXISTENTIAL]]) Test) -> @unowned_inner_pointer UnsafeMutableRawPointer
-    // CHECK: [[PROP2_PARTIAL_BORROW:%.*]] = begin_borrow [[PROP2_PARTIAL]]
-    // CHECK: = apply [[PROP2_PARTIAL_BORROW]]() : $@callee_guaranteed () -> UnsafeMutableRawPointer
+    // CHECK: = apply [[PROP2_PARTIAL]]() : $@callee_guaranteed () -> UnsafeMutableRawPointer
     _ = prop2
   }
 } // CHECK: // end sil function '$s4Test16testPartialApplyyySoAA_pF'

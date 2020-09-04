@@ -28,7 +28,7 @@ func parseError4(x: Int) {
 
 func parseError5(x: Int) {
   switch x {
-  case let z // expected-error {{expected ':' after 'case'}} expected-warning {{immutable value 'z' was never used}} {{12-13=_}}
+  case let z // expected-error {{expected ':' after 'case'}} expected-warning {{immutable value 'z' was never used}} {{8-13=_}}
   }
 }
 
@@ -336,6 +336,7 @@ func f1(x: String, y: Whichever) {
     case Whichever.buzz: // expected-error {{type 'Whichever' has no member 'buzz'}}
         break
     case Whichever.alias: // expected-error {{expression pattern of type 'Whichever' cannot match values of type 'String'}}
+    // expected-note@-1 {{overloads for '~=' exist with these partially matching parameter lists: (Substring, String)}}
         break
     default:
       break

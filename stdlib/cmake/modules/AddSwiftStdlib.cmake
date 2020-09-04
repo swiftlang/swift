@@ -49,8 +49,7 @@ function(_add_target_variant_c_compile_link_flags)
 
   set(result ${${CFLAGS_RESULT_VAR_NAME}})
 
-  is_darwin_based_sdk("${CFLAGS_SDK}" IS_DARWIN)
-  if(IS_DARWIN)
+  if("${CFLAGS_SDK}" IN_LIST SWIFT_APPLE_PLATFORMS)
     # Check if there's a specific OS deployment version needed for this invocation
     if("${CFLAGS_SDK}" STREQUAL "OSX")
       if(DEFINED maccatalyst_build_flavor)
@@ -84,7 +83,7 @@ function(_add_target_variant_c_compile_link_flags)
   endif()
 
   set(_sysroot "${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_PATH}")
-  if(IS_DARWIN)
+  if(SWIFT_SDK_${CFLAGS_SDK}_USE_ISYSROOT)
     list(APPEND result "-isysroot" "${_sysroot}")
   elseif(NOT SWIFT_COMPILER_IS_MSVC_LIKE AND NOT "${_sysroot}" STREQUAL "/")
     list(APPEND result "--sysroot=${_sysroot}")
@@ -99,7 +98,7 @@ function(_add_target_variant_c_compile_link_flags)
     endif()
   endif()
 
-  if(IS_DARWIN)
+  if("${CFLAGS_SDK}" IN_LIST SWIFT_APPLE_PLATFORMS)
     # We collate -F with the framework path to avoid unwanted deduplication
     # of options by target_compile_options -- this way no undesired
     # side effects are introduced should a new search path be added.
@@ -165,13 +164,18 @@ function(_add_target_variant_c_compile_flags)
     MACCATALYST_BUILD_FLAVOR "${CFLAGS_MACCATALYST_BUILD_FLAVOR}")
 
   is_build_type_optimized("${CFLAGS_BUILD_TYPE}" optimized)
-  if(optimized)
-    list(APPEND result "-O2")
+  is_build_type_with_debuginfo("${CFLAGS_BUILD_TYPE}" debuginfo)
 
+  # Add -O0/-O2/-O3/-Os/-g/... based on CFLAGS_BUILD_TYPE.
+  list(APPEND result "${CMAKE_CXX_FLAGS_${CFLAGS_BUILD_TYPE}}")
+
+  if(optimized)
     # Omit leaf frame pointers on x86 production builds (optimized, no debug
     # info, and no asserts).
-    is_build_type_with_debuginfo("${CFLAGS_BUILD_TYPE}" debug)
-    if(NOT debug AND NOT CFLAGS_ENABLE_ASSERTIONS)
+    if(NOT debuginfo AND NOT CFLAGS_ENABLE_ASSERTIONS)
+      # Unfortunately, this cannot be folded into the standard
+      # CMAKE_CXX_FLAGS_... because Apple multi-SDK builds use different
+      # architectures for different SDKs (CFLAGS_ARCH isn't constant here).
       if("${CFLAGS_ARCH}" STREQUAL "i386" OR "${CFLAGS_ARCH}" STREQUAL "i686")
         if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
           list(APPEND result "-momit-leaf-frame-pointer")
@@ -179,27 +183,6 @@ function(_add_target_variant_c_compile_flags)
           list(APPEND result "/Oy")
         endif()
       endif()
-    endif()
-  else()
-    if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-      list(APPEND result "-O0")
-    else()
-      list(APPEND result "/Od")
-    endif()
-  endif()
-
-  # CMake automatically adds the flags for debug info if we use MSVC/clang-cl.
-  if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-    is_build_type_with_debuginfo("${CFLAGS_BUILD_TYPE}" debuginfo)
-    if(debuginfo)
-      _compute_lto_flag("${CFLAGS_ENABLE_LTO}" _lto_flag_out)
-      if(_lto_flag_out)
-        list(APPEND result "-gline-tables-only")
-      else()
-        list(APPEND result "-g")
-      endif()
-    else()
-      list(APPEND result "-g0")
     endif()
   endif()
 
@@ -311,6 +294,22 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-D_WASI_EMULATED_MMAN")
   endif()
 
+  if(SWIFT_DISABLE_OBJC_INTEROP)
+    list(APPEND result "-DSWIFT_OBJC_INTEROP=0")
+  endif()
+
+  if(NOT SWIFT_ENABLE_COMPATIBILITY_OVERRIDES)
+    list(APPEND result "-DSWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES")
+  endif()
+
+  if(SWIFT_RUNTIME_MACHO_NO_DYLD)
+    list(APPEND result "-DSWIFT_RUNTIME_MACHO_NO_DYLD")
+  endif()
+
+  if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+    list(APPEND result "-DSWIFT_STDLIB_SINGLE_THREADED_RUNTIME")
+  endif()
+
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
 endfunction()
 
@@ -350,6 +349,8 @@ function(_add_target_variant_link_flags)
   if("${LFLAGS_SDK}" STREQUAL "LINUX")
     list(APPEND link_libraries "pthread" "dl")
   elseif("${LFLAGS_SDK}" STREQUAL "FREEBSD")
+    list(APPEND link_libraries "pthread")
+  elseif("${LFLAGS_SDK}" STREQUAL "OPENBSD")
     list(APPEND link_libraries "pthread")
   elseif("${LFLAGS_SDK}" STREQUAL "CYGWIN")
     # No extra libraries required.
@@ -477,7 +478,7 @@ function(_add_swift_lipo_target)
     list(APPEND source_binaries $<TARGET_FILE:${source_target}>)
   endforeach()
 
-  if(${LIPO_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
+  if("${SWIFT_SDK_${LIPO_SDK}_OBJECT_FORMAT}" STREQUAL "MACHO")
     if(LIPO_CODESIGN)
       set(codesign_command COMMAND "codesign" "-f" "-s" "-" "${LIPO_OUTPUT}")
     endif()
@@ -634,6 +635,9 @@ function(_add_swift_target_library_single target name)
                         "${SWIFTLIB_SINGLE_multiple_parameter_options}"
                         ${ARGN})
 
+  translate_flag(${SWIFTLIB_SINGLE_STATIC} "STATIC"
+                 SWIFTLIB_SINGLE_STATIC_keyword)
+
   # Determine macCatalyst build flavor
   get_maccatalyst_build_flavor(maccatalyst_build_flavor
     "${SWIFTLIB_SINGLE_SDK}" "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}")
@@ -763,6 +767,7 @@ function(_add_swift_target_library_single target name)
       ${SWIFTLIB_SINGLE_IS_STDLIB_CORE_keyword}
       ${SWIFTLIB_SINGLE_IS_SDK_OVERLAY_keyword}
       ${embed_bitcode_arg}
+      ${SWIFTLIB_SINGLE_STATIC_keyword}
       INSTALL_IN_COMPONENT "${SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT}"
       MACCATALYST_BUILD_FLAVOR "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}")
   add_swift_source_group("${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}")
@@ -867,6 +872,13 @@ function(_add_swift_target_library_single target name)
     endif()
   endif()
   _set_target_prefix_and_suffix("${target}" "${libkind}" "${SWIFTLIB_SINGLE_SDK}")
+
+  # Target libraries that include libDemangling must define the name to use for
+  # the inline namespace to distinguish symbols from those built for the
+  # compiler, in order to avoid possible ODR violations if both are statically
+  # linked into the same binary.
+  target_compile_definitions("${target}" PRIVATE
+                             SWIFT_INLINE_NAMESPACE=__runtime)
 
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
     swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE} SWIFTLIB_INCLUDE)
@@ -1104,6 +1116,8 @@ function(_add_swift_target_library_single target name)
       list(APPEND library_search_directories "$ENV{SDKROOT}/usr/lib/swift")
   endif()
 
+  list(APPEND library_search_directories "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/usr/lib/swift")
+
   # Add variant-specific flags.
   if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
     set(build_type "${SWIFT_STDLIB_BUILD_TYPE}")
@@ -1226,7 +1240,9 @@ function(_add_swift_target_library_single target name)
     endif()
     # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
     if(SWIFT_EMBED_BITCODE_SECTION AND NOT SWIFTLIB_SINGLE_DONT_EMBED_BITCODE)
-      if(${SWIFTLIB_SINGLE_SDK} MATCHES "(I|TV|WATCH)OS")
+      if(${SWIFTLIB_SINGLE_SDK} STREQUAL "IOS" OR
+         ${SWIFTLIB_SINGLE_SDK} STREQUAL "TVOS" OR
+         ${SWIFTLIB_SINGLE_SDK} STREQUAL "WATCHOS")
         # Please note that using a generator expression to fit
         # this in a single target_link_options does not work
         # (at least in CMake 3.15 and 3.16),

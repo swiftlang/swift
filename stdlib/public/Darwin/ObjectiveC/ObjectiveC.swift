@@ -25,8 +25,8 @@ import ObjectiveC
 /// ObjCBool.
 @frozen
 public struct ObjCBool : ExpressibleByBooleanLiteral {
-#if os(macOS) || (os(iOS) && (arch(i386) || arch(arm)))
-  // On OS X and 32-bit iOS, Objective-C's BOOL type is a "signed char".
+#if (os(macOS) && arch(x86_64)) || (os(iOS) && (arch(i386) || arch(arm)))
+  // On Intel OS X and 32-bit iOS, Objective-C's BOOL type is a "signed char".
   @usableFromInline var _value: Int8
 
   @_transparent
@@ -52,7 +52,7 @@ public struct ObjCBool : ExpressibleByBooleanLiteral {
   /// The value of `self`, expressed as a `Bool`.
   @_transparent
   public var boolValue: Bool {
-#if os(macOS) || (os(iOS) && (arch(i386) || arch(arm)))
+#if (os(macOS) && arch(x86_64)) || (os(iOS) && (arch(i386) || arch(arm)))
     return _value != 0
 #else
     return _value

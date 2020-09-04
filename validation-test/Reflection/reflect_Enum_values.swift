@@ -2,7 +2,7 @@
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/reflect_Enum_values
 // RUN: %target-codesign %t/reflect_Enum_values
 
-// RUN: %target-run %target-swift-reflection-test %t/reflect_Enum_values | tee /dev/stderr | %FileCheck %s --check-prefix=CHECK%target-ptrsize --check-prefix=CHECKALL --dump-input=fail
+// RUN: %target-run %target-swift-reflection-test %t/reflect_Enum_values | tee /dev/stderr | %FileCheck %s --check-prefix=CHECK%target-ptrsize --check-prefix=CHECKALL --dump-input=fail %add_num_extra_inhabitants
 
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
@@ -93,17 +93,17 @@ reflect(object: ManyCasesNoPayloadC())
 // CHECKALL-NEXT:       (case name=c index=2)
 // CHECKALL-NEXT:       (case name=d index=3)))
 // CHECK64-NEXT:   (field name=s offset=24
-// CHECK64-NEXT:     (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:     (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:       (field name=_guts offset=0
-// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:           (field name=_object offset=0
-// CHECK64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:               (field name=_countAndFlagsBits offset=0
 // CHECK64-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK64-NEXT:                   (field name=_value offset=0
 // CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
 // CHECK64-NEXT:               (field name=_object offset=8
-// CHECK64-NEXT:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1)))))))))
+// CHECK64-NEXT:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1)))))))))
 // CHECK32-NEXT:   (field name=s offset=12
 // CHECK32-NEXT:     (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
 // CHECK32-NEXT:       (field name=_guts offset=0
@@ -423,70 +423,70 @@ reflect(object: ManyCasesOnePayloadC())
 // CHECKALL: Type info:
 // CHECK64-NEXT: (class_instance size=80 alignment=8 stride=80 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK64-NEXT:   (field name=payload offset=16
-// CHECK64-NEXT:     (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=2147483644 bitwise_takable=1
+// CHECK64-NEXT:     (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit-3]] bitwise_takable=1
 // CHECK64-NEXT:       (case name=payload index=0 offset=0
-// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:           (field name=_guts offset=0
-// CHECK64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:               (field name=_object offset=0
-// CHECK64-NEXT:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:                   (field name=_countAndFlagsBits offset=0
 // CHECK64-NEXT:                     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK64-NEXT:                       (field name=_value offset=0
 // CHECK64-NEXT:                         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
 // CHECK64-NEXT:                   (field name=_object offset=8
-// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1))))))))
 // CHECK64-NEXT:       (case name=otherA index=1)
 // CHECK64-NEXT:       (case name=otherB index=2)
 // CHECK64-NEXT:       (case name=otherC index=3)))
 // CHECK64-NEXT:   (field name=a offset=32
-// CHECK64-NEXT:     (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=2147483644 bitwise_takable=1
+// CHECK64-NEXT:     (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit-3]] bitwise_takable=1
 // CHECK64-NEXT:       (case name=payload index=0 offset=0
-// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:           (field name=_guts offset=0
-// CHECK64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:               (field name=_object offset=0
-// CHECK64-NEXT:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:                   (field name=_countAndFlagsBits offset=0
 // CHECK64-NEXT:                     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK64-NEXT:                       (field name=_value offset=0
 // CHECK64-NEXT:                         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
 // CHECK64-NEXT:                   (field name=_object offset=8
-// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1))))))))
 // CHECK64-NEXT:       (case name=otherA index=1)
 // CHECK64-NEXT:       (case name=otherB index=2)
 // CHECK64-NEXT:       (case name=otherC index=3)))
 // CHECK64-NEXT:   (field name=b offset=48
-// CHECK64-NEXT:     (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=2147483644 bitwise_takable=1
+// CHECK64-NEXT:     (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit-3]] bitwise_takable=1
 // CHECK64-NEXT:       (case name=payload index=0 offset=0
-// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:           (field name=_guts offset=0
-// CHECK64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:               (field name=_object offset=0
-// CHECK64-NEXT:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:                   (field name=_countAndFlagsBits offset=0
 // CHECK64-NEXT:                     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK64-NEXT:                       (field name=_value offset=0
 // CHECK64-NEXT:                         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
 // CHECK64-NEXT:                   (field name=_object offset=8
-// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1))))))))
 // CHECK64-NEXT:       (case name=otherA index=1)
 // CHECK64-NEXT:       (case name=otherB index=2)
 // CHECK64-NEXT:       (case name=otherC index=3)))
 // CHECK64-NEXT:   (field name=c offset=64
-// CHECK64-NEXT:     (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=2147483644 bitwise_takable=1
+// CHECK64-NEXT:     (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit-3]] bitwise_takable=1
 // CHECK64-NEXT:       (case name=payload index=0 offset=0
-// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:           (field name=_guts offset=0
-// CHECK64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:               (field name=_object offset=0
-// CHECK64-NEXT:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:                   (field name=_countAndFlagsBits offset=0
 // CHECK64-NEXT:                     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK64-NEXT:                       (field name=_value offset=0
 // CHECK64-NEXT:                         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
 // CHECK64-NEXT:                   (field name=_object offset=8
-// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1)))))))
+// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1)))))))
 // CHECK64-NEXT:       (case name=otherA index=1)
 // CHECK64-NEXT:       (case name=otherB index=2)
 // CHECK64-NEXT:       (case name=otherC index=3)))
@@ -664,95 +664,95 @@ reflect(object: ManyCasesManyPayloadsC())
 // CHECK64-NEXT:   (field name=a offset=16
 // CHECK64-NEXT:     (multi_payload_enum size=17 alignment=8 stride=24 num_extra_inhabitants=252 bitwise_takable=1
 // CHECK64-NEXT:       (case name=a index=0 offset=0
-// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:           (field name=_guts offset=0
-// CHECK64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:               (field name=_object offset=0
-// CHECK64-NEXT:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:                   (field name=_countAndFlagsBits offset=0
 // CHECK64-NEXT:                     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK64-NEXT:                       (field name=_value offset=0
 // CHECK64-NEXT:                         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
 // CHECK64-NEXT:                   (field name=_object offset=8
-// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1))))))))
 // CHECK64-NEXT:       (case name=b index=1 offset=0
-// CHECK64-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:           (field name=_buffer offset=0
-// CHECK64-NEXT:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:               (field name=_storage offset=0
-// CHECK64-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:                   (field name=rawValue offset=0
-// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1))))))))
 // CHECK64-NEXT:       (case name=c index=2 offset=0
-// CHECK64-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:           (field name=_variant offset=0
-// CHECK64-NEXT:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:               (field name=object offset=0
-// CHECK64-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:                   (field name=rawValue offset=0
-// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1))))))))
 // CHECK64-NEXT:       (case name=extra index=3)))
 // CHECK64-NEXT:   (field name=b offset=40
 // CHECK64-NEXT:     (multi_payload_enum size=17 alignment=8 stride=24 num_extra_inhabitants=252 bitwise_takable=1
 // CHECK64-NEXT:       (case name=a index=0 offset=0
-// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:           (field name=_guts offset=0
-// CHECK64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:               (field name=_object offset=0
-// CHECK64-NEXT:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:                   (field name=_countAndFlagsBits offset=0
 // CHECK64-NEXT:                     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK64-NEXT:                       (field name=_value offset=0
 // CHECK64-NEXT:                         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
 // CHECK64-NEXT:                   (field name=_object offset=8
-// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1))))))))
 // CHECK64-NEXT:       (case name=b index=1 offset=0
-// CHECK64-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:           (field name=_buffer offset=0
-// CHECK64-NEXT:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:               (field name=_storage offset=0
-// CHECK64-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:                   (field name=rawValue offset=0
-// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1))))))))
 // CHECK64-NEXT:       (case name=c index=2 offset=0
-// CHECK64-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:           (field name=_variant offset=0
-// CHECK64-NEXT:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:               (field name=object offset=0
-// CHECK64-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:                   (field name=rawValue offset=0
-// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1))))))))
 // CHECK64-NEXT:       (case name=extra index=3)))
 // CHECK64-NEXT:   (field name=c offset=64
 // CHECK64-NEXT:     (multi_payload_enum size=17 alignment=8 stride=24 num_extra_inhabitants=252 bitwise_takable=1
 // CHECK64-NEXT:       (case name=a index=0 offset=0
-// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:           (field name=_guts offset=0
-// CHECK64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:               (field name=_object offset=0
-// CHECK64-NEXT:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:                   (field name=_countAndFlagsBits offset=0
 // CHECK64-NEXT:                     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK64-NEXT:                       (field name=_value offset=0
 // CHECK64-NEXT:                         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
 // CHECK64-NEXT:                   (field name=_object offset=8
-// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1))))))))
 // CHECK64-NEXT:       (case name=b index=1 offset=0
-// CHECK64-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:           (field name=_buffer offset=0
-// CHECK64-NEXT:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:               (field name=_storage offset=0
-// CHECK64-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:                   (field name=rawValue offset=0
-// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1))))))))
 // CHECK64-NEXT:       (case name=c index=2 offset=0
-// CHECK64-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:           (field name=_variant offset=0
-// CHECK64-NEXT:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:               (field name=object offset=0
-// CHECK64-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:                   (field name=rawValue offset=0
-// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1))))))))
 // CHECK64-NEXT:       (case name=extra index=3))))
 
 // CHECK32-NEXT: (class_instance size=44 alignment=4 stride=44 num_extra_inhabitants=0 bitwise_takable=1
@@ -1520,19 +1520,19 @@ reflect(enum: ManyCasesOneStringPayload.payload("hello, world"))
 // CHECKALL-NEXT: (enum reflect_Enum_values.ManyCasesOneStringPayload)
 
 // CHECKALL: Type info:
-// CHECK64-NEXT: (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=2147483644 bitwise_takable=1
+// CHECK64-NEXT: (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit-3]] bitwise_takable=1
 // CHECK64-NEXT:   (case name=payload index=0 offset=0
-// CHECK64-NEXT:     (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:     (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:       (field name=_guts offset=0
-// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:           (field name=_object offset=0
-// CHECK64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:               (field name=_countAndFlagsBits offset=0
 // CHECK64-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK64-NEXT:                   (field name=_value offset=0
 // CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
 // CHECK64-NEXT:               (field name=_object offset=8
-// CHECK64-NEXT:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK64-NEXT:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1))))))))
 // CHECK64-NEXT:   (case name=otherA index=1)
 // CHECK64-NEXT:   (case name=otherB index=2)
 // CHECK64-NEXT:   (case name=otherC index=3))
@@ -1590,19 +1590,19 @@ reflect(enum: ManyCasesOneStringPayload.otherB)
 // CHECKALL-NEXT: (enum reflect_Enum_values.ManyCasesOneStringPayload)
 
 // CHECKALL: Type info:
-// CHECK64-NEXT: (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=2147483644 bitwise_takable=1
+// CHECK64-NEXT: (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit-3]] bitwise_takable=1
 // CHECK64-NEXT:   (case name=payload index=0 offset=0
-// CHECK64-NEXT:     (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:     (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:       (field name=_guts offset=0
-// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:           (field name=_object offset=0
-// CHECK64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK64-NEXT:               (field name=_countAndFlagsBits offset=0
 // CHECK64-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK64-NEXT:                   (field name=_value offset=0
 // CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
 // CHECK64-NEXT:               (field name=_object offset=8
-// CHECK64-NEXT:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK64-NEXT:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1))))))))
 // CHECK64-NEXT:   (case name=otherA index=1)
 // CHECK64-NEXT:   (case name=otherB index=2)
 // CHECK64-NEXT:   (case name=otherC index=3))

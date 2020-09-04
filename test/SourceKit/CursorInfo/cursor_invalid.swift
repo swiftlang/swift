@@ -24,8 +24,12 @@ func resyncParser2() {}
 
 Swift(label: 3)
 
-enum Outer {
-  case Inner(IDontExist)
+enum Outer1 {
+  case Inner1(IDontExist)
+}
+
+enum Outer2 {
+  case Inner2(x: Undefined)
 }
 
 // RUN: %sourcekitd-test -req=cursor -pos=4:13 %s -- %s | %FileCheck -check-prefix=CHECK1 %s
@@ -68,6 +72,10 @@ enum Outer {
 
 // RUN: %sourcekitd-test -req=cursor -pos=25:7 %s -- %s | %FileCheck -check-prefix=DIAG %s
 
-// RUN: %sourcekitd-test -req=cursor -pos=28:8 %s -- %s | %FileCheck -check-prefix=INVALID_ENUM %s
-// INVALID_ENUM: source.lang.swift.decl.enumelement (28:8-28:13)
-// INVALID_ENUM: Inner(_:)
+// RUN: %sourcekitd-test -req=cursor -pos=28:8 %s -- %s | %FileCheck -check-prefix=INVALID_ENUM1 %s
+// INVALID_ENUM1: source.lang.swift.decl.enumelement (28:8-28:14)
+// INVALID_ENUM1: Inner1(_:)
+
+// RUN: %sourcekitd-test -req=cursor -pos=32:8 %s -- %s | %FileCheck -check-prefix=INVALID_ENUM2 %s
+// INVALID_ENUM2: source.lang.swift.decl.enumelement (32:8-32:14)
+// INVALID_ENUM2: Inner2(x:)

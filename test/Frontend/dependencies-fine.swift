@@ -6,12 +6,12 @@
 
 // RUN: %target-swift-frontend -emit-dependencies-path - -resolve-imports "%S/../Inputs/empty file.swift" | %FileCheck -check-prefix=CHECK-BASIC %s
 // RUN: %target-swift-frontend -emit-reference-dependencies-path - -typecheck -primary-file "%S/../Inputs/empty file.swift" > %t.swiftdeps
-// RUN: %S/../Inputs/process_fine_grained_swiftdeps.sh <%t.swiftdeps >%t-processed.swiftdeps
+// RUN: %S/../Inputs/process_fine_grained_swiftdeps.sh %swift-dependency-tool %t.swiftdeps %t-processed.swiftdeps
 // RUN: %FileCheck -check-prefix=CHECK-BASIC-YAML %s <%t-processed.swiftdeps
 
 // RUN: %target-swift-frontend -emit-dependencies-path %t.d -emit-reference-dependencies-path %t.swiftdeps -typecheck -primary-file "%S/../Inputs/empty file.swift"
 // RUN: %FileCheck -check-prefix=CHECK-BASIC %s < %t.d
-// RUN: %S/../Inputs/process_fine_grained_swiftdeps.sh <%t.swiftdeps >%t-processed.swiftdeps
+// RUN: %S/../Inputs/process_fine_grained_swiftdeps.sh %swift-dependency-tool %t.swiftdeps %t-processed.swiftdeps
 // RUN: %FileCheck -check-prefix=CHECK-BASIC-YAML %s < %t-processed.swiftdeps
 
 // CHECK-BASIC-LABEL: - :
@@ -48,7 +48,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/dependencies/extra-header.h -track-system-dependencies -emit-dependencies-path - -resolve-imports %s | %FileCheck -check-prefix=CHECK-IMPORT-TRACK-SYSTEM %s
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-reference-dependencies-path %t.swiftdeps -typecheck -primary-file %s
-// RUN: %S/../Inputs/process_fine_grained_swiftdeps.sh <%t.swiftdeps >%t-processed.swiftdeps
+// RUN: %S/../Inputs/process_fine_grained_swiftdeps.sh %swift-dependency-tool %t.swiftdeps %t-processed.swiftdeps
 // RUN: %FileCheck -check-prefix=CHECK-IMPORT-YAML %s <%t-processed.swiftdeps
 
 // CHECK-IMPORT-LABEL: - :

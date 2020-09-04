@@ -794,8 +794,9 @@ class TargetFunctionTypeFlags {
     ThrowsMask        = 0x01000000U,
     ParamFlagsMask    = 0x02000000U,
     EscapingMask      = 0x04000000U,
-    DifferentiableMask  = 0x08000000U,
-    LinearMask          = 0x10000000U
+    DifferentiableMask = 0x08000000U,
+    LinearMask        = 0x10000000U,
+    AsyncMask         = 0x20000000U,
   };
   int_type Data;
   
@@ -813,7 +814,13 @@ public:
     return TargetFunctionTypeFlags((Data & ~ConventionMask)
                              | (int_type(c) << ConventionShift));
   }
-  
+
+  constexpr TargetFunctionTypeFlags<int_type>
+  withAsync(bool async) const {
+    return TargetFunctionTypeFlags<int_type>((Data & ~AsyncMask) |
+                                             (async ? AsyncMask : 0));
+  }
+
   constexpr TargetFunctionTypeFlags<int_type>
   withThrows(bool throws) const {
     return TargetFunctionTypeFlags<int_type>((Data & ~ThrowsMask) |
@@ -847,10 +854,10 @@ public:
   FunctionMetadataConvention getConvention() const {
     return FunctionMetadataConvention((Data&ConventionMask) >> ConventionShift);
   }
-  
-  bool throws() const {
-    return bool(Data & ThrowsMask);
-  }
+
+  bool isAsync() const { return bool(Data & AsyncMask); }
+
+  bool isThrowing() const { return bool(Data & ThrowsMask); }
 
   bool isEscaping() const {
     return bool (Data & EscapingMask);
@@ -1118,6 +1125,9 @@ namespace SpecialPointerAuthDiscriminators {
   /// Runtime function variables exported by the runtime.
   const uint16_t RuntimeFunctionEntry = 0x625b;
 
+  /// Protocol conformance descriptors.
+  const uint16_t ProtocolConformanceDescriptor = 0xc6eb;
+
   /// Value witness functions.
   const uint16_t InitializeBufferWithCopyOfBuffer = 0xda4a;
   const uint16_t Destroy = 0x04f8;
@@ -1316,6 +1326,10 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     /// Meaningful for all type-descriptor kinds.
     HasImportInfo = 2,
 
+    /// Set if the type descriptor has a pointer to a list of canonical 
+    /// prespecializations.
+    HasCanonicalMetadataPrespecializations = 3,
+
     // Type-specific flags:
 
     /// The kind of reference that this class makes to its resilient superclass
@@ -1382,6 +1396,8 @@ public:
   }
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(HasImportInfo, hasImportInfo, setHasImportInfo)
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(HasCanonicalMetadataPrespecializations, hasCanonicalMetadataPrespecializations, setHasCanonicalMetadataPrespecializations)
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasVTable,
                                 class_hasVTable,

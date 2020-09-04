@@ -4,6 +4,10 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5 -I %t -verify-ignore-unknown
 
 // REQUIRES: objc_interop
+
+// FIXME(rdar://64425653): We should re-enable this test for other platforms.
+// REQUIRES: OS=macosx
+
 import Foundation
 import PrivateObjC
 
@@ -338,7 +342,7 @@ func testOverloadedWithUnavailable(ao: AnyObject) {
 
 func dynamicInitCrash(ao: AnyObject.Type) {
   let sdk = ao.init(blahblah: ())
-  // expected-error@-1 {{incorrect argument label in call (have 'blahblah:', expected 'toMemory:')}}
+  // expected-error@-1 {{no exact matches in call to initializer}}
 }
 
 // Test that we correctly diagnose ambiguity for different typed members available

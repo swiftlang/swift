@@ -10,12 +10,14 @@ func garbage() -> () {
   var a : Int
   ) this line is invalid, but we will stop at the keyword below... // expected-error{{expected expression}}
   return a + "a" // expected-error{{binary operator '+' cannot be applied to operands of type 'Int' and 'String'}} expected-note {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (String, String)}}
+  // expected-error@-1 {{no '+' candidates produce the expected contextual result type '()'}}
 }
 
 func moreGarbage() -> () {
   ) this line is invalid, but we will stop at the declaration... // expected-error{{expected expression}}
   func a() -> Int { return 4 }
   return a() + "a" // expected-error{{binary operator '+' cannot be applied to operands of type 'Int' and 'String'}} expected-note {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (String, String)}}
+  // expected-error@-1 {{no '+' candidates produce the expected contextual result type '()'}}
 }
 
 
@@ -677,12 +679,13 @@ func a(s: S[{{g) -> Int {} // expected-note {{to match this opening '['}}
 }}} // expected-error {{expected ']' in array type}}
 #endif
   
-  
-  
 // rdar://19605567
-// expected-error@+3{{expected '(' for initializer parameters}}
-// expected-error@+2{{initializers may only be declared within a type}}
-// expected-error@+1{{expected an identifier to name generic parameter}}
+// expected-error@+6{{expected '(' for initializer parameters}}
+// expected-error@+5{{initializers may only be declared within a type}}
+// expected-error@+4{{expected an identifier to name generic parameter}}
+// expected-error@+3{{consecutive statements on a line must be separated by ';'}}
+// expected-error@+2{{expected expression}}
+// expected-error@+1{{extraneous '}' at top level}}
 func F() { init<( } )} // expected-note 2{{did you mean 'F'?}}
 
 struct InitializerWithName {
@@ -857,3 +860,16 @@ func SR11006(a: Int == 0) {}
 // rdar://38225184
 extension Collection where Element == Int && Index == Int {}
 // expected-error@-1 {{expected ',' to separate the requirements of this 'where' clause}} {{43-45=,}}
+
+func testSkipUnbalancedParen() {
+  ?( // expected-error {{expected expression}}
+}
+func testSkipToFindOpenBrace1() {
+  // expected-error@+3 {{expected pattern}}
+  // expected-error@+2 {{variable binding in a condition requires an initializer}}
+  // expected-error@+1 {{expected '{' after 'if' condition}}
+  do { if case }
+}
+func testSkipToFindOpenBrace2() {
+  do { if true {} else false } // expected-error {{expected '{' or 'if' after 'else'}}
+}

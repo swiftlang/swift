@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend -diagnostic-style=swift -typecheck %s 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend -diagnostic-style=swift -typecheck %/s 2>&1 | %FileCheck %s
 
 1 + 2
 

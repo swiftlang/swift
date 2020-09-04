@@ -153,3 +153,21 @@ func rdar_49159472() {
     func baz(e: E) {}
   }
 }
+
+struct EnumElementPatternFromContextualType<T> {
+  enum E {
+    case plain
+    case payload(T)
+  }
+
+  func foo(x: Any) where T == EnumElementPatternFromContextualType<Bool>.E {
+    switch x {
+    case T.plain: // Ok
+      break
+    case T.payload(true): // Ok
+      break
+    default:
+      break
+    }
+  }
+}

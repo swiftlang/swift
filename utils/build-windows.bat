@@ -97,6 +97,7 @@ git clone --depth 1 --single-branch https://github.com/apple/swift-cmark cmark %
 git clone --depth 1 --single-branch --branch swift/master https://github.com/apple/llvm-project llvm-project %exitOnError%
 mklink /D "%source_root%\clang" "%source_root%\llvm-project\clang"
 mklink /D "%source_root%\llvm" "%source_root%\llvm-project\llvm"
+mklink /D "%source_root%\lld" "%source_root%\llvm-project\lld"
 mklink /D "%source_root%\lldb" "%source_root%\llvm-project\lldb"
 mklink /D "%source_root%\compiler-rt" "%source_root%\llvm-project\compiler-rt"
 mklink /D "%source_root%\libcxx" "%source_root%\llvm-project\libcxx"
@@ -165,7 +166,7 @@ cmake^
     -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-windows-msvc^
     -DLLVM_ENABLE_PDB:BOOL=YES^
     -DLLVM_ENABLE_ASSERTIONS:BOOL=YES^
-    -DLLVM_ENABLE_PROJECTS:STRING=clang^
+    -DLLVM_ENABLE_PROJECTS:STRING=lld;clang^
     -DLLVM_TARGETS_TO_BUILD:STRING="AArch64;ARM;X86"^
     -DLLVM_INCLUDE_BENCHMARKS:BOOL=NO^
     -DLLVM_INCLUDE_DOCS:BOOL=NO^
@@ -175,6 +176,7 @@ cmake^
     -DLLVM_ENABLE_OCAMLDOC:BOOL=NO^
     -DLLVM_ENABLE_LIBXML2:BOOL=NO^
     -DLLVM_ENABLE_ZLIB:BOOL=NO^
+    -DLLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN=ON^
     -DENABLE_X86_RELAX_RELOCATIONS:BOOL=YES^
     -DLLVM_INSTALL_BINUTILS_SYMLINKS:BOOL=YES^
     -DLLVM_INSTALL_TOOLCHAIN_ONLY:BOOL=YES^
@@ -231,6 +233,7 @@ cmake^
     -DSWIFT_PATH_TO_CMARK_SOURCE:PATH=%source_root%\cmark^
     -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE:PATH=%source_root%\swift-corelibs-libdispatch^
     -DLLVM_DIR:PATH=%build_root%\llvm\lib\cmake\llvm^
+    -DLLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN=ON^
     -DSWIFT_INCLUDE_DOCS:BOOL=NO^
     -DSWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE:PATH=%source_root%\icu-%icu_version%\include\unicode^
     -DSWIFT_WINDOWS_x86_64_ICU_UC:PATH=%source_root%\icu-%icu_version%\lib64\icuuc.lib^
@@ -276,8 +279,8 @@ cmake^
     -B "%build_root%\lldb"^
     -G Ninja^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
-    -DCMAKE_C_COMPILER=clang-cl^
-    -DCMAKE_CXX_COMPILER=clang-cl^
+    -DCMAKE_C_COMPILER=cl^
+    -DCMAKE_CXX_COMPILER=cl^
     -DCMAKE_INSTALL_PREFIX:PATH=%install_directory%^
     -DLLVM_DIR:PATH=%build_root%\llvm\lib\cmake\llvm^
     -DClang_DIR:PATH=%build_root%\llvm\lib\cmake\clang^
@@ -290,6 +293,7 @@ cmake^
     -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
     -DLLDB_DISABLE_PYTHON=YES^
     -DLLDB_INCLUDE_TESTS:BOOL=NO^
+    -DLLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN=ON^
     -S "%source_root%\lldb" %exitOnError%
 
 cmake --build "%build_root%\lldb" %exitOnError%

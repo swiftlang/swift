@@ -3,9 +3,9 @@
 // RUN: %target-swift-frontend -emit-module -primary-file %s %S/Inputs/sil-merge-partial-modules-other.swift -module-name test -enable-library-evolution -o %t/partial.a.swiftmodule
 // RUN: %target-swift-frontend -emit-module %s -primary-file %S/Inputs/sil-merge-partial-modules-other.swift -module-name test -enable-library-evolution -o %t/partial.b.swiftmodule
 
-// RUN: %target-swift-frontend -emit-module %t/partial.a.swiftmodule %t/partial.b.swiftmodule -module-name test -enable-library-evolution -sil-merge-partial-modules -disable-diagnostic-passes -disable-sil-perf-optzns -o %t/test.swiftmodule
+// RUN: %target-swift-frontend -merge-modules -emit-module %t/partial.a.swiftmodule %t/partial.b.swiftmodule -module-name test -enable-library-evolution -o %t/test.swiftmodule
 
-// RUN: %target-sil-opt %t/test.swiftmodule -disable-sil-linking -emit-sorted-sil > %t/dump.sil
+// RUN: %target-sil-opt %t/test.swiftmodule -emit-sorted-sil > %t/dump.sil
 // RUN: %FileCheck %s < %t/dump.sil
 // RUN: %FileCheck %s --check-prefix=NEGATIVE < %t/dump.sil
 

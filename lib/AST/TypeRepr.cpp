@@ -171,6 +171,9 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
     Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
     Printer << " ";
   }
+
+  if (hasAttr(TAK_async))
+    Printer.printSimpleAttr("@async") << " ";
 }
 
 IdentTypeRepr *IdentTypeRepr::create(ASTContext &C,
@@ -221,7 +224,7 @@ void FunctionTypeRepr::printImpl(ASTPrinter &Printer,
                                  const PrintOptions &Opts) const {
   Printer.callPrintStructurePre(PrintStructureKind::FunctionType);
   printTypeRepr(ArgsTy, Printer, Opts);
-  if (throws()) {
+  if (isThrowing()) {
     Printer << " ";
     Printer.printKeyword("throws", Opts);
   }
@@ -454,14 +457,14 @@ void SILBoxTypeRepr::printImpl(ASTPrinter &Printer,
 // linkage dependency.
 
 struct TypeReprTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
-  void traceName(const void *Entity, raw_ostream &OS) const {
+  void traceName(const void *Entity, raw_ostream &OS) const override {
     if (!Entity)
       return;
     const TypeRepr *TR = static_cast<const TypeRepr *>(Entity);
     TR->print(OS);
   }
   void traceLoc(const void *Entity, SourceManager *SM,
-                clang::SourceManager *CSM, raw_ostream &OS) const {
+                clang::SourceManager *CSM, raw_ostream &OS) const override {
     if (!Entity)
       return;
     const TypeRepr *TR = static_cast<const TypeRepr *>(Entity);

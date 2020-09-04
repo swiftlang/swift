@@ -350,8 +350,7 @@ getParameterTypes(AnyFunctionType::CanParamArrayRef params) {
 static CanAnyFunctionType getBridgedBlockType(SILGenModule &SGM,
                                               CanAnyFunctionType blockType) {
   return SGM.Types.getBridgedFunctionType(AbstractionPattern(blockType),
-                                         blockType, blockType->getExtInfo(),
-                                         Bridgeability::Full);
+                                          blockType, Bridgeability::Full);
 }
 
 static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
@@ -574,7 +573,7 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
     // context. Currently we don't capture anything directly into a block but a
     // Swift closure, but that's totally dumb.
     if (genericSig)
-      extInfo = extInfo.withIsPseudogeneric();
+      extInfo = extInfo.intoBuilder().withIsPseudogeneric().build();
   }
 
   auto invokeTy = SILFunctionType::get(
@@ -1469,7 +1468,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
       // If @objc was inferred based on the Swift 3 @objc inference rules, emit
       // a call to Builtin.swift3ImplicitObjCEntrypoint() to enable runtime
       // logging of the uses of such entrypoints.
-      if (attr->isSwift3Inferred() && !decl->isObjCDynamic()) {
+      if (attr->isSwift3Inferred() && !decl->shouldUseObjCDispatch()) {
         // Get the starting source location of the declaration so we can say
         // exactly where to stick '@objc'.
         SourceLoc objcInsertionLoc =

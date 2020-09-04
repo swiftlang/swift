@@ -685,6 +685,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::FunctionRefInst:
   case SILInstructionKind::AllocGlobalInst:
   case SILInstructionKind::GlobalAddrInst:
+  case SILInstructionKind::BaseAddrForOffsetInst:
   case SILInstructionKind::EndLifetimeInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:
     return InlineCost::Free;
@@ -713,6 +714,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::UncheckedAddrCastInst:
   case SILInstructionKind::UncheckedTrivialBitCastInst:
   case SILInstructionKind::UncheckedBitwiseCastInst:
+  case SILInstructionKind::UncheckedValueCastInst:
 
   case SILInstructionKind::RawPointerToRefInst:
   case SILInstructionKind::RefToRawPointerInst:

@@ -30,7 +30,6 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/Support/Compiler.h"
-#include <algorithm>
 
 using namespace swift;
 using namespace namelookup;
@@ -82,6 +81,15 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
   // Someday, just use the assertion below. For now, print out lots of info for
   // debugging.
   if (!startingScope) {
+
+    // Be lenient in code completion mode. There are cases where the decl
+    // context doesn't match with the ASTScope. e.g. dangling attributes.
+    // FIXME: Create ASTScope tree even for invalid code.
+    if (innermost &&
+        startingContext->getASTContext().SourceMgr.hasCodeCompletionBuffer()) {
+      return innermost;
+    }
+
     llvm::errs() << "ASTScopeImpl: resorting to startingScope hack, file: "
                  << sourceFile->getFilename() << "\n";
     // The check is costly, and inactive lookups will end up here, so don't
@@ -143,33 +151,40 @@ bool ASTScopeImpl::checkSourceRangeOfThisASTNode() const {
   return true;
 }
 
+/// If the \p loc is in a new buffer but \p range is not, consider the location
+/// is at the start of replaced range. Otherwise, returns \p loc as is.
+static SourceLoc translateLocForReplacedRange(SourceManager &sourceMgr,
+                                              SourceRange range,
+                                              SourceLoc loc) {
+  if (const auto &replacedRange = sourceMgr.getReplacedRange()) {
+    if (sourceMgr.rangeContainsTokenLoc(replacedRange.New, loc) &&
+        !sourceMgr.rangeContains(replacedRange.New, range)) {
+      return replacedRange.Original.Start;
+    }
+  }
+  return loc;
+}
+
 NullablePtr<ASTScopeImpl>
 ASTScopeImpl::findChildContaining(SourceLoc loc,
                                   SourceManager &sourceMgr) const {
   // Use binary search to find the child that contains this location.
-  struct CompareLocs {
-    SourceManager &sourceMgr;
+  auto *const *child = llvm::lower_bound(
+      getChildren(), loc,
+      [&sourceMgr](const ASTScopeImpl *scope, SourceLoc loc) {
+        ASTScopeAssert(scope->checkSourceRangeOfThisASTNode(), "Bad range.");
+        auto rangeOfScope = scope->getSourceRangeOfScope();
+        loc = translateLocForReplacedRange(sourceMgr, rangeOfScope, loc);
+        return -1 == ASTScopeImpl::compare(rangeOfScope, loc, sourceMgr,
+                                           /*ensureDisjoint=*/false);
+      });
 
-    bool operator()(const ASTScopeImpl *scope, SourceLoc loc) {
-      ASTScopeAssert(scope->checkSourceRangeOfThisASTNode(), "Bad range.");
-      return -1 == ASTScopeImpl::compare(scope->getSourceRangeOfScope(), loc,
-                                         sourceMgr,
-                                         /*ensureDisjoint=*/false);
-    }
-    bool operator()(SourceLoc loc, const ASTScopeImpl *scope) {
-      ASTScopeAssert(scope->checkSourceRangeOfThisASTNode(), "Bad range.");
-      // Alternatively, we could check that loc < start-of-scope
-      return 0 >= ASTScopeImpl::compare(loc, scope->getSourceRangeOfScope(),
-                                        sourceMgr,
-                                        /*ensureDisjoint=*/false);
-    }
-  };
-  auto *const *child = std::lower_bound(
-      getChildren().begin(), getChildren().end(), loc, CompareLocs{sourceMgr});
-
-  if (child != getChildren().end() &&
-      sourceMgr.rangeContainsTokenLoc((*child)->getSourceRangeOfScope(), loc))
-    return *child;
+  if (child != getChildren().end()) {
+    auto rangeOfScope = (*child)->getSourceRangeOfScope();
+    loc = translateLocForReplacedRange(sourceMgr, rangeOfScope, loc);
+    if (sourceMgr.rangeContainsTokenLoc(rangeOfScope, loc))
+      return *child;
+  }
 
   return nullptr;
 }
@@ -292,7 +307,10 @@ NullablePtr<const GenericParamList> GenericTypeScope::genericParams() const {
   // Sigh... These must be here so that from body, we search generics before
   // members. But they also must be on the Decl scope for lookups starting from
   // generic parameters, where clauses, etc.
-  return getGenericContext()->getGenericParams();
+  auto *context = getGenericContext();
+  if (isa<TypeAliasDecl>(context))
+    return context->getParsedGenericParams();
+  return context->getGenericParams();
 }
 NullablePtr<const GenericParamList> ExtensionScope::genericParams() const {
   return decl->getGenericParams();
@@ -365,6 +383,22 @@ bool GenericTypeOrExtensionWhereOrBodyPortion::lookupMembersOf(
                                              history, initialIsCascadingUse)
                                       .getValueOr(true);
                                 });
+}
+
+bool GenericTypeOrExtensionWherePortion::lookupMembersOf(
+    const GenericTypeOrExtensionScope *scope,
+    ArrayRef<const ASTScopeImpl *> history,
+    ASTScopeImpl::DeclConsumer consumer) const {
+  if (!scope->areMembersVisibleFromWhereClause())
+    return false;
+
+  return GenericTypeOrExtensionWhereOrBodyPortion::lookupMembersOf(
+    scope, history, consumer);
+}
+
+bool GenericTypeOrExtensionScope::areMembersVisibleFromWhereClause() const {
+  auto *decl = getDecl();
+  return isa<ProtocolDecl>(decl) || isa<ExtensionDecl>(decl);
 }
 
 #pragma mark looking in locals or members - locals
@@ -485,7 +519,7 @@ bool BraceStmtScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
 bool PatternEntryInitializerScope::lookupLocalsOrMembers(
     ArrayRef<const ASTScopeImpl *>, DeclConsumer consumer) const {
   // 'self' is available within the pattern initializer of a 'lazy' variable.
-  auto *initContext = cast_or_null<PatternBindingInitializer>(
+  auto *initContext = dyn_cast_or_null<PatternBindingInitializer>(
       decl->getInitContext(0));
   if (initContext) {
     if (auto *selfParam = initContext->getImplicitSelfDecl()) {
@@ -782,7 +816,7 @@ Optional<bool> ClosureBodyScope::resolveIsCascadingUseForThisScope(
 Optional<bool> PatternEntryInitializerScope::resolveIsCascadingUseForThisScope(
     Optional<bool> isCascadingUse) const {
   auto *const initContext = getPatternEntry().getInitContext();
-  auto *PBI = cast_or_null<PatternBindingInitializer>(initContext);
+  auto *PBI = dyn_cast_or_null<PatternBindingInitializer>(initContext);
   auto *isd = PBI ? PBI->getImplicitSelfDecl() : nullptr;
 
   // 'self' is available within the pattern initializer of a 'lazy' variable.
@@ -832,4 +866,85 @@ bool isLocWithinAnInactiveClause(const SourceLoc loc, SourceFile *SF) {
   InactiveClauseTester tester(loc, SF->getASTContext().SourceMgr);
   SF->walk(tester);
   return tester.wasFoundWithinInactiveClause;
+}
+
+#pragma mark isLabeledStmtLookupTerminator implementations
+bool ASTScopeImpl::isLabeledStmtLookupTerminator() const {
+  return true;
+}
+
+bool LookupParentDiversionScope::isLabeledStmtLookupTerminator() const {
+  return false;
+}
+
+bool ConditionalClauseScope::isLabeledStmtLookupTerminator() const {
+  return false;
+}
+
+bool ConditionalClausePatternUseScope::isLabeledStmtLookupTerminator() const {
+  return false;
+}
+
+bool AbstractStmtScope::isLabeledStmtLookupTerminator() const {
+  return false;
+}
+
+bool ForEachPatternScope::isLabeledStmtLookupTerminator() const {
+  return false;
+}
+
+llvm::SmallVector<LabeledStmt *, 4>
+ASTScopeImpl::lookupLabeledStmts(SourceFile *sourceFile, SourceLoc loc) {
+  // Find the innermost scope from which to start our search.
+  auto *const fileScope = sourceFile->getScope().impl;
+  const auto *innermost = fileScope->findInnermostEnclosingScope(loc, nullptr);
+  ASTScopeAssert(innermost->getWasExpanded(),
+                 "If looking in a scope, it must have been expanded.");
+
+  llvm::SmallVector<LabeledStmt *, 4> labeledStmts;
+  for (auto scope = innermost; scope && !scope->isLabeledStmtLookupTerminator();
+       scope = scope->getParent().getPtrOrNull()) {
+    // If we have a labeled statement, record it.
+    auto stmt = scope->getStmtIfAny();
+    if (!stmt) continue;
+
+    auto labeledStmt = dyn_cast<LabeledStmt>(stmt.get());
+    if (!labeledStmt) continue;
+
+    // Skip guard statements; they aren't actually targets for break or
+    // continue.
+    if (isa<GuardStmt>(labeledStmt)) continue;
+
+    labeledStmts.push_back(labeledStmt);
+  }
+
+  return labeledStmts;
+}
+
+std::pair<CaseStmt *, CaseStmt *> ASTScopeImpl::lookupFallthroughSourceAndDest(
+    SourceFile *sourceFile, SourceLoc loc) {
+  // Find the innermost scope from which to start our search.
+  auto *const fileScope = sourceFile->getScope().impl;
+  const auto *innermost = fileScope->findInnermostEnclosingScope(loc, nullptr);
+  ASTScopeAssert(innermost->getWasExpanded(),
+                 "If looking in a scope, it must have been expanded.");
+
+  // Look for the enclosing case statement of a 'switch'.
+  for (auto scope = innermost; scope && !scope->isLabeledStmtLookupTerminator();
+       scope = scope->getParent().getPtrOrNull()) {
+    // If we have a case statement, record it.
+    auto stmt = scope->getStmtIfAny();
+    if (!stmt) continue;
+
+    // If we've found the first case statement of a switch, record it as the
+    // fallthrough source. do-catch statements don't support fallthrough.
+    if (auto caseStmt = dyn_cast<CaseStmt>(stmt.get())) {
+      if (caseStmt->getParentKind() == CaseParentKind::Switch)
+        return { caseStmt, caseStmt->findNextCaseStmt() };
+
+      continue;
+    }
+  }
+
+  return { nullptr, nullptr };
 }

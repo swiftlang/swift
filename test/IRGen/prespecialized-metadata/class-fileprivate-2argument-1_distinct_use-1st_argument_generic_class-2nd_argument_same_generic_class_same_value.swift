@@ -1,6 +1,6 @@
 // RUN: %swift -prespecialize-generic-metadata -target %module-target-future -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize -DALIGNMENT=%target-alignment --check-prefix=CHECK --check-prefix=CHECK-%target-vendor
 
-// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos || OS=linux-gnu
+// REQUIRES: VENDOR=apple || OS=linux-gnu
 // UNSUPPORTED: CPU=i386 && OS=ios
 // UNSUPPORTED: CPU=armv7 && OS=ios
 // UNSUPPORTED: CPU=armv7s && OS=ios
@@ -228,90 +228,6 @@ doit()
 //      CHECK: entry:
 //      CHECK:   [[ERASED_ARGUMENT1:%[0-9]+]] = bitcast %swift.type* [[ARGUMENT1_METADATA]] to i8*
 //      CHECK:   [[ERASED_ARGUMENT2:%[0-9]+]] = bitcast %swift.type* [[ARGUMENT2_METADATA]] to i8*
-//      CHECK:   br label %[[TYPE_COMPARISON_LABEL:[0-9]+]]
-//      CHECK: [[TYPE_COMPARISON_LABEL]]:
-//      CHECK:   [[EQUAL_TYPE_1:%[0-9]+]] = icmp eq i8* bitcast (
-//           :     %swift.type* getelementptr inbounds (
-//           :       %swift.full_heapmetadata,
-//           :       %swift.full_heapmetadata* bitcast (
-//           :         <{
-//           :           void (
-//           :             %T4main9Argument1[[UNIQUE_ID_1]]LLC*
-//           :           )*,
-//           :           i8**,
-//           :           [[INT]],
-//           :           %objc_class*,
-//           :           %swift.opaque*,
-//           :           %swift.opaque*,
-//           :           [[INT]],
-//           :           i32,
-//           :           i32,
-//           :           i32,
-//           :           i16,
-//           :           i16,
-//           :           i32,
-//           :           i32,
-//           :           %swift.type_descriptor*,
-//           :           i8*,
-//           :           %swift.type*,
-//           :           [[INT]],
-//           :           %T4main9Argument1[[UNIQUE_ID_1]]LLC* (
-//           :             %swift.opaque*,
-//           :             %swift.type*
-//           :           )*
-//           :         }>* 
-// CHECK-SAME:         @"$s4main9Argument1[[UNIQUE_ID_1]]LLCySiGMf" 
-//           :         to %swift.full_heapmetadata*
-//           :       ),
-//           :       i32 0,
-//           :       i32 2
-//           :     ) to i8*
-// CHECK-SAME:   ), [[ERASED_ARGUMENT1]]
-//      CHECK:   [[EQUAL_TYPES_1:%[0-9]+]] = and i1 true, [[EQUAL_TYPE_1]]
-//      CHECK:   [[EQUAL_TYPE_2:%[0-9]+]] = icmp eq i8* bitcast (
-//           :     %swift.type* getelementptr inbounds (
-//           :       %swift.full_heapmetadata,
-//           :       %swift.full_heapmetadata* bitcast (
-//           :         <{
-//           :           void (
-//           :             %T4main9Argument1[[UNIQUE_ID_1]]LLC*
-//           :           )*,
-//           :           i8**,
-//           :           [[INT]],
-//           :           %objc_class*,
-//           :           %swift.opaque*,
-//           :           %swift.opaque*,
-//           :           [[INT]],
-//           :           i32,
-//           :           i32,
-//           :           i32,
-//           :           i16,
-//           :           i16,
-//           :           i32,
-//           :           i32,
-//           :           %swift.type_descriptor*,
-//           :           i8*,
-//           :           %swift.type*,
-//           :           [[INT]],
-//           :           %T4main9Argument1[[UNIQUE_ID_1]]LLC* (
-//           :             %swift.opaque*,
-//           :             %swift.type*
-//           :           )*
-// CHECK-SAME:         }>* @"$s4main9Argument1[[UNIQUE_ID_1]]LLCySiGMf" to %swift.full_heapmetadata*
-//           :       ),
-//           :       i32 0,
-//           :       i32 2
-//           :     ) to i8*
-//           :   ), [[ERASED_ARGUMENT2]]
-//      CHECK:   [[EQUAL_TYPES_2:%[0-9]+]] = and i1 [[EQUAL_TYPES_1]], [[EQUAL_TYPE_2]]
-//      CHECK:   br i1 [[EQUAL_TYPES_2]], label %[[EXIT_PRESPECIALIZED:[0-9]+]], label %[[EXIT_NORMAL:[0-9]+]]
-//      CHECK: [[EXIT_PRESPECIALIZED]]:
-//      CHECK-NEXT:   [[METADATA_RESPONSE:%[0-9]+]] = call swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_3:[0-9A-Z_]+]]LLCyAA9Argument1ACLLCySiGAGGMb"([[INT]] [[METADATA_REQUEST]])
-//      CHECK:   [[METADATA:%[0-9]+]] = extractvalue %swift.metadata_response [[METADATA_RESPONSE]], 0
-//      CHECK:   [[PARTIAL_RESULT_METADATA:%[\" a-zA-Z0-9]+]] = insertvalue %swift.metadata_response undef, %swift.type* [[METADATA]], 0
-//      CHECK:   [[RESULT_METADATA:%[\" a-zA-Z0-9]+]] = insertvalue %swift.metadata_response [[PARTIAL_RESULT_METADATA]], [[INT]] 0, 1
-//      CHECK:   ret %swift.metadata_response [[RESULT_METADATA]] 
-//      CHECK: [[EXIT_NORMAL]]:
 //      CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata(
 //      CHECK:     [[INT]] [[METADATA_REQUEST]], 
 //      CHECK:     i8* [[ERASED_ARGUMENT1]], 
@@ -329,8 +245,8 @@ doit()
 
 //             CHECK: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_4]]LLCyAA9Argument1ACLLCySiGAGGMb"([[INT]] {{%[0-9]+}}) {{#[0-9]}} {
 //             CHECK: entry:
-//     CHECK-unknown:  call swiftcc %swift.metadata_response @"$s4main9Argument1[[UNIQUE_ID_1]]LLCySiGMb"([[INT]] 0)
-// CHECK-unknown-NOT:  call swiftcc %swift.metadata_response @"$s4main9Argument1[[UNIQUE_ID_1]]LLCySiGMb"([[INT]] 0)
+//             CHECK:  call swiftcc %swift.metadata_response @"$s4main9Argument1[[UNIQUE_ID_1]]LLCySiGMb"([[INT]] 0)
+//         CHECK-NOT:  call swiftcc %swift.metadata_response @"$s4main9Argument1[[UNIQUE_ID_1]]LLCySiGMb"([[INT]] 0)
 //     CHECK-unknown:  ret
 //       CHECK-apple:  [[INITIALIZED_CLASS:%[0-9]+]] = call %objc_class* @objc_opt_self(
 //                  :    %objc_class* bitcast (
@@ -375,8 +291,6 @@ doit()
 //                  :    )
 //                  :  )
 //       CHECK-apple:  [[INITIALIZED_METADATA:%[0-9]+]] = bitcast %objc_class* [[INITIALIZED_CLASS]] to %swift.type*
-//       CHECK-apple:  call swiftcc %swift.metadata_response @"$s4main9Argument1[[UNIQUE_ID_1]]LLCySiGMb"([[INT]] 0)
-//   CHECK-apple-NOT:  call swiftcc %swift.metadata_response @"$s4main9Argument1[[UNIQUE_ID_1]]LLCySiGMb"([[INT]] 0)
 //       CHECK-apple:  [[PARTIAL_METADATA_RESPONSE:%[0-9]+]] = insertvalue %swift.metadata_response undef, %swift.type* [[INITIALIZED_METADATA]], 0
 //       CHECK-apple:  [[METADATA_RESPONSE:%[0-9]+]] = insertvalue %swift.metadata_response [[PARTIAL_METADATA_RESPONSE]], [[INT]] 0, 1
 //       CHECK-apple:  ret %swift.metadata_response [[METADATA_RESPONSE]]

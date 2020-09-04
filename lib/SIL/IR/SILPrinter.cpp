@@ -462,18 +462,20 @@ static void printSILFunctionNameAndType(
     llvm::DenseMap<CanType, Identifier> &sugaredTypeNames) {
   function->printName(OS);
   OS << " : $";
-  auto genSig =
-    function->getLoweredFunctionType()->getInvocationGenericSignature();
   auto *genEnv = function->getGenericEnvironment();
-  // If `genSig` and `genEnv` are both defined, get sugared names of generic
+  const GenericSignatureImpl *genSig = nullptr;
+
+  // If `genEnv` is defined, get sugared names of generic
   // parameter types for printing.
-  if (genSig && genEnv) {
+  if (genEnv) {
+    genSig = genEnv->getGenericSignature().getPointer();
+
     llvm::DenseSet<Identifier> usedNames;
     llvm::SmallString<16> disambiguatedNameBuf;
     unsigned disambiguatedNameCounter = 1;
     for (auto *paramTy : genSig->getGenericParams()) {
       // Get a uniqued sugared name for the generic parameter type.
-      auto sugaredTy = genEnv->getSugaredType(paramTy);
+      auto sugaredTy = genEnv->getGenericSignature()->getSugaredType(paramTy);
       Identifier name = sugaredTy->getName();
       while (!usedNames.insert(name).second) {
         disambiguatedNameBuf.clear();
@@ -495,7 +497,7 @@ static void printSILFunctionNameAndType(
     }
   }
   auto printOptions = PrintOptions::printSIL();
-  printOptions.GenericEnv = genEnv;
+  printOptions.GenericSig = genSig;
   printOptions.AlternativeTypeNames =
       sugaredTypeNames.empty() ? nullptr : &sugaredTypeNames;
   function->getLoweredFunctionType()->print(OS, printOptions);
@@ -1319,6 +1321,10 @@ public:
     *this << " : " << GVI->getType();
   }
 
+  void visitBaseAddrForOffsetInst(BaseAddrForOffsetInst *BAI) {
+    *this << BAI->getType();
+  }
+
   void visitIntegerLiteralInst(IntegerLiteralInst *ILI) {
     const auto &lit = ILI->getValue();
     *this << ILI->getType() << ", " << lit;
@@ -1335,7 +1341,6 @@ public:
     switch (kind) {
     case StringLiteralInst::Encoding::Bytes: return "bytes ";
     case StringLiteralInst::Encoding::UTF8: return "utf8 ";
-    case StringLiteralInst::Encoding::UTF16: return "utf16 ";
     case StringLiteralInst::Encoding::ObjCSelector: return "objc_selector ";
     }
     llvm_unreachable("bad string literal encoding");
@@ -1614,6 +1619,9 @@ public:
     printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *CI) {
+    printUncheckedConversionInst(CI, CI->getOperand());
+  }
+  void visitUncheckedValueCastInst(UncheckedValueCastInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitRefToRawPointerInst(RefToRawPointerInst *CI) {
@@ -2334,6 +2342,10 @@ public:
     for (auto i : dfi->getParameterIndices()->getIndices())
       *this << ' ' << i;
     *this << "] ";
+    *this << "[results";
+    for (auto i : dfi->getResultIndices()->getIndices())
+      *this << ' ' << i;
+    *this << "] ";
     *this << getIDAndType(dfi->getOriginalFunction());
     if (dfi->hasDerivativeFunctions()) {
       *this << " with_derivative ";
@@ -2387,7 +2399,7 @@ public:
       break;
     }
     *this << "] ";
-    *this << getIDAndType(lfei->getFunctionOperand());
+    *this << getIDAndType(lfei->getOperand());
   }
 
   void visitDifferentiabilityWitnessFunctionInst(
@@ -2594,6 +2606,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   case SILFunction::Purpose::GlobalInit:
     OS << "[global_init] ";
     break;
+  case SILFunction::Purpose::GlobalInitOnceFunction:
+    OS << "[global_init_once_fn] ";
+    break;
   case SILFunction::Purpose::LazyPropertyGetter:
     OS << "[lazy_getter] ";
     break;
@@ -2697,7 +2712,9 @@ void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
   printClangQualifiedNameCommentIfPresent(OS, getClangDecl());
 
   OS << "sil_global ";
-  printLinkage(OS, getLinkage(), isDefinition());
+  // Passing true for 'isDefinition' lets print the (external) linkage if it's
+  // not a definition.
+  printLinkage(OS, getLinkage(), /*isDefinition*/ true);
 
   if (isSerialized())
     OS << "[serialized] ";
@@ -2793,15 +2810,15 @@ static void printSILFunctions(SILPrintContext &Ctx,
 static void printSILVTables(SILPrintContext &Ctx,
                             const SILModule::VTableListType &VTables) {
   if (!Ctx.sortSIL()) {
-    for (const SILVTable &vt : VTables)
-      vt.print(Ctx.OS(), Ctx.printVerbose());
+    for (const auto &vt : VTables)
+      vt->print(Ctx.OS(), Ctx.printVerbose());
     return;
   }
 
   std::vector<const SILVTable *> vtables;
   vtables.reserve(VTables.size());
-  for (const SILVTable &vt : VTables)
-    vtables.push_back(&vt);
+  for (const auto &vt : VTables)
+    vtables.push_back(vt);
   std::sort(vtables.begin(), vtables.end(),
     [] (const SILVTable *v1, const SILVTable *v2) -> bool {
       StringRef Name1 = v1->getClass()->getName().str();
@@ -2905,12 +2922,10 @@ printSILCoverageMaps(SILPrintContext &Ctx,
     M->print(Ctx);
 }
 
-using MagicFileStringMap =
-    llvm::StringMap<std::pair<std::string, /*isWinner=*/bool>>;
+using FileIDMap = llvm::StringMap<std::pair<std::string, /*isWinner=*/bool>>;
 
-static void
-printMagicFileStringMapEntry(SILPrintContext &Ctx,
-                             const MagicFileStringMap::MapEntryTy &entry) {
+static void printFileIDMapEntry(SILPrintContext &Ctx,
+                                const FileIDMap::MapEntryTy &entry) {
   auto &OS = Ctx.OS();
   OS << "//   '" << std::get<0>(entry.second)
      << "' => '" << entry.first() << "'";
@@ -2921,12 +2936,11 @@ printMagicFileStringMapEntry(SILPrintContext &Ctx,
   OS << "\n";
 }
 
-static void printMagicFileStringMap(SILPrintContext &Ctx,
-                                    const MagicFileStringMap map) {
+static void printFileIDMap(SILPrintContext &Ctx, const FileIDMap map) {
   if (map.empty())
     return;
 
-  Ctx.OS() << "\n\n// Mappings from '#file' to '#filePath':\n";
+  Ctx.OS() << "\n\n// Mappings from '#fileID' to '#filePath':\n";
 
   if (Ctx.sortSIL()) {
     llvm::SmallVector<llvm::StringRef, 16> keys;
@@ -2949,10 +2963,10 @@ static void printMagicFileStringMap(SILPrintContext &Ctx,
     });
 
     for (auto key : keys)
-      printMagicFileStringMapEntry(Ctx, *map.find(key));
+      printFileIDMapEntry(Ctx, *map.find(key));
   } else {
     for (const auto &entry : map)
-      printMagicFileStringMapEntry(Ctx, entry);
+      printFileIDMapEntry(Ctx, entry);
   }
 }
 
@@ -3063,7 +3077,7 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   printSILDifferentiabilityWitnesses(PrintCtx,
                                      getDifferentiabilityWitnessList());
   printSILFunctions(PrintCtx, getFunctionList());
-  printSILVTables(PrintCtx, getVTableList());
+  printSILVTables(PrintCtx, getVTables());
   printSILWitnessTables(PrintCtx, getWitnessTableList());
   printSILDefaultWitnessTables(PrintCtx, getDefaultWitnessTableList());
   printSILCoverageMaps(PrintCtx, getCoverageMaps());
@@ -3071,8 +3085,8 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   printExternallyVisibleDecls(PrintCtx, externallyVisible.getArrayRef());
 
   if (M)
-    printMagicFileStringMap(
-        PrintCtx, M->computeMagicFileStringMap(/*shouldDiagnose=*/false));
+    printFileIDMap(
+        PrintCtx, M->computeFileIDMap(/*shouldDiagnose=*/false));
 
   OS << "\n\n";
 }
@@ -3093,51 +3107,56 @@ void SILInstruction::printInContext(llvm::raw_ostream &OS) const {
   SILPrinter(Ctx).printInContext(this);
 }
 
+void SILVTableEntry::print(llvm::raw_ostream &OS) const {
+  getMethod().print(OS);
+  OS << ": ";
+
+  PrintOptions QualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
+  bool HasSingleImplementation = false;
+  switch (getMethod().kind) {
+  default:
+    break;
+  case SILDeclRef::Kind::IVarDestroyer:
+  case SILDeclRef::Kind::Destroyer:
+  case SILDeclRef::Kind::Deallocator:
+    HasSingleImplementation = true;
+  }
+  // No need to emit the signature for methods that may have only
+  // single implementation, e.g. for destructors.
+  if (!HasSingleImplementation) {
+    QualifiedSILTypeOptions.CurrentModule =
+        getMethod().getDecl()->getDeclContext()->getParentModule();
+    getMethod().getDecl()->getInterfaceType().print(
+        OS, QualifiedSILTypeOptions);
+    OS << " : ";
+  }
+  OS << '@' << getImplementation()->getName();
+  switch (getKind()) {
+  case SILVTable::Entry::Kind::Normal:
+    break;
+  case SILVTable::Entry::Kind::Inherited:
+    OS << " [inherited]";
+    break;
+  case SILVTable::Entry::Kind::Override:
+    OS << " [override]";
+    break;
+  }
+  if (isNonOverridden()) {
+    OS << " [nonoverridden]";
+  }
+
+  OS << "\t// " << demangleSymbol(getImplementation()->getName());
+}
+
 void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   OS << "sil_vtable ";
   if (isSerialized())
     OS << "[serialized] ";
   OS << getClass()->getName() << " {\n";
 
-  PrintOptions QualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
   for (auto &entry : getEntries()) {
     OS << "  ";
-    entry.Method.print(OS);
-    OS << ": ";
-
-    bool HasSingleImplementation = false;
-    switch (entry.Method.kind) {
-    default:
-      break;
-    case SILDeclRef::Kind::IVarDestroyer:
-    case SILDeclRef::Kind::Destroyer:
-    case SILDeclRef::Kind::Deallocator:
-      HasSingleImplementation = true;
-    }
-    // No need to emit the signature for methods that may have only
-    // single implementation, e.g. for destructors.
-    if (!HasSingleImplementation) {
-      QualifiedSILTypeOptions.CurrentModule =
-          entry.Method.getDecl()->getDeclContext()->getParentModule();
-      entry.Method.getDecl()->getInterfaceType().print(OS,
-                                                       QualifiedSILTypeOptions);
-      OS << " : ";
-    }
-    OS << '@' << entry.Implementation->getName();
-    switch (entry.TheKind) {
-    case SILVTable::Entry::Kind::Normal:
-      break;
-    case SILVTable::Entry::Kind::NormalNonOverridden:
-      OS << " [nonoverridden]";
-      break;
-    case SILVTable::Entry::Kind::Inherited:
-      OS << " [inherited]";
-      break;
-    case SILVTable::Entry::Kind::Override:
-      OS << " [override]";
-      break;
-    }
-    OS << "\t// " << demangleSymbol(entry.Implementation->getName());
+    entry.print(OS);
     OS << "\n";
   }
   OS << "}\n\n";
@@ -3231,8 +3250,9 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
     OS << "[serialized] ";
 
   getConformance()->printName(OS, Options);
-  Options.GenericEnv =
-    getConformance()->getDeclContext()->getGenericEnvironmentOfContext();
+  Options.GenericSig =
+    getConformance()->getDeclContext()->getGenericSignatureOfContext()
+      .getPointer();
 
   if (isDeclaration()) {
     OS << "\n\n";
@@ -3275,7 +3295,7 @@ void SILDefaultWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   OS << getProtocol()->getName() << " {\n";
   
   PrintOptions options = PrintOptions::printSIL();
-  options.GenericEnv = Protocol->getGenericEnvironmentOfContext();
+  options.GenericSig = Protocol->getGenericSignatureOfContext().getPointer();
 
   for (auto &witness : getEntries()) {
     witness.print(OS, Verbose, options);
@@ -3377,7 +3397,7 @@ void SILCoverageMap::dump() const {
 #pragma warning(disable : 4996)
 #endif
 
-void SILDebugScope::dump(SourceManager &SM, llvm::raw_ostream &OS,
+void SILDebugScope::print(SourceManager &SM, llvm::raw_ostream &OS,
                          unsigned Indent) const {
   OS << "{\n";
   OS.indent(Indent);
@@ -3387,7 +3407,7 @@ void SILDebugScope::dump(SourceManager &SM, llvm::raw_ostream &OS,
   OS.indent(Indent + 2);
   OS << " parent: ";
   if (auto *P = Parent.dyn_cast<const SILDebugScope *>()) {
-    P->dump(SM, OS, Indent + 2);
+    P->print(SM, OS, Indent + 2);
     OS.indent(Indent + 2);
   }
   else if (auto *F = Parent.dyn_cast<SILFunction *>())
@@ -3399,15 +3419,15 @@ void SILDebugScope::dump(SourceManager &SM, llvm::raw_ostream &OS,
   OS.indent(Indent + 2);
   if (auto *CS = InlinedCallSite) {
     OS << "inlinedCallSite: ";
-    CS->dump(SM, OS, Indent + 2);
+    CS->print(SM, OS, Indent + 2);
     OS.indent(Indent + 2);
   }
   OS << "}\n";
 }
 
-void SILDebugScope::dump(SILModule &Mod) const {
+void SILDebugScope::print(SILModule &Mod) const {
   // We just use the default indent and llvm::errs().
-  dump(Mod.getASTContext().SourceMgr);
+  print(Mod.getASTContext().SourceMgr);
 }
 
 #if SWIFT_COMPILER_IS_MSVC
@@ -3426,12 +3446,17 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
   OS << "exported: " << exported << ", ";
   OS << "kind: " << kind << ", ";
 
+  auto *genericEnv = getFunction()->getGenericEnvironment();
+  GenericSignature genericSig;
+  if (genericEnv)
+    genericSig = genericEnv->getGenericSignature();
+
   ArrayRef<Requirement> requirements;
   SmallVector<Requirement, 4> requirementsScratch;
   if (auto specializedSig = getSpecializedSignature()) {
-    if (auto env = getFunction()->getGenericEnvironment()) {
+    if (genericSig) {
       requirementsScratch = specializedSig->requirementsNotSatisfiedBy(
-          env->getGenericSignature());
+          genericSig);
       requirements = requirementsScratch;
     } else {
       requirements = specializedSig->getRequirements();
@@ -3441,19 +3466,18 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
     OS << "where ";
     SILFunction *F = getFunction();
     assert(F);
-    auto GenericEnv = F->getGenericEnvironment();
     interleave(requirements,
                [&](Requirement req) {
-                 if (!GenericEnv) {
+                 if (!genericSig) {
                    req.print(OS, SubPrinter);
                    return;
                  }
                  // Use GenericEnvironment to produce user-friendly
                  // names instead of something like t_0_0.
-                 auto FirstTy = GenericEnv->getSugaredType(req.getFirstType());
+                 auto FirstTy = genericSig->getSugaredType(req.getFirstType());
                  if (req.getKind() != RequirementKind::Layout) {
                    auto SecondTy =
-                       GenericEnv->getSugaredType(req.getSecondType());
+                       genericSig->getSugaredType(req.getSecondType());
                    Requirement ReqWithDecls(req.getKind(), FirstTy, SecondTy);
                    ReqWithDecls.print(OS, SubPrinter);
                  } else {

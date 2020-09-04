@@ -355,6 +355,28 @@ bb4:
   return %10 : $()
 }
 
+sil @potential_escape : $@convention(thin) (@guaranteed RefElemClass) -> ()
+
+// CHECK-LABEL: sil @dont_hoist_begin_cow_mutation
+// CHECK:      bb1:
+// CHECK-NEXT:   begin_cow_mutation
+// CHECK-NEXT:   end_cow_mutation
+// CHECK-NEXT:   apply
+sil @dont_hoist_begin_cow_mutation : $@convention(thin) (@owned RefElemClass) -> @owned RefElemClass {
+bb0(%0 : $RefElemClass):
+  br bb1
+
+bb1:
+  (%u, %m) = begin_cow_mutation %0 : $RefElemClass
+  %b = end_cow_mutation %m : $RefElemClass
+  %f = function_ref @potential_escape : $@convention(thin) (@guaranteed RefElemClass) -> ()
+  %a = apply %f(%b) : $@convention(thin) (@guaranteed RefElemClass) -> ()
+  cond_br undef, bb1, bb2
+
+bb2:
+  return %b : $RefElemClass
+}
+
 // CHECK-LABEL: sil @hoist_load_and_store
 // CHECK:   [[V1:%[0-9]+]] = load %0
 // CHECK:   br bb1([[V1]] : $Int32)
@@ -831,4 +853,83 @@ bb9(%39 : $Builtin.Int64):                        // Preds: bb7
   %40 = struct $Int64 (%39 : $Builtin.Int64)        // user: %42
   dealloc_stack %3 : $*Index           // id: %41
   return %40 : $Int64                               // id: %42
+}
+
+// testConditionalTrapInInfiniteSyncLoop and
+// testConditionalTrapDominatingSyncLoopExit
+//
+// It's legal for the optimizer to consider code after the loop as
+// always reachable, but when a loop has no exits, or when the loops
+// exits are dominated by a conditional statement we should not
+// consider conditional statements within the loop as dominating all
+// possible execution paths through the loop. At least not when there
+// is at least one path through the loop that contains a
+// "synchronization point", such as a function that may contain a
+// memory barrier, perform I/O, or exit the program.
+sil @mayExit : $@convention(thin) () -> ()
+
+// CHECK-LABEL: sil @testConditionalTrapInInfiniteSyncLoop : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> () {
+// CHECK: bb0
+// CHECK-NOT: cond_fail
+// CHECK:   br bb1
+// CHECK: bb1:
+// CHECK:   cond_br %0, bb2, bb3
+// CHECK: bb2:
+// CHECK: cond_fail %1 : $Builtin.Int1, "arithmetic overflow"
+// CHECK-LABEL: } // end sil function 'testConditionalTrapInInfiniteSyncLoop'
+sil @testConditionalTrapInInfiniteSyncLoop : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
+  br bb1
+
+bb1: // loop head
+  cond_br %0, bb2, bb3
+
+bb2: // maybe never executed
+  cond_fail %1 : $Builtin.Int1, "arithmetic overflow"
+  br bb4
+
+bb3:
+  // synchronization point: has "real" side-effects that we can't
+  // reorder with traps
+  %f = function_ref @mayExit : $@convention(thin) () -> ()
+  apply %f() : $@convention(thin) () -> ()
+  br bb4
+
+bb4: // latch
+  br bb1
+}
+
+// CHECK-LABEL: sil @testConditionalTrapDominatingSyncLoopExit : $@convention(thin) (Builtin.Int1, Builtin.Int1, Builtin.Int1) -> () {
+// CHECK: bb0
+// CHECK-NOT: cond_fail
+// CHECK:   br bb1
+// CHECK: bb1:
+// CHECK:   cond_br %0, bb2, bb4
+// CHECK: bb2:
+// CHECK:   cond_fail %1 : $Builtin.Int1, "arithmetic overflow"
+// CHECK-LABEL: } // end sil function 'testConditionalTrapDominatingSyncLoopExit'
+sil @testConditionalTrapDominatingSyncLoopExit : $@convention(thin) (Builtin.Int1, Builtin.Int1, Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1, %2 : $Builtin.Int1):
+  br bb1
+
+bb1: // loop head
+  cond_br %0, bb2, bb4
+
+bb2: // maybe never executed
+  cond_fail %1 : $Builtin.Int1, "arithmetic overflow"
+  cond_br %2, bb3, bb5
+
+bb3: // tail
+  br bb1
+
+bb4:
+  // synchronization point: has "real" side-effects that we can't
+  // reorder with traps
+  %f = function_ref @mayExit : $@convention(thin) () -> ()
+  apply %f() : $@convention(thin) () -> ()
+  br bb1
+
+bb5:
+  %99 = tuple ()
+  return %99 : $()
 }

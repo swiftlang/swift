@@ -1,0 +1,32 @@
+// RUN: %empty-directory(%t)
+// RUN: not --crash %target-sil-opt -enable-sil-verify-all %s 2> %t/err.txt
+// RUN: %FileCheck %s < %t/err.txt
+
+class Klass {}
+
+struct MyStruct {
+  @_hasStorage var k: Klass
+}
+
+// The SIL verifier must crash on address phis.
+//
+// CHECK: SIL verification failed: Block arguments cannot be addresses: !arg->getType().isAddress()
+sil [ossa] @handle_phi_address_nodes : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $MyStruct
+  %2 = struct_element_addr %1 : $*MyStruct, #MyStruct.k
+  store %0 to [init] %2 : $*Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%1 : $*MyStruct)
+
+bb2:
+  br bb3(%1 : $*MyStruct)
+
+bb3(%7 : $*MyStruct):
+  destroy_addr %7 : $*MyStruct
+  dealloc_stack %1 : $*MyStruct
+  %9999 = tuple()
+  return %9999 : $()
+}

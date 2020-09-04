@@ -20,7 +20,7 @@ func makeSignatureAbstract() {
 }
 
 // CHECK-LABEL: sil{{.*}}@makeSignatureAbstract
-// CHECK:   [[BEFORE:%.*]] = differentiable_function [parameters 0]
+// CHECK:   [[BEFORE:%.*]] = differentiable_function [parameters 0] [results 0]
 // CHECK:   [[BEFORE_BORROWED:%.*]] = begin_borrow [[BEFORE]]
 // CHECK:   [[ORIG_0:%.*]] = differentiable_function_extract [original] [[BEFORE_BORROWED]]
 // CHECK:   [[ORIG_1:%.*]] = copy_value [[ORIG_0]]
@@ -37,7 +37,7 @@ func makeSignatureAbstract() {
 // CHECK:   [[VJP_THUNK:%.*]] = function_ref {{.*}} : $@convention(thin) (@in_guaranteed Float, @guaranteed @callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)) -> (@out Float, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Float, Float>)
 // CHECK:   [[VJP_2:%.*]] = partial_apply [callee_guaranteed] [[VJP_THUNK]]([[VJP_1]])
 // CHECK:   [[VJP_3:%.*]] = convert_function [[VJP_2]]
-// CHECK:   [[AFTER:%.*]] = differentiable_function [parameters 0] [[ORIG_3]] {{.*}} with_derivative {[[JVP_3]] {{.*}}, [[VJP_3]] {{.*}}}
+// CHECK:   [[AFTER:%.*]] = differentiable_function [parameters 0] [results 0] [[ORIG_3]] {{.*}} with_derivative {[[JVP_3]] {{.*}}, [[VJP_3]] {{.*}}}
 // CHECK:   [[TRIGGER:%.*]] = function_ref @triggerReabstraction1
 // CHECK:   apply [[TRIGGER]]<Float>([[AFTER]])
 
@@ -64,7 +64,7 @@ func makeOpaque() {
 // CHECK:   [[VJP_THUNK:%.*]] = function_ref {{.*}} : $@convention(thin) (@in_guaranteed Float, @guaranteed @callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)) -> (@out Float, @out @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Float, Float>)
 // CHECK:   [[VJP_2:%.*]] = partial_apply [callee_guaranteed] [[VJP_THUNK]]([[VJP_1]])
 // CHECK:   [[VJP_3:%.*]] = convert_function [[VJP_2]]
-// CHECK:   [[AFTER:%.*]] = differentiable_function [parameters 0] [[ORIG_3]] {{.*}} with_derivative {[[JVP_3]] {{.*}}, [[VJP_3]] {{.*}}}
+// CHECK:   [[AFTER:%.*]] = differentiable_function [parameters 0] [results 0] [[ORIG_3]] {{.*}} with_derivative {[[JVP_3]] {{.*}}, [[VJP_3]] {{.*}}}
 // CHECK:   store [[AFTER]] to [init] [[STACK_ADDR]]
 // CHECK:   [[TRIGGER:%.*]] = function_ref @triggerReabstraction2
 // CHECK:   apply [[TRIGGER]]<@differentiable (Float) -> Float>([[STACK_ADDR]])
@@ -79,4 +79,4 @@ func makeSignatureDirect() {
 // CHECK:  [[ORIG_1:%.*]] = partial_apply [callee_guaranteed] [[ORIG_0]]<Float>()
 // CHECK:  [[THUNK:%.*]] = function_ref {{.*}} : $@convention(thin) (Float, @guaranteed @callee_guaranteed (@in_guaranteed Float) -> @out Float) -> Float
 // CHECK:  [[ORIG_2:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[ORIG_1]])
-// CHECK:  differentiable_function [parameters 0] [[ORIG_2]]
+// CHECK:  differentiable_function [parameters 0] [results 0] [[ORIG_2]]

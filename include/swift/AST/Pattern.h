@@ -24,7 +24,6 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
-#include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/OptionSet.h"
@@ -73,7 +72,7 @@ protected:
     Value : 1
   );
 
-  SWIFT_INLINE_BITFIELD(VarPattern, Pattern, 1,
+  SWIFT_INLINE_BITFIELD(BindingPattern, Pattern, 1,
     /// True if this is a let pattern, false if a var pattern.
     IsLet : 1
   );
@@ -113,7 +112,7 @@ public:
   /// Find the smallest subpattern which obeys the property that matching it is
   /// equivalent to matching this pattern.
   ///
-  /// Looks through ParenPattern, VarPattern, and TypedPattern.
+  /// Looks through ParenPattern, BindingPattern, and TypedPattern.
   Pattern *getSemanticsProvidingPattern();
   const Pattern *getSemanticsProvidingPattern() const {
     return const_cast<Pattern*>(this)->getSemanticsProvidingPattern();
@@ -447,7 +446,6 @@ public:
 
   TypeRepr *getTypeRepr() const { return PatTypeRepr; }
 
-  TypeLoc getTypeLoc() const;
   SourceLoc getLoc() const;
   SourceRange getSourceRange() const;
 
@@ -470,19 +468,14 @@ class IsPattern : public Pattern {
   CheckedCastKind CastKind;
 
   /// The type being checked for.
-  TypeLoc CastType;
+  TypeExpr *CastType;
 
 public:
-  IsPattern(SourceLoc IsLoc, TypeLoc CastTy,
-             Pattern *SubPattern,
-             CheckedCastKind Kind)
-    : Pattern(PatternKind::Is),
-      IsLoc(IsLoc),
-      SubPattern(SubPattern),
-      CastKind(Kind),
-      CastType(CastTy) {
-    assert(IsLoc.isValid() == CastTy.hasLocation());
-  }
+  IsPattern(SourceLoc IsLoc, TypeExpr *CastTy, Pattern *SubPattern,
+            CheckedCastKind Kind);
+
+  static IsPattern *createImplicit(ASTContext &Ctx, Type castTy,
+                                   Pattern *SubPattern, CheckedCastKind Kind);
 
   CheckedCastKind getCastKind() const { return CastKind; }
   void setCastKind(CheckedCastKind kind) { CastKind = kind; }
@@ -493,16 +486,11 @@ public:
   void setSubPattern(Pattern *p) { SubPattern = p; }
 
   SourceLoc getLoc() const { return IsLoc; }
-  SourceRange getSourceRange() const {
-    SourceLoc beginLoc =
-      SubPattern ? SubPattern->getSourceRange().Start : IsLoc;
-    SourceLoc endLoc =
-      (isImplicit() ? beginLoc : CastType.getSourceRange().End);
-    return { beginLoc, endLoc };
-  }
+  SourceRange getSourceRange() const;
 
-  TypeLoc &getCastTypeLoc() { return CastType; }
-  TypeLoc getCastTypeLoc() const { return CastType; }
+  void setCastType(Type castTy);
+  Type getCastType() const;
+  TypeRepr *getCastTypeRepr() const;
 
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::Is;
@@ -513,7 +501,7 @@ public:
 /// case, then the value is extracted. If there is a subpattern, it is then
 /// matched against the associated value for the case.
 class EnumElementPattern : public Pattern {
-  TypeLoc ParentType;
+  TypeExpr *ParentType;
   SourceLoc DotLoc;
   DeclNameLoc NameLoc;
   DeclNameRef Name;
@@ -521,27 +509,23 @@ class EnumElementPattern : public Pattern {
   Pattern /*nullable*/ *SubPattern;
 
 public:
-  EnumElementPattern(TypeLoc ParentType, SourceLoc DotLoc, DeclNameLoc NameLoc,
-                     DeclNameRef Name, EnumElementDecl *Element,
-                     Pattern *SubPattern)
-    : Pattern(PatternKind::EnumElement),
-      ParentType(ParentType), DotLoc(DotLoc), NameLoc(NameLoc), Name(Name),
-      ElementDeclOrUnresolvedOriginalExpr(Element),
-      SubPattern(SubPattern) { }
+  EnumElementPattern(TypeExpr *ParentType, SourceLoc DotLoc,
+                     DeclNameLoc NameLoc, DeclNameRef Name,
+                     EnumElementDecl *Element, Pattern *SubPattern)
+      : Pattern(PatternKind::EnumElement), ParentType(ParentType),
+        DotLoc(DotLoc), NameLoc(NameLoc), Name(Name),
+        ElementDeclOrUnresolvedOriginalExpr(Element), SubPattern(SubPattern) {
+    assert(ParentType && "Missing parent type?");
+  }
 
   /// Create an unresolved EnumElementPattern for a `.foo` pattern relying on
   /// contextual type.
-  EnumElementPattern(SourceLoc DotLoc,
-                     DeclNameLoc NameLoc,
-                     DeclNameRef Name,
-                     Pattern *SubPattern,
-                     Expr *UnresolvedOriginalExpr)
-    : Pattern(PatternKind::EnumElement),
-      ParentType(), DotLoc(DotLoc), NameLoc(NameLoc), Name(Name),
-      ElementDeclOrUnresolvedOriginalExpr(UnresolvedOriginalExpr),
-      SubPattern(SubPattern) {
-
-  }
+  EnumElementPattern(SourceLoc DotLoc, DeclNameLoc NameLoc, DeclNameRef Name,
+                     Pattern *SubPattern, Expr *UnresolvedOriginalExpr)
+      : Pattern(PatternKind::EnumElement), ParentType(nullptr), DotLoc(DotLoc),
+        NameLoc(NameLoc), Name(Name),
+        ElementDeclOrUnresolvedOriginalExpr(UnresolvedOriginalExpr),
+        SubPattern(SubPattern) {}
 
   bool hasSubPattern() const { return SubPattern; }
 
@@ -551,10 +535,6 @@ public:
 
   Pattern *getSubPattern() {
     return SubPattern;
-  }
-
-  bool isParentTypeImplicit() {
-    return !ParentType.hasLocation();
   }
 
   void setSubPattern(Pattern *p) { SubPattern = p; }
@@ -574,24 +554,20 @@ public:
   bool hasUnresolvedOriginalExpr() const {
     return ElementDeclOrUnresolvedOriginalExpr.is<Expr*>();
   }
+  void setUnresolvedOriginalExpr(Expr *e) {
+    ElementDeclOrUnresolvedOriginalExpr = e;
+  }
 
   DeclNameLoc getNameLoc() const { return NameLoc; }
   SourceLoc getLoc() const { return NameLoc.getBaseNameLoc(); }
-  SourceLoc getStartLoc() const {
-    return ParentType.hasLocation() ? ParentType.getSourceRange().Start :
-           DotLoc.isValid()         ? DotLoc
-                                    : NameLoc.getBaseNameLoc();
-  }
-  SourceLoc getEndLoc() const {
-    if (SubPattern && SubPattern->getSourceRange().isValid()) {
-      return SubPattern->getSourceRange().End;
-    }
-    return NameLoc.getEndLoc();
-  }
+  SourceLoc getStartLoc() const;
+  SourceLoc getEndLoc() const;
   SourceRange getSourceRange() const { return {getStartLoc(), getEndLoc()}; }
 
-  TypeLoc &getParentType() { return ParentType; }
-  TypeLoc getParentType() const { return ParentType; }
+  TypeRepr *getParentTypeRepr() const;
+
+  void setParentType(Type ty);
+  Type getParentType() const;
 
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::EnumElement;
@@ -717,22 +693,23 @@ public:
 /// semantics of its own, but has a syntactic effect on the subpattern. Bare
 /// identifiers in the subpattern create new variable bindings instead of being
 /// parsed as expressions referencing existing entities.
-class VarPattern : public Pattern {
+class BindingPattern : public Pattern {
   SourceLoc VarLoc;
   Pattern *SubPattern;
 public:
-  VarPattern(SourceLoc loc, bool isLet, Pattern *sub)
-      : Pattern(PatternKind::Var), VarLoc(loc), SubPattern(sub) {
-    Bits.VarPattern.IsLet = isLet;
+  BindingPattern(SourceLoc loc, bool isLet, Pattern *sub)
+      : Pattern(PatternKind::Binding), VarLoc(loc), SubPattern(sub) {
+    Bits.BindingPattern.IsLet = isLet;
   }
 
-  static VarPattern *createImplicit(ASTContext &Ctx, bool isLet, Pattern *sub) {
-    auto *VP = new (Ctx) VarPattern(SourceLoc(), isLet, sub);
+  static BindingPattern *createImplicit(ASTContext &Ctx, bool isLet,
+                                        Pattern *sub) {
+    auto *VP = new (Ctx) BindingPattern(SourceLoc(), isLet, sub);
     VP->setImplicit();
     return VP;
   }
 
-  bool isLet() const { return Bits.VarPattern.IsLet; }
+  bool isLet() const { return Bits.BindingPattern.IsLet; }
 
   SourceLoc getLoc() const { return VarLoc; }
   SourceRange getSourceRange() const {
@@ -747,17 +724,16 @@ public:
   void setSubPattern(Pattern *p) { SubPattern = p; }
 
   static bool classof(const Pattern *P) {
-    return P->getKind() == PatternKind::Var;
+    return P->getKind() == PatternKind::Binding;
   }
 };
-
 
 inline Pattern *Pattern::getSemanticsProvidingPattern() {
   if (auto *pp = dyn_cast<ParenPattern>(this))
     return pp->getSubPattern()->getSemanticsProvidingPattern();
   if (auto *tp = dyn_cast<TypedPattern>(this))
     return tp->getSubPattern()->getSemanticsProvidingPattern();
-  if (auto *vp = dyn_cast<VarPattern>(this))
+  if (auto *vp = dyn_cast<BindingPattern>(this))
     return vp->getSubPattern()->getSemanticsProvidingPattern();
   return this;
 }

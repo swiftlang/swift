@@ -24,7 +24,6 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Basic/Timer.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/ParseSILSupport.h"
@@ -32,6 +31,7 @@
 #include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Syntax/RawSyntax.h"
 #include "swift/Syntax/TokenSyntax.h"
+#include "swift/SyntaxParse/SyntaxTreeCreator.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/MD5.h"
@@ -109,6 +109,7 @@ void tokenize(const LangOptions &LangOpts, const SourceManager &SM,
 
 using namespace swift;
 using namespace swift::syntax;
+using ParsingFlags = SourceFile::ParsingFlags;
 
 void SILParserStateBase::anchor() { }
 
@@ -147,8 +148,8 @@ void Parser::performCodeCompletionSecondPassImpl(
   SyntaxContext->disable();
 
   // Disable updating the interface hash
-  llvm::SaveAndRestore<NullablePtr<llvm::MD5>> CurrentTokenHashSaver(
-      CurrentTokenHash, nullptr);
+  llvm::SaveAndRestore<Optional<llvm::MD5>> CurrentTokenHashSaver(
+      CurrentTokenHash, None);
 
   auto BufferID = L->getBufferID();
   auto startLoc = SourceMgr.getLocForOffset(BufferID, info.StartOffset);
@@ -202,7 +203,7 @@ void Parser::performCodeCompletionSecondPassImpl(
 
   case CodeCompletionDelayedDeclKind::FunctionBody: {
     auto *AFD = cast<AbstractFunctionDecl>(DC);
-    AFD->setBodyParsed(parseAbstractFunctionBodyImpl(AFD).getPtrOrNull());
+    (void)parseAbstractFunctionBodyImpl(AFD);
     break;
   }
   }
@@ -411,18 +412,17 @@ namespace {
 /// underlying corrected token stream.
 class TokenRecorder: public ConsumeTokenReceiver {
   ASTContext &Ctx;
-  SourceManager &SM;
+  unsigned BufferID;
 
   // Token list ordered by their appearance in the source file.
-  std::vector<Token> &Bag;
-  unsigned BufferID;
+  std::vector<Token> Tokens;
 
   // Registered token kind change. These changes are regiestered before the
   // token is consumed, so we need to keep track of them here.
   llvm::DenseMap<const void*, tok> TokenKindChangeMap;
 
   std::vector<Token>::iterator lower_bound(SourceLoc Loc) {
-    return token_lower_bound(Bag, Loc);
+    return token_lower_bound(Tokens, Loc);
   }
 
   std::vector<Token>::iterator lower_bound(Token Tok) {
@@ -431,9 +431,9 @@ class TokenRecorder: public ConsumeTokenReceiver {
 
   void relexComment(CharSourceRange CommentRange,
                     llvm::SmallVectorImpl<Token> &Scratch) {
-    Lexer L(Ctx.LangOpts, Ctx.SourceMgr, BufferID, nullptr, LexerMode::Swift,
-            HashbangMode::Disallowed,
-            CommentRetentionMode::ReturnAsTokens,
+    auto &SM = Ctx.SourceMgr;
+    Lexer L(Ctx.LangOpts, SM, BufferID, nullptr, LexerMode::Swift,
+            HashbangMode::Disallowed, CommentRetentionMode::ReturnAsTokens,
             TriviaRetentionMode::WithoutTrivia,
             SM.getLocOffsetInBuffer(CommentRange.getStart(), BufferID),
             SM.getLocOffsetInBuffer(CommentRange.getEnd(), BufferID));
@@ -448,19 +448,17 @@ class TokenRecorder: public ConsumeTokenReceiver {
   }
 
 public:
-  TokenRecorder(SourceFile &SF, unsigned BufferID):
-  Ctx(SF.getASTContext()),
-  SM(SF.getASTContext().SourceMgr),
-  Bag(SF.getTokenVector()),
-  BufferID(BufferID) {};
+  TokenRecorder(ASTContext &ctx, unsigned BufferID)
+      : Ctx(ctx), BufferID(BufferID) {}
 
-  void finalize() override {
+  Optional<std::vector<Token>> finalize() override {
+    auto &SM = Ctx.SourceMgr;
 
     // We should consume the comments at the end of the file that don't attach
     // to any tokens.
     SourceLoc TokEndLoc;
-    if (!Bag.empty()) {
-      Token Last = Bag.back();
+    if (!Tokens.empty()) {
+      Token Last = Tokens.back();
       TokEndLoc = Last.getLoc().getAdvancedLoc(Last.getLength());
     } else {
 
@@ -472,14 +470,15 @@ public:
                                  SM.getRangeForBuffer(BufferID).getEnd()),
                  Scratch);
     // Accept these orphaned comments.
-    Bag.insert(Bag.end(), Scratch.begin(), Scratch.end());
+    Tokens.insert(Tokens.end(), Scratch.begin(), Scratch.end());
+    return std::move(Tokens);
   }
 
   void registerTokenKindChange(SourceLoc Loc, tok NewKind) override {
     // If a token with the same location is already in the bag, update its kind.
     auto Pos = lower_bound(Loc);
-    if (Pos != Bag.end() && Pos->getLoc().getOpaquePointerValue() ==
-        Loc.getOpaquePointerValue()) {
+    if (Pos != Tokens.end() &&
+        Pos->getLoc().getOpaquePointerValue() == Loc.getOpaquePointerValue()) {
       Pos->setKind(NewKind);
       return;
     }
@@ -495,8 +494,8 @@ public:
 
     // If a token with the same location is already in the bag, skip this token.
     auto Pos = lower_bound(Tok);
-    if (Pos != Bag.end() && Pos->getLoc().getOpaquePointerValue() ==
-        Tok.getLoc().getOpaquePointerValue()) {
+    if (Pos != Tokens.end() && Pos->getLoc().getOpaquePointerValue() ==
+                                   Tok.getLoc().getOpaquePointerValue()) {
       return;
     }
 
@@ -515,7 +514,7 @@ public:
     }
 
     TokensToConsume.push_back(Tok);
-    Bag.insert(Pos, TokensToConsume.begin(), TokensToConsume.end());
+    Tokens.insert(Pos, TokensToConsume.begin(), TokensToConsume.end());
   }
 };
 } // End of an anonymous namespace.
@@ -530,9 +529,8 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     SIL(SIL),
     CurDeclContext(&SF),
     Context(SF.getASTContext()),
-    CurrentTokenHash(SF.getInterfaceHashPtr()),
-    TokReceiver(SF.shouldCollectToken() ?
-                new TokenRecorder(SF, L->getBufferID()) :
+    TokReceiver(SF.shouldCollectTokens() ?
+                new TokenRecorder(SF.getASTContext(), L->getBufferID()) :
                 new ConsumeTokenReceiver()),
     SyntaxContext(new SyntaxParsingContext(SyntaxContext, SF,
                                            L->getBufferID(),
@@ -542,6 +540,10 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     OwnedState.reset(new PersistentParserState());
     State = OwnedState.get();
   }
+
+  // If the interface hash is enabled, set up the initial hash.
+  if (SF.hasInterfaceHash())
+    CurrentTokenHash.emplace();
 
   // Set the token to a sentinel so that we know the lexer isn't primed yet.
   // This cannot be tok::unknown, since that is a token the lexer could produce.
@@ -566,7 +568,7 @@ bool Parser::isDelayedParsingEnabled() const {
 
 bool Parser::shouldEvaluatePoundIfDecls() const {
   auto opts = SF.getParsingOptions();
-  return !opts.contains(SourceFile::ParsingFlags::DisablePoundIfEvaluation);
+  return !opts.contains(ParsingFlags::DisablePoundIfEvaluation);
 }
 
 bool Parser::allowTopLevelCode() const {
@@ -590,11 +592,11 @@ SourceLoc Parser::consumeTokenWithoutFeedingReceiver() {
 
 void Parser::recordTokenHash(StringRef token) {
   assert(!token.empty());
-  if (llvm::MD5 *cth = CurrentTokenHash.getPtrOrNull()) {
-    cth->update(token);
+  if (CurrentTokenHash) {
+    CurrentTokenHash->update(token);
     // Add null byte to separate tokens.
     uint8_t a[1] = {0};
-    cth->update(a);
+    CurrentTokenHash->update(a);
   }
 }
 
@@ -658,7 +660,7 @@ void Parser::skipSingle() {
   switch (Tok.getKind()) {
   case tok::l_paren:
     consumeToken();
-    skipUntil(tok::r_paren);
+    skipUntil(tok::r_paren, tok::r_brace);
     consumeIf(tok::r_paren);
     break;
   case tok::l_brace:
@@ -668,7 +670,7 @@ void Parser::skipSingle() {
     break;
   case tok::l_square:
     consumeToken();
-    skipUntil(tok::r_square);
+    skipUntil(tok::r_square, tok::r_brace);
     consumeIf(tok::r_square);
     break;
   case tok::pound_if:
@@ -693,8 +695,9 @@ void Parser::skipSingle() {
 void Parser::skipUntil(tok T1, tok T2) {
   // tok::NUM_TOKENS is a sentinel that means "don't skip".
   if (T1 == tok::NUM_TOKENS && T2 == tok::NUM_TOKENS) return;
-  
-  while (Tok.isNot(T1, T2, tok::eof, tok::pound_endif, tok::code_complete))
+
+  while (Tok.isNot(T1, T2, tok::eof, tok::pound_endif, tok::pound_else,
+                   tok::pound_elseif))
     skipSingle();
 }
 
@@ -823,11 +826,11 @@ void Parser::skipUntilConditionalBlockClose() {
   }
 }
 
-bool Parser::skipUntilTokenOrEndOfLine(tok T1) {
-  while (Tok.isNot(tok::eof, T1) && !Tok.isAtStartOfLine())
+bool Parser::skipUntilTokenOrEndOfLine(tok T1, tok T2) {
+  while (Tok.isNot(tok::eof, T1, T2) && !Tok.isAtStartOfLine())
     skipSingle();
 
-  return Tok.is(T1) && !Tok.isAtStartOfLine();
+  return Tok.isAny(T1, T2) && !Tok.isAtStartOfLine();
 }
 
 bool Parser::loadCurrentSyntaxNodeFromCache() {
@@ -1187,6 +1190,7 @@ struct ParserUnit::Implementation {
   LangOptions LangOpts;
   TypeCheckerOptions TypeCheckerOpts;
   SearchPathOptions SearchPathOpts;
+  ClangImporterOptions clangImporterOpts;
   DiagnosticEngine Diags;
   ASTContext &Ctx;
   SourceFile *SF;
@@ -1196,14 +1200,17 @@ struct ParserUnit::Implementation {
                  const LangOptions &Opts, const TypeCheckerOptions &TyOpts,
                  StringRef ModuleName,
                  std::shared_ptr<SyntaxParseActions> spActions)
-      : SPActions(std::move(spActions)),
-        LangOpts(Opts), TypeCheckerOpts(TyOpts), Diags(SM),
-        Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SearchPathOpts, SM, Diags)),
-        SF(new (Ctx) SourceFile(
-            *ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx), SFKind,
-            BufferID, Opts.CollectParsedToken, Opts.BuildSyntaxTree,
-            SourceFile::ParsingFlags::DisableDelayedBodies |
-                SourceFile::ParsingFlags::DisablePoundIfEvaluation)) {}
+      : SPActions(std::move(spActions)), LangOpts(Opts),
+        TypeCheckerOpts(TyOpts), Diags(SM),
+        Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SearchPathOpts,
+                             clangImporterOpts, SM, Diags)) {
+    auto parsingOpts = SourceFile::getDefaultParsingOptions(LangOpts);
+    parsingOpts |= ParsingFlags::DisableDelayedBodies;
+    parsingOpts |= ParsingFlags::DisablePoundIfEvaluation;
+
+    auto *M = ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx);
+    SF = new (Ctx) SourceFile(*M, SFKind, BufferID, parsingOpts);
+  }
 
   ~Implementation() {
     // We need to delete the parser before the context so that it can finalize
@@ -1260,9 +1267,21 @@ OpaqueSyntaxNode ParserUnit::parse() {
   SmallVector<Decl *, 128> decls;
   P.parseTopLevel(decls);
 
-  ctx.evaluator.cacheOutput(ParseSourceFileRequest{&P.SF},
-                            ctx.AllocateCopy(decls));
-  return P.finalizeSyntaxTree();
+  Optional<ArrayRef<Token>> tokensRef;
+  if (auto tokens = P.takeTokenReceiver()->finalize())
+    tokensRef = ctx.AllocateCopy(*tokens);
+
+  auto rawNode = P.finalizeSyntaxTree();
+  Optional<SourceFileSyntax> syntaxRoot;
+  if (Impl.SPActions) {
+    if (auto root = Impl.SPActions->realizeSyntaxRoot(rawNode, *Impl.SF))
+      syntaxRoot.emplace(*root);
+  }
+
+  auto result = SourceFileParsingResult{ctx.AllocateCopy(decls), tokensRef,
+                                        P.CurrentTokenHash, syntaxRoot};
+  ctx.evaluator.cacheOutput(ParseSourceFileRequest{&P.SF}, std::move(result));
+  return rawNode;
 }
 
 Parser &ParserUnit::getParser() {

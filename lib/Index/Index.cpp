@@ -125,10 +125,10 @@ public:
 
   void
   getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &Modules) const {
-    ModuleDecl::ImportFilter ImportFilter;
-    ImportFilter |= ModuleDecl::ImportFilterKind::Public;
-    ImportFilter |= ModuleDecl::ImportFilterKind::Private;
-    ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+    constexpr ModuleDecl::ImportFilter ImportFilter = {
+        ModuleDecl::ImportFilterKind::Public,
+        ModuleDecl::ImportFilterKind::Private,
+        ModuleDecl::ImportFilterKind::ImplementationOnly};
 
     if (auto *SF = SFOrMod.dyn_cast<SourceFile *>()) {
       SF->getImportedModules(Modules, ImportFilter);
@@ -343,13 +343,13 @@ private:
       if (customAttr->isImplicit())
         continue;
 
-      auto &Loc = customAttr->getTypeLoc();
       if (auto *semanticInit = dyn_cast_or_null<CallExpr>(customAttr->getSemanticInit())) {
         if (auto *CD = semanticInit->getCalledValue()) {
           if (!shouldIndex(CD, /*IsRef*/true))
             continue;
           IndexSymbol Info;
-          if (initIndexSymbol(CD, Loc.getLoc(), /*IsRef=*/true, Info))
+          const auto reprLoc = customAttr->getTypeRepr()->getLoc();
+          if (initIndexSymbol(CD, reprLoc, /*IsRef=*/true, Info))
             continue;
           Info.roles |= (unsigned)SymbolRole::Call;
           if (semanticInit->isImplicit())

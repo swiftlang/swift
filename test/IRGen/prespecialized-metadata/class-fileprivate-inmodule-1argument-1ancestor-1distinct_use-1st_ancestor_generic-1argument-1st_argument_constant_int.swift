@@ -1,6 +1,6 @@
 // RUN: %swift -prespecialize-generic-metadata -target %module-target-future -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize -DALIGNMENT=%target-alignment --check-prefix=CHECK --check-prefix=CHECK-%target-vendor
 
-// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos || OS=linux-gnu
+// REQUIRES: VENDOR=apple || OS=linux-gnu
 // UNSUPPORTED: CPU=i386 && OS=ios
 // UNSUPPORTED: CPU=armv7 && OS=ios
 // UNSUPPORTED: CPU=armv7s && OS=ios
@@ -9,7 +9,7 @@
 // CHECK: @"$s4main9Ancestor1[[UNIQUE_ID_1:[A-Za-z_0-9]+]]CySiGMf" =
 //              CHECK: @"$s4main5Value[[UNIQUE_ID_1]]CySSGMf" = linkonce_odr hidden 
 //   CHECK-apple-SAME: global
-// CHECK-unknown-SMAE: constant
+// CHECK-unknown-SAME: constant
 //         CHECK-SAME: <{
 //         CHECK-SAME:   void (
 //         CHECK-SAME:    %T4main5Value[[UNIQUE_ID_1]]C*
@@ -208,7 +208,7 @@ doit()
 //              CHECK: ; Function Attrs: noinline nounwind readnone
 //              CHECK: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_1]]CySSGMb"([[INT]] {{%[0-9]+}}) {{#[0-9]+}} {
 //         CHECK-NEXT: entry:
-//      CHECK-unknown:   [[SUPER_CLASS_METADATA:%[0-9]+]] = call swiftcc %swift.metadata_response @"$s4main9Ancestor1[[UNIQUE_ID_1]]CySiGMb"([[INT]] 0)
+//              CHECK:   [[SUPER_CLASS_METADATA:%[0-9]+]] = call swiftcc %swift.metadata_response @"$s4main9Ancestor1[[UNIQUE_ID_1]]CySiGMb"([[INT]] 0)
 //      CHECK-unknown:  ret
 //        CHECK-apple:  [[THIS_CLASS_METADATA:%[0-9]+]] = call %objc_class* @objc_opt_self(
 //                   :   %objc_class* bitcast (
@@ -258,7 +258,6 @@ doit()
 //                   :   )
 //                   : )
 //        CHECK-apple:   [[THIS_TYPE_METADATA:%[0-9]+]] = bitcast %objc_class* [[THIS_CLASS_METADATA]] to %swift.type*
-//        CHECK-apple:   [[SUPER_CLASS_METADATA:%[0-9]+]] = call swiftcc %swift.metadata_response @"$s4main9Ancestor1[[UNIQUE_ID_1]]CySiGMb"([[INT]] 0)
 //        CHECK-apple:   [[RESPONSE:%[0-9]+]] = insertvalue %swift.metadata_response undef, %swift.type* [[THIS_TYPE_METADATA]], 0
 //        CHECK-apple:   [[COMPLETE_RESPONSE:%[0-9]+]] = insertvalue %swift.metadata_response %5, [[INT]] 0, 1
 //        CHECK-apple:   ret %swift.metadata_response [[COMPLETE_RESPONSE]]

@@ -312,6 +312,19 @@ static void recordShadowedDeclsAfterTypeMatch(
           }
         }
 
+        // If one declaration is in a protocol or extension thereof and the
+        // other is not, prefer the one that is not.
+        if ((bool)firstDecl->getDeclContext()->getSelfProtocolDecl() !=
+              (bool)secondDecl->getDeclContext()->getSelfProtocolDecl()) {
+          if (firstDecl->getDeclContext()->getSelfProtocolDecl()) {
+            shadowed.insert(firstDecl);
+            break;
+          } else {
+            shadowed.insert(secondDecl);
+            continue;
+          }
+        }
+
         continue;
       }
 
@@ -819,13 +832,12 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
                           SmallVectorImpl<ModuleDecl *> &modulesFound,
                           bool &anyObject);
 
-SelfBounds
-SelfBoundsFromWhereClauseRequest::evaluate(
+SelfBounds SelfBoundsFromWhereClauseRequest::evaluate(
     Evaluator &evaluator,
-    llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl) const {
-  auto *typeDecl = decl.dyn_cast<TypeDecl *>();
-  auto *protoDecl = dyn_cast_or_null<ProtocolDecl>(typeDecl);
-  auto *extDecl = decl.dyn_cast<ExtensionDecl *>();
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl) const {
+  auto *typeDecl = decl.dyn_cast<const TypeDecl *>();
+  auto *protoDecl = dyn_cast_or_null<const ProtocolDecl>(typeDecl);
+  auto *extDecl = decl.dyn_cast<const ExtensionDecl *>();
 
   DeclContext *dc = protoDecl ? (DeclContext *)protoDecl : (DeclContext *)extDecl;
 
@@ -857,8 +869,6 @@ SelfBoundsFromWhereClauseRequest::evaluate(
       if (auto identTypeRepr = dyn_cast<SimpleIdentTypeRepr>(typeRepr))
         isSelfLHS = (identTypeRepr->getNameRef().getBaseIdentifier() ==
                      ctx.Id_Self);
-    } else if (Type type = req.getSubject()) {
-      isSelfLHS = type->isEqual(dc->getSelfInterfaceType());
     }
     if (!isSelfLHS)
       continue;
@@ -867,8 +877,6 @@ SelfBoundsFromWhereClauseRequest::evaluate(
     DirectlyReferencedTypeDecls rhsDecls;
     if (auto typeRepr = req.getConstraintRepr()) {
       rhsDecls = directReferencesForTypeRepr(evaluator, ctx, typeRepr, lookupDC);
-    } else if (Type type = req.getConstraint()) {
-      rhsDecls = directReferencesForType(type);
     }
 
     SmallVector<ModuleDecl *, 2> modulesFound;
@@ -884,9 +892,9 @@ SelfBoundsFromWhereClauseRequest::evaluate(
 }
 
 SelfBounds swift::getSelfBoundsFromWhereClause(
-    llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl) {
-  auto *typeDecl = decl.dyn_cast<TypeDecl *>();
-  auto *extDecl = decl.dyn_cast<ExtensionDecl *>();
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl) {
+  auto *typeDecl = decl.dyn_cast<const TypeDecl *>();
+  auto *extDecl = decl.dyn_cast<const ExtensionDecl *>();
   auto &ctx = typeDecl ? typeDecl->getASTContext()
                        : extDecl->getASTContext();
   return evaluateOrDefault(ctx.evaluator,
@@ -899,31 +907,28 @@ TypeDeclsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
   ASTContext &ctx = ext->getASTContext();
 
   TinyPtrVector<TypeDecl *> result;
-  for (const auto &req : ext->getGenericParams()->getTrailingRequirements()) {
-    auto resolve = [&](TypeLoc loc) {
-      DirectlyReferencedTypeDecls decls;
-      if (auto *typeRepr = loc.getTypeRepr())
-        decls = directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext);
-      else if (Type type = loc.getType())
-        decls = directReferencesForType(type);
+  auto resolve = [&](TypeRepr *typeRepr) {
+    auto decls = directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext);
+    result.insert(result.end(), decls.begin(), decls.end());
+  };
 
-      result.insert(result.end(), decls.begin(), decls.end());
-    };
+  if (auto *whereClause = ext->getTrailingWhereClause()) {
+    for (const auto &req : whereClause->getRequirements()) {
+      switch (req.getKind()) {
+      case RequirementReprKind::TypeConstraint:
+        resolve(req.getSubjectRepr());
+        resolve(req.getConstraintRepr());
+        break;
 
-    switch (req.getKind()) {
-    case RequirementReprKind::TypeConstraint:
-      resolve(req.getSubjectLoc());
-      resolve(req.getConstraintLoc());
-      break;
+      case RequirementReprKind::SameType:
+        resolve(req.getFirstTypeRepr());
+        resolve(req.getSecondTypeRepr());
+        break;
 
-    case RequirementReprKind::SameType:
-      resolve(req.getFirstTypeLoc());
-      resolve(req.getSecondTypeLoc());
-      break;
-
-    case RequirementReprKind::LayoutConstraint:
-      resolve(req.getSubjectLoc());
-      break;
+      case RequirementReprKind::LayoutConstraint:
+        resolve(req.getSubjectRepr());
+        break;
+      }
     }
   }
 
@@ -1340,6 +1345,12 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
                           << "\n");
 
   decl->prepareLookupTable();
+
+  // If we're allowed to load extensions, call prepareExtensions to ensure we
+  // properly invalidate the lazily-complete cache for any extensions brought in
+  // by modules loaded after-the-fact. This can happen with the LLDB REPL.
+  if (!disableAdditionalExtensionLoading)
+    decl->prepareExtensions();
 
   auto &Table = *decl->LookupTable;
   if (!useNamedLazyMemberLoading) {
@@ -2143,18 +2154,18 @@ static DirectlyReferencedTypeDecls directReferencesForType(Type type) {
 
 DirectlyReferencedTypeDecls InheritedDeclsReferencedRequest::evaluate(
     Evaluator &evaluator,
-    llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
     unsigned index) const {
 
   // Prefer syntactic information when we have it.
-  TypeLoc &typeLoc = getInheritedTypeLocAtIndex(decl, index);
+  const TypeLoc &typeLoc = getInheritedTypeLocAtIndex(decl, index);
   if (auto typeRepr = typeLoc.getTypeRepr()) {
     // Figure out the context in which name lookup will occur.
     DeclContext *dc;
-    if (auto typeDecl = decl.dyn_cast<TypeDecl *>())
+    if (auto typeDecl = decl.dyn_cast<const TypeDecl *>())
       dc = typeDecl->getInnermostDeclContext();
     else
-      dc = decl.get<ExtensionDecl *>();
+      dc = (DeclContext *)decl.get<const ExtensionDecl *>();
 
     return directReferencesForTypeRepr(evaluator, dc->getASTContext(), typeRepr,
                                        dc);
@@ -2291,17 +2302,83 @@ static bool declsAreAssociatedTypes(ArrayRef<TypeDecl *> decls) {
   return true;
 }
 
+static GenericParamList *
+createExtensionGenericParams(ASTContext &ctx,
+                             ExtensionDecl *ext,
+                             NominalTypeDecl *nominal) {
+  // Collect generic parameters from all outer contexts.
+  SmallVector<GenericParamList *, 2> allGenericParams;
+  nominal->forEachGenericContext([&](GenericParamList *gpList) {
+    allGenericParams.push_back(gpList->clone(ext));
+  });
+
+  GenericParamList *toParams = nullptr;
+  for (auto *gpList : llvm::reverse(allGenericParams)) {
+    gpList->setOuterParameters(toParams);
+    toParams = gpList;
+  }
+
+  return toParams;
+}
+
+GenericParamList *
+GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) const {
+  if (auto *ext = dyn_cast<ExtensionDecl>(value)) {
+    // Create the generic parameter list for the extension by cloning the
+    // generic parameter lists of the nominal and any of its parent types.
+    auto &ctx = value->getASTContext();
+    auto *nominal = ext->getExtendedNominal();
+    if (!nominal) {
+      return nullptr;
+    }
+    auto *genericParams = createExtensionGenericParams(ctx, ext, nominal);
+
+    // Protocol extensions need an inheritance clause due to how name lookup
+    // is implemented.
+    if (auto *proto = ext->getExtendedProtocolDecl()) {
+      auto protoType = proto->getDeclaredInterfaceType();
+      TypeLoc selfInherited[1] = { TypeLoc::withoutLoc(protoType) };
+      genericParams->getParams().front()->setInherited(
+        ctx.AllocateCopy(selfInherited));
+    }
+
+    // Set the depth of every generic parameter.
+    unsigned depth = nominal->getGenericContextDepth();
+    for (auto *outerParams = genericParams;
+         outerParams != nullptr;
+         outerParams = outerParams->getOuterParameters())
+      outerParams->setDepth(depth--);
+
+    return genericParams;
+  } else if (auto *proto = dyn_cast<ProtocolDecl>(value)) {
+    // The generic parameter 'Self'.
+    auto &ctx = value->getASTContext();
+    auto selfId = ctx.Id_Self;
+    auto selfDecl = new (ctx) GenericTypeParamDecl(
+        proto, selfId, SourceLoc(), /*depth=*/0, /*index=*/0);
+    auto protoType = proto->getDeclaredInterfaceType();
+    TypeLoc selfInherited[1] = { TypeLoc::withoutLoc(protoType) };
+    selfDecl->setInherited(ctx.AllocateCopy(selfInherited));
+    selfDecl->setImplicit();
+
+    // The generic parameter list itself.
+    auto result = GenericParamList::create(ctx, SourceLoc(), selfDecl,
+                                           SourceLoc());
+    return result;
+  }
+  return nullptr;
+}
+
 NominalTypeDecl *
 CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
                                    CustomAttr *attr, DeclContext *dc) const {
   // Find the types referenced by the custom attribute.
   auto &ctx = dc->getASTContext();
-  TypeLoc &typeLoc = attr->getTypeLoc();
   DirectlyReferencedTypeDecls decls;
-  if (auto typeRepr = typeLoc.getTypeRepr()) {
+  if (auto *typeRepr = attr->getTypeRepr()) {
     decls = directReferencesForTypeRepr(
         evaluator, ctx, typeRepr, dc);
-  } else if (Type type = typeLoc.getType()) {
+  } else if (Type type = attr->getType()) {
     decls = directReferencesForType(type);
   }
 
@@ -2316,7 +2393,7 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
   // If we found declarations that are associated types, look outside of
   // the current context to see if we can recover.
   if (declsAreAssociatedTypes(decls)) {
-    if (auto typeRepr = typeLoc.getTypeRepr()) {
+    if (auto typeRepr = attr->getTypeRepr()) {
       if (auto identTypeRepr = dyn_cast<SimpleIdentTypeRepr>(typeRepr)) {
         auto assocType = cast<AssociatedTypeDecl>(decls.front());
 
@@ -2348,7 +2425,8 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
               identTypeRepr
             };
 
-            typeLoc = TypeLoc(IdentTypeRepr::create(ctx, components));
+            auto *newTE = new (ctx) TypeExpr(IdentTypeRepr::create(ctx, components));
+            attr->resetTypeInformation(newTE);
             return nominal;
           }
         }
@@ -2356,16 +2434,62 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
     }
   }
 
+  // If we have more than one attribute declaration, we have an ambiguity.
+  // So, emit an ambiguity diagnostic.
+  if (auto typeRepr = attr->getTypeRepr()) {
+    if (nominals.size() > 1) {
+      SmallVector<NominalTypeDecl *, 4> ambiguousCandidates;
+      // Filter out declarations that cannot be attributes.
+      for (auto decl : nominals) {
+        if (isa<ProtocolDecl>(decl)) {
+          continue;
+        }
+        ambiguousCandidates.push_back(decl);
+      }
+      if (ambiguousCandidates.size() > 1) {
+        auto attrName = nominals.front()->getName();
+        ctx.Diags.diagnose(typeRepr->getLoc(),
+                           diag::ambiguous_custom_attribute_ref, attrName);
+        for (auto candidate : ambiguousCandidates) {
+          ctx.Diags.diagnose(candidate->getLoc(),
+                             diag::found_attribute_candidate);
+          // If the candidate is a top-level attribute, let's suggest
+          // adding module name to resolve the ambiguity.
+          if (candidate->getDeclContext()->isModuleScopeContext()) {
+            auto moduleName = candidate->getParentModule()->getName();
+            ctx.Diags
+                .diagnose(typeRepr->getLoc(),
+                          diag::ambiguous_custom_attribute_ref_fix,
+                          moduleName.str(), attrName, moduleName)
+                .fixItInsert(typeRepr->getLoc(), moduleName.str().str() + ".");
+          }
+        }
+        return nullptr;
+      }
+    }
+  }
+
+  // There is no nominal type with this name, so complain about this being
+  // an unknown attribute.
+  std::string typeName;
+  if (auto typeRepr = attr->getTypeRepr()) {
+    llvm::raw_string_ostream out(typeName);
+    typeRepr->print(out);
+  } else {
+    typeName = attr->getType().getString();
+  }
+
+  ctx.Diags.diagnose(attr->getLocation(), diag::unknown_attribute, typeName);
+
   return nullptr;
 }
 
 void swift::getDirectlyInheritedNominalTypeDecls(
-    llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-    unsigned i,
-    llvm::SmallVectorImpl<Located<NominalTypeDecl *>> &result,
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
+    unsigned i, llvm::SmallVectorImpl<Located<NominalTypeDecl *>> &result,
     bool &anyObject) {
-  auto typeDecl = decl.dyn_cast<TypeDecl *>();
-  auto extDecl = decl.dyn_cast<ExtensionDecl *>();
+  auto typeDecl = decl.dyn_cast<const TypeDecl *>();
+  auto extDecl = decl.dyn_cast<const ExtensionDecl *>();
 
   ASTContext &ctx = typeDecl ? typeDecl->getASTContext()
                              : extDecl->getASTContext();
@@ -2397,10 +2521,10 @@ void swift::getDirectlyInheritedNominalTypeDecls(
 
 SmallVector<Located<NominalTypeDecl *>, 4>
 swift::getDirectlyInheritedNominalTypeDecls(
-                        llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-                        bool &anyObject) {
-  auto typeDecl = decl.dyn_cast<TypeDecl *>();
-  auto extDecl = decl.dyn_cast<ExtensionDecl *>();
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
+    bool &anyObject) {
+  auto typeDecl = decl.dyn_cast<const TypeDecl *>();
+  auto extDecl = decl.dyn_cast<const ExtensionDecl *>();
 
   // Gather results from all of the inherited types.
   unsigned numInherited = typeDecl ? typeDecl->getInherited().size()
@@ -2455,7 +2579,7 @@ void FindLocalVal::checkPattern(const Pattern *Pat, DeclVisibilityKind Reason) {
     return;
   case PatternKind::Paren:
   case PatternKind::Typed:
-  case PatternKind::Var:
+  case PatternKind::Binding:
     return checkPattern(Pat->getSemanticsProvidingPattern(), Reason);
   case PatternKind::Named:
     return checkValueDecl(cast<NamedPattern>(Pat)->getDecl(), Reason);

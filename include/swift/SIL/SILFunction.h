@@ -121,6 +121,7 @@ public:
   enum class Purpose : uint8_t {
     None,
     GlobalInit,
+    GlobalInitOnceFunction,
     LazyPropertyGetter
   };
 
@@ -501,6 +502,8 @@ public:
     IsWithoutActuallyEscapingThunk = val;
   }
 
+  bool isAsync() const { return LoweredType->isAsync(); }
+
   /// Returns the calling convention used by this entry point.
   SILFunctionTypeRepresentation getRepresentation() const {
     return getLoweredFunctionType()->getRepresentation();
@@ -830,6 +833,10 @@ public:
   /// function itself does not need this attribute. It is private and only
   /// called within the addressor.
   bool isGlobalInit() const { return specialPurpose == Purpose::GlobalInit; }
+    
+  bool isGlobalInitOnceFunction() const {
+    return specialPurpose == Purpose::GlobalInitOnceFunction;
+  }
 
   bool isLazyPropertyGetter() const {
     return specialPurpose == Purpose::LazyPropertyGetter;

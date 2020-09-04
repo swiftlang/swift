@@ -98,8 +98,10 @@ protected:
     LangOptions langOpts;
     langOpts.Target = llvm::Triple(llvm::sys::getDefaultTargetTriple());
     SearchPathOptions searchPathOpts;
+    ClangImporterOptions clangImpOpts;
     auto ctx =
-        ASTContext::get(langOpts, typeckOpts, searchPathOpts, sourceMgr, diags);
+        ASTContext::get(langOpts, typeckOpts, searchPathOpts, clangImpOpts,
+                        sourceMgr, diags);
 
     auto loader = ModuleInterfaceLoader::create(
         *ctx, cacheDir, prebuiltCacheDir,
@@ -116,7 +118,7 @@ protected:
       loader->findModuleFilesInDirectory({moduleName, SourceLoc()},
         SerializedModuleBaseName(tempDir, SerializedModuleBaseName("Library")),
         /*ModuleInterfacePath*/nullptr,
-        &moduleBuffer, &moduleDocBuffer, &moduleSourceInfoBuffer);
+        &moduleBuffer, &moduleDocBuffer, &moduleSourceInfoBuffer, /*IsFramework*/false);
     ASSERT_FALSE(error);
     ASSERT_FALSE(diags.hadAnyError());
 

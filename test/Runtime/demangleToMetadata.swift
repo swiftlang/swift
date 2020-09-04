@@ -1,8 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -parse-stdlib %s -module-name main -o %t/a.out
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-stdlib %s -module-name main -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
+// UNSUPPORTED: use_os_stdlib
 
 import Swift
 import StdlibUnittest
@@ -33,6 +34,7 @@ var f0_c: @convention(c) () -> Void = f0
 var f0_block: @convention(block) () -> Void = f0
 #endif
 
+func f0_async() async { }
 func f0_throws() throws { }
 
 func f1(x: ()) { }
@@ -57,6 +59,9 @@ DemangleToMetadataTests.test("function types") {
 #if _runtime(_ObjC)
   expectEqual(type(of: f0_block), _typeByName("yyXB")!)
 #endif
+
+  // Async functions
+  expectEqual(type(of: f0_async), _typeByName("yyYc")!)
 
   // Throwing functions
   expectEqual(type(of: f0_throws), _typeByName("yyKc")!)
@@ -441,7 +446,7 @@ DemangleToMetadataTests.test("Nested types in same-type-constrained extensions")
   // V !: P3 in InnerTEqualsConformsToP1
 }
 
-if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
   DemangleToMetadataTests.test("Round-trip with _mangledTypeName and _typeByName") {
     func roundTrip<T>(_ type: T.Type) {
       let mangledName: String? = _mangledTypeName(type)

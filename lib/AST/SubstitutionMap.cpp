@@ -97,6 +97,13 @@ ArrayRef<Type> SubstitutionMap::getReplacementTypes() const {
   return getReplacementTypesBuffer();
 }
 
+ArrayRef<Type> SubstitutionMap::getInnermostReplacementTypes() const {
+  if (empty()) return { };
+
+  return getReplacementTypes().take_back(
+      getGenericSignature()->getInnermostGenericParams().size());
+}
+
 GenericSignature SubstitutionMap::getGenericSignature() const {
   return storage ? storage->getGenericSignature() : nullptr;
 }
@@ -330,7 +337,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   for (auto reqt : genericSig->getRequirements()) {
     if (reqt.getKind() == RequirementKind::Conformance) {
       if (reqt.getFirstType()->isEqual(type) &&
-          reqt.getSecondType()->isEqual(proto->getDeclaredType()))
+          reqt.getSecondType()->isEqual(proto->getDeclaredInterfaceType()))
         return getConformances()[index];
 
       ++index;

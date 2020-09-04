@@ -29,7 +29,7 @@
 // RUN: %FileCheck %s -check-prefix=FOO_ENUM_DOT_ELEMENTS < %t.enum.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_WITH_QUAL_1 > %t.enum.txt
-// RUN: %FileCheck %s -check-prefix=FOO_ENUM_DOT < %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=FOO_ENUM_DOT_CONTEXT < %t.enum.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_EXPR_ERROR_1 > %t.enum.txt
 // RUN: %FileCheck %s -check-prefix=FOO_ENUM_DOT < %t.enum.txt
@@ -116,6 +116,17 @@ enum FooEnum: CaseIterable {
 // FOO_ENUM_DOT-NEXT: Decl[StaticVar]/CurrNominal: allCases[#[FooEnum]#]{{; name=.+$}}
 // FOO_ENUM_DOT-NEXT: End completions
 
+// FOO_ENUM_DOT_CONTEXT: Begin completions
+// FOO_ENUM_DOT_CONTEXT-NEXT: Keyword[self]/CurrNominal: self[#FooEnum.Type#]; name=self
+// FOO_ENUM_DOT_CONTEXT-NEXT: Keyword/CurrNominal: Type[#FooEnum.Type#]; name=Type
+// FOO_ENUM_DOT_CONTEXT-NEXT: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: Foo1[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_DOT_CONTEXT-NEXT: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: Foo2[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_DOT_CONTEXT-NEXT: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: alias1[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_DOT_CONTEXT-NEXT: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): FooEnum#})[#(into: inout Hasher) -> Void#]{{; name=.+$}}
+// FOO_ENUM_DOT_CONTEXT-NEXT: Decl[TypeAlias]/CurrNominal: AllCases[#[FooEnum]#]{{; name=.+$}}
+// FOO_ENUM_DOT_CONTEXT-NEXT: Decl[StaticVar]/CurrNominal: allCases[#[FooEnum]#]{{; name=.+$}}
+// FOO_ENUM_DOT_CONTEXT-NEXT: End completions
+
 // FOO_ENUM_DOT_INVALID: Begin completions
 // FOO_ENUM_DOT_INVALID-NEXT: Keyword[self]/CurrNominal: self[#FooEnum.Type#]; name=self
 // FOO_ENUM_DOT_INVALID-NEXT: Keyword/CurrNominal: Type[#FooEnum.Type#]; name=Type
@@ -127,10 +138,20 @@ enum FooEnum: CaseIterable {
 // FOO_ENUM_DOT_INVALID-NEXT: Decl[StaticVar]/CurrNominal: allCases[#[FooEnum]#]{{; name=.+$}}
 // FOO_ENUM_DOT_INVALID-NEXT: End completions
 
-// FOO_ENUM_DOT_ELEMENTS: Begin completions, 3 items
+// FOO_ENUM_DOT_ELEMENTS: Begin completions, 13 items
 // FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: Foo1[#FooEnum#]{{; name=.+$}}
 // FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: Foo2[#FooEnum#]{{; name=.+$}}
 // FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: alias1[#FooEnum#]; name=alias1
+// FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): FooEnum#})[#(into: inout Hasher) -> Void#]; name=hash(self: FooEnum)
+// FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[Constructor]/CurrNominal/IsSystem: AllCases({#arrayLiteral: FooEnum...#})[#Array<FooEnum>#]; name=AllCases(arrayLiteral: FooEnum...)
+// FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[Constructor]/CurrNominal/IsSystem: AllCases()[#Array<FooEnum>#]; name=AllCases()
+// FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[Constructor]/CurrNominal/IsSystem: AllCases({#(s): Sequence#})[#Array<FooEnum>#]; name=AllCases(s: Sequence)
+// FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[Constructor]/CurrNominal/IsSystem: AllCases({#repeating: FooEnum#}, {#count: Int#})[#Array<FooEnum>#]; name=AllCases(repeating: FooEnum, count: Int)
+// FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[Constructor]/CurrNominal/IsSystem: AllCases({#unsafeUninitializedCapacity: Int#}, {#initializingWith: (inout UnsafeMutableBufferPointer<FooEnum>, inout Int) throws -> Void##(inout UnsafeMutableBufferPointer<FooEnum>, inout Int) throws -> Void#})[' rethrows'][#Array<FooEnum>#]; name=AllCases(unsafeUninitializedCapacity: Int, initializingWith: (inout UnsafeMutableBufferPointer<FooEnum>, inout Int) throws -> Void) rethrows
+// FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[Constructor]/CurrNominal/IsSystem: AllCases({#from: Decoder#})[' throws'][#Array<FooEnum>#]; name=AllCases(from: Decoder) throws
+// FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[Constructor]/CurrNominal/IsSystem: AllCases({#repeating: FooEnum#}, {#count: Int#})[#FooEnum.AllCases#]; name=AllCases(repeating: FooEnum, count: Int)
+// FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[Constructor]/CurrNominal/IsSystem: AllCases({#(elements): Sequence#})[#FooEnum.AllCases#]; name=AllCases(elements: Sequence)
+// FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[StaticVar]/CurrNominal:        allCases[#[FooEnum]#]; name=allCases
 // FOO_ENUM_DOT_ELEMENTS-NEXT: End completions
 
 enum BarEnum {
@@ -443,9 +464,12 @@ func testWithInvalid1() {
 
 func testUnqualified1(x: QuxEnum) {
   _ = x == .Qux1 || x == .#^UNRESOLVED_2^#Qux2
-  // UNRESOLVED_2: Begin completions, 2 items
+  // UNRESOLVED_2: Begin completions
   // UNRESOLVED_2-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     Qux1[#QuxEnum#]; name=Qux1
   // UNRESOLVED_2-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     Qux2[#QuxEnum#]; name=Qux2
+  // UNRESOLVED_2-DAG: Decl[Constructor]/CurrNominal/IsSystem:                     RawValue({#bitPattern: UInt#})[#Int#]; name=RawValue(bitPattern: UInt)
+  // UNRESOLVED_2-DAG: Decl[Constructor]/CurrNominal:                              init({#rawValue: Int#})[#QuxEnum?#]; name=init(rawValue: Int)
+  // UNRESOLVED_2-DAG: Decl[InstanceMethod]/Super/IsSystem/TypeRelation[Invalid]:  hash({#(self): QuxEnum#})[#(into: inout Hasher) -> Void#]; name=hash(self: QuxEnum)
   // UNRESOLVED_2: End completions
 
   _ = (x == .Qux1#^UNRESOLVED_3^#)

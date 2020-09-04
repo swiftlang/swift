@@ -2,11 +2,6 @@
 // RUN: mkdir -p %t/stats-dir
 // RUN: %target-typecheck-verify-swift
 // RUN: not %target-swift-frontend -typecheck -debug-cycles %s -build-request-dependency-graph -output-request-graphviz %t.dot -stats-output-dir %t/stats-dir 2> %t.cycles
-// RUN: %FileCheck %s < %t.cycles
-// RUN: %FileCheck -check-prefix CHECK-DOT %s  < %t.dot
-
-// Check that we produced superclass type requests.
-// RUN: %{python} %utils/process-stats-dir.py --evaluate 'SuperclassTypeRequest == 18' %t/stats-dir
 
 class Left // expected-error {{circular reference}} expected-note {{through reference here}}
     : Right.Hand { // expected-note {{through reference here}}

@@ -1,6 +1,8 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -no-omit-leaf-frame-pointer| %FileCheck %s --check-prefix=CHECK-ALL
+// RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s -check-prefix CHECK --check-prefix=CHECK-%target-abi
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -Xcc -mno-omit-leaf-frame-pointer | %FileCheck %s -check-prefix CHECK-ALL --check-prefix=CHECK-%target-abi-ALL
 // RUN: %target-swift-frontend -primary-file %s -S | %FileCheck %s  --check-prefix=CHECKASM --check-prefix=CHECKASM-%target-os-%target-cpu
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -Xcc -momit-leaf-frame-pointer | %FileCheck %s -check-prefix LEAF --check-prefix=LEAF-%target-abi
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -Xcc -fomit-frame-pointer | %FileCheck %s --check-prefix=NOFP
 
 // REQUIRES: CPU=x86_64
 
@@ -31,7 +33,8 @@ entry(%i : $Int32):
 // CHECK:   ret i32 %1
 // CHECK: }
 
-// CHECK: attributes [[ATTR]] = {{{.*}}"frame-pointer"="all"
+// CHECK-SYSV: attributes [[ATTR]] = { {{.*}}"frame-pointer"="all"
+// CHECK-WIN: attributes [[ATTR]] = { {{.*}}"frame-pointer"="none"
 
 // CHECK-ALL: define{{.*}} swiftcc i32 @leaf_function_no_frame_pointer(i32 %0) [[ATTR:#.*]] {
 // CHECK-ALL: entry:
@@ -44,7 +47,35 @@ entry(%i : $Int32):
 // CHECK-ALL:   ret i32 %1
 // CHECK-ALL: }
 
-// CHECK-ALL: attributes [[ATTR]] = {{{.*}}"frame-pointer"="all"
+// CHECK-SYSV-ALL: attributes [[ATTR]] = {{{.*}}"frame-pointer"="all"
+// CHECK-WIN-ALL: attributes [[ATTR]] = {{{.*}}"frame-pointer"="none"
+
+// LEAF: define{{.*}} swiftcc i32 @leaf_function_no_frame_pointer(i32 %0) [[ATTR:#.*]] {
+// LEAF: entry:
+// LEAF:   ret i32 %0
+// LEAF: }
+
+// LEAF: define{{.*}} swiftcc i32 @non_leaf_function_with_frame_pointer(i32 %0) [[ATTR]] {
+// LEAF: entry:
+// LEAF:   %1 = call swiftcc i32 @leaf_function_no_frame_pointer(i32 %0)
+// LEAF:   ret i32 %1
+// LEAF: }
+
+// LEAF-SYSV: attributes [[ATTR]] = {{{.*}}"frame-pointer"="non-leaf"
+// LEAF-WIN: attributes [[ATTR]] = {{{.*}}"frame-pointer"="none"
+
+// NOFP: define{{.*}} swiftcc i32 @leaf_function_no_frame_pointer(i32 %0) [[ATTR:#.*]] {
+// NOFP: entry:
+// NOFP:   ret i32 %0
+// NOFP: }
+
+// NOFP: define{{.*}} swiftcc i32 @non_leaf_function_with_frame_pointer(i32 %0) [[ATTR]] {
+// NOFP: entry:
+// NOFP:   %1 = call swiftcc i32 @leaf_function_no_frame_pointer(i32 %0)
+// NOFP:   ret i32 %1
+// NOFP: }
+
+// NOFP: attributes [[ATTR]] = {{{.*}}"frame-pointer"="none"
 
 // Silence other os-archs.
 // CHECKASM: {{.*}}

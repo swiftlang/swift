@@ -458,7 +458,7 @@ public:
 #else
     auto applePlatform = false;
 #endif
-#if defined(__APPLE__) && __APPLE__ && ((defined(TARGET_OS_IOS) && TARGET_OS_IOS) || (defined(TARGET_OS_IOS) && TARGET_OS_WATCH) || (defined(TARGET_OS_TV) && TARGET_OS_TV))
+#if defined(__APPLE__) && __APPLE__ && ((defined(TARGET_OS_IOS) && TARGET_OS_IOS) || (defined(TARGET_OS_IOS) && TARGET_OS_WATCH) || (defined(TARGET_OS_TV) && TARGET_OS_TV) || defined(__arm64__))
     auto iosDerivedPlatform = true;
 #else
     auto iosDerivedPlatform = false;
@@ -668,12 +668,15 @@ static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
 
       Demangle::Demangler Dem;
       auto Demangled = Dem.demangleType(Line);
-      auto *TypeRef =
-          swift::Demangle::decodeMangledType(builder, Demangled);
-      if (TypeRef == nullptr) {
-        fprintf(file, "Invalid typeref:%s\n", Line.c_str());
+      auto Result = swift::Demangle::decodeMangledType(builder, Demangled);
+      if (Result.isError()) {
+        auto *error = Result.getError();
+        char *str = error->copyErrorString();
+        fprintf(file, "Invalid typeref:%s - %s\n", Line.c_str(), str);
+        error->freeErrorString(str);
         continue;
       }
+      auto TypeRef = Result.getType();
 
       TypeRef->dump(file);
       auto *TypeInfo = builder.getTypeConverter().getTypeInfo(TypeRef);

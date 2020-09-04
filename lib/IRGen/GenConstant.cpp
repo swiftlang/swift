@@ -85,7 +85,8 @@ llvm::Constant *irgen::emitConstantZero(IRGenModule &IGM, BuiltinInst *BI) {
 
   if (auto vector = BI->getType().getAs<BuiltinVectorType>()) {
     auto zero = helper(vector.getElementType());
-    return llvm::ConstantVector::getSplat(vector->getNumElements(), zero);
+    return llvm::ConstantVector::getSplat(
+        llvm::ElementCount(vector->getNumElements(), /*scalable*/ false), zero);
   }
 
   return helper(BI->getType().getASTType());
@@ -101,14 +102,6 @@ llvm::Constant *irgen::emitAddrOfConstantString(IRGenModule &IGM,
   case StringLiteralInst::Encoding::Bytes:
   case StringLiteralInst::Encoding::UTF8:
     return IGM.getAddrOfGlobalString(SLI->getValue());
-
-  case StringLiteralInst::Encoding::UTF16: {
-    // This is always a GEP of a GlobalVariable with a nul terminator.
-    auto addr = IGM.getAddrOfGlobalUTF16String(SLI->getValue());
-
-    // Cast to Builtin.RawPointer.
-    return llvm::ConstantExpr::getBitCast(addr, IGM.Int8PtrTy);
-  }
 
   case StringLiteralInst::Encoding::ObjCSelector:
     llvm_unreachable("cannot get the address of an Objective-C selector");

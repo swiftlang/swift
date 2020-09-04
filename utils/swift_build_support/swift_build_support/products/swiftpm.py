@@ -12,7 +12,16 @@
 
 import os
 
+from . import cmark
+from . import foundation
+from . import libcxx
+from . import libdispatch
+from . import libicu
+from . import llbuild
+from . import llvm
 from . import product
+from . import swift
+from . import xctest
 from .. import shell
 
 
@@ -31,7 +40,7 @@ class SwiftPM(product.Product):
     def run_bootstrap_script(self, action, host_target, additional_params=[]):
         script_path = os.path.join(
             self.source_dir, 'Utilities', 'bootstrap')
-        toolchain_path = self.install_toolchain_path()
+        toolchain_path = self.install_toolchain_path(host_target)
         swiftc = os.path.join(toolchain_path, "bin", "swiftc")
 
         # FIXME: We require llbuild build directory in order to build. Is
@@ -41,6 +50,11 @@ class SwiftPM(product.Product):
             build_root, '%s-%s' % ("llbuild", host_target))
 
         helper_cmd = [script_path, action]
+
+        if action == 'clean':
+            helper_cmd += ["--build-dir", self.build_dir]
+            shell.call(helper_cmd)
+            return
 
         if self.is_release():
             helper_cmd.append("--release")
@@ -72,6 +86,12 @@ class SwiftPM(product.Product):
                 "--foundation-build-dir", foundation_build_dir
             ]
 
+        # Pass Cross compile host info
+        if self.has_cross_compile_hosts(self.args):
+            helper_cmd += ['--cross-compile-hosts']
+            for cross_compile_host in self.args.cross_compile_hosts:
+                helper_cmd += [cross_compile_host]
+
         helper_cmd.extend(additional_params)
 
         shell.call(helper_cmd)
@@ -85,11 +105,45 @@ class SwiftPM(product.Product):
     def test(self, host_target):
         self.run_bootstrap_script('test', host_target)
 
+    def should_clean(self, host_target):
+        return self.args.clean_swiftpm
+
+    def clean(self, host_target):
+        self.run_bootstrap_script('clean', host_target)
+
     def should_install(self, host_target):
         return self.args.install_swiftpm
 
+    @classmethod
+    def has_cross_compile_hosts(self, args):
+        return args.cross_compile_hosts
+
+    @classmethod
+    def get_install_destdir(self, args, host_target, build_dir):
+        install_destdir = args.install_destdir
+        if self.has_cross_compile_hosts(args):
+            build_root = os.path.dirname(build_dir)
+            install_destdir = '%s/intermediate-install/%s' % (build_root, host_target)
+        return install_destdir
+
     def install(self, host_target):
-        install_prefix = self.args.install_destdir + self.args.install_prefix
+        install_destdir = self.get_install_destdir(self.args,
+                                                   host_target,
+                                                   self.build_dir)
+        install_prefix = install_destdir + self.args.install_prefix
+
         self.run_bootstrap_script('install', host_target, [
             '--prefix', install_prefix
         ])
+
+    @classmethod
+    def get_dependencies(cls):
+        return [cmark.CMark,
+                llvm.LLVM,
+                libcxx.LibCXX,
+                libicu.LibICU,
+                swift.Swift,
+                libdispatch.LibDispatch,
+                foundation.Foundation,
+                xctest.XCTest,
+                llbuild.LLBuild]

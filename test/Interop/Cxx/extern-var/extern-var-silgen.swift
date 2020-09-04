@@ -7,9 +7,9 @@ func getCounter() -> CInt {
 }
 
 // CHECK: // clang name: counter
-// CHECK: sil_global @counter : $Int32
+// CHECK: sil_global public_external @counter : $Int32
 // CHECK: // clang name: Namespaced::counter
-// CHECK: sil_global @{{_ZN10Namespaced7counterE|\?counter@Namespaced@@3HA}} : $Int32
+// CHECK: sil_global public_external @{{_ZN10Namespaced7counterE|\?counter@Namespaced@@3HA}} : $Int32
 
 // CHECK: sil hidden @$s4main10getCounters5Int32VyF : $@convention(thin) () -> Int32
 // CHECK: [[COUNTER:%.*]] = global_addr @counter : $*Int32

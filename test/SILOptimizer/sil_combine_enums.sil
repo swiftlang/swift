@@ -140,9 +140,10 @@ bb0(%0 : $*G<T>):
 // CHECK: enum $Optional<Int32>, #Optional.some!enumelt
 // CHECK-NOT: inject_enum_addr
 // CHECK: return
-sil @canonicalize_init_enum_data_addr : $@convention(thin) (@inout Int32, Builtin.Int32) -> Int32 {
-bb0(%0 : $*Int32, %1 : $Builtin.Int32):
+sil @canonicalize_init_enum_data_addr : $@convention(thin) (@inout Int32, Builtin.Int32, Optional<Int32>) -> Int32 {
+bb0(%0 : $*Int32, %1 : $Builtin.Int32, %2 : $Optional<Int32>):
   %s1 = alloc_stack $Optional<Int32>
+  store %2 to %s1 : $*Optional<Int32>
   %e1 = init_enum_data_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt
   %v = load %0 : $*Int32
   store %v to %e1 : $*Int32
@@ -163,9 +164,10 @@ bb0(%0 : $*Int32, %1 : $Builtin.Int32):
 // CHECK: enum $Optional<Int32>, #Optional.some!enumelt
 // CHECK-NOT: inject_enum_addr
 // CHECK: return
-sil @canonicalize_init_enum_data_addr_diff_basic_blocks : $@convention(thin) (@inout Int32, Builtin.Int32) -> Int32 {
-bb0(%0 : $*Int32, %1 : $Builtin.Int32):
+sil @canonicalize_init_enum_data_addr_diff_basic_blocks : $@convention(thin) (@inout Int32, Builtin.Int32, Optional<Int32>) -> Int32 {
+bb0(%0 : $*Int32, %1 : $Builtin.Int32, %2 : $Optional<Int32>):
   %s1 = alloc_stack $Optional<Int32>
+  store %2 to %s1 : $*Optional<Int32>
   %e1 = init_enum_data_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt
   %v = load %0 : $*Int32
   store %v to %e1 : $*Int32
@@ -494,5 +496,116 @@ bb0(%0 : $Int, %1 : $Int):
   %r = load %17 : $*Optional<(Int, Int)>
   dealloc_stack %17 : $*Optional<(Int, Int)>
   return %r : $Optional<(Int, Int)>
+}
+
+enum MP {
+  case A(S)
+  case B(S)
+}
+
+sil @take_s : $@convention(thin) (@in S) -> ()
+sil @use_mp : $@convention(thin) (@in_guaranteed MP) -> ()
+
+// CHECK-LABEL: sil @expand_alloc_stack_of_enum1
+// CHECK:        [[A:%[0-9]+]] = alloc_stack $S
+// CHECK:      bb1:
+// CHECK-NEXT:   store %0 to [[A]]
+// CHECK:      bb2:
+// CHECK-NEXT:   store %0 to [[A]]
+// CHECK:      bb3:
+// CHECK:        apply {{%[0-9]+}}([[A]])
+// CHECK: } // end sil function 'expand_alloc_stack_of_enum1'
+sil @expand_alloc_stack_of_enum1 : $@convention(method) (S) -> () {
+bb0(%0 : $S):
+  %1 = alloc_stack $MP
+  cond_br undef, bb1, bb2
+bb1:
+  %2 = init_enum_data_addr %1 : $*MP, #MP.A!enumelt
+  store %0 to %2 : $*S
+  inject_enum_addr %1 : $*MP, #MP.A!enumelt
+  br bb3
+bb2:
+  %3 = init_enum_data_addr %1 : $*MP, #MP.A!enumelt
+  store %0 to %3 : $*S
+  inject_enum_addr %1 : $*MP, #MP.A!enumelt
+  br bb3
+bb3:
+  %7 = unchecked_take_enum_data_addr %1 : $*MP, #MP.A!enumelt
+  %8 = function_ref @take_s : $@convention(thin) (@in S) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@in S) -> ()
+  dealloc_stack %1 : $*MP
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: sil @expand_alloc_stack_of_enum_without_take
+// CHECK:        [[A:%[0-9]+]] = alloc_stack $S
+// CHECK:      bb1:
+// CHECK-NEXT:   store %0 to [[A]]
+// CHECK:      bb2:
+// CHECK-NEXT:   store %0 to [[A]]
+// CHECK:      bb3:
+// CHECK:        destroy_addr [[A]]
+// CHECK: } // end sil function 'expand_alloc_stack_of_enum_without_take'
+sil @expand_alloc_stack_of_enum_without_take : $@convention(method) (S) -> () {
+bb0(%0 : $S):
+  %1 = alloc_stack $MP
+  cond_br undef, bb1, bb2
+bb1:
+  %2 = init_enum_data_addr %1 : $*MP, #MP.A!enumelt
+  store %0 to %2 : $*S
+  inject_enum_addr %1 : $*MP, #MP.A!enumelt
+  br bb3
+bb2:
+  %3 = init_enum_data_addr %1 : $*MP, #MP.A!enumelt
+  store %0 to %3 : $*S
+  inject_enum_addr %1 : $*MP, #MP.A!enumelt
+  br bb3
+bb3:
+  destroy_addr %1 : $*MP
+  dealloc_stack %1 : $*MP
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: sil @dont_expand_alloc_stack_of_enum_multiple_cases
+// CHECK:   alloc_stack $MP
+// CHECK: } // end sil function 'dont_expand_alloc_stack_of_enum_multiple_cases'
+sil @dont_expand_alloc_stack_of_enum_multiple_cases : $@convention(method) (S) -> () {
+bb0(%0 : $S):
+  %1 = alloc_stack $MP
+  cond_br undef, bb1, bb2
+bb1:
+  %2 = init_enum_data_addr %1 : $*MP, #MP.A!enumelt
+  store %0 to %2 : $*S
+  inject_enum_addr %1 : $*MP, #MP.A!enumelt
+  br bb3
+bb2:
+  %3 = init_enum_data_addr %1 : $*MP, #MP.B!enumelt
+  store %0 to %3 : $*S
+  inject_enum_addr %1 : $*MP, #MP.B!enumelt
+  br bb3
+bb3:
+  destroy_addr %1 : $*MP
+  dealloc_stack %1 : $*MP
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: sil @dont_expand_alloc_stack_of_enum_unknown_use
+// CHECK:   alloc_stack $MP
+// CHECK: } // end sil function 'dont_expand_alloc_stack_of_enum_unknown_use'
+sil @dont_expand_alloc_stack_of_enum_unknown_use : $@convention(method) (S) -> () {
+bb0(%0 : $S):
+  %1 = alloc_stack $MP
+  %2 = init_enum_data_addr %1 : $*MP, #MP.A!enumelt
+  store %0 to %2 : $*S
+  inject_enum_addr %1 : $*MP, #MP.A!enumelt
+  %8 = function_ref @use_mp : $@convention(thin) (@in_guaranteed MP) -> ()
+  %9 = apply %8(%1) : $@convention(thin) (@in_guaranteed MP) -> ()
+  destroy_addr %1 : $*MP
+  dealloc_stack %1 : $*MP
+  %11 = tuple ()
+  return %11 : $()
 }
 

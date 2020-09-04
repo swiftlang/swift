@@ -498,6 +498,15 @@ bb0:
   return %6 : $()
 }
 
+// CHECK-LABEL: @base_addr : $@convention(thin) () -> ()
+sil [transparent] [serialized] @base_addr : $@convention(thin) () -> () {
+bb0:
+  // CHECK: base_addr_for_offset $*Int
+  %0 = base_addr_for_offset $*Int
+  %1 = tuple ()
+  return %1 : $()
+}
+
 class GlobalObject { }
 
 sil_global @static_global_object : $GlobalObject = {
@@ -1491,7 +1500,8 @@ bb0:
   %57 = function_ref @$s7literal8literalsyyF : $@convention(thin) () -> ()
   %59 = function_ref @$s5index5gep641p1iBpBp_Bi64_tF : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer
   %60 = function_ref @global_code : $@convention(thin) () -> ()
-  %61 = function_ref @global_object : $@convention(thin) () -> GlobalObject
+  %61 = function_ref @base_addr : $@convention(thin) () -> ()
+  %62 = function_ref @global_object : $@convention(thin) () -> GlobalObject
   %63 = function_ref @test_class_metatype : $@convention(thin) (SomeClass, SomeSubclass) -> (@thick SomeClass.Type, @thick SomeClass.Type)
   %67 = function_ref @test_existential_metatype : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type
   %69 = function_ref @test_unreachable : $@convention(thin) () -> ()

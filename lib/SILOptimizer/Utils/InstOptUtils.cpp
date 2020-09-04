@@ -43,6 +43,32 @@ using namespace swift;
 static llvm::cl::opt<bool> EnableExpandAll("enable-expand-all",
                                            llvm::cl::init(false));
 
+static llvm::cl::opt<bool> KeepWillThrowCall(
+    "keep-will-throw-call", llvm::cl::init(false),
+    llvm::cl::desc(
+      "Keep calls to swift_willThrow, even if the throw is optimized away"));
+
+// Defined here to avoid repeatedly paying the price of template instantiation.
+const std::function<void(SILInstruction *)>
+    InstModCallbacks::defaultDeleteInst
+        = [](SILInstruction *inst) {
+          inst->eraseFromParent();
+        };
+const std::function<void(SILInstruction *)>
+    InstModCallbacks::defaultCreatedNewInst
+        = [](SILInstruction *) {};
+const std::function<void(SILValue, SILValue)>
+    InstModCallbacks::defaultReplaceValueUsesWith
+        = [](SILValue oldValue, SILValue newValue) {
+          oldValue->replaceAllUsesWith(newValue);
+        };
+const std::function<void(SingleValueInstruction *, SILValue)>
+    InstModCallbacks::defaultEraseAndRAUWSingleValueInst
+        = [](SingleValueInstruction *i, SILValue newValue) {
+          i->replaceAllUsesWith(newValue);
+          i->eraseFromParent();
+        };
+
 /// Creates an increment on \p Ptr before insertion point \p InsertPt that
 /// creates a strong_retain if \p Ptr has reference semantics itself or a
 /// retain_value if \p Ptr is a non-trivial value without reference-semantics.
@@ -667,6 +693,91 @@ void swift::eraseUsesOfValue(SILValue v) {
   }
 }
 
+SILValue swift::
+getConcreteValueOfExistentialBox(AllocExistentialBoxInst *existentialBox,
+                                  SILInstruction *ignoreUser) {
+  StoreInst *singleStore = nullptr;
+  for (Operand *use : getNonDebugUses(existentialBox)) {
+    SILInstruction *user = use->getUser();
+    switch (user->getKind()) {
+      case SILInstructionKind::StrongRetainInst:
+      case SILInstructionKind::StrongReleaseInst:
+        break;
+      case SILInstructionKind::ProjectExistentialBoxInst: {
+        auto *projectedAddr = cast<ProjectExistentialBoxInst>(user);
+        for (Operand *addrUse : getNonDebugUses(projectedAddr)) {
+          if (auto *store = dyn_cast<StoreInst>(addrUse->getUser())) {
+            assert(store->getSrc() != projectedAddr &&
+                   "cannot store an address");
+            // Bail if there are multiple stores.
+            if (singleStore)
+              return SILValue();
+            singleStore = store;
+            continue;
+          }
+          // If there are other users to the box value address then bail out.
+          return SILValue();
+        }
+        break;
+      }
+      case SILInstructionKind::BuiltinInst: {
+        auto *builtin = cast<BuiltinInst>(user);
+        if (KeepWillThrowCall ||
+            builtin->getBuiltinInfo().ID != BuiltinValueKind::WillThrow) {
+          return SILValue();
+        }
+        break;
+      }
+      default:
+        if (user != ignoreUser)
+          return SILValue();
+        break;
+    }
+  }
+  if (!singleStore)
+    return SILValue();
+  return singleStore->getSrc();
+}
+
+SILValue swift::
+getConcreteValueOfExistentialBoxAddr(SILValue addr, SILInstruction *ignoreUser) {
+  auto *stackLoc = dyn_cast<AllocStackInst>(addr);
+  if (!stackLoc)
+    return SILValue();
+
+  StoreInst *singleStackStore = nullptr;
+  for (Operand *stackUse : stackLoc->getUses()) {
+    SILInstruction *stackUser = stackUse->getUser();
+    switch (stackUser->getKind()) {
+      case SILInstructionKind::DeallocStackInst:
+      case SILInstructionKind::DebugValueAddrInst:
+      case SILInstructionKind::LoadInst:
+        break;
+      case SILInstructionKind::StoreInst: {
+        auto *store = cast<StoreInst>(stackUser);
+        assert(store->getSrc() != stackLoc && "cannot store an address");
+        // Bail if there are multiple stores.
+        if (singleStackStore)
+          return SILValue();
+        singleStackStore = store;
+        break;
+      }
+      default:
+        if (stackUser != ignoreUser)
+          return SILValue();
+        break;
+    }
+  }
+  if (!singleStackStore)
+    return SILValue();
+
+  auto *box = dyn_cast<AllocExistentialBoxInst>(singleStackStore->getSrc());
+  if (!box)
+    return SILValue();
+
+  return getConcreteValueOfExistentialBox(box, singleStackStore);
+}
+
 // Devirtualization of functions with covariant return types produces
 // a result that is not an apply, but takes an apply as an
 // argument. Attempt to dig the apply out from this result.
@@ -853,7 +964,8 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
         }
 
         // Cast between two metatypes and that's it.
-        return {builder->createUncheckedBitCast(loc, value, destTy), false};
+        return {builder->createUncheckedReinterpretCast(loc, value, destTy),
+                false};
       }
     }
   }
@@ -1022,247 +1134,6 @@ swift::findInitAddressForTrivialEnum(UncheckedTakeEnumDataAddrInst *utedai) {
   // given UncheckedTakeEnumDataAddrInst, because that's how SIL is defined. I
   // don't know where this is actually verified.
   return dyn_cast<InitEnumDataAddrInst>(singleUser);
-}
-
-//===----------------------------------------------------------------------===//
-//                       String Concatenation Optimizer
-//===----------------------------------------------------------------------===//
-
-namespace {
-/// This is a helper class that performs optimization of string literals
-/// concatenation.
-class StringConcatenationOptimizer {
-  /// Apply instruction being optimized.
-  ApplyInst *ai;
-  /// Builder to be used for creation of new instructions.
-  SILBuilder &builder;
-  /// Left string literal operand of a string concatenation.
-  StringLiteralInst *sliLeft = nullptr;
-  /// Right string literal operand of a string concatenation.
-  StringLiteralInst *sliRight = nullptr;
-  /// Function used to construct the left string literal.
-  FunctionRefInst *friLeft = nullptr;
-  /// Function used to construct the right string literal.
-  FunctionRefInst *friRight = nullptr;
-  /// Apply instructions used to construct left string literal.
-  ApplyInst *aiLeft = nullptr;
-  /// Apply instructions used to construct right string literal.
-  ApplyInst *aiRight = nullptr;
-  /// String literal conversion function to be used.
-  FunctionRefInst *friConvertFromBuiltin = nullptr;
-  /// Result type of a function producing the concatenated string literal.
-  SILValue funcResultType;
-
-  /// Internal helper methods
-  bool extractStringConcatOperands();
-  void adjustEncodings();
-  APInt getConcatenatedLength();
-  bool isAscii() const;
-
-public:
-  StringConcatenationOptimizer(ApplyInst *ai, SILBuilder &builder)
-      : ai(ai), builder(builder) {}
-
-  /// Tries to optimize a given apply instruction if it is a
-  /// concatenation of string literals.
-  ///
-  /// Returns a new instruction if optimization was possible.
-  SingleValueInstruction *optimize();
-};
-
-} // end anonymous namespace
-
-/// Checks operands of a string concatenation operation to see if
-/// optimization is applicable.
-///
-/// Returns false if optimization is not possible.
-/// Returns true and initializes internal fields if optimization is possible.
-bool StringConcatenationOptimizer::extractStringConcatOperands() {
-  auto *Fn = ai->getReferencedFunctionOrNull();
-  if (!Fn)
-    return false;
-
-  if (ai->getNumArguments() != 3 || !Fn->hasSemanticsAttr(semantics::STRING_CONCAT))
-    return false;
-
-  // Left and right operands of a string concatenation operation.
-  aiLeft = dyn_cast<ApplyInst>(ai->getOperand(1));
-  aiRight = dyn_cast<ApplyInst>(ai->getOperand(2));
-
-  if (!aiLeft || !aiRight)
-    return false;
-
-  friLeft = dyn_cast<FunctionRefInst>(aiLeft->getCallee());
-  friRight = dyn_cast<FunctionRefInst>(aiRight->getCallee());
-
-  if (!friLeft || !friRight)
-    return false;
-
-  auto *friLeftFun = friLeft->getReferencedFunctionOrNull();
-  auto *friRightFun = friRight->getReferencedFunctionOrNull();
-
-  if (friLeftFun->getEffectsKind() >= EffectsKind::ReleaseNone
-      || friRightFun->getEffectsKind() >= EffectsKind::ReleaseNone)
-    return false;
-
-  if (!friLeftFun->hasSemanticsAttrs() || !friRightFun->hasSemanticsAttrs())
-    return false;
-
-  auto aiLeftOperandsNum = aiLeft->getNumOperands();
-  auto aiRightOperandsNum = aiRight->getNumOperands();
-
-  // makeUTF8 should have following parameters:
-  // (start: RawPointer, utf8CodeUnitCount: Word, isASCII: Int1)
-  if (!((friLeftFun->hasSemanticsAttr(semantics::STRING_MAKE_UTF8)
-         && aiLeftOperandsNum == 5)
-        || (friRightFun->hasSemanticsAttr(semantics::STRING_MAKE_UTF8)
-            && aiRightOperandsNum == 5)))
-    return false;
-
-  sliLeft = dyn_cast<StringLiteralInst>(aiLeft->getOperand(1));
-  sliRight = dyn_cast<StringLiteralInst>(aiRight->getOperand(1));
-
-  if (!sliLeft || !sliRight)
-    return false;
-
-  // Only UTF-8 and UTF-16 encoded string literals are supported by this
-  // optimization.
-  if (sliLeft->getEncoding() != StringLiteralInst::Encoding::UTF8
-      && sliLeft->getEncoding() != StringLiteralInst::Encoding::UTF16)
-    return false;
-
-  if (sliRight->getEncoding() != StringLiteralInst::Encoding::UTF8
-      && sliRight->getEncoding() != StringLiteralInst::Encoding::UTF16)
-    return false;
-
-  return true;
-}
-
-/// Ensures that both string literals to be concatenated use the same
-/// UTF encoding. Converts UTF-8 into UTF-16 if required.
-void StringConcatenationOptimizer::adjustEncodings() {
-  if (sliLeft->getEncoding() == sliRight->getEncoding()) {
-    friConvertFromBuiltin = friLeft;
-    if (sliLeft->getEncoding() == StringLiteralInst::Encoding::UTF8) {
-      funcResultType = aiLeft->getOperand(4);
-    } else {
-      funcResultType = aiLeft->getOperand(3);
-    }
-    return;
-  }
-
-  builder.setCurrentDebugScope(ai->getDebugScope());
-
-  // If one of the string literals is UTF8 and another one is UTF16,
-  // convert the UTF8-encoded string literal into UTF16-encoding first.
-  if (sliLeft->getEncoding() == StringLiteralInst::Encoding::UTF8
-      && sliRight->getEncoding() == StringLiteralInst::Encoding::UTF16) {
-    funcResultType = aiRight->getOperand(3);
-    friConvertFromBuiltin = friRight;
-    // Convert UTF8 representation into UTF16.
-    sliLeft = builder.createStringLiteral(ai->getLoc(), sliLeft->getValue(),
-                                          StringLiteralInst::Encoding::UTF16);
-  }
-
-  if (sliRight->getEncoding() == StringLiteralInst::Encoding::UTF8
-      && sliLeft->getEncoding() == StringLiteralInst::Encoding::UTF16) {
-    funcResultType = aiLeft->getOperand(3);
-    friConvertFromBuiltin = friLeft;
-    // Convert UTF8 representation into UTF16.
-    sliRight = builder.createStringLiteral(ai->getLoc(), sliRight->getValue(),
-                                           StringLiteralInst::Encoding::UTF16);
-  }
-
-  // It should be impossible to have two operands with different
-  // encodings at this point.
-  assert(
-      sliLeft->getEncoding() == sliRight->getEncoding()
-      && "Both operands of string concatenation should have the same encoding");
-}
-
-/// Computes the length of a concatenated string literal.
-APInt StringConcatenationOptimizer::getConcatenatedLength() {
-  // Real length of string literals computed based on its contents.
-  // Length is in code units.
-  auto sliLenLeft = sliLeft->getCodeUnitCount();
-  (void)sliLenLeft;
-  auto sliLenRight = sliRight->getCodeUnitCount();
-  (void)sliLenRight;
-
-  // Length of string literals as reported by string.make functions.
-  auto *lenLeft = dyn_cast<IntegerLiteralInst>(aiLeft->getOperand(2));
-  auto *lenRight = dyn_cast<IntegerLiteralInst>(aiRight->getOperand(2));
-
-  // Real and reported length should be the same.
-  assert(sliLenLeft == lenLeft->getValue()
-         && "Size of string literal in @_semantics(string.make) is wrong");
-
-  assert(sliLenRight == lenRight->getValue()
-         && "Size of string literal in @_semantics(string.make) is wrong");
-
-  // Compute length of the concatenated literal.
-  return lenLeft->getValue() + lenRight->getValue();
-}
-
-/// Computes the isAscii flag of a concatenated UTF8-encoded string literal.
-bool StringConcatenationOptimizer::isAscii() const {
-  // Add the isASCII argument in case of UTF8.
-  // IsASCII is true only if IsASCII of both literals is true.
-  auto *asciiLeft = dyn_cast<IntegerLiteralInst>(aiLeft->getOperand(3));
-  auto *asciiRight = dyn_cast<IntegerLiteralInst>(aiRight->getOperand(3));
-  auto isAsciiLeft = asciiLeft->getValue() == 1;
-  auto isAsciiRight = asciiRight->getValue() == 1;
-  return isAsciiLeft && isAsciiRight;
-}
-
-SingleValueInstruction *StringConcatenationOptimizer::optimize() {
-  // Bail out if string literals concatenation optimization is
-  // not possible.
-  if (!extractStringConcatOperands())
-    return nullptr;
-
-  // Perform string literal encodings adjustments if needed.
-  adjustEncodings();
-
-  // Arguments of the new StringLiteralInst to be created.
-  SmallVector<SILValue, 4> arguments;
-
-  // Encoding to be used for the concatenated string literal.
-  auto encoding = sliLeft->getEncoding();
-
-  // Create a concatenated string literal.
-  builder.setCurrentDebugScope(ai->getDebugScope());
-  auto lv = sliLeft->getValue();
-  auto rv = sliRight->getValue();
-  auto *newSLI =
-      builder.createStringLiteral(ai->getLoc(), lv + Twine(rv), encoding);
-  arguments.push_back(newSLI);
-
-  // Length of the concatenated literal according to its encoding.
-  auto *len = builder.createIntegerLiteral(
-      ai->getLoc(), aiLeft->getOperand(2)->getType(), getConcatenatedLength());
-  arguments.push_back(len);
-
-  // isAscii flag for UTF8-encoded string literals.
-  if (encoding == StringLiteralInst::Encoding::UTF8) {
-    bool ascii = isAscii();
-    auto ilType = aiLeft->getOperand(3)->getType();
-    auto *asciiLiteral =
-        builder.createIntegerLiteral(ai->getLoc(), ilType, intmax_t(ascii));
-    arguments.push_back(asciiLiteral);
-  }
-
-  // Type.
-  arguments.push_back(funcResultType);
-
-  return builder.createApply(ai->getLoc(), friConvertFromBuiltin,
-                             SubstitutionMap(), arguments);
-}
-
-/// Top level entry point
-SingleValueInstruction *swift::tryToConcatenateStrings(ApplyInst *ai,
-                                                       SILBuilder &builder) {
-  return StringConcatenationOptimizer(ai, builder).optimize();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1800,77 +1671,39 @@ void swift::replaceLoadSequence(SILInstruction *inst, SILValue value) {
 bool swift::calleesAreStaticallyKnowable(SILModule &module, SILDeclRef decl) {
   if (decl.isForeign)
     return false;
-
-  if (decl.isEnumElement()) {
-    return calleesAreStaticallyKnowable(module,
-                                        cast<EnumElementDecl>(decl.getDecl()));
-  }
-
-  auto *afd = decl.getAbstractFunctionDecl();
-  assert(afd && "Expected abstract function decl!");
-  return calleesAreStaticallyKnowable(module, afd);
+  return calleesAreStaticallyKnowable(module, decl.getDecl());
 }
 
 /// Are the callees that could be called through Decl statically
 /// knowable based on the Decl and the compilation mode?
-bool swift::calleesAreStaticallyKnowable(SILModule &module,
-                                         AbstractFunctionDecl *afd) {
+bool swift::calleesAreStaticallyKnowable(SILModule &module, ValueDecl *vd) {
+  assert(isa<AbstractFunctionDecl>(vd) || isa<EnumElementDecl>(vd));
+
   // Only handle members defined within the SILModule's associated context.
-  if (!afd->isChildContextOf(module.getAssociatedContext()))
+  if (!cast<DeclContext>(vd)->isChildContextOf(module.getAssociatedContext()))
     return false;
 
-  if (afd->isDynamic()) {
+  if (vd->isDynamic()) {
     return false;
   }
 
-  if (!afd->hasAccess())
+  if (!vd->hasAccess())
     return false;
 
   // Only consider 'private' members, unless we are in whole-module compilation.
-  switch (afd->getEffectiveAccess()) {
+  switch (vd->getEffectiveAccess()) {
   case AccessLevel::Open:
     return false;
   case AccessLevel::Public:
-    if (isa<ConstructorDecl>(afd)) {
+    if (isa<ConstructorDecl>(vd)) {
       // Constructors are special: a derived class in another module can
       // "override" a constructor if its class is "open", although the
       // constructor itself is not open.
-      auto *nd = afd->getDeclContext()->getSelfNominalTypeDecl();
+      auto *nd = vd->getDeclContext()->getSelfNominalTypeDecl();
       if (nd->getEffectiveAccess() == AccessLevel::Open)
         return false;
     }
     LLVM_FALLTHROUGH;
-  case AccessLevel::Internal:
-    return module.isWholeModule();
-  case AccessLevel::FilePrivate:
-  case AccessLevel::Private:
-    return true;
-  }
-
-  llvm_unreachable("Unhandled access level in switch.");
-}
-
-/// Are the callees that could be called through Decl statically
-/// knowable based on the Decl and the compilation mode?
-// FIXME: Merge this with calleesAreStaticallyKnowable above
-bool swift::calleesAreStaticallyKnowable(SILModule &module,
-                                         EnumElementDecl *eed) {
-  // Only handle members defined within the SILModule's associated context.
-  if (!eed->isChildContextOf(module.getAssociatedContext()))
-    return false;
-
-  if (eed->isDynamic()) {
-    return false;
-  }
-
-  if (!eed->hasAccess())
-    return false;
-
-  // Only consider 'private' members, unless we are in whole-module compilation.
-  switch (eed->getEffectiveAccess()) {
-  case AccessLevel::Open:
-    return false;
-  case AccessLevel::Public:
   case AccessLevel::Internal:
     return module.isWholeModule();
   case AccessLevel::FilePrivate:

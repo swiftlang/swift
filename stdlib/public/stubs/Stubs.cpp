@@ -36,44 +36,28 @@
 #endif
 #include <climits>
 #include <clocale>
+#include <cmath>
 #include <cstdarg>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#if defined(__CYGWIN__) || defined(_WIN32) || defined(__HAIKU__) || defined(__OpenBSD__)
 #include <sstream>
-#include <cmath>
-#elif defined(__ANDROID__)
+#if defined(__OpenBSD__) || defined(__ANDROID__) || defined(__linux__) || defined(__wasi__) || defined(_WIN32)
 #include <locale.h>
-
-#include <android/api-level.h>
-
-#if __ANDROID_API__ < 21 // Introduced in Android API 21 - L
-static inline long double swift_strtold_l(const char *nptr, char **endptr,
-                                          locale_t) {
-  return strtod(nptr, endptr);
-}
-#define strtold_l swift_strtold_l
+#if defined(_WIN32)
+#define locale_t _locale_t
 #endif
-
-#if __ANDROID_API__ < 26 // Introduced in Android API 26 - O
-static double swift_strtod_l(const char *nptr, char **endptr, locale_t loc) {
-  return strtod(nptr, endptr);
-}
-static float swift_strtof_l(const char *nptr, char **endptr, locale_t loc) {
-  return strtof(nptr, endptr);
-}
-#define strtod_l swift_strtod_l
-#define strtof_l swift_strtof_l
-#endif
-#elif defined(__linux__) || defined(__wasi__)
-#include <locale.h>
 #else
 #include <xlocale.h>
 #endif
 #include <limits>
 #include <thread>
+
+#if defined(__ANDROID__)
+#include <android/api-level.h>
+#endif
+
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/SwiftDtoa.h"
 #include "swift/Basic/Lazy.h"
@@ -305,7 +289,7 @@ uint64_t swift_float80ToString(char *Buffer, size_t BufferLength,
 /// \returns Size of character data returned in \c LinePtr, or -1
 /// if an error occurred, or EOF was reached.
 __swift_ssize_t
-swift::swift_stdlib_readLine_stdin(unsigned char **LinePtr) {
+swift_stdlib_readLine_stdin(unsigned char **LinePtr) {
 #if defined(_WIN32)
   if (LinePtr == nullptr)
     return -1;
@@ -353,7 +337,11 @@ swift::swift_stdlib_readLine_stdin(unsigned char **LinePtr) {
   return Pos;
 #else
   size_t Capacity = 0;
-  return getline((char **)LinePtr, &Capacity, stdin);
+  int result;
+  do {
+    result = getline((char **)LinePtr, &Capacity, stdin);
+  } while (result < 0 && errno == EINTR);
+  return result;
 #endif
 }
 
@@ -369,104 +357,82 @@ static bool swift_stringIsSignalingNaN(const char *nptr) {
   return strcasecmp(nptr, "snan") == 0;
 }
 
-#if defined(__CYGWIN__) || defined(_WIN32) || defined(__HAIKU__) || defined(__OpenBSD__)
-// Cygwin does not support uselocale(), but we can use the locale feature 
-// in stringstream object.
+// This implementation should only be used on platforms without the
+// relevant strto* functions, such as Cygwin or Haiku.
+// Note that using this currently causes test failures.
 template <typename T>
-static const char *_swift_stdlib_strtoX_clocale_impl(
-    const char *nptr, T *outResult) {
-  if (swift_stringIsSignalingNaN(nptr)) {
-    *outResult = std::numeric_limits<T>::signaling_NaN();
-    return nptr + std::strlen(nptr);
-  }
-  
+T _swift_strto(const char *nptr, char **endptr) {
   std::istringstream ValueStream(nptr);
   ValueStream.imbue(std::locale::classic());
   T ParsedValue;
   ValueStream >> ParsedValue;
-  *outResult = ParsedValue;
 
   std::streamoff pos = ValueStream.tellg();
   if (ValueStream.eof())
     pos = static_cast<std::streamoff>(strlen(nptr));
-  if (pos <= 0)
-    return nullptr;
+  if (pos <= 0) {
+    errno = ERANGE;
+    return 0.0;
+  }
 
-  return nptr + pos;
+  return ParsedValue;
 }
 
+static double swift_strtod_l(const char *nptr, char **endptr, locale_t loc) {
 #if defined(_WIN32)
-template <>
-const char *
-_swift_stdlib_strtoX_clocale_impl<float>(const char *str, float *result) {
-  if (swift_stringIsSignalingNaN(str)) {
-    *result = std::numeric_limits<float>::signaling_NaN();
-    return str + std::strlen(str);
-  }
-
-  char *end;
-  _set_errno(0);
-  *result = _strtof_l(str, &end, getCLocale());
-  if (*result == HUGE_VALF || *result == -HUGE_VALF || *result == 0.0 || *result == -0.0) {
-    if (errno == ERANGE)
-        end = nullptr;
-  }
-  return end;
+  return _strtod_l(nptr, endptr, getCLocale());
+#elif defined(__CYGWIN__) || defined(__HAIKU__)
+  return _swift_strto<double>(nptr, endptr);
+#else
+  return strtod(nptr, endptr);
+#endif
 }
 
-template <>
-const char *
-_swift_stdlib_strtoX_clocale_impl<double>(const char *str, double *result) {
-  if (swift_stringIsSignalingNaN(str)) {
-    *result = std::numeric_limits<double>::signaling_NaN();
-    return str + std::strlen(str);
-  }
-
-  char *end;
-  _set_errno(0);
-  *result = _strtod_l(str, &end, getCLocale());
-  if (*result == HUGE_VAL || *result == -HUGE_VAL || *result == 0.0 || *result == -0.0) {
-    if (errno == ERANGE)
-        end = nullptr;
-  }
-  return end;
+static float swift_strtof_l(const char *nptr, char **endptr, locale_t loc) {
+#if defined(_WIN32)
+  return _strtof_l(nptr, endptr, getCLocale());
+#elif defined(__CYGWIN__) || defined(__HAIKU__)
+  return _swift_strto<float>(nptr, endptr);
+#else
+  return strtof(nptr, endptr);
+#endif
 }
 
-template <>
-const char *
-_swift_stdlib_strtoX_clocale_impl<long double>(const char *str, long double *result) {
-  if (swift_stringIsSignalingNaN(str)) {
-    *result = std::numeric_limits<long double>::signaling_NaN();
-    return str + std::strlen(str);
-  }
-
-  char *end;
-  _set_errno(0);
-  *result = _strtod_l(str, &end, getCLocale());
-  if (*result == HUGE_VALL || *result == -HUGE_VALL || *result == 0.0 || *result == -0.0) {
-    if (errno == ERANGE)
-        end = nullptr;
-  }
-  return end;
+static long double swift_strtold_l(const char *nptr, char **endptr,
+                                   locale_t loc) {
+#if defined(_WIN32)
+  return _strtod_l(nptr, endptr, getCLocale());
+#elif defined(__ANDROID__)
+  return strtod(nptr, endptr);
+#elif defined(__CYGWIN__) || defined(__HAIKU__)
+  return _swift_strto<long double>(nptr, endptr);
+#else
+  return strtold(nptr, endptr);
+#endif
 }
+
+#if defined(__OpenBSD__) || defined(_WIN32) || defined(__CYGWIN__) || defined(__HAIKU__)
+#define strtod_l swift_strtod_l
+#define strtof_l swift_strtof_l
+#define strtold_l swift_strtold_l
+#elif defined(__ANDROID__)
+#if __ANDROID_API__ < 21 // Introduced in Android API 21 - L
+#define strtold_l swift_strtold_l
 #endif
 
-const char *swift::_swift_stdlib_strtold_clocale(
-    const char *nptr, void *outResult) {
-  return _swift_stdlib_strtoX_clocale_impl(
-    nptr, static_cast<long double*>(outResult));
-}
+#if __ANDROID_API__ < 26 // Introduced in Android API 26 - O
+#define strtod_l swift_strtod_l
+#define strtof_l swift_strtof_l
+#endif
+#endif
 
-const char *swift::_swift_stdlib_strtod_clocale(
-    const char * nptr, double *outResult) {
-  return _swift_stdlib_strtoX_clocale_impl(nptr, outResult);
-}
-
-const char *swift::_swift_stdlib_strtof_clocale(
-    const char * nptr, float *outResult) {
-  return _swift_stdlib_strtoX_clocale_impl(nptr, outResult);
-}
+static inline void _swift_set_errno(int to) {
+#if defined(_WIN32)
+  _set_errno(0);
 #else
+  errno = 0;
+#endif
+}
 
 // We can't return Float80, but we can receive a pointer to one, so
 // switch the return type and the out parameter on strtold.
@@ -483,7 +449,7 @@ static const char *_swift_stdlib_strtoX_clocale_impl(
   }
   
   char *EndPtr;
-  errno = 0;
+  _swift_set_errno(0);
   const auto result = posixImpl(nptr, &EndPtr, getCLocale());
   *outResult = result;
   if (result == huge || result == -huge || result == 0.0 || result == -0.0) {
@@ -493,26 +459,25 @@ static const char *_swift_stdlib_strtoX_clocale_impl(
   return EndPtr;
 }
     
-const char *swift::_swift_stdlib_strtold_clocale(
+const char *_swift_stdlib_strtold_clocale(
   const char * nptr, void *outResult) {
   return _swift_stdlib_strtoX_clocale_impl(
     nptr, static_cast<long double*>(outResult), HUGE_VALL, strtold_l);
 }
 
-const char *swift::_swift_stdlib_strtod_clocale(
+const char *_swift_stdlib_strtod_clocale(
     const char * nptr, double *outResult) {
   return _swift_stdlib_strtoX_clocale_impl(
     nptr, outResult, HUGE_VAL, strtod_l);
 }
 
-const char *swift::_swift_stdlib_strtof_clocale(
+const char *_swift_stdlib_strtof_clocale(
     const char * nptr, float *outResult) {
   return _swift_stdlib_strtoX_clocale_impl(
     nptr, outResult, HUGE_VALF, strtof_l);
 }
-#endif
 
-const char *swift::_swift_stdlib_strtof16_clocale(
+const char *_swift_stdlib_strtof16_clocale(
     const char * nptr, __fp16 *outResult) {
   float tmp;
   const char *result = _swift_stdlib_strtof_clocale(nptr, &tmp);
@@ -520,7 +485,7 @@ const char *swift::_swift_stdlib_strtof16_clocale(
   return result;
 }
 
-void swift::_swift_stdlib_flockfile_stdout() {
+void _swift_stdlib_flockfile_stdout() {
 #if defined(_WIN32)
   _lock_file(stdout);
 #elif defined(__wasi__)
@@ -530,7 +495,7 @@ void swift::_swift_stdlib_flockfile_stdout() {
 #endif
 }
 
-void swift::_swift_stdlib_funlockfile_stdout() {
+void _swift_stdlib_funlockfile_stdout() {
 #if defined(_WIN32)
   _unlock_file(stdout);
 #elif defined(__wasi__)
@@ -540,10 +505,14 @@ void swift::_swift_stdlib_funlockfile_stdout() {
 #endif
 }
 
-int swift::_swift_stdlib_putc_stderr(int C) {
+int _swift_stdlib_putc_stderr(int C) {
   return putc(C, stderr);
 }
 
-size_t swift::_swift_stdlib_getHardwareConcurrency() {
+size_t _swift_stdlib_getHardwareConcurrency() {
+#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+  return 1;
+#else
   return std::thread::hardware_concurrency();
+#endif
 }

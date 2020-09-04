@@ -13,12 +13,23 @@
 #ifndef SWIFT_FRONTENDTOOL_SCANDEPENDENCIES_H
 #define SWIFT_FRONTENDTOOL_SCANDEPENDENCIES_H
 
+#include "llvm/ADT/StringRef.h"
+
 namespace swift {
 
+class CompilerInvocation;
 class CompilerInstance;
+
+/// Batch scan the dependencies for modules specified in \c batchInputFile.
+bool batchScanModuleDependencies(CompilerInstance &instance,
+                                 llvm::StringRef batchInputFile);
 
 /// Scans the dependencies of the main module of \c instance.
 bool scanDependencies(CompilerInstance &instance);
+
+/// Scans the dependencies of the underlying clang module of the main module
+/// of \c instance.
+bool scanClangDependencies(CompilerInstance &instance);
 
 } // end namespace swift
 

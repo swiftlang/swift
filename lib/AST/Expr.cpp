@@ -126,7 +126,7 @@ namespace {
 } // end anonymous namespace
 
 void Expr::setType(Type T) {
-  assert(!T || !T->hasTypeVariable());
+  assert(!T || !T->hasTypeVariable() || !T->hasHole());
   Ty = T;
 }
 
@@ -288,7 +288,9 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
     return cast<ParenExpr>(this)
                ->getSubExpr()->getReferencedDecl(stopAtParenExpr);
 
+  PASS_THROUGH_REFERENCE(UnresolvedMemberChainResult, getSubExpr);
   PASS_THROUGH_REFERENCE(DotSelf, getSubExpr);
+  PASS_THROUGH_REFERENCE(Await, getSubExpr);
   PASS_THROUGH_REFERENCE(Try, getSubExpr);
   PASS_THROUGH_REFERENCE(ForceTry, getSubExpr);
   PASS_THROUGH_REFERENCE(OptionalTry, getSubExpr);
@@ -422,7 +424,6 @@ forEachImmediateChildExpr(llvm::function_ref<Expr *(Expr *)> callback) {
     }
     bool walkToDeclPre(Decl *D) override { return false; }
     bool walkToTypeReprPre(TypeRepr *T) override { return false; }
-    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
   };
   
   this->walk(ChildWalker(callback, this));
@@ -452,7 +453,6 @@ void Expr::forEachChildExpr(llvm::function_ref<Expr *(Expr *)> callback) {
     }
     bool walkToDeclPre(Decl *D) override { return false; }
     bool walkToTypeReprPre(TypeRepr *T) override { return false; }
-    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
   };
 
   this->walk(ChildWalker(callback));
@@ -607,6 +607,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
 
   case ExprKind::Paren:
   case ExprKind::DotSelf:
+  case ExprKind::UnresolvedMemberChainResult:
   case ExprKind::Tuple:
   case ExprKind::Array:
   case ExprKind::Dictionary:
@@ -623,6 +624,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::DynamicType:
     return true;
 
+  case ExprKind::Await:
   case ExprKind::Try:
   case ExprKind::ForceTry:
   case ExprKind::OptionalTry:
@@ -831,16 +833,15 @@ APInt BuiltinIntegerWidth::parse(StringRef text, unsigned radix, bool negate,
 static APFloat getFloatLiteralValue(bool IsNegative, StringRef Text,
                                     const llvm::fltSemantics &Semantics) {
   APFloat Val(Semantics);
-  llvm::Expected<APFloat::opStatus> MaybeRes =
-      Val.convertFromString(Text, llvm::APFloat::rmNearestTiesToEven);
-  assert(MaybeRes && *MaybeRes != APFloat::opInvalidOp &&
-         "Sema didn't reject invalid number");
-  (void)MaybeRes;
+  auto Res =
+    Val.convertFromString(Text, llvm::APFloat::rmNearestTiesToEven);
+  assert(Res && "Sema didn't reject invalid number");
+  consumeError(Res.takeError());
   if (IsNegative) {
     auto NegVal = APFloat::getZero(Semantics, /*negative*/ true);
-    auto Res = NegVal.subtract(Val, llvm::APFloat::rmNearestTiesToEven);
-    assert(Res != APFloat::opInvalidOp && "Sema didn't reject invalid number");
-    (void)Res;
+    Res = NegVal.subtract(Val, llvm::APFloat::rmNearestTiesToEven);
+    assert(Res && "Sema didn't reject invalid number");
+    consumeError(Res.takeError());
     return NegVal;
   }
   return Val;
@@ -1204,9 +1205,8 @@ InOutExpr::InOutExpr(SourceLoc operLoc, Expr *subExpr, Type baseType,
 
 SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
   assert(elements.size() & 1 && "even number of elements in sequence");
-  void *Buffer = ctx.Allocate(sizeof(SequenceExpr) +
-                              elements.size() * sizeof(Expr*),
-                              alignof(SequenceExpr));
+  size_t bytes = totalSizeToAlloc<Expr *>(elements.size());
+  void *Buffer = ctx.Allocate(bytes, alignof(SequenceExpr));
   return ::new(Buffer) SequenceExpr(elements);
 }
 
@@ -1278,15 +1278,29 @@ SourceRange TupleExpr::getSourceRange() const {
       return { SourceLoc(), SourceLoc() };
     } else {
       // Scan backwards for a valid source loc.
+      bool hasSingleTrailingClosure = hasTrailingClosure();
       for (Expr *expr : llvm::reverse(getElements())) {
         // Default arguments are located at the start of their parent tuple, so
         // skip over them.
         if (isa<DefaultArgumentExpr>(expr))
           continue;
-        end = expr->getEndLoc();
-        if (end.isValid()) {
-          break;
+
+        SourceLoc newEnd = expr->getEndLoc();
+        if (newEnd.isInvalid())
+          continue;
+
+        // There is a quirk with the backward scan logic for trailing
+        // closures that can cause arguments to be flipped. If there is a
+        // single trailing closure, only stop when the "end" point we hit comes
+        // after the close parenthesis (if there is one).
+        if (end.isInvalid() ||
+            end.getOpaquePointerValue() < newEnd.getOpaquePointerValue()) {
+          end = newEnd;
         }
+
+        if (!hasSingleTrailingClosure || RParenLoc.isInvalid() ||
+            RParenLoc.getOpaquePointerValue() < end.getOpaquePointerValue())
+          break;
       }
     }
   } else {
@@ -1463,13 +1477,13 @@ static ValueDecl *getCalledValue(Expr *E) {
 
 PropertyWrapperValuePlaceholderExpr *
 PropertyWrapperValuePlaceholderExpr::create(ASTContext &ctx, SourceRange range,
-                                            Type ty, Expr *wrappedValue) {
+                                            Type ty, Expr *wrappedValue,
+                                            bool isAutoClosure) {
   auto *placeholder =
       new (ctx) OpaqueValueExpr(range, ty, /*isPlaceholder=*/true);
 
-  return new (ctx) PropertyWrapperValuePlaceholderExpr(range, ty,
-                                                       placeholder,
-                                                       wrappedValue);
+  return new (ctx) PropertyWrapperValuePlaceholderExpr(
+      range, ty, placeholder, wrappedValue, isAutoClosure);
 }
 
 const ParamDecl *DefaultArgumentExpr::getParamDecl() const {
@@ -1591,61 +1605,6 @@ DynamicSubscriptExpr::create(ASTContext &ctx, Expr *base, Expr *index,
   void *memory = ctx.Allocate(size, alignof(DynamicSubscriptExpr));
   return new (memory) DynamicSubscriptExpr(base, index, argLabels, argLabelLocs,
                                            hasTrailingClosure, decl, implicit);
-}
-
-UnresolvedMemberExpr::UnresolvedMemberExpr(SourceLoc dotLoc,
-                                           DeclNameLoc nameLoc,
-                                           DeclNameRef name, Expr *argument,
-                                           ArrayRef<Identifier> argLabels,
-                                           ArrayRef<SourceLoc> argLabelLocs,
-                                           bool hasTrailingClosure,
-                                           bool implicit)
-  : Expr(ExprKind::UnresolvedMember, implicit),
-    DotLoc(dotLoc), NameLoc(nameLoc), Name(name), Argument(argument) {
-  Bits.UnresolvedMemberExpr.HasArguments = (argument != nullptr);
-  Bits.UnresolvedMemberExpr.NumArgLabels = argLabels.size();
-  Bits.UnresolvedMemberExpr.HasArgLabelLocs = !argLabelLocs.empty();
-  Bits.UnresolvedMemberExpr.HasTrailingClosure = hasTrailingClosure;
-  initializeCallArguments(argLabels, argLabelLocs);
-}
-
-UnresolvedMemberExpr *UnresolvedMemberExpr::create(ASTContext &ctx,
-                                                   SourceLoc dotLoc,
-                                                   DeclNameLoc nameLoc,
-                                                   DeclNameRef name,
-                                                   bool implicit) {
-  size_t size = totalSizeToAlloc({ }, { });
-
-  void *memory = ctx.Allocate(size, alignof(UnresolvedMemberExpr));
-  return new (memory) UnresolvedMemberExpr(dotLoc, nameLoc, name, nullptr,
-                                           { }, { },
-                                           /*hasTrailingClosure=*/false,
-                                           implicit);
-}
-
-UnresolvedMemberExpr *
-UnresolvedMemberExpr::create(ASTContext &ctx, SourceLoc dotLoc,
-                             DeclNameLoc nameLoc, DeclNameRef name,
-                             SourceLoc lParenLoc,
-                             ArrayRef<Expr *> args,
-                             ArrayRef<Identifier> argLabels,
-                             ArrayRef<SourceLoc> argLabelLocs,
-                             SourceLoc rParenLoc,
-                             ArrayRef<TrailingClosure> trailingClosures,
-                             bool implicit) {
-  SmallVector<Identifier, 4> argLabelsScratch;
-  SmallVector<SourceLoc, 4> argLabelLocsScratch;
-  Expr *arg = packSingleArgument(ctx, lParenLoc, args, argLabels, argLabelLocs,
-                                 rParenLoc, trailingClosures, implicit,
-                                 argLabelsScratch, argLabelLocsScratch);
-
-  size_t size = totalSizeToAlloc(argLabels, argLabelLocs);
-
-  void *memory = ctx.Allocate(size, alignof(UnresolvedMemberExpr));
-  return new (memory) UnresolvedMemberExpr(dotLoc, nameLoc, name, arg,
-                                           argLabels, argLabelLocs,
-                                           trailingClosures.size() == 1,
-                                           implicit);
 }
 
 ArrayRef<Identifier> ApplyExpr::getArgumentLabels(
@@ -1770,6 +1729,71 @@ Expr *CallExpr::getDirectCallee() const {
   }
 }
 
+void ExplicitCastExpr::setCastType(Type type) {
+  CastTy->setType(MetatypeType::get(type));
+}
+
+ForcedCheckedCastExpr *ForcedCheckedCastExpr::create(ASTContext &ctx,
+                                                     SourceLoc asLoc,
+                                                     SourceLoc exclaimLoc,
+                                                     TypeRepr *tyRepr) {
+  return new (ctx) ForcedCheckedCastExpr(nullptr, asLoc, exclaimLoc,
+                                         new (ctx) TypeExpr(tyRepr));
+}
+
+ForcedCheckedCastExpr *
+ForcedCheckedCastExpr::createImplicit(ASTContext &ctx, Expr *sub, Type castTy) {
+  auto *const expr = new (ctx) ForcedCheckedCastExpr(
+      sub, SourceLoc(), SourceLoc(), TypeExpr::createImplicit(castTy, ctx));
+  expr->setType(castTy);
+  expr->setImplicit();
+  return expr;
+}
+
+ConditionalCheckedCastExpr *
+ConditionalCheckedCastExpr::create(ASTContext &ctx, SourceLoc asLoc,
+                                   SourceLoc questionLoc, TypeRepr *tyRepr) {
+  return new (ctx) ConditionalCheckedCastExpr(nullptr, asLoc, questionLoc,
+                                              new (ctx) TypeExpr(tyRepr));
+}
+
+ConditionalCheckedCastExpr *
+ConditionalCheckedCastExpr::createImplicit(ASTContext &ctx, Expr *sub,
+                                           Type castTy) {
+  auto *const expr = new (ctx) ConditionalCheckedCastExpr(
+      sub, SourceLoc(), SourceLoc(), TypeExpr::createImplicit(castTy, ctx));
+  expr->setType(OptionalType::get(castTy));
+  expr->setImplicit();
+  return expr;
+}
+
+IsExpr *IsExpr::create(ASTContext &ctx, SourceLoc isLoc, TypeRepr *tyRepr) {
+  return new (ctx) IsExpr(nullptr, isLoc, new (ctx) TypeExpr(tyRepr));
+}
+
+CoerceExpr *CoerceExpr::create(ASTContext &ctx, SourceLoc asLoc,
+                               TypeRepr *tyRepr) {
+  return new (ctx) CoerceExpr(nullptr, asLoc, new (ctx) TypeExpr(tyRepr));
+}
+
+CoerceExpr *CoerceExpr::createImplicit(ASTContext &ctx, Expr *sub,
+                                       Type castTy) {
+  auto *const expr = new (ctx)
+      CoerceExpr(sub, SourceLoc(), TypeExpr::createImplicit(castTy, ctx));
+  expr->setType(castTy);
+  expr->setImplicit();
+  return expr;
+}
+
+CoerceExpr *CoerceExpr::forLiteralInit(ASTContext &ctx, Expr *literal,
+                                       SourceRange range,
+                                       TypeRepr *literalTyRepr) {
+  auto *const expr =
+      new (ctx) CoerceExpr(range, literal, new (ctx) TypeExpr(literalTyRepr));
+  expr->setImplicit();
+  return expr;
+}
+
 RebindSelfInConstructorExpr::RebindSelfInConstructorExpr(Expr *SubExpr,
                                                          VarDecl *Self)
   : Expr(ExprKind::RebindSelfInConstructor, /*Implicit=*/true,
@@ -1850,8 +1874,15 @@ Type AbstractClosureExpr::getResultType(
 bool AbstractClosureExpr::isBodyThrowing() const {
   if (getType()->hasError())
     return false;
+  
+  return getType()->castTo<FunctionType>()->getExtInfo().isThrowing();
+}
 
-  return getType()->castTo<FunctionType>()->getExtInfo().throws();
+bool AbstractClosureExpr::isBodyAsync() const {
+  if (getType()->hasError())
+    return false;
+
+  return getType()->castTo<FunctionType>()->getExtInfo().isAsync();
 }
 
 bool AbstractClosureExpr::hasSingleExpressionBody() const {
@@ -1898,32 +1929,27 @@ Expr *ClosureExpr::getSingleExpressionBody() const {
   return body.get<Expr *>();
 }
 
-void ClosureExpr::setSingleExpressionBody(Expr *NewBody) {
-  assert(hasSingleExpressionBody() && "Not a single-expression body");
-  auto body = getBody()->getFirstElement();
-  if (auto stmt = body.dyn_cast<Stmt *>()) {
-    if (auto braceStmt = dyn_cast<BraceStmt>(stmt))
-      braceStmt->getFirstElement() = NewBody;
-    else
-      cast<ReturnStmt>(stmt)->setResult(NewBody);
-    return;
-  }
-  getBody()->setFirstElement(NewBody);
-}
-
 bool ClosureExpr::hasEmptyBody() const {
   return getBody()->empty();
 }
 
 bool ClosureExpr::capturesSelfEnablingImplictSelf() const {
-  if (auto *VD = getCapturedSelfDecl())
-    return VD->isSelfParamCapture() && !VD->getType()->is<WeakStorageType>();
+  if (auto *VD = getCapturedSelfDecl()) {
+    if (!VD->isSelfParamCapture())
+      return false;
+
+    if (auto *attr = VD->getAttrs().getAttribute<ReferenceOwnershipAttr>())
+      return attr->get() != ReferenceOwnership::Weak;
+
+    return true;
+  }
   return false;
 }
 
 void ClosureExpr::setExplicitResultType(Type ty) {
-  assert(ty && !ty->hasTypeVariable());
-  ExplicitResultType->setType(MetatypeType::get(ty));
+  assert(ty && !ty->hasTypeVariable() && !ty->hasHole());
+  ExplicitResultTypeAndBodyState.getPointer()
+      ->setType(MetatypeType::get(ty));
 }
 
 FORWARD_SOURCE_LOCS_TO(AutoClosureExpr, Body)
@@ -1948,7 +1974,7 @@ Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
     body = body->getSemanticsProvidingExpr();
 
     if (auto *openExistential = dyn_cast<OpenExistentialExpr>(body)) {
-      body = openExistential->getSubExpr();
+      body = openExistential->getSubExpr()->getSemanticsProvidingExpr();
     }
 
     if (auto *outerCall = dyn_cast<ApplyExpr>(body)) {
@@ -1968,7 +1994,7 @@ Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
       innerBody = innerBody->getSemanticsProvidingExpr();
 
       if (auto *openExistential = dyn_cast<OpenExistentialExpr>(innerBody)) {
-        innerBody = openExistential->getSubExpr();
+        innerBody = openExistential->getSubExpr()->getSemanticsProvidingExpr();
         if (auto *ICE = dyn_cast<ImplicitConversionExpr>(innerBody))
           innerBody = ICE->getSyntacticSubExpr();
       }
@@ -2303,6 +2329,7 @@ void KeyPathExpr::Component::setSubscriptIndexHashableConformances(
   case Kind::Property:
   case Kind::Identity:
   case Kind::TupleElement:
+  case Kind::DictionaryKey:
     llvm_unreachable("no hashable conformances for this kind");
   }
 }
@@ -2364,11 +2391,7 @@ void swift::simple_display(llvm::raw_ostream &out, const ClosureExpr *CE) {
     return;
   }
 
-  if (CE->hasSingleExpressionBody()) {
-    out << "single expression closure";
-  } else {
-    out << "closure";
-  }
+  out << "closure";
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
@@ -2393,14 +2416,14 @@ SourceLoc swift::extractNearestSourceLoc(const DefaultArgumentExpr *expr) {
 // dependency.
 
 struct ExprTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
-  void traceName(const void *Entity, raw_ostream &OS) const {
+  void traceName(const void *Entity, raw_ostream &OS) const override {
     if (!Entity)
       return;
     const Expr *E = static_cast<const Expr *>(Entity);
     OS << Expr::getKindName(E->getKind());
   }
   void traceLoc(const void *Entity, SourceManager *SM,
-                clang::SourceManager *CSM, raw_ostream &OS) const {
+                clang::SourceManager *CSM, raw_ostream &OS) const override {
     if (!Entity)
       return;
     const Expr *E = static_cast<const Expr *>(Entity);
@@ -2415,3 +2438,4 @@ const UnifiedStatsReporter::TraceFormatter*
 FrontendStatsTracer::getTraceFormatter<const Expr *>() {
   return &TF;
 }
+

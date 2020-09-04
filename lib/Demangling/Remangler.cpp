@@ -1573,6 +1573,9 @@ void Remangler::mangleImplFunctionType(Node *node) {
                         .Default(0);
         assert(ConvCh && "invalid impl parameter convention");
         Buffer << ConvCh;
+        // Mangle result differentiability, if it exists.
+        if (Child->getNumChildren() == 3)
+          mangleImplDifferentiability(Child->getChild(1));
         break;
       }
       default:
@@ -2311,6 +2314,10 @@ void Remangler::mangleFullObjCResilientClassStub(Node *node) {
   Buffer << "Mt";
 }
 
+void Remangler::mangleAsyncAnnotation(Node *node) {
+  Buffer << 'Y';
+}
+
 void Remangler::mangleThrowsAnnotation(Node *node) {
   Buffer << 'K';
 }
@@ -2542,6 +2549,38 @@ void Remangler::mangleCanonicalSpecializedGenericTypeMetadataAccessFunction(
     Node *node) {
   mangleSingleChildNode(node);
   Buffer << "Mb";
+}
+
+void Remangler::mangleMetadataInstantiationCache(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "MK";
+}
+
+void Remangler::mangleNoncanonicalSpecializedGenericTypeMetadata(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "MN";
+}
+
+void Remangler::mangleNoncanonicalSpecializedGenericTypeMetadataCache(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "MJ";
+}
+
+void Remangler::mangleGlobalVariableOnceToken(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "Wz";
+}
+
+void Remangler::mangleGlobalVariableOnceFunction(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "WZ";
+}
+
+void Remangler::mangleGlobalVariableOnceDeclList(Node *node) {
+  for (unsigned i = 0, e = node->getNumChildren(); i < e; ++i) {
+    mangle(node->getChild(i));
+    Buffer << '_';
+  }
 }
 
 } // anonymous namespace

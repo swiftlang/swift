@@ -48,7 +48,7 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS, PatternKind kind) {
     return OS << "prefix 'is' pattern";
   case PatternKind::Expr:
     return OS << "expression pattern";
-  case PatternKind::Var:
+  case PatternKind::Binding:
     return OS << "'var' binding pattern";
   case PatternKind::EnumElement:
     return OS << "enum case matching pattern";
@@ -187,7 +187,6 @@ namespace {
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
       return { false, S };
     }
-    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
     bool walkToTypeReprPre(TypeRepr *T) override { return false; }
     bool walkToParameterListPre(ParameterList *PL) override { return false; }
     bool walkToDeclPre(Decl *D) override { return false; }
@@ -214,7 +213,7 @@ void Pattern::forEachVariable(llvm::function_ref<void(VarDecl *)> fn) const {
 
   case PatternKind::Paren:
   case PatternKind::Typed:
-  case PatternKind::Var:
+  case PatternKind::Binding:
     return getSemanticsProvidingPattern()->forEachVariable(fn);
 
   case PatternKind::Tuple:
@@ -262,8 +261,8 @@ void Pattern::forEachNode(llvm::function_ref<void(Pattern*)> f) {
     return cast<ParenPattern>(this)->getSubPattern()->forEachNode(f);
   case PatternKind::Typed:
     return cast<TypedPattern>(this)->getSubPattern()->forEachNode(f);
-  case PatternKind::Var:
-    return cast<VarPattern>(this)->getSubPattern()->forEachNode(f);
+  case PatternKind::Binding:
+    return cast<BindingPattern>(this)->getSubPattern()->forEachNode(f);
 
   case PatternKind::Tuple:
     for (auto elt : cast<TuplePattern>(this)->getElements())
@@ -407,15 +406,6 @@ TypedPattern::TypedPattern(Pattern *pattern, TypeRepr *tr)
   Bits.TypedPattern.IsPropagatedType = false;
 }
 
-TypeLoc TypedPattern::getTypeLoc() const {
-  TypeLoc loc = TypeLoc(PatTypeRepr);
-
-  if (hasType())
-    loc.setType(getType());
-
-  return loc;
-}
-
 SourceLoc TypedPattern::getLoc() const {
   if (SubPattern->isImplicit() && PatTypeRepr)
     return PatTypeRepr->getSourceRange().Start;
@@ -441,12 +431,77 @@ SourceRange TypedPattern::getSourceRange() const {
            PatTypeRepr->getSourceRange().End };
 }
 
+IsPattern::IsPattern(SourceLoc IsLoc, TypeExpr *CastTy, Pattern *SubPattern,
+                     CheckedCastKind Kind)
+    : Pattern(PatternKind::Is), IsLoc(IsLoc), SubPattern(SubPattern),
+      CastKind(Kind), CastType(CastTy) {
+  assert(IsLoc.isValid() == CastTy->getLoc().isValid());
+}
+
+IsPattern *IsPattern::createImplicit(ASTContext &Ctx, Type castTy,
+                                     Pattern *SubPattern,
+                                     CheckedCastKind Kind) {
+  assert(castTy);
+  auto *CastTE = TypeExpr::createImplicit(castTy, Ctx);
+  auto *ip = new (Ctx) IsPattern(SourceLoc(), CastTE, SubPattern, Kind);
+  ip->setImplicit();
+  return ip;
+}
+
+SourceRange IsPattern::getSourceRange() const {
+  SourceLoc beginLoc = SubPattern ? SubPattern->getSourceRange().Start : IsLoc;
+  SourceLoc endLoc = (isImplicit() ? beginLoc : CastType->getEndLoc());
+  return {beginLoc, endLoc};
+}
+
+Type IsPattern::getCastType() const { return CastType->getInstanceType(); }
+void IsPattern::setCastType(Type type) {
+  assert(type);
+  CastType->setType(MetatypeType::get(type));
+}
+
+TypeRepr *IsPattern::getCastTypeRepr() const { return CastType->getTypeRepr(); }
+
 /// Construct an ExprPattern.
 ExprPattern::ExprPattern(Expr *e, bool isResolved, Expr *matchExpr,
                          VarDecl *matchVar)
   : Pattern(PatternKind::Expr), SubExprAndIsResolved(e, isResolved),
     MatchExpr(matchExpr), MatchVar(matchVar) {
   assert(!matchExpr || e->isImplicit() == matchExpr->isImplicit());
+}
+
+SourceLoc EnumElementPattern::getStartLoc() const {
+  return (ParentType && !ParentType->isImplicit())
+             ? ParentType->getSourceRange().Start
+             : DotLoc.isValid() ? DotLoc : NameLoc.getBaseNameLoc();
+}
+
+SourceLoc EnumElementPattern::getEndLoc() const {
+  if (SubPattern && SubPattern->getSourceRange().isValid()) {
+    return SubPattern->getSourceRange().End;
+  }
+  return NameLoc.getEndLoc();
+}
+
+TypeRepr *EnumElementPattern::getParentTypeRepr() const {
+  if (!ParentType)
+    return nullptr;
+  return ParentType->getTypeRepr();
+}
+
+Type EnumElementPattern::getParentType() const {
+  if (!ParentType)
+    return Type();
+  return ParentType->getInstanceType();
+}
+
+void EnumElementPattern::setParentType(Type type) {
+  assert(type);
+  if (ParentType) {
+    ParentType->setType(MetatypeType::get(type));
+  } else {
+    ParentType = TypeExpr::createImplicit(type, type->getASTContext());
+  }
 }
 
 SourceLoc ExprPattern::getLoc() const {
@@ -462,7 +517,7 @@ SourceRange ExprPattern::getSourceRange() const {
 // dependency.
 
 struct PatternTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
-  void traceName(const void *Entity, raw_ostream &OS) const {
+  void traceName(const void *Entity, raw_ostream &OS) const override {
     if (!Entity)
       return;
     const Pattern *P = static_cast<const Pattern *>(Entity);
@@ -471,7 +526,7 @@ struct PatternTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
     }
   }
   void traceLoc(const void *Entity, SourceManager *SM,
-                clang::SourceManager *CSM, raw_ostream &OS) const {
+                clang::SourceManager *CSM, raw_ostream &OS) const override {
     if (!Entity)
       return;
     const Pattern *P = static_cast<const Pattern *>(Entity);

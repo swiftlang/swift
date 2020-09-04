@@ -67,9 +67,7 @@ void ConformingMethodListCallbacks::doneParsing() {
   if (!ParsedExpr)
     return;
 
-  typeCheckContextUntil(
-      CurDeclContext,
-      CurDeclContext->getASTContext().SourceMgr.getCodeCompletionLoc());
+  typeCheckContextAt(CurDeclContext, ParsedExpr->getLoc());
 
   Type T = ParsedExpr->getType();
 
@@ -156,7 +154,7 @@ void ConformingMethodListCallbacks::getMatchingMethods(
           Result(result) {}
 
     void foundDecl(ValueDecl *VD, DeclVisibilityKind reason,
-                   DynamicLookupInfo) {
+                   DynamicLookupInfo) override {
       if (isMatchingMethod(VD) && !VD->shouldHideFromEditor())
         Result.push_back(VD);
     }

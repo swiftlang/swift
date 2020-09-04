@@ -124,7 +124,10 @@ public:
 
   bool isNull() const { return Ptr == 0; }
 
-  const GenericSignatureImpl *operator->() const { return Ptr; }
+  const GenericSignatureImpl *operator->() const {
+    assert(Ptr && "Cannot dereference a null GenericSignature!");
+    return Ptr;
+  }
 
   explicit operator bool() const { return Ptr != 0; }
 
@@ -136,8 +139,10 @@ public:
     return hash_value(sig.getPointer());
   }
 
-  void print(raw_ostream &OS, PrintOptions Options = PrintOptions()) const;
-  void print(ASTPrinter &Printer, PrintOptions Opts = PrintOptions()) const;
+  void print(raw_ostream &OS,
+             const PrintOptions &Options = PrintOptions()) const;
+  void print(ASTPrinter &Printer,
+             const PrintOptions &Opts = PrintOptions()) const;
   SWIFT_DEBUG_DUMP;
   std::string getAsString() const;
 
@@ -392,10 +397,17 @@ public:
   ///   <t_0_0, t_0_1, t_1_0>
   /// then this will return 0 for t_0_0, 1 for t_0_1, and 2 for t_1_0.
   unsigned getGenericParamOrdinal(GenericTypeParamType *param) const;
-      
+
   /// Get a substitution map that maps all of the generic signature's
   /// generic parameters to themselves.
   SubstitutionMap getIdentitySubstitutionMap() const;
+
+  /// Get the sugared form of a generic parameter type.
+  GenericTypeParamType *getSugaredType(GenericTypeParamType *type) const;
+
+  /// Get the sugared form of a type by substituting any
+  /// generic parameter types by their sugared form.
+  Type getSugaredType(Type type) const;
 
   /// Whether this generic signature involves a type variable.
   bool hasTypeVariable() const;

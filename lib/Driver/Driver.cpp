@@ -163,6 +163,16 @@ static void validateProfilingArgs(DiagnosticEngine &diags,
   }
 }
 
+static void validateDependencyScanningArgs(DiagnosticEngine &diags,
+                                           const ArgList &args) {
+  const Arg *ExternalDependencyMap = args.getLastArg(options::OPT_placeholder_dependency_module_map);
+  const Arg *ScanDependencies = args.getLastArg(options::OPT_scan_dependencies);
+  if (ExternalDependencyMap && !ScanDependencies) {
+    diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
+                   "-placeholder-dependency-module-map-file", "-scan-dependencies");
+  }
+}
+
 static void validateDebugInfoArgs(DiagnosticEngine &diags,
                                   const ArgList &args) {
   // Check for missing debug option when verifying debug info.
@@ -179,6 +189,12 @@ static void validateDebugInfoArgs(DiagnosticEngine &diags,
   for (auto A : args.getAllArgValues(options::OPT_debug_prefix_map))
     if (A.find('=') == StringRef::npos)
       diags.diagnose(SourceLoc(), diag::error_invalid_debug_prefix_map, A);
+
+  // Check for any -coverage-prefix-map options that aren't of the form
+  // 'original=remapped' (either side can be empty, however).
+  for (auto A : args.getAllArgValues(options::OPT_coverage_prefix_map))
+    if (A.find('=') == StringRef::npos)
+      diags.diagnose(SourceLoc(), diag::error_invalid_coverage_prefix_map, A);
 }
 
 static void validateVerifyIncrementalDependencyArgs(DiagnosticEngine &diags,
@@ -255,6 +271,7 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &args,
   validateBridgingHeaderArgs(diags, args);
   validateWarningControlArgs(diags, args);
   validateProfilingArgs(diags, args);
+  validateDependencyScanningArgs(diags, args);
   validateDebugInfoArgs(diags, args);
   validateCompilationConditionArgs(diags, args);
   validateSearchPathArgs(diags, args);
@@ -1958,6 +1975,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
         }
       case file_types::TY_AutolinkFile:
       case file_types::TY_Object:
+      case file_types::TY_TBD:
         // Object inputs are only okay if linking.
         if (OI.shouldLink()) {
           AllLinkerInputs.push_back(Current);
@@ -1981,7 +1999,6 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_IndexData:
       case file_types::TY_PCH:
       case file_types::TY_ImportedModules:
-      case file_types::TY_TBD:
       case file_types::TY_ModuleTrace:
       case file_types::TY_YAMLOptRecord:
       case file_types::TY_BitstreamOptRecord:
@@ -2191,6 +2208,30 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       TopLevelActions.push_back(MergeModuleAction);
     TopLevelActions.append(AllLinkerInputs.begin(), AllLinkerInputs.end());
   }
+
+#ifdef NDEBUG
+  bool verifyInterfacesByDefault = false;
+#else
+  bool verifyInterfacesByDefault = true;
+#endif
+
+  if (MergeModuleAction
+      && Args.hasFlag(options::OPT_verify_emitted_module_interface,
+                      options::OPT_no_verify_emitted_module_interface,
+                      verifyInterfacesByDefault)) {
+    if (Args.hasArgNoClaim(options::OPT_emit_module_interface,
+                           options::OPT_emit_module_interface_path)) {
+      TopLevelActions.push_back(
+          C.createAction<VerifyModuleInterfaceJobAction>(MergeModuleAction,
+              file_types::TY_SwiftModuleInterfaceFile));
+    }
+
+    if (Args.hasArgNoClaim(options::OPT_emit_private_module_interface_path)) {
+      TopLevelActions.push_back(
+          C.createAction<VerifyModuleInterfaceJobAction>(MergeModuleAction,
+              file_types::TY_PrivateSwiftModuleInterfaceFile));
+    }
+  }
 }
 
 bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
@@ -2247,6 +2288,13 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
     if (const Arg *resourceDirArg = Args.getLastArg(options::OPT_resource_dir)) {
       commandLine.push_back("-resource-dir");
       commandLine.push_back(resourceDirArg->getValue());
+    }
+
+    if (Args.hasFlag(options::OPT_static_executable,
+                     options::OPT_no_static_executable, false) ||
+        Args.hasFlag(options::OPT_static_stdlib, options::OPT_no_static_stdlib,
+                     false)) {
+      commandLine.push_back("-use-static-resource-dir");
     }
 
     std::string executable = getSwiftProgramPath();

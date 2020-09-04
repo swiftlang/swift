@@ -15,6 +15,7 @@
 #include "ManagedValue.h"
 #include "Scope.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 

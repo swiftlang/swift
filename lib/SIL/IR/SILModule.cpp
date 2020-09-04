@@ -115,6 +115,9 @@ SILModule::~SILModule() {
   for (SILGlobalVariable &v : silGlobals)
     v.dropAllReferences();
 
+  for (auto vt : vtables)
+    vt->~SILVTable();
+
   // Drop everything functions in this module reference.
   //
   // This is necessary since the functions may reference each other.  We don't
@@ -355,6 +358,7 @@ bool SILModule::linkFunction(SILFunction *F, SILModule::LinkingMode Mode) {
 
 SILFunction *SILModule::findFunction(StringRef Name, SILLinkage Linkage) {
   assert((Linkage == SILLinkage::Public ||
+          Linkage == SILLinkage::SharedExternal ||
           Linkage == SILLinkage::PublicExternal) &&
          "Only a lookup of public functions is supported currently");
 
@@ -405,6 +409,9 @@ SILFunction *SILModule::findFunction(StringRef Name, SILLinkage Linkage) {
   // compilation, simply convert it into an external declaration,
   // so that a compiled version from the shared library is used.
   if (F->isDefinition() &&
+      // Don't eliminate bodies of _alwaysEmitIntoClient functions
+      // (PublicNonABI linkage is de-serialized as SharedExternal)
+      F->getLinkage() != SILLinkage::SharedExternal &&
       !F->getModule().getOptions().shouldOptimize()) {
     F->convertToDeclaration();
   }
@@ -418,11 +425,6 @@ bool SILModule::hasFunction(StringRef Name) {
   if (lookUpFunction(Name))
     return true;
   return getSILLoader()->hasSILFunction(Name);
-}
-
-void SILModule::linkAllFromCurrentModule() {
-  getSILLoader()->getAllForModule(getSwiftModule()->getName(),
-                                  /*PrimaryFile=*/nullptr);
 }
 
 void SILModule::invalidateSILLoaderCaches() {
@@ -469,7 +471,8 @@ void SILModule::eraseGlobalVariable(SILGlobalVariable *G) {
   getSILGlobalList().erase(G);
 }
 
-SILVTable *SILModule::lookUpVTable(const ClassDecl *C) {
+SILVTable *SILModule::lookUpVTable(const ClassDecl *C,
+                                   bool deserializeLazily) {
   if (!C)
     return nullptr;
 
@@ -477,6 +480,9 @@ SILVTable *SILModule::lookUpVTable(const ClassDecl *C) {
   auto R = VTableMap.find(C);
   if (R != VTableMap.end())
     return R->second;
+
+  if (!deserializeLazily)
+    return nullptr;
 
   // If that fails, try to deserialize it. If that fails, return nullptr.
   SILVTable *Vtbl = getSILLoader()->lookupVTable(C);
@@ -586,7 +592,7 @@ lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member) {
   // Ok, we have a VTable. Try to lookup the SILFunction implementation from
   // the VTable.
   if (auto E = Vtbl->getEntry(*this, Member))
-    return E->Implementation;
+    return E->getImplementation();
 
   return nullptr;
 }

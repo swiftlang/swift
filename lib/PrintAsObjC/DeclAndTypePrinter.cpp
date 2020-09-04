@@ -32,6 +32,7 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/CharInfo.h"
+#include "clang/Basic/SourceManager.h"
 
 using namespace swift;
 using namespace swift::objc_translation;
@@ -821,7 +822,7 @@ private:
 
       const char *plat;
       switch (AvAttr->Platform) {
-      case PlatformKind::OSX:
+      case PlatformKind::macOS:
         plat = "macos";
         break;
       case PlatformKind::iOS:
@@ -836,7 +837,7 @@ private:
       case PlatformKind::watchOS:
         plat = "watchos";
         break;
-      case PlatformKind::OSXApplicationExtension:
+      case PlatformKind::macOSApplicationExtension:
         plat = "macos_app_extension";
         break;
       case PlatformKind::iOSApplicationExtension:
@@ -1339,6 +1340,7 @@ private:
     return true;
   }
 
+public:
   /// If \p nominal is bridged to an Objective-C class (via a conformance to
   /// _ObjectiveCBridgeable), return that class.
   ///
@@ -1369,6 +1371,7 @@ private:
     return objcType->getClassOrBoundGenericClass();
   }
 
+private:
   /// If the nominal type is bridged to Objective-C (via a conformance
   /// to _ObjectiveCBridgeable), print the bridged type.
   void printObjCBridgeableType(const NominalTypeDecl *swiftNominal,
@@ -1570,12 +1573,16 @@ private:
   }
 
   bool printImportedAlias(const TypeAliasDecl *alias,
+                          ArrayRef<Type> genericArgs,
                           Optional<OptionalTypeKind> optionalKind) {
     if (!alias->hasClangNode())
       return false;
 
     if (auto *clangTypeDecl =
           dyn_cast<clang::TypeDecl>(alias->getClangDecl())) {
+      assert(!alias->isGeneric()
+             && "generic typealias backed by clang typedecl?");
+
       maybePrintTagKeyword(alias);
       os << getNameForObjC(alias);
 
@@ -1583,12 +1590,19 @@ private:
         printNullability(optionalKind);
     } else if (auto *clangObjCClass
                = dyn_cast<clang::ObjCInterfaceDecl>(alias->getClangDecl())){
+      assert(!alias->isGeneric()
+             && "generic typealias backed by clang interface?");
+
       os << clangObjCClass->getName() << " *";
       printNullability(optionalKind);
     } else {
       auto *clangCompatAlias =
       cast<clang::ObjCCompatibleAliasDecl>(alias->getClangDecl());
-      os << clangCompatAlias->getName() << " *";
+
+      os << clangCompatAlias->getName();
+      if (!genericArgs.empty())
+        printGenericArgs(genericArgs);
+      os << " *";
       printNullability(optionalKind);
     }
 
@@ -1598,10 +1612,12 @@ private:
   void visitTypeAliasType(TypeAliasType *aliasTy,
                                Optional<OptionalTypeKind> optionalKind) {
     const TypeAliasDecl *alias = aliasTy->getDecl();
+    auto genericArgs = aliasTy->getDirectGenericArgs();
+
     if (printIfKnownSimpleType(alias, optionalKind))
       return;
 
-    if (printImportedAlias(alias, optionalKind))
+    if (printImportedAlias(alias, genericArgs, optionalKind))
       return;
 
     visitPart(aliasTy->getSinglyDesugaredType(), optionalKind);
@@ -1735,8 +1751,12 @@ private:
   }
 
   void printGenericArgs(BoundGenericType *BGT) {
+    printGenericArgs(BGT->getGenericArgs());
+  }
+
+  void printGenericArgs(ArrayRef<Type> genericArgs) {
     os << '<';
-    interleave(BGT->getGenericArgs(),
+    interleave(genericArgs,
                [this](Type t) { print(t, None); },
                [this] { os << ", "; });
     os << '>';
@@ -1890,7 +1910,7 @@ private:
       assert(extension->getGenericSignature().getCanonicalSignature() ==
                  extendedClass->getGenericSignature().getCanonicalSignature() &&
              "constrained extensions or custom generic parameters?");
-      type = extendedClass->getGenericEnvironment()->getSugaredType(type);
+      type = extendedClass->getGenericSignature()->getSugaredType(type);
       decl = type->getDecl();
     }
 
@@ -2065,6 +2085,14 @@ void DeclAndTypePrinter::printAdHocCategory(
 
 bool DeclAndTypePrinter::isEmptyExtensionDecl(const ExtensionDecl *ED) {
   return getImpl().isEmptyExtensionDecl(ED);
+}
+
+const TypeDecl *DeclAndTypePrinter::getObjCTypeDecl(const TypeDecl* TD) {
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(TD))
+    if (auto *bridged = getImpl().getObjCBridgedClass(nominal))
+      return bridged;
+
+  return TD;
 }
 
 StringRef

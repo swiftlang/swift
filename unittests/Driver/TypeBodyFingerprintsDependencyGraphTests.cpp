@@ -13,6 +13,8 @@
 // would be excluded in the coarse-grained graph. But since these will be jobs
 // that have already been scheduled, downstream mechanisms will filter them out.
 
+// \c \c findExternallyDependentUntracedJobs may also return duplicates
+
 // To debug a test, create the \c ModuleDepGraph and pass true as the second
 // argument to the constructor, then find the dot files in the directory
 // where the tests run,
@@ -807,10 +809,10 @@ TEST(ModuleDepGraph, UseFingerprints) {
   {
     const auto jobs =
         simulateReload(graph, &job0, {{NodeKind::nominal, {"A1@11", "A2@2"}}});
-    EXPECT_EQ(2u, jobs.size());
+    EXPECT_EQ(3u, jobs.size());
     EXPECT_TRUE(contains(jobs, &job0));
     EXPECT_TRUE(contains(jobs, &job1));
-    EXPECT_FALSE(contains(jobs, &job2));
+    EXPECT_TRUE(contains(jobs, &job2));
     EXPECT_FALSE(contains(jobs, &job3));
   }
 }

@@ -386,6 +386,14 @@ class MetadataCacheKey {
 
     auto *aDescription = awt->getDescription();
     auto *bDescription = bwt->getDescription();
+    return compareProtocolConformanceDescriptors(aDescription, bDescription);
+  }
+
+public:
+  /// Compare two conformance descriptors, checking their contents if necessary.
+  static int compareProtocolConformanceDescriptors(
+      const ProtocolConformanceDescriptor *aDescription,
+      const ProtocolConformanceDescriptor *bDescription) {
     if (aDescription == bDescription)
       return 0;
 
@@ -405,6 +413,7 @@ class MetadataCacheKey {
                            bDescription->getProtocol());
   }
 
+private:
   /// Compare the content from two keys.
   static int compareContent(const void * const *adata,
                             const void * const *bdata,
@@ -766,10 +775,22 @@ protected:
   using super::asImpl;
 
 private:
+  #ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+  using ThreadID = int;
+  static ThreadID CurrentThreadID() {
+    return 0;
+  }
+  #else
+  using ThreadID = std::thread::id;
+  static ThreadID CurrentThreadID() {
+    return std::this_thread::get_id();
+  }
+  #endif
+
   /// Additional storage that is only ever accessed under the lock.
   union LockedStorage_t {
     /// The thread that is allocating the entry.
-    std::thread::id AllocatingThread;
+    ThreadID AllocatingThread;
 
     /// The completion queue.
     MetadataCompletionQueueEntry *CompletionQueue;
@@ -828,7 +849,7 @@ public:
   MetadataCacheEntryBase()
       : LockedStorageKind(LSK::AllocatingThread),
         TrackingInfo(PrivateMetadataTrackingInfo::initial().getRawValue()) {
-    LockedStorage.AllocatingThread = std::this_thread::get_id();
+    LockedStorage.AllocatingThread = CurrentThreadID();
   }
 
   // Note that having an explicit destructor here is important to make this
@@ -841,7 +862,7 @@ public:
 
   bool isBeingAllocatedByCurrentThread() const {
     return LockedStorageKind == LSK::AllocatingThread &&
-           LockedStorage.AllocatingThread == std::this_thread::get_id();
+           LockedStorage.AllocatingThread == CurrentThreadID();
   }
 
   /// Given that this thread doesn't own the right to initialize the

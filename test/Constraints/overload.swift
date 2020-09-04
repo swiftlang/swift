@@ -127,11 +127,12 @@ func test20886179(_ handlers: [(Int) -> Void], buttonIndex: Int) {
 
 // The problem here is that the call has a contextual result type incompatible
 // with *all* overload set candidates.  This is not an ambiguity.
-func overloaded_identity(_ a : Int) -> Int {} // expected-note {{found this candidate}}
-func overloaded_identity(_ b : Float) -> Float {} // expected-note {{found this candidate}}
+func overloaded_identity(_ a : Int) -> Int {} // expected-note {{'overloaded_identity' produces 'Int', not the expected contextual result type '()'}} expected-note {{'overloaded_identity' declared her}}
+func overloaded_identity(_ b : Float) -> Float {} // expected-note {{'overloaded_identity' produces 'Float', not the expected contextual result type '()'}}
 
 func test_contextual_result_1() {
-  return overloaded_identity()  // expected-error {{no exact matches in call to global function 'overloaded_identity'}}
+  return overloaded_identity()  // expected-error {{missing argument for parameter #1 in call}}
+  // expected-error@-1 {{no 'overloaded_identity' candidates produce the expected contextual result type '()'}}
 }
 
 func test_contextual_result_2() {
@@ -237,4 +238,11 @@ func autoclosure1<T>(_: [T], _: X) { }
 
 func test_autoclosure1(ia: [Int]) {
   autoclosure1(ia, X()) // okay: resolves to the second function
+}
+
+// rdar://problem/64368545 - failed to produce diagnostic (hole propagated to func result without recording a fix)
+func test_no_hole_propagation() {
+  func test(withArguments arguments: [String]) -> String {
+    return arguments.reduce(0, +) // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
+  }
 }

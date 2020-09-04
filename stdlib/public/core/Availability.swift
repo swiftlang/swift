@@ -42,3 +42,20 @@ public func _stdlib_isOSVersionAtLeast(
   return false._value
 #endif
 }
+
+#if os(macOS)
+// This is a magic entry point known to the compiler. It is called in
+// generated code for API availability checking.
+@_semantics("availability.osversion")
+@_effects(readnone)
+public func _stdlib_isOSVersionAtLeastOrVariantVersionAtLeast(
+  _ major: Builtin.Word,
+  _ minor: Builtin.Word,
+  _ patch: Builtin.Word,
+  _ variantMajor: Builtin.Word,
+  _ variantMinor: Builtin.Word,
+  _ variantPatch: Builtin.Word
+  ) -> Builtin.Int1 {
+  return _stdlib_isOSVersionAtLeast(major, minor, patch)
+}
+#endif

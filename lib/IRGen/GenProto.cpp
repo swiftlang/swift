@@ -1924,11 +1924,16 @@ namespace {
           llvm::ArrayType::get(IGM.Int8PtrTy,
                                swift::NumGenericMetadataPrivateDataWords);
         auto privateDataInit = llvm::Constant::getNullValue(privateDataTy);
+        
+        IRGenMangler mangler;
+        auto symbolName =
+          mangler.mangleProtocolConformanceInstantiationCache(Conformance);
+        
         auto privateData =
           new llvm::GlobalVariable(IGM.Module, privateDataTy,
                                    /*constant*/ false,
                                    llvm::GlobalVariable::InternalLinkage,
-                                   privateDataInit, "");
+                                   privateDataInit, symbolName);
         B.addRelativeAddress(privateData);
       }
     }
@@ -2749,12 +2754,10 @@ static void addAbstractConditionalRequirements(
     auto *proto =
         req.getSecondType()->castTo<ProtocolType>()->getDecl();
     auto ty = req.getFirstType()->getCanonicalType();
-    if (!isa<ArchetypeType>(ty))
+    auto archetype = dyn_cast<ArchetypeType>(ty);
+    if (!archetype)
       continue;
-    auto conformance = subMap.lookupConformance(ty, proto);
-    if (!conformance.isAbstract())
-      continue;
-    requirements.insert({ty, conformance.getAbstract()});
+    requirements.insert({ty, proto});
   }
   // Recursively add conditional requirements.
   for (auto &conf : subMap.getConformances()) {

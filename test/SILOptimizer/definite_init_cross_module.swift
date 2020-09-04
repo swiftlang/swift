@@ -3,8 +3,8 @@
 // RUN: %target-swift-frontend -emit-sil -verify -I %t -swift-version 5 %s > /dev/null -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/definite_init_cross_module/BridgingHeader.h
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -emit-module-path=%t/OtherModule.swiftmodule %S/Inputs/definite_init_cross_module/OtherModule.swift -enable-ownership-stripping-after-serialization
-// RUN: %target-swift-frontend -emit-sil -verify -I %t -swift-version 5 %s > /dev/null -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/definite_init_cross_module/BridgingHeader.h -enable-ownership-stripping-after-serialization
+// RUN: %target-swift-frontend -emit-module -emit-module-path=%t/OtherModule.swiftmodule %S/Inputs/definite_init_cross_module/OtherModule.swift
+// RUN: %target-swift-frontend -emit-sil -verify -I %t -swift-version 5 %s > /dev/null -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/definite_init_cross_module/BridgingHeader.h
 
 import OtherModule
 
@@ -253,4 +253,28 @@ extension GenericEmpty {
 
   init(xx: Double) {
   } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
+}
+
+class AcceptsVisibleNoArgsDesignatedInit: VisibleNoArgsDesignatedInit {
+  var y: Float
+  init(y: Float) {
+    self.y = y
+    // no error
+  }
+}
+
+open class InModuleVisibleNoArgsDesignatedInit {
+  var x: Float
+  public init() { x = 0.0 }
+
+  // Add a designated init the subclass cannot see.
+  private init(x: Float) { self.x = x }
+}
+
+class AcceptsInModuleVisibleNoArgsDesignatedInit: InModuleVisibleNoArgsDesignatedInit {
+  var y: Float
+  init(y: Float) {
+    self.y = y
+    // no error
+  }
 }

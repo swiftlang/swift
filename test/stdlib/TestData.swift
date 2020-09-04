@@ -1077,6 +1077,99 @@ class TestData : TestDataSuper {
         expectEqual(slice4[0], 8)
     }
 
+    func test_rangeOfDataProtocol() {
+        // https://bugs.swift.org/browse/SR-10689
+        
+        let base = Data([0x00, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x03,
+                         0x00, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x03])
+        let subdata = base[10..<13] // [0x02, 0x03, 0x00]
+        let oneByte = base[14..<15] // [0x02]
+        
+        do { // firstRange(of:in:)
+            func assertFirstRange(_ data: Data, _ fragment: Data, range: ClosedRange<Int>? = nil,
+                                  expectedStartIndex: Int?,
+                                  _ message: @autoclosure () -> String = "",
+                                  file: String = #file, line: UInt = #line) {
+                if let index = expectedStartIndex {
+                    let expectedRange: Range<Int> = index..<(index + fragment.count)
+                    if let someRange = range {
+                        expectEqual(data.firstRange(of: fragment, in: someRange), expectedRange, message(), file: file, line: line)
+                    } else {
+                        expectEqual(data.firstRange(of: fragment), expectedRange, message(), file: file, line: line)
+                    }
+                } else {
+                    if let someRange = range {
+                        expectNil(data.firstRange(of: fragment, in: someRange), message(), file: file, line: line)
+                    } else {
+                        expectNil(data.firstRange(of: fragment), message(), file: file, line: line)
+                    }
+                }
+            }
+            
+            assertFirstRange(base, base, expectedStartIndex: base.startIndex)
+            assertFirstRange(base, subdata, expectedStartIndex: 2)
+            assertFirstRange(base, oneByte, expectedStartIndex: 2)
+            
+            assertFirstRange(subdata, base, expectedStartIndex: nil)
+            assertFirstRange(subdata, subdata, expectedStartIndex: subdata.startIndex)
+            assertFirstRange(subdata, oneByte, expectedStartIndex: subdata.startIndex)
+            
+            assertFirstRange(oneByte, base, expectedStartIndex: nil)
+            assertFirstRange(oneByte, subdata, expectedStartIndex: nil)
+            assertFirstRange(oneByte, oneByte, expectedStartIndex: oneByte.startIndex)
+            
+            assertFirstRange(base, subdata, range: 1...14, expectedStartIndex: 2)
+            assertFirstRange(base, subdata, range: 6...8, expectedStartIndex: 6)
+            assertFirstRange(base, subdata, range: 8...10, expectedStartIndex: nil)
+            
+            assertFirstRange(base, oneByte, range: 1...14, expectedStartIndex: 2)
+            assertFirstRange(base, oneByte, range: 6...6, expectedStartIndex: 6)
+            assertFirstRange(base, oneByte, range: 8...9, expectedStartIndex: nil)
+        }
+        
+        do { // lastRange(of:in:)
+            func assertLastRange(_ data: Data, _ fragment: Data, range: ClosedRange<Int>? = nil,
+                                 expectedStartIndex: Int?,
+                                 _ message: @autoclosure () -> String = "",
+                                 file: String = #file, line: UInt = #line) {
+                if let index = expectedStartIndex {
+                    let expectedRange: Range<Int> = index..<(index + fragment.count)
+                    if let someRange = range {
+                        expectEqual(data.lastRange(of: fragment, in: someRange), expectedRange, message(), file: file, line: line)
+                    } else {
+                        expectEqual(data.lastRange(of: fragment), expectedRange, message(), file: file, line: line)
+                    }
+                } else {
+                  if let someRange = range {
+                      expectNil(data.lastRange(of: fragment, in: someRange), message(), file: file, line: line)
+                  } else {
+                      expectNil(data.lastRange(of: fragment), message(), file: file, line: line)
+                  }
+                }
+            }
+            
+            assertLastRange(base, base, expectedStartIndex: base.startIndex)
+            assertLastRange(base, subdata, expectedStartIndex: 10)
+            assertLastRange(base, oneByte, expectedStartIndex: 14)
+            
+            assertLastRange(subdata, base, expectedStartIndex: nil)
+            assertLastRange(subdata, subdata, expectedStartIndex: subdata.startIndex)
+            assertLastRange(subdata, oneByte, expectedStartIndex: subdata.startIndex)
+            
+            assertLastRange(oneByte, base, expectedStartIndex: nil)
+            assertLastRange(oneByte, subdata, expectedStartIndex: nil)
+            assertLastRange(oneByte, oneByte, expectedStartIndex: oneByte.startIndex)
+            
+            assertLastRange(base, subdata, range: 1...14, expectedStartIndex: 10)
+            assertLastRange(base, subdata, range: 6...8, expectedStartIndex: 6)
+            assertLastRange(base, subdata, range: 8...10, expectedStartIndex: nil)
+            
+            assertLastRange(base, oneByte, range: 1...14, expectedStartIndex: 14)
+            assertLastRange(base, oneByte, range: 6...6, expectedStartIndex: 6)
+            assertLastRange(base, oneByte, range: 8...9, expectedStartIndex: nil)
+        }
+    }
+
     func test_sliceAppending() {
         // https://bugs.swift.org/browse/SR-4473
         var fooData = Data()
@@ -3838,7 +3931,7 @@ class TestData : TestDataSuper {
     }
 
     func test_increaseCount() {
-        guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else { return }
+        guard #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) else { return }
         let initials: [Range<UInt8>] = [
             0..<0,
             0..<2,
@@ -3861,7 +3954,7 @@ class TestData : TestDataSuper {
     }
 
     func test_decreaseCount() {
-        guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else { return }
+        guard #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) else { return }
         let initials: [Range<UInt8>] = [
             0..<0,
             0..<2,
@@ -4022,6 +4115,7 @@ DataTests.test("test_noCopyBehavior") { TestData().test_noCopyBehavior() }
 DataTests.test("test_doubleDeallocation") { TestData().test_doubleDeallocation() }
 DataTests.test("test_repeatingValueInitialization") { TestData().test_repeatingValueInitialization() }
 DataTests.test("test_rangeZoo") { TestData().test_rangeZoo() }
+DataTests.test("test_rangeOfDataProtocol") { TestData().test_rangeOfDataProtocol() }
 DataTests.test("test_sliceAppending") { TestData().test_sliceAppending() }
 DataTests.test("test_replaceSubrange") { TestData().test_replaceSubrange() }
 DataTests.test("test_sliceWithUnsafeBytes") { TestData().test_sliceWithUnsafeBytes() }
@@ -4373,4 +4467,3 @@ DataTests.test("bounding failure subscript") {
 
 runAllTests()
 #endif
-

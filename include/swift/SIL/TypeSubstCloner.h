@@ -351,7 +351,8 @@ protected:
         remappedOrigFnType
             ->getAutoDiffDerivativeFunctionType(
                 remappedOrigFnType->getDifferentiabilityParameterIndices(),
-                /*resultIndex*/ 0, dfei->getDerivativeFunctionKind(),
+                remappedOrigFnType->getDifferentiabilityResultIndices(),
+                dfei->getDerivativeFunctionKind(),
                 getBuilder().getModule().Types,
                 LookUpConformanceInModule(SwiftMod))
             ->getWithoutDifferentiability();

@@ -29,7 +29,7 @@ bb0:
   %jvpThick = thin_to_thick_function %jvp : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) to $@callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
   %vjp = function_ref @f_vjp : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
   %vjpThick = thin_to_thick_function %vjp : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) to $@callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
-  %result = differentiable_function [parameters 0] %origThick : $@callee_guaranteed (Float) -> Float with_derivative {%jvpThick : $@callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float), %vjpThick : $@callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)}
+  %result = differentiable_function [parameters 0] [results 0] %origThick : $@callee_guaranteed (Float) -> Float with_derivative {%jvpThick : $@callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float), %vjpThick : $@callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)}
   return %result : $@differentiable @callee_guaranteed (Float) -> Float
 }
 

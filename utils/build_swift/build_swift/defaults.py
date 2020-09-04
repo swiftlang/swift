@@ -14,6 +14,7 @@ Default option value definitions.
 
 from __future__ import absolute_import, unicode_literals
 
+import os
 import platform
 
 from . import shell
@@ -111,6 +112,19 @@ def _default_swift_lto_link_jobs():
 
 LLVM_MAX_PARALLEL_LTO_LINK_JOBS = _default_llvm_lto_link_jobs()
 SWIFT_MAX_PARALLEL_LTO_LINK_JOBS = _default_swift_lto_link_jobs()
+
+
+def llvm_install_components():
+    """Convenience function for getting the default llvm install components for
+    platforms.
+    """
+    components = ['llvm-cov', 'llvm-profdata', 'IndexStore', 'clang',
+                  'clang-resource-headers', 'compiler-rt', 'clangd']
+    if os.sys.platform == 'darwin':
+        components.extend(['dsymutil'])
+    else:
+        components.extend(['lld'])
+    return ';'.join(components)
 
 
 # Options that can only be "configured" by editing this file.

@@ -41,8 +41,8 @@ sil_vtable Base {
 }
 
 sil_vtable Sub {
-  #Base.foo: @_TSubFooFun
-  #Base.exit: @Sub_exit 
+  #Base.foo: @_TSubFooFun [override]
+  #Base.exit: @Sub_exit  [override]
 }
 
 sil @test_objc_ancestry : $@convention(thin) (@guaranteed Base) -> () {
@@ -97,7 +97,7 @@ sil_vtable Base2 {
 }
 
 sil_vtable Sub2 {
-  #Base2.foo: @_TSub2FooFun
+  #Base2.foo: @_TSub2FooFun [override]
 }
 
 sil @test_objc_ancestry2 : $@convention(thin) (@guaranteed Base2) -> () {

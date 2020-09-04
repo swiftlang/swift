@@ -719,9 +719,7 @@ public:
   }
 
   void parse() {
-    auto root = Parser->parse();
-    if (SynTreeCreator)
-      SynTreeCreator->acceptSyntaxRoot(root, Parser->getSourceFile());
+    Parser->parse();
   }
 
   SourceFile &getSourceFile() {
@@ -788,8 +786,10 @@ SwiftDocumentSemanticInfo::takeSemanticTokens(
           });
 
       std::vector<SwiftSemanticToken>::iterator ReplaceEnd;
-      if (Upd->getLength() == 0) {
+      if (ReplaceBegin == SemaToks.end()) {
         ReplaceEnd = ReplaceBegin;
+      } else if (Upd->getLength() == 0) {
+        ReplaceEnd = ReplaceBegin + 1;
       } else {
         ReplaceEnd = std::upper_bound(ReplaceBegin, SemaToks.end(),
             Upd->getByteOffset() + Upd->getLength(),
@@ -1601,9 +1601,6 @@ private:
         if (auto *CE = dyn_cast<CallExpr>(E)) {
           // Call expression can have argument.
           Arg = CE->getArg();
-        } else if (auto UME = dyn_cast<UnresolvedMemberExpr>(E)) {
-          // Unresolved member can have argument too.
-          Arg = UME->getArgument();
         }
         if (!Arg)
           return false;
@@ -1615,27 +1612,9 @@ private:
 
       bool walkToExprPre(Expr *E) override {
         auto SR = E->getSourceRange();
-        if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc)) {
-          if (auto closure = dyn_cast<ClosureExpr>(E)) {
-            if (closure->hasSingleExpressionBody()) {
-              // Treat a single-expression body like a brace statement and reset
-              // the enclosing context. Note: when the placeholder is the whole
-              // body it is handled specially as wrapped in braces by
-              // shouldUseTrailingClosureInTuple().
-              auto SR = closure->getSingleExpressionBody()->getSourceRange();
-              if (SR.isValid() && SR.Start != TargetLoc &&
-                  SM.rangeContainsTokenLoc(SR, TargetLoc)) {
-                OuterStmt = nullptr;
-                OuterExpr = nullptr;
-                EnclosingCallAndArg = {nullptr, nullptr};
-                return true;
-              }
-            }
-          }
-
-          if (!checkCallExpr(E) && !EnclosingCallAndArg.first) {
-            OuterExpr = E;
-          }
+        if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc) &&
+            !checkCallExpr(E) && !EnclosingCallAndArg.first) {
+          OuterExpr = E;
         }
         return true;
       }
@@ -1646,11 +1625,30 @@ private:
         return true;
       }
 
+      /// Whether this statement body consists of only an implicit "return",
+      /// possibly within braces.
+      bool isImplicitReturnBody(Stmt *S) {
+        if (auto RS = dyn_cast<ReturnStmt>(S))
+          return RS->isImplicit() && RS->getSourceRange().Start == TargetLoc;
+
+        if (auto BS = dyn_cast<BraceStmt>(S)) {
+          if (BS->getNumElements() == 1) {
+            if (auto innerS = BS->getFirstElement().dyn_cast<Stmt *>())
+              return isImplicitReturnBody(innerS);
+          }
+        }
+
+        return false;
+      }
+
       bool walkToStmtPre(Stmt *S) override {
         auto SR = S->getSourceRange();
-        if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc)) {
+        if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc) &&
+            !isImplicitReturnBody(S)) {
           // A statement inside an expression - e.g. `foo({ if ... })` - resets
           // the enclosing context.
+          //
+          // ... unless it's an implicit return.
           OuterExpr = nullptr;
           EnclosingCallAndArg = {nullptr, nullptr};
 
@@ -1766,7 +1764,6 @@ public:
                                ArrayRef<ClosureInfo> trailingClosures)>
                 MultiClosureCallback,
             std::function<bool(EditorPlaceholderExpr *)> NonClosureCallback) {
-
     SourceLoc PlaceholderStartLoc = SM.getLocForOffset(BufID, Offset);
 
     // See if the placeholder is encapsulated with an EditorPlaceholderExpr
@@ -1989,10 +1986,18 @@ void SwiftEditorDocument::parse(ImmutableTextSnapshotRef Snapshot,
   Impl.SyntaxInfo->parse();
 }
 
-void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
+static UIdent SemaDiagStage("source.diagnostic.stage.swift.sema");
+static UIdent ParseDiagStage("source.diagnostic.stage.swift.parse");
+
+void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer, bool ReportDiags) {
   llvm::sys::ScopedLock L(Impl.AccessMtx);
 
   Impl.ParserDiagnostics = Impl.SyntaxInfo->getDiagnostics();
+  if (ReportDiags) {
+    Consumer.setDiagnosticStage(ParseDiagStage);
+    for (auto &Diag : Impl.ParserDiagnostics)
+      Consumer.handleDiagnostic(Diag, ParseDiagStage);
+  }
 
   SwiftSyntaxMap NewMap = SwiftSyntaxMap(Impl.SyntaxMap.Tokens.size() + 16);
 
@@ -2058,9 +2063,6 @@ void SwiftEditorDocument::readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
     if (Kind.isValid())
       Consumer.handleSemanticAnnotation(Offset, Length, Kind, IsSystem);
   }
-
-  static UIdent SemaDiagStage("source.diagnostic.stage.swift.sema");
-  static UIdent ParseDiagStage("source.diagnostic.stage.swift.parse");
 
   // If there's no value returned for diagnostics it means they are out-of-date
   // (based on a different snapshot).
@@ -2129,23 +2131,10 @@ void SwiftEditorDocument::formatText(unsigned Line, unsigned Length,
   Consumer.recordAffectedLineRange(LineRange.startLine(), LineRange.lineCount());
 }
 
-bool isReturningVoid(const SourceManager &SM, CharSourceRange Range) {
-  if (Range.isInvalid())
-    return false;
-  StringRef Text = SM.extractText(Range);
-  return "()" == Text || "Void" == Text;
-}
-
 static void
 printClosureBody(const PlaceholderExpansionScanner::ClosureInfo &closure,
                  llvm::raw_ostream &OS, const SourceManager &SM) {
-  bool ReturningVoid = isReturningVoid(SM, closure.ReturnTypeRange);
-
-  bool HasSignature = !closure.Params.empty() ||
-                      (closure.ReturnTypeRange.isValid() && !ReturningVoid);
   bool FirstParam = true;
-  if (HasSignature)
-    OS << "(";
   for (auto &Param : closure.Params) {
     if (!FirstParam)
       OS << ", ";
@@ -2153,30 +2142,19 @@ printClosureBody(const PlaceholderExpansionScanner::ClosureInfo &closure,
     if (Param.NameRange.isValid()) {
       // If we have a parameter name, just output the name as is and skip
       // the type. For example:
-      // <#(arg1: Int, arg2: Int)#> turns into (arg1, arg2).
+      // <#(arg1: Int, arg2: Int)#> turns into '{ arg1, arg2 in'.
       OS << SM.extractText(Param.NameRange);
     } else {
       // If we only have the parameter type, output the type as a
       // placeholder. For example:
-      // <#(Int, Int)#> turns into (<#Int#>, <#Int#>).
+      // <#(Int, Int)#> turns into '{ <#Int#>, <#Int#> in'.
       OS << "<#";
       OS << SM.extractText(Param.TypeRange);
       OS << "#>";
     }
   }
-  if (HasSignature)
-    OS << ") ";
-  if (closure.ReturnTypeRange.isValid()) {
-    auto ReturnTypeText = SM.extractText(closure.ReturnTypeRange);
-
-    // We need return type if it is not Void.
-    if (!ReturningVoid) {
-      OS << "-> ";
-      OS << ReturnTypeText << " ";
-    }
-  }
-  if (HasSignature)
-    OS << "in";
+  if (!FirstParam)
+    OS << " in";
   OS << "\n" << getCodePlaceholder() << "\n";
 }
 
@@ -2328,7 +2306,6 @@ void SwiftEditorDocument::reportDocumentStructure(SourceFile &SrcFile,
 //===----------------------------------------------------------------------===//
 // EditorOpen
 //===----------------------------------------------------------------------===//
-
 void SwiftLangSupport::editorOpen(
     StringRef Name, llvm::MemoryBuffer *Buf, EditorConsumer &Consumer,
     ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions) {
@@ -2367,8 +2344,7 @@ void SwiftLangSupport::editorOpen(
     EditorDoc->updateSemaInfo();
   }
 
-  EditorDoc->readSyntaxInfo(Consumer);
-  EditorDoc->readSemanticInfo(Snapshot, Consumer);
+  EditorDoc->readSyntaxInfo(Consumer, /*ReportDiags=*/true);
 
   if (Consumer.syntaxTreeEnabled()) {
     assert(EditorDoc->getSyntaxTree().hasValue());
@@ -2530,7 +2506,8 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
     }
     EditorDoc->parse(Snapshot, *this, Consumer.syntaxTreeEnabled(),
                      SyntaxCachePtr);
-    EditorDoc->readSyntaxInfo(Consumer);
+    // Do not report syntactic diagnostics; will be handled in readSemanticInfo.
+    EditorDoc->readSyntaxInfo(Consumer, /*ReportDiags=*/false);
 
     // Log reuse information
     if (SyntaxCache.hasValue() && LogReuseRegions) {

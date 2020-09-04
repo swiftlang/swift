@@ -2060,10 +2060,7 @@ void Compilation::sortJobsToMatchCompilationInputs(
     if (const CompileJobAction *CJA =
             dyn_cast<CompileJobAction>(&J->getSource())) {
       const InputAction *IA = CJA->findSingleSwiftInput();
-      auto R =
-          jobsByInput.insert(std::make_pair(IA->getInputArg().getValue(), J));
-      assert(R.second);
-      (void)R;
+      jobsByInput.insert(std::make_pair(IA->getInputArg().getValue(), J));
     } else
       sortedJobs.push_back(J);
   }

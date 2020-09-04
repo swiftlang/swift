@@ -323,8 +323,6 @@ bb0(%0 : @guaranteed $StructMemberTest):
 // multiple trivial arguments), we can.
 //
 // CHECK-LABEL: sil [ossa] @multiple_arg_forwarding_inst_test : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject, Builtin.Int32) -> () {
-// CHECK: copy_value
-// CHECK: copy_value
 // CHECK-NOT: copy_value
 // CHECK: } // end sil function 'multiple_arg_forwarding_inst_test'
 sil [ossa] @multiple_arg_forwarding_inst_test : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject, Builtin.Int32) -> () {
@@ -394,43 +392,6 @@ bb0(%0 : @guaranteed $(Klass, MyInt)):
   %4 = struct_extract %3 : $MyInt, #MyInt.value
   destroy_value %2 : $Klass
   return %4 : $Builtin.Int32
-}
-
-// Make sure that we do not optimize this case.
-//
-// CHECK-LABEL: sil [ossa] @handle_phi_address_nodes : $@convention(thin) (@guaranteed Klass) -> () {
-// CHECK: load [copy]
-// CHECK: } // end sil function 'handle_phi_address_nodes'
-sil [ossa] @handle_phi_address_nodes : $@convention(thin) (@guaranteed Klass) -> () {
-bb0(%0 : @guaranteed $Klass):
-  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
-  %2 = copy_value %1 : $FakeOptional<Klass>
-  %3 = copy_value %1 : $FakeOptional<Klass>
-
-  %4 = alloc_stack $FakeOptional<Klass>
-  store %2 to [init] %4 : $*FakeOptional<Klass>
-  %5 = alloc_stack $FakeOptional<Klass>
-  store %3 to [init] %5 : $*FakeOptional<Klass>
-
-  cond_br undef, bb1, bb2
-
-bb1:
-  br bb3(%4 : $*FakeOptional<Klass>)
-
-bb2:
-  br bb3(%5 : $*FakeOptional<Klass>)
-
-bb3(%6 : $*FakeOptional<Klass>):
-  %7 = load [copy] %6 : $*FakeOptional<Klass>
-  %8 = function_ref @fakeoptional_guaranteed_user : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
-  apply %8(%7) : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
-  destroy_value %7 : $FakeOptional<Klass>
-  destroy_addr %5 : $*FakeOptional<Klass>
-  dealloc_stack %5 : $*FakeOptional<Klass>
-  destroy_addr %4 : $*FakeOptional<Klass>
-  dealloc_stack %4 : $*FakeOptional<Klass>
-  %9999 = tuple()
-  return %9999 : $()
 }
 
 // CHECK-LABEL: sil [ossa] @switch_enum_test_loadcopy_no_default : $@convention(thin) (@owned FakeOptional<Builtin.NativeObject>) -> () {

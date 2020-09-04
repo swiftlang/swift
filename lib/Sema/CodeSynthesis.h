@@ -76,20 +76,6 @@ bool hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal);
 /// Add `@_fixed_layout` attribute to the nominal type, if possible.
 void addFixedLayoutAttr(NominalTypeDecl *nominal);
 
-/// Find available closure discriminators.
-///
-/// The parser typically takes care of assigning unique discriminators to
-/// closures, but the parser is unavailable during semantic analysis.
-class DiscriminatorFinder : public ASTWalker {
-  unsigned NextDiscriminator = 0;
-
-public:
-  Expr *walkToExprPost(Expr *E) override;
-
-  // Get the next available closure discriminator.
-  unsigned getNextDiscriminator();
-};
-
 } // end namespace swift
 
 #endif

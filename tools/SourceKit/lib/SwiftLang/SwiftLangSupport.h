@@ -109,7 +109,7 @@ public:
   void parse(ImmutableTextSnapshotRef Snapshot, SwiftLangSupport &Lang,
              bool BuildSyntaxTree,
              swift::SyntaxParsingCache *SyntaxCache = nullptr);
-  void readSyntaxInfo(EditorConsumer &consumer);
+  void readSyntaxInfo(EditorConsumer &consumer, bool ReportDiags);
   void readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
                         EditorConsumer& Consumer);
 
@@ -219,6 +219,18 @@ public:
   bool remove(StringRef name, unsigned offset);
 };
 } // end namespace CodeCompletion
+
+namespace TypeContextInfo {
+struct Options {
+  bool reuseASTContextIfPossible = true;
+};
+} // namespace TypeContextInfo
+
+namespace ConformingMethodList {
+struct Options {
+  bool reuseASTContextIfPossible = true;
+};
+} // namespace ConformingMethodList
 
 class SwiftInterfaceGenMap {
   llvm::StringMap<SwiftInterfaceGenContextRef> IFaceGens;
@@ -383,6 +395,8 @@ public:
 
   static Optional<UIdent> getUIDForDeclAttribute(const swift::DeclAttribute *Attr);
 
+  static SourceKit::UIdent getUIDForFormalAccessScope(const swift::AccessScope Scope);
+
   static std::vector<UIdent> UIDsFromDeclAttributes(const swift::DeclAttributes &Attrs);
 
   static SourceKit::UIdent getUIDForNameKind(swift::ide::NameKind Kind);
@@ -420,14 +434,18 @@ public:
                                              swift::Type BaseTy,
                                              llvm::raw_ostream &OS);
 
+  static void printFullyAnnotatedDeclaration(const swift::ExtensionDecl *VD,
+                                             llvm::raw_ostream &OS);
+
   static void
   printFullyAnnotatedSynthesizedDeclaration(const swift::ValueDecl *VD,
                                             swift::TypeOrExtensionDecl Target,
                                             llvm::raw_ostream &OS);
 
   static void
-  printFullyAnnotatedGenericReq(const swift::GenericSignature Sig,
-                                llvm::raw_ostream &OS);
+  printFullyAnnotatedSynthesizedDeclaration(const swift::ExtensionDecl *ED,
+                                            swift::TypeOrExtensionDecl Target,
+                                            llvm::raw_ostream &OS);
 
   /// Print 'description' or 'sourcetext' the given \p VD to \p OS. If
   /// \p usePlaceholder is \c true, call argument positions are substituted with
@@ -600,11 +618,13 @@ public:
                std::function<void(const RequestResult<ArrayRef<StringRef>> &)> Receiver) override;
 
   void getExpressionContextInfo(llvm::MemoryBuffer *inputBuf, unsigned Offset,
+                                OptionsDictionary *options,
                                 ArrayRef<const char *> Args,
                                 TypeContextInfoConsumer &Consumer,
                                 Optional<VFSOptions> vfsOptions) override;
 
   void getConformingMethodList(llvm::MemoryBuffer *inputBuf, unsigned Offset,
+                               OptionsDictionary *options,
                                ArrayRef<const char *> Args,
                                ArrayRef<const char *> ExpectedTypes,
                                ConformingMethodListConsumer &Consumer,

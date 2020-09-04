@@ -31,6 +31,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
+#include "swift/AST/SILLayout.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -38,7 +39,6 @@
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/STLExtras.h"
-#include "swift/Basic/Timer.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -46,6 +46,7 @@
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Strings.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Bitcode/RecordLayout.h"
@@ -609,7 +610,8 @@ serialization::ClangTypeID Serializer::addClangTypeRef(const clang::Type *ty) {
     isSerializable = false;
   }
   if (!isSerializable) {
-    PrettyStackTraceClangType trace("staging a serialized reference to", ty);
+    PrettyStackTraceClangType trace(loader->getClangASTContext(),
+                                    "staging a serialized reference to", ty);
     llvm::report_fatal_error("Clang function type is not serializable");
   }
 
@@ -856,6 +858,8 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_index_block, SIL_DEFAULT_WITNESS_TABLE_NAMES);
   BLOCK_RECORD(sil_index_block, SIL_DEFAULT_WITNESS_TABLE_OFFSETS);
   BLOCK_RECORD(sil_index_block, SIL_PROPERTY_OFFSETS);
+  BLOCK_RECORD(sil_index_block, SIL_DIFFERENTIABILITY_WITNESS_NAMES);
+  BLOCK_RECORD(sil_index_block, SIL_DIFFERENTIABILITY_WITNESS_OFFSETS);
 
 #undef BLOCK
 #undef BLOCK_RECORD
@@ -901,6 +905,11 @@ void Serializer::writeHeader(const SerializationOptions &options) {
       if (M->arePrivateImportsEnabled()) {
         options_block::ArePrivateImportsEnabledLayout PrivateImports(Out);
         PrivateImports.emit(ScratchRecord);
+      }
+
+      if (M->isImplicitDynamicEnabled()) {
+        options_block::IsImplicitDynamicEnabledLayout ImplicitDynamic(Out);
+        ImplicitDynamic.emit(ScratchRecord);
       }
 
       if (M->getResilienceStrategy() != ResilienceStrategy::Default) {
@@ -1015,13 +1024,12 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   if (!options.ModuleInterface.empty())
     ModuleInterface.emit(ScratchRecord, options.ModuleInterface);
 
-  ModuleDecl::ImportFilter allImportFilter;
-  allImportFilter |= ModuleDecl::ImportFilterKind::Public;
-  allImportFilter |= ModuleDecl::ImportFilterKind::Private;
-  allImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-  allImportFilter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
   SmallVector<ModuleDecl::ImportedModule, 8> allImports;
-  M->getImportedModules(allImports, allImportFilter);
+  M->getImportedModules(allImports,
+                        {ModuleDecl::ImportFilterKind::Public,
+                         ModuleDecl::ImportFilterKind::Private,
+                         ModuleDecl::ImportFilterKind::ImplementationOnly,
+                         ModuleDecl::ImportFilterKind::SPIAccessControl});
   ModuleDecl::removeDuplicateImports(allImports);
 
   // Collect the public and private imports as a subset so that we can
@@ -1116,8 +1124,10 @@ static uint8_t getRawStableDefaultArgumentKind(swift::DefaultArgumentKind kind) 
   CASE(Normal)
   CASE(Inherited)
   CASE(Column)
-  CASE(File)
+  CASE(FileID)
   CASE(FilePath)
+  CASE(FileIDSpelledAsFile)
+  CASE(FilePathSpelledAsFile)
   CASE(Line)
   CASE(Function)
   CASE(DSOHandle)
@@ -2348,7 +2358,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           S.Out, S.ScratchRecord, abbrCode,
           (unsigned)SA->isExported(),
           (unsigned)SA->getSpecializationKind(),
-          S.addGenericSignatureRef(SA->getSpecializedSgnature()));
+          S.addGenericSignatureRef(SA->getSpecializedSignature()));
       return;
     }
 
@@ -2383,9 +2393,9 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DAK_Custom: {
       auto abbrCode = S.DeclTypeAbbrCodes[CustomDeclAttrLayout::Code];
       auto theAttr = cast<CustomAttr>(DA);
-      CustomDeclAttrLayout::emitRecord(
-        S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
-        S.addTypeRef(theAttr->getTypeLoc().getType()));
+      CustomDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                       theAttr->isImplicit(),
+                                       S.addTypeRef(theAttr->getType()));
       return;
     }
 
@@ -2426,11 +2436,16 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       assert(attr->getOriginalFunction(ctx) &&
              "`@derivative` attribute should have original declaration set "
              "during construction or parsing");
-      auto origName = attr->getOriginalFunctionName().Name.getBaseName();
+      auto origDeclNameRef = attr->getOriginalFunctionName();
+      auto origName = origDeclNameRef.Name.getBaseName();
       IdentifierID origNameId = S.addDeclBaseNameRef(origName);
       DeclID origDeclID = S.addDeclRef(attr->getOriginalFunction(ctx));
       auto derivativeKind =
           getRawStableAutoDiffDerivativeFunctionKind(attr->getDerivativeKind());
+      uint8_t rawAccessorKind = 0;
+      auto origAccessorKind = origDeclNameRef.AccessorKind;
+      if (origAccessorKind)
+        rawAccessorKind = uint8_t(getStableAccessorKind(*origAccessorKind));
       auto *parameterIndices = attr->getParameterIndices();
       assert(parameterIndices && "Parameter indices must be resolved");
       SmallVector<bool, 4> paramIndicesVector;
@@ -2438,7 +2453,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
         paramIndicesVector.push_back(parameterIndices->contains(i));
       DerivativeDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), origNameId,
-          origDeclID, derivativeKind, paramIndicesVector);
+          origAccessorKind.hasValue(), rawAccessorKind, origDeclID,
+          derivativeKind, paramIndicesVector);
       return;
     }
 
@@ -2711,12 +2727,12 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case PatternKind::Expr:
       llvm_unreachable("Refutable patterns cannot be serialized");
 
-    case PatternKind::Var: {
-      auto var = cast<VarPattern>(pattern);
+    case PatternKind::Binding: {
+      auto var = cast<BindingPattern>(pattern);
 
-      unsigned abbrCode = S.DeclTypeAbbrCodes[VarPatternLayout::Code];
-      VarPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                   var->isLet());
+      unsigned abbrCode = S.DeclTypeAbbrCodes[BindingPatternLayout::Code];
+      BindingPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                       var->isLet());
       writePattern(var->getSubPattern());
       break;
     }
@@ -2792,7 +2808,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     // its overrides after they've been compiled: if the declaration is '@objc'
     // and 'dynamic'. In that case, all accesses to the method or property will
     // go through the Objective-C method tables anyway.
-    if (overridden->hasClangNode() || overridden->isObjCDynamic())
+    if (overridden->hasClangNode() || overridden->shouldUseObjCDispatch())
       return false;
     return true;
   }
@@ -3298,9 +3314,9 @@ public:
         ++numBackingProperties;
         arrayFields.push_back(S.addDeclRef(backingInfo.backingVar));
       }
-      if (backingInfo.storageWrapperVar) {
+      if (backingInfo.projectionVar) {
         ++numBackingProperties;
-        arrayFields.push_back(S.addDeclRef(backingInfo.storageWrapperVar));
+        arrayFields.push_back(S.addDeclRef(backingInfo.projectionVar));
       }
     }
     for (Type dependency : collectDependenciesFromType(ty->getCanonicalType()))
@@ -3409,6 +3425,7 @@ public:
                            uint8_t(
                              getStableSelfAccessKind(fn->getSelfAccessKind())),
                            fn->hasForcedStaticDispatch(),
+                           fn->hasAsync(),
                            fn->hasThrows(),
                            S.addGenericSignatureRef(
                                                   fn->getGenericSignature()),
@@ -3422,6 +3439,7 @@ public:
                            rawAccessLevel,
                            fn->needsNewVTableEntry(),
                            S.addDeclRef(fn->getOpaqueResultTypeDecl()),
+                           fn->isUserAccessible(),
                            nameComponentsAndDependencies);
 
     writeGenericParams(fn->getGenericParams());
@@ -3862,6 +3880,17 @@ static uint8_t getRawStableResultConvention(swift::ResultConvention rc) {
   llvm_unreachable("bad result convention kind");
 }
 
+/// Translate from AST SILResultDifferentiability enum to the Serialization enum
+/// values, which are guaranteed to be stable.
+static uint8_t
+getRawSILResultDifferentiability(swift::SILResultDifferentiability pd) {
+  switch (pd) {
+  SIMPLE_CASE(SILResultDifferentiability, DifferentiableOrNotApplicable)
+  SIMPLE_CASE(SILResultDifferentiability, NotDifferentiable)
+  }
+  llvm_unreachable("bad result differentiability kind");
+}
+
 #undef SIMPLE_CASE
 
 /// Find the typealias given a builtin type.
@@ -3895,6 +3924,10 @@ public:
   }
 
   void visitUnresolvedType(const UnresolvedType *) {
+    llvm_unreachable("should not serialize an invalid type");
+  }
+
+  void visitHoleType(const HoleType *) {
     llvm_unreachable("should not serialize an invalid type");
   }
 
@@ -4104,7 +4137,7 @@ public:
     using namespace decls_block;
 
     auto resultType = S.addTypeRef(fnTy->getResult());
-    auto clangType = S.addClangTypeRef(fnTy->getClangFunctionType());
+    auto clangType = S.addClangTypeRef(fnTy->getClangTypeInfo().getType());
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[FunctionTypeLayout::Code];
     FunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -4112,7 +4145,8 @@ public:
         getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
         clangType,
         fnTy->isNoEscape(),
-        fnTy->throws(),
+        fnTy->isAsync(),
+        fnTy->isThrowing(),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()));
 
     serializeFunctionTypeParams(fnTy);
@@ -4126,7 +4160,7 @@ public:
     GenericFunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
         S.addTypeRef(fnTy->getResult()),
         getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
-        fnTy->throws(),
+        fnTy->isAsync(), fnTy->isThrowing(),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
         S.addGenericSignatureRef(genericSig));
 
@@ -4174,6 +4208,9 @@ public:
       variableData.push_back(S.addTypeRef(result.getInterfaceType()));
       unsigned conv = getRawStableResultConvention(result.getConvention());
       variableData.push_back(TypeID(conv));
+      if (fnTy->isDifferentiable())
+        variableData.push_back(TypeID(
+            getRawSILResultDifferentiability(result.getDifferentiability())));
     }
     if (fnTy->hasErrorResult()) {
       auto abResult = fnTy->getErrorResult();
@@ -4188,7 +4225,7 @@ public:
       S.addSubstitutionMapRef(fnTy->getInvocationSubstitutions());
     auto patternSubstMapID =
       S.addSubstitutionMapRef(fnTy->getPatternSubstitutions());
-    auto clangTypeID = S.addClangTypeRef(fnTy->getClangFunctionType());
+    auto clangTypeID = S.addClangTypeRef(fnTy->getClangTypeInfo().getType());
 
     auto stableCoroutineKind =
       getRawStableSILCoroutineKind(fnTy->getCoroutineKind());
@@ -4202,7 +4239,7 @@ public:
     unsigned abbrCode = S.DeclTypeAbbrCodes[SILFunctionTypeLayout::Code];
     SILFunctionTypeLayout::emitRecord(
         S.Out, S.ScratchRecord, abbrCode,
-        stableCoroutineKind, stableCalleeConvention,
+        fnTy->isAsync(), stableCoroutineKind, stableCalleeConvention,
         stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
         stableDiffKind, fnTy->hasErrorResult(), fnTy->getParameters().size(),
         fnTy->getNumYields(), fnTy->getNumResults(),
@@ -4376,7 +4413,8 @@ public:
 
 void Serializer::writeASTBlockEntity(const clang::Type *ty) {
   using namespace decls_block;
-  PrettyStackTraceClangType traceRAII("serializing clang type", ty);
+  auto &ctx = getASTContext().getClangModuleLoader()->getClangASTContext();
+  PrettyStackTraceClangType traceRAII(ctx, "serializing clang type", ty);
   assert(ClangTypesToSerialize.hasRef(ty));
 
   // Serialize the type as an opaque sequence of data.
@@ -4463,7 +4501,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<TuplePatternLayout>();
   registerDeclTypeAbbr<TuplePatternEltLayout>();
   registerDeclTypeAbbr<NamedPatternLayout>();
-  registerDeclTypeAbbr<VarPatternLayout>();
+  registerDeclTypeAbbr<BindingPatternLayout>();
   registerDeclTypeAbbr<AnyPatternLayout>();
   registerDeclTypeAbbr<TypedPatternLayout>();
   registerDeclTypeAbbr<InlinableBodyTextLayout>();
@@ -5124,7 +5162,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     DerivativeFunctionConfigTable derivativeConfigs;
     for (auto entry : uniquedDerivativeConfigs) {
       for (auto config : entry.second) {
-        auto paramIndices = config.first.str();
+        std::string paramIndices = config.first.str().str();
         auto genSigID = addGenericSignatureRef(config.second);
         derivativeConfigs[entry.first].push_back({paramIndices, genSigID});
       }

@@ -2,7 +2,7 @@
 // RUN: %{python} %utils/chex.py < %s > %t/generic_structs_future.sil
 // RUN: %target-swift-frontend -disable-type-layout -prespecialize-generic-metadata -target %module-target-future %t/generic_structs_future.sil -emit-ir | %FileCheck %t/generic_structs_future.sil
 
-// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos || OS=linux-gnu
+// REQUIRES: VENDOR=apple || OS=linux-gnu
 // REQUIRES: CPU=x86_64
 
 import Builtin

@@ -5,6 +5,9 @@
 // Check the contents of the JSON output
 // RUN: %FileCheck %s < %t/deps.json
 
+// Check the contents of the JSON output
+// RUN: %FileCheck %s -check-prefix CHECK-NO-SEARCH-PATHS < %t/deps.json
+
 // Check the make-style dependencies file
 // RUN: %FileCheck %s -check-prefix CHECK-MAKE-DEPS < %t/deps.d
 
@@ -17,32 +20,13 @@
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main %t/deps.json
 
-// RUN: mkdir -p %t/BuildModules
-// RUN: cp %S/Inputs/BuildModulesFromGraph.swift %t/BuildModules/main.swift
-// RUN: %target-build-swift %S/Inputs/ModuleDependencyGraph.swift %t/BuildModules/main.swift -o %t/ModuleBuilder
-// RUN: %target-codesign %t/ModuleBuilder
-
-// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path A.pcm | %S/Inputs/CommandRunner.py
-// RUN: ls %t/clang-module-cache/A-*.pcm
-// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path B.pcm | %S/Inputs/CommandRunner.py
-// RUN: ls %t/clang-module-cache/B-*.pcm
-// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path C.pcm | %S/Inputs/CommandRunner.py
-// RUN: ls %t/clang-module-cache/C-*.pcm
-// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path A.swiftmodule | %S/Inputs/CommandRunner.py
-// RUN: ls %t/clang-module-cache/A-*.swiftmodule
-// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path E.swiftmodule | %S/Inputs/CommandRunner.py
-// RUN: ls %t/clang-module-cache/E-*.swiftmodule
-// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path F.swiftmodule | %S/Inputs/CommandRunner.py
-// RUN: ls %t/clang-module-cache/F-*.swiftmodule
-// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path G.swiftmodule | %S/Inputs/CommandRunner.py
-// RUN: ls %t/clang-module-cache/G-*.swiftmodule
-
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
 import C
 import E
 import G
+import SubE
 
 // CHECK: "mainModuleName": "deps"
 
@@ -62,10 +46,16 @@ import G
 // CHECK-NEXT: "swift": "G"
 // CHECK-NEXT: }
 // CHECK-NEXT: {
+// CHECK-NEXT: "swift": "SubE"
+// CHECK-NEXT: }
+// CHECK-NEXT: {
 // CHECK-NEXT: "swift": "Swift"
 // CHECK-NEXT: }
 // CHECK-NEXT: {
 // CHECK-NEXT: "swift": "SwiftOnoneSupport"
+// CHECK-NEXT: }
+// CHECK-NEXT: {
+// CHECK-NEXT:   "swift": "_cross_import_E"
 // CHECK-NEXT: }
 // CHECK-NEXT: {
 // CHECK-NEXT: "swift": "F"
@@ -73,7 +63,14 @@ import G
 // CHECK-NEXT: {
 // CHECK-NEXT: "swift": "A"
 // CHECK-NEXT: }
+// CHECK-NEXT: ],
 
+// CHECK:      "extraPcmArgs": [
+// CHECK-NEXT:    "-Xcc",
+// CHECK-NEXT:    "-target",
+// CHECK-NEXT:    "-Xcc",
+// CHECK:         "-fapinotes-swift-version=4"
+// CHECK-NOT: "error: cannot open Swift placeholder dependency module map from"
 // CHECK: "bridgingHeader":
 // CHECK-NEXT: "path":
 // CHECK-SAME: Bridging.h
@@ -105,11 +102,9 @@ import G
 
 // CHECK: "commandLine": [
 // CHECK-NEXT: "-frontend"
+// CHECK-NEXT: "-only-use-extra-clang-opts"
 // CHECK-NEXT: "-Xcc"
-// CHECK-NEXT: "-Xclang"
-// CHECK-NEXT: "-Xcc"
-// CHECK-NEXT: "-cc1"
-// CHECK: "-remove-preceeding-explicit-module-build-incompatible-options"
+// CHECK-NEXT: "clang"
 
 /// --------Swift module E
 // CHECK: "swift": "E"
@@ -125,7 +120,13 @@ import G
 // CHECK-LABEL: "modulePath": "G.swiftmodule"
 // CHECK: "directDependencies"
 // CHECK-NEXT: {
-// CHECK-NEXT: "clang": "G"
+// CHECK-NEXT:   "swift": "Swift"
+// CHECK-NEXT: },
+// CHECK-NEXT: {
+// CHECK-NEXT:   "clang": "G"
+// CHECK-NEXT: },
+// CHECK-NEXT: {
+// CHECK-NEXT:   "swift": "SwiftOnoneSupport"
 // CHECK-NEXT: }
 // CHECK-NEXT: ],
 // CHECK-NEXT: "details": {
@@ -134,14 +135,15 @@ import G
 // CHECK: "commandLine": [
 // CHECK: "-compile-module-from-interface"
 // CHECK: "-target"
-// CHECK: "-sdk"
-// CHECK: "-o"
-// CHECK: /clang-module-cache/G-{{.*}}.swiftmodule"
 // CHECK: "-module-name"
 // CHECK: "G"
 // CHECK: "-swift-version"
 // CHECK: "5"
-// CHECK: ]
+// CHECK: ],
+// CHECK" "extraPcmArgs": [
+// CHECK"   "-target",
+// CHECK"   "-fapinotes-swift-version=5"
+// CHECK" ]
 
 /// --------Swift module Swift
 // CHECK-LABEL: "modulePath": "Swift.swiftmodule",
@@ -150,12 +152,31 @@ import G
 // CHECK-NEXT: {
 // CHECK-NEXT: "clang": "SwiftShims"
 
+/// --------Swift module F
+// CHECK:      "modulePath": "F.swiftmodule",
+// CHECK-NEXT: "sourceFiles": [
+// CHECK-NEXT: ],
+// CHECK-NEXT: "directDependencies": [
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "swift": "Swift"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "clang": "F"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "swift": "SwiftOnoneSupport"
+// CHECK-NEXT:   }
+// CHECK-NEXT: ],
+
 /// --------Swift module A
 // CHECK-LABEL: "modulePath": "A.swiftmodule",
 
 // CHECK: directDependencies
 // CHECK-NEXT: {
-// CHECK-NEXT: "clang": "A"
+// CHECK-NEXT:   "swift": "Swift"
+// CHECK-NEXT: },
+// CHECK-NEXT: {
+// CHECK-NEXT:   "clang": "A"
 // CHECK-NEXT: }
 
 /// --------Clang module B
@@ -173,12 +194,13 @@ import G
 /// --------Clang module SwiftShims
 // CHECK-LABEL: "modulePath": "SwiftShims.pcm",
 
+// CHECK-NO-SEARCH-PATHS-NOT: "-sdk"
+// CHECK-NO-SEARCH-PATHS-NOT: "-prebuilt-module-cache-path"
 
 // Check make-style dependencies
 // CHECK-MAKE-DEPS: module_deps.swift
 // CHECK-MAKE-DEPS-SAME: A.swiftinterface
 // CHECK-MAKE-DEPS-SAME: G.swiftinterface
-// CHECK-MAKE-DEPS-SAME: Swift.swiftmodule
 // CHECK-MAKE-DEPS-SAME: B.h
 // CHECK-MAKE-DEPS-SAME: F.h
 // CHECK-MAKE-DEPS-SAME: Bridging.h

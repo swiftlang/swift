@@ -216,11 +216,13 @@ func rdar46459603() {
   let e = E.foo(value: "String")
   var arr = ["key": e]
 
+  // FIXME(rdar://problem/64844584) - on iOS simulator this diagnostic is flaky,
+  // either `referencing operator function '==' on 'Equatable'` or `operator function '==' requires`
   _ = arr.values == [e]
-  // expected-error@-1 {{referencing operator function '==' on 'Equatable' requires that 'Dictionary<String, E>.Values' conform to 'Equatable'}}
+  // expected-error@-1 {{requires that 'Dictionary<String, E>.Values' conform to 'Equatable'}}
   // expected-error@-2 {{cannot convert value of type '[E]' to expected argument type 'Dictionary<String, E>.Values'}}
   _ = [arr.values] == [[e]]
-  // expected-error@-1 {{operator function '==' requires that 'Dictionary<String, E>.Values' conform to 'Equatable'}}
+  // expected-error@-1 {{requires that 'Dictionary<String, E>.Values' conform to 'Equatable'}}
   // expected-error@-2 {{cannot convert value of type '[E]' to expected element type 'Dictionary<String, E>.Values'}}
 }
 
@@ -288,5 +290,12 @@ func rdar_62054241() {
 
   func test(_ arr: [Foo]) -> [Foo] {
     return arr.sorted(by: <) // expected-error {{no exact matches in reference to operator function '<'}}
+    // expected-note@-1 {{found candidate with type '(Foo, Foo) -> Bool'}}
   }
 }
+
+// SR-11399 - Operator returning IUO doesn't implicitly unwrap
+postfix operator ^^^
+postfix func ^^^ (lhs: Int) -> Int! { 0 }
+
+let x: Int = 1^^^

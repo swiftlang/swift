@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-build-swift -parse-stdlib -Xfrontend -verify-type-layout -Xfrontend SpareBitExtraInhabitants -Xfrontend -verify-type-layout -Xfrontend SpareBitSingleExtraInhabitant -Xfrontend -verify-type-layout -Xfrontend SpareBitNoExtraInhabitant -Xfrontend -verify-type-layout -Xfrontend SpareBitNoExtraInhabitant2 -Xfrontend -verify-type-layout -Xfrontend TwoTagExtraInhabitants -Xfrontend -verify-type-layout -Xfrontend ThreeTagExtraInhabitants -Xfrontend -verify-type-layout -Xfrontend NoTagExtraInhabitants -Xfrontend -verify-type-layout -Xfrontend DynamicExtraInhabitantsNever -Xfrontend -verify-type-layout -Xfrontend DynamicExtraInhabitantsZeroBytes -Xfrontend -verify-type-layout -Xfrontend DynamicExtraInhabitantsOneByte -Xfrontend -verify-type-layout -Xfrontend DynamicExtraInhabitantsTwoBytes -Xfrontend -verify-type-layout -Xfrontend MoreSpareBitsThanTagsExtraInhabitants -Xfrontend -verify-type-layout -Xfrontend OptOptMoreSpareBitsThanTagsExtraInhabitants -O -o %t/a.out %s
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out 2>&1
 
 // Type layout verifier is only compiled into the runtime in asserts builds.

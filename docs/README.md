@@ -69,6 +69,9 @@ documentation, please create a thread on the Swift forums under the
     How to build Swift on Windows using Visual Studio.
   - [WindowsCrossCompile.md](/docs/WindowsCrossCompile.md):
     How to cross compile Swift for Windows on a non-Windows host OS.
+- [RunningIncludeWhatYouUse.md](/docs/RunningIncludeWhatYouUse.md):
+  Describes how to run [include-what-you-use](https://include-what-you-use.org)
+  on the Swift project.
 
 ## Explanations
 
@@ -102,7 +105,7 @@ documentation, please create a thread on the Swift forums under the
   - [RequestEvaluator.md](/docs/RequestEvaluator.md):
     Describes the request evaluator architecture, which is used for
     lazy type-checking and efficient caching.
-  - [Literal.md](/docs/Literal.md):
+  - [Literals.md](/docs/Literals.md):
     Describes type-checking and inference specifically for literals.
 - [Serialization.rst](/docs/Serialization.rst):
   Gives an overview of the LLVM bitcode format used for swiftmodules.
@@ -114,7 +117,7 @@ documentation, please create a thread on the Swift forums under the
     Provides an overview of the implementation of SIL in the compiler.
   - [OptimizerDesign.md](/docs/OptimizerDesign.md):
     Describes the design of the optimizer pipeline.
-  - [HighLevelSILOptimizations.rst](docs/HighLevelSILOptimizations.rst):
+  - [HighLevelSILOptimizations.rst](/docs/HighLevelSILOptimizations.rst):
     Describes how the optimizer understands the semantics of high-level
     operations on currency data types and optimizes accordingly.
     Includes a thorough discussion of the `@_semantics` attribute.
@@ -156,6 +159,8 @@ documentation, please create a thread on the Swift forums under the
   Documents the Swift Intermediate Language (SIL).
   - [TransparentAttr.md](/docs/TransparentAttr.md):
     Documents the semantics of the `@_transparent` attribute.
+- [DynamicCasting.md](/docs/DynamicCasting.md):
+  Behavior of the dynamic casting operators `is`, `as?`, and `as!`.
 - [Runtime.md](/docs/Runtime.md):
   Describes the ABI interface to the Swift runtime.
   <!-- NOTE: Outdated -->
@@ -249,12 +254,10 @@ They are preserved mostly for historical interest.
 
 ## External Resources
 
-The official [Swift blog](https://swift.org/blog/) contains a lot of useful
-information, such as how library evolution works and how the compiler's new
-diagnostic architecture is structured, helping us provide more precise
-diagnostics.
-
-TODO: Add a new document ExternalResources.md.
+External resources are listed in [docs/ExternalResources.md](ExternalResources.md).
+These cover a variety of topics,
+such as the design of different aspects of the Swift compiler and runtime
+and contributing to the project more effectively.
 
 ## Uncategorized
 

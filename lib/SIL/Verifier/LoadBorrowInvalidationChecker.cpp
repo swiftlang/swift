@@ -247,6 +247,13 @@ constructValuesForKey(SILValue initialValue,
       continue;
     }
 
+    // We consider address_to_pointer to be an escape from our system. The
+    // frontend must protect the uses of the load_borrow as appropriate in other
+    // ways (for instance by using a mark_dependence).
+    if (isa<AddressToPointerInst>(user)) {
+      continue;
+    }
+
     if (auto *yi = dyn_cast<YieldInst>(user)) {
       auto info = yi->getYieldInfoForOperand(*op);
       if (info.isIndirectInGuaranteed()) {
@@ -479,6 +486,11 @@ bool LoadBorrowNeverInvalidatedAnalysis::isNeverInvalidated(
   // validate that all uses of the project_box are not writes that overlap with
   // our load_borrow's result. These are things that may not be a formal access
   // base.
+  //
+  // FIXME: we don't seem to verify anywhere that a pointer_to_address cannot
+  // itself be derived from another address that is accessible in the same
+  // function, either because it was returned from a call or directly
+  // address_to_pointer'd.
   if (isa<PointerToAddressInst>(address)) {
     return doesAddressHaveWriteThatInvalidatesLoadBorrow(lbi, endBorrowUses,
                                                          address);
@@ -518,6 +530,9 @@ bool LoadBorrowNeverInvalidatedAnalysis::isNeverInvalidated(
   }
   case AccessedStorage::Yield: {
     // For now, do this. Otherwise, check for in_guaranteed, etc.
+    //
+    // FIXME: The yielded address could overlap with another address in this
+    // function.
     return true;
   }
   case AccessedStorage::Box: {
@@ -527,8 +542,17 @@ bool LoadBorrowNeverInvalidatedAnalysis::isNeverInvalidated(
   case AccessedStorage::Class: {
     // Check that the write to the class's memory doesn't overlap with our
     // load_borrow.
+    //
+    // FIXME: how do we know that other projections of the same object don't
+    // occur within the same function?
     return doesAddressHaveWriteThatInvalidatesLoadBorrow(lbi, endBorrowUses,
                                                          address);
+  }
+  case AccessedStorage::Tail: {
+    // This should be as strong as the Class address case, but to handle it we
+    // need to find all aliases of the object and all tail projections within
+    // that object.
+    return false;
   }
   case AccessedStorage::Global: {
     // Check that the write to the class's memory doesn't overlap with our

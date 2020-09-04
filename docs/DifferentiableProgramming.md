@@ -1,7 +1,7 @@
 # Differentiable Programming Manifesto
 
 *   Authors: [Richard Wei], [Dan Zheng], [Marc Rasi], [Bart Chrzaszcz]
-*   Status: Partially implemented
+*   Status: Partially implemented on master, feature gated under `import _Differentiation`
 
 ## Table of contents
 
@@ -893,8 +893,15 @@ extension Perceptron {
 
 ### `@differentiable` function types
 
-A subtype of normal function types with a different runtime representation,
-which stores metadata that allows their values to be differentiated anywhere.
+Differentiable functions are first-class values, identified by a
+`@differentiable` attribute in the function type. A `@differentiable` function
+type is a subtype of its corresponding normal function type (i.e. without a
+`@differentiable` attribute) with an extended ABI, which stores metadata that
+allows their values to be differentiated anywhere the function is passed. A
+`@differentiable(linear)` function type is a subtype of its corresponding
+`@differentiable` function type. A normal function can be implicitly converted
+to a `@differentiable` or `@differentiable(linear)` function with appropriate
+compile-time checks.
 
 ```swift
 func addOne(_ x: Float) -> Float { x + 1 }
@@ -920,8 +927,9 @@ func _(_ x: Float) -> (value: Float,
 
 ### Differential operators
 
-Standard library differentiation APIs that take `@differentiable` functions and
-return derivative functions or compute derivative values.
+Differential operators are APIs defined in the standard library that take
+`@differentiable` functions and return derivative functions or compute
+derivative values.
 
 ```swift
 // In the standard library:
@@ -1192,7 +1200,14 @@ extension Optional: Differentiable where Wrapped: Differentiable {
 
     @noDerivative
     public var zeroTangentVectorInitializer: () -> TangentVector {
-        { TangentVector(.zero) }
+        switch self {
+        case nil:
+            return { TangentVector(nil) }
+        case let x?:
+            return { [zeroTanInit = x.zeroTangentVectorInitializer] in
+                TangentVector(zeroTanInit())
+            }
+        }
     }
 }
 ```
@@ -1949,7 +1964,7 @@ One concrete example is `sinf(_:)` from the C standard library. It can be made
 differentiable by defining a derivative retroactively.
 
 ```swift
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if canImport(Darwin)
 import func Darwin.sinf
 #else
 import func Glibc.sinf
@@ -2311,7 +2326,7 @@ As shown in the
 subsection, a `@differentiable` function value's runtime representation contains
 the original function along with extra information that allows the function to
 be differentiated (or transposed, if it is `@differentiable(linear)`). A
-@differentiable or `@differentiable(linear)` function value can be called like a
+`@differentiable` or `@differentiable(linear)` function value can be called like a
 non-`@differentiable` function. A `@differentiable(linear)` function value can
 be implicitly converted to a `@differentiable` one, which can be implicitly
 converted to a non-`@differentiable` one.

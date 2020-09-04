@@ -1,0 +1,50 @@
+//===--- EnvironmentVariables.def - Debug variables. ------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines x-macros used for metaprogramming with the set of
+// environment variables used for configuring or enabling debug features in the
+// runtime.
+//
+//===----------------------------------------------------------------------===//
+
+// #define VARIABLE(name, type, defaultValue, help)
+
+#ifndef VARIABLE
+#error "Must define VARIABLE to include EnvironmentVariables.def"
+#endif
+
+VARIABLE(SWIFT_DEBUG_ENABLE_METADATA_ALLOCATION_ITERATION, bool, false,
+         "Enable additional metadata allocation tracking for swift-inspect to "
+         "use.")
+
+VARIABLE(SWIFT_DEBUG_ENABLE_METADATA_BACKTRACE_LOGGING, bool, false,
+         "Enable logging of backtraces for each metadata allocation. Requires "
+         "SWIFT_DEBUG_ENABLE_METADATA_ALLOCATION_ITERATION to be enabled.")
+
+VARIABLE(SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT, uint8_t, 2,
+         "Print warnings when using implicit @objc entrypoints. Set to "
+         "desired reporting level, 0-3.")
+
+VARIABLE(SWIFT_DETERMINISTIC_HASHING, bool, false,
+         "Disable randomized hash seeding.")
+
+VARIABLE(SWIFT_ENABLE_MANGLED_NAME_VERIFICATION, bool, false,
+         "Enable verification that metadata can roundtrip through a mangled "
+         "name each time metadata is instantiated.")
+
+VARIABLE(SWIFT_DEBUG_ENABLE_MALLOC_SCRIBBLE, bool, false,
+         "Scribble on runtime allocations such as metadata allocations.")
+
+VARIABLE(SWIFT_DEBUG_ENABLE_COW_SANITY_CHECKS, bool, false,
+         "Enable sanity checks for copy-on-write operations.")
+
+#undef VARIABLE

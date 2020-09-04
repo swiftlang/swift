@@ -139,3 +139,6 @@ public class UnavailableOnMac {}
 extension SwiftObjcClass {
   public func functionUnavailableOnMac() {}
 }
+
+@_alwaysEmitIntoClient
+public func emitIntoClientFunc() {}

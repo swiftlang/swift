@@ -286,7 +286,7 @@ public:
   ALWAYS_RESOLVED_PATTERN(Bool)
 #undef ALWAYS_RESOLVED_PATTERN
 
-  Pattern *visitVarPattern(VarPattern *P) {
+  Pattern *visitBindingPattern(BindingPattern *P) {
     // Keep track of the fact that we're inside of a var/let pattern.  This
     // affects how unqualified identifiers are processed.
     P->setSubPattern(visit(P->getSubPattern()));
@@ -360,10 +360,17 @@ public:
     auto cast = dyn_cast<CoerceExpr>(E->getElement(1));
     if (!cast)
       return nullptr;
-    
+
     Pattern *subPattern = getSubExprPattern(E->getElement(0));
-    return new (Context) IsPattern(cast->getLoc(), cast->getCastTypeLoc(),
-                                   subPattern, CheckedCastKind::Unresolved);
+    if (cast->isImplicit()) {
+      return IsPattern::createImplicit(Context, cast->getCastType(), subPattern,
+                                       CheckedCastKind::Unresolved);
+    }
+    auto *TE = new (Context) TypeExpr(cast->getCastTypeRepr());
+    if (auto castTy = cast->getType())
+      TE->setType(MetatypeType::get(castTy));
+    return new (Context)
+        IsPattern(cast->getLoc(), TE, subPattern, CheckedCastKind::Unresolved);
   }
   
   // Convert a paren expr to a pattern if it contains a pattern.
@@ -439,18 +446,12 @@ public:
   // Unresolved member syntax '.Element' forms an EnumElement pattern. The
   // element will be resolved when we type-check the pattern.
   Pattern *visitUnresolvedMemberExpr(UnresolvedMemberExpr *ume) {
-    // If the unresolved member has an argument, turn it into a subpattern.
-    Pattern *subPattern = nullptr;
-    if (auto arg = ume->getArgument()) {
-      subPattern = getSubExprPattern(arg);
-    }
-    
     if (ume->getName().getBaseName().isSpecial())
       return nullptr;
 
     return new (Context)
         EnumElementPattern(ume->getDotLoc(), ume->getNameLoc(), ume->getName(),
-                           subPattern, ume);
+                           nullptr, ume);
   }
   
   // Member syntax 'T.Element' forms a pattern if 'T' is an enum and the
@@ -460,14 +461,19 @@ public:
     if (!ExprToIdentTypeRepr(components, Context).visit(ude->getBase()))
       return nullptr;
 
-    TypeResolutionOptions options = None;
-    options |= TypeResolutionFlags::AllowUnboundGenerics;
-    options |= TypeResolutionFlags::SilenceErrors;
+    const auto options =
+        TypeResolutionOptions(None) | TypeResolutionFlags::SilenceErrors;
 
     auto *repr = IdentTypeRepr::create(Context, components);
 
     // See if the repr resolves to a type.
-    auto ty = TypeResolution::forContextual(DC, options).resolveType(repr);
+    const auto resolution =
+        TypeResolution::forContextual(DC, options, [](auto unboundTy) {
+          // FIXME: Don't let unbound generic types escape type resolution.
+          // For now, just return the unbound generic type.
+          return unboundTy;
+        });
+    const auto ty = resolution.resolveType(repr);
     auto *enumDecl = dyn_cast_or_null<EnumDecl>(ty->getAnyNominal());
     if (!enumDecl)
       return nullptr;
@@ -476,13 +482,13 @@ public:
       = lookupEnumMemberElement(DC, ty, ude->getName(), ude->getLoc());
     if (!referencedElement)
       return nullptr;
-    
-    // Build a TypeRepr from the head of the full path.
-    TypeLoc loc(repr);
-    loc.setType(ty);
-    return new (Context) EnumElementPattern(
-        loc, ude->getDotLoc(), ude->getNameLoc(), ude->getName(),
-        referencedElement, nullptr);
+
+    auto *base =
+        TypeExpr::createForMemberDecl(repr, ude->getNameLoc(), enumDecl);
+    base->setType(MetatypeType::get(ty));
+    return new (Context)
+        EnumElementPattern(base, ude->getDotLoc(), ude->getNameLoc(),
+                           ude->getName(), referencedElement, nullptr);
   }
   
   // A DeclRef 'E' that refers to an enum element forms an EnumElementPattern.
@@ -492,9 +498,10 @@ public:
       return nullptr;
     
     // Use the type of the enum from context.
-    TypeLoc loc = TypeLoc::withoutLoc(
-                            elt->getParentEnum()->getDeclaredTypeInContext());
-    return new (Context) EnumElementPattern(loc, SourceLoc(), de->getNameLoc(),
+    auto enumTy = elt->getParentEnum()->getDeclaredTypeInContext();
+    auto *base = TypeExpr::createImplicit(enumTy, Context);
+
+    return new (Context) EnumElementPattern(base, SourceLoc(), de->getNameLoc(),
                                             elt->createNameRef(), elt, nullptr);
   }
   Pattern *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *ude) {
@@ -508,18 +515,19 @@ public:
                                              ude->getLoc())) {
       auto *enumDecl = referencedElement->getParentEnum();
       auto enumTy = enumDecl->getDeclaredTypeInContext();
-      TypeLoc loc = TypeLoc::withoutLoc(enumTy);
+      auto *base = TypeExpr::createImplicit(enumTy, Context);
 
-      return new (Context) EnumElementPattern(
-          loc, SourceLoc(), ude->getNameLoc(), ude->getName(),
-          referencedElement, nullptr);
+      return new (Context)
+          EnumElementPattern(base, SourceLoc(), ude->getNameLoc(),
+                             ude->getName(), referencedElement, nullptr);
     }
       
     
     // Perform unqualified name lookup to find out what the UDRE is.
-    return getSubExprPattern(TypeChecker::resolveDeclRefExpr(ude, DC));
+    return getSubExprPattern(TypeChecker::resolveDeclRefExpr(
+        ude, DC, /*replaceInvalidRefsWithErrors=*/true));
   }
-  
+
   // Call syntax forms a pattern if:
   // - the callee in 'Element(x...)' or '.Element(x...)'
   //   references an enum element. The arguments then form a tuple
@@ -533,6 +541,18 @@ public:
     if (isa<UnresolvedSpecializeExpr>(ce->getFn()))
       return nullptr;
 
+    if (isa<UnresolvedMemberExpr>(ce->getFn())) {
+      auto *P = visit(ce->getFn());
+      if (!P)
+        return nullptr;
+
+      auto *EEP = cast<EnumElementPattern>(P);
+      EEP->setSubPattern(getSubExprPattern(ce->getArg()));
+      EEP->setUnresolvedOriginalExpr(ce);
+
+      return P;
+    }
+
     SmallVector<ComponentIdentTypeRepr *, 2> components;
     if (!ExprToIdentTypeRepr(components, Context).visit(ce->getFn()))
       return nullptr;
@@ -542,7 +562,7 @@ public:
 
     auto tailComponent = components.pop_back_val();
     EnumElementDecl *referencedElement = nullptr;
-    TypeLoc loc;
+    TypeExpr *baseTE = nullptr;
 
     if (components.empty()) {
       // Only one component. Try looking up an enum element in context.
@@ -553,20 +573,25 @@ public:
         return nullptr;
 
       auto *enumDecl = referencedElement->getParentEnum();
-      loc = TypeLoc::withoutLoc(enumDecl->getDeclaredTypeInContext());
+      baseTE = TypeExpr::createImplicit(enumDecl->getDeclaredTypeInContext(),
+                                        Context);
     } else {
-      TypeResolutionOptions options = None;
-      options |= TypeResolutionFlags::AllowUnboundGenerics;
-      options |= TypeResolutionFlags::SilenceErrors;
+      const auto options =
+          TypeResolutionOptions(None) | TypeResolutionFlags::SilenceErrors;
 
       // Otherwise, see whether we had an enum type as the penultimate
       // component, and look up an element inside it.
       auto *prefixRepr = IdentTypeRepr::create(Context, components);
 
       // See first if the entire repr resolves to a type.
-      Type enumTy = TypeResolution::forContextual(DC, options)
-                        .resolveType(prefixRepr);
-      if (!dyn_cast_or_null<EnumDecl>(enumTy->getAnyNominal()))
+      const Type enumTy =
+          TypeResolution::forContextual(DC, options, [](auto unboundTy) {
+            // FIXME: Don't let unbound generic types escape type resolution.
+            // For now, just return the unbound generic type.
+            return unboundTy;
+          }).resolveType(prefixRepr);
+      auto *enumDecl = dyn_cast_or_null<EnumDecl>(enumTy->getAnyNominal());
+      if (!enumDecl)
         return nullptr;
 
       referencedElement
@@ -576,18 +601,19 @@ public:
       if (!referencedElement)
         return nullptr;
 
-      loc = TypeLoc(prefixRepr);
-      loc.setType(enumTy);
+      baseTE = TypeExpr::createForMemberDecl(
+          prefixRepr, tailComponent->getNameLoc(), enumDecl);
+      baseTE->setType(MetatypeType::get(enumTy));
     }
 
+    assert(baseTE && baseTE->getType() && "Didn't initialize base expression?");
     assert(!isa<GenericIdentTypeRepr>(tailComponent) &&
            "should be handled above");
 
     auto *subPattern = getSubExprPattern(ce->getArg());
     return new (Context) EnumElementPattern(
-        loc, SourceLoc(), tailComponent->getNameLoc(),
-        tailComponent->getNameRef(), referencedElement,
-        subPattern);
+        baseTE, SourceLoc(), tailComponent->getNameLoc(),
+        tailComponent->getNameRef(), referencedElement, subPattern);
   }
 };
 
@@ -613,12 +639,10 @@ Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC,
     if (auto *TE = dyn_cast<TypeExpr>(EP->getSubExpr())) {
       Context.Diags.diagnose(TE->getStartLoc(), diag::type_pattern_missing_is)
         .fixItInsert(TE->getStartLoc(), "is ");
-      
-      P = new (Context) IsPattern(TE->getStartLoc(),
-                                  TypeLoc(TE->getTypeRepr(),
-                                          TE->getInstanceType()),
-                                  /*subpattern*/nullptr,
-                                  CheckedCastKind::Unresolved);
+
+      P = new (Context)
+          IsPattern(TE->getStartLoc(), TE,
+                    /*subpattern*/ nullptr, CheckedCastKind::Unresolved);
     }
   
   // Look through a TypedPattern if present.
@@ -626,11 +650,11 @@ Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC,
   if (auto *TP = dyn_cast<TypedPattern>(P))
     InnerP = TP->getSubPattern();
 
-  // If the pattern was valid, check for an implicit VarPattern on the outer
+  // If the pattern was valid, check for an implicit BindingPattern on the outer
   // level.  If so, we have an "if let" condition and we want to enforce some
   // more structure on it.
-  if (isStmtCondition && isa<VarPattern>(InnerP) && InnerP->isImplicit()) {
-    auto *Body = cast<VarPattern>(InnerP)->getSubPattern();
+  if (isStmtCondition && isa<BindingPattern>(InnerP) && InnerP->isImplicit()) {
+    auto *Body = cast<BindingPattern>(InnerP)->getSubPattern();
 
     // If they wrote a "x?" pattern, they probably meant "if let x".
     // Check for this and recover nicely if they wrote that.
@@ -662,44 +686,47 @@ Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC,
   return P;
 }
 
-static Type validateTypedPattern(TypeResolution resolution,
-                                 TypedPattern *TP,
-                                 TypeResolutionOptions options) {
-  TypeLoc TL = TP->getTypeLoc();
-  
-  bool hadError;
-  
+static Type validateTypedPattern(TypedPattern *TP, TypeResolution resolution) {
+  if (TP->hasType()) {
+    return TP->getType();
+  }
+
   // If the pattern declares an opaque type, and applies to a single
   // variable binding, then we can bind the opaque return type from the
   // property definition.
   auto &Context = resolution.getASTContext();
-  auto *Repr = TL.getTypeRepr();
+  auto *Repr = TP->getTypeRepr();
   if (Repr && isa<OpaqueReturnTypeRepr>(Repr)) {
     auto named = dyn_cast<NamedPattern>(
                            TP->getSubPattern()->getSemanticsProvidingPattern());
-    if (named) {
-      auto *var = named->getDecl();
-      auto opaqueDecl = var->getOpaqueResultTypeDecl();
-      auto opaqueTy = (opaqueDecl
-                       ? opaqueDecl->getDeclaredInterfaceType()
-                       : ErrorType::get(Context));
-      TL.setType(named->getDecl()->getDeclContext()
-                                 ->mapTypeIntoContext(opaqueTy));
-      hadError = opaqueTy->hasError();
-    } else {
-      Context.Diags.diagnose(TP->getLoc(), diag::opaque_type_unsupported_pattern);
-      hadError = true;
+    if (!named) {
+      Context.Diags.diagnose(TP->getLoc(),
+                             diag::opaque_type_unsupported_pattern);
+      return ErrorType::get(Context);
     }
-  } else {
-    hadError = TypeChecker::validateType(TL, resolution);
+
+    auto *var = named->getDecl();
+    auto opaqueDecl = var->getOpaqueResultTypeDecl();
+    if (!opaqueDecl) {
+      return ErrorType::get(Context);
+    }
+
+    auto opaqueTy = opaqueDecl->getDeclaredInterfaceType();
+    if (opaqueTy->hasError()) {
+      return ErrorType::get(Context);
+    }
+
+    return named->getDecl()->getDeclContext()->mapTypeIntoContext(opaqueTy);
   }
 
-  if (hadError) {
+  auto ty = resolution.resolveType(Repr);
+  if (ty->hasError()) {
     return ErrorType::get(Context);
   }
 
-  assert(!dyn_cast_or_null<SpecifierTypeRepr>(Repr));
-  return TL.getType();
+  assert(!dyn_cast_or_null<SpecifierTypeRepr>(Repr) &&
+         "Didn't resolve invalid type to error type!");
+  return ty;
 }
 
 Type TypeChecker::typeCheckPattern(ContextualPattern pattern) {
@@ -714,7 +741,6 @@ static TypeResolutionOptions applyContextualPatternOptions(
     TypeResolutionOptions options, ContextualPattern pattern) {
   if (pattern.allowsInference()) {
     options |= TypeResolutionFlags::AllowUnspecifiedTypes;
-    options |= TypeResolutionFlags::AllowUnboundGenerics;
   }
 
   return options;
@@ -738,12 +764,12 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
   // Type-check paren patterns by checking the sub-pattern and
   // propagating that type out.
   case PatternKind::Paren:
-  case PatternKind::Var: {
+  case PatternKind::Binding: {
     Pattern *SP;
     if (auto *PP = dyn_cast<ParenPattern>(P))
       SP = PP->getSubPattern();
     else
-      SP = cast<VarPattern>(P)->getSubPattern();
+      SP = cast<BindingPattern>(P)->getSubPattern();
     Type subType = TypeChecker::typeCheckPattern(
         pattern.forSubPattern(SP, /*retainTopLevel=*/true));
     if (subType->hasError())
@@ -758,9 +784,17 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
   // If we see an explicit type annotation, coerce the sub-pattern to
   // that type.
   case PatternKind::Typed: {
-    auto resolution = TypeResolution::forContextual(dc, options);
-    TypedPattern *TP = cast<TypedPattern>(P);
-    return validateTypedPattern(resolution, TP, options);
+    OpenUnboundGenericTypeFn unboundTyOpener = nullptr;
+    if (pattern.allowsInference()) {
+      unboundTyOpener = [](auto unboundTy) {
+        // FIXME: Don't let unbound generic types escape type resolution.
+        // For now, just return the unbound generic type.
+        return unboundTy;
+      };
+    }
+    return validateTypedPattern(
+        cast<TypedPattern>(P),
+        TypeResolution::forContextual(dc, options, unboundTyOpener));
   }
 
   // A wildcard or name pattern cannot appear by itself in a context
@@ -813,9 +847,17 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
     // typed pattern, the resulting pattern must have optional type.
     auto somePat = cast<OptionalSomePattern>(P);
     if (somePat->isImplicit() && isa<TypedPattern>(somePat->getSubPattern())) {
-      auto resolution = TypeResolution::forContextual(dc, options);
+      OpenUnboundGenericTypeFn unboundTyOpener = nullptr;
+      if (pattern.allowsInference()) {
+        unboundTyOpener = [](auto unboundTy) {
+          // FIXME: Don't let unbound generic types escape type resolution.
+          // For now, just return the unbound generic type.
+          return unboundTy;
+        };
+      }
       TypedPattern *TP = cast<TypedPattern>(somePat->getSubPattern());
-      auto type = validateTypedPattern(resolution, TP, options);
+      const auto type = validateTypedPattern(
+          TP, TypeResolution::forContextual(dc, options, unboundTyOpener));
       if (type && !type->hasError()) {
         return OptionalType::get(type);
       }
@@ -976,9 +1018,9 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     PP->setType(sub->getType());
     return P;
   }
-  case PatternKind::Var: {
-    auto VP = cast<VarPattern>(P);
-    
+  case PatternKind::Binding: {
+    auto VP = cast<BindingPattern>(P);
+
     Pattern *sub = VP->getSubPattern();
     sub = coercePatternToType(
         pattern.forSubPattern(sub, /*retainTopLevel=*/false), type, subOptions);
@@ -1199,11 +1241,10 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       auto EP = cast<ExprPattern>(P);
       if (auto *NLE = dyn_cast<NilLiteralExpr>(EP->getSubExpr())) {
         auto *NoneEnumElement = Context.getOptionalNoneDecl();
-        P = new (Context) EnumElementPattern(TypeLoc::withoutLoc(type),
-                                             NLE->getLoc(),
-                                             DeclNameLoc(NLE->getLoc()),
-                                             NoneEnumElement->createNameRef(),
-                                             NoneEnumElement, nullptr);
+        auto *BaseTE = TypeExpr::createImplicit(type, Context);
+        P = new (Context) EnumElementPattern(
+            BaseTE, NLE->getLoc(), DeclNameLoc(NLE->getLoc()),
+            NoneEnumElement->createNameRef(), NoneEnumElement, nullptr);
         return TypeChecker::coercePatternToType(
             pattern.forSubPattern(P, /*retainTopLevel=*/true), type, options);
       }
@@ -1220,12 +1261,15 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     auto IP = cast<IsPattern>(P);
 
     // Type-check the type parameter.
-    TypeResolutionOptions paramOptions(TypeResolverContext::InExpression);
-    TypeResolution resolution = TypeResolution::forContextual(dc, paramOptions);
-    if (validateType(IP->getCastTypeLoc(), resolution))
+    const auto castType =
+        TypeResolution::forContextual(dc, TypeResolverContext::InExpression,
+                                      // FIXME: Should we really unconditionally
+                                      // complain about unbound generics here?
+                                      /*unboundTyOpener*/ nullptr)
+            .resolveType(IP->getCastTypeRepr());
+    if (castType->hasError())
       return nullptr;
-
-    auto castType = IP->getCastTypeLoc().getType();
+    IP->setCastType(castType);
 
     // Determine whether we have an imbalance in the number of optionals.
     SmallVector<Type, 2> inputTypeOptionals;
@@ -1233,36 +1277,32 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     SmallVector<Type, 2> castTypeOptionals;
     castType->lookThroughAllOptionalTypes(castTypeOptionals);
 
-    // If we have extra optionals on the input type. Create ".Some" patterns
-    // wrapping the isa pattern to balance out the optionals.
+    // If we have extra optionals on the input type. Create ".some" patterns
+    // wrapping the is pattern to balance out the optionals.
     int numExtraOptionals = inputTypeOptionals.size()-castTypeOptionals.size();
     if (numExtraOptionals > 0) {
       Pattern *sub = IP;
-      for (int i = 0; i < numExtraOptionals; ++i) {
+      auto extraOpts =
+          llvm::drop_begin(inputTypeOptionals, castTypeOptionals.size());
+      for (auto extraOptTy : llvm::reverse(extraOpts)) {
         auto some = Context.getOptionalDecl()->getUniqueElement(/*hasVal*/true);
-        sub = new (Context) EnumElementPattern(TypeLoc(),
-                                               IP->getStartLoc(),
-                                               DeclNameLoc(IP->getEndLoc()),
-                                               some->createNameRef(),
-                                               nullptr, sub);
+        auto *base = TypeExpr::createImplicit(extraOptTy, Context);
+        sub = new (Context) EnumElementPattern(
+            base, IP->getStartLoc(), DeclNameLoc(IP->getEndLoc()),
+            some->createNameRef(), nullptr, sub);
         sub->setImplicit();
       }
 
       P = sub;
       return coercePatternToType(
-          pattern.forSubPattern(P, /*retainTopLevle=*/true), type, options);
+          pattern.forSubPattern(P, /*retainTopLevel=*/true), type, options);
     }
 
-
-    CheckedCastKind castKind
-      = TypeChecker::typeCheckCheckedCast(type, IP->getCastTypeLoc().getType(),
-                                          type->hasError()
-                                            ? CheckedCastContextKind::None
-                                            : CheckedCastContextKind::IsPattern,
-                                          dc,
-                                          IP->getLoc(),
-                                          nullptr,
-                                          IP->getCastTypeLoc().getSourceRange());
+    CheckedCastKind castKind = TypeChecker::typeCheckCheckedCast(
+        type, IP->getCastType(),
+        type->hasError() ? CheckedCastContextKind::None
+                         : CheckedCastContextKind::IsPattern,
+        dc, IP->getLoc(), nullptr, IP->getCastTypeRepr()->getSourceRange());
     switch (castKind) {
     case CheckedCastKind::Unresolved:
       return nullptr;
@@ -1272,8 +1312,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       // it is "useful" because it is providing a different type to the
       // sub-pattern.  If this is an 'is' pattern or an 'as' pattern where the
       // types are the same, then produce a warning.
-      if (!IP->getSubPattern() ||
-          type->isEqual(IP->getCastTypeLoc().getType())) {
+      if (!IP->getSubPattern() || type->isEqual(IP->getCastType())) {
         diags.diagnose(IP->getLoc(), diag::isa_is_always_true,
                        IP->getSubPattern() ? "as" : "is");
       }
@@ -1286,7 +1325,10 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     case CheckedCastKind::SetDowncast: {
       diags.diagnose(IP->getLoc(),
                      diag::isa_collection_downcast_pattern_value_unimplemented,
-                     IP->getCastTypeLoc().getType());
+                     IP->getCastType());
+      IP->setType(ErrorType::get(Context));
+      if (Pattern *sub = IP->getSubPattern())
+        sub->forEachVariable([](VarDecl *VD) { VD->setInvalid(); });
       return P;
     }
 
@@ -1300,8 +1342,8 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     if (Pattern *sub = IP->getSubPattern()) {
       sub = coercePatternToType(
           pattern.forSubPattern(sub, /*retainTopLevel=*/false),
-          IP->getCastTypeLoc().getType(),
-          subOptions|TypeResolutionFlags::FromNonInferredPattern);
+          IP->getCastType(),
+          subOptions | TypeResolutionFlags::FromNonInferredPattern);
       if (!sub)
         return nullptr;
 
@@ -1406,7 +1448,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       // coercing to.
       assert(!EEP->getParentType().isNull()
              && "enum with resolved element doesn't specify parent type?!");
-      auto parentTy = EEP->getParentType().getType();
+      auto parentTy = EEP->getParentType();
       // If the type matches exactly, use it.
       if (parentTy->isEqual(type)) {
         enumTy = type;
@@ -1520,18 +1562,12 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
 
     EEP->setElementDecl(elt);
     EEP->setType(enumTy);
-    
-    // Ensure that the type of our TypeLoc is fully resolved. If an unbound
-    // generic type was spelled in the source (e.g. `case Optional.None:`) this
-    // will fill in the generic parameters.
-    EEP->getParentType().setType(enumTy);
-    
+    EEP->setParentType(enumTy);
+
     // If we needed a cast, wrap the pattern in a cast pattern.
     if (castKind) {
-      auto isPattern = new (Context) IsPattern(SourceLoc(),
-                                               TypeLoc::withoutLoc(enumTy),
-                                               EEP, *castKind);
-      isPattern->setImplicit();
+      auto isPattern =
+          IsPattern::createImplicit(Context, enumTy, EEP, *castKind);
       isPattern->setType(type);
       P = isPattern;
     }

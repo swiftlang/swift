@@ -235,6 +235,9 @@ namespace swift {
     /// Enable experimental #assert feature.
     bool EnableExperimentalStaticAssert = false;
 
+    /// Enable experimental concurrency model.
+    bool EnableExperimentalConcurrency = false;
+
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;
@@ -271,11 +274,18 @@ namespace swift {
     /// behavior. This is a staging flag, and will be removed in the future.
     bool EnableNewOperatorLookup = false;
 
+    /// Whether to enable the "fuzzy" forward-scanning behavior for trailing
+    /// closure matching, which skips over defaulted closure parameters
+    /// to match later (non-defaulted) closure parameters
+    ///
+    /// This is a backward-compatibility hack for unlabeled trailing closures,
+    /// to be disabled in Swift 6+.
+    bool EnableFuzzyForwardScanTrailingClosureMatching = true;
+
     /// Use Clang function types for computing canonical types.
     /// If this option is false, the clang function types will still be computed
     /// but will not be used for checking type equality.
-    /// FIXME: [clang-function-type-serialization] This option should be turned
-    /// on once we start serializing clang function types.
+    /// [TODO: Clang-type-plumbing] Turn on for feature rollout.
     bool UseClangFunctionTypes = false;
 
     /// Whether to use the import as member inference system
@@ -335,6 +345,10 @@ namespace swift {
     /// Whether to verify the parsed syntax tree and emit related diagnostics.
     bool VerifySyntaxTree = false;
 
+    /// Whether to disable the evaluation of '#if' decls, such that the bodies
+    /// of active clauses aren't hoisted into the enclosing scope.
+    bool DisablePoundIfEvaluation = false;
+
     /// Instead of hashing tokens inside of NominalType and ExtensionBodies into
     /// the interface hash, hash them into per-iterable-decl-context
     /// fingerprints. Fine-grained dependency types won't dirty every provides
@@ -363,10 +377,19 @@ namespace swift {
 
     /// Whether to enable a more aggressive mode of incremental dependency
     /// gathering that never captures cascading edges.
-    bool EnableExperientalPrivateIntransitiveDependencies = false;
+    bool DirectIntramoduleDependencies = true;
 
     /// Enable verification when every SubstitutionMap is constructed.
     bool VerifyAllSubstitutionMaps = false;
+
+    /// Load swiftmodule files in memory as volatile and avoid mmap.
+    bool EnableVolatileModules = false;
+
+    /// Allow deserializing implementation only dependencies. This should only
+    /// be set true by lldb and other tooling, so that deserilization
+    /// recovery issues won't bring down the debugger.
+    /// TODO: remove this when @_implementationOnly modules are robust enough.
+    bool AllowDeserializingImplementationOnly = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.
@@ -500,7 +523,7 @@ namespace swift {
     /// Indicate that the type checker should skip type-checking non-inlinable
     /// function bodies.
     bool SkipNonInlinableFunctionBodies = false;
-    
+
     ///
     /// Flags for developers
     ///
@@ -549,8 +572,120 @@ namespace swift {
     /// Enable constraint solver support for experimental
     ///        operator protocol designator feature.
     bool SolverEnableOperatorDesignatedTypes = false;
-    
+
+    /// Enable experimental support for one-way constraints for the
+    /// parameters of closures.
+    bool EnableOneWayClosureParameters = false;
   };
+
+  /// Options for controlling the behavior of the Clang importer.
+  class ClangImporterOptions final {
+  public:
+    /// The module cache path which the Clang importer should use.
+    std::string ModuleCachePath;
+
+    /// Extra arguments which should be passed to the Clang importer.
+    std::vector<std::string> ExtraArgs;
+
+    /// A directory for overriding Clang's resource directory.
+    std::string OverrideResourceDir;
+
+    /// The target CPU to compile for.
+    ///
+    /// Equivalent to Clang's -mcpu=.
+    std::string TargetCPU;
+
+    /// The path to which we should store indexing data, if any.
+    std::string IndexStorePath;
+
+    /// The bridging header or PCH that will be imported.
+    std::string BridgingHeader;
+
+    /// When automatically generating a precompiled header from the bridging
+    /// header, place it in this directory.
+    std::string PrecompiledHeaderOutputDir;
+
+    /// The optimizaton setting.  This doesn't typically matter for
+    /// import, but it can affect Clang's IR generation of static functions.
+    std::string Optimization;
+
+    /// Disable validating the persistent PCH.
+    bool PCHDisableValidation = false;
+
+    /// \see Mode
+    enum class Modes : uint8_t {
+      /// Set up Clang for importing modules into Swift and generating IR from
+      /// Swift code.
+      Normal,
+      /// Set up Clang for backend compilation only.
+      EmbedBitcode,
+      /// Set up Clang to emit a precompiled module from a C/Objective-C module
+      /// map or dump debugging info about a precompiled module.
+      PrecompiledModule
+    };
+
+    /// Controls how Clang is initially set up.
+    Modes Mode = Modes::Normal;
+
+    /// When set, preserves more information during import.
+    ///
+    /// Also \em disables some information that is only needed for object file
+    /// generation.
+    bool DetailedPreprocessingRecord = false;
+
+    /// If true, Clang diagnostics will be dumped to stderr using Clang's
+    /// diagnostic printer as well as being passed to Swift's diagnostic engine.
+    bool DumpClangDiagnostics = false;
+
+    /// If true, forward declarations will be imported using unavailable types
+    /// instead of dropped altogether when possible.
+    bool ImportForwardDeclarations = false;
+
+    /// Whether to use the import as member inference system
+    ///
+    /// When importing a global, try to infer whether we can import it as a
+    /// member of some type instead. This includes inits, computed properties,
+    /// and methods.
+    bool InferImportAsMember = false;
+
+    /// If true ignore the swift bridged attribute.
+    bool DisableSwiftBridgeAttr = false;
+
+    /// When set, don't look for or load overlays.
+    bool DisableOverlayModules = false;
+
+    /// When set, don't enforce warnings with -Werror.
+    bool DebuggerSupport = false;
+
+    /// When set, ClangImporter is disabled, and all requests go to the
+    /// DWARFImporter delegate.
+    bool DisableSourceImport = false;
+
+    /// When set, use ExtraArgs alone to configure clang instance because ExtraArgs
+    /// contains the full option set.
+    bool ExtraArgsOnly = false;
+
+    /// Return a hash code of any components from these options that should
+    /// contribute to a Swift Bridging PCH hash.
+    llvm::hash_code getPCHHashComponents() const {
+      using llvm::hash_combine;
+      using llvm::hash_combine_range;
+
+      return hash_combine(ModuleCachePath,
+                          hash_combine_range(ExtraArgs.begin(), ExtraArgs.end()),
+                          OverrideResourceDir,
+                          TargetCPU,
+                          BridgingHeader,
+                          PrecompiledHeaderOutputDir,
+                          static_cast<uint8_t>(Mode),
+                          DetailedPreprocessingRecord,
+                          ImportForwardDeclarations,
+                          InferImportAsMember,
+                          DisableSwiftBridgeAttr,
+                          DisableOverlayModules);
+    }
+  };
+
 } // end namespace swift
 
 #endif // SWIFT_BASIC_LANGOPTIONS_H

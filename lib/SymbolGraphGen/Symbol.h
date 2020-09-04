@@ -21,7 +21,7 @@
 namespace swift {
 namespace symbolgraphgen {
 
-struct AvailabilityDomain;
+struct Availability;
 struct SymbolGraphASTWalker;
 struct SymbolGraph;
 
@@ -67,10 +67,6 @@ class Symbol {
   void serializeAccessLevelMixin(llvm::json::OStream &OS) const;
 
   void serializeLocationMixin(llvm::json::OStream &OS) const;
-
-  llvm::Optional<StringRef>
-  getDomain(PlatformAgnosticAvailabilityKind AgnosticKind,
-            PlatformKind Kind) const;
 
   void serializeAvailabilityMixin(llvm::json::OStream &OS) const;
 

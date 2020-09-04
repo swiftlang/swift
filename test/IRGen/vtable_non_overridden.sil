@@ -1,0 +1,305 @@
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=NO-LIBRARY-EVOLUTION
+// RUN: %target-swift-frontend -enable-library-evolution -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=LIBRARY-EVOLUTION
+
+sil_stage canonical
+
+class InternalA {
+  init()
+  func foo()
+  func bar()
+  func bas()
+}
+
+sil @InternalA_foo : $@convention(method) (@guaranteed InternalA) -> ()
+sil @InternalA_bar : $@convention(method) (@guaranteed InternalA) -> ()
+sil @InternalA_bas : $@convention(method) (@guaranteed InternalA) -> ()
+sil @InternalA_init : $@convention(method) (@thick InternalA.Type) -> @owned InternalA
+sil @InternalA_dealloc : $@convention(method) (@owned InternalA) -> ()
+
+sil_vtable InternalA {
+  #InternalA.deinit!deallocator : @InternalA_dealloc
+  #InternalA.init!allocator : @InternalA_init
+  #InternalA.foo : @InternalA_foo [nonoverridden]
+  #InternalA.bar : @InternalA_bar
+  #InternalA.bas : @InternalA_bas [nonoverridden]
+}
+
+// -- we should still generate method descriptors for the elided methods
+// CHECK-LABEL: @"$s21vtable_non_overridden9InternalAC3fooyyFTq" =
+// CHECK-LABEL: @"$s21vtable_non_overridden9InternalAC3basyyFTq" =
+
+// -- only overridden entries in internal method descriptor table
+// CHECK-LABEL: @"$s21vtable_non_overridden9InternalACMn" =
+// CHECK-SAME:     i32 2, %swift.method_descriptor
+// CHECK-SAME:     @InternalA_init
+// CHECK-NOT:      @InternalA_foo
+// CHECK-SAME:     @InternalA_bar
+// CHECK-NOT:      @InternalA_bas
+
+// -- only overridden entries in internal vtable
+// CHECK-LABEL: @"$s21vtable_non_overridden9InternalACMf" = 
+// CHECK-SAME:     @InternalA_init
+// CHECK-NOT:      @InternalA_foo
+// CHECK-SAME:     @InternalA_bar
+// CHECK-NOT:      @InternalA_bas
+
+sil @InternalB_bar : $@convention(method) (@guaranteed InternalB) -> ()
+sil @InternalB_init : $@convention(method) (@thick InternalB.Type) -> @owned InternalB
+sil @InternalB_dealloc : $@convention(method) (@owned InternalB) -> ()
+
+class InternalB: InternalA {
+  override func bar()
+}
+
+sil_vtable InternalB {
+  #InternalB.deinit!deallocator : @InternalB_dealloc
+  #InternalA.init!allocator : @InternalB_init [override]
+  #InternalA.foo : @InternalA_foo [inherited] [nonoverridden]
+  #InternalA.bar : @InternalB_bar [override]
+  #InternalA.bas : @InternalA_bas [inherited] [nonoverridden]
+}
+
+// -- only overridden entries in internal method descriptor table
+// CHECK-LABEL: @"$s21vtable_non_overridden9InternalBCMn" =
+// CHECK-SAME:     i32 2, %swift.method_override_descriptor
+// CHECK-NOT:      @InternalA_foo
+// CHECK-SAME:     @InternalB_bar
+// CHECK-NOT:      @InternalA_bas
+// CHECK-SAME:     @InternalB_init
+
+// -- only overridden entries in internal vtable
+// CHECK-LABEL: @"$s21vtable_non_overridden9InternalBCMf" = 
+// CHECK-SAME:     @InternalB_init
+// CHECK-NOT:      @InternalA_foo
+// CHECK-SAME:     @InternalB_bar
+// CHECK-NOT:      @InternalA_bas
+// CHECK-SAME:     {{$}}
+
+@_fixed_layout
+public class PublicFragileA {
+  init()
+  func foo()
+  func bar()
+  func bas()
+}
+
+sil @PublicFragileA_foo : $@convention(method) (@guaranteed PublicFragileA) -> ()
+sil @PublicFragileA_bar : $@convention(method) (@guaranteed PublicFragileA) -> ()
+sil @PublicFragileA_bas : $@convention(method) (@guaranteed PublicFragileA) -> ()
+sil @PublicFragileA_init : $@convention(method) (@thick PublicFragileA.Type) -> @owned PublicFragileA
+sil @PublicFragileA_dealloc : $@convention(method) (@owned PublicFragileA) -> ()
+
+sil_vtable PublicFragileA {
+  #PublicFragileA.deinit!deallocator : @PublicFragileA_dealloc
+  #PublicFragileA.init!allocator : @PublicFragileA_init
+  #PublicFragileA.foo : @PublicFragileA_foo [nonoverridden]
+  #PublicFragileA.bar : @PublicFragileA_bar
+  #PublicFragileA.bas : @PublicFragileA_bas [nonoverridden]
+}
+
+// -- all entries should be preserved in public fragile method descriptor table
+// CHECK-LABEL: @"$s21vtable_non_overridden14PublicFragileACMn" =
+// CHECK-SAME:     i32 4, %swift.method_descriptor
+// CHECK-SAME:     @PublicFragileA_init
+// CHECK-SAME:     @PublicFragileA_foo
+// CHECK-SAME:     @PublicFragileA_bar
+// CHECK-SAME:     @PublicFragileA_bas
+
+// -- all entries should be preserved in public fragile vtable
+// CHECK-LABEL: @"$s21vtable_non_overridden14PublicFragileACMf" = 
+// CHECK-SAME:     @PublicFragileA_init
+// CHECK-SAME:     @PublicFragileA_foo
+// CHECK-SAME:     @PublicFragileA_bar
+// CHECK-SAME:     @PublicFragileA_bas
+
+sil @PublicFragileB_bar : $@convention(method) (@guaranteed PublicFragileB) -> ()
+sil @PublicFragileB_init : $@convention(method) (@thick PublicFragileB.Type) -> @owned PublicFragileB
+sil @PublicFragileB_dealloc : $@convention(method) (@owned PublicFragileB) -> ()
+
+@_fixed_layout
+public class PublicFragileB: PublicFragileA {
+  override func bar()
+}
+
+sil_vtable PublicFragileB {
+  #PublicFragileB.deinit!deallocator : @PublicFragileB_dealloc
+  #PublicFragileA.init!allocator : @PublicFragileB_init [override]
+  #PublicFragileA.foo : @PublicFragileA_foo [inherited] [nonoverridden]
+  #PublicFragileA.bar : @PublicFragileB_bar [override]
+  #PublicFragileA.bas : @PublicFragileA_bas [inherited] [nonoverridden]
+}
+
+// -- all entries should be preserved in public fragile method descriptor table
+// CHECK-LABEL: @"$s21vtable_non_overridden14PublicFragileBCMn" =
+// CHECK-SAME:     i32 2, %swift.method_override_descriptor
+// CHECK-SAME:     @PublicFragileB_bar
+// CHECK-SAME:     @PublicFragileB_init
+
+// -- all entries should be preserved in public fragile vtable
+// CHECK-LABEL: @"$s21vtable_non_overridden14PublicFragileBCMf" = 
+// CHECK-SAME:     @PublicFragileB_init
+// CHECK-SAME:     @PublicFragileA_foo
+// CHECK-SAME:     @PublicFragileB_bar
+// CHECK-SAME:     @PublicFragileA_bas
+
+sil @PublicResilientSubclassOfFragile_bar : $@convention(method) (@guaranteed PublicResilientSubclassOfFragile) -> ()
+sil @PublicResilientSubclassOfFragile_init : $@convention(method) (@thick PublicResilientSubclassOfFragile.Type) -> @owned PublicResilientSubclassOfFragile
+sil @PublicResilientSubclassOfFragile_dealloc : $@convention(method) (@owned PublicResilientSubclassOfFragile) -> ()
+
+public class PublicResilientSubclassOfFragile: PublicFragileA {
+  override func bar()
+}
+
+sil_vtable PublicResilientSubclassOfFragile {
+  #PublicResilientSubclassOfFragile.deinit!deallocator : @PublicResilientSubclassOfFragile_dealloc
+  #PublicFragileA.init!allocator : @PublicResilientSubclassOfFragile_init [override]
+  #PublicFragileA.foo : @PublicFragileA_foo [inherited] [nonoverridden]
+  #PublicFragileA.bar : @PublicResilientSubclassOfFragile_bar [override]
+  #PublicFragileA.bas : @PublicFragileA_bas [inherited] [nonoverridden]
+}
+
+// -- all entries from fragile base class should be preserved in public method descriptor table
+// CHECK-LABEL: @"$s21vtable_non_overridden32PublicResilientSubclassOfFragileCMn" =
+// CHECK-SAME:     i32 2, %swift.method_override_descriptor
+// CHECK-SAME:     @PublicResilientSubclassOfFragile_bar
+// CHECK-SAME:     @PublicResilientSubclassOfFragile_init
+
+// -- all entries from fragile base class should be preserved in public vtable
+// CHECK-LABEL: @"$s21vtable_non_overridden32PublicResilientSubclassOfFragileCMf" = 
+// CHECK-SAME:     @PublicResilientSubclassOfFragile_init
+// CHECK-SAME:     @PublicFragileA_foo
+// CHECK-SAME:     @PublicResilientSubclassOfFragile_bar
+// CHECK-SAME:     @PublicFragileA_bas
+
+public class PublicA {
+  init()
+  public func foo()
+  public func bar()
+  func bas()
+}
+
+sil @PublicA_foo : $@convention(method) (@guaranteed PublicA) -> ()
+sil @PublicA_bar : $@convention(method) (@guaranteed PublicA) -> ()
+sil @PublicA_bas : $@convention(method) (@guaranteed PublicA) -> ()
+sil @PublicA_init : $@convention(method) (@thick PublicA.Type) -> @owned PublicA
+sil @PublicA_dealloc : $@convention(method) (@owned PublicA) -> ()
+
+sil_vtable PublicA {
+  #PublicA.deinit!deallocator : @PublicA_dealloc
+  #PublicA.init!allocator : @PublicA_init
+  #PublicA.foo : @PublicA_foo [nonoverridden]
+  #PublicA.bar : @PublicA_bar
+  #PublicA.bas : @PublicA_bas [nonoverridden]
+}
+
+// -- nonoverridden entries can be dropped in resilient method descriptor table
+// LIBRARY-EVOLUTION-LABEL: @"$s21vtable_non_overridden7PublicACMn" =
+// LIBRARY-EVOLUTION-SAME:     i32 2, %swift.method_descriptor
+// LIBRARY-EVOLUTION-SAME:     @PublicA_init
+// LIBRARY-EVOLUTION-NOT:      @PublicA_foo
+// LIBRARY-EVOLUTION-SAME:     @PublicA_bar
+// LIBRARY-EVOLUTION-NOT:      @PublicA_bas
+
+// -- nonoverridden entries can be dropped in resilient method descriptor table
+// LIBRARY-EVOLUTION-LABEL: @"$s21vtable_non_overridden7PublicACMf" = 
+// LIBRARY-EVOLUTION-SAME:     @PublicA_init
+// LIBRARY-EVOLUTION-NOT:      @PublicA_foo
+// LIBRARY-EVOLUTION-SAME:     @PublicA_bar
+// LIBRARY-EVOLUTION-NOT:      @PublicA_bas
+// LIBRARY-EVOLUTION-SAME:     {{$}}
+
+// -- with library evolution disabled, treat the vtable as fragile
+
+// NO-LIBRARY-EVOLUTION-LABEL: @"$s21vtable_non_overridden7PublicACMn" =
+// NO-LIBRARY-EVOLUTION-SAME:     i32 4, %swift.method_descriptor
+// NO-LIBRARY-EVOLUTION-SAME:     @PublicA_init
+// NO-LIBRARY-EVOLUTION-SAME:     @PublicA_foo
+// NO-LIBRARY-EVOLUTION-SAME:     @PublicA_bar
+// NO-LIBRARY-EVOLUTION-SAME:     @PublicA_bas
+
+// NO-LIBRARY-EVOLUTION-LABEL: @"$s21vtable_non_overridden7PublicACMf" = 
+// NO-LIBRARY-EVOLUTION-SAME:     @PublicA_init
+// NO-LIBRARY-EVOLUTION-SAME:     @PublicA_foo
+// NO-LIBRARY-EVOLUTION-SAME:     @PublicA_bar
+// NO-LIBRARY-EVOLUTION-SAME:     @PublicA_bas
+
+sil @PublicB_bar : $@convention(method) (@guaranteed PublicB) -> ()
+sil @PublicB_init : $@convention(method) (@thick PublicB.Type) -> @owned PublicB
+sil @PublicB_dealloc : $@convention(method) (@owned PublicB) -> ()
+
+class PublicB: PublicA {
+  override func bar()
+}
+
+sil_vtable PublicB {
+  #PublicB.deinit!deallocator : @PublicB_dealloc
+  #PublicA.init!allocator : @PublicB_init [override]
+  #PublicA.foo : @PublicA_foo [inherited] [nonoverridden]
+  #PublicA.bar : @PublicB_bar [override]
+  #PublicA.bas : @PublicA_bas [inherited] [nonoverridden]
+}
+
+// -- nonoverridden entries can be dropped in resilient method descriptor table
+// LIBRARY-EVOLUTION-LABEL: @"$s21vtable_non_overridden7PublicBCMn" =
+// LIBRARY-EVOLUTION-SAME:     i32 2, %swift.method_override_descriptor
+// LIBRARY-EVOLUTION-NOT:      @PublicA_foo
+// LIBRARY-EVOLUTION-SAME:     @PublicB_bar
+// LIBRARY-EVOLUTION-NOT:      @PublicA_bas
+// LIBRARY-EVOLUTION-SAME:     @PublicB_init
+
+// -- nonoverridden entries can be dropped in resilient method descriptor table
+// LIBRARY-EVOLUTION-LABEL: @"$s21vtable_non_overridden7PublicBCMf" = 
+// LIBRARY-EVOLUTION-SAME:     @PublicB_init
+// LIBRARY-EVOLUTION-NOT:      @PublicA_foo
+// LIBRARY-EVOLUTION-SAME:     @PublicB_bar
+// LIBRARY-EVOLUTION-NOT:      @PublicA_bas
+// LIBRARY-EVOLUTION-SAME:     {{$}}
+
+// -- with library evolution disabled, treat the vtable as fragile
+
+// NO-LIBRARY-EVOLUTION-LABEL: @"$s21vtable_non_overridden7PublicBCMn" =
+// NO-LIBRARY-EVOLUTION-SAME:     i32 2, %swift.method_override_descriptor
+// NO-LIBRARY-EVOLUTION-SAME:     @PublicB_bar
+// NO-LIBRARY-EVOLUTION-SAME:     @PublicB_init
+
+// NO-LIBRARY-EVOLUTION-LABEL: @"$s21vtable_non_overridden7PublicBCMf" = 
+// NO-LIBRARY-EVOLUTION-SAME:     @PublicB_init
+// NO-LIBRARY-EVOLUTION-SAME:     @PublicB_bar
+
+// Ensure we still emit a method lookup function even if the vtable is
+// completely optimized away.
+sil @PublicOnlyNonoverridden_foo : $@convention(method) (@guaranteed PublicOnlyNonoverridden) -> ()
+sil @PublicOnlyNonoverridden_init : $@convention(method) (@thick PublicOnlyNonoverridden.Type) -> @owned PublicOnlyNonoverridden
+sil @PublicOnlyNonoverridden_dealloc : $@convention(method) (@owned PublicOnlyNonoverridden) -> ()
+
+public class PublicOnlyNonoverridden {
+  public func foo()
+}
+
+sil_vtable PublicOnlyNonoverridden {
+  #PublicOnlyNonoverridden.deinit!deallocator : @PublicOnlyNonoverridden_dealloc
+  #PublicOnlyNonoverridden.init!allocator : @PublicOnlyNonoverridden_init [nonoverridden]
+  #PublicOnlyNonoverridden.foo : @PublicOnlyNonoverridden_foo [nonoverridden]
+}
+
+// Ensure that `class_method` lookups of nonoverridden vtable entries resolve
+// to the one implementation instead of trying to load a nonexistent runtime
+// vtable entry.
+
+// CHECK-LABEL: define {{.*}}@non_overridable_invocation
+sil @non_overridable_invocation : $@convention(thin) (@guaranteed InternalA, @guaranteed InternalB) -> () {
+entry(%a : $InternalA, %b : $InternalB):
+  // CHECK: call swiftcc void @InternalA_foo
+  %am = class_method %a : $InternalA, #InternalA.foo, $@convention(method) (@guaranteed InternalA) -> ()
+  apply %am(%a) : $@convention(method) (@guaranteed InternalA) -> ()
+
+  // CHECK: call swiftcc void @InternalA_foo
+  %bm = class_method %b : $InternalB, #InternalA.foo, $@convention(method) (@guaranteed InternalA) -> ()
+  %ba = upcast %b : $InternalB to $InternalA
+  apply %bm(%ba) : $@convention(method) (@guaranteed InternalA) -> ()
+
+  return undef : $()
+}
+
+// LIBRARY-EVOLUTION-LABEL: define{{.*}}@"$s21vtable_non_overridden23PublicOnlyNonoverriddenCMu"
+

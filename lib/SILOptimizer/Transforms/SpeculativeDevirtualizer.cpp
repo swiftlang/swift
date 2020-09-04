@@ -562,9 +562,9 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
   if (LastCCBI && SubTypeValue == LastCCBI->getOperand()) {
     // Remove last checked_cast_br, because it will always succeed.
     SILBuilderWithScope B(LastCCBI);
-    auto CastedValue = B.createUncheckedBitCast(LastCCBI->getLoc(),
-                                                LastCCBI->getOperand(),
-                                                LastCCBI->getTargetLoweredType());
+    auto CastedValue = B.createUncheckedReinterpretCast(
+        LastCCBI->getLoc(), LastCCBI->getOperand(),
+        LastCCBI->getTargetLoweredType());
     B.createBranch(LastCCBI->getLoc(), LastCCBI->getSuccessBB(), {CastedValue});
     LastCCBI->eraseFromParent();
     ORE.emit(RB);
@@ -616,7 +616,7 @@ namespace {
         }
       }
 
-      OptRemark::Emitter ORE(DEBUG_TYPE, CurFn.getModule());
+      OptRemark::Emitter ORE(DEBUG_TYPE, CurFn);
       // Go over the collected calls and try to insert speculative calls.
       for (auto AI : ToSpecialize)
         Changed |= tryToSpeculateTarget(AI, CHA, ORE);

@@ -682,7 +682,6 @@ bool LinearLifetimeChecker::validateLifetime(
 bool LinearLifetimeChecker::usesNotContainedWithinLifetime(
     SILValue value, ArrayRef<Operand *> consumingUses,
     ArrayRef<Operand *> usesToTest) {
-
   auto errorBehavior = ErrorBehaviorKind(
       ErrorBehaviorKind::ReturnFalse |
       ErrorBehaviorKind::StoreNonConsumingUsesOutsideLifetime);
@@ -707,7 +706,13 @@ bool LinearLifetimeChecker::usesNotContainedWithinLifetime(
   assert(numFoundUses == uniqueUsers.size());
 #endif
 
-  // Return true if we /did/ found an error and when emitting that error, we
+  // If we found any error except for uses outside of our lifetime, bail.
+  if (error.getFoundLeak() || error.getFoundOverConsume() ||
+      error.getFoundUseAfterFree())
+    return false;
+
+  // Return true if we /did/ find an error and when emitting that error, we
   // found /all/ uses we were looking for.
-  return error.getFoundError() && numFoundUses == usesToTest.size();
+  return error.getFoundUseOutsideOfLifetime() &&
+         numFoundUses == usesToTest.size();
 }

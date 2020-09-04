@@ -404,10 +404,10 @@ public:
   }
 
   const TupleTypeRef *createTupleType(llvm::ArrayRef<const TypeRef *> elements,
-                                      std::string &&labels, bool isVariadic) {
+                                      std::string &&labels) {
     // FIXME: Add uniqueness checks in TupleTypeRef::Profile and
     // unittests/Reflection/TypeRef.cpp if using labels for identity.
-    return TupleTypeRef::create(*this, elements, isVariadic);
+    return TupleTypeRef::create(*this, elements);
   }
 
   const FunctionTypeRef *createFunctionType(
@@ -445,7 +445,7 @@ public:
       break;
     }
 
-    auto result = createTupleType({}, "", false);
+    auto result = createTupleType({}, "");
     return FunctionTypeRef::create(*this, {}, result, funcFlags);
   }
 
@@ -618,8 +618,8 @@ public:
       }),
       OpaqueUnderlyingTypeReader(
       [&reader](uint64_t descriptorAddr, unsigned ordinal) -> const TypeRef* {
-        return reader.readUnderlyingTypeForOpaqueTypeDescriptor(descriptorAddr,
-                                                                ordinal);
+        return reader.readUnderlyingTypeForOpaqueTypeDescriptor(
+          descriptorAddr, ordinal).getType();
       })
   {}
 

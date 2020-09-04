@@ -26,6 +26,7 @@
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -54,66 +55,40 @@ SILCombiner::visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
   //   debug_value %6#0 : $Error
   //   strong_release %6#0 : $Error
 
-  StoreInst *SingleStore = nullptr;
-  StrongReleaseInst *SingleRelease = nullptr;
-  ProjectExistentialBoxInst *SingleProjection = nullptr;
-
-  // For each user U of the alloc_existential_box...
-  for (auto U : getNonDebugUses(AEBI)) {
-
-    if (auto *PEBI = dyn_cast<ProjectExistentialBoxInst>(U->getUser())) {
-      if (SingleProjection) return nullptr;
-      SingleProjection = PEBI;
-      for (auto AddrUse : getNonDebugUses(PEBI)) {
-        // Record stores into the box.
-        if (auto *SI = dyn_cast<StoreInst>(AddrUse->getUser())) {
-          // If this is not the only store into the box then bail out.
-          if (SingleStore) return nullptr;
-          SingleStore = SI;
-          continue;
-        }
-        // If there are other users to the box value address then bail out.
-        return nullptr;
-      }
-      continue;
-    }
-
-    // Record releases of the box.
-    if (auto *RI = dyn_cast<StrongReleaseInst>(U->getUser())) {
-      // If this is not the only release of the box then bail out.
-      if (SingleRelease) return nullptr;
-      SingleRelease = RI;
-      continue;
-    }
-
-    // If there are other users to the box then bail out.
+  SILValue boxedValue =
+    getConcreteValueOfExistentialBox(AEBI, /*ignoreUser*/ nullptr);
+  if (!boxedValue)
     return nullptr;
+
+  // Check if the box is released at a single place. That's the end of its
+  // lifetime.
+  StrongReleaseInst *singleRelease = nullptr;
+  for (Operand *use : AEBI->getUses()) {
+    if (auto *RI = dyn_cast<StrongReleaseInst>(use->getUser())) {
+      // If this is not the only release of the box then bail out.
+      if (singleRelease)
+        return nullptr;
+      singleRelease = RI;
+    }
   }
+  if (!singleRelease)
+    return nullptr;
 
-  if (SingleStore && SingleRelease) {
-    assert(SingleProjection && "store without a projection");
-    // Release the value that was stored into the existential box. The box
-    // is going away so we need to release the stored value.
-    // NOTE: It's important that the release is inserted at the single
-    // release of the box and not at the store, because a balancing retain could
-    // be _after_ the store, e.g:
-    //      %box = alloc_existential_box
-    //      %addr = project_existential_box %box
-    //      store %value to %addr
-    //      retain_value %value    // must insert the release after this retain
-    //      strong_release %box
-    Builder.setInsertionPoint(SingleRelease);
-    Builder.createReleaseValue(AEBI->getLoc(), SingleStore->getSrc(),
-                               SingleRelease->getAtomicity());
+  // Release the value that was stored into the existential box. The box
+  // is going away so we need to release the stored value.
+  // NOTE: It's important that the release is inserted at the single
+  // release of the box and not at the store, because a balancing retain could
+  // be _after_ the store, e.g:
+  //      %box = alloc_existential_box
+  //      %addr = project_existential_box %box
+  //      store %value to %addr
+  //      retain_value %value    // must insert the release after this retain
+  //      strong_release %box
+  Builder.setInsertionPoint(singleRelease);
+  Builder.createReleaseValue(AEBI->getLoc(), boxedValue,
+                             singleRelease->getAtomicity());
 
-    // Erase the instruction that stores into the box and the release that
-    // releases the box, and finally, release the box.
-    eraseInstFromFunction(*SingleRelease);
-    eraseInstFromFunction(*SingleStore);
-    eraseInstFromFunction(*SingleProjection);
-    return eraseInstFromFunction(*AEBI);
-  }
-
+  eraseInstIncludingUsers(AEBI);
   return nullptr;
 }
 
@@ -454,8 +429,107 @@ static bool somethingIsRetained(SILInstruction *from, AllocStackInst *alloc) {
   return false;
 }
 
+/// Replaces an alloc_stack of an enum by an alloc_stack of the payload if only
+/// one enum case (with payload) is stored to that location.
+///
+/// For example:
+///
+///   %loc = alloc_stack $Optional<T>
+///   %payload = init_enum_data_addr %loc
+///   store %value to %payload
+///   ...
+///   %take_addr = unchecked_take_enum_data_addr %loc
+///   %l = load %take_addr
+///
+/// is transformed to
+///
+///   %loc = alloc_stack $T
+///   store %value to %loc
+///   ...
+///   %l = load %loc
+bool SILCombiner::optimizeStackAllocatedEnum(AllocStackInst *AS) {
+  EnumDecl *enumDecl = AS->getType().getEnumOrBoundGenericEnum();
+  if (!enumDecl)
+    return false;
+  
+  EnumElementDecl *element = nullptr;
+  SILType payloadType;
+  
+  // First step: check if the stack location is only used to hold one specific
+  // enum case with payload.
+  for (auto *use : AS->getUses()) {
+    SILInstruction *user = use->getUser();
+    switch (user->getKind()) {
+      case SILInstructionKind::DebugValueAddrInst:
+      case SILInstructionKind::DestroyAddrInst:
+      case SILInstructionKind::DeallocStackInst:
+        break;
+      case SILInstructionKind::InitEnumDataAddrInst: {
+        auto *ieda = cast<InitEnumDataAddrInst>(user);
+        auto *el = ieda->getElement();
+        if (element && el != element)
+          return false;
+        element = el;
+        assert(!payloadType || payloadType == ieda->getType());
+        payloadType = ieda->getType();
+        break;
+      }
+      case SILInstructionKind::InjectEnumAddrInst: {
+        auto *el = cast<InjectEnumAddrInst>(user)->getElement();
+        if (element && el != element)
+          return false;
+        element = el;
+        break;
+      }
+      case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
+        auto *el = cast<UncheckedTakeEnumDataAddrInst>(user)->getElement();
+        if (element && el != element)
+          return false;
+        element = el;
+        break;
+      }
+      default:
+        return false;
+    }
+  }
+  if (!element || !payloadType)
+    return false;
+
+  // Second step: replace the enum alloc_stack with a payload alloc_stack.
+  auto *newAlloc = Builder.createAllocStack(
+      AS->getLoc(), payloadType, AS->getVarInfo(), AS->hasDynamicLifetime());
+
+  while (!AS->use_empty()) {
+    Operand *use = *AS->use_begin();
+    SILInstruction *user = use->getUser();
+    switch (user->getKind()) {
+      case SILInstructionKind::InjectEnumAddrInst:
+      case SILInstructionKind::DebugValueAddrInst:
+        eraseInstFromFunction(*user);
+        break;
+      case SILInstructionKind::DestroyAddrInst:
+      case SILInstructionKind::DeallocStackInst:
+        use->set(newAlloc);
+        break;
+      case SILInstructionKind::InitEnumDataAddrInst:
+      case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
+        auto *svi = cast<SingleValueInstruction>(user);
+        svi->replaceAllUsesWith(newAlloc);
+        eraseInstFromFunction(*svi);
+        break;
+      }
+      default:
+        llvm_unreachable("unexpected alloc_stack user");
+    }
+  }
+  return true;
+}
+
 SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
   if (AS->getFunction()->hasOwnership())
+    return nullptr;
+
+  if (optimizeStackAllocatedEnum(AS))
     return nullptr;
 
   // If we are testing SILCombine and we are asked not to eliminate
@@ -480,7 +554,8 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
   // Be careful with open archetypes, because they cannot be moved before
   // their definitions.
   if (IEI && !OEI &&
-      !IEI->getLoweredConcreteType().isOpenedExistential()) {
+      !IEI->getLoweredConcreteType().hasOpenedExistential()) {
+    assert(!IEI->getLoweredConcreteType().isOpenedExistential());
     auto *ConcAlloc = Builder.createAllocStack(
         AS->getLoc(), IEI->getLoweredConcreteType(), AS->getVarInfo());
     IEI->replaceAllUsesWith(ConcAlloc);
@@ -708,6 +783,31 @@ static bool isZeroLoadFromEmptyCollection(LoadInst *LI) {
   }
 }
 
+static SingleValueInstruction *getValueFromStaticLet(SILValue v) {
+  if (auto *globalAddr = dyn_cast<GlobalAddrInst>(v)) {
+    SILGlobalVariable *global = globalAddr->getReferencedGlobal();
+    if (!global->isLet())
+      return nullptr;
+    return dyn_cast_or_null<SingleValueInstruction>(
+             global->getStaticInitializerValue());
+  }
+  if (auto *seai = dyn_cast<StructElementAddrInst>(v)) {
+    auto *structVal = getValueFromStaticLet(seai->getOperand());
+    if (!structVal)
+      return nullptr;
+    return cast<SingleValueInstruction>(
+      cast<StructInst>(structVal)->getOperandForField(seai->getField())->get());
+  }
+  if (auto *teai = dyn_cast<TupleElementAddrInst>(v)) {
+    auto *tupleVal = getValueFromStaticLet(teai->getOperand());
+    if (!tupleVal)
+      return nullptr;
+    return cast<SingleValueInstruction>(
+      cast<TupleInst>(tupleVal)->getElement(teai->getFieldNo()));
+  }
+  return nullptr;
+}
+
 SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   if (LI->getFunction()->hasOwnership())
     return nullptr;
@@ -733,6 +833,15 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   // propagated by redundant load elimination.
   if (isZeroLoadFromEmptyCollection(LI))
     return Builder.createIntegerLiteral(LI->getLoc(), LI->getType(), 0);
+
+  // Propagate a value from a static "let" global variable.
+  // This optimization is also done by GlobalOpt, but not with de-serialized
+  // globals, which can occur with cross-module optimization.
+  if (SingleValueInstruction *initVal = getValueFromStaticLet(LI->getOperand())) {
+    StaticInitCloner cloner(LI);
+    cloner.add(initVal);
+    return cloner.clone(initVal);
+  }
 
   return nullptr;
 }

@@ -1,0 +1,3782 @@
+{
+  key.dependencies: [
+    {
+      key.kind: source.lang.swift.import.module.swift,
+      key.name: "Swift",
+      key.filepath: Swift.swiftmodule,
+      key.is_system: 1
+    },
+    {
+      key.kind: source.lang.swift.import.module.swift,
+      key.name: "Module",
+      key.filepath: Module.swiftmodule,
+      key.dependencies: [
+        {
+          key.kind: source.lang.swift.import.module.swift,
+          key.name: "Exported",
+          key.filepath: Exported.swiftmodule,
+          key.dependencies: [
+            {
+              key.kind: source.lang.swift.import.module.swift,
+              key.name: "Swift",
+              key.filepath: Swift.swiftmodule,
+              key.is_system: 1
+            },
+            {
+              key.kind: source.lang.swift.import.module.swift,
+              key.name: "SwiftOnoneSupport",
+              key.filepath: SwiftOnoneSupport.swiftmodule,
+              key.is_system: 1,
+              key.dependencies: [
+                {
+                  key.kind: source.lang.swift.import.module.swift,
+                  key.name: "Swift",
+                  key.filepath: Swift.swiftmodule,
+                  key.is_system: 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.import.module.swift,
+          key.name: "Swift",
+          key.filepath: Swift.swiftmodule,
+          key.is_system: 1
+        },
+        {
+          key.kind: source.lang.swift.import.module.swift,
+          key.name: "SwiftOnoneSupport",
+          key.filepath: SwiftOnoneSupport.swiftmodule,
+          key.is_system: 1
+        }
+      ]
+    }
+  ],
+  key.entities: [
+    {
+      key.kind: source.lang.swift.decl.enum,
+      key.name: "PublicEnum",
+      key.usr: "s:28index_effective_access_level10PublicEnumO",
+      key.line: 8,
+      key.column: 13,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.enumelement,
+          key.name: "publicEnumCase",
+          key.usr: "s:28index_effective_access_level10PublicEnumO06publicF4CaseyA2CmF",
+          key.line: 9,
+          key.column: 10,
+          key.effective_access: source.decl.effective_access.public
+        }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.public
+        }
+      ],
+      key.effective_access: source.decl.effective_access.public
+    },
+    {
+      key.kind: source.lang.swift.decl.enum,
+      key.name: "InternalEnum",
+      key.usr: "s:28index_effective_access_level12InternalEnumO",
+      key.line: 12,
+      key.column: 6,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.enumelement,
+          key.name: "internalEnumCase",
+          key.usr: "s:28index_effective_access_level12InternalEnumO08internalF4CaseyA2CmF",
+          key.line: 13,
+          key.column: 10,
+          key.effective_access: source.decl.effective_access.internal
+        }
+      ],
+      key.effective_access: source.decl.effective_access.internal
+    },
+    {
+      key.kind: source.lang.swift.decl.enum,
+      key.name: "FilePrivateEnum",
+      key.usr: "s:28index_effective_access_level15FilePrivateEnum33_2295DDF1454D6A6D9229E8222CD85214LLO",
+      key.line: 16,
+      key.column: 18,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.enumelement,
+          key.name: "filePrivateEnumCase",
+          key.usr: "s:28index_effective_access_level15FilePrivateEnum33_2295DDF1454D6A6D9229E8222CD85214LLO04filefG4CaseyA2DmF",
+          key.line: 17,
+          key.column: 10,
+          key.effective_access: source.decl.effective_access.fileprivate
+        }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.fileprivate
+        }
+      ],
+      key.effective_access: source.decl.effective_access.fileprivate
+    },
+    {
+      key.kind: source.lang.swift.decl.enum,
+      key.name: "PrivateEnum",
+      key.usr: "s:28index_effective_access_level11PrivateEnum33_2295DDF1454D6A6D9229E8222CD85214LLO",
+      key.line: 20,
+      key.column: 14,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.enumelement,
+          key.name: "privateEnumCase",
+          key.usr: "s:28index_effective_access_level11PrivateEnum33_2295DDF1454D6A6D9229E8222CD85214LLO07privateF4CaseyA2DmF",
+          key.line: 21,
+          key.column: 10,
+          key.effective_access: source.decl.effective_access.fileprivate
+        }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.private
+        }
+      ],
+      key.effective_access: source.decl.effective_access.fileprivate
+    },
+    {
+      key.kind: source.lang.swift.decl.extension.enum,
+      key.name: "PublicEnum",
+      key.usr: "s:e:s:28index_effective_access_level10PublicEnumO12publicMethodyyF",
+      key.line: 24,
+      key.column: 11,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.ref.enum,
+          key.name: "PublicEnum",
+          key.usr: "s:28index_effective_access_level10PublicEnumO",
+          key.line: 24,
+          key.column: 11
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "publicMethod()",
+          key.usr: "s:28index_effective_access_level10PublicEnumO12publicMethodyyF",
+          key.line: 25,
+          key.column: 17,
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.public
+            }
+          ],
+          key.effective_access: source.decl.effective_access.public
+        }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.public
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.extension.enum,
+      key.name: "PublicEnum",
+      key.usr: "s:e:s:28index_effective_access_level10PublicEnumO010methodFromE9ExtensionyyF",
+      key.line: 28,
+      key.column: 18,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.ref.enum,
+          key.name: "PublicEnum",
+          key.usr: "s:28index_effective_access_level10PublicEnumO",
+          key.line: 28,
+          key.column: 18
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "methodFromPublicExtension()",
+          key.usr: "s:28index_effective_access_level10PublicEnumO010methodFromE9ExtensionyyF",
+          key.line: 29,
+          key.column: 10,
+          key.effective_access: source.decl.effective_access.public
+        }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.public
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.extension.enum,
+      key.name: "InternalEnum",
+      key.usr: "s:e:s:28index_effective_access_level12InternalEnumO14internalMethodyyF",
+      key.line: 32,
+      key.column: 11,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.ref.enum,
+          key.name: "InternalEnum",
+          key.usr: "s:28index_effective_access_level12InternalEnumO",
+          key.line: 32,
+          key.column: 11
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "internalMethod()",
+          key.usr: "s:28index_effective_access_level12InternalEnumO14internalMethodyyF",
+          key.line: 33,
+          key.column: 10,
+          key.effective_access: source.decl.effective_access.internal
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.extension.enum,
+      key.name: "FilePrivateEnum",
+      key.usr: "s:e:s:28index_effective_access_level15FilePrivateEnum33_2295DDF1454D6A6D9229E8222CD85214LLO04fileF6MethodyyF",
+      key.line: 36,
+      key.column: 11,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.ref.enum,
+          key.name: "FilePrivateEnum",
+          key.usr: "s:28index_effective_access_level15FilePrivateEnum33_2295DDF1454D6A6D9229E8222CD85214LLO",
+          key.line: 36,
+          key.column: 11
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "filePrivateMethod()",
+          key.usr: "s:28index_effective_access_level15FilePrivateEnum33_2295DDF1454D6A6D9229E8222CD85214LLO04fileF6MethodyyF",
+          key.line: 37,
+          key.column: 22,
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.fileprivate
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.fileprivate
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.extension.enum,
+      key.name: "FilePrivateEnum",
+      key.usr: "s:e:s:28index_effective_access_level15FilePrivateEnum33_2295DDF1454D6A6D9229E8222CD85214LLO010methodFromeF9ExtensionyyF",
+      key.line: 40,
+      key.column: 23,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.ref.enum,
+          key.name: "FilePrivateEnum",
+          key.usr: "s:28index_effective_access_level15FilePrivateEnum33_2295DDF1454D6A6D9229E8222CD85214LLO",
+          key.line: 40,
+          key.column: 23
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "methodFromFilePrivateExtension()",
+          key.usr: "s:28index_effective_access_level15FilePrivateEnum33_2295DDF1454D6A6D9229E8222CD85214LLO010methodFromeF9ExtensionyyF",
+          key.line: 41,
+          key.column: 10,
+          key.effective_access: source.decl.effective_access.fileprivate
+        }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.fileprivate
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.extension.enum,
+      key.name: "PrivateEnum",
+      key.usr: "s:e:s:28index_effective_access_level11PrivateEnum33_2295DDF1454D6A6D9229E8222CD85214LLO13privateMethodyyF",
+      key.line: 44,
+      key.column: 11,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.ref.enum,
+          key.name: "PrivateEnum",
+          key.usr: "s:28index_effective_access_level11PrivateEnum33_2295DDF1454D6A6D9229E8222CD85214LLO",
+          key.line: 44,
+          key.column: 11
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "privateMethod()",
+          key.usr: "s:28index_effective_access_level11PrivateEnum33_2295DDF1454D6A6D9229E8222CD85214LLO13privateMethodyyF",
+          key.line: 45,
+          key.column: 18,
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.private
+            }
+          ],
+          key.effective_access: source.decl.effective_access.less_than_fileprivate
+        }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.private
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.extension.enum,
+      key.name: "PrivateEnum",
+      key.usr: "s:e:s:28index_effective_access_level11PrivateEnum33_2295DDF1454D6A6D9229E8222CD85214LLO010methodFromE9ExtensionyyF",
+      key.line: 48,
+      key.column: 19,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.ref.enum,
+          key.name: "PrivateEnum",
+          key.usr: "s:28index_effective_access_level11PrivateEnum33_2295DDF1454D6A6D9229E8222CD85214LLO",
+          key.line: 48,
+          key.column: 19
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "methodFromPrivateExtension()",
+          key.usr: "s:28index_effective_access_level11PrivateEnum33_2295DDF1454D6A6D9229E8222CD85214LLO010methodFromE9ExtensionyyF",
+          key.line: 49,
+          key.column: 10,
+          key.effective_access: source.decl.effective_access.fileprivate
+        }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.private
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.struct,
+      key.name: "PublicPropertyWrapper",
+      key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV",
+      key.line: 53,
+      key.column: 15,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.generic_type_param,
+          key.name: "T",
+          key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV1Txmfp",
+          key.line: 53,
+          key.column: 37
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "wrappedValue",
+          key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV12wrappedValuexvp",
+          key.line: 54,
+          key.column: 16,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV12wrappedValuexvg",
+              key.line: 54,
+              key.column: 16,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.public
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV12wrappedValuexvs",
+              key.line: 54,
+              key.column: 16,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.public
+                }
+              ]
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.public
+            }
+          ],
+          key.effective_access: source.decl.effective_access.public
+        },
+        {
+          key.kind: source.lang.swift.ref.generic_type_param,
+          key.name: "T",
+          key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV1Txmfp",
+          key.line: 54,
+          key.column: 30
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.name: "init(wrappedValue:)",
+          key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV12wrappedValueACyxGx_tcfc",
+          key.line: 55,
+          key.column: 12,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.generic_type_param,
+              key.name: "T",
+              key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV1Txmfp",
+              key.line: 55,
+              key.column: 31
+            },
+            {
+              key.kind: source.lang.swift.ref.var.instance,
+              key.name: "wrappedValue",
+              key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV12wrappedValuexvp",
+              key.line: 56,
+              key.column: 14,
+              key.entities: [
+                {
+                  key.kind: source.lang.swift.ref.function.accessor.setter,
+                  key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV12wrappedValuexvs",
+                  key.line: 56,
+                  key.column: 14,
+                  key.receiver_usr: "s:28index_effective_access_level21PublicPropertyWrapperV",
+                  key.is_implicit: 1
+                }
+              ]
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.public
+            }
+          ],
+          key.effective_access: source.decl.effective_access.public
+        }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.public
+        },
+        {
+          key.attribute: source.decl.attribute.propertyWrapper
+        }
+      ],
+      key.effective_access: source.decl.effective_access.public
+    },
+    {
+      key.kind: source.lang.swift.decl.struct,
+      key.name: "InternalPropertyWrapper",
+      key.usr: "s:28index_effective_access_level23InternalPropertyWrapperV",
+      key.line: 61,
+      key.column: 8,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.generic_type_param,
+          key.name: "T",
+          key.usr: "s:28index_effective_access_level23InternalPropertyWrapperV1Txmfp",
+          key.line: 61,
+          key.column: 32
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "wrappedValue",
+          key.usr: "s:28index_effective_access_level23InternalPropertyWrapperV12wrappedValuexvp",
+          key.line: 62,
+          key.column: 9,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level23InternalPropertyWrapperV12wrappedValuexvg",
+              key.line: 62,
+              key.column: 9,
+              key.is_implicit: 1
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level23InternalPropertyWrapperV12wrappedValuexvs",
+              key.line: 62,
+              key.column: 9,
+              key.is_implicit: 1
+            }
+          ],
+          key.effective_access: source.decl.effective_access.internal
+        },
+        {
+          key.kind: source.lang.swift.ref.generic_type_param,
+          key.name: "T",
+          key.usr: "s:28index_effective_access_level23InternalPropertyWrapperV1Txmfp",
+          key.line: 62,
+          key.column: 23
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: "s:28index_effective_access_level23InternalPropertyWrapperV12wrappedValueACyxGx_tcfc",
+          key.line: 61,
+          key.column: 8,
+          key.is_implicit: 1,
+          key.effective_access: source.decl.effective_access.internal
+        }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.propertyWrapper
+        }
+      ],
+      key.effective_access: source.decl.effective_access.internal
+    },
+    {
+      key.kind: source.lang.swift.decl.struct,
+      key.name: "FilePrivatePropertyWrapper",
+      key.usr: "s:28index_effective_access_level26FilePrivatePropertyWrapper33_2295DDF1454D6A6D9229E8222CD85214LLV",
+      key.line: 66,
+      key.column: 20,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.generic_type_param,
+          key.name: "T",
+          key.usr: "s:28index_effective_access_level26FilePrivatePropertyWrapper33_2295DDF1454D6A6D9229E8222CD85214LLV1Txmfp",
+          key.line: 66,
+          key.column: 47
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "wrappedValue",
+          key.usr: "s:28index_effective_access_level26FilePrivatePropertyWrapper33_2295DDF1454D6A6D9229E8222CD85214LLV12wrappedValuexvp",
+          key.line: 67,
+          key.column: 21,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level26FilePrivatePropertyWrapper33_2295DDF1454D6A6D9229E8222CD85214LLV12wrappedValuexvg",
+              key.line: 67,
+              key.column: 21,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.fileprivate
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level26FilePrivatePropertyWrapper33_2295DDF1454D6A6D9229E8222CD85214LLV12wrappedValuexvs",
+              key.line: 67,
+              key.column: 21,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.fileprivate
+                }
+              ]
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.fileprivate
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.ref.generic_type_param,
+          key.name: "T",
+          key.usr: "s:28index_effective_access_level26FilePrivatePropertyWrapper33_2295DDF1454D6A6D9229E8222CD85214LLV1Txmfp",
+          key.line: 67,
+          key.column: 35
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: "s:28index_effective_access_level26FilePrivatePropertyWrapper33_2295DDF1454D6A6D9229E8222CD85214LLV12wrappedValueADyxGx_tcfc",
+          key.line: 66,
+          key.column: 20,
+          key.is_implicit: 1,
+          key.effective_access: source.decl.effective_access.fileprivate
+        }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.fileprivate
+        },
+        {
+          key.attribute: source.decl.attribute.propertyWrapper
+        }
+      ],
+      key.effective_access: source.decl.effective_access.fileprivate
+    },
+    {
+      key.kind: source.lang.swift.decl.struct,
+      key.name: "PrivatePropertyWrapper",
+      key.usr: "s:28index_effective_access_level22PrivatePropertyWrapper33_2295DDF1454D6A6D9229E8222CD85214LLV",
+      key.line: 71,
+      key.column: 16,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.generic_type_param,
+          key.name: "T",
+          key.usr: "s:28index_effective_access_level22PrivatePropertyWrapper33_2295DDF1454D6A6D9229E8222CD85214LLV1Txmfp",
+          key.line: 71,
+          key.column: 39
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "wrappedValue",
+          key.usr: "s:28index_effective_access_level22PrivatePropertyWrapper33_2295DDF1454D6A6D9229E8222CD85214LLV12wrappedValuexvp",
+          key.line: 72,
+          key.column: 17,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level22PrivatePropertyWrapper33_2295DDF1454D6A6D9229E8222CD85214LLV12wrappedValuexvg",
+              key.line: 72,
+              key.column: 17,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.private
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level22PrivatePropertyWrapper33_2295DDF1454D6A6D9229E8222CD85214LLV12wrappedValuexvs",
+              key.line: 72,
+              key.column: 17,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.private
+                }
+              ]
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.private
+            }
+          ],
+          key.effective_access: source.decl.effective_access.less_than_fileprivate
+        },
+        {
+          key.kind: source.lang.swift.ref.generic_type_param,
+          key.name: "T",
+          key.usr: "s:28index_effective_access_level22PrivatePropertyWrapper33_2295DDF1454D6A6D9229E8222CD85214LLV1Txmfp",
+          key.line: 72,
+          key.column: 31
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: "s:28index_effective_access_level22PrivatePropertyWrapper33_2295DDF1454D6A6D9229E8222CD85214LLV12wrappedValueADyxGx_tcfc",
+          key.line: 71,
+          key.column: 16,
+          key.is_implicit: 1,
+          key.effective_access: source.decl.effective_access.less_than_fileprivate
+        }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.private
+        },
+        {
+          key.attribute: source.decl.attribute.propertyWrapper
+        }
+      ],
+      key.effective_access: source.decl.effective_access.fileprivate
+    },
+    {
+      key.kind: source.lang.swift.decl.struct,
+      key.name: "ScopeReducerStruct",
+      key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV",
+      key.line: 75,
+      key.column: 16,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.name: "init(publicInitializer:)",
+          key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV17publicInitializerADSi_tcfc",
+          key.line: 76,
+          key.column: 12,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 76,
+              key.column: 36
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.public
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.name: "init(internalInitializer:)",
+          key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV19internalInitializerADSi_tcfc",
+          key.line: 77,
+          key.column: 5,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 77,
+              key.column: 31
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.name: "init(filePrivateInitializer:)",
+          key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV22filePrivateInitializerADSi_tcfc",
+          key.line: 78,
+          key.column: 17,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 78,
+              key.column: 46
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.fileprivate
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.name: "init(privateInitializer:)",
+          key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV18privateInitializerADSi_tcfc",
+          key.line: 79,
+          key.column: 13,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 79,
+              key.column: 38
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.private
+            }
+          ],
+          key.effective_access: source.decl.effective_access.less_than_fileprivate
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "publicProperty",
+          key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV14publicPropertySivp",
+          key.line: 81,
+          key.column: 16,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV14publicPropertySivg",
+              key.line: 81,
+              key.column: 16,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.public
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV14publicPropertySivs",
+              key.line: 81,
+              key.column: 16,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.public
+                }
+              ]
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.public
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 81,
+          key.column: 32
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "internalProperty",
+          key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV16internalPropertySivp",
+          key.line: 82,
+          key.column: 9,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV16internalPropertySivg",
+              key.line: 82,
+              key.column: 9,
+              key.is_implicit: 1
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV16internalPropertySivs",
+              key.line: 82,
+              key.column: 9,
+              key.is_implicit: 1
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 82,
+          key.column: 27
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "filePrivateProperty",
+          key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV19filePrivatePropertySivp",
+          key.line: 83,
+          key.column: 21,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV19filePrivatePropertySivg",
+              key.line: 83,
+              key.column: 21,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.fileprivate
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV19filePrivatePropertySivs",
+              key.line: 83,
+              key.column: 21,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.fileprivate
+                }
+              ]
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.fileprivate
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 83,
+          key.column: 42
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "privateProperty",
+          key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV15privatePropertySivp",
+          key.line: 84,
+          key.column: 17,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV15privatePropertySivg",
+              key.line: 84,
+              key.column: 17,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.private
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV15privatePropertySivs",
+              key.line: 84,
+              key.column: 17,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.private
+                }
+              ]
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.private
+            }
+          ],
+          key.effective_access: source.decl.effective_access.less_than_fileprivate
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 84,
+          key.column: 34
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "publicPropertyWithPrivateSetter",
+          key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV31publicPropertyWithPrivateSetterSivp",
+          key.line: 85,
+          key.column: 29,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV31publicPropertyWithPrivateSetterSivg",
+              key.line: 85,
+              key.column: 29,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.setter_access.private
+                },
+                {
+                  key.attribute: source.decl.attribute.public
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV31publicPropertyWithPrivateSetterSivs",
+              key.line: 85,
+              key.column: 29,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.setter_access.private
+                },
+                {
+                  key.attribute: source.decl.attribute.public
+                }
+              ]
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.setter_access.private
+            },
+            {
+              key.attribute: source.decl.attribute.public
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 85,
+          key.column: 62
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "PublicPropertyWrapper",
+          key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV",
+          key.line: 87,
+          key.column: 6
+        },
+        {
+          key.kind: source.lang.swift.ref.function.constructor,
+          key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV12wrappedValueACyxGx_tcfc",
+          key.line: 87,
+          key.column: 6,
+          key.is_implicit: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "publicPropertyWrappedProperty",
+          key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV021publicPropertyWrappedO0Sivp",
+          key.line: 87,
+          key.column: 39,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV021publicPropertyWrappedO0Sivg",
+              key.line: 87,
+              key.column: 39,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.public
+                },
+                {
+                  key.attribute: source.decl.attribute._custom
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV021publicPropertyWrappedO0Sivs",
+              key.line: 87,
+              key.column: 39,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.public
+                },
+                {
+                  key.attribute: source.decl.attribute._custom
+                }
+              ]
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.public
+            },
+            {
+              key.attribute: source.decl.attribute._custom
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 87,
+          key.column: 70
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "PublicPropertyWrapper",
+          key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV",
+          key.line: 88,
+          key.column: 6
+        },
+        {
+          key.kind: source.lang.swift.ref.function.constructor,
+          key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV12wrappedValueACyxGx_tcfc",
+          key.line: 88,
+          key.column: 6,
+          key.is_implicit: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "internalPropertyWrappedProperty",
+          key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV023internalPropertyWrappedO0Sivp",
+          key.line: 88,
+          key.column: 32,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV023internalPropertyWrappedO0Sivg",
+              key.line: 88,
+              key.column: 32,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute._custom
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV023internalPropertyWrappedO0Sivs",
+              key.line: 88,
+              key.column: 32,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute._custom
+                }
+              ]
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute._custom
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 88,
+          key.column: 65
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "PublicPropertyWrapper",
+          key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV",
+          key.line: 89,
+          key.column: 6
+        },
+        {
+          key.kind: source.lang.swift.ref.function.constructor,
+          key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV12wrappedValueACyxGx_tcfc",
+          key.line: 89,
+          key.column: 6,
+          key.is_implicit: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "filePrivatePropertyWrappedProperty",
+          key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV026filePrivatePropertyWrappedP0Sivp",
+          key.line: 89,
+          key.column: 44,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV026filePrivatePropertyWrappedP0Sivg",
+              key.line: 89,
+              key.column: 44,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.fileprivate
+                },
+                {
+                  key.attribute: source.decl.attribute._custom
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV026filePrivatePropertyWrappedP0Sivs",
+              key.line: 89,
+              key.column: 44,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.fileprivate
+                },
+                {
+                  key.attribute: source.decl.attribute._custom
+                }
+              ]
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.fileprivate
+            },
+            {
+              key.attribute: source.decl.attribute._custom
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 89,
+          key.column: 80
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "PublicPropertyWrapper",
+          key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV",
+          key.line: 90,
+          key.column: 6
+        },
+        {
+          key.kind: source.lang.swift.ref.function.constructor,
+          key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV12wrappedValueACyxGx_tcfc",
+          key.line: 90,
+          key.column: 6,
+          key.is_implicit: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "privatePropertyWrappedProperty",
+          key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV022privatePropertyWrappedO0Sivp",
+          key.line: 90,
+          key.column: 40,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV022privatePropertyWrappedO0Sivg",
+              key.line: 90,
+              key.column: 40,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.private
+                },
+                {
+                  key.attribute: source.decl.attribute._custom
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV022privatePropertyWrappedO0Sivs",
+              key.line: 90,
+              key.column: 40,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.private
+                },
+                {
+                  key.attribute: source.decl.attribute._custom
+                }
+              ]
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.private
+            },
+            {
+              key.attribute: source.decl.attribute._custom
+            }
+          ],
+          key.effective_access: source.decl.effective_access.less_than_fileprivate
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 90,
+          key.column: 72
+        },
+        {
+          key.kind: source.lang.swift.decl.function.subscript,
+          key.name: "subscript(_:)",
+          key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLVyS2icip",
+          key.line: 92,
+          key.column: 12,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.name: "getter:subscript(_:)",
+              key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLVyS2icig",
+              key.line: 92,
+              key.column: 51
+            },
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 92,
+              key.column: 39
+            },
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 92,
+              key.column: 47
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.public
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.decl.function.subscript,
+          key.name: "subscript(_:)",
+          key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLVXeip",
+          key.line: 93,
+          key.column: 5,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.name: "getter:subscript(_:)",
+              key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLVXeig",
+              key.line: 93,
+              key.column: 46
+            },
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 93,
+              key.column: 34
+            },
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 93,
+              key.column: 42
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.decl.function.subscript,
+          key.name: "subscript(_:)",
+          key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLVXeip",
+          key.line: 94,
+          key.column: 17,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.name: "getter:subscript(_:)",
+              key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLVXeig",
+              key.line: 94,
+              key.column: 61
+            },
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 94,
+              key.column: 49
+            },
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 94,
+              key.column: 57
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.fileprivate
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.decl.function.subscript,
+          key.name: "subscript(_:)",
+          key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLVXeip",
+          key.line: 95,
+          key.column: 13,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.name: "getter:subscript(_:)",
+              key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLVXeig",
+              key.line: 95,
+              key.column: 53
+            },
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 95,
+              key.column: 41
+            },
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 95,
+              key.column: 49
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.private
+            }
+          ],
+          key.effective_access: source.decl.effective_access.less_than_fileprivate
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "publicMethod()",
+          key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV12publicMethodyyF",
+          key.line: 97,
+          key.column: 17,
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.public
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "internalMethod()",
+          key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV14internalMethodyyF",
+          key.line: 98,
+          key.column: 10,
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "filePrivateMethod()",
+          key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV17filePrivateMethodyyF",
+          key.line: 99,
+          key.column: 22,
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.fileprivate
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "privateMethod()",
+          key.usr: "s:28index_effective_access_level18ScopeReducerStruct33_2295DDF1454D6A6D9229E8222CD85214LLV13privateMethodyyF",
+          key.line: 100,
+          key.column: 18,
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.private
+            }
+          ],
+          key.effective_access: source.decl.effective_access.less_than_fileprivate
+        }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.private
+        }
+      ],
+      key.effective_access: source.decl.effective_access.fileprivate
+    },
+    {
+      key.kind: source.lang.swift.decl.struct,
+      key.name: "ScopeKeeperStruct",
+      key.usr: "s:28index_effective_access_level17ScopeKeeperStructV",
+      key.line: 103,
+      key.column: 15,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.name: "init(publicInitializer:)",
+          key.usr: "s:28index_effective_access_level17ScopeKeeperStructV17publicInitializerACSi_tcfc",
+          key.line: 104,
+          key.column: 12,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 104,
+              key.column: 36
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.public
+            }
+          ],
+          key.effective_access: source.decl.effective_access.public
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.name: "init(internalInitializer:)",
+          key.usr: "s:28index_effective_access_level17ScopeKeeperStructV19internalInitializerACSi_tcfc",
+          key.line: 105,
+          key.column: 5,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 105,
+              key.column: 31
+            }
+          ],
+          key.effective_access: source.decl.effective_access.internal
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.name: "init(filePrivateInitializer:)",
+          key.usr: "s:28index_effective_access_level17ScopeKeeperStructV22filePrivateInitializerACSi_tc33_2295DDF1454D6A6D9229E8222CD85214Llfc",
+          key.line: 106,
+          key.column: 17,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 106,
+              key.column: 46
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.fileprivate
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.name: "init(privateInitializer:)",
+          key.usr: "s:28index_effective_access_level17ScopeKeeperStructV18privateInitializerACSi_tc33_2295DDF1454D6A6D9229E8222CD85214Llfc",
+          key.line: 107,
+          key.column: 13,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 107,
+              key.column: 38
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.private
+            }
+          ],
+          key.effective_access: source.decl.effective_access.less_than_fileprivate
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "publicProperty",
+          key.usr: "s:28index_effective_access_level17ScopeKeeperStructV14publicPropertySivp",
+          key.line: 109,
+          key.column: 16,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level17ScopeKeeperStructV14publicPropertySivg",
+              key.line: 109,
+              key.column: 16,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.public
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level17ScopeKeeperStructV14publicPropertySivs",
+              key.line: 109,
+              key.column: 16,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.public
+                }
+              ]
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.public
+            }
+          ],
+          key.effective_access: source.decl.effective_access.public
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 109,
+          key.column: 32
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "internalProperty",
+          key.usr: "s:28index_effective_access_level17ScopeKeeperStructV16internalPropertySivp",
+          key.line: 110,
+          key.column: 9,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level17ScopeKeeperStructV16internalPropertySivg",
+              key.line: 110,
+              key.column: 9,
+              key.is_implicit: 1
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level17ScopeKeeperStructV16internalPropertySivs",
+              key.line: 110,
+              key.column: 9,
+              key.is_implicit: 1
+            }
+          ],
+          key.effective_access: source.decl.effective_access.internal
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 110,
+          key.column: 27
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "filePrivateProperty",
+          key.usr: "s:28index_effective_access_level17ScopeKeeperStructV19filePrivateProperty33_2295DDF1454D6A6D9229E8222CD85214LLSivp",
+          key.line: 111,
+          key.column: 21,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level17ScopeKeeperStructV19filePrivateProperty33_2295DDF1454D6A6D9229E8222CD85214LLSivg",
+              key.line: 111,
+              key.column: 21,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.fileprivate
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level17ScopeKeeperStructV19filePrivateProperty33_2295DDF1454D6A6D9229E8222CD85214LLSivs",
+              key.line: 111,
+              key.column: 21,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.fileprivate
+                }
+              ]
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.fileprivate
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 111,
+          key.column: 42
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "privateProperty",
+          key.usr: "s:28index_effective_access_level17ScopeKeeperStructV15privateProperty33_2295DDF1454D6A6D9229E8222CD85214LLSivp",
+          key.line: 112,
+          key.column: 17,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level17ScopeKeeperStructV15privateProperty33_2295DDF1454D6A6D9229E8222CD85214LLSivg",
+              key.line: 112,
+              key.column: 17,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.private
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level17ScopeKeeperStructV15privateProperty33_2295DDF1454D6A6D9229E8222CD85214LLSivs",
+              key.line: 112,
+              key.column: 17,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.private
+                }
+              ]
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.private
+            }
+          ],
+          key.effective_access: source.decl.effective_access.less_than_fileprivate
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 112,
+          key.column: 34
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "publicPropertyWithPrivateSetter",
+          key.usr: "s:28index_effective_access_level17ScopeKeeperStructV31publicPropertyWithPrivateSetterSivp",
+          key.line: 113,
+          key.column: 29,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level17ScopeKeeperStructV31publicPropertyWithPrivateSetterSivg",
+              key.line: 113,
+              key.column: 29,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.setter_access.private
+                },
+                {
+                  key.attribute: source.decl.attribute.public
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level17ScopeKeeperStructV31publicPropertyWithPrivateSetterSivs",
+              key.line: 113,
+              key.column: 29,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.setter_access.private
+                },
+                {
+                  key.attribute: source.decl.attribute.public
+                }
+              ]
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.setter_access.private
+            },
+            {
+              key.attribute: source.decl.attribute.public
+            }
+          ],
+          key.effective_access: source.decl.effective_access.public
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 113,
+          key.column: 62
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "PublicPropertyWrapper",
+          key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV",
+          key.line: 115,
+          key.column: 6
+        },
+        {
+          key.kind: source.lang.swift.ref.function.constructor,
+          key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV12wrappedValueACyxGx_tcfc",
+          key.line: 115,
+          key.column: 6,
+          key.is_implicit: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "publicPropertyWrappedProperty",
+          key.usr: "s:28index_effective_access_level17ScopeKeeperStructV021publicPropertyWrappedI0Sivp",
+          key.line: 115,
+          key.column: 39,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level17ScopeKeeperStructV021publicPropertyWrappedI0Sivg",
+              key.line: 115,
+              key.column: 39,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.public
+                },
+                {
+                  key.attribute: source.decl.attribute._custom
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level17ScopeKeeperStructV021publicPropertyWrappedI0Sivs",
+              key.line: 115,
+              key.column: 39,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.public
+                },
+                {
+                  key.attribute: source.decl.attribute._custom
+                }
+              ]
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.public
+            },
+            {
+              key.attribute: source.decl.attribute._custom
+            }
+          ],
+          key.effective_access: source.decl.effective_access.public
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 115,
+          key.column: 70
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "PublicPropertyWrapper",
+          key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV",
+          key.line: 116,
+          key.column: 6
+        },
+        {
+          key.kind: source.lang.swift.ref.function.constructor,
+          key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV12wrappedValueACyxGx_tcfc",
+          key.line: 116,
+          key.column: 6,
+          key.is_implicit: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "internalPropertyWrappedProperty",
+          key.usr: "s:28index_effective_access_level17ScopeKeeperStructV023internalPropertyWrappedI0Sivp",
+          key.line: 116,
+          key.column: 32,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level17ScopeKeeperStructV023internalPropertyWrappedI0Sivg",
+              key.line: 116,
+              key.column: 32,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute._custom
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level17ScopeKeeperStructV023internalPropertyWrappedI0Sivs",
+              key.line: 116,
+              key.column: 32,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute._custom
+                }
+              ]
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute._custom
+            }
+          ],
+          key.effective_access: source.decl.effective_access.internal
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 116,
+          key.column: 65
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "PublicPropertyWrapper",
+          key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV",
+          key.line: 117,
+          key.column: 6
+        },
+        {
+          key.kind: source.lang.swift.ref.function.constructor,
+          key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV12wrappedValueACyxGx_tcfc",
+          key.line: 117,
+          key.column: 6,
+          key.is_implicit: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "filePrivatePropertyWrappedProperty",
+          key.usr: "s:28index_effective_access_level17ScopeKeeperStructV026filePrivatePropertyWrappedJ033_2295DDF1454D6A6D9229E8222CD85214LLSivp",
+          key.line: 117,
+          key.column: 44,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level17ScopeKeeperStructV026filePrivatePropertyWrappedJ033_2295DDF1454D6A6D9229E8222CD85214LLSivg",
+              key.line: 117,
+              key.column: 44,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.fileprivate
+                },
+                {
+                  key.attribute: source.decl.attribute._custom
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level17ScopeKeeperStructV026filePrivatePropertyWrappedJ033_2295DDF1454D6A6D9229E8222CD85214LLSivs",
+              key.line: 117,
+              key.column: 44,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.fileprivate
+                },
+                {
+                  key.attribute: source.decl.attribute._custom
+                }
+              ]
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.fileprivate
+            },
+            {
+              key.attribute: source.decl.attribute._custom
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 117,
+          key.column: 80
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "PublicPropertyWrapper",
+          key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV",
+          key.line: 118,
+          key.column: 6
+        },
+        {
+          key.kind: source.lang.swift.ref.function.constructor,
+          key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV12wrappedValueACyxGx_tcfc",
+          key.line: 118,
+          key.column: 6,
+          key.is_implicit: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "privatePropertyWrappedProperty",
+          key.usr: "s:28index_effective_access_level17ScopeKeeperStructV022privatePropertyWrappedI033_2295DDF1454D6A6D9229E8222CD85214LLSivp",
+          key.line: 118,
+          key.column: 40,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level17ScopeKeeperStructV022privatePropertyWrappedI033_2295DDF1454D6A6D9229E8222CD85214LLSivg",
+              key.line: 118,
+              key.column: 40,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.private
+                },
+                {
+                  key.attribute: source.decl.attribute._custom
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level17ScopeKeeperStructV022privatePropertyWrappedI033_2295DDF1454D6A6D9229E8222CD85214LLSivs",
+              key.line: 118,
+              key.column: 40,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.private
+                },
+                {
+                  key.attribute: source.decl.attribute._custom
+                }
+              ]
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.private
+            },
+            {
+              key.attribute: source.decl.attribute._custom
+            }
+          ],
+          key.effective_access: source.decl.effective_access.less_than_fileprivate
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 118,
+          key.column: 72
+        },
+        {
+          key.kind: source.lang.swift.decl.function.subscript,
+          key.name: "subscript(_:)",
+          key.usr: "s:28index_effective_access_level17ScopeKeeperStructVyS2icip",
+          key.line: 120,
+          key.column: 12,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.name: "getter:subscript(_:)",
+              key.usr: "s:28index_effective_access_level17ScopeKeeperStructVyS2icig",
+              key.line: 120,
+              key.column: 51
+            },
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 120,
+              key.column: 39
+            },
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 120,
+              key.column: 47
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.public
+            }
+          ],
+          key.effective_access: source.decl.effective_access.public
+        },
+        {
+          key.kind: source.lang.swift.decl.function.subscript,
+          key.name: "subscript(_:)",
+          key.usr: "s:28index_effective_access_level17ScopeKeeperStructVXeip",
+          key.line: 121,
+          key.column: 5,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.name: "getter:subscript(_:)",
+              key.usr: "s:28index_effective_access_level17ScopeKeeperStructVXeig",
+              key.line: 121,
+              key.column: 46
+            },
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 121,
+              key.column: 34
+            },
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 121,
+              key.column: 42
+            }
+          ],
+          key.effective_access: source.decl.effective_access.internal
+        },
+        {
+          key.kind: source.lang.swift.decl.function.subscript,
+          key.name: "subscript(_:)",
+          key.usr: "s:28index_effective_access_level17ScopeKeeperStructVXe33_2295DDF1454D6A6D9229E8222CD85214Llip",
+          key.line: 122,
+          key.column: 17,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.name: "getter:subscript(_:)",
+              key.usr: "s:28index_effective_access_level17ScopeKeeperStructVXe33_2295DDF1454D6A6D9229E8222CD85214Llig",
+              key.line: 122,
+              key.column: 61
+            },
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 122,
+              key.column: 49
+            },
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 122,
+              key.column: 57
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.fileprivate
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.decl.function.subscript,
+          key.name: "subscript(_:)",
+          key.usr: "s:28index_effective_access_level17ScopeKeeperStructVXe33_2295DDF1454D6A6D9229E8222CD85214Llip",
+          key.line: 123,
+          key.column: 13,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.name: "getter:subscript(_:)",
+              key.usr: "s:28index_effective_access_level17ScopeKeeperStructVXe33_2295DDF1454D6A6D9229E8222CD85214Llig",
+              key.line: 123,
+              key.column: 53
+            },
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 123,
+              key.column: 41
+            },
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 123,
+              key.column: 49
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.private
+            }
+          ],
+          key.effective_access: source.decl.effective_access.less_than_fileprivate
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "publicMethod()",
+          key.usr: "s:28index_effective_access_level17ScopeKeeperStructV12publicMethodyyF",
+          key.line: 125,
+          key.column: 17,
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.public
+            }
+          ],
+          key.effective_access: source.decl.effective_access.public
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "internalMethod()",
+          key.usr: "s:28index_effective_access_level17ScopeKeeperStructV14internalMethodyyF",
+          key.line: 126,
+          key.column: 10,
+          key.effective_access: source.decl.effective_access.internal
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "filePrivateMethod()",
+          key.usr: "s:28index_effective_access_level17ScopeKeeperStructV17filePrivateMethod33_2295DDF1454D6A6D9229E8222CD85214LLyyF",
+          key.line: 127,
+          key.column: 22,
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.fileprivate
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "privateMethod()",
+          key.usr: "s:28index_effective_access_level17ScopeKeeperStructV13privateMethod33_2295DDF1454D6A6D9229E8222CD85214LLyyF",
+          key.line: 128,
+          key.column: 18,
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.private
+            }
+          ],
+          key.effective_access: source.decl.effective_access.less_than_fileprivate
+        }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.public
+        }
+      ],
+      key.effective_access: source.decl.effective_access.public
+    },
+    {
+      key.kind: source.lang.swift.decl.struct,
+      key.name: "PartialScopeReducerStruct",
+      key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV",
+      key.line: 131,
+      key.column: 8,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.name: "init(publicInitializer:)",
+          key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV17publicInitializerACSi_tcfc",
+          key.line: 132,
+          key.column: 12,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 132,
+              key.column: 36
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.public
+            }
+          ],
+          key.effective_access: source.decl.effective_access.internal
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.name: "init(internalInitializer:)",
+          key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV19internalInitializerACSi_tcfc",
+          key.line: 133,
+          key.column: 5,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 133,
+              key.column: 31
+            }
+          ],
+          key.effective_access: source.decl.effective_access.internal
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.name: "init(filePrivateInitializer:)",
+          key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV22filePrivateInitializerACSi_tc33_2295DDF1454D6A6D9229E8222CD85214Llfc",
+          key.line: 134,
+          key.column: 17,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 134,
+              key.column: 46
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.fileprivate
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.name: "init(privateInitializer:)",
+          key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV18privateInitializerACSi_tc33_2295DDF1454D6A6D9229E8222CD85214Llfc",
+          key.line: 135,
+          key.column: 13,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 135,
+              key.column: 38
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.private
+            }
+          ],
+          key.effective_access: source.decl.effective_access.less_than_fileprivate
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "publicProperty",
+          key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV14publicPropertySivp",
+          key.line: 137,
+          key.column: 16,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV14publicPropertySivg",
+              key.line: 137,
+              key.column: 16,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.public
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV14publicPropertySivs",
+              key.line: 137,
+              key.column: 16,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.public
+                }
+              ]
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.public
+            }
+          ],
+          key.effective_access: source.decl.effective_access.internal
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 137,
+          key.column: 32
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "internalProperty",
+          key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV16internalPropertySivp",
+          key.line: 138,
+          key.column: 9,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV16internalPropertySivg",
+              key.line: 138,
+              key.column: 9,
+              key.is_implicit: 1
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV16internalPropertySivs",
+              key.line: 138,
+              key.column: 9,
+              key.is_implicit: 1
+            }
+          ],
+          key.effective_access: source.decl.effective_access.internal
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 138,
+          key.column: 27
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "filePrivateProperty",
+          key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV19filePrivateProperty33_2295DDF1454D6A6D9229E8222CD85214LLSivp",
+          key.line: 139,
+          key.column: 21,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV19filePrivateProperty33_2295DDF1454D6A6D9229E8222CD85214LLSivg",
+              key.line: 139,
+              key.column: 21,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.fileprivate
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV19filePrivateProperty33_2295DDF1454D6A6D9229E8222CD85214LLSivs",
+              key.line: 139,
+              key.column: 21,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.fileprivate
+                }
+              ]
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.fileprivate
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 139,
+          key.column: 42
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "privateProperty",
+          key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV15privateProperty33_2295DDF1454D6A6D9229E8222CD85214LLSivp",
+          key.line: 140,
+          key.column: 17,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV15privateProperty33_2295DDF1454D6A6D9229E8222CD85214LLSivg",
+              key.line: 140,
+              key.column: 17,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.private
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV15privateProperty33_2295DDF1454D6A6D9229E8222CD85214LLSivs",
+              key.line: 140,
+              key.column: 17,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.private
+                }
+              ]
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.private
+            }
+          ],
+          key.effective_access: source.decl.effective_access.less_than_fileprivate
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 140,
+          key.column: 34
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "publicPropertyWithPrivateSetter",
+          key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV31publicPropertyWithPrivateSetterSivp",
+          key.line: 141,
+          key.column: 29,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV31publicPropertyWithPrivateSetterSivg",
+              key.line: 141,
+              key.column: 29,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.setter_access.private
+                },
+                {
+                  key.attribute: source.decl.attribute.public
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV31publicPropertyWithPrivateSetterSivs",
+              key.line: 141,
+              key.column: 29,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.setter_access.private
+                },
+                {
+                  key.attribute: source.decl.attribute.public
+                }
+              ]
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.setter_access.private
+            },
+            {
+              key.attribute: source.decl.attribute.public
+            }
+          ],
+          key.effective_access: source.decl.effective_access.internal
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 141,
+          key.column: 62
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "PublicPropertyWrapper",
+          key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV",
+          key.line: 143,
+          key.column: 6
+        },
+        {
+          key.kind: source.lang.swift.ref.function.constructor,
+          key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV12wrappedValueACyxGx_tcfc",
+          key.line: 143,
+          key.column: 6,
+          key.is_implicit: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "publicPropertyWrappedProperty",
+          key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV021publicPropertyWrappedJ0Sivp",
+          key.line: 143,
+          key.column: 39,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV021publicPropertyWrappedJ0Sivg",
+              key.line: 143,
+              key.column: 39,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.public
+                },
+                {
+                  key.attribute: source.decl.attribute._custom
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV021publicPropertyWrappedJ0Sivs",
+              key.line: 143,
+              key.column: 39,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.public
+                },
+                {
+                  key.attribute: source.decl.attribute._custom
+                }
+              ]
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.public
+            },
+            {
+              key.attribute: source.decl.attribute._custom
+            }
+          ],
+          key.effective_access: source.decl.effective_access.internal
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 143,
+          key.column: 70
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "PublicPropertyWrapper",
+          key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV",
+          key.line: 144,
+          key.column: 6
+        },
+        {
+          key.kind: source.lang.swift.ref.function.constructor,
+          key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV12wrappedValueACyxGx_tcfc",
+          key.line: 144,
+          key.column: 6,
+          key.is_implicit: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "internalPropertyWrappedProperty",
+          key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV023internalPropertyWrappedJ0Sivp",
+          key.line: 144,
+          key.column: 32,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV023internalPropertyWrappedJ0Sivg",
+              key.line: 144,
+              key.column: 32,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute._custom
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV023internalPropertyWrappedJ0Sivs",
+              key.line: 144,
+              key.column: 32,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute._custom
+                }
+              ]
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute._custom
+            }
+          ],
+          key.effective_access: source.decl.effective_access.internal
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 144,
+          key.column: 65
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "PublicPropertyWrapper",
+          key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV",
+          key.line: 145,
+          key.column: 6
+        },
+        {
+          key.kind: source.lang.swift.ref.function.constructor,
+          key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV12wrappedValueACyxGx_tcfc",
+          key.line: 145,
+          key.column: 6,
+          key.is_implicit: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "filePrivatePropertyWrappedProperty",
+          key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV026filePrivatePropertyWrappedK033_2295DDF1454D6A6D9229E8222CD85214LLSivp",
+          key.line: 145,
+          key.column: 44,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV026filePrivatePropertyWrappedK033_2295DDF1454D6A6D9229E8222CD85214LLSivg",
+              key.line: 145,
+              key.column: 44,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.fileprivate
+                },
+                {
+                  key.attribute: source.decl.attribute._custom
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV026filePrivatePropertyWrappedK033_2295DDF1454D6A6D9229E8222CD85214LLSivs",
+              key.line: 145,
+              key.column: 44,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.fileprivate
+                },
+                {
+                  key.attribute: source.decl.attribute._custom
+                }
+              ]
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.fileprivate
+            },
+            {
+              key.attribute: source.decl.attribute._custom
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 145,
+          key.column: 80
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "PublicPropertyWrapper",
+          key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV",
+          key.line: 146,
+          key.column: 6
+        },
+        {
+          key.kind: source.lang.swift.ref.function.constructor,
+          key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV12wrappedValueACyxGx_tcfc",
+          key.line: 146,
+          key.column: 6,
+          key.is_implicit: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "privatePropertyWrappedProperty",
+          key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV022privatePropertyWrappedJ033_2295DDF1454D6A6D9229E8222CD85214LLSivp",
+          key.line: 146,
+          key.column: 40,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV022privatePropertyWrappedJ033_2295DDF1454D6A6D9229E8222CD85214LLSivg",
+              key.line: 146,
+              key.column: 40,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.private
+                },
+                {
+                  key.attribute: source.decl.attribute._custom
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV022privatePropertyWrappedJ033_2295DDF1454D6A6D9229E8222CD85214LLSivs",
+              key.line: 146,
+              key.column: 40,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.private
+                },
+                {
+                  key.attribute: source.decl.attribute._custom
+                }
+              ]
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.private
+            },
+            {
+              key.attribute: source.decl.attribute._custom
+            }
+          ],
+          key.effective_access: source.decl.effective_access.less_than_fileprivate
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 146,
+          key.column: 72
+        },
+        {
+          key.kind: source.lang.swift.decl.function.subscript,
+          key.name: "subscript(_:)",
+          key.usr: "s:28index_effective_access_level25PartialScopeReducerStructVyS2icip",
+          key.line: 148,
+          key.column: 12,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.name: "getter:subscript(_:)",
+              key.usr: "s:28index_effective_access_level25PartialScopeReducerStructVyS2icig",
+              key.line: 148,
+              key.column: 51
+            },
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 148,
+              key.column: 39
+            },
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 148,
+              key.column: 47
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.public
+            }
+          ],
+          key.effective_access: source.decl.effective_access.internal
+        },
+        {
+          key.kind: source.lang.swift.decl.function.subscript,
+          key.name: "subscript(_:)",
+          key.usr: "s:28index_effective_access_level25PartialScopeReducerStructVXeip",
+          key.line: 149,
+          key.column: 5,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.name: "getter:subscript(_:)",
+              key.usr: "s:28index_effective_access_level25PartialScopeReducerStructVXeig",
+              key.line: 149,
+              key.column: 46
+            },
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 149,
+              key.column: 34
+            },
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 149,
+              key.column: 42
+            }
+          ],
+          key.effective_access: source.decl.effective_access.internal
+        },
+        {
+          key.kind: source.lang.swift.decl.function.subscript,
+          key.name: "subscript(_:)",
+          key.usr: "s:28index_effective_access_level25PartialScopeReducerStructVXe33_2295DDF1454D6A6D9229E8222CD85214Llip",
+          key.line: 150,
+          key.column: 17,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.name: "getter:subscript(_:)",
+              key.usr: "s:28index_effective_access_level25PartialScopeReducerStructVXe33_2295DDF1454D6A6D9229E8222CD85214Llig",
+              key.line: 150,
+              key.column: 61
+            },
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 150,
+              key.column: 49
+            },
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 150,
+              key.column: 57
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.fileprivate
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.decl.function.subscript,
+          key.name: "subscript(_:)",
+          key.usr: "s:28index_effective_access_level25PartialScopeReducerStructVXe33_2295DDF1454D6A6D9229E8222CD85214Llip",
+          key.line: 151,
+          key.column: 13,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.name: "getter:subscript(_:)",
+              key.usr: "s:28index_effective_access_level25PartialScopeReducerStructVXe33_2295DDF1454D6A6D9229E8222CD85214Llig",
+              key.line: 151,
+              key.column: 53
+            },
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 151,
+              key.column: 41
+            },
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 151,
+              key.column: 49
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.private
+            }
+          ],
+          key.effective_access: source.decl.effective_access.less_than_fileprivate
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "publicMethod()",
+          key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV12publicMethodyyF",
+          key.line: 153,
+          key.column: 17,
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.public
+            }
+          ],
+          key.effective_access: source.decl.effective_access.internal
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "internalMethod()",
+          key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV14internalMethodyyF",
+          key.line: 154,
+          key.column: 10,
+          key.effective_access: source.decl.effective_access.internal
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "filePrivateMethod()",
+          key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV17filePrivateMethod33_2295DDF1454D6A6D9229E8222CD85214LLyyF",
+          key.line: 155,
+          key.column: 22,
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.fileprivate
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "privateMethod()",
+          key.usr: "s:28index_effective_access_level25PartialScopeReducerStructV13privateMethod33_2295DDF1454D6A6D9229E8222CD85214LLyyF",
+          key.line: 156,
+          key.column: 18,
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.private
+            }
+          ],
+          key.effective_access: source.decl.effective_access.less_than_fileprivate
+        }
+      ],
+      key.effective_access: source.decl.effective_access.internal
+    },
+    {
+      key.kind: source.lang.swift.decl.extension.enum,
+      key.name: "PrivateEnum",
+      key.usr: "s:e:s:28index_effective_access_level11PrivateEnum33_2295DDF1454D6A6D9229E8222CD85214LLO017privateMethodFromE9ExtensionyyF",
+      key.line: 159,
+      key.column: 19,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.ref.enum,
+          key.name: "PrivateEnum",
+          key.usr: "s:28index_effective_access_level11PrivateEnum33_2295DDF1454D6A6D9229E8222CD85214LLO",
+          key.line: 159,
+          key.column: 19
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "privateMethodFromPrivateExtension()",
+          key.usr: "s:28index_effective_access_level11PrivateEnum33_2295DDF1454D6A6D9229E8222CD85214LLO017privateMethodFromE9ExtensionyyF",
+          key.line: 160,
+          key.column: 18,
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.private
+            }
+          ],
+          key.effective_access: source.decl.effective_access.less_than_fileprivate
+        }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.private
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.protocol,
+      key.name: "PublicProtocol",
+      key.usr: "s:28index_effective_access_level14PublicProtocolP",
+      key.line: 163,
+      key.column: 17,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "member",
+          key.usr: "s:28index_effective_access_level14PublicProtocolP6memberSivp",
+          key.line: 164,
+          key.column: 9,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.name: "getter:member",
+              key.usr: "s:28index_effective_access_level14PublicProtocolP6memberSivg",
+              key.line: 164,
+              key.column: 23,
+              key.is_dynamic: 1
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.name: "setter:member",
+              key.usr: "s:28index_effective_access_level14PublicProtocolP6memberSivs",
+              key.line: 164,
+              key.column: 27,
+              key.is_dynamic: 1
+            }
+          ],
+          key.effective_access: source.decl.effective_access.public
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 164,
+          key.column: 17
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "method()",
+          key.usr: "s:28index_effective_access_level14PublicProtocolP6methodyyF",
+          key.line: 165,
+          key.column: 10,
+          key.is_dynamic: 1,
+          key.effective_access: source.decl.effective_access.public
+        }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.public
+        }
+      ],
+      key.effective_access: source.decl.effective_access.public
+    },
+    {
+      key.kind: source.lang.swift.decl.protocol,
+      key.name: "InternalProtocol",
+      key.usr: "s:28index_effective_access_level16InternalProtocolP",
+      key.line: 168,
+      key.column: 10,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "member",
+          key.usr: "s:28index_effective_access_level16InternalProtocolP6memberSivp",
+          key.line: 169,
+          key.column: 9,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.name: "getter:member",
+              key.usr: "s:28index_effective_access_level16InternalProtocolP6memberSivg",
+              key.line: 169,
+              key.column: 23,
+              key.is_dynamic: 1
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.name: "setter:member",
+              key.usr: "s:28index_effective_access_level16InternalProtocolP6memberSivs",
+              key.line: 169,
+              key.column: 27,
+              key.is_dynamic: 1
+            }
+          ],
+          key.effective_access: source.decl.effective_access.internal
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 169,
+          key.column: 17
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "method()",
+          key.usr: "s:28index_effective_access_level16InternalProtocolP6methodyyF",
+          key.line: 170,
+          key.column: 10,
+          key.is_dynamic: 1,
+          key.effective_access: source.decl.effective_access.internal
+        }
+      ],
+      key.effective_access: source.decl.effective_access.internal
+    },
+    {
+      key.kind: source.lang.swift.decl.protocol,
+      key.name: "FilePrivateProtocol",
+      key.usr: "s:28index_effective_access_level19FilePrivateProtocol33_2295DDF1454D6A6D9229E8222CD85214LLP",
+      key.line: 173,
+      key.column: 22,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "member",
+          key.usr: "s:28index_effective_access_level19FilePrivateProtocol33_2295DDF1454D6A6D9229E8222CD85214LLP6memberSivp",
+          key.line: 174,
+          key.column: 9,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.name: "getter:member",
+              key.usr: "s:28index_effective_access_level19FilePrivateProtocol33_2295DDF1454D6A6D9229E8222CD85214LLP6memberSivg",
+              key.line: 174,
+              key.column: 23,
+              key.is_dynamic: 1
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.name: "setter:member",
+              key.usr: "s:28index_effective_access_level19FilePrivateProtocol33_2295DDF1454D6A6D9229E8222CD85214LLP6memberSivs",
+              key.line: 174,
+              key.column: 27,
+              key.is_dynamic: 1
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 174,
+          key.column: 17
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "method()",
+          key.usr: "s:28index_effective_access_level19FilePrivateProtocol33_2295DDF1454D6A6D9229E8222CD85214LLP6methodyyF",
+          key.line: 175,
+          key.column: 10,
+          key.is_dynamic: 1,
+          key.effective_access: source.decl.effective_access.fileprivate
+        }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.fileprivate
+        }
+      ],
+      key.effective_access: source.decl.effective_access.fileprivate
+    },
+    {
+      key.kind: source.lang.swift.decl.protocol,
+      key.name: "PrivateProtocol",
+      key.usr: "s:28index_effective_access_level15PrivateProtocol33_2295DDF1454D6A6D9229E8222CD85214LLP",
+      key.line: 178,
+      key.column: 18,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "member",
+          key.usr: "s:28index_effective_access_level15PrivateProtocol33_2295DDF1454D6A6D9229E8222CD85214LLP6memberSivp",
+          key.line: 179,
+          key.column: 9,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.name: "getter:member",
+              key.usr: "s:28index_effective_access_level15PrivateProtocol33_2295DDF1454D6A6D9229E8222CD85214LLP6memberSivg",
+              key.line: 179,
+              key.column: 23,
+              key.is_dynamic: 1
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.name: "setter:member",
+              key.usr: "s:28index_effective_access_level15PrivateProtocol33_2295DDF1454D6A6D9229E8222CD85214LLP6memberSivs",
+              key.line: 179,
+              key.column: 27,
+              key.is_dynamic: 1
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 179,
+          key.column: 17
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "method()",
+          key.usr: "s:28index_effective_access_level15PrivateProtocol33_2295DDF1454D6A6D9229E8222CD85214LLP6methodyyF",
+          key.line: 180,
+          key.column: 10,
+          key.is_dynamic: 1,
+          key.effective_access: source.decl.effective_access.fileprivate
+        }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.private
+        }
+      ],
+      key.effective_access: source.decl.effective_access.fileprivate
+    },
+    {
+      key.kind: source.lang.swift.decl.struct,
+      key.name: "FilePrivateImplementationOfPublicProtocol",
+      key.usr: "s:28index_effective_access_level41FilePrivateImplementationOfPublicProtocol33_2295DDF1454D6A6D9229E8222CD85214LLV",
+      key.line: 183,
+      key.column: 20,
+      key.related: [
+        {
+          key.kind: source.lang.swift.ref.protocol,
+          key.name: "PublicProtocol",
+          key.usr: "s:28index_effective_access_level14PublicProtocolP",
+          key.line: 183,
+          key.column: 63
+        }
+      ],
+      key.entities: [
+        {
+          key.kind: source.lang.swift.ref.protocol,
+          key.name: "PublicProtocol",
+          key.usr: "s:28index_effective_access_level14PublicProtocolP",
+          key.line: 183,
+          key.column: 63
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "member",
+          key.usr: "s:28index_effective_access_level41FilePrivateImplementationOfPublicProtocol33_2295DDF1454D6A6D9229E8222CD85214LLV6memberSivp",
+          key.line: 184,
+          key.column: 21,
+          key.related: [
+            {
+              key.kind: source.lang.swift.ref.var.instance,
+              key.name: "member",
+              key.usr: "s:28index_effective_access_level14PublicProtocolP6memberSivp"
+            }
+          ],
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level41FilePrivateImplementationOfPublicProtocol33_2295DDF1454D6A6D9229E8222CD85214LLV6memberSivg",
+              key.line: 184,
+              key.column: 21,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.fileprivate
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level41FilePrivateImplementationOfPublicProtocol33_2295DDF1454D6A6D9229E8222CD85214LLV6memberSivs",
+              key.line: 184,
+              key.column: 21,
+              key.is_implicit: 1,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.fileprivate
+                }
+              ]
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.fileprivate
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 184,
+          key.column: 29
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "method()",
+          key.usr: "s:28index_effective_access_level41FilePrivateImplementationOfPublicProtocol33_2295DDF1454D6A6D9229E8222CD85214LLV6methodyyF",
+          key.line: 185,
+          key.column: 22,
+          key.related: [
+            {
+              key.kind: source.lang.swift.ref.function.method.instance,
+              key.name: "method()",
+              key.usr: "s:28index_effective_access_level14PublicProtocolP6methodyyF"
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.fileprivate
+            }
+          ],
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: "s:28index_effective_access_level41FilePrivateImplementationOfPublicProtocol33_2295DDF1454D6A6D9229E8222CD85214LLV6memberADSi_tcfc",
+          key.line: 183,
+          key.column: 20,
+          key.is_implicit: 1,
+          key.effective_access: source.decl.effective_access.fileprivate
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: "s:28index_effective_access_level41FilePrivateImplementationOfPublicProtocol33_2295DDF1454D6A6D9229E8222CD85214LLVADycfc",
+          key.line: 183,
+          key.column: 20,
+          key.is_implicit: 1,
+          key.effective_access: source.decl.effective_access.fileprivate
+        }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.fileprivate
+        }
+      ],
+      key.effective_access: source.decl.effective_access.fileprivate
+    },
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.name: "OpenClass",
+      key.usr: "s:28index_effective_access_level9OpenClassC",
+      key.line: 188,
+      key.column: 12,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "openProperty",
+          key.usr: "s:28index_effective_access_level9OpenClassC12openPropertySivp",
+          key.line: 189,
+          key.column: 14,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.name: "getter:openProperty",
+              key.usr: "s:28index_effective_access_level9OpenClassC12openPropertySivg",
+              key.line: 189,
+              key.column: 32,
+              key.is_dynamic: 1
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.open
+            }
+          ],
+          key.effective_access: source.decl.effective_access.public
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 189,
+          key.column: 28
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "publicProperty",
+          key.usr: "s:28index_effective_access_level9OpenClassC14publicPropertySivp",
+          key.line: 190,
+          key.column: 16,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.name: "getter:publicProperty",
+              key.usr: "s:28index_effective_access_level9OpenClassC14publicPropertySivg",
+              key.line: 190,
+              key.column: 36,
+              key.is_dynamic: 1
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.public
+            }
+          ],
+          key.effective_access: source.decl.effective_access.public
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 190,
+          key.column: 32
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "internalProperty",
+          key.usr: "s:28index_effective_access_level9OpenClassC16internalPropertySivp",
+          key.line: 191,
+          key.column: 9,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.name: "getter:internalProperty",
+              key.usr: "s:28index_effective_access_level9OpenClassC16internalPropertySivg",
+              key.line: 191,
+              key.column: 31,
+              key.is_dynamic: 1
+            }
+          ],
+          key.effective_access: source.decl.effective_access.internal
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 191,
+          key.column: 27
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "openMethod()",
+          key.usr: "s:28index_effective_access_level9OpenClassC10openMethodyyF",
+          key.line: 193,
+          key.column: 15,
+          key.is_dynamic: 1,
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.open
+            }
+          ],
+          key.effective_access: source.decl.effective_access.public
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "publicMethod()",
+          key.usr: "s:28index_effective_access_level9OpenClassC12publicMethodyyF",
+          key.line: 194,
+          key.column: 17,
+          key.is_dynamic: 1,
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.public
+            }
+          ],
+          key.effective_access: source.decl.effective_access.public
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "internalMethod()",
+          key.usr: "s:28index_effective_access_level9OpenClassC14internalMethodyyF",
+          key.line: 195,
+          key.column: 10,
+          key.is_dynamic: 1,
+          key.effective_access: source.decl.effective_access.internal
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: "s:28index_effective_access_level9OpenClassCACycfc",
+          key.line: 188,
+          key.column: 12,
+          key.is_implicit: 1,
+          key.effective_access: source.decl.effective_access.internal
+        }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.open
+        }
+      ],
+      key.effective_access: source.decl.effective_access.public
+    },
+    {
+      key.kind: source.lang.swift.ref.module,
+      key.name: "Module",
+      key.usr: "c:@M@Module",
+      key.line: 198,
+      key.column: 8
+    },
+    {
+      key.kind: source.lang.swift.decl.struct,
+      key.name: "InternalStruct",
+      key.usr: "s:28index_effective_access_level14InternalStructV",
+      key.line: 200,
+      key.column: 8,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "propertyReferencingPublicClassFromModule",
+          key.usr: "s:28index_effective_access_level14InternalStructV40propertyReferencingPublicClassFromModule0L00lJ0Cvp",
+          key.line: 201,
+          key.column: 9,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level14InternalStructV40propertyReferencingPublicClassFromModule0L00lJ0Cvg",
+              key.line: 201,
+              key.column: 9,
+              key.is_implicit: 1
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level14InternalStructV40propertyReferencingPublicClassFromModule0L00lJ0Cvs",
+              key.line: 201,
+              key.column: 9,
+              key.is_implicit: 1
+            }
+          ],
+          key.effective_access: source.decl.effective_access.internal
+        },
+        {
+          key.kind: source.lang.swift.ref.module,
+          key.name: "Module",
+          key.usr: "c:@M@Module",
+          key.line: 201,
+          key.column: 51
+        },
+        {
+          key.kind: source.lang.swift.ref.class,
+          key.name: "ModuleClass",
+          key.usr: "s:6Module0A5ClassC",
+          key.line: 201,
+          key.column: 58
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "propertyReferencingPublicClassFromExportedModule",
+          key.usr: "s:28index_effective_access_level14InternalStructV48propertyReferencingPublicClassFromExportedModule0L00lJ0Cvp",
+          key.line: 202,
+          key.column: 9,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:28index_effective_access_level14InternalStructV48propertyReferencingPublicClassFromExportedModule0L00lJ0Cvg",
+              key.line: 202,
+              key.column: 9,
+              key.is_implicit: 1
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:28index_effective_access_level14InternalStructV48propertyReferencingPublicClassFromExportedModule0L00lJ0Cvs",
+              key.line: 202,
+              key.column: 9,
+              key.is_implicit: 1
+            }
+          ],
+          key.effective_access: source.decl.effective_access.internal
+        },
+        {
+          key.kind: source.lang.swift.ref.module,
+          key.name: "Exported",
+          key.usr: "c:@M@Exported",
+          key.line: 202,
+          key.column: 59
+        },
+        {
+          key.kind: source.lang.swift.ref.class,
+          key.name: "ExportedClass",
+          key.usr: "s:8Exported0A5ClassC",
+          key.line: 202,
+          key.column: 68
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: "s:28index_effective_access_level14InternalStructV40propertyReferencingPublicClassFromModule0ghijk8ExportedL0AC0L00lJ0C_0M00mJ0Ctcfc",
+          key.line: 200,
+          key.column: 8,
+          key.is_implicit: 1,
+          key.effective_access: source.decl.effective_access.internal
+        }
+      ],
+      key.effective_access: source.decl.effective_access.internal
+    },
+    {
+      key.kind: source.lang.swift.decl.typealias,
+      key.name: "Alias",
+      key.usr: "s:28index_effective_access_level5Aliasa",
+      key.line: 205,
+      key.column: 18,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 205,
+          key.column: 26
+        }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.public
+        }
+      ],
+      key.effective_access: source.decl.effective_access.public
+    },
+    {
+      key.kind: source.lang.swift.decl.var.global,
+      key.name: "globalVariable",
+      key.usr: "s:28index_effective_access_level14globalVariableSivp",
+      key.line: 207,
+      key.column: 12,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.function.accessor.getter,
+          key.usr: "s:28index_effective_access_level14globalVariableSivg",
+          key.line: 207,
+          key.column: 12,
+          key.is_implicit: 1,
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.public
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.decl.function.accessor.setter,
+          key.usr: "s:28index_effective_access_level14globalVariableSivs",
+          key.line: 207,
+          key.column: 12,
+          key.is_implicit: 1,
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.public
+            }
+          ]
+        }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.public
+        }
+      ],
+      key.effective_access: source.decl.effective_access.public
+    },
+    {
+      key.kind: source.lang.swift.ref.struct,
+      key.name: "Int",
+      key.usr: "s:Si",
+      key.line: 207,
+      key.column: 28
+    },
+    {
+      key.kind: source.lang.swift.decl.protocol,
+      key.name: "ProtocolWithAssociatedType",
+      key.usr: "s:28index_effective_access_level26ProtocolWithAssociatedTypeP",
+      key.line: 209,
+      key.column: 10,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.associatedtype,
+          key.name: "T",
+          key.usr: "s:28index_effective_access_level26ProtocolWithAssociatedTypeP1TQa",
+          key.line: 210,
+          key.column: 20,
+          key.effective_access: source.decl.effective_access.internal
+        }
+      ],
+      key.effective_access: source.decl.effective_access.internal
+    },
+    {
+      key.kind: source.lang.swift.decl.struct,
+      key.name: "ProtocolWithAssociatedTypeImpl",
+      key.usr: "s:28index_effective_access_level30ProtocolWithAssociatedTypeImplV",
+      key.line: 213,
+      key.column: 8,
+      key.related: [
+        {
+          key.kind: source.lang.swift.ref.protocol,
+          key.name: "ProtocolWithAssociatedType",
+          key.usr: "s:28index_effective_access_level26ProtocolWithAssociatedTypeP",
+          key.line: 213,
+          key.column: 40
+        }
+      ],
+      key.entities: [
+        {
+          key.kind: source.lang.swift.ref.protocol,
+          key.name: "ProtocolWithAssociatedType",
+          key.usr: "s:28index_effective_access_level26ProtocolWithAssociatedTypeP",
+          key.line: 213,
+          key.column: 40
+        },
+        {
+          key.kind: source.lang.swift.decl.typealias,
+          key.name: "T",
+          key.usr: "s:28index_effective_access_level30ProtocolWithAssociatedTypeImplV1Ta",
+          key.line: 214,
+          key.column: 15,
+          key.related: [
+            {
+              key.kind: source.lang.swift.ref.associatedtype,
+              key.name: "T",
+              key.usr: "s:28index_effective_access_level26ProtocolWithAssociatedTypeP1TQa"
+            }
+          ],
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 214,
+              key.column: 19
+            }
+          ],
+          key.effective_access: source.decl.effective_access.internal
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "testLocalContent()",
+          key.usr: "s:28index_effective_access_level30ProtocolWithAssociatedTypeImplV16testLocalContentyyF",
+          key.line: 215,
+          key.column: 10,
+          key.effective_access: source.decl.effective_access.internal
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: "s:28index_effective_access_level30ProtocolWithAssociatedTypeImplVACycfc",
+          key.line: 213,
+          key.column: 8,
+          key.is_implicit: 1,
+          key.effective_access: source.decl.effective_access.internal
+        }
+      ],
+      key.effective_access: source.decl.effective_access.internal
+    }
+  ]
+}

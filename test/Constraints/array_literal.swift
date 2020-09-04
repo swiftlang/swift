@@ -50,7 +50,7 @@ useDoubleList([1.0,2,3])
 useDoubleList([1.0,2.0,3.0])
 
 useIntDict(["Niners" => 31, "Ravens" => 34])
-useIntDict(["Niners" => 31, "Ravens" => 34.0]) // expected-error{{cannot convert value of type 'Double' to expected argument type 'Int'}}
+useIntDict(["Niners" => 31, "Ravens" => 34.0]) // expected-error{{cannot convert value of type 'Double' to expected element type 'Int'}}
 // <rdar://problem/22333090> QoI: Propagate contextual information in a call to operands
 useDoubleDict(["Niners" => 31, "Ravens" => 34.0])
 useDoubleDict(["Niners" => 31.0, "Ravens" => 34])
@@ -328,7 +328,6 @@ protocol P { }
 struct PArray<T> { }
 
 extension PArray : ExpressibleByArrayLiteral where T: P {
-  // expected-note@-1 {{requirement from conditional conformance of 'PArray<String>' to 'ExpressibleByArrayLiteral'}}
   typealias ArrayLiteralElement = T
 
   init(arrayLiteral elements: T...) { }
@@ -338,7 +337,7 @@ extension Int: P { }
 
 func testConditional(i: Int, s: String) {
   let _: PArray<Int> = [i, i, i]
-  let _: PArray<String> = [s, s, s] // expected-error{{generic struct 'PArray' requires that 'String' conform to 'P'}}
+  let _: PArray<String> = [s, s, s] // expected-error{{cannot convert value of type '[String]' to specified type 'PArray<String>'}}
 }
 
 

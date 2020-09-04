@@ -30,7 +30,7 @@ namespace swift {
   class Stmt;
   class Decl;
   class Pattern;
-  class TypeLoc;
+  class TypeRepr;
   class DeclContext;
   class SourceLoc;
   class SourceRange;
@@ -41,7 +41,7 @@ namespace swift {
   enum class StmtKind;
 
   struct ASTNode : public llvm::PointerUnion<Expr *, Stmt *, Decl *, Pattern *,
-                                             TypeLoc *> {
+                                             TypeRepr *> {
     // Inherit the constructors from PointerUnion.
     using PointerUnion::PointerUnion;
 

@@ -178,34 +178,42 @@ int main(int argc, char **argv) {
   if (CI.setup(Invocation))
     return 1;
 
-  CI.performSema();
-
-  // If parsing produced an error, don't run any passes.
-  if (CI.getASTContext().hadError())
+  std::error_code EC;
+  llvm::raw_fd_ostream outStream(OutputFilename, EC, llvm::sys::fs::F_None);
+  if (outStream.has_error() || EC) {
+    CI.getDiags().diagnose(SourceLoc(), diag::error_opening_output,
+                           OutputFilename, EC.message());
+    outStream.clear_error();
     return 1;
+  }
 
   auto *mod = CI.getMainModule();
   assert(mod->getFiles().size() == 1);
 
-  std::unique_ptr<SILModule> SILMod;
-  if (PerformWMO) {
-    SILMod = performASTLowering(mod, CI.getSILTypes(), CI.getSILOptions());
-  } else {
-    SILMod = performASTLowering(*mod->getFiles()[0], CI.getSILTypes(),
-                                CI.getSILOptions());
-  }
-
-  // Load the SIL if we have a non-SIB serialized module. SILGen handles SIB for
-  // us.
-  if (Invocation.hasSerializedAST() && !extendedInfo.isSIB()) {
-    auto SL = SerializedSILLoader::create(
-        CI.getASTContext(), SILMod.get(), nullptr);
-    SL->getAll();
-  }
-
+  const auto &TBDOpts = Invocation.getTBDGenOptions();
+  const auto &SILOpts = Invocation.getSILOptions();
+  auto &SILTypes = CI.getSILTypes();
+  auto moduleName = CI.getMainModule()->getName().str();
   const PrimarySpecificPaths PSPs(OutputFilename, InputFilename);
-  auto Mod = performIRGeneration(Opts, CI.getMainModule(), std::move(SILMod),
-                                 CI.getMainModule()->getName().str(), PSPs,
-                                 ArrayRef<std::string>());
-  return CI.getASTContext().hadError();
+
+  auto getDescriptor = [&]() -> IRGenDescriptor {
+    if (PerformWMO) {
+      return IRGenDescriptor::forWholeModule(
+          mod, Opts, TBDOpts, SILOpts, SILTypes,
+          /*SILMod*/ nullptr, moduleName, PSPs);
+    } else {
+      return IRGenDescriptor::forFile(mod->getFiles()[0], Opts, TBDOpts,
+                                      SILOpts, SILTypes, /*SILMod*/ nullptr,
+                                      moduleName, PSPs, /*discriminator*/ "");
+    }
+  };
+
+  auto &eval = CI.getASTContext().evaluator;
+  auto generatedMod = llvm::cantFail(eval(OptimizedIRRequest{getDescriptor()}));
+  if (!generatedMod)
+    return 1;
+
+  return compileAndWriteLLVM(generatedMod.getModule(),
+                             generatedMod.getTargetMachine(), Opts,
+                             CI.getStatsReporter(), CI.getDiags(), outStream);
 }

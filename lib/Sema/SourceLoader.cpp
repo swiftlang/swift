@@ -118,12 +118,11 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
   auto *importMod = ModuleDecl::create(moduleID.Item, Ctx, importInfo);
   if (EnableLibraryEvolution)
     importMod->setResilienceStrategy(ResilienceStrategy::Resilient);
-  Ctx.LoadedModules[moduleID.Item] = importMod;
+  Ctx.addLoadedModule(importMod);
 
-  auto *importFile = new (Ctx) SourceFile(*importMod, SourceFileKind::Library,
-                                          bufferID,
-                                          Ctx.LangOpts.CollectParsedToken,
-                                          Ctx.LangOpts.BuildSyntaxTree);
+  auto *importFile =
+      new (Ctx) SourceFile(*importMod, SourceFileKind::Library, bufferID,
+                           SourceFile::getDefaultParsingOptions(Ctx.LangOpts));
   importMod->addFile(*importFile);
   performImportResolution(*importFile);
   importMod->setHasResolvedImports();

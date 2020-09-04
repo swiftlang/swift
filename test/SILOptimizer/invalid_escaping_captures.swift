@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil %s -verify
-// RUN: %target-swift-frontend -emit-sil %s -verify -enable-ownership-stripping-after-serialization
+// RUN: %target-swift-frontend -emit-sil %s -verify
 
 func takesEscaping(_: @escaping () -> ()) {}
 

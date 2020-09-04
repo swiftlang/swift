@@ -13,21 +13,22 @@
 #define DEBUG_TYPE "generic-specializer"
 
 #include "swift/SILOptimizer/Utils/Generics.h"
-#include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/TypeMatcher.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/SemanticAttrs.h"
-#include "swift/Basic/Statistic.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/Serialization/SerializedSILLoader.h"
+#include "swift/AST/TypeMatcher.h"
+#include "swift/Basic/Statistic.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/OptimizationRemark.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SILOptimizer/Utils/GenericCloner.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
-#include "swift/Demangling/ManglingMacros.h"
+#include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/Strings.h"
 
 using namespace swift;
@@ -57,6 +58,12 @@ llvm::cl::opt<bool> PrintGenericSpecializationLoops(
     "sil-print-generic-specialization-loops", llvm::cl::init(false),
     llvm::cl::desc("Print detected infinite generic specialization loops that "
                    "were prevented"));
+
+llvm::cl::opt<bool> VerifyFunctionsAfterSpecialization(
+    "sil-generic-verify-after-specialization", llvm::cl::init(false),
+    llvm::cl::desc(
+        "Verify functions after they are specialized "
+        "'PrettyStackTraceFunction'-ing the original function if we fail."));
 
 static bool OptimizeGenericSubstitutions = false;
 
@@ -1863,7 +1870,6 @@ SILFunction *GenericFuncSpecializer::tryCreateSpecialization() {
           SpecializedF->getGenericEnvironment()) ||
          (!SpecializedF->getLoweredFunctionType()->isPolymorphic() &&
           !SpecializedF->getGenericEnvironment()));
-  assert(!SpecializedF->hasOwnership());
   // Store the meta-information about how this specialization was created.
   auto *Caller = ReInfo.getApply() ? ReInfo.getApply().getFunction() : nullptr;
   SubstitutionMap Subs = Caller ? ReInfo.getApply().getSubstitutionMap()
@@ -1871,6 +1877,15 @@ SILFunction *GenericFuncSpecializer::tryCreateSpecialization() {
   SpecializedF->setClassSubclassScope(SubclassScope::NotApplicable);
   SpecializedF->setSpecializationInfo(
       GenericSpecializationInformation::create(Caller, GenericFunc, Subs));
+
+  if (VerifyFunctionsAfterSpecialization) {
+    PrettyStackTraceSILFunction SILFunctionDumper(
+        llvm::Twine("Generic function: ") + GenericFunc->getName() +
+            ". Specialized Function: " + SpecializedF->getName(),
+        GenericFunc);
+    SpecializedF->verify();
+  }
+
   return SpecializedF;
 }
 
@@ -1891,137 +1906,201 @@ static void fixUsedVoidType(SILValue VoidVal, SILLocation Loc,
 }
 
 /// Prepare call arguments. Perform re-abstraction if required.
-static void prepareCallArguments(ApplySite AI, SILBuilder &Builder,
-                                 const ReabstractionInfo &ReInfo,
-                                 SmallVectorImpl<SILValue> &Arguments,
-                                 SILValue &StoreResultTo) {
+///
+/// \p ArgAtIndexNeedsEndBorrow after return contains indices of arguments that
+/// need end borrow. The reason why we are doing this in a separate array is
+/// that we are going to eventually need to pass off Arguments to SILBuilder
+/// which will want an ArrayRef<SILValue>() so using a composite type here would
+/// force us to do some sort of conversion then.
+static void
+prepareCallArguments(ApplySite AI, SILBuilder &Builder,
+                     const ReabstractionInfo &ReInfo,
+                     SmallVectorImpl<SILValue> &Arguments,
+                     SmallVectorImpl<unsigned> &ArgAtIndexNeedsEndBorrow,
+                     SILValue &StoreResultTo) {
   /// SIL function conventions for the original apply site with substitutions.
   SILLocation Loc = AI.getLoc();
   auto substConv = AI.getSubstCalleeConv();
   unsigned ArgIdx = AI.getCalleeArgIndexOfFirstAppliedArg();
-  for (auto &Op : AI.getArgumentOperands()) {
-    auto handleConversion = [&]() {
-      // Rewriting SIL arguments is only for lowered addresses.
-      if (!substConv.useLoweredAddresses())
-        return false;
 
-      if (ArgIdx < substConv.getSILArgIndexOfFirstParam()) {
-        // Handle result arguments.
-        unsigned formalIdx =
-            substConv.getIndirectFormalResultIndexForSILArg(ArgIdx);
-        if (ReInfo.isFormalResultConverted(formalIdx)) {
-          // The result is converted from indirect to direct. We need to insert
-          // a store later.
-          assert(!StoreResultTo);
-          StoreResultTo = Op.get();
-          return true;
-        }
-      } else {
-        // Handle arguments for formal parameters.
-        unsigned paramIdx = ArgIdx - substConv.getSILArgIndexOfFirstParam();
-        if (ReInfo.isParamConverted(paramIdx)) {
-          // An argument is converted from indirect to direct. Instead of the
-          // address we pass the loaded value.
-          SILValue Val = Builder.createLoad(
-              Loc, Op.get(), LoadOwnershipQualifier::Unqualified);
-          Arguments.push_back(Val);
-          return true;
-        }
-      }
+  auto handleConversion = [&](SILValue InputValue) {
+    // Rewriting SIL arguments is only for lowered addresses.
+    if (!substConv.useLoweredAddresses())
       return false;
-    };
-    if (!handleConversion())
-      Arguments.push_back(Op.get());
 
+    if (ArgIdx < substConv.getSILArgIndexOfFirstParam()) {
+      // Handle result arguments.
+      unsigned formalIdx =
+          substConv.getIndirectFormalResultIndexForSILArg(ArgIdx);
+      if (!ReInfo.isFormalResultConverted(formalIdx)) {
+        return false;
+      }
+
+      // The result is converted from indirect to direct. We need to insert
+      // a store later.
+      assert(!StoreResultTo);
+      StoreResultTo = InputValue;
+      return true;
+    }
+
+    // Handle arguments for formal parameters.
+    unsigned paramIdx = ArgIdx - substConv.getSILArgIndexOfFirstParam();
+    if (!ReInfo.isParamConverted(paramIdx)) {
+      return false;
+    }
+
+    // An argument is converted from indirect to direct. Instead of the
+    // address we pass the loaded value.
+    auto argConv = substConv.getSILArgumentConvention(ArgIdx);
+    SILValue Val;
+    if (!argConv.isGuaranteedConvention() || isa<PartialApplyInst>(AI)) {
+      Val = Builder.emitLoadValueOperation(Loc, InputValue,
+                                           LoadOwnershipQualifier::Take);
+    } else {
+      Val = Builder.emitLoadBorrowOperation(Loc, InputValue);
+      if (Val.getOwnershipKind() == ValueOwnershipKind::Guaranteed)
+        ArgAtIndexNeedsEndBorrow.push_back(Arguments.size());
+    }
+
+    Arguments.push_back(Val);
+    return true;
+  };
+
+  for (auto &Op : AI.getArgumentOperands()) {
+    if (!handleConversion(Op.get()))
+      Arguments.push_back(Op.get());
     ++ArgIdx;
+  }
+}
+
+static void
+cleanupCallArguments(SILBuilder &builder, SILLocation loc,
+                     ArrayRef<SILValue> values,
+                     ArrayRef<unsigned> valueIndicesThatNeedEndBorrow) {
+  for (int index : valueIndicesThatNeedEndBorrow) {
+    auto *lbi = cast<LoadBorrowInst>(values[index]);
+    builder.createEndBorrow(loc, lbi);
   }
 }
 
 /// Create a new apply based on an old one, but with a different
 /// function being applied.
-static ApplySite replaceWithSpecializedCallee(ApplySite AI,
-                                              SILValue Callee,
-                                              const ReabstractionInfo &ReInfo) {
-  SILBuilderWithScope Builder(AI.getInstruction());
-  SILLocation Loc = AI.getLoc();
-  SmallVector<SILValue, 4> Arguments;
-  SILValue StoreResultTo;
+static ApplySite replaceWithSpecializedCallee(ApplySite applySite,
+                                              SILValue callee,
+                                              const ReabstractionInfo &reInfo) {
+  SILBuilderWithScope builder(applySite.getInstruction());
+  SILLocation loc = applySite.getLoc();
+  SmallVector<SILValue, 4> arguments;
+  SmallVector<unsigned, 4> argsNeedingEndBorrow;
+  SILValue resultOut;
 
-  prepareCallArguments(AI, Builder, ReInfo, Arguments, StoreResultTo);
+  prepareCallArguments(applySite, builder, reInfo, arguments,
+                       argsNeedingEndBorrow, resultOut);
 
   // Create a substituted callee type.
-  auto CanFnTy = Callee->getType().castTo<SILFunctionType>();
-  SubstitutionMap Subs;
-  if (ReInfo.getSpecializedType()->isPolymorphic()) {
-    Subs = ReInfo.getCallerParamSubstitutionMap();
-    Subs = SubstitutionMap::get(CanFnTy->getSubstGenericSignature(), Subs);
+  //
+  // NOTE: We do not perform this substitution if we are promoting a full apply
+  // site callee of a partial apply.
+  auto canFnTy = callee->getType().castTo<SILFunctionType>();
+  SubstitutionMap subs;
+  if (reInfo.getSpecializedType()->isPolymorphic() &&
+      canFnTy->isPolymorphic()) {
+    subs = reInfo.getCallerParamSubstitutionMap();
+    subs = SubstitutionMap::get(canFnTy->getSubstGenericSignature(), subs);
   }
 
-  auto CalleeSubstFnTy =
-      CanFnTy->substGenericArgs(*Callee->getModule(), Subs,
-                                ReInfo.getResilienceExpansion());
-  auto CalleeSILSubstFnTy = SILType::getPrimitiveObjectType(CalleeSubstFnTy);
-  SILFunctionConventions substConv(CalleeSubstFnTy, Builder.getModule());
+  auto calleeSubstFnTy = canFnTy->substGenericArgs(
+      *callee->getModule(), subs, reInfo.getResilienceExpansion());
+  auto calleeSILSubstFnTy = SILType::getPrimitiveObjectType(calleeSubstFnTy);
+  SILFunctionConventions substConv(calleeSubstFnTy, builder.getModule());
 
-  if (auto *TAI = dyn_cast<TryApplyInst>(AI)) {
-    SILBasicBlock *ResultBB = TAI->getNormalBB();
-    assert(ResultBB->getSinglePredecessorBlock() == TAI->getParent());
-    auto *NewTAI = Builder.createTryApply(Loc, Callee, Subs, Arguments,
-                                          ResultBB, TAI->getErrorBB());
-    if (StoreResultTo) {
+  switch (applySite.getKind()) {
+  case ApplySiteKind::TryApplyInst: {
+    auto *tai = cast<TryApplyInst>(applySite);
+    SILBasicBlock *resultBlock = tai->getNormalBB();
+    assert(resultBlock->getSinglePredecessorBlock() == tai->getParent());
+    // First insert the cleanups for our arguments int he appropriate spot.
+    FullApplySite(tai).insertAfterFullEvaluation(
+        [&](SILBasicBlock::iterator insertPt) {
+          SILBuilderWithScope argBuilder(insertPt);
+          cleanupCallArguments(argBuilder, loc, arguments,
+                               argsNeedingEndBorrow);
+        });
+    auto *newTAI = builder.createTryApply(loc, callee, subs, arguments,
+                                          resultBlock, tai->getErrorBB());
+    if (resultOut) {
       assert(substConv.useLoweredAddresses());
       // The original normal result of the try_apply is an empty tuple.
-      assert(ResultBB->getNumArguments() == 1);
-      Builder.setInsertionPoint(ResultBB->begin());
-      fixUsedVoidType(ResultBB->getArgument(0), Loc, Builder);
+      assert(resultBlock->getNumArguments() == 1);
+      builder.setInsertionPoint(resultBlock->begin());
+      fixUsedVoidType(resultBlock->getArgument(0), loc, builder);
 
-      SILArgument *Arg = ResultBB->replacePhiArgument(
-          0, StoreResultTo->getType().getObjectType(),
-          ValueOwnershipKind::Owned);
+      SILArgument *arg = resultBlock->replacePhiArgument(
+          0, resultOut->getType().getObjectType(), ValueOwnershipKind::Owned);
       // Store the direct result to the original result address.
-      Builder.createStore(Loc, Arg, StoreResultTo,
-                          StoreOwnershipQualifier::Unqualified);
+      builder.emitStoreValueOperation(loc, arg, resultOut,
+                                      StoreOwnershipQualifier::Init);
     }
-    return NewTAI;
+    return newTAI;
   }
-  if (auto *A = dyn_cast<ApplyInst>(AI)) {
-    auto *NewAI = Builder.createApply(Loc, Callee, Subs, Arguments,
-                                      A->isNonThrowing());
-    if (StoreResultTo) {
-      assert(substConv.useLoweredAddresses());
-      if (!CalleeSILSubstFnTy.isNoReturnFunction(
-              Builder.getModule(), Builder.getTypeExpansionContext())) {
+  case ApplySiteKind::ApplyInst: {
+    auto *ai = cast<ApplyInst>(applySite);
+    FullApplySite(ai).insertAfterFullEvaluation(
+        [&](SILBasicBlock::iterator insertPt) {
+          SILBuilderWithScope argBuilder(insertPt);
+          cleanupCallArguments(argBuilder, loc, arguments,
+                               argsNeedingEndBorrow);
+        });
+    auto *newAI =
+        builder.createApply(loc, callee, subs, arguments, ai->isNonThrowing());
+    if (resultOut) {
+      if (!calleeSILSubstFnTy.isNoReturnFunction(
+              builder.getModule(), builder.getTypeExpansionContext())) {
         // Store the direct result to the original result address.
-        fixUsedVoidType(A, Loc, Builder);
-        Builder.createStore(Loc, NewAI, StoreResultTo,
-                            StoreOwnershipQualifier::Unqualified);
+        fixUsedVoidType(ai, loc, builder);
+        builder.emitStoreValueOperation(loc, newAI, resultOut,
+                                        StoreOwnershipQualifier::Init);
       } else {
-        Builder.createUnreachable(Loc);
+        builder.createUnreachable(loc);
         // unreachable should be the terminator instruction.
         // So, split the current basic block right after the
         // inserted unreachable instruction.
-        Builder.getInsertionPoint()->getParent()->split(
-            Builder.getInsertionPoint());
+        builder.getInsertionPoint()->getParent()->split(
+            builder.getInsertionPoint());
       }
     }
-    A->replaceAllUsesWith(NewAI);
-    return NewAI;
+    ai->replaceAllUsesWith(newAI);
+    return newAI;
   }
-  if (auto *A = dyn_cast<BeginApplyInst>(AI)) {
-    assert(!StoreResultTo);
-    auto *NewAI = Builder.createBeginApply(Loc, Callee, Subs, Arguments,
-                                           A->isNonThrowing());
-    A->replaceAllUsesPairwiseWith(NewAI);
-    return NewAI;
+  case ApplySiteKind::BeginApplyInst: {
+    auto *bai = cast<BeginApplyInst>(applySite);
+    assert(!resultOut);
+    FullApplySite(bai).insertAfterFullEvaluation(
+        [&](SILBasicBlock::iterator insertPt) {
+          SILBuilderWithScope argBuilder(insertPt);
+          cleanupCallArguments(argBuilder, loc, arguments,
+                               argsNeedingEndBorrow);
+        });
+    auto *newBAI = builder.createBeginApply(loc, callee, subs, arguments,
+                                            bai->isNonThrowing());
+    bai->replaceAllUsesPairwiseWith(newBAI);
+    return newBAI;
   }
-  if (auto *PAI = dyn_cast<PartialApplyInst>(AI)) {
-    auto *NewPAI = Builder.createPartialApply(
-        Loc, Callee, Subs, Arguments,
-        PAI->getType().getAs<SILFunctionType>()->getCalleeConvention(),
-        PAI->isOnStack());
-    PAI->replaceAllUsesWith(NewPAI);
-    return NewPAI;
+  case ApplySiteKind::PartialApplyInst: {
+    auto *pai = cast<PartialApplyInst>(applySite);
+    auto *newPAI = builder.createPartialApply(
+        loc, callee, subs, arguments,
+        pai->getType().getAs<SILFunctionType>()->getCalleeConvention(),
+        pai->isOnStack());
+    // When we have a partial apply, we should always perform a load [take].
+    pai->replaceAllUsesWith(newPAI);
+    assert(llvm::none_of(arguments,
+                         [](SILValue v) { return isa<LoadBorrowInst>(v); }) &&
+           "Partial apply consumes all of its parameters?!");
+    return newPAI;
   }
+  }
+
   llvm_unreachable("unhandled kind of apply");
 }
 
@@ -2075,8 +2154,9 @@ public:
   SILFunction *createThunk();
 
 protected:
-  SILValue createReabstractionThunkApply(SILBuilder &Builder);
-  SILArgument *convertReabstractionThunkArguments(SILBuilder &Builder);
+  FullApplySite createReabstractionThunkApply(SILBuilder &Builder);
+  SILArgument *convertReabstractionThunkArguments(
+      SILBuilder &Builder, SmallVectorImpl<unsigned> &ArgsNeedingEndBorrows);
 };
 } // anonymous namespace
 
@@ -2111,30 +2191,46 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
                                                             SpecArg->getDecl());
       Arguments.push_back(NewArg);
     }
-    SILValue ReturnValue = createReabstractionThunkApply(Builder);
+    FullApplySite ApplySite = createReabstractionThunkApply(Builder);
+    SILValue ReturnValue = ApplySite.getSingleDirectResult();
+    assert(ReturnValue && "getSingleDirectResult out of sync with ApplySite?!");
     Builder.createReturn(Loc, ReturnValue);
+
     return Thunk;
   }
   // Handle lowered addresses.
-  SILArgument *ReturnValueAddr = convertReabstractionThunkArguments(Builder);
+  SmallVector<unsigned, 4> ArgsThatNeedEndBorrow;
+  SILArgument *ReturnValueAddr =
+      convertReabstractionThunkArguments(Builder, ArgsThatNeedEndBorrow);
 
-  SILValue ReturnValue = createReabstractionThunkApply(Builder);
+  FullApplySite ApplySite = createReabstractionThunkApply(Builder);
+
+  SILValue ReturnValue = ApplySite.getSingleDirectResult();
+  assert(ReturnValue && "getSingleDirectResult out of sync with ApplySite?!");
 
   if (ReturnValueAddr) {
     // Need to store the direct results to the original indirect address.
-    Builder.createStore(Loc, ReturnValue, ReturnValueAddr,
-                        StoreOwnershipQualifier::Unqualified);
+    Builder.emitStoreValueOperation(Loc, ReturnValue, ReturnValueAddr,
+                                    StoreOwnershipQualifier::Init);
     SILType VoidTy = OrigPAI->getSubstCalleeType()->getDirectFormalResultsType(
         M, Builder.getTypeExpansionContext());
     assert(VoidTy.isVoid());
     ReturnValue = Builder.createTuple(Loc, VoidTy, {});
   }
   Builder.createReturn(Loc, ReturnValue);
+
+  // Now that we have finished constructing our CFG (note the return above),
+  // insert any compensating end borrows that we need.
+  ApplySite.insertAfterFullEvaluation([&](SILBasicBlock::iterator insertPt) {
+    SILBuilderWithScope argBuilder(insertPt);
+    cleanupCallArguments(argBuilder, Loc, Arguments, ArgsThatNeedEndBorrow);
+  });
+
   return Thunk;
 }
 
 /// Create a call to a reabstraction thunk. Return the call's direct result.
-SILValue ReabstractionThunkGenerator::createReabstractionThunkApply(
+FullApplySite ReabstractionThunkGenerator::createReabstractionThunkApply(
     SILBuilder &Builder) {
   SILFunction *Thunk = &Builder.getFunction();
   auto *FRI = Builder.createFunctionRef(Loc, SpecializedFunc);
@@ -2146,19 +2242,20 @@ SILValue ReabstractionThunkGenerator::createReabstractionThunkApply(
   // Create the logic for calling a throwing function.
   SILBasicBlock *NormalBB = Thunk->createBasicBlock();
   SILBasicBlock *ErrorBB = Thunk->createBasicBlock();
-  Builder.createTryApply(Loc, FRI, Subs, Arguments, NormalBB, ErrorBB);
+  auto *TAI =
+      Builder.createTryApply(Loc, FRI, Subs, Arguments, NormalBB, ErrorBB);
   auto *ErrorVal = ErrorBB->createPhiArgument(
       SpecializedFunc->mapTypeIntoContext(
           specConv.getSILErrorType(Builder.getTypeExpansionContext())),
       ValueOwnershipKind::Owned);
   Builder.setInsertionPoint(ErrorBB);
   Builder.createThrow(Loc, ErrorVal);
-  SILValue ReturnValue = NormalBB->createPhiArgument(
+  NormalBB->createPhiArgument(
       SpecializedFunc->mapTypeIntoContext(
           specConv.getSILResultType(Builder.getTypeExpansionContext())),
       ValueOwnershipKind::Owned);
   Builder.setInsertionPoint(NormalBB);
-  return ReturnValue;
+  return FullApplySite(TAI);
 }
 
 /// Create SIL arguments for a reabstraction thunk with lowered addresses. This
@@ -2168,7 +2265,7 @@ SILValue ReabstractionThunkGenerator::createReabstractionThunkApply(
 /// FIXME: Remove this if we don't need to create reabstraction thunks after
 /// address lowering.
 SILArgument *ReabstractionThunkGenerator::convertReabstractionThunkArguments(
-    SILBuilder &Builder) {
+    SILBuilder &Builder, SmallVectorImpl<unsigned> &ArgsThatNeedEndBorrow) {
   SILFunction *Thunk = &Builder.getFunction();
   CanSILFunctionType SpecType = SpecializedFunc->getLoweredFunctionType();
   CanSILFunctionType SubstType = ReInfo.getSubstitutedType();
@@ -2230,11 +2327,18 @@ SILArgument *ReabstractionThunkGenerator::convertReabstractionThunkArguments(
                                Builder.getTypeExpansionContext()));
       assert(ParamTy.isAddress());
       SILArgument *SpecArg = *SpecArgIter++;
-      SILArgument *NewArg =
+      SILFunctionArgument *NewArg =
           EntryBB->createFunctionArgument(ParamTy, SpecArg->getDecl());
-      auto *ArgVal =
-          Builder.createLoad(Loc, NewArg, LoadOwnershipQualifier::Unqualified);
-      Arguments.push_back(ArgVal);
+      if (!NewArg->getArgumentConvention().isGuaranteedConvention()) {
+        SILValue argVal = Builder.emitLoadValueOperation(
+            Loc, NewArg, LoadOwnershipQualifier::Take);
+        Arguments.push_back(argVal);
+      } else {
+        SILValue argVal = Builder.emitLoadBorrowOperation(Loc, NewArg);
+        if (argVal.getOwnershipKind() == ValueOwnershipKind::Guaranteed)
+          ArgsThatNeedEndBorrow.push_back(Arguments.size());
+        Arguments.push_back(argVal);
+      }
       continue;
     }
     // Simply clone unconverted direct or indirect parameters.
@@ -2337,15 +2441,6 @@ void swift::trySpecializeApplyOfGeneric(
   if (shouldNotSpecialize(RefF, F))
     return;
 
-  // If our callee has ownership, do not specialize for now. This should only
-  // occur with transparent referenced functions.
-  //
-  // FIXME: Support this.
-  if (RefF->hasOwnership()) {
-    assert(RefF->isTransparent());
-    return;
-  }
-
   // If the caller and callee are both fragile, preserve the fragility when
   // cloning the callee. Otherwise, strip it off so that we can optimize
   // the body more.
@@ -2387,11 +2482,24 @@ void swift::trySpecializeApplyOfGeneric(
     //    this case we can just skip the existing re-abstraction.
     // 3) For all other cases we need to create a new re-abstraction thunk.
     needAdaptUsers = true;
-    for (Operand *Use : PAI->getUses()) {
+    SmallVector<Operand *, 4> worklist(PAI->getUses());
+    while (!worklist.empty()) {
+      auto *Use = worklist.pop_back_val();
+
       SILInstruction *User = Use->getUser();
+
+      // Look through copy_value.
+      if (auto *cvi = dyn_cast<CopyValueInst>(User)) {
+        llvm::copy(cvi->getUses(), std::back_inserter(worklist));
+        continue;
+      }
+      // Ignore destroy_value.
+      if (isa<DestroyValueInst>(User))
+        continue;
+      // Ignore older ref count instructions.
       if (isa<RefCountingInst>(User))
         continue;
-      if (User->isDebugInstruction())
+      if (isIncidentalUse(User))
         continue;
 
       auto FAS = FullApplySite::isa(User);
@@ -2422,7 +2530,6 @@ void swift::trySpecializeApplyOfGeneric(
                             << SpecializedF->getName() << "\n"
                             << "Specialized function type: "
                             << SpecializedF->getLoweredFunctionType() << "\n");
-    assert(!SpecializedF->hasOwnership());
     NewFunctions.push_back(SpecializedF);
   }
 
@@ -2438,6 +2545,20 @@ void swift::trySpecializeApplyOfGeneric(
            << NV("FuncType", OS.str());
   });
 
+  // Verify our function after we have finished fixing up call sites/etc. Dump
+  // the generic function if there is an assertion failure (or a crash) to make
+  // it easier to debug such problems since the original generic function is
+  // easily at hand.
+  SWIFT_DEFER {
+    if (VerifyFunctionsAfterSpecialization) {
+      PrettyStackTraceSILFunction SILFunctionDumper(
+          llvm::Twine("Generic function: ") + RefF->getName() +
+              ". Specialized Function: " + SpecializedF->getName(),
+          RefF);
+      SpecializedF->verify();
+    }
+  };
+
   assert(ReInfo.getSpecializedType()
          == SpecializedF->getLoweredFunctionType() &&
          "Previously specialized function does not match expected type.");
@@ -2452,6 +2573,13 @@ void swift::trySpecializeApplyOfGeneric(
     SILFunction *Thunk =
       ReabstractionThunkGenerator(FuncBuilder, ReInfo, PAI, SpecializedF)
         .createThunk();
+    if (VerifyFunctionsAfterSpecialization) {
+      PrettyStackTraceSILFunction SILFunctionDumper(
+          llvm::Twine("Thunk For Generic function: ") + RefF->getName() +
+              ". Specialized Function: " + SpecializedF->getName(),
+          RefF);
+      Thunk->verify();
+    }
     NewFunctions.push_back(Thunk);
     SILBuilderWithScope Builder(PAI);
     auto *FRI = Builder.createFunctionRef(PAI->getLoc(), Thunk);

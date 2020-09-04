@@ -137,3 +137,53 @@ func test_mismatch_with_contextual_optional_result() {
   let _ = A(B(), keyPath: \.arr)
   // expected-error@-1 {{key path value type '[Int]' cannot be converted to contextual type '[Int]?'}}
 }
+
+// SR-11184
+class SR11184 {}
+
+func fSR11184(_ c: SR11184!, _ kp: ReferenceWritableKeyPath<SR11184, String?>, _ str: String) {
+  c[keyPath: kp] = str // OK
+  c![keyPath: kp] = str // OK
+  c?[keyPath: kp] = str // OK
+}
+
+func fSR11184_O(_ c: SR11184!, _ kp: ReferenceWritableKeyPath<SR11184, String?>, _ str: String?) {
+  c[keyPath: kp] = str // OK
+  c![keyPath: kp] = str // OK
+  c?[keyPath: kp] = str // OK
+}
+
+class KeyPathBase {}
+class KeyPathBaseSubtype: KeyPathBase {}
+class AnotherBase {}
+class AnotherComposeBase {
+  var member: KeyPathBase?
+}
+
+func key_path_root_mismatch<T>(_ base: KeyPathBase?, subBase: KeyPathBaseSubtype?, _ abase: AnotherComposeBase,
+                               _ kp: KeyPath<KeyPathBase, T>, _ kpa: KeyPath<AnotherBase, T>) {
+  let _ : T = base[keyPath: kp] // expected-error {{value of optional type 'KeyPathBase?' must be unwrapped to a value of type 'KeyPathBase'}}
+  // expected-note@-1 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{19-19=!}}
+  // expected-note@-2 {{use '?' to access key path subscript only for non-'nil' base values}} {{19-19=?}}
+  let _ : T = base[keyPath: kpa] // expected-error {{key path with root type 'AnotherBase' cannot be applied to a base of type 'KeyPathBase?'}}
+
+  // Chained root mismatch
+  let _ : T = abase.member[keyPath: kp] // expected-error {{value of optional type 'KeyPathBase?' must be unwrapped to a value of type 'KeyPathBase'}}
+  // expected-note@-1 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{27-27=!}}
+  // expected-note@-2 {{use '?' to access key path subscript only for non-'nil' base values}} {{27-27=?}}
+  let _ : T = abase.member[keyPath: kpa] // expected-error {{key path with root type 'AnotherBase' cannot be applied to a base of type 'KeyPathBase?'}}
+
+  let _ : T = subBase[keyPath: kp] // expected-error {{value of optional type 'KeyPathBaseSubtype?' must be unwrapped to a value of type 'KeyPathBaseSubtype'}}
+  // expected-note@-1 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{22-22=!}}
+  // expected-note@-2 {{use '?' to access key path subscript only for non-'nil' base values}} {{22-22=?}}
+  let _ : T = subBase[keyPath: kpa] // expected-error {{key path with root type 'AnotherBase' cannot be applied to a base of type 'KeyPathBaseSubtype?'}}
+
+}
+
+// SR-13442
+func SR13442<T>(_ x: KeyPath<String?, T>) -> T { "1"[keyPath: x] }
+
+func testSR13442() {
+  _ = SR13442(\.!.count) // OK
+  _ = SR13442(\String?.!.count) // OK
+}

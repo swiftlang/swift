@@ -255,6 +255,9 @@ protocol MyEquatable {
   static func isEqual (lhs: Self, rhs: Self) -> Builtin.Int1
 }
 
+protocol MyExtended : MyEquatable {
+  func extended()
+}
 public struct Inner<Element> {
   public init()
   public init(_ e: Element)
@@ -278,7 +281,7 @@ public struct Outermost<Value> {
 sil @$closure : $@convention(method) <Value where Value : MyEquatable> (Outer<Value>, Outer<Value>, @thin Outer<Value>.Type) -> Builtin.Int1
 sil @$closure2 : $@convention(method) <Value where Value : MyEquatable> (Outermost<Value>, Outermost<Value>, @thin Outermost<Value>.Type) -> Builtin.Int1
 
-sil @$dont_crash_test_capture_specialized_conditional_conformance : $@convention(thin) <Element where Element : MyEquatable> (Outer<Inner<Element>>) -> () {
+sil @$dont_crash_test_capture_specialized_conditional_conformance : $@convention(thin) <Element where Element : MyExtended> (Outer<Inner<Element>>) -> () {
 bb0(%0 : $Outer<Inner<Element>>):
   %2 = alloc_stack $Outer<Inner<Element>>
   store %0 to %2 : $*Outer<Inner<Element>>
@@ -291,7 +294,24 @@ bb0(%0 : $Outer<Inner<Element>>):
   return %15 : $()
 }
 
-sil @$dont_crash_test_capture_specialized_conditional_conformance_nested : $@convention(thin) <Element where Element : MyEquatable> (Outer<Inner<Element>>) -> () {
+protocol AssocType {
+  associatedtype A : MyExtended
+}
+
+sil @$dont_crash_test_capture_specialized_conditional_conformance_associated_type : $@convention(thin) <Element where Element : AssocType> (Outer<Inner<Element.A>>) -> () {
+bb0(%0 : $Outer<Inner<Element.A>>):
+  %2 = alloc_stack $Outer<Inner<Element.A>>
+  store %0 to %2 : $*Outer<Inner<Element.A>>
+  %4 = metatype $@thin Outer<Inner<Element.A>>.Type
+  %5 = function_ref @$closure : $@convention(method) <τ_0_0 where τ_0_0 : MyEquatable> (Outer<τ_0_0>, Outer<τ_0_0>, @thin Outer<τ_0_0>.Type) -> Builtin.Int1
+  %6 = partial_apply [callee_guaranteed] %5<Inner<Element.A>>(%4) : $@convention(method) <τ_0_0 where τ_0_0 : MyEquatable> (Outer<τ_0_0>, Outer<τ_0_0>, @thin Outer<τ_0_0>.Type) -> Builtin.Int1
+  strong_release %6 : $@callee_guaranteed (Outer<Inner<Element.A>>, Outer<Inner<Element.A>>) -> Builtin.Int1
+  dealloc_stack %2 : $*Outer<Inner<Element.A>>
+  %15 = tuple ()
+  return %15 : $()
+}
+
+sil @$dont_crash_test_capture_specialized_conditional_conformance_nested : $@convention(thin) <A, B, Element where Element : MyEquatable> (Outer<Inner<Element>>) -> () {
 bb0(%0 : $Outer<Inner<Element>>):
   %4 = metatype $@thin Outermost<Outer<Inner<Element>>>.Type
   %5 = function_ref @$closure2 : $@convention(method) <Value where Value : MyEquatable> (Outermost<Value>, Outermost<Value>, @thin Outermost<Value>.Type) -> Builtin.Int1

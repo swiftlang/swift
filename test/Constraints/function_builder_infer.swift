@@ -184,3 +184,51 @@ struct TupleMeResolvedExplicit: Tupled, OtherTupled {
     return "hello"
   }
 }
+
+// Inference through dynamic replacement
+struct DynamicTupled: Tupled {
+  dynamic var tuple: some Any {
+    return "hello"
+  }
+}
+
+extension DynamicTupled {
+  @_dynamicReplacement(for: tuple)
+  var replacementTuple: some Any {
+    1
+    3.14159
+    "hello"
+  }
+}
+
+struct DynamicTupled2: Tupled, OtherTupled {
+  dynamic var tuple: some Any {
+    return "hello"
+  }
+}
+
+extension DynamicTupled2 {
+  @_dynamicReplacement(for: tuple)
+  var replacementTuple: some Any { // expected-error{{ambiguous function builder inferred for 'replacementTuple': 'TupleBuilder' or 'OtherTupleBuilder'}}
+    // expected-note@-1{{add an explicit 'return' statement to not use a function builder}}
+    // expected-note@-2{{apply function builder 'TupleBuilder' (inferred from protocol 'Tupled')}}
+    // expected-note@-3{{apply function builder 'OtherTupleBuilder' (inferred from protocol 'OtherTupled')}}
+    1
+  }
+}
+
+struct DynamicTupled3 {
+  @TupleBuilder dynamic var dynamicTuple: some Any {
+    0
+  }
+}
+
+extension DynamicTupled3: OtherTupled {
+  @_dynamicReplacement(for: dynamicTuple)
+  var tuple: some Any { // expected-error{{ambiguous function builder inferred for 'tuple': 'OtherTupleBuilder' or 'TupleBuilder'}}
+    // expected-note@-1{{add an explicit 'return' statement to not use a function builder}}
+    // expected-note@-2{{apply function builder 'OtherTupleBuilder' (inferred from protocol 'OtherTupled')}}
+    // expected-note@-3{{apply function builder 'TupleBuilder' (inferred from dynamic replacement of 'dynamicTuple')}}
+    0
+  }
+}

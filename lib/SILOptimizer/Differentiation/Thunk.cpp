@@ -129,13 +129,14 @@ CanSILFunctionType buildThunkType(SILFunction *fn,
   // - Building a reabstraction thunk type.
   // - Building an index subset thunk type, where the expected type has context
   //   (i.e. is `@convention(thick)`).
-  auto extInfo = expectedType->getExtInfo();
+  auto extInfoBuilder = expectedType->getExtInfo().intoBuilder();
   if (thunkKind == DifferentiationThunkKind::Reabstraction ||
-      extInfo.hasContext()) {
-    extInfo = extInfo.withRepresentation(SILFunctionType::Representation::Thin);
+      extInfoBuilder.hasContext()) {
+    extInfoBuilder = extInfoBuilder.withRepresentation(
+        SILFunctionType::Representation::Thin);
   }
   if (withoutActuallyEscaping)
-    extInfo = extInfo.withNoEscape(false);
+    extInfoBuilder = extInfoBuilder.withNoEscape(false);
 
   // Does the thunk type involve archetypes other than opened existentials?
   bool hasArchetypes = false;
@@ -191,7 +192,7 @@ CanSILFunctionType buildThunkType(SILFunction *fn,
   // pseudogeneric, since we have no way to pass generic parameters.
   if (genericSig)
     if (fn->getLoweredFunctionType()->isPseudogeneric())
-      extInfo = extInfo.withIsPseudogeneric();
+      extInfoBuilder = extInfoBuilder.withIsPseudogeneric();
 
   // Add the function type as the parameter.
   auto contextConvention =
@@ -237,12 +238,11 @@ CanSILFunctionType buildThunkType(SILFunction *fn,
   if (expectedType->hasErrorResult()) {
     auto errorResult = expectedType->getErrorResult();
     interfaceErrorResult = errorResult.map(mapTypeOutOfContext);
-    ;
   }
 
   // The type of the thunk function.
   return SILFunctionType::get(
-      genericSig, extInfo, expectedType->getCoroutineKind(),
+      genericSig, extInfoBuilder.build(), expectedType->getCoroutineKind(),
       ParameterConvention::Direct_Unowned, interfaceParams, interfaceYields,
       interfaceResults, interfaceErrorResult,
       expectedType->getPatternSubstitutions(), SubstitutionMap(),
@@ -381,6 +381,23 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   for (unsigned resIdx : range(toType->getNumResults())) {
     auto fromRes = fromConv.getResults()[resIdx];
     auto toRes = toConv.getResults()[resIdx];
+    // Check function-typed results.
+    if (isa<SILFunctionType>(fromRes.getInterfaceType()) &&
+        isa<SILFunctionType>(toRes.getInterfaceType())) {
+      auto fromFnType = cast<SILFunctionType>(fromRes.getInterfaceType());
+      auto toFnType = cast<SILFunctionType>(toRes.getInterfaceType());
+      auto fromUnsubstFnType = fromFnType->getUnsubstitutedType(module);
+      auto toUnsubstFnType = toFnType->getUnsubstitutedType(module);
+      // If unsubstituted function types are not equal, perform reabstraction.
+      if (fromUnsubstFnType != toUnsubstFnType) {
+        auto fromFn = *fromDirResultsIter++;
+        auto newFromFn = reabstractFunction(
+            builder, fb, loc, fromFn, toFnType,
+            [](SubstitutionMap substMap) { return substMap; });
+        results.push_back(newFromFn);
+        continue;
+      }
+    }
     // No abstraction mismatch.
     if (fromRes.isFormalIndirect() == toRes.isFormalIndirect()) {
       // If result types are direct, add call result as direct thunk result.
@@ -403,9 +420,11 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
     }
     // Store direct results to indirect results.
     assert(toRes.isFormalIndirect());
+#ifndef NDEBUG
     SILType resultTy =
         toConv.getSILType(toRes, builder.getTypeExpansionContext());
     assert(resultTy.isAddress());
+#endif
     auto indRes = *toIndResultsIter++;
     builder.createStore(loc, *fromDirResultsIter++, indRes,
                         StoreOwnershipQualifier::Unqualified);
@@ -725,7 +744,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   // Compute target type for thunking.
   auto derivativeFnType = derivativeFn->getType().castTo<SILFunctionType>();
   auto targetType = origFnType->getAutoDiffDerivativeFunctionType(
-      desiredIndices.parameters, desiredIndices.source, kind, module.Types,
+      desiredIndices.parameters, desiredIndices.results, kind, module.Types,
       lookupConformance);
   auto *caller = derivativeFn->getFunction();
   if (targetType->hasArchetype()) {
@@ -821,8 +840,10 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
                  peerThroughFunctionConversions<ClassMethodInst>(
                      derivativeFn)) {
     auto classOperand = thunk->getArgumentsWithoutIndirectResults().back();
+#ifndef NDEBUG
     auto classOperandType = assocMethodInst->getOperand()->getType();
     assert(classOperand->getType() == classOperandType);
+#endif
     assocRef = builder.createClassMethod(
         loc, classOperand, assocMethodInst->getMember(),
         thunk->mapTypeIntoContext(assocMethodInst->getType()));

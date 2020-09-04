@@ -22,6 +22,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/LayoutConstraint.h"
+#include "swift/AST/ParseRequests.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/OptionSet.h"
@@ -92,8 +93,11 @@ public:
   /// This is called to update the kind of a token whose start location is Loc.
   virtual void registerTokenKindChange(SourceLoc Loc, tok NewKind) {};
 
-  /// This is called when a source file is fully parsed.
-  virtual void finalize() {};
+  /// This is called when a source file is fully parsed. It returns the
+  /// finalized vector of tokens, or \c None if the receiver isn't configured to
+  /// record them.
+  virtual Optional<std::vector<Token>> finalize() { return None; }
+
   virtual ~ConsumeTokenReceiver() = default;
 };
 
@@ -121,10 +125,10 @@ public:
   CodeCompletionCallbacks *CodeCompletion = nullptr;
   std::vector<Located<std::vector<ParamDecl*>>> AnonClosureVars;
 
-  /// Tracks parsed decls that LLDB requires to be inserted at the top-level.
-  std::vector<Decl *> ContextSwitchedTopLevelDecls;
+  /// The current token hash, or \c None if the parser isn't computing a hash
+  /// for the token stream.
+  Optional<llvm::MD5> CurrentTokenHash;
 
-  NullablePtr<llvm::MD5> CurrentTokenHash;
   void recordTokenHash(const Token Tok) {
     if (!Tok.getText().empty())
       recordTokenHash(Tok.getText());
@@ -139,7 +143,6 @@ public:
   ArrayRef<VarDecl *> DisabledVars;
   Diag<> DisabledVarReason;
   
-  llvm::SmallPtrSet<Decl *, 2> AlreadyHandledDecls;
   enum {
     /// InVarOrLetPattern has this value when not parsing a pattern.
     IVOLP_NotInVarOrLet,
@@ -416,6 +419,14 @@ public:
     return SyntaxContext->finalizeRoot();
   }
 
+  /// Retrieve the token receiver from the parser once it has finished parsing.
+  std::unique_ptr<ConsumeTokenReceiver> takeTokenReceiver() {
+    assert(Tok.is(tok::eof) && "not done parsing yet");
+    auto *receiver = TokReceiver;
+    TokReceiver = nullptr;
+    return std::unique_ptr<ConsumeTokenReceiver>(receiver);
+  }
+
   //===--------------------------------------------------------------------===//
   // Routines to save and restore parser state.
 
@@ -471,6 +482,9 @@ public:
         savedConsumer(receiver, this) {}
       void receive(Token tok) override {
         delayedTokens.push_back(tok);
+      }
+      Optional<std::vector<Token>> finalize() override {
+        llvm_unreachable("Cannot finalize a DelayedTokenReciever");
       }
       ~DelayedTokenReceiver() {
         if (!shouldTransfer)
@@ -642,7 +656,7 @@ public:
   /// \returns true if there is an instance of \c T1 on the current line (this
   /// avoids the foot-gun of not considering T1 starting the next line for a
   /// plain Tok.is(T1) check).
-  bool skipUntilTokenOrEndOfLine(tok T1);
+  bool skipUntilTokenOrEndOfLine(tok T1, tok T2 = tok::NUM_TOKENS);
 
   /// Skip a braced block (e.g. function body). The current token must be '{'.
   /// Returns \c true if the parser hit the eof before finding matched '}'.
@@ -669,6 +683,14 @@ public:
   /// \param DiagText name for the string literal in the diagnostic.
   Optional<StringRef>
   getStringLiteralIfNotInterpolated(SourceLoc Loc, StringRef DiagText);
+
+  /// Returns true to indicate that experimental concurrency syntax should be
+  /// parsed if the parser is generating only a syntax tree or if the user has
+  /// passed the `-enable-experimental-concurrency` flag to the frontend.
+  bool shouldParseExperimentalConcurrency() const {
+    return Context.LangOpts.EnableExperimentalConcurrency ||
+      Context.LangOpts.ParseForSyntaxTreeOnly;
+  }
 
 public:
   InFlightDiagnostic diagnose(SourceLoc Loc, Diagnostic Diag) {
@@ -904,14 +926,8 @@ public:
   void consumeDecl(ParserPosition BeginParserPosition, ParseDeclOptions Flags,
                    bool IsTopLevel);
 
-  // When compiling for the Debugger, some Decl's need to be moved from the
-  // current scope.  In which case although the Decl will be returned in the
-  // ParserResult, it should not be inserted into the Decl list for the current
-  // context.  markWasHandled asserts that the Decl is already where it
-  // belongs, and declWasHandledAlready is used to check this assertion.
-  // To keep the handled decl array small, we remove the Decl when it is
-  // checked, so you can only call declWasAlreadyHandled once for a given
-  // decl.
+  /// FIXME: Remove this, it's vestigial.
+  llvm::SmallPtrSet<Decl *, 2> AlreadyHandledDecls;
 
   void markWasHandled(Decl *D) {
     AlreadyHandledDecls.insert(D);
@@ -928,9 +944,8 @@ public:
   std::pair<std::vector<Decl *>, Optional<std::string>>
   parseDeclListDelayed(IterableDeclContext *IDC);
 
-  bool parseMemberDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
-                           SourceLoc PosBeforeLB,
-                           Diag<> ErrorDiag,
+  bool parseMemberDeclList(SourceLoc &LBLoc, SourceLoc &RBLoc,
+                           Diag<> LBraceDiag, Diag<> RBraceDiag,
                            IterableDeclContext *IDC);
 
   bool canDelayMemberDeclParsing(bool &HasOperatorDeclarations,
@@ -1108,8 +1123,7 @@ public:
                                        ParseDeclOptions Flags,
                                        DeclAttributes &Attributes,
                                        bool HasFuncKeyword = true);
-  ParserResult<BraceStmt>
-  parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD);
+  BraceStmt *parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD);
   void parseAbstractFunctionBody(AbstractFunctionDecl *AFD);
   BraceStmt *parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
   ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,
@@ -1334,9 +1348,23 @@ public:
                                       DeclName &fullName,
                                       ParameterList *&bodyParams,
                                       DefaultArgumentInfo &defaultArgs,
+                                      SourceLoc &asyncLoc,
                                       SourceLoc &throws,
                                       bool &rethrows,
                                       TypeRepr *&retType);
+
+  /// Parse 'async' and 'throws', if present, putting the locations of the
+  /// keywords into the \c SourceLoc parameters.
+  ///
+  /// \param existingArrowLoc The location of an existing '->', if there is
+  /// one. Parsing 'async' or 'throws' after the `->` is an error we
+  /// correct for.
+  ///
+  /// \param rethrows If non-NULL, will also parse the 'rethrows' keyword in
+  /// lieu of 'throws'.
+  void parseAsyncThrows(
+      SourceLoc existingArrowLoc, SourceLoc &asyncLoc, SourceLoc &throwsLoc,
+      bool *rethrows);
 
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
@@ -1541,6 +1569,7 @@ public:
           SmallVectorImpl<CaptureListEntry> &captureList,
           VarDecl *&capturedSelfParamDecl,
           ParameterList *&params,
+          SourceLoc &asyncLoc,
           SourceLoc &throwsLoc,
           SourceLoc &arrowLoc,
           TypeExpr *&explicitResultType,
@@ -1630,9 +1659,7 @@ public:
   diagnoseWhereClauseInGenericParamList(const GenericParamList *GenericParams);
 
   ParserStatus
-  parseFreestandingGenericWhereClause(GenericContext *genCtx,
-                                      GenericParamList *&GPList,
-                                      ParseDeclOptions flags);
+  parseFreestandingGenericWhereClause(GenericContext *genCtx);
 
   ParserStatus parseGenericWhereClause(
       SourceLoc &WhereLoc, SmallVectorImpl<RequirementRepr> &Requirements,

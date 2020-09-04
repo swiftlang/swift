@@ -31,49 +31,6 @@
 
 using namespace swift;
 
-enum NonconformingMemberKind {
-  AssociatedValue,
-  StoredProperty
-};
-
-/// Returns the VarDecl of each stored property in the given struct whose type
-/// does not conform to a protocol.
-/// \p theStruct The struct whose stored properties should be checked.
-/// \p protocol The protocol being requested.
-/// \return The VarDecl of each stored property whose type does not conform.
-static SmallVector<VarDecl *, 3>
-storedPropertiesNotConformingToProtocol(DeclContext *DC, StructDecl *theStruct,
-                                        ProtocolDecl *protocol) {
-  auto storedProperties = theStruct->getStoredProperties();
-  SmallVector<VarDecl *, 3> nonconformingProperties;
-  for (auto propertyDecl : storedProperties) {
-    if (!propertyDecl->isUserAccessible())
-      continue;
-
-    auto type = propertyDecl->getValueInterfaceType();
-    if (!type)
-      nonconformingProperties.push_back(propertyDecl);
-
-    if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type), protocol,
-                                         DC)) {
-      nonconformingProperties.push_back(propertyDecl);
-    }
-  }
-  return nonconformingProperties;
-}
-
-/// Returns true if every stored property in the given struct conforms to the
-/// protocol (or, vacuously, if it has no stored properties).
-/// \p theStruct The struct whose stored properties should be checked.
-/// \p protocol The protocol being requested.
-/// \return True if all stored properties of the struct conform.
-static bool allStoredPropertiesConformToProtocol(DeclContext *DC,
-                                                 StructDecl *theStruct,
-                                                 ProtocolDecl *protocol) {
-  return storedPropertiesNotConformingToProtocol(DC, theStruct, protocol)
-      .empty();
-}
-
 /// Common preconditions for Equatable and Hashable.
 static bool canDeriveConformance(DeclContext *DC,
                                  NominalTypeDecl *target,
@@ -86,53 +43,14 @@ static bool canDeriveConformance(DeclContext *DC,
   }
 
   if (auto structDecl = dyn_cast<StructDecl>(target)) {
-    // All stored properties of the struct must conform to the protocol.
-    return allStoredPropertiesConformToProtocol(DC, structDecl, protocol);
+    // All stored properties of the struct must conform to the protocol. If
+    // there are no stored properties, we will vaccously return true.
+    return DerivedConformance::storedPropertiesNotConformingToProtocol(
+               DC, structDecl, protocol)
+        .empty();
   }
 
   return false;
-}
-
-/// Diagnose failed conformance synthesis caused by a member type not conforming
-/// to the same protocol
-void diagnoseFailedDerivation(DeclContext *DC, NominalTypeDecl *nominal,
-                              ProtocolDecl *protocol) {
-  ASTContext &ctx = DC->getASTContext();
-
-  if (auto *enumDecl = dyn_cast<EnumDecl>(nominal)) {
-    auto nonconformingAssociatedTypes =
-        DerivedConformance::associatedValuesNotConformingToProtocol(DC, enumDecl, protocol);
-    for (auto *typeToDiagnose : nonconformingAssociatedTypes) {
-      SourceLoc reprLoc;
-      if (auto *repr = typeToDiagnose->getTypeRepr())
-        reprLoc = repr->getStartLoc();
-      ctx.Diags.diagnose(
-          reprLoc,
-          diag::missing_member_type_conformance_prevents_synthesis,
-          NonconformingMemberKind::AssociatedValue,
-          typeToDiagnose->getInterfaceType(), protocol->getDeclaredType(),
-          nominal->getDeclaredInterfaceType());
-    }
-  }
-
-  if (auto *structDecl = dyn_cast<StructDecl>(nominal)) {
-    auto nonconformingStoredProperties =
-        storedPropertiesNotConformingToProtocol(DC, structDecl, protocol);
-    for (auto *propertyToDiagnose : nonconformingStoredProperties) {
-      ctx.Diags.diagnose(
-          propertyToDiagnose->getLoc(),
-          diag::missing_member_type_conformance_prevents_synthesis,
-          NonconformingMemberKind::StoredProperty,
-          propertyToDiagnose->getInterfaceType(), protocol->getDeclaredType(),
-          nominal->getDeclaredInterfaceType());
-    }
-  }
-
-  if (auto *classDecl = dyn_cast<ClassDecl>(nominal)) {
-    ctx.Diags.diagnose(classDecl->getLoc(),
-                       diag::classes_automatic_protocol_synthesis,
-                       protocol->getName().str());
-  }
 }
 
 static std::pair<BraceStmt *, bool>
@@ -259,20 +177,20 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     SmallVector<VarDecl*, 3> lhsPayloadVars;
     auto lhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'l', eqDecl,
                                                       lhsPayloadVars);
-    auto lhsElemPat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                                 SourceLoc(), DeclNameLoc(),
-                                                 DeclNameRef(), elt,
-                                                 lhsSubpattern);
+    auto *lhsBaseTE = TypeExpr::createImplicit(enumType, C);
+    auto lhsElemPat =
+        new (C) EnumElementPattern(lhsBaseTE, SourceLoc(), DeclNameLoc(),
+                                   DeclNameRef(), elt, lhsSubpattern);
     lhsElemPat->setImplicit();
 
     // .<elt>(let r0, let r1, ...)
     SmallVector<VarDecl*, 3> rhsPayloadVars;
     auto rhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'r', eqDecl,
                                                       rhsPayloadVars);
-    auto rhsElemPat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                                 SourceLoc(), DeclNameLoc(),
-                                                 DeclNameRef(), elt,
-                                                 rhsSubpattern);
+    auto *rhsBaseTE = TypeExpr::createImplicit(enumType, C);
+    auto rhsElemPat =
+        new (C) EnumElementPattern(rhsBaseTE, SourceLoc(), DeclNameLoc(),
+                                   DeclNameRef(), elt, rhsSubpattern);
     rhsElemPat->setImplicit();
 
     auto hasBoundDecls = !lhsPayloadVars.empty();
@@ -386,19 +304,17 @@ deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl, void *) {
     if (!propertyDecl->isUserAccessible())
       continue;
 
-    auto aPropertyRef = new (C) DeclRefExpr(propertyDecl, DeclNameLoc(),
-                                            /*implicit*/ true);
     auto aParamRef = new (C) DeclRefExpr(aParam, DeclNameLoc(),
                                          /*implicit*/ true);
-    auto aPropertyExpr = new (C) DotSyntaxCallExpr(aPropertyRef, SourceLoc(),
-                                                   aParamRef);
+    auto aPropertyExpr = new (C) MemberRefExpr(aParamRef, SourceLoc(),
+                                               propertyDecl, DeclNameLoc(),
+                                               /*implicit*/ true);
 
-    auto bPropertyRef = new (C) DeclRefExpr(propertyDecl, DeclNameLoc(),
-                                            /*implicit*/ true);
     auto bParamRef = new (C) DeclRefExpr(bParam, DeclNameLoc(),
                                          /*implicit*/ true);
-    auto bPropertyExpr = new (C) DotSyntaxCallExpr(bPropertyRef, SourceLoc(),
-                                                   bParamRef);
+    auto bPropertyExpr = new (C) MemberRefExpr(bParamRef, SourceLoc(),
+                                               propertyDecl, DeclNameLoc(),
+                                               /*implicit*/ true);
 
     auto guardStmt = DerivedConformance::returnFalseIfNotEqualGuard(C,
       aPropertyExpr, bPropertyExpr);
@@ -477,7 +393,7 @@ deriveEquatable_eq(
     getParamDecl("b")
   });
 
-  auto boolTy = C.getBoolDecl()->getDeclaredType();
+  auto boolTy = C.getBoolDecl()->getDeclaredInterfaceType();
 
   Identifier generatedIdentifier;
   if (parentDC->getParentModule()->isResilient()) {
@@ -490,29 +406,24 @@ deriveEquatable_eq(
   }
 
   DeclName name(C, generatedIdentifier, params);
-  auto eqDecl =
-    FuncDecl::create(C, /*StaticLoc=*/SourceLoc(),
-                     StaticSpellingKind::KeywordStatic,
-                     /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
-                     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                     /*GenericParams=*/nullptr,
-                     params,
-                     TypeLoc::withoutLoc(boolTy),
-                     parentDC);
-  eqDecl->setImplicit();
+  auto *const eqDecl = FuncDecl::createImplicit(
+      C, StaticSpellingKind::KeywordStatic, name, /*NameLoc=*/SourceLoc(),
+      /*Async=*/false,
+      /*Throws=*/false,
+      /*GenericParams=*/nullptr, params, boolTy, parentDC);
   eqDecl->setUserAccessible(false);
 
   // Add the @_implements(Equatable, ==(_:_:)) attribute
   if (generatedIdentifier != C.Id_EqualsOperator) {
     auto equatableProto = C.getProtocol(KnownProtocolKind::Equatable);
-    auto equatableTy = equatableProto->getDeclaredType();
-    auto equatableTypeLoc = TypeLoc::withoutLoc(equatableTy);
+    auto equatableTy = equatableProto->getDeclaredInterfaceType();
+    auto equatableTyExpr = TypeExpr::createImplicit(equatableTy, C);
     SmallVector<Identifier, 2> argumentLabels = { Identifier(), Identifier() };
     auto equalsDeclName = DeclName(C, DeclBaseName(C.Id_EqualsOperator),
                                    argumentLabels);
     eqDecl->getAttrs().add(new (C) ImplementsAttr(SourceLoc(),
                                                   SourceRange(),
-                                                  equatableTypeLoc,
+                                                  equatableTyExpr,
                                                   equalsDeclName,
                                                   DeclNameLoc()));
   }
@@ -567,7 +478,8 @@ void DerivedConformance::tryDiagnoseFailedEquatableDerivation(
     DeclContext *DC, NominalTypeDecl *nominal) {
   ASTContext &ctx = DC->getASTContext();
   auto *equatableProto = ctx.getProtocol(KnownProtocolKind::Equatable);
-  diagnoseFailedDerivation(DC, nominal, equatableProto);
+  diagnoseAnyNonConformingMemberTypes(DC, nominal, equatableProto);
+  diagnoseIfSynthesisUnsupportedForDecl(nominal, equatableProto);
 }
 
 /// Returns a new \c CallExpr representing
@@ -615,7 +527,7 @@ deriveHashable_hashInto(
     hashableProto->diagnose(diag::broken_hashable_no_hasher);
     return nullptr;
   }
-  Type hasherType = hasherDecl->getDeclaredType();
+  Type hasherType = hasherDecl->getDeclaredInterfaceType();
 
   // Params: self (implicit), hasher
   auto *hasherParamDecl = new (C) ParamDecl(SourceLoc(),
@@ -631,14 +543,11 @@ deriveHashable_hashInto(
 
   // Func name: hash(into: inout Hasher) -> ()
   DeclName name(C, C.Id_hash, params);
-  auto *hashDecl = FuncDecl::create(C,
-                                    SourceLoc(), StaticSpellingKind::None,
-                                    SourceLoc(), name, SourceLoc(),
-                                    /*Throws=*/false, SourceLoc(),
-                                    nullptr, params,
-                                    TypeLoc::withoutLoc(returnType),
-                                    parentDC);
-  hashDecl->setImplicit();
+  auto *const hashDecl = FuncDecl::createImplicit(
+      C, StaticSpellingKind::None, name, /*NameLoc=*/SourceLoc(),
+      /*Async=*/false,
+      /*Throws=*/false,
+      /*GenericParams=*/nullptr, params, returnType, parentDC);
   hashDecl->setBodySynthesizer(bodySynthesizer);
 
   hashDecl->copyFormalAccessFrom(derived.Nominal);
@@ -748,12 +657,12 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
   //   case A, B(Int), C(String, Int)
   //   @derived func hash(into hasher: inout Hasher) {
   //     switch self {
-  //     case A:
+  //     case .A:
   //       hasher.combine(0)
-  //     case B(let a0):
+  //     case .B(let a0):
   //       hasher.combine(1)
   //       hasher.combine(a0)
-  //     case C(let a0, let a1):
+  //     case .C(let a0, let a1):
   //       hasher.combine(2)
   //       hasher.combine(a0)
   //       hasher.combine(a1)
@@ -783,10 +692,9 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
 
     auto payloadPattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'a', hashIntoDecl,
                                                        payloadVars);
-    auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                          SourceLoc(), DeclNameLoc(),
-                                          DeclNameRef(elt->getBaseIdentifier()),
-                                          elt, payloadPattern);
+    auto pat = new (C) EnumElementPattern(
+        TypeExpr::createImplicit(enumType, C), SourceLoc(), DeclNameLoc(),
+        DeclNameRef(elt->getBaseIdentifier()), elt, payloadPattern);
     pat->setImplicit();
 
     auto labelItem = CaseLabelItem(pat);
@@ -874,12 +782,12 @@ deriveBodyHashable_struct_hashInto(AbstractFunctionDecl *hashIntoDecl, void *) {
     if (!propertyDecl->isUserAccessible())
       continue;
 
-    auto propertyRef = new (C) DeclRefExpr(propertyDecl, DeclNameLoc(),
-                                           /*implicit*/ true);
     auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
                                        /*implicit*/ true);
-    auto selfPropertyExpr = new (C) DotSyntaxCallExpr(propertyRef, SourceLoc(),
-                                                      selfRef);
+    auto selfPropertyExpr = new (C) MemberRefExpr(selfRef, SourceLoc(),
+                                                  propertyDecl, DeclNameLoc(),
+                                                  /*implicit*/ true);
+
     // Generate: hasher.combine(self.<property>)
     auto combineExpr = createHasherCombineCall(C, hasherParam, selfPropertyExpr);
     statements.emplace_back(ASTNode(combineExpr));
@@ -947,7 +855,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   ASTContext &C = derived.Context;
 
   auto parentDC = derived.getConformanceContext();
-  Type intType = C.getIntDecl()->getDeclaredType();
+  Type intType = C.getIntDecl()->getDeclaredInterfaceType();
 
   // We can't form a Hashable conformance if Int isn't Hashable or
   // ExpressibleByIntegerLiteral.
@@ -981,7 +889,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       /*GenericParams=*/nullptr, params,
-      TypeLoc::withoutLoc(intType), parentDC);
+      intType, parentDC);
   getterDecl->setImplicit();
   getterDecl->setBodySynthesizer(&deriveBodyHashable_hashValue);
   getterDecl->setIsTransparent(false);
@@ -1051,7 +959,8 @@ void DerivedConformance::tryDiagnoseFailedHashableDerivation(
     DeclContext *DC, NominalTypeDecl *nominal) {
   ASTContext &ctx = DC->getASTContext();
   auto *hashableProto = ctx.getProtocol(KnownProtocolKind::Hashable);
-  diagnoseFailedDerivation(DC, nominal, hashableProto);
+  diagnoseAnyNonConformingMemberTypes(DC, nominal, hashableProto);
+  diagnoseIfSynthesisUnsupportedForDecl(nominal, hashableProto);
 }
 
 ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
@@ -1086,7 +995,7 @@ ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
                                 hashableProto)) {
         ConformanceDecl->diagnose(diag::type_does_not_conform,
                                   Nominal->getDeclaredType(),
-                                  hashableProto->getDeclaredType());
+                                  hashableProto->getDeclaredInterfaceType());
         // Ideally, this would be diagnosed in
         // ConformanceChecker::resolveWitnessViaLookup. That doesn't work for
         // Hashable because DerivedConformance::canDeriveHashable returns true

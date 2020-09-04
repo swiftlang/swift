@@ -414,11 +414,13 @@ bb0:
     // CHECK: [[INDEX2:%[0-9]+]] = integer_literal $Builtin.Word, 2
     // CHECK: [[INDEXADDR2:%[0-9]+]] = index_addr [[STORAGEADDR]] : $*Int64, [[INDEX2]] : $Builtin.Word
     // CHECK: store [[ELEM3INT]] to [trivial] [[INDEXADDR2]] : $*Int64
-    // CHECK: [[BORROW:%[0-9]+]] = begin_borrow [[ARRAY]]
+    // CHECK: [[FINALIZEREF:%[0-9]+]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
+    // CHECK: [[FINALIZED:%[0-9]+]] = apply [[FINALIZEREF]]<Int64>([[ARRAY]])
+    // CHECK: [[BORROW:%[0-9]+]] = begin_borrow [[FINALIZED]]
     // CHECK: [[USEREF:%[0-9]+]] = function_ref @useArray
     // CHECK: apply [[USEREF]]([[BORROW]])
     // CHECK: end_borrow [[BORROW]]
-    // CHECK: destroy_value [[ARRAY]] : $Array<Int64>
+    // CHECK: destroy_value [[FINALIZED]] : $Array<Int64>
 }
 
 /// A stub for OSLogMessage.init. The optimization is driven by this function.
@@ -538,11 +540,13 @@ bb0:
     // CHECK: ([[ARRAY:%[0-9]+]], [[STORAGEPTR:%[0-9]+]]) = destructure_tuple [[TUPLE]]
     // CHECK: [[STORAGEADDR:%[0-9]+]] = pointer_to_address [[STORAGEPTR]] : $Builtin.RawPointer to [strict] $*String
     // CHECK: store [[STRINGCONST]] to [init] [[STORAGEADDR]] : $*String
-    // CHECK: [[BORROW:%[0-9]+]] = begin_borrow [[ARRAY]]
+    // CHECK: [[FINALIZEREF:%[0-9]+]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
+    // CHECK: [[FINALIZED:%[0-9]+]] = apply [[FINALIZEREF]]<String>([[ARRAY]])
+    // CHECK: [[BORROW:%[0-9]+]] = begin_borrow [[FINALIZED]]
     // CHECK: [[USEREF:%[0-9]+]] = function_ref @useArrayString
     // CHECK: apply [[USEREF]]([[BORROW]])
     // CHECK: end_borrow [[BORROW]]
-    // CHECK: destroy_value [[ARRAY]] : $Array<String>
+    // CHECK: destroy_value [[FINALIZED]] : $Array<String>
 }
 
 sil [ossa] [Onone] [_semantics "constant_evaluable"] [_semantics "oslog.message.init_stub"] @oslogMessageArrayInterpolationInit : $@convention(thin) (@owned OSLogInterpolationArrayStub)

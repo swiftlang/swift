@@ -173,9 +173,9 @@ internal typealias _EitherRandomAccessCollection<
 extension _EitherRandomAccessCollection: RandomAccessCollection { }
 
 extension _Either {
-  init<T, C: Collection>(
+  init<C: Collection>(
     _ collection: C
-  ) where Right == AnyCollection<T>, C.Element == T {
+  ) where Right == AnyCollection<C.Element> {
     self = .right(AnyCollection(collection))
   }
 }

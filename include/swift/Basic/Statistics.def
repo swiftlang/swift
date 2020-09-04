@@ -247,9 +247,6 @@ FRONTEND_STATISTIC(Sema, NamedLazyMemberLoadSuccessCount)
 /// Number of types deserialized.
 FRONTEND_STATISTIC(Sema, NumTypesDeserialized)
 
-/// Number of types validated.
-FRONTEND_STATISTIC(Sema, NumTypesValidated)
-
 /// Number of lazy iterable declaration contexts left unloaded.
 FRONTEND_STATISTIC(Sema, NumUnloadedLazyIterableDeclContexts)
 

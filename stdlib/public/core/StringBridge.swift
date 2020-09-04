@@ -472,7 +472,7 @@ private func getConstantTaggedCocoaContents(_ cocoaString: _CocoaString) ->
   )!
 
   guard _swift_stdlib_dyld_is_objc_constant_string(
-    unsafeBitCast(ivarPointer, to: UnsafeRawPointer.self)
+    UnsafeRawPointer(ivarPointer)
   ) == 1 else {
     return nil
   }

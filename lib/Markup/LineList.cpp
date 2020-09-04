@@ -78,7 +78,7 @@ static unsigned measureASCIIArt(StringRef S, unsigned NumLeadingSpaces) {
 
   if (S.startswith(" * "))
     return NumLeadingSpaces + 3;
-  if (S.startswith(" *\n") || S.startswith(" *\n\r"))
+  if (S.startswith(" *\n") || S.startswith(" *\r\n"))
     return NumLeadingSpaces + 2;
   return 0;
 }

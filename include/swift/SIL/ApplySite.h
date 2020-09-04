@@ -21,11 +21,16 @@
 #ifndef SWIFT_SIL_APPLYSITE_H
 #define SWIFT_SIL_APPLYSITE_H
 
+#include "swift/Basic/STLExtras.h"
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
-#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILInstruction.h"
+#include "llvm/ADT/ArrayRef.h"
 
 namespace swift {
+
+class FullApplySite;
 
 //===----------------------------------------------------------------------===//
 //                                 ApplySite
@@ -394,6 +399,10 @@ public:
     llvm_unreachable("covered switch");
   }
 
+  /// Returns true if \p op is an operand that passes an indirect
+  /// result argument to the apply site.
+  bool isIndirectResultOperand(const Operand &op) const;
+
   /// Return whether the given apply is of a formally-throwing function
   /// which is statically known not to throw.
   bool isNonThrowing() const {
@@ -423,6 +432,10 @@ public:
   }
 
   void dump() const LLVM_ATTRIBUTE_USED { getInstruction()->dump(); }
+
+  /// Attempt to cast this apply site to a full apply site, returning None on
+  /// failure.
+  Optional<FullApplySite> asFullApplySite() const;
 };
 
 //===----------------------------------------------------------------------===//
@@ -502,6 +515,34 @@ public:
     return getSubstCalleeConv().hasIndirectSILResults();
   }
 
+  /// If our apply site has a single direct result SILValue, return that
+  /// SILValue. Return SILValue() otherwise.
+  ///
+  /// This means that:
+  ///
+  /// 1. If we have an ApplyInst, we just visit the apply.
+  /// 2. If we have a TryApplyInst, we visit the first argument of the normal
+  ///    block.
+  /// 3. If we have a BeginApplyInst, we return SILValue() since the begin_apply
+  ///    yields values instead of returning them. A returned value should only
+  ///    be valid after a full apply site has completely finished executing.
+  SILValue getSingleDirectResult() const {
+    switch (getKind()) {
+    case FullApplySiteKind::ApplyInst:
+      return SILValue(cast<ApplyInst>(getInstruction()));
+    case FullApplySiteKind::BeginApplyInst: {
+      return SILValue();
+    }
+    case FullApplySiteKind::TryApplyInst: {
+      auto *normalBlock = cast<TryApplyInst>(getInstruction())->getNormalBB();
+      assert(normalBlock->getNumArguments() == 1 &&
+             "Expected try apply to have a single result");
+      return normalBlock->getArgument(0);
+    }
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
+  }
+
   unsigned getNumIndirectSILResults() const {
     return getSubstCalleeConv().getNumIndirectSILResults();
   }
@@ -530,12 +571,6 @@ public:
   /// and not an argument operand.
   bool isCalleeOperand(const Operand &op) const {
     return op.getOperandNumber() < getOperandIndexOfFirstArgument();
-  }
-
-  /// Returns true if \p op is an operand that passes an indirect
-  /// result argument to the apply site.
-  bool isIndirectResultOperand(const Operand &op) const {
-    return getCalleeArgIndex(op) < getNumIndirectSILResults();
   }
 
   /// Is this an ApplySite that begins the evaluation of a coroutine.
@@ -605,6 +640,12 @@ public:
     }
 
     llvm_unreachable("covered switch isn't covered");
+  }
+
+  /// Returns true if \p op is an operand that passes an indirect
+  /// result argument to the apply site.
+  bool isIndirectResultOperand(const Operand &op) const {
+    return getCalleeArgIndex(op) < getNumIndirectSILResults();
   }
 
   static FullApplySite getFromOpaqueValue(void *p) { return FullApplySite(p); }
@@ -698,5 +739,24 @@ template <> struct DenseMapInfo<::swift::FullApplySite> {
 };
 
 } // namespace llvm
+
+//===----------------------------------------------------------------------===//
+//           Inline Definitions to work around Forward Declaration
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+
+inline Optional<FullApplySite> ApplySite::asFullApplySite() const {
+  return FullApplySite::isa(getInstruction());
+}
+
+inline bool ApplySite::isIndirectResultOperand(const Operand &op) const {
+  auto fas = asFullApplySite();
+  if (!fas)
+    return false;
+  return fas->isIndirectResultOperand(op);
+}
+
+} // namespace swift
 
 #endif

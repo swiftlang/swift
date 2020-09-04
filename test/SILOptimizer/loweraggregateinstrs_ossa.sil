@@ -1,0 +1,117 @@
+// RUN: %target-sil-opt -sil-print-on-error -enable-sil-verify-all %s -lower-aggregate-instrs | %FileCheck %s
+
+// This file makes sure that given the current code-size metric we properly
+// expand operations for small structs and not for large structs in a consistent
+// way for all operations we expand.
+
+sil_stage canonical
+
+import Swift
+import Builtin
+
+class C1 {
+  var data : Builtin.Int64
+  init()
+}
+
+class C2 {
+  var data : Builtin.FPIEEE32
+  init()
+}
+
+class C3 {
+  var data : Builtin.FPIEEE64
+  init()
+}
+
+struct S2 {
+  var cls1 : C1
+  var cls2 : C2
+  var trivial : Builtin.FPIEEE32
+}
+
+struct S {
+  var trivial : Builtin.Int64
+  var cls : C3
+  var inner_struct : S2
+}
+
+enum E {
+  case NoElement
+  case TrivialElement(Builtin.Int64)
+  case ReferenceElement(C1)
+  case StructNonTrivialElt(S)
+  case TupleNonTrivialElt((Builtin.Int64, S, C3))
+}
+
+// This struct is larger than our current code-size limit (> 6 leaf nodes).
+struct LargeStruct {
+  var trivial1 : Builtin.Int64
+  var cls : S
+  var trivial2 : Builtin.Int64
+  var trivial3 : Builtin.Int64
+}
+
+///////////
+// Tests //
+///////////
+
+// This test makes sure that we /do not/ expand copy_value, destroy_value and
+// promote copy_addr/destroy_value to non-expanded copy_value, destroy_value.
+// CHECK-LABEL: sil [ossa] @large_struct_test : $@convention(thin) (@owned LargeStruct, @in LargeStruct) -> () {
+// CHECK: bb0([[ARG0:%.*]] : @owned $LargeStruct, [[ARG1:%.*]] : $*LargeStruct):
+// CHECK:   [[ARG0_COPY:%.*]] = copy_value [[ARG0]]
+// CHECK:   destroy_value [[ARG0]]
+// CHECK:   [[ALLOC_STACK:%.*]] = alloc_stack $LargeStruct
+// CHECK:   [[LOADED_ARG1:%.*]] = load [copy] [[ARG1]]
+// CHECK:   store [[LOADED_ARG1]] to [init] [[ALLOC_STACK]]
+// CHECK:   [[LOADED_OLD_VAL:%.*]] = load [take] [[ARG1]]
+// CHECK:   destroy_value [[LOADED_OLD_VAL]]
+// CHECK:   [[LOADED_ARG1:%.*]] = load [take] [[ALLOC_STACK]]
+// CHECK:   destroy_value [[LOADED_ARG1]]
+// CHECK:   dealloc_stack [[ALLOC_STACK]]
+// CHECK:   destroy_value [[ARG0_COPY]]
+// CHECK: } // end sil function 'large_struct_test'
+sil [ossa] @large_struct_test : $@convention(thin) (@owned LargeStruct, @in LargeStruct) -> () {
+bb0(%0 : @owned $LargeStruct, %1 : $*LargeStruct):
+  %0a = copy_value %0 : $LargeStruct
+  destroy_value %0 : $LargeStruct
+  %2 = alloc_stack $LargeStruct
+  copy_addr %1 to [initialization] %2 : $*LargeStruct
+  destroy_addr %1 : $*LargeStruct
+  destroy_addr %2 : $*LargeStruct
+  dealloc_stack %2 : $*LargeStruct
+  destroy_value %0a : $LargeStruct
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// In OSSA, we do not blow up copy_value, destroy_value today, but we do promote
+// copy_addr, destroy_addr of loadable types to their deep variants.
+//
+// CHECK-LABEL: sil [ossa] @small_struct_test : $@convention(thin) (@guaranteed S2, @in S2) -> () {
+// CHECK: bb0([[ARG0:%.*]] : @guaranteed $S2, [[ARG1:%.*]] : $*S2):
+// CHECK:   [[ARG0_COPY:%.*]] = copy_value [[ARG0]]
+// CHECK:   destroy_value [[ARG0_COPY]]
+// CHECK:   [[ALLOC_STACK:%.*]] = alloc_stack $S2
+// CHECK:   [[LOADED_ARG1:%.*]] = load [copy] [[ARG1]]
+// CHECK:   store [[LOADED_ARG1]] to [init] [[ALLOC_STACK]]
+//
+// CHECK:   [[LOADED_OLDVALUE:%.*]] = load [take] [[ARG1]]
+// CHECK:   destroy_value [[LOADED_OLDVALUE]]
+//
+// CHECK:   [[RELOADED_ARG1:%.*]] = load [take] [[ALLOC_STACK]]
+// CHECK:   destroy_value [[RELOADED_ARG1]]
+// CHECK: } // end sil function 'small_struct_test'
+sil [ossa] @small_struct_test : $@convention(thin) (@guaranteed S2, @in S2) -> () {
+bb0(%0 : @guaranteed $S2, %1 : $*S2):
+  %0a = copy_value %0 : $S2
+  destroy_value %0a : $S2
+  %2 = alloc_stack $S2
+  copy_addr %1 to [initialization] %2 : $*S2
+  destroy_addr %1 : $*S2
+  destroy_addr %2 : $*S2
+  dealloc_stack %2 : $*S2
+  %9999 = tuple()
+  return %9999 : $()
+}

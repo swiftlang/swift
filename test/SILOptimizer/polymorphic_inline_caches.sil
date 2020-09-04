@@ -112,15 +112,15 @@ sil_vtable A {
 }
 
 sil_vtable B {
-  #A.ping: @_TFC25polymorphic_inline_caches1B4pingfS0_FBi32_Bi32_
+  #A.ping: @_TFC25polymorphic_inline_caches1B4pingfS0_FBi32_Bi32_ [override]
 }
 
 sil_vtable C {
-  #A.ping: @_TFC25polymorphic_inline_caches1C4pingfS0_FBi32_Bi32_
+  #A.ping: @_TFC25polymorphic_inline_caches1C4pingfS0_FBi32_Bi32_ [override]
 }
 
 sil_vtable D {
-  #A.ping: @_TFC25polymorphic_inline_caches1D4pingfS0_FBi32_Bi32_
+  #A.ping: @_TFC25polymorphic_inline_caches1D4pingfS0_FBi32_Bi32_ [override]
 }
 
 protocol P {
@@ -223,9 +223,9 @@ sil_vtable E {
 }
 
 sil_vtable F {
-  #E.foo: @_TFC5casts1F3foofS0_FT_T_
+  #E.foo: @_TFC5casts1F3foofS0_FT_T_ [override]
 }
 
 sil_vtable G {
-  #E.foo: @_TFC5casts1G3foofS0_FT_T_
+  #E.foo: @_TFC5casts1G3foofS0_FT_T_ [override]
 }

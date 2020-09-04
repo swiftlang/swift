@@ -24,6 +24,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
+#include "clang/Basic/SourceManager.h"
 #include "clang/Index/USRGeneration.h"
 #include "clang/Lex/Lexer.h"
 #include "clang/Basic/CharInfo.h"
@@ -177,7 +178,7 @@ bool NameMatcher::handleCustomAttrs(Decl *D) {
     if (shouldSkip(customAttr->getRangeWithAt()))
       continue;
     auto *Arg = customAttr->getArg();
-    if (auto *Repr = customAttr->getTypeLoc().getTypeRepr()) {
+    if (auto *Repr = customAttr->getTypeRepr()) {
       // Note the associated call arguments of the semantic initializer call
       // in case we're resolving an explicit initializer call within the
       // CustomAttr's type, e.g. on `Wrapper` in `@Wrapper(wrappedValue: 10)`.
@@ -282,10 +283,6 @@ Stmt *NameMatcher::walkToStmtPost(Stmt *S) {
 }
 
 Expr *NameMatcher::getApplicableArgFor(Expr *E) {
-  if (auto *UME = dyn_cast<UnresolvedMemberExpr>(E)) {
-    if (auto *Arg = UME->getArgument())
-      return Arg;
-  }
   if (ParentCalls.empty())
     return nullptr;
   auto &Last = ParentCalls.back();
@@ -466,16 +463,6 @@ Expr *NameMatcher::walkToExprPost(Expr *E) {
   }
 
   return E;
-}
-
-bool NameMatcher::walkToTypeLocPre(TypeLoc &TL) {
-  if (isDone() || shouldSkip(TL.getSourceRange()))
-    return false;
-  return true;
-}
-
-bool NameMatcher::walkToTypeLocPost(TypeLoc &TL) {
-  return !isDone();
 }
 
 bool NameMatcher::walkToTypeReprPre(TypeRepr *T) {

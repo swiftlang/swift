@@ -43,7 +43,6 @@ class CompletionInstance {
   std::mutex mtx;
 
   std::unique_ptr<CompilerInstance> CachedCI;
-  ModuleDecl *CurrentModule = nullptr;
   llvm::hash_code CachedArgHash;
   llvm::sys::TimePoint<> DependencyCheckedTimestamp;
   llvm::StringMap<llvm::hash_code> InMemoryDependencyHash;

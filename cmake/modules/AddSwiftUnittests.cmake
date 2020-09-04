@@ -57,9 +57,11 @@ function(add_swift_unittest test_dirname)
       _ENABLE_EXTENDED_ALIGNED_STORAGE)
   endif()
 
-  if(SWIFT_USE_LINKER)
-    set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
-      LINK_FLAGS " -fuse-ld=${SWIFT_USE_LINKER}")
+  if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+    if(SWIFT_USE_LINKER)
+      target_link_options(${test_dirname} PRIVATE
+        -fuse-ld=${SWIFT_USE_LINKER}$<$<STREQUAL:${CMAKE_HOST_SYSTEM_NAME},Windows>:.exe>)
+    endif()
   endif()
 
   if(SWIFT_ANALYZE_CODE_COVERAGE)

@@ -126,8 +126,8 @@ static void nmModule(SILModule *M) {
   {
     std::vector<StringRef> VTableNames;
     llvm::transform(M->getVTables(), std::back_inserter(VTableNames),
-                    [](const SILVTable &VT) -> StringRef {
-                      return VT.getClass()->getName().str();
+                    [](const SILVTable *VT) -> StringRef {
+                      return VT->getClass()->getName().str();
                     });
     printAndSortNames(VTableNames, 'V');
   }
@@ -188,15 +188,6 @@ int main(int argc, char **argv) {
 
   auto SILMod = performASTLowering(CI.getMainModule(), CI.getSILTypes(),
                                    CI.getSILOptions());
-
-  // Load the SIL if we have a non-SIB serialized module. SILGen handles SIB for
-  // us.
-  if (Invocation.hasSerializedAST() && !extendedInfo.isSIB()) {
-    auto SL = SerializedSILLoader::create(
-        CI.getASTContext(), SILMod.get(), nullptr);
-    SL->getAll();
-  }
-
   nmModule(SILMod.get());
 
   return CI.getASTContext().hadError();

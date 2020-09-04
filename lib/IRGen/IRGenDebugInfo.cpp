@@ -672,7 +672,7 @@ private:
     return M;
   }
 
-  using ASTSourceDescriptor = clang::ExternalASTSource::ASTSourceDescriptor;
+  using ASTSourceDescriptor = clang::ASTSourceDescriptor;
   /// Create a DIModule from a clang module or PCH.
   /// The clang::Module pointer is passed separately because the recursive case
   /// needs to fudge the AST descriptor.
@@ -948,7 +948,7 @@ private:
       } else {
         // Discriminated union case without argument. Fallback to Int
         // as the element type; there is no storage here.
-        Type IntTy = IGM.Context.getIntDecl()->getDeclaredType();
+        Type IntTy = IGM.Context.getIntDecl()->getDeclaredInterfaceType();
         ElemDbgTy = DebugTypeInfo(IntTy, DbgTy.getStorageType(), Size(0),
                                   Alignment(1), true, false);
       }
@@ -1020,7 +1020,8 @@ private:
     SmallVector<llvm::Metadata *, 16> TemplateParams;
     for (auto Param : BGT->getGenericArgs()) {
       TemplateParams.push_back(DBuilder.createTemplateTypeParameter(
-          TheCU, "", getOrCreateType(DebugTypeInfo::getForwardDecl(Param))));
+          TheCU, "", getOrCreateType(DebugTypeInfo::getForwardDecl(Param)),
+          false));
     }
     return DBuilder.getOrCreateArray(TemplateParams);
   }
@@ -1571,6 +1572,7 @@ private:
     case TypeKind::Unresolved:
     case TypeKind::LValue:
     case TypeKind::TypeVariable:
+    case TypeKind::Hole:
     case TypeKind::Module:
     case TypeKind::SILBlockStorage:
     case TypeKind::SILBox:
@@ -1586,6 +1588,13 @@ private:
 
   /// Determine if there exists a name mangling for the given type.
   static bool canMangle(TypeBase *Ty) {
+    // TODO: C++ types are not yet supported (SR-13223).
+    if (Ty->getStructOrBoundGenericStruct() &&
+        Ty->getStructOrBoundGenericStruct()->getClangDecl() &&
+        isa<clang::CXXRecordDecl>(
+            Ty->getStructOrBoundGenericStruct()->getClangDecl()))
+      return false;
+
     switch (Ty->getKind()) {
     case TypeKind::GenericFunction: // Not yet supported.
     case TypeKind::SILBlockStorage: // Not supported at all.
@@ -1782,7 +1791,7 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
       /* DWOId */ 0, /* SplitDebugInlining */ true,
       /* DebugInfoForProfiling */ false,
       llvm::DICompileUnit::DebugNameTableKind::Default,
-      /* RangesBaseAddress */ false, Sysroot, SDK);
+      /* RangesBaseAddress */ false, DebugPrefixMap.remapPath(Sysroot), SDK);
 
   // Because the swift compiler relies on Clang to setup the Module,
   // the clang CU is always created first.  Several dwarf-reading
@@ -1832,12 +1841,11 @@ void IRGenDebugInfoImpl::finalize() {
 
   // Get the list of imported modules (which may actually be different
   // from all ImportDecls).
-  ModuleDecl::ImportFilter ImportFilter;
-  ImportFilter |= ModuleDecl::ImportFilterKind::Public;
-  ImportFilter |= ModuleDecl::ImportFilterKind::Private;
-  ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
   SmallVector<ModuleDecl::ImportedModule, 8> ModuleWideImports;
-  IGM.getSwiftModule()->getImportedModules(ModuleWideImports, ImportFilter);
+  IGM.getSwiftModule()->getImportedModules(
+      ModuleWideImports, {ModuleDecl::ImportFilterKind::Public,
+                          ModuleDecl::ImportFilterKind::Private,
+                          ModuleDecl::ImportFilterKind::ImplementationOnly});
   for (auto M : ModuleWideImports)
     if (!ImportedModules.count(M.importedModule))
       DBuilder.createImportedModule(MainFile, getOrCreateModule(M), MainFile,
@@ -2378,6 +2386,17 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
     Optional<SILLocation> Loc) {
   if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
     return;
+
+  // TODO: fix demangling for C++ types (SR-13223).
+  if (swift::TypeBase *ty = DbgTy.getType()) {
+    if (MetatypeType *metaTy = dyn_cast<MetatypeType>(ty))
+      ty = metaTy->getInstanceType().getPointer();
+    if (ty->getStructOrBoundGenericStruct() &&
+        ty->getStructOrBoundGenericStruct()->getClangDecl() &&
+        isa<clang::CXXRecordDecl>(
+            ty->getStructOrBoundGenericStruct()->getClangDecl()))
+      return;
+  }
 
   llvm::DIType *DITy = getOrCreateType(DbgTy);
   VarDecl *VD = nullptr;

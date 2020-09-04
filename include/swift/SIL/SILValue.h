@@ -20,6 +20,8 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/SIL/SILAllocated.h"
+#include "swift/SIL/SILArgumentConvention.h"
 #include "swift/SIL/SILNode.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -39,6 +41,7 @@ class SILLocation;
 class DeadEndBlocks;
 class ValueBaseUseIterator;
 class ValueUseIterator;
+class SILValue;
 
 /// An enumeration which contains values for all the concrete ValueBase
 /// subclasses.
@@ -185,6 +188,12 @@ struct ValueOwnershipKind {
   bool isCompatibleWith(ValueOwnershipKind other) const {
     return merge(other).hasValue();
   }
+
+  /// Returns isCompatibleWith(other.getOwnershipKind()).
+  ///
+  /// Definition is inline after SILValue is defined to work around circular
+  /// dependencies.
+  bool isCompatibleWith(SILValue other) const;
 
   template <typename RangeTy>
   static Optional<ValueOwnershipKind> merge(RangeTy &&r) {
@@ -437,6 +446,10 @@ public:
   /// Verify that this SILValue and its uses respects ownership invariants.
   void verifyOwnership(DeadEndBlocks *DEBlocks = nullptr) const;
 };
+
+inline bool ValueOwnershipKind::isCompatibleWith(SILValue other) const {
+  return isCompatibleWith(other.getOwnershipKind());
+}
 
 /// A map from a ValueOwnershipKind that an operand can accept to a
 /// UseLifetimeConstraint that describes the effect that the operand's use has

@@ -57,7 +57,8 @@ CanAnyFunctionType adjustFunctionType(CanAnyFunctionType type,
 /// Change the given function type's representation.
 inline CanAnyFunctionType adjustFunctionType(CanAnyFunctionType t,
                                           SILFunctionType::Representation rep) {
-  auto extInfo = t->getExtInfo().withSILRepresentation(rep);
+  auto extInfo =
+      t->getExtInfo().intoBuilder().withSILRepresentation(rep).build();
   return adjustFunctionType(t, extInfo);  
 }
 
@@ -389,6 +390,28 @@ public:
                             ///> substypes and perform operations on these
                             ///> types.
   };
+
+  /// Emit a load from \p addr given the LoadOwnershipQualifier \p qual.
+  ///
+  /// This abstracts over the differences in between trivial and non-trivial
+  /// types and lets one specify an expansion kind that gets passed to any
+  /// copy_value that we create.
+  virtual SILValue emitLoweredLoad(
+      SILBuilder &B, SILLocation loc, SILValue addr,
+      LoadOwnershipQualifier qual,
+      Lowering::TypeLowering::TypeExpansionKind expansionKind) const = 0;
+
+  /// Emit a store of \p value into \p addr given the StoreOwnershipQualifier
+  /// qual.
+  ///
+  /// This abstracts over the differences in between trivial and non-trivial
+  /// types and allows for one to specify an expansion kind that is passed to
+  /// any destroy operations we create if we are asked to assign in non-ossa
+  /// code.
+  virtual void emitLoweredStore(
+      SILBuilder &B, SILLocation loc, SILValue value, SILValue addr,
+      StoreOwnershipQualifier qual,
+      Lowering::TypeLowering::TypeExpansionKind expansionKind) const = 0;
 
   //===--------------------------------------------------------------------===//
   // DestroyValue
@@ -969,7 +992,6 @@ public:
   /// Given a function type, yield its bridged formal type.
   CanAnyFunctionType getBridgedFunctionType(AbstractionPattern fnPattern,
                                             CanAnyFunctionType fnType,
-                                            AnyFunctionType::ExtInfo extInfo,
                                             Bridgeability bridging);
 
   /// Given a referenced value and the substituted formal type of a
@@ -1095,6 +1117,15 @@ private:
 };
 
 } // namespace Lowering
+
+CanSILFunctionType getNativeSILFunctionType(
+    Lowering::TypeConverter &TC, TypeExpansionContext context,
+    Lowering::AbstractionPattern origType, CanAnyFunctionType substType,
+    Optional<SILDeclRef> origConstant = None,
+    Optional<SILDeclRef> constant = None,
+    Optional<SubstitutionMap> reqtSubs = None,
+    ProtocolConformanceRef witnessMethodConformance = ProtocolConformanceRef());
+
 } // namespace swift
 
 namespace llvm {

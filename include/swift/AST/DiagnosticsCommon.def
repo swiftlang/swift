@@ -118,13 +118,21 @@ ERROR(sdk_node_unrecognized_decl_kind,none,
 ERROR(sdk_node_unrecognized_accessor_kind,none,
       "unrecognized accessor kind '%0' in SDK node", (StringRef))
 
-// Emitted from ModuleDecl::computeMagicFileStringMap()
-WARNING(pound_source_location_creates_pound_file_conflicts,none,
-        "'#sourceLocation' directive produces '#file' string of '%0', which "
-        "conflicts with '#file' strings produced by other paths in the module",
-        (StringRef))
+// Emitted from ModuleDecl::computeFileIDMap()
+WARNING(source_location_creates_file_id_conflicts,none,
+        "'#sourceLocation' directive produces '#fileID' string of '%0', which "
+        "conflicts with '#fileID' strings produced by other paths in the "
+        "module", (StringRef))
 NOTE(fixit_correct_source_location_file,none,
      "change file in '#sourceLocation' to '%0'", (StringRef))
+
+// Usually, but not always, emitted from the driver
+ERROR(error_two_files_same_name,none,
+      "filename \"%0\" used twice: '%1' and '%2'",
+      (StringRef, StringRef, StringRef))
+NOTE(note_explain_two_files_same_name,none,
+     "filenames are used to distinguish private declarations with the same "
+     "name", ())
 
 //------------------------------------------------------------------------------
 // MARK: Circular reference diagnostics
@@ -159,16 +167,40 @@ NOTE(circular_type_resolution_note,none,
 // MARK: Cross-import overlay loading diagnostics
 //------------------------------------------------------------------------------
 ERROR(cannot_load_swiftoverlay_file, none,
-      "cannot load cross-import overlay for %0 and %1: %2 (declared by '%3')",
-      (Identifier, Identifier, StringRef, StringRef))
+      "cannot load cross-import overlay for '%0' and '%1': %2 (declared by '%3')",
+      (StringRef, StringRef, StringRef, StringRef))
 ERROR(cannot_list_swiftcrossimport_dir, none,
-      "cannot list cross-import overlays for %0: %1 (declared in '%2')",
-      (Identifier, StringRef, StringRef))
+      "cannot list cross-import overlays for '%0': %1 (declared in '%2')",
+      (StringRef, StringRef, StringRef))
 WARNING(cross_imported_by_both_modules, none,
         "modules %0 and %1 both declare module %2 as a cross-import overlay, "
         "which may cause paradoxical behavior when looking up names in them; "
         "please report this bug to the maintainers of these modules",
         (Identifier, Identifier, Identifier))
+
+//------------------------------------------------------------------------------
+// MARK: dependencies scanner diagnostics
+//------------------------------------------------------------------------------
+
+ERROR(scanner_find_cycle, none,
+      "dependency scanner detected dependency cycle: '%0'", (StringRef))
+
+ERROR(scanner_arguments_invalid, none,
+      "dependencies scanner cannot be configured with arguments: '%0'", (StringRef))
+
+//------------------------------------------------------------------------------
+// MARK: custom attribute diagnostics
+//------------------------------------------------------------------------------
+
+ERROR(ambiguous_custom_attribute_ref,none,
+      "ambiguous use of attribute %0", (Identifier))
+NOTE(ambiguous_custom_attribute_ref_fix,none,
+     "use '%0.' to reference the attribute %1 in module %2",
+     (StringRef, Identifier, Identifier))
+NOTE(found_attribute_candidate,none,
+     "found this attribute", ())
+ERROR(unknown_attribute,none,
+      "unknown attribute '%0'", (StringRef))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

@@ -627,6 +627,10 @@ void Remangler::mangleValueWitnessTable(Node *node) {
   mangleSingleChildNode(node); // type
 }
 
+void Remangler::mangleAsyncAnnotation(Node *node) {
+  Buffer << "Z";
+}
+
 void Remangler::mangleThrowsAnnotation(Node *node) {
   Buffer << "z";
 }
@@ -2106,7 +2110,7 @@ void Remangler::mangleSugaredParen(Node *node) {
 }
 
 void Remangler::mangleOpaqueReturnType(Node *node) {
-  unreachable("unsupported");
+  Buffer << "Qu";
 }
 void Remangler::mangleOpaqueReturnTypeOf(Node *node, EntityContext &ctx) {
   unreachable("unsupported");
@@ -2132,6 +2136,18 @@ void Remangler::mangleOpaqueTypeDescriptorAccessorVar(Node *node) {
 void Remangler::mangleAccessorFunctionReference(Node *node) {
   unreachable("can't remangle");
 }
+void Remangler::mangleMetadataInstantiationCache(Node *node) {
+  unreachable("unsupported");
+}
+void Remangler::mangleGlobalVariableOnceToken(Node *node) {
+  unreachable("unsupported");
+}
+void Remangler::mangleGlobalVariableOnceFunction(Node *node) {
+  unreachable("unsupported");
+}
+void Remangler::mangleGlobalVariableOnceDeclList(Node *node) {
+  unreachable("unsupported");
+}
 
 void Remangler::mangleCanonicalSpecializedGenericMetaclass(Node *node) {
   Buffer << "MM";
@@ -2142,6 +2158,16 @@ void Remangler::mangleCanonicalSpecializedGenericTypeMetadataAccessFunction(
     Node *node) {
   mangleSingleChildNode(node);
   Buffer << "Mb";
+}
+
+void Remangler::mangleNoncanonicalSpecializedGenericTypeMetadata(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "MN";
+}
+
+void Remangler::mangleNoncanonicalSpecializedGenericTypeMetadataCache(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "MJ";
 }
 
 /// The top-level interface to the remangler.

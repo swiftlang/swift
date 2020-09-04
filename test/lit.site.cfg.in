@@ -14,6 +14,7 @@ import os
 import platform
 import sys
 
+config.cmake = "@CMAKE_COMMAND@"
 config.llvm_src_root = "@LLVM_MAIN_SRC_DIR@"
 config.llvm_obj_root = "@LLVM_BINARY_DIR@"
 config.llvm_tools_dir = "@LLVM_TOOLS_DIR@"
@@ -86,14 +87,11 @@ if "@SWIFT_AST_VERIFIER@" == "TRUE":
 if "@SWIFT_OPTIMIZED@" == "TRUE":
     config.available_features.add("optimized_stdlib")
 
-if "@SWIFT_STDLIB_USE_NONATOMIC_RC@" == "TRUE":
-    config.available_features.add("nonatomic_rc")
+if "@SWIFT_STDLIB_SINGLE_THREADED_RUNTIME@" == "TRUE":
+    config.available_features.add("single_threaded_runtime")
 
 if "@SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS@" == "TRUE":
     config.available_features.add('runtime_function_counters')
-
-if "@SWIFT_BUILT_STANDALONE@" == "TRUE":
-    config.available_features.add('standalone_build')
 
 if "@CMAKE_GENERATOR@" == "Xcode":
     xcode_bin_dir = os.path.join(config.llvm_obj_root, "@LLVM_BUILD_TYPE@",
@@ -127,6 +125,8 @@ if '@SWIFT_INCLUDE_TOOLS@' == 'TRUE':
 
 if "@SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING@" == "TRUE":
     config.available_features.add('differentiable_programming')
+if "@SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY@" == "TRUE":
+    config.available_features.add('concurrency')
 
 # Let the main config do the real work.
 if config.test_exec_root is None:

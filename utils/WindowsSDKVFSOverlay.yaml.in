@@ -149,6 +149,9 @@ roots:
       - name: unknwn.h
         type: file
         external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/Unknwn.h"
+      - name: uxtheme.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/Uxtheme.h"
       - name: unknwnbase.h
         type: file
         external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/Unknwnbase.h"
