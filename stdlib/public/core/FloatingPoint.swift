@@ -1890,7 +1890,18 @@ extension BinaryFloatingPoint {
   /// - Parameter value: A floating-point value to be converted.
   @inlinable
   public init<Source: BinaryFloatingPoint>(_ value: Source) {
-    self = Self._convert(from: value).value
+    switch value {
+    case let value_ as Float:
+      self = Self(value_)
+    case let value_ as Double:
+      self = Self(value_)
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+    case let value_ as Float80:
+      self = Self(value_)
+#endif
+    default:
+      self = Self._convert(from: value).value
+    }
   }
 
   /// Creates a new instance from the given value, if it can be represented
