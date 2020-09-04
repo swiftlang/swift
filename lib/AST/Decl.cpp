@@ -59,6 +59,7 @@
 #include "swift/Demangling/ManglingMacros.h"
 
 #include "clang/Basic/CharInfo.h"
+#include "clang/Basic/Module.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 
@@ -4181,13 +4182,6 @@ DestructorDecl *ClassDecl::getDestructor() const {
                            nullptr);
 }
 
-ArrayRef<Decl *> ClassDecl::getEmittedMembers() const {
-  ASTContext &ctx = getASTContext();
-  return evaluateOrDefault(ctx.evaluator,
-                           EmittedMembersRequest{const_cast<ClassDecl *>(this)},
-                           ArrayRef<Decl *>());
-}
-
 /// Synthesizer callback for an empty implicit function body.
 static std::pair<BraceStmt *, bool>
 synthesizeEmptyFunctionBody(AbstractFunctionDecl *afd, void *context) {
@@ -5915,8 +5909,8 @@ VarDecl::getPropertyWrapperSynthesizedPropertyKind() const {
           PropertyWrapperSynthesizedPropertyKind::Backing))
     return PropertyWrapperSynthesizedPropertyKind::Backing;
   if (getOriginalWrappedProperty(
-          PropertyWrapperSynthesizedPropertyKind::StorageWrapper))
-    return PropertyWrapperSynthesizedPropertyKind::StorageWrapper;
+          PropertyWrapperSynthesizedPropertyKind::Projection))
+    return PropertyWrapperSynthesizedPropertyKind::Projection;
   return None;
 }
 
@@ -5924,8 +5918,8 @@ VarDecl *VarDecl::getPropertyWrapperBackingProperty() const {
   return getPropertyWrapperBackingPropertyInfo().backingVar;
 }
 
-VarDecl *VarDecl::getPropertyWrapperStorageWrapper() const {
-  return getPropertyWrapperBackingPropertyInfo().storageWrapperVar;
+VarDecl *VarDecl::getPropertyWrapperProjectionVar() const {
+  return getPropertyWrapperBackingPropertyInfo().projectionVar;
 }
 
 VarDecl *VarDecl::getLazyStorageProperty() const {

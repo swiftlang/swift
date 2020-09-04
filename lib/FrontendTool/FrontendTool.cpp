@@ -68,6 +68,7 @@
 #include "swift/TBDGen/TBDGen.h"
 
 #include "clang/AST/ASTContext.h"
+#include "clang/Basic/Module.h"
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/LLVMContext.h"
@@ -85,6 +86,7 @@
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Target/TargetMachine.h"
 
+#include <algorithm>
 #include <memory>
 #include <unordered_set>
 #include <utility>
@@ -179,14 +181,14 @@ static bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
     reversePathSortedFilenames(opts.InputsAndOutputs.getInputFilenames());
   for (auto const &path : inputPaths) {
     dependencyString.push_back(' ');
-    dependencyString.append(frontend::utils::escapeForMake(path, buffer));
+    dependencyString.append(frontend::utils::escapeForMake(path, buffer).str());
   }
   // Then print dependencies we've picked up during compilation.
   auto dependencyPaths =
     reversePathSortedFilenames(depTracker->getDependencies());
   for (auto const &path : dependencyPaths) {
     dependencyString.push_back(' ');
-    dependencyString.append(frontend::utils::escapeForMake(path, buffer));
+    dependencyString.append(frontend::utils::escapeForMake(path, buffer).str());
   }
   
   // FIXME: Xcode can't currently handle multiple targets in a single
@@ -351,22 +353,25 @@ class ABIDependencyEvaluator {
 
   /// Check for cases where we have a fake cycle through an overlay.
   ///
-  /// \code
-  /// Actual stack:
-  ///    sandwichedModule -> Overlay (Swift) -> ... -> sandwichedModule
-  ///                     ^^--- wrong!
-  /// Ideal stack:
-  ///    sandwichedModule -> Underlying (Clang)
-  /// \endcode
+  /// Sometimes, we have fake cycles in the import graph due to the Clang
+  /// importer injecting overlays between Clang modules. These don't represent
+  /// an actual cycle in the build, so we should ignore them.
   ///
-  /// This happens when we have a dependency like:
-  /// \code
-  ///     Overlay (Swift) -> sandwichedModule -> Underlying (Clang)
-  /// \endcode
+  /// We check this lazily after detecting a cycle because it is difficult to
+  /// determine at the point where we see the overlay whether it was incorrectly
+  /// injected by the Clang importer or whether any of its imports will
+  /// eventually lead to a cycle.
   ///
-  /// We check this lazily because eagerly detecting if the dependency on an
-  /// overlay is correct or not is difficult.
-  bool isFakeCycleThroughOverlay(ModuleDecl **sandwichedModuleIter);
+  /// For more details, see [NOTE: ABIDependencyEvaluator-fake-cycle-detection]
+  ///
+  /// \param startOfCycle A pointer to the element of \c searchStack where
+  ///        the module \em first appeared.
+  ///
+  /// \pre The module on top of \c searchStack is the same module as
+  ///      *startOfCycle.
+  ///
+  /// \pre searchStack.begin() <= startOfCycle < searchStack.end()
+  bool isFakeCycleThroughOverlay(ModuleDecl **startOfCycle);
 
   /// Recursive step in computing ABI dependencies.
   ///
@@ -492,21 +497,87 @@ bool ABIDependencyEvaluator::isOverlayOfClangModule(ModuleDecl *swiftModule) {
   return isOverlay;
 }
 
+// [NOTE: ABIDependencyEvaluator-fake-cycle-detection]
+//
+// First, let's consider a concrete example.
+// - In Clang-land, ToyKit #imports CoreDoll.
+// - The Swift overlay for CoreDoll imports both CoreDoll and ToyKit.
+// Importing ToyKit from CoreDoll's overlay informally violates the layering
+// of frameworks, but it doesn't actually create any cycles in the build
+// dependencies.
+//                        ┌───────────────────────────┐
+//                    ┌───│    CoreDoll.swiftmodule   │
+//                    │   └───────────────────────────┘
+//                    │                 │
+//              import ToyKit     @_exported import CoreDoll
+//                    │                 │
+//                    │                 │
+//                    ▼                 │
+//      ┌──────────────────────────┐    │
+//      │ ToyKit (ToyKit/ToyKit.h) │    │
+//      └──────────────────────────┘    │
+//                    │                 │
+//       #import <CoreDoll/CoreDoll.h>  │
+//                    │                 │
+//                    ▼                 │
+//   ┌──────────────────────────────┐   │
+//   │CoreDoll (CoreDoll/CoreDoll.h)│◀──┘
+//   └──────────────────────────────┘
+//
+// Say we are trying to build a Swift module that imports ToyKit. Due to how
+// module loading works, the Clang importer inserts the CoreDoll overlay
+// between the ToyKit and CoreDoll Clang modules, creating a cycle in the
+// import graph.
+//
+//   ┌──────────────────────────┐
+//   │ ToyKit (ToyKit/ToyKit.h) │◀──────────┐
+//   └──────────────────────────┘           │
+//                 │                        │
+//    #import <CoreDoll/CoreDoll.h>    import ToyKit
+//                 │                        │
+//                 ▼                        │
+//   ┌────────────────────────────┐         │
+//   │    CoreDoll.swiftmodule    │─────────┘
+//   └────────────────────────────┘
+//                 │
+//     @_exported import CoreDoll
+//                 │
+//                 ▼
+//   ┌──────────────────────────────┐
+//   │CoreDoll (CoreDoll/CoreDoll.h)│
+//   └──────────────────────────────┘
+//
+// This means that, at some point, searchStack will look like:
+//
+//   [others] → ToyKit → CoreDoll (overlay) → ToyKit
+//
+// In the general case, there may be arbitrarily many modules in the cycle,
+// including submodules.
+//
+//   [others] → ToyKit → [others] → CoreDoll (overlay) → [others] → ToyKit
+//
+// where "[others]" indicates 0 or more modules of any kind.
+//
+// To detect this, we check that the start of the cycle is a Clang module and
+// that there is at least one overlay between it and its recurrence at the end
+// of the searchStack. If so, we assume we have detected a benign cycle which
+// can be safely ignored.
+
 bool ABIDependencyEvaluator::isFakeCycleThroughOverlay(
-    ModuleDecl **sandwichModuleIter) {
-  assert(sandwichModuleIter >= searchStack.begin()
-         && sandwichModuleIter < searchStack.end()
-         && "sandwichModuleIter points to an element in searchStack");
-  // The sandwichedModule must be a Clang module.
-  if (!(*sandwichModuleIter)->isNonSwiftModule())
+    ModuleDecl **startOfCycle) {
+  assert(startOfCycle >= searchStack.begin() &&
+         startOfCycle < searchStack.end() &&
+         "startOfCycleIter points to an element in searchStack");
+  // The startOfCycle module must be a Clang module.
+  if (!(*startOfCycle)->isNonSwiftModule())
     return false;
-  auto nextModuleIter = sandwichModuleIter + 1;
-  if (nextModuleIter == searchStack.end())
-    return false;
-  // The next module must be a Swift overlay for a Clang module
-  if ((*nextModuleIter)->isNonSwiftModule())
-    return false;
-  return isOverlayOfClangModule(*nextModuleIter);
+  // Next, we must have zero or more modules followed by a Swift overlay for a
+  // Clang module.
+  return std::any_of(startOfCycle + 1, searchStack.end(),
+                     [this](ModuleDecl *module) {
+                       return !module->isNonSwiftModule() &&
+                              isOverlayOfClangModule(module);
+                     });
 }
 
 void ABIDependencyEvaluator::computeABIDependenciesForModule(
@@ -518,7 +589,11 @@ void ABIDependencyEvaluator::computeABIDependenciesForModule(
     crashOnInvariantViolation([&](llvm::raw_string_ostream &os) {
       os << "unexpected cycle in import graph!\n";
       for (auto m: searchStack) {
-        printModule(m, os); os << "\ndepends on ";
+        printModule(m, os);
+        if (!m->isNonSwiftModule()) {
+          os << " (isOverlay = " << isOverlayOfClangModule(m) << ")";
+        }
+        os << "\ndepends on ";
       }
       printModule(module, os); os << '\n';
     });
@@ -1523,7 +1598,7 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
         llvm::SmallString<32> Buffer(*opts.BridgingHeaderDirForPrint);
         llvm::sys::path::append(Buffer,
           llvm::sys::path::filename(opts.ImplicitObjCHeaderPath));
-        BridgingHeaderPathForPrint = Buffer.str();
+        BridgingHeaderPathForPrint = (std::string)Buffer;
       } else {
         // By default, include the given bridging header path directly.
         BridgingHeaderPathForPrint = opts.ImplicitObjCHeaderPath;

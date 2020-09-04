@@ -298,6 +298,8 @@ void swift::performImportResolution(SourceFile &SF) {
   // Resolve each import declaration.
   for (auto D : SF.getTopLevelDecls())
     resolver.visit(D);
+  for (auto D : SF.getHoistedDecls())
+    resolver.visit(D);
 
   SF.setImports(resolver.getFinishedImports());
 

@@ -187,6 +187,10 @@ private:
   /// have been removed, this can become an optional ArrayRef.
   Optional<std::vector<Decl *>> Decls;
 
+  /// The list of hoisted declarations. See Decl::isHoisted().
+  /// This is only used by lldb.
+  std::vector<Decl *> Hoisted;
+
   using SeparatelyImportedOverlayMap =
     llvm::SmallDenseMap<ModuleDecl *, llvm::SmallPtrSet<ModuleDecl *, 1>>;
 
@@ -231,8 +235,17 @@ public:
     Decls->insert(Decls->begin(), d);
   }
 
+  /// Add a hoisted declaration. See Decl::isHoisted().
+  void addHoistedDecl(Decl *d) {
+    Hoisted.push_back(d);
+  }
+
   /// Retrieves an immutable view of the list of top-level decls in this file.
   ArrayRef<Decl *> getTopLevelDecls() const;
+
+  /// Retrieves an immutable view of the list of hoisted decls in this file.
+  /// See Decl::isHoisted().
+  ArrayRef<Decl *> getHoistedDecls() const;
 
   /// Retrieves an immutable view of the top-level decls if they have already
   /// been parsed, or \c None if they haven't. Should only be used for dumping.
@@ -692,9 +705,11 @@ struct DenseMapInfo<swift::SourceFile::ImportedModuleDesc> {
                               StringRefDMI::getTombstoneKey());
   }
   static inline unsigned getHashValue(const ImportedModuleDesc &import) {
-    return combineHashValue(ImportedModuleDMI::getHashValue(import.module),
-           combineHashValue(ImportOptionsDMI::getHashValue(import.importOptions),
-                            StringRefDMI::getHashValue(import.filename)));
+    return detail::combineHashValue(
+        ImportedModuleDMI::getHashValue(import.module),
+        detail::combineHashValue(
+            ImportOptionsDMI::getHashValue(import.importOptions),
+            StringRefDMI::getHashValue(import.filename)));
   }
   static bool isEqual(const ImportedModuleDesc &a,
                       const ImportedModuleDesc &b) {

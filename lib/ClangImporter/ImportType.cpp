@@ -34,6 +34,7 @@
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
+#include "clang/AST/DeclObjCCommon.h"
 #include "clang/AST/TypeVisitor.h"
 #include "clang/Basic/Builtins.h"
 #include "clang/Lex/Preprocessor.h"
@@ -248,6 +249,7 @@ namespace {
       case clang::BuiltinType::ARCUnbridgedCast:
       case clang::BuiltinType::BoundMember:
       case clang::BuiltinType::BuiltinFn:
+      case clang::BuiltinType::IncompleteMatrixIdx:
       case clang::BuiltinType::Overload:
       case clang::BuiltinType::PseudoObject:
       case clang::BuiltinType::UnknownAny:
@@ -278,6 +280,7 @@ namespace {
       case clang::BuiltinType::SatUShortFract:
       case clang::BuiltinType::SatUFract:
       case clang::BuiltinType::SatULongFract:
+      case clang::BuiltinType::BFloat16:
       case clang::BuiltinType::Float128:
       case clang::BuiltinType::NullPtr:
       case clang::BuiltinType::Char8:
@@ -348,29 +351,32 @@ namespace {
 
       // OpenMP types that don't have Swift equivalents.
       case clang::BuiltinType::OMPArraySection:
+      case clang::BuiltinType::OMPArrayShaping:
+      case clang::BuiltinType::OMPIterator:
         return Type();
 
       // SVE builtin types that don't have Swift equivalents.
-      case clang::BuiltinType::SveInt8:
-      case clang::BuiltinType::SveInt16:
-      case clang::BuiltinType::SveInt32:
-      case clang::BuiltinType::SveInt64:
-      case clang::BuiltinType::SveUint8:
-      case clang::BuiltinType::SveUint16:
-      case clang::BuiltinType::SveUint32:
-      case clang::BuiltinType::SveUint64:
-      case clang::BuiltinType::SveFloat16:
-      case clang::BuiltinType::SveFloat32:
-      case clang::BuiltinType::SveFloat64:
-      case clang::BuiltinType::SveBool:
+#define SVE_TYPE(Name, Id, ...) \
+      case clang::BuiltinType::Id:
+#include "clang/Basic/AArch64SVEACLETypes.def"
         return Type();
       }
 
       llvm_unreachable("Invalid BuiltinType.");
     }
 
+    ImportResult VisitExtIntType(const clang::ExtIntType *) {
+      // ExtInt is not supported in Swift.
+      return Type();
+    }
+
     ImportResult VisitPipeType(const clang::PipeType *) {
       // OpenCL types are not supported in Swift.
+      return Type();
+    }
+
+    ImportResult VisitMatrixType(const clang::MatrixType *ty) {
+      // Matrix types are not supported in Swift.
       return Type();
     }
 
@@ -1589,8 +1595,8 @@ bool ClangImporter::Implementation::shouldAllowNSUIntegerAsInt(
 ImportedType ClangImporter::Implementation::importPropertyType(
     const clang::ObjCPropertyDecl *decl, bool isFromSystemModule) {
   const auto assignOrUnsafeUnretained =
-      clang::ObjCPropertyDecl::OBJC_PR_assign |
-      clang::ObjCPropertyDecl::OBJC_PR_unsafe_unretained;
+      clang::ObjCPropertyAttribute::kind_assign |
+      clang::ObjCPropertyAttribute::kind_unsafe_unretained;
 
   ImportTypeKind importKind;
   // HACK: Certain decls are always imported using bridged types,

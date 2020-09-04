@@ -22,13 +22,14 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"
+
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Support/Debug.h"
 #include <system_error>
 
 using namespace swift;
@@ -386,14 +387,12 @@ llvm::ErrorOr<ModuleDependencies> SerializedModuleLoaderBase::scanModuleFile(
   // Load the module file without validation.
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
   bool isFramework = false;
-  serialization::ExtendedValidationInfo extInfo;
   serialization::ValidationInfo loadInfo =
       ModuleFileSharedCore::load(modulePath.str(),
                        std::move(moduleBuf.get()),
                        nullptr,
                        nullptr,
-                       isFramework, loadedModuleFile,
-                       &extInfo);
+                       isFramework, loadedModuleFile);
 
   // Map the set of dependencies over to the "module dependencies".
   auto dependencies = ModuleDependencies::forSwiftModule(modulePath.str(), isFramework);
@@ -694,7 +693,6 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
     return nullptr;
   }
 
-  serialization::ExtendedValidationInfo extendedInfo;
   std::unique_ptr<ModuleFile> loadedModuleFile;
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFileCore;
   serialization::ValidationInfo loadInfo =
@@ -702,20 +700,19 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
                        std::move(moduleInputBuffer),
                        std::move(moduleDocInputBuffer),
                        std::move(moduleSourceInfoInputBuffer),
-                       isFramework, loadedModuleFileCore,
-                       &extendedInfo);
+                       isFramework, loadedModuleFileCore);
   if (loadInfo.status == serialization::Status::Valid) {
     loadedModuleFile =
         std::make_unique<ModuleFile>(std::move(loadedModuleFileCore));
-    M.setResilienceStrategy(extendedInfo.getResilienceStrategy());
+    M.setResilienceStrategy(loadedModuleFile->getResilienceStrategy());
 
     // We've loaded the file. Now try to bring it into the AST.
     auto fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile);
-    if (extendedInfo.isTestable())
+    if (loadedModuleFile->isTestable())
       M.setTestingEnabled();
-    if (extendedInfo.arePrivateImportsEnabled())
+    if (loadedModuleFile->arePrivateImportsEnabled())
       M.setPrivateImportsEnabled();
-    if (extendedInfo.isImplicitDynamicEnabled())
+    if (loadedModuleFile->isImplicitDynamicEnabled())
       M.setImplicitDynamicEnabled();
 
     auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
@@ -743,7 +740,7 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
 
   if (diagLoc)
     serialization::diagnoseSerializedASTLoadFailure(
-        Ctx, *diagLoc, loadInfo, extendedInfo, moduleBufferID,
+        Ctx, *diagLoc, loadInfo, moduleBufferID,
         moduleDocBufferID, loadedModuleFile.get(), M.getName());
 
   // Even though the module failed to load, it's possible its contents include
@@ -760,7 +757,6 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
 void swift::serialization::diagnoseSerializedASTLoadFailure(
     ASTContext &Ctx, SourceLoc diagLoc,
     const serialization::ValidationInfo &loadInfo,
-    const serialization::ExtendedValidationInfo &extendedInfo,
     StringRef moduleBufferID, StringRef moduleDocBufferID,
     ModuleFile *loadedModuleFile, Identifier ModuleName) {
   auto diagnoseDifferentLanguageVersion = [&](StringRef shortVersion) -> bool {
@@ -990,10 +986,8 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
   Ctx.addLoadedModule(M);
   SWIFT_DEFER { M->setHasResolvedImports(); };
 
-  StringRef moduleInterfacePathStr =
-    Ctx.AllocateCopy(moduleInterfacePath.str());
   auto *file =
-      loadAST(*M, moduleID.Loc, moduleInterfacePathStr,
+      loadAST(*M, moduleID.Loc, moduleInterfacePath,
               std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
               std::move(moduleSourceInfoInputBuffer), isFramework);
   if (file) {

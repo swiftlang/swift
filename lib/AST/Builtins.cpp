@@ -1747,12 +1747,12 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   IITDescriptor D = Table.front();
   Table = Table.slice(1);
   switch (D.Kind) {
+  case IITDescriptor::BFloat:
   case IITDescriptor::MMX:
   case IITDescriptor::Metadata:
   case IITDescriptor::ExtendArgument:
   case IITDescriptor::TruncArgument:
   case IITDescriptor::HalfVecArgument:
-  case IITDescriptor::ScalableVecArgument:
   case IITDescriptor::VarArg:
   case IITDescriptor::Token:
   case IITDescriptor::VecElementArgument:
@@ -1781,7 +1781,7 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::Vector: {
     Type eltType = decodeImmediate();
     if (!eltType) return Type();
-    return makeVector(eltType, D.Vector_Width);
+    return makeVector(eltType, D.Vector_Width.Min);
   }
 
   // A pointer to an immediate type.

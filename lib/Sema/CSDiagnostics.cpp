@@ -1047,6 +1047,8 @@ SourceRange MemberAccessOnOptionalBaseFailure::getSourceRange() const {
     if (componentPathElt->getIndex() == 0) {
       if (auto rootType = keyPathExpr->getRootType()) {
         return rootType->getSourceRange();
+      } else {
+        return keyPathExpr->getComponents().front().getLoc();
       }
     } else {
       auto componentIdx = componentPathElt->getIndex() - 1;
@@ -3169,7 +3171,7 @@ bool MissingCallFailure::diagnoseAsError() {
 }
 
 bool ExtraneousPropertyWrapperUnwrapFailure::diagnoseAsError() {
-  auto newPrefix = usingStorageWrapper() ? "$" : "_";
+  auto newPrefix = usingProjection() ? "$" : "_";
 
   if (auto *member = getReferencedMember()) {
     emitDiagnostic(diag::incorrect_property_wrapper_reference_member,

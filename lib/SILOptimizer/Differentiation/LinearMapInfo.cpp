@@ -141,8 +141,6 @@ LinearMapInfo::createBranchingTraceDecl(SILBasicBlock *originalBB,
   if (genericSig)
     branchingTraceDecl->setGenericSignature(genericSig);
   computeAccessLevel(branchingTraceDecl, original->getEffectiveSymbolLinkage());
-  branchingTraceDecl->getInterfaceType();
-  assert(branchingTraceDecl->hasInterfaceType());
   file.addTopLevelDecl(branchingTraceDecl);
   // Add basic block enum cases.
   for (auto *predBB : originalBB->getPredecessorBlocks()) {
@@ -165,7 +163,6 @@ LinearMapInfo::createBranchingTraceDecl(SILBasicBlock *originalBB,
         /*IdentifierLoc*/ loc, DeclName(astCtx.getIdentifier(bbId)), paramList,
         loc, /*RawValueExpr*/ nullptr, branchingTraceDecl);
     enumEltDecl->setImplicit();
-    enumEltDecl->getInterfaceType();
     auto *enumCaseDecl = EnumCaseDecl::create(
         /*CaseLoc*/ loc, {enumEltDecl}, branchingTraceDecl);
     enumCaseDecl->setImplicit();
@@ -207,8 +204,6 @@ LinearMapInfo::createLinearMapStruct(SILBasicBlock *originalBB,
   if (genericSig)
     linearMapStruct->setGenericSignature(genericSig);
   computeAccessLevel(linearMapStruct, original->getEffectiveSymbolLinkage());
-  linearMapStruct->getInterfaceType();
-  assert(linearMapStruct->hasInterfaceType());
   file.addTopLevelDecl(linearMapStruct);
   return linearMapStruct;
 }

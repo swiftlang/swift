@@ -449,13 +449,15 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
   // Emit types and other global decls.
   for (auto *decl : SF.getTopLevelDecls())
     emitGlobalDecl(decl);
+  for (auto *decl : SF.getHoistedDecls())
+    emitGlobalDecl(decl);
   for (auto *localDecl : SF.LocalTypeDecls)
     emitGlobalDecl(localDecl);
   for (auto *opaqueDecl : SF.getOpaqueReturnTypeDecls())
     maybeEmitOpaqueTypeDecl(opaqueDecl);
 
   SF.collectLinkLibraries([this](LinkLibrary linkLib) {
-      this->addLinkLibrary(linkLib);
+    this->addLinkLibrary(linkLib);
   });
 
   if (ObjCInterop)
@@ -4441,7 +4443,7 @@ static Address getAddrOfSimpleVariable(IRGenModule &IGM,
   // Check whether it's already cached.
   llvm::Constant *&entry = cache[entity];
   if (entry) {
-    auto existing = cast<llvm::GlobalValue>(entry);
+    auto existing = cast<llvm::GlobalVariable>(entry);
     assert(alignment == Alignment(existing->getAlignment()));
     if (forDefinition) updateLinkageForDefinition(IGM, existing, entity);
     return Address(entry, alignment);
@@ -4600,7 +4602,7 @@ Address IRGenFunction::createAlloca(llvm::Type *type,
   llvm::AllocaInst *alloca =
       new llvm::AllocaInst(type, IGM.DataLayout.getAllocaAddrSpace(), name,
                            AllocaIP);
-  alloca->setAlignment(llvm::MaybeAlign(alignment.getValue()));
+  alloca->setAlignment(llvm::MaybeAlign(alignment.getValue()).valueOrOne());
   return Address(alloca, alignment);
 }
 
@@ -4611,7 +4613,7 @@ Address IRGenFunction::createAlloca(llvm::Type *type,
                                     const llvm::Twine &name) {
   llvm::AllocaInst *alloca = new llvm::AllocaInst(
       type, IGM.DataLayout.getAllocaAddrSpace(), ArraySize,
-      llvm::MaybeAlign(alignment.getValue()), name, AllocaIP);
+      llvm::MaybeAlign(alignment.getValue()).valueOrOne(), name, AllocaIP);
   return Address(alloca, alignment);
 }
 

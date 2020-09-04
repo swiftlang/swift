@@ -927,9 +927,18 @@ PrecedenceGroupDecl *lookupPrecedenceGroupForInfixOperator(DeclContext *dc,
 PrecedenceGroupLookupResult
 lookupPrecedenceGroup(DeclContext *dc, Identifier name, SourceLoc nameLoc);
 
+enum class UnsupportedMemberTypeAccessKind : uint8_t {
+  None,
+  TypeAliasOfUnboundGeneric,
+  TypeAliasOfExistential,
+  AssociatedTypeOfUnboundGeneric,
+  AssociatedTypeOfExistential
+};
+
 /// Check whether the given declaration can be written as a
 /// member of the given base type.
-bool isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl);
+UnsupportedMemberTypeAccessKind
+isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl);
 
 /// @}
 

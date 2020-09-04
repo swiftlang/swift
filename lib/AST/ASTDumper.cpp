@@ -585,6 +585,9 @@ namespace {
       if (D->isImplicit())
         PrintWithColorRAII(OS, DeclModifierColor) << " implicit";
 
+      if (D->isHoisted())
+        PrintWithColorRAII(OS, DeclModifierColor) << " hoisted";
+
       auto R = D->getSourceRange();
       if (R.isValid()) {
         PrintWithColorRAII(OS, RangeColor) << " range=";
@@ -3781,7 +3784,9 @@ namespace {
       if (!T->getClangTypeInfo().empty()) {
         std::string s;
         llvm::raw_string_ostream os(s);
-        T->getClangTypeInfo().dump(os);
+        auto &ctx = T->getASTContext().getClangModuleLoader()
+          ->getClangASTContext();
+        T->getClangTypeInfo().dump(os, ctx);
         printField("clang_type", os.str());
       }
       printAnyFunctionParams(T->getParams(), "input");

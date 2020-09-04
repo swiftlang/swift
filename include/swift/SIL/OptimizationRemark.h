@@ -119,6 +119,12 @@ struct Argument {
       : Argument(ArgumentKey(ArgumentKeyKind::Default, key), msg, decl) {}
   Argument(ArgumentKey key, StringRef msg, const ValueDecl *decl)
       : key(key), val(msg), loc(decl->getLoc()) {}
+
+  Argument(StringRef key, llvm::Twine &&msg, SILLocation loc)
+      : Argument(ArgumentKey(ArgumentKeyKind::Default, key), std::move(msg),
+                 loc) {}
+  Argument(ArgumentKey key, llvm::Twine &&msg, SILLocation loc)
+      : key(key), val(msg.str()), loc(loc.getSourceLoc()) {}
 };
 
 /// Shorthand to insert named-value pairs.

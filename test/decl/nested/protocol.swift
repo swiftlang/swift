@@ -51,10 +51,11 @@ protocol Racoon {
 }
 
 enum SillyRawEnum : SillyProtocol.InnerClass {} // expected-error {{an enum with no cases cannot declare a raw type}}
-// expected-error@-1 {{raw type}}
+// expected-error@-1 {{reference to generic type 'SillyProtocol.InnerClass' requires arguments in <...>}}
 
 protocol SillyProtocol {
   class InnerClass<T> {} // expected-error {{type 'InnerClass' cannot be nested in protocol 'SillyProtocol'}}
+  // expected-note@-1 {{generic type 'InnerClass' declared here}}
 }
 
 // N.B. Redeclaration checks don't see this case because `protocol A` is invalid.
