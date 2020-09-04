@@ -394,7 +394,8 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
 
   if (shouldParseExperimentalConcurrency() && Tok.isContextualKeyword("await")) {
     SourceLoc awaitLoc = consumeToken();
-    ParserResult<Expr> sub = parseExprUnary(message, isExprBasic);
+    ParserResult<Expr> sub =
+      parseExprSequenceElement(diag::expected_expr_after_await, isExprBasic);
     if (!sub.hasCodeCompletion() && !sub.isNull()) {
       ElementContext.setCreateSyntax(SyntaxKind::AwaitExpr);
       sub = makeParserResult(new (Context) AwaitExpr(awaitLoc, sub.get()));
@@ -428,7 +429,9 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
     }
   }
 
-  ParserResult<Expr> sub = parseExprUnary(message, isExprBasic);
+  ParserResult<Expr> sub = hadTry
+      ? parseExprSequenceElement(message, isExprBasic)
+      : parseExprUnary(message, isExprBasic);
 
   if (hadTry && !sub.hasCodeCompletion() && !sub.isNull()) {
     ElementContext.setCreateSyntax(SyntaxKind::TryExpr);
