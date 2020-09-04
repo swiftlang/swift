@@ -55,7 +55,7 @@ public:
   /// *NOTE* This ignores obvious ARC escapes where the a potential
   /// user of the RC is not managed by ARC. For instance
   /// unchecked_trivial_bit_cast.
-  void getRCUses(SILValue V, llvm::SmallVectorImpl<Operand *> &Uses);
+  void getRCUses(SILValue V, SmallVectorImpl<Operand *> &Uses);
 
   /// A helper method that calls getRCUses and then maps each operand to the
   /// operands user and then uniques the list.
@@ -63,7 +63,11 @@ public:
   /// *NOTE* The routine asserts that the passed in Users array is empty for
   /// simplicity. If needed this can be changed, but it is not necessary given
   /// current uses.
-  void getRCUsers(SILValue V, llvm::SmallVectorImpl<SILInstruction *> &Users);
+  void getRCUsers(SILValue V, SmallVectorImpl<SILInstruction *> &Users);
+
+  /// Like getRCUses except uses a callback to prevent the need for an
+  /// intermediate array.
+  void visitRCUses(SILValue V, function_ref<void(Operand *)> Visitor);
 
   void handleDeleteNotification(SILNode *node) {
     auto value = dyn_cast<ValueBase>(node);
