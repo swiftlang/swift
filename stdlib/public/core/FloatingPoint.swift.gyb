@@ -1,4 +1,4 @@
-//===--- FloatingPoint.swift ----------------------------------*- swift -*-===//
+//===--- FloatingPoint.swift.gyb ------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,6 +9,12 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+
+%{
+from __future__ import division
+from SwiftIntTypes import all_integer_types
+from SwiftFloatingPointTypes import all_floating_point_types
+}%
 
 /// A floating-point numeric type.
 ///
@@ -1890,6 +1896,38 @@ extension BinaryFloatingPoint {
   /// - Parameter value: A floating-point value to be converted.
   @inlinable
   public init<Source: BinaryFloatingPoint>(_ value: Source) {
+%   for float_type in all_floating_point_types():
+%     if float_type.bits == 16:
+#if !os(macOS) && !targetEnvironment(macCatalyst)
+%     elif float_type.bits == 80:
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+%     end
+      if let source = value as? ${float_type.stdlib_name} {
+%     if float_type.stdlib_name in ['Float', 'Double', 'Float80']:
+        self = Self(source)
+        return
+%     else:
+%       for self_float_type in all_floating_point_types():
+%         if self_float_type.bits == 16:
+#if !os(macOS) && !targetEnvironment(macCatalyst)
+%         elif self_float_type.bits == 80:
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+%         end
+        if ${self_float_type.stdlib_name}.self == Self.self {
+          self = ${self_float_type.stdlib_name}(source) as! Self
+          return
+        }
+%         if self_float_type.bits == 16 or self_float_type.bits == 80:
+#endif
+%         end
+%       end
+%     end
+    }
+%     if float_type.bits == 16 or float_type.bits == 80:
+#endif
+%     end
+%   end
+
     self = Self._convert(from: value).value
   }
 
@@ -1902,6 +1940,37 @@ extension BinaryFloatingPoint {
   /// - Parameter value: A floating-point value to be converted.
   @inlinable
   public init?<Source: BinaryFloatingPoint>(exactly value: Source) {
+%     for self_float_type in all_floating_point_types():
+%       if self_float_type.bits == 16:
+#if !os(macOS) && !targetEnvironment(macCatalyst)
+%       elif self_float_type.bits == 80:
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+%       end
+      if ${self_float_type.stdlib_name}.self == Self.self {
+%       for float_type in all_floating_point_types():
+%         if float_type.bits == 16:
+#if !os(macOS) && !targetEnvironment(macCatalyst)
+%         elif float_type.bits == 80:
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+%         end
+    if let source = value as? ${float_type.stdlib_name} {
+        if let converted = ${self_float_type.stdlib_name}(exactly: source) {
+          self = converted as! Self
+          return
+        } else {
+          return nil
+        }
+      }
+%       if float_type.bits == 16 or float_type.bits == 80:
+#endif
+%       end
+%     end
+    }
+%     if self_float_type.bits == 16 or self_float_type.bits == 80:
+#endif
+%     end
+%   end
+
     let (value_, exact) = Self._convert(from: value)
     guard exact else { return nil }
     self = value_

@@ -69,7 +69,6 @@ set(SWIFTLIB_ESSENTIAL
   FixedArray.swift
   FlatMap.swift
   Flatten.swift
-  FloatingPoint.swift
   Hashable.swift
   # WORKAROUND: This file name is not sorted alphabetically in the list because
   # if we do so, the compiler crashes.
@@ -196,6 +195,7 @@ set(SWIFTLIB_ESSENTIAL_GYB_SOURCES
   AtomicInt.swift.gyb
   FloatingPointParsing.swift.gyb
   FloatingPointTypes.swift.gyb
+  FloatingPoint.swift.gyb
   IntegerTypes.swift.gyb
   UnsafeBufferPointer.swift.gyb
   UnsafeRawBufferPointer.swift.gyb
