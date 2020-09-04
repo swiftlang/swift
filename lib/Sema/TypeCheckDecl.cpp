@@ -2696,7 +2696,7 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   if (!extendedType->getAnyNominal()) {
     diags
         .diagnose(ext->getLoc(), diag::non_nominal_extension,
-                  extendedType->getKind(), extendedType)
+                  extendedType->getCanonicalType()->getKind(), extendedType)
         .highlight(extendedRepr->getSourceRange());
     return error();
   }
