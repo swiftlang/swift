@@ -13,6 +13,7 @@
 #include "swift/IDE/Utils.h"
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Platform.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
@@ -662,46 +663,6 @@ ide::replacePlaceholders(std::unique_ptr<llvm::MemoryBuffer> InputBuf,
     if (HadPlaceholder)
       *HadPlaceholder = true;
   });
-}
-
-static std::string getPlistEntry(const llvm::Twine &Path, StringRef KeyName) {
-  auto BufOrErr = llvm::MemoryBuffer::getFile(Path);
-  if (!BufOrErr) {
-    llvm::errs() << "could not open '" << Path << "': " << BufOrErr.getError().message() << '\n';
-    return {};
-  }
-
-  std::string Key = "<key>";
-  Key += KeyName;
-  Key += "</key>";
-
-  StringRef Lines = BufOrErr.get()->getBuffer();
-  while (!Lines.empty()) {
-    StringRef CurLine;
-    std::tie(CurLine, Lines) = Lines.split('\n');
-    if (CurLine.find(Key) != StringRef::npos) {
-      std::tie(CurLine, Lines) = Lines.split('\n');
-      unsigned Begin = CurLine.find("<string>") + strlen("<string>");
-      unsigned End = CurLine.find("</string>");
-      return CurLine.substr(Begin, End - Begin).str();
-    }
-  }
-
-  return {};
-}
-
-std::string ide::getSDKName(StringRef Path) {
-  std::string Name = getPlistEntry(llvm::Twine(Path)+"/SDKSettings.plist",
-                                   "CanonicalName");
-  if (Name.empty() && Path.endswith(".sdk")) {
-    Name = llvm::sys::path::filename(Path).drop_back(strlen(".sdk")).str();
-  }
-  return Name;
-}
-
-std::string ide::getSDKVersion(StringRef Path) {
-  return getPlistEntry(llvm::Twine(Path)+"/System/Library/CoreServices/"
-                       "SystemVersion.plist", "ProductBuildVersion");
 }
 
 // Modules failing to load are commented-out.
