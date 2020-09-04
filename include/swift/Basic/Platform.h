@@ -106,6 +106,13 @@ namespace swift {
   /// Retrieve the target SDK version for the given SDKInfo and target triple.
   llvm::VersionTuple getTargetSDKVersion(clang::driver::DarwinSDKInfo &SDKInfo,
                                          const llvm::Triple &triple);
+
+  /// Get SDK build version.
+  std::string getSDKBuildVersion(StringRef SDKPath);
+  std::string getSDKBuildVersionFromPlist(StringRef Path);
+
+  /// Get SDK name.
+  std::string getSDKName(StringRef SDKPath);
 } // end namespace swift
 
 #endif // SWIFT_BASIC_PLATFORM_H
