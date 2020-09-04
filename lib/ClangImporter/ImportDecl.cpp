@@ -16,7 +16,6 @@
 
 #include "CFTypeInfo.h"
 #include "ImporterImpl.h"
-#include "swift/Strings.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Attr.h"
@@ -36,15 +35,19 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Stmt.h"
-#include "swift/AST/Types.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/PrettyStackTrace.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/Parse/Lexer.h"
 #include "swift/Config.h"
+#include "swift/Parse/Lexer.h"
+#include "swift/Strings.h"
+
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
+#include "clang/AST/DeclObjCCommon.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/Basic/CharInfo.h"
 #include "swift/Basic/Statistic.h"
@@ -160,6 +163,7 @@ static FuncDecl *createFuncOrAccessor(ASTContext &ctx, SourceLoc funcLoc,
                                       DeclName name, SourceLoc nameLoc,
                                       ParameterList *bodyParams,
                                       Type resultTy,
+                                      bool async,
                                       bool throws,
                                       DeclContext *dc,
                                       ClangNode clangNode) {
@@ -177,7 +181,7 @@ static FuncDecl *createFuncOrAccessor(ASTContext &ctx, SourceLoc funcLoc,
                                 bodyParams,
                                 resultTy, dc, clangNode);
   } else {
-    return FuncDecl::createImported(ctx, funcLoc, name, nameLoc, throws, nullptr,
+    return FuncDecl::createImported(ctx, funcLoc, name, nameLoc, async, throws, nullptr,
                                     bodyParams, resultTy, dc, clangNode);
   }
 }
@@ -374,6 +378,7 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
       case clang::TargetInfo::VoidPtrBuiltinVaList:
       case clang::TargetInfo::PowerABIBuiltinVaList:
       case clang::TargetInfo::AAPCSABIBuiltinVaList:
+      case clang::TargetInfo::HexagonBuiltinVaList:
         assert(ClangCtx.getTypeSize(ClangCtx.VoidPtrTy) == ClangTypeSize &&
                "expected va_list type to be sizeof(void *)");
         break;
@@ -1216,15 +1221,16 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                          fieldType,
                                                          clang::VK_RValue,
                                                          clang::SourceLocation());
-    
-    auto cSetterExpr = new (Ctx) clang::BinaryOperator(cSetterMemberExpr,
-                                                       cSetterValueExpr,
-                                                       clang::BO_Assign,
-                                                       fieldType,
-                                                       clang::VK_RValue,
-                                                       clang::OK_Ordinary,
-                                                       clang::SourceLocation(),
-                                                       clang::FPOptions());
+
+    auto cSetterExpr = clang::BinaryOperator::Create(Ctx,
+                                                     cSetterMemberExpr,
+                                                     cSetterValueExpr,
+                                                     clang::BO_Assign,
+                                                     fieldType,
+                                                     clang::VK_RValue,
+                                                     clang::OK_Ordinary,
+                                                     clang::SourceLocation(),
+                                                     clang::FPOptionsOverride());
     
     cSetterDecl->setBody(cSetterExpr);
   }
@@ -2065,7 +2071,7 @@ classImplementsProtocol(const clang::ObjCInterfaceDecl *constInterface,
 
 static void
 applyPropertyOwnership(VarDecl *prop,
-                       clang::ObjCPropertyDecl::PropertyAttributeKind attrs) {
+                       clang::ObjCPropertyAttribute::Kind attrs) {
   Type ty = prop->getInterfaceType();
   if (auto innerTy = ty->getOptionalObjectType())
     ty = innerTy;
@@ -2073,19 +2079,19 @@ applyPropertyOwnership(VarDecl *prop,
     return;
 
   ASTContext &ctx = prop->getASTContext();
-  if (attrs & clang::ObjCPropertyDecl::OBJC_PR_copy) {
+  if (attrs & clang::ObjCPropertyAttribute::kind_copy) {
     prop->getAttrs().add(new (ctx) NSCopyingAttr(false));
     return;
   }
-  if (attrs & clang::ObjCPropertyDecl::OBJC_PR_weak) {
+  if (attrs & clang::ObjCPropertyAttribute::kind_weak) {
     prop->getAttrs().add(new (ctx)
                              ReferenceOwnershipAttr(ReferenceOwnership::Weak));
     prop->setInterfaceType(WeakStorageType::get(
         prop->getInterfaceType(), ctx));
     return;
   }
-  if ((attrs & clang::ObjCPropertyDecl::OBJC_PR_assign) ||
-      (attrs & clang::ObjCPropertyDecl::OBJC_PR_unsafe_unretained)) {
+  if ((attrs & clang::ObjCPropertyAttribute::kind_assign) ||
+      (attrs & clang::ObjCPropertyAttribute::kind_unsafe_unretained)) {
     prop->getAttrs().add(
         new (ctx) ReferenceOwnershipAttr(ReferenceOwnership::Unmanaged));
     prop->setInterfaceType(UnmanagedStorageType::get(
@@ -2262,7 +2268,7 @@ namespace {
     /// Whether the names we're importing are from the language version the user
     /// requested, or if these are decls from another version
     bool isActiveSwiftVersion() const {
-      return getVersion() == getActiveSwiftVersion();
+      return getVersion().withConcurrency(false) == getActiveSwiftVersion().withConcurrency(false);
     }
 
     void recordMemberInContext(const DeclContext *dc, ValueDecl *member) {
@@ -2308,7 +2314,7 @@ namespace {
         return canonicalName;
       }
 
-      // Special handling when we import using the older Swift name.
+      // Special handling when we import using the alternate Swift name.
       //
       // Import using the alternate Swift name. If that fails, or if it's
       // identical to the active Swift name, we won't introduce an alternate
@@ -2316,6 +2322,19 @@ namespace {
       auto alternateName = Impl.importFullName(D, getVersion());
       if (!alternateName)
         return ImportedName();
+
+      // Importing for concurrency is special in that the same declaration
+      // is imported both with a completion handler parameter and as 'async',
+      // creating two separate declarations.
+      if (getVersion().supportsConcurrency()) {
+        // If the resulting name isn't special for concurrency, it's not
+        // different.
+        if (!alternateName.getAsyncInfo())
+          return ImportedName();
+
+        // Otherwise, it's a legitimately different import.
+        return alternateName;
+      }
 
       if (alternateName.getDeclName() == canonicalName.getDeclName() &&
           alternateName.getEffectiveContext().equalsWithoutResolving(
@@ -2476,6 +2495,13 @@ namespace {
 
         if (getVersion() >= getActiveSwiftVersion())
           return;
+      }
+
+      // If this the active and current Swift versions differ based on
+      // concurrency, it's not actually a variant.
+      if (getVersion().supportsConcurrency() !=
+            getActiveSwiftVersion().supportsConcurrency()) {
+        return;
       }
 
       // TODO: some versions should be deprecated instead of unavailable
@@ -3845,9 +3871,10 @@ namespace {
 
       // FIXME: Poor location info.
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
-      result = createFuncOrAccessor(Impl.SwiftContext, loc, accessorInfo, name,
-                                    nameLoc, bodyParams, resultTy,
-                                    /*throws*/ false, dc, decl);
+      result = createFuncOrAccessor(
+          Impl.SwiftContext, loc, accessorInfo, name,
+          nameLoc, bodyParams, resultTy,
+          /*async*/ false, /*throws*/ false, dc, decl);
 
       if (!dc->isModuleScopeContext()) {
         if (selfIsInOut)
@@ -4418,6 +4445,16 @@ namespace {
         }
       }
 
+      // Determine whether the function is throwing and/or async.
+      bool throws = importedName.getErrorInfo().hasValue();
+      bool async = false;
+      auto asyncConvention = importedName.getAsyncInfo();
+      if (asyncConvention) {
+        async = true;
+        if (asyncConvention->isThrowing())
+          throws = true;
+      }
+
       auto resultTy = importedType.getType();
       auto isIUO = importedType.isImplicitlyUnwrapped();
 
@@ -4447,8 +4484,7 @@ namespace {
                                          importedName.getDeclName(),
                                          /*nameLoc*/SourceLoc(),
                                          bodyParams, resultTy,
-                                         importedName.getErrorInfo().hasValue(),
-                                         dc, decl);
+                                         async, throws, dc, decl);
 
       result->setAccess(getOverridableAccessLevel(dc));
 
@@ -4478,6 +4514,11 @@ namespace {
       // Record the error convention.
       if (errorConvention) {
         result->setForeignErrorConvention(*errorConvention);
+      }
+
+      // Record the async convention.
+      if (asyncConvention) {
+        result->setForeignAsyncConvention(*asyncConvention);
       }
 
       // Handle attributes.
@@ -4511,6 +4552,7 @@ namespace {
             Impl.addAlternateDecl(result, cast<ValueDecl>(imported));
         }
       }
+
       return result;
     }
 
@@ -6451,6 +6493,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
     return known->second;
 
   // Create the actual constructor.
+  assert(!importedName.getAsyncInfo());
   auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
       objcMethod, AccessLevel::Public, importedName.getDeclName(),
       /*NameLoc=*/SourceLoc(), failability, /*FailabilityLoc=*/SourceLoc(),
@@ -7151,6 +7194,11 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
         return;
 
       if (isa<AccessorDecl>(afd))
+        return;
+
+      // Asynch methods are also always imported without async, so don't
+      // record them here.
+      if (afd->hasAsync())
         return;
 
       auto objcMethod =

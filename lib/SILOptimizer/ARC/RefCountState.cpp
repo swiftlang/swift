@@ -118,7 +118,7 @@ bool BottomUpRefCountState::mightRemoveMutators() {
 
   // We will not remove mutators if we have a might be decremented value that
   // is not known safe.
-  return LatState != LatticeState::MightBeDecremented || isKnownSafe();
+  return isCodeMotionSafe() || isKnownSafe();
 }
 
 /// Uninitialize the current state.
@@ -195,9 +195,7 @@ bool BottomUpRefCountState::valueCanBeUsedGivenLatticeState() const {
 
 /// Given the current lattice state, if we have seen a use, advance the
 /// lattice state. Return true if we do so and false otherwise.
-bool BottomUpRefCountState::handleUser(
-    SILValue RCIdentity,
-    ImmutablePointerSetFactory<SILInstruction> &SetFactory, AliasAnalysis *AA) {
+bool BottomUpRefCountState::handleUser() {
   assert(valueCanBeUsedGivenLatticeState() &&
          "Must be able to be used at this point of the lattice.");
 
@@ -233,9 +231,7 @@ valueCanBeGuaranteedUsedGivenLatticeState() const {
 
 /// Given the current lattice state, if we have seen a use, advance the
 /// lattice state. Return true if we do so and false otherwise.
-bool BottomUpRefCountState::handleGuaranteedUser(
-    SILValue RCIdentity,
-    ImmutablePointerSetFactory<SILInstruction> &SetFactory, AliasAnalysis *AA) {
+bool BottomUpRefCountState::handleGuaranteedUser() {
   assert(valueCanBeGuaranteedUsedGivenLatticeState() &&
          "Must be able to be used at this point of the lattice.");
 
@@ -270,14 +266,12 @@ bool BottomUpRefCountState::isRefCountInstMatchedToTrackedInstruction(
   if (!Transition.matchingInst(RefCountInst))
     return false;
 
-  return handleRefCountInstMatch(RefCountInst);
+  return handleRefCountInstMatch();
 }
 
 /// We have a matching ref count inst. Return true if we advance the sequence
 /// and false otherwise.
-bool
-BottomUpRefCountState::
-handleRefCountInstMatch(SILInstruction *RefCountInst) {
+bool BottomUpRefCountState::handleRefCountInstMatch() {
   // Otherwise modify the state appropriately in preparation for removing the
   // increment, decrement pair.
   switch (LatState) {
@@ -340,8 +334,7 @@ bool BottomUpRefCountState::merge(const BottomUpRefCountState &Other) {
 // the value we are tracking. If so advance the state's sequence appropriately
 // and return true. Otherwise return false.
 bool BottomUpRefCountState::handlePotentialGuaranteedUser(
-    SILInstruction *PotentialGuaranteedUser,
-    ImmutablePointerSetFactory<SILInstruction> &SetFactory, AliasAnalysis *AA) {
+    SILInstruction *PotentialGuaranteedUser, AliasAnalysis *AA) {
   // If we are not tracking a ref count, just return false.
   if (!isTrackingRefCount())
     return false;
@@ -375,7 +368,7 @@ bool BottomUpRefCountState::handlePotentialGuaranteedUser(
       FoundNonARCUser = true;
 
   // Otherwise, update the ref count state given the guaranteed user.
-  return handleGuaranteedUser(getRCRoot(), SetFactory, AA);
+  return handleGuaranteedUser();
 }
 
 /// Check if PotentialDecrement can decrement the reference count associated
@@ -408,9 +401,8 @@ bool BottomUpRefCountState::handlePotentialDecrement(
 // Check if PotentialUser could be a use of the reference counted value that
 // requires user to be alive. If so advance the state's sequence
 // appropriately and return true. Otherwise return false.
-bool BottomUpRefCountState::handlePotentialUser(
-    SILInstruction *PotentialUser,
-    ImmutablePointerSetFactory<SILInstruction> &SetFactory, AliasAnalysis *AA) {
+bool BottomUpRefCountState::handlePotentialUser(SILInstruction *PotentialUser,
+                                                AliasAnalysis *AA) {
 
   // If we are not tracking a ref count, just return false.
   if (!isTrackingRefCount())
@@ -434,12 +426,11 @@ bool BottomUpRefCountState::handlePotentialUser(
     if (mustUseValue(PotentialUser, getRCRoot(), AA))
       FoundNonARCUser = true;
 
-  return handleUser(getRCRoot(), SetFactory, AA);
+  return handleUser();
 }
 
-void BottomUpRefCountState::updateForSameLoopInst(
-    SILInstruction *I,
-    ImmutablePointerSetFactory<SILInstruction> &SetFactory, AliasAnalysis *AA) {
+void BottomUpRefCountState::updateForSameLoopInst(SILInstruction *I,
+                                                  AliasAnalysis *AA) {
   // If this state is not tracking anything, there is nothing to update.
   if (!isTrackingRefCount())
     return;
@@ -448,7 +439,7 @@ void BottomUpRefCountState::updateForSameLoopInst(
   // instruction in a way that requires us to guarantee the lifetime of the
   // pointer up to this point. This has the effect of performing a use and a
   // decrement.
-  if (handlePotentialGuaranteedUser(I, SetFactory, AA)) {
+  if (handlePotentialGuaranteedUser(I, AA)) {
     LLVM_DEBUG(llvm::dbgs() << "    Found Potential Guaranteed Use:\n        "
                             << getRCRoot());
     return;
@@ -465,15 +456,45 @@ void BottomUpRefCountState::updateForSameLoopInst(
 
   // Otherwise check if the reference counted value we are tracking
   // could be used by the given instruction.
-  if (!handlePotentialUser(I, SetFactory, AA))
+  if (!handlePotentialUser(I, AA))
     return;
   LLVM_DEBUG(llvm::dbgs() << "    Found Potential Use:\n        "
                           << getRCRoot());
 }
 
-void BottomUpRefCountState::updateForDifferentLoopInst(
-    SILInstruction *I,
-    ImmutablePointerSetFactory<SILInstruction> &SetFactory, AliasAnalysis *AA) {
+// Remove "KnownSafe" on the BottomUpRefCountState. If we find another unmatched
+// retain instruction with a different aliasing RCIdentity or the same
+// RCIdentity in the child region in the loop case.
+void BottomUpRefCountState::checkAndResetKnownSafety(
+    SILInstruction *I, SILValue VisitedRC,
+    std::function<bool(SILInstruction *)> checkIfRefCountInstIsMatched,
+    RCIdentityFunctionInfo *RCIA, AliasAnalysis *AA) {
+  assert(VisitedRC);
+  // If the RefCountState was not marked "KnownSafe", there is nothing to do.
+  if (!isKnownSafe())
+    return;
+  assert(Transition.getKind() == RCStateTransitionKind::StrongDecrement);
+  // We only care about retain instructions that can potentially pair with a
+  // previously visited release.
+  if (!(isa<StrongRetainInst>(I) || isa<RetainValueInst>(I)))
+    return;
+  SILValue VisitingRC = RCIA->getRCIdentityRoot(I->getOperand(0));
+  assert(VisitingRC);
+  // If the visiting retain instruction was not already pair with a release
+  // instruction, return.
+  if (checkIfRefCountInstIsMatched(I))
+    return;
+  // If the VisitingRC and VisitedRC do not alias, they cannot be incorrectly
+  // paired.
+  if (AA->isNoAlias(VisitingRC, VisitedRC))
+    return;
+  LLVM_DEBUG(llvm::dbgs() << "Clearing KnownSafe for: ");
+  LLVM_DEBUG(VisitedRC->dump());
+  clearKnownSafe();
+}
+
+void BottomUpRefCountState::updateForDifferentLoopInst(SILInstruction *I,
+                                                       AliasAnalysis *AA) {
   // If we are not tracking anything, bail.
   if (!isTrackingRefCount())
     return;
@@ -483,7 +504,7 @@ void BottomUpRefCountState::updateForDifferentLoopInst(
         mayDecrementRefCount(I, getRCRoot(), AA)) {
       LLVM_DEBUG(llvm::dbgs() << "    Found potential guaranteed use:\n        "
                               << getRCRoot());
-      handleGuaranteedUser(getRCRoot(), SetFactory, AA);
+      handleGuaranteedUser();
       return;
     }
   }
@@ -491,7 +512,7 @@ void BottomUpRefCountState::updateForDifferentLoopInst(
   // We can just handle potential users normally, since if we handle the user we
   // already saw a decrement implying that we will treat this like a guaranteed
   // use.
-  if (!handlePotentialUser(I, SetFactory, AA))
+  if (!handlePotentialUser(I, AA))
     return;
   LLVM_DEBUG(llvm::dbgs() << "    Found Potential Use:\n        "
                           << getRCRoot());
@@ -585,9 +606,7 @@ bool TopDownRefCountState::valueCanBeDecrementedGivenLatticeState() const {
 
 /// If advance the state's sequence appropriately for a decrement. If we do
 /// advance return true. Otherwise return false.
-bool TopDownRefCountState::handleDecrement(
-    SILInstruction *PotentialDecrement,
-    ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
+bool TopDownRefCountState::handleDecrement() {
   switch (LatState) {
   case LatticeState::Incremented:
     LatState = LatticeState::MightBeDecremented;
@@ -618,9 +637,7 @@ bool TopDownRefCountState::valueCanBeUsedGivenLatticeState() const {
 
 /// Given the current lattice state, if we have seen a use, advance the
 /// lattice state. Return true if we do so and false otherwise.
-bool TopDownRefCountState::handleUser(SILInstruction *PotentialUser,
-                                      SILValue RCIdentity,
-                                      AliasAnalysis *AA) {
+bool TopDownRefCountState::handleUser() {
   assert(valueCanBeUsedGivenLatticeState() &&
          "Must be able to be used at this point of the lattice.");
 
@@ -657,10 +674,7 @@ valueCanBeGuaranteedUsedGivenLatticeState() const {
 
 /// Given the current lattice state, if we have seen a use, advance the
 /// lattice state. Return true if we do so and false otherwise.
-bool TopDownRefCountState::handleGuaranteedUser(
-    SILInstruction *PotentialGuaranteedUser,
-    SILValue RCIdentity, ImmutablePointerSetFactory<SILInstruction> &SetFactory,
-    AliasAnalysis *AA) {
+bool TopDownRefCountState::handleGuaranteedUser() {
   assert(valueCanBeGuaranteedUsedGivenLatticeState() &&
          "Must be able to be used at this point of the lattice.");
   // Advance the sequence...
@@ -694,13 +708,12 @@ bool TopDownRefCountState::isRefCountInstMatchedToTrackedInstruction(
   if (!Transition.matchingInst(RefCountInst))
     return false;
 
-  return handleRefCountInstMatch(RefCountInst);
+  return handleRefCountInstMatch();
 }
 
 /// We have a matching ref count inst. Return true if we advance the sequence
 /// and false otherwise.
-bool TopDownRefCountState::
-handleRefCountInstMatch(SILInstruction *RefCountInst) {
+bool TopDownRefCountState::handleRefCountInstMatch() {
   // Otherwise modify the state appropriately in preparation for removing the
   // increment, decrement pair.
   switch (LatState) {
@@ -762,8 +775,7 @@ bool TopDownRefCountState::merge(const TopDownRefCountState &Other) {
 // the value we are tracking. If so advance the state's sequence appropriately
 // and return true. Otherwise return false.
 bool TopDownRefCountState::handlePotentialGuaranteedUser(
-    SILInstruction *PotentialGuaranteedUser,
-    ImmutablePointerSetFactory<SILInstruction> &SetFactory, AliasAnalysis *AA) {
+    SILInstruction *PotentialGuaranteedUser, AliasAnalysis *AA) {
   // If we are not tracking a ref count, just return false.
   if (!isTrackingRefCount())
     return false;
@@ -789,16 +801,14 @@ bool TopDownRefCountState::handlePotentialGuaranteedUser(
    }
 
   // Otherwise, update our step given that we have a potential decrement.
-  return handleGuaranteedUser(PotentialGuaranteedUser, getRCRoot(),
-                              SetFactory, AA);
+   return handleGuaranteedUser();
 }
 
 // Check if PotentialDecrement can decrement the reference count associated with
 // the value we are tracking. If so advance the state's sequence appropriately
 // and return true. Otherwise return false.
 bool TopDownRefCountState::handlePotentialDecrement(
-    SILInstruction *PotentialDecrement,
-    ImmutablePointerSetFactory<SILInstruction> &SetFactory, AliasAnalysis *AA) {
+    SILInstruction *PotentialDecrement, AliasAnalysis *AA) {
   // If we are not tracking a ref count, just return false.
   if (!isTrackingRefCount())
     return false;
@@ -817,7 +827,7 @@ bool TopDownRefCountState::handlePotentialDecrement(
     return false;
 
   // Otherwise, update our state given the potential decrement.
-  return handleDecrement(PotentialDecrement, SetFactory);
+  return handleDecrement();
 }
 
 // Check if PotentialUser could be a use of the reference counted value that
@@ -840,12 +850,11 @@ bool TopDownRefCountState::handlePotentialUser(SILInstruction *PotentialUser,
   if (!mayHaveSymmetricInterference(PotentialUser, getRCRoot(), AA))
     return false;
 
-  return handleUser(PotentialUser, getRCRoot(), AA);
+  return handleUser();
 }
 
-void TopDownRefCountState::updateForSameLoopInst(
-    SILInstruction *I, 
-    ImmutablePointerSetFactory<SILInstruction> &SetFactory, AliasAnalysis *AA) {
+void TopDownRefCountState::updateForSameLoopInst(SILInstruction *I,
+                                                 AliasAnalysis *AA) {
   // If we are not tracking anything, bail.
   if (!isTrackingRefCount())
     return;
@@ -854,7 +863,7 @@ void TopDownRefCountState::updateForSameLoopInst(
   // instruction in a way that requires us to guarantee the lifetime of the
   // pointer up to this point. This has the effect of performing a use and a
   // decrement.
-  if (handlePotentialGuaranteedUser(I, SetFactory, AA)) {
+  if (handlePotentialGuaranteedUser(I, AA)) {
     LLVM_DEBUG(llvm::dbgs() << "    Found Potential Guaranteed Use:\n        "
                             << getRCRoot());
     return;
@@ -863,7 +872,7 @@ void TopDownRefCountState::updateForSameLoopInst(
   // Check if the instruction we are visiting could potentially decrement
   // the reference counted value we are tracking in a manner that could
   // cause us to change states. If we do change states continue...
-  if (handlePotentialDecrement(I, SetFactory, AA)) {
+  if (handlePotentialDecrement(I, AA)) {
     LLVM_DEBUG(llvm::dbgs() << "    Found Potential Decrement:\n        "
                             << getRCRoot());
     return;
@@ -877,9 +886,39 @@ void TopDownRefCountState::updateForSameLoopInst(
                           << getRCRoot());
 }
 
-void TopDownRefCountState::updateForDifferentLoopInst(
-    SILInstruction *I,
-    ImmutablePointerSetFactory<SILInstruction> &SetFactory, AliasAnalysis *AA) {
+// Remove "KnownSafe" on the TopDownRefCountState. If we find another unmatched
+// release instruction with a different aliasing RCIdentity or the same
+// RCIdentity in the child region in the loop case.
+void TopDownRefCountState::checkAndResetKnownSafety(
+    SILInstruction *I, SILValue VisitedRC,
+    std::function<bool(SILInstruction *)> checkIfRefCountInstIsMatched,
+    RCIdentityFunctionInfo *RCIA, AliasAnalysis *AA) {
+  assert(VisitedRC);
+  // If the RefCountState was not marked "KnownSafe", there is nothing to do.
+  if (!isKnownSafe())
+    return;
+  assert(Transition.getKind() == RCStateTransitionKind::StrongIncrement);
+  // We only care about release instructions that can potentially pair with a
+  // previously visited retain.
+  if (!(isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I)))
+    return;
+  SILValue VisitingRC = RCIA->getRCIdentityRoot(I->getOperand(0));
+  assert(VisitingRC);
+  // If the visiting release instruction was already pair with a retain
+  // instruction, return.
+  if (checkIfRefCountInstIsMatched(I))
+    return;
+  // If the VisitingRC and VisitedRC do not alias, they cannot be incorrectly
+  // paired.
+  if (AA->isNoAlias(VisitingRC, VisitedRC))
+    return;
+  LLVM_DEBUG(llvm::dbgs() << "Clearing KnownSafe for: ");
+  LLVM_DEBUG(VisitedRC->dump());
+  clearKnownSafe();
+}
+
+void TopDownRefCountState::updateForDifferentLoopInst(SILInstruction *I,
+                                                      AliasAnalysis *AA) {
   // If we are not tracking anything, bail.
   if (!isTrackingRefCount())
     return;
@@ -888,7 +927,7 @@ void TopDownRefCountState::updateForDifferentLoopInst(
     if (mayGuaranteedUseValue(I, getRCRoot(), AA) ||
         mayDecrementRefCount(I, getRCRoot(), AA)) {
       LLVM_DEBUG(llvm::dbgs() << "    Found potential guaranteed use!\n");
-      handleGuaranteedUser(I, getRCRoot(), SetFactory, AA);
+      handleGuaranteedUser();
       return;
     }
   }
@@ -902,6 +941,27 @@ void TopDownRefCountState::updateForDifferentLoopInst(
 //===----------------------------------------------------------------------===//
 //                             Printing Utilities
 //===----------------------------------------------------------------------===//
+
+void BottomUpRefCountState::dump() {
+  llvm::dbgs() << LatState << " "
+               << (isKnownSafe() ? "KnownSafe" : "NotKnownSafe") << " "
+               << (isCodeMotionSafe() ? "CodeMotionSafe" : "NotCodeMotionSafe")
+               << "\n";
+  llvm::dbgs() << "Matching Instructions:\n";
+  for (auto it : getInstructions()) {
+    it->dump();
+  }
+}
+void TopDownRefCountState::dump() {
+  llvm::dbgs() << LatState << " "
+               << (isKnownSafe() ? "KnownSafe" : "NotKnownSafe") << " "
+               << (isCodeMotionSafe() ? "CodeMotionSafe" : "NotCodeMotionSafe")
+               << "\n";
+  llvm::dbgs() << "Matching Instructions:\n";
+  for (auto it : getInstructions()) {
+    it->dump();
+  }
+}
 
 namespace llvm {
 
@@ -938,5 +998,4 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
 
   llvm_unreachable("Unhandled LatticeState in switch.");
 }
-
 } // end namespace llvm

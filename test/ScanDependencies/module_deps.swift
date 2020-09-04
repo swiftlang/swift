@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/clang-module-cache
-// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -emit-dependencies -emit-dependencies-path %t/deps.d -import-objc-header %S/Inputs/CHeaders/Bridging.h -swift-version 4 -disable-implicit-swift-modules -Xcc -Xclang -Xcc -fno-implicit-modules
+// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -emit-dependencies -emit-dependencies-path %t/deps.d -import-objc-header %S/Inputs/CHeaders/Bridging.h -swift-version 4
 
 // Check the contents of the JSON output
 // RUN: %FileCheck %s < %t/deps.json
@@ -105,7 +105,6 @@ import SubE
 // CHECK-NEXT: "-only-use-extra-clang-opts"
 // CHECK-NEXT: "-Xcc"
 // CHECK-NEXT: "clang"
-// CHECK: "-fno-implicit-modules"
 
 /// --------Swift module E
 // CHECK: "swift": "E"
@@ -195,9 +194,7 @@ import SubE
 /// --------Clang module SwiftShims
 // CHECK-LABEL: "modulePath": "SwiftShims.pcm",
 
-// CHECK-NO-SEARCH-PATHS-NOT: "-I"
 // CHECK-NO-SEARCH-PATHS-NOT: "-sdk"
-// CHECK-NO-SEARCH-PATHS-NOT: "-F"
 // CHECK-NO-SEARCH-PATHS-NOT: "-prebuilt-module-cache-path"
 
 // Check make-style dependencies

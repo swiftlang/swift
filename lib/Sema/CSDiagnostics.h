@@ -94,20 +94,26 @@ public:
   /// Resolve type variables present in the raw type, if any.
   Type resolveType(Type rawType, bool reconstituteSugar = false,
                    bool wantRValue = true) const {
-    if (!rawType->hasTypeVariable()) {
-      if (reconstituteSugar)
-        rawType = rawType->reconstituteSugar(/*recursive*/ true);
-      return wantRValue ? rawType->getRValueType() : rawType;
+    auto &cs = getConstraintSystem();
+
+    if (rawType->hasTypeVariable() || rawType->hasHole()) {
+      rawType = rawType.transform([&](Type type) {
+        if (auto *typeVar = type->getAs<TypeVariableType>()) {
+          auto resolvedType = S.simplifyType(typeVar);
+          Type GP = typeVar->getImpl().getGenericParameter();
+          return resolvedType->is<UnresolvedType>() && GP
+                     ? GP
+                     : resolvedType;
+        }
+
+        return type->isHole() ? Type(cs.getASTContext().TheUnresolvedType)
+                              : type;
+      });
     }
 
-    auto &cs = getConstraintSystem();
-    return cs.simplifyTypeImpl(rawType, [&](TypeVariableType *typeVar) -> Type {
-      auto fixed = S.simplifyType(typeVar);
-      auto *genericParam = typeVar->getImpl().getGenericParameter();
-      if (fixed->isHole() && genericParam)
-        return genericParam;
-      return resolveType(fixed, reconstituteSugar, wantRValue);
-    });
+    if (reconstituteSugar)
+      rawType = rawType->reconstituteSugar(/*recursive*/ true);
+    return wantRValue ? rawType->getRValueType() : rawType;
   }
 
   template <typename... ArgTypes>
@@ -968,20 +974,20 @@ public:
 
 class PropertyWrapperReferenceFailure : public ContextualFailure {
   VarDecl *Property;
-  bool UsingStorageWrapper;
+  bool UsingProjection;
 
 public:
   PropertyWrapperReferenceFailure(const Solution &solution, VarDecl *property,
-                                  bool usingStorageWrapper, Type base,
+                                  bool usingProjection, Type base,
                                   Type wrapper, ConstraintLocator *locator)
       : ContextualFailure(solution, base, wrapper, locator), Property(property),
-        UsingStorageWrapper(usingStorageWrapper) {}
+        UsingProjection(usingProjection) {}
 
   VarDecl *getProperty() const { return Property; }
 
   Identifier getPropertyName() const { return Property->getName(); }
 
-  bool usingStorageWrapper() const { return UsingStorageWrapper; }
+  bool usingProjection() const { return UsingProjection; }
 
   ValueDecl *getReferencedMember() const {
     auto *locator = getLocator();

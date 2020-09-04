@@ -156,6 +156,7 @@ bool LoopARCPairingContext::processRegion(const LoopRegion *Region,
     }
 
     MadeChange |= MatchedPair;
+    Evaluator.saveMatchingInfo(Region);
     Evaluator.clearLoopState(Region);
     Context.DecToIncStateMap.clear();
     Context.IncToDecStateMap.clear();
@@ -183,7 +184,7 @@ processFunctionWithoutLoopSupport(SILFunction &F, bool FreezePostDomReleases,
   // globalinit_func. Since that is not *that* interesting from an ARC
   // perspective (i.e. no ref count operations in a loop), disable it on such
   // functions temporarily in order to unblock others. This should be removed.
-  if (F.getName().startswith("globalinit_"))
+  if (F.isGlobalInitOnceFunction())
     return false;
 
   LLVM_DEBUG(llvm::dbgs() << "***** Processing " << F.getName() << " *****\n");
@@ -231,7 +232,7 @@ static bool processFunctionWithLoopSupport(
   // globalinit_func. Since that is not *that* interesting from an ARC
   // perspective (i.e. no ref count operations in a loop), disable it on such
   // functions temporarily in order to unblock others. This should be removed.
-  if (F.getName().startswith("globalinit_"))
+  if (F.isGlobalInitOnceFunction())
     return false;
 
   LLVM_DEBUG(llvm::dbgs() << "***** Processing " << F.getName() << " *****\n");

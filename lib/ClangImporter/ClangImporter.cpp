@@ -32,7 +32,6 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Version.h"
-#include "swift/ClangImporter/ClangImporterOptions.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Config.h"
 #include "swift/Demangling/Demangle.h"
@@ -410,11 +409,10 @@ bool ClangImporter::Implementation::shouldIgnoreBridgeHeaderTopLevelDecl(
 }
 
 ClangImporter::ClangImporter(ASTContext &ctx,
-                             const ClangImporterOptions &clangImporterOpts,
                              DependencyTracker *tracker,
                              DWARFImporterDelegate *dwarfImporterDelegate)
     : ClangModuleLoader(tracker),
-      Impl(*new Implementation(ctx, clangImporterOpts, dwarfImporterDelegate)) {
+      Impl(*new Implementation(ctx, dwarfImporterDelegate)) {
 }
 
 ClangImporter::~ClangImporter() {
@@ -466,12 +464,11 @@ getGlibcModuleMapPath(SearchPathOptions& Opts, llvm::Triple triple,
 void
 importer::getNormalInvocationArguments(
     std::vector<std::string> &invocationArgStrs,
-    ASTContext &ctx,
-    const ClangImporterOptions &importerOpts) {
+    ASTContext &ctx) {
   const auto &LangOpts = ctx.LangOpts;
   const llvm::Triple &triple = LangOpts.Target;
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
-
+  ClangImporterOptions &importerOpts = ctx.ClangImporterOpts;
   auto languageVersion = ctx.LangOpts.EffectiveLanguageVersion;
 
   if (llvm::sys::path::extension(importerOpts.BridgingHeader)
@@ -688,8 +685,7 @@ importer::getNormalInvocationArguments(
 
 static void
 getEmbedBitcodeInvocationArguments(std::vector<std::string> &invocationArgStrs,
-                                   ASTContext &ctx,
-                                   const ClangImporterOptions &importerOpts) {
+                                   ASTContext &ctx) {
   invocationArgStrs.insert(invocationArgStrs.end(), {
     // Backend mode.
     "-fembed-bitcode",
@@ -704,11 +700,11 @@ getEmbedBitcodeInvocationArguments(std::vector<std::string> &invocationArgStrs,
 void
 importer::addCommonInvocationArguments(
     std::vector<std::string> &invocationArgStrs,
-    ASTContext &ctx,
-    const ClangImporterOptions &importerOpts) {
+    ASTContext &ctx) {
   using ImporterImpl = ClangImporter::Implementation;
   const llvm::Triple &triple = ctx.LangOpts.Target;
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
+  const ClangImporterOptions &importerOpts = ctx.ClangImporterOpts;
 
   invocationArgStrs.push_back("-target");
   invocationArgStrs.push_back(triple.str());
@@ -920,25 +916,24 @@ ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
 }
 
 std::vector<std::string>
-ClangImporter::getClangArguments(ASTContext &ctx,
-                                 const ClangImporterOptions &importerOpts) {
-  if (importerOpts.ExtraArgsOnly) {
-    return importerOpts.ExtraArgs;
+ClangImporter::getClangArguments(ASTContext &ctx) {
+  if (ctx.ClangImporterOpts.ExtraArgsOnly) {
+    return ctx.ClangImporterOpts.ExtraArgs;
   }
   std::vector<std::string> invocationArgStrs;
   // Clang expects this to be like an actual command line. So we need to pass in
   // "clang" for argv[0]
   invocationArgStrs.push_back("clang");
-  switch (importerOpts.Mode) {
+  switch (ctx.ClangImporterOpts.Mode) {
   case ClangImporterOptions::Modes::Normal:
   case ClangImporterOptions::Modes::PrecompiledModule:
-    getNormalInvocationArguments(invocationArgStrs, ctx, importerOpts);
+    getNormalInvocationArguments(invocationArgStrs, ctx);
     break;
   case ClangImporterOptions::Modes::EmbedBitcode:
-    getEmbedBitcodeInvocationArguments(invocationArgStrs, ctx, importerOpts);
+    getEmbedBitcodeInvocationArguments(invocationArgStrs, ctx);
     break;
   }
-  addCommonInvocationArguments(invocationArgStrs, ctx, importerOpts);
+  addCommonInvocationArguments(invocationArgStrs, ctx);
   return invocationArgStrs;
 }
 
@@ -974,19 +969,15 @@ ClangImporter::createClangInvocation(ClangImporter *importer,
                                                 nullptr, false, CC1Args);
 }
 
-ArrayRef<std::string> ClangImporter::getExtraClangArgs() const {
-  return Impl.ExtraClangArgs;
-}
-
 std::unique_ptr<ClangImporter>
-ClangImporter::create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
+ClangImporter::create(ASTContext &ctx,
                       std::string swiftPCHHash, DependencyTracker *tracker,
                       DWARFImporterDelegate *dwarfImporterDelegate) {
   std::unique_ptr<ClangImporter> importer{
-      new ClangImporter(ctx, importerOpts, tracker, dwarfImporterDelegate)};
-  importer->Impl.ClangArgs = getClangArguments(ctx, importerOpts);
+      new ClangImporter(ctx, tracker, dwarfImporterDelegate)};
+  auto &importerOpts = ctx.ClangImporterOpts;
+  importer->Impl.ClangArgs = getClangArguments(ctx);
   ArrayRef<std::string> invocationArgStrs = importer->Impl.ClangArgs;
-  importer->Impl.ExtraClangArgs = importerOpts.ExtraArgs;
   if (importerOpts.DumpClangDiagnostics) {
     llvm::errs() << "'";
     llvm::interleave(
@@ -1597,6 +1588,30 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
   return false;
 }
 
+bool ClangImporter::runPreprocessor(StringRef inputPath, StringRef outputPath) {
+  auto emitInstance = cloneCompilerInstanceForPrecompiling();
+  auto &invocation = emitInstance->getInvocation();
+  auto LangOpts = invocation.getLangOpts();
+  auto &OutputOpts = invocation.getPreprocessorOutputOpts();
+  OutputOpts.ShowCPP = 1;
+  OutputOpts.ShowComments = 0;
+  OutputOpts.ShowLineMarkers = 0;
+  OutputOpts.ShowMacros = 0;
+  OutputOpts.ShowMacroComments = 0;
+  auto language = getLanguageFromOptions(LangOpts);
+  auto inputFile = clang::FrontendInputFile(inputPath, language);
+
+  auto &FrontendOpts = invocation.getFrontendOpts();
+  FrontendOpts.Inputs = {inputFile};
+  FrontendOpts.OutputFile = outputPath.str();
+  FrontendOpts.ProgramAction = clang::frontend::PrintPreprocessedInput;
+
+  auto action = wrapActionForIndexingIfEnabled(
+      FrontendOpts, std::make_unique<clang::PrintPreprocessedAction>());
+  emitInstance->ExecuteAction(*action);
+  return emitInstance->getDiagnostics().hasErrorOccurred();
+}
+
 bool ClangImporter::emitPrecompiledModule(StringRef moduleMapPath,
                                           StringRef moduleName,
                                           StringRef outputPath) {
@@ -1992,20 +2007,20 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
 }
 
 ClangImporter::Implementation::Implementation(
-    ASTContext &ctx, const ClangImporterOptions &opts,
+    ASTContext &ctx,
     DWARFImporterDelegate *dwarfImporterDelegate)
     : SwiftContext(ctx),
-      ImportForwardDeclarations(opts.ImportForwardDeclarations),
-      InferImportAsMember(opts.InferImportAsMember),
-      DisableSwiftBridgeAttr(opts.DisableSwiftBridgeAttr),
-      BridgingHeaderExplicitlyRequested(!opts.BridgingHeader.empty()),
-      DisableOverlayModules(opts.DisableOverlayModules),
+      ImportForwardDeclarations(ctx.ClangImporterOpts.ImportForwardDeclarations),
+      InferImportAsMember(ctx.ClangImporterOpts.InferImportAsMember),
+      DisableSwiftBridgeAttr(ctx.ClangImporterOpts.DisableSwiftBridgeAttr),
+      BridgingHeaderExplicitlyRequested(!ctx.ClangImporterOpts.BridgingHeader.empty()),
+      DisableOverlayModules(ctx.ClangImporterOpts.DisableOverlayModules),
       IsReadingBridgingPCH(false),
       CurrentVersion(ImportNameVersion::fromOptions(ctx.LangOpts)),
       BridgingHeaderLookupTable(new SwiftLookupTable(nullptr)),
       BuffersForDiagnostics(ctx.SourceMgr),
       platformAvailability(ctx.LangOpts), nameImporter(),
-      DisableSourceImport(opts.DisableSourceImport),
+      DisableSourceImport(ctx.ClangImporterOpts.DisableSourceImport),
       DWARFImporter(dwarfImporterDelegate) {}
 
 ClangImporter::Implementation::~Implementation() {
@@ -3333,7 +3348,7 @@ StringRef ClangModuleUnit::getModuleDefiningPath() const {
   return clangSourceMgr.getFilename(clangModule->DefinitionLoc);
 }
 
-Optional<clang::ExternalASTSource::ASTSourceDescriptor>
+Optional<clang::ASTSourceDescriptor>
 ClangModuleUnit::getASTSourceDescriptor() const {
   if (clangModule) {
     assert(ASTSourceDescriptor.getModuleOrNull() == clangModule);
@@ -3681,6 +3696,7 @@ void ClangImporter::Implementation::lookupValue(
             clangDecl->getMostRecentDecl();
 
         CurrentVersion.forEachOtherImportNameVersion(
+            SwiftContext.LangOpts.EnableExperimentalConcurrency,
             [&](ImportNameVersion nameVersion) {
           if (anyMatching)
             return;
@@ -3688,6 +3704,12 @@ void ClangImporter::Implementation::lookupValue(
           // Check to see if the name and context match what we expect.
           ImportedName newName = importFullName(recentClangDecl, nameVersion);
           if (!newName.getDeclName().matchesRef(name))
+            return;
+
+          // If we asked for an async import and didn't find one, skip this.
+          // This filters out duplicates.
+          if (nameVersion.supportsConcurrency() &&
+              !newName.getAsyncInfo())
             return;
 
           const clang::DeclContext *clangDC =

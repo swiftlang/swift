@@ -1,7 +1,13 @@
 // RUN: %target-run-simple-swift
-// RUN: %target-build-swift -O %s -o %t/a.out.optimized
-// RUN: %target-codesign %t/a.out.optimized
-// RUN: %target-run %t/a.out.optimized
+//
+// RUN: %target-build-swift -swift-version 5 -O %s -o %t/a.swift5.O.out
+// RUN: %target-codesign %t/a.swift5.O.out
+// RUN: %target-run %t/a.swift5.O.out
+//
+// RUN: %target-build-swift -swift-version 5 -Onone %s -o %t/a.swift5.Onone.out
+// RUN: %target-codesign %t/a.swift5.Onone.out
+// RUN: %target-run %t/a.swift5.Onone.out
+//
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -31,13 +37,29 @@ tupleCastTests.test("Adding/removing labels") {
               String(describing: anyToIntPoint((3, 4))))
   expectEqual("(x: 5, y: 6)",
               String(describing: anyToIntPoint((x: 5, 6))))
+  expectEqual("(x: 5, y: 6)",
+              String(describing: anyToIntPoint((5, y: 6))))
 
   expectEqual("(1, 2)", String(describing: anyToInt2((1, 2))))
   expectEqual("(3, 4)", String(describing: anyToInt2((x: 3, y: 4))))
   expectEqual("(5, 6)", String(describing: anyToInt2((x: 5, 6))))
+  expectEqual("(7, 8)", String(describing: anyToInt2((7, y: 8))))
 
   expectEqual("(first: 1, 2, third: 3)",
               String(describing: anyToPartlyLabeled((1, 2, 3))))
+}
+
+tupleCastTests.test("Label checks on casting") {
+  expectTrue((x: 1, y: 2) is (Int, Int))
+  expectTrue((x: 1, y: 2) is (x: Int, Int))
+  expectTrue((x: 1, y: 2) is (Int, y: Int))
+  expectTrue((x: 1, y: 2) is (x: Int, y: Int))
+
+  expectFalse((x: 1, y: 2) is (x: Int, z: Int))
+  expectFalse((x: 1, y: 2) is (a: Int, y: Int))
+  expectFalse((x: 1, y: 2) is (a: Int, z: Int))
+  expectFalse((x: 1, y: 2) is (Int, z: Int))
+  expectFalse((x: 1, y: 2) is (a: Int, Int))
 }
 
 tupleCastTests.test("Incorrect labels conditional cast") {

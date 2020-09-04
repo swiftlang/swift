@@ -78,7 +78,7 @@ static StringRef getCategoryName(uint32_t ID) {
   case LocalDiagID::not_inheriting_convenience_inits:
     return "/* Class Inheritance Change */";
   default:
-    return StringRef();
+    return "/* Others */";
   }
 }
 }
@@ -120,5 +120,30 @@ swift::ide::api::ModuleDifferDiagsConsumer::~ModuleDifferDiagsConsumer() {
     for (auto &Item: Pair.second) {
       OS << Item << "\n";
     }
+  }
+}
+
+bool swift::ide::api::
+FilteringDiagnosticConsumer::shouldProceed(const DiagnosticInfo &Info) {
+  if (allowedBreakages->empty()) {
+    return true;
+  }
+  llvm::SmallString<256> Text;
+  {
+    llvm::raw_svector_ostream Out(Text);
+    DiagnosticEngine::formatDiagnosticText(Out, Info.FormatString,
+                                           Info.FormatArgs);
+  }
+  return allowedBreakages->count(Text.str()) == 0;
+}
+
+void swift::ide::api::
+FilteringDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
+                                              const DiagnosticInfo &Info) {
+  if (shouldProceed(Info)) {
+    if (Info.Kind == DiagnosticKind::Error) {
+      HasError = true;
+    }
+    subConsumer->handleDiagnostic(SM, Info);
   }
 }

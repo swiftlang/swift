@@ -263,7 +263,7 @@ static void discoverCrosssImportOverlayDependencies(
     dummyMainDependencies.addModuleDependency(modName.str());
     mainDep.addModuleDependency(modName.str());
   });
-  cache.updateDependencies({mainModuleName, ModuleDependenciesKind::Swift}, mainDep);
+  cache.updateDependencies({mainModuleName.str(), ModuleDependenciesKind::Swift}, mainDep);
 
   // Record the dummy main module's direct dependencies. The dummy main module
   // only directly depend on these newly discovered overlay modules.
@@ -641,8 +641,8 @@ static bool scanModuleDependencies(CompilerInstance &instance,
   ModuleDependenciesCache cache;
   InterfaceSubContextDelegateImpl ASTDelegate(ctx.SourceMgr, ctx.Diags,
                                               ctx.SearchPathOpts, ctx.LangOpts,
+                                              ctx.ClangImporterOpts,
                                               LoaderOpts,
-                                              ctx.getClangModuleLoader(),
                                               /*buildModuleCacheDirIfAbsent*/false,
                                               ModuleCachePath,
                                               FEOpts.PrebuiltModuleCachePath,
@@ -690,9 +690,10 @@ bool swift::scanClangDependencies(CompilerInstance &instance) {
                                   .InputsAndOutputs.getSingleOutputFilename());
 }
 
-bool swift::batchScanModuleDependencies(CompilerInvocation &invok,
-                                        CompilerInstance &instance,
+bool swift::batchScanModuleDependencies(CompilerInstance &instance,
                                         llvm::StringRef batchInputFile) {
+  const CompilerInvocation &invok = instance.getInvocation();
+
   (void)instance.getMainModule();
   llvm::BumpPtrAllocator alloc;
   llvm::StringSaver saver(alloc);
@@ -838,8 +839,8 @@ bool swift::scanDependencies(CompilerInstance &instance) {
   ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
   InterfaceSubContextDelegateImpl ASTDelegate(ctx.SourceMgr, ctx.Diags,
                                               ctx.SearchPathOpts, ctx.LangOpts,
+                                              ctx.ClangImporterOpts,
                                               LoaderOpts,
-                                              ctx.getClangModuleLoader(),
                                               /*buildModuleCacheDirIfAbsent*/false,
                                               ModuleCachePath,
                                               FEOpts.PrebuiltModuleCachePath,

@@ -537,6 +537,8 @@ static CanSILFunctionType getAutoDiffPullbackType(
         TC.getTypeLowering(pattern, tanType, TypeExpansionContext::minimal());
     ParameterConvention conv;
     switch (origResConv) {
+    case ResultConvention::Unowned:
+    case ResultConvention::UnownedInnerPointer:
     case ResultConvention::Owned:
     case ResultConvention::Autoreleased:
       if (tl.isAddressOnly()) {
@@ -545,10 +547,6 @@ static CanSILFunctionType getAutoDiffPullbackType(
         conv = tl.isTrivial() ? ParameterConvention::Direct_Unowned
                               : ParameterConvention::Direct_Guaranteed;
       }
-      break;
-    case ResultConvention::Unowned:
-    case ResultConvention::UnownedInnerPointer:
-      conv = ParameterConvention::Direct_Unowned;
       break;
     case ResultConvention::Indirect:
       conv = ParameterConvention::Indirect_In_Guaranteed;
@@ -3984,27 +3982,17 @@ SILFunctionType::substituteOpaqueArchetypes(TypeConverter &TC,
 CanAnyFunctionType
 TypeConverter::getBridgedFunctionType(AbstractionPattern pattern,
                                       CanAnyFunctionType t,
-                                      AnyFunctionType::ExtInfo extInfo,
                                       Bridgeability bridging) {
   // Pull out the generic signature.
   CanGenericSignature genericSig = t.getOptGenericSignature();
 
-  switch (auto rep = t->getExtInfo().getSILRepresentation()) {
-  case SILFunctionTypeRepresentation::Thick:
-  case SILFunctionTypeRepresentation::Thin:
-  case SILFunctionTypeRepresentation::Method:
-  case SILFunctionTypeRepresentation::Closure:
-  case SILFunctionTypeRepresentation::WitnessMethod: {
+  auto rep = t->getExtInfo().getSILRepresentation();
+  switch (getSILFunctionLanguage(rep)) {
+  case SILFunctionLanguage::Swift: {
     // No bridging needed for native functions.
-    if (t->getExtInfo().isEqualTo(extInfo, useClangTypes(t)))
-      return t;
-    return CanAnyFunctionType::get(genericSig, t.getParams(), t.getResult(),
-                                   extInfo);
+    return t;
   }
-
-  case SILFunctionTypeRepresentation::CFunctionPointer:
-  case SILFunctionTypeRepresentation::Block:
-  case SILFunctionTypeRepresentation::ObjCMethod: {
+  case SILFunctionLanguage::C: {
     SmallVector<AnyFunctionType::Param, 8> params;
     getBridgedParams(rep, pattern, t->getParams(), params, bridging);
 
@@ -4016,7 +4004,7 @@ TypeConverter::getBridgedFunctionType(AbstractionPattern pattern,
                                        suppressOptional);
 
     return CanAnyFunctionType::get(genericSig, llvm::makeArrayRef(params),
-                                   result, extInfo);
+                                   result, t->getExtInfo());
   }
   }
   llvm_unreachable("bad calling convention");
@@ -4098,7 +4086,6 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
   auto bridging = Bridgeability::Full;
 
   unsigned numParameterLists = constant.getParameterListCount();
-  auto extInfo = fnType->getExtInfo();
 
   // Form an abstraction pattern for bridging purposes.
   AbstractionPattern bridgingFnPattern =
@@ -4108,12 +4095,13 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
   // Fast path: no uncurrying required.
   if (numParameterLists == 1) {
     auto bridgedFnType =
-      getBridgedFunctionType(bridgingFnPattern, fnType, extInfo, bridging);
+      getBridgedFunctionType(bridgingFnPattern, fnType, bridging);
     bridgingFnPattern.rewriteType(bridgingFnPattern.getGenericSignature(),
                                   bridgedFnType);
     return { bridgingFnPattern, bridgedFnType };
   }
 
+  auto extInfo = fnType->getExtInfo();
   SILFunctionTypeRepresentation rep = extInfo.getSILRepresentation();
   assert(rep != SILFunctionType::Representation::Block
          && "objc blocks cannot be curried");

@@ -31,6 +31,7 @@
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA80_cEEEvv \
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA88_cEEEvv \
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA104_cEEEvv \
+// RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA168_cEEEvv \
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA216_cEEEvv \
 // RUN:             -e _ZN9__gnu_cxx12__to_xstringISscEET_PFiPT0_mPKS2_P13__va_list_tagEmS5_z \
 // RUN:   > %t/swiftCore-all.txt
@@ -55,6 +56,7 @@
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA80_cEEEvv \
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA88_cEEEvv \
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA104_cEEEvv \
+// RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA168_cEEEvv \
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA216_cEEEvv \
 // RUN:             -e _ZN9__gnu_cxx12__to_xstringISscEET_PFiPT0_mPKS2_P13__va_list_tagEmS5_z \
 // RUN:   > %t/swiftRemoteMirror-all.txt

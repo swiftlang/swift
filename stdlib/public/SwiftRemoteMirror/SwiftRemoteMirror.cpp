@@ -298,7 +298,7 @@ swift_reflection_typeRefForMangledTypeName(SwiftReflectionContextRef ContextRef,
                                            const char *MangledTypeName,
                                            uint64_t Length) {
   auto Context = ContextRef->nativeContext;
-  auto TR = Context->readTypeFromMangledName(MangledTypeName, Length);
+  auto TR = Context->readTypeFromMangledName(MangledTypeName, Length).getType();
   return reinterpret_cast<swift_typeref_t>(TR);
 }
 
@@ -447,6 +447,12 @@ static swift_childinfo_t convertChild(const TypeInfo *TI, unsigned Index) {
     FieldInfo = &(RecordTI->getFields()[Index]);
   } else {
     assert(false && "convertChild(TI): TI must be record or enum typeinfo");
+    return {
+      "unknown TypeInfo kind",
+      0,
+      SWIFT_UNKNOWN,
+      0,
+    };
   }
 
   return {

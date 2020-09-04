@@ -281,6 +281,7 @@ namespace sil_block {
                      BCFixed<2>,  // inlineStrategy
                      BCFixed<2>,  // optimizationMode
                      BCFixed<2>,  // classSubclassScope
+                     BCFixed<1>,  // hasCReferences
                      BCFixed<3>,  // side effect info.
                      BCVBR<8>,    // number of specialize attributes
                      BCFixed<1>,  // has qualified ownership

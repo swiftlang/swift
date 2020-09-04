@@ -2025,6 +2025,13 @@ private:
   /// from declared parameters/result and body.
   llvm::MapVector<const ClosureExpr *, FunctionType *> ClosureTypes;
 
+  /// This is a *global* list of all function builder bodies that have
+  /// been determined to be incorrect by failing constraint generation.
+  ///
+  /// Tracking this information is useful to avoid producing duplicate
+  /// diagnostics when function builder has multiple overloads.
+  llvm::SmallDenseSet<AnyFunctionRef> InvalidFunctionBuilderBodies;
+
   /// Maps node types used within all portions of the constraint
   /// system, instead of directly using the types on the
   /// nodes themselves. This allows us to typecheck and
@@ -3436,9 +3443,9 @@ public:
                       ConstraintLocator::PathElementKind kind) const;
 
   /// Gets the VarDecl associateed with resolvedOverload, and the type of the
-  /// storage wrapper if the decl has an associated storage wrapper.
+  /// projection if the decl has an associated property wrapper with a projectedValue.
   Optional<std::pair<VarDecl *, Type>>
-  getStorageWrapperInformation(SelectedOverload resolvedOverload);
+  getPropertyWrapperProjectionInfo(SelectedOverload resolvedOverload);
 
   /// Gets the VarDecl associateed with resolvedOverload, and the type of the
   /// backing storage if the decl has an associated property wrapper.
@@ -4564,9 +4571,10 @@ private:
       return {type, kind, BindingSource};
     }
 
-    static PotentialBinding forHole(ASTContext &ctx,
+    static PotentialBinding forHole(TypeVariableType *typeVar,
                                     ConstraintLocator *locator) {
-      return {ctx.TheUnresolvedType, AllowedBindingKind::Exact,
+      return {HoleType::get(typeVar->getASTContext(), typeVar),
+              AllowedBindingKind::Exact,
               /*source=*/locator};
     }
   };

@@ -16,7 +16,6 @@
 #include "ImporterImpl.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/ClangImporter/ClangImporter.h"
-#include "swift/ClangImporter/ClangImporterOptions.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningService.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningTool.h"
 #include "llvm/Support/FileSystem.h"
@@ -105,9 +104,7 @@ namespace {
 // adds search paths to Clang's data structures rather than to its
 // command line.
 static void addSearchPathInvocationArguments(
-    std::vector<std::string> &invocationArgStrs,
-    ASTContext &ctx,
-    const ClangImporterOptions &importerOpts) {
+    std::vector<std::string> &invocationArgStrs, ASTContext &ctx) {
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
   for (const auto &framepath : searchPathOpts.FrameworkSearchPaths) {
     invocationArgStrs.push_back(framepath.IsSystem ? "-iframework" : "-F");
@@ -123,15 +120,14 @@ static void addSearchPathInvocationArguments(
 /// Create the command line for Clang dependency scanning.
 static std::vector<std::string> getClangDepScanningInvocationArguments(
     ASTContext &ctx,
-    const ClangImporterOptions &importerOpts,
     StringRef sourceFileName) {
   std::vector<std::string> commandLineArgs;
 
   // Form the basic command line.
   commandLineArgs.push_back("clang");
-  importer::getNormalInvocationArguments(commandLineArgs, ctx, importerOpts);
-  importer::addCommonInvocationArguments(commandLineArgs, ctx, importerOpts);
-  addSearchPathInvocationArguments(commandLineArgs, ctx, importerOpts);
+  importer::getNormalInvocationArguments(commandLineArgs, ctx);
+  importer::addCommonInvocationArguments(commandLineArgs, ctx);
+  addSearchPathInvocationArguments(commandLineArgs, ctx);
 
   auto sourceFilePos = std::find(
       commandLineArgs.begin(), commandLineArgs.end(),
@@ -254,6 +250,18 @@ void ClangImporter::recordModuleDependencies(
     swiftArgs.push_back("-module-name");
     swiftArgs.push_back(clangModuleDep.ModuleName);
 
+    // Pass down search paths to the -emit-module action.
+    // Unlike building Swift modules, we need to include all search paths to
+    // the clang invocation to build PCMs because transitive headers can only
+    // be found via search paths. Passing these headers as explicit inputs can
+    // be quite challenging.
+    for (auto &path: Impl.SwiftContext.SearchPathOpts.ImportSearchPaths) {
+      addClangArg("-I" + path);
+    }
+    for (auto &path: Impl.SwiftContext.SearchPathOpts.FrameworkSearchPaths) {
+      addClangArg((path.IsSystem ? "-Fsystem": "-F") + path.Path);
+    }
+
     // Swift frontend option for input file path (Foo.modulemap).
     swiftArgs.push_back(clangModuleDep.ClangModuleMapFile);
     // Module-level dependencies.
@@ -291,15 +299,11 @@ Optional<ModuleDependencies> ClangImporter::getModuleDependencies(
     // FIXME: Emit a diagnostic here.
     return None;
   }
-  // Reform the Clang importer options.
-  // FIXME: Just save a reference or copy so we can get this back.
-  ClangImporterOptions importerOpts;
 
   // Determine the command-line arguments for dependency scanning.
   auto &ctx = Impl.SwiftContext;
   std::vector<std::string> commandLineArgs =
-    getClangDepScanningInvocationArguments(
-      ctx, importerOpts, *importHackFile);
+    getClangDepScanningInvocationArguments(ctx, *importHackFile);
 
   std::string workingDir =
       ctx.SourceMgr.getFileSystem()->getCurrentWorkingDirectory().get();
@@ -334,18 +338,13 @@ bool ClangImporter::addBridgingHeaderDependencies(
   // Retrieve or create the shared state.
   auto clangImpl = getOrCreateClangImpl(cache);
 
-  // Reform the Clang importer options.
-  // FIXME: Just save a reference or copy so we can get this back.
-  ClangImporterOptions importerOpts;
-
   // Retrieve the bridging header.
   std::string bridgingHeader = *targetModule.getBridgingHeader();
 
   // Determine the command-line arguments for dependency scanning.
   auto &ctx = Impl.SwiftContext;
   std::vector<std::string> commandLineArgs =
-    getClangDepScanningInvocationArguments(
-      ctx, importerOpts, bridgingHeader);
+    getClangDepScanningInvocationArguments(ctx, bridgingHeader);
 
   std::string workingDir =
       ctx.SourceMgr.getFileSystem()->getCurrentWorkingDirectory().get();

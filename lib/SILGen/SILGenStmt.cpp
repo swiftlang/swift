@@ -346,7 +346,13 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
     } else if (auto *E = ESD.dyn_cast<Expr*>()) {
       SGF.emitIgnoredExpr(E);
     } else {
-      SGF.visit(ESD.get<Decl*>());
+      auto *D = ESD.get<Decl*>();
+
+      // Hoisted declarations are emitted at the top level by emitSourceFile().
+      if (D->isHoisted())
+        continue;
+
+      SGF.visit(D);
     }
   }
 }

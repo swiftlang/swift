@@ -585,6 +585,9 @@ namespace {
       if (D->isImplicit())
         PrintWithColorRAII(OS, DeclModifierColor) << " implicit";
 
+      if (D->isHoisted())
+        PrintWithColorRAII(OS, DeclModifierColor) << " hoisted";
+
       auto R = D->getSourceRange();
       if (R.isValid()) {
         PrintWithColorRAII(OS, RangeColor) << " range=";
@@ -2108,11 +2111,8 @@ public:
   void visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     printCommon(E, "unresolved_member_expr")
       << " name='" << E->getName() << "'";
-    printArgumentLabels(E->getArgumentLabels());
-    if (E->getArgument()) {
-      OS << '\n';
-      printRec(E->getArgument());
-    }
+    PrintWithColorRAII(OS, ExprModifierColor)
+      << " function_ref=" << getFunctionRefKindStr(E->getFunctionRefKind());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitDotSelfExpr(DotSelfExpr *E) {
@@ -2135,7 +2135,12 @@ public:
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
-
+  void visitUnresolvedMemberChainResultExpr(UnresolvedMemberChainResultExpr *E){
+    printCommon(E, "unresolved_member_chain_expr");
+    OS << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
   void visitTupleExpr(TupleExpr *E) {
     printCommon(E, "tuple_expr");
     if (E->hasTrailingClosure())
@@ -3496,6 +3501,18 @@ namespace {
 
     TRIVIAL_TYPE_PRINTER(Unresolved, unresolved)
 
+    void visitHoleType(HoleType *T, StringRef label) {
+      printCommon(label, "hole_type");
+      auto originatorTy = T->getOriginatorType();
+      if (auto *typeVar = originatorTy.dyn_cast<TypeVariableType *>()) {
+        printRec("type_variable", typeVar);
+      } else {
+        printRec("dependent_member_type",
+                 originatorTy.get<DependentMemberType *>());
+      }
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
     void visitBuiltinIntegerType(BuiltinIntegerType *T, StringRef label) {
       printCommon(label, "builtin_integer_type");
       if (T->isFixedWidth())
@@ -3767,7 +3784,9 @@ namespace {
       if (!T->getClangTypeInfo().empty()) {
         std::string s;
         llvm::raw_string_ostream os(s);
-        T->getClangTypeInfo().dump(os);
+        auto &ctx = T->getASTContext().getClangModuleLoader()
+          ->getClangASTContext();
+        T->getClangTypeInfo().dump(os, ctx);
         printField("clang_type", os.str());
       }
       printAnyFunctionParams(T->getParams(), "input");

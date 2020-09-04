@@ -34,6 +34,7 @@
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
+#include "clang/AST/DeclObjCCommon.h"
 #include "clang/AST/TypeVisitor.h"
 #include "clang/Basic/Builtins.h"
 #include "clang/Lex/Preprocessor.h"
@@ -248,6 +249,7 @@ namespace {
       case clang::BuiltinType::ARCUnbridgedCast:
       case clang::BuiltinType::BoundMember:
       case clang::BuiltinType::BuiltinFn:
+      case clang::BuiltinType::IncompleteMatrixIdx:
       case clang::BuiltinType::Overload:
       case clang::BuiltinType::PseudoObject:
       case clang::BuiltinType::UnknownAny:
@@ -278,6 +280,7 @@ namespace {
       case clang::BuiltinType::SatUShortFract:
       case clang::BuiltinType::SatUFract:
       case clang::BuiltinType::SatULongFract:
+      case clang::BuiltinType::BFloat16:
       case clang::BuiltinType::Float128:
       case clang::BuiltinType::NullPtr:
       case clang::BuiltinType::Char8:
@@ -348,29 +351,32 @@ namespace {
 
       // OpenMP types that don't have Swift equivalents.
       case clang::BuiltinType::OMPArraySection:
+      case clang::BuiltinType::OMPArrayShaping:
+      case clang::BuiltinType::OMPIterator:
         return Type();
 
       // SVE builtin types that don't have Swift equivalents.
-      case clang::BuiltinType::SveInt8:
-      case clang::BuiltinType::SveInt16:
-      case clang::BuiltinType::SveInt32:
-      case clang::BuiltinType::SveInt64:
-      case clang::BuiltinType::SveUint8:
-      case clang::BuiltinType::SveUint16:
-      case clang::BuiltinType::SveUint32:
-      case clang::BuiltinType::SveUint64:
-      case clang::BuiltinType::SveFloat16:
-      case clang::BuiltinType::SveFloat32:
-      case clang::BuiltinType::SveFloat64:
-      case clang::BuiltinType::SveBool:
+#define SVE_TYPE(Name, Id, ...) \
+      case clang::BuiltinType::Id:
+#include "clang/Basic/AArch64SVEACLETypes.def"
         return Type();
       }
 
       llvm_unreachable("Invalid BuiltinType.");
     }
 
+    ImportResult VisitExtIntType(const clang::ExtIntType *) {
+      // ExtInt is not supported in Swift.
+      return Type();
+    }
+
     ImportResult VisitPipeType(const clang::PipeType *) {
       // OpenCL types are not supported in Swift.
+      return Type();
+    }
+
+    ImportResult VisitMatrixType(const clang::MatrixType *ty) {
+      // Matrix types are not supported in Swift.
       return Type();
     }
 
@@ -1589,8 +1595,8 @@ bool ClangImporter::Implementation::shouldAllowNSUIntegerAsInt(
 ImportedType ClangImporter::Implementation::importPropertyType(
     const clang::ObjCPropertyDecl *decl, bool isFromSystemModule) {
   const auto assignOrUnsafeUnretained =
-      clang::ObjCPropertyDecl::OBJC_PR_assign |
-      clang::ObjCPropertyDecl::OBJC_PR_unsafe_unretained;
+      clang::ObjCPropertyAttribute::kind_assign |
+      clang::ObjCPropertyAttribute::kind_unsafe_unretained;
 
   ImportTypeKind importKind;
   // HACK: Certain decls are always imported using bridged types,
@@ -1747,8 +1753,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
 
     // Check nullability of the parameter.
     OptionalTypeKind OptionalityOfParam =
-        getParamOptionality(SwiftContext.LangOpts.EffectiveLanguageVersion,
-                            param, !nonNullArgs.empty() && nonNullArgs[index]);
+        getParamOptionality(param, !nonNullArgs.empty() && nonNullArgs[index]);
 
     ImportTypeKind importKind = ImportTypeKind::Parameter;
     if (param->hasAttr<clang::CFReturnsRetainedAttr>())
@@ -1989,6 +1994,42 @@ static Type mapGenericArgs(const DeclContext *fromDC,
   return type.subst(subs);
 }
 
+/// Decompose the type of a completion handler parameter in a function
+/// imported as 'async' and produce the result type of the 'async' function.
+static Type decomposeCompletionHandlerType(
+   Type paramTy, ForeignAsyncConvention info) {
+  auto fnType = paramTy->lookThroughAllOptionalTypes()->getAs<FunctionType>();
+  if (!fnType)
+    return Type();
+
+  SmallVector<TupleTypeElt, 2> resultTypeElts;
+  auto params = fnType->getParams();
+  for (unsigned paramIdx : indices(params)) {
+    const auto &param = params[paramIdx];
+    if (param.isInOut() || param.isVariadic())
+      return Type();
+
+    // If there is an error parameter to the completion handler, it is
+    // not part of the result type of the asynchronous function.
+    if (info.completionHandlerErrorParamIndex() &&
+        paramIdx == *info.completionHandlerErrorParamIndex())
+      continue;
+
+    resultTypeElts.push_back(param.getPlainType());
+  }
+
+  switch (resultTypeElts.size()) {
+  case 0:
+    return paramTy->getASTContext().getVoidDecl()->getDeclaredInterfaceType();
+
+  case 1:
+    return resultTypeElts.front().getType();
+
+  default:
+    return TupleType::get(resultTypeElts, paramTy->getASTContext());
+  }
+}
+
 ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     const DeclContext *dc, const clang::ObjCMethodDecl *clangDecl,
     ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
@@ -2025,6 +2066,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
   CanType origSwiftResultTy;
   Optional<ForeignErrorConvention::Info> errorInfo =
       importedName.getErrorInfo();
+  auto asyncInfo = importedName.getAsyncInfo();
   OptionalTypeKind OptionalityOfReturn;
   if (clangDecl->hasAttr<clang::ReturnsNonNullAttr>()) {
     OptionalityOfReturn = OTK_None;
@@ -2123,12 +2165,14 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
       continue;
     }
 
+    bool paramIsCompletionHandler =
+        asyncInfo && paramIndex == asyncInfo->completionHandlerParamIndex();
+
     // Import the parameter type into Swift.
 
     // Check nullability of the parameter.
     OptionalTypeKind optionalityOfParam
-        = getParamOptionality(SwiftContext.LangOpts.EffectiveLanguageVersion,
-                              param,
+        = getParamOptionality(param,
                               !nonNullArgs.empty() && nonNullArgs[paramIndex]);
 
     bool allowNSUIntegerAsIntInParam = isFromSystemModule;
@@ -2191,6 +2235,21 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
         ++nameIndex;
       }
       continue;
+    }
+
+    // If this is a completion handler, figure out it's effect on the result
+    // type but don't build it into the parameter type.
+    if (paramIsCompletionHandler) {
+      if (Type replacedSwiftResultTy =
+              decomposeCompletionHandlerType(swiftParamTy, *asyncInfo)) {
+        swiftResultTy = replacedSwiftResultTy;
+
+        // FIXME: We will need an equivalent to "error parameter is replaced"
+        // for asynchronous functions. Perhaps add "async: ()"?
+        continue;
+      }
+
+      llvm_unreachable("async info computed incorrectly?");
     }
 
     // Map __attribute__((noescape)) to @noescape.

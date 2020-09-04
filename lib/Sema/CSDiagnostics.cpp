@@ -643,7 +643,7 @@ Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
 
 void GenericArgumentsMismatchFailure::emitNoteForMismatch(int position) {
   auto *locator = getLocator();
-  // Since there could be implicit conversions assoicated with argument
+  // Since there could be implicit conversions associated with argument
   // to parameter conversions, let's use parameter type as a source of
   // generic parameter information.
   auto paramSourceTy =
@@ -752,6 +752,11 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
         diagnostic = getDiagnosticFor(
             eltLoc.getIndex() == 0 ? CTP_DictionaryKey : CTP_DictionaryValue);
       }
+      break;
+    }
+
+    case ConstraintLocator::UnresolvedMemberChainResult: {
+      diagnostic = diag::cannot_convert_chain_result_type;
       break;
     }
 
@@ -1042,6 +1047,8 @@ SourceRange MemberAccessOnOptionalBaseFailure::getSourceRange() const {
     if (componentPathElt->getIndex() == 0) {
       if (auto rootType = keyPathExpr->getRootType()) {
         return rootType->getSourceRange();
+      } else {
+        return keyPathExpr->getComponents().front().getLoc();
       }
     } else {
       auto componentIdx = componentPathElt->getIndex() - 1;
@@ -1071,9 +1078,6 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
     return false;
   
   auto sourceRange = getSourceRange();
-  
-  emitDiagnostic(diag::optional_base_not_unwrapped,
-                 baseType, Member, unwrappedBaseType);
 
   auto componentPathElt =
       locator->getLastElementAs<LocatorPathElt::KeyPathComponent>();
@@ -1082,12 +1086,25 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
     // let's emit a tailored note suggesting to use its unwrapped type.
     auto *keyPathExpr = castToExpr<KeyPathExpr>(getAnchor());
     if (auto rootType = keyPathExpr->getRootType()) {
+      emitDiagnostic(diag::optional_base_not_unwrapped, baseType, Member,
+                     unwrappedBaseType);
+
       emitDiagnostic(diag::optional_base_remove_optional_for_keypath_root,
                      unwrappedBaseType)
           .fixItReplace(rootType->getSourceRange(),
                         unwrappedBaseType.getString());
+    } else {
+      emitDiagnostic(diag::invalid_optional_infered_keypath_root, baseType,
+                     Member, unwrappedBaseType);
+      emitDiagnostic(diag::optional_key_path_root_base_chain, Member)
+          .fixItInsert(sourceRange.End, "?.");
+      emitDiagnostic(diag::optional_key_path_root_base_unwrap, Member)
+          .fixItInsert(sourceRange.End, "!.");
     }
   } else {
+    emitDiagnostic(diag::optional_base_not_unwrapped, baseType, Member,
+                   unwrappedBaseType);
+
     // FIXME: It would be nice to immediately offer "base?.member ?? defaultValue"
     // for non-optional results where that would be appropriate. For the moment
     // always offering "?" means that if the user chooses chaining, we'll end up
@@ -1126,6 +1143,8 @@ void MissingOptionalUnwrapFailure::offerDefaultValueUnwrapFixIt(
   bool needsParensInside =
       exprNeedsParensBeforeAddingNilCoalescing(DC, const_cast<Expr *>(expr));
   auto parentExpr = findParentExpr(anchor);
+  if (parentExpr && isa<UnresolvedMemberChainResultExpr>(parentExpr))
+    parentExpr = findParentExpr(parentExpr);
   bool needsParensOutside = exprNeedsParensAfterAddingNilCoalescing(
       DC, const_cast<Expr *>(expr), parentExpr);
 
@@ -1200,14 +1219,6 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
 
   auto *anchor = castToExpr(getAnchor());
 
-  // If this is an unresolved member expr e.g. `.foo` its
-  // base type is going to be the same as result type minus
-  // r-value adjustment because base could be an l-value type.
-  // We want to fix both cases by only diagnose one of them,
-  // otherwise this is just going to result in a duplcate diagnostic.
-  if (getLocator()->isLastElement<LocatorPathElt::UnresolvedMember>())
-    return false;
-
   if (auto assignExpr = dyn_cast<AssignExpr>(anchor))
     anchor = assignExpr->getSrc();
 
@@ -1237,8 +1248,10 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
 
   assert(!baseType->hasTypeVariable() &&
          "Base type must not be a type variable");
+  assert(!baseType->isHole() && "Base type must not be a type hole");
   assert(!unwrappedType->hasTypeVariable() &&
          "Unwrapped type must not be a type variable");
+  assert(!unwrappedType->isHole() && "Unwrapped type must not be a type hole");
 
   if (!baseType->getOptionalObjectType())
     return false;
@@ -1314,6 +1327,11 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
   // most likely the problem is related to use of `=` itself.
   if (getContextualTypePurpose(diagExpr) == CTP_Condition)
     return false;
+
+  // If the failure happened at the end of an unresolved member chain, it should
+  // be diagnosed instead as though it happened at the last element.
+  if (auto chainExpr = dyn_cast<UnresolvedMemberChainResultExpr>(diagExpr))
+      diagExpr = chainExpr->getSubExpr();
 
   if (auto assignExpr = dyn_cast<AssignExpr>(diagExpr)) {
     // Let's check whether this is an attempt to assign
@@ -1438,6 +1456,8 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
     }
   } else if (isa<SubscriptExpr>(diagExpr)) {
       subElementDiagID = diag::assignment_subscript_has_immutable_base;
+  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(diagExpr)) {
+    subElementDiagID = diag::assignment_lhs_is_immutable_property;
   } else {
     subElementDiagID = diag::assignment_lhs_is_immutable_variable;
   }
@@ -1904,6 +1924,18 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
     return resolveImmutableBase(MRE->getBase());
   }
 
+  if (auto *UME = dyn_cast<UnresolvedMemberExpr>(expr)) {
+    auto loc = getConstraintLocator(UME, ConstraintLocator::UnresolvedMember);
+    auto member = getMemberRef(loc);
+
+    // If we can resolve a member, we can determine whether it is settable in
+    // this context.
+    if (member && member->isDecl() && isImmutable(member->getDecl()))
+      return {expr, member};
+    else
+      return {expr, None};
+  }
+
   if (auto *DRE = dyn_cast<DeclRefExpr>(expr))
     return {expr,
             OverloadChoice(Type(), DRE->getDecl(), FunctionRefKind::Unapplied)};
@@ -2137,10 +2169,11 @@ bool ContextualFailure::diagnoseAsError() {
     return false;
   }
 
-  case ConstraintLocator::RValueAdjustment: {
+  case ConstraintLocator::UnresolvedMemberChainResult: {
     auto &solution = getSolution();
-    auto overload = getOverloadChoiceIfAvailable(
-        getConstraintLocator(anchor, ConstraintLocator::UnresolvedMember));
+
+    auto overload =
+        getCalleeOverloadChoiceIfAvailable(getConstraintLocator(anchor));
     if (!(overload && overload->choice.isDecl()))
       return false;
 
@@ -2175,13 +2208,22 @@ bool ContextualFailure::diagnoseAsError() {
         });
 
     if (numMissingArgs == 0 || numMissingArgs > 1) {
-      auto diagnostic = emitDiagnostic(
-          diag::expected_parens_in_contextual_member, choice->getName());
-
-      // If there are no parameters we can suggest a fix-it
-      // to form an explicit call.
-      if (numMissingArgs == 0)
-        diagnostic.fixItInsertAfter(getSourceRange().End, "()");
+      auto applyFixIt = [&](InFlightDiagnostic &diagnostic) {
+        // If there are no parameters we can suggest a fix-it
+        // to form an explicit call.
+        if (numMissingArgs == 0)
+          diagnostic.fixItInsertAfter(getSourceRange().End, "()");
+      };
+      if (fnType->getResult()->isEqual(toType)) {
+        auto diag = emitDiagnostic(
+                      diag::expected_parens_in_contextual_member_type,
+                      choice->getName(), fnType->getResult());
+        applyFixIt(diag);
+      } else {
+        auto diag = emitDiagnostic(diag::expected_parens_in_contextual_member,
+                                   choice->getName());
+        applyFixIt(diag);
+      }
     } else {
       emitDiagnostic(diag::expected_argument_in_contextual_member,
                      choice->getName(), params.front().getPlainType());
@@ -2398,6 +2440,10 @@ void ContextualFailure::tryFixIts(InFlightDiagnostic &diagnostic) const {
 
 bool ContextualFailure::diagnoseMissingFunctionCall() const {
   if (getLocator()->isLastElement<LocatorPathElt::RValueAdjustment>())
+    return false;
+
+  if (getLocator()
+      ->isLastElement<LocatorPathElt::UnresolvedMemberChainResult>())
     return false;
 
   auto *srcFT = getFromType()->getAs<FunctionType>();
@@ -3125,7 +3171,7 @@ bool MissingCallFailure::diagnoseAsError() {
 }
 
 bool ExtraneousPropertyWrapperUnwrapFailure::diagnoseAsError() {
-  auto newPrefix = usingStorageWrapper() ? "$" : "_";
+  auto newPrefix = usingProjection() ? "$" : "_";
 
   if (auto *member = getReferencedMember()) {
     emitDiagnostic(diag::incorrect_property_wrapper_reference_member,
@@ -3440,6 +3486,13 @@ bool MissingMemberFailure::diagnoseInLiteralCollectionContext() const {
   auto &solution = getSolution();
 
   if (!(parentExpr && isa<UnresolvedMemberExpr>(expr)))
+    return false;
+
+  if (!isa<UnresolvedMemberChainResultExpr>(parentExpr))
+    return false;
+
+  parentExpr = findParentExpr(parentExpr);
+  if (!parentExpr)
     return false;
 
   auto parentType = getType(parentExpr);
@@ -4458,9 +4511,6 @@ MissingArgumentsFailure::getCallInfo(ASTNode anchor) const {
     return std::make_tuple(call->getFn(), call->getArg(),
                            call->getNumArguments(),
                            call->getUnlabeledTrailingClosureIndex());
-  } else if (auto *UME = getAsExpr<UnresolvedMemberExpr>(anchor)) {
-    return std::make_tuple(UME, UME->getArgument(), UME->getNumArguments(),
-                           UME->getUnlabeledTrailingClosureIndex());
   } else if (auto *SE = getAsExpr<SubscriptExpr>(anchor)) {
     return std::make_tuple(SE, SE->getIndex(), SE->getNumArguments(),
                            SE->getUnlabeledTrailingClosureIndex());
@@ -5088,7 +5138,7 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
     // holes present in the contextual type.
     if (FailureDiagnostic::getContextualTypePurpose(getAnchor()) ==
             ContextualTypePurpose::CTP_ForEachStmt &&
-        contextualType->hasHole()) {
+        contextualType->hasUnresolvedType()) {
       diagnostic.emplace(emitDiagnostic(
           (contextualType->is<TupleType>() && !eltType->is<TupleType>())
               ? diag::cannot_match_expr_tuple_pattern_with_nontuple_value
@@ -6299,6 +6349,20 @@ bool MissingContextualBaseInMemberRefFailure::diagnoseAsError() {
   // Member reference could be wrapped into a number of parens
   // e.g. `((.foo))`.
   auto *parentExpr = findParentExpr(anchor);
+
+  // Look through immediate call of unresolved member (e.g., `.foo(0)`).
+  if (parentExpr && isa<CallExpr>(parentExpr))
+    parentExpr = findParentExpr(parentExpr);
+
+  // FIXME: We should probably look through the entire member chain so that
+  // something like `let _ = .foo().bar` gets the "no contextual type" error
+  // rather than the "Cannot infer contextual base" error.
+  UnresolvedMemberChainResultExpr *resultExpr = nullptr;
+  if (parentExpr && isa<UnresolvedMemberChainResultExpr>(parentExpr)) {
+    resultExpr = cast<UnresolvedMemberChainResultExpr>(parentExpr);
+    parentExpr = findParentExpr(parentExpr);
+  }
+
   do {
     // If we have found something which isn't a paren let's stop,
     // otherwise let's keep unwrapping until there are either no
@@ -6307,7 +6371,7 @@ bool MissingContextualBaseInMemberRefFailure::diagnoseAsError() {
       break;
   } while ((parentExpr = findParentExpr(parentExpr)));
 
-  auto diagnostic = parentExpr || getContextualType(anchor)
+  auto diagnostic = parentExpr || (resultExpr && getContextualType(resultExpr))
                         ? diag::cannot_infer_base_of_unresolved_member
                         : diag::unresolved_member_no_inference;
 
@@ -6346,7 +6410,7 @@ bool UnableToInferClosureParameterType::diagnoseAsError() {
       if (parentExpr) {
         // Missing or invalid member reference in call.
         if (auto *AE = dyn_cast<ApplyExpr>(parentExpr)) {
-          if (getType(AE->getFn())->isHole())
+          if (getType(AE->getFn())->is<UnresolvedType>())
             return false;
         }
 

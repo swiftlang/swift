@@ -33,6 +33,7 @@ set(swift_runtime_sources
     CompatibilityOverride.cpp
     CygwinPort.cpp
     Demangle.cpp
+    DynamicCast.cpp
     Enum.cpp
     EnvironmentVariables.cpp
     ErrorObjectCommon.cpp

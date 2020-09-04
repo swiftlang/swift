@@ -48,6 +48,7 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
+#include "clang/Basic/SourceManager.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ConvertUTF.h"
@@ -57,6 +58,11 @@
 #include <queue>
 
 using namespace swift;
+
+// Defined here to avoid repeatedly paying the price of template instantiation.
+const std::function<bool(const ExtensionDecl *)>
+    PrintOptions::defaultPrintExtensionContentAsMembers
+        = [] (const ExtensionDecl *) { return false; };
 
 void PrintOptions::setBaseType(Type T) {
   if (T->is<ErrorType>())
@@ -3629,7 +3635,7 @@ void printCType(ASTContext &Ctx, ASTPrinter &Printer, ExtInfo &info) {
   auto *cml = Ctx.getClangModuleLoader();
   SmallString<64> buf;
   llvm::raw_svector_ostream os(buf);
-  info.getClangTypeInfo().getValue().printType(cml, os);
+  info.getClangTypeInfo().printType(cml, os);
   Printer << ", cType: " << QuotedString(os.str());
 }
 
@@ -3811,6 +3817,17 @@ public:
       Printer << "<<unresolvedtype>>";
     else
       Printer << "_";
+  }
+
+  void visitHoleType(HoleType *T) {
+    if (Options.PrintTypesForDebugging) {
+      Printer << "<<hole for ";
+      auto originatorTy = T->getOriginatorType();
+      visit(Type(reinterpret_cast<TypeBase *>(originatorTy.getOpaqueValue())));
+      Printer << ">>";
+    } else {
+      Printer << "<<hole>>";
+    }
   }
 
 #ifdef ASTPRINTER_HANDLE_BUILTINTYPE
@@ -4054,7 +4071,7 @@ public:
       case SILFunctionType::Representation::CFunctionPointer:
         Printer << "c";
         // [TODO: Clang-type-plumbing] Remove the second check.
-        if (printNameOnly || !info.getClangTypeInfo().hasValue())
+        if (printNameOnly || info.getClangTypeInfo().empty())
           break;
         printCType(Ctx, Printer, info);
         break;
@@ -4120,7 +4137,7 @@ public:
       case SILFunctionType::Representation::CFunctionPointer:
         Printer << "c";
         // [TODO: Clang-type-plumbing] Remove the second check.
-        if (printNameOnly || !info.getClangTypeInfo().hasValue())
+        if (printNameOnly || info.getClangTypeInfo().empty())
           break;
         printCType(Ctx, Printer, info);
         break;

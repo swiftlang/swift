@@ -1,6 +1,8 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// Test differentiation of `Optional` values and operations.
+
 import DifferentiationUnittest
 import StdlibUnittest
 
@@ -9,7 +11,6 @@ var OptionalTests = TestSuite("OptionalDifferentiation")
 //===----------------------------------------------------------------------===//
 // Basic tests.
 //===----------------------------------------------------------------------===//
-
 
 // TODO(TF-433): operator `??` lowers to an active `try_apply`.
 /*
@@ -267,7 +268,7 @@ OptionalTests.test("Switch") {
     (.init(.init(0.0)), 1.0))
 }
 
-OptionalTests.test("Var1") {
+OptionalTests.test("Optional binding: if let") {
   @differentiable
   func optional_var1(_ maybeX: Float?) -> Float {
     var maybeX = maybeX
@@ -393,7 +394,7 @@ OptionalTests.test("Var1") {
     (.init(.init(0.0)), 1.0))
 }
 
-OptionalTests.test("Var2") {
+OptionalTests.test("Optional binding: if var") {
   @differentiable
   func optional_var2(_ maybeX: Float?) -> Float {
     if var x = maybeX {
