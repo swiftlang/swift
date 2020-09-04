@@ -1138,6 +1138,19 @@ getCanonicalParams(AnyFunctionType *funcType,
 }
 
 StringRef TypeBase::getKindName(TypeKind K) {
+  switch (K) {
+  case TypeKind::Hole:
+  case TypeKind::TypeVariable:
+  case TypeKind::WeakStorage:
+  case TypeKind::UnownedStorage:
+  case TypeKind::UnmanagedStorage:
+  case TypeKind::LValue:
+  case TypeKind::InOut:
+  case TypeKind::Paren:
+    assert(false && "These types should never appear in diagnostics!");
+  default:
+    break;
+  }
 #define ENTRY(Kind, String)                                                    \
   case TypeKind::Kind:                                                         \
     return String
@@ -1158,9 +1171,9 @@ StringRef TypeBase::getKindName(TypeKind K) {
 
     ENTRY(Tuple, "tuple type");
 
-    ENTRY(WeakStorage, "reference storage type");
-    ENTRY(UnownedStorage, "reference storage type");
-    ENTRY(UnmanagedStorage, "reference storage type");
+    ENTRY(WeakStorage, "weak storage type");
+    ENTRY(UnownedStorage, "unowned storage type");
+    ENTRY(UnmanagedStorage, "unmanaged storage type");
 
     ENTRY(Enum, "enum type");
     ENTRY(Struct, "struct type");
@@ -1173,17 +1186,20 @@ StringRef TypeBase::getKindName(TypeKind K) {
 
     ENTRY(UnboundGeneric, "generic type");
 
-    ENTRY(Metatype, "metatype type");
-    ENTRY(ExistentialMetatype, "metatype type");
+    ENTRY(Metatype, "metatype");
+    ENTRY(ExistentialMetatype, "protocol metatype");
 
-    ENTRY(Module, "module type");
+    // Calling this 'module' instead of 'module type'
+    // because we don't want users to think of
+    // module as types.
+    ENTRY(Module, "module");
 
     ENTRY(DynamicSelf, "dynamic self type");
 
-    ENTRY(PrimaryArchetype, "archetype type");
-    ENTRY(OpaqueTypeArchetype, "archetype type");
-    ENTRY(OpenedArchetype, "archetype type");
-    ENTRY(NestedArchetype, "archetype type");
+    ENTRY(PrimaryArchetype, "generic parameter type");
+    ENTRY(OpaqueTypeArchetype, "opaque type");
+    ENTRY(OpenedArchetype, "protocol type");
+    ENTRY(NestedArchetype, "associated type");
 
     ENTRY(GenericTypeParam, "generic parameter type");
     ENTRY(DependentMember, "dependent member type");
@@ -1197,12 +1213,15 @@ StringRef TypeBase::getKindName(TypeKind K) {
     ENTRY(SILToken, "SIL token type");
 
     ENTRY(ProtocolComposition, "protocol composition type");
+
     ENTRY(LValue, "lvalue type");
     ENTRY(InOut, "inout type");
-
     ENTRY(Paren, "paren type");
-    ENTRY(TypeAlias, "typealias type");
-    ENTRY(ArraySlice, "array slice type");
+
+    // 'typealias' sounds better than 'typealias type'.
+    ENTRY(TypeAlias, "typealias");
+
+    ENTRY(ArraySlice, "array type");
     ENTRY(Optional, "optional type");
     ENTRY(Dictionary, "dictionary type");
   }
