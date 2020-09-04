@@ -4653,7 +4653,8 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
     if (originalAFD->getFormalAccess() == derivative->getFormalAccess())
       return true;
     return originalAFD->getFormalAccess() == AccessLevel::Public &&
-           derivative->getEffectiveAccess() == AccessLevel::Public;
+           (derivative->getFormalAccess() == AccessLevel::Public ||
+            derivative->isUsableFromInline());
   };
 
   // Check access level compatibility for original and derivative functions.
