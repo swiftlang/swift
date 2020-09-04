@@ -186,12 +186,57 @@ void Parser::performCodeCompletionSecondPassImpl(
            "Delayed decl must be a type member or a top-level decl");
     ContextChange CC(*this, DC);
 
+    auto addMember = [&](IterableDeclContext *idc, Decl *member) {
+      // Add this to the parsed members.
+      //
+      // The parser will already have populated the set of parsed members
+      // without including the delayed declaration. Augment that set of
+      // parsed members now that we have parsed the delayed declaration, so
+      // the set of parsed members is reflective of what occured in the source.
+      //
+      // FIXME: This is potentially problematic, if anything has been computed
+      // based on the existing set of parsed members. We don't have a great
+      // way to do that invalidation right now. A better (but more invasive)
+      // approach would be to delay *all* of the members and refuse to populate
+      // the parsed-members request until we've parsed the delayed declaration.
+      SmallVector<Decl *, 4> membersVec;
+      bool addedMember = false;
+      SourceLoc memberEndLoc = member->getEndLoc();
+      for (auto existingMember : idc->getParsedMembers()) {
+        // If the new member belongs before this existing member, insert it
+        // now.
+        if (!addedMember &&
+            Context.SourceMgr.isBeforeInBuffer(
+                memberEndLoc, existingMember->getStartLoc())) {
+          membersVec.push_back(member);
+          addedMember = true;
+        }
+
+        membersVec.push_back(existingMember);
+      }
+
+      // If the member should be last, add it now.
+      if (!addedMember)
+        membersVec.push_back(member);
+
+      // Check whether this member is already known in the context. If not,
+      // add it.
+      if (llvm::find(idc->getMembers(), member) == idc->getMembers().end())
+        idc->addMember(member);
+
+      // Replace the cached parsed-members output with the new list.
+      Context.evaluator.clearCachedOutput(ParseMembersRequest{idc});
+      Context.evaluator.cacheOutput(
+          ParseMembersRequest{idc},
+          FingerprintAndMembers{None, Context.AllocateCopy(membersVec)});
+    };
+
     parseDecl(ParseDeclOptions(info.Flags),
               /*IsAtStartOfLineOrPreviousHadSemi=*/true, [&](Decl *D) {
                 if (auto *NTD = dyn_cast<NominalTypeDecl>(DC)) {
-                  NTD->addMember(D);
+                  addMember(NTD, D);
                 } else if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
-                  ED->addMember(D);
+                  addMember(ED, D);
                 } else if (auto *SF = dyn_cast<SourceFile>(DC)) {
                   SF->addTopLevelDecl(D);
                 } else {

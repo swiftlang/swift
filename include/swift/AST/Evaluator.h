@@ -322,6 +322,12 @@ public:
     cache.insert({AnyRequest(request), std::move(output)});
   }
 
+  template<typename Request,
+           typename std::enable_if<!Request::hasExternalCache>::type* = nullptr>
+  void clearCachedOutput(const Request &request) {
+    cache.erase(AnyRequest(request));
+  }
+
   /// Clear the cache stored within this evaluator.
   ///
   /// Note that this does not clear the caches of requests that use external
