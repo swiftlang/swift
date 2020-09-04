@@ -93,8 +93,11 @@ private:
   /// An auxiliary differential local allocation builder.
   SILBuilder diffLocalAllocBuilder;
 
-  /// Stack buffers allocated for storing local tangent values.
-  SmallVector<SILValue, 8> differentialLocalAllocations;
+  /// Stack buffers allocated for storing differential local tangent values.
+  SmallVector<AllocStackInst *, 8> differentialLocalAllocations;
+
+  /// A set used to remember differential local allocations that were destroyed.
+  llvm::SmallDenseSet<SILValue> differentialDestroyedLocalAllocations;
 
   /// Mapping from original blocks to differential values. Used to build
   /// differential struct instances.
@@ -309,6 +312,22 @@ private:
   // Tangent buffer mapping
   //--------------------------------------------------------------------------//
 
+  /// Returns true iff the original buffer has a corresponding the tangent
+  /// buffer.
+  bool hasTangentBuffer(SILBasicBlock *origBB, SILValue originalBuffer) {
+    return bufferMap.count({origBB, originalBuffer});
+  }
+
+  /// Returns the tangent buffer for the original buffer. Asserts that the
+  /// original buffer has a tangent buffer.
+  SILValue &getTangentBuffer(SILBasicBlock *origBB, SILValue originalBuffer) {
+    assert(originalBuffer->getType().isAddress());
+    assert(originalBuffer->getFunction() == original);
+    auto it = bufferMap.find({origBB, originalBuffer});
+    assert(it != bufferMap.end() && "Tangent buffer should already exist");
+    return it->getSecond();
+  }
+
   /// Sets the tangent buffer for the original buffer. Asserts that the
   /// original buffer does not already have a tangent buffer.
   void setTangentBuffer(SILBasicBlock *origBB, SILValue originalBuffer,
@@ -320,14 +339,15 @@ private:
     (void)insertion;
   }
 
-  /// Returns the tangent buffer for the original buffer. Asserts that the
-  /// original buffer has a tangent buffer.
-  SILValue &getTangentBuffer(SILBasicBlock *origBB, SILValue originalBuffer) {
-    assert(originalBuffer->getType().isAddress());
-    assert(originalBuffer->getFunction() == original);
-    auto it = bufferMap.find({origBB, originalBuffer});
-    assert(it != bufferMap.end() && "Tangent buffer should already exist");
-    return it->getSecond();
+  /// Creates and returns a differential local allocation with the given type.
+  ///
+  /// Local allocations are created at the current insertion point of the
+  /// differential `SILBuilder`.
+  AllocStackInst *createDifferentialLocalAllocation(SILLocation loc,
+                                                    SILType type) {
+    auto *alloc = differentialBuilder.createAllocStack(loc, type);
+    differentialLocalAllocations.push_back(alloc);
+    return alloc;
   }
 
   //--------------------------------------------------------------------------//
@@ -370,6 +390,49 @@ private:
         getTangentSpace(remapSILTypeInDifferential(type).getASTType())
             ->getCanonicalType(),
         type.getCategory());
+  }
+
+  /// Get the type lowering for the given AST type in the differential function.
+  const Lowering::TypeLowering &getTypeLoweringInDifferential(Type type) {
+    auto dfGenSig =
+        getDifferential().getLoweredFunctionType()->getSubstGenericSignature();
+    Lowering::AbstractionPattern pattern(dfGenSig,
+                                         type->getCanonicalType(dfGenSig));
+    return getDifferential().getTypeLowering(pattern, type);
+  }
+
+  /// Returns the tangent value category of the given type.
+  SILValueCategory getTangentValueCategory(SILType type) {
+    // Tangent value category table:
+    //
+    // Let $L be a loadable type and $*A be an address-only type.
+    //
+    // Original type | Tangent type loadable? | Tangent value category and type
+    // --------------|------------------------|--------------------------------
+    // $L            | loadable               | object, $L' (no mismatch)
+    // $*A           | loadable               | address, $*L' (create a buffer)
+    // $L            | address-only           | address, $*A' (no alternative)
+    // $*A           | address-only           | address, $*A' (no alternative)
+
+    // TODO(SR-13077): Make "tangent value category" depend solely on whether
+    // the tangent type is loadable or address-only.
+    //
+    // For loadable tangent types, using symbolic tangent values instead of
+    // concrete tangent buffers is more efficient.
+
+    // Quick check: if the type is an address type, the tangent value category
+    // is currently always "address".
+    if (type.isAddress())
+      return SILValueCategory::Address;
+    // If the type is an object type and the tangent type is not address-only,
+    // then the tangent value category is "object".
+    auto tanSpace = getTangentSpace(remapType(type).getASTType());
+    auto tanASTType = tanSpace->getCanonicalType();
+    if (type.isObject() &&
+        getTypeLoweringInDifferential(tanASTType).isLoadable())
+      return SILValueCategory::Object;
+    // Otherwise, the tangent value category is "address".
+    return SILValueCategory::Address;
   }
 
   /// Set up the differential function. This includes:
@@ -724,15 +787,6 @@ public:
     } else {
       llvm::report_fatal_error("Differential value type is not ABI-compatible "
                                "with the returned differential type");
-    }
-
-    // Destroy and deallocate local allocations.
-    for (auto alloc : differentialLocalAllocations) {
-      // Assert that local allocations have at least one use.
-      // Buffers should not be allocated needlessly.
-      assert(!alloc->use_empty());
-      differentialBuilder.emitDestroyAddrAndFold(loc, alloc);
-      differentialBuilder.createDeallocStack(loc, alloc);
     }
 
     // Return a tuple of the original result and differential.
@@ -1348,18 +1402,77 @@ public:
     auto diffLoc = differential.getLocation();
     auto &diffBuilder = getDifferentialBuilder();
 
+    auto origExitIt = original->findReturnBB();
+    assert(origExitIt != original->end() &&
+           "Functions without returns must have been diagnosed");
+    auto *origExit = &*origExitIt;
+    auto origFnTy = original->getLoweredFunctionType();
+    SILFunctionConventions convs(origFnTy, original->getModule());
+
     // Collect original results.
     SmallVector<SILValue, 2> originalResults;
-    collectAllDirectResultsInTypeOrder(*original, originalResults);
-    // Collect differential return elements.
+    collectAllFormalResultsInTypeOrder(*original, originalResults);
+    // Collect differential direct results.
     SmallVector<SILValue, 8> retElts;
-    // for (auto origResult : originalResults) {
-    for (auto i : range(originalResults.size())) {
-      auto origResult = originalResults[i];
-      if (!getIndices().results->contains(i))
+    unsigned differentialIndirectResultIndex = 0;
+    for (auto resultIndex : getIndices().results->getIndices()) {
+      auto origResult = originalResults[resultIndex];
+      // Handle original formal result.
+      if (resultIndex < origFnTy->getNumResults()) {
+        switch (getTangentValueCategory(origResult->getType())) {
+        case SILValueCategory::Object: {
+          auto tanVal =
+              materializeTangent(getTangentValue(origResult), diffLoc);
+          retElts.push_back(tanVal);
+          break;
+        }
+        case SILValueCategory::Address: {
+          if (!hasTangentBuffer(origExit, origResult)) {
+            auto tanType = getRemappedTangentType(origResult->getType());
+            auto *tanBuf = createDifferentialLocalAllocation(diffLoc, tanType);
+            setTangentBuffer(origExit, origResult, tanBuf);
+            emitZeroIndirect(tanType.getASTType(), tanBuf, diffLoc);
+          }
+          auto tanBuf = getTangentBuffer(origExit, origResult);
+          auto diffIndRes =
+              differential
+                  .getIndirectResults()[differentialIndirectResultIndex++];
+          diffBuilder.createCopyAddr(diffLoc, tanBuf, diffIndRes, IsTake,
+                                     IsInitialization);
+          differentialDestroyedLocalAllocations.insert(tanBuf);
+          break;
+        }
+        }
         continue;
-      auto tanVal = materializeTangent(getTangentValue(origResult), diffLoc);
-      retElts.push_back(tanVal);
+      }
+      // Handle original non-wrt `inout` parameters.
+      // Only original non-wrt `inout` parameters have corresponding
+      // differential indirect results.
+      auto inoutParamIndex = resultIndex - origFnTy->getNumResults();
+      auto inoutParamIt = std::next(
+          origFnTy->getIndirectMutatingParameters().begin(), inoutParamIndex);
+      auto paramIndex =
+          std::distance(origFnTy->getParameters().begin(), &*inoutParamIt);
+      if (getIndices().parameters->contains(paramIndex))
+        continue;
+      auto tanBuf = getTangentBuffer(origExit, origResult);
+      auto diffIndRes =
+          differential.getIndirectResults()[differentialIndirectResultIndex++];
+      diffBuilder.createCopyAddr(diffLoc, tanBuf, diffIndRes, IsTake,
+                                 IsInitialization);
+      differentialDestroyedLocalAllocations.insert(tanBuf);
+    }
+
+    // Destroy and deallocate local allocations.
+    for (auto *alloc : differentialLocalAllocations) {
+      // Assert that local allocations have at least one use.
+      // Buffers should not be allocated needlessly.
+      assert(!alloc->use_empty());
+      if (!differentialDestroyedLocalAllocations.count(alloc)) {
+        differentialBuilder.emitDestroyAddrAndFold(diffLoc, alloc);
+        differentialDestroyedLocalAllocations.insert(alloc);
+      }
+      differentialBuilder.createDeallocStack(diffLoc, alloc);
     }
 
     diffBuilder.createReturn(diffLoc,
@@ -1470,6 +1583,7 @@ JVPCloner::Implementation::getDifferentialStructElement(SILBasicBlock *origBB,
 void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   // Create differential blocks and arguments.
   auto &differential = getDifferential();
+  auto diffLoc = differential.getLocation();
   auto *origEntry = original->getEntryBlock();
   for (auto &origBB : *original) {
     auto *diffBB = differential.createBasicBlock();
@@ -1551,37 +1665,22 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
                << " as the tangent of original result " << *origArg);
   }
 
-  // Initialize tangent mapping for indirect results.
-  auto origIndResults = original->getIndirectResults();
-  auto diffIndResults = differential.getIndirectResults();
+  // Initialize tangent mapping for original non-wrt `inout` parameters.
+  // Give these parameters zero-initialized tangent buffers.
   auto isNonWrtInoutParameter = [&](unsigned i) {
     auto &paramInfo = original->getLoweredFunctionType()->getParameters()[i];
     return paramInfo.isIndirectInOut() && !getIndices().parameters->contains(i);
   };
-  auto origNumParams = original->getLoweredFunctionType()->getNumParameters();
-#ifndef NDEBUG
-  unsigned numNonWrtInoutParameters =
-      llvm::count_if(range(origNumParams), isNonWrtInoutParameter);
-  assert(origIndResults.size() + numNonWrtInoutParameters ==
-         diffIndResults.size());
-#endif
   differentialBuilder.setInsertionPoint(differential.getEntryBlock());
-  for (auto i : range(origNumParams)) {
-    if (isNonWrtInoutParameter(i)) {
-      auto &origParam = original->getArgumentsWithoutIndirectResults()[i];
-      if (!activityInfo.isVaried(origParam, getIndices().parameters))
-        continue;
-      auto origSILType = origParam->getType();
-      auto tangentSILType = getRemappedTangentType(origSILType);
-      auto *tanBuf = differentialBuilder.createAllocStack(
-          differential.getLocation(), tangentSILType);
-      setTangentBuffer(origEntry, origParam, tanBuf);
-      differentialLocalAllocations.push_back(tanBuf);
-    }
+  for (auto i : range(original->getLoweredFunctionType()->getNumParameters())) {
+    if (!isNonWrtInoutParameter(i))
+      continue;
+    auto &origParam = original->getArgumentsWithoutIndirectResults()[i];
+    auto tanType = getRemappedTangentType(origParam->getType());
+    auto *tanBuf = createDifferentialLocalAllocation(diffLoc, tanType);
+    emitZeroIndirect(tanType.getASTType(), tanBuf, diffLoc);
+    setTangentBuffer(origEntry, origParam, tanBuf);
   }
-  for (auto &origBB : *original)
-    for (auto i : indices(origIndResults))
-      setTangentBuffer(&origBB, origIndResults[i], diffIndResults[i]);
 }
 
 /*static*/ SILFunction *JVPCloner::Implementation::createEmptyDifferential(
@@ -1613,7 +1712,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
 
   for (auto resultIndex : indices.results->getIndices()) {
     if (resultIndex < origTy->getNumResults()) {
-      // Handle formal original result.
+      // Handle original formal result.
       auto origResult = origTy->getResults()[resultIndex];
       origResult = origResult.getWithInterfaceType(
           origResult.getInterfaceType()->getCanonicalType(witnessCanGenSig));
