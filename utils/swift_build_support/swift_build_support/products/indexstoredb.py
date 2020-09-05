@@ -13,6 +13,7 @@
 import os
 
 from . import product
+from . import swiftpm
 from .. import shell
 from .. import targets
 

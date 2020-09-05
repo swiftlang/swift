@@ -17,6 +17,7 @@ import platform
 from build_swift.build_swift.constants import MULTIROOT_DATA_FILE_PATH
 
 from . import product
+from . import swiftpm
 from .. import shell
 
 

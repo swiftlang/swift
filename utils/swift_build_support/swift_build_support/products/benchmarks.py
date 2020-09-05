@@ -14,6 +14,7 @@ import os
 import platform
 
 from . import product
+from . import swiftpm
 from .. import shell
 from .. import targets
 
