@@ -79,6 +79,7 @@ import ExistentialPerformance
 import Fibonacci
 import FindStringNaive
 import FlattenList
+import FloatingPointConversion
 import FloatingPointParsing
 import FloatingPointPrinting
 import Hanoi
@@ -266,6 +267,7 @@ registerBenchmark(Fibonacci)
 registerBenchmark(FindStringNaive)
 registerBenchmark(FlattenListLoop)
 registerBenchmark(FlattenListFlatMap)
+registerBenchmark(FloatingPointConversion)
 registerBenchmark(FloatingPointParsing)
 registerBenchmark(FloatingPointPrinting)
 registerBenchmark(Hanoi)
