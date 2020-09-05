@@ -425,10 +425,11 @@ void OptRemarkGeneratorInstructionVisitor::visitStrongRetainInst(
     (void)foundArgs;
 
     // Retains begin a lifetime scope so we infer scan forward.
-    auto remark = RemarkMissed("memory", *sri,
-                               SourceLocInferenceBehavior::ForwardScanOnly)
-                  << "retain of type '"
-                  << NV("ValueType", sri->getOperand()->getType()) << "'";
+    auto remark =
+        RemarkMissed("memory", *sri,
+                     SourceLocInferenceBehavior::ForwardScanAlwaysInfer)
+        << "retain of type '" << NV("ValueType", sri->getOperand()->getType())
+        << "'";
     for (auto arg : inferredArgs) {
       remark << arg;
     }
@@ -446,10 +447,11 @@ void OptRemarkGeneratorInstructionVisitor::visitStrongReleaseInst(
                                                sri->getOperand(), inferredArgs);
     (void)foundArgs;
 
-    auto remark = RemarkMissed("memory", *sri,
-                               SourceLocInferenceBehavior::BackwardScanOnly)
-                  << "release of type '"
-                  << NV("ValueType", sri->getOperand()->getType()) << "'";
+    auto remark =
+        RemarkMissed("memory", *sri,
+                     SourceLocInferenceBehavior::BackwardScanAlwaysInfer)
+        << "release of type '" << NV("ValueType", sri->getOperand()->getType())
+        << "'";
     for (auto arg : inferredArgs) {
       remark << arg;
     }
@@ -466,10 +468,11 @@ void OptRemarkGeneratorInstructionVisitor::visitRetainValueInst(
                                                rvi->getOperand(), inferredArgs);
     (void)foundArgs;
     // Retains begin a lifetime scope, so we infer scan forwards.
-    auto remark = RemarkMissed("memory", *rvi,
-                               SourceLocInferenceBehavior::ForwardScanOnly)
-                  << "retain of type '"
-                  << NV("ValueType", rvi->getOperand()->getType()) << "'";
+    auto remark =
+        RemarkMissed("memory", *rvi,
+                     SourceLocInferenceBehavior::ForwardScanAlwaysInfer)
+        << "retain of type '" << NV("ValueType", rvi->getOperand()->getType())
+        << "'";
     for (auto arg : inferredArgs) {
       remark << arg;
     }
@@ -487,10 +490,11 @@ void OptRemarkGeneratorInstructionVisitor::visitReleaseValueInst(
     (void)foundArgs;
 
     // Releases end a lifetime scope so we infer scan backward.
-    auto remark = RemarkMissed("memory", *rvi,
-                               SourceLocInferenceBehavior::BackwardScanOnly)
-                  << "release of type '"
-                  << NV("ValueType", rvi->getOperand()->getType()) << "'";
+    auto remark =
+        RemarkMissed("memory", *rvi,
+                     SourceLocInferenceBehavior::BackwardScanAlwaysInfer)
+        << "release of type '" << NV("ValueType", rvi->getOperand()->getType())
+        << "'";
     for (auto arg : inferredArgs) {
       remark << arg;
     }
@@ -508,8 +512,7 @@ void OptRemarkGeneratorInstructionVisitor::visitAllocRefInst(
           valueToDeclInferrer.infer(ArgumentKeyKind::Note, ari, inferredArgs);
       (void)foundArgs;
       auto resultRemark =
-          RemarkPassed("memory", *ari,
-                       SourceLocInferenceBehavior::ForwardScanOnly)
+          RemarkPassed("memory", *ari, SourceLocInferenceBehavior::ForwardScan)
           << "stack allocated ref of type '" << NV("ValueType", ari->getType())
           << "'";
       for (auto &arg : inferredArgs)
@@ -526,8 +529,7 @@ void OptRemarkGeneratorInstructionVisitor::visitAllocRefInst(
     (void)foundArgs;
 
     auto resultRemark =
-        RemarkMissed("memory", *ari,
-                     SourceLocInferenceBehavior::ForwardScanOnly)
+        RemarkMissed("memory", *ari, SourceLocInferenceBehavior::ForwardScan)
         << "heap allocated ref of type '" << NV("ValueType", ari->getType())
         << "'";
     for (auto &arg : inferredArgs)
@@ -546,8 +548,7 @@ void OptRemarkGeneratorInstructionVisitor::visitAllocBoxInst(
     (void)foundArgs;
 
     auto resultRemark =
-        RemarkMissed("memory", *abi,
-                     SourceLocInferenceBehavior::ForwardScanOnly)
+        RemarkMissed("memory", *abi, SourceLocInferenceBehavior::ForwardScan)
         << "heap allocated box of type '" << NV("ValueType", abi->getType())
         << "'";
     for (auto &arg : inferredArgs)

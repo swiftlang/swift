@@ -137,13 +137,25 @@ struct IndentDebug {
   unsigned width;
 };
 
-enum class SourceLocInferenceBehavior {
-  None,
-  ForwardScanOnly,
-  BackwardScanOnly,
-  ForwardThenBackward,
-  BackwardThenForward,
+enum class SourceLocInferenceBehavior : unsigned {
+  None = 0,
+  ForwardScan = 0x1,
+  BackwardScan = 0x2,
+  ForwardScan2nd = 0x4,
+  AlwaysInfer = 0x8,
+
+  ForwardThenBackwards = ForwardScan | BackwardScan,
+  BackwardsThenForwards = BackwardScan | ForwardScan2nd,
+  ForwardScanAlwaysInfer = ForwardScan | AlwaysInfer,
+  BackwardScanAlwaysInfer = BackwardScan | AlwaysInfer,
 };
+
+inline SourceLocInferenceBehavior operator&(SourceLocInferenceBehavior lhs,
+                                            SourceLocInferenceBehavior rhs) {
+  auto lhsVal = std::underlying_type<SourceLocInferenceBehavior>::type(lhs);
+  auto rhsVal = std::underlying_type<SourceLocInferenceBehavior>::type(rhs);
+  return SourceLocInferenceBehavior(lhsVal & rhsVal);
+}
 
 /// Infer the proper SourceLoc to use for the given SILInstruction.
 ///
