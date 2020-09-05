@@ -98,11 +98,6 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
         refFinder.TraverseDecl(executableDecl);
         next = executableDecl;
     }
-
-    if (auto var = dyn_cast<clang::VarDecl>(next))
-      if (!var->isFileVarDecl())
-	continue;
-
     ClangCodeGen->HandleTopLevelDecl(clang::DeclGroupRef(next));
   }
 }
