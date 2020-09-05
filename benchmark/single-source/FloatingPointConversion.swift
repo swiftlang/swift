@@ -16,15 +16,18 @@ public let FloatingPointConversion = [
   BenchmarkInfo(
     name: "ConvertFloatingPoint.ConcreteDoubleToDouble",
     runFunction: run_ConvertFloatingPoint_ConcreteDoubleToDouble,
-    tags: [.validation, .api]),
+    tags: [.validation, .api],
+    setUpFunction: { blackHole(doubles) }),
   BenchmarkInfo(
     name: "ConvertFloatingPoint.GenericDoubleToDouble",
     runFunction: run_ConvertFloatingPoint_GenericDoubleToDouble,
-    tags: [.validation, .api]),
+    tags: [.validation, .api],
+    setUpFunction: { blackHole(doubles) }),
   BenchmarkInfo(
     name: "ConvertFloatingPoint.MockFloat64ToDouble",
     runFunction: run_ConvertFloatingPoint_MockFloat64ToDouble,
-    tags: [.validation, .api]),
+    tags: [.validation, .api],
+    setUpFunction: { blackHole(mockFloat64s) }),
 ]
 
 protocol MockBinaryFloatingPoint: BinaryFloatingPoint {
@@ -123,11 +126,6 @@ extension MockBinaryFloatingPoint {
     _value.isLessThanOrEqualTo(other._value)
   }
   mutating func round(_ rule: FloatingPointRoundingRule) { _value.round(rule) }
-}
-
-struct MockFloat32: MockBinaryFloatingPoint {
-  var _value: Float
-  init(_ _value: Float) { self._value = _value }
 }
 
 struct MockFloat64: MockBinaryFloatingPoint {
