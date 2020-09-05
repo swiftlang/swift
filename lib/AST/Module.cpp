@@ -2337,6 +2337,12 @@ bool SourceFile::hasDelayedBodyParsing() const {
   return true;
 }
 
+/// Add a hoisted declaration. See Decl::isHoisted().
+void SourceFile::addHoistedDecl(Decl *d) {
+  assert(d->isHoisted());
+  Hoisted.push_back(d);
+}
+
 ArrayRef<Decl *> SourceFile::getTopLevelDecls() const {
   auto &ctx = getASTContext();
   auto *mutableThis = const_cast<SourceFile *>(this);

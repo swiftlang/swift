@@ -328,11 +328,6 @@ public:
     return CodeCompletionOffset != ~0U;
   }
 
-  /// Called from lldb, see rdar://53971116
-  void disableASTScopeLookup() {
-    LangOpts.EnableASTScopeLookup = false;
-  }
-
   /// Retrieve a module hash string that is suitable for uniquely
   /// identifying the conditions under which the module was built, for use
   /// in generating a cached PCH file for the bridging header.
