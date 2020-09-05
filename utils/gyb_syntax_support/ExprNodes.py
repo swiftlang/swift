@@ -190,7 +190,7 @@ EXPR_NODES = [
          ]),
 
     Node('TypedThrowsClause', kind='Syntax',
-          children=[
+         children=[
              Child('ThrowsKeyword', kind='Token',
                    token_choices=[
                        'ThrowsToken',
@@ -198,7 +198,7 @@ EXPR_NODES = [
              Child('LeftParen', kind='LeftParenToken'),
              Child('ThrowsType', kind='Type'),
              Child('RightParen', kind='RightParenToken'),
-          ]),
+         ]),
 
     # arrow-expr -> 'async'? ('throws'|'throws' '(' type ')')? '->'
     # NOTE: This appears only in SequenceExpr.
