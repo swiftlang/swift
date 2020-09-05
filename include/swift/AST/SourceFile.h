@@ -236,9 +236,7 @@ public:
   }
 
   /// Add a hoisted declaration. See Decl::isHoisted().
-  void addHoistedDecl(Decl *d) {
-    Hoisted.push_back(d);
-  }
+  void addHoistedDecl(Decl *d);
 
   /// Retrieves an immutable view of the list of top-level decls in this file.
   ArrayRef<Decl *> getTopLevelDecls() const;

@@ -160,9 +160,6 @@ def crosscheck_unqualified_lookup : Flag<["-"], "crosscheck-unqualified-lookup">
 def stress_astscope_lookup : Flag<["-"], "stress-astscope-lookup">,
   HelpText<"Stress ASTScope-based unqualified name lookup (for testing)">;
   
-def warn_if_astscope_lookup : Flag<["-"], "warn-if-astscope-lookup">,
-  HelpText<"Print a warning if ASTScope lookup is used">;
-  
 def lazy_astscopes : Flag<["-"], "lazy-astscopes">,
   HelpText<"Build ASTScopes lazily">;
 

@@ -1086,8 +1086,6 @@ void ASTScopeImpl::disownDescendants(ScopeCreator &scopeCreator) {
 
 ASTScopeImpl *
 ASTScopeImpl::expandAndBeCurrentDetectingRecursion(ScopeCreator &scopeCreator) {
-  assert(scopeCreator.getASTContext().LangOpts.EnableASTScopeLookup &&
-         "Should not be getting here if ASTScopes are disabled");
   return evaluateOrDefault(scopeCreator.getASTContext().evaluator,
                            ExpandASTScopeRequest{this, &scopeCreator}, nullptr);
 }
