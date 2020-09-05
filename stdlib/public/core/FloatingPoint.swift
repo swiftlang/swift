@@ -1908,6 +1908,62 @@ extension BinaryFloatingPoint {
       self = Self(value_)
 #endif
     default:
+      if value.isFinite {
+        // According to IEEE 754:
+        // - The set of finite floating-point numbers representable within a
+        //   particular format is determined by: the radix (b), the precision
+        //   (p, the number of digits in the significand), and the maximum and
+        //   minimum exponent (emax and emin, respectively, where
+        //   emin = 1 - emax).
+        // - In a binary interchange format, each floating-point number has only
+        //   one encoding.
+        //
+        // If two binary interchange formats have the same exponent bit count
+        // (w) and significand bit count (p - 1), then they must share the same
+        // encoding for finite values.
+        switch (Source.exponentBitCount, Source.significandBitCount) {
+#if !os(macOS) && !(os(iOS) && targetEnvironment(macCatalyst))
+        case (5, 10):
+          if #available(iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+            let value_ = Float16(
+              sign: value.sign,
+              exponentBitPattern: Float16.RawExponent(value.exponentBitPattern),
+              significandBitPattern:
+                Float16.RawSignificand(value.significandBitPattern))
+            self = Self(Float(value_))
+            return
+          }
+#endif
+        case (8, 23):
+          let value_ = Float(
+            sign: value.sign,
+            exponentBitPattern: Float.RawExponent(value.exponentBitPattern),
+            significandBitPattern:
+              Float.RawSignificand(value.significandBitPattern))
+          self = Self(value_)
+          return
+        case (11, 52):
+          let value_ = Double(
+            sign: value.sign,
+            exponentBitPattern: Double.RawExponent(value.exponentBitPattern),
+            significandBitPattern:
+              Double.RawSignificand(value.significandBitPattern))
+          self = Self(value_)
+          return
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+        case (15, 63):
+          let value_ = Float80(
+            sign: value.sign,
+            exponentBitPattern: Float80.RawExponent(value.exponentBitPattern),
+            significandBitPattern:
+              Float80.RawSignificand(value.significandBitPattern))
+          self = Self(value_)
+          return
+#endif
+        default:
+          break
+        }
+      }
       self = Self._convert(from: value).value
     }
   }
