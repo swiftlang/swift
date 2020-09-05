@@ -90,8 +90,10 @@ func printKlassPairLHS(x : KlassPair) {
                  // expected-remark @-3:16 {{release of type}}
 }
 
+// We put the retain on the return here since it is part of the result
+// convention.
 func returnKlassPairLHS(x: KlassPair) -> Klass {
-    return x.lhs // expected-remark @:14 {{retain of type 'Klass'}}
+    return x.lhs // expected-remark @:5 {{retain of type 'Klass'}}
                  // expected-note @-2:25 {{of 'x.lhs'}}
 }
 
@@ -123,7 +125,7 @@ func printKlassTupleLHS(x : (Klass, Klass)) {
 }
 
 func returnKlassTupleLHS(x: (Klass, Klass)) -> Klass {
-    return x.0 // expected-remark @:12 {{retain of type 'Klass'}}
+    return x.0 // expected-remark @:5 {{retain of type 'Klass'}}
                // expected-note @-2:26 {{of 'x'}}
 }
 
