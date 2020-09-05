@@ -543,6 +543,9 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
   //       name/module qualifier to access top-level name.
   lookupOptions |= NameLookupFlags::IncludeOuterResults;
 
+  if (Loc.isInvalid())
+    DC = DC->getModuleScopeContext();
+
   auto Lookup = TypeChecker::lookupUnqualified(DC, Name, Loc, lookupOptions);
 
   auto &Context = DC->getASTContext();
@@ -2459,8 +2462,9 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   auto lookupOptions = defaultUnqualifiedLookupOptions;
   lookupOptions |= NameLookupFlags::KnownPrivate;
   auto matchLookup =
-      lookupUnqualified(DC, DeclNameRef(Context.Id_MatchOperator), SourceLoc(),
-                        lookupOptions);
+      lookupUnqualified(DC->getModuleScopeContext(),
+                        DeclNameRef(Context.Id_MatchOperator),
+                        SourceLoc(), lookupOptions);
   auto &diags = DC->getASTContext().Diags;
   if (!matchLookup) {
     diags.diagnose(EP->getLoc(), diag::no_match_operator);
