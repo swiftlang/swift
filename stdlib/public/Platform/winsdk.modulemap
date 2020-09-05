@@ -21,6 +21,10 @@ module WinSDK [system] {
     link "WS2_32.Lib"
   }
 
+  module WinSock {
+    header "winsock.h"
+  }
+
   module core {
     module acl {
       header "AclAPI.h"
@@ -206,6 +210,11 @@ module WinSDK [system] {
     export *
   }
 
+  module WinBase {
+    header "winbase.h"
+    export *
+  }
+
   module WinCrypt {
     header "wincrypt.h"
     export *
@@ -240,6 +249,13 @@ module WinSDK [system] {
     export *
 
     link "RpcRT4.Lib"
+  }
+
+  module WinSVC {
+    header "winsvc.h"
+    export *
+
+    link "AdvAPI32.Lib"
   }
 }
 
