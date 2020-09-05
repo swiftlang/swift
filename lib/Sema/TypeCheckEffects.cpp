@@ -1329,6 +1329,29 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
     void mergeFrom(ContextFlag flag, ContextFlags other) {
       Bits |= (other.Bits & flag);
     }
+
+    void mergeFrom(ContextFlags flags, ContextFlags other) {
+      Bits |= (other.Bits & flags.Bits);
+    }
+
+    // All of the flags that can be set by throw checking.
+    static ContextFlags throwFlags() {
+      ContextFlags result;
+      result.set(IsTryCovered);
+      result.set(IsInTry);
+      result.set(HasAnyThrowSite);
+      result.set(HasTryThrowSite);
+      return result;
+    }
+
+    // All of the flags that can be set by async/await checking.
+    static ContextFlags asyncAwaitFlags() {
+      ContextFlags result;
+      result.set(IsAsyncCovered);
+      result.set(HasAnyAsyncSite);
+      result.set(HasAnyAwait);
+      return result;
+    }
   };
 
   ContextFlags Flags;
@@ -1408,6 +1431,10 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       // body for the purposes of deciding whether a try contained
       // a throwing call.
       OldFlags.mergeFrom(ContextFlags::HasTryThrowSite, Self.Flags);
+
+      // "await" doesn't work this way; the "await" needs to be part of
+      // the autoclosure expression itself, and the autoclosure must be
+      // 'async'.
     }
 
     void preserveCoverageFromNonExhaustiveCatch() {
@@ -1417,16 +1444,21 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
 
     void preserveCoverageFromAwaitOperand() {
       OldFlags.mergeFrom(ContextFlags::HasAnyAwait, Self.Flags);
+      OldFlags.mergeFrom(ContextFlags::throwFlags(), Self.Flags);
+      OldMaxThrowingKind = std::max(OldMaxThrowingKind, Self.MaxThrowingKind);
     }
 
     void preserveCoverageFromTryOperand() {
       OldFlags.mergeFrom(ContextFlags::HasAnyThrowSite, Self.Flags);
+      OldFlags.mergeFrom(ContextFlags::asyncAwaitFlags(), Self.Flags);
       OldMaxThrowingKind = std::max(OldMaxThrowingKind, Self.MaxThrowingKind);
     }
 
     void preserveCoverageFromInterpolatedString() {
       OldFlags.mergeFrom(ContextFlags::HasAnyThrowSite, Self.Flags);
       OldFlags.mergeFrom(ContextFlags::HasTryThrowSite, Self.Flags);
+      OldFlags.mergeFrom(ContextFlags::HasAnyAsyncSite, Self.Flags);
+      OldFlags.mergeFrom(ContextFlags::HasAnyAwait, Self.Flags);
       OldMaxThrowingKind = std::max(OldMaxThrowingKind, Self.MaxThrowingKind);
     }
     
