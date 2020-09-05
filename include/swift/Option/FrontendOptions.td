@@ -160,9 +160,6 @@ def crosscheck_unqualified_lookup : Flag<["-"], "crosscheck-unqualified-lookup">
 def stress_astscope_lookup : Flag<["-"], "stress-astscope-lookup">,
   HelpText<"Stress ASTScope-based unqualified name lookup (for testing)">;
   
-def lazy_astscopes : Flag<["-"], "lazy-astscopes">,
-  HelpText<"Build ASTScopes lazily">;
-
 def use_clang_function_types : Flag<["-"], "use-clang-function-types">,
   HelpText<"Use stored Clang function types for computing canonical types.">;
 
