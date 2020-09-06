@@ -59,10 +59,12 @@ static Type dropResultOptionality(Type type, unsigned uncurryLevel) {
   if (auto genericFn = dyn_cast<GenericFunctionType>(fnType)) {
     return GenericFunctionType::get(genericFn->getGenericSignature(),
                                     parameters, resultType,
+                                    fnType->getThrowsType(),
                                     fnType->getExtInfo());
   }
 
-  return FunctionType::get(parameters, resultType, fnType->getExtInfo());
+  return FunctionType::get(parameters, resultType,
+                           fnType->getThrowsType(), fnType->getExtInfo());
 }
 
 Type swift::getMemberTypeForComparison(const ValueDecl *member,
@@ -95,7 +97,8 @@ Type swift::getMemberTypeForComparison(const ValueDecl *member,
     // For subscripts, we don't have a 'Self' type, but turn it
     // into a monomorphic function type.
     auto funcTy = memberType->castTo<AnyFunctionType>();
-    memberType = FunctionType::get(funcTy->getParams(), funcTy->getResult());
+    memberType = FunctionType::get(funcTy->getParams(), funcTy->getResult(),
+                                   funcTy->getASTContext().getNeverType());
   } else {
     // For properties, strip off ownership.
     memberType = memberType->getReferenceStorageReferent();

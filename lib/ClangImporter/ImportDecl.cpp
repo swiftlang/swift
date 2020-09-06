@@ -984,7 +984,8 @@ synthesizeUnionFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
       AnyFunctionType::Param(inoutSelfDecl->getInterfaceType(),
                              Identifier(),
                              ParameterTypeFlags().withInOut(true)),
-      ctx.TheRawPointerType, ctx.getNeverType()));
+      ctx.TheRawPointerType,
+      ctx.getNeverType()));
   auto selfPointer = CallExpr::createImplicit(ctx, addressofFnRefExpr,
                                               { inoutSelf },
                                               { Identifier() });
@@ -1002,7 +1003,8 @@ synthesizeUnionFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
   initializeFnRefExpr->setType(
       FunctionType::get({AnyFunctionType::Param(newValueDecl->getInterfaceType()),
                          AnyFunctionType::Param(ctx.TheRawPointerType)},
-                        TupleType::getEmpty(ctx), ctx.getNeverType()));
+                        TupleType::getEmpty(ctx),
+                        ctx.getNeverType()));
   auto initialize = CallExpr::createImplicit(ctx, initializeFnRefExpr,
                                              { newValueRef, selfPointer },
                                              { Identifier(), Identifier() });
@@ -1266,7 +1268,8 @@ synthesizeStructDefaultConstructorBody(AbstractFunctionDecl *afd,
   ConcreteDeclRef concreteDeclRef(zeroInitializerFunc, subMap);
   auto zeroInitializerRef =
     new (ctx) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
-  zeroInitializerRef->setType(FunctionType::get({}, selfType, ctx.getNeverType()));
+  zeroInitializerRef->setType(FunctionType::get({}, selfType,
+                                                ctx.getNeverType()));
 
   auto call = CallExpr::createImplicit(ctx, zeroInitializerRef, {}, {});
   call->setType(selfType);

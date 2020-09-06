@@ -224,10 +224,12 @@ VarDecl *LinearMapInfo::addLinearMapDecl(ApplyInst *ai, SILType linearMapType) {
   AnyFunctionType *astFnTy;
   if (auto genSig = silFnTy->getSubstGenericSignature())
     astFnTy = GenericFunctionType::get(
-        genSig, params, silFnTy->getAllResultsInterfaceType().getASTType());
+        genSig, params, silFnTy->getAllResultsInterfaceType().getASTType(),
+        silFnTy->getASTContext().getNeverType());
   else
     astFnTy = FunctionType::get(
-        params, silFnTy->getAllResultsInterfaceType().getASTType());
+        params, silFnTy->getAllResultsInterfaceType().getASTType(),
+        silFnTy->getASTContext().getNeverType());
 
   auto *origBB = ai->getParent();
   auto *linMapStruct = getLinearMapStruct(origBB);

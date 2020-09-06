@@ -550,6 +550,8 @@ ERROR(cannot_convert_sequence_element_protocol,none,
 ERROR(throws_functiontype_mismatch,none,
       "invalid conversion from throwing function of type %0 to "
       "non-throwing function type %1", (Type, Type))
+ERROR(throws_type_doesnt_conform_to_error,none,
+      "throws type %0 must conform to 'Error'", (Type))
 
 // Key-path expressions.
 ERROR(expr_keypath_no_objc_runtime,none,

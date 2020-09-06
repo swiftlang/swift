@@ -971,7 +971,8 @@ namespace {
       // Add the constraint that the index expression's type be convertible
       // to the input type of the subscript operator.
       CS.addConstraint(ConstraintKind::ApplicableFunction,
-                       FunctionType::get(params, outputTy, CS.getASTContext().getNeverType()),
+                       FunctionType::get(params, outputTy,
+                                         CS.getASTContext().getNeverType()),
                        memberTy,
                        fnLocator);
 
@@ -1225,7 +1226,9 @@ namespace {
 
       CS.addConstraint(
           ConstraintKind::ApplicableFunction,
-          FunctionType::get(args, resultType, CS.getASTContext().getNeverType()), memberType,
+          FunctionType::get(args, resultType,
+                            CS.getASTContext().getNeverType()),
+          memberType,
           CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
 
       if (constr->isFailable())
@@ -2068,7 +2071,14 @@ namespace {
                                                           : TVO_CanBindToHole));
       }();
 
-      return FunctionType::get(closureParams, resultTy, CS.getASTContext().getNeverType(), extInfo);
+      auto &ctx = CS.getASTContext();
+
+      #warning TODO: get correct throwing type from closure
+      return FunctionType::get(closureParams, resultTy,
+                               extInfo.isThrowing()
+                               ? ctx.getErrorDecl()->getInterfaceType()
+                               : ctx.getNeverType(),
+                               extInfo);
     }
 
     /// Produces a type for the given pattern, filling in any missing

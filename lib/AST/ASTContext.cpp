@@ -3211,8 +3211,8 @@ FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params,
                            Type output, Type throwsType, ExtInfo info,
                            const ASTContext *ctx,
                            RecursiveTypeProperties properties)
-    : AnyFunctionType(TypeKind::Function, ctx,
-                      output, throwsType, properties, params.size(), info) {
+    : AnyFunctionType(TypeKind::Function, ctx, output, throwsType,
+                      properties, params.size(), info) {
   std::uninitialized_copy(params.begin(), params.end(),
                           getTrailingObjects<AnyFunctionType::Param>());
   auto clangTypeInfo = info.getClangTypeInfo();
@@ -3235,8 +3235,7 @@ void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
 
 GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
                                               ArrayRef<Param> params,
-                                              Type result,
-                                              Type throwsType,
+                                              Type result, Type throwsType,
                                               ExtInfo info) {
   assert(sig && "no generic signature for generic function type?!");
   assert(!result->hasTypeVariable());
@@ -3269,7 +3268,8 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
   void *mem = ctx.Allocate(allocSize, alignof(GenericFunctionType));
 
   auto properties = getGenericFunctionRecursiveProperties(params, result);
-  auto funcTy = new (mem) GenericFunctionType(sig, params, result, throwsType, info,
+  auto funcTy = new (mem) GenericFunctionType(sig, params, result, throwsType,
+                                              info,
                                               isCanonical ? &ctx : nullptr,
                                               properties);
 
@@ -3280,8 +3280,7 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
 GenericFunctionType::GenericFunctionType(
                        GenericSignature sig,
                        ArrayRef<AnyFunctionType::Param> params,
-                       Type result,
-                       Type throwsType,
+                       Type result, Type throwsType,
                        ExtInfo info,
                        const ASTContext *ctx,
                        RecursiveTypeProperties properties)

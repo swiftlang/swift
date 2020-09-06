@@ -166,7 +166,8 @@ namespace {
                                                     const Type &pointeeType) {
     auto funcTy = pointeeType->castTo<FunctionType>();
     return {FunctionType::get(
-                funcTy->getParams(), funcTy->getResult(), funcTy->getThrowsType(),
+                funcTy->getParams(), funcTy->getResult(),
+                funcTy->getThrowsType(),
                 funcTy->getExtInfo()
                     .intoBuilder()
                     .withRepresentation(
@@ -490,7 +491,8 @@ namespace {
       
       auto rep = FunctionType::Representation::Block;
       auto funcTy =
-          FunctionType::get(fTy->getParams(), fTy->getResult(), fTy->getThrowsType(),
+          FunctionType::get(fTy->getParams(), fTy->getResult(),
+                            fTy->getThrowsType(),
                             fTy->getExtInfo().withRepresentation(rep));
       return { funcTy, ImportHint::Block };
     }
@@ -620,7 +622,9 @@ namespace {
       }
 
       // Form the function type.
-      return FunctionType::get(params, resultTy,resultTy->getASTContext().getNeverType(), FunctionType::ExtInfo());
+      return FunctionType::get(params, resultTy,
+                               resultTy->getASTContext().getNeverType(),
+                               FunctionType::ExtInfo());
     }
 
     ImportResult
@@ -632,7 +636,8 @@ namespace {
       if (!resultTy)
         return Type();
 
-      return FunctionType::get({}, resultTy->getASTContext().getNeverType(), resultTy);
+      return FunctionType::get({}, resultTy,
+                               resultTy->getASTContext().getNeverType());
     }
 
     ImportResult VisitParenType(const clang::ParenType *type) {

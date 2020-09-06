@@ -4163,7 +4163,8 @@ public:
                                       genericFn->getExtInfo());
     }
 
-    return FunctionType::get(fnTy->getParams(), resultTy, fnTy->getThrowsType(), fnTy->getExtInfo());
+    return FunctionType::get(fnTy->getParams(), resultTy,
+                             fnTy->getThrowsType(), fnTy->getExtInfo());
   }
 
   // Build a disjunction that attempts both T? and T for a particular

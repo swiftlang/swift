@@ -4807,7 +4807,8 @@ namespace {
       //
       //     let closure = "{ $0[keyPath: $kp$] }"
       auto closureTy =
-          FunctionType::get({ FunctionType::Param(baseTy) }, leafTy, ctx.getNeverType());
+          FunctionType::get({ FunctionType::Param(baseTy) }, leafTy,
+                            ctx.getNeverType());
       auto closure = new (ctx)
           AutoClosureExpr(/*set body later*/nullptr, leafTy,
                           discriminator, cs.DC);
@@ -4822,7 +4823,8 @@ namespace {
       //
       //    let outerClosure = "{ $kp$ in \(closure) }"
       auto outerClosureTy =
-          FunctionType::get({ FunctionType::Param(keyPathTy) }, closureTy, ctx.getNeverType());
+          FunctionType::get({ FunctionType::Param(keyPathTy) }, closureTy,
+                            ctx.getNeverType());
       auto outerClosure = new (ctx)
           AutoClosureExpr(/*set body later*/nullptr, closureTy,
                           discriminator, cs.DC);
@@ -6655,7 +6657,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
             fromEI.intoBuilder()
                 .withDifferentiabilityKind(toEI.getDifferentiabilityKind())
                 .build();
-        fromFunc = FunctionType::get(toFunc->getParams(), fromFunc->getResult(), ctx.getNeverType())
+        fromFunc = FunctionType::get(toFunc->getParams(), fromFunc->getResult(),
+                                     ctx.getNeverType())
             ->withExtInfo(newEI)
             ->castTo<FunctionType>();
         switch (toEI.getDifferentiabilityKind()) {

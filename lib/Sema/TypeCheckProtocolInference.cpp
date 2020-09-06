@@ -537,6 +537,7 @@ static Type getWitnessTypeForMatching(NormalProtocolConformance *conformance,
   if (auto genericFn = type->getAs<GenericFunctionType>()) {
     type = FunctionType::get(genericFn->getParams(),
                              genericFn->getResult(),
+                             genericFn->getThrowsType(),
                              genericFn->getExtInfo());
   }
 
@@ -653,6 +654,7 @@ Type swift::adjustInferredAssociatedType(Type type, bool &noescapeToEscaping) {
     if (funcType->isNoEscape()) {
       noescapeToEscaping = true;
       return FunctionType::get(funcType->getParams(), funcType->getResult(),
+                               funcType->getThrowsType(),
                                funcType->getExtInfo().withNoEscape(false));
     }
   }

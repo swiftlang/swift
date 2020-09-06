@@ -1037,10 +1037,11 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
         SmallVector<FunctionType::Param, 2> params;
         for (auto &paramGen : fnParamGens)
           params.push_back(FunctionType::Param(paramGen.build(builder)));
-        auto innerFunction = FunctionType::get(params, fnResultGen.build(builder),
-                                               throws
-                                               ? Context.getErrorDecl()->getInterfaceType()
-                                               : Context.getNeverType());
+        auto innerFunction =
+            FunctionType::get(params, fnResultGen.build(builder),
+                              throws
+                              ? Context.getErrorDecl()->getInterfaceType()
+                              : Context.getNeverType());
         return innerFunction->withExtInfo(extInfo);
       }};
   // Eagerly build the type of the first arg, then use that to compute the type
@@ -1106,8 +1107,10 @@ static ValueDecl *getAutoDiffApplyTransposeFunction(
       SmallVector<FunctionType::Param, 2> params;
       for (auto &paramGen : linearFnParamGens)
         params.push_back(FunctionType::Param(paramGen.build(builder)));
-      auto innerFunction = FunctionType::get(params,
-                                             linearFnResultGen.build(builder), Context.getErrorDecl()->getInterfaceType());
+      auto innerFunction =
+          FunctionType::get(params, linearFnResultGen.build(builder),
+                            throws ? Context.getErrorDecl()->getInterfaceType()
+                                   : Context.getNeverType());
       return innerFunction->withExtInfo(extInfo);
     }
   };
@@ -1153,13 +1156,16 @@ static ValueDecl *getDifferentiableFunctionConstructor(
   }
 
   BuiltinFunctionBuilder::LambdaGenerator origFnGen {
-    [=, &fnArgGens, &throws, &Context](BuiltinFunctionBuilder &builder) -> Type {
+    [=, &fnArgGens, &Context](BuiltinFunctionBuilder &builder) -> Type {
       SmallVector<FunctionType::Param, 2> params;
       auto throwsType = throws ? Context.getErrorDecl()->getInterfaceType() : Context.getNeverType();
       for (auto &paramGen : fnArgGens)
         params.push_back(FunctionType::Param(paramGen.build(builder)));
-      return FunctionType::get(params, origResultGen.build(builder), throwsType)
-      ->withExtInfo(FunctionType::ExtInfoBuilder(
+      return FunctionType::get(params, origResultGen.build(builder),
+                               throws
+                               ? Context.getErrorDecl()->getInterfaceType()
+                               : Context.getNeverType())
+          ->withExtInfo(FunctionType::ExtInfoBuilder(
                             FunctionTypeRepresentation::Swift, throws)
                             .build());
     }
@@ -1266,7 +1272,10 @@ static ValueDecl *getLinearFunctionConstructor(
       auto throwsType = throws ? Context.getErrorDecl()->getInterfaceType() : Context.getNeverType();
       for (auto &paramGen : fnArgGens)
         params.push_back(FunctionType::Param(paramGen.build(builder)));
-      return FunctionType::get(params, origResultGen.build(builder), throwsType)
+      return FunctionType::get(params, origResultGen.build(builder),
+                               throws
+                               ? Context.getErrorDecl()->getInterfaceType()
+                               : Context.getNeverType())
           ->withExtInfo(FunctionType::ExtInfoBuilder(
                             FunctionTypeRepresentation::Swift, throws)
                             .build());

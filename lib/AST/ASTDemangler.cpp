@@ -405,10 +405,12 @@ Type ASTBuilder::createFunctionType(
                                    diffKind, clangFunctionType)
           .withAsync(flags.isAsync())
           .build();
-  
-  auto throwsType = flags.isThrowing() ? Ctx.getErrorDecl()->getInterfaceType() : Ctx.getNeverType();
-  
-  return FunctionType::get(funcParams, output, throwsType, einfo);
+
+  return FunctionType::get(funcParams, output,
+                           flags.isThrowing()
+                           ? Ctx.getErrorDecl()->getInterfaceType()
+                           : Ctx.getNeverType(),
+                           einfo);
 }
 
 static ParameterConvention

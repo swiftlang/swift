@@ -965,6 +965,7 @@ namespace decls_block {
     BCFixed<1>,  // noescape?
     BCFixed<1>,   // async?
     BCFixed<1>,   // throws?
+    TypeIDField, // throws type
     DifferentiabilityKindField // differentiability kind
 
     // trailed by parameters
@@ -1041,6 +1042,7 @@ namespace decls_block {
     FunctionTypeRepresentationField, // representation
     BCFixed<1>,          // async?
     BCFixed<1>,          // throws?
+    TypeIDField,         // throws type
     DifferentiabilityKindField, // differentiability kind
     GenericSignatureIDField // generic signture
 
@@ -1296,6 +1298,7 @@ namespace decls_block {
     BCFixed<1>,   // has forced static dispatch?
     BCFixed<1>,   // async?
     BCFixed<1>,   // throws?
+    TypeIDField,  // throws interface type
     GenericSignatureIDField, // generic environment
     TypeIDField,  // result interface type
     BCFixed<1>,   // IUO result?
@@ -1341,6 +1344,7 @@ namespace decls_block {
     SelfAccessKindField,   // self access kind
     BCFixed<1>,   // has forced static dispatch?
     BCFixed<1>,   // throws?
+    TypeIDField,  // throws interface type
     GenericSignatureIDField, // generic environment
     TypeIDField,  // result interface type
     BCFixed<1>,   // IUO result?

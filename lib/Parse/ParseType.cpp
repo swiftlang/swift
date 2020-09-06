@@ -673,8 +673,8 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       }
     }
 
-    tyR = new (Context) FunctionTypeRepr(generics, argsTyR, asyncLoc, throwsLoc, throwsType,
-                                         arrowLoc, SecondHalf.get(),
+    tyR = new (Context) FunctionTypeRepr(generics, argsTyR, asyncLoc, throwsLoc,
+                                         throwsType, arrowLoc, SecondHalf.get(),
                                          patternGenerics, patternSubsTypes,
                                          invocationSubsTypes);
   } else if (auto firstGenerics = generics ? generics : patternGenerics) {

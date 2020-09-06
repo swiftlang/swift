@@ -6252,6 +6252,7 @@ protected:
     Bits.FuncDecl.HasTopLevelLocalContextCaptures = false;
   }
 
+  void setThrowsInterfaceType(Type type);
   void setResultInterfaceType(Type type);
 
 private:
@@ -6283,7 +6284,7 @@ public:
   /// Factory function only for use by deserialization.
   static FuncDecl *createDeserialized(ASTContext &Context,
                                       StaticSpellingKind StaticSpelling,
-                                      DeclName Name, bool Async, bool Throws, TypeRepr *ThrowsType,
+                                      DeclName Name, bool Async, bool Throws, Type ThrowsType,
                                       GenericParamList *GenericParams,
                                       Type FnRetType, DeclContext *Parent);
 
@@ -6477,7 +6478,7 @@ public:
                                           AccessorKind accessorKind,
                                           AbstractStorageDecl *storage,
                                           StaticSpellingKind staticSpelling,
-                                          bool throws,
+                                          bool throws, Type throwsType,
                                           GenericParamList *genericParams,
                                           Type fnRetType, DeclContext *parent);
 

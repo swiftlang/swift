@@ -2248,7 +2248,8 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
   }
 
   return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig),
-                                 {}, resultTy->getASTContext().getNeverType(), canResultTy);
+                                 {}, canResultTy,
+                                 canResultTy->getASTContext().getNeverType());
 }
 
 /// Get the type of a stored property initializer, () -> T.
@@ -2274,7 +2275,8 @@ static CanAnyFunctionType getStoredPropertyInitializerInterfaceType(
   auto sig = DC->getGenericSignatureOfContext();
 
   return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig),
-                                 {}, resultTy->getASTContext().getNeverType(), resultTy);
+                                 {}, resultTy,
+                                 resultTy->getASTContext().getNeverType());
 }
 
 /// Get the type of a property wrapper backing initializer,
@@ -2295,8 +2297,8 @@ static CanAnyFunctionType getPropertyWrapperBackingInitializerInterfaceType(
       inputType, Identifier(),
       ParameterTypeFlags().withValueOwnership(ValueOwnership::Owned));
   return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), {param},
-                                 resultType->getASTContext().getNeverType(),
-                                 resultType);
+                                 resultType,
+                                 resultType->getASTContext().getNeverType());
 }
 /// Get the type of a destructor function.
 static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
@@ -2328,8 +2330,7 @@ static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
   FunctionType::Param args[] = {FunctionType::Param(classType)};
   return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig),
                                  llvm::makeArrayRef(args),
-                                 C.getNeverType(),
-                                 methodTy, extInfo);
+                                 methodTy, C.getNeverType(), extInfo);
 }
 
 /// Retrieve the type of the ivar initializer or destroyer method for
@@ -2352,12 +2353,14 @@ static CanAnyFunctionType getIVarInitDestroyerInterfaceType(ClassDecl *cd,
                                 : SILFunctionTypeRepresentation::Method)
                      .build();
 
-  resultType = CanFunctionType::get({}, resultType, cd->getASTContext().getNeverType(), extInfo);
+  resultType = CanFunctionType::get({}, resultType,
+                                    cd->getASTContext().getNeverType(),
+                                    extInfo);
   auto sig = cd->getGenericSignature();
   FunctionType::Param args[] = {FunctionType::Param(classType)};
   return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig),
-                                 llvm::makeArrayRef(args),
-                                 resultType, cd->getASTContext().getNeverType(), extInfo);
+                                 llvm::makeArrayRef(args), resultType,
+                                 cd->getASTContext().getNeverType(), extInfo);
 }
 
 static CanAnyFunctionType
@@ -2379,9 +2382,7 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
 
   return CanAnyFunctionType::get(
       getCanonicalSignatureOrNull(genericSig),
-      funcType.getParams(),
-      funcType.getResult(),
-      funcType.getThrowsType(),
+      funcType.getParams(), funcType.getResult(), funcType.getThrowsType(),
       innerExtInfo);
 }
 
@@ -2415,8 +2416,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
       vd->getInterfaceType()->getCanonicalType());
     auto sig = vd->getDeclContext()->getGenericSignatureOfContext();
     return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig),
-                                   funcTy->getParams(),
-                                   funcTy.getResult(),
+                                   funcTy.getParams(), funcTy.getResult(),
                                    funcTy.getThrowsType(),
                                    funcTy->getExtInfo());
   }

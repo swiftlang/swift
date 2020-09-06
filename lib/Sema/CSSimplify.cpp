@@ -9266,7 +9266,8 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
   // Create a type variable for the argument to the `dynamicallyCall` method.
   auto tvParam = createTypeVariable(loc, TVO_CanBindToNoEscape);
   AnyFunctionType *funcType =
-    FunctionType::get({ AnyFunctionType::Param(tvParam) }, func1->getResult(), ctx.getNeverType());
+    FunctionType::get({ AnyFunctionType::Param(tvParam) }, func1->getResult(),
+                      ctx.getNeverType());
   addConstraint(ConstraintKind::DynamicCallableApplicableFunction,
                 funcType, tv, locator);
 

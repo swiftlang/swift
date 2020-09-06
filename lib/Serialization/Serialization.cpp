@@ -3426,6 +3426,7 @@ public:
                            fn->hasForcedStaticDispatch(),
                            fn->hasAsync(),
                            fn->hasThrows(),
+                           S.addTypeRef(fn->getThrowsInterfaceType()),
                            S.addGenericSignatureRef(
                                                   fn->getGenericSignature()),
                            S.addTypeRef(fn->getResultInterfaceType()),
@@ -3509,6 +3510,7 @@ public:
                                                   fn->getSelfAccessKind())),
                                fn->hasForcedStaticDispatch(),
                                fn->hasThrows(),
+                               S.addTypeRef(fn->getThrowsInterfaceType()),
                                S.addGenericSignatureRef(
                                                   fn->getGenericSignature()),
                                S.addTypeRef(fn->getResultInterfaceType()),
@@ -4136,6 +4138,7 @@ public:
     using namespace decls_block;
 
     auto resultType = S.addTypeRef(fnTy->getResult());
+    auto throwsType = S.addTypeRef(fnTy->getThrowsType());
     auto clangType = S.addClangTypeRef(fnTy->getClangTypeInfo().getType());
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[FunctionTypeLayout::Code];
@@ -4146,6 +4149,7 @@ public:
         fnTy->isNoEscape(),
         fnTy->isAsync(),
         fnTy->isThrowing(),
+        throwsType,
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()));
 
     serializeFunctionTypeParams(fnTy);
@@ -4160,6 +4164,7 @@ public:
         S.addTypeRef(fnTy->getResult()),
         getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
         fnTy->isAsync(), fnTy->isThrowing(),
+        S.addTypeRef(fnTy->getThrowsType()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
         S.addGenericSignatureRef(genericSig));
 

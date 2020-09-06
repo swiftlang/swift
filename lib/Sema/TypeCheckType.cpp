@@ -1648,7 +1648,8 @@ static Type applyNonEscapingIfNecessary(Type ty,
     // which would wrap the TypeAliasType or ParenType, and apply the
     // isNoEscape bit when de-sugaring.
     // <https://bugs.swift.org/browse/SR-2520>
-    return FunctionType::get(funcTy->getParams(), funcTy->getResult(), extInfo);
+    return FunctionType::get(funcTy->getParams(), funcTy->getResult(),
+                             funcTy->getThrowsType(), extInfo);
   }
 
   // Note: original sugared type
@@ -2741,6 +2742,13 @@ Type TypeResolver::resolveASTFunctionType(
     return ErrorType::get(getASTContext());
   }
 
+  auto throwsOptions = options.withoutContext();
+  throwsOptions.setContext(TypeResolverContext::FunctionThrows);
+  auto throwsTy = resolveType(repr->getThrowsType(), resultOptions);
+  if (throwsTy->hasError()) {
+    return ErrorType::get(getASTContext());
+  }
+
   // If this is a function type without parens around the parameter list,
   // diagnose this and produce a fixit to add them.
   if (!repr->isWarnedAbout()) {
@@ -2779,10 +2787,10 @@ Type TypeResolver::resolveASTFunctionType(
   if (auto genericEnv = repr->getGenericEnvironment()) {
     outputTy = outputTy->mapTypeOutOfContext();
     return GenericFunctionType::get(genericEnv->getGenericSignature(),
-                                    params, outputTy, extInfo);
+                                    params, outputTy, throwsTy, extInfo);
   }
 
-  auto fnTy = FunctionType::get(params, outputTy, extInfo);
+  auto fnTy = FunctionType::get(params, outputTy, throwsTy, extInfo);
   
   if (fnTy->hasError())
     return fnTy;
@@ -2800,7 +2808,7 @@ Type TypeResolver::resolveASTFunctionType(
         : "c";
       auto extInfo2 =
         extInfo.withRepresentation(AnyFunctionType::Representation::Swift);
-      auto simpleFnTy = FunctionType::get(params, outputTy, extInfo2);
+      auto simpleFnTy = FunctionType::get(params, outputTy, throwsTy, extInfo2);
       diagnose(repr->getStartLoc(), diag::objc_convention_invalid,
                simpleFnTy, strName);
     }
