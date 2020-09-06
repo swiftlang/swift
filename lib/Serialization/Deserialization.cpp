@@ -4995,7 +4995,7 @@ public:
   Expected<Type> deserializeAnyFunctionType(SmallVectorImpl<uint64_t> &scratch,
                                             StringRef blobData,
                                             bool isGeneric) {
-    TypeID resultID;
+    TypeID resultID, throwsTypeID;
     uint8_t rawRepresentation, rawDiffKind;
     bool noescape = false, async, throws;
     GenericSignature genericSig;
@@ -5074,14 +5074,18 @@ public:
                                              isNonEphemeral, *ownership,
                                              isNoDerivative));
     }
+    
+    auto throwsTy = MF.getTypeChecked(throwsTypeID);
+    if (!throwsTy)
+      return throwsTy.takeError();
 
     if (!isGeneric) {
       assert(genericSig.isNull());
-      return FunctionType::get(params, resultTy.get(), info);
+      return FunctionType::get(params, resultTy.get(), throwsTy.get(), info);
     }
 
     assert(!genericSig.isNull());
-    return GenericFunctionType::get(genericSig, params, resultTy.get(), info);
+    return GenericFunctionType::get(genericSig, params, resultTy.get(), throwsTy.get(), info);
   }
 
   Expected<Type> deserializeFunctionType(SmallVectorImpl<uint64_t> &scratch,

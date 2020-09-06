@@ -5959,7 +5959,7 @@ public:
   /// Returns true if the function has a typed throw.
   bool hasTypedThrows() const { return (Bits.AbstractFunctionDecl.Throws && ThrowsType != nullptr); }
 
-  TypeRepr *typedThrow() const { return ThrowsType; }
+  TypeLoc getTypedThrow() const { return TypeLoc(ThrowsType); }
 
   // FIXME: Hack that provides names with keyword arguments for accessors.
   DeclName getEffectiveFullName() const;

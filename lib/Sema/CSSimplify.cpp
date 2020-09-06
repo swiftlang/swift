@@ -5398,7 +5398,7 @@ ConstraintSystem::simplifyConstructionConstraint(
     // let's diagnose it.
     if (shouldAttemptFixes()) {
       if (valueType->isVoid() && fnType->getNumParams() > 0) {
-        auto contextualType = FunctionType::get({}, fnType->getResult());
+        auto contextualType = FunctionType::get({}, fnType->getResult(), fnType->getThrowsType());
         if (fixExtraneousArguments(
                 *this, contextualType, fnType->getParams(),
                 fnType->getNumParams(),
@@ -7656,6 +7656,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
 
   auto closureType =
       FunctionType::get(parameters, inferredClosureType->getResult(),
+                        inferredClosureType->getThrowsType(),
                         inferredClosureType->getExtInfo());
   assignFixedType(typeVar, closureType, closureLocator);
 
@@ -9265,7 +9266,7 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
   // Create a type variable for the argument to the `dynamicallyCall` method.
   auto tvParam = createTypeVariable(loc, TVO_CanBindToNoEscape);
   AnyFunctionType *funcType =
-    FunctionType::get({ AnyFunctionType::Param(tvParam) }, func1->getResult());
+    FunctionType::get({ AnyFunctionType::Param(tvParam) }, func1->getResult(), ctx.getNeverType());
   addConstraint(ConstraintKind::DynamicCallableApplicableFunction,
                 funcType, tv, locator);
 

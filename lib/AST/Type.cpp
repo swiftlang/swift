@@ -432,14 +432,15 @@ Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
     sig = genericFn->getGenericSignature();
     type = FunctionType::get(genericFn->getParams(),
                              genericFn->getResult(),
+                             genericFn->getThrowsType(),
                              genericFn->getExtInfo());
   }
 
   auto selfTy = dc->getSelfInterfaceType();
   auto selfParam = AnyFunctionType::Param(selfTy);
   if (sig)
-    return GenericFunctionType::get(sig, {selfParam}, type);
-  return FunctionType::get({selfParam}, type);
+    return GenericFunctionType::get(sig, {selfParam}, type, Context->getNeverType());
+  return FunctionType::get({selfParam}, type, Context->getNeverType());
 }
 
 void
@@ -792,10 +793,11 @@ Type TypeBase::removeArgumentLabels(unsigned numArgumentLabels) {
   if (auto *genericFnType = dyn_cast<GenericFunctionType>(fnType)) {
     return GenericFunctionType::get(genericFnType->getGenericSignature(),
                                     unlabeledParams, result,
-                                    fnType->getExtInfo());
+                                    fnType->getThrowsType(), fnType->getExtInfo());
   }
 
-  return FunctionType::get(unlabeledParams, result, fnType->getExtInfo());
+  return FunctionType::get(unlabeledParams, result,
+                           fnType->getThrowsType(), fnType->getExtInfo());
 }
 
 
@@ -829,10 +831,12 @@ Type TypeBase::replaceCovariantResultType(Type newResultType,
   if (auto genericFn = dyn_cast<GenericFunctionType>(fnType)) {
     return GenericFunctionType::get(genericFn->getGenericSignature(),
                                     inputType, resultType,
+                                    fnType->getThrowsType(),
                                     fnType->getExtInfo());
   }
   
-  return FunctionType::get(inputType, resultType, fnType->getExtInfo());
+  return FunctionType::get(inputType, resultType,
+                           fnType->getThrowsType(), fnType->getExtInfo());
 }
 
 /// Whether this parameter accepts an unlabeled trailing closure argument
@@ -972,11 +976,13 @@ Type TypeBase::replaceSelfParameterType(Type newSelf) {
     return GenericFunctionType::get(genericFnTy->getGenericSignature(),
                                     {selfParam},
                                     fnTy->getResult(),
+                                    fnTy->getThrowsType(),
                                     fnTy->getExtInfo());
   }
 
   return FunctionType::get({selfParam},
                            fnTy->getResult(),
+                           fnTy->getThrowsType(),
                            fnTy->getExtInfo());
 }
 
@@ -1246,13 +1252,13 @@ CanType TypeBase::computeCanonicalType() {
     SmallVector<AnyFunctionType::Param, 8> canParams;
     getCanonicalParams(funcTy, genericSig, canParams);
     auto resultTy = funcTy->getResult()->getCanonicalType(genericSig);
-
+    auto throwsTy = funcTy->getThrowsType()->getCanonicalType(genericSig);
     auto extInfo = funcTy->getCanonicalExtInfo(useClangTypes(resultTy));
     if (genericSig) {
-      Result = GenericFunctionType::get(genericSig, canParams, resultTy,
+      Result = GenericFunctionType::get(genericSig, canParams, resultTy, throwsTy,
                                         extInfo);
     } else {
-      Result = FunctionType::get(canParams, resultTy, extInfo);
+      Result = FunctionType::get(canParams, resultTy, throwsTy, extInfo);
     }
     assert(Result->isCanonical());
     break;
@@ -1815,7 +1821,8 @@ public:
         return CanType();
       if (!didChange && newReturn == substFunc.getResult())
         return subst;
-      return FunctionType::get(newParams, newReturn, func->getExtInfo())
+      return FunctionType::get(newParams, newReturn,
+                               func->getThrowsType(), func->getExtInfo())
         ->getCanonicalType();
     }
     return CanType();
@@ -3454,9 +3461,9 @@ FunctionType *GenericFunctionType::substGenericArgs(
                   });
 
   auto resultTy = substFn(getResult());
-
+  auto throwsTy = substFn(getThrowsType());
   // Build the resulting (non-generic) function type.
-  return FunctionType::get(params, resultTy, getExtInfo());
+  return FunctionType::get(params, resultTy, throwsTy, getExtInfo());
 }
 
 CanFunctionType
@@ -3651,6 +3658,7 @@ static Type substGenericFunctionType(GenericFunctionType *genericFnType,
   // Substitute into the function type (without generic signature).
   auto *bareFnType = FunctionType::get(genericFnType->getParams(),
                                        genericFnType->getResult(),
+                                       genericFnType->getThrowsType(),
                                        genericFnType->getExtInfo());
   Type result =
     Type(bareFnType).subst(substitutions, lookupConformances, options);
@@ -3723,7 +3731,8 @@ static Type substGenericFunctionType(GenericFunctionType *genericFnType,
 
   // Produce the new generic function type.
   return GenericFunctionType::get(genericSig, fnType->getParams(),
-                                  fnType->getResult(), fnType->getExtInfo());
+                                  fnType->getResult(), fnType->getThrowsType(),
+                                  fnType->getExtInfo());
 }
 
 static Type substType(Type derivedType,
@@ -4136,6 +4145,7 @@ Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
   if (auto *genericMemberType = memberType->getAs<GenericFunctionType>()) {
     memberType = FunctionType::get(genericMemberType->getParams(),
                                    genericMemberType->getResult(),
+                                   genericMemberType->getThrowsType(),
                                    genericMemberType->getExtInfo());
   }
 
@@ -4677,6 +4687,14 @@ case TypeKind::Id:
 
       substParams.emplace_back(substType, label, flags);
     }
+    
+    // Transform throws type, if any.
+    auto throwsTy = function->getThrowsType().transformRec(fn);
+    if (!throwsTy)
+      return Type();
+    
+    if (throwsTy.getPointer() != function->getThrowsType().getPointer())
+      isUnchanged = false;
 
     // Transform result type.
     auto resultTy = function->getResult().transformRec(fn);
@@ -4699,13 +4717,13 @@ case TypeKind::Id:
       if (isUnchanged) return *this;
 
       auto genericSig = genericFnType->getGenericSignature();
-      return GenericFunctionType::get(genericSig, substParams, resultTy,
+      return GenericFunctionType::get(genericSig, substParams, resultTy, throwsTy,
                                       function->getExtInfo());
     }
 
     if (isUnchanged) return *this;
 
-    return FunctionType::get(substParams, resultTy,
+    return FunctionType::get(substParams, resultTy, throwsTy,
                              function->getExtInfo());
   }
 
@@ -5095,10 +5113,10 @@ AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {
           .withDifferentiabilityKind(DifferentiabilityKind::NonDifferentiable)
           .build();
   if (isa<FunctionType>(this))
-    return FunctionType::get(newParams, getResult(), nonDiffExtInfo);
+    return FunctionType::get(newParams, getResult(), getThrowsType(), nonDiffExtInfo);
   assert(isa<GenericFunctionType>(this));
   return GenericFunctionType::get(getOptGenericSignature(), newParams,
-                                  getResult(), nonDiffExtInfo);
+                                  getResult(), getThrowsType(), nonDiffExtInfo);
 }
 
 Optional<TangentSpace>
@@ -5160,13 +5178,13 @@ TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
 // Creates an `AnyFunctionType` from the given parameters, result type,
 // generic signature, and `ExtInfo`.
 static AnyFunctionType *
-makeFunctionType(ArrayRef<AnyFunctionType::Param> parameters, Type resultType,
+makeFunctionType(ArrayRef<AnyFunctionType::Param> parameters, Type resultType, Type throwsType,
                  GenericSignature genericSignature,
                  AnyFunctionType::ExtInfo extInfo) {
   if (genericSignature)
-    return GenericFunctionType::get(genericSignature, parameters, resultType,
+    return GenericFunctionType::get(genericSignature, parameters, resultType, throwsType,
                                     extInfo);
-  return FunctionType::get(parameters, resultType, extInfo);
+  return FunctionType::get(parameters, resultType, throwsType, extInfo);
 }
 
 AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
@@ -5210,6 +5228,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
   auto retTy = TupleType::get(retElts, ctx);
   auto *derivativeFunctionType =
       makeFunctionType(curryLevels.back()->getParams(), retTy,
+                       curryLevels.back()->getThrowsType(),
                        curryLevels.size() == 1 ? derivativeGenSig : nullptr,
                        curryLevels.back()->getExtInfo());
 
@@ -5220,7 +5239,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
     unsigned i = pair.index();
     auto *curryLevel = pair.value();
     derivativeFunctionType = makeFunctionType(
-        curryLevel->getParams(), derivativeFunctionType,
+        curryLevel->getParams(), derivativeFunctionType, curryLevels.back()->getThrowsType(),
         i == curryLevelsWithoutLast.size() - 1 ? derivativeGenSig : nullptr,
         curryLevel->getExtInfo());
   }
@@ -5307,7 +5326,7 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
     }
     auto differentialResult =
         hasInoutDiffParameter ? Type(ctx.TheEmptyTupleType) : resultTanType;
-    linearMapType = FunctionType::get(differentialParams, differentialResult);
+    linearMapType = FunctionType::get(differentialParams, differentialResult, ctx.getNeverType());
     break;
   }
   case AutoDiffLinearMapKind::Pullback: {
@@ -5356,7 +5375,7 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
     auto flags = ParameterTypeFlags().withInOut(hasInoutDiffParameter);
     auto pullbackParam =
         AnyFunctionType::Param(resultTanType, Identifier(), flags);
-    linearMapType = FunctionType::get({pullbackParam}, pullbackResult);
+    linearMapType = FunctionType::get({pullbackParam}, pullbackResult, ctx.getNeverType());
     break;
   }
   }

@@ -5110,6 +5110,20 @@ public:
                                      DifferentiabilityKind::Linear);
       }
     }
+    //
+    //
+    if (auto *fnTy = ty->getAs<AnyFunctionType>()) {
+      auto &ctx = Builder.getASTContext();
+      auto *errorProtocol = ctx.getProtocol(KnownProtocolKind::Error);
+      if (errorProtocol && fnTy->isAsync()) {
+        auto addConformanceContraint = [&](Type type, ProtocolDecl *protocol) {
+          Requirement req(RequirementKind::Conformance, type,
+                          protocol->TypeDecl::getDeclaredInterfaceType());
+          Builder.addRequirement(req, source, nullptr);
+        };
+        addConformanceContraint(fnTy->getThrowsType(), errorProtocol);
+      }
+    }
 
     if (!ty->isSpecialized())
       return Action::Continue;

@@ -330,12 +330,19 @@ CanType TypeJoin::visitFunctionType(CanType second) {
   auto result = join(firstResult, secondResult);
   if (!result)
     return Unimplemented;
+  
+  auto firstThrowsTy = firstFnTy->getThrowsType()->getCanonicalType();
+  auto secondThrowsTy = secondFnTy->getThrowsType()->getCanonicalType();
+  
+  auto throwsTy = join(firstThrowsTy, secondThrowsTy);
+  if (!throwsTy)
+    return Unimplemented;
 
   auto extInfo = firstExtInfo;
   if (secondFnTy->getExtInfo().isNoEscape())
     extInfo = extInfo.withNoEscape(true);
 
-  return FunctionType::get(firstFnTy->getParams(), result, extInfo)
+  return FunctionType::get(firstFnTy->getParams(), result, throwsTy, extInfo)
       ->getCanonicalType();
 }
 

@@ -971,7 +971,7 @@ namespace {
       // Add the constraint that the index expression's type be convertible
       // to the input type of the subscript operator.
       CS.addConstraint(ConstraintKind::ApplicableFunction,
-                       FunctionType::get(params, outputTy),
+                       FunctionType::get(params, outputTy, CS.getASTContext().getNeverType()),
                        memberTy,
                        fnLocator);
 
@@ -1225,7 +1225,7 @@ namespace {
 
       CS.addConstraint(
           ConstraintKind::ApplicableFunction,
-          FunctionType::get(args, resultType), memberType,
+          FunctionType::get(args, resultType, CS.getASTContext().getNeverType()), memberType,
           CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
 
       if (constr->isFailable())
@@ -2068,7 +2068,7 @@ namespace {
                                                           : TVO_CanBindToHole));
       }();
 
-      return FunctionType::get(closureParams, resultTy, extInfo);
+      return FunctionType::get(closureParams, resultTy, CS.getASTContext().getNeverType(), extInfo);
     }
 
     /// Produces a type for the given pattern, filling in any missing
@@ -2455,7 +2455,7 @@ namespace {
           Type outputType = CS.createTypeVariable(
               CS.getConstraintLocator(locator),
               TVO_CanBindToNoEscape);
-          Type functionType = FunctionType::get(params, outputType);
+          Type functionType = FunctionType::get(params, outputType, CS.getASTContext().getNeverType());
           CS.addConstraint(
               ConstraintKind::Equal, functionType, memberType,
               locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
@@ -2647,7 +2647,8 @@ namespace {
       AnyFunctionType::decomposeInput(CS.getType(expr->getArg()), params);
 
       CS.addConstraint(ConstraintKind::ApplicableFunction,
-                       FunctionType::get(params, resultType, extInfo),
+                       FunctionType::get(params, resultType,
+                       CS.getASTContext().getNeverType(), extInfo),
                        CS.getType(expr->getFn()),
         CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
 

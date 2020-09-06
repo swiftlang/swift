@@ -7,6 +7,9 @@ func hasThrownType() throws (SomeError) -> Int {
   return 1
 }
 
+struct NoError {}
+func hasNoConformingError() throws (NoError) ->
+
 protocol TestProtocol {
   func missingClosingParenAndType() throws ( -> Int
   // expected-error@-1 {{expected a parenthesized type after 'throws'}} {{45-45= <#type#>}}

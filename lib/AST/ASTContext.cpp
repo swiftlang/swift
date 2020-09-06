@@ -3045,11 +3045,11 @@ isGenericFunctionTypeCanonical(GenericSignature sig,
 
 AnyFunctionType *AnyFunctionType::withExtInfo(ExtInfo info) const {
   if (isa<FunctionType>(this))
-    return FunctionType::get(getParams(), getResult(), info);
+    return FunctionType::get(getParams(), getResult(), getThrowsType(), info);
 
   auto *genFnTy = cast<GenericFunctionType>(this);
   return GenericFunctionType::get(genFnTy->getGenericSignature(),
-                                  getParams(), getResult(), info);
+                                  getParams(), getResult(), getThrowsType(), info);
 }
 
 void AnyFunctionType::decomposeInput(
@@ -3169,7 +3169,7 @@ void FunctionType::Profile(llvm::FoldingSetNodeID &ID,
 }
 
 FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
-                                Type result, ExtInfo info) {
+                                Type result, Type throwsType, ExtInfo info) {
   auto properties = getFunctionRecursiveProperties(params, result);
   auto arena = getArena(properties);
 
@@ -3199,7 +3199,7 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
       isCanonical = false;
   }
 
-  auto funcTy = new (mem) FunctionType(params, result, info,
+  auto funcTy = new (mem) FunctionType(params, result, throwsType, info,
                                        isCanonical ? &ctx : nullptr,
                                        properties);
   ctx.getImpl().getArena(arena).FunctionTypes.InsertNode(funcTy, insertPos);
@@ -3208,11 +3208,11 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
 
 // If the input and result types are canonical, then so is the result.
 FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params,
-                           Type output, ExtInfo info,
+                           Type output, Type throwsType, ExtInfo info,
                            const ASTContext *ctx,
                            RecursiveTypeProperties properties)
     : AnyFunctionType(TypeKind::Function, ctx,
-                      output, properties, params.size(), info) {
+                      output, throwsType, properties, params.size(), info) {
   std::uninitialized_copy(params.begin(), params.end(),
                           getTrailingObjects<AnyFunctionType::Param>());
   auto clangTypeInfo = info.getClangTypeInfo();
@@ -3236,6 +3236,7 @@ void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
 GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
                                               ArrayRef<Param> params,
                                               Type result,
+                                              Type throwsType,
                                               ExtInfo info) {
   assert(sig && "no generic signature for generic function type?!");
   assert(!result->hasTypeVariable());
@@ -3268,7 +3269,7 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
   void *mem = ctx.Allocate(allocSize, alignof(GenericFunctionType));
 
   auto properties = getGenericFunctionRecursiveProperties(params, result);
-  auto funcTy = new (mem) GenericFunctionType(sig, params, result, info,
+  auto funcTy = new (mem) GenericFunctionType(sig, params, result, throwsType, info,
                                               isCanonical ? &ctx : nullptr,
                                               properties);
 
@@ -3280,10 +3281,11 @@ GenericFunctionType::GenericFunctionType(
                        GenericSignature sig,
                        ArrayRef<AnyFunctionType::Param> params,
                        Type result,
+                       Type throwsType,
                        ExtInfo info,
                        const ASTContext *ctx,
                        RecursiveTypeProperties properties)
-  : AnyFunctionType(TypeKind::GenericFunction, ctx, result,
+  : AnyFunctionType(TypeKind::GenericFunction, ctx, result, throwsType,
                     properties, params.size(), info), Signature(sig) {
   std::uninitialized_copy(params.begin(), params.end(),
                           getTrailingObjects<AnyFunctionType::Param>());

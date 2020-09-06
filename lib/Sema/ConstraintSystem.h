@@ -4159,10 +4159,11 @@ public:
     if (auto *genericFn = fnTy->getAs<GenericFunctionType>()) {
       return GenericFunctionType::get(genericFn->getGenericSignature(),
                                       genericFn->getParams(), resultTy,
+                                      genericFn->getThrowsType(),
                                       genericFn->getExtInfo());
     }
 
-    return FunctionType::get(fnTy->getParams(), resultTy, fnTy->getExtInfo());
+    return FunctionType::get(fnTy->getParams(), resultTy, fnTy->getThrowsType(), fnTy->getExtInfo());
   }
 
   // Build a disjunction that attempts both T? and T for a particular

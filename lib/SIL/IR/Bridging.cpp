@@ -207,6 +207,7 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
 
       return FunctionType::get(
           newParams, newResult,
+          funTy->getThrowsType(),
           funTy->getExtInfo()
               .intoBuilder()
               .withSILRepresentation(SILFunctionType::Representation::Block)
