@@ -16,12 +16,122 @@ public let FloatingPointConversion = [
   BenchmarkInfo(
     name: "ConvertFloatingPoint.ConcreteDoubleToDouble",
     runFunction: run_ConvertFloatingPoint_ConcreteDoubleToDouble,
-    tags: [.validation, .api]),
+    tags: [.validation, .api],
+    setUpFunction: { blackHole(doubles) }),
   BenchmarkInfo(
     name: "ConvertFloatingPoint.GenericDoubleToDouble",
     runFunction: run_ConvertFloatingPoint_GenericDoubleToDouble,
-    tags: [.validation, .api]),
+    tags: [.validation, .api],
+    setUpFunction: { blackHole(doubles) }),
+  BenchmarkInfo(
+    name: "ConvertFloatingPoint.MockFloat64ToDouble",
+    runFunction: run_ConvertFloatingPoint_MockFloat64ToDouble,
+    tags: [.validation, .api],
+    setUpFunction: { blackHole(mockFloat64s) }),
 ]
+
+protocol MockBinaryFloatingPoint: BinaryFloatingPoint {
+  associatedtype _Value: BinaryFloatingPoint
+  var _value: _Value { get set }
+  init(_ _value: _Value)
+}
+
+extension MockBinaryFloatingPoint {
+  static var exponentBitCount: Int { _Value.exponentBitCount }
+  static var greatestFiniteMagnitude: Self {
+    Self(_Value.greatestFiniteMagnitude)
+  }
+  static var infinity: Self { Self(_Value.infinity) }
+  static var leastNonzeroMagnitude: Self { Self(_Value.leastNonzeroMagnitude) }
+  static var leastNormalMagnitude: Self { Self(_Value.leastNormalMagnitude) }
+  static var nan: Self { Self(_Value.nan) }
+  static var pi: Self { Self(_Value.pi) }
+  static var signalingNaN: Self { Self(_Value.signalingNaN) }
+  static var significandBitCount: Int { _Value.significandBitCount }
+  
+  static func + (lhs: Self, rhs: Self) -> Self { Self(lhs._value + rhs._value) }
+  static func += (lhs: inout Self, rhs: Self) { lhs._value += rhs._value }
+  static func - (lhs: Self, rhs: Self) -> Self { Self(lhs._value - rhs._value) }
+  static func -= (lhs: inout Self, rhs: Self) { lhs._value -= rhs._value }
+  static func * (lhs: Self, rhs: Self) -> Self { Self(lhs._value * rhs._value) }
+  static func *= (lhs: inout Self, rhs: Self) { lhs._value *= rhs._value }
+  static func / (lhs: Self, rhs: Self) -> Self { Self(lhs._value / rhs._value) }
+  static func /= (lhs: inout Self, rhs: Self) { lhs._value /= rhs._value }
+  
+  init(_ value: Int) { self.init(_Value(value)) }
+  init(_ value: Float) { self.init(_Value(value)) }
+  init(_ value: Double) { self.init(_Value(value)) }
+  init(_ value: Float80) { self.init(_Value(value)) }
+  init(integerLiteral value: _Value.IntegerLiteralType) {
+    self.init(_Value(integerLiteral: value))
+  }
+  init(floatLiteral value: _Value.FloatLiteralType) {
+    self.init(_Value(floatLiteral: value))
+  }
+  init(sign: FloatingPointSign, exponent: _Value.Exponent, significand: Self) {
+    self.init(
+      _Value(sign: sign, exponent: exponent, significand: significand._value))
+  }
+  init(
+    sign: FloatingPointSign,
+    exponentBitPattern: _Value.RawExponent,
+    significandBitPattern: _Value.RawSignificand
+  ) {
+    self.init(
+      _Value(
+        sign: sign,
+        exponentBitPattern: exponentBitPattern,
+        significandBitPattern: significandBitPattern))
+  }
+  
+  var binade: Self { Self(_value.binade) }
+  var exponent: _Value.Exponent { _value.exponent }
+  var exponentBitPattern: _Value.RawExponent { _value.exponentBitPattern }
+  var isCanonical: Bool { _value.isCanonical }
+  var isFinite: Bool { _value.isFinite }
+  var isInfinite: Bool { _value.isInfinite }
+  var isNaN: Bool { _value.isNaN }
+  var isNormal: Bool { _value.isNormal }
+  var isSignalingNaN: Bool { _value.isSignalingNaN }
+  var isSubnormal: Bool { _value.isSubnormal }
+  var isZero: Bool { _value.isZero }
+  var magnitude: Self { Self(_value.magnitude) }
+  var nextDown: Self { Self(_value.nextDown) }
+  var nextUp: Self { Self(_value.nextUp) }
+  var sign: FloatingPointSign { _value.sign }
+  var significand: Self { Self(_value.significand) }
+  var significandBitPattern: _Value.RawSignificand {
+    _value.significandBitPattern
+  }
+  var significandWidth: Int { _value.significandWidth }
+  var ulp: Self { Self(_value.ulp) }
+  
+  mutating func addProduct(_ lhs: Self, _ rhs: Self) {
+    _value.addProduct(lhs._value, rhs._value)
+  }
+  func advanced(by n: _Value.Stride) -> Self { Self(_value.advanced(by: n)) }
+  func distance(to other: Self) -> _Value.Stride {
+    _value.distance(to: other._value)
+  }
+  mutating func formRemainder(dividingBy other: Self) {
+    _value.formRemainder(dividingBy: other._value)
+  }
+  mutating func formSquareRoot() { _value.formSquareRoot() }
+  mutating func formTruncatingRemainder(dividingBy other: Self) {
+    _value.formTruncatingRemainder(dividingBy: other._value)
+  }
+  func isEqual(to other: Self) -> Bool { _value.isEqual(to: other._value) }
+  func isLess(than other: Self) -> Bool { _value.isLess(than: other._value) }
+  func isLessThanOrEqualTo(_ other: Self) -> Bool {
+    _value.isLessThanOrEqualTo(other._value)
+  }
+  mutating func round(_ rule: FloatingPointRoundingRule) { _value.round(rule) }
+}
+
+struct MockFloat64: MockBinaryFloatingPoint {
+  var _value: Double
+  init(_ _value: Double) { self._value = _value }
+}
 
 let doubles = [
    1.8547832857295,  26.321549267719135, 98.9544480962058,    73.70286973782363,
@@ -37,6 +147,8 @@ let doubles = [
   62.60505762081415, 29.57878462599286,  66.06040114311294,   51.709999429326636,
   64.79777579583545, 45.25948795832151,  94.31492354198335,   52.31096166433902,
 ]
+
+let mockFloat64s = doubles.map { MockFloat64($0) }
 
 @inline(__always)
 func convert<
@@ -60,6 +172,16 @@ public func run_ConvertFloatingPoint_GenericDoubleToDouble(_ N: Int) {
   for _ in 0..<(N * 100) {
     for element in doubles {
       let f = convert(identity(element), to: Double.self)
+      blackHole(f)
+    }
+  }
+}
+
+@inline(never)
+public func run_ConvertFloatingPoint_MockFloat64ToDouble(_ N: Int) {
+  for _ in 0..<(N * 100) {
+    for element in mockFloat64s {
+      let f = Double(identity(element))
       blackHole(f)
     }
   }
