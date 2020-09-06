@@ -254,9 +254,6 @@ namespace swift {
     /// Should  we stress ASTScope-based resolution for debugging?
     bool StressASTScopeLookup = false;
 
-    /// Build the ASTScope tree lazily
-    bool LazyASTScopes = true;
-
     /// Whether to enable the new operator decl and precedencegroup lookup
     /// behavior. This is a staging flag, and will be removed in the future.
     bool EnableNewOperatorLookup = false;
