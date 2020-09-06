@@ -25,20 +25,20 @@ protocol Brew { // expected-note {{in declaration of 'Brew'}}
 infix operator %%
 
 struct Bar {
- fisr = 0x5F3759DF // expected-error {{expected 'var' keyword in property declaration}} {{3-3=var }}
+  fisr = 0x5F3759DF // expected-error {{expected 'var' keyword in property declaration}} {{3-3=var }}
 
- %%<T: Brew> (lhs: T, rhs: T) -> T { // expected-error {{expected 'func' keyword in operator function declaration}} {{3-3=func }}
-                                     // expected-error @-1 {{operator '%%' declared in type 'Bar' must be 'static'}}
-                                     // expected-error @-2 {{member operator '%%' must have at least one argument of type 'Bar'}}
-   lhs + lhs + rhs + rhs
- }
+  %%<T: Brew> (lhs: T, rhs: T) -> T { // expected-error {{expected 'func' keyword in operator function declaration}} {{3-3=func }}
+                                      // expected-error @-1 {{operator '%%' declared in type 'Bar' must be 'static'}}
+                                      // expected-error @-2 {{member operator '%%' must have at least one argument of type 'Bar'}}
+    lhs + lhs + rhs + rhs
+  }
 
- _: Int = 42 // expected-error {{expected 'var' keyword in property declaration}} {{3-3=var }}
+  _: Int = 42 // expected-error {{expected 'var' keyword in property declaration}} {{3-3=var }}
              // expected-error @-1 {{property declaration does not bind any variables}}
 
- (light, dark) = (100, 200)// expected-error {{expected 'var' keyword in property declaration}} {{3-3=var }}
+  (light, dark) = (100, 200)// expected-error {{expected 'var' keyword in property declaration}} {{3-3=var }}
 
- a, b: Int // expected-error {{expected 'var' keyword in property declaration}} {{3-3=var }}
+  a, b: Int // expected-error {{expected 'var' keyword in property declaration}} {{3-3=var }}
 }
 
 class Baz {
