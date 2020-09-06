@@ -68,6 +68,36 @@ This very depends on what X is, but some broad guidelines are:
    - Use `grep -i -r "mypattern" .`.
 2. Go through the [Documentation Index](/docs/README.md).
 
+### How do I build the documentation as HTML?
+
+You can build the ReST formatted documentation as HTML using Sphinx. Follow
+[Sphinx's installation instructions][] and check that `sphinx-build` is
+available on your `PATH`:
+
+[Sphinx's installation instructions]: https://www.sphinx-doc.org/en/master/usage/installation.html
+
+```sh
+sphinx-build --version
+```
+
+If that succeeds, you can build the documentation using `make`
+
+```sh
+make -C docs
+```
+
+(Tested with `sphinx-build` version 3.2.1.)
+
+This compiles the `.rst` files in the `docs` directory into HTML in the
+`docs/_build/html` directory.
+
+For the Markdown documentation, you can view the rendered HTML directly on
+GitHub. For example, this file is rendered on GitHub at
+https://github.com/apple/swift/tree/master/docs/HowToGuides/FAQ.md .
+
+HTML documentation for the standard library on Darwin platforms is hosted on the
+[Apple Developer website](https://developer.apple.com/documentation/swift/swift_standard_library).
+
 ## Pull Request Workflow
 
 ### How do I format my changes?
