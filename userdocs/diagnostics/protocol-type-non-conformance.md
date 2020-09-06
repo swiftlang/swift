@@ -54,7 +54,7 @@ Currently, even if a protocol `P` requires no initializers or static members, th
 
 ## Exceptions
 
-The Swift protocol `Error` has no required members and, when used as a type, conforms to itself; `@objc` protocols with no static requirements can also be used as types that conform to themselves.
+When used as a type, the Swift protocol `Error` conforms to itself; `@objc` protocols with no static requirements can also be used as types that conform to themselves.
 
 ## Alternatives
 
