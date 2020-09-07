@@ -306,11 +306,13 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
       options::OPT_emit_module_source_info_path);
   auto ldAddCFileOutput  = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_ldadd_cfile_path);
+  auto moduleSummaryOutput = getSupplementaryFilenamesFromArguments(
+      options::OPT_emit_module_summary_path);
   if (!objCHeaderOutput || !moduleOutput || !moduleDocOutput ||
       !dependenciesFile || !referenceDependenciesFile ||
       !serializedDiagnostics || !fixItsOutput || !loadedModuleTrace || !TBD ||
       !moduleInterfaceOutput || !privateModuleInterfaceOutput ||
-      !moduleSourceInfoOutput || !ldAddCFileOutput) {
+      !moduleSourceInfoOutput || !ldAddCFileOutput || !moduleSummaryOutput) {
     return None;
   }
   std::vector<SupplementaryOutputPaths> result;
@@ -334,6 +336,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
     sop.PrivateModuleInterfaceOutputPath = (*privateModuleInterfaceOutput)[i];
     sop.ModuleSourceInfoOutputPath = (*moduleSourceInfoOutput)[i];
     sop.LdAddCFilePath = (*ldAddCFileOutput)[i];
+    sop.ModuleSummaryOutputPath = (*moduleSummaryOutput)[i];
     result.push_back(sop);
   }
   return result;
@@ -422,6 +425,10 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
       OPT_emit_module_source_info, pathsFromArguments.ModuleSourceInfoOutputPath,
       file_types::TY_SwiftSourceInfoFile, "",
       defaultSupplementaryOutputPathExcludingExtension);
+  auto moduleSummaryOutputPath = determineSupplementaryOutputFilename(
+      OPT_emit_module_summary, pathsFromArguments.ModuleSummaryOutputPath,
+      file_types::TY_SwiftModuleSummaryFile, "",
+      defaultSupplementaryOutputPathExcludingExtension);
 
   // There is no non-path form of -emit-interface-path
   auto ModuleInterfaceOutputPath =
@@ -456,6 +463,7 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.PrivateModuleInterfaceOutputPath = PrivateModuleInterfaceOutputPath;
   sop.ModuleSourceInfoOutputPath = moduleSourceInfoOutputPath;
   sop.LdAddCFilePath = pathsFromArguments.LdAddCFilePath;
+  sop.ModuleSummaryOutputPath = moduleSummaryOutputPath;
   return sop;
 }
 
@@ -537,6 +545,7 @@ createFromTypeToPathMap(const TypeToPathMap *map) {
       {file_types::TY_TBD, paths.TBDPath},
       {file_types::TY_SwiftModuleInterfaceFile,
        paths.ModuleInterfaceOutputPath},
+      {file_types::TY_SwiftModuleSummaryFile, paths.ModuleSummaryOutputPath},
       {file_types::TY_PrivateSwiftModuleInterfaceFile,
        paths.PrivateModuleInterfaceOutputPath}};
   for (const std::pair<file_types::ID, std::string &> &typeAndString :

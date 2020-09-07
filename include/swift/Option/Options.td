@@ -443,6 +443,17 @@ def emit_module_path_EQ : Joined<["-"], "emit-module-path=">,
          ArgumentIsPath, SupplementaryOutput]>,
   Alias<emit_module_path>;
 
+def emit_module_summary :
+  Flag<["-"], "emit-module-summary">,
+  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild,
+         SupplementaryOutput]>,
+  HelpText<"Output module summary file">;
+def emit_module_summary_path :
+  Separate<["-"], "emit-module-summary-path">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
+         ArgumentIsPath, SupplementaryOutput]>,
+  MetaVarName<"<path>">, HelpText<"Output module summary file to <path>">;
+
 def emit_module_interface :
   Flag<["-"], "emit-module-interface">,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild,
