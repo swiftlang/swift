@@ -61,7 +61,9 @@ extension MockBinaryFloatingPoint {
   init(_ value: Int) { self.init(_Value(value)) }
   init(_ value: Float) { self.init(_Value(value)) }
   init(_ value: Double) { self.init(_Value(value)) }
-  init(_ value: Float80) { self.init(_Value(value)) }
+  #if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+    init(_ value: Float80) { self.init(_Value(value)) }
+  #endif
   init(integerLiteral value: _Value.IntegerLiteralType) {
     self.init(_Value(integerLiteral: value))
   }
