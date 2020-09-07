@@ -8,11 +8,10 @@ The commands below (with the exception of installing Visual Studio) must be ente
 
 ### Visual Studio
 
-An easy way to get most of the tools to build Swift is using the [Visual Studio installer](https://www.visualstudio.com/downloads/). This command installs all needed Visual Studio components as well as Python and Git:
+An easy way to get most of the tools to build Swift is using the [Visual Studio installer](https://www.visualstudio.com/downloads/). This command installs all needed Visual Studio components as well as Python, Git, CMake and Ninja:
 
 ```
 vs_community ^
-  --add Component.CPython2.x86 ^
   --add Component.CPython3.x64 ^
   --add Microsoft.VisualStudio.Component.Git ^
   --add Microsoft.VisualStudio.Component.VC.ATL ^
@@ -28,13 +27,7 @@ The following [link](https://docs.microsoft.com/visualstudio/install/workload-co
 
 ### Python
 
-The command above already installs Python 2 and 3. Alternatively, in the Visual Studio installation program, under *Individual Components*
-
-1. Install *Python 2*, either the 32-bit version (C:\Python27\\) or the 64-bit version (C:\Python27amd64\\)
-
-   **Note:** If you install the 64-bit version only, you will need to adjust `PYTHON_EXECUTABLE` below to `C:\Python27amd64\python.exe`
-
-2. Install *Python 3 64 bits (3.7.x)*
+The command above already installs Python 3. Alternatively, in the Visual Studio installation program, under *Individual Components*, install *Python 3 64 bits (3.7.x)*.
 
 If you are building a debug version of Swift, you should also install the Python debug binaries.
 
@@ -137,9 +130,6 @@ cmake -B "S:\b\toolchain" ^
 ninja -C S:\b\toolchain
 ```
 
-**Note:** If you installed only the 64-bit version of Python, you will need to adjust `PYTHON_EXECUTABLE` argument to `C:\Python27amd64\python.exe`
-
-
 ## Running Swift tests on Windows
 
 ```cmd
@@ -176,7 +166,7 @@ path S:\b\foundation\Foundation;%PATH%
 ## Build swift-corelibs-xctest
 
 ```cmd
-cmake -B S:\b\xctest -D CMAKE_BUILD_TYPE=RelWithDebInfo -D CMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -D dispatch_DIR=S:\b\dispatch\cmake\modules -D Foundation_DIR=S:\b\foundation\cmake\modules -D LIT_COMMAND=S:\toolchain\llvm\utils\lit\lit.py -D PYTHON_EXECUTABLE=C:\Python27\python.exe -G Ninja -S S:\swift-corelibs-xctest
+cmake -B S:\b\xctest -D CMAKE_BUILD_TYPE=RelWithDebInfo -D CMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -D dispatch_DIR=S:\b\dispatch\cmake\modules -D Foundation_DIR=S:\b\foundation\cmake\modules -D LIT_COMMAND=S:\toolchain\llvm\utils\lit\lit.py -G Ninja -S S:\swift-corelibs-xctest
 ninja -C S:\b\xctest
 ```
 
