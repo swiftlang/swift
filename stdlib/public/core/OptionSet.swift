@@ -277,7 +277,7 @@ extension OptionSet where Element == Self {
   ///     let expressOption = options.remove(.express)
   ///     print(expressOption == .express)
   ///     // Prints "false"
-  ///     print(expressOption == .secondDay)
+  ///     print(expressOption == nil)
   ///     // Prints "true"
   ///
   /// - Parameter member: The element of the set to remove.
