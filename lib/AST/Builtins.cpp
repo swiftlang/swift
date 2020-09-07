@@ -1158,7 +1158,6 @@ static ValueDecl *getDifferentiableFunctionConstructor(
   BuiltinFunctionBuilder::LambdaGenerator origFnGen {
     [=, &fnArgGens, &Context](BuiltinFunctionBuilder &builder) -> Type {
       SmallVector<FunctionType::Param, 2> params;
-      auto throwsType = throws ? Context.getErrorDecl()->getInterfaceType() : Context.getNeverType();
       for (auto &paramGen : fnArgGens)
         params.push_back(FunctionType::Param(paramGen.build(builder)));
       return FunctionType::get(params, origResultGen.build(builder),
@@ -1269,7 +1268,6 @@ static ValueDecl *getLinearFunctionConstructor(
   BuiltinFunctionBuilder::LambdaGenerator origFnGen {
     [=, &fnArgGens, &Context](BuiltinFunctionBuilder &builder) -> Type {
       SmallVector<FunctionType::Param, 2> params;
-      auto throwsType = throws ? Context.getErrorDecl()->getInterfaceType() : Context.getNeverType();
       for (auto &paramGen : fnArgGens)
         params.push_back(FunctionType::Param(paramGen.build(builder)));
       return FunctionType::get(params, origResultGen.build(builder),

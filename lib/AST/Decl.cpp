@@ -2678,9 +2678,6 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
     ctx, funcTy->getResult(), topLevelFunction, false, isInitializer,
     curryLevels - 1);
 
-  // Map the throws type.
-  auto throwsTy = mapSignatureParamType(ctx, funcTy->getThrowsType());
-
 
   // Map various attributes differently depending on if we're looking at
   // the declaration, or a function parameter type.

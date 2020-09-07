@@ -5115,7 +5115,7 @@ public:
     if (auto *fnTy = ty->getAs<AnyFunctionType>()) {
       auto &ctx = Builder.getASTContext();
       auto *errorProtocol = ctx.getProtocol(KnownProtocolKind::Error);
-      if (errorProtocol && fnTy->isAsync()) {
+      if (errorProtocol && fnTy->isThrowing()) {
         auto addConformanceContraint = [&](Type type, ProtocolDecl *protocol) {
           Requirement req(RequirementKind::Conformance, type,
                           protocol->TypeDecl::getDeclaredInterfaceType());

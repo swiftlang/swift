@@ -4091,7 +4091,6 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
   unsigned numParameterLists = constant.getParameterListCount();
   auto throwsTy = fnType->getThrowsType()->getCanonicalType();
 
-  auto throwsTy = fnType->getThrowsType()->getCanonicalType();
 
   // Form an abstraction pattern for bridging purposes.
   AbstractionPattern bridgingFnPattern =

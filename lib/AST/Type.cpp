@@ -4715,11 +4715,6 @@ case TypeKind::Id:
     if (resultTy.getPointer() != function->getResult().getPointer())
       isUnchanged = false;
 
-    // Transform throws type.
-    auto throwsTy = function->getThrowsType().transformRec(fn);
-    if (!throwsTy)
-      return Type();
-
     if (throwsTy.getPointer() != function->getThrowsType().getPointer())
       isUnchanged = false;
 

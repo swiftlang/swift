@@ -2705,7 +2705,6 @@ END_CAN_TYPE_WRAPPER(DynamicSelfType, Type)
 class AnyFunctionType : public TypeBase {
   const Type ThrowsType;
   const Type Output;
-  const Type ThrowsType;
   
 public:
   using Representation = FunctionTypeRepresentation;
