@@ -443,15 +443,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
   
   Opts.DisableParserLookup |= Args.hasArg(OPT_disable_parser_lookup);
-  Opts.EnableASTScopeLookup =
-      Args.hasFlag(options::OPT_enable_astscope_lookup,
-                   options::OPT_disable_astscope_lookup, Opts.EnableASTScopeLookup) ||
-      Opts.DisableParserLookup;
-  Opts.CrosscheckUnqualifiedLookup |=
-      Args.hasArg(OPT_crosscheck_unqualified_lookup);
   Opts.StressASTScopeLookup |= Args.hasArg(OPT_stress_astscope_lookup);
-  Opts.WarnIfASTScopeLookup |= Args.hasArg(OPT_warn_if_astscope_lookup);
-  Opts.LazyASTScopes |= Args.hasArg(OPT_lazy_astscopes);
   Opts.EnableNewOperatorLookup = Args.hasFlag(OPT_enable_new_operator_lookup,
                                               OPT_disable_new_operator_lookup,
                                               /*default*/ false);

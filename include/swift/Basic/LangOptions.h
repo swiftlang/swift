@@ -248,27 +248,11 @@ namespace swift {
     /// This is a staging flag; eventually it will be removed.
     bool EnableDeserializationRecovery = true;
 
-    /// Should we use \c ASTScope-based resolution for unqualified name lookup?
-    /// Default is in \c ParseLangArgs
-    ///
-    /// This is a staging flag; eventually it will be removed.
-    bool EnableASTScopeLookup = true;
-
     /// Someday, ASTScopeLookup will supplant lookup in the parser
     bool DisableParserLookup = false;
 
-    /// Should  we compare to ASTScope-based resolution for debugging?
-    bool CrosscheckUnqualifiedLookup = false;
-
     /// Should  we stress ASTScope-based resolution for debugging?
     bool StressASTScopeLookup = false;
-
-    /// Since some tests fail if the warning is output, use a flag to decide
-    /// whether it is. The warning is useful for testing.
-    bool WarnIfASTScopeLookup = false;
-
-    /// Build the ASTScope tree lazily
-    bool LazyASTScopes = true;
 
     /// Whether to enable the new operator decl and precedencegroup lookup
     /// behavior. This is a staging flag, and will be removed in the future.

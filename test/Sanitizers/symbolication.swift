@@ -5,6 +5,8 @@
 // REQUIRES: asan_runtime
 // REQUIRES: VENDOR=apple
 
+// REQUIRES: rdar68353068
+
 // Check that Sanitizer reports are properly symbolicated on Apple platforms,
 // both out-of-process (via `atos`) and when falling back to in-process
 // symbolication.  Note that `atos` also demangles Swift symbol names.

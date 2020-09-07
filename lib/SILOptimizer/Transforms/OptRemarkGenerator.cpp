@@ -62,6 +62,7 @@ struct ValueToDeclInferrer {
 
   RCIdentityFunctionInfo &rcfi;
   SmallVector<std::pair<SILType, Projection>, 32> accessPath;
+  SmallVector<Operand *, 32> rcIdenticalSecondaryUseSearch;
 
   ValueToDeclInferrer(RCIdentityFunctionInfo &rcfi) : rcfi(rcfi) {}
 
@@ -70,17 +71,74 @@ struct ValueToDeclInferrer {
   bool infer(ArgumentKeyKind keyKind, SILValue value,
              SmallVectorImpl<Argument> &resultingInferredDecls);
 
-  /// Print out a note to \p stream that beings at decl and then consumes the
-  /// accessPath we computed for decl producing a segmented access path, e.x.:
-  /// "of 'x.lhs.ivar'".
-  void printNote(llvm::raw_string_ostream &stream, const ValueDecl *decl);
+  /// Print out a note to \p stream that beings at decl and then if
+  /// useProjectionPath is set to true iterates the accessPath we computed for
+  /// decl producing a segmented access path, e.x.: "of 'x.lhs.ivar'".
+  ///
+  /// The reason why one may not want to emit a projection path note here is if
+  /// one found an debug_value on a value that is rc-identical to the actual
+  /// value associated with the current projection path. Consider the following
+  /// SIL:
+  ///
+  ///    struct KlassPair {
+  ///      var lhs: Klass
+  ///      var rhs: Klass
+  ///    }
+  ///
+  ///    struct StateWithOwningPointer {
+  ///      var state: TrivialState
+  ///      var owningPtr: Klass
+  ///    }
+  ///
+  ///    sil @theFunction : $@convention(thin) () -> () {
+  ///    bb0:
+  ///      %0 = apply %getKlassPair() : $@convention(thin) () -> @owned KlassPair
+  ///      // This debug_value's name can be combined...
+  ///      debug_value %0 : $KlassPair, name "myPair"
+  ///      // ... with the access path from the struct_extract here...
+  ///      %1 = struct_extract %0 : $KlassPair, #KlassPair.lhs
+  ///      // ... to emit a nice diagnostic that 'myPair.lhs' is being retained.
+  ///      strong_retain %1 : $Klass
+  ///
+  ///      // In contrast in this case, we rely on looking through rc-identity
+  ///      // uses to find the debug_value. In this case, the source info
+  ///      // associated with the debug_value (%2) is no longer associated with
+  ///      // the underlying access path we have been tracking upwards (%1 is in
+  ///      // our access path list). Instead, we know that the debug_value is
+  ///      // rc-identical to whatever value we were originally tracking up (%1)
+  ///      // and thus the correct identifier to use is the direct name of the
+  ///      // identifier alone since that source identifier must be some value
+  ///      // in the source that by itself is rc-identical to whatever is being
+  ///      // manipulated.
+  ///      //
+  ///      // The reason why we must do this is due to the behavior of the late
+  ///      // optimizer and how it forms these patterns in the code.
+  ///      %0a = apply %getStateWithOwningPointer() : $@convention(thin) () -> @owned StateWithOwningPointer
+  ///      %1 = struct_extract %0a : $StateWithOwningPointer, #StateWithOwningPointer.owningPtr
+  ///      strong_retain %1 : $Klass
+  ///      %2 = struct $Array(%0 : $Builtin.NativeObject, ...)
+  ///      debug_value %2 : $Array, ...
+  ///    }
+  void printNote(llvm::raw_string_ostream &stream, StringRef name,
+                 bool shouldPrintAccessPath = true);
 
-  void printProjectionPath(llvm::raw_string_ostream &stream);
+  /// Convenience overload that calls:
+  ///
+  ///   printNote(stream, decl->getBaseName().userFacingName(), shouldPrintAccessPath).
+  void printNote(llvm::raw_string_ostream &stream, const ValueDecl *decl,
+                 bool shouldPrintAccessPath = true) {
+    printNote(stream, decl->getBaseName().userFacingName(),
+              shouldPrintAccessPath);
+  }
+
+  /// Print out non-destructively the current access path we have found to
+  /// stream.
+  void printAccessPath(llvm::raw_string_ostream &stream);
 };
 
 } // anonymous namespace
 
-void ValueToDeclInferrer::printProjectionPath(llvm::raw_string_ostream &stream) {
+void ValueToDeclInferrer::printAccessPath(llvm::raw_string_ostream &stream) {
   for (auto &pair : accessPath) {
     auto baseType = pair.first;
     auto &proj = pair.second;
@@ -120,11 +178,11 @@ void ValueToDeclInferrer::printProjectionPath(llvm::raw_string_ostream &stream) 
 }
 
 void ValueToDeclInferrer::printNote(llvm::raw_string_ostream &stream,
-                                    const ValueDecl *decl) {
-  assert(decl &&
-         "We assume for now that this is always called with a non-null decl");
-  stream << "of '" << decl->getBaseName();
-  printProjectionPath(stream);
+                                    StringRef name,
+                                    bool shouldPrintAccessPath) {
+  stream << "of '" << name;
+  if (shouldPrintAccessPath)
+    printAccessPath(stream);
   stream << "'";
 }
 
@@ -161,6 +219,7 @@ bool ValueToDeclInferrer::infer(
   SWIFT_DEFER {
     accessPath.clear();
   };
+  SmallPtrSet<SILInstruction *, 8> visitedDebugValueInsts;
 
   // This is a linear IR traversal using a 'falling while loop'. That means
   // every time through the loop we are trying to handle a case before we hit
@@ -233,62 +292,77 @@ bool ValueToDeclInferrer::infer(
       }
     }
 
-    // Then visit our users and see if we can find a debug_value that provides
-    // us with a decl we can use to construct an argument.
+    // Then visit our users (ignoring rc identical transformations) and see if
+    // we can find a debug_value that provides us with a decl we can use to
+    // construct an argument.
+    //
+    // The reason why we do this is that sometimes we reform a struct from its
+    // constituant parts and then construct the debug_value from that. For
+    // instance, if we FSOed.
     bool foundDeclFromUse = false;
-    for (auto *use : value->getUses()) {
+    rcfi.visitRCUses(value, [&](Operand *use) {
       // Skip type dependent uses.
       if (use->isTypeDependent())
-        continue;
+        return;
 
-      if (auto *dvi = dyn_cast<DebugValueInst>(use->getUser())) {
-        // Check if our debug_value has a decl and was not inlined into the
-        // current function.
-        if (hasNonInlinedDebugScope(dvi)) {
-          if (auto *decl = dvi->getDecl()) {
-            std::string msg;
-            {
-              llvm::raw_string_ostream stream(msg);
-              printNote(stream, decl);
-            }
-            resultingInferredDecls.emplace_back(
-                OptRemark::ArgumentKey{keyKind, "InferredValue"},
-                std::move(msg), decl);
-            foundDeclFromUse = true;
-          } else {
-            // If we did not have a decl, see if we were asked for testing
-            // purposes to use SILDebugInfo to create a placeholder inferred
-            // value.
-            if (DecllessDebugValueUseSILDebugInfo) {
-              if (auto varInfo = dvi->getVarInfo()) {
-                auto name = varInfo->Name;
-                if (!name.empty()) {
-                  std::string msg;
-                  {
-                    llvm::raw_string_ostream stream(msg);
-                    stream << "of '" << name;
-                    printProjectionPath(stream);
-                    stream << "'";
-                  }
-                  resultingInferredDecls.push_back(
-                      Argument({keyKind, "InferredValue"},
-                               std::move(msg),
-                               dvi->getLoc()));
-                  foundDeclFromUse = true;
-                }
-              }
-            }
-          }
+      // Then see if we have a debug_value that is associated with a non-inlined
+      // debug scope. Such an instruction is an instruction that is from the
+      // current function.
+      auto *dvi = dyn_cast<DebugValueInst>(use->getUser());
+      if (!dvi || !hasNonInlinedDebugScope(dvi))
+        return;
+
+      // See if we have already inferred this debug_value as a potential source
+      // for this instruction. In such a case, just return.
+      if (!visitedDebugValueInsts.insert(dvi).second)
+        return;
+
+      if (auto *decl = dvi->getDecl()) {
+        std::string msg;
+        {
+          llvm::raw_string_ostream stream(msg);
+          // If we are not a top level use, we must be a rc-identical transitive
+          // use. In such a case, we just print out the rc identical value
+          // without a projection path. This is because we now have a better
+          // name and the name is rc-identical to whatever was at the end of the
+          // projection path but is not at the end of that projection path.
+          printNote(stream, decl,
+                    use->get() == value /*print projection path*/);
         }
+        resultingInferredDecls.emplace_back(
+            OptRemark::ArgumentKey{keyKind, "InferredValue"}, std::move(msg),
+            decl);
+        foundDeclFromUse = true;
+        return;
       }
-    }
 
-    // At this point, we could not infer any argument. See if we can look
-    // through loads.
-    //
-    // TODO: Add GEPs to construct a ProjectionPath.
+      // If we did not have a decl, see if we were asked for testing
+      // purposes to use SILDebugInfo to create a placeholder inferred
+      // value.
+      if (!DecllessDebugValueUseSILDebugInfo)
+        return;
 
-    // Finally, see if we can look through a load...
+      auto varInfo = dvi->getVarInfo();
+      if (!varInfo)
+        return;
+
+      auto name = varInfo->Name;
+      if (name.empty())
+        return;
+
+      std::string msg;
+      {
+        llvm::raw_string_ostream stream(msg);
+        printNote(stream, name, use->get() == value /*print projection path*/);
+      }
+      resultingInferredDecls.push_back(
+          Argument({keyKind, "InferredValue"}, std::move(msg), dvi->getLoc()));
+      foundDeclFromUse = true;
+    });
+
+    // At this point, we could not infer any argument. See if we can look up the
+    // def-use graph and come up with a good location after looking through
+    // loads and projections.
     if (auto *li = dyn_cast<LoadInst>(value)) {
       value = stripAccessMarkers(li->getOperand());
       continue;
@@ -305,7 +379,8 @@ bool ValueToDeclInferrer::infer(
     // TODO: We could emit at this point a msg for temporary allocations.
 
     // If we reached this point, we finished falling through the loop and return
-    // true.
+    // if we found any decls from uses. We always process everything so we /can/
+    // potentially emit multiple diagnostics.
     return foundDeclFromUse;
   }
 }
@@ -350,10 +425,11 @@ void OptRemarkGeneratorInstructionVisitor::visitStrongRetainInst(
     (void)foundArgs;
 
     // Retains begin a lifetime scope so we infer scan forward.
-    auto remark = RemarkMissed("memory", *sri,
-                               SourceLocInferenceBehavior::ForwardScanOnly)
-                  << "retain of type '"
-                  << NV("ValueType", sri->getOperand()->getType()) << "'";
+    auto remark =
+        RemarkMissed("memory", *sri,
+                     SourceLocInferenceBehavior::ForwardScanAlwaysInfer)
+        << "retain of type '" << NV("ValueType", sri->getOperand()->getType())
+        << "'";
     for (auto arg : inferredArgs) {
       remark << arg;
     }
@@ -371,10 +447,11 @@ void OptRemarkGeneratorInstructionVisitor::visitStrongReleaseInst(
                                                sri->getOperand(), inferredArgs);
     (void)foundArgs;
 
-    auto remark = RemarkMissed("memory", *sri,
-                               SourceLocInferenceBehavior::BackwardScanOnly)
-                  << "release of type '"
-                  << NV("ValueType", sri->getOperand()->getType()) << "'";
+    auto remark =
+        RemarkMissed("memory", *sri,
+                     SourceLocInferenceBehavior::BackwardScanAlwaysInfer)
+        << "release of type '" << NV("ValueType", sri->getOperand()->getType())
+        << "'";
     for (auto arg : inferredArgs) {
       remark << arg;
     }
@@ -391,10 +468,11 @@ void OptRemarkGeneratorInstructionVisitor::visitRetainValueInst(
                                                rvi->getOperand(), inferredArgs);
     (void)foundArgs;
     // Retains begin a lifetime scope, so we infer scan forwards.
-    auto remark = RemarkMissed("memory", *rvi,
-                               SourceLocInferenceBehavior::ForwardScanOnly)
-                  << "retain of type '"
-                  << NV("ValueType", rvi->getOperand()->getType()) << "'";
+    auto remark =
+        RemarkMissed("memory", *rvi,
+                     SourceLocInferenceBehavior::ForwardScanAlwaysInfer)
+        << "retain of type '" << NV("ValueType", rvi->getOperand()->getType())
+        << "'";
     for (auto arg : inferredArgs) {
       remark << arg;
     }
@@ -412,10 +490,11 @@ void OptRemarkGeneratorInstructionVisitor::visitReleaseValueInst(
     (void)foundArgs;
 
     // Releases end a lifetime scope so we infer scan backward.
-    auto remark = RemarkMissed("memory", *rvi,
-                               SourceLocInferenceBehavior::BackwardScanOnly)
-                  << "release of type '"
-                  << NV("ValueType", rvi->getOperand()->getType()) << "'";
+    auto remark =
+        RemarkMissed("memory", *rvi,
+                     SourceLocInferenceBehavior::BackwardScanAlwaysInfer)
+        << "release of type '" << NV("ValueType", rvi->getOperand()->getType())
+        << "'";
     for (auto arg : inferredArgs) {
       remark << arg;
     }
@@ -433,8 +512,7 @@ void OptRemarkGeneratorInstructionVisitor::visitAllocRefInst(
           valueToDeclInferrer.infer(ArgumentKeyKind::Note, ari, inferredArgs);
       (void)foundArgs;
       auto resultRemark =
-          RemarkPassed("memory", *ari,
-                       SourceLocInferenceBehavior::ForwardScanOnly)
+          RemarkPassed("memory", *ari, SourceLocInferenceBehavior::ForwardScan)
           << "stack allocated ref of type '" << NV("ValueType", ari->getType())
           << "'";
       for (auto &arg : inferredArgs)
@@ -451,8 +529,7 @@ void OptRemarkGeneratorInstructionVisitor::visitAllocRefInst(
     (void)foundArgs;
 
     auto resultRemark =
-        RemarkMissed("memory", *ari,
-                     SourceLocInferenceBehavior::ForwardScanOnly)
+        RemarkMissed("memory", *ari, SourceLocInferenceBehavior::ForwardScan)
         << "heap allocated ref of type '" << NV("ValueType", ari->getType())
         << "'";
     for (auto &arg : inferredArgs)
@@ -471,8 +548,7 @@ void OptRemarkGeneratorInstructionVisitor::visitAllocBoxInst(
     (void)foundArgs;
 
     auto resultRemark =
-        RemarkMissed("memory", *abi,
-                     SourceLocInferenceBehavior::ForwardScanOnly)
+        RemarkMissed("memory", *abi, SourceLocInferenceBehavior::ForwardScan)
         << "heap allocated box of type '" << NV("ValueType", abi->getType())
         << "'";
     for (auto &arg : inferredArgs)

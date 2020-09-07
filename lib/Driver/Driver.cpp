@@ -1990,6 +1990,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_BitstreamOptRecord:
       case file_types::TY_SwiftModuleInterfaceFile:
       case file_types::TY_PrivateSwiftModuleInterfaceFile:
+      case file_types::TY_SwiftModuleSummaryFile:
       case file_types::TY_SwiftCrossImportDir:
       case file_types::TY_SwiftOverlayFile:
       case file_types::TY_JSONDependencies:
@@ -2841,6 +2842,10 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
                                       Output.get());
   }
 
+  if (isa<CompileJobAction>(JA)) {
+    chooseModuleSummaryPath(C, OutputMap, workingDirectory, Buf, Output.get());
+  }
+
   if (isa<MergeModuleJobAction>(JA) ||
       (isa<CompileJobAction>(JA) &&
        OI.CompilerMode == OutputInfo::Mode::SingleCompile)) {
@@ -3192,6 +3197,22 @@ void Driver::chooseModuleInterfacePath(Compilation &C, const JobAction *JA,
       C.getOutputInfo(), C.getArgs(), pathOpt, fileType,
       /*TreatAsTopLevelOutput*/true, workingDirectory, buffer);
   output->setAdditionalOutputForType(fileType, outputPath);
+}
+
+void Driver::chooseModuleSummaryPath(Compilation &C,
+                                     const TypeToPathMap *OutputMap,
+                                     StringRef workingDirectory,
+                                     llvm::SmallString<128> &Buf,
+                                     CommandOutput *Output) const {
+  StringRef pathFromArgs;
+  if (const Arg *A =
+          C.getArgs().getLastArg(options::OPT_emit_module_summary_path)) {
+    pathFromArgs = A->getValue();
+  }
+
+  addAuxiliaryOutput(C, *Output, file_types::TY_SwiftModuleSummaryFile,
+                     OutputMap, workingDirectory, pathFromArgs,
+                     /*requireArg=*/options::OPT_emit_module_summary);
 }
 
 void Driver::chooseSerializedDiagnosticsPath(Compilation &C,
