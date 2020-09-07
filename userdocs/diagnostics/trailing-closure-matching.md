@@ -16,7 +16,7 @@ animate(withDuration: 0.3) /* `animate:` is unwritten. */ {
 }
 ```
 
-Sometimes, an unlabeled trailing closure argument can be matched to more than one function parameter. Before Swift 5.3, the compiler would use a __backward scanning rule__ to match the unlabeled trailing closure, scanning backwards from the end of the parameter list until the first parameter that can accept a closure argument (a function type, unconstrained generic type, `Any`, etc.):
+Sometimes, an unlabeled trailing closure argument can be matched to more than one function parameter. Before Swift 5.3, the compiler would use a __backward scanning rule__ to match the unlabeled trailing closure, scanning backwards from the end of the parameter list until finding a parameter that can accept a closure argument (a function type, unconstrained generic type, `Any`, etc.):
 
 ```swift
 animate(withDuration: 0.3) {
@@ -28,7 +28,7 @@ animate(withDuration: 0.3) {
 
 We encounter a compiler error in this example because the backward scanning rule matches the trailing closure to the `completion` parameter instead of the `animations` parameter, even though `completion` has a default value while `animations` does not.
 
-Swift 5.3 introduces a new __forward scanning rule__, which matches trailing closures to function parameters from left to right. This leads to more predictable and easy-to-understand behavior in many situations. With the new rule, the unlabeled closure in the example above is matched to the `animations` parameter, just as most users would expect:
+Swift 5.3 introduces a new __forward scanning rule__, which matches trailing closures to function parameters from left to right (after matching non-trailing arguments). This leads to more predictable and easy-to-understand behavior in many situations. With the new rule, the unlabeled closure in the example above is matched to the `animations` parameter, just as most users would expect:
 
 ```swift
 animate(withDuration: 0.3) {
