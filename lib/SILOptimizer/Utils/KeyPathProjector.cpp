@@ -233,7 +233,22 @@ public:
       assert(getter->getConventions().getNumSILArguments());
       
       auto ref = builder.createFunctionRef(loc, getter);
-      builder.createApply(loc, ref, subs, {addr, parentValue});
+
+      std::vector<SILValue> args{addr, parentValue};
+      // FIXME(wasm): For wasm, KeyPath getter always take indices parameter
+      // to match callee and caller signature. So need to pass stub pointer.
+      // See also: getOrCreateKeyPathSetter and getOrCreateKeyPathGetter
+      if (builder.getASTContext().LangOpts.Target.isOSBinFormatWasm()) {
+        auto IntTy = SILType::getBuiltinIntegerType(32, builder.getASTContext());
+        auto UnsafeRawPointerTy = SILType::getRawPointerType(builder.getASTContext());
+        auto zeroVal = SILValue(builder.createIntegerLiteral(loc, IntTy, 0));
+        auto stackBuffer = SILValue(builder.createAllocStack(loc, IntTy));
+        builder.createStore(loc, zeroVal, stackBuffer, StoreOwnershipQualifier::Unqualified);
+        auto nonePointer = builder.createUncheckedAddrCast(loc, stackBuffer, UnsafeRawPointerTy);
+        args.push_back(SILValue(nonePointer));
+      }
+
+      builder.createApply(loc, ref, subs, args);
       
       // If we were previously accessing a class member, we're done now.
       insertEndAccess(beginAccess, builder);
