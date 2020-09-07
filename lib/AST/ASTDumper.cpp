@@ -18,6 +18,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
@@ -953,6 +954,16 @@ namespace {
       if (!D->getCaptureInfo().isTrivial()) {
         OS << " ";
         D->getCaptureInfo().print(OS);
+      }
+
+      if (auto fac = D->getForeignAsyncConvention()) {
+        OS << " foreign_async=";
+        if (auto type = fac->completionHandlerType())
+          type.print(OS);
+        OS << ",completion_handler_param="
+           << fac->completionHandlerParamIndex();
+        if (auto errorParamIndex = fac->completionHandlerErrorParamIndex())
+          OS << ",error_param=" << *errorParamIndex;
       }
 
       if (auto fec = D->getForeignErrorConvention()) {

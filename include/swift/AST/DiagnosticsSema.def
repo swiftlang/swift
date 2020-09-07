@@ -1384,6 +1384,8 @@ ERROR(cdecl_empty_name,none,
       "@_cdecl symbol name cannot be empty", ())
 ERROR(cdecl_throws,none,
       "raising errors from @_cdecl functions is not supported", ())
+ERROR(cdecl_async,none,
+      "@_cdecl functions cannot be asynchronous", ())
 
 ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))
@@ -4116,6 +4118,17 @@ ERROR(asynchandler_inout_parameter,none,
 ERROR(asynchandler_mutating,none,
       "'@asyncHandler' function cannot be 'mutating'",
       ())
+
+ERROR(objc_ambiguous_async_convention,none,
+      "%0 overrides or implements protocol requirements for Objective-C "
+      "declarations with incompatible async conventions",
+      (DeclName))
+NOTE(objc_ambiguous_async_convention_candidate,none,
+     "%0 provides async here", (DeclName))
+
+ERROR(satisfy_async_objc,none,
+      "satisfying an asychronous @objc %select{method|initializer}0 with "
+      "a synchronous %select{method|initializer}0 is not supported", (bool))
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Types
