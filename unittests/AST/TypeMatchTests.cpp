@@ -30,10 +30,10 @@ TEST(TypeMatch, IdenticalTypes) {
   EXPECT_TRUE(check(C.Ctx.TheEmptyTupleType));
   EXPECT_TRUE(check(C.Ctx.TheRawPointerType));
 
-  Type voidToVoidFn = FunctionType::get({}, C.Ctx.TheEmptyTupleType);
+  Type voidToVoidFn = FunctionType::get({}, C.Ctx.TheEmptyTupleType, C.Ctx.getNeverType());
   EXPECT_TRUE(check(voidToVoidFn));
 
-  Type ptrToPtrFn = FunctionType::get({}, C.Ctx.TheRawPointerType);
+  Type ptrToPtrFn = FunctionType::get({}, C.Ctx.TheRawPointerType, C.Ctx.getNeverType());
   EXPECT_TRUE(check(ptrToPtrFn));
 
   auto *someStruct = C.makeNominal<StructDecl>("MyStruct");
@@ -41,7 +41,7 @@ TEST(TypeMatch, IdenticalTypes) {
   EXPECT_TRUE(check(structTy));
 
   Type structToStructFn = FunctionType::get(
-      {FunctionType::Param(structTy)}, structTy);
+      {FunctionType::Param(structTy)}, structTy, C.Ctx.getNeverType());
   EXPECT_TRUE(check(structToStructFn));
 }
 
@@ -56,11 +56,11 @@ TEST(TypeMatch, UnrelatedTypes) {
   EXPECT_FALSE(check(C.Ctx.TheEmptyTupleType, C.Ctx.TheRawPointerType));
   EXPECT_FALSE(check(C.Ctx.TheRawPointerType, C.Ctx.TheEmptyTupleType));
 
-  Type voidToVoidFn = FunctionType::get({}, C.Ctx.TheEmptyTupleType);
+  Type voidToVoidFn = FunctionType::get({}, C.Ctx.TheEmptyTupleType, C.Ctx.getNeverType());
   EXPECT_FALSE(check(voidToVoidFn, C.Ctx.TheEmptyTupleType));
   EXPECT_FALSE(check(C.Ctx.TheEmptyTupleType, voidToVoidFn));
 
-  Type ptrToPtrFn = FunctionType::get({}, C.Ctx.TheRawPointerType);
+  Type ptrToPtrFn = FunctionType::get({}, C.Ctx.TheRawPointerType, C.Ctx.getNeverType());
   EXPECT_FALSE(check(ptrToPtrFn, voidToVoidFn));
   EXPECT_FALSE(check(voidToVoidFn, ptrToPtrFn));
 
@@ -72,7 +72,7 @@ TEST(TypeMatch, UnrelatedTypes) {
   EXPECT_FALSE(check(voidToVoidFn, structTy));
 
   Type structToStructFn = FunctionType::get(
-      FunctionType::Param(structTy), structTy);
+      FunctionType::Param(structTy), structTy, C.Ctx.getNeverType());
   EXPECT_FALSE(check(structToStructFn, structTy));
   EXPECT_FALSE(check(structTy, structToStructFn));
   EXPECT_FALSE(check(structToStructFn, voidToVoidFn));
@@ -85,13 +85,15 @@ TEST(TypeMatch, UnrelatedTypes) {
 
   Type anotherStructToAnotherStructFn = FunctionType::get(
       FunctionType::Param(anotherStructTy),
-      anotherStructTy);
+      anotherStructTy,
+      C.Ctx.getNeverType());
   EXPECT_FALSE(check(anotherStructToAnotherStructFn, structToStructFn));
   EXPECT_FALSE(check(structToStructFn, anotherStructToAnotherStructFn));
 
   Type S2ASFn = FunctionType::get(
       FunctionType::Param(structTy),
-      anotherStructTy);
+      anotherStructTy,
+      C.Ctx.getNeverType());
   EXPECT_FALSE(check(S2ASFn, structToStructFn));
   EXPECT_FALSE(check(structToStructFn, S2ASFn));
   EXPECT_FALSE(check(S2ASFn, anotherStructToAnotherStructFn));
@@ -125,22 +127,24 @@ TEST(TypeMatch, Classes) {
 
   Type baseToVoid = FunctionType::get(
       FunctionType::Param(baseTy),
-      C.Ctx.TheEmptyTupleType);
+      C.Ctx.TheEmptyTupleType,
+      C.Ctx.getNeverType());
   Type subToVoid = FunctionType::get(
       FunctionType::Param(subTy),
-      C.Ctx.TheEmptyTupleType);
+      C.Ctx.TheEmptyTupleType,
+      C.Ctx.getNeverType());
   EXPECT_FALSE(check(baseToVoid, subToVoid));
   EXPECT_TRUE(check(subToVoid, baseToVoid));
 
-  Type voidToBase = FunctionType::get({}, baseTy);
-  Type voidToSub = FunctionType::get({}, subTy);
+  Type voidToBase = FunctionType::get({}, baseTy, C.Ctx.getNeverType());
+  Type voidToSub = FunctionType::get({}, subTy, C.Ctx.getNeverType());
   EXPECT_FALSE(check(voidToSub, voidToBase));
   EXPECT_TRUE(check(voidToBase, voidToSub));
 
   Type baseToBase = FunctionType::get(
-      FunctionType::Param(baseTy), baseTy);
+      FunctionType::Param(baseTy), baseTy, C.Ctx.getNeverType());
   Type subToSub = FunctionType::get(
-      FunctionType::Param(subTy), subTy);
+      FunctionType::Param(subTy), subTy, C.Ctx.getNeverType());
   EXPECT_FALSE(check(baseToBase, subToSub));
   EXPECT_FALSE(check(subToSub, baseToBase));
 }
@@ -162,24 +166,26 @@ TEST(TypeMatch, Optionals) {
 
   Type baseToVoid = FunctionType::get(
       FunctionType::Param(baseTy),
-      C.Ctx.TheEmptyTupleType);
+      C.Ctx.TheEmptyTupleType,
+      C.Ctx.getNeverType());
   Type optToVoid = FunctionType::get(
       FunctionType::Param(optTy),
-      C.Ctx.TheEmptyTupleType);
+      C.Ctx.TheEmptyTupleType,
+      C.Ctx.getNeverType());
   EXPECT_TRUE(check(baseToVoid, optToVoid));
   EXPECT_FALSE(check(optToVoid, baseToVoid));
 
-  Type voidToBase = FunctionType::get({}, baseTy);
-  Type voidToOpt = FunctionType::get({}, optTy);
+  Type voidToBase = FunctionType::get({}, baseTy, C.Ctx.getNeverType());
+  Type voidToOpt = FunctionType::get({}, optTy, C.Ctx.getNeverType());
   EXPECT_FALSE(check(voidToBase, voidToOpt));
   EXPECT_TRUE(check(voidToOpt, voidToBase));
 
   Type baseToBase = FunctionType::get(
       FunctionType::Param(baseTy),
-      baseTy);
+      baseTy, C.Ctx.getNeverType());
   Type optToOpt = FunctionType::get(
       FunctionType::Param(optTy),
-      optTy);
+      optTy, C.Ctx.getNeverType());
   EXPECT_FALSE(check(baseToBase, optToOpt));
   EXPECT_FALSE(check(optToOpt, baseToBase));
 }
@@ -207,10 +213,12 @@ TEST(TypeMatch, OptionalMismatch) {
 
   Type baseToVoid = FunctionType::get(
       FunctionType::Param(baseTy),
-      C.Ctx.TheEmptyTupleType);
+      C.Ctx.TheEmptyTupleType,
+      C.Ctx.getNeverType());
   Type optToVoid = FunctionType::get(
       FunctionType::Param(optTy),
-      C.Ctx.TheEmptyTupleType);
+      C.Ctx.TheEmptyTupleType,
+      C.Ctx.getNeverType());
   EXPECT_TRUE(check(baseToVoid, optToVoid));
   EXPECT_TRUE(checkOpt(baseToVoid, optToVoid));
   EXPECT_TRUE(checkOptOverride(baseToVoid, optToVoid));
@@ -218,8 +226,8 @@ TEST(TypeMatch, OptionalMismatch) {
   EXPECT_TRUE(checkOpt(optToVoid, baseToVoid));
   EXPECT_TRUE(checkOptOverride(optToVoid, baseToVoid));
 
-  Type voidToBase = FunctionType::get({}, baseTy);
-  Type voidToOpt = FunctionType::get({}, optTy);
+  Type voidToBase = FunctionType::get({}, baseTy, C.Ctx.getNeverType());
+  Type voidToOpt = FunctionType::get({}, optTy, C.Ctx.getNeverType());
   EXPECT_FALSE(check(voidToBase, voidToOpt));
   EXPECT_TRUE(checkOpt(voidToBase, voidToOpt));
   EXPECT_TRUE(checkOptOverride(voidToBase, voidToOpt));
@@ -229,10 +237,10 @@ TEST(TypeMatch, OptionalMismatch) {
 
   Type baseToBase = FunctionType::get(
       FunctionType::Param(baseTy),
-      baseTy);
+      baseTy, C.Ctx.getNeverType());
   Type optToOpt = FunctionType::get(
       FunctionType::Param(optTy),
-      optTy);
+      optTy, C.Ctx.getNeverType());
   EXPECT_FALSE(check(baseToBase, optToOpt));
   EXPECT_TRUE(checkOpt(baseToBase, optToOpt));
   EXPECT_TRUE(checkOptOverride(baseToBase, optToOpt));
@@ -339,7 +347,7 @@ TEST(TypeMatch, OptionalMismatchFunctions) {
                             TypeMatchFlags::AllowTopLevelOptionalMismatch);
   };
 
-  Type voidToVoid = FunctionType::get({}, C.Ctx.TheEmptyTupleType);
+  Type voidToVoid = FunctionType::get({}, C.Ctx.TheEmptyTupleType, C.Ctx.getNeverType());
   Type optVoidToVoid = OptionalType::get(voidToVoid);
   EXPECT_TRUE(checkOverride(optVoidToVoid, voidToVoid));
   EXPECT_TRUE(checkOpt(optVoidToVoid, voidToVoid));
@@ -361,9 +369,9 @@ TEST(TypeMatch, NoEscapeMismatchFunctions) {
         TypeMatchFlags::IgnoreNonEscapingForOptionalFunctionParam);
   };
 
-  Type voidToVoidFn = FunctionType::get({}, C.Ctx.TheEmptyTupleType);
+  Type voidToVoidFn = FunctionType::get({}, C.Ctx.TheEmptyTupleType, C.Ctx.getNeverType());
   Type nonescapingVoidToVoidFn =
-      FunctionType::get({}, C.Ctx.TheEmptyTupleType,
+      FunctionType::get({}, C.Ctx.TheEmptyTupleType, C.Ctx.getNeverType(),
                         FunctionType::ExtInfo().withNoEscape());
   Type optVoidToVoidFn = OptionalType::get(voidToVoidFn);
   Type optNonescapingVoidToVoidFn = OptionalType::get(nonescapingVoidToVoidFn);

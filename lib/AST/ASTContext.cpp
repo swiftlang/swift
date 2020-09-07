@@ -583,6 +583,8 @@ ASTContext::ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
     TheErrorType(
       new (*this, AllocationArena::Permanent)
         ErrorType(*this, Type(), RecursiveTypeProperties::HasError)),
+    TheNeverType(nullptr),
+//                 new (*this, AllocationArena::Permanent) nullptr),
     TheUnresolvedType(new (*this, AllocationArena::Permanent)
                       UnresolvedType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),

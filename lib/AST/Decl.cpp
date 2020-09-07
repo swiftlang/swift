@@ -6805,7 +6805,7 @@ Type AbstractFunctionDecl::getThrowsInterfaceType() const {
   auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
   if (auto type = evaluateOrDefault(ctx.evaluator,
                            ThrowsTypeRequest{mutableThis},
-                           Type()))
+                           ctx.getNeverType()->getMetatypeInstanceType()))
     return type;
   return ErrorType::get(ctx);
 }
