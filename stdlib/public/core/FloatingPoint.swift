@@ -1904,8 +1904,10 @@ extension BinaryFloatingPoint {
         if !value.isNaN {
           let value_ = Float16(
             sign: value.sign,
-            exponentBitPattern: UInt(value.exponentBitPattern),
-            significandBitPattern: UInt16(value.significandBitPattern))
+            exponentBitPattern:
+              UInt(truncatingIfNeeded: value.exponentBitPattern),
+            significandBitPattern:
+              UInt16(truncatingIfNeeded: value.significandBitPattern))
           self = Self(Float(value_))
           return
         }
@@ -1915,8 +1917,10 @@ extension BinaryFloatingPoint {
       if !value.isNaN {
         let value_ = Float(
           sign: value.sign,
-          exponentBitPattern: UInt(value.exponentBitPattern),
-          significandBitPattern: UInt32(value.significandBitPattern) &<< 16)
+          exponentBitPattern:
+            UInt(truncatingIfNeeded: value.exponentBitPattern),
+          significandBitPattern:
+            UInt32(truncatingIfNeeded: value.significandBitPattern) &<< 16)
         self = Self(value_)
         return
       }
@@ -1928,8 +1932,10 @@ extension BinaryFloatingPoint {
       if !value.isNaN {
         let value_ = Float(
           sign: value.sign,
-          exponentBitPattern: UInt(value.exponentBitPattern),
-          significandBitPattern: UInt32(value.significandBitPattern))
+          exponentBitPattern:
+            UInt(truncatingIfNeeded: value.exponentBitPattern),
+          significandBitPattern:
+            UInt32(truncatingIfNeeded: value.significandBitPattern))
         self = Self(value_)
         return
       }
@@ -1941,8 +1947,10 @@ extension BinaryFloatingPoint {
       if !value.isNaN {
         let value_ = Double(
           sign: value.sign,
-          exponentBitPattern: UInt(value.exponentBitPattern),
-          significandBitPattern: UInt64(value.significandBitPattern))
+          exponentBitPattern:
+            UInt(truncatingIfNeeded: value.exponentBitPattern),
+          significandBitPattern:
+            UInt64(truncatingIfNeeded: value.significandBitPattern))
         self = Self(value_)
         return
       }
@@ -1955,8 +1963,10 @@ extension BinaryFloatingPoint {
       if !value.isNaN {
         let value_ = Float80(
           sign: value.sign,
-          exponentBitPattern: UInt(value.exponentBitPattern),
-          significandBitPattern: UInt64(value.significandBitPattern))
+          exponentBitPattern:
+            UInt(truncatingIfNeeded: value.exponentBitPattern),
+          significandBitPattern:
+            UInt64(truncatingIfNeeded: value.significandBitPattern))
         self = Self(value_)
         return
       }
