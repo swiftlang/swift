@@ -863,6 +863,7 @@ tryCastToString(
       takeOnSuccess, mayDeferChecks);
 #endif
   }
+    SWIFT_FALLTHROUGH;
   default:
     return DynamicCastResult::Failure;
   }
