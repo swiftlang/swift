@@ -9,7 +9,7 @@ func animate(
   completion: (() -> Void)? = nil
 ) { /* ... */ }
 
-animate(withDuration: 0.3) /* `animate:` is unwritten. */ {
+animate(withDuration: 0.3) /* `animations:` is unwritten. */ {
   // Animate something.
 } completion: {
   // Completion handler.
