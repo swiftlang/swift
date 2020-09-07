@@ -58,7 +58,6 @@ set(swift_runtime_sources
     MetadataLookup.cpp
     MutexPThread.cpp
     MutexWin32.cpp
-    MutexWASI.cpp
     Numeric.cpp
     Once.cpp
     Portability.cpp
