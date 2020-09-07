@@ -1890,82 +1890,81 @@ extension BinaryFloatingPoint {
   /// - Parameter value: A floating-point value to be converted.
   @inlinable
   public init<Source: BinaryFloatingPoint>(_ value: Source) {
+    // If two IEEE 754 binary interchange formats share the same exponent bit
+    // count and significand bit count, then they must share the same encoding
+    // for finite and infinite values.
+    switch (Source.exponentBitCount, Source.significandBitCount) {
 #if !os(macOS) && !(os(iOS) && targetEnvironment(macCatalyst))
-    if #available(iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
-      if case let value_ as Float16 = value {
-        self = Self(Float(value_))
-        return
-      }
-    }
-#endif
-    switch value {
-    case let value_ as Float:
-      self = Self(value_)
-    case let value_ as Double:
-      self = Self(value_)
-#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
-    case let value_ as Float80:
-      self = Self(value_)
-#endif
-    default:
-      if value.isFinite {
-        // According to IEEE 754:
-        // - The set of finite floating-point numbers representable within a
-        //   particular format is determined by: the radix (b), the precision
-        //   (p, the number of digits in the significand), and the maximum and
-        //   minimum exponent (emax and emin, respectively, where
-        //   emin = 1 - emax).
-        // - In a binary interchange format, each floating-point number has only
-        //   one encoding.
-        //
-        // If two binary interchange formats have the same exponent bit count
-        // (w) and significand bit count (p - 1), then they must share the same
-        // encoding for finite values.
-        switch (Source.exponentBitCount, Source.significandBitCount) {
-#if !os(macOS) && !(os(iOS) && targetEnvironment(macCatalyst))
-        case (5, 10):
-          if #available(iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
-            let value_ = Float16(
-              sign: value.sign,
-              exponentBitPattern: Float16.RawExponent(value.exponentBitPattern),
-              significandBitPattern:
-                Float16.RawSignificand(value.significandBitPattern))
-            self = Self(Float(value_))
-            return
-          }
-#endif
-        case (8, 23):
-          let value_ = Float(
-            sign: value.sign,
-            exponentBitPattern: Float.RawExponent(value.exponentBitPattern),
-            significandBitPattern:
-              Float.RawSignificand(value.significandBitPattern))
-          self = Self(value_)
+    case (5, 10):
+      if #available(iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+        if case let value_ as Float16 = value {
+          self = Self(Float(value_))
           return
-        case (11, 52):
-          let value_ = Double(
+        }
+        if !value.isNaN {
+          let value_ = Float16(
             sign: value.sign,
-            exponentBitPattern: Double.RawExponent(value.exponentBitPattern),
-            significandBitPattern:
-              Double.RawSignificand(value.significandBitPattern))
-          self = Self(value_)
+            exponentBitPattern: UInt(value.exponentBitPattern),
+            significandBitPattern: UInt16(value.significandBitPattern))
+          self = Self(Float(value_))
           return
-#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
-        case (15, 63):
-          let value_ = Float80(
-            sign: value.sign,
-            exponentBitPattern: Float80.RawExponent(value.exponentBitPattern),
-            significandBitPattern:
-              Float80.RawSignificand(value.significandBitPattern))
-          self = Self(value_)
-          return
-#endif
-        default:
-          break
         }
       }
-      self = Self._convert(from: value).value
+#endif
+    case (8, 7):
+      if !value.isNaN {
+        let value_ = Float(
+          sign: value.sign,
+          exponentBitPattern: UInt(value.exponentBitPattern),
+          significandBitPattern: UInt32(value.significandBitPattern) &<< 16)
+        self = Self(value_)
+        return
+      }
+    case (8, 23):
+      if case let value_ as Float = value {
+        self = Self(value_)
+        return
+      }
+      if !value.isNaN {
+        let value_ = Float(
+          sign: value.sign,
+          exponentBitPattern: UInt(value.exponentBitPattern),
+          significandBitPattern: UInt32(value.significandBitPattern))
+        self = Self(value_)
+        return
+      }
+    case (11, 52):
+      if case let value_ as Double = value {
+        self = Self(value_)
+        return
+      }
+      if !value.isNaN {
+        let value_ = Double(
+          sign: value.sign,
+          exponentBitPattern: UInt(value.exponentBitPattern),
+          significandBitPattern: UInt64(value.significandBitPattern))
+        self = Self(value_)
+        return
+      }
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+    case (15, 63):
+      if case let value_ as Float80 = value {
+        self = Self(value_)
+        return
+      }
+      if !value.isNaN {
+        let value_ = Float80(
+          sign: value.sign,
+          exponentBitPattern: UInt(value.exponentBitPattern),
+          significandBitPattern: UInt64(value.significandBitPattern))
+        self = Self(value_)
+        return
+      }
+#endif
+    default:
+      break
     }
+    self = Self._convert(from: value).value
   }
 
   /// Creates a new instance from the given value, if it can be represented
