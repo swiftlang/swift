@@ -1,5 +1,6 @@
 add_swift_unittest(swiftLocalizationTests
-  DefToYAMLConverterTests.cpp)
+  DefToYAMLConverterTests.cpp
+  SerializationTests.cpp)
 
 target_link_libraries(swiftLocalizationTests
   PRIVATE
