@@ -439,9 +439,8 @@ Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
   auto selfTy = dc->getSelfInterfaceType();
   auto selfParam = AnyFunctionType::Param(selfTy);
   if (sig)
-    return GenericFunctionType::get(sig, {selfParam}, type,
-                                    Context->getNeverType());
-  return FunctionType::get({selfParam}, type, Context->getNeverType());
+    return GenericFunctionType::get(sig, {selfParam}, type, dc->getASTContext().getNeverType());
+  return FunctionType::get({selfParam}, type, dc->getASTContext().getNeverType());
 }
 
 void
@@ -1254,7 +1253,9 @@ CanType TypeBase::computeCanonicalType() {
     SmallVector<AnyFunctionType::Param, 8> canParams;
     getCanonicalParams(funcTy, genericSig, canParams);
     auto resultTy = funcTy->getResult()->getCanonicalType(genericSig);
-    auto throwsTy = funcTy->getThrowsType()->getCanonicalType(genericSig);
+    CanType throwsTy;
+    if (auto funcThrowsTy = funcTy->getThrowsType())
+      throwsTy = funcThrowsTy->getCanonicalType(genericSig);
 
     auto extInfo = funcTy->getCanonicalExtInfo(useClangTypes(resultTy));
     if (genericSig) {
@@ -1822,10 +1823,13 @@ public:
                              nullptr, {});
       if (!newReturn)
         return CanType();
+      
+      CanType newThrowsTy;
+      if (func->getThrowsType() && substFunc->getThrowsType())
+        newThrowsTy = visit(func->getThrowsType()->getCanonicalType(),
+                            substFunc->getThrowsType()->getCanonicalType(),
+                            nullptr, {});
 
-      auto newThrowsTy = visit(func->getThrowsType()->getCanonicalType(),
-                               substFunc->getThrowsType()->getCanonicalType(),
-                               nullptr, {});
       if (!newThrowsTy)
         return CanType();
       if (!didChange && newReturn == substFunc.getResult()

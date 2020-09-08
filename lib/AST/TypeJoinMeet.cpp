@@ -324,6 +324,7 @@ CanType TypeJoin::visitFunctionType(CanType second) {
                                     secondFnTy->getParams()))
     return Unimplemented;
 
+  
   auto firstResult = firstFnTy->getResult()->getCanonicalType();
   auto secondResult = secondFnTy->getResult()->getCanonicalType();
 
@@ -331,8 +332,12 @@ CanType TypeJoin::visitFunctionType(CanType second) {
   if (!result)
     return Unimplemented;
   
-  auto firstThrowsTy = firstFnTy->getThrowsType()->getCanonicalType();
-  auto secondThrowsTy = secondFnTy->getThrowsType()->getCanonicalType();
+  CanType firstThrowsTy;
+  if (auto firstFuncThrows = firstFnTy->getThrowsType())
+    firstThrowsTy = firstFuncThrows->getCanonicalType();
+  CanType secondThrowsTy;
+  if (auto secondFuncThrows = secondFnTy->getThrowsType())
+    secondThrowsTy = secondFuncThrows->getCanonicalType();
   
   auto throwsTy = join(firstThrowsTy, secondThrowsTy);
   if (!throwsTy)

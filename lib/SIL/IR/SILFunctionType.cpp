@@ -3405,10 +3405,14 @@ static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
       auto result = copyOptionalityFromDerivedToBase(tc,
                                                      derivedFunc.getResult(),
                                                      baseFunc.getResult());
+      CanType throwsType;
+      if(auto funcThrowsType = baseFunc->getThrowsType())
+        throwsType = funcThrowsType->getCanonicalType();
+      
       return
           CanAnyFunctionType::get(baseFunc.getOptGenericSignature(),
                                   llvm::makeArrayRef(params), result,
-                                  baseFunc->getThrowsType()->getCanonicalType(),
+                                  throwsType,
                                   baseFunc->getExtInfo());
     }
   }
@@ -4089,7 +4093,10 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
   auto bridging = Bridgeability::Full;
 
   unsigned numParameterLists = constant.getParameterListCount();
-  auto throwsTy = fnType->getThrowsType()->getCanonicalType();
+  
+  CanType throwsTy;
+  if (auto bridgeThrowsTy = fnType->getThrowsType())
+    throwsTy = bridgeThrowsTy->getCanonicalType();
 
 
   // Form an abstraction pattern for bridging purposes.
@@ -4190,7 +4197,7 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
   auto inner =
     CanFunctionType::get(llvm::makeArrayRef(bridgedParams),
                          bridgedResultType,
-                         fnType->getThrowsType()->getCanonicalType(),
+                         throwsTy,
                          innerExtInfo);
 
   auto curried =
@@ -4202,10 +4209,10 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
   // Build the uncurried function type.
   if (innerExtInfo.isThrowing()) {
     extInfo = extInfo.withThrows(true);
-    if (throwsTy == Context.getNeverType()) {
-      throwsTy = fnType->getThrowsType()->getCanonicalType();
+    if (auto funcThrowsTy = fnType->getThrowsType()) {
+      throwsTy = funcThrowsTy->getCanonicalType();
     } else {
-      throwsTy = Context.getErrorDecl()->getInterfaceType()->getCanonicalType();
+      throwsTy = Context.getNeverType();
     }
   }
 
