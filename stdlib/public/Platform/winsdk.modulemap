@@ -180,9 +180,11 @@ module WinSDK [system] {
   }
 
   module ShellAPI {
+    header "shellapi.h"
     header "Shlwapi.h"
     export *
 
+    link "Shell32.Lib"
     link "ShLwApi.Lib"
   }
 
