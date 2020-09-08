@@ -1329,9 +1329,8 @@ public:
     // Collect original results.
     SmallVector<SILValue, 2> originalResults;
     collectAllDirectResultsInTypeOrder(*original, originalResults);
-    // Collect differential return elements.
+    // Collect differential direct results.
     SmallVector<SILValue, 8> retElts;
-    // for (auto origResult : originalResults) {
     for (auto i : range(originalResults.size())) {
       auto origResult = originalResults[i];
       if (!getIndices().results->contains(i))
@@ -1448,7 +1447,10 @@ JVPCloner::Implementation::getDifferentialStructElement(SILBasicBlock *origBB,
 void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   // Create differential blocks and arguments.
   auto &differential = getDifferential();
+  auto diffLoc = differential.getLocation();
   auto *origEntry = original->getEntryBlock();
+  auto origFnTy = original->getLoweredFunctionType();
+
   for (auto &origBB : *original) {
     auto *diffBB = differential.createBasicBlock();
     diffBBMap.insert({&origBB, diffBB});
@@ -1529,44 +1531,51 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
                << " as the tangent of original result " << *origArg);
   }
 
-  // Initialize tangent mapping for indirect results.
-  auto origIndResults = original->getIndirectResults();
-  auto diffIndResults = differential.getIndirectResults();
-  auto isNonWrtInoutParameter = [&](unsigned i) {
-    auto &paramInfo = original->getLoweredFunctionType()->getParameters()[i];
-    return paramInfo.isIndirectInOut() && !getIndices().parameters->contains(i);
-  };
-  auto origNumParams = original->getLoweredFunctionType()->getNumParameters();
-#ifndef NDEBUG
-  unsigned numNonWrtInoutParameters =
-      llvm::count_if(range(origNumParams), isNonWrtInoutParameter);
-  assert(origIndResults.size() + numNonWrtInoutParameters ==
-         diffIndResults.size());
-#endif
-  differentialBuilder.setInsertionPoint(differential.getEntryBlock());
-  unsigned j = 0;
-  for (auto i : range(origNumParams)) {
-    // Non-wrt inout parameters become indirect results of the differential.
-    if (isNonWrtInoutParameter(i)) {
-      auto &origParam = original->getArgumentsWithoutIndirectResults()[i];
-      auto &tanBuf = diffIndResults[j + origIndResults.size()];
-      setTangentBuffer(origEntry, origParam, tanBuf);
-      // Original inout parameters are initialized, therefore the differential
-      // indirect result must be initialized too.
-      emitZeroIndirect(tanBuf->getType().getASTType(), tanBuf,
-                       differential.getLocation());
-    }
-  }
-  for (auto &origBB : *original)
-    for (auto i : indices(origIndResults))
-      setTangentBuffer(&origBB, origIndResults[i], diffIndResults[i]);
+  // Initialize tangent mapping for original indirect results and non-wrt
+  // `inout` parameters. The tangent buffers of these address values are
+  // differential indirect results.
 
-  // Tangent buffers for non-varied original indirect results have to be
-  // initialized.
-  for (auto i : indices(origIndResults))
-    if (!activityInfo.isVaried(origIndResults[i], getIndices().parameters))
-      emitZeroIndirect(diffIndResults[i]->getType().getASTType(),
-                       diffIndResults[i], differential.getLocation());
+  // Collect original results.
+  SmallVector<SILValue, 2> originalResults;
+  collectAllFormalResultsInTypeOrder(*original, originalResults);
+
+  // Iterate over differentiability results.
+  differentialBuilder.setInsertionPoint(differential.getEntryBlock());
+  auto diffIndResults = differential.getIndirectResults();
+  unsigned differentialIndirectResultIndex = 0;
+  for (auto resultIndex : getIndices().results->getIndices()) {
+    auto origResult = originalResults[resultIndex];
+    // Handle original formal indirect result.
+    if (resultIndex < origFnTy->getNumResults()) {
+      // Skip original direct results.
+      if (origResult->getType().isObject())
+        continue;
+      auto diffIndResult = diffIndResults[differentialIndirectResultIndex++];
+      setTangentBuffer(origEntry, origResult, diffIndResult);
+      // If original indirect result is non-varied, zero-initialize its tangent
+      // buffer.
+      if (!activityInfo.isVaried(origResult, getIndices().parameters))
+        emitZeroIndirect(diffIndResult->getType().getASTType(),
+                         diffIndResult, diffLoc);
+      continue;
+    }
+    // Handle original non-wrt `inout` parameter.
+    // Only original *non-wrt* `inout` parameters have corresponding
+    // differential indirect results.
+    auto inoutParamIndex = resultIndex - origFnTy->getNumResults();
+    auto inoutParamIt = std::next(
+        origFnTy->getIndirectMutatingParameters().begin(), inoutParamIndex);
+    auto paramIndex =
+        std::distance(origFnTy->getParameters().begin(), &*inoutParamIt);
+    if (getIndices().parameters->contains(paramIndex))
+      continue;
+    auto diffIndResult = diffIndResults[differentialIndirectResultIndex++];
+    setTangentBuffer(origEntry, origResult, diffIndResult);
+    // Original `inout` parameters are initialized, so their tangent buffers
+    // must also be initialized.
+    emitZeroIndirect(diffIndResult->getType().getASTType(),
+                     diffIndResult, diffLoc);
+  }
 }
 
 /*static*/ SILFunction *JVPCloner::Implementation::createEmptyDifferential(
