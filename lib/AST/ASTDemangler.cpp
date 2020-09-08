@@ -396,7 +396,7 @@ Type ASTBuilder::createFunctionType(
     && !flags.isEscaping();
 
   const clang::Type *clangFunctionType = nullptr;
-  if (representation == FunctionTypeRepresentation::CFunctionPointer)
+  if (shouldStoreClangType(representation))
     clangFunctionType = Ctx.getClangFunctionType(funcParams, output,
                                                  representation);
 
@@ -523,12 +523,6 @@ Type ASTBuilder::createImplFunctionType(
     break;
   }
 
-  // [TODO: Store-SIL-Clang-type]
-  auto einfo = SILExtInfoBuilder(representation, flags.isPseudogeneric(),
-                                 !flags.isEscaping(), flags.isAsync(), diffKind,
-                                 /*clangFunctionType*/ nullptr)
-                   .build();
-
   llvm::SmallVector<SILParameterInfo, 8> funcParams;
   llvm::SmallVector<SILYieldInfo, 8> funcYields;
   llvm::SmallVector<SILResultInfo, 8> funcResults;
@@ -553,6 +547,21 @@ Type ASTBuilder::createImplFunctionType(
     auto conv = getResultConvention(errorResult->getConvention());
     funcErrorResult.emplace(type, conv);
   }
+
+  const clang::Type *clangFnType = nullptr;
+  if (shouldStoreClangType(representation)) {
+    assert(funcResults.size() <= 1 && funcYields.size() == 0 &&
+           "C functions and blocks have at most 1 result and 0 yields.");
+    auto result =
+        funcResults.empty() ? Optional<SILResultInfo>() : funcResults[0];
+    clangFnType = getASTContext().getCanonicalClangFunctionType(
+        funcParams, result, representation);
+  }
+  auto einfo = SILFunctionType::ExtInfoBuilder(
+                   representation, flags.isPseudogeneric(), !flags.isEscaping(),
+                   flags.isAsync(), diffKind, clangFnType)
+                   .build();
+
   return SILFunctionType::get(genericSig, einfo, funcCoroutineKind,
                               funcCalleeConvention, funcParams, funcYields,
                               funcResults, funcErrorResult,

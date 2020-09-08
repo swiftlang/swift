@@ -3428,9 +3428,13 @@ bool AnyFunctionType::hasSameExtInfoAs(const AnyFunctionType *otherFn) {
   return getExtInfo().isEqualTo(otherFn->getExtInfo(), useClangTypes(this));
 }
 
-// [TODO: Store-SIL-Clang-type]
 ClangTypeInfo SILFunctionType::getClangTypeInfo() const {
-  return ClangTypeInfo();
+  if (!Bits.SILFunctionType.HasClangTypeInfo)
+    return ClangTypeInfo();
+  auto *info = getTrailingObjects<ClangTypeInfo>();
+  assert(!info->empty() &&
+         "If the ClangTypeInfo was empty, we shouldn't have stored it.");
+  return *info;
 }
 
 bool SILFunctionType::hasSameExtInfoAs(const SILFunctionType *otherFn) {

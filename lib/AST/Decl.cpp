@@ -2592,6 +2592,7 @@ mapSignatureExtInfo(AnyFunctionType::ExtInfo info,
       .withRepresentation(info.getRepresentation())
       .withAsync(info.isAsync())
       .withThrows(info.isThrowing())
+      .withClangFunctionType(info.getClangTypeInfo().getType())
       .build();
 }
 

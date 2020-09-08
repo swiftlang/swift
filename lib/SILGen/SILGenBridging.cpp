@@ -347,10 +347,11 @@ getParameterTypes(AnyFunctionType::CanParamArrayRef params) {
   return results;
 }
 
-static CanAnyFunctionType getBridgedBlockType(SILGenModule &SGM,
-                                              CanAnyFunctionType blockType) {
-  return SGM.Types.getBridgedFunctionType(AbstractionPattern(blockType),
-                                          blockType, Bridgeability::Full);
+static CanAnyFunctionType
+getBridgedBlockType(SILGenModule &SGM, CanAnyFunctionType blockType,
+                    SILFunctionTypeRepresentation silRep) {
+  return SGM.Types.getBridgedFunctionType(
+      AbstractionPattern(blockType), blockType, Bridgeability::Full, silRep);
 }
 
 static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
@@ -367,7 +368,8 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
   SILFunctionConventions funcConv(funcTy, SGF.SGM.M);
 
   // Make sure we lower the component types of the formal block type.
-  formalBlockType = getBridgedBlockType(SGF.SGM, formalBlockType);
+  formalBlockType = getBridgedBlockType(SGF.SGM, formalBlockType,
+                                        blockTy->getRepresentation());
 
   // Set up the indirect result.
   SILType blockResultTy =
@@ -551,9 +553,16 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
             blockInterfaceTy->getParameters().end(),
             std::back_inserter(params));
 
-  auto extInfo =
-      SILFunctionType::ExtInfo()
-        .withRepresentation(SILFunctionType::Representation::CFunctionPointer);
+  auto results = blockInterfaceTy->getResults();
+  auto representation = SILFunctionType::Representation::CFunctionPointer;
+  auto *clangFnType = getASTContext().getCanonicalClangFunctionType(
+      params, results.empty() ? Optional<SILResultInfo>() : results[0],
+      representation);
+
+  auto extInfo = SILFunctionType::ExtInfoBuilder()
+                     .withRepresentation(representation)
+                     .withClangFunctionType(clangFnType)
+                     .build();
 
   CanGenericSignature genericSig;
   GenericEnvironment *genericEnv = nullptr;
@@ -821,7 +830,8 @@ static void buildBlockToFuncThunkBody(SILGenFunction &SGF,
   Scope scope(SGF.Cleanups, CleanupLocation::get(loc));
 
   // Make sure we lower the component types of the formal block type.
-  formalBlockTy = getBridgedBlockType(SGF.SGM, formalBlockTy);
+  formalBlockTy =
+      getBridgedBlockType(SGF.SGM, formalBlockTy, blockTy->getRepresentation());
 
   assert(blockTy->getNumParameters() == funcTy->getNumParameters()
          && "block and function types don't match");

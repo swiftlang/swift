@@ -598,20 +598,23 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     CanType anyObjectMetaTy = CanExistentialMetatypeType::get(anyObjectTy,
                                                   MetatypeRepresentation::ObjC);
 
-    auto NSStringFromClassType = SILFunctionType::get(nullptr,
-                  SILFunctionType::ExtInfo()
-                    .withRepresentation(SILFunctionType::Representation::
-                                        CFunctionPointer),
-                  SILCoroutineKind::None,
-                  ParameterConvention::Direct_Unowned,
-                  SILParameterInfo(anyObjectMetaTy,
-                                   ParameterConvention::Direct_Unowned),
-                  /*yields*/ {},
-                  SILResultInfo(OptNSStringTy,
-                                ResultConvention::Autoreleased),
-                  /*error result*/ None,
-                  SubstitutionMap(), SubstitutionMap(),
-                  ctx);
+    auto paramConvention = ParameterConvention::Direct_Unowned;
+    auto params = {SILParameterInfo(anyObjectMetaTy, paramConvention)};
+    std::array<SILResultInfo, 1> resultInfos = {
+        SILResultInfo(OptNSStringTy, ResultConvention::Autoreleased)};
+    auto repr = SILFunctionType::Representation::CFunctionPointer;
+    auto *clangFnType =
+        ctx.getCanonicalClangFunctionType(params, resultInfos[0], repr);
+    auto extInfo = SILFunctionType::ExtInfoBuilder()
+                       .withRepresentation(repr)
+                       .withClangFunctionType(clangFnType)
+                       .build();
+
+    auto NSStringFromClassType = SILFunctionType::get(
+        nullptr, extInfo, SILCoroutineKind::None, paramConvention, params,
+        /*yields*/ {}, resultInfos, /*error result*/ None, SubstitutionMap(),
+        SubstitutionMap(), ctx);
+
     auto NSStringFromClassFn = builder.getOrCreateFunction(
         mainClass, "NSStringFromClass", SILLinkage::PublicExternal,
         NSStringFromClassType, IsBare, IsTransparent, IsNotSerialized,
