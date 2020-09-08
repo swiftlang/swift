@@ -69,6 +69,35 @@ Swift Next
 Swift 5.3
 ---------
 
+* [SE-0279][] & [SE-0286][]:
+
+  Trailing closure syntax has been extended to allow additional labeled closures to follow the initial unlabeled closure:
+  
+  ```swift
+  // Single trailing closure argument
+  UIView.animate(withDuration: 0.3) {
+    self.view.alpha = 0
+  }
+  // Multiple trailing closure arguments
+  UIView.animate(withDuration: 0.3) {
+    self.view.alpha = 0
+  } completion: { _ in
+    self.view.removeFromSuperview()
+  }
+  ```
+  
+  Additionally, trailing closure arguments now match the appropriate parameter according to a forward-scan rule (as opposed to the previous backward-scan rule):
+  
+  ```swift
+  func takesClosures(first: () -> Void, second: (Int) -> Void = { _ in }) {}
+  
+  takesClosures {
+    print("First")
+  }
+  ```
+  
+  In the above example, the trailing closure argument matches parameter `first`, whereas pre-Swift-5.3 it would have matched `second`. In order to ease the transition to this new rule, cases in which the forward-scan and backward-scan match a single trailing closure to different parameters, the backward-scan result is preferred and a warning is emitted. This is expected to be upgraded to an error in the next major version of Swift.
+
 * [SR-7083][]:
 
   Property observers such as `willSet` and `didSet` are now supported on `lazy` properties:
@@ -8112,7 +8141,9 @@ Swift 1.0
 [SE-0268]: <https://github.com/apple/swift-evolution/blob/master/proposals/0268-didset-semantics.md>
 [SE-0269]: <https://github.com/apple/swift-evolution/blob/master/proposals/0269-implicit-self-explicit-capture.md>
 [SE-0276]: <https://github.com/apple/swift-evolution/blob/master/proposals/0276-multi-pattern-catch-clauses.md>
+[SE-0279]: <https://github.com/apple/swift-evolution/blob/master/proposals/0279-multiple-trailing-closures.md>
 [SE-0280]: <https://github.com/apple/swift-evolution/blob/master/proposals/0280-enum-cases-as-protocol-witnesses.md>
+[SE-0286]: <https://github.com/apple/swift-evolution/blob/master/proposals/0286-forward-scan-trailing-closures.md>
 [SE-0287]: <https://github.com/apple/swift-evolution/blob/master/proposals/0287-implicit-member-chains.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>

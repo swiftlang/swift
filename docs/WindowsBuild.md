@@ -8,11 +8,10 @@ The commands below (with the exception of installing Visual Studio) must be ente
 
 ### Visual Studio
 
-An easy way to get most of the tools to build Swift is using the [Visual Studio installer](https://www.visualstudio.com/downloads/). This command installs all needed Visual Studio components as well as Python and Git:
+An easy way to get most of the tools to build Swift is using the [Visual Studio installer](https://www.visualstudio.com/downloads/). This command installs all needed Visual Studio components as well as Python, Git, CMake and Ninja:
 
 ```
 vs_community ^
-  --add Component.CPython2.x86 ^
   --add Component.CPython3.x64 ^
   --add Microsoft.VisualStudio.Component.Git ^
   --add Microsoft.VisualStudio.Component.VC.ATL ^
@@ -28,13 +27,7 @@ The following [link](https://docs.microsoft.com/visualstudio/install/workload-co
 
 ### Python
 
-The command above already installs Python 2 and 3. Alternatively, in the Visual Studio installation program, under *Individual Components*
-
-1. Install *Python 2*, either the 32-bit version (C:\Python27\\) or the 64-bit version (C:\Python27amd64\\)
-
-   **Note:** If you install the 64-bit version only, you will need to adjust `PYTHON_EXECUTABLE` below to `C:\Python27amd64\python.exe`
-
-2. Install *Python 3 64 bits (3.7.x)*
+The command above already installs Python 3. Alternatively, in the Visual Studio installation program, under *Individual Components*, install *Python 3 64 bits (3.7.x)*.
 
 If you are building a debug version of Swift, you should also install the Python debug binaries.
 
@@ -69,9 +62,13 @@ git clone https://github.com/apple/swift-cmark cmark
 git clone https://github.com/apple/swift-corelibs-libdispatch swift-corelibs-libdispatch
 git clone https://github.com/apple/swift-corelibs-foundation swift-corelibs-foundation
 git clone https://github.com/apple/swift-corelibs-xctest swift-corelibs-xctest
-git clone https://github.com/apple/swift-llbuild llbuild
 git clone https://github.com/apple/swift-tools-support-core swift-tools-support-core
-git clone -c core.autocrlf=input https://github.com/apple/swift-package-manager swiftpm
+git clone -c core.symlinks=true https://github.com/apple/swift-llbuild swift-llbuild
+git clone https://github.com/JPSim/Yams Yams
+git clone https://github.com/apple/swift-driver swift-driver
+git clone https://github.com/apple/swift-argument-parser swift-argument-parser
+git clone -c core.autocrlf=input https://github.com/apple/swift-package-manager swift-package-manager
+git clone https://github.com/apple/indexstore-db indexstore-db
 ```
 
 ## Dependencies (ICU, SQLite3, curl, libxml2 and zlib)
@@ -119,119 +116,261 @@ Warning: Creating the above links usually requires administrator privileges. The
 ## Build the toolchain
 
 ```cmd
-cmake -B "S:\b\toolchain" ^
+cmake -B "S:\b\1" ^
   -C S:\swift\cmake\caches\Windows-x86_64.cmake ^
   -D CMAKE_BUILD_TYPE=Release ^
-  -D SWIFT_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch ^
+  -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
+  -D LLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-windows-msvc ^
   -D LLVM_ENABLE_PDB=YES ^
-  -D LLVM_EXTERNAL_SWIFT_SOURCE_DIR=S:\swift ^
   -D LLVM_EXTERNAL_CMARK_SOURCE_DIR=S:\cmark ^
-  -D SWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE=S:\Library\icu-67\usr\include ^
-  -D SWIFT_WINDOWS_x86_64_ICU_UC=S:\Library\icu-67\usr\lib\icuuc67.lib ^
+  -D LLVM_EXTERNAL_SWIFT_SOURCE_DIR=S:\swift ^
+  -D SWIFT_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch ^
   -D SWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE=S:\Library\icu-67\usr\include ^
   -D SWIFT_WINDOWS_x86_64_ICU_I18N=S:\Library\icu-67\usr\lib\icuin67.lib ^
-  -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
+  -D SWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE=S:\Library\icu-67\usr\include ^
+  -D SWIFT_WINDOWS_x86_64_ICU_UC=S:\Library\icu-67\usr\lib\icuuc67.lib ^
   -G Ninja ^
   -S S:\llvm-project\llvm
 
-ninja -C S:\b\toolchain
+ninja -C S:\b\1
 ```
-
-**Note:** If you installed only the 64-bit version of Python, you will need to adjust `PYTHON_EXECUTABLE` argument to `C:\Python27amd64\python.exe`
-
 
 ## Running Swift tests on Windows
 
 ```cmd
-path S:\Library\icu-67\usr\bin;S:\b\toolchain\bin;S:\b\toolchain\tools\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
+path S:\Library\icu-67\usr\bin;S:\b\1\bin;S:\b\1\tools\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
 ninja -C S:\b\toolchain check-swift
 ```
 
 ## Build swift-corelibs-libdispatch
 
 ```cmd
-cmake -B S:\b\libdispatch -D CMAKE_BUILD_TYPE=RelWithDebInfo -D CMAKE_C_COMPILER=S:/b/toolchain/bin/clang-cl.exe -D CMAKE_CXX_COMPILER=S:/b/toolchain/bin/clang-cl.exe -D CMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -D ENABLE_SWIFT=YES -G Ninja -S S:\swift-corelibs-libdispatch
-ninja -C S:\b\libdispatch
+cmake -B S:\b\2 ^
+  -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
+  -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
+  -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
+  -D CMAKE_CXX_COMPILER=S:/b/1/bin/clang-cl.exe ^
+  -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
+  -D ENABLE_SWIFT=YES ^
+  -G Ninja ^
+  -S S:\swift-corelibs-libdispatch
+
+ninja -C S:\b\2
 ```
 
 ## Test swift-corelibs-libdispatch
 
 ```cmd
-ninja -C S:\b\libdispatch check
+ninja -C S:\b\2 check
 ```
 
 ## Build swift-corelibs-foundation
 
 ```cmd
-cmake -B S:\b\foundation -D CMAKE_BUILD_TYPE=RelWithDebInfo -D CMAKE_C_COMPILER=S:/b/toolchain/bin/clang-cl.exe -D CMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -D CURL_LIBRARY="S:/Library/libcurl-development/usr/lib/libcurl.lib" -D CURL_INCLUDE_DIR="S:/Library/libcurl-development/usr/include" -D ICU_ROOT="S:/Library/icu-67" -D ICU_INCLUDE_DIR=S:/Library/icu-67/usr/include -D LIBXML2_LIBRARY="S:/Library/libxml2-development/usr/lib/libxml2s.lib" -D LIBXML2_INCLUDE_DIR="S:/Library/libxml2-development/usr/include/libxml2" -D ENABLE_TESTING=NO -D dispatch_DIR=S:/b/libdispatch/cmake/modules -G Ninja -S S:\swift-corelibs-foundation
-ninja -C S:\b\foundation
+cmake -B S:\b\3 ^
+  -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
+  -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
+  -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
+  -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
+  -D CURL_LIBRARY="S:/Library/libcurl-development/usr/lib/libcurl.lib" ^
+  -D CURL_INCLUDE_DIR="S:/Library/libcurl-development/usr/include" ^
+  -D ICU_I18N_LIBRARY_RELEASE=S:\library\icu-67\usr\lib\icuin67.lib ^
+  -D ICU_ROOT=S:\Library\icu-67\usr ^
+  -D ICU_UC_LIBRARY_RELEASE=S:\Library\icu-67\usr\lib\icuuc67.lib ^
+  -D LIBXML2_LIBRARY=S:\Library\libxml2-development\usr\lib\libxml2s.lib ^
+  -D LIBXML2_INCLUDE_DIR=S:\Library\libxml2-development\usr\include\libxml2 ^
+  -D ENABLE_TESTING=NO ^
+  -D dispatch_DIR=S:\b\2\cmake\modules ^
+  -G Ninja ^
+  -S S:\swift-corelibs-foundation
+
+ninja -C S:\b\3
 ```
 
 - Add Foundation to your path:
 
 ```cmd
-path S:\b\foundation\Foundation;%PATH%
+path S:\b\3\bin;%PATH%
 ```
 
 ## Build swift-corelibs-xctest
 
 ```cmd
-cmake -B S:\b\xctest -D CMAKE_BUILD_TYPE=RelWithDebInfo -D CMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -D dispatch_DIR=S:\b\dispatch\cmake\modules -D Foundation_DIR=S:\b\foundation\cmake\modules -D LIT_COMMAND=S:\toolchain\llvm\utils\lit\lit.py -D PYTHON_EXECUTABLE=C:\Python27\python.exe -G Ninja -S S:\swift-corelibs-xctest
-ninja -C S:\b\xctest
+cmake -B S:\b\4 ^
+  -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
+  -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
+  -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
+  -D dispatch_DIR=S:\b\2\cmake\modules ^
+  -D Foundation_DIR=S:\b\3\cmake\modules ^
+  -D LIT_COMMAND=S:\llvm-project\llvm\utils\lit\lit.py ^
+  -G Ninja ^
+  -S S:\swift-corelibs-xctest
+
+ninja -C S:\b\4
 ```
 
 - Add XCTest to your path:
 
 ```cmd
-path S:\b\xctest;%PATH%
+
+path S:\b\4;%PATH%
 ```
 
 ## Test XCTest
 
 ```cmd
-ninja -C S:\b\xctest check-xctest
+ninja -C S:\b\4 check-xctest
 ```
 
 ## Rebuild Foundation
 
 ```cmd
-cmake -B S:\b\foundation -D CMAKE_BUILD_TYPE=RelWithDebInfo -D CMAKE_C_COMPILER=S:/b/toolchain/bin/clang-cl.exe -D CMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -D CURL_LIBRARY="S:/Library/libcurl-development/usr/lib/libcurl.lib" -D CURL_INCLUDE_DIR="S:/Library/libcurl-development/usr/include" -D ICU_ROOT="S:/Library/icu-67" -D LIBXML2_LIBRARY="S:/Library/libxml2-development/usr/lib/libxml2.lib" -D LIBXML2_INCLUDE_DIR="S:/Library/libxml2-development/usr/include" -D ENABLE_TESTING=YES -D dispatch_DIR=S:/b/libdispatch/cmake/modules -D XCTest_DIR=S:/b/xctest/cmake/modules -G Ninja -S S:\swift-corelibs-foundation
-ninja -C S:\b\foundation
+cmake -B S:\b\3 ^
+  -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
+  -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
+  -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
+  -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
+  -D CURL_LIBRARY="S:/Library/libcurl-development/usr/lib/libcurl.lib" ^
+  -D CURL_INCLUDE_DIR="S:/Library/libcurl-development/usr/include" ^
+  -D ICU_I18N_LIBRARY_RELEASE=S:\library\icu-67\usr\lib\icuin67.lib ^
+  -D ICU_ROOT=S:\Library\icu-67\usr ^
+  -D ICU_UC_LIBRARY_RELEASE=S:\Library\icu-67\usr\lib\icuuc67.lib ^
+  -D LIBXML2_LIBRARY=S:\Library\libxml2-development\usr\lib\libxml2s.lib ^
+  -D LIBXML2_INCLUDE_DIR=S:\Library\libxml2-development\usr\include\libxml2 ^
+  -D ENABLE_TESTING=YES ^
+  -D dispatch_DIR=S:\b\2\cmake\modules ^
+  -D XCTest_DIR=S:\b\4\cmake\modules ^
+  -G Ninja ^
+  -S S:\swift-corelibs-foundation
+
+ninja -C S:\b\3
 ```
 
 ## Test Foundation
 
 ```cmd
-cmake --build S:\b\foundation
-ninja -C S:\b\foundation test
-```
-
-## Build llbuild
-
-```cmd
-set AR=llvm-ar
-cmake -B S:\b\llbuild -D CMAKE_BUILD_TYPE=RelWithDebInfo -D CMAKE_CXX_COMPILER=cl -D CMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -D Foundation_DIR=S:/b/foundation/cmake/modules -D dispatch_DIR=S:/b/libdispatch/cmake/modules -D SQLite3_INCLUDE_DIR=S:\Library\sqlite-3.28.0\usr\include -D SQLite3_LIBRARY=S:\Library\sqlite-3.28.0\usr\lib\sqlite3.lib -D LLBUILD_SUPPORT_BINDINGS=Swift -G Ninja -S S:\llbuild
-ninja -C S:\b\llbuild
-```
-
-- Add llbuild to your path:
-
-```cmd
-path S:\b\llbuild\bin;%PATH%
+ninja -C S:\b\3 test
 ```
 
 ## Build swift-tools-core-support
 
 ```cmd
-cmake -B S:\b\tsc -D CMAKE_BUILD_TYPE=RelWithDebInfo -D CMAKE_C_COMPILER=cl -D CMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -D Foundation_DIR=S:/b/foundation/cmake/modules -D dispatch_DIR=S:/b/libdispatch/cmake/modules -G Ninja -S S:\swift-tools-support-core
-ninja -C S:\b\tsc
+cmake -B S:\b\5 ^
+  -D BUILD_SHARED_LIBS=YES ^
+  -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
+  -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
+  -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
+  -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
+  -D dispatch_DIR=S:\b\2\cmake\modules ^
+  -D Foundation_DIR=S:\b\3\cmake\modules ^
+  -D SQLite3_INCLUDE_DIR=S:\Library\sqlite-3.28.0\usr\include ^
+  -D SQLite3_LIBRARY=S:\Library\sqlite-3.28.0\usr\lib\SQLite3.lib ^
+  -G Ninja ^
+  -S S:\swift-tools-support-core
+
+ninja -C S:\b\5
+```
+
+## Build swift-llbuild
+
+```cmd
+cmake -B S:\b\6 ^
+  -D BUILD_SHARED_LIBS=YES ^
+  -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
+  -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
+  -D CMAKE_CXX_COMPILER=S:/b/1/bin/clang-cl.exe ^
+  -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
+  -D CMAKE_CXX_FLAGS="-Xclang -fno-split-cold-code" ^
+  -D LLBUILD_SUPPORT_BINDINGS=Swift ^
+  -D dispatch_DIR=S:\b\2\cmake\modules ^
+  -D Foundation_DIR=S:\b\3\cmake\modules ^
+  -D SQLite3_INCLUDE_DIR=S:\Library\sqlite-3.28.0\usr\include ^
+  -D SQLite3_LIBRARY=S:\Library\sqlite-3.28.0\usr\lib\sqlite3.lib ^
+  -G Ninja ^
+  -S S:\swift-llbuild
+
+ninja -C S:\b\6
+```
+
+- Add llbuild to your path:
+
+```cmd
+path S:\b\6\bin;%PATH%
+```
+
+## Build Yams
+
+```cmd
+cmake -B S:\b\7 ^
+  -D BUILD_SHARED_LIBS=YES ^
+  -D CMAKE_BUILD_TYPE=Release ^
+  -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
+  -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
+  -D dispatch_DIR=S:\b\2\cmake\modules ^
+  -D Foundation_DIR=S:\b\3\cmake\modules ^
+  -D XCTest_DIR=S:\b\4\cmake\modules ^
+  -G Ninja ^
+  -S S:\swift-llbuild
+
+ninja -C S:\b\7
+```
+
+## Build swift-driver
+
+```cmd
+cmake -B S:\b\8 ^
+  -D BUILD_SHARED_LIBS=YES ^
+  -D CMAKE_BUILD_TYPE=Release ^
+  -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
+  -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
+  -D dispatch_DIR=S:\b\2\cmake\modules ^
+  -D Foundation_DIR=S:\b\3\cmake\modules ^
+  -D TSC_DIR=S:\b\5\cmake\modules ^
+  -D LLBuild_DIR=S:\b\6\cmake\modules ^
+  -D Yams_DIR=S:\b\7\cmake\modules ^
+  -G Ninja ^
+  -S S:\swift-driver
+
+ninja -C S:\b\8
+```
+
+## Build swift-argument-parser
+
+```cmd
+cmake -B S:\b\9 ^
+  -D BUILD_SHARED_LIBS=YES ^
+  -D CMAKE_BUILD_TYPE=Release ^
+  -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
+  -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
+  -D dispatch_DIR=S:\b\2\cmake\modules ^
+  -D Foundation_DIR=S:\b\3\cmake\modules ^
+  -D XCTest_DIR=S:\b\4\cmake\modules ^
+  -G Ninja ^
+  -S S:\swift-argument-parser
+
+ninja -C S:\b\9
 ```
 
 ## Build swift-package-manager
 
 ```cmd
-cmake -B S:\b\spm -D CMAKE_BUILD_TYPE=RelWithDebInfo -D CMAKE_C_COMPILER=S:/b/toolchain/bin/clang-cl.exe -D CMAKE_CXX_COMPILER=S:/b/toolchain/bin/clang-cl.exe -D CMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -D USE_VENDORED_TSC=YES -D Foundation_DIR=S:/b/foundation/cmake/modules -D dispatch_DIR=S:/b/libdispatch/cmake/modules -D LLBuild_DIR=S:/b/llbuild/cmake/modules -G Ninja -S S:\swiftpm
-ninja -C S:\b\spm
+cmake -B S:\b\10 ^
+  -D BUILD_SHARED_LIBS=YES ^
+  -D CMAKE_BUILD_TYPE=Release ^
+  -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
+  -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
+  -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
+  -D dispatch_DIR=S:\b\2\cmake\modules ^
+  -D Foundation_DIR=S:\b\3\cmake\modules ^
+  -D TSC_DIR=S:\b\5\cmake\modules ^
+  -D LLBuild_DIR=S:\b\6\cmake\modules ^
+  -D Yams_DIR=S:\b\7\cmake\modules ^
+  -D SwiftDriver_DIR=S:\b\8\cmake\modules ^
+  -D ArgumentParser_DIR=S:\b\9\cmake\modules ^
+  -G Ninja ^
+  -S S:\swift-package-manager
+
+ninja -C S:\b\10
 ```
 
 ## Install the Swift toolchain on Windows
