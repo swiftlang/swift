@@ -19,6 +19,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/Signals.h"
 #include "llvm/Support/raw_ostream.h"
 #include "gtest/gtest.h"
 #include <random>
@@ -50,12 +51,7 @@ struct LocalizationTest : public ::testing::Test {
   std::string YAMLPath;
 
   LocalizationTest() {
-    llvm::SmallString<128> tempFilename;
-    std::error_code error =
-        llvm::sys::fs::createTemporaryFile("en", "yaml", tempFilename);
-    assert(!error);
-
-    YAMLPath = std::string(tempFilename);
+    YAMLPath = std::string(createTemporaryFile("en", "yaml"));
   }
 
   void SetUp() override {
@@ -63,7 +59,15 @@ struct LocalizationTest : public ::testing::Test {
     assert(!failed && "failed to generate a YAML file");
   }
 
-  void TearDown() override { llvm::sys::fs::remove(YAMLPath); }
+  static std::string createTemporaryFile(std::string prefix,
+                                         std::string suffix) {
+    llvm::SmallString<128> tempFile;
+    std::error_code error =
+        llvm::sys::fs::createTemporaryFile(prefix, suffix, tempFile);
+    assert(!error);
+    llvm::sys::RemoveFileOnSignal(tempFile);
+    return std::string(tempFile);
+  }
 
   /// Random number in [0,n)
   unsigned RandNumber(unsigned n) { return unsigned(rand()) % n; }
