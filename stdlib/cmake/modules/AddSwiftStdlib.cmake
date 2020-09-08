@@ -298,6 +298,9 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-DSWIFT_OBJC_INTEROP=0")
   endif()
 
+  # TODO(mracek): This should turned off for non-ABI-stable environments.
+  list(APPEND result "-DSWIFT_LIBRARY_EVOLUTION=1")
+
   if(NOT SWIFT_ENABLE_COMPATIBILITY_OVERRIDES)
     list(APPEND result "-DSWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES")
   endif()
