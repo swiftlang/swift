@@ -601,10 +601,10 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
   assert(!Decls.empty() && "Must have at least one declaration");
 
   auto &Context = UseDC->getASTContext();
-  if (Decls.size() == 1 && !isa<ProtocolDecl>(Decls[0]->getDeclContext())) {
-    auto semantics = Decls[0]->getAccessSemanticsFromContext(UseDC,
-                                                       /*isAccessOnSelf*/false);
-    return new (Context) DeclRefExpr(Decls[0], NameLoc, Implicit, semantics);
+
+  if (Decls.size() == 1) {
+    return new (Context) DeclRefExpr(Decls[0], NameLoc, Implicit,
+                                     AccessSemantics::Ordinary);
   }
 
   Decls = Context.AllocateCopy(Decls);
