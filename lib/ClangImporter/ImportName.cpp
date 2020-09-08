@@ -1185,7 +1185,7 @@ static bool isNullableNSErrorType(
   return true;
 }
 
-Optional<ForeignAsyncConvention>
+Optional<ForeignAsyncConvention::Info>
 NameImporter::considerAsyncImport(
     const clang::ObjCMethodDecl *clangDecl,
     StringRef &baseName,
@@ -1211,7 +1211,8 @@ NameImporter::considerAsyncImport(
   // Determine whether the naming indicates that this is a completion
   // handler.
   Optional<StringRef> newBaseName;
-  if (isCompletionHandlerParamName(paramNames[completionHandlerParamNameIndex])) {
+  if (isCompletionHandlerParamName(
+          paramNames[completionHandlerParamNameIndex])) {
     // The argument label itself has an appropriate name.
   } else if (!hasCustomName && completionHandlerParamIndex == 0 &&
              (newBaseName = isCompletionHandlerInBaseName(baseName))) {
@@ -1226,7 +1227,8 @@ NameImporter::considerAsyncImport(
   // Used for returns once we've determined that the method cannot be
   // imported as async, even though it has what looks like a completion handler
   // parameter.
-  auto notAsync = [&](const char *reason) -> Optional<ForeignAsyncConvention> {
+  auto notAsync = [&](const char *reason) ->
+      Optional<ForeignAsyncConvention::Info> {
 #ifdef ASYNC_IMPORT_DEBUG
     llvm::errs() << "*** failed async import: " << reason << "\n";
     clangDecl->dump(llvm::errs());
@@ -1306,7 +1308,7 @@ NameImporter::considerAsyncImport(
   if (newBaseName && !hasCustomName)
     baseName = *newBaseName;
 
-  return ForeignAsyncConvention(
+  return ForeignAsyncConvention::Info(
       completionHandlerParamIndex, completionHandlerErrorParamIndex);
 }
 
