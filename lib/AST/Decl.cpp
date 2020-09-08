@@ -2451,7 +2451,11 @@ bool swift::conflicting(const OverloadSignature& sig1,
     return !((sig1.IsVariable && !sig2.Name.getArgumentNames().empty()) ||
              (sig2.IsVariable && !sig1.Name.getArgumentNames().empty()));
   }
-  
+
+  // If one is asynchronous and the other is not, they can't conflict.
+  if (sig1.HasAsync != sig2.HasAsync)
+    return false;
+
   // Note that we intentionally ignore the HasOpaqueReturnType bit here.
   // For declarations that can't be overloaded by type, we want them to be
   // considered conflicting independent of their type.
@@ -2674,6 +2678,8 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
   signature.IsTypeAlias = isa<TypeAliasDecl>(this);
   signature.HasOpaqueReturnType =
                        !signature.IsVariable && (bool)getOpaqueResultTypeDecl();
+  signature.HasAsync = isa<AbstractFunctionDecl>(this) &&
+    cast<AbstractFunctionDecl>(this)->hasAsync();
 
   // Unary operators also include prefix/postfix.
   if (auto func = dyn_cast<FuncDecl>(this)) {

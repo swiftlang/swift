@@ -122,11 +122,7 @@ void addImageCallback2Sections(const mach_header *mh, intptr_t vmaddr_slide) {
 
 #if OBJC_ADDLOADIMAGEFUNC_DEFINED && SWIFT_OBJC_INTEROP
 #define REGISTER_FUNC(...)                                               \
-  if (__builtin_available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)) { \
-    objc_addLoadImageFunc(__VA_ARGS__);                                  \
-  } else {                                                               \
-    _dyld_register_func_for_add_image(__VA_ARGS__);                      \
-  }
+    _dyld_register_func_for_add_image(__VA_ARGS__);
 #else
 #define REGISTER_FUNC(...) _dyld_register_func_for_add_image(__VA_ARGS__)
 #endif
