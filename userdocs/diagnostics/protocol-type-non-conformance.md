@@ -60,7 +60,7 @@ When used as a type, the Swift protocol `Error` conforms to itself; `@objc` prot
 
 Concrete types that _do_ conform to protocols can provide functionality similar to that of existential types. For example, the standard library provides the `AnyHashable` type for `Hashable` values. Manual implementation of such __type erasure__ can require specific knowledge of the semantic requirements for each protocol involved and is beyond the scope of this discussion.
 
-In certain scenarios, you might avoid any need for manual type erasure by reworking generic APIs themselves to use existential types instead:
+In certain scenarios, you might avoid any need for manual type erasure by reworking generic APIs to use existential types instead:
 
 ```swift
 func declareAnimalSpeciesDynamically(_ animal: Animal) {
