@@ -249,8 +249,6 @@ CanSILFunctionType buildThunkType(SILFunction *fn,
       fn->getASTContext());
 }
 
-enum class CleanupOperation { Destroy, EndBorrow };
-
 /// Forward function arguments, handling ownership convention mismatches.
 /// Adapted from `forwardFunctionArguments` in SILGenPoly.cpp.
 ///
@@ -265,8 +263,7 @@ static void forwardFunctionArgumentsConvertingOwnership(
     CanSILFunctionType toTy, ArrayRef<SILArgument *> originalArgs,
     SmallVectorImpl<SILValue> &forwardedArgs,
     SmallVectorImpl<AllocStackInst *> &localAllocations,
-    SmallVectorImpl<std::pair<SILValue, CleanupOperation>>
-        &valuesToCleanup) {
+    SmallVectorImpl<SILValue> &valuesToCleanup) {
   auto fromParameters = fromTy->getParameters();
   auto toParameters = toTy->getParameters();
   assert(fromParameters.size() == toParameters.size());
@@ -295,8 +292,8 @@ static void forwardFunctionArgumentsConvertingOwnership(
     if (fromParam.isGuaranteed() && !toParam.isGuaranteed()) {
       auto bbi = builder.emitBeginBorrowOperation(loc, arg);
       forwardedArgs.push_back(bbi);
-      valuesToCleanup.push_back({bbi, CleanupOperation::EndBorrow});
-      valuesToCleanup.push_back({arg, CleanupOperation::Destroy});
+      valuesToCleanup.push_back(bbi);
+      valuesToCleanup.push_back(arg);
       continue;
     }
     // Otherwise, simply forward the argument.
@@ -349,7 +346,7 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   for (auto indRes : thunk->getIndirectResults())
     forwardedArgs.push_back(indRes);
   SmallVector<AllocStackInst *, 4> localAllocations;
-  SmallVector<std::pair<SILValue, CleanupOperation>, 4> valuesToCleanup;
+  SmallVector<SILValue, 4> valuesToCleanup;
   forwardFunctionArgumentsConvertingOwnership(
       builder, loc, fromType, toType,
       thunk->getArgumentsWithoutIndirectResults().drop_back(), forwardedArgs,
@@ -413,7 +410,7 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
       toArg = builder.emitCopyValueOperation(loc, toArg);
       builder.emitStoreValueOperation(loc, toArg, buf,
                                       StoreOwnershipQualifier::Init);
-      valuesToCleanup.push_back({buf, CleanupOperation::Destroy});
+      valuesToCleanup.push_back(buf);
       arguments.push_back(buf);
       continue;
     }
@@ -422,7 +419,7 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
     auto toArg = *toArgIter++;
     auto load = builder.emitLoadBorrowOperation(loc, toArg);
     if (isa<LoadBorrowInst>(load))
-      valuesToCleanup.push_back({load, CleanupOperation::EndBorrow});
+      valuesToCleanup.push_back(load);
     arguments.push_back(load);
   }
 
@@ -495,14 +492,16 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   auto retVal = joinElements(results, builder, loc);
 
   // Clean up local values.
-  for (auto pair : valuesToCleanup) {
-    auto arg = pair.first;
-    auto cleanupKind = pair.second;
-    switch (cleanupKind) {
-    case CleanupOperation::EndBorrow:
+  // Guaranteed values need an `end_borrow`.
+  // Owned values need to be destroyed.
+  for (auto arg : valuesToCleanup) {
+    switch (arg.getOwnershipKind()) {
+    case ValueOwnershipKind::Guaranteed:
       builder.emitEndBorrowOperation(loc, arg);
       break;
-    case CleanupOperation::Destroy:
+    case ValueOwnershipKind::Owned:
+    case ValueOwnershipKind::Unowned:
+    case ValueOwnershipKind::None:
       builder.emitDestroyOperation(loc, arg);
       break;
     }
