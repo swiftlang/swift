@@ -885,7 +885,8 @@ void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {
   if (auto VD = dyn_cast<ValueDecl>(D)) {
     // VD must be public or open to use an @_spi attribute.
     auto declAccess = VD->getFormalAccess();
-    if (declAccess < AccessLevel::Public) {
+    if (declAccess < AccessLevel::Public &&
+        !VD->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
       diagnoseAndRemoveAttr(attr,
                             diag::spi_attribute_on_non_public,
                             declAccess,
