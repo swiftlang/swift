@@ -6072,7 +6072,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
     // TypeName at attribute position after '@'.
     // - VarDecl: Property Wrappers.
-    // - ParamDecl/VarDecl/FuncDecl: Function Buildres.
+    // - ParamDecl/VarDecl/FuncDecl: Function Builders.
     if (!AttTargetDK || *AttTargetDK == DeclKind::Var ||
         *AttTargetDK == DeclKind::Param || *AttTargetDK == DeclKind::Func)
       Lookup.getTypeCompletionsInDeclContext(
