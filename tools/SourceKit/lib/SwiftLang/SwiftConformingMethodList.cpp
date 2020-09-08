@@ -26,11 +26,10 @@ using namespace SourceKit;
 using namespace swift;
 using namespace ide;
 
-static void translateConformingMethodListOptions(OptionsDictionary &from,
-                                                 ConformingMethodList::Options &to) {
-  static UIdent KeyReuseASTContext("key.conformingmethods.reuseastcontext");
-
-  from.valueForOption(KeyReuseASTContext, to.reuseASTContextIfPossible);
+static void
+translateConformingMethodListOptions(OptionsDictionary &from,
+                                     ConformingMethodList::Options &to) {
+  // ConformingMethodList doesn't receive any options at this point.
 }
 
 static bool swiftConformingMethodListImpl(
@@ -39,9 +38,9 @@ static bool swiftConformingMethodListImpl(
     ArrayRef<const char *> ExpectedTypeNames,
     ide::ConformingMethodListConsumer &Consumer,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    bool EnableASTCaching, std::string &Error) {
+    std::string &Error) {
   return Lang.performCompletionLikeOperation(
-      UnresolvedInputFile, Offset, Args, FileSystem, EnableASTCaching, Error,
+      UnresolvedInputFile, Offset, Args, FileSystem, Error,
       [&](CompilerInstance &CI, bool reusingASTContext) {
         // Create a factory for code completion callbacks that will feed the
         // Consumer.
@@ -194,7 +193,7 @@ void SwiftLangSupport::getConformingMethodList(
 
   if (!swiftConformingMethodListImpl(*this, UnresolvedInputFile, Offset, Args,
                                      ExpectedTypeNames, Consumer, fileSystem,
-                                     options.reuseASTContextIfPossible, error)) {
+                                     error)) {
     SKConsumer.failed(error);
   }
 }

@@ -829,7 +829,7 @@ static bool doCodeCompletionImpl(
   CompletionInstance CompletionInst;
   auto isSuccess = CompletionInst.performOperation(
       Invocation, /*Args=*/{}, llvm::vfs::getRealFileSystem(), CleanFile.get(),
-      Offset, /*EnableASTCaching=*/false, Error,
+      Offset, Error,
       CodeCompletionDiagnostics ? &PrintDiags : nullptr,
       [&](CompilerInstance &CI, bool reusingASTContext) {
         assert(!reusingASTContext && "reusing AST context without enabling it");
@@ -1207,8 +1207,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
     bool wasASTContextReused = false;
     bool isSuccess = CompletionInst.performOperation(
         Invocation, /*Args=*/{}, FileSystem, completionBuffer.get(), Offset,
-        /*EnableASTCaching=*/true, Error,
-        CodeCompletionDiagnostics ? &PrintDiags : nullptr,
+        Error, CodeCompletionDiagnostics ? &PrintDiags : nullptr,
         [&](CompilerInstance &CI, bool reusingASTContext) {
           // Create a CodeCompletionConsumer.
           std::unique_ptr<ide::CodeCompletionConsumer> Consumer(
