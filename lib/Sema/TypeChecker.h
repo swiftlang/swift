@@ -42,7 +42,6 @@ class TypeResolution;
 class TypeResolutionOptions;
 class TypoCorrectionResults;
 class ExprPattern;
-class CompletionCollector;
 enum class TypeResolutionStage : uint8_t;
 
 namespace constraints {

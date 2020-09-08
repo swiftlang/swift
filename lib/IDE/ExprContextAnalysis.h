@@ -22,7 +22,6 @@ namespace swift {
 class DeclContext;
 class Expr;
 class ValueDecl;
-class CompletionCollector;
 
 namespace ide {
 enum class SemanticContextKind;

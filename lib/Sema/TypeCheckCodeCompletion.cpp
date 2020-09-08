@@ -41,6 +41,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Sema/CodeCompletionTypeChecking.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -865,7 +866,13 @@ bool TypeChecker::typeCheckForCodeCompletion(
                                                /*contextualType=*/Type(),
                                                /*isDiscarded=*/true);
 
-    (void)solveForCodeCompletion(completionTarget);
+    switch (solveForCodeCompletion(completionTarget)) {
+    case CompletionResult::Ok:
+    case CompletionResult::Fallback:
+      break;
+    case CompletionResult::NotApplicable:
+      llvm_unreachable("solve on CodeCompletionExpr produced not applicable?");
+    }
   }
   return true;
 }
@@ -966,7 +973,7 @@ swift::lookupSemanticMember(DeclContext *DC, Type ty, DeclName name) {
   return TypeChecker::lookupMember(DC, ty, DeclNameRef(name), None);
 }
 
-void DotExprLookup::fallbackTypeCheck() {
+void DotExprTypeCheckCompletionCallback::fallbackTypeCheck() {
   assert(!gotCallback());
   SolutionApplicationTarget completionTarget(CompletionExpr, DC, CTP_Unused,
                                              Type(), /*isDiscared=*/true);
@@ -974,7 +981,8 @@ void DotExprLookup::fallbackTypeCheck() {
       completionTarget, [&](const Solution &S) { sawSolution(S); });
 }
 
-void DotExprLookup::sawSolution(const constraints::Solution &S) {
+void DotExprTypeCheckCompletionCallback::
+sawSolution(const constraints::Solution &S) {
   GotCallback = true;
   auto &CS = S.getConstraintSystem();
 
@@ -1047,9 +1055,9 @@ void DotExprLookup::sawSolution(const constraints::Solution &S) {
     ReferencedDecl = SelectedOverload->choice.getDeclOrNull();
 
   auto Key = std::make_pair(BaseTy, ReferencedDecl);
-  auto Ret = BaseToSolutionIdx.insert({Key, Solutions.size()});
+  auto Ret = BaseToSolutionIdx.insert({Key, Results.size()});
   if (!Ret.second && ExpectedTy) {
-    Solutions[Ret.first->getSecond()].ExpectedTypes.push_back(ExpectedTy);
+    Results[Ret.first->getSecond()].ExpectedTypes.push_back(ExpectedTy);
   } else {
     bool ISDMT = S.isStaticallyDerivedMetatype(ParsedExpr);
     bool SingleExprBody = false;
@@ -1070,9 +1078,9 @@ void DotExprLookup::sawSolution(const constraints::Solution &S) {
       }
     }
 
-    Solutions.push_back(
+    Results.push_back(
         {BaseTy, ReferencedDecl, {}, DisallowVoid, ISDMT, SingleExprBody});
     if (ExpectedTy)
-      Solutions.back().ExpectedTypes.push_back(ExpectedTy);
+      Results.back().ExpectedTypes.push_back(ExpectedTy);
   }
 }

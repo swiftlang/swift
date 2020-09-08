@@ -35,6 +35,7 @@
 #include "swift/IDE/Utils.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Sema/CodeCompletionTypeChecking.h"
 #include "swift/Syntax/SyntaxKind.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
@@ -5911,9 +5912,11 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
                                    DCForModules);
 }
 
-void DotExprLookup::performLookup(ide::CodeCompletionContext &CompletionCtx,
-                                  CodeCompletionConsumer &Consumer,
-                                  bool IsInSelector) const {
+void deliverDotExprResults(
+    ArrayRef<DotExprTypeCheckCompletionCallback::Result> Solutions,
+    Expr *BaseExpr, DeclContext *DC, SourceLoc DotLoc, bool IsInSelector,
+    ide::CodeCompletionContext &CompletionCtx,
+    CodeCompletionConsumer &Consumer) {
   ASTContext &Ctx = DC->getASTContext();
   CompletionLookup Lookup(CompletionCtx.getResultSink(), Ctx, DC,
                           &CompletionCtx);
@@ -5921,7 +5924,6 @@ void DotExprLookup::performLookup(ide::CodeCompletionContext &CompletionCtx,
   if (DotLoc.isValid())
     Lookup.setHaveDot(DotLoc);
 
-  Expr *BaseExpr = CompletionExpr->getBase();
   Lookup.setIsSuperRefExpr(isa<SuperRefExpr>(BaseExpr));
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(BaseExpr))
@@ -5980,21 +5982,26 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion() {
     assert(CodeCompleteTokenExpr);
     assert(CurDeclContext);
 
-    DotExprLookup Lookup(DotLoc, CurDeclContext, CodeCompleteTokenExpr);
-    llvm::SaveAndRestore<CompletionCollector*>
+    DotExprTypeCheckCompletionCallback Lookup(CurDeclContext,
+                                              CodeCompleteTokenExpr);
+    llvm::SaveAndRestore<TypeCheckCompletionCallback*>
       CompletionCollector(Context.CompletionCallback, &Lookup);
     typeCheckContextAt(CurDeclContext, CompletionLoc);
 
     // This (hopefully) only happens in cases where the expression isn't
     // typechecked during normal compilation either (e.g. member completion in a
-    // switch case where there switched value is invalid). Having normal
+    // switch case where there control expression is invalid). Having normal
     // typechecking still resolve even these cases would be beneficial for
     // tooling in general though.
     if (!Lookup.gotCallback())
       Lookup.fallbackTypeCheck();
 
     addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
-    Lookup.performLookup(CompletionContext, Consumer, isInsideObjCSelector());
+
+    Expr *CheckedBase = CodeCompleteTokenExpr->getBase();
+    deliverDotExprResults(Lookup.getResults(), CheckedBase, CurDeclContext,
+                          DotLoc, isInsideObjCSelector(), CompletionContext,
+                          Consumer);
     return true;
   }
   default:
