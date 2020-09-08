@@ -6081,26 +6081,9 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   switch (Kind) {
   case CompletionKind::None:
+  case CompletionKind::DotExpr:
     llvm_unreachable("should be already handled");
     return;
-
-  case CompletionKind::DotExpr: {
-    Lookup.setHaveDot(DotLoc);
-
-    if (isDynamicLookup(*ExprType))
-      Lookup.setIsDynamicLookup();
-
-    Lookup.getPostfixKeywordCompletions(*ExprType, ParsedExpr);
-
-    if (isa<BindOptionalExpr>(ParsedExpr) || isa<ForceValueExpr>(ParsedExpr))
-      Lookup.setIsUnwrappedOptional(true);
-
-    ExprContextInfo ContextInfo(CurDeclContext, ParsedExpr);
-    Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
-                            ContextInfo.isSingleExpressionBody());
-    Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
-    break;
-  }
 
   case CompletionKind::KeyPathExprSwift: {
     auto KPE = dyn_cast<KeyPathExpr>(ParsedExpr);
