@@ -2347,10 +2347,15 @@ public:
     // FIXME: This needs to be moved to its own request if we want to
     // productize @_cdecl.
     if (auto CDeclAttr = FD->getAttrs().getAttribute<swift::CDeclAttr>()) {
+      Optional<ForeignAsyncConvention> asyncConvention;
       Optional<ForeignErrorConvention> errorConvention;
       if (isRepresentableInObjC(FD, ObjCReason::ExplicitlyCDecl,
-                                errorConvention)) {
-        if (FD->hasThrows()) {
+                                asyncConvention, errorConvention)) {
+        if (FD->hasAsync()) {
+          FD->setForeignAsyncConvention(*asyncConvention);
+          getASTContext().Diags.diagnose(CDeclAttr->getLocation(),
+                                         diag::cdecl_async);
+        } else if (FD->hasThrows()) {
           FD->setForeignErrorConvention(*errorConvention);
           getASTContext().Diags.diagnose(CDeclAttr->getLocation(),
                                          diag::cdecl_throws);

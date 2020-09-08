@@ -24,38 +24,78 @@ namespace swift {
 
 /// A small structure describing the async convention of a foreign declaration.
 class ForeignAsyncConvention {
-  /// The index of the completion handler parameters.
-  unsigned CompletionHandlerParamIndex;
-
-  /// When non-zero, indicates which parameter to the completion handler is the
-  /// Error? parameter (minus one) that makes this async function also throwing.
-  unsigned CompletionHandlerErrorParamIndex;
 public:
-  ForeignAsyncConvention()
+  struct Info {
+    /// The index of the completion handler parameters.
+    unsigned CompletionHandlerParamIndex;
+
+    /// When non-zero, indicates which parameter to the completion handler is
+    /// the Error? parameter (minus one) that makes this async function also
+    /// throwing.
+    unsigned CompletionHandlerErrorParamIndex;
+
+    Info()
       : CompletionHandlerParamIndex(0), CompletionHandlerErrorParamIndex(0) { }
 
-  ForeignAsyncConvention(unsigned completionHandlerParamIndex,
-                         Optional<unsigned> completionHandlerErrorParamIndex)
+    Info(
+        unsigned completionHandlerParamIndex,
+        Optional<unsigned> completionHandlerErrorParamIndex)
       : CompletionHandlerParamIndex(completionHandlerParamIndex),
         CompletionHandlerErrorParamIndex(
-          completionHandlerErrorParamIndex
-            ? *completionHandlerErrorParamIndex + 1
-            : 0) {}
+            completionHandlerErrorParamIndex
+              ? *completionHandlerErrorParamIndex + 1
+              : 0) {}
+
+    /// Retrieve the index of the \c Error? parameter in the completion handler's
+    /// parameter list. When argument passed to this parameter is non-null, the
+    /// provided error will be thrown by the async function.
+    Optional<unsigned> completionHandlerErrorParamIndex() const {
+      if (CompletionHandlerErrorParamIndex == 0)
+        return None;
+
+      return CompletionHandlerErrorParamIndex - 1;
+    }
+
+    /// Whether the async function is throwing due to the completion handler
+    /// having an \c Error? parameter.
+    ///
+    /// Equivalent to \c static_cast<bool>(completionHandlerErrorParamIndex()).
+    bool isThrowing() const {
+      return CompletionHandlerErrorParamIndex != 0;
+    }
+  };
+
+  /// The type of the completion handler parameter.
+  CanType CompletionHandlerType;
+
+  /// Information about the async convention that can be determined from an
+  /// Objective-C declaration by itself.
+  Info TheInfo;
+
+public:
+  ForeignAsyncConvention() : TheInfo() { }
+
+  ForeignAsyncConvention(CanType completionHandlerType,
+                         unsigned completionHandlerParamIndex,
+                         Optional<unsigned> completionHandlerErrorParamIndex)
+      : CompletionHandlerType(completionHandlerType),
+        TheInfo(completionHandlerParamIndex, completionHandlerErrorParamIndex)
+  { }
+
+  /// Retrieve the type of the completion handler parameter.
+  CanType completionHandlerType() const { return CompletionHandlerType; }
 
   /// Retrieve the index of the completion handler parameter, which will be
   /// erased from the Swift signature of the imported async function.
   unsigned completionHandlerParamIndex() const {
-    return CompletionHandlerParamIndex;
+    return TheInfo.CompletionHandlerParamIndex;
   }
 
   /// Retrieve the index of the \c Error? parameter in the completion handler's
   /// parameter list. When argument passed to this parameter is non-null, the
   /// provided error will be thrown by the async function.
   Optional<unsigned> completionHandlerErrorParamIndex() const {
-    if (CompletionHandlerErrorParamIndex == 0)
-      return None;
-
-    return CompletionHandlerErrorParamIndex - 1;
+    return TheInfo.completionHandlerErrorParamIndex();
   }
 
   /// Whether the async function is throwing due to the completion handler
@@ -63,14 +103,17 @@ public:
   ///
   /// Equivalent to \c static_cast<bool>(completionHandlerErrorParamIndex()).
   bool isThrowing() const {
-    return CompletionHandlerErrorParamIndex != 0;
+    return TheInfo.isThrowing();
   }
 
   bool operator==(ForeignAsyncConvention other) const {
-    return CompletionHandlerParamIndex == other.CompletionHandlerParamIndex
-      && CompletionHandlerErrorParamIndex ==
-        other.CompletionHandlerErrorParamIndex;
+    return CompletionHandlerType == other.CompletionHandlerType
+        && TheInfo.CompletionHandlerParamIndex ==
+          other.TheInfo.CompletionHandlerParamIndex
+        && TheInfo.CompletionHandlerErrorParamIndex ==
+          other.TheInfo.CompletionHandlerErrorParamIndex;
   }
+
   bool operator!=(ForeignAsyncConvention other) const {
     return !(*this == other);
   }

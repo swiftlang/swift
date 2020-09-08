@@ -1159,6 +1159,7 @@ public:
                                   bool isFromSystemModule,
                                   ParameterList **bodyParams,
                                   importer::ImportedName importedName,
+                                  Optional<ForeignAsyncConvention> &asyncConv,
                                   Optional<ForeignErrorConvention> &errorConv,
                                   SpecialMethodKind kind);
 
