@@ -17,4 +17,7 @@ class Concurrency {
 
   @objc func takeAnAsync(_ fn: () async -> Int) { } // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-1{{'async' function types cannot be represented in Objective-C}}
+
+  @objc class func createAsynchronously() async -> Self? { nil }
+  // expected-error@-1{{asynchronous method returning 'Self' cannot be '@objc'}}
 }

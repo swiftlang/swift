@@ -4129,6 +4129,8 @@ NOTE(objc_ambiguous_async_convention_candidate,none,
 ERROR(satisfy_async_objc,none,
       "satisfying an asychronous @objc %select{method|initializer}0 with "
       "a synchronous %select{method|initializer}0 is not supported", (bool))
+ERROR(async_objc_dynamic_self,none,
+      "asynchronous method returning 'Self' cannot be '@objc'", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Types

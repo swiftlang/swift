@@ -630,6 +630,18 @@ bool swift::isRepresentableInObjC(
       return false;
     }
 
+    // The completion handler transformation cannot properly represent a
+    // dynamic 'Self' type, so disallow @objc for such methods.
+    if (FD->hasDynamicSelfResult()) {
+      if (Diagnose) {
+        AFD->diagnose(diag::async_objc_dynamic_self)
+            .highlight(AFD->getAsyncLoc());
+        describeObjCReason(AFD, Reason);
+      }
+
+      return false;
+    }
+
     // The completion handler parameter always goes at the end.
     unsigned completionHandlerParamIndex = AFD->getParameters()->size();
 
