@@ -677,21 +677,29 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
   SmallVector<ValueDecl*, 4> ResultValues;
   ValueDecl *localDeclAfterUse = nullptr;
   auto isValid = [&](ValueDecl *D) {
-    // FIXME: The source-location checks won't make sense once
-    // EnableASTScopeLookup is the default.
+    // For local stored properties with an initializer, we look at
+    // the end location of the initializer, instead of the location
+    // of the property. This allows the following pattern to work:
     //
-    // Note that we allow forward references to types, because they cannot
-    // capture.
-    if (Loc.isValid() && D->getLoc().isValid() &&
+    // func foo(x: Int) {
+    //    let x = x
+    // }
+    auto DeclLoc = D->getLoc();
+    if (auto *VD = dyn_cast<VarDecl>(D))
+      if (auto *E = VD->getParentInitializer())
+        DeclLoc = E->getSourceRange().End;
+
+    if (Loc.isValid() && DeclLoc.isValid() &&
         D->getDeclContext()->isLocalContext() &&
         D->getDeclContext() == DC &&
-        Context.SourceMgr.isBeforeInBuffer(Loc, D->getLoc()) &&
+        !Context.SourceMgr.isBeforeInBuffer(DeclLoc, Loc) &&
         !isa<TypeDecl>(D)) {
       localDeclAfterUse = D;
       return false;
     }
     return true;
   };
+
   bool AllDeclRefs =
       findNonMembers(Lookup.innerResults(), UDRE->getRefKind(),
                      /*breakOnMember=*/true, ResultValues, isValid);
