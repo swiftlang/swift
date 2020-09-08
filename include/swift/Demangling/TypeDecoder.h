@@ -349,9 +349,8 @@ class TypeDecoder {
 
   BuilderType &Builder;
 
- public:
-  explicit TypeDecoder(BuilderType &Builder)
-    : Builder(Builder) {}
+public:
+  explicit TypeDecoder(BuilderType &Builder) : Builder(Builder) {}
 
   /// Given a demangle tree, attempt to turn it into a type.
   TypeLookupErrorOr<BuiltType> decodeMangledType(NodePointer Node) {
