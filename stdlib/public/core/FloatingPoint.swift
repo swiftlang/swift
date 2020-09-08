@@ -1896,85 +1896,47 @@ extension BinaryFloatingPoint {
     switch (Source.exponentBitCount, Source.significandBitCount) {
 #if !os(macOS) && !(os(iOS) && targetEnvironment(macCatalyst))
     case (5, 10):
-      if #available(iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
-        if case let value_ as Float16 = value {
-          self = Self(Float(value_))
-          return
-        }
-        if !value.isNaN {
-          let value_ = Float16(
-            sign: value.sign,
-            exponentBitPattern:
-              UInt(truncatingIfNeeded: value.exponentBitPattern),
-            significandBitPattern:
-              UInt16(truncatingIfNeeded: value.significandBitPattern))
-          self = Self(Float(value_))
-          return
-        }
+      guard #available(iOS 14.0, watchOS 7.0, tvOS 14.0, *) else {
+        self = Self._convert(from: value).value
+        break
       }
+      let value_ = value as? Float16 ?? Float16(
+        sign: value.sign,
+        exponentBitPattern:
+          UInt(truncatingIfNeeded: value.exponentBitPattern),
+        significandBitPattern:
+          UInt16(truncatingIfNeeded: value.significandBitPattern))
+      self = Self(Float(value_))
 #endif
-    case (8, 7):
-      if !value.isNaN {
-        let value_ = Float(
-          sign: value.sign,
-          exponentBitPattern:
-            UInt(truncatingIfNeeded: value.exponentBitPattern),
-          significandBitPattern:
-            UInt32(truncatingIfNeeded: value.significandBitPattern) &<< 16)
-        self = Self(value_)
-        return
-      }
     case (8, 23):
-      if case let value_ as Float = value {
-        self = Self(value_)
-        return
-      }
-      if !value.isNaN {
-        let value_ = Float(
-          sign: value.sign,
-          exponentBitPattern:
-            UInt(truncatingIfNeeded: value.exponentBitPattern),
-          significandBitPattern:
-            UInt32(truncatingIfNeeded: value.significandBitPattern))
-        self = Self(value_)
-        return
-      }
+      let value_ = value as? Float ?? Float(
+        sign: value.sign,
+        exponentBitPattern:
+          UInt(truncatingIfNeeded: value.exponentBitPattern),
+        significandBitPattern:
+          UInt32(truncatingIfNeeded: value.significandBitPattern))
+      self = Self(value_)
     case (11, 52):
-      if case let value_ as Double = value {
-        self = Self(value_)
-        return
-      }
-      if !value.isNaN {
-        let value_ = Double(
-          sign: value.sign,
-          exponentBitPattern:
-            UInt(truncatingIfNeeded: value.exponentBitPattern),
-          significandBitPattern:
-            UInt64(truncatingIfNeeded: value.significandBitPattern))
-        self = Self(value_)
-        return
-      }
+      let value_ = value as? Double ?? Double(
+        sign: value.sign,
+        exponentBitPattern:
+          UInt(truncatingIfNeeded: value.exponentBitPattern),
+        significandBitPattern:
+          UInt64(truncatingIfNeeded: value.significandBitPattern))
+      self = Self(value_)
 #if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
     case (15, 63):
-      if case let value_ as Float80 = value {
-        self = Self(value_)
-        return
-      }
-      if !value.isNaN {
-        let value_ = Float80(
-          sign: value.sign,
-          exponentBitPattern:
-            UInt(truncatingIfNeeded: value.exponentBitPattern),
-          significandBitPattern:
-            UInt64(truncatingIfNeeded: value.significandBitPattern))
-        self = Self(value_)
-        return
-      }
+      let value_ = value as? Float80 ?? Float80(
+        sign: value.sign,
+        exponentBitPattern:
+          UInt(truncatingIfNeeded: value.exponentBitPattern),
+        significandBitPattern:
+          UInt64(truncatingIfNeeded: value.significandBitPattern))
+      self = Self(value_)
 #endif
     default:
-      break
+      self = Self._convert(from: value).value
     }
-    self = Self._convert(from: value).value
   }
 
   /// Creates a new instance from the given value, if it can be represented
