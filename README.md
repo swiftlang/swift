@@ -80,6 +80,8 @@ If you are interested in:
   up until the "Building the project" section. After that, follow the
   instructions in the [Swift Toolchains](#swift-toolchains) section below.
 
+We also have an [FAQ](/docs/HowToGuides/FAQ.md) that answers common questions.
+
 [Getting Started guide]: /docs/HowToGuides/GettingStarted.md
 
 ### Swift Toolchains
@@ -150,7 +152,7 @@ If you have changed Xcode versions but still encounter errors that appear to
 be related to the Xcode version, try passing `--clean` to `build-script`.
 
 When a new version of Xcode is released, you can update your build without
-recompiling the entire project by passing the `--reconfigure` option.
+recompiling the entire project by passing `--reconfigure` to `build-script`.
 
 ## Learning More
 
