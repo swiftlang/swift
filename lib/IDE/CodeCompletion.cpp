@@ -1534,7 +1534,6 @@ namespace {
 
 class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   CodeCompletionContext &CompletionContext;
-  std::vector<RequestedCachedModule> RequestedModules;
   CodeCompletionConsumer &Consumer;
   CodeCompletionExpr *CodeCompleteTokenExpr = nullptr;
   CompletionKind Kind = CompletionKind::None;
