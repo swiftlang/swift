@@ -275,7 +275,7 @@ static bool areAnyDependentFilesInvalidated(
 } // namespace
 
 bool CompletionInstance::performCachedOperationIfPossible(
-    const swift::CompilerInvocation &Invocation, llvm::hash_code ArgsHash,
+   llvm::hash_code ArgsHash,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     DiagnosticConsumer *DiagC,
@@ -285,7 +285,7 @@ bool CompletionInstance::performCachedOperationIfPossible(
 
   if (!CachedCI)
     return false;
-  if (CachedReuseCount >= MaxASTReuseCount)
+  if (CachedReuseCount >= Opts.MaxASTReuseCount)
     return false;
   if (CachedArgHash != ArgsHash)
     return false;
@@ -570,20 +570,21 @@ bool CompletionInstance::shouldCheckDependencies() const {
   assert(CachedCI);
   using namespace std::chrono;
   auto now = system_clock::now();
-  return DependencyCheckedTimestamp + seconds(DependencyCheckIntervalSecond) <
-         now;
+  auto threshold = DependencyCheckedTimestamp +
+                   seconds(Opts.DependencyCheckIntervalSecond);
+  return threshold < now;
 }
 
-void CompletionInstance::setDependencyCheckIntervalSecond(unsigned Value) {
+void CompletionInstance::setOptions(CompletionInstance::Options NewOpts) {
   std::lock_guard<std::mutex> lock(mtx);
-  DependencyCheckIntervalSecond = Value;
+  Opts = NewOpts;
 }
 
 bool swift::ide::CompletionInstance::performOperation(
     swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
-    bool EnableASTCaching, std::string &Error, DiagnosticConsumer *DiagC,
+    std::string &Error, DiagnosticConsumer *DiagC,
     llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
 
   // Always disable source location resolutions from .swiftsourceinfo file
@@ -601,29 +602,23 @@ bool swift::ide::CompletionInstance::performOperation(
   // We don't need token list.
   Invocation.getLangOptions().CollectParsedToken = false;
 
-  if (EnableASTCaching) {
-    // Compute the signature of the invocation.
-    llvm::hash_code ArgsHash(0);
-    for (auto arg : Args)
-      ArgsHash = llvm::hash_combine(ArgsHash, StringRef(arg));
+  // Compute the signature of the invocation.
+  llvm::hash_code ArgsHash(0);
+  for (auto arg : Args)
+    ArgsHash = llvm::hash_combine(ArgsHash, StringRef(arg));
 
-    // Concurrent completions will block so that they have higher chance to use
-    // the cached completion instance.
-    std::lock_guard<std::mutex> lock(mtx);
+  // Concurrent completions will block so that they have higher chance to use
+  // the cached completion instance.
+  std::lock_guard<std::mutex> lock(mtx);
 
-    if (performCachedOperationIfPossible(Invocation, ArgsHash, FileSystem,
-                                         completionBuffer, Offset, DiagC,
-                                         Callback))
-      return true;
+  if (performCachedOperationIfPossible(ArgsHash, FileSystem, completionBuffer,
+                                       Offset, DiagC, Callback)) {
+    return true;
+  }
 
-    if (performNewOperation(ArgsHash, Invocation, FileSystem, completionBuffer,
-                            Offset, Error, DiagC, Callback))
-      return true;
-  } else {
-    // Concurrent completions may happen in parallel when caching is disabled.
-    if (performNewOperation(None, Invocation, FileSystem, completionBuffer,
-                            Offset, Error, DiagC, Callback))
-      return true;
+  if(performNewOperation(ArgsHash, Invocation, FileSystem, completionBuffer,
+                         Offset, Error, DiagC, Callback)) {
+    return true;
   }
 
   assert(!Error.empty());

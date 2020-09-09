@@ -37,7 +37,8 @@ namespace remote {
 class MemoryReader {
 public:
   /// A convenient name for the return type from readBytes.
-  using ReadBytesResult = std::unique_ptr<const void, std::function<void(const void *)>>;
+  using ReadBytesResult =
+      std::unique_ptr<const void, std::function<void(const void *)>>;
 
   virtual bool queryDataLayout(DataLayoutQueryType type, void *inBuffer,
                                void *outBuffer) = 0;
@@ -152,9 +153,8 @@ public:
     
     return resolvePointer(address, pointerData);
   }
-          
 
-  // Parse extra inhabitants stored in a pointer.
+ // Parse extra inhabitants stored in a pointer.
   // Sets *extraInhabitant to -1 if the pointer at this address
   // is actually a valid pointer.
   // Otherwise, it sets *extraInhabitant to the inhabitant

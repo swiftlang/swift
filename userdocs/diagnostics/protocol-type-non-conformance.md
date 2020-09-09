@@ -52,10 +52,41 @@ In general, any initializers, static members, and associated types required by a
 
 Currently, even if a protocol `P` requires no initializers or static members, the existential type `P` does not conform to `P` (with exceptions below). This restriction allows library authors to add such requirements (initializers or static members) to an existing protocol without breaking their users' source code.
 
-Concrete types that _do_ conform to protocols can provide functionality similar to that of existential types. For example, the standard library provides the `AnyHashable` type for `Hashable` values. Manual implementation of such __type erasure__ can require specific knowledge of the semantic requirements for each protocol involved and is beyond the scope of this discussion.
-
-For more on using existential types, see [Protocols as Types](https://docs.swift.org/swift-book/LanguageGuide/Protocols.html#ID275) in _The Swift Programming Language_.
-
 ## Exceptions
 
-The Swift protocol `Error` has no required members and, when used as a type, conforms to itself; `@objc` protocols with no static requirements can also be used as types that conform to themselves.
+When used as a type, the Swift protocol `Error` conforms to itself; `@objc` protocols with no static requirements can also be used as types that conform to themselves.
+
+## Alternatives
+
+Concrete types that _do_ conform to protocols can provide functionality similar to that of existential types. For example, the standard library provides the `AnyHashable` type for `Hashable` values. Manual implementation of such __type erasure__ can require specific knowledge of the semantic requirements for each protocol involved and is beyond the scope of this discussion.
+
+In certain scenarios, you might avoid any need for manual type erasure by reworking generic APIs to use existential types instead:
+
+```swift
+func declareAnimalSpeciesDynamically(_ animal: Animal) {
+    animal.makeNoise()
+    print("My species is known as \(type(of: animal).species)")
+}
+
+declareAnimalSpeciesDynamically(animal)
+// Prints:
+// "Meow"
+// "My species is known as Felis catus"
+```
+
+(Note that there is a distinction between the _static_ type of a value as given by the generic parameter `T` and the _dynamic_ type of a value obtained by invoking `type(of:)`. For example, the static type of `animal` is `Animal`, while its dynamic type is `Cat`. Therefore, the two functions `declareAnimalSpecies(_:)` and `declareAnimalSpeciesDynamically(_:)` are not exact replacements of each other.)
+
+The same technique might be applicable to members of generic types:
+
+```swift
+// Instead of...
+struct Habitat<T: Animal> {
+    var animal: T
+}
+// ...consider:
+struct Habitat {
+    var animal: Animal
+}
+```
+
+For more on using existential types, see [Protocols as Types](https://docs.swift.org/swift-book/LanguageGuide/Protocols.html#ID275) in _The Swift Programming Language_.

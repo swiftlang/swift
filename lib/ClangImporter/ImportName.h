@@ -200,7 +200,7 @@ class ImportedName {
 
     /// For names that map Objective-C completion handlers into async
     /// Swift methods, describes how the mapping is performed.
-    ForeignAsyncConvention asyncInfo;
+    ForeignAsyncConvention::Info asyncInfo;
 
     /// For a declaration name that makes the declaration into an
     /// instance member, the index of the "Self" parameter.
@@ -270,7 +270,7 @@ public:
 
   /// For names that map Objective-C methods with completion handlers into
   /// async Swift methods, describes how the mapping is performed.
-  Optional<ForeignAsyncConvention> getAsyncInfo() const {
+  Optional<ForeignAsyncConvention::Info> getAsyncInfo() const {
     if (info.hasAsyncInfo)
       return info.asyncInfo;
     return None;
@@ -453,7 +453,7 @@ private:
                       ArrayRef<const clang::ParmVarDecl *> params,
                       bool isInitializer, bool hasCustomName);
 
-  Optional<ForeignAsyncConvention>
+  Optional<ForeignAsyncConvention::Info>
   considerAsyncImport(const clang::ObjCMethodDecl *clangDecl,
                       StringRef &baseName,
                       SmallVectorImpl<StringRef> &paramNames,

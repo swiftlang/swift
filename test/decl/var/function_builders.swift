@@ -7,10 +7,10 @@ var globalBuilder: Int
 func globalBuilderFunction() -> Int { return 0 }
 
 @_functionBuilder
-struct Maker {}
+struct Maker {} // expected-error {{function builder must provide at least one static 'buildBlock' method}}
 
 @_functionBuilder
-class Inventor {}
+class Inventor {} // expected-error {{function builder must provide at least one static 'buildBlock' method}}
 
 @Maker // expected-error {{function builder attribute 'Maker' can only be applied to a parameter, function, or computed property}}
 typealias typename = Inventor
@@ -66,11 +66,11 @@ func makerParamAutoclosure(@Maker // expected-error {{function builder attribute
                            fn: @autoclosure () -> ()) {}
 
 @_functionBuilder
-struct GenericMaker<T> {} // expected-note {{generic type 'GenericMaker' declared here}}
+struct GenericMaker<T> {} // expected-note {{generic type 'GenericMaker' declared here}} expected-error {{function builder must provide at least one static 'buildBlock' method}}
 
 struct GenericContainer<T> {  // expected-note {{generic type 'GenericContainer' declared here}}
   @_functionBuilder
-  struct Maker {}
+  struct Maker {} // expected-error {{function builder must provide at least one static 'buildBlock' method}}
 }
 
 func makeParamUnbound(@GenericMaker // expected-error {{reference to generic type 'GenericMaker' requires arguments}}
@@ -89,7 +89,7 @@ func makeParamNestedBound(@GenericContainer<Int>.Maker
 protocol P { }
 
 @_functionBuilder
-struct ConstrainedGenericMaker<T: P> {}
+struct ConstrainedGenericMaker<T: P> {} // expected-error {{function builder must provide at least one static 'buildBlock' method}}
 
 
 struct WithinGeneric<U> {
@@ -98,4 +98,122 @@ struct WithinGeneric<U> {
   // expected-error@+1{{type 'U' does not conform to protocol 'P'}}
   func makeParamBoundInContextBad(@ConstrainedGenericMaker<U>
     fn: () -> ()) {}
+}
+
+@_functionBuilder
+struct ValidBuilder1 {
+  static func buildBlock(_ exprs: Any...) -> Int { return exprs.count }
+}
+
+protocol BuilderFuncHelper {}
+
+extension BuilderFuncHelper {
+  static func buildBlock(_ exprs: Any...) -> Int { return exprs.count }
+}
+
+@_functionBuilder
+struct ValidBuilder2: BuilderFuncHelper {}
+
+class BuilderFuncBase {
+  static func buildBlock(_ exprs: Any...) -> Int { return exprs.count }
+}
+
+@_functionBuilder
+class ValidBuilder3: BuilderFuncBase {}
+
+@_functionBuilder
+struct ValidBuilder4 {}
+extension ValidBuilder4 {
+    static func buildBlock(_ exprs: Any...) -> Int { return exprs.count }
+}
+
+@_functionBuilder
+struct ValidBuilder5 {
+    static func buildBlock() -> Int { 0 }
+}
+
+@_functionBuilder
+struct InvalidBuilder1 {} // expected-error {{function builder must provide at least one static 'buildBlock' method}}
+
+@_functionBuilder
+struct InvalidBuilder2 { // expected-error {{function builder must provide at least one static 'buildBlock' method}}
+  func buildBlock(_ exprs: Any...) -> Int { return exprs.count } // expected-note {{did you mean to make instance method 'buildBlock' static?}} {{3-3=static }}
+}
+
+@_functionBuilder
+struct InvalidBuilder3 { // expected-error {{function builder must provide at least one static 'buildBlock' method}}
+  var buildBlock: (Any...) -> Int = { return $0.count } // expected-note {{potential match 'buildBlock' is not a static method}}
+}
+
+@_functionBuilder
+struct InvalidBuilder4 {} // expected-error {{function builder must provide at least one static 'buildBlock' method}}
+extension InvalidBuilder4 {
+  func buildBlock(_ exprs: Any...) -> Int { return exprs.count } // expected-note {{did you mean to make instance method 'buildBlock' static?}} {{3-3=static }}
+}
+
+protocol InvalidBuilderHelper {}
+extension InvalidBuilderHelper {
+  func buildBlock(_ exprs: Any...) -> Int { return exprs.count } // expected-note {{potential match 'buildBlock' is not a static method}}
+}
+
+@_functionBuilder
+struct InvalidBuilder5: InvalidBuilderHelper {} // expected-error {{function builder must provide at least one static 'buildBlock' method}}
+
+@_functionBuilder
+struct InvalidBuilder6 { // expected-error {{function builder must provide at least one static 'buildBlock' method}}
+    static var buildBlock: Int = 0 // expected-note {{potential match 'buildBlock' is not a static method}}
+}
+
+struct Callable {
+    func callAsFunction(_ exprs: Any...) -> Int { return exprs.count }
+}
+
+@_functionBuilder
+struct InvalidBuilder7 { // expected-error {{function builder must provide at least one static 'buildBlock' method}}
+    static var buildBlock = Callable() // expected-note {{potential match 'buildBlock' is not a static method}}
+}
+
+class BuilderVarBase {
+  static var buildBlock: (Any...) -> Int = { return $0.count } // expected-note {{potential match 'buildBlock' is not a static method}}
+}
+
+@_functionBuilder
+class InvalidBuilder8: BuilderVarBase {} // expected-error {{function builder must provide at least one static 'buildBlock' method}}
+
+protocol BuilderVarHelper {}
+
+extension BuilderVarHelper {
+  static var buildBlock: (Any...) -> Int { { return $0.count } } // expected-note {{potential match 'buildBlock' is not a static method}}
+}
+
+@_functionBuilder
+struct InvalidBuilder9: BuilderVarHelper {} // expected-error {{function builder must provide at least one static 'buildBlock' method}}
+
+@_functionBuilder
+struct InvalidBuilder10 { // expected-error {{function builder must provide at least one static 'buildBlock' method}}
+  static var buildBlock: (Any...) -> Int = { return $0.count } // expected-note {{potential match 'buildBlock' is not a static method}}
+}
+
+@_functionBuilder
+enum InvalidBuilder11 { // expected-error {{function builder must provide at least one static 'buildBlock' method}}
+    case buildBlock(Any) // expected-note {{enum case 'buildBlock' cannot be used to satisfy the function builder requirement}}
+}
+
+struct S {
+  @ValidBuilder1 var v1: Int { 1 }
+  @ValidBuilder2 var v2: Int { 1 }
+  @ValidBuilder3 var v3: Int { 1 }
+  @ValidBuilder4 var v4: Int { 1 }
+  @ValidBuilder5 func v5() -> Int {}
+  @InvalidBuilder1 var i1: Int { 1 } // expected-error {{type 'InvalidBuilder1' has no member 'buildBlock'}}
+  @InvalidBuilder2 var i2: Int { 1 } // expected-error {{instance member 'buildBlock' cannot be used on type 'InvalidBuilder2'; did you mean to use a value of this type instead?}}
+  @InvalidBuilder3 var i3: Int { 1 } // expected-error {{instance member 'buildBlock' cannot be used on type 'InvalidBuilder3'; did you mean to use a value of this type instead?}}
+  @InvalidBuilder4 var i4: Int { 1 } // expected-error {{instance member 'buildBlock' cannot be used on type 'InvalidBuilder4'; did you mean to use a value of this type instead?}}
+  @InvalidBuilder5 var i5: Int { 1 } // expected-error {{instance member 'buildBlock' cannot be used on type 'InvalidBuilder5'; did you mean to use a value of this type instead?}}
+  @InvalidBuilder6 var i6: Int { 1 } // expected-error {{cannot call value of non-function type 'Int'}}
+  @InvalidBuilder7 var i7: Int { 1 }
+  @InvalidBuilder8 var i8: Int { 1 }
+  @InvalidBuilder9 var i9: Int { 1 }
+  @InvalidBuilder10 var i10: Int { 1 }
+  @InvalidBuilder11 var i11: InvalidBuilder11 { 1 }
 }

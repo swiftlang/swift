@@ -6966,40 +6966,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
   auto locator = getConstraintLocator(locatorB);
 
-  // If the base type of this member lookup is a "hole" there is no
-  // reason to perform a lookup because it wouldn't return any results.
-  if (shouldAttemptFixes()) {
-    auto markMemberTypeAsPotentialHole = [&](Type memberTy) {
-      if (auto *typeVar = memberTy->getAs<TypeVariableType>())
-        recordPotentialHole(typeVar);
-    };
-
-    // If this is an unresolved member ref e.g. `.foo` and its contextual base
-    // type has been determined to be a "hole", let's mark the resulting member
-    // type as a potential hole and continue solving.
-    if (kind == ConstraintKind::UnresolvedValueMember &&
-        baseObjTy->getMetatypeInstanceType()->isHole()) {
-      auto *fix =
-          SpecifyBaseTypeForContextualMember::create(*this, member, locator);
-      if (recordFix(fix))
-        return SolutionKind::Error;
-
-      markMemberTypeAsPotentialHole(memberTy);
-      return SolutionKind::Solved;
-    } else if ((kind == ConstraintKind::ValueMember ||
-                kind == ConstraintKind::ValueWitness) &&
-               baseObjTy->getMetatypeInstanceType()->isHole()) {
-      // If base type is a "hole" there is no reason to record any
-      // more "member not found" fixes for chained member references.
-      markMemberTypeAsPotentialHole(memberTy);
-      return SolutionKind::Solved;
-    }
-  }
-
-  MemberLookupResult result =
-      performMemberLookup(kind, member, baseTy, functionRefKind, locator,
-                          /*includeInaccessibleMembers*/ shouldAttemptFixes());
-
   auto formUnsolved = [&](bool activate = false) {
     // If requested, generate a constraint.
     if (flags.contains(TMF_GenerateConstraints)) {
@@ -7017,6 +6983,82 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
     return SolutionKind::Unsolved;
   };
+
+  // If the base type of this member lookup is a "hole" there is no
+  // reason to perform a lookup because it wouldn't return any results.
+  if (shouldAttemptFixes()) {
+    auto markMemberTypeAsPotentialHole = [&](Type memberTy) {
+      if (auto *typeVar = memberTy->getAs<TypeVariableType>())
+        recordPotentialHole(typeVar);
+    };
+
+    // If this is an unresolved member ref e.g. `.foo` and its contextual base
+    // type has been determined to be a "hole", let's mark the resulting member
+    // type as a potential hole and continue solving.
+    if (kind == ConstraintKind::UnresolvedValueMember) {
+      // Let's look through all metatypes to find "underlying" type
+      // of this lookup.
+      Type underlyingType = baseObjTy;
+      while (auto *MT = underlyingType->getAs<AnyMetatypeType>()) {
+        underlyingType = MT->getInstanceType();
+      }
+
+      // Let's delay solving this constraint in diagnostic
+      // mode until it's certain that there is no way to
+      // find out what the base type is.
+      if (underlyingType->isTypeVariableOrMember())
+        return formUnsolved();
+
+      // Let's record a fix only if the hole originates either
+      // at the result of the chain (that could happen since solving
+      // of this constraint is delayed until base could be resolved),
+      // or it is certain that base type can't be bound to any other
+      // type but a hole.
+      auto shouldRecordFixForHole = [&](HoleType *baseType) {
+        auto *originator =
+            baseType->getOriginatorType().dyn_cast<TypeVariableType *>();
+
+        if (!originator)
+          return false;
+
+        auto *originatorLoc = originator->getImpl().getLocator();
+
+        // It could either be a hole associated directly with the base
+        // or a hole which came from result type of the chain.
+        if (originatorLoc->isLastElement<
+                LocatorPathElt::UnresolvedMemberChainResult>()) {
+          auto *UMCR = castToExpr<UnresolvedMemberChainResultExpr>(
+              originatorLoc->getAnchor());
+          return UMCR->getChainBase() == getAsExpr(locator->getAnchor());
+        }
+
+        return originatorLoc == locator;
+      };
+
+      if (auto *hole = underlyingType->getAs<HoleType>()) {
+        if (shouldRecordFixForHole(hole)) {
+          auto *fix = SpecifyBaseTypeForContextualMember::create(*this, member,
+                                                                 locator);
+          if (recordFix(fix))
+            return SolutionKind::Error;
+        }
+
+        markMemberTypeAsPotentialHole(memberTy);
+        return SolutionKind::Solved;
+      }
+    } else if ((kind == ConstraintKind::ValueMember ||
+                kind == ConstraintKind::ValueWitness) &&
+               baseObjTy->getMetatypeInstanceType()->isHole()) {
+      // If base type is a "hole" there is no reason to record any
+      // more "member not found" fixes for chained member references.
+      markMemberTypeAsPotentialHole(memberTy);
+      return SolutionKind::Solved;
+    }
+  }
+
+  MemberLookupResult result =
+      performMemberLookup(kind, member, baseTy, functionRefKind, locator,
+                          /*includeInaccessibleMembers*/ shouldAttemptFixes());
 
   switch (result.OverallResult) {
   case MemberLookupResult::Unsolved:

@@ -373,6 +373,11 @@ cmake -B S:\b\10 ^
 ninja -C S:\b\10
 ```
 
+Indicate to swift-package-manager where to find the Package Description before installation:
+```cmd
+set SWIFTPM_PD_LIBS=S:\b\10\pm
+```
+
 ## Install the Swift toolchain on Windows
 
 - Run ninja install:

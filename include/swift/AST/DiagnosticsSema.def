@@ -1384,6 +1384,8 @@ ERROR(cdecl_empty_name,none,
       "@_cdecl symbol name cannot be empty", ())
 ERROR(cdecl_throws,none,
       "raising errors from @_cdecl functions is not supported", ())
+ERROR(cdecl_async,none,
+      "@_cdecl functions cannot be asynchronous", ())
 
 ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))
@@ -4117,6 +4119,19 @@ ERROR(asynchandler_mutating,none,
       "'@asyncHandler' function cannot be 'mutating'",
       ())
 
+ERROR(objc_ambiguous_async_convention,none,
+      "%0 overrides or implements protocol requirements for Objective-C "
+      "declarations with incompatible async conventions",
+      (DeclName))
+NOTE(objc_ambiguous_async_convention_candidate,none,
+     "%0 provides async here", (DeclName))
+
+ERROR(satisfy_async_objc,none,
+      "satisfying an asychronous @objc %select{method|initializer}0 with "
+      "a synchronous %select{method|initializer}0 is not supported", (bool))
+ERROR(async_objc_dynamic_self,none,
+      "asynchronous method returning 'Self' cannot be '@objc'", ())
+
 //------------------------------------------------------------------------------
 // MARK: Type Check Types
 //------------------------------------------------------------------------------
@@ -5250,6 +5265,16 @@ WARNING(function_builder_missing_limited_availability, none,
         "function builder %0 does not implement 'buildLimitedAvailability'; "
         "this code may crash on earlier versions of the OS",
         (Type))
+ERROR(function_builder_static_buildblock, none,
+      "function builder must provide at least one static 'buildBlock' "
+      "method", ())
+NOTE(function_builder_non_static_buildblock, none,
+     "did you mean to make instance method 'buildBlock' static?", ())
+NOTE(function_builder_buildblock_enum_case, none,
+     "enum case 'buildBlock' cannot be used to satisfy the function builder "
+     "requirement", ())
+NOTE(function_builder_buildblock_not_static_method, none,
+     "potential match 'buildBlock' is not a static method", ())
 
 //------------------------------------------------------------------------------
 // MARK: Tuple Shuffle Diagnostics
