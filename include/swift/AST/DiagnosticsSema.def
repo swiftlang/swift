@@ -3351,7 +3351,7 @@ ERROR(missing_builtin_precedence_group,none,
       (Identifier))
 WARNING(nan_comparison, none, 
        "comparison with '.nan' using %0 is always %select{false|true}1, use "
-       "'%2.isNan' to check if '%3' %select{is not a number|is a number}1",
+       "'%2.isNaN' to check if '%3' %select{is not a number|is a number}1",
        (Identifier, bool, StringRef, StringRef))
 WARNING(nan_comparison_without_isnan, none, 
        "comparison with '.nan' using %0 is always %select{false|true}1", 
