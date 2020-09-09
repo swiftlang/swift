@@ -17,8 +17,15 @@ func overloadedSame() async -> String { "asynchronous" }
 func overloaded() -> String { "synchronous" }
 func overloaded() async -> Double { 3.14159 }
 
+@available(swift, deprecated: 4.0, message: "synchronous is no fun")
+func overloadedOptDifference() -> String { "synchronous" }
+
+func overloadedOptDifference() async -> String? { nil }
+
 func testOverloadedSync() {
   _ = overloadedSame() // expected-warning{{synchronous is no fun}}
+
+  let _: String? = overloadedOptDifference() // expected-warning{{synchronous is no fun}}
 
   let _ = overloaded()
   let fn = {
@@ -46,6 +53,8 @@ func testOverloadedSync() {
 
 func testOverloadedAsync() async {
   _ = await overloadedSame() // no warning
+
+  let _: String? = await overloadedOptDifference() // no warning
 
   let _ = await overloaded()
   let _ = overloaded() // expected-error{{call is 'async' but is not marked with 'await'}}
