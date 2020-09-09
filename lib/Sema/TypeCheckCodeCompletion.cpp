@@ -739,9 +739,8 @@ bool TypeChecker::typeCheckForCodeCompletion(
   ContextFinder contextAnalyzer(expr);
   expr->walk(contextAnalyzer);
 
-  // If there was no completion expr (e.g. if the code completion location is
-  // within an ErrorExpr without an valid subexpr due to parser error recovery)
-  // bail.
+  // If there was no completion expr (e.g. if the code completion location was
+  // among tokens that were skipped over during parser error recovery) bail.
   if (!contextAnalyzer.hasCompletionExpr())
     return false;
 

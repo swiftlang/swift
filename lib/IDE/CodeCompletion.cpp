@@ -1531,7 +1531,6 @@ void CodeCompletionContext::sortCompletionResults(
 }
 
 namespace {
-class CompletionLookup;
 
 class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   CodeCompletionContext &CompletionContext;
