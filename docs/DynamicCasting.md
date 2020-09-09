@@ -308,6 +308,26 @@ Note that it is _not_ sufficient for argument and return types to be castable; t
 Conceptually, an "existential type" is an opaque wrapper that carries a type and an instance of that type.
 The various existential types differ in what kinds of types they can hold (for example, `AnyObject` can only hold reference types) and in the capabilities exposed by the container (`AnyHashable` exposes equality testing and hashing).
 
+The key invariant for existential types `E` is the following:
+* Strong existential invariant: If `t` is any instance, `U` is any type, and `t is E` then `(t as! E) as? U` produces the same result as `t as? U`
+
+Intuitively, this simply says that if you can put an instance `t` into an existential `E`, then you can take it back out again via casting.
+For Equatable types, this implies that the results of the two operations here are equal to each other when they succeed.
+It also implies that if either of these `as?` casts fails, so will the other.
+
+`AnyObject` and `AnyHashable` do not fully satisfy the strong invariant described above.  Instead, they satisfy the following weaker version:
+* Weak existential invariant: If `t` is any instance, `U` is any type, and both `t is U` and `t is E`, then `(t as! E) as? U` produces the same result as `t as? U`
+
+### Objective-C Interactions
+
+The difference between the strong and weak existential invariants comes about because casting to `AnyObject` or `AnyHashable` can trigger Objective-C bridging conversions.
+The result of these conversions may support casts that the original type did not.
+As a result, `(t as! E)` may be castable to `U` even if `t` alone is not directly castable.
+
+One example of this is Foundation's `NSNumber` type which conditionally bridges to several Swift numeric types.
+As a result, when Foundation is in scope, `Int(7) is Double == false` but `(Int(7) as! AnyObject) is Double == true`.
+In general, the ability to add new bridging behaviors from a single type to several distinct types implies that Swift casting cannot be transitive.
+
 ### Any
 
 Any Swift instance can be cast to the type `Any`.
@@ -318,14 +338,7 @@ Invariants
 * If `t` is any instance, then `t is Any == true`
 * If `t` is any instance, `t as! Any` always succeeds
 * For every type `T` (including protocol types), `T.self is Any.Type`
-* If `t` is any instance and `U` is any `Equatable` type, then `t as? U == (t as! Any) as? U`.
-
-This last invariant deserves some explanation, as a similar pattern appears repeatedly throughout this document.
-In essence, this invariant just says that putting something into an "Any box" (`t as! Any`) and taking it out again (`as? U`) does not change the result.
-The requirement that `U` be `Equatable` is a technical necessity for using `==` in this statement.
-
-Note that in many cases, we've shortened such invariants to the form `t is U == (t as! Any) is U`.
-Using `is` here simply avoids the technical necessity that `U` be `Equatable` but except where explicitly called out, the intention in every case is that such casting does not change the value.
+* Strong existential invariant: If `t` is any instance and `U` is any type, then `(t as! Any) as? U` produces the same result as `t as? U`.
 
 ### AnyObject
 
@@ -334,49 +347,44 @@ Any class, enum, struct, tuple, function, metatype, or existential metatype inst
 XXX TODO The runtime logic has code to cast protocol types to `AnyObject` only if they are compatible with `__SwiftValue`.  What is the practical effect of this logic?  Does it mean that casting a protocol type to `AnyObject` will sometimes unwrap (if the protocol is incompatible) and sometimes not?  What protocols are affected by this?
 
 The contents of an `AnyObject` container can be accessed by casting to another type:
-* If `t` is any instance, `U` is any type, `t is AnyObject` and `t is U`, then `(t as! AnyObject) is U`.
+* Weak existential invariant: If `t` is any instance, `U` is any type, `t is AnyObject`, and `t is U`, then `(t as! AnyObject) as? U` will produce the same result as `t as? U`
 
 Implementation Note: `AnyObject` is represented in memory as a pointer to a refcounted object.  The dynamic type of the object can be recovered from the "isa" field of the object.  The optional form `AnyObject?` is the same except that it allows null.  Reference types (class, metatype, or existential metatype instances) can be directly assigned to an `AnyObject` without any conversion.  For non-reference types -- including struct, enum, and tuple types -- the casting logic will first look for an `_ObjectiveCBridgeable` conformance that it can use to convert the source into a tailored reference type.  If that fails, the value will be copied into an opaque `_SwiftValue` container.
 
 (See "The _ObjectiveCBridgeable Protocol" below for more details.)
 
-### Objective-C Interactions
-
-Note the invariant above cannot be an equality because Objective-C bridging allows libraries to introduce new relationships that can alter the behavior of seemingly-unrelated casts.
-One example of this is Foundation's `NSNumber` type which conditionally bridges to several Swift numeric types.
-As a result, when Foundation is in scope, `Int(7) is Double == false` but `(Int(7) as! AnyObject) is Double == true`.
-In general, the ability to add new bridging behaviors from a single type to several distinct types implies that Swift casting cannot be transitive.
-
 ### Error (SE-0112)
 
-Although the Error protocol is specially handled by the Swift compiler and runtime (as detailed in [SE-0112](https://github.com/apple/swift-evolution/blob/master/proposals/0112-nserror-bridging.md)), it behaves like an ordinary protocol type for casting purposes.
+The `Error` type behaves like an ordinary existential type for casting purposes.
 
-(See "Note: 'Self-conforming' protocols" below for additional details relevant to the Error protocol.)
+(See "Note: 'Self-conforming' protocols" below for additional details relevant to the `Error` protocol.)
 
 ### AnyHashable (SE-0131)
 
 For casting purposes, `AnyHashable` behaves like an existential type.
+It satisfies the weak existential invariant above.
 
 However, note that `AnyHashable` does not act like an existential for other purposes.
 For example, it's metatype is named `AnyHashable.Type` and it does not have an existential metatype.
 
 ### Protocol Witness types
 
-Caveat:
-Protocols that have `associatedtype` properties or which make use of the `Self` typealias cannot be used as independent types.
-As such, the discussion below does not apply to them.
+Any protocol definition (except those that include an `associatedtype` property or which makes use of the `Self` typealias) has an associated existential type named after the protocol.
 
-Any Swift instance of a concrete type `T` can be cast to `P` iff `T` conforms to `P`.
-The result is a "protocol witness" instance that provides access only to those methods and properties defined on `P`.
+Specifically, assume you have a protocol definition
+```
+protocol P {}
+```
+
+As a result of this definition, there is an existential type (also called `P`).
+This existential type is also known as a "protocol witness type" since it exposes exactly the capabilities that are defined by the protocol.
 Other capabilities of the type `T` are not accessible from a `P` instance.
+Any Swift instance of a concrete type `T` can be cast to the type `P` iff `T` conforms to the protocol `P`.
 
 The contents of a protocol witness can be accessed by casting to some other appropriate type:
-* For any protocol `P`, instance `t`, and type `U`, if `t is P`, then `t as? U == (t as! P) as? U`
+* Strong existential Invariant: For any protocol `P`, instance `t`, and type `U`, if `t is P`, then `t as? U` produces the same result as `(t as! P) as? U`
 
-XXX TODO: The invariant above does not apply to AnyObject, AnyHashable.
-Does it suffice to explicitly exclude those two, or do other protocols share that behavior?  The alternative would seem to be to change the equality here into an implication.
-
-In addition to the protocol witness type, every Swift protocol `P` implicitly defines two other types:
+In addition to the protocol witness type `P`, every Swift protocol `P` implicitly defines two other types:
 `P.Protocol` is the "protocol metatype", the type of `P.self`.
 `P.Type` is the "protocol existential metatype".
 These are described in more detail below.
@@ -422,9 +430,11 @@ S.svar // Shorthand for S.self.svar
 ```
 
 For most Swift types, the metatype of `T` is named `T.Type`.
-However, in two cases the metatype has a different name:
+However, in the following cases the metatype has a different name:
 * For a nominal protocol type `P`, the metatype is named `P.Protocol`
-* For a type bound to a generic variable `G`, the metatype is named `G.Type` _even if `G` is bound to a protocol type_.  Specifically, if `G` is bound to the nominal protocol type `P`, then `G.Type` is another name for the metatype `P.Protocol`, and hence `G.Type.self == P.Protocol.self`.
+* For non-protocol existential types `E`, the metatype is also named `E.Protocol`.  For example, `Any.Protocol`, `AnyObject.Protocol`, and `Error.Protocol`.
+* For a type bound to a generic variable `G`, the metatype is named `G.Type` _even if `G` is bound to a protocol or existential type_.  Specifically, if `G` is bound to the nominal protocol type `P`, then `G.Type` is another name for the metatype `P.Protocol`, and hence `G.Type.self == P.Protocol.self`.
+* As explained above, although `AnyHashable` behaves like an existential type in some respects, its metatype is called `AnyHashable.Type`.
 
 Example:
 ```
@@ -456,7 +466,7 @@ Invariants
 * For a nominal non-protocol type `T`, `T.self is T.Type`
 * For a nominal protocol type `P`, `P.self is P.Protocol`
 * `P.Protocol` is a singleton: `T.self is P.Protocol` iff `T` is exactly `P`
-* A non-protocol type `T` conforms to a protocol `P` iff `T.self is P.Type`
+* A non-protocol type `T` conforms to a protocol `P` iff `T.self is P.Type`  (If `T` is a protocol type, see "Self conforming existential types" below for details.)
 * `T` is a subtype of a non-protocol type `U` iff `T.self is U.Type`
 * Subtypes define metatype subtypes: if `T` and `U` are non-protocol types, `T.self is U.Type == T.Type.self is U.Type.Type`
 * Subtypes define metatype subtypes: if `T` is a non-protocol type and `P` is a protocol type, `T.self is P.Protocol == T.Type.self is P.Protocol.Type`
