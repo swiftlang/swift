@@ -3473,7 +3473,6 @@ FunctionType *GenericFunctionType::substGenericArgs(
                   [&](const AnyFunctionType::Param &param) {
                     return param.withType(substFn(param.getPlainType()));
                   });
-
   auto resultTy = substFn(getResult());
   auto throwsTy = substFn(getThrowsType());
 
@@ -4704,9 +4703,15 @@ case TypeKind::Id:
     }
     
     // Transform throws type, if any.
-    auto throwsTy = function->getThrowsType().transformRec(fn);
-    if (!throwsTy)
-      return Type();
+    Type throwsTy;
+    if (function->isThrowing()) {
+      throwsTy = function->getThrowsType().transformRec(fn);
+      if (!throwsTy) {
+        return Type();
+      }
+    } else {
+      throwsTy = function->getASTContext().getTypeByString("Never").transformRec(fn);
+    }
     
     if (throwsTy.getPointer() != function->getThrowsType().getPointer())
       isUnchanged = false;

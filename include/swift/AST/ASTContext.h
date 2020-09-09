@@ -588,6 +588,9 @@ public:
   /// Retrieve a specific, known protocol.
   ProtocolDecl *getProtocol(KnownProtocolKind kind) const;
   
+  /// Retrieves a Type of the standard library given his name.
+  Type getTypeByString(StringRef type);
+  
   /// Determine whether the given nominal type is one of the standard
   /// library or Cocoa framework types that is known to be bridged by another
   /// module's overlay, for layering or implementation detail reasons.

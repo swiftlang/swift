@@ -969,6 +969,18 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   return nullptr;
 }
 
+Type ASTContext::getTypeByString(StringRef type) {
+  SmallVector<ValueDecl *, 1> Results;
+  lookupInSwiftModule(type, Results);
+  for (auto Result : Results) {
+    if (auto *FD = dyn_cast<FuncDecl>(Result)) {
+      if (FD->getDeclaredInterfaceType())
+        return FD->getDeclaredInterfaceType();
+    }
+  }
+  return ErrorType::get(*this);
+}
+
 /// Find the implementation for the given "intrinsic" library function.
 static FuncDecl *findLibraryIntrinsic(const ASTContext &ctx,
                                       StringRef name) {

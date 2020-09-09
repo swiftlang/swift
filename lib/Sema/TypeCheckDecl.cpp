@@ -1969,25 +1969,22 @@ static Type buildAddressorResultType(AccessorDecl *addressor,
 Type ThrowsTypeRequest::evaluate(Evaluator &evaluator,
                                  AbstractFunctionDecl *decl) const {
   auto &ctx = decl->getASTContext();
-
   // Return Swift.Never, if the function doesnt throw.
   if (!decl->hasThrows())
-    return ctx.getNeverType();
+    return ctx.getTypeByString("Never");
 
   TypeRepr *throwsTyRepr = decl->getThrowsTypeRepr();
 
   // If no type is specified, default to Swift.Error
-  if (throwsTyRepr == nullptr)
-    return ctx.getErrorDecl()->getInterfaceType();
+  if (!throwsTyRepr)
+    return ctx.getTypeByString("Error");
 
   const auto options =
       TypeResolutionOptions(TypeResolverContext::FunctionThrows);
   auto *const dc = decl->getInnermostDeclContext();
   auto type = TypeResolution::forInterface(dc, options, /*unboundTyOpener*/ nullptr)
       .resolveType(throwsTyRepr);
-
-
-
+  
   return type;
 }
 

@@ -58,6 +58,7 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/TypeID.h"
 #include "swift/Demangling/ManglingMacros.h"
+#include "swift/ClangImporter/ClangImporter.h"
 
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/Module.h"
@@ -2671,7 +2672,25 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
   }
   
   // Map the throws type, if any.
-  auto throwsTy = mapSignatureParamType(ctx, funcTy->getThrowsType());
+  Type throwsType;
+  if (funcTy->isThrowing()) {
+    if (auto afdThrowsTy = funcTy->getThrowsType()) {
+      throwsType = afdThrowsTy;
+    } else {
+      throwsType = ctx.getErrorDecl()->getDeclaredInterfaceType();
+    }
+  } else {
+    SmallVector<ValueDecl *, 1> Results;
+    ctx.lookupInSwiftModule("Never", Results);
+    for (auto Result : Results) {
+      if (auto *FD = dyn_cast<FuncDecl>(Result)) {
+        if (FD->getDeclaredInterfaceType())
+          throwsType = FD->getDeclaredInterfaceType();
+      }
+    }
+  }
+  
+//  auto throwsTy = mapSignatureParamType(ctx, throwsType);
 
   // Map the result type.
   auto resultTy = mapSignatureFunctionType(
@@ -2687,9 +2706,9 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
   // Rebuild the resulting function type.
   if (auto genericFuncTy = dyn_cast<GenericFunctionType>(funcTy))
     return GenericFunctionType::get(genericFuncTy->getGenericSignature(),
-                                    newParams, resultTy, throwsTy, info);
+                                    newParams, resultTy, throwsType, info);
 
-  return FunctionType::get(newParams, resultTy, throwsTy, info);
+  return FunctionType::get(newParams, resultTy, throwsType, info);
 }
 
 OverloadSignature ValueDecl::getOverloadSignature() const {
@@ -6801,11 +6820,15 @@ bool AbstractFunctionDecl::isAsyncHandler() const {
 }
 
 Type AbstractFunctionDecl::getThrowsInterfaceType() const {
+  auto func = dyn_cast<AbstractFunctionDecl>(this);
+  if (!func)
+    return Type();
+  
   auto &ctx = getASTContext();
   auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
   if (auto type = evaluateOrDefault(ctx.evaluator,
                            ThrowsTypeRequest{mutableThis},
-                           ctx.getNeverType()->getMetatypeInstanceType()))
+                           ctx.getTypeByString("Never")))
     return type;
   return ErrorType::get(ctx);
 }

@@ -8,7 +8,7 @@ func hasThrownType() throws (SomeError) -> Int {
 }
 
 struct NoError {}
-func hasNoConformingError() throws (NoError) ->
+func hasNoConformingError() throws (NoError) { }
 
 protocol TestProtocol {
   func missingClosingParenAndType() throws ( -> Int
