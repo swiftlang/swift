@@ -2217,6 +2217,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
 #endif
 
   if (MergeModuleAction
+      && Args.hasArg(options::OPT_enable_library_evolution)
       && Args.hasFlag(options::OPT_verify_emitted_module_interface,
                       options::OPT_no_verify_emitted_module_interface,
                       verifyInterfacesByDefault)) {
