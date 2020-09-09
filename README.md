@@ -143,7 +143,7 @@ Try the suggestions in
 [Troubleshooting build issues](/docs/HowToGuides/GettingStarted.md#troubleshooting-build-issues).
 
 Make sure you are using the
-[correct release](/docs/HowToGuides/GettingStared.md#installing-dependencies)
+[correct release](/docs/HowToGuides/GettingStarted.md#installing-dependencies)
 of Xcode.
 
 If you have changed Xcode versions but still encounter errors that appear to
