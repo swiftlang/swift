@@ -4253,9 +4253,7 @@ bool constraints::isStandardComparisonOperator(ASTNode node) {
   if (!expr) return false;
 
   if (auto opName = getOperatorName(expr)) {
-    return opName->is("==") || opName->is("!=") || opName->is("===") ||
-           opName->is("!==") || opName->is("<") || opName->is(">") ||
-           opName->is("<=") || opName->is(">=");
+    return opName->isStandardComparisonOperator();
   }
   return false;
 }
