@@ -2049,10 +2049,8 @@ bool Decl::isSPI() const {
 }
 
 ArrayRef<Identifier> Decl::getSPIGroups() const {
-  if (auto vd = dyn_cast<ValueDecl>(this)) {
-    if (vd->getFormalAccess() < AccessLevel::Public)
-      return ArrayRef<Identifier>();
-  } else if (!isa<ExtensionDecl>(this))
+  if (!isa<ValueDecl>(this) &&
+      !isa<ExtensionDecl>(this))
     return ArrayRef<Identifier>();
 
   return evaluateOrDefault(getASTContext().evaluator,
@@ -2063,10 +2061,8 @@ ArrayRef<Identifier> Decl::getSPIGroups() const {
 llvm::ArrayRef<Identifier>
 SPIGroupsRequest::evaluate(Evaluator &evaluator, const Decl *decl) const {
   // Applies only to public ValueDecls and ExtensionDecls.
-  if (auto vd = dyn_cast<ValueDecl>(decl))
-    assert(vd->getFormalAccess() >= AccessLevel::Public);
-  else
-    assert(isa<ExtensionDecl>(decl));
+  assert (isa<ValueDecl>(decl) ||
+          isa<ExtensionDecl>(decl));
 
   // First, look for local attributes.
   llvm::SetVector<Identifier> spiGroups;
