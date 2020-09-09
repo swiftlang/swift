@@ -6,6 +6,7 @@
 // forward mode reaches feature parity with reverse mode.
 
 import _Differentiation
+import DifferentiationUnittest
 
 //===----------------------------------------------------------------------===//
 // Basic function
@@ -85,10 +86,8 @@ func activeInoutParamControlFlow(_ array: [Float]) -> Float {
   return result
 }
 
-// FIXME(TF-984): Forward-mode crash due to unset tangent buffer.
-/*
 struct X: Differentiable {
-  var x : Float
+  var x: Float
 
   @differentiable(wrt: y)
   mutating func mutate(_ y: X) { self.x = y.x }
@@ -101,7 +100,6 @@ func activeMutatingMethod(_ x: Float) -> Float {
   x2.mutate(x1)
   return x1.x
 }
-*/
 
 
 struct Mut: Differentiable {}
@@ -240,12 +238,16 @@ final class ClassTangentPropertyWrongType: Differentiable {
   func move(along direction: TangentVector) {}
 }
 
-// FIXME(TF-984): Forward-mode crash due to unset tangent buffer.
+// SR-13464: Missing support for classes in forward-mode AD
 /*
+// xpected-error @+2 {{function is not differentiable}}
+// xpected-note @+3 {{when differentiating this function definition}}
 @differentiable
 @_silgen_name("test_class_tangent_property_wrong_type")
 func testClassTangentPropertyWrongType(_ c: ClassTangentPropertyWrongType) -> Float {
+  // xpected-warning @+1 {{variable 'tmp' was never mutated}}
   var tmp = c
+  // xpected-note @+1 {{cannot differentiate access to property 'ClassTangentPropertyWrongType.x' because 'ClassTangentPropertyWrongType.TangentVector.x' does not have expected type 'Float.TangentVector' (aka 'Float')}}
   return tmp.x
 }
 */
@@ -285,12 +287,16 @@ final class ClassTangentPropertyNotStored: Differentiable {
   func move(along direction: TangentVector) {}
 }
 
-// FIXME(TF-984): Forward-mode crash due to unset tangent buffer.
+// SR-13464: Missing support for classes in forward-mode AD
 /*
+// xpected-error @+2 {{function is not differentiable}}
+// xpected-note @+3 {{when differentiating this function definition}}
 @differentiable
 @_silgen_name("test_class_tangent_property_not_stored")
 func testClassTangentPropertyNotStored(_ c: ClassTangentPropertyNotStored) -> Float {
+  // xpected-warning @+1 {{variable 'tmp' was never mutated}}
   var tmp = c
+  // xpected-note @+1 {{cannot differentiate access to property 'ClassTangentPropertyNotStored.x' because 'ClassTangentPropertyNotStored.TangentVector.x' is not a stored property}}
   return tmp.x
 }
 */
