@@ -9,10 +9,17 @@ func testNonConversions() async {
 }
 
 // Overloading
+@available(swift, deprecated: 4.0, message: "synchronous is no fun")
+func overloadedSame() -> String { "synchronous" }
+
+func overloadedSame() async -> String { "asynchronous" }
+
 func overloaded() -> String { "synchronous" }
 func overloaded() async -> Double { 3.14159 }
 
 func testOverloadedSync() {
+  _ = overloadedSame() // expected-warning{{synchronous is no fun}}
+
   let _ = overloaded()
   let fn = {
     overloaded()
@@ -38,6 +45,8 @@ func testOverloadedSync() {
 }
 
 func testOverloadedAsync() async {
+  _ = await overloadedSame() // no warning
+
   let _ = await overloaded()
   let _ = overloaded() // expected-error{{call is 'async' but is not marked with 'await'}}
 
@@ -62,4 +71,15 @@ func testOverloadedAsync() async {
     _ = await overloaded()
   }
   let _: Int = fn4 // expected-error{{value of type '() async -> ()'}}
+}
+
+func takesAsyncClosure(_ closure: () async -> String) -> Int { 0 }
+func takesAsyncClosure(_ closure: () -> String) -> String { "" }
+
+func testPassAsyncClosure() {
+  let a = takesAsyncClosure { await overloadedSame() }
+  let _: Double = a // expected-error{{convert value of type 'Int'}}
+
+  let b = takesAsyncClosure { overloadedSame() } // expected-warning{{synchronous is no fun}}
+  let _: Double = b // expected-error{{convert value of type 'String'}}
 }
