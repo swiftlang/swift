@@ -139,6 +139,24 @@ swift::frontend::utils::escapeForMake(StringRef raw,
   return buffer.data();
 }
 
+/// This sorting function is used to stabilize the order in which dependencies
+/// are emitted into \c .d files that are consumed by external build systems.
+/// This serves to eliminate order as a source of non-determinism in these
+/// outputs.
+///
+/// The exact sorting predicate is not important. Currently, it is a
+/// lexicographic comparison that reverses the provided strings before applying
+/// the sorting predicate. This has the benefit of being somewhat
+/// invariant with respect to the installation location of various system
+/// components. e.g. on two systems, the same file identified by two different
+/// paths differing only in their relative install location such as
+///
+/// /Applications/MyXcode.app/Path/To/A/Framework/In/The/SDK/Header.h
+/// /Applications/Xcodes/AnotherXcode.app/Path/To/A/Framework/In/The/SDK/Header.h
+///
+/// should appear in roughly the same order relative to other paths. Ultimately,
+/// this makes it easier to test the contents of the emitted files with tools
+/// like FileCheck.
 static std::vector<std::string>
 reversePathSortedFilenames(const ArrayRef<std::string> elts) {
   std::vector<std::string> tmp(elts.begin(), elts.end());
