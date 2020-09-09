@@ -2,7 +2,7 @@
 
 // Redeclaration checking
 func redecl1() async { } // expected-note{{previously declared here}}
-func redecl1() throws { } // expected-error{{invalid redeclaration of 'redecl1()'}}
+func redecl1() async throws { } // expected-error{{invalid redeclaration of 'redecl1()'}}
 
 // Override checking
 

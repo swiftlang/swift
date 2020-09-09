@@ -2241,10 +2241,16 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
       // of is-patterns applied to an irrefutable pattern.
       pattern = pattern->getSemanticsProvidingPattern();
       while (auto isp = dyn_cast<IsPattern>(pattern)) {
-        const Type castType = TypeResolution::forContextual(
-                                  CS.DC, TypeResolverContext::InExpression,
-                                  /*unboundTyOpener*/ nullptr)
-                                  .resolveType(isp->getCastTypeRepr());
+        Type castType;
+        if (auto castTypeRepr = isp->getCastTypeRepr()) {
+          castType = TypeResolution::forContextual(
+                         CS.DC, TypeResolverContext::InExpression,
+                         /*unboundTyOpener*/ nullptr)
+                         .resolveType(castTypeRepr);
+        } else {
+          castType = isp->getCastType();
+        }
+
         if (castType->hasError()) {
           return false;
         }
