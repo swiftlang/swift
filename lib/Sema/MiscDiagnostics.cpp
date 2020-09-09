@@ -15,8 +15,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "MiscDiagnostics.h"
-#include "TypeChecker.h"
+#include "ConstraintSystem.h"
 #include "TypeCheckAvailability.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -34,6 +35,7 @@
 
 #define DEBUG_TYPE "Sema"
 using namespace swift;
+using namespace constraints;
 
 /// Return true if this expression is an implicit promotion from T to T?.
 static Expr *isImplicitPromotionToOptional(Expr *E) {
@@ -4479,16 +4481,12 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
       auto secondArg = BE->getArg()->getElement(1);
 
       // Both arguments must conform to FloatingPoint protocol.
-      auto conformsToFpProto = [&](Type type) {
-        
-        auto fpProto = C.getProtocol(KnownProtocolKind::FloatingPoint);
-        return !TypeChecker::conformsToProtocol(type, fpProto,
-                                                const_cast<DeclContext *>(DC))
-                    .isInvalid();
-      };
-
-      if (!conformsToFpProto(firstArg->getType()) ||
-          !conformsToFpProto(secondArg->getType())) {
+      if (!conformsToKnownProtocol(const_cast<DeclContext *>(DC),
+                                   firstArg->getType(),
+                                   KnownProtocolKind::FloatingPoint) ||
+          !conformsToKnownProtocol(const_cast<DeclContext *>(DC),
+                                   secondArg->getType(),
+                                   KnownProtocolKind::FloatingPoint)) {
         return;
       }
 

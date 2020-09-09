@@ -3930,11 +3930,11 @@ bool constraints::hasAppliedSelf(const OverloadChoice &choice,
          doesMemberRefApplyCurriedSelf(baseType, decl);
 }
 
-bool constraints::conformsToKnownProtocol(ConstraintSystem &cs, Type type,
+bool constraints::conformsToKnownProtocol(DeclContext *dc, Type type,
                                           KnownProtocolKind protocol) {
   if (auto *proto =
-          TypeChecker::getProtocol(cs.getASTContext(), SourceLoc(), protocol))
-    return (bool)TypeChecker::conformsToProtocol(type, proto, cs.DC);
+          TypeChecker::getProtocol(dc->getASTContext(), SourceLoc(), protocol))
+    return (bool)TypeChecker::conformsToProtocol(type, proto, dc);
   return false;
 }
 
@@ -3959,7 +3959,8 @@ Type constraints::isRawRepresentable(
     ConstraintSystem &cs, Type type,
     KnownProtocolKind rawRepresentableProtocol) {
   Type rawTy = isRawRepresentable(cs, type);
-  if (!rawTy || !conformsToKnownProtocol(cs, rawTy, rawRepresentableProtocol))
+  if (!rawTy ||
+      !conformsToKnownProtocol(cs.DC, rawTy, rawRepresentableProtocol))
     return Type();
 
   return rawTy;

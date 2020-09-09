@@ -165,7 +165,7 @@ Type FailureDiagnostic::restoreGenericParameters(
 bool FailureDiagnostic::conformsToKnownProtocol(
     Type type, KnownProtocolKind protocol) const {
   auto &cs = getConstraintSystem();
-  return constraints::conformsToKnownProtocol(cs, type, protocol);
+  return constraints::conformsToKnownProtocol(cs.DC, type, protocol);
 }
 
 Type RequirementFailure::getOwnerType() const {
