@@ -145,32 +145,8 @@ class BuilderClosureVisitor
       return known->second;
     }
 
-    bool found = false;
-    SmallVector<ValueDecl *, 4> foundDecls;
-    dc->lookupQualified(
-        builderType, DeclNameRef(fnName),
-        NL_QualifiedDefault | NL_ProtocolMembers, foundDecls);
-    for (auto decl : foundDecls) {
-      if (auto func = dyn_cast<FuncDecl>(decl)) {
-        // Function must be static.
-        if (!func->isStatic())
-          continue;
-
-        // Function must have the right argument labels, if provided.
-        if (!argLabels.empty()) {
-          auto funcLabels = func->getName().getArgumentNames();
-          if (argLabels.size() > funcLabels.size() ||
-              funcLabels.slice(0, argLabels.size()) != argLabels)
-            continue;
-        }
-
-        // Okay, it's a good-enough match.
-        found = true;
-        break;
-      }
-    }
-
-    return supportedOps[fnName] = found;
+    return supportedOps[fnName] = TypeChecker::typeSupportsBuilderOp(
+               builderType, dc, fnName, argLabels);
   }
 
   /// Build an implicit variable in this context.
@@ -1874,3 +1850,37 @@ std::vector<ReturnStmt *> TypeChecker::findReturnStatements(AnyFunctionRef fn) {
   (void)precheck.run();
   return precheck.getReturnStmts();
 }
+
+bool TypeChecker::typeSupportsBuilderOp(
+    Type builderType, DeclContext *dc, Identifier fnName,
+    ArrayRef<Identifier> argLabels, SmallVectorImpl<ValueDecl *> *allResults) {
+  bool foundMatch = false;
+  SmallVector<ValueDecl *, 4> foundDecls;
+  dc->lookupQualified(
+      builderType, DeclNameRef(fnName),
+      NL_QualifiedDefault | NL_ProtocolMembers, foundDecls);
+  for (auto decl : foundDecls) {
+    if (auto func = dyn_cast<FuncDecl>(decl)) {
+      // Function must be static.
+      if (!func->isStatic())
+        continue;
+
+      // Function must have the right argument labels, if provided.
+      if (!argLabels.empty()) {
+        auto funcLabels = func->getName().getArgumentNames();
+        if (argLabels.size() > funcLabels.size() ||
+            funcLabels.slice(0, argLabels.size()) != argLabels)
+          continue;
+      }
+
+      foundMatch = true;
+      break;
+    }
+  }
+
+  if (allResults)
+    allResults->append(foundDecls.begin(), foundDecls.end());
+
+  return foundMatch;
+}
+

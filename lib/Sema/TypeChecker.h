@@ -1221,6 +1221,13 @@ bool requireArrayLiteralIntrinsics(ASTContext &ctx, SourceLoc loc);
 /// If \c expr is not part of a member chain or the base is something other than
 /// an \c UnresolvedMemberExpr, \c nullptr is returned.
 UnresolvedMemberExpr *getUnresolvedMemberChainBase(Expr *expr);
+
+/// Checks whether a function builder type has a well-formed function builder
+/// method with the given name. If provided and non-empty, the argument labels
+/// are verified against any candidates.
+bool typeSupportsBuilderOp(Type builderType, DeclContext *dc, Identifier fnName,
+                           ArrayRef<Identifier> argLabels = {},
+                           SmallVectorImpl<ValueDecl *> *allResults = nullptr);
 }; // namespace TypeChecker
 
 /// Temporary on-stack storage and unescaping for encoded diagnostic

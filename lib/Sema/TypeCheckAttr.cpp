@@ -3008,8 +3008,32 @@ void AttributeChecker::visitPropertyWrapperAttr(PropertyWrapperAttr *attr) {
 }
 
 void AttributeChecker::visitFunctionBuilderAttr(FunctionBuilderAttr *attr) {
-  // TODO: check that the type at least provides a `sequence` factory?
-  // Any other validation?
+  auto *nominal = dyn_cast<NominalTypeDecl>(D);
+  SmallVector<ValueDecl *, 4> potentialMatches;
+  bool supportsBuildBlock = TypeChecker::typeSupportsBuilderOp(
+      nominal->getDeclaredType(), nominal, D->getASTContext().Id_buildBlock,
+      /*argLabels=*/{}, &potentialMatches);
+
+  if (!supportsBuildBlock) {
+    diagnose(nominal->getLoc(), diag::function_builder_static_buildblock);
+
+    // For any close matches, attempt to explain to the user why they aren't
+    // valid.
+    for (auto *member : potentialMatches) {
+      if (member->isStatic() && isa<FuncDecl>(member))
+        continue;
+
+      if (isa<FuncDecl>(member) &&
+          member->getDeclContext()->getSelfNominalTypeDecl() == nominal)
+        diagnose(member->getLoc(), diag::function_builder_non_static_buildblock)
+          .fixItInsert(member->getAttributeInsertionLoc(true), "static ");
+      else if (isa<EnumElementDecl>(member))
+        diagnose(member->getLoc(), diag::function_builder_buildblock_enum_case);
+      else
+        diagnose(member->getLoc(),
+                 diag::function_builder_buildblock_not_static_method);
+    }
+  }
 }
 
 void
