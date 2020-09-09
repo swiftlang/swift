@@ -2974,9 +2974,9 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
       }
     }
 
-    PrintOptions Options = PrintOptions::printForDiagnostics();
+    PrintOptions Options =
+        PrintOptions::printForDiagnostics(AccessLevel::Private);
     Options.PrintDocumentationComments = false;
-    Options.AccessFilter = AccessLevel::Private;
     Options.PrintAccess = false;
     Options.SkipAttributes = true;
     Options.FunctionDefinitions = true;
