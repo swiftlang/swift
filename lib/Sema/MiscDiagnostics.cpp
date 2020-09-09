@@ -4471,9 +4471,7 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
 
       // We're only interested in comparison functions like == or <=.
       auto comparisonDeclName = comparisonDecl->getBaseIdentifier();
-      if (!(comparisonDeclName.is("==") || comparisonDeclName.is("!=") ||
-            comparisonDeclName.is("<=") || comparisonDeclName.is("<") ||
-            comparisonDeclName.is(">") || comparisonDeclName.is(">="))) {
+      if (!comparisonDeclName.isStandardComparisonOperator()) {
         return;
       }
 
@@ -4482,6 +4480,7 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
 
       // Both arguments must conform to FloatingPoint protocol.
       auto conformsToFpProto = [&](Type type) {
+        
         auto fpProto = C.getProtocol(KnownProtocolKind::FloatingPoint);
         return !TypeChecker::conformsToProtocol(type, fpProto,
                                                 const_cast<DeclContext *>(DC))
@@ -4493,20 +4492,19 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
         return;
       }
 
-      // Dig out the declarations for the arguments.
-      ValueDecl *firstVal = nullptr;
-      ValueDecl *secondVal = nullptr;
-      if (auto DRE = dyn_cast<DeclRefExpr>(firstArg)) {
-        firstVal = DRE->getDecl();
-      } else if (auto MRE = dyn_cast<MemberRefExpr>(firstArg)) {
-        firstVal = MRE->getMember().getDecl();
-      }
+      // Convenience utility to extract argument decl.
+      auto extractArgumentDecl = [&](Expr *arg) -> ValueDecl * {
+        if (auto DRE = dyn_cast<DeclRefExpr>(arg)) {
+          return DRE->getDecl();
+        } else if (auto MRE = dyn_cast<MemberRefExpr>(arg)) {
+          return MRE->getMember().getDecl();
+        }
+        return nullptr;
+      };
 
-      if (auto DRE = dyn_cast<DeclRefExpr>(secondArg)) {
-        secondVal = DRE->getDecl();
-      } else if (auto MRE = dyn_cast<MemberRefExpr>(secondArg)) {
-        secondVal = MRE->getMember().getDecl();
-      }
+      // Dig out the declarations for the arguments.
+      auto *firstVal = extractArgumentDecl(firstArg);
+      auto *secondVal = extractArgumentDecl(secondArg);
 
       // If we can't find declarations for both arguments, bail out,
       // because one of them has to be '.nan'.
