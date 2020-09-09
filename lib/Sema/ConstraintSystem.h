@@ -700,6 +700,9 @@ enum ScoreKind {
   SK_Hole,
   /// A reference to an @unavailable declaration.
   SK_Unavailable,
+  /// A reference to an async function in a synchronous context, or
+  /// vice versa.
+  SK_AsyncSyncMismatch,
   /// A use of the "forward" scan for trailing closures.
   SK_ForwardTrailingClosure,
   /// A use of a disfavored overload.
@@ -2122,6 +2125,9 @@ private:
   std::vector<std::pair<AnyFunctionRef, AppliedBuilderTransform>>
       functionBuilderTransformed;
 
+  /// Cache of the effects any closures visited.
+  llvm::SmallDenseMap<ClosureExpr *, FunctionType::ExtInfo, 4> closureEffectsCache;
+
 public:
   /// The locators of \c Defaultable constraints whose defaults were used.
   std::vector<ConstraintLocator *> DefaultedConstraints;
@@ -3061,6 +3067,16 @@ public:
       TrailingClosureMatching trailingClosureMatch) {
     trailingClosureMatchingChoices.push_back({locator, trailingClosureMatch});
   }
+
+  /// Walk a closure AST to determine its effects.
+  ///
+  /// \returns a function's extended info describing the effects, as
+  /// determined syntactically.
+  FunctionType::ExtInfo closureEffects(ClosureExpr *expr);
+
+  /// Determine whether the given context is asynchronous, e.g., an async
+  /// function or closure.
+  bool isAsynchronousContext(DeclContext *dc);
 
   /// Determine whether constraint system already has a fix recorded
   /// for a particular location.

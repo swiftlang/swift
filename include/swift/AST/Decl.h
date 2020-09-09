@@ -239,10 +239,14 @@ struct OverloadSignature {
   /// Whether this declaration has an opaque return type.
   unsigned HasOpaqueReturnType : 1;
 
+  /// Whether this declaration is 'async'
+  unsigned HasAsync : 1;
+
   OverloadSignature()
       : UnaryOperator(UnaryOperatorKind::None), IsInstanceMember(false),
         IsVariable(false), IsFunction(false), InProtocolExtension(false),
-        InExtensionOfGenericType(false), HasOpaqueReturnType(false) {}
+        InExtensionOfGenericType(false), HasOpaqueReturnType(false),
+        HasAsync(false) {}
 };
 
 /// Determine whether two overload signatures conflict.
