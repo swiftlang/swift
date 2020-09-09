@@ -4132,6 +4132,11 @@ ERROR(satisfy_async_objc,none,
 ERROR(async_objc_dynamic_self,none,
       "asynchronous method returning 'Self' cannot be '@objc'", ())
 
+ERROR(actor_without_concurrency,none,
+      "'actor' classes require experimental concurrency support", ())
+ERROR(actor_with_nonactor_superclass,none,
+      "actor class cannot inherit from non-actor class %0", (DeclName))
+
 //------------------------------------------------------------------------------
 // MARK: Type Check Types
 //------------------------------------------------------------------------------

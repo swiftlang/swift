@@ -161,3 +161,36 @@ bool IsAsyncHandlerRequest::evaluate(
 
   return false;
 }
+
+bool IsActorRequest::evaluate(
+    Evaluator &evaluator, ClassDecl *classDecl) const {
+  // If concurrency is not enabled, we don't have actors.
+  auto actorAttr = classDecl->getAttrs().getAttribute<ActorAttr>();
+  if (!classDecl->getASTContext().LangOpts.EnableExperimentalConcurrency) {
+    if (actorAttr) {
+      classDecl->diagnose(diag::actor_without_concurrency)
+          .highlight(actorAttr->getRange());
+    }
+
+    return false;
+  }
+
+  // If there is a superclass, we can infer actor-ness from it.
+  if (auto superclassDecl = classDecl->getSuperclassDecl()) {
+    // The superclass is an actor, so we are, too.
+    if (superclassDecl->isActor())
+      return true;
+
+    // This class cannot be an actor; complain if the 'actor' modifier was
+    // provided.
+    if (actorAttr) {
+      classDecl->diagnose(
+          diag::actor_with_nonactor_superclass, superclassDecl->getName())
+        .highlight(actorAttr->getRange());
+    }
+
+    return false;
+  }
+
+  return actorAttr != nullptr;
+}
