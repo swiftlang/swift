@@ -2753,22 +2753,6 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
   return invalid;
 }
 
-static bool isMemberCompletion(ASTNode Node) {
-  struct HasMemberCompletion: public ASTWalker {
-    bool Value = false;
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      if (auto *CCE = dyn_cast<CodeCompletionExpr>(E)) {
-        Value = CCE->getBase();
-        return {false, nullptr};
-      }
-      return {true, E};
-    }
-  };
-  HasMemberCompletion Check;
-  Node.walk(Check);
-  return Check.Value;
-}
-
 ParserResult<Expr> Parser::parseExprClosure() {
   assert(Tok.is(tok::l_brace) && "Not at a left brace?");
   SyntaxParsingContext ClosureContext(SyntaxContext, SyntaxKind::ClosureExpr);
@@ -2875,12 +2859,12 @@ ParserResult<Expr> Parser::parseExprClosure() {
   // If the body consists of a single expression, turn it into a return
   // statement.
   //
-  // But don't do this transformation during code completion, as the source
-  // may be incomplete and the type mismatch in return statement will just
-  // confuse the type checker.
+  // But don't do this transformation when performing certain kinds of code
+  // completion, as the source may be incomplete and the type mismatch in return
+  // statement will just confuse the type checker.
   bool hasSingleExpressionBody = false;
-  if (!missingRBrace && bodyElements.size() == 1 &&
-      (!Status.hasCodeCompletion() || isMemberCompletion(bodyElements[0]))) {
+  if (!missingRBrace &&
+      !shouldSuppressSingleExpressionBodyTransform(Status, bodyElements)) {
     // If the closure's only body element is a single return statement,
     // use that instead of creating a new wrapping return expression.
     Expr *returnExpr = nullptr;

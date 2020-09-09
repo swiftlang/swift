@@ -5911,7 +5911,7 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
 }
 
 void deliverDotExprResults(
-    ArrayRef<DotExprTypeCheckCompletionCallback::Result> Solutions,
+    ArrayRef<DotExprTypeCheckCompletionCallback::Result> Results,
     Expr *BaseExpr, DeclContext *DC, SourceLoc DotLoc, bool IsInSelector,
     ide::CodeCompletionContext &CompletionCtx,
     CodeCompletionConsumer &Consumer) {
@@ -5935,15 +5935,15 @@ void deliverDotExprResults(
     Lookup.setPreferFunctionReferencesToCalls();
   }
 
-  for (auto &Solution: Solutions) {
-    Lookup.setIsStaticMetatype(Solution.BaseIsStaticMetaType);
-    Lookup.getPostfixKeywordCompletions(Solution.BaseTy, BaseExpr);
-    Lookup.setExpectedTypes(Solution.ExpectedTypes,
-                            Solution.IsSingleExpressionBody,
-                            Solution.ExpectsNonVoid);
-    if (isDynamicLookup(Solution.BaseTy))
+  for (auto &Result: Results) {
+    Lookup.setIsStaticMetatype(Result.BaseIsStaticMetaType);
+    Lookup.getPostfixKeywordCompletions(Result.BaseTy, BaseExpr);
+    Lookup.setExpectedTypes(Result.ExpectedTypes,
+                            Result.IsSingleExpressionBody,
+                            Result.ExpectsNonVoid);
+    if (isDynamicLookup(Result.BaseTy))
       Lookup.setIsDynamicLookup();
-    Lookup.getValueExprCompletions(Solution.BaseTy, Solution.BaseDecl);
+    Lookup.getValueExprCompletions(Result.BaseTy, Result.BaseDecl);
   }
 
   SourceFile *SF = DC->getParentSourceFile();

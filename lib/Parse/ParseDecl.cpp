@@ -6443,22 +6443,6 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   return DCC.fixupParserResult(FD);
 }
 
-static bool isMemberCompletion(ASTNode Node) {
-  struct HasMemberCompletion: public ASTWalker {
-    bool Value = false;
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      if (auto *CCE = dyn_cast<CodeCompletionExpr>(E)) {
-        Value = CCE->getBase();
-        return {false, nullptr};
-      }
-      return {true, E};
-    }
-  };
-  HasMemberCompletion Check;
-  Node.walk(Check);
-  return Check.Value;
-}
-
 /// Parse a function body for \p AFD, setting the body to \p AFD before
 /// returning it.
 BraceStmt *Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
@@ -6506,11 +6490,10 @@ BraceStmt *Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
   // If the body consists of a single expression, turn it into a return
   // statement.
   //
-  // But don't do this transformation during code completion, as the source
-  // may be incomplete and the type mismatch in return statement will just
-  // confuse the type checker.
-  if (BS->getNumElements() != 1 ||
-      (Body.hasCodeCompletion() && !isMemberCompletion(BS->getFirstElement())))
+  // But don't do this transformation when performing certain kinds of code
+  // completion, as the source may be incomplete and the type mismatch in return
+  // statement will just confuse the type checker.
+  if (shouldSuppressSingleExpressionBodyTransform(Body, BS->getElements()))
     return BS;
 
   auto Element = BS->getFirstElement();

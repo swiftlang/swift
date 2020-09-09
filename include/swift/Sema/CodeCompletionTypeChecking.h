@@ -1,3 +1,4 @@
+//===--- CodeCompletionTypeChecking.h  --------------------------*- C++ -*-===//
 //
 // Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
