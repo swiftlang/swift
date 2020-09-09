@@ -4469,7 +4469,7 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
         return;
       }
 
-      // We're only interested in == and != functions.
+      // We're only interested in comparison functions like == or <=.
       auto comparisonDeclName = comparisonDecl->getBaseIdentifier();
       if (!(comparisonDeclName.is("==") || comparisonDeclName.is("!=") ||
             comparisonDeclName.is("<=") || comparisonDeclName.is("<") ||
@@ -4508,9 +4508,9 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
         secondVal = MRE->getMember().getDecl();
       }
 
-      // One of them has to be '.nan', so if we don't have declarations
-      // for both, then bail out.
-      if (!firstVal && !secondVal) {
+      // If we can't find declarations for both arguments, bail out,
+      // because one of them has to be '.nan'.
+      if (!firstArg && !secondArg) {
         return;
       }
 
@@ -4531,7 +4531,7 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
       if (isNanDecl(firstVal) && isNanDecl(secondVal)) {
         C.Diags.diagnose(BE->getLoc(), diag::nan_comparison_both_nan,
                          comparisonDeclName.str(), comparisonDeclName.is("!="));
-      } else {
+      } else if (isNanDecl(firstVal) || isNanDecl(secondVal)) {
         if (comparisonDeclName.is("==") || comparisonDeclName.is("!=")) {
           auto exprStr =
               C.SourceMgr
