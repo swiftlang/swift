@@ -1767,11 +1767,11 @@ namespace {
 
         auto type = contextualType->lookThroughAllOptionalTypes();
         if (conformsToKnownProtocol(
-                CS, type, KnownProtocolKind::ExpressibleByArrayLiteral))
+                CS.DC, type, KnownProtocolKind::ExpressibleByArrayLiteral))
           return false;
 
         return conformsToKnownProtocol(
-            CS, type, KnownProtocolKind::ExpressibleByDictionaryLiteral);
+            CS.DC, type, KnownProtocolKind::ExpressibleByDictionaryLiteral);
       };
 
       if (isDictionaryContextualType(contextualType)) {

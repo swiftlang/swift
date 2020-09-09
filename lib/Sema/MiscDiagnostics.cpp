@@ -15,8 +15,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "MiscDiagnostics.h"
-#include "TypeChecker.h"
+#include "ConstraintSystem.h"
 #include "TypeCheckAvailability.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -34,6 +35,7 @@
 
 #define DEBUG_TYPE "Sema"
 using namespace swift;
+using namespace constraints;
 
 /// Return true if this expression is an implicit promotion from T to T?.
 static Expr *isImplicitPromotionToOptional(Expr *E) {
@@ -4438,6 +4440,131 @@ static void diagnoseExplicitUseOfLazyVariableStorage(const Expr *E,
   const_cast<Expr *>(E)->walk(Walker);
 }
 
+static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
+  class ComparisonWithNaNFinder : public ASTWalker {
+    const ASTContext &C;
+    const DeclContext *DC;
+
+  public:
+    ComparisonWithNaNFinder(const DeclContext *dc)
+        : C(dc->getASTContext()), DC(dc) {}
+
+    void tryDiagnoseComparisonWithNaN(BinaryExpr *BE) {
+      ValueDecl *comparisonDecl = nullptr;
+
+      // Comparison functions like == or <= take two arguments.
+      if (BE->getArg()->getNumElements() != 2) {
+        return;
+      }
+
+      // Dig out the function declaration.
+      if (auto Fn = BE->getFn()) {
+        if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(Fn)) {
+          comparisonDecl = DSCE->getCalledValue();
+        } else {
+          comparisonDecl = BE->getCalledValue();
+        }
+      }
+
+      // Bail out if it isn't a function.
+      if (!comparisonDecl || !isa<FuncDecl>(comparisonDecl)) {
+        return;
+      }
+
+      // We're only interested in comparison functions like == or <=.
+      auto comparisonDeclName = comparisonDecl->getBaseIdentifier();
+      if (!comparisonDeclName.isStandardComparisonOperator()) {
+        return;
+      }
+
+      auto firstArg = BE->getArg()->getElement(0);
+      auto secondArg = BE->getArg()->getElement(1);
+
+      // Both arguments must conform to FloatingPoint protocol.
+      if (!conformsToKnownProtocol(const_cast<DeclContext *>(DC),
+                                   firstArg->getType(),
+                                   KnownProtocolKind::FloatingPoint) ||
+          !conformsToKnownProtocol(const_cast<DeclContext *>(DC),
+                                   secondArg->getType(),
+                                   KnownProtocolKind::FloatingPoint)) {
+        return;
+      }
+
+      // Convenience utility to extract argument decl.
+      auto extractArgumentDecl = [&](Expr *arg) -> ValueDecl * {
+        if (auto DRE = dyn_cast<DeclRefExpr>(arg)) {
+          return DRE->getDecl();
+        } else if (auto MRE = dyn_cast<MemberRefExpr>(arg)) {
+          return MRE->getMember().getDecl();
+        }
+        return nullptr;
+      };
+
+      // Dig out the declarations for the arguments.
+      auto *firstVal = extractArgumentDecl(firstArg);
+      auto *secondVal = extractArgumentDecl(secondArg);
+
+      // If we can't find declarations for both arguments, bail out,
+      // because one of them has to be '.nan'.
+      if (!firstArg && !secondArg) {
+        return;
+      }
+
+      // Convenience utility to check if this is a 'nan' variable.
+      auto isNanDecl = [&](ValueDecl *VD) {
+        return VD && isa<VarDecl>(VD) && VD->getBaseIdentifier().is("nan");
+      };
+
+      // Diagnose comparison with '.nan'.
+      //
+      // If the comparison is done using '<=', '<', '==', '>', '>=', then
+      // the result is always false. If the comparison is done using '!=',
+      // then the result is always true.
+      //
+      // Emit a different diagnostic which doesn't mention using '.isNaN' if
+      // the comparison isn't done using '==' or '!=' or if both sides are
+      // '.nan'.
+      if (isNanDecl(firstVal) && isNanDecl(secondVal)) {
+        C.Diags.diagnose(BE->getLoc(), diag::nan_comparison_both_nan,
+                         comparisonDeclName.str(), comparisonDeclName.is("!="));
+      } else if (isNanDecl(firstVal) || isNanDecl(secondVal)) {
+        if (comparisonDeclName.is("==") || comparisonDeclName.is("!=")) {
+          auto exprStr =
+              C.SourceMgr
+                  .extractText(Lexer::getCharSourceRangeFromSourceRange(
+                      C.SourceMgr, firstArg->getSourceRange()))
+                  .str();
+          auto prefix = exprStr;
+          if (comparisonDeclName.is("!=")) {
+            prefix = "!" + prefix;
+          }
+          C.Diags.diagnose(BE->getLoc(), diag::nan_comparison,
+                           comparisonDeclName, comparisonDeclName.is("!="),
+                           prefix, exprStr);
+        } else {
+          C.Diags.diagnose(BE->getLoc(), diag::nan_comparison_without_isnan,
+                           comparisonDeclName, comparisonDeclName.is("!="));
+        }
+      }
+    }
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (!E || isa<ErrorExpr>(E) || !E->getType())
+        return {false, E};
+
+      if (auto *BE = dyn_cast<BinaryExpr>(E)) {
+        tryDiagnoseComparisonWithNaN(BE);
+        return {false, E};
+      }
+
+      return {true, E};
+    }
+  };
+
+  ComparisonWithNaNFinder Walker(DC);
+  const_cast<Expr *>(E)->walk(Walker);
+}
+
 //===----------------------------------------------------------------------===//
 // High-level entry points.
 //===----------------------------------------------------------------------===//
@@ -4454,6 +4581,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   diagnoseUnintendedOptionalBehavior(E, DC);
   maybeDiagnoseCallToKeyValueObserveMethod(E, DC);
   diagnoseExplicitUseOfLazyVariableStorage(E, DC);
+  diagnoseComparisonWithNaN(E, DC);
   if (!ctx.isSwiftVersionAtLeast(5))
     diagnoseDeprecatedWritableKeyPath(E, DC);
   if (!ctx.LangOpts.DisableAvailabilityChecking)
