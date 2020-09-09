@@ -3350,13 +3350,15 @@ ERROR(missing_builtin_precedence_group,none,
       "broken standard library: missing builtin precedence group %0",
       (Identifier))
 WARNING(nan_comparison, none, 
-       "comparison with '.nan' may lead to unexpected result, use "
-       "%select{'%0.isNan'|'.isNan'}1 to check for %select{presence|"
-       "absence|presence or absence}2 of NaN", 
-       (StringRef, bool, unsigned))
-WARNING(nan_comparison_constant, none, 
-       "'.nan' %select{==|!=}0 '.nan' is always %select{false|true}0", 
-       (bool))
+       "comparison with '.nan' using %0 is always %select{false|true}1, use "
+       "'%2.isNan' to check if '%3' %select{is not a number|is a number}1",
+       (Identifier, bool, StringRef, StringRef))
+WARNING(nan_comparison_without_isnan, none, 
+       "comparison with '.nan' using %0 is always %select{false|true}1", 
+       (Identifier, bool))
+WARNING(nan_comparison_both_nan, none, 
+       "'.nan' %0 '.nan' is always %select{false|true}1", 
+       (StringRef, bool))
 
 // If you change this, also change enum TryKindForDiagnostics.
 #define TRY_KIND_SELECT(SUB) "%select{try|try!|try?|await}" #SUB

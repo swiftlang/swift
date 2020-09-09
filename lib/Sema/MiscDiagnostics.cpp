@@ -4470,22 +4470,19 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
       }
 
       // We're only interested in == and != functions.
-      if (!(comparisonDecl->getBaseIdentifier().is("==") ||
-            comparisonDecl->getBaseIdentifier().is("!="))) {
+      auto comparisonDeclName = comparisonDecl->getBaseIdentifier();
+      if (!(comparisonDeclName.is("==") || comparisonDeclName.is("!=") ||
+            comparisonDeclName.is("<=") || comparisonDeclName.is("<") ||
+            comparisonDeclName.is(">") || comparisonDeclName.is(">="))) {
         return;
       }
 
       auto firstArg = BE->getArg()->getElement(0);
       auto secondArg = BE->getArg()->getElement(1);
 
-      // == is defined in FloatingPoint stdlib protocol.
-      // != comes from Equatable which uses == internally.
-      // If both arguments conform to FloatingPoint then we're
-      // in the clear and we don't have to check anything else.
+      // Both arguments must conform to FloatingPoint protocol.
       auto conformsToFpProto = [&](Type type) {
         auto fpProto = C.getProtocol(KnownProtocolKind::FloatingPoint);
-        auto comparisonProtoDC =
-            comparisonDecl->getDeclContext()->getSelfProtocolDecl();
         return !TypeChecker::conformsToProtocol(type, fpProto,
                                                 const_cast<DeclContext *>(DC))
                     .isInvalid();
@@ -4522,38 +4519,35 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
         return VD && isa<VarDecl>(VD) && VD->getBaseIdentifier().is("nan");
       };
 
-      // Emit a special diagnostic for comparisons where both arguments is
-      // '.nan' i.e. Double.nan == Double.nan is always false and Double.nan !=
-      // Double.nan is always true.
+      // Diagnose comparison with '.nan'.
+      //
+      // If the comparison is done using '<=', '<', '==', '>', '>=', then
+      // the result is always false. If the comparison is done using '!=',
+      // then the result is always true.
+      //
+      // Emit a different diagnostic which doesn't mention using '.isNan' if
+      // the comparison isn't done using '==' or '!=' or if both sides are
+      // '.nan'.
       if (isNanDecl(firstVal) && isNanDecl(secondVal)) {
-        C.Diags.diagnose(BE->getLoc(), diag::nan_comparison_constant,
-                         comparisonDecl->getBaseIdentifier().is("!="));
+        C.Diags.diagnose(BE->getLoc(), diag::nan_comparison_both_nan,
+                         comparisonDeclName.str(), comparisonDeclName.is("!="));
       } else {
-        // Fallback to generic diagnostic for comparisons where one of the
-        // arguments is '.nan' i.e. 0.0 == .nan or .nan == foo.
-        auto diagnose = [&](ValueDecl *otherArg) {
-          // 0 = used when comparing using !=
-          // 1 = used when comparing using ==
-          // 2 = used when one of the arguments isn't a declaration i.e 0 ==
-          // .nan.
-          unsigned presenceOrAbsence = 2;
-          if (otherArg) {
-            presenceOrAbsence =
-                comparisonDecl->getBaseIdentifier().is("!=") ? 1 : 0;
-          }
-          auto prefix =
-              otherArg ? otherArg->getBaseIdentifier().str().str() : "";
-          // If we're comparing using '!=', use '!isNan' in the message.
-          if (comparisonDecl->getBaseIdentifier().is("!=")) {
+        if (comparisonDeclName.is("==") || comparisonDeclName.is("!=")) {
+          auto exprStr =
+              C.SourceMgr
+                  .extractText(Lexer::getCharSourceRangeFromSourceRange(
+                      C.SourceMgr, firstArg->getSourceRange()))
+                  .str();
+          auto prefix = exprStr;
+          if (comparisonDeclName.is("!=")) {
             prefix = "!" + prefix;
           }
-          C.Diags.diagnose(BE->getLoc(), diag::nan_comparison, prefix,
-                           otherArg == nullptr, presenceOrAbsence);
-        };
-        if (isNanDecl(firstVal)) {
-          diagnose(/*otherArg=*/secondVal);
-        } else if (isNanDecl(secondVal)) {
-          diagnose(/*otherArg=*/firstVal);
+          C.Diags.diagnose(BE->getLoc(), diag::nan_comparison,
+                           comparisonDeclName, comparisonDeclName.is("!="),
+                           prefix, exprStr);
+        } else {
+          C.Diags.diagnose(BE->getLoc(), diag::nan_comparison_without_isnan,
+                           comparisonDeclName, comparisonDeclName.is("!="));
         }
       }
     }
