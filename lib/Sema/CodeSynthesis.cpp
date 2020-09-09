@@ -125,8 +125,9 @@ Expr *swift::buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
                                   /*hasTrailingClosure=*/false);
     argExpr->setImplicit();
   } else {
-    argExpr = TupleExpr::create(ctx, SourceLoc(), args, labels, labelLocs,
-                                SourceLoc(), false, IsImplicit);
+    argExpr = TupleExpr::createArgTuple(ctx, SourceLoc(), args, labels,
+                                        labelLocs, SourceLoc(), false,
+                                        IsImplicit);
   }
 
   auto argTy = AnyFunctionType::composeInput(ctx, elts, /*canonical*/false);
@@ -262,9 +263,9 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
       }
 
       // Create the parameter.
-      auto *arg = new (ctx)
-          ParamDecl(SourceLoc(), Loc,
-                    var->getName(), Loc, var->getName(), decl);
+      auto *arg = new (ctx) ParamDecl(SourceLoc(), Loc,
+                                      var->getName().getBaseIdentifier(),
+                                      DeclNameLoc(Loc), var->getName(), decl);
       arg->setSpecifier(ParamSpecifier::Default);
       arg->setInterfaceType(varInterfaceType);
       arg->setImplicit();

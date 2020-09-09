@@ -452,7 +452,7 @@ unsigned OpaqueStorageAllocation::insertIndirectReturnArgs() {
     auto bodyResultTy = pass.F->mapTypeIntoContext(resultTy);
     auto var = new (ctx)
         ParamDecl(SourceLoc(), SourceLoc(),
-                  ctx.getIdentifier("$return_value"), SourceLoc(),
+                  ctx.getIdentifier("$return_value"), DeclNameLoc(),
                   ctx.getIdentifier("$return_value"),
                   pass.F->getDeclContext());
     var->setSpecifier(ParamSpecifier::InOut);

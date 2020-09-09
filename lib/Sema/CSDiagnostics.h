@@ -985,7 +985,7 @@ public:
 
   VarDecl *getProperty() const { return Property; }
 
-  Identifier getPropertyName() const { return Property->getName(); }
+  DeclName getPropertyName() const { return Property->getName(); }
 
   bool usingProjection() const { return UsingProjection; }
 

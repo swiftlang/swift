@@ -233,7 +233,7 @@ public:
 
   void printEscapedStringLiteral(StringRef str);
 
-  void printName(Identifier Name,
+  void printName(DeclName Name,
                  PrintNameContext Context = PrintNameContext::Normal);
 
   void setIndent(unsigned NumSpaces) {

@@ -1385,7 +1385,8 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
         index->getArgumentNameLoc().isInvalid()) {
       diagnose(SD, diag::invalid_dynamic_member_subscript)
           .highlight(index->getSourceRange())
-          .fixItInsert(index->getParameterNameLoc(), "dynamicMember ");
+          .fixItInsert(index->getParameterNameLoc().getBaseNameLoc(),
+                       "dynamicMember ");
     }
   }
 
@@ -4476,14 +4477,14 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
   auto funcResultElt = derivativeResultTupleType->getElement(1);
   // Get derivative kind and derivative function identifier.
   AutoDiffDerivativeFunctionKind kind;
-  if (valueResultElt.getName().str() != "value") {
+  if (!valueResultElt.getName().isSimpleName("value")) {
     diags.diagnose(attr->getLocation(),
                    diag::derivative_attr_invalid_result_tuple_value_label);
     return true;
   }
-  if (funcResultElt.getName().str() == "differential") {
+  if (funcResultElt.getName().isSimpleName("differential")) {
     kind = AutoDiffDerivativeFunctionKind::JVP;
-  } else if (funcResultElt.getName().str() == "pullback") {
+  } else if (funcResultElt.getName().isSimpleName("pullback")) {
     kind = AutoDiffDerivativeFunctionKind::VJP;
   } else {
     diags.diagnose(attr->getLocation(),

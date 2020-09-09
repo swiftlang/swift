@@ -2345,7 +2345,7 @@ isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
   public:
     bool ParamsUseSameVars = true;
     bool ConditionUseOnlyAllowedFunctions = false;
-    StringRef ExpectName;
+    DeclName ExpectName;
 
     Expr *walkToExprPost(Expr *E) override {
       if (E->getKind() != ExprKind::DeclRef)
@@ -2366,7 +2366,7 @@ isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
 
   private:
     bool checkName(VarDecl *VD) {
-      auto Name = VD->getName().str();
+      auto Name = VD->getName();
       if (ExpectName.empty())
         ExpectName = Name;
       return Name == ExpectName;
@@ -2452,7 +2452,8 @@ bool RefactoringActionConvertToSwitchStmt::performChange() {
       auto D = dyn_cast<DeclRefExpr>(E)->getDecl();
       if (D->getKind() != DeclKind::Var && D->getKind() != DeclKind::Param)
         return E;
-      VarName = dyn_cast<VarDecl>(D)->getName().str().str();
+      llvm::SmallString<32> scratch;
+      VarName = dyn_cast<VarDecl>(D)->getName().getString(scratch).str();
       return nullptr;
     }
   };
@@ -3117,11 +3118,11 @@ bool RefactoringActionLocalizeString::performChange() {
 }
 
 struct MemberwiseParameter {
-  Identifier Name;
+  DeclName Name;
   Type MemberType;
   Expr *DefaultExpr;
 
-  MemberwiseParameter(Identifier name, Type type, Expr *initialExpr)
+  MemberwiseParameter(DeclName name, Type type, Expr *initialExpr)
       : Name(name), MemberType(type), DefaultExpr(initialExpr) {}
 };
 
@@ -3136,7 +3137,12 @@ static void generateMemberwiseInit(SourceEditConsumer &EditConsumer,
   auto insertMember = [&SM](const MemberwiseParameter &memberData,
                             llvm::raw_ostream &OS, bool wantsSeparator) {
     {
-      OS << memberData.Name << ": ";
+      OS << memberData.Name.getBaseName();
+      // Compound names are labeled with just the base name, but get the full
+      // name internally.
+      if (memberData.Name.isCompoundName())
+        OS << " " << memberData.Name;
+      OS << ": ";
       // Unconditionally print '@escaping' if we print out a function type -
       // the assignments we generate below will escape this parameter.
       if (isa<AnyFunctionType>(memberData.MemberType->getCanonicalType())) {
@@ -3220,8 +3226,8 @@ collectMembersForInit(ResolvedCursorInfo CursorInfo,
       defaultInit = varDecl->getParentInitializer();
     }
 
-    memberVector.emplace_back(varDecl->getName(),
-                              varDecl->getType(), defaultInit);
+    memberVector.emplace_back(varDecl->getName(), varDecl->getType(),
+                              defaultInit);
   }
   
   if (memberVector.empty()) {
@@ -3866,7 +3872,7 @@ bool RefactoringActionConvertToComputedProperty::performChange() {
   
   OS << tok::kw_var << Space;
   // Add var name
-  OS << SV->getNameStr().str() << ":" << Space;
+  OS << SV->getName() << ":" << Space;
   // For computed property must write a type of var
   if (TR) {
     OS << Lexer::getCharSourceRangeFromSourceRange(SM, TR->getSourceRange()).str();

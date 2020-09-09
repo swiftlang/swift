@@ -1095,8 +1095,9 @@ static bool checkOSLogMessageIsConstant(SingleValueInstruction *osLogMessage,
   for (auto *propDecl : propertyDecls) {
     SymbolicValue propertyValue = *(propValueI++);
     if (!propertyValue.isConstant()) {
+      llvm::SmallString<32> scratch;
       diagnose(astContext, sourceLoc, diag::oslog_property_not_constant,
-               propDecl->getNameStr());
+               propDecl->getNameStr(scratch));
       errorDetected = true;
       break;
     }

@@ -1083,8 +1083,8 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
     auto errorName = P.Context.Id_error;
     auto var = new (P.Context) VarDecl(/*IsStatic*/false,
                                        VarDecl::Introducer::Let,
-                                       /*IsCaptureList*/false, loc, errorName,
-                                       P.CurDeclContext);
+                                       /*IsCaptureList*/false, DeclNameLoc(loc),
+                                       errorName, P.CurDeclContext);
     var->setImplicit();
     auto namePattern = new (P.Context) NamedPattern(var);
     auto varPattern =
@@ -1151,7 +1151,8 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
       }
       if (!found) {
         // Diagnose a declaration that doesn't match a previous pattern.
-        P.diagnose(VD->getLoc(), diag::extra_var_in_multiple_pattern_list, VD->getName());
+        P.diagnose(VD->getLoc(), diag::extra_var_in_multiple_pattern_list,
+                   VD->getName());
         status.setIsParseError();
       }
       repeatedDecls.push_back(VD);

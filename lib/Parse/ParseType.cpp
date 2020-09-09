@@ -1104,11 +1104,16 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
         && (peekToken().is(tok::colon)
             || peekToken().canBeArgumentLabel())) {
       // Consume a name.
-      element.NameLoc = consumeArgumentLabel(element.Name);
+      Identifier firstName;
+      element.NameLoc = DeclNameLoc(consumeArgumentLabel(firstName));
+      element.Name = firstName;
 
       // If there is a second name, consume it as well.
-      if (Tok.canBeArgumentLabel())
-        element.SecondNameLoc = consumeArgumentLabel(element.SecondName);
+      if (Tok.canBeArgumentLabel()) {
+        Identifier secondName;
+        element.SecondNameLoc = DeclNameLoc(consumeArgumentLabel(secondName));
+        element.SecondName = secondName;
+      }
 
       // Consume the ':'.
       if (consumeIf(tok::colon, element.ColonLoc)) {
@@ -1121,8 +1126,8 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
         if (!Backtracking) {
           diagnose(Tok, diag::expected_parameter_colon);
         }
-        element.NameLoc = SourceLoc();
-        element.SecondNameLoc = SourceLoc();
+        element.NameLoc = DeclNameLoc();
+        element.SecondNameLoc = DeclNameLoc();
       }
 
     } else if (Backtracking) {
@@ -1204,14 +1209,17 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
     if (!isFunctionType) {
       // If there were two names, complain.
       if (element.NameLoc.isValid() && element.SecondNameLoc.isValid()) {
-        auto diag = diagnose(element.NameLoc, diag::tuple_type_multiple_labels);
+        auto diag = diagnose(element.NameLoc.getBaseNameLoc(),
+                             diag::tuple_type_multiple_labels);
         if (element.Name.empty()) {
-          diag.fixItRemoveChars(element.NameLoc,
+          diag.fixItRemoveChars(element.NameLoc.getBaseNameLoc(),
                                 element.Type->getStartLoc());
         } else {
           diag.fixItRemove(
-            SourceRange(Lexer::getLocForEndOfToken(SourceMgr, element.NameLoc),
-                        element.SecondNameLoc));
+            SourceRange(
+              Lexer::getLocForEndOfToken(SourceMgr,
+                                         element.NameLoc.getBaseNameLoc()),
+              element.SecondNameLoc.getBaseNameLoc()));
         }
       }
       continue;
@@ -1220,20 +1228,21 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
     // If there was a first name, complain; arguments in function types are
     // always unlabeled.
     if (element.NameLoc.isValid() && !element.Name.empty()) {
-      auto diag = diagnose(element.NameLoc, diag::function_type_argument_label,
+      auto diag = diagnose(element.NameLoc.getBaseNameLoc(),
+                           diag::function_type_argument_label,
                            element.Name);
       if (element.SecondNameLoc.isInvalid())
-        diag.fixItInsert(element.NameLoc, "_ ");
+        diag.fixItInsert(element.NameLoc.getBaseNameLoc(), "_ ");
       else if (element.SecondName.empty())
-        diag.fixItRemoveChars(element.NameLoc,
+        diag.fixItRemoveChars(element.NameLoc.getBaseNameLoc(),
                               element.Type->getStartLoc());
       else
-        diag.fixItReplace(SourceRange(element.NameLoc), "_");
+        diag.fixItReplace(element.NameLoc.getSourceRange(), "_");
     }
 
     if (element.SecondNameLoc.isValid()) {
       // Form the named parameter type representation.
-      element.UnderscoreLoc = element.NameLoc;
+      element.UnderscoreLoc = element.NameLoc.getBaseNameLoc();
       element.Name = element.SecondName;
       element.NameLoc = element.SecondNameLoc;
     }

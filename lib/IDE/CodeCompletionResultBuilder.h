@@ -379,7 +379,7 @@ public:
     });
   }
 
-  void addCallParameter(Identifier Name, Identifier LocalName, Type Ty,
+  void addCallParameter(Identifier Name, DeclName LocalName, Type Ty,
                         Type ContextTy, bool IsVarArg, bool IsInOut, bool IsIUO,
                         bool isAutoClosure, bool useUnderscoreLabel,
                         bool isLabeledTrailingClosure);

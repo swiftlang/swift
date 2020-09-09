@@ -751,7 +751,7 @@ static bool isZeroLoadFromEmptyCollection(LoadInst *LI) {
         // is not defined in the ABI and could change in another version of the
         // runtime (the capacity must be 0, but the flags may be not 0).
         if (SEA->getStructDecl()->getName().is("_SwiftArrayBodyStorage") &&
-            !SEA->getField()->getName().is("count")) {
+            !SEA->getField()->getName().isSimpleName("count")) {
           return false;
         }
         addr = SEA->getOperand();
@@ -763,8 +763,9 @@ static bool isZeroLoadFromEmptyCollection(LoadInst *LI) {
         // For Dictionary and Set we support "count" and "capacity".
         if (className.is("__RawDictionaryStorage") ||
             className.is("__RawSetStorage")) {
-          Identifier fieldName = REA->getField()->getName();
-          if (!fieldName.is("_count") && !fieldName.is("_capacity"))
+          DeclName fieldName = REA->getField()->getName();
+          if (!fieldName.isSimpleName("_count") &&
+              !fieldName.isSimpleName("_capacity"))
             return false;
         }
         addr = REA->getOperand();

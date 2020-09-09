@@ -411,7 +411,7 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
 
   auto *rawDecl = new (C)
       ParamDecl(SourceLoc(), SourceLoc(),
-                C.Id_rawValue, SourceLoc(), C.Id_rawValue, parentDC);
+                C.Id_rawValue, DeclNameLoc(), C.Id_rawValue, parentDC);
   rawDecl->setSpecifier(ParamSpecifier::Default);
   rawDecl->setInterfaceType(rawInterfaceType);
   rawDecl->setImplicit();

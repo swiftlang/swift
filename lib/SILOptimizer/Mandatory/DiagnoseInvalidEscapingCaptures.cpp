@@ -348,7 +348,7 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
   }
   // First, diagnose the inout captures, if any.
   for (auto inoutCapture : inoutCaptures) {
-    Optional<Identifier> paramName = None;
+    Optional<DeclName> paramName = None;
     if (isUseOfSelfInInitializer(inoutCapture)) {
       diagnose(Context, PAI->getLoc(), diag::escaping_mutable_self_capture,
                functionKind);

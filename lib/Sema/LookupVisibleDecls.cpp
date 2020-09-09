@@ -295,7 +295,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
     const DeclContext *CurrDC;
     llvm::DenseSet<std::pair<DeclBaseName, CanType>> FunctionsReported;
     llvm::DenseSet<CanType> SubscriptsReported;
-    llvm::DenseSet<std::pair<Identifier, CanType>> PropertiesReported;
+    llvm::DenseSet<std::pair<DeclName, CanType>> PropertiesReported;
 
   public:
     explicit DynamicLookupConsumer(VisibleDeclConsumer &ChainedConsumer,

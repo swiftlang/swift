@@ -510,7 +510,7 @@ public:
 
     VarDecl *VD =
         new (Context) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
-                              /*IsCaptureList*/false, SourceLoc(),
+                              /*IsCaptureList*/false, DeclNameLoc(),
                               Context.getIdentifier(NameBuf),
                               TypeCheckDC);
     VD->setInterfaceType(MaybeLoadInitExpr->getType()->mapTypeOutOfContext());
@@ -594,7 +594,7 @@ public:
 
     llvm::SmallVector<Expr *, 3> TupleArgs{};
     TupleArgs.append({*AddedBeforeLogger, E, *AddedAfterLogger});
-    SmallVector<Identifier, 3> ThreeArgLabels(TupleArgs.size(), Identifier());
+    SmallVector<DeclName, 3> ThreeArgLabels(TupleArgs.size(), Identifier());
     TupleExpr *Tup =
         TupleExpr::createImplicit(Context, TupleArgs, ThreeArgLabels);
     SmallVector<TupleTypeElt, 3> TupleTypes{};

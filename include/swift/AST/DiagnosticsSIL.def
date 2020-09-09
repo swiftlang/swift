@@ -114,18 +114,18 @@ NOTE(captured_value_declared_here,none,
 ERROR(escaping_inout_capture,none,
       SELECT_ESCAPING_CLOSURE_KIND
       " captures 'inout' parameter %1",
-      (unsigned, Identifier))
+      (unsigned, DeclName))
 NOTE(inout_param_defined_here,none,
-     "parameter %0 is declared 'inout'", (Identifier))
+     "parameter %0 is declared 'inout'", (DeclName))
 ERROR(escaping_mutable_self_capture,none,
       SELECT_ESCAPING_CLOSURE_KIND
       " captures mutating 'self' parameter", (unsigned))
 
 ERROR(escaping_noescape_param_capture,none,
       SELECT_ESCAPING_CLOSURE_KIND
-      " captures non-escaping parameter %1", (unsigned, Identifier))
+      " captures non-escaping parameter %1", (unsigned, DeclName))
 NOTE(noescape_param_defined_here,none,
-     "parameter %0 is implicitly non-escaping", (Identifier))
+     "parameter %0 is implicitly non-escaping", (DeclName))
 
 ERROR(escaping_noescape_var_capture,none,
       SELECT_ESCAPING_CLOSURE_KIND
@@ -133,7 +133,7 @@ ERROR(escaping_noescape_var_capture,none,
 
 NOTE(value_captured_here,none,"captured here", ())
 
-NOTE(copy_inout_captured_by_autoclosure,none, "pass a copy of %0", (Identifier))
+NOTE(copy_inout_captured_by_autoclosure,none, "pass a copy of %0", (DeclName))
 
 NOTE(copy_self_captured_by_autoclosure,none, "pass a copy of 'self'", ())
 
@@ -180,7 +180,7 @@ ERROR(self_use_before_fully_init,none,
       "'self' used in %select{method call|property access}1 %0 before "
       "%select{all stored properties are initialized|"
       "'super.init' call|"
-      "'self.init' call}2", (DeclBaseName, bool, unsigned))
+      "'self.init' call}2", (DeclName, bool, unsigned))
 ERROR(use_of_self_before_fully_init,none,
       "'self' used before all stored properties are initialized", ())
 

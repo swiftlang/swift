@@ -361,7 +361,7 @@ PropertyWrapperTypeInfoRequest::evaluate(
     if (result.projectedValueVar &&
         result.projectedValueVar->getLoc().isValid()) {
       result.projectedValueVar->diagnose(diag::property_wrapper_wrapperValue)
-        .fixItReplace(result.projectedValueVar->getNameLoc(),
+        .fixItReplace(result.projectedValueVar->getNameLoc().getBaseNameLoc(),
                       "projectedValue");
     }
   }
@@ -662,8 +662,8 @@ Expr *swift::buildPropertyWrapperWrappedValueCall(
     if (auto tuple = dyn_cast<TupleExpr>(attr->getArg())) {
       for (unsigned i : range(tuple->getNumElements())) {
         elements.push_back(tuple->getElement(i));
-        elementNames.push_back(tuple->getElementName(i));
-        elementLocs.push_back(tuple->getElementNameLoc(i));
+        elementNames.push_back(tuple->getElementName(i).getBaseIdentifier());
+        elementLocs.push_back(tuple->getElementNameLoc(i).getBaseNameLoc());
       }
     } else {
       auto paren = cast<ParenExpr>(attr->getArg());

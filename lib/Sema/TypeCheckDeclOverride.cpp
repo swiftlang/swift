@@ -1001,7 +1001,7 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
     // override NSObject.hash instead.
     if (isNSObjectHashValue(baseDecl)) {
       diags.diagnose(decl, diag::override_nsobject_hashvalue_error)
-        .fixItReplace(SourceRange(decl->getNameLoc()), "hash");
+        .fixItReplace(decl->getNameLoc().getSourceRange(), "hash");
     } else {
       diags.diagnose(decl, diag::override_of_non_open,
                      decl->getDescriptiveKind());

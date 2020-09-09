@@ -877,8 +877,11 @@ private:
           VD->getInterfaceType(),
           IGM.getTypeInfoForUnlowered(
               IGM.getSILTypes().getAbstractionPattern(VD), memberTy));
-      Elements.push_back(createMemberType(DbgTy, VD->getName().str(),
-                                          OffsetInBits, Scope, File, Flags));
+      // TODO(Compound variable names)
+      assert(VD->getName().isSimpleName());
+      Elements.push_back(
+          createMemberType(DbgTy, VD->getName().getBaseIdentifier().str(),
+                           OffsetInBits, Scope, File, Flags));
     }
     if (OffsetInBits > SizeInBits)
       SizeInBits = OffsetInBits;

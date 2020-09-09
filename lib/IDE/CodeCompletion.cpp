@@ -898,7 +898,7 @@ public:
 } // namespcae
 
 void CodeCompletionResultBuilder::addCallParameter(Identifier Name,
-                                                   Identifier LocalName,
+                                                   DeclName LocalName,
                                                    Type Ty,
                                                    Type ContextTy,
                                                    bool IsVarArg,
@@ -913,6 +913,9 @@ void CodeCompletionResultBuilder::addCallParameter(Identifier Name,
   addSimpleChunk(ChunkKind::CallParameterBegin);
 
   if (shouldAnnotateResults()) {
+    // TODO(Compound variable names): Need to descide how to handle escaping
+    // keywords...
+    assert(LocalName.isSimpleName());
     if (!Name.empty() || !LocalName.empty()) {
       llvm::SmallString<16> EscapedKeyword;
 
@@ -925,7 +928,8 @@ void CodeCompletionResultBuilder::addCallParameter(Identifier Name,
           addChunkWithTextNoCopy(ChunkKind::Text, " ");
           getLastChunk().setIsAnnotation();
           addChunkWithText(ChunkKind::CallParameterInternalName,
-              escapeKeyword(LocalName.str(), false, EscapedKeyword));
+                           escapeKeyword(LocalName.getBaseIdentifier().str(),
+                                         false, EscapedKeyword));
           getLastChunk().setIsAnnotation();
         }
       } else {
@@ -935,7 +939,8 @@ void CodeCompletionResultBuilder::addCallParameter(Identifier Name,
         addChunkWithTextNoCopy(ChunkKind::Text, " ");
         getLastChunk().setIsAnnotation();
         addChunkWithText(ChunkKind::CallParameterInternalName,
-            escapeKeyword(LocalName.str(), false, EscapedKeyword));
+                         escapeKeyword(LocalName.getBaseIdentifier().str(),
+                                       false, EscapedKeyword));
       }
       addChunkWithTextNoCopy(ChunkKind::CallParameterColon, ": ");
     }
@@ -957,7 +962,8 @@ void CodeCompletionResultBuilder::addCallParameter(Identifier Name,
       llvm::SmallString<16> EscapedKeyword;
       addChunkWithText(
           CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName,
-            escapeKeyword(LocalName.str(), false, EscapedKeyword));
+          escapeKeyword(LocalName.getBaseIdentifier().str(), false,
+                        EscapedKeyword));
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
     }
@@ -2515,7 +2521,7 @@ public:
         VD->shouldHideFromEditor())
       return;
 
-    const Identifier Name = VD->getName();
+    const DeclName Name = VD->getName();
     assert(!Name.empty() && "name should not be empty");
 
     CommandWordsPairs Pairs;
@@ -2524,7 +2530,7 @@ public:
         getSemanticContext(VD, Reason, dynamicLookupInfo), expectedTypeContext);
     Builder.setAssociatedDecl(VD);
     addLeadingDot(Builder);
-    addValueBaseName(Builder, Name);
+    addValueBaseName(Builder, Name.getBaseName());
     setClangDeclKeywords(VD, Pairs, Builder);
 
     // "not recommended" in its own getter.
@@ -2623,7 +2629,7 @@ public:
       auto &typeParam = typeParams[i];
 
       Identifier argName;
-      Identifier bodyName;
+      DeclName bodyName;
       bool isIUO = false;
 
       if (!declParams.empty()) {
@@ -3641,7 +3647,7 @@ public:
           SemanticContextKind::CurrentNominal, expectedTypeContext);
       addLeadingDot(Builder);
       if (TupleElt.hasName()) {
-        Builder.addBaseName(TupleElt.getName().str());
+        Builder.addBaseName(TupleElt.getName().getBaseIdentifier().str());
       } else {
         llvm::SmallString<4> IndexStr;
         {

@@ -44,9 +44,11 @@ void IRGenModule::emitSILGlobalVariable(SILGlobalVariable *var) {
   if (ti.isKnownEmpty(expansion)) {
     if (DebugInfo && var->getDecl()) {
       auto DbgTy = DebugTypeInfo::getGlobal(var, Int8Ty, Size(0), Alignment(1));
+      // TODO(Compound variable names)
+      assert(var->getDecl()->getName().isSimpleName());
       DebugInfo->emitGlobalVariableDeclaration(
-          nullptr, var->getDecl()->getName().str(), "", DbgTy,
-          var->getLinkage() != SILLinkage::Public,
+          nullptr, var->getDecl()->getName().getBaseIdentifier().str(), "",
+          DbgTy, var->getLinkage() != SILLinkage::Public,
           IRGenDebugInfo::NotHeapAllocated, SILLocation(var->getDecl()));
     }
     return;

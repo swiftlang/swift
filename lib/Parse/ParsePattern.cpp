@@ -492,7 +492,7 @@ mapParsedParameters(Parser &parser,
   -> ParamDecl * {
     auto param = new (ctx) ParamDecl(paramInfo.SpecifierLoc,
                                      argNameLoc, argName,
-                                     paramNameLoc, paramName,
+                                     DeclNameLoc(paramNameLoc), paramName,
                                      parser.CurDeclContext);
     param->getAttrs() = paramInfo.Attrs;
 
@@ -966,7 +966,7 @@ ParserResult<Pattern> Parser::parsePattern() {
       PatternCtx.setCreateSyntax(SyntaxKind::IdentifierPattern);
       auto VD = new (Context) VarDecl(
         /*IsStatic*/false, introducer, /*IsCaptureList*/false,
-        consumeToken(tok::kw__), Identifier(), CurDeclContext);
+        DeclNameLoc(consumeToken(tok::kw__)), Identifier(), CurDeclContext);
       return makeParserResult(NamedPattern::createImplicit(Context, VD));
     }
     PatternCtx.setCreateSyntax(SyntaxKind::WildcardPattern);
@@ -1038,8 +1038,8 @@ ParserResult<Pattern> Parser::parsePattern() {
 Pattern *Parser::createBindingFromPattern(SourceLoc loc, Identifier name,
                                           VarDecl::Introducer introducer) {
   auto var = new (Context) VarDecl(/*IsStatic*/false, introducer,
-                                   /*IsCaptureList*/false, loc, name,
-                                   CurDeclContext);
+                                   /*IsCaptureList*/false, DeclNameLoc(loc),
+                                   name, CurDeclContext);
   return new (Context) NamedPattern(var);
 }
 
@@ -1066,7 +1066,7 @@ Parser::parsePatternTupleElement() {
   if (pattern.isNull())
     return std::make_pair(makeParserError(), None);
 
-  auto Elt = TuplePatternElt(Label, LabelLoc, pattern.get());
+  auto Elt = TuplePatternElt(Label, DeclNameLoc(LabelLoc), pattern.get());
   return std::make_pair(makeParserSuccess(), Elt);
 }
 

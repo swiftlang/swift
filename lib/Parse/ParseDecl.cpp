@@ -5234,9 +5234,9 @@ static ParamDecl *createSetterAccessorArgument(SourceLoc nameLoc,
     name = P.Context.getIdentifier(implName);
   }
 
-  auto result = new (P.Context)
-      ParamDecl(SourceLoc(), SourceLoc(),
-                Identifier(), nameLoc, name, P.CurDeclContext);
+  auto result = new (P.Context) ParamDecl(SourceLoc(), SourceLoc(),
+                                          Identifier(), DeclNameLoc(nameLoc),
+                                          name, P.CurDeclContext);
 
   if (isNameImplicit)
     result->setImplicit();
@@ -5718,7 +5718,7 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
     storage = new (Context) VarDecl(StaticLoc.isValid(),
                                     VarDecl::Introducer::Var,
                                     /*is capture list*/ false,
-                                    VarLoc, Identifier(),
+                                    DeclNameLoc(VarLoc), Identifier(),
                                     CurDeclContext);
     storage->setImplicit(true);
     storage->setInvalid();
@@ -5755,10 +5755,8 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
   if (!isa<TypedPattern>(pattern)) {
     if (accessors.Get || accessors.Set || accessors.Address ||
         accessors.MutableAddress) {
-      SourceLoc locAfterPattern = pattern->getLoc().getAdvancedLoc(
-        pattern->getBoundName().getLength());
       diagnose(pattern->getLoc(), diag::computed_property_missing_type)
-        .fixItInsert(locAfterPattern, ": <# Type #>");
+        .fixItInsertAfter(pattern->getEndLoc(), ": <# Type #>");
       Invalid = true;
     }
   }

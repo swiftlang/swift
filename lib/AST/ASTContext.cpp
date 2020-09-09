@@ -2454,7 +2454,8 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID,
                         ArrayRef<TupleTypeElt> Fields) {
   ID.AddInteger(Fields.size());
   for (const TupleTypeElt &Elt : Fields) {
-    ID.AddPointer(Elt.Name.get());
+    llvm::SmallString<32> scratch;
+    ID.AddString(Elt.Name.getString(scratch));
     ID.AddPointer(Elt.getType().getPointer());
     ID.AddInteger(Elt.Flags.toRaw());
   }
@@ -2515,7 +2516,7 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
   return New;
 }
 
-TupleTypeElt::TupleTypeElt(Type ty, Identifier name,
+TupleTypeElt::TupleTypeElt(Type ty, DeclName name,
                            ParameterTypeFlags fl)
   : Name(name), ElementType(ty), Flags(fl) {
   if (fl.isInOut())
@@ -3045,10 +3046,11 @@ void AnyFunctionType::decomposeInput(
   case TypeKind::Tuple: {
     auto tupleTy = cast<TupleType>(type.getPointer());
     for (auto &elt : tupleTy->getElements()) {
+      assert(elt.getName().isSimpleName());
       result.emplace_back((elt.isVararg()
                            ? elt.getVarargBaseTy()
                            : elt.getRawType()),
-                          elt.getName(),
+                          elt.getName().getBaseIdentifier(),
                           elt.getParameterFlags());
     }
     return;

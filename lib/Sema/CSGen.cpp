@@ -4218,8 +4218,8 @@ swift::getOriginalArgumentList(Expr *expr) {
     auto labelLocs = tupleExpr->getElementNameLocs();
     for (unsigned i = 0, e = args.size(); i != e; ++i) {
       // Implicit TupleExprs don't always store label locations.
-      add(args[i], labels[i],
-          labelLocs.empty() ? SourceLoc() : labelLocs[i]);
+      add(args[i], labels[i].getBaseIdentifier(),
+          labelLocs.empty() ? SourceLoc() : labelLocs[i].getBaseNameLoc());
     }
   } else {
     add(expr, Identifier(), SourceLoc());

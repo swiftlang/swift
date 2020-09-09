@@ -941,7 +941,7 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   SourceRange TypeRange = VD->getTypeSourceRangeForDiagnostics();
   // TypeRange can be invalid; e.g. '@objc let foo = SwiftType()'
   if (TypeRange.isInvalid())
-    TypeRange = VD->getNameLoc();
+    TypeRange = VD->getNameLoc().getSourceRange();
 
   VD->diagnose(diag::objc_invalid_on_var, getObjCDiagnosticAttrKind(Reason))
       .highlight(TypeRange);
@@ -1902,7 +1902,8 @@ bool swift::fixDeclarationName(InFlightDiagnostic &diag, const ValueDecl *decl,
   if (auto var = dyn_cast<VarDecl>(decl)) {
     // Replace the name.
     SmallString<64> scratch;
-    diag.fixItReplace(var->getNameLoc(), targetName.getString(scratch));
+    diag.fixItReplace(var->getNameLoc().getSourceRange(),
+                      targetName.getString(scratch));
     return false;
   }
 

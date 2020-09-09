@@ -619,16 +619,18 @@ public:
   // after or instead of the expression they're looking at.  Only call this
   // if the variable has an initializer.
   Added<Stmt *> logVarDecl(VarDecl *VD) {
-    if (isa<ConstructorDecl>(TypeCheckDC) && VD->getNameStr().equals("self")) {
+    if (isa<ConstructorDecl>(TypeCheckDC) &&
+        VD->getName().isSimpleName("self")) {
       // Don't log "self" in a constructor
       return nullptr;
     }
 
+    llvm::SmallString<32> scratch;
     return buildLoggerCall(
         new (Context) DeclRefExpr(ConcreteDeclRef(VD), DeclNameLoc(),
                                   true, // implicit
                                   AccessSemantics::Ordinary, Type()),
-        VD->getSourceRange(), VD->getName().str());
+        VD->getSourceRange(), VD->getName().getString(scratch));
   }
 
   Added<Stmt *> logDeclOrMemberRef(Added<Expr *> RE) {
@@ -640,10 +642,11 @@ public:
         return nullptr;
       }
 
+      llvm::SmallString<32> scratch;
       return buildLoggerCall(
           new (Context) DeclRefExpr(ConcreteDeclRef(VD), DeclNameLoc(),
                                     /*implicit=*/true),
-          DRE->getSourceRange(), VD->getName().str());
+          DRE->getSourceRange(), VD->getName().getString(scratch));
     } else if (auto *MRE = dyn_cast<MemberRefExpr>(*RE)) {
       Expr *B = MRE->getBase();
       ConcreteDeclRef M = MRE->getMember();
@@ -757,7 +760,7 @@ public:
 
     VarDecl *VD =
         new (Context) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
-                              /*IsCaptureList*/false, SourceLoc(),
+                              /*IsCaptureList*/false, DeclNameLoc(),
                               Context.getIdentifier(NameBuf),
                               TypeCheckDC);
     VD->setInterfaceType(MaybeLoadInitExpr->getType()->mapTypeOutOfContext());

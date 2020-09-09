@@ -230,7 +230,8 @@ void Symbol::serializeFunctionSignature(llvm::json::OStream &OS) const {
           OS.attributeArray("parameters", [&](){
             for (const auto *Param : *ParamList) {
               auto ExternalName = Param->getArgumentName().str();
-              auto InternalName = Param->getParameterName().str();
+              llvm::SmallString<32> scratch;
+              auto InternalName = Param->getParameterName().getString(scratch);
 
               OS.object([&](){
                 if (ExternalName.empty()) {

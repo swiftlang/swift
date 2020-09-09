@@ -264,7 +264,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           if (tupleExpr->getNumElements() == 1) {
             Ctx.Diags.diagnose(tupleExpr->getElementNameLoc(0),
                                diag::tuple_single_element)
-              .fixItRemoveChars(tupleExpr->getElementNameLoc(0),
+              .fixItRemoveChars(tupleExpr->getElementNameLoc(0).getStartLoc(),
                                 tupleExpr->getElement(0)->getStartLoc());
           }
         }
@@ -285,7 +285,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         if ((!CallArgs.count(tupleExpr)) || isEnumCase) {
           auto diagnose = false;
 
-          llvm::SmallDenseSet<Identifier> names;
+          llvm::SmallDenseSet<DeclName> names;
           names.reserve(tupleExpr->getNumElements());
 
           for (auto name : tupleExpr->getElementNames()) {
@@ -2358,7 +2358,7 @@ public:
     }
     
     // If the variable is already unnamed, ignore it.
-    if (!VD->hasName() || VD->getName().str() == "_")
+    if (!VD->hasName() || VD->getName().isSimpleName("_"))
       return false;
     
     return true;
@@ -2707,11 +2707,13 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
           auto found = AssociatedGetterRefExpr.find(VD);
           if (found != AssociatedGetterRefExpr.end()) {
             auto *DRE = found->second;
+            llvm::SmallString<32> scratch;
             Diags.diagnose(DRE->getLoc(), diag::unused_setter_parameter,
                            var->getName());
             Diags.diagnose(DRE->getLoc(), diag::fixit_for_unused_setter_parameter,
                            var->getName())
-              .fixItReplace(DRE->getSourceRange(), var->getName().str());
+              .fixItReplace(DRE->getSourceRange(),
+                            var->getName().getString(scratch));
           }
         }
       }
@@ -3323,7 +3325,8 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
       Identifier closureLabel;
       if (auto TT = argsTy->getAs<TupleType>()) {
         assert(TT->getNumElements() != 0 && "Unexpected empty TupleType");
-        closureLabel = TT->getElement(TT->getNumElements() - 1).getName();
+        auto elt = TT->getElement(TT->getNumElements() - 1);
+        closureLabel = elt.getName().getBaseIdentifier();
       }
 
       auto diag = Ctx.Diags.diagnose(closureLoc,
@@ -4709,9 +4712,10 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
 
   // Figure out the first parameter name.
   StringRef firstParamName;
+  llvm::SmallString<32> nameScratch;
   auto params = afd->getParameters();
   if (params->size() != 0 && !params->get(0)->getName().empty())
-    firstParamName = params->get(0)->getName().str();
+    firstParamName = params->get(0)->getName().getString(nameScratch);
 
   StringScratchSpace scratch;
   if (!swift::omitNeedlessWords(baseNameStr, argNameStrs, firstParamName,
@@ -4755,7 +4759,10 @@ Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   if (var->getName().empty())
     return None;
 
-  auto name = var->getName().str();
+  auto baseName = var->getName().getBaseIdentifier().str();
+  llvm::SmallVector<StringRef, 4> argNames;
+  for (auto arg : var->getName().getArgumentNames())
+    argNames.push_back(arg.str());
 
   // Dig out the context type.
   Type contextType = var->getDeclContext()->getDeclaredInterfaceType();
@@ -4771,10 +4778,10 @@ Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   StringScratchSpace scratch;
   OmissionTypeName typeName = getTypeNameForOmission(var->getInterfaceType());
   OmissionTypeName contextTypeName = getTypeNameForOmission(contextType);
-  if (::omitNeedlessWords(name, { }, "", typeName, contextTypeName, { },
-                          /*returnsSelf=*/false, true,
+  if (::omitNeedlessWords(baseName, argNames, "", typeName, contextTypeName,
+                          { }, /*returnsSelf=*/false, true,
                           /*allPropertyNames=*/nullptr, scratch)) {
-    return Context.getIdentifier(name);
+    return Context.getIdentifier(baseName);
   }
 
   return None;

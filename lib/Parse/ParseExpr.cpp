@@ -1988,7 +1988,7 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
     // Make the variable which will contain our temporary value.
     auto InterpolationVar =
       new (Context) VarDecl(/*IsStatic=*/false, VarDecl::Introducer::Var,
-                            /*IsCaptureList=*/false, /*NameLoc=*/SourceLoc(),
+                            /*IsCaptureList=*/false, /*NameLoc=*/DeclNameLoc(),
                             Context.Id_dollarInterpolation, CurDeclContext);
     InterpolationVar->setImplicit(true);
     InterpolationVar->setHasNonPatternBindingInit(true);
@@ -2572,7 +2572,8 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
                          : VarDecl::Introducer::Var);
       auto *VD = new (Context) VarDecl(/*isStatic*/false, introducer,
                                        /*isCaptureList*/true,
-                                       nameLoc, name, CurDeclContext);
+                                       DeclNameLoc(nameLoc), name,
+                                       CurDeclContext);
         
       // If we captured something under the name "self", remember that.
       if (name == Context.Id_self)
@@ -2640,7 +2641,7 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
         }
         auto var = new (Context)
             ParamDecl(SourceLoc(), SourceLoc(),
-                      Identifier(), nameLoc, name, nullptr);
+                      Identifier(), DeclNameLoc(nameLoc), name, nullptr);
         var->setSpecifier(ParamSpecifier::Default);
         elements.push_back(var);
 
@@ -2944,7 +2945,8 @@ Expr *Parser::parseExprAnonClosureArg() {
   // replacements.
   if (auto *params = closure->getParameters()) {
     if (ArgNo < params->size() && params->get(ArgNo)->hasName()) {
-      auto paramName = params->get(ArgNo)->getNameStr();
+      llvm::SmallString<32> scratch;
+      auto paramName = params->get(ArgNo)->getNameStr(scratch);
       diagnose(Loc, diag::anon_closure_arg_in_closure_with_args_typo, paramName)
         .fixItReplace(Loc, paramName);
       return new (Context) DeclRefExpr(params->get(ArgNo), DeclNameLoc(Loc),
@@ -2965,7 +2967,7 @@ Expr *Parser::parseExprAnonClosureArg() {
     SourceLoc varLoc = leftBraceLoc;
     auto *var = new (Context)
         ParamDecl(SourceLoc(), SourceLoc(),
-                  Identifier(), varLoc, ident, closure);
+                  Identifier(), DeclNameLoc(varLoc), ident, closure);
     var->setSpecifier(ParamSpecifier::Default);
     var->setImplicit();
     decls.push_back(var);
@@ -3012,10 +3014,18 @@ Parser::parseExprList(tok leftTok, tok rightTok, SyntaxKind Kind) {
                                         /*hasTrailingClosure=*/false));
   }
 
+  SmallVector<DeclName, 8> declNames;
+  SmallVector<DeclNameLoc, 8> declNameLocs;
+  assert(subExprNames.size() == subExprNameLocs.size());
+  for (size_t i = 0; i < subExprNames.size(); ++i) {
+    declNames.push_back(subExprNames[i]);
+    declNameLocs.push_back(DeclNameLoc(subExprNameLocs[i]));
+  }
+
   return makeParserResult(
       status,
-      TupleExpr::create(Context, leftLoc, subExprs, subExprNames,
-                        subExprNameLocs, rightLoc, /*HasTrailingClosure=*/false,
+      TupleExpr::create(Context, leftLoc, subExprs, declNames, declNameLocs,
+                        rightLoc, /*HasTrailingClosure=*/false,
                         /*Implicit=*/false));
 }
 

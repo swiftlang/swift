@@ -809,8 +809,8 @@ bool LabelingFailure::diagnoseAsNote() {
   if (isa<ParenExpr>(argExpr)) {
     argLabels.push_back(Identifier());
   } else if (auto *tuple = dyn_cast<TupleExpr>(argExpr)) {
-    argLabels.append(tuple->getElementNames().begin(),
-                     tuple->getElementNames().end());
+    for (auto name : tuple->getElementNames())
+      argLabels.push_back(name.getBaseIdentifier());
   } else {
     return false;
   }
@@ -1607,7 +1607,7 @@ bool AssignmentFailure::diagnoseAsError() {
     auto getKeyPathArgument = [](SubscriptExpr *expr) {
       auto *TE = dyn_cast<TupleExpr>(expr->getIndex());
       assert(TE->getNumElements() == 1);
-      assert(TE->getElementName(0).str() == "keyPath");
+      assert(TE->getElementName(0).isSimpleName("keyPath"));
       return TE->getElement(0);
     };
 
@@ -1634,7 +1634,8 @@ bool AssignmentFailure::diagnoseAsError() {
     // problematic decl, we can produce a nice tailored diagnostic.
     if (auto *VD = dyn_cast<VarDecl>(choice->getDecl())) {
       std::string message = "'";
-      message += VD->getName().str().str();
+      llvm::SmallString<32> scratch;
+      message += VD->getName().getString(scratch).str();
       message += "'";
 
       auto type = getType(immutableExpr);
@@ -3566,7 +3567,9 @@ bool MissingMemberFailure::diagnoseForSubscriptMemberWithTupleBase() const {
         dyn_cast<StringLiteralExpr>(index->getSemanticsProvidingExpr());
     if (stringLiteral && !stringLiteral->getValue().empty() &&
         llvm::any_of(tupleType->getElements(), [&](TupleTypeElt element) {
-          return element.getName().is(stringLiteral->getValue());
+          llvm::SmallString<32> scratch;
+          return element.getName().getString(scratch) ==
+                 stringLiteral->getValue();
         })) {
       llvm::SmallString<16> dotAccess;
       llvm::raw_svector_ostream OS(dotAccess);
@@ -4219,7 +4222,7 @@ bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
       insertLoc = Lexer::getLocForEndOfToken(
           ctx.SourceMgr, TE->getElement(argPos)->getEndLoc());
     } else {
-      insertLoc = TE->getElementNameLoc(0);
+      insertLoc = TE->getElementNameLoc(0).getStartLoc();
       if (insertLoc.isInvalid())
         insertLoc = TE->getElement(0)->getStartLoc();
     }
@@ -4614,7 +4617,10 @@ bool ClosureParamDestructuringFailure::diagnoseAsError() {
   parameterOS << "(";
   interleave(
       params->getArray(),
-      [&](const ParamDecl *param) { parameterOS << param->getNameStr(); },
+      [&](const ParamDecl *param) {
+        llvm::SmallString<32> scratch;
+        parameterOS << param->getNameStr(scratch);
+      },
       [&] { parameterOS << ", "; });
   parameterOS << ")";
 
@@ -4692,8 +4698,8 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
 
   auto *tuple = cast<TupleExpr>(argExpr);
 
-  Identifier first = tuple->getElementName(ArgIdx);
-  Identifier second = tuple->getElementName(PrevArgIdx);
+  Identifier first = tuple->getElementName(ArgIdx).getBaseIdentifier();
+  Identifier second = tuple->getElementName(PrevArgIdx).getBaseIdentifier();
 
   // Build a mapping from arguments to parameters.
   SmallVector<unsigned, 4> argBindings(tuple->getNumElements());
@@ -4705,7 +4711,7 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
   auto argRange = [&](unsigned argIdx, Identifier label) -> SourceRange {
     auto range = tuple->getElement(argIdx)->getSourceRange();
     if (!label.empty())
-      range.Start = tuple->getElementNameLoc(argIdx);
+      range.Start = tuple->getElementNameLoc(argIdx).getStartLoc();
 
     unsigned paramIdx = argBindings[argIdx];
     if (Bindings[paramIdx].size() > 1)
@@ -5605,8 +5611,8 @@ bool InvalidTupleSplatWithSingleParameterFailure::diagnoseAsError() {
       // If the label of the first argument matches the one required
       // by the parameter it would be omitted from the fixed parameter type.
       if (!paramTuple->getElement(0).hasName())
-        newLeftParenLoc = Lexer::getLocForEndOfToken(getASTContext().SourceMgr,
-                                                     TE->getElementNameLoc(0));
+        newLeftParenLoc = Lexer::getLocForEndOfToken(
+            getASTContext().SourceMgr, TE->getElementNameLoc(0).getEndLoc());
     }
   }
 
@@ -5700,7 +5706,7 @@ void InOutConversionFailure::fixItChangeArgumentType() const {
     startLoc = typeRange.Start;
     endLoc = typeRange.End;
   } else if (isSimpleTypelessPattern(VD->getParentPattern())) {
-    endLoc = VD->getNameLoc();
+    endLoc = VD->getNameLoc().getEndLoc();
     scratch += ": ";
   }
 

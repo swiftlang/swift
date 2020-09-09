@@ -2347,7 +2347,8 @@ void ASTMangler::appendTypeList(Type listTy, const ValueDecl *forDecl) {
     bool firstField = true;
     for (auto &field : tuple->getElements()) {
       assert(field.getParameterFlags().isNone());
-      appendTypeListElement(field.getName(), field.getRawType(),
+      appendTypeListElement(field.getName().getBaseIdentifier(),
+                            field.getRawType(),
                             ParameterTypeFlags(),
                             forDecl);
       appendListSeparator(firstField);
@@ -2358,7 +2359,7 @@ void ASTMangler::appendTypeList(Type listTy, const ValueDecl *forDecl) {
   }
 }
 
-void ASTMangler::appendTypeListElement(Identifier name, Type elementType,
+void ASTMangler::appendTypeListElement(DeclName name, Type elementType,
                                        ParameterTypeFlags flags,
                                        const ValueDecl *forDecl) {
   if (auto *fnType = elementType->getAs<FunctionType>())
@@ -2380,8 +2381,11 @@ void ASTMangler::appendTypeListElement(Identifier name, Type elementType,
     appendOperator("n");
     break;
   }
+  // TODO(Compound variable names): Need to decide whether and how to mangle
+  // compound names in type lists (e.g., compound-named tuple elements)
+  assert(name.isSimpleName());
   if (!name.empty())
-    appendIdentifier(name.str());
+    appendIdentifier(name.getBaseIdentifier().str());
   if (flags.isVariadic())
     appendOperator("d");
 }

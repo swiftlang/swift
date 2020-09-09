@@ -673,10 +673,10 @@ private:
 
 /// A parsed element within a tuple type.
 struct TupleTypeReprElement {
-  Identifier Name;
-  SourceLoc NameLoc;
-  Identifier SecondName;
-  SourceLoc SecondNameLoc;
+  DeclName Name;
+  DeclNameLoc NameLoc;
+  DeclName SecondName;
+  DeclNameLoc SecondNameLoc;
   SourceLoc UnderscoreLoc;
   SourceLoc ColonLoc;
   TypeRepr *Type;
@@ -737,17 +737,17 @@ public:
     return getElements()[i];
   }
 
-  void getElementNames(SmallVectorImpl<Identifier> &Names) {
+  void getElementNames(SmallVectorImpl<DeclName> &Names) {
     for (auto &Element : getElements()) {
       Names.push_back(Element.Name);
     }
   }
 
-  Identifier getElementName(unsigned i) const {
+  DeclName getElementName(unsigned i) const {
     return getElement(i).Name;
   }
 
-  SourceLoc getElementNameLoc(unsigned i) const {
+  DeclNameLoc getElementNameLoc(unsigned i) const {
     return getElement(i).NameLoc;
   }
 

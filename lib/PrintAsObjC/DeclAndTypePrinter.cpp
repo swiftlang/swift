@@ -431,7 +431,7 @@ private:
     if (!param->hasName()) {
       os << "_";
     } else {
-      Identifier name = param->getName();
+      Identifier name = param->getName().getBaseIdentifier();
       os << name;
       if (isClangKeyword(name))
         os << "_";
@@ -752,7 +752,8 @@ private:
                    Type objTy;
                    std::tie(objTy, kind) = getObjectTypeAndOptionality(
                        param, param->getInterfaceType());
-                   print(objTy, kind, param->getName(), IsFunctionParam);
+                   print(objTy, kind, param->getName().getBaseIdentifier(),
+                         IsFunctionParam);
                  },
                  [&] { os << ", "; });
     } else {

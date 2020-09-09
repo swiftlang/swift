@@ -2383,8 +2383,10 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
       Optional<SILLocation> loc;
       if (var->getDecl()) {
         // Use the VarDecl for more accurate debugging information.
+        // TODO(Compound variable names)
+        assert(var->getDecl()->getName().isSimpleName());
         loc = var->getDecl();
-        name = var->getDecl()->getName().str();
+        name = var->getDecl()->getName().getBaseIdentifier().str();
       } else {
         if (var->hasLocation())
           loc = var->getLocation();

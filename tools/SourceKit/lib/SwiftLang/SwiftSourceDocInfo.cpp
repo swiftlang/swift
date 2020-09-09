@@ -716,10 +716,10 @@ getParamParentNameOffset(const ValueDecl *VD, SourceLoc Cursor) {
     auto *DC = PD->getDeclContext();
     switch (DC->getContextKind()) {
       case DeclContextKind::SubscriptDecl:
-        Loc = cast<SubscriptDecl>(DC)->getNameLoc();
+        Loc = cast<SubscriptDecl>(DC)->getNameLoc().getBaseNameLoc();
         break;
       case DeclContextKind::AbstractFunctionDecl:
-        Loc = cast<AbstractFunctionDecl>(DC)->getNameLoc();
+        Loc = cast<AbstractFunctionDecl>(DC)->getBaseNameLoc();
         break;
       default:
         break;

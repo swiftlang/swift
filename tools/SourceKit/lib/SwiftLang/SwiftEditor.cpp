@@ -1525,9 +1525,10 @@ private:
         for (auto &ArgElt : FTR->getArgsTypeRepr()->getElements()) {
           CharSourceRange NR;
           CharSourceRange TR;
-          auto name = ArgElt.Name;
+          assert(ArgElt.Name.isSimpleName());
+          auto name = ArgElt.Name.getBaseIdentifier();
           if (!name.empty()) {
-            NR = CharSourceRange(ArgElt.NameLoc,
+            NR = CharSourceRange(ArgElt.NameLoc.getBaseNameLoc(),
                                  name.getLength());
           }
           SourceLoc SRE = Lexer::getLocForEndOfToken(SM,
@@ -2263,7 +2264,12 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
             OS << "{ ";
           } else {
             auto label = args->getElementName(argI);
-            OS << " " << (label.empty() ? "_" : label.str()) << ": { ";
+            OS << " ";
+            if (label.empty())
+              OS << "_";
+            else
+              OS << label;
+            OS << ": { ";
           }
           printClosureBody(closure, OS, SM);
           OS << "}";

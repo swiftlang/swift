@@ -901,15 +901,21 @@ static ArrayRef<Identifier> getArgumentLabelsFromArgument(
   // A tuple expression stores its element names, if they exist.
   if (auto tuple = dyn_cast<TupleExpr>(arg)) {
     if (sourceLocs && tuple->hasElementNameLocs()) {
-      sourceLocs->append(tuple->getElementNameLocs().begin(),
-                         tuple->getElementNameLocs().end());
+      for (auto eltNameLoc : tuple->getElementNameLocs()) {
+        assert(!eltNameLoc.isCompound());
+        sourceLocs->push_back(eltNameLoc.getBaseNameLoc());
+      }
     }
 
     if (hasTrailingClosure) *hasTrailingClosure = tuple->hasTrailingClosure();
 
     if (tuple->hasElementNames()) {
       assert(tuple->getElementNames().size() == tuple->getNumElements());
-      return tuple->getElementNames();
+      for (auto eltName : tuple->getElementNames()) {
+        assert(eltName.isSimpleName());
+        scratch.push_back(eltName.getBaseIdentifier());
+      }
+      return scratch;
     }
 
     scratch.assign(tuple->getNumElements(), Identifier());
@@ -927,8 +933,10 @@ static ArrayRef<Identifier> getArgumentLabelsFromArgument(
   // FIXME: Should be a dyn_cast.
   if (auto tupleTy = type->getAs<TupleType>()) {
     scratch.clear();
-    for (const auto &elt : tupleTy->getElements())
-      scratch.push_back(elt.getName());
+    for (const auto &elt : tupleTy->getElements()) {
+      assert(elt.getName().isSimpleName());
+      scratch.push_back(elt.getName().getBaseIdentifier());
+    }
     return scratch;
   }
 
@@ -1010,9 +1018,11 @@ Expr *swift::packSingleArgument(ASTContext &ctx, SourceLoc lParenLoc,
       argLabels = argLabelsScratch;
     }
       
-    auto arg = TupleExpr::create(ctx, lParenLoc, args, argLabels, argLabelLocs,
-                                 rParenLoc, /*HasTrailingClosure=*/false,
-                                 implicit);
+    auto arg = TupleExpr::createArgTuple(ctx, lParenLoc, args, argLabels,
+                                         argLabelLocs,
+                                         rParenLoc,
+                                         /*HasTrailingClosure=*/false,
+                                         implicit);
     computeSingleArgumentType(ctx, arg, implicit, getType);
     return arg;
   }
@@ -1074,10 +1084,10 @@ Expr *swift::packSingleArgument(ASTContext &ctx, SourceLoc lParenLoc,
   if (!trailingClosures.empty() && trailingClosures[0].Label.empty())
     unlabeledTrailingClosureIndex = args.size() - trailingClosures.size();
 
-  auto arg = TupleExpr::create(ctx, lParenLoc, rParenLoc, args, argLabels,
-                               argLabelLocs,
-                               unlabeledTrailingClosureIndex,
-                               /*Implicit=*/false);
+  auto arg = TupleExpr::createArgTuple(ctx, lParenLoc, rParenLoc, args,
+                                       argLabels, argLabelLocs,
+                                       unlabeledTrailingClosureIndex,
+                                       /*Implicit=*/false);
   computeSingleArgumentType(ctx, arg, implicit, getType);
   return arg;
 }
@@ -1316,8 +1326,8 @@ SourceRange TupleExpr::getSourceRange() const {
 
 TupleExpr::TupleExpr(SourceLoc LParenLoc, SourceLoc RParenLoc,
                      ArrayRef<Expr *> SubExprs,
-                     ArrayRef<Identifier> ElementNames, 
-                     ArrayRef<SourceLoc> ElementNameLocs,
+                     ArrayRef<DeclName> ElementNames,
+                     ArrayRef<DeclNameLoc> ElementNameLocs,
                      Optional<unsigned> FirstTrailingArgumentAt,
                      bool Implicit, Type Ty)
   : Expr(ExprKind::Tuple, Implicit, Ty),
@@ -1340,21 +1350,21 @@ TupleExpr::TupleExpr(SourceLoc LParenLoc, SourceLoc RParenLoc,
   // Copy element names, if provided.
   if (hasElementNames()) {
     std::uninitialized_copy(ElementNames.begin(), ElementNames.end(),
-                            getTrailingObjects<Identifier>());
+                            getTrailingObjects<DeclName>());
   }
 
   // Copy element name locations, if provided.
   if (hasElementNameLocs()) {
     std::uninitialized_copy(ElementNameLocs.begin(), ElementNameLocs.end(),
-                            getTrailingObjects<SourceLoc>());
+                            getTrailingObjects<DeclNameLoc>());
   }
 }
 
 TupleExpr *TupleExpr::create(ASTContext &ctx,
                              SourceLoc LParenLoc,
                              ArrayRef<Expr *> SubExprs,
-                             ArrayRef<Identifier> ElementNames,
-                             ArrayRef<SourceLoc> ElementNameLocs,
+                             ArrayRef<DeclName> ElementNames,
+                             ArrayRef<DeclNameLoc> ElementNameLocs,
                              SourceLoc RParenLoc,
                              bool HasTrailingClosure,
                              bool Implicit, Type Ty) {
@@ -1369,12 +1379,12 @@ TupleExpr *TupleExpr::create(ASTContext &ctx,
                              SourceLoc LParenLoc,
                              SourceLoc RParenLoc,
                              ArrayRef<Expr *> SubExprs,
-                             ArrayRef<Identifier> ElementNames,
-                             ArrayRef<SourceLoc> ElementNameLocs,
+                             ArrayRef<DeclName> ElementNames,
+                             ArrayRef<DeclNameLoc> ElementNameLocs,
                              Optional<unsigned> FirstTrailingArgumentAt,
                              bool Implicit, Type Ty) {
   assert(!Ty || isa<TupleType>(Ty.getPointer()));
-  auto hasNonEmptyIdentifier = [](ArrayRef<Identifier> Ids) -> bool {
+  auto hasNonEmptyName = [](ArrayRef<DeclName> Ids) -> bool {
     for (auto ident : Ids) {
       if (!ident.empty())
         return true;
@@ -1382,18 +1392,58 @@ TupleExpr *TupleExpr::create(ASTContext &ctx,
     return false;
   };
   assert((Implicit || ElementNames.size() == ElementNameLocs.size() ||
-          (!hasNonEmptyIdentifier(ElementNames) && ElementNameLocs.empty())) &&
+          (!hasNonEmptyName(ElementNames) && ElementNameLocs.empty())) &&
          "trying to create non-implicit tuple-expr without name locations");
-  (void)hasNonEmptyIdentifier;
+  (void)hasNonEmptyName;
 
   size_t size =
-      totalSizeToAlloc<Expr *, Identifier, SourceLoc>(SubExprs.size(),
+      totalSizeToAlloc<Expr *, DeclName, DeclNameLoc>(SubExprs.size(),
                                                       ElementNames.size(),
                                                       ElementNameLocs.size());
   void *mem = ctx.Allocate(size, alignof(TupleExpr));
   return new (mem) TupleExpr(LParenLoc, RParenLoc, SubExprs, ElementNames,
                              ElementNameLocs,
                              FirstTrailingArgumentAt, Implicit, Ty);
+}
+
+TupleExpr *TupleExpr::createArgTuple(ASTContext &ctx,
+                                     SourceLoc LParenLoc,
+                                     ArrayRef<Expr *> SubExprs,
+                                     ArrayRef<Identifier> ArgLabels,
+                                     ArrayRef<SourceLoc> ArgLabelLocs,
+                                     SourceLoc RParenLoc,
+                                     bool HasTrailingClosure,
+                                     bool Implicit, Type Ty) {
+  SmallVector<DeclName, 4> eltNames;
+  for (auto label : ArgLabels)
+    eltNames.push_back(label);
+
+  SmallVector<DeclNameLoc, 4> eltNameLocs;
+  for (auto loc : ArgLabelLocs)
+    eltNameLocs.push_back(DeclNameLoc(loc));
+
+  return create(ctx, LParenLoc, SubExprs, eltNames, eltNameLocs, RParenLoc,
+                HasTrailingClosure, Implicit, Ty);
+}
+
+TupleExpr *TupleExpr::createArgTuple(ASTContext &ctx,
+                                     SourceLoc LParenLoc,
+                                     SourceLoc RParenLoc,
+                                     ArrayRef<Expr *> SubExprs,
+                                     ArrayRef<Identifier> ArgLabels,
+                                     ArrayRef<SourceLoc> ArgLabelLocs,
+                                     Optional<unsigned> FirstTrailingArgumentAt,
+                                     bool Implicit, Type Ty) {
+  SmallVector<DeclName, 4> eltNames;
+  for (auto label : ArgLabels)
+    eltNames.push_back(label);
+
+  SmallVector<DeclNameLoc, 4> eltNameLocs;
+  for (auto loc : ArgLabelLocs)
+    eltNameLocs.push_back(DeclNameLoc(loc));
+
+  return create(ctx, LParenLoc, RParenLoc, SubExprs, eltNames, eltNameLocs,
+                FirstTrailingArgumentAt, Implicit, Ty);
 }
 
 TupleExpr *TupleExpr::createEmpty(ASTContext &ctx, SourceLoc LParenLoc, 
@@ -1404,7 +1454,7 @@ TupleExpr *TupleExpr::createEmpty(ASTContext &ctx, SourceLoc LParenLoc,
 }
 
 TupleExpr *TupleExpr::createImplicit(ASTContext &ctx, ArrayRef<Expr *> SubExprs,
-                                     ArrayRef<Identifier> ElementNames) {
+                                     ArrayRef<DeclName> ElementNames) {
   return create(ctx, SourceLoc(), SourceLoc(), SubExprs, ElementNames, {},
                 /*FirstTrailingArgumentAt=*/None, /*Implicit=*/true, Type());
 }

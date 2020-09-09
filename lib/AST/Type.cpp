@@ -2772,9 +2772,9 @@ bool TypeBase::matchesFunctionType(Type other, TypeMatchOptions matchMode,
 
 /// getNamedElementId - If this tuple has a field with the specified name,
 /// return the field index, otherwise return -1.
-int TupleType::getNamedElementId(Identifier I) const {
+int TupleType::getNamedElementId(DeclName N) const {
   for (unsigned i = 0, e = Bits.TupleType.Count; i != e; ++i) {
-    if (getTrailingObjects<TupleTypeElt>()[i].getName() == I)
+    if (getTrailingObjects<TupleTypeElt>()[i].getName() == N)
       return i;
   }
 
