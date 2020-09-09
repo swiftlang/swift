@@ -2874,7 +2874,7 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
 void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
   if (auto *ED = dyn_cast<EnumDecl>(D)) {
     if (!ED->getModuleContext()->isResilient()) {
-      attr->setInvalid();
+      //attr->setInvalid();
       return;
     }
 
