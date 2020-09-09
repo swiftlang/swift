@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -51,6 +51,11 @@ public let UTF8Decode = [
       runFunction: run_UTF8Decode_InitDecoding,
       tags: [.validation, .api, .String]),
     BenchmarkInfo(
+      name: "UTF8Decode_InitDecoding_repairUTF8",
+      runFunction: run_UTF8Decode_InitDecoding_repairUTF8,
+      tags: [.validation, .api, .String],
+      setUpFunction: { blackHole(allStringsBytes_repairUTF8) }),
+    BenchmarkInfo(
       name: "UTF8Decode_InitFromBytes",
       runFunction: run_UTF8Decode_InitFromBytes,
       tags: [.validation, .api, .String]),
@@ -98,6 +103,10 @@ let allStrings = [ascii, russian, japanese, emoji].map { Array($0.utf8) }
 let allStringsBytes: [UInt8] = Array(allStrings.joined())
 let allStringsData: Data = Data(allStringsBytes)
 
+let allStringsBytes_repairUTF8: [UInt8] = allStringsBytes.map {
+  // Replace each ASCII comma with an invalid UTF-8 byte.
+  $0 == UInt8(ascii: ",") ? 0xFF : $0
+}
 
 @inline(never)
 public func run_UTF8Decode(_ N: Int) {
@@ -131,6 +140,13 @@ public func run_UTF8Decode_InitFromData(_ N: Int) {
 @inline(never)
 public func run_UTF8Decode_InitDecoding(_ N: Int) {
   let input = allStringsBytes
+  for _ in 0..<200*N {
+    blackHole(String(decoding: input, as: UTF8.self))
+  }
+}
+@inline(never)
+public func run_UTF8Decode_InitDecoding_repairUTF8(_ N: Int) {
+  let input = allStringsBytes_repairUTF8
   for _ in 0..<200*N {
     blackHole(String(decoding: input, as: UTF8.self))
   }
