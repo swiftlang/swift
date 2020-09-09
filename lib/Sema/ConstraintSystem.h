@@ -5521,7 +5521,7 @@ bool hasAppliedSelf(const OverloadChoice &choice,
                     llvm::function_ref<Type(Type)> getFixedType);
 
 /// Check whether type conforms to a given known protocol.
-bool conformsToKnownProtocol(ConstraintSystem &cs, Type type,
+bool conformsToKnownProtocol(DeclContext *dc, Type type,
                              KnownProtocolKind protocol);
 
 /// Check whether given type conforms to `RawPepresentable` protocol
