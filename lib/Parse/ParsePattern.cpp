@@ -228,7 +228,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       if (AttrStatus.hasCodeCompletion()) {
         if (CodeCompletion)
           CodeCompletion->setAttrTargetDeclKind(DeclKind::Param);
-        status.setHasCodeCompletion();
+        status.setHasCodeCompletionAndIsError();
       }
     }
     
@@ -808,7 +808,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
         parseDeclResultType(diag::expected_type_function_result);
     retType = ResultType.getPtrOrNull();
     Status |= ResultType;
-    if (Status.isError())
+    if (Status.isErrorOrHasCompletion())
       return Status;
 
     // Check for 'throws' and 'rethrows' after the type and correct it.
@@ -919,7 +919,7 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
                                             argLabelLocs, rParenLoc,
                                             trailingClosures,
                                             SyntaxKind::Unknown);
-        if (status.isSuccess()) {
+        if (status.isSuccess() && !status.hasCodeCompletion()) {
           backtrack.cancelBacktrack();
           
           // Suggest replacing ':' with '='
@@ -1133,11 +1133,11 @@ parseOptionalPatternTypeAnnotation(ParserResult<Pattern> result) {
   Pattern *P = result.get();
   ParserStatus status;
   if (result.hasCodeCompletion())
-    status.setHasCodeCompletion();
+    status.setHasCodeCompletionAndIsError();
 
   ParserResult<TypeRepr> Ty = parseType();
   if (Ty.hasCodeCompletion()) {
-    result.setHasCodeCompletion();
+    result.setHasCodeCompletionAndIsError();
     return result;
   }
 

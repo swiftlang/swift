@@ -9,6 +9,7 @@
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=CLOSURE_MISSINGARG | %FileCheck %s --check-prefix=POINT_MEMBER
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=CLOSURE_NORETURN | %FileCheck %s --check-prefix=POINT_MEMBER
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=CLOSURE_FUNCBUILDER | %FileCheck %s --check-prefix=POINT_MEMBER
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=MULTICLOSURE_FUNCBUILDER | %FileCheck %s --check-prefix=POINT_MEMBER
 
 struct A {
   func doAThings() -> A { return self }
@@ -127,10 +128,19 @@ struct ThingBuilder {
 }
 func CreateThings(@ThingBuilder makeThings: () -> [Thing]) {}
 
-// FIXME: only works if the first call to Thing is passed a single expression closure
+// In single statement closure
 CreateThings {
     Thing { point in
       point.#^CLOSURE_FUNCBUILDER^#
+    }
+    Thing { _ in }
+}
+
+// In multi-statement closure
+CreateThings {
+    Thing { point in
+      print("hello")
+      point.#^MULTICLOSURE_FUNCBUILDER^#
     }
     Thing { _ in }
 }
