@@ -4450,12 +4450,12 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
     void tryDiagnoseComparisonWithNaN(BinaryExpr *BE) {
       ValueDecl *comparisonDecl = nullptr;
 
-      // The == and != methods take two arguments.
+      // Comparison functions like == or <= take two arguments.
       if (BE->getArg()->getNumElements() != 2) {
         return;
       }
 
-      // Dig out the function the arguments are being passed to.
+      // Dig out the function declaration.
       if (auto Fn = BE->getFn()) {
         if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(Fn)) {
           comparisonDecl = DSCE->getCalledValue();
@@ -4489,7 +4489,7 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
       };
 
       if (!conformsToFpProto(firstArg->getType()) ||
-          !conformsToFpProto(firstArg->getType())) {
+          !conformsToFpProto(secondArg->getType())) {
         return;
       }
 
@@ -4525,7 +4525,7 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
       // the result is always false. If the comparison is done using '!=',
       // then the result is always true.
       //
-      // Emit a different diagnostic which doesn't mention using '.isNan' if
+      // Emit a different diagnostic which doesn't mention using '.isNaN' if
       // the comparison isn't done using '==' or '!=' or if both sides are
       // '.nan'.
       if (isNanDecl(firstVal) && isNanDecl(secondVal)) {
