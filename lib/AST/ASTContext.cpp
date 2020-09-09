@@ -4551,11 +4551,17 @@ CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
 // constraints while existential values do.
 CanGenericSignature ASTContext::getOpenedArchetypeSignature(CanType existential,
                                                             ModuleDecl *mod) {
+  assert(existential.isExistentialType());
+
+  // The opened archetype signature for a protocol type is identical
+  // to the protocol's own canonical generic signature.
+  if (const auto protoTy = dyn_cast<ProtocolType>(existential)) {
+    return protoTy->getDecl()->getGenericSignature()->getCanonicalSignature();
+  }
+
   auto found = getImpl().ExistentialSignatures.find(existential);
   if (found != getImpl().ExistentialSignatures.end())
     return found->second;
-
-  assert(existential.isExistentialType());
 
   auto genericParam = GenericTypeParamType::get(0, 0, *this);
   Requirement requirement(RequirementKind::Conformance, genericParam,
