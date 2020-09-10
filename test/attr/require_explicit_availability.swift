@@ -79,3 +79,15 @@ public protocol PublicProtocol { }
 
 @available(macOS 10.1, *)
 extension S : PublicProtocol { }
+
+@_spi(SPIsAreOK)
+public func spiFunc() { }
+
+@_spi(SPIsAreOK)
+public struct spiStruct {
+  public func spiMethod() {}
+}
+
+extension spiStruct {
+  public func spiExtensionMethod() {}
+}

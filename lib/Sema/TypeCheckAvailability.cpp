@@ -2866,7 +2866,9 @@ static bool declNeedsExplicitAvailability(const Decl *decl) {
       return false;
   }
 
-  if (decl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+  // Skip functions emitted into clients or SPI.
+  if (decl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
+      decl->isSPI())
     return false;
 
   // Warn on decls without an introduction version.
