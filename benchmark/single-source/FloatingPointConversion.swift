@@ -18,6 +18,11 @@ public let FloatingPointConversion = [
     runFunction: run_ConvertFloatingPoint_MockFloat64ToDouble,
     tags: [.validation, .api],
     setUpFunction: { blackHole(mockFloat64s) }),
+  BenchmarkInfo(
+    name: "ConvertFloatingPoint.MockFloat64ToInt64",
+    runFunction: run_ConvertFloatingPoint_MockFloat64ToInt64,
+    tags: [.validation, .api],
+    setUpFunction: { blackHole(mockFloat64s) }),
 ]
 
 protocol MockBinaryFloatingPoint: BinaryFloatingPoint {
@@ -157,6 +162,16 @@ public func run_ConvertFloatingPoint_MockFloat64ToDouble(_ N: Int) {
     for element in mockFloat64s {
       let f = Double(identity(element))
       blackHole(f)
+    }
+  }
+}
+
+@inline(never)
+public func run_ConvertFloatingPoint_MockFloat64ToInt64(_ N: Int) {
+  for _ in 0..<(N * 100) {
+    for element in mockFloat64s {
+      let i = Int64(identity(element))
+      blackHole(i)
     }
   }
 }
