@@ -3059,8 +3059,8 @@ operator()(SubstitutableType *maybeOpaqueType) const {
           }))
     return maybeOpaqueType;
 
-  // If the type still contains opaque types, recur.
-  if (substTy->hasOpaqueArchetype()) {
+  // If the type changed, but still contains opaque types, recur.
+  if (!substTy->isEqual(maybeOpaqueType) && substTy->hasOpaqueArchetype()) {
     return ::substOpaqueTypesWithUnderlyingTypes(
         substTy, inContext, contextExpansion, isContextWholeModule);
   }
