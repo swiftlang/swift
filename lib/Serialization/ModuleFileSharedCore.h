@@ -456,7 +456,6 @@ public:
   /// \param isFramework If true, this is treated as a framework module for
   /// linking purposes.
   /// \param[out] theModule The loaded module.
-  /// \param[out] extInfo Optionally, extra info serialized about the module.
   /// \returns Whether the module was successfully loaded, or what went wrong
   ///          if it was not.
   static serialization::ValidationInfo
