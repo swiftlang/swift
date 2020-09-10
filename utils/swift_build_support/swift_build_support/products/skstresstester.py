@@ -17,6 +17,7 @@ import platform
 from build_swift.build_swift.constants import MULTIROOT_DATA_FILE_PATH
 
 from . import product
+from . import swiftpm
 from .. import shell
 
 
@@ -40,7 +41,7 @@ class SKStressTester(product.Product):
     def package_name(self):
         return 'SourceKitStressTester'
 
-    def run_build_script_helper(self, action, additional_params=[]):
+    def run_build_script_helper(self, action, host_target, additional_params=[]):
         script_path = os.path.join(
             self.source_dir, 'build-script-helper.py')
 
@@ -50,7 +51,7 @@ class SKStressTester(product.Product):
             script_path,
             action,
             '--package-dir', self.package_name(),
-            '--toolchain', self.install_toolchain_path(),
+            '--toolchain', self.install_toolchain_path(host_target),
             '--config', configuration,
             '--build-dir', self.build_dir,
             '--multiroot-data-file', MULTIROOT_DATA_FILE_PATH,
@@ -74,19 +75,22 @@ class SKStressTester(product.Product):
                                "than Darwin".format(
                                    product=self.package_name()))
 
-        self.run_build_script_helper('build')
+        self.run_build_script_helper('build', host_target)
 
     def should_test(self, host_target):
         return self.args.test_skstresstester
 
     def test(self, host_target):
-        self.run_build_script_helper('test')
+        self.run_build_script_helper('test', host_target)
 
     def should_install(self, host_target):
         return self.args.install_skstresstester
 
     def install(self, host_target):
-        install_prefix = self.args.install_destdir + self.args.install_prefix
-        self.run_build_script_helper('install', [
+        install_destdir = swiftpm.SwiftPM.get_install_destdir(self.args,
+                                                              host_target,
+                                                              self.build_dir)
+        install_prefix = install_destdir + self.args.install_prefix
+        self.run_build_script_helper('install', host_target, [
             '--prefix', install_prefix
         ])

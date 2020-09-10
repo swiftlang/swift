@@ -45,7 +45,7 @@ class SwiftSyntax(product.Product):
             script_path,
             '--build-dir', self.build_dir,
             '--multiroot-data-file', MULTIROOT_DATA_FILE_PATH,
-            '--toolchain', self.install_toolchain_path(),
+            '--toolchain', self.install_toolchain_path(target),
             '--filecheck-exec', os.path.join(llvm_build_dir, 'bin',
                                              'FileCheck'),
         ]
