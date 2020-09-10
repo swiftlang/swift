@@ -87,6 +87,8 @@ static bool isPlatformActiveForTarget(PlatformKind Platform,
     case PlatformKind::watchOS:
     case PlatformKind::watchOSApplicationExtension:
       return Target.isWatchOS();
+    case PlatformKind::OpenBSD:
+      return Target.isOSOpenBSD();
     case PlatformKind::none:
       llvm_unreachable("handled above");
   }
