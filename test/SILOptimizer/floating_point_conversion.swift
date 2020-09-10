@@ -6,6 +6,12 @@ func convert<
   U(value)
 }
 
+func convert<
+  T: BinaryFloatingPoint, U: BinaryInteger
+>(_ value: T, to: U.Type) -> U {
+  U(value)
+}
+
 // Check that the following functions can be optimized to concrete conversions.
 
 // CHECK-LABEL: sil @$s4test0A13DoubleToFloatySfSdF
@@ -30,6 +36,17 @@ public func testFloatToDouble(_ x: Float) -> Double {
   return convert(x, to: Double.self)
 }
 
+// CHECK-LABEL: sil @$s4test0A13DoubleToInt64ys0D0VSdF
+// CHECK:      bb0(%0 : $Double):
+// CHECK:        [[ARG:%[0-9]+]] = struct_extract %0
+// CHECK:        [[CNV:%[0-9]+]] = builtin "fptosi_FPIEEE64_Int64"([[ARG]] : $Builtin.FPIEEE64)
+// CHECK-NEXT:   [[RET:%[0-9]+]] = struct $Int64 ([[CNV]] : $Builtin.Int64)
+// CHECK-NEXT:   return [[RET]]
+// CHECK-NEXT: } // end sil function '$s4test0A13DoubleToInt64ys0D0VSdF'
+public func testDoubleToInt64(_ x: Double) -> Int64 {
+  return convert(x, to: Int64.self)
+}
+
 // Check that the following functions can be optimized to no-ops.
 
 // CHECK-LABEL: sil @$s4test0A6DoubleyS2dF
@@ -45,3 +62,5 @@ public func testDouble(_ x: Double) -> Double {
 public func testFloat(_ x: Float) -> Float {
   return convert(x, to: Float.self)
 }
+
+
