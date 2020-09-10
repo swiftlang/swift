@@ -184,7 +184,7 @@ module WinSDK [system] {
     header "Shlwapi.h"
     export *
 
-    link "Shell32.Lib"
+    link "shell32.lib"
     link "ShLwApi.Lib"
   }
 
