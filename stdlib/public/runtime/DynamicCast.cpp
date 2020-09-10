@@ -862,6 +862,7 @@ tryCastToString(
       destFailureType, srcFailureType,
       takeOnSuccess, mayDeferChecks);
 #endif
+    SWIFT_FALLTHROUGH;
   }
   default:
     return DynamicCastResult::Failure;
