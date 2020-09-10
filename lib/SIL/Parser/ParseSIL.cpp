@@ -189,6 +189,8 @@ namespace {
           TUState(*static_cast<SILParserState *>(P.SIL)),
           ParsedTypeCallback([](Type ty) {}) {}
 
+    ~SILParser();
+
     /// diagnoseProblems - After a function is fully parse, emit any diagnostics
     /// for errors and return true if there were any.
     bool diagnoseProblems();
@@ -516,6 +518,17 @@ bool SILParser::parseVerbatim(StringRef name) {
   return false;
 }
 
+SILParser::~SILParser() {
+  for (auto &Entry : ForwardRefLocalValues) {
+    if (ValueBase *dummyVal = LocalValues[Entry.first()]) {
+      dummyVal->replaceAllUsesWith(SILUndef::get(dummyVal->getType(), SILMod, ValueOwnershipKind::None));
+      SILInstruction::destroy(cast<GlobalAddrInst>(dummyVal));
+      SILMod.deallocateInst(cast<GlobalAddrInst>(dummyVal));
+    }
+  }
+}
+
+
 /// diagnoseProblems - After a function is fully parse, emit any diagnostics
 /// for errors and return true if there were any.
 bool SILParser::diagnoseProblems() {
@@ -686,7 +699,7 @@ SILValue SILParser::getLocalValue(UnresolvedValueName Name, SILType Type,
       P.diagnose(Name.NameLoc, diag::sil_value_use_type_mismatch, Name.Name,
                  EntryTy.getASTType(), Type.getASTType());
       // Make sure to return something of the requested type.
-      return new (SILMod) GlobalAddrInst(getDebugLoc(B, Loc), Type);
+      return SILUndef::get(Type, B.getFunction());
     }
 
     return SILValue(Entry);
@@ -724,6 +737,8 @@ void SILParser::setLocalValue(ValueBase *Value, StringRef Name,
     } else {
       // Forward references only live here if they have a single result.
       Entry->replaceAllUsesWith(Value);
+      SILInstruction::destroy(cast<GlobalAddrInst>(Entry));
+      SILMod.deallocateInst(cast<GlobalAddrInst>(Entry));
     }
     Entry = Value;
     return;
