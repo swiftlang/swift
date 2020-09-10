@@ -137,3 +137,30 @@ public var computedOk1: S {
   get { return S() }
   set { }
 }
+
+public class SomeClass { // expected-warning {{public declarations should have an availability attribute when building with -require-explicit-availability}} {{1-1=@available(macOS 10.10, *)\n}}
+  public init () {}
+
+  public subscript(index: String) -> Int {
+    get { return 42; }
+    set(newValue) { }
+  }
+}
+
+extension SomeClass { // expected-warning {{public declarations should have an availability attribute when building with -require-explicit-availability}} {{1-1=@available(macOS 10.10, *)\n}}
+  public convenience init(s : S) {} // expected-warning {{public declarations should have an availability attribute when building with -require-explicit-availability}} {{3-3=@available(macOS 10.10, *)\n  }}
+
+  @available(macOS 10.10, *)
+  public convenience init(s : SomeClass) {}
+
+  public subscript(index: Int) -> Int { // expected-warning {{public declarations should have an availability attribute when building with -require-explicit-availability}} {{3-3=@available(macOS 10.10, *)\n  }}
+    get { return 42; }
+    set(newValue) { }
+  }
+
+  @available(macOS 10.10, *)
+  public subscript(index: S) -> Int {
+    get { return 42; }
+    set(newValue) { }
+  }
+}

@@ -1685,6 +1685,8 @@ public:
 
     checkAccessControl(SD);
 
+    checkExplicitAvailability(SD);
+
     if (!checkOverrides(SD)) {
       // If a subscript has an override attribute but does not override
       // anything, complain.
@@ -2643,6 +2645,8 @@ public:
     }
 
     checkAccessControl(CD);
+
+    checkExplicitAvailability(CD);
 
     if (requiresDefinition(CD) && !CD->hasBody()) {
       // Complain if we should have a body.
