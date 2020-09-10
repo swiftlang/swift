@@ -340,7 +340,7 @@ public:
   /// Specialization can cause a function that was erased before by dead function
   /// elimination to become alive again. If this happens we need to remove it
   /// from the list of zombies.
-  void removeFromZombieList(StringRef Name);
+  SILFunction *removeFromZombieList(StringRef Name);
 
   /// Erase a global SIL variable from the module.
   void eraseGlobalVariable(SILGlobalVariable *G);

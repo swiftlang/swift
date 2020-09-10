@@ -431,11 +431,18 @@ void SILModule::invalidateSILLoaderCaches() {
   getSILLoader()->invalidateCaches();
 }
 
-void SILModule::removeFromZombieList(StringRef Name) {
+SILFunction *SILModule::removeFromZombieList(StringRef Name) {
   if (auto *Zombie = ZombieFunctionTable.lookup(Name)) {
     ZombieFunctionTable.erase(Name);
     zombieFunctions.remove(Zombie);
+
+    // The owner of the function's Name is the ZombieFunctionTable key, which is
+    // freed by erase().
+    // Make sure nobody accesses the name string after it is freed.
+    Zombie->Name = StringRef();
+    return Zombie;
   }
+  return nullptr;
 }
 
 /// Erase a function from the module.
@@ -459,6 +466,7 @@ void SILModule::eraseFunction(SILFunction *F) {
   // (References are not needed anymore.)
   F->dropAllReferences();
   F->dropDynamicallyReplacedFunction();
+  F->getBlocks().clear();
 }
 
 void SILModule::invalidateFunctionInSILCache(SILFunction *F) {
