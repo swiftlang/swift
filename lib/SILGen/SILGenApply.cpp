@@ -39,6 +39,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "clang/AST/DeclCXX.h"
 #include "llvm/Support/Compiler.h"
+#include "clang/AST/DeclObjC.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -1059,7 +1060,18 @@ public:
     auto constant = SILDeclRef(afd).asForeign(requiresForeignEntryPoint(afd));
 
     auto subs = e->getDeclRef().getSubstitutions();
-    setCallee(Callee::forClassMethod(SGF, constant, subs, e));
+
+    bool isObjCDirect = false;
+    if (auto objcDecl = dyn_cast_or_null<clang::ObjCMethodDecl>(
+            afd->getClangDecl())) {
+      isObjCDirect = objcDecl->isDirectMethod();
+    }
+
+    if (isObjCDirect) {
+      setCallee(Callee::forDirect(SGF, constant, subs, e));
+    } else {
+      setCallee(Callee::forClassMethod(SGF, constant, subs, e));
+    }
   }
 
   //
@@ -5112,8 +5124,14 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &SGF,
     }
   }
 
+  bool isObjCDirect = false;
+  if (auto objcDecl = dyn_cast_or_null<clang::ObjCMethodDecl>(
+          decl->getClangDecl())) {
+    isObjCDirect = objcDecl->isDirectMethod();
+  }
+
   // Dispatch in a struct/enum or to a final method is always direct.
-  if (!isClassDispatch)
+  if (!isClassDispatch || isObjCDirect)
     return Callee::forDirect(SGF, constant, subs, loc);
 
   // Otherwise, if we have a non-final class dispatch to a normal method,

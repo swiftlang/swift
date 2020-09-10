@@ -21,6 +21,7 @@
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
+#include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
@@ -712,6 +713,16 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
             return SS.str();
           }
           return namedClangDecl->getName().str();
+        } else if (auto objcDecl = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
+          if (objcDecl->isDirectMethod()) {
+            std::string storage;
+            llvm::raw_string_ostream SS(storage);
+            clang::ASTContext &ctx = clangDecl->getASTContext();
+            std::unique_ptr<clang::MangleContext> mangler(ctx.createMangleContext());
+            mangler->mangleObjCMethodName(objcDecl, SS, /*includePrefixByte=*/true,
+                                          /*includeCategoryNamespace=*/false);
+            return SS.str();
+          }
         }
       }
     }
