@@ -342,6 +342,21 @@ std::string swift::ide::removeCodeCompletionTokens(
   return CleanFile;
 }
 
+llvm::StringRef swift::ide::copyString(llvm::BumpPtrAllocator &Allocator,
+                                       llvm::StringRef Str) {
+  char *Buffer = Allocator.Allocate<char>(Str.size());
+  std::copy(Str.begin(), Str.end(), Buffer);
+  return llvm::StringRef(Buffer, Str.size());
+}
+
+const char *swift::ide::copyCString(llvm::BumpPtrAllocator &Allocator,
+                                    llvm::StringRef Str) {
+  char *Buffer = Allocator.Allocate<char>(Str.size() + 1);
+  std::copy(Str.begin(), Str.end(), Buffer);
+  Buffer[Str.size()] = '\0';
+  return Buffer;
+}
+
 CodeCompletionString::CodeCompletionString(ArrayRef<Chunk> Chunks) {
   std::uninitialized_copy(Chunks.begin(), Chunks.end(),
                           getTrailingObjects<Chunk>());
@@ -770,29 +785,6 @@ void CodeCompletionResult::dump() const {
   llvm::errs() << "\n";
 }
 
-static StringRef copyString(llvm::BumpPtrAllocator &Allocator,
-                            StringRef Str) {
-  char *Mem = Allocator.Allocate<char>(Str.size());
-  std::copy(Str.begin(), Str.end(), Mem);
-  return StringRef(Mem, Str.size());
-}
-
-static ArrayRef<StringRef> copyStringArray(llvm::BumpPtrAllocator &Allocator,
-                                           ArrayRef<StringRef> Arr) {
-  StringRef *Buff = Allocator.Allocate<StringRef>(Arr.size());
-  std::copy(Arr.begin(), Arr.end(), Buff);
-  return llvm::makeArrayRef(Buff, Arr.size());
-}
-
-static ArrayRef<std::pair<StringRef, StringRef>> copyStringPairArray(
-    llvm::BumpPtrAllocator &Allocator,
-    ArrayRef<std::pair<StringRef, StringRef>> Arr) {
-  std::pair<StringRef, StringRef> *Buff = Allocator.Allocate<std::pair<StringRef,
-    StringRef>>(Arr.size());
-  std::copy(Arr.begin(), Arr.end(), Buff);
-  return llvm::makeArrayRef(Buff, Arr.size());
-}
-
 void CodeCompletionResultBuilder::withNestedGroup(
     CodeCompletionString::Chunk::ChunkKind Kind,
     llvm::function_ref<void()> body) {
@@ -1126,7 +1118,7 @@ ArrayRef<StringRef> copyAssociatedUSRs(llvm::BumpPtrAllocator &Allocator,
   });
 
   if (!USRs.empty())
-    return copyStringArray(Allocator, USRs);
+    return copyArray(Allocator, ArrayRef<StringRef>(USRs));
 
   return ArrayRef<StringRef>();
 }
@@ -1348,7 +1340,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
         /*NotRecommended=*/IsNotRecommended, NotRecReason,
         copyString(*Sink.Allocator, BriefComment),
         copyAssociatedUSRs(*Sink.Allocator, AssociatedDecl),
-        copyStringPairArray(*Sink.Allocator, CommentWords), typeRelation);
+        copyArray(*Sink.Allocator, CommentWords), typeRelation);
   }
 
   case CodeCompletionResult::ResultKind::Keyword:
