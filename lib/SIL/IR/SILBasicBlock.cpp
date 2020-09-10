@@ -112,10 +112,10 @@ void SILBasicBlock::eraseInstructions() {
 /// Returns the iterator following the erased instruction.
 SILBasicBlock::iterator SILBasicBlock::erase(SILInstruction *I) {
   // Notify the delete handlers that this instruction is going away.
-  getModule().notifyDeleteHandlers(&*I);
-  auto *F = getParent();
+  SILModule &module = getModule();
+  module.notifyDeleteHandlers(&*I);
   auto nextIter = InstList.erase(I);
-  F->getModule().deallocateInst(I);
+  module.deallocateInst(I);
   return nextIter;
 }
 
