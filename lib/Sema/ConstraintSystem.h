@@ -1190,6 +1190,8 @@ public:
 
   void setExprTypes(Expr *expr) const;
 
+  bool hasType(ASTNode node) const;
+
   /// Retrieve the type of the given node, as recorded in this solution.
   Type getType(ASTNode node) const;
 
@@ -5034,21 +5036,15 @@ public:
   /// solution, and constraint solver is allowed to produce partially correct
   /// solutions. Such solutions can have any number of holes in them.
   ///
-  /// \param expr The expression involved in code completion.
+  /// \param target The expression involved in code completion.
   ///
-  /// \param DC The declaration context this expression is found in.
+  /// \param solutions The solutions produced for the given target without
+  /// filtering.
   ///
-  /// \param contextualType The type \p expr is being converted to.
-  ///
-  /// \param CTP When contextualType is specified, this indicates what
-  /// the conversion is doing.
-  ///
-  /// \param callback The callback to be used to provide results to
-  /// code completion.
-  static void
-  solveForCodeCompletion(Expr *expr, DeclContext *DC, Type contextualType,
-                         ContextualTypePurpose CTP,
-                         llvm::function_ref<void(const Solution &)> callback);
+  /// \returns `false` if this call fails (e.g. pre-check or constraint
+  /// generation fails), `true` otherwise.
+  bool solveForCodeCompletion(SolutionApplicationTarget &target,
+                              SmallVectorImpl<Solution> &solutions);
 
 private:
   /// Solve the system of constraints.

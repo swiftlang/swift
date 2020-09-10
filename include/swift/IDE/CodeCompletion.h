@@ -870,7 +870,7 @@ public:
     /// but should not hide any results.
     SingleExpressionBody,
 
-    /// There are known contextual types.
+    /// There are known contextual types, or there aren't but a nonvoid type is expected.
     Required,
   };
 

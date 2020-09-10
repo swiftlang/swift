@@ -8409,6 +8409,15 @@ ProtocolConformanceRef Solution::resolveConformance(
   return ProtocolConformanceRef::forInvalid();
 }
 
+bool Solution::hasType(ASTNode node) const {
+  auto result = nodeTypes.find(node);
+  if (result != nodeTypes.end())
+    return true;
+
+  auto &cs = getConstraintSystem();
+  return cs.hasType(node);
+}
+
 Type Solution::getType(ASTNode node) const {
   auto result = nodeTypes.find(node);
   if (result != nodeTypes.end())

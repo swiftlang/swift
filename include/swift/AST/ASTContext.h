@@ -122,6 +122,7 @@ namespace swift {
   class IndexSubset;
   struct SILAutoDiffDerivativeFunctionKey;
   struct InterfaceSubContextDelegate;
+  class TypeCheckCompletionCallback;
 
   enum class KnownProtocolKind : uint8_t;
 
@@ -257,6 +258,8 @@ public:
 
   /// Diags - The diagnostics engine.
   DiagnosticEngine &Diags;
+
+  TypeCheckCompletionCallback *CompletionCallback = nullptr;
 
   /// The request-evaluator that is used to process various requests.
   Evaluator evaluator;
