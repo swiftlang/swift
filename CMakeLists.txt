@@ -630,6 +630,10 @@ if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC" OR "${CMAKE_CXX_SIMULATE_ID}" STREQU
 endif()
 
 if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+  # CMake's default for CMAKE_CXX_FLAGS_DBEUG is "-g". Let's add "-O0", because we want to be able
+  # to append CMAKE_CXX_FLAGS_DEBUG to a list of compile flags that already contains a -O flag.
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
+
   # CMake's default for CMAKE_CXX_FLAGS_RELEASE is "-O3 -DNDEBUG". Let's avoid "-O3" for consistency
   # between Release and RelWithDebInfo. Dropping -DNDEBUG from this setting is blocked by triggering
   # a test failure of Swift-Unit :: Syntax/./SwiftSyntaxTests/TypeSyntaxTests.MetatypeTypeWithAPIs

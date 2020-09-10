@@ -167,7 +167,9 @@ function(_add_target_variant_c_compile_flags)
   is_build_type_with_debuginfo("${CFLAGS_BUILD_TYPE}" debuginfo)
 
   # Add -O0/-O2/-O3/-Os/-g/... based on CFLAGS_BUILD_TYPE.
-  list(APPEND result "${CMAKE_CXX_FLAGS_${CFLAGS_BUILD_TYPE}}")
+  string(TOUPPER ${CFLAGS_BUILD_TYPE} build_type_upper)
+  string(REPLACE " " ";" cxx_flags_list "${CMAKE_CXX_FLAGS_${build_type_upper}}")
+  list(APPEND result ${cxx_flags_list})
 
   if(optimized)
     # Omit leaf frame pointers on x86 production builds (optimized, no debug

@@ -133,7 +133,9 @@ function(_add_host_variant_c_compile_flags target)
   is_build_type_with_debuginfo("${CMAKE_BUILD_TYPE}" debuginfo)
 
   # Add -O0/-O2/-O3/-Os/-g/-momit-leaf-frame-pointer/... based on CMAKE_BUILD_TYPE.
-  target_compile_options(${target} PRIVATE "${CMAKE_CXX_FLAGS_${CMAKE_BUILD_TYPE}}")
+  string(TOUPPER ${CMAKE_BUILD_TYPE} build_type_upper)
+  string(REPLACE " " ";" cxx_flags_list "${CMAKE_CXX_FLAGS_${build_type_upper}}")
+  target_compile_options(${target} PRIVATE ${cxx_flags_list})
 
   if(optimized)
     # Omit leaf frame pointers on x86 production builds (optimized, no debug
