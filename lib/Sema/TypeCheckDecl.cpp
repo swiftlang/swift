@@ -1977,7 +1977,7 @@ Type ThrowsTypeRequest::evaluate(Evaluator &evaluator,
 
   // If no type is specified, default to Swift.Error
   if (!throwsTyRepr)
-    return ctx.getTypeByString("Error");
+    return ctx.getTypeByString("Never");
 
   const auto options =
       TypeResolutionOptions(TypeResolverContext::FunctionThrows);

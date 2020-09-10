@@ -583,8 +583,7 @@ ASTContext::ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
     TheErrorType(
       new (*this, AllocationArena::Permanent)
         ErrorType(*this, Type(), RecursiveTypeProperties::HasError)),
-    TheNeverType(nullptr),
-//                 new (*this, AllocationArena::Permanent) nullptr),
+    TheNeverType(getTypeByString("Never")),
     TheUnresolvedType(new (*this, AllocationArena::Permanent)
                       UnresolvedType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
@@ -809,7 +808,7 @@ CanType ASTContext::getExceptionType() const {
 }
 
 ProtocolDecl *ASTContext::getErrorDecl() const {
-  return getProtocol(KnownProtocolKind::Error);
+    return getProtocol(KnownProtocolKind::Error);
 }
 
 EnumElementDecl *ASTContext::getOptionalSomeDecl() const {

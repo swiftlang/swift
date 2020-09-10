@@ -1903,7 +1903,7 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
         TVO_CanBindToNoEscape);
     FunctionType::Param arg(escapeClosure);
     auto bodyClosure = FunctionType::get(
-        arg, result, ctx.getErrorDecl()->getInterfaceType(),
+        arg, result, ctx.getTypeByString("Never"),
         FunctionType::ExtInfoBuilder(FunctionType::Representation::Swift,
                                      /*noescape*/ true,
                                      /*throws*/ true,
@@ -1916,7 +1916,7 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     };
 
     auto refType = FunctionType::get(
-        args, result, ctx.getErrorDecl()->getInterfaceType(),
+        args, result, ctx.getTypeByString("Never"),
         FunctionType::ExtInfoBuilder(FunctionType::Representation::Swift,
                                      /*noescape*/ false,
                                      /*throws*/ true,
@@ -1942,7 +1942,7 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
         TVO_CanBindToNoEscape);
     FunctionType::Param bodyArgs[] = {FunctionType::Param(openedTy)};
     auto bodyClosure = FunctionType::get(
-        bodyArgs, result, ctx.getErrorDecl()->getInterfaceType(),
+        bodyArgs, result, ctx.getTypeByString("Never"),
         FunctionType::ExtInfoBuilder(FunctionType::Representation::Swift,
                                      /*noescape*/ true,
                                      /*throws*/ true,
@@ -1954,7 +1954,7 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
       FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
     };
     auto refType = FunctionType::get(
-        args, result, ctx.getErrorDecl()->getInterfaceType(),
+        args, result, ctx.getTypeByString("Never"),
         FunctionType::ExtInfoBuilder(FunctionType::Representation::Swift,
                                      /*noescape*/ false,
                                      /*throws*/ true,
