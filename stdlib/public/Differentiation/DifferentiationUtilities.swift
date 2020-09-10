@@ -127,9 +127,11 @@ public extension Differentiable {
 //===----------------------------------------------------------------------===//
 
 @_silgen_name("_fatalErrorForwardModeDifferentiationDisabled")
-public func _fatalErrorForwardModeDifferentiationDisabled() -> Never {
+public func _fatalErrorForwardModeDifferentiationDisabled(
+  _ functionName: String
+) -> Never {
   fatalError("""
-    JVP does not exist. Use \
+    JVP for \(functionName) does not exist. Use \
     '-Xfrontend -enable-experimental-forward-mode-differentiation' to enable \
     differential-first differentiation APIs.
     """)
