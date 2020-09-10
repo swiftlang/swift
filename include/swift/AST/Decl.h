@@ -1332,6 +1332,8 @@ public:
 
   void print(raw_ostream &OS) const;
   SWIFT_DEBUG_DUMP;
+
+  bool walk(ASTWalker &walker);
 };
   
 /// A trailing where clause.
