@@ -111,6 +111,10 @@ SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
 }
 
 SILModule::~SILModule() {
+#ifndef NDEBUG
+  checkForLeaks();
+#endif
+
   // Decrement ref count for each SILGlobalVariable with static initializers.
   for (SILGlobalVariable &v : silGlobals)
     v.dropAllReferences();
@@ -127,6 +131,44 @@ SILModule::~SILModule() {
   for (SILFunction &F : *this) {
     F.dropAllReferences();
     F.dropDynamicallyReplacedFunction();
+  }
+}
+
+void SILModule::checkForLeaks() const {
+  int instsInModule = 0;
+  for (const SILFunction &F : *this) {
+    for (const SILBasicBlock &block : F) {
+      instsInModule += std::distance(block.begin(), block.end());
+    }
+  }
+  for (const SILFunction &F : zombieFunctions) {
+    for (const SILBasicBlock &block : F) {
+      instsInModule += std::distance(block.begin(), block.end());
+    }
+  }
+  for (const SILGlobalVariable &global : getSILGlobals()) {
+      instsInModule += std::distance(global.StaticInitializerBlock.begin(),
+                                     global.StaticInitializerBlock.end());
+  }
+  
+  int numAllocated = SILInstruction::getNumCreatedInstructions() -
+                       SILInstruction::getNumDeletedInstructions();
+                       
+  if (numAllocated != instsInModule) {
+    llvm::errs() << "Leaking instructions!\n";
+    llvm::errs() << "Alloated instructions: " << numAllocated << '\n';
+    llvm::errs() << "Instructions in module: " << instsInModule << '\n';
+    llvm_unreachable("leaking instructions");
+  }
+}
+
+void SILModule::checkForLeaksAfterDestruction() {
+  int numAllocated = SILInstruction::getNumCreatedInstructions() -
+                     SILInstruction::getNumDeletedInstructions();
+
+  if (numAllocated != 0) {
+    llvm::errs() << "Leaking " << numAllocated << " instructions!\n";
+    llvm_unreachable("leaking instructions");
   }
 }
 

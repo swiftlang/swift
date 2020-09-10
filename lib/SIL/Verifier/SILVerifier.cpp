@@ -5559,6 +5559,8 @@ void SILModule::verify() const {
   if (!verificationEnabled(*this))
     return;
 
+  checkForLeaks();
+
   // Uniquing set to catch symbol name collisions.
   llvm::DenseSet<StringRef> symbolNames;
 
