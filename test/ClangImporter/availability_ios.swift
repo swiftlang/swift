@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -I %S/Inputs/custom-modules -application-extension %s
 
 // REQUIRES: OS=ios
+// REQUIRES: rdar67721506
 
 import Foundation
 import AvailabilityExtras

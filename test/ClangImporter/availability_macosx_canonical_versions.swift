@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -I %S/Inputs/custom-modules -target x86_64-apple-macosx10.15 %s
 
 // REQUIRES: OS=macosx
+// REQUIRES: rdar67721506
 
 import MacOSVersionCanonicalization
 
