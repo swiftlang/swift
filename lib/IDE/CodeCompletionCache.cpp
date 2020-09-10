@@ -102,28 +102,6 @@ CodeCompletionCache::~CodeCompletionCache() {}
 /// cached results. This isn't expected to change very often.
 static constexpr uint32_t onDiskCompletionCacheVersion = 1;
 
-static StringRef copyString(llvm::BumpPtrAllocator &Allocator, StringRef Str) {
-  char *Mem = Allocator.Allocate<char>(Str.size());
-  std::copy(Str.begin(), Str.end(), Mem);
-  return StringRef(Mem, Str.size());
-}
-
-static ArrayRef<StringRef> copyStringArray(llvm::BumpPtrAllocator &Allocator,
-                                           ArrayRef<StringRef> Arr) {
-  StringRef *Buff = Allocator.Allocate<StringRef>(Arr.size());
-  std::copy(Arr.begin(), Arr.end(), Buff);
-  return llvm::makeArrayRef(Buff, Arr.size());
-}
-
-static ArrayRef<std::pair<StringRef, StringRef>> copyStringPairArray(
-    llvm::BumpPtrAllocator &Allocator,
-    ArrayRef<std::pair<StringRef, StringRef>> Arr) {
-  std::pair<StringRef, StringRef> *Buff = Allocator.Allocate<std::pair<StringRef,
-    StringRef>>(Arr.size());
-  std::copy(Arr.begin(), Arr.end(), Buff);
-  return llvm::makeArrayRef(Buff, Arr.size());
-}
-
 /// Deserializes CodeCompletionResults from \p in and stores them in \p V.
 /// \see writeCacheModule.
 static bool readCachedModule(llvm::MemoryBuffer *in,
@@ -251,8 +229,8 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
       result = new (*V.Sink.Allocator) CodeCompletionResult(
           context, numBytesToErase, string, declKind, isSystem, moduleName,
           notRecommended, CodeCompletionResult::NotRecommendedReason::NoReason,
-          briefDocComment, copyStringArray(*V.Sink.Allocator, assocUSRs),
-          copyStringPairArray(*V.Sink.Allocator, declKeywords),
+          briefDocComment, copyArray(*V.Sink.Allocator, ArrayRef<StringRef>(assocUSRs)),
+          copyArray(*V.Sink.Allocator, ArrayRef<std::pair<StringRef, StringRef>>(declKeywords)),
           CodeCompletionResult::Unknown, opKind);
     } else {
       result = new (*V.Sink.Allocator)
