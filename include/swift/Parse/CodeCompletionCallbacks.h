@@ -119,7 +119,7 @@ public:
   virtual void setAttrTargetDeclKind(Optional<DeclKind> DK) {}
 
   /// Complete expr-dot after we have consumed the dot.
-  virtual void completeDotExpr(Expr *E, SourceLoc DotLoc) {};
+  virtual void completeDotExpr(CodeCompletionExpr *E, SourceLoc DotLoc) {};
 
   /// Complete the beginning of a statement or expression.
   virtual void completeStmtOrExpr(CodeCompletionExpr *E) {};
