@@ -674,6 +674,7 @@ static void reportAttributes(ASTContext &Ctx,
   static UIdent PlatformOSXAppExt("source.availability.platform.osx_app_extension");
   static UIdent PlatformtvOSAppExt("source.availability.platform.tvos_app_extension");
   static UIdent PlatformWatchOSAppExt("source.availability.platform.watchos_app_extension");
+  static UIdent PlatformOpenBSD("source.availability.platform.openbsd");
   std::vector<const DeclAttribute*> Scratch;
 
   for (auto Attr : getDeclAttributes(D, Scratch)) {
@@ -702,6 +703,8 @@ static void reportAttributes(ASTContext &Ctx,
         PlatformUID = PlatformtvOSAppExt; break;
       case PlatformKind::watchOSApplicationExtension:
         PlatformUID = PlatformWatchOSAppExt; break;
+      case PlatformKind::OpenBSD:
+        PlatformUID = PlatformOpenBSD; break;
       }
 
       AvailableAttrInfo Info;
