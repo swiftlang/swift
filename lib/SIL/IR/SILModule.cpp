@@ -448,18 +448,23 @@ SILFunction *SILModule::removeFromZombieList(StringRef Name) {
 /// Erase a function from the module.
 void SILModule::eraseFunction(SILFunction *F) {
   assert(!F->isZombie() && "zombie function is in list of alive functions");
+
+  llvm::StringMapEntry<SILFunction*> *entry =
+      &*ZombieFunctionTable.insert(std::make_pair(F->getName(), nullptr)).first;
+  assert(!entry->getValue() && "Zombie function already exists");
+  StringRef zombieName = entry->getKey();
+
   // The owner of the function's Name is the FunctionTable key. As we remove
-  // the function from the table we have to store the name string elsewhere:
-  // in zombieFunctionNames.
-  StringRef copiedName = F->getName().copy(zombieFunctionNames);
+  // the function from the table we need to use the allocated name string from
+  // the ZombieFunctionTable.
   FunctionTable.erase(F->getName());
-  F->Name = copiedName;
+  F->Name = zombieName;
 
   // The function is dead, but we need it later (at IRGen) for debug info
   // or vtable stub generation. So we move it into the zombie list.
   getFunctionList().remove(F);
   zombieFunctions.push_back(F);
-  ZombieFunctionTable[copiedName] = F;
+  entry->setValue(F);
   F->setZombie();
 
   // This opens dead-function-removal opportunities for called functions.
