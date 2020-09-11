@@ -4141,10 +4141,14 @@ ERROR(actor_isolated_non_self_reference,none,
         "actor-isolated %0 %1 can only be referenced "
         "%select{inside the actor|on 'self'}2",
         (DescriptiveDeclKind, DeclName, bool))
-WARNING(concurrent_access,none,
-        "%select{local|actor-isolated}0 %1 %2 is unsafe to reference in code "
+WARNING(concurrent_access_local,none,
+        "local %0 %1 is unsafe to reference in code that may execute "
+        "concurrently",
+        (DescriptiveDeclKind, DeclName))
+ERROR(actor_isolated_concurrent_access,none,
+        "actor-isolated %0 %1 is unsafe to reference in code "
         "that may execute concurrently",
-        (bool, DescriptiveDeclKind, DeclName))
+        (DescriptiveDeclKind, DeclName))
 NOTE(actor_isolated_method,none,
      "only asynchronous methods can be used outside the actor instance; "
      "do you want to add 'async'?", ())

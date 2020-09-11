@@ -551,7 +551,7 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
         if (mayExecuteConcurrentlyWith(
                 getDeclContext(), isolation.getLocalContext())) {
           ctx.Diags.diagnose(
-              loc, diag::concurrent_access, false,
+              loc, diag::concurrent_access_local,
               value->getDescriptiveKind(), value->getName());
           value->diagnose(
               diag::kind_declared_here, value->getDescriptiveKind());
@@ -593,7 +593,7 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
         if (mayExecuteConcurrentlyWith(
                 getDeclContext(), selfVar->getDeclContext())) {
           ctx.Diags.diagnose(
-              memberLoc, diag::concurrent_access, true,
+              memberLoc, diag::actor_isolated_concurrent_access,
               member->getDescriptiveKind(), member->getName());
           noteIsolatedActorMember(member);
           return true;

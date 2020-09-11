@@ -28,7 +28,7 @@ actor class MyActor: MySuperActor {
   class func synchronousClass() { }
   static func synchronousStatic() { }
 
-  func synchronous() -> String { text.first ?? "nothing" } // expected-note 3{{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
+  func synchronous() -> String { text.first ?? "nothing" } // expected-note 4{{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
   func asynchronous() async -> String { synchronous() }
 }
 
@@ -73,14 +73,15 @@ extension MyActor {
     let localConstant = 17
     var localVar = 17 // expected-note 2{{var declared here}}
     acceptClosure {
-      _ = text[0] // expected-warning{{actor-isolated property 'text' is unsafe to reference in code that may execute concurrently}}
-      _ = self.synchronous() // expected-warning{{actor-isolated instance method 'synchronous()' is unsafe to reference in code that may execute concurrently}}
+      _ = text[0] // expected-error{{actor-isolated property 'text' is unsafe to reference in code that may execute concurrently}}
+      _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' is unsafe to reference in code that may execute concurrently}}
       _ = localVar // expected-warning{{local var 'localVar' is unsafe to reference in code that may execute concurrently}}
       _ = localConstant
     }
 
     acceptEscapingClosure {
-      _ = self.text[0] // expected-warning{{actor-isolated property 'text' is unsafe to reference in code that may execute concurrently}}
+      _ = self.text[0] // expected-error{{actor-isolated property 'text' is unsafe to reference in code that may execute concurrently}}
+      _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' is unsafe to reference in code that may execute concurrently}}
       _ = localVar // expected-warning{{local var 'localVar' is unsafe to reference in code that may execute concurrently}}
       _ = localConstant
     }
