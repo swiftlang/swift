@@ -304,6 +304,9 @@ public:
   /// \return true if the given action requires input files to be provided.
   static bool doesActionRequireInputs(ActionType action);
 
+  /// \return true if the given action requires input files to be provided.
+  static bool doesActionPerformEndOfPipelineActions(ActionType action);
+
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
   llvm::hash_code getPCHHashComponents() const {
