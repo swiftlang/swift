@@ -537,10 +537,6 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
         isa<EndBorrowInst>(inst) || isa<DeallocationInst>(inst) ||
         isa<DestroyValueInst>(inst) || isa<DestroyAddrInst>(inst))
       return true;
-    // Should differentiate any instruction that creates an SSA copy of an
-    // active operand.
-    if (isa<CopyValueInst>(inst))
-      return true;
   }
   return false;
 }
