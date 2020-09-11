@@ -233,12 +233,12 @@ function(_add_host_variant_c_compile_flags target)
   if(LLVM_ENABLE_ASSERTIONS)
     target_compile_options(${target} PRIVATE -UNDEBUG)
   else()
-    target_compile_definitions(${target} PRIVATE -DNDEBUG)
+    target_compile_options(${target} PRIVATE -DNDEBUG)
   endif()
 
   if(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
-    target_compile_definitions(${target} PRIVATE
-      SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
+    target_compile_options(${target} PRIVATE
+      -DSWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
   endif()
 
   if(SWIFT_ANALYZE_CODE_COVERAGE)
