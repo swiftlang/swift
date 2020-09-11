@@ -162,6 +162,18 @@ extension IOIPublicStruct : LocalPublicProto {}
 // CHECK-PRIVATE-NOT: IOIPublicStruct
 // CHECK-PUBLIC-NOT: IOIPublicStruct
 
+@_spi(S)
+@frozen public struct SPIFrozenStruct {
+// CHECK-PRIVATE: struct SPIFrozenStruct
+// CHECK-PUBLIC-NOT: SPIFrozenStruct
+
+  var spiTypeInFrozen = SPIStruct()
+  // CHECK-PRIVATE: @_spi(S) internal var spiTypeInFrozen
+
+  private var spiTypeInFrozen1: SPIClass
+  // CHECK-PRIVATE: @_spi(S) private var spiTypeInFrozen1
+}
+
 // The dummy conformance should be only in the private swiftinterface for
 // SPI extensions.
 @_spi(LocalSPI)
