@@ -720,6 +720,14 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
     }
   }
 
+  // If we still don't have an introduction version, use the current deployment
+  // target. This covers cases where an inlinable function and its parent
+  // contexts don't have explicit availability attributes.
+  if (!OverApproximateContext.getOSVersion().hasLowerEndpoint()) {
+    auto currentOS = AvailabilityContext::forDeploymentTarget(Context);
+    OverApproximateContext.constrainWith(currentOS);
+  }
+
   return OverApproximateContext;
 }
 
