@@ -1102,8 +1102,8 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
       return Status;
     }
     // If we haven't made progress, or seeing any error, skip ahead.
-    if (Tok.getLoc() == StartLoc || Status.isError()) {
-      assert(Status.isError() && "no progress without error");
+    if (Tok.getLoc() == StartLoc || Status.isErrorOrHasCompletion()) {
+      assert(Status.isErrorOrHasCompletion() && "no progress without error");
       skipListUntilDeclRBrace(LeftLoc, RightK, tok::comma);
       if (Tok.is(RightK) || Tok.isNot(tok::comma))
         break;
@@ -1136,7 +1136,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
 
   ListContext.reset();
 
-  if (Status.isError()) {
+  if (Status.isErrorOrHasCompletion()) {
     // If we've already got errors, don't emit missing RightK diagnostics.
     if (Tok.is(RightK)) {
       RightLoc = consumeToken();
