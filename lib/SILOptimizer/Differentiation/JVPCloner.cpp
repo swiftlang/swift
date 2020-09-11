@@ -815,7 +815,7 @@ public:
     differentialValues[ai->getParent()].push_back(differential);
 
     // TODO: uncommenting this results in store / struct overconsume error in SIL verification
-    /*if (ai->getParent() == this->original->getEntryBlock()) {
+    if (ai->getParent() == this->original->getEntryBlock()) {
       llvm::errs() << "C1\n";
       auto *linearMapFieldLookup = differentialInfo.lookUpLinearMapDecl(ai);
       auto *field =
@@ -846,7 +846,7 @@ public:
       structFieldAddr->dump();
       builder.emitStoreValueOperation(loc, differential, structFieldAddr,
                           StoreOwnershipQualifier::Init);
-    }*/
+    }
 
     // Differential emission.
     emitTangentForApplyInst(ai, indices, originalDifferentialType);
@@ -856,8 +856,15 @@ public:
     auto loc = ri->getOperand().getLoc();
     auto *origExit = ri->getParent();
     auto &builder = getBuilder();
-    auto *diffStructVal = buildDifferentialValueStructValue(ri);
-
+    //auto *diffStructVal = buildDifferentialValueStructValue(ri);
+    SILValue diffStructVal;
+    auto *bb = ri->getParent();
+    auto *jvpBB = getOpBasicBlock(bb);
+    if (bb->isEntry())
+      diffStructVal = bb0Struct;
+    else
+      diffStructVal = jvpBB->getArgument(0);
+    diffStructVal = builder.createLoad(loc, diffStructVal, LoadOwnershipQualifier::Copy);
     // Get the JVP value corresponding to the original functions's return value.
     auto *origRetInst = cast<ReturnInst>(origExit->getTerminator());
     auto origResult = getOpValue(origRetInst->getOperand());
@@ -1810,8 +1817,8 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
     });
   }
 
-  assert(diffBBMap.size() == 1 &&
-         "Can only currently handle single basic block functions");
+  /*assert(diffBBMap.size() == 1 &&
+         "Can only currently handle single basic block functions");*/
 
   // The differential function has type:
   // (arg0', ..., argn', entry_df_struct) -> result'.

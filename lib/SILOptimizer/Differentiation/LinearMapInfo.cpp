@@ -113,14 +113,14 @@ void LinearMapInfo::computeAccessLevel(NominalTypeDecl *nominal,
   }
 }
 
-void LinearMapInfo::addEnumToStruct(SILBasicBlock *predBB, SILBasicBlock *originalBB,
+void LinearMapInfo::addEnumToStruct(SILBasicBlock *toBB, SILBasicBlock *fromBB,
                        EnumDecl *branchingTraceDecl) {
     auto &astCtx = original->getASTContext();
     auto *moduleDecl = original->getModule().getSwiftModule();
     auto loc = original->getLocation().getSourceLoc();
 
-    auto bbId = "bb" + std::to_string(predBB->getDebugID());
-    auto *linearMapStruct = getLinearMapStruct(predBB);
+    auto bbId = "bb" + std::to_string(toBB->getDebugID());
+    auto *linearMapStruct = getLinearMapStruct(toBB);
     assert(linearMapStruct);
     auto linearMapStructTy =
         linearMapStruct->getDeclaredInterfaceType()->getCanonicalType();
@@ -144,7 +144,7 @@ void LinearMapInfo::addEnumToStruct(SILBasicBlock *predBB, SILBasicBlock *origin
     branchingTraceDecl->addMember(enumEltDecl);
     branchingTraceDecl->addMember(enumCaseDecl);
     // Record enum element declaration.
-    branchingTraceEnumCases.insert({{predBB, originalBB}, enumEltDecl});
+    branchingTraceEnumCases.insert({{toBB, fromBB}, enumEltDecl});
 }
 
 EnumDecl *
@@ -180,7 +180,7 @@ LinearMapInfo::createBranchingTraceDecl(SILBasicBlock *originalBB,
   switch (kind) {
   case AutoDiffLinearMapKind::Differential:
     for (auto *succBB : originalBB->getSuccessorBlocks())
-      addEnumToStruct(originalBB, succBB, branchingTraceDecl);
+      addEnumToStruct(succBB, originalBB, branchingTraceDecl);
     break;
   case AutoDiffLinearMapKind::Pullback:
     for (auto *predBB : originalBB->getPredecessorBlocks())
