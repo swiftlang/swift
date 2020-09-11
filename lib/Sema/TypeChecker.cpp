@@ -257,8 +257,7 @@ static void typeCheckDelayedFunctions(SourceFile &SF) {
          ++currentFunctionIdx) {
       auto *AFD = SF.DelayedFunctions[currentFunctionIdx];
       assert(!AFD->getDeclContext()->isLocalContext());
-
-      TypeChecker::typeCheckAbstractFunctionBody(AFD);
+      (void)AFD->getTypecheckedBody();
     }
 
     // Type check synthesized functions and their bodies.
