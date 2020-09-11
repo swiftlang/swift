@@ -3629,15 +3629,15 @@ void IRGenSILFunction::visitRetainValueInst(swift::RetainValueInst *i) {
 }
 
 void IRGenSILFunction::visitRetainValueAddrInst(swift::RetainValueAddrInst *i) {
-  assert(i->getAtomicity() == RefCountingInst::Atomicity::Atomic &&
-         "Non atomic retains are not supported");
   SILValue operandValue = i->getOperand();
   Address addr = getLoweredAddress(operandValue);
   SILType addrTy = operandValue->getType();
   SILType objectT = addrTy.getObjectType();
   llvm::Type *llvmType = addr.getAddress()->getType();
   const TypeInfo &addrTI = getTypeInfo(addrTy);
-  auto *outlinedF = IGM.getOrCreateRetainFunction(addrTI, objectT, llvmType);
+  auto atomicity = i->isAtomic() ? Atomicity::Atomic : Atomicity::NonAtomic;
+  auto *outlinedF = IGM.getOrCreateRetainFunction(
+      addrTI, objectT, llvmType, atomicity);
   llvm::Value *args[] = {addr.getAddress()};
   llvm::CallInst *call = Builder.CreateCall(outlinedF, args);
   call->setCallingConv(IGM.DefaultCC);
@@ -3704,16 +3704,15 @@ void IRGenSILFunction::visitReleaseValueInst(swift::ReleaseValueInst *i) {
 
 void IRGenSILFunction::visitReleaseValueAddrInst(
     swift::ReleaseValueAddrInst *i) {
-  assert(i->getAtomicity() == RefCountingInst::Atomicity::Atomic &&
-         "Non atomic retains are not supported");
   SILValue operandValue = i->getOperand();
   Address addr = getLoweredAddress(operandValue);
   SILType addrTy = operandValue->getType();
   SILType objectT = addrTy.getObjectType();
   llvm::Type *llvmType = addr.getAddress()->getType();
   const TypeInfo &addrTI = getTypeInfo(addrTy);
+  auto atomicity = i->isAtomic() ? Atomicity::Atomic : Atomicity::NonAtomic;
   auto *outlinedF = IGM.getOrCreateReleaseFunction(
-      addrTI, objectT, llvmType);
+      addrTI, objectT, llvmType, atomicity);
   llvm::Value *args[] = {addr.getAddress()};
   llvm::CallInst *call = Builder.CreateCall(outlinedF, args);
   call->setCallingConv(IGM.DefaultCC);
