@@ -1927,7 +1927,7 @@ NeverNullType TypeResolver::resolveTypeByString(StringRef type,
   SmallVector<ValueDecl *, 1> Results;
   ctx.lookupInSwiftModule(type, Results);
   for (auto Result : Results) {
-    if (auto *FD = dyn_cast<FuncDecl>(Result)) {
+    if (auto *FD = dyn_cast<NominalTypeDecl>(Result)) {
       if (FD->getDeclaredInterfaceType())
         return FD->getDeclaredInterfaceType();
     }
