@@ -64,8 +64,14 @@ This very depends on what X is, but some broad guidelines are:
 1. Do a case-insensitive recursive string search.
    - Use a specialized tool like [ripgrep](https://github.com/BurntSushi/ripgrep)
      or [ag](https://github.com/ggreer/the_silver_searcher).
+   - Use `git grep --ignore-case "mypattern"`. `git grep` also supports helpful
+     flags which provide more context:
+     - `--show-function`: Tries to print the function name that a match was
+       found in.
+     - `--function-context`: Tries to print the entire surrounding function
+       containing the match.
    - Use 'Find in Workspace' in Xcode (<kbd>⌘</kbd>+<kbd>⇧</kbd>+<kbd>F</kbd>).
-   - Use `grep -i -r "mypattern" .`.
+   - Use `grep --ignore-case --recursive "mypattern" .`.
 2. Go through the [Documentation Index](/docs/README.md).
 
 ### How do I build the documentation as HTML?
