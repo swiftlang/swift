@@ -418,6 +418,9 @@ public:
 
     /// The opposite of ABIBreakingToRemove
     ABIStableToRemove = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 15),
+
+    /// Whether this attribute is only valid when concurrency is enabled.
+    ConcurrencyOnly = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 16),
   };
 
   LLVM_READNONE
@@ -494,6 +497,10 @@ public:
 
   static bool isSilOnly(DeclAttrKind DK) {
     return getOptions(DK) & SILOnly;
+  }
+
+  static bool isConcurrencyOnly(DeclAttrKind DK) {
+    return getOptions(DK) & ConcurrencyOnly;
   }
 
   static bool isUserInaccessible(DeclAttrKind DK) {

@@ -1652,7 +1652,7 @@ bool SILParser::parseSILBBArgsAtBranch(SmallVector<SILValue, 6> &Args,
                       }
                       Args.push_back(Arg);
                       return makeParserSuccess();
-                    }).isError() || HasError)
+                    }).isErrorOrHasCompletion() || HasError)
       return true;
   }
   return false;

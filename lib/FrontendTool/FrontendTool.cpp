@@ -1876,8 +1876,6 @@ static bool performAction(CompilerInstance &Instance,
                              "removed; use the LLDB-enhanced REPL instead.");
 
   // MARK: Actions for Clang and Clang Modules
-  // We've been asked to precompile a bridging header or module; we want to
-  // avoid touching any other inputs and just parse, emit and exit.
   case FrontendOptions::ActionType::EmitPCH:
     return precompileBridgingHeader(Instance);
   case FrontendOptions::ActionType::EmitPCM:
@@ -1983,7 +1981,7 @@ static bool performCompile(CompilerInstance &Instance,
   const FrontendOptions::ActionType Action = opts.RequestedAction;
 
   // To compile LLVM IR, just pass it off unmodified.
-  if (Instance.getInvocation().getInputKind() == InputFileKind::LLVM)
+  if (Invocation.getInputKind() == InputFileKind::LLVM)
     return compileLLVMIR(Instance);
 
   // If we aren't in a parse-only context and expect an implicit stdlib import,
@@ -2014,7 +2012,7 @@ static bool performCompile(CompilerInstance &Instance,
   // We might have freed the ASTContext already, but in that case we would
   // have already performed these actions.
   if (Instance.hasASTContext() &&
-      FrontendOptions::doesActionRequireInputs(Action)) {
+      FrontendOptions::doesActionPerformEndOfPipelineActions(Action)) {
     performEndOfPipelineActions(Instance);
     hadError |= Instance.getASTContext().hadError();
   }

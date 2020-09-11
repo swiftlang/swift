@@ -423,6 +423,8 @@ bool ArgsToFrontendOptionsConverter::setUpInputKindAndImmediateArgs() {
     Opts.InputKind = InputFileKind::SIL;
   else if (Opts.InputsAndOutputs.shouldTreatAsLLVM())
     Opts.InputKind = InputFileKind::LLVM;
+  else if (Opts.InputsAndOutputs.shouldTreatAsObjCHeader())
+    Opts.InputKind = InputFileKind::ObjCHeader;
   else if (Opts.InputsAndOutputs.shouldTreatAsModuleInterface())
     Opts.InputKind = InputFileKind::SwiftModuleInterface;
   else if (Args.hasArg(OPT_parse_as_library))

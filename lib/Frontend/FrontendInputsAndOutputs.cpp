@@ -199,6 +199,19 @@ bool FrontendInputsAndOutputs::shouldTreatAsSIL() const {
   llvm_unreachable("Either all primaries or none must end with .sil");
 }
 
+bool FrontendInputsAndOutputs::shouldTreatAsObjCHeader() const {
+  if (hasSingleInput()) {
+    StringRef InputExt = llvm::sys::path::extension(getFilenameOfFirstInput());
+    switch (file_types::lookupTypeForExtension(InputExt)) {
+    case file_types::TY_ObjCHeader:
+      return true;
+    default:
+      return false;
+    }
+  }
+  return false;
+}
+
 bool FrontendInputsAndOutputs::areAllNonPrimariesSIB() const {
   for (const InputFile &input : AllInputs) {
     if (input.isPrimary())

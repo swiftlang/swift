@@ -273,6 +273,14 @@ public:
     // Trigger the request to check for @asyncHandler.
     (void)func->isAsyncHandler();
   }
+
+  void visitActorAttr(ActorAttr *attr) {
+    auto classDecl = dyn_cast<ClassDecl>(D);
+    if (!classDecl)
+      return; // already diagnosed
+
+    (void)classDecl->isActor();
+  }
 };
 } // end anonymous namespace
 

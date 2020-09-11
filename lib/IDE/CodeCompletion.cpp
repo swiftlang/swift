@@ -4428,6 +4428,7 @@ public:
   }
 
   static bool canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
+                                    bool IsConcurrencyEnabled,
                                     Optional<DeclKind> DK) {
     if (DeclAttribute::isUserInaccessible(DAK))
       return false;
@@ -4436,6 +4437,8 @@ public:
     if (DeclAttribute::shouldBeRejectedByParser(DAK))
       return false;
     if (!IsInSil && DeclAttribute::isSilOnly(DAK))
+      return false;
+    if (!IsConcurrencyEnabled && DeclAttribute::isConcurrencyOnly(DAK))
       return false;
     if (!DK.hasValue())
       return true;
@@ -4454,9 +4457,10 @@ public:
 #include "swift/AST/DeclNodes.def"
       }
     }
+    bool IsConcurrencyEnabled = Ctx.LangOpts.EnableExperimentalConcurrency;
     std::string Description = TargetName.str() + " Attribute";
 #define DECL_ATTR(KEYWORD, NAME, ...)                                         \
-    if (canUseAttributeOnDecl(DAK_##NAME, IsInSil, DK))                       \
+    if (canUseAttributeOnDecl(DAK_##NAME, IsInSil, IsConcurrencyEnabled, DK)) \
       addDeclAttrKeyword(#KEYWORD, Description);
 #include "swift/AST/Attr.def"
   }
@@ -5503,7 +5507,8 @@ addKeyword(CodeCompletionResultSink &Sink, StringRef Name,
   Builder.setExpectedTypeRelation(TypeRelation);
 }
 
-static void addDeclKeywords(CodeCompletionResultSink &Sink) {
+static void addDeclKeywords(CodeCompletionResultSink &Sink,
+                            bool IsConcurrencyEnabled) {
   auto AddDeclKeyword = [&](StringRef Name, CodeCompletionKeywordKind Kind,
                         Optional<DeclAttrKind> DAK) {
     if (Name == "let" || Name == "var") {
@@ -5511,8 +5516,15 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink) {
       return;
     }
 
+    // FIXME: This should use canUseAttributeOnDecl.
+
     // Remove user inaccessible keywords.
     if (DAK.hasValue() && DeclAttribute::isUserInaccessible(*DAK)) return;
+
+    // Remove keywords only available when concurrency is enabled.
+    if (DAK.hasValue() && !IsConcurrencyEnabled &&
+        DeclAttribute::isConcurrencyOnly(*DAK))
+      return;
 
     addKeyword(Sink, Name, Kind);
   };
@@ -5626,7 +5638,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     LLVM_FALLTHROUGH;
   }
   case CompletionKind::StmtOrExpr:
-    addDeclKeywords(Sink);
+    addDeclKeywords(Sink, Context.LangOpts.EnableExperimentalConcurrency);
     addStmtKeywords(Sink, MaybeFuncBody);
     LLVM_FALLTHROUGH;
   case CompletionKind::ReturnStmtExpr:
@@ -5687,7 +5699,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
         .Default(false);
     }) != ParsedKeywords.end();
     if (!HasDeclIntroducer) {
-      addDeclKeywords(Sink);
+      addDeclKeywords(Sink, Context.LangOpts.EnableExperimentalConcurrency);
       addLetVarKeywords(Sink);
     }
     break;
@@ -6384,7 +6396,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
         if (CurDeclContext->isTypeContext()) {
           // Override completion (CompletionKind::NominalMemberBeginning).
-          addDeclKeywords(Sink);
+          addDeclKeywords(Sink, Context.LangOpts.EnableExperimentalConcurrency);
           addLetVarKeywords(Sink);
           SmallVector<StringRef, 0> ParsedKeywords;
           CompletionOverrideLookup OverrideLookup(Sink, Context, CurDeclContext,
@@ -6392,7 +6404,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
           OverrideLookup.getOverrideCompletions(SourceLoc());
         } else {
           // Global completion (CompletionKind::PostfixExprBeginning).
-          addDeclKeywords(Sink);
+          addDeclKeywords(Sink, Context.LangOpts.EnableExperimentalConcurrency);
           addStmtKeywords(Sink, MaybeFuncBody);
           addSuperKeyword(Sink);
           addLetVarKeywords(Sink);

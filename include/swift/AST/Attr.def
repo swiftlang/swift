@@ -566,6 +566,12 @@ SIMPLE_DECL_ATTR(asyncHandler, AsyncHandler,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   101)
 
+CONTEXTUAL_SIMPLE_DECL_ATTR(actor, Actor,
+  OnClass | ConcurrencyOnly |
+  ABIBreakingToAdd | ABIBreakingToRemove |
+  APIBreakingToAdd | APIBreakingToRemove,
+  102)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

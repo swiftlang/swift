@@ -1133,8 +1133,7 @@ void checkTopLevelEffects(TopLevelCodeDecl *D);
 void checkFunctionEffects(AbstractFunctionDecl *D);
 void checkInitializerEffects(Initializer *I, Expr *E);
 void checkEnumElementEffects(EnumElementDecl *D, Expr *expr);
-void checkPropertyWrapperEffects(PatternBindingDecl *binding,
-                                       Expr *expr);
+void checkPropertyWrapperEffects(PatternBindingDecl *binding, Expr *expr);
 
 /// If an expression references 'self.init' or 'super.init' in an
 /// initializer context, returns the implicit 'self' decl of the constructor.
@@ -1388,6 +1387,9 @@ void bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *stmt);
 /// Add notes suggesting the addition of 'async' or '@asyncHandler', as
 /// appropriate, to a diagnostic for a function that isn't an async context.
 void addAsyncNotes(FuncDecl *func);
+
+/// Check actor isolation rules.
+void checkActorIsolation(const Expr *expr, const DeclContext *dc);
 
 } // end namespace swift
 
