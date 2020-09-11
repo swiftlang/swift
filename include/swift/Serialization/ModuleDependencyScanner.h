@@ -54,7 +54,7 @@ namespace swift {
             dependencyKind(dependencyKind) {}
 
       std::error_code findModuleFilesInDirectory(
-          AccessPathElem ModuleID,
+          ImportPath::Element ModuleID,
           const SerializedModuleBaseName &BaseName,
           SmallVectorImpl<char> *ModuleInterfacePath,
           std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
@@ -117,7 +117,8 @@ namespace swift {
       }
 
       std::error_code findModuleFilesInDirectory(
-          AccessPathElem ModuleID, const SerializedModuleBaseName &BaseName,
+          ImportPath::Element ModuleID,
+          const SerializedModuleBaseName &BaseName,
           SmallVectorImpl<char> *ModuleInterfacePath,
           std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
           std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,

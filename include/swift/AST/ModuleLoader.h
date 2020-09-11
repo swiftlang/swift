@@ -18,6 +18,7 @@
 #define SWIFT_AST_MODULE_LOADER_H
 
 #include "swift/AST/Identifier.h"
+#include "swift/AST/Import.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Located.h"
 #include "swift/Basic/SourceLoc.h"
@@ -143,7 +144,7 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  virtual bool canImportModule(Located<Identifier> named) = 0;
+  virtual bool canImportModule(ImportPath::Element named) = 0;
 
   /// Import a module with the given module path.
   ///
@@ -155,8 +156,7 @@ public:
   /// \returns the module referenced, if it could be loaded. Otherwise,
   /// emits a diagnostic and returns NULL.
   virtual
-  ModuleDecl *loadModule(SourceLoc importLoc,
-                         ArrayRef<Located<Identifier>> path) = 0;
+  ModuleDecl *loadModule(SourceLoc importLoc, ImportPath::Module path) = 0;
 
   /// Load extensions to the given nominal type.
   ///

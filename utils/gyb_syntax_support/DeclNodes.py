@@ -480,12 +480,14 @@ DECL_NODES = [
                    is_optional=True),
          ]),
 
+    # FIXME: technically misnamed; should be "ImportPathComponent"
     Node('AccessPathComponent', kind='Syntax',
          children=[
             Child('Name', kind='IdentifierToken'),
             Child('TrailingDot', kind='PeriodToken', is_optional=True),
          ]),
 
+    # FIXME: technically misnamed; should be "ImportPath"
     Node('AccessPath', kind='SyntaxCollection', element='AccessPathComponent'),
 
     Node('ImportDecl', kind='Decl',

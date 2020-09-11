@@ -1685,7 +1685,7 @@ void ClangImporter::collectVisibleTopLevelModuleNames(
 }
 
 void ClangImporter::collectSubModuleNames(
-    ArrayRef<Located<Identifier>> path,
+    ImportPath::Module path,
     std::vector<std::string> &names) const {
   auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
 
@@ -1696,7 +1696,7 @@ void ClangImporter::collectSubModuleNames(
   if (!clangModule)
     return;
   clang::Module *submodule = clangModule;
-  for (auto component : path.slice(1)) {
+  for (auto component : path.getSubmodulePath()) {
     submodule = submodule->findSubmodule(component.Item.str());
     if (!submodule)
       return;
@@ -1709,7 +1709,7 @@ bool ClangImporter::isModuleImported(const clang::Module *M) {
   return M->NameVisibility == clang::Module::NameVisibilityKind::AllVisible;
 }
 
-bool ClangImporter::canImportModule(Located<Identifier> moduleID) {
+bool ClangImporter::canImportModule(ImportPath::Element moduleID) {
   // Look up the top-level module to see if it exists.
   // FIXME: This only works with top-level modules.
   auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
@@ -1728,7 +1728,7 @@ bool ClangImporter::canImportModule(Located<Identifier> moduleID) {
 }
 
 ModuleDecl *ClangImporter::Implementation::loadModuleClang(
-    SourceLoc importLoc, ArrayRef<Located<Identifier>> path) {
+    SourceLoc importLoc, ImportPath::Module path) {
   auto &clangHeaderSearch = getClangPreprocessor().getHeaderSearchInfo();
 
   // Look up the top-level module first, to see if it exists at all.
@@ -1798,7 +1798,7 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
 
   // Verify that the submodule exists.
   clang::Module *submodule = clangModule;
-  for (auto &component : path.slice(1)) {
+  for (auto &component : path.getSubmodulePath()) {
     submodule = submodule->findSubmodule(component.Item.str());
 
     // Special case: a submodule named "Foo.Private" can be moved to a top-level
@@ -1806,7 +1806,7 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
     // We're limiting this to just submodules named "Private" because this will
     // put the Clang AST in a fatal error state if it /doesn't/ exist.
     if (!submodule && component.Item.str() == "Private" &&
-        (&component) == (&path[1])) {
+        (&component) == (&path.getRaw()[1])) {
       submodule = loadModule(llvm::makeArrayRef(clangPath).slice(0, 2),
                              clang::Module::Hidden);
     }
@@ -1827,12 +1827,12 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
 
 ModuleDecl *
 ClangImporter::loadModule(SourceLoc importLoc,
-                          ArrayRef<Located<Identifier>> path) {
+                          ImportPath::Module path) {
   return Impl.loadModule(importLoc, path);
 }
 
 ModuleDecl *ClangImporter::Implementation::loadModule(
-    SourceLoc importLoc, ArrayRef<Located<Identifier>> path) {
+    SourceLoc importLoc, ImportPath::Module path) {
   ModuleDecl *MD = nullptr;
   if (!DisableSourceImport)
     MD = loadModuleClang(importLoc, path);
@@ -2743,7 +2743,7 @@ void ClangImporter::lookupRelatedEntity(
   }
 }
 
-void ClangModuleUnit::lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
+void ClangModuleUnit::lookupVisibleDecls(ImportPath::Access accessPath,
                                          VisibleDeclConsumer &consumer,
                                          NLKind lookupKind) const {
   // FIXME: Ignore submodules, which are empty for now.
@@ -2864,13 +2864,14 @@ ImportDecl *swift::createImportDecl(ASTContext &Ctx,
                                     ArrayRef<clang::Module *> Exported) {
   auto *ImportedMod = ClangN.getClangModule();
   assert(ImportedMod);
-  SmallVector<Located<Identifier>, 4> AccessPath;
+
+  ImportPath::Builder importPath;
   auto *TmpMod = ImportedMod;
   while (TmpMod) {
-    AccessPath.push_back({ Ctx.getIdentifier(TmpMod->Name), SourceLoc() });
+    importPath.push_back(Ctx.getIdentifier(TmpMod->Name));
     TmpMod = TmpMod->Parent;
   }
-  std::reverse(AccessPath.begin(), AccessPath.end());
+  std::reverse(importPath.begin(), importPath.end());
 
   bool IsExported = false;
   for (auto *ExportedMod : Exported) {
@@ -2881,8 +2882,8 @@ ImportDecl *swift::createImportDecl(ASTContext &Ctx,
   }
 
   auto *ID = ImportDecl::create(Ctx, DC, SourceLoc(),
-                                ImportKind::Module, SourceLoc(), AccessPath,
-                                ClangN);
+                                ImportKind::Module, SourceLoc(),
+                                importPath.get(), ClangN);
   if (IsExported)
     ID->getAttrs().add(new (Ctx) ExportedAttr(/*IsImplicit=*/false));
   return ID;
@@ -3125,7 +3126,7 @@ void ClangImporter::loadObjCMethods(
 }
 
 void
-ClangModuleUnit::lookupClassMember(ModuleDecl::AccessPathTy accessPath,
+ClangModuleUnit::lookupClassMember(ImportPath::Access accessPath,
                                    DeclName name,
                                    SmallVectorImpl<ValueDecl*> &results) const {
   // FIXME: Ignore submodules, which are empty for now.
@@ -3141,7 +3142,7 @@ ClangModuleUnit::lookupClassMember(ModuleDecl::AccessPathTy accessPath,
   }
 }
 
-void ClangModuleUnit::lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
+void ClangModuleUnit::lookupClassMembers(ImportPath::Access accessPath,
                                          VisibleDeclConsumer &consumer) const {
   // FIXME: Ignore submodules, which are empty for now.
   if (clangModule && clangModule->isSubModule())
@@ -3413,8 +3414,7 @@ ModuleDecl *ClangModuleUnit::getOverlayModule() const {
     // FIXME: Include proper source location.
     ModuleDecl *M = getParentModule();
     ASTContext &Ctx = M->getASTContext();
-    auto overlay = Ctx.getModule(ModuleDecl::AccessPathTy({M->getName(),
-                                                           SourceLoc()}));
+    auto overlay = Ctx.getModuleByIdentifier(M->getName());
     if (overlay == M) {
       overlay = nullptr;
     } else {
@@ -3445,7 +3445,7 @@ void ClangModuleUnit::getImportedModules(
   // Needed for implicitly synthesized conformances.
   if (filter.contains(ModuleDecl::ImportFilterKind::Private))
     if (auto stdlib = owner.getStdlibModule())
-      imports.push_back({ModuleDecl::AccessPathTy(), stdlib});
+      imports.push_back({ImportPath::Access(), stdlib});
 
   SmallVector<clang::Module *, 8> imported;
   if (!clangModule) {
@@ -3490,7 +3490,7 @@ void ClangModuleUnit::getImportedModules(
       if (importTopLevel != importMod) {
         if (!clangModule || importTopLevel != clangModule->getTopLevelModule()){
           auto topLevelWrapper = owner.getWrapperForModule(importTopLevel);
-          imports.push_back({ ModuleDecl::AccessPathTy(),
+          imports.push_back({ ImportPath::Access(),
                               topLevelWrapper->getParentModule() });
         }
       }
@@ -3500,7 +3500,7 @@ void ClangModuleUnit::getImportedModules(
     }
 
     assert(actualMod && "Missing imported overlay");
-    imports.push_back({ModuleDecl::AccessPathTy(), actualMod});
+    imports.push_back({ImportPath::Access(), actualMod});
   }
 }
 
@@ -3576,7 +3576,7 @@ void ClangModuleUnit::getImportedModulesForLookup(
       actualMod = wrapper->getParentModule();
 
     assert(actualMod && "Missing imported overlay");
-    imports.push_back({ModuleDecl::AccessPathTy(), actualMod});
+    imports.push_back({ImportPath::Access(), actualMod});
   }
 
   // Cache our results for use next time.

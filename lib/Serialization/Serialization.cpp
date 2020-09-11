@@ -1044,7 +1044,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   auto clangImporter =
     static_cast<ClangImporter *>(M->getASTContext().getClangModuleLoader());
   ModuleDecl *bridgingHeaderModule = clangImporter->getImportedHeaderModule();
-  ModuleDecl::ImportedModule bridgingHeaderImport{ModuleDecl::AccessPathTy(),
+  ModuleDecl::ImportedModule bridgingHeaderImport{ImportPath::Access(),
                                                   bridgingHeaderModule};
 
   // Make sure the bridging header module is always at the top of the import

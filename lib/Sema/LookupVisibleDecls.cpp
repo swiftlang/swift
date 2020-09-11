@@ -624,7 +624,7 @@ static void lookupVisibleMemberDeclsImpl(
   // special and can't have extensions.
   if (ModuleType *MT = BaseTy->getAs<ModuleType>()) {
     AccessFilteringDeclConsumer FilteringConsumer(CurrDC, Consumer);
-    MT->getModule()->lookupVisibleDecls(ModuleDecl::AccessPathTy(),
+    MT->getModule()->lookupVisibleDecls(ImportPath::Access(),
                                         FilteringConsumer,
                                         NLKind::QualifiedLookup);
     return;
