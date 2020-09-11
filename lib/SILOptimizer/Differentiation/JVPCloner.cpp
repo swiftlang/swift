@@ -73,9 +73,18 @@ private:
   /// blocks.
   llvm::DenseMap<SILBasicBlock *, SILBasicBlock *> diffBBMap;
 
+  /// Mapping from original basic blocks and successor basic blocks to
+  /// corresponding jvp trampoline basic blocks. Trampoline basic blocks
+  /// take additional arguments in addition to the successor enum argument.
+  llvm::DenseMap<std::pair<SILBasicBlock *, SILBasicBlock *>, SILBasicBlock *>
+      jvpTrampolineBBMap;
+
   /// Mapping from original basic blocks and original values to corresponding
   /// tangent values.
   llvm::DenseMap<SILValue, AdjointValue> tangentValueMap;
+
+  /// The main differential linear value map struct which has all the other structs nested within.
+  AllocStackInst *bb0Struct = nullptr;
 
   /// Mapping from original basic blocks and original buffers to corresponding
   /// tangent buffers.
@@ -359,6 +368,80 @@ private:
         type.getCategory());
   }
 
+  void addPayloadPointerArgument(SILBasicBlock *bb, SILBasicBlock *newBb) {
+    SILType builtinRawPtrTy = SILType::getRawPointerType(getASTContext());
+    newBb->createPhiArgument(builtinRawPtrTy, ValueOwnershipKind::Owned);
+  }
+
+  SILBasicBlock *createTrampolineBlock(SILBasicBlock *bb) {
+    auto *trampBlock = jvp->createBasicBlock();
+    for (auto &arg : bb->getArguments())
+      trampBlock->createPhiArgument(arg->getType(), arg->getOwnershipKind());
+    addPayloadPointerArgument(bb, trampBlock);
+    return trampBlock;
+  }
+
+  void addBranchInstToTrampolineBlock(SILLocation loc,
+                                      SILBasicBlock *bb,
+                                      SILBasicBlock *origSuccBB) {
+    auto *trampBB = jvpTrampolineBBMap.lookup({bb, origSuccBB});
+    assert(trampBB && "trampoline block mapping should have been added");
+    auto trampBuilder = SILBuilder(trampBB);
+    // Step 1: Create enum with the undef payload for the next succ bb.
+    auto *succStruct = differentialInfo.getLinearMapStruct(origSuccBB);
+    auto succStructLoweredTy = getLoweredType( // !! TODO ??
+        succStruct->getDeclaredInterfaceType());
+    auto *undefStruct = SILUndef::get(succStructLoweredTy, getModule(),
+                                      ValueOwnershipKind::Owned);
+    auto *curEnum = differentialInfo.getBranchingTraceDecl(bb);
+    auto enumLoweredTy = getNominalDeclLoweredType(curEnum);
+    auto *enumEltDecl =
+        differentialInfo.lookUpBranchingTraceEnumElement(origSuccBB, bb);
+    assert(enumEltDecl && "should have found the enum element decl.");
+//    auto enumEltType = getOpType(
+//        enumLoweredTy.getEnumElementType(enumEltDecl, getModule()));
+    auto *succEnum =
+        trampBuilder.createEnum(loc, undefStruct, enumEltDecl, enumLoweredTy);
+
+    // Step 2: Set the successor of the current bb to be the next succ bb.
+    auto *succFieldLookup = differentialInfo.lookUpLinearMapStructEnumField(bb);
+    assert(succFieldLookup && "should fine a field for the given basic block");
+    auto payloadPointer = trampBB->getArguments().back();
+    // Convert the raw pointer to an address.
+    auto *curStruct = differentialInfo.getLinearMapStruct(bb);
+    auto structTy = SILType::getPrimitiveAddressType(
+        curStruct->TypeDecl::getDeclaredInterfaceType()->getCanonicalType());
+    auto payloadAddress = trampBuilder.createPointerToAddress(
+        loc, payloadPointer, structTy, false);
+    auto *succField = trampBuilder.createStructElementAddr(
+        loc, payloadAddress, succFieldLookup);
+    llvm::errs() << "STORE 418\n";
+    succField->dump();
+    trampBuilder.emitStoreValueOperation(loc, succEnum, succField,
+                             StoreOwnershipQualifier::Init);
+
+    // Step 3: Get a pointer to the memory of the field (the payload).
+    auto payloadType = differentialInfo.getLinearMapStruct(origSuccBB)
+        ->getDeclaredInterfaceType()->getCanonicalType();
+    auto newPayloadAddr = trampBuilder.createInitEnumDataAddr(
+        loc, succField, enumEltDecl,
+        SILType::getPrimitiveAddressType(payloadType));
+    SILType builtinRawPtrTy = SILType::getRawPointerType(getASTContext());
+    auto newPayloadPointer =
+        trampBuilder.createAddressToPointer(loc, newPayloadAddr,
+                                            builtinRawPtrTy);
+
+    // Remap arguments, adding the payload pointer.
+    SmallVector<SILValue, 8> args;
+    for (auto origArg : trampBB->getArguments().drop_back())
+      args.push_back(origArg);
+    args.push_back(newPayloadPointer);
+
+
+    // Step 4: create the branch.
+    trampBuilder.createBranch(loc, getOpBasicBlock(origSuccBB), args);
+  }
+
   /// Set up the differential function. This includes:
   /// - Creating all differential blocks.
   /// - Creating differential entry block arguments based on the function type.
@@ -396,6 +479,25 @@ public:
   void visit(SILInstruction *inst) {
     if (errorOccurred)
       return;
+    // Create the main bb0 struct and add a payload data mapping.
+    // TODO: can't put this in `JVP::run()` or else it can't print the
+    // emitted differential.
+    if (!bb0Struct) {
+      auto loc = original->getLocation();
+      auto *entryStruct = differentialInfo.getLinearMapStruct(original->getEntryBlock());
+      auto structLoweredTy = getNominalDeclLoweredType(entryStruct);
+      bb0Struct = getBuilder().createAllocStack(loc, structLoweredTy);
+      // Create the trampoline blocks.
+      for (auto &origBB : *original) {
+        for (auto &succ : origBB.getSuccessors()) {
+          auto *trampBB = createTrampolineBlock(succ.getBB());
+          jvpTrampolineBBMap.insert({{&origBB, succ.getBB()},
+                                             trampBB});
+          // Body of trampoline block is filled at the end of the visitor.
+          // TODO: See if we can find a better place to do it.
+        }
+      }
+    }
     if (differentialInfo.shouldDifferentiateInstruction(inst)) {
       LLVM_DEBUG(getADDebugStream() << "JVPCloner visited:\n[ORIG]" << *inst);
 #ifndef NDEBUG
@@ -414,13 +516,49 @@ public:
     }
   }
 
-  void visitSILInstruction(SILInstruction *inst) {
-    context.emitNondifferentiabilityError(
-        inst, invoker, diag::autodiff_expression_not_differentiable_note);
-    errorOccurred = true;
+  void visitBasicBlockArguments(SILBasicBlock *BB) {
+    assert(false);
   }
 
+
+  
   void visitInstructionsInBlock(SILBasicBlock *bb) {
+    
+    auto *jvpBB = BBMap[bb];
+    assert(jvpBB && "basic block should exist.");
+    auto *diffBB = diffBBMap.lookup(bb);
+    if (bb != original->getEntryBlock()) {
+      addPayloadPointerArgument(bb, jvpBB);
+      getDifferentialBuilder().setInsertionPoint(diffBB);
+      auto *structDecl = differentialInfo.getLinearMapStruct(bb);
+      auto loweredStructDeclTy =
+          getLoweredType(
+              structDecl->getDeclaredInterfaceType());
+      diffBB->createPhiArgument(loweredStructDeclTy, ValueOwnershipKind::Owned);
+      auto diffStructLoweredType =
+          remapSILTypeInDifferential(differentialInfo.getLinearMapStructLoweredType(bb)
+              );
+      auto *lastArg = diffBB->getArguments().back();
+      assert(lastArg->getType() == diffStructLoweredType);
+      differentialStructArguments[bb] = lastArg;
+      for (auto i : range(bb->getNumArguments())) {
+        auto arg = bb->getArgument(i);
+        auto diffArg = diffBB->getArgument(i);
+        setTangentValue(bb, arg, makeConcreteTangentValue(diffArg));
+      }
+    }
+    auto diffLoc = getDifferential().getLocation();
+    auto *mainDifferentialStruct = diffBB->getArguments().back();
+    auto *dsi =
+      getDifferentialBuilder().createDestructureStruct(diffLoc, mainDifferentialStruct);
+    initializeDifferentialStructElements(bb, dsi->getResults());
+    TypeSubstCloner::visitInstructionsInBlock(bb);
+  }
+
+  /*void visitInstructionsInBlock(SILBasicBlock *bb) {
+    if (!bb->getTerminator()->isBranch()) {
+      exitBasicBlock = bb;
+    }
     // Destructure the differential struct to get the elements.
     auto &diffBuilder = getDifferentialBuilder();
     auto diffLoc = getDifferential().getLocation();
@@ -431,6 +569,12 @@ public:
         diffBuilder.createDestructureStruct(diffLoc, mainDifferentialStruct);
     initializeDifferentialStructElements(bb, dsi->getResults());
     TypeSubstCloner::visitInstructionsInBlock(bb);
+  }*/
+
+  void visitSILInstruction(SILInstruction *inst) {
+    context.emitNondifferentiabilityError(
+        inst, invoker, diag::autodiff_expression_not_differentiable_note);
+    errorOccurred = true;
   }
 
   // If an `apply` has active results or active inout parameters, replace it
@@ -670,6 +814,40 @@ public:
     }
     differentialValues[ai->getParent()].push_back(differential);
 
+    // TODO: uncommenting this results in store / struct overconsume error in SIL verification
+    /*if (ai->getParent() == this->original->getEntryBlock()) {
+      llvm::errs() << "C1\n";
+      auto *linearMapFieldLookup = differentialInfo.lookUpLinearMapDecl(ai);
+      auto *field =
+        builder.createStructElementAddr(loc, bb0Struct, linearMapFieldLookup);
+      bb0Struct->dump();
+      field->dump();
+      differential->dump();
+      builder.emitStoreValueOperation(loc, differential, field,
+        StoreOwnershipQualifier::Assign);
+    } else {
+      llvm::errs() << "C2\n";
+      auto *jvpBlock = builder.getInsertionBB();
+      // auto *jvpBlock = jvpBBMap.lookup(ai->getParent());
+      assert(jvpBlock && "the mapping between original and jvp bb should have "
+              "been already added.");
+      auto payloadPointer = jvpBlock->getArguments().back();
+      // TODO: optimize this so it doesn't occur for every apply instruction.
+      auto *curStruct = differentialInfo.getLinearMapStruct(ai->getParent());
+      auto structTy = SILType::getPrimitiveAddressType(
+          curStruct->TypeDecl::getDeclaredInterfaceType()->getCanonicalType());
+      auto payloadAddress = builder.createPointerToAddress(
+          loc, payloadPointer, structTy, false);
+      auto *structFieldDecl = differentialInfo.lookUpLinearMapDecl(ai);
+      assert(structFieldDecl && "differentialInfo should have visited this "
+                                "active apply instruction");
+      auto *structFieldAddr =
+          builder.createStructElementAddr(loc, payloadAddress, structFieldDecl);
+      structFieldAddr->dump();
+      builder.emitStoreValueOperation(loc, differential, structFieldAddr,
+                          StoreOwnershipQualifier::Init);
+    }*/
+
     // Differential emission.
     emitTangentForApplyInst(ai, indices, originalDifferentialType);
   }
@@ -727,16 +905,69 @@ public:
     SmallVector<SILValue, 8> directResults;
     directResults.append(origResults.begin(), origResults.end());
     directResults.push_back(differentialValue);
+    builder.createDeallocStack(loc, bb0Struct);
     builder.createReturn(ri->getLoc(),
                          joinElements(directResults, builder, loc));
   }
 
   void visitBranchInst(BranchInst *bi) {
-    llvm_unreachable("Unsupported SIL instruction.");
+    auto &builder = getBuilder();
+    auto loc = bi->getLoc();
+    auto *bb = bi->getParent();
+    auto *trampBB = jvpTrampolineBBMap.lookup(
+        {bi->getParent(), bi->getDestBB()});
+
+    // Remap arguments, adding the payload pointer.
+    SmallVector<SILValue, 8> args;
+    auto *jvpBB = getOpBasicBlock(bb);
+    for (auto origArg : bi->getArgs())
+      args.push_back(getOpValue(origArg));
+    SILValue payloadPointer;
+    if (bb->isEntry())
+      payloadPointer = bb0Struct;
+    else
+      payloadPointer = jvpBB->getArgument(0);
+    args.push_back(payloadPointer);
+
+    builder.createBranch(loc, trampBB, args);
+    emitTangentForBranchInst(bi);
   }
 
   void visitCondBranchInst(CondBranchInst *cbi) {
-    llvm_unreachable("Unsupported SIL instruction.");
+    auto &builder = getBuilder();
+    auto loc = cbi->getLoc();
+    auto *bb = cbi->getParent();
+
+
+    // Create the trampoline blocks.
+    auto *trueBB = jvpTrampolineBBMap.lookup(
+      {cbi->getParent(), cbi->getTrueBB()});
+    auto *falseBB = jvpTrampolineBBMap.lookup(
+      {cbi->getParent(), cbi->getFalseBB()});
+
+    // Remap arguments, adding the payload pointer.
+    SmallVector<SILValue, 8> trueArgs;
+    SmallVector<SILValue, 8> falseArgs;
+    auto *jvpBB = getOpBasicBlock(bb);
+    for (auto origArg : cbi->getTrueArgs())
+      trueArgs.push_back(getOpValue(origArg));
+    for (auto origArg : cbi->getTrueArgs())
+    falseArgs.push_back(getOpValue(origArg));
+    SILValue payloadPointer;
+    if (bb->isEntry()) {
+      SILType builtinRawPtrTy = SILType::getRawPointerType(getASTContext());
+      payloadPointer = builder.createAddressToPointer(loc, bb0Struct,
+                                                      builtinRawPtrTy);
+    } else {
+      payloadPointer = jvpBB->getArgument(0);
+    }
+    trueArgs.push_back(payloadPointer);
+    falseArgs.push_back(payloadPointer);
+
+
+    builder.createCondBranch(loc, getOpValue(cbi->getCondition()),
+                             trueBB, trueArgs, falseBB, falseArgs);
+    emitTangentForCondBranchInst(cbi);
   }
 
   void visitSwitchEnumInst(SwitchEnumInst *sei) {
@@ -861,6 +1092,8 @@ public:
     auto loc = si->getLoc();
     auto tanValSrc = materializeTangent(getTangentValue(si->getSrc()), loc);
     auto &tanValDest = getTangentBuffer(si->getParent(), si->getDest());
+    llvm::errs() << "STORE 1089\n";
+    tanValDest->dump();
     diffBuilder.emitStoreValueOperation(loc, tanValSrc, tanValDest,
                                         si->getOwnershipQualifier());
   }
@@ -1195,6 +1428,78 @@ public:
 
 #undef CLONE_AND_EMIT_TANGENT
 
+  void emitTangentForBranchInst(BranchInst *bi) {
+    auto loc = bi->getLoc();
+    auto *bb = bi->getParent();
+    auto &diffBuilder = getDifferentialBuilder();
+    // Need to manually set insertion point for the differential builder since
+    // super class does not know about this second builder.
+    auto *diffBB = diffBBMap.lookup(bb);
+    diffBuilder.setInsertionPoint(diffBB);
+    // Get all the successors that we can branch to based on the original basic
+    // block.
+    SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 4>
+        branchableBlocks;
+    for (auto &succBB : bb->getSuccessors()) {
+      auto *diffBlock = diffBBMap.lookup(succBB.getBB());
+      auto *enumEltDecl =
+          differentialInfo.lookUpBranchingTraceEnumElement(succBB, bb);
+      branchableBlocks.push_back({enumEltDecl, diffBlock});
+    }
+
+    auto *diffStructArg = getDifferentialStructArgument(bi->getParent());
+    // Get the enum.
+    auto *branchEnumField = differentialInfo.lookUpLinearMapStructEnumField(bb);
+    auto *enumField = diffBuilder.createStructExtract(
+        loc, diffStructArg, branchEnumField);
+
+    // Emit inst.
+    if (branchableBlocks.size() == 1) {
+      auto *payload = diffBuilder.createUncheckedEnumData(
+          loc, enumField, branchableBlocks.front().first);
+      SmallVector<SILValue, 1> args {payload};
+      diffBuilder.createBranch(loc, branchableBlocks.front().second, args);
+    } else {
+      diffBuilder.createSwitchEnum(loc, enumField, nullptr, branchableBlocks);
+    }
+  }
+
+  void emitTangentForCondBranchInst(CondBranchInst *cbi) {
+    auto loc = cbi->getLoc();
+    auto *bb = cbi->getParent();
+    auto &diffBuilder = getDifferentialBuilder();
+    // Need to manually set insertion point for the differential builder since
+    // super class does not know about this second builder.
+    auto *diffBB = diffBBMap.lookup(bb);
+    diffBuilder.setInsertionPoint(diffBB);
+
+    // Get all the successors that we can branch to based on the original basic
+    // block.
+    SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 4>
+        branchableBlocks;
+    for (auto &succBB : bb->getSuccessors()) {
+      auto *diffBlock = diffBBMap.lookup(succBB.getBB());
+      auto *enumEltDecl =
+          differentialInfo.lookUpBranchingTraceEnumElement(succBB, bb);
+      branchableBlocks.push_back({enumEltDecl, diffBlock});
+    }
+    auto *diffStructArg = getDifferentialStructArgument(cbi->getParent());;
+    // Get the enum.
+    auto *branchEnumField = differentialInfo.lookUpLinearMapStructEnumField(bb);
+    auto *enumField = diffBuilder.createStructExtract(
+        loc, diffStructArg, branchEnumField);
+
+    // Emit inst.
+    if (branchableBlocks.size() == 1) {
+      auto *payload = diffBuilder.createUncheckedEnumData(
+          loc, enumField, branchableBlocks.front().first);
+      SmallVector<SILValue, 1> args {payload};
+      diffBuilder.createBranch(loc, branchableBlocks.front().second, args);
+    } else {
+      diffBuilder.createSwitchEnum(loc, enumField, nullptr, branchableBlocks);
+    }
+  }
+
   /// Handle `apply` instruction, given:
   /// - The minimal indices for differentiating the `apply`.
   /// - The original non-reabstracted differential type.
@@ -1334,7 +1639,12 @@ public:
   void emitReturnInstForDifferential() {
     auto &differential = getDifferential();
     auto diffLoc = differential.getLocation();
+    auto *origExit = &*original->findReturnBB();
     auto &diffBuilder = getDifferentialBuilder();
+    // Need to manually set insertion point for the differential builder since
+    // super class does not know about this second builder.
+    auto *diffBB = diffBBMap.lookup(origExit);
+    diffBuilder.setInsertionPoint(diffBB);
 
     // Collect original results.
     SmallVector<SILValue, 2> originalResults;
@@ -1463,12 +1773,21 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
 
   for (auto &origBB : *original) {
     auto *diffBB = differential.createBasicBlock();
+    // Copy over tangent type of original arguments for non entry blocks.
+    if (!origBB.isEntry()) {
+      for (auto &arg : origBB.getArguments()) {
+        auto diffType = getRemappedTangentType(arg->getType());
+        diffBB->createPhiArgument(diffType, arg->getOwnershipKind());
+      }
+    }
     diffBBMap.insert({&origBB, diffBB});
     // If the BB is the original entry, then the differential block that we
     // just created must be the differential function's entry. Create
     // differential entry arguments and continue.
     if (&origBB == origEntry) {
       assert(diffBB->isEntry());
+      llvm::errs() << "createEntryAgruments\n";
+      llvm::errs().flush();
       createEntryArguments(&differential);
       auto *lastArg = diffBB->getArguments().back();
 #ifndef NDEBUG
@@ -1714,6 +2033,20 @@ bool JVPCloner::Implementation::run() {
   SmallVector<SILValue, 4> entryArgs(entry->getArguments().begin(),
                                      entry->getArguments().end());
   cloneFunctionBody(original, entry, entryArgs);
+
+  // Add the branch instruction to the trampoline blocks. The reason why
+  // we add this at the very end is that the JVP basic blocks haven't been
+  // created yet and thus must wait until they are all created.
+  for (auto &origBB : *original) {
+    for (auto &succ : origBB.getSuccessors()) {
+      auto loc = origBB.getParent()->getLocation();
+      auto *trampBB =
+          jvpTrampolineBBMap.lookup({&origBB, succ.getBB()});
+      assert(trampBB && "trampoline block mapping should been found");
+      addBranchInstToTrampolineBlock(loc, &origBB, succ.getBB());
+    }
+  }
+
   emitReturnInstForDifferential();
   // If errors occurred, back out.
   if (errorOccurred)
