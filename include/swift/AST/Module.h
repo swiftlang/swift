@@ -204,7 +204,7 @@ class ModuleDecl : public DeclContext, public TypeDecl {
 public:
   typedef ArrayRef<Located<Identifier>> AccessPathTy;
   /// Convenience struct to keep track of a module along with its access path.
-  struct ImportedModule {
+  struct alignas(uint64_t) ImportedModule {
     /// The access path from an import: `import Foo.Bar` -> `Foo.Bar`.
     ModuleDecl::AccessPathTy accessPath;
     /// The actual module corresponding to the import.
