@@ -69,6 +69,7 @@ bool swift::inputFileKindCanHaveTBDValidated(InputFileKind kind) {
   case InputFileKind::None:
   case InputFileKind::SIL:
   case InputFileKind::LLVM:
+  case InputFileKind::ObjCHeader:
     return false;
   }
   llvm_unreachable("unhandled kind");

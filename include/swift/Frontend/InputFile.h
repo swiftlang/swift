@@ -26,7 +26,8 @@ enum class InputFileKind {
   SwiftLibrary,
   SwiftModuleInterface,
   SIL,
-  LLVM
+  LLVM,
+  ObjCHeader,
 };
 
 // Inputs may include buffers that override contents, and eventually should
