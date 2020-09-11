@@ -168,7 +168,7 @@ public func run_ConvertFloatingPoint_MockFloat64ToDouble(_ N: Int) {
 
 @inline(never)
 public func run_ConvertFloatingPoint_MockFloat64ToInt64(_ N: Int) {
-  for _ in 0..<(N * 100) {
+  for _ in 0..<(N * 1000) {
     for element in mockFloat64s {
       let i = Int64(identity(element))
       blackHole(i)
