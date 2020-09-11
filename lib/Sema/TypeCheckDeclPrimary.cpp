@@ -1629,6 +1629,8 @@ public:
 
     checkAccessControl(PBD);
 
+    checkExplicitAvailability(PBD);
+
     // If the initializers in the PBD aren't checked yet, do so now.
     for (auto i : range(PBD->getNumPatternEntries())) {
       if (!PBD->isInitialized(i))
@@ -1682,6 +1684,8 @@ public:
     TypeChecker::checkDeclAttributes(SD);
 
     checkAccessControl(SD);
+
+    checkExplicitAvailability(SD);
 
     if (!checkOverrides(SD)) {
       // If a subscript has an override attribute but does not override
@@ -2641,6 +2645,8 @@ public:
     }
 
     checkAccessControl(CD);
+
+    checkExplicitAvailability(CD);
 
     if (requiresDefinition(CD) && !CD->hasBody()) {
       // Complain if we should have a body.
