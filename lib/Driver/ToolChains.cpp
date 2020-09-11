@@ -265,6 +265,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
 
   // Pass on file paths that should be remapped in debug info.
   inputArgs.AddAllArgs(arguments, options::OPT_debug_prefix_map);
+  inputArgs.AddAllArgs(arguments, options::OPT_coverage_prefix_map);
 
   // Pass through the values passed to -Xfrontend.
   inputArgs.AddAllArgValues(arguments, options::OPT_Xfrontend);

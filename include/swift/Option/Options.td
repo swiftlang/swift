@@ -708,6 +708,9 @@ def gdwarf_types : Flag<["-"], "gdwarf-types">,
 def debug_prefix_map : Separate<["-"], "debug-prefix-map">,
     Flags<[FrontendOption]>,
     HelpText<"Remap source paths in debug info">;
+def coverage_prefix_map : Separate<["-"], "coverage-prefix-map">,
+  Flags<[FrontendOption]>,
+  HelpText<"Remap source paths in coverage info">;
 
 def debug_info_format : Joined<["-"], "debug-info-format=">,
   Flags<[FrontendOption]>,

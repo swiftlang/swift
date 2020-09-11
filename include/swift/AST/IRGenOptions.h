@@ -169,6 +169,9 @@ public:
   /// Path prefixes that should be rewritten in debug info.
   PathRemapper DebugPrefixMap;
 
+  /// Path prefixes that should be rewritten in coverage info.
+  PathRemapper CoveragePrefixMap;
+
   /// What level of debug info to generate.
   IRGenDebugInfoLevel DebugInfoLevel : 2;
 
