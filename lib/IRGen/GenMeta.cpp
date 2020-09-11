@@ -5045,6 +5045,16 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::AdditiveArithmetic:
   case KnownProtocolKind::Differentiable:
   case KnownProtocolKind::FloatingPoint:
+  // SWIFT_ENABLE_TENSORFLOW
+  case KnownProtocolKind::PointwiseMultiplicative:
+  case KnownProtocolKind::ElementaryFunctions:
+  case KnownProtocolKind::KeyPathIterable:
+  case KnownProtocolKind::TensorArrayProtocol:
+  case KnownProtocolKind::TensorGroup:
+  case KnownProtocolKind::VectorProtocol:
+  case KnownProtocolKind::EuclideanDifferentiable:
+  case KnownProtocolKind::Expression:
+  // SWIFT_ENABLE_TENSORFLOW END
     return SpecialProtocol::None;
   }
 

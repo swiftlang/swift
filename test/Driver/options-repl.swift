@@ -1,3 +1,6 @@
+// SWIFT_ENABLE_TENSORFLOW: REPL is disabled in tensorflow branch.
+// UNSUPPORTED: tensorflow
+
 // RUN: not %swift -repl %s 2>&1 | %FileCheck -check-prefix=REPL_NO_FILES %s
 // RUN: not %swift_driver -sdk "" -repl %s 2>&1 | %FileCheck -check-prefix=REPL_NO_FILES %s
 // RUN: not %swift_driver -sdk "" -lldb-repl %s 2>&1 | %FileCheck -check-prefix=REPL_NO_FILES %s

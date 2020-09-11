@@ -30,6 +30,10 @@
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/VersionTuple.h"
+
+// SWIFT_ENABLE_TENSORFLOW
+#include "clang/Basic/InMemoryOutputFileSystem.h"
+
 #include <string>
 #include <vector>
 
@@ -183,6 +187,8 @@ namespace swift {
     /// options. Disabled by default because there is no way to control the
     /// language mode of clang on a per-header or even per-module basis. Also
     /// disabled because it is not complete.
+    /// options.
+    /// FIXME: Disabled by default until this is fully baked.
     bool EnableCXXInterop = false;
 
     /// On Darwin platforms, use the pre-stable ABI's mark bit for Swift
@@ -350,7 +356,10 @@ namespace swift {
 
     /// Whether to enable experimental differentiable programming features:
     /// `@differentiable` declaration attribute, etc.
-    bool EnableExperimentalDifferentiableProgramming = false;
+    // SWIFT_ENABLE_TENSORFLOW
+    // Use default value true on `tensorflow` branch.
+    bool EnableExperimentalDifferentiableProgramming = true;
+    // SWIFT_ENABLE_TENSORFLOW END
 
     /// Whether to enable forward mode differentiation.
     bool EnableExperimentalForwardModeDifferentiation = false;
@@ -648,6 +657,13 @@ namespace swift {
     /// When set, use ExtraArgs alone to configure clang instance because ExtraArgs
     /// contains the full option set.
     bool ExtraArgsOnly = false;
+
+    // SWIFT_ENABLE_TENSORFLOW
+    /// When set, clang writes its output files (module caches) to this instead
+    /// of to the real filesystem.
+    llvm::IntrusiveRefCntPtr<clang::InMemoryOutputFileSystem>
+        InMemoryOutputFileSystem;
+    // SWIFT_ENABLE_TENSORFLOW END
 
     /// Return a hash code of any components from these options that should
     /// contribute to a Swift Bridging PCH hash.

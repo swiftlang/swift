@@ -36,6 +36,9 @@ class DependencyCollector;
 
 namespace swift {
 
+// SWIFT_ENABLE_TENSORFLOW
+struct AutoDiffConfig;
+// SWIFT_ENABLE_TENSORFLOW END
 class AbstractFunctionDecl;
 struct AutoDiffConfig;
 class ClangImporterOptions;

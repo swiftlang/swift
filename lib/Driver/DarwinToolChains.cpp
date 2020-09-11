@@ -412,8 +412,16 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
     Arguments.push_back(context.Args.MakeArgString(path));
   }
 
-  if (context.Args.hasFlag(options::OPT_toolchain_stdlib_rpath,
-                           options::OPT_no_toolchain_stdlib_rpath, false)) {
+  // SWIFT_ENABLE_TENSORFLOW
+  // NOTE(TF-797): default true for toolchain stdlib rpath to prevent linker
+  // issues. This works around the fact that TensorFlow/Python modules do not
+  // exist in `/usr/lib/swift` on Darwin platforms.
+  // Relevant Swift-in-Darwin-OSs patch:
+  // https://github.com/apple/swift/pull/24787.
+  if (!context.Args.hasArg(options::OPT_no_stdlib_rpath) &&
+      context.Args.hasFlag(options::OPT_toolchain_stdlib_rpath,
+                           options::OPT_no_toolchain_stdlib_rpath, true)) {
+  // SWIFT_ENABLE_TENSORFLOW END
     // If the user has explicitly asked for a toolchain stdlib, we should
     // provide one using -rpath. This used to be the default behaviour but it
     // was considered annoying in at least the SwiftPM scenario (see

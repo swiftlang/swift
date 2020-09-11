@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
-
 extension Optional: Differentiable where Wrapped: Differentiable {
   public struct TangentVector: Differentiable, AdditiveArithmetic {
     public typealias TangentVector = Self

@@ -225,6 +225,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   Int32Ty = llvm::Type::getInt32Ty(getLLVMContext());
   Int32PtrTy = Int32Ty->getPointerTo();
   Int64Ty = llvm::Type::getInt64Ty(getLLVMContext());
+  // SWIFT_ENABLE_TENSORFLOW
+  DoubleTy = llvm::Type::getDoubleTy(getLLVMContext());
+  FloatTy = llvm::Type::getFloatTy(getLLVMContext());
+
   Int8PtrTy = llvm::Type::getInt8PtrTy(getLLVMContext());
   Int8PtrPtrTy = Int8PtrTy->getPointerTo(0);
   SizeTy = DataLayout.getIntPtrType(getLLVMContext(), /*addrspace*/ 0);
@@ -694,6 +698,12 @@ static bool isReturnAttribute(llvm::Attribute::AttrKind Attr) {
 static bool isReturnedAttribute(llvm::Attribute::AttrKind Attr) {
   return Attr == llvm::Attribute::Returned;
 }
+// SWIFT_ENABLE_TENSORFLOW
+// Similar to the 'return' attribute we assume that the 'sret' attributed is
+// associated with the first function parameter.
+static bool isStructRetAttribute(llvm::Attribute::AttrKind Attr) {
+  return Attr == llvm::Attribute::StructRet;
+}
 
 namespace {
 bool isStandardLibrary(const llvm::Module &M) {
@@ -792,7 +802,8 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
     for (auto Attr : attrs) {
       if (isReturnAttribute(Attr))
         buildRetAttr.addAttribute(Attr);
-      else if (isReturnedAttribute(Attr))
+      // SWIFT_ENABLE_TENSORFLOW
+      else if (isReturnedAttribute(Attr) || isStructRetAttribute(Attr))
         buildFirstParamAttr.addAttribute(Attr);
       else
         buildFnAttr.addAttribute(Attr);

@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
 import SwiftShims
 
 % from SwiftFloatingPointTypes import all_floating_point_types
@@ -51,6 +50,50 @@ extension ${Self}: Differentiable {
     { 0 }
   }
 }
+
+// SWIFT_ENABLE_TENSORFLOW
+${Availability(bits)}
+extension ${Self} : EuclideanDifferentiable {}
+// SWIFT_ENABLE_TENSORFLOW END
+
+// SWIFT_ENABLE_TENSORFLOW
+
+${Availability(bits)}
+extension ${Self} : VectorProtocol {
+  ${Availability(bits)}
+  public typealias VectorSpaceScalar = ${Self}
+
+  ${Availability(bits)}
+  public func adding(_ x: ${Self}) -> ${Self} {
+    self + x
+  }
+
+  ${Availability(bits)}
+  public mutating func add(_ x: ${Self}) {
+    self += x
+  }
+
+  ${Availability(bits)}
+  public func subtracting(_ x: ${Self}) -> ${Self} {
+    self - x
+  }
+
+  ${Availability(bits)}
+  public mutating func subtract(_ x: ${Self}) {
+    self -= x
+  }
+
+  ${Availability(bits)}
+  public func scaled(by scalar: ${Self}) -> ${Self} {
+    self * scalar
+  }
+
+  ${Availability(bits)}
+  public mutating func scale(by scalar: ${Self}) {
+    self *= scalar
+  }
+}
+// SWIFT_ENABLE_TENSORFLOW END
 
 //===----------------------------------------------------------------------===//
 // Derivatives

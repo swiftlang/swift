@@ -38,6 +38,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/QuotedString.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Config.h"
@@ -3731,6 +3732,22 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   }
 
   bool shouldPrintFullyQualified(TypeBase *T) {
+    // SWIFT_ENABLE_TENSORFLOW
+    // NOTE(TF-590): Workaround for REPL qualified module name bug.
+    // Do not print qualified LLDB module names.
+    {
+      Decl *D;
+      if (auto *TAT = dyn_cast<TypeAliasType>(T))
+        D = TAT->getDecl();
+      else
+        D = T->getAnyGeneric();
+
+      ModuleDecl *M = D->getDeclContext()->getParentModule();
+      if (isLLDBExpressionModule(M))
+        return false;
+    }
+    // SWIFT_ENABLE_TENSORFLOW END
+
     if (Options.FullyQualifiedTypes)
       return true;
 

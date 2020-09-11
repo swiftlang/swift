@@ -2926,6 +2926,12 @@ public:
                      DynamicLookupInfo dynamicLookupInfo) {
     if (FD->getBaseIdentifier().empty())
       return;
+
+    // Suppress "sequenced" as a result, because it crashes completions.
+    // TODO(TF-315): Fix properly and then remove this.
+    if (FD->getBaseIdentifier().str() == "sequenced")
+      return;
+
     foundFunction(FD);
 
     const Identifier Name = FD->getBaseIdentifier();

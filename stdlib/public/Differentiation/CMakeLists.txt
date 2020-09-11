@@ -10,18 +10,18 @@
 #
 #===----------------------------------------------------------------------===#
 
-add_swift_target_library(swift_Differentiation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
-  Differentiable.swift
-  DifferentialOperators.swift
-  DifferentiationUtilities.swift
-  AnyDifferentiable.swift
-  ArrayDifferentiation.swift
-  OptionalDifferentiation.swift
+# SWIFT_ENABLE_TENSORFLOW
+# NOTE: A non-empty `_Differentiation` module is currently created only on
+# master branch, not on tensorflow branch.
+#
+# Instead, on tensorflow branch, the differentiation-related Swift source files
+# in this directory are directly built as part of swiftCore: see
+# stdlib/public/core/CMakeLists.txt. The `_Differentiation` module is created
+# empty to enable `#if canImport(_Differentiation)` guards in tests.
+# SWIFT_ENABLE_TENSORFLOW END
 
-  GYB_SOURCES
-    FloatingPointDifferentiation.swift.gyb
-    TgmathDerivatives.swift.gyb
-    SIMDDifferentiation.swift.gyb
+add_swift_target_library(swift_Differentiation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
+  Empty.swift
 
   SWIFT_MODULE_DEPENDS_OSX Darwin
   SWIFT_MODULE_DEPENDS_IOS Darwin

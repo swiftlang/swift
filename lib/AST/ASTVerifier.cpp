@@ -2775,6 +2775,11 @@ public:
         abort();
       }
 
+      // Skip implicit generic param decls. Their depth and index may not be
+      // consistent with the generic context's parameter list.
+      if (GTPD->isImplicit())
+        return;
+
       unsigned currentDepth = DC->getGenericContextDepth();
       if (currentDepth < GTPD->getDepth()) {
         Out << "GenericTypeParamDecl has incorrect depth\n";

@@ -34,6 +34,8 @@ ATTRIBUTE_NODES = [
     #                | availability-spec-list
     #                | specialize-attr-spec-list
     #                | implements-attr-arguments
+    #                | differentiable-attr-arguments
+    #                | derivative-registration-attr-arguments
     #                | named-attribute-string-argument
     #              )? ')'?
     Node('Attribute', kind='Syntax',

@@ -616,7 +616,6 @@ SILFunction *SILParser::getGlobalNameForReference(Identifier name,
   return fn;
 }
 
-
 /// getBBForDefinition - Return the SILBasicBlock for a definition of the
 /// specified block.
 SILBasicBlock *SILParser::getBBForDefinition(Identifier Name, SourceLoc Loc) {
@@ -2767,6 +2766,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     ResultVal = B.createFunctionRef(InstLoc, Fn);
     break;
   }
+
   case SILInstructionKind::DynamicFunctionRefInst: {
     SILFunction *Fn;
     if (parseSILFunctionRef(InstLoc, Fn) || parseSILDebugLocation(InstLoc, B))
@@ -2789,6 +2789,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     ResultVal = B.createPreviousDynamicFunctionRef(InstLoc, Fn);
     break;
   }
+
   case SILInstructionKind::BuiltinInst: {
     if (P.Tok.getKind() != tok::string_literal) {
       P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "builtin name");
@@ -6526,6 +6527,8 @@ static bool parseSILVTableEntry(
   }
 
   SILDeclRef Ref;
+
+
   Identifier FuncName;
   SourceLoc FuncLoc;
   if (witnessState.parseSILDeclRef(Ref, true) ||
@@ -6547,6 +6550,7 @@ static bool parseSILVTableEntry(
       return true;
     }
   }
+
   witnessEntries.push_back(SILWitnessTable::MethodWitness{
     Ref, Func
   });

@@ -66,9 +66,16 @@ static llvm::cl::opt<bool> AbortOnFailure(
                               "verify-abort-on-failure",
                               llvm::cl::init(true));
 
+// SWIFT_ENABLE_TENSORFLOW
+// This flag is temporarily set to false because debug scope verification does
+// not handle inlined call sites. This is problematic for deabstraction, which
+// does performance inlining at -Onone.
+// When debug scope verification handles inlined call sites, set this flag to
+// true.
+// Documented at SR-8114.
 static llvm::cl::opt<bool> VerifyDIHoles(
                               "verify-di-holes",
-                              llvm::cl::init(true));
+                              llvm::cl::init(false));
 
 static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
     "verify-skip-convert-escape-to-noescape-attributes", llvm::cl::init(false));
@@ -1572,6 +1579,12 @@ public:
   }
 
   void checkPartialApplyInst(PartialApplyInst *PAI) {
+    if (PAI->getModule().getStage() != SILStage::Raw) {
+      require(!PAI->getFunctionType()->isDifferentiable(),
+              "partial_apply of differentiable funtions is only allowed "
+              "in raw SIL");
+    }
+
     auto resultInfo = requireObjectType(SILFunctionType, PAI,
                                         "result of partial_apply");
     verifySILFunctionType(resultInfo);
@@ -1719,7 +1732,7 @@ public:
       return;
     }
   }
-  
+
   void checkFunctionRefBaseInst(FunctionRefBaseInst *FRI) {
     auto fnType = requireObjectType(SILFunctionType, FRI,
                                     "result of function_ref");
@@ -5564,6 +5577,70 @@ void SILGlobalVariable::verify() const {
   }
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+/// Verify that a differentiability witness follows invariants.
+void SILDifferentiabilityWitness::verify(const SILModule &M) const {
+  // FIXME(TF-1197): Re-enable verification after substituted SIL function
+  // types.
+  return;
+#if 0
+#ifdef NDEBUG
+  if (!M.getOptions().VerifyAll)
+    return;
+#endif
+  // Skip lowered SIL: LoadableByAddress changes parameter/result conventions.
+  // TODO: Check that derivative function types match excluding
+  // parameter/result conventions in lowered SIL.
+  if (M.getStage() == SILStage::Lowered)
+    return;
+  auto *origFn = getOriginalFunction();
+  auto origFnType = origFn->getLoweredFunctionType();
+  bool origIsReabstractionThunk = origFn->isThunk() == IsReabstractionThunk;
+  CanGenericSignature derivativeCanGenSig;
+  if (auto derivativeGenSig = getDerivativeGenericSignature())
+    derivativeCanGenSig = derivativeGenSig->getCanonicalSignature();
+  auto requireSameType =
+      [&](CanSILFunctionType type1, CanSILFunctionType type2,
+          const Twine &complaint) {
+    if (type1 == type2)
+      return;
+    llvm::dbgs() << "SIL verification failed: " << complaint << "\n";
+    llvm::dbgs() << "  " << type1 << "\n  " << type2 << "\n\n";
+    llvm::dbgs() << "In differentiability witness:\n";
+    print(llvm::dbgs());
+    // We abort by default because we want to always crash in
+    // the debugger.
+    if (AbortOnFailure)
+      abort();
+    else
+      exit(1);
+  };
+  if (auto *jvp = getJVP()) {
+    // TODO(TF-893): Change `SILFunctionType::getAutoDiffDerivativeFunctionType`
+    // to accept result indices.
+    auto expectedJVPType = origFnType->getAutoDiffDerivativeFunctionType(
+        getParameterIndices(), /*resultIndex*/ *getResultIndices()->begin(),
+        AutoDiffDerivativeFunctionKind::JVP, M.Types,
+        LookUpConformanceInModule(M.getSwiftModule()), derivativeCanGenSig,
+        origIsReabstractionThunk);
+    requireSameType(jvp->getLoweredFunctionType(), expectedJVPType,
+                    "JVP type does not match expected JVP type");
+  }
+  if (auto *vjp = getVJP()) {
+    // TODO(TF-893): Change `SILFunctionType::getAutoDiffDerivativeFunctionType`
+    // to result indices.
+    auto expectedVJPType = origFnType->getAutoDiffDerivativeFunctionType(
+        getParameterIndices(), /*resultIndex*/ *getResultIndices()->begin(),
+        AutoDiffDerivativeFunctionKind::VJP, M.Types,
+        LookUpConformanceInModule(M.getSwiftModule()), derivativeCanGenSig,
+        origIsReabstractionThunk);
+    requireSameType(vjp->getLoweredFunctionType(), expectedVJPType,
+                    "VJP type does not match expected VJP type");
+  }
+#endif
+}
+// SWIFT_ENABLE_TENSORFLOW END
+
 /// Verify the module.
 void SILModule::verify() const {
   if (!verificationEnabled(*this))
@@ -5641,6 +5718,22 @@ void SILModule::verify() const {
     }
     wt.verify(*this);
   }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // Check all differentiability witnesses.
+  LLVM_DEBUG(llvm::dbgs() <<
+             "*** Checking differentiability witnesses for duplicates ***\n");
+  llvm::DenseSet<SILDifferentiabilityWitnessKey> diffWitnesses;
+  for (auto &dw : getDifferentiabilityWitnesses()) {
+    LLVM_DEBUG(llvm::dbgs() << "Differentiability Witness:\n"; dw.dump());
+    if (!diffWitnesses.insert(dw.getKey()).second) {
+      llvm::errs() << "Differentiability witness redefined: ";
+      dw.dump();
+      assert(false && "triggering standard assertion failure routine");
+    }
+    dw.verify(*this);
+  }
+  // SWIFT_ENABLE_TENSORFLOW END
   
   // Check property descriptors.
   LLVM_DEBUG(llvm::dbgs() << "*** Checking property descriptors ***\n");

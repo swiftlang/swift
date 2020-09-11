@@ -149,7 +149,8 @@
     "MemoryLayout.swift",
   ],
   "KeyPaths": [
-    "KeyPath.swift"
+    "KeyPath.swift",
+    "KeyPathIterable.swift"
   ],
   "Reflection": [
     "Dump.swift",
@@ -161,6 +162,7 @@
   "Math": [
     "SetAlgebra.swift",
     "BuiltinMath.swift",
+    "MathFunctions.swift",
     {
     "Integers": [
       "Integers.swift",
@@ -234,5 +236,17 @@
   ],
   "Result": [
     "Result.swift"
+  ],
+  "DifferentiableProgramming": [
+    "Differentiable.swift",
+    "DifferentialOperators.swift",
+    "DifferentiationUtilities.swift",
+    "DifferentiationSupport.swift",
+    "AnyDifferentiable.swift",
+    "ArrayDifferentiation.swift",
+    "FloatingPointDifferentiation.swift",
+    "OptionalDifferentiation.swift",
+    "SIMDDifferentiation.swift",
+    "TgmathDerivatives.swift"
   ]
 }

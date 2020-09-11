@@ -68,6 +68,9 @@ SILFunction::create(SILModule &M, SILLinkage linkage, StringRef name,
   if (!name.empty()) {
     entry = &*M.FunctionTable.insert(std::make_pair(name, nullptr)).first;
     PrettyStackTraceSILFunction trace("creating", entry->getValue());
+    if (entry->getValue()) {
+      entry->getValue()->dump();
+    }
     assert(!entry->getValue() && "function already exists");
     name = entry->getKey();
   }
@@ -112,6 +115,11 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
   assert(!Transparent || !IsDynamicReplaceable);
   validateSubclassScope(classSubclassScope, isThunk, nullptr);
   setDebugScope(DebugScope);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // Function type cannot be @differentiable.
+  assert(!LoweredType->isDifferentiable() &&
+         "SIL function declarations cannot have an @differentiable type");
 
   if (InsertBefore)
     Module.functions.insert(SILModule::iterator(InsertBefore), this);
@@ -229,6 +237,10 @@ SILType SILFunction::mapTypeIntoContext(SILType type) const {
 
 SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
                                                SILType type) const {
+  if (type.hasArchetype()) {
+    llvm::errs() << "TYPE HAS ARCHETYPE\n";
+    type.dump();
+  }
   assert(!type.hasArchetype());
 
   auto genericSig = getGenericSignature().getCanonicalSignature();

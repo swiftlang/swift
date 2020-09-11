@@ -274,6 +274,9 @@ bool ide::initCompilerInvocation(
     CompilerInvocation &Invocation, ArrayRef<const char *> OrigArgs,
     DiagnosticEngine &Diags, StringRef UnresolvedPrimaryFile,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    // SWIFT_ENABLE_TENSORFLOW
+    llvm::IntrusiveRefCntPtr<clang::InMemoryOutputFileSystem> InMemoryOutputFileSystem,
+    // SWIFT_ENABLE_TENSORFLOW END
     const std::string &runtimeResourcePath,
     const std::string &diagnosticDocumentationPath,
     bool shouldOptimizeForIDE, time_t sessionTimestamp, std::string &Error) {
@@ -315,6 +318,9 @@ bool ide::initCompilerInvocation(
 
   ClangImporterOptions &ImporterOpts = Invocation.getClangImporterOptions();
   ImporterOpts.DetailedPreprocessingRecord = true;
+  // SWIFT_ENABLE_TENSORFLOW
+  ImporterOpts.InMemoryOutputFileSystem = InMemoryOutputFileSystem;
+  // SWIFT_ENABLE_TENSORFLOW END
 
   assert(!Invocation.getModuleName().empty());
 

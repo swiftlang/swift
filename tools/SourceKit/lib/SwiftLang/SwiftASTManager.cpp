@@ -361,6 +361,12 @@ struct SwiftASTManager::Implementation {
   llvm::sys::Mutex CacheMtx;
   std::time_t SessionTimestamp;
 
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Requests will write temporary output files to this filesystem rather than
+  /// to the real filesystem.
+  llvm::IntrusiveRefCntPtr<clang::InMemoryOutputFileSystem>
+      InMemoryOutputFileSystem;
+
   WorkQueue ASTBuildQueue{ WorkQueue::Dequeuing::Serial,
                            "sourcekit.swift.ASTBuilding" };
 
@@ -388,6 +394,12 @@ SwiftASTManager::SwiftASTManager(
 
 SwiftASTManager::~SwiftASTManager() {
   delete &Impl;
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+void SwiftASTManager::setInMemoryOutputFileSystem(
+    llvm::IntrusiveRefCntPtr<clang::InMemoryOutputFileSystem> FS) {
+  Impl.InMemoryOutputFileSystem = std::move(FS);
 }
 
 std::unique_ptr<llvm::MemoryBuffer>
@@ -420,6 +432,9 @@ bool SwiftASTManager::initCompilerInvocation(
     std::string &Error) {
   return ide::initCompilerInvocation(
       Invocation, OrigArgs, Diags, UnresolvedPrimaryFile, FileSystem,
+      // SWIFT_ENABLE_TENSORFLOW
+      Impl.InMemoryOutputFileSystem,
+      // SWIFT_ENABLE_TENSORFLOW END
       Impl.RuntimeResourcePath, Impl.DiagnosticDocumentationPath,
       Impl.Config->shouldOptimizeForIDE(), Impl.SessionTimestamp, Error);
 }

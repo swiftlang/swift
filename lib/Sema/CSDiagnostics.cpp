@@ -340,6 +340,8 @@ bool RequirementFailure::isStaticOrInstanceMember(const ValueDecl *decl) {
 bool RequirementFailure::diagnoseAsError() {
   const auto *reqDC = getRequirementDC();
   auto *genericCtx = getGenericContext();
+  if (!genericCtx)
+    return false;
 
   auto lhs = getLHS();
   auto rhs = getRHS();

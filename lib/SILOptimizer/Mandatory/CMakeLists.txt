@@ -5,6 +5,9 @@ target_sources(swiftSILOptimizer PRIVATE
   ClosureLifetimeFixup.cpp
   ConstantPropagation.cpp
   DefiniteInitialization.cpp
+  # SWIFT_ENABLE_TENSORFLOW
+  Differentiation.cpp
+  # SWIFT_ENABLE_TENSORFLOW END
   DIMemoryUseCollector.cpp
   DataflowDiagnostics.cpp
   DiagnoseInfiniteRecursion.cpp

@@ -54,3 +54,6 @@ if(SWIFT_HOST_VARIANT STREQUAL "macosx")
 endif()
 
 add_swift_tool_subdirectory(swift-reflection-dump)
+
+# SWIFT_ENABLE_TENSORFLOW
+add_swift_tool_subdirectory(libInMemoryFrontend)

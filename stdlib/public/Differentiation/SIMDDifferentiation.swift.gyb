@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
-
 %{
 storagescalarCounts = [2,4,8,16,32,64]
 vectorscalarCounts = storagescalarCounts + [3]
@@ -37,6 +35,15 @@ where
     { .init(repeating: 0) }
   }
 }
+
+// SWIFT_ENABLE_TENSORFLOW
+extension SIMD${n}: EuclideanDifferentiable
+where
+  Scalar: EuclideanDifferentiable & BinaryFloatingPoint,
+  Scalar.TangentVector: BinaryFloatingPoint
+{
+}
+// SWIFT_ENABLE_TENSORFLOW END
 
 //===----------------------------------------------------------------------===//
 // Derivatives
@@ -412,9 +419,6 @@ where
   }
 }
 
-// FIXME(TF-1103): Derivative registration does not yet support
-// `@_alwaysEmitIntoClient` original functions like `SIMD.sum()`.
-/*
 extension SIMD
 where
   Self: Differentiable,
@@ -439,7 +443,6 @@ where
     return (sum(), { v in Scalar.TangentVector(v.sum()) })
   }
 }
-*/
 
 extension SIMD
 where

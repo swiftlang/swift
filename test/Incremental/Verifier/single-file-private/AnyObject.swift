@@ -58,6 +58,9 @@ import Foundation
 // expected-private-member {{Swift.Encodable.callAsFunction}}
 // expected-private-member {{Swift.Decodable.callAsFunction}}
 // expected-private-member {{Foundation._OptionalForKVO.callAsFunction}}
+// SWIFT_ENABLE_TENSORFLOW
+// expected-private-member {{Swift.Differentiable.callAsFunction}}
+// SWIFT_ENABLE_TENSORFLOW END
 
 // expected-provides {{AnyObject}}
 func lookupOnAnyObject(object: AnyObject) { // expected-provides {{lookupOnAnyObject}}

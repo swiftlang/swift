@@ -1460,7 +1460,10 @@ ConstraintSystem::getTypeOfMemberReference(
   auto hasAppliedSelf = doesMemberRefApplyCurriedSelf(baseObjTy, value);
 
   baseObjTy = baseObjTy->getMetatypeInstanceType();
-  FunctionType::Param baseObjParam(baseObjTy);
+  // SWIFT_ENABLE_TENSORFLOW
+  FunctionType::Param baseObjParam(
+      baseObjTy->getInOutObjectType(), Identifier(),
+      ParameterTypeFlags().withInOut(baseObjTy->is<InOutType>()));
 
   if (auto *typeDecl = dyn_cast<TypeDecl>(value)) {
     assert(!isa<ModuleDecl>(typeDecl) && "Nested module?");
@@ -3012,6 +3015,21 @@ SolutionResult ConstraintSystem::salvage() {
 
     // If there are multiple solutions, try to diagnose an ambiguity.
     if (viable.size() > 1) {
+      // SWIFT_ENABLE_TENSORFLOW
+      if (DC->getParentModule()->getNameStr().startswith("__lldb_expr")) {
+        // TODO(https://bugs.swift.org/browse/SR-9814):
+        // If in LLDB repl mode, patch up the solution if we have ambiguity.
+        //
+        // This is a *temporary* short-term hack that simply returns the last
+        // solution.  It seems to work for now and returns the lastly added
+        // definition during the repl session. However, this is extremely brittle and
+        // is not expected to work correctly all the time.
+        viable[0] = std::move(viable.back());
+        viable.erase(viable.begin() + 1, viable.end());
+        return SolutionResult::forSolved(std::move(viable[0]));
+      }
+      // SWIFT_ENABLE_TENSORFLOW
+
       if (isDebugMode()) {
         auto &log = llvm::errs();
         log << "---Ambiguity error: " << viable.size()

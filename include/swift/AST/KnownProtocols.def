@@ -89,6 +89,17 @@ PROTOCOL(Differentiable)
 
 PROTOCOL(FloatingPoint)
 
+// SWIFT_ENABLE_TENSORFLOW
+PROTOCOL(PointwiseMultiplicative)
+PROTOCOL(ElementaryFunctions)
+PROTOCOL(KeyPathIterable)
+PROTOCOL(TensorArrayProtocol)
+PROTOCOL(TensorGroup)
+PROTOCOL(VectorProtocol)
+PROTOCOL(EuclideanDifferentiable)
+PROTOCOL(Expression)
+// SWIFT_ENABLE_TENSORFLOW END
+
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByArrayLiteral, "Array", false)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByBooleanLiteral, "BooleanLiteralType", true)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByDictionaryLiteral, "Dictionary", false)
@@ -103,6 +114,9 @@ EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByUnicodeScalarLiteral, "UnicodeScala
 EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByColorLiteral, "_ColorLiteralType", true)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByImageLiteral, "_ImageLiteralType", true)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByFileReferenceLiteral, "_FileReferenceLiteralType", true)
+// SWIFT_ENABLE_TENSORFLOW
+// TODO(TF-735): Implement ExpressibleByQuoteLiteral.
+// EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByQuoteLiteral, "_QuoteLiteralType", true)
 
 BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByBuiltinBooleanLiteral)
 BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByBuiltinExtendedGraphemeClusterLiteral)

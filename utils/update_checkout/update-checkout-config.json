@@ -32,16 +32,23 @@
             "remote": { "id": "apple/swift-xcode-playground-support" } },
         "ninja": {
             "remote": { "id": "ninja-build/ninja" } },
+        "tensorflow": {
+            "remote": { "id": "tensorflow/tensorflow" } },
+        "tensorflow-swift-apis": {
+            "remote": { "id": "tensorflow/swift-apis" } },
         "icu": {
             "remote": { "id": "unicode-org/icu" },
             "platforms": [ "Linux" ]
         },
         "yams": {
-            "remote": { "id": "jpsim/Yams" }
+            "remote": { "id": "asuhan/Yams" }
         },
         "cmake": {
             "remote": { "id": "KitWare/CMake" },
             "platforms": [ "Linux" ]
+        },
+        "tensorflow-swift-apis": {
+            "remote": { "id": "tensorflow/swift-apis" }
         },
        "indexstore-db": {
             "remote": { "id": "apple/indexstore-db" } },
@@ -78,7 +85,8 @@
                 "cmake": "v3.16.5",
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master",
-                "swift-format": "master"
+                "swift-format": "master",
+                "tensorflow-swift-apis": "master"
             }
         },
         "next" : {
@@ -108,7 +116,8 @@
                 "cmake": "v3.16.5",
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master",
-                "swift-format": "master"
+                "swift-format": "master",
+                "tensorflow-swift-apis": "master"
             }
         },
        "swift-3.0-branch" : {
@@ -304,7 +313,8 @@
                 "cmake": "v3.16.5",
                 "indexstore-db": "release/5.3",
                 "sourcekit-lsp": "release/5.3",
-                "swift-format": "master"
+                "swift-format": "master",
+                "tensorflow-swift-apis": "master"
             }
         },
        "master-rebranch": {
@@ -332,6 +342,36 @@
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master",
                 "swift-format": "master"
+            }
+       },
+
+       "tensorflow": {
+            "aliases": ["tensorflow"],
+            "repos": {
+                "llvm-project": "14a10d635b229fb3d8fc0d80340f98430b46fcff",
+                "swift": "tensorflow",
+                "cmark": "swift-DEVELOPMENT-SNAPSHOT-2020-08-31-a",
+                "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2020-08-31-a",
+                "swift-tools-support-core": "0.1.8",
+                "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2020-08-31-a",
+                "swift-argument-parser": "0.3.0",
+                "swift-driver": "7a441561a176f6eac2953aea2c395cc4e683f820",
+                "swift-syntax": "swift-DEVELOPMENT-SNAPSHOT-2020-08-31-a",
+                "swift-stress-tester": "swift-DEVELOPMENT-SNAPSHOT-2020-08-31-a",
+                "swift-corelibs-xctest": "swift-DEVELOPMENT-SNAPSHOT-2020-08-31-a",
+                "swift-corelibs-foundation": "swift-DEVELOPMENT-SNAPSHOT-2020-08-31-a",
+                "swift-corelibs-libdispatch": "swift-DEVELOPMENT-SNAPSHOT-2020-08-31-a",
+                "swift-integration-tests": "swift-DEVELOPMENT-SNAPSHOT-2020-08-31-a",
+                "swift-xcode-playground-support": "swift-DEVELOPMENT-SNAPSHOT-2020-08-31-a",
+                "ninja": "release",
+                "icu": "release-65-1",
+                "yams": "3.0.1-patched",
+                "indexstore-db": "swift-DEVELOPMENT-SNAPSHOT-2020-08-31-a",
+                "sourcekit-lsp": "swift-DEVELOPMENT-SNAPSHOT-2020-08-31-a",
+                "PythonKit": "master",
+                "swift-format": "master",
+                "tensorflow": "v2.3.0",
+                "tensorflow-swift-apis": "master"
             }
         }
     }

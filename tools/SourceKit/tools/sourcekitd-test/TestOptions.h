@@ -116,6 +116,8 @@ struct TestOptions {
   bool SuppressDefaultConfigRequest = false;
   llvm::Optional<unsigned> CompletionCheckDependencyInterval;
   unsigned repeatRequest = 1;
+  // SWIFT_ENABLE_TENSORFLOW
+  bool InMemoryClangModuleCache;
   struct VFSFile {
     std::string path;
     bool passAsSourceText;

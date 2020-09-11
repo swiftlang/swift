@@ -18,6 +18,7 @@
 # vim swap files
 .*.sw[a-z]
 .sw?
+*.vscode
 
 #==============================================================================#
 # Explicit files to ignore (only matches one).

@@ -296,7 +296,7 @@ public:
 
   /// Cached mapping from types to their associated tangent spaces.
   llvm::DenseMap<Type, Optional<TangentSpace>> AutoDiffTangentSpaces;
-
+  
   /// A cache of derivative function types per configuration.
   llvm::DenseMap<SILAutoDiffDerivativeFunctionKey, CanSILFunctionType>
       SILAutoDiffDerivativeFunctions;
@@ -309,8 +309,10 @@ public:
   /// Cache of `@derivative` attributes keyed by parameter indices and
   /// derivative function kind. Used to diagnose duplicate `@derivative`
   /// attributes for the same key.
-  // TODO(TF-1042): remove `DerivativeAttrs` from `ASTContext`. Serialize
-  // derivative function configurations per original `AbstractFunctionDecl`.
+  // NOTE(TF-680): relaxing the uniqueness condition to use derivative generic
+  // signature as a key is possible. It requires derivative generic signature
+  // mangling to avoid name collisions for SIL derivative functions with the
+  // same parameter indices but different derivative generic signatures.
   llvm::DenseMap<
       std::tuple<Decl *, IndexSubset *, AutoDiffDerivativeFunctionKind>,
       llvm::SmallPtrSet<DerivativeAttr *, 1>>
@@ -336,6 +338,7 @@ private:
   /// Cache of module names that fail the 'canImport' test in this context.
   llvm::SmallPtrSet<Identifier, 8> FailedModuleImportNames;
   
+public:
   /// Retrieve the allocator for the given arena.
   llvm::BumpPtrAllocator &
   getAllocator(AllocationArena arena = AllocationArena::Permanent) const;
@@ -484,6 +487,35 @@ public:
 
   /// Retrieve the type Swift.AnyObject.
   CanType getAnyObjectType() const;
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Retrieve the decl for TensorFlow.TensorHandle iff the TensorFlow module
+  /// has been imported.  Otherwise, this returns null.
+  ClassDecl *getTensorHandleDecl() const;
+
+  /// Retrieve the decl for TensorFlow.TensorShape iff the TensorFlow module
+  /// has been imported.  Otherwise, this returns null.
+  StructDecl *getTensorShapeDecl() const;
+
+  /// Retrieve the decl for TensorFlow.TensorDataType iff the TensorFlow module
+  /// has been imported.  Otherwise, this returns null.
+  StructDecl *getTensorDataTypeDecl() const;
+
+  /// Retrieve the decl for the Quote module iff it has been imported.
+  /// Otherwise, this returns null.
+  ModuleDecl *getQuoteModule() const;
+
+  /// Retrieve the decl for Quote.Tree iff the Quote module has been imported.
+  /// Otherwise, this returns null.
+  ProtocolDecl *getTreeDecl() const;
+
+  /// Retrieve the decl for Quote.Quote iff the Quote module has been imported.
+  /// Otherwise, this returns null.
+  ClassDecl *getQuoteDecl() const;
+
+  /// Retrieve the decl for Quote.FunctionQuoteN iff the Quote module has been
+  /// imported. Otherwise, this returns null.
+  ClassDecl *getFunctionQuoteDecl(unsigned n) const;
 
   /// Retrieve the type Swift.Never.
   CanType getNeverType() const;

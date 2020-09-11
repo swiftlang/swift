@@ -1157,7 +1157,9 @@ PRODUCTS=(llvm)
 # llbuild and XCTest depend on Foundation, so Foundation must
 # be added to the list of build products first.
 [[ "${SKIP_BUILD_FOUNDATION}" ]] || PRODUCTS+=(foundation)
-[[ "${SKIP_BUILD_STATIC_FOUNDATION}" ]] || PRODUCTS+=(foundation_static)
+# SWIFT_ENABLE_TENSORFLOW
+# TODO(TF-490): Reenable this.
+# [[ "${SKIP_BUILD_STATIC_FOUNDATION}" ]] || PRODUCTS+=(foundation_static)
 [[ "${SKIP_BUILD_LLBUILD}" ]] || PRODUCTS+=(llbuild)
 [[ "${SKIP_BUILD_XCTEST}" ]] || PRODUCTS+=(xctest)
 
@@ -1795,6 +1797,10 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_TOOLS_ENABLE_LTO:STRING="${SWIFT_TOOLS_ENABLE_LTO}"
                     -DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER:BOOL=$(true_false "${BUILD_RUNTIME_WITH_HOST_COMPILER}")
                     -DLIBDISPATCH_CMAKE_BUILD_TYPE:STRING="${LIBDISPATCH_BUILD_TYPE}"
+                    # SWIFT_ENABLE_TENSORFLOW
+                    # CMake options specific to `tensorflow` branch here.
+                    -DSWIFT_ENABLE_TENSORFLOW:BOOL=TRUE
+                    # SWIFT_ENABLE_TENSORFLOW END
                     "${swift_cmake_options[@]}"
                 )
 
@@ -2543,7 +2549,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 with_pushd ${lldb_build_dir} \
                     call ${NINJA_BIN} -j ${BUILD_JOBS} lldb-test-deps
                 with_pushd ${results_dir} \
-                    call "${llvm_build_dir}/bin/llvm-lit" \
+                    call "/usr/bin/env" "python3" "${llvm_build_dir}/bin/llvm-lit" \
                          "${lldb_build_dir}/test" \
                          ${LLVM_LIT_ARGS} ${LLVM_LIT_FILTER_ARG}
                 echo "--- Rerun LLDB Swift tests (using only DWARFImporter) ---"
@@ -2558,7 +2564,8 @@ for host in "${ALL_HOSTS[@]}"; do
                          "${LLDB_TEST_SWIFT_COMPATIBILITY}"
                     DOTEST_ARGS="-G swift-history --swift-compiler \"${LLDB_TEST_SWIFT_COMPATIBILITY}\""
                     with_pushd ${results_dir} \
-                       call "${llvm_build_dir}/bin/llvm-lit" \
+                       # SWIFT_ENABLE_TENSORFLOW: use python3 to launch llvm-lit below.
+                       call "/usr/bin/env" "python3" "${llvm_build_dir}/bin/llvm-lit" \
                             "${lldb_build_dir}/test" \
                             ${LLVM_LIT_ARGS} \
                             --param dotest-args="${DOTEST_ARGS}" \
@@ -2739,6 +2746,10 @@ for host in "${ALL_HOSTS[@]}"; do
 
         echo "--- Running tests for ${product} ---"
         for target in "${results_targets[@]}"; do
+            # TODO (TF-1045): Ninja/Build/strip-colors.ninja in llbuild tests is spuriously failing
+            if [[ "${product}" == "llbuild" ]]; then
+                continue
+            fi
             if [[ "${target}" != "" ]]; then
                 echo "--- ${target} ---"
                 trap "tests_busted ${product} '(${target})'" ERR

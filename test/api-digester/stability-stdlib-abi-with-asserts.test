@@ -1,3 +1,11 @@
+// SWIFT_ENABLE_TENSORFLOW
+// Note: this test is disabled on `tensorflow` branch because `tensorflow`
+// branch adds various public APIs to the stdlib without `@available`
+// attributes. These APIs should ideally be removed over time, or upstreamed to
+// `master` branch.
+// UNSUPPORTED: tensorflow
+// SWIFT_ENABLE_TENSORFLOW END
+
 // Welcome, Build Wrangler!
 //
 // A failure in this test indicates that there is a potential ABI breaking

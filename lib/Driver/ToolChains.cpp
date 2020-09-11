@@ -272,6 +272,11 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
                        options::OPT_enable_direct_intramodule_dependencies,
                        options::OPT_disable_direct_intramodule_dependencies);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  inputArgs.AddLastArg(
+      arguments, options::OPT_enable_experimental_forward_mode_differentiation);
+  // SWIFT_ENABLE_TENSORFLOW END
+  
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
 

@@ -1765,5 +1765,22 @@ ERROR(expected_closure_literal,none,
 ERROR(expected_multiple_closures_block_rbrace,none,
       "expected '}' at the end of a trailing closures block", ())
 
+// SWIFT_ENABLE_TENSORFLOW
+ERROR(sil_const_expected_int_datatype,PointsToFirstBadToken,
+      "expected integer datatype ('i[0-9]+', e.g. 'i32')", ())
+ERROR(sil_const_expected_int_value,PointsToFirstBadToken,
+      "expected integer value in SIL constant value", ())
+ERROR(sil_const_expected_fp_datatype,PointsToFirstBadToken,
+      "expected floating point datatype ('f32' or 'f64')", ())
+ERROR(sil_const_expected_fp_value,PointsToFirstBadToken,
+      "expected floating point value in SIL constant value", ())
+ERROR(sil_const_array_expected_rsquare,PointsToFirstBadToken,
+      "expected ']' at end of array 'SymbolicValue'", ())
+ERROR(sil_const_aggregate_expected_rparen,PointsToFirstBadToken,
+      "expected ')' at end of aggregate 'SymbolicValue'", ())
+ERROR(sil_const_expected_fn_sub_conv,PointsToFirstBadToken,
+      "expected '(N)' or '(W)' function substitution convention", ())
+// SWIFT_ENABLE_TENSORFLOW END
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

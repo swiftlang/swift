@@ -10,7 +10,7 @@
 // ARGS: -- a b c
 
 // RUN: %swift_driver -### -parse-stdlib %s | %FileCheck -check-prefix PARSE_STDLIB %s
-// RUN: %swift_driver -### -parse-stdlib | %FileCheck -check-prefix PARSE_STDLIB %s
+// SWIFT_ENABLE_TENSORFLOW: REPL is disabled in tensorflow branch.
 // PARSE_STDLIB: -parse-stdlib
 
 

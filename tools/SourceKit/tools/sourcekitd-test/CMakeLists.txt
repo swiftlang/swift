@@ -7,6 +7,10 @@ add_sourcekit_executable(sourcekitd-test
   TestOptions.cpp
   LLVM_LINK_COMPONENTS option coverage lto
 )
+# SWIFT_ENABLE_TENSORFLOW
+target_compile_definitions(sourcekitd-test PRIVATE
+    $<$<BOOL:${SWIFT_USE_SOURCEKIT_INPROC_LIBRARY}>:SWIFT_SOURCEKIT_USE_INPROC_LIBRARY>)
+# SWIFT_ENABLE_TENSORFLOW END
 target_link_libraries(sourcekitd-test PRIVATE
   SourceKitSupport
   clangRewrite

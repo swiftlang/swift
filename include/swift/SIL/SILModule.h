@@ -143,6 +143,9 @@ private:
   friend SILProperty;
   friend SILUndef;
   friend SILWitnessTable;
+  // SWIFT_ENABLE_TENSORFLOW
+  friend SILDifferentiabilityWitness;
+  // SWIFT_ENABLE_TENSORFLOW END
   friend Lowering::SILGenModule;
   friend Lowering::TypeConverter;
   class SerializationCallback;

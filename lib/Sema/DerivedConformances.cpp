@@ -83,6 +83,29 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
   if (*derivableKind == KnownDerivableProtocolKind::Differentiable)
     return true;
 
+  // SWIFT_ENABLE_TENSORFLOW
+  if (*derivableKind == KnownDerivableProtocolKind::PointwiseMultiplicative)
+    return canDerivePointwiseMultiplicative(Nominal, DC);
+
+  if (*derivableKind == KnownDerivableProtocolKind::ElementaryFunctions)
+    return canDeriveElementaryFunctions(Nominal, DC);
+
+  if (*derivableKind == KnownDerivableProtocolKind::KeyPathIterable)
+    return canDeriveKeyPathIterable(Nominal);
+
+  if (*derivableKind == KnownDerivableProtocolKind::TensorArrayProtocol)
+    return canDeriveTensorArrayProtocol(Nominal, DC);
+
+  if (*derivableKind == KnownDerivableProtocolKind::TensorGroup)
+    return canDeriveTensorGroup(Nominal, DC);
+
+  if (*derivableKind == KnownDerivableProtocolKind::VectorProtocol)
+    return canDeriveVectorProtocol(Nominal, DC);
+
+  if (*derivableKind == KnownDerivableProtocolKind::EuclideanDifferentiable)
+    return canDeriveEuclideanDifferentiable(Nominal, DC);
+  // SWIFT_ENABLE_TENSORFLOW END
+
   if (auto *enumDecl = dyn_cast<EnumDecl>(Nominal)) {
     switch (*derivableKind) {
         // The presence of a raw type is an explicit declaration that
@@ -268,7 +291,10 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
 
   // Local function that retrieves the requirement with the same name as
   // the provided requirement, but within the given known protocol.
-  auto getRequirement = [&](KnownProtocolKind kind) -> ValueDecl * {
+  // SWIFT_ENABLE_TENSORFLOW
+  auto getRequirement = [&](KnownProtocolKind kind,
+                            llvm::function_ref<bool(ValueDecl *)> filter =
+                                nullptr) -> ValueDecl * {
     // Dig out the protocol.
     auto proto = ctx.getProtocol(kind);
     if (!proto) return nullptr;
@@ -283,6 +309,17 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     }
 
     // Retrieve the requirement.
+    // SWIFT_ENABLE_TENSORFLOW
+    // Filter requirements, if `filter` function is specified.
+    if (filter) {
+      auto results = proto->lookupDirect(name);
+      llvm::erase_if(results, [&](ValueDecl *v) {
+        return !isa<ProtocolDecl>(v->getDeclContext()) ||
+               !v->isProtocolRequirement() || !filter(v);
+      });
+      return results.empty() ? nullptr : results.front();
+    }
+    // SWIFT_ENABLE_TENSORFLOW END
     return proto->getSingleRequirement(name);
   };
 
@@ -319,6 +356,36 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     // AdditiveArithmetic.zero
     if (name.isSimpleName(ctx.Id_zero))
       return getRequirement(KnownProtocolKind::AdditiveArithmetic);
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // EuclideanDifferentiable.differentiableVectorView
+    if (name.isSimpleName(ctx.Id_differentiableVectorView))
+      return getRequirement(KnownProtocolKind::EuclideanDifferentiable);
+
+    // PointwiseMultiplicative.one
+    if (name.isSimpleName(ctx.Id_one))
+      return getRequirement(KnownProtocolKind::PointwiseMultiplicative);
+
+    // PointwiseMultiplicative.reciprocal
+    if (name.isSimpleName(ctx.Id_reciprocal))
+      return getRequirement(KnownProtocolKind::PointwiseMultiplicative);
+
+    // KeyPathIterable.allKeyPaths
+    if (name.isSimpleName(ctx.Id_allKeyPaths))
+      return getRequirement(KnownProtocolKind::KeyPathIterable);
+
+    // TensorArrayProtocol._tensorHandleCount
+    if (name.isSimpleName(ctx.Id_tensorHandleCount))
+      return getRequirement(KnownProtocolKind::TensorArrayProtocol);
+
+    // TensorArrayProtocol._typeList
+    if (name.isSimpleName(ctx.Id_typeList) && !requirement->isStatic())
+      return getRequirement(KnownProtocolKind::TensorArrayProtocol);
+
+    // TensorGroup._typeList
+    if (name.isSimpleName(ctx.Id_typeList))
+      return getRequirement(KnownProtocolKind::TensorGroup);
+    // SWIFT_ENABLE_TENSORFLOW END
 
     return nullptr;
   }
@@ -359,6 +426,94 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
         return getRequirement(KnownProtocolKind::Hashable);
     }
 
+    // SWIFT_ENABLE_TENSORFLOW
+    // AdditiveArithmetic.+
+    // AdditiveArithmetic.-
+    if (func->isOperator() && (name.getBaseName() == "+" ||
+                               name.getBaseName() == "-")) {
+      auto argumentNames = name.getArgumentNames();
+      if (argumentNames.size() == 2)
+        return getRequirement(KnownProtocolKind::AdditiveArithmetic);
+    }
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // PointwiseMultiplicative.(.*)
+    if (func->isOperator() && name.getBaseName() == ".*") {
+      auto argumentNames = name.getArgumentNames();
+      if (argumentNames.size() == 2)
+        return getRequirement(KnownProtocolKind::PointwiseMultiplicative);
+    }
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // ElementaryFunctions requirements
+    if (name.isCompoundName()) {
+      auto argumentNames = name.getArgumentNames();
+      if (argumentNames.size() == 1 && (false
+#define ELEMENTARY_FUNCTION_UNARY(ID, NAME) || name.getBaseName() == NAME
+#include "DerivedConformanceElementaryFunctions.def"
+#undef ELEMENTARY_FUNCTION_UNARY
+                                        )) {
+        return getRequirement(KnownProtocolKind::ElementaryFunctions);
+      }
+      if (argumentNames.size() == 2) {
+        if (name.getBaseName() == "root")
+          return getRequirement(KnownProtocolKind::ElementaryFunctions);
+        if (name.getBaseName() == "pow") {
+          return getRequirement(
+              KnownProtocolKind::ElementaryFunctions,
+              [&](ValueDecl *v) {
+                auto *funcDecl = dyn_cast<FuncDecl>(v);
+                if (!funcDecl)
+                  return false;
+                return funcDecl->getParameters()->get(1)->getName() ==
+                       func->getParameters()->get(1)->getName();
+              });
+        }
+      }
+    }
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // VectorProtocol.scaled(by:)
+    if (name.isCompoundName() && name.getBaseName() == ctx.Id_scaled) {
+      auto argumentNames = name.getArgumentNames();
+      if (argumentNames.size() == 1 &&
+          argumentNames[0] == ctx.getIdentifier("by"))
+        return getRequirement(KnownProtocolKind::VectorProtocol);
+    }
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // VectorProtocol.adding(_:)
+    // VectorProtocol.subtracting(_:)
+    if (name.isCompoundName() &&
+        (name.getBaseName() == ctx.Id_adding ||
+         name.getBaseName() == ctx.Id_subtracting)) {
+      auto argumentNames = name.getArgumentNames();
+      if (argumentNames.size() == 1 && argumentNames[0].empty())
+        return getRequirement(KnownProtocolKind::VectorProtocol);
+    }
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // TensorArrayProtocol._unpackTensorHandles(into:)
+    if (name.isCompoundName() &&
+        name.getBaseName() == ctx.Id_unpackTensorHandles) {
+      auto argumentNames = name.getArgumentNames();
+      if (argumentNames.size() == 1 &&
+          argumentNames[0] == ctx.getIdentifier("into")) {
+        return getRequirement(KnownProtocolKind::TensorArrayProtocol);
+      }
+    }
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // Differentiable.move(along:)
+    if (name.isCompoundName() &&
+        name.getBaseName() == ctx.Id_move) {
+      auto argumentNames = name.getArgumentNames();
+      if (argumentNames.size() == 1 &&
+          argumentNames[0] == ctx.getIdentifier("along")) {
+        return getRequirement(KnownProtocolKind::Differentiable);
+      }
+    }
+
     return nullptr;
   }
 
@@ -379,6 +534,19 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
       // Decodable.init(from: Decoder)
       if (argumentNames[0] == ctx.Id_from)
         return getRequirement(KnownProtocolKind::Decodable);
+
+      // SWIFT_ENABLE_TENSORFLOW
+      // TensorGroup.init(_owning:)
+      if (argumentNames[0] == ctx.getIdentifier("_owning")) {
+        return getRequirement(KnownProtocolKind::TensorGroup);
+      }
+    } else if (argumentNames.size() == 2) {
+      // SWIFT_ENABLE_TENSORFLOW
+      // TensorArrayProtocol.init(_owning:count)
+      if (argumentNames[0] == ctx.getIdentifier("_owning") &&
+          argumentNames[1] == ctx.getIdentifier("count")) {
+        return getRequirement(KnownProtocolKind::TensorArrayProtocol);
+      }
     }
 
     return nullptr;
@@ -397,6 +565,16 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     // Differentiable.TangentVector
     if (name.isSimpleName(ctx.Id_TangentVector))
       return getRequirement(KnownProtocolKind::Differentiable);
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // KeyPathIterable.AllKeyPaths
+    if (name.isSimpleName(ctx.Id_AllKeyPaths))
+      return getRequirement(KnownProtocolKind::KeyPathIterable);
+
+    // VectorProtocol.VectorSpaceScalar
+    if (name.isSimpleName(ctx.Id_VectorSpaceScalar))
+      return getRequirement(KnownProtocolKind::VectorProtocol);
+    // SWIFT_ENABLE_TENSORFLOW END
 
     return nullptr;
   }
@@ -447,6 +625,60 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
   return getterDecl;
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+std::pair<AccessorDecl *, AccessorDecl *>
+DerivedConformance::addGetterAndSetterToMutableDerivedProperty(
+    VarDecl *property, Type propertyContextType) {
+  auto *getter = declareDerivedPropertyGetter(property, propertyContextType);
+  auto *setter = declareDerivedPropertySetter(property, propertyContextType);
+  property->setImplInfo(StorageImplInfo::getMutableComputed());
+  property->setAccessors(SourceLoc(), {getter, setter}, SourceLoc());
+  return std::make_pair(getter, setter);
+}
+// SWIFT_ENABLE_TENSORFLOW END
+
+// SWIFT_ENABLE_TENSORFLOW
+AccessorDecl *
+DerivedConformance::declareDerivedPropertySetter(VarDecl *property,
+                                                 Type propertyContextType) {
+  bool isStatic = property->isStatic();
+  bool isFinal = property->isFinal();
+
+  auto &C = property->getASTContext();
+  auto parentDC = property->getDeclContext();
+
+  auto propertyInterfaceType = property->getInterfaceType();
+  auto propertyParam = new (C) ParamDecl(SourceLoc(), SourceLoc(), Identifier(),
+              property->getLoc(), C.getIdentifier("newValue"), parentDC);
+  propertyParam->setSpecifier(ParamDecl::Specifier::Default);
+  propertyParam->setInterfaceType(propertyInterfaceType);
+
+  ParameterList *params = ParameterList::create(C, propertyParam);
+
+  auto setterDecl = AccessorDecl::create(C,
+    /*FuncLoc*/ SourceLoc(), /*AccessorKeywordLoc*/ SourceLoc(),
+    AccessorKind::Set, property, /*StaticLoc*/ SourceLoc(),
+    StaticSpellingKind::None, /*Throws*/ false, /*ThrowsLoc*/ SourceLoc(),
+    /*GenericParams*/ nullptr, params, propertyInterfaceType, parentDC);
+  setterDecl->setImplicit();
+  setterDecl->setStatic(isStatic);
+  // Set mutating if parent is not a class.
+  if (!parentDC->getSelfClassDecl())
+    setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
+
+  // If this is supposed to be a final method, mark it as such.
+  assert(isFinal || !parentDC->getSelfClassDecl());
+  if (isFinal && parentDC->getSelfClassDecl() &&
+      !setterDecl->isFinal())
+    setterDecl->getAttrs().add(new (C) FinalAttr(/*Implicit*/ true));
+
+  // Compute the interface type of the setter.
+  setterDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
+  setterDecl->copyFormalAccessFrom(property);
+
+  return setterDecl;
+}
+
 std::pair<VarDecl *, PatternBindingDecl *>
 DerivedConformance::declareDerivedProperty(Identifier name,
                                            Type propertyInterfaceType,
@@ -457,6 +689,10 @@ DerivedConformance::declareDerivedProperty(Identifier name,
   VarDecl *propDecl = new (Context)
       VarDecl(/*IsStatic*/ isStatic, VarDecl::Introducer::Var,
               /*IsCaptureList*/ false, SourceLoc(), name, parentDC);
+  // SWIFT_ENABLE_TENSORFLOW
+  // TODO: Upstream this change to master.
+  if (isFinal && parentDC->getSelfClassDecl())
+    propDecl->getAttrs().add(new (Context) FinalAttr(/*Implicit*/ true));
   propDecl->setImplicit();
   propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyInterfaceType);

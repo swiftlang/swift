@@ -115,10 +115,10 @@ enum CustomTangentVectorEnum<T: Differentiable>: Differentiable {
 // CHECK-NEXT: sil hidden [_semantics "autodiff.nonvarying"] [ossa] @${{.*}}MemberwiseTangentVectorStructV0bgH11InitializerAC0gH0Vycvg : $@convention(method) (MemberwiseTangentVectorStruct) -> @owned @callee_guaranteed () -> MemberwiseTangentVectorStruct.TangentVector {
 // CHECK: bb0([[SELF:%.*]] : $MemberwiseTangentVectorStruct):
 // CHECK:   [[X_PROP:%.*]] = struct_extract [[SELF]] : $MemberwiseTangentVectorStruct, #MemberwiseTangentVectorStruct.x
-// CHECK:   [[X_ZERO_INIT_FN:%.*]] = function_ref @$sSf{{.*}}E28zeroTangentVectorInitializerSfycvg : $@convention(method) (Float) -> @owned @callee_guaranteed () -> Float
+// CHECK:   [[X_ZERO_INIT_FN:%.*]] = function_ref @$sSf{{.*}}28zeroTangentVectorInitializerSfycvg : $@convention(method) (Float) -> @owned @callee_guaranteed () -> Float
 // CHECK:   [[X_ZERO_INIT:%.*]] = apply [[X_ZERO_INIT_FN]]([[X_PROP]])
 // CHECK:   [[Y_PROP:%.*]] = struct_extract [[SELF]] : $MemberwiseTangentVectorStruct, #MemberwiseTangentVectorStruct.y
-// CHECK:   [[Y_ZERO_INIT_FN:%.*]] = function_ref @$sSd{{.*}}E28zeroTangentVectorInitializerSdycvg : $@convention(method) (Double) -> @owned @callee_guaranteed () -> Double
+// CHECK:   [[Y_ZERO_INIT_FN:%.*]] = function_ref @$sSd{{.*}}28zeroTangentVectorInitializerSdycvg : $@convention(method) (Double) -> @owned @callee_guaranteed () -> Double
 // CHECK:   [[Y_ZERO_INIT:%.*]] = apply [[Y_ZERO_INIT_FN]]([[Y_PROP]])
 // CHECK:   // function_ref closure #1 in MemberwiseTangentVectorStruct.zeroTangentVectorInitializer.getter
 // CHECK:   [[CLOSURE_FN:%.*]] = function_ref @${{.*}}MemberwiseTangentVectorStructV0bgH11InitializerAC0gH0VycvgAFycfU_
@@ -132,10 +132,10 @@ enum CustomTangentVectorEnum<T: Differentiable>: Differentiable {
 // CHECK-NEXT: sil hidden [_semantics "autodiff.nonvarying"] [ossa] @${{.*}}SelfTangentVectorStructV0bgH11InitializerACycvg : $@convention(method) (SelfTangentVectorStruct) -> @owned @callee_guaranteed () -> SelfTangentVectorStruct {
 // CHECK: bb0([[SELF:%.*]] : $SelfTangentVectorStruct):
 // CHECK:   [[X_PROP:%.*]] = struct_extract [[SELF]] : $SelfTangentVectorStruct, #SelfTangentVectorStruct.x
-// CHECK:   [[X_ZERO_INIT_FN:%.*]] = function_ref @$sSf{{.*}}E28zeroTangentVectorInitializerSfycvg : $@convention(method) (Float) -> @owned @callee_guaranteed () -> Float
+// CHECK:   [[X_ZERO_INIT_FN:%.*]] = function_ref @$sSf{{.*}}28zeroTangentVectorInitializerSfycvg : $@convention(method) (Float) -> @owned @callee_guaranteed () -> Float
 // CHECK:   [[X_ZERO_INIT:%.*]] = apply [[X_ZERO_INIT_FN]]([[X_PROP]])
 // CHECK:   [[Y_PROP:%.*]] = struct_extract [[SELF]] : $SelfTangentVectorStruct, #SelfTangentVectorStruct.y
-// CHECK:   [[Y_ZERO_INIT_FN:%.*]] = function_ref @$sSd{{.*}}E28zeroTangentVectorInitializerSdycvg : $@convention(method) (Double) -> @owned @callee_guaranteed () -> Double
+// CHECK:   [[Y_ZERO_INIT_FN:%.*]] = function_ref @$sSd{{.*}}28zeroTangentVectorInitializerSdycvg : $@convention(method) (Double) -> @owned @callee_guaranteed () -> Double
 // CHECK:   [[Y_ZERO_INIT:%.*]] = apply [[Y_ZERO_INIT_FN]]([[Y_PROP]])
 // CHECK:   // function_ref closure #1 in SelfTangentVectorStruct.zeroTangentVectorInitializer.getter
 // CHECK:   [[CLOSURE_FN:%.*]] = function_ref @${{.*}}SelfTangentVectorStructV0bgH11InitializerACycvgACycfU_
@@ -157,11 +157,11 @@ enum CustomTangentVectorEnum<T: Differentiable>: Differentiable {
 // CHECK: bb0([[SELF:%.*]] : @guaranteed $MemberwiseTangentVectorClass):
 // CHECK:   [[X_PROP_METHOD:%.*]] = class_method [[SELF]] : $MemberwiseTangentVectorClass, #MemberwiseTangentVectorClass.x!getter
 // CHECK:   [[X_PROP:%.*]] = apply [[X_PROP_METHOD]]([[SELF]])
-// CHECK:   [[X_ZERO_INIT_FN:%.*]] = function_ref @$sSf{{.*}}E28zeroTangentVectorInitializerSfycvg : $@convention(method) (Float) -> @owned @callee_guaranteed () -> Float
+// CHECK:   [[X_ZERO_INIT_FN:%.*]] = function_ref @$sSf{{.*}}28zeroTangentVectorInitializerSfycvg : $@convention(method) (Float) -> @owned @callee_guaranteed () -> Float
 // CHECK:   [[X_ZERO_INIT:%.*]] = apply [[X_ZERO_INIT_FN]]([[X_PROP]])
 // CHECK:   [[Y_PROP_METHOD:%.*]] = class_method [[SELF]] : $MemberwiseTangentVectorClass, #MemberwiseTangentVectorClass.y!getter
 // CHECK:   [[Y_PROP:%.*]] = apply [[Y_PROP_METHOD]]([[SELF]])
-// CHECK:   [[Y_ZERO_INIT_FN:%.*]] = function_ref @$sSd{{.*}}E28zeroTangentVectorInitializerSdycvg : $@convention(method) (Double) -> @owned @callee_guaranteed () -> Double
+// CHECK:   [[Y_ZERO_INIT_FN:%.*]] = function_ref @$sSd{{.*}}28zeroTangentVectorInitializerSdycvg : $@convention(method) (Double) -> @owned @callee_guaranteed () -> Double
 // CHECK:   [[Y_ZERO_INIT:%.*]] = apply [[Y_ZERO_INIT_FN]]([[Y_PROP]])
 // CHECK:   // function_ref closure #1 in MemberwiseTangentVectorClass.zeroTangentVectorInitializer.getter
 // CHECK:   [[CLOSURE_FN:%.*]] = function_ref @${{.*}}MemberwiseTangentVectorClassC0bgH11InitializerAC0gH0VycvgAFycfU_

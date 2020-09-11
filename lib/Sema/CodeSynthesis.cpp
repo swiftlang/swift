@@ -1305,6 +1305,10 @@ ResolveEffectiveMemberwiseInitRequest::evaluate(Evaluator &evaluator,
       continue;
     assert(!memberwiseInitDecl && "Memberwise initializer already found");
     memberwiseInitDecl = initDecl;
+    // Overwrite access level only  for implicit initializers, not user-defined
+    // initializers.
+    if (memberwiseInitDecl->isImplicit())
+      memberwiseInitDecl->overwriteAccess(accessLevel);
   }
 
   // Otherwise, create a memberwise initializer, set its access level, and

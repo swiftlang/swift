@@ -1725,6 +1725,13 @@ public:
     return BuiltinVectorType::get(Context, eltType, width);
   }
 
+  /// Create a vector type.
+  Type makeVector(Type eltType, llvm::ElementCount width) {
+    // Need an actual element count
+    assert(!width.Scalable);
+    return makeVector(eltType, width.Min);
+  }
+
   /// Return the first type or, if the second type is a vector type, a vector
   /// of the first type of the same length as the second type.
   Type maybeMakeVectorized(Type eltType, Type maybeVectorType) {
@@ -2155,7 +2162,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
       return nullptr;
     return getLinearFunctionConstructor(Context, Id, arity, throws);
   }
-
   auto BV = llvm::StringSwitch<BuiltinValueKind>(OperationName)
 #define BUILTIN(id, name, Attrs) .Case(name, BuiltinValueKind::id)
 #include "swift/AST/Builtins.def"

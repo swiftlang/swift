@@ -337,7 +337,6 @@ SYNTAX_TOKENS = [
          text=')', classification='StringInterpolationAnchor',
          serialization_code=101),
     Misc('Yield', 'kw_yield', serialization_code=116, text='yield'),
-
 ]
 
 SYNTAX_TOKEN_MAP = {token.name + 'Token': token for token in SYNTAX_TOKENS}

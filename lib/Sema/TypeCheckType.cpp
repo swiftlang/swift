@@ -3110,7 +3110,6 @@ SILParameterInfo TypeResolver::resolveSILParameter(
       attrs.clearAttribute(TAK_noDerivative);
       differentiability = SILParameterDifferentiability::NotDifferentiable;
     }
-
     type = resolveAttributedType(attrs, attrRepr->getTypeRepr(), options);
   } else {
     type = resolveType(repr, options);

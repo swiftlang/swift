@@ -16,6 +16,9 @@
 
 #define DEBUG_TYPE "differentiation"
 
+#include "llvm/ADT/APSInt.h"
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/Support/CommandLine.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/AnyFunctionRef.h"
@@ -35,6 +38,7 @@
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/TypeSubstCloner.h"
+#include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
 #include "swift/SILOptimizer/Differentiation/JVPCloner.h"
@@ -1414,7 +1418,7 @@ void Differentiation::run() {
                           diag::autodiff_internal_swift_not_imported);
     return;
   }
-  if (!astCtx.getLoadedModule(astCtx.Id_Differentiation)) {
+  if (!astCtx.getProtocol(KnownProtocolKind::Differentiable)) {
     SourceLoc loc;
     if (!context.getInvokers().empty()) {
       loc = context.getInvokers().front().second.getLocation();

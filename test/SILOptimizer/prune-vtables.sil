@@ -1,5 +1,6 @@
 // RUN: %target-sil-opt -prune-vtables %s | %FileCheck --check-prefix=NOWMO %s
 // RUN: %target-sil-opt -wmo -prune-vtables %s | %FileCheck --check-prefix=WMO %s
+// UNSUPPORTED: tensorflow
 
 sil_stage canonical
 

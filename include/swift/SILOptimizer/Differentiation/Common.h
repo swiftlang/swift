@@ -21,6 +21,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/SIL/SILDifferentiabilityWitness.h"
+#include "swift/SIL/SILType.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeSubstCloner.h"

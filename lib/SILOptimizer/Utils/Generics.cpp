@@ -536,6 +536,20 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
     return false;
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  // Disable specialization for instructions that are operands of
+  // `differentiable_function` instructions. `differentiable_function`
+  // requires derivative function operand types to match expected derivative
+  // function types computed from the original function operand's type, so
+  // operands cannot be specialized individually without specializing the
+  // others.
+  if (Apply.getInstruction())
+    for (auto result : Apply.getInstruction()->getResults())
+      for (auto use : result->getUses())
+        if (isa<DifferentiableFunctionInst>(use->getUser()))
+          return false;
+  // SWIFT_ENABLE_TENSORFLOW END
+
   return true;
 }
 

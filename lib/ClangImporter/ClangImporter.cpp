@@ -629,6 +629,21 @@ importer::getNormalInvocationArguments(
     }
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  // Include platform-specific standard library modulemaps.
+  SmallString<128> platformSpecificModuleMapDir;
+  platformSpecificModuleMapDir = searchPathOpts.RuntimeResourcePath;
+  llvm::sys::path::append(
+    platformSpecificModuleMapDir,
+    swift::getPlatformNameForTriple(triple),
+    swift::getMajorArchitectureName(triple),
+    "modulemaps");
+  if (llvm::sys::fs::exists(platformSpecificModuleMapDir)) {
+    invocationArgStrs.push_back("-I");
+    invocationArgStrs.push_back(
+      std::string(platformSpecificModuleMapDir.str()));
+  }
+
   if (searchPathOpts.SDKPath.empty()) {
     invocationArgStrs.push_back("-Xclang");
     invocationArgStrs.push_back("-nostdsysteminc");
@@ -1059,10 +1074,22 @@ ClangImporter::create(ASTContext &ctx,
 
   // Set up the file manager.
   {
+    // SWIFT_ENABLE_TENSORFLOW
+    auto clangFileSystem = ctx.SourceMgr.getFileSystem();
+    if (importerOpts.InMemoryOutputFileSystem) {
+      instance.setInMemoryOutputFileSystem(
+          importerOpts.InMemoryOutputFileSystem);
+      llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> overlayFileSystem(
+            new llvm::vfs::OverlayFileSystem(clangFileSystem));
+      overlayFileSystem->pushOverlay(importerOpts.InMemoryOutputFileSystem);
+      clangFileSystem = overlayFileSystem;
+    }
+    // TODO(asuhan): Check this, CompilerInstance::setVirtualFileSystem removed in
+    // https://github.com/apple/swift-clang/commit/5f92395a7e64526f6f94f31a9d143f81a69e9209.
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS =
         clang::createVFSFromCompilerInvocation(instance.getInvocation(),
                                                instance.getDiagnostics(),
-                                               ctx.SourceMgr.getFileSystem());
+                                               clangFileSystem);
     instance.createFileManager(std::move(VFS));
   }
 

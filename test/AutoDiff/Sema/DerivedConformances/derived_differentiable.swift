@@ -70,7 +70,9 @@ public struct FrozenStruct: Differentiable {}
 
 // CHECK-AST-LABEL: @frozen public struct FrozenStruct : Differentiable {
 // CHECK-AST:   internal init()
-// CHECK-AST:   @frozen public struct TangentVector : Differentiable, AdditiveArithmetic {
+// SWIFT_ENABLE_TENSORFLOW
+// CHECK-AST:   @frozen public struct TangentVector : Differentiable, AdditiveArithmetic, PointwiseMultiplicative, ElementaryFunctions {
+// SWIFT_ENABLE_TENSORFLOW END
 
 @usableFromInline
 struct UsableFromInlineStruct: Differentiable {}
@@ -79,7 +81,9 @@ struct UsableFromInlineStruct: Differentiable {}
 // CHECK-AST: struct UsableFromInlineStruct : Differentiable {
 // CHECK-AST:   internal init()
 // CHECK-AST:   @usableFromInline
-// CHECK-AST:   struct TangentVector : Differentiable, AdditiveArithmetic {
+// SWIFT_ENABLE_TENSORFLOW
+// CHECK-AST:   struct TangentVector : Differentiable, AdditiveArithmetic, PointwiseMultiplicative, ElementaryFunctions {
+// SWIFT_ENABLE_TENSORFLOW END
 
 // Test property wrappers.
 
@@ -96,7 +100,7 @@ struct WrappedPropertiesStruct: Differentiable {
 }
 
 // CHECK-AST-LABEL: internal struct WrappedPropertiesStruct : Differentiable {
-// CHECK-AST:   internal struct TangentVector : Differentiable, AdditiveArithmetic {
+// CHECK-AST:   internal struct TangentVector : Differentiable, AdditiveArithmetic, ElementaryFunctions, VectorProtocol {
 // CHECK-AST:     internal var x: Float.TangentVector
 // CHECK-AST:     internal var y: Float.TangentVector
 // CHECK-AST:     internal var z: Float.TangentVector
@@ -111,7 +115,7 @@ class WrappedPropertiesClass: Differentiable {
 }
 
 // CHECK-AST-LABEL: internal class WrappedPropertiesClass : Differentiable {
-// CHECK-AST:   internal struct TangentVector : Differentiable, AdditiveArithmetic {
+// CHECK-AST:   internal struct TangentVector : Differentiable, AdditiveArithmetic, ElementaryFunctions, VectorProtocol {
 // CHECK-AST:     internal var x: Float.TangentVector
 // CHECK-AST:     internal var y: Float.TangentVector
 // CHECK-AST:     internal var z: Float.TangentVector

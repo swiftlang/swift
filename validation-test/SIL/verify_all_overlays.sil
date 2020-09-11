@@ -1,0 +1,7 @@
+// TODO(SR-9715): Fix this and re-enable.
+// RUN: echo "disabled"
+
+// CHECK-NOT: Unknown
+
+// REQUIRES: long_test
+// REQUIRES: nonexecutable_test

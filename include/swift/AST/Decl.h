@@ -3502,6 +3502,20 @@ public:
   /// Retrieve information about this type as a property wrapper.
   PropertyWrapperTypeInfo getPropertyWrapperTypeInfo() const;
 
+private:
+  /// Predicate used to filter StoredPropertyRange.
+  struct ToStoredProperty {
+    ToStoredProperty(bool skipInaccessible = false) :
+        skipUserInaccessible(skipInaccessible) {}
+    bool skipUserInaccessible;
+    Optional<VarDecl *> operator()(Decl *decl) const;
+  };
+  
+public:
+  /// A range for iterating the stored member variables of a structure.
+  using StoredPropertyRange = OptionalTransformRange<DeclRange,
+                                                     ToStoredProperty>;
+
   /// Return a collection of the stored member variables of this type.
   ArrayRef<VarDecl *> getStoredProperties() const;
 
@@ -4198,6 +4212,15 @@ enum class KnownDerivableProtocolKind : uint8_t {
   Decodable,
   AdditiveArithmetic,
   Differentiable,
+  // SWIFT_ENABLE_TENSORFLOW
+  PointwiseMultiplicative,
+  ElementaryFunctions,
+  KeyPathIterable,
+  TensorArrayProtocol,
+  TensorGroup,
+  VectorProtocol,
+  EuclideanDifferentiable,
+  // SWIFT_ENABLE_TENSORFLOW END
 };
 
 /// ProtocolDecl - A declaration of a protocol, for example:
@@ -6586,8 +6609,9 @@ AbstractStorageDecl::AccessorRecord::getAccessor(AccessorKind kind) const {
   
 /// This represents a 'case' declaration in an 'enum', which may declare
 /// one or more individual comma-separated EnumElementDecls.
-class EnumCaseDecl final : public Decl,
-    private llvm::TrailingObjects<EnumCaseDecl, EnumElementDecl *> {
+class EnumCaseDecl final
+    : public Decl,
+      private llvm::TrailingObjects<EnumCaseDecl, EnumElementDecl *> {
   friend TrailingObjects;
   friend class Decl;
   SourceLoc CaseLoc;

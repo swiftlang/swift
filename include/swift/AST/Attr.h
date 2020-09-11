@@ -51,6 +51,7 @@ class Decl;
 class AbstractFunctionDecl;
 class FuncDecl;
 class ClassDecl;
+class FuncDecl;
 class GenericFunctionType;
 class LazyConformanceLoader;
 class LazyMemberLoader;

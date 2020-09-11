@@ -10,10 +10,7 @@
 // -working-directory=
 // RUN: cd %t && %swiftc_driver -driver-print-jobs -working-directory=%S/Inputs -c %/S/Inputs/main.swift | %FileCheck %s -check-prefix=INPUT
 
-// In another driver mode.
-// RUN: cd %t && %swift_driver -driver-print-jobs -working-directory %/S/Inputs -F. | %FileCheck %s -check-prefix=REPL
-// RUN: cd %t && %swift_driver -driver-print-jobs -deprecated-integrated-repl -working-directory %/S/Inputs -F. | %FileCheck %s -check-prefix=REPL
-// REPL: -F {{\\?"?}}SOURCE_DIR/test/Driver/Inputs{{(\\\\(\\\\)?)|/}}.
+// SWIFT_ENABLE_TENSORFLOW: REPL is disabled in tensorflow branch.
 
 // RUN: cd %t && %swiftc_driver -driver-print-jobs -working-directory=%/S/Inputs -c -module-name m main.swift lib.swift | %FileCheck %s -check-prefix=MULTI_INPUT
 // MULTI_INPUT: SOURCE_DIR/test/Driver/Inputs{{/|\\\\}}main.swift

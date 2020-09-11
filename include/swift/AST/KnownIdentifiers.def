@@ -225,6 +225,35 @@ IDENTIFIER(TangentVector)
 IDENTIFIER(zero)
 IDENTIFIER(zeroTangentVectorInitializer)
 
+// SWIFT_ENABLE_TENSORFLOW
+IDENTIFIER(TensorFlow)
+// Module that supports #quote(...) literals.
+IDENTIFIER(Quote)
+// KeyPathIterable
+IDENTIFIER(AllKeyPaths)
+IDENTIFIER(allKeyPaths)
+IDENTIFIER(recursivelyAllKeyPaths)
+IDENTIFIER(allWritableKeyPaths)
+IDENTIFIER(recursivelyAllWritableKeyPaths)
+// TensorArrayProtocol
+IDENTIFIER_(unpackTensorHandles)
+IDENTIFIER_(tensorHandleCount)
+// TensorGroup
+IDENTIFIER_(typeList)
+// AdditiveArithmetic, PointwiseMultiplicative, VectorProtocol
+IDENTIFIER(one)
+IDENTIFIER(reciprocal)
+IDENTIFIER(VectorSpaceScalar)
+IDENTIFIER(adding)
+IDENTIFIER(subtracting)
+IDENTIFIER(scaled)
+IDENTIFIER(by)
+IDENTIFIER(scale)
+IDENTIFIER(x)
+// Differentiable
+IDENTIFIER(differentiableVectorView)
+// SWIFT_ENABLE_TENSORFLOW END
+
 #undef IDENTIFIER
 #undef IDENTIFIER_
 #undef IDENTIFIER_WITH_NAME

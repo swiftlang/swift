@@ -176,6 +176,10 @@ public:
 
   /// Promote memory to registers. Return True on change.
   bool run();
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Promote specific allocations.
+  void promoteAllocs(ArrayRef<AllocStackInst*> allocs);
 };
 
 } // end anonymous namespace
@@ -949,6 +953,26 @@ bool MemoryToRegisters::run() {
   }
   return Changed;
 }
+
+
+/// SWIFT_ENABLE_TENSORFLOW
+/// Promote specific allocations.
+void MemoryToRegisters::promoteAllocs(ArrayRef<AllocStackInst*> allocs) {
+  F.verifyCriticalEdges();
+
+  // Compute dominator tree node levels for the function.
+  DomTreeLevelMap DomTreeLevels;
+  computeDomTreeLevels(DT, DomTreeLevels);
+
+  for (auto alloc : allocs) {
+    if (!promoteSingleAllocation(alloc, DomTreeLevels))
+      continue;
+
+    if (alloc->use_empty())
+      alloc->eraseFromParent();
+  }
+}
+
 
 namespace {
 class SILMem2Reg : public SILFunctionTransform {

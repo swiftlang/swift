@@ -1288,16 +1288,14 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   // required by sourcekitd.
   subClangImporterOpts.DetailedPreprocessingRecord =
     clangImporterOpts.DetailedPreprocessingRecord;
-  // We need to add these extra clang flags because explict module building
-  // related flags are all there: -fno-implicit-modules, -fmodule-map-file=,
-  // and -fmodule-file=.
-  // If we don't add these flags, the interface will be built with implicit
-  // PCMs.
-  subClangImporterOpts.ExtraArgs = clangImporterOpts.ExtraArgs;
-  for (auto arg: subClangImporterOpts.ExtraArgs) {
-    GenericArgs.push_back("-Xcc");
-    GenericArgs.push_back(ArgSaver.save(arg));
-  }
+  // SWIFT_ENABLE_TENSORFLOW
+  // If the ClangModuleLoader is using an InMemoryOutputFileSystem, the
+  // subinstance loader should use it as well, as files written to the file
+  // system may not be visible to read, causing subinvocations to fail loading
+  // dependencies.
+  subClangImporterOpts.InMemoryOutputFileSystem =
+    clangImporterOpts.InMemoryOutputFileSystem;
+  // SWIFT_ENABLE_TENSORFLOW END
 
   // Tell the genericSubInvocation to serialize dependency hashes if asked to do so.
   auto &frontendOpts = genericSubInvocation.getFrontendOptions();

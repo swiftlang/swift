@@ -89,6 +89,11 @@ public:
     CodeCompletionOffset = Offset;
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  void clearCodeCompletionPoint() {
+    CodeCompletionBufferID = 0U;
+  }
+
   bool hasCodeCompletionBuffer() const {
     return CodeCompletionBufferID != 0U;
   }

@@ -2766,9 +2766,16 @@ namespace {
     Type visitCoerceExpr(CoerceExpr *expr) {
       // Validate the resulting type.
       auto *const repr = expr->getCastTypeRepr();
-      const auto toType = resolveTypeReferenceInExpression(
+      // SWIFT_ENABLE_TENSORFLOW
+      // Handle implicit `CoerceExpr` with null `TypeRepr`.
+      // Created by `KeyPathIterable` derived conformances.
+      auto toType = expr->getCastType();
+      if (!toType) {
+        toType = resolveTypeReferenceInExpression(
           repr, TypeResolverContext::ExplicitCastExpr,
           CS.getConstraintLocator(expr));
+      }
+      // SWIFT_ENABLE_TENSORFLOW END
       if (!toType)
         return nullptr;
 

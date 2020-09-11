@@ -21,6 +21,8 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "swift/AST/Type.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "clang/Basic/InMemoryOutputFileSystem.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include <functional>
 #include <memory>
@@ -657,6 +659,13 @@ public:
 
   virtual ~LangSupport() { }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Subsequent requests will write temporary output files to this filesystem
+  /// rather than to the real filesystem.
+  virtual void setInMemoryOutputFileSystem(
+      llvm::IntrusiveRefCntPtr<clang::InMemoryOutputFileSystem> FS) = 0;
+  // SWIFT_ENABLE_TENSORFLOW END
+
   virtual void globalConfigurationUpdated(std::shared_ptr<GlobalConfig> Config) {};
 
   virtual void indexSource(StringRef Filename,
@@ -827,6 +836,19 @@ public:
                                        Optional<VFSOptions> vfsOptions) = 0;
 
   virtual void getStatistics(StatisticsReceiver) = 0;
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Tempoary shim for clients that want to pass the filesystem directly.
+  virtual void
+  codeComplete(llvm::MemoryBuffer *InputBuf, unsigned Offset,
+               CodeCompletionConsumer &Consumer, ArrayRef<const char *> Args,
+               llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS) = 0;
+
+  /// Tempoary shim for clients that want to pass the filesystem directly.
+  virtual void
+  editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, EditorConsumer &Consumer,
+             ArrayRef<const char *> Args,
+             llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS) = 0;
 };
 } // namespace SourceKit
 

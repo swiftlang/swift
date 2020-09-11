@@ -566,6 +566,13 @@ SIMPLE_DECL_ATTR(asyncHandler, AsyncHandler,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   101)
 
+// SWIFT_ENABLE_TENSORFLOW
+SIMPLE_DECL_ATTR(compilerEvaluable, CompilerEvaluable,
+  OnAccessor | OnFunc | OnConstructor | OnSubscript |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove |
+  NotSerialized, 102)
+// SWIFT_ENABLE_TENSORFLOW END
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

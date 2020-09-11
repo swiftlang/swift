@@ -16,6 +16,13 @@
 // REQUIRES: executable_test
 // REQUIRES: CPU=x86_64
 
+// SWIFT_ENABLE_TENSORFLOW
+// This test is currently unsupported because the addition of `+` operators
+// to the stdlib (via `VectorProtocol`) causes type-checking to fail.
+// Re-enable when type-checking no longer fails.
+// REQUIRES: no_tensorflow
+// SWIFT_ENABLE_TENSORFLOW END
+
 // See rdar://problem/65251059
 // UNSUPPORTED: windows
 // rdar://problem/65015626

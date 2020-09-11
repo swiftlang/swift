@@ -186,6 +186,21 @@ struct ASTContext::Implementation {
   /// The AnyObject type.
   CanType AnyObjectType;
 
+  // SWIFT_ENABLE_TENSORFLOW
+  /// The declaration of TensorFlow.TensorHandle<T>.
+  ClassDecl *TensorHandleDecl = nullptr;
+  /// The declaration of TensorFlow.TensorShape.
+  StructDecl *TensorShapeDecl = nullptr;
+  /// The declaration of TensorFlow.TensorDataType.
+  StructDecl *TensorDataTypeDecl = nullptr;
+
+  /// The declaration of Quote.Tree.
+  ProtocolDecl *TreeDecl = nullptr;
+  /// The declaration of Quote.Quote.
+  ClassDecl *QuoteDecl = nullptr;
+  /// The declarations of Quote.FunctionQuoteN.
+  SmallVector<ClassDecl *, 16> FunctionQuoteDecls;
+
 #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
   /** The declaration of Swift.NAME. */ \
   DECL_CLASS *NAME##Decl = nullptr;
@@ -874,6 +889,150 @@ CanType ASTContext::getAnyObjectType() const {
   return getImpl().AnyObjectType;
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+
+/// Retrieve the decl for TensorFlow.TensorHandle iff the TensorFlow module has
+/// been imported.  Otherwise, this returns null.
+ClassDecl *ASTContext::getTensorHandleDecl() const {
+  if (getImpl().TensorHandleDecl)
+    return getImpl().TensorHandleDecl;
+
+  // See if the TensorFlow module was imported.  If not, return null.
+  auto tfModule = getLoadedModule(Id_TensorFlow);
+  if (!tfModule)
+    return nullptr;
+
+  SmallVector<ValueDecl *, 1> results;
+  tfModule->lookupValue(getIdentifier("TensorHandle"),
+                        NLKind::UnqualifiedLookup, results);
+
+  for (auto result : results)
+    if (auto CD = dyn_cast<ClassDecl>(result))
+      return getImpl().TensorHandleDecl = CD;
+  return nullptr;
+}
+
+/// Retrieve the decl for TensorFlow.TensorShape iff the TensorFlow module has
+/// been imported.  Otherwise, this returns null.
+StructDecl *ASTContext::getTensorShapeDecl() const {
+  if (getImpl().TensorShapeDecl)
+    return getImpl().TensorShapeDecl;
+
+  // See if the TensorFlow module was imported.  If not, return null.
+  auto tfModule = getLoadedModule(Id_TensorFlow);
+  if (!tfModule)
+    return nullptr;
+
+  SmallVector<ValueDecl *, 1> results;
+  tfModule->lookupValue(getIdentifier("TensorShape"),
+                        NLKind::UnqualifiedLookup, results);
+
+  for (auto result : results)
+    if (auto CD = dyn_cast<StructDecl>(result))
+      return getImpl().TensorShapeDecl = CD;
+  return nullptr;
+}
+
+/// Retrieve the decl for TensorFlow.TensorDataType iff the TensorFlow module has
+/// been imported.  Otherwise, this returns null.
+StructDecl *ASTContext::getTensorDataTypeDecl() const {
+  if (getImpl().TensorDataTypeDecl)
+    return getImpl().TensorDataTypeDecl;
+
+  // See if the TensorFlow module was imported.  If not, return null.
+  auto tfModule = getLoadedModule(Id_TensorFlow);
+  if (!tfModule)
+    return nullptr;
+
+  SmallVector<ValueDecl *, 1> results;
+  tfModule->lookupValue(getIdentifier("TensorDataType"),
+                        NLKind::UnqualifiedLookup, results);
+
+  for (auto result : results)
+    if (auto CD = dyn_cast<StructDecl>(result))
+      return getImpl().TensorDataTypeDecl = CD;
+  return nullptr;
+}
+
+/// Retrieve the decl for the Quote module iff it has been imported.
+/// Otherwise, this returns null.
+ModuleDecl *ASTContext::getQuoteModule() const {
+  return getLoadedModule(Id_Quote);
+}
+
+/// Retrieve the decl for Quote.Tree iff the Quote module has been imported.
+/// Otherwise, this returns null.
+ProtocolDecl *ASTContext::getTreeDecl() const {
+  if (getImpl().TreeDecl)
+    return getImpl().TreeDecl;
+
+  auto quoteModule = getLoadedModule(Id_Quote);
+  if (!quoteModule)
+    return nullptr;
+
+  SmallVector<ValueDecl *, 1> results;
+  quoteModule->lookupValue(getIdentifier("Tree"), NLKind::UnqualifiedLookup,
+                           results);
+
+  for (auto result : results)
+    if (auto CD = dyn_cast<ProtocolDecl>(result))
+      return getImpl().TreeDecl = CD;
+  return nullptr;
+}
+
+/// Retrieve the decl for Quote.Quote iff the Quote module has been imported.
+/// Otherwise, this returns null.
+ClassDecl *ASTContext::getQuoteDecl() const {
+  if (getImpl().QuoteDecl)
+    return getImpl().QuoteDecl;
+
+  auto quoteModule = getLoadedModule(Id_Quote);
+  if (!quoteModule)
+    return nullptr;
+
+  SmallVector<ValueDecl *, 1> results;
+  quoteModule->lookupValue(getIdentifier("Quote"), NLKind::UnqualifiedLookup,
+                           results);
+
+  for (auto result : results)
+    if (auto CD = dyn_cast<ClassDecl>(result))
+      return getImpl().QuoteDecl = CD;
+  return nullptr;
+}
+
+/// Retrieve the decl for Quote.FunctionQuoteN iff the Quote module has been
+/// imported. Otherwise, this returns null.
+ClassDecl *ASTContext::getFunctionQuoteDecl(unsigned n) const {
+  auto cache = getImpl().FunctionQuoteDecls;
+  if (cache.size() == 0) {
+    auto quoteModule = getLoadedModule(Id_Quote);
+    if (!quoteModule)
+      return nullptr;
+
+    for (auto i = 0; i < 16; ++i) {
+      llvm::SmallString<16> SS;
+      llvm::raw_svector_ostream OS(SS);
+      OS << "FunctionQuote" << n;
+      auto id = getIdentifier(SS);
+
+      SmallVector<ValueDecl *, 1> results;
+      quoteModule->lookupValue(id, NLKind::UnqualifiedLookup, results);
+
+      for (auto result : results) {
+        if (auto CD = dyn_cast<ClassDecl>(result)) {
+          cache.push_back(CD);
+          break;
+        }
+      }
+    }
+  }
+  if (n < cache.size()) {
+    return cache[n];
+  } else {
+    return nullptr;
+  }
+}
+
 CanType ASTContext::getNeverType() const {
   auto neverDecl = getNeverDecl();
   if (!neverDecl)
@@ -931,9 +1090,18 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::CFObject:
     M = getLoadedModule(Id_CoreFoundation);
     break;
-  case KnownProtocolKind::Differentiable:
-    M = getLoadedModule(Id_Differentiation);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // NOTE: The `Differentiable` protocol is in the stdlib module on tensorflow
+  // branch, but in `_Differentiation` module on the master branch.
+  case KnownProtocolKind::TensorArrayProtocol:
+  case KnownProtocolKind::TensorGroup:
+    M = getLoadedModule(Id_TensorFlow);
     break;
+  case KnownProtocolKind::Expression:
+    M = getLoadedModule(Id_Quote);
+    break;
+  // SWIFT_ENABLE_TENSORFLOW END
   default:
     M = getStdlibModule();
     break;

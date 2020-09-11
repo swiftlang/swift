@@ -1,0 +1,63 @@
+//===--- DerivedConformanceElementaryFunctions.def ------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines macros used for macro-metaprogramming with
+// ElementaryFunction protocol requirements. Currently used only by derived
+// conformances.
+//
+//===----------------------------------------------------------------------===//
+
+/// ELEMENTARY_FUNCTION(Id, Name)
+/// - Id is an elementary function identifier, used for the enum case
+///   `ElementaryFunctions::Id`.
+/// - Name is the name of the elementary function.
+
+// One macro must be defined by the includer.
+#if !defined(ELEMENTARY_FUNCTION) && !defined(ELEMENTARY_FUNCTION_UNARY)
+#error "Macro must be defined by includer"
+#endif
+
+#ifndef ELEMENTARY_FUNCTION
+#define ELEMENTARY_FUNCTION(Id, Name)
+#endif
+
+#ifndef ELEMENTARY_FUNCTION_UNARY
+#define ELEMENTARY_FUNCTION_UNARY(Id, Name) ELEMENTARY_FUNCTION(Id,Name)
+#endif
+
+ELEMENTARY_FUNCTION_UNARY(Sqrt, "sqrt")
+ELEMENTARY_FUNCTION_UNARY(Cos, "cos")
+ELEMENTARY_FUNCTION_UNARY(Sin, "sin")
+ELEMENTARY_FUNCTION_UNARY(Tan, "tan")
+ELEMENTARY_FUNCTION_UNARY(Cosh, "cosh")
+ELEMENTARY_FUNCTION_UNARY(Sinh, "sinh")
+ELEMENTARY_FUNCTION_UNARY(Tanh, "tanh")
+ELEMENTARY_FUNCTION_UNARY(Acos, "acos")
+ELEMENTARY_FUNCTION_UNARY(Asin, "asin")
+ELEMENTARY_FUNCTION_UNARY(Atan, "atan")
+ELEMENTARY_FUNCTION_UNARY(Acosh, "acosh")
+ELEMENTARY_FUNCTION_UNARY(Asinh, "asinh")
+ELEMENTARY_FUNCTION_UNARY(Atanh, "atanh")
+ELEMENTARY_FUNCTION_UNARY(Exp, "exp")
+ELEMENTARY_FUNCTION_UNARY(Exp2, "exp2")
+ELEMENTARY_FUNCTION_UNARY(Exp10, "exp10")
+ELEMENTARY_FUNCTION_UNARY(Expm1, "expm1")
+ELEMENTARY_FUNCTION_UNARY(Log, "log")
+ELEMENTARY_FUNCTION_UNARY(Log2, "log2")
+ELEMENTARY_FUNCTION_UNARY(Log10, "log10")
+ELEMENTARY_FUNCTION_UNARY(Log1p, "log1p")
+ELEMENTARY_FUNCTION(Pow, "pow")
+ELEMENTARY_FUNCTION(PowInt, "pow")
+ELEMENTARY_FUNCTION(Root, "root")
+
+#undef ELEMENTARY_FUNCTION_UNARY
+#undef ELEMENTARY_FUNCTION

@@ -13,7 +13,9 @@
 #ifndef SWIFT_SERIALIZATION_SILLOADER_H
 #define SWIFT_SERIALIZATION_SILLOADER_H
 
+// SWIFT_ENABLE_TENSORFLOW
 #include "swift/AST/AutoDiff.h"
+// SWIFT_ENABLE_TENSORFLOW END
 #include "swift/AST/Decl.h"
 #include "swift/AST/Identifier.h"
 #include "swift/SIL/Notifications.h"
@@ -99,8 +101,10 @@ public:
   /// Deserialize all Properties in all SILModules.
   void getAllProperties();
 
+  // SWIFT_ENABLE_TENSORFLOW
   /// Deserialize all DifferentiabilityWitnesses in all SILModules.
   void getAllDifferentiabilityWitnesses();
+  // SWIFT_ENABLE_TENSORFLOW END
 
   SerializedSILLoader(const SerializedSILLoader &) = delete;
   SerializedSILLoader(SerializedSILLoader &&) = delete;

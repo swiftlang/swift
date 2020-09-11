@@ -1006,6 +1006,7 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
   assert(!F->isExternalDeclaration() && "did not emit any function body?!");
   LLVM_DEBUG(llvm::dbgs() << "lowered sil:\n";
              F->print(llvm::dbgs()));
+
   F->verify();
 
   emitDifferentiabilityWitnessesForFunction(constant, F);

@@ -163,6 +163,319 @@ double lgamma_r(double x, int *psigngam);
 long double lgammal_r(long double x, int *psigngam);
 #endif // defined(__APPLE__)
 
+// SWIFT_ENABLE_TENSORFLOW
+// These changes were part of `ElementaryFunctions`, which was removed from
+// apple/swift master branch and moved to apple/swift-numerics.
+// TF-1203 tracks eliminating these ad-hoc tensorflow branch changes.
+static inline SWIFT_ALWAYS_INLINE
+float _stdlib_tanf(float x) {
+  return __builtin_tanf(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+float _stdlib_acosf(float x) {
+  return __builtin_acosf(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+float _stdlib_asinf(float x) {
+  return __builtin_asinf(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+float _stdlib_atanf(float x) {
+  return __builtin_atanf(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+float _stdlib_atan2f(float y, float x) {
+  return __builtin_atan2f(y, x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+float _stdlib_coshf(float x) {
+  return __builtin_coshf(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+float _stdlib_sinhf(float x) {
+  return __builtin_sinhf(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+float _stdlib_tanhf(float x) {
+  return __builtin_tanhf(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+float _stdlib_acoshf(float x) {
+  return __builtin_acoshf(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+float _stdlib_asinhf(float x) {
+  return __builtin_asinhf(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+float _stdlib_atanhf(float x) {
+  return __builtin_atanhf(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+float _stdlib_exp10f(float x) {
+#if defined __APPLE__
+  extern float __exp10f(float);
+  return __exp10f(x);
+#else
+  return __builtin_powf(10, x);
+#endif
+}
+
+static inline SWIFT_ALWAYS_INLINE
+float _stdlib_expm1f(float x) {
+  return __builtin_expm1f(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+float _stdlib_log1pf(float x) {
+  return __builtin_log1pf(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+float _stdlib_hypotf(float x, float y) {
+#if defined(_WIN32)
+  extern float _hypotf(float, float);
+  return _hypotf(x, y);
+#else
+  return __builtin_hypotf(x, y);
+#endif
+}
+
+static inline SWIFT_ALWAYS_INLINE
+float _stdlib_erff(float x) {
+  return __builtin_erff(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+float _stdlib_erfcf(float x) {
+  return __builtin_erfcf(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+float _stdlib_tgammaf(float x) {
+  return __builtin_tgammaf(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+float _stdlib_lgammaf(float x) {
+  extern float lgammaf_r(float x, int *psigngam);
+  int dontCare;
+  return lgammaf_r(x, &dontCare);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+double _stdlib_tan(double x) {
+  return __builtin_tan(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+double _stdlib_acos(double x) {
+  return __builtin_acos(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+double _stdlib_asin(double x) {
+  return __builtin_asin(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+double _stdlib_atan(double x) {
+  return __builtin_atan(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+double _stdlib_atan2(double y, double x) {
+  return __builtin_atan2(y, x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+double _stdlib_cosh(double x) {
+  return __builtin_cosh(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+double _stdlib_sinh(double x) {
+  return __builtin_sinh(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+double _stdlib_tanh(double x) {
+  return __builtin_tanh(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+double _stdlib_acosh(double x) {
+  return __builtin_acosh(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+double _stdlib_asinh(double x) {
+  return __builtin_asinh(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+double _stdlib_atanh(double x) {
+  return __builtin_atanh(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+double _stdlib_exp10(double x) {
+#if defined __APPLE__
+  extern double __exp10(double);
+  return __exp10(x);
+#else
+  return __builtin_pow(10, x);
+#endif
+}
+
+static inline SWIFT_ALWAYS_INLINE
+double _stdlib_expm1(double x) {
+  return __builtin_expm1(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+double _stdlib_log1p(double x) {
+  return __builtin_log1p(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+double _stdlib_hypot(double x, double y) {
+  return __builtin_hypot(x, y);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+double _stdlib_erf(double x) {
+  return __builtin_erf(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+double _stdlib_erfc(double x) {
+  return __builtin_erfc(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+double _stdlib_tgamma(double x) {
+  return __builtin_tgamma(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+double _stdlib_lgamma(double x) {
+  extern double lgamma_r(double x, int *psigngam);
+  int dontCare;
+  return lgamma_r(x, &dontCare);
+}
+
+#if !(defined(_WIN32) || defined(ANDROID)) && (defined(__i386__) || defined(__x86_64__))
+static inline SWIFT_ALWAYS_INLINE
+long double _stdlib_tanl(long double x) {
+  return __builtin_tanl(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+long double _stdlib_acosl(long double x) {
+  return __builtin_acosl(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+long double _stdlib_asinl(long double x) {
+  return __builtin_asinl(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+long double _stdlib_atanl(long double x) {
+  return __builtin_atanl(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+long double _stdlib_atan2l(long double y, long double x) {
+  return __builtin_atan2l(y, x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+long double _stdlib_coshl(long double x) {
+  return __builtin_coshl(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+long double _stdlib_sinhl(long double x) {
+  return __builtin_sinhl(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+long double _stdlib_tanhl(long double x) {
+  return __builtin_tanhl(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+long double _stdlib_acoshl(long double x) {
+  return __builtin_acoshl(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+long double _stdlib_asinhl(long double x) {
+  return __builtin_asinhl(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+long double _stdlib_atanhl(long double x) {
+  return __builtin_atanhl(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+long double _stdlib_exp10l(long double x) {
+  return __builtin_powl(10, x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+long double _stdlib_expm1l(long double x) {
+  return __builtin_expm1l(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+long double _stdlib_log1pl(long double x) {
+  return __builtin_log1pl(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+long double _stdlib_hypotl(long double x, long double y) {
+  return __builtin_hypotl(x, y);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+long double _stdlib_erfl(long double x) {
+  return __builtin_erfl(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+long double _stdlib_erfcl(long double x) {
+  return __builtin_erfcl(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+long double _stdlib_tgammal(long double x) {
+  return __builtin_tgammal(x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+long double _stdlib_lgammal(long double x) {
+  extern long double lgammal_r(long double x, int *psigngam);
+  int dontCare;
+  return lgammal_r(x, &dontCare);
+}
+#endif // !(defined(_WIN32) || defined(ANDROID)) && (defined(__i386__) || defined(__x86_64__))
+// SWIFT_ENABLE_TENSORFLOW END
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

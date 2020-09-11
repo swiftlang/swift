@@ -22,6 +22,9 @@
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Parse/Token.h"
 #include "llvm/ADT/StringRef.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "clang/Basic/InMemoryOutputFileSystem.h"
+// SWIFT_ENABLE_TENSORFLOW END
 #include <memory>
 #include <string>
 #include <functional>
@@ -85,6 +88,9 @@ bool initCompilerInvocation(
     CompilerInvocation &Invocation, ArrayRef<const char *> OrigArgs,
     DiagnosticEngine &Diags, StringRef UnresolvedPrimaryFile,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    // SWIFT_ENABLE_TENSORFLOW
+    llvm::IntrusiveRefCntPtr<clang::InMemoryOutputFileSystem> InMemoryOutputFileSystem,
+    // SWIFT_ENABLE_TENSORFLOW END
     const std::string &runtimeResourcePath,
     const std::string &diagnosticDocumentationPath,
     bool shouldOptimizeForIDE, time_t sessionTimestamp, std::string &Error);

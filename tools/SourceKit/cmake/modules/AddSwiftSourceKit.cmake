@@ -7,6 +7,17 @@ function(add_sourcekit_default_compiler_flags target)
   _add_host_variant_c_compile_flags(${target})
   _add_host_variant_link_flags(${target})
 
+  # SWIFT_ENABLE_TENSORFLOW
+  if(SWIFT_ENABLE_TENSORFLOW)
+    if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+      # FIXME: This is a hack: adding rpaths with many `..` that jump across
+      # frameworks is bad practice. It would be cleaner/more robust to copy
+      # the TensorFlow libraries to sourcekitd.framework.
+      set_target_properties(${target} PROPERTIES
+          INSTALL_RPATH "@loader_path/../../../swift/${SOURCEKIT_DEPLOYMENT_OS};@loader_path/../../../../../../../swift/${SOURCEKIT_DEPLOYMENT_OS}")
+    endif()
+  endif()
+
   # Set compilation and link flags.
   if(${SWIFT_HOST_VARIANT_SDK} STREQUAL WINDOWS)
     swift_windows_include_for_arch(${SWIFT_HOST_VARIANT_ARCH}
@@ -176,6 +187,8 @@ macro(add_sourcekit_executable name)
 
   set_target_properties(${name} PROPERTIES FOLDER "SourceKit executables")
   add_sourcekit_default_compiler_flags("${name}")
+  set_property(TARGET "${name}" APPEND_STRING PROPERTY
+	       COMPILE_FLAGS " ${SOURCEKITEXE_C_COMPILE_FLAGS}")
 endmacro()
 
 # Add a new SourceKit framework.

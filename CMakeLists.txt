@@ -86,6 +86,12 @@ option(SWIFT_BUILD_STDLIB_EXTRA_TOOLCHAIN_CONTENT
     "If not building stdlib, controls whether to build 'stdlib/toolchain' content"
     TRUE)
 
+# `SWIFT_ENABLE_TENSOFRFLOW` affects lit tests, adding "tensorflow" as an
+# available feature.
+option(SWIFT_ENABLE_TENSORFLOW
+    "Enable TensorFlow in the compiler"
+    FALSE)
+
 # In many cases, the CMake build system needs to determine whether to include
 # a directory, or perform other actions, based on whether the stdlib or SDK is
 # being built at all -- statically or dynamically. Please note that these
@@ -372,6 +378,19 @@ option(SWIFT_REPORT_STATISTICS
 option(SWIFT_DISABLE_OBJC_INTEROP
     "Disable Objective-C interoperability even on platforms what would normally have it"
     FALSE)
+
+#
+# User-configurable TensorFlow specific options.
+#
+set(SWIFT_TENSORFLOW_HOST_LIB_DIR "" CACHE PATH
+    "If set, directory with TensorFlow host libraries to be linked into swiftc.")
+set(SWIFT_TENSORFLOW_TARGET_LIB_DIR "" CACHE PATH
+    "If set, directory with TensorFlow target libraries to be linked into swift programs.")
+
+set(SWIFT_TENSORFLOW_HOST_INCLUDE_DIR "" CACHE PATH
+    "If set, directory with host TensorFlow headers.")
+set(SWIFT_TENSORFLOW_TARGET_INCLUDE_DIR "" CACHE PATH
+    "If set, directory with target TensorFlow headers.")
 
 #
 # User-configurable experimental options.  Do not use in production builds.
@@ -1082,6 +1101,11 @@ if(SWIFT_BUILD_SYNTAXPARSERLIB OR SWIFT_BUILD_SOURCEKIT)
                           ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}/src/BlocksRuntime
                           ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE})
   endif()
+endif()
+
+# Enable TensorFlow in compiler code.
+if(SWIFT_ENABLE_TENSORFLOW)
+  add_definitions(-DSWIFT_ENABLE_TENSORFLOW)
 endif()
 
 # Add all of the subdirectories, where we actually do work.

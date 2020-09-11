@@ -1605,6 +1605,13 @@ bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
                                TypeCheckFunctionBodyRequest{AFD}, true);
   TypeChecker::checkFunctionEffects(AFD);
   TypeChecker::computeCaptures(AFD);
+  // SWIFT_ENABLE_TENSORFLOW
+  // Check `@compilerEvaluable` function body correctness.
+  // Do this here, rather than in
+  // `AttributeChecker::visitCompilerEvaluableAttr()` because we need the
+  // function bodies to be type checked.
+  TypeChecker::checkFunctionBodyCompilerEvaluable(AFD);
+  // SWIFT_ENABLE_TENSORFLOW END
   return res;
 }
 

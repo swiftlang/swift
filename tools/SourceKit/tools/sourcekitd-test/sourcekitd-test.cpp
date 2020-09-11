@@ -12,9 +12,15 @@
 
 #include "sourcekitd/sourcekitd.h"
 
+// SWIFT_ENABLE_TENSORFLOW
+#include "sourcekitd/FileSystemProvider.h"
+// SWIFT_ENABLE_TENSORFLOW END
 #include "SourceKit/Support/Concurrency.h"
 #include "TestOptions.h"
 #include "swift/Demangling/ManglingMacros.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "clang/Basic/InMemoryOutputFileSystem.h"
+// SWIFT_ENABLE_TENSORFLOW END
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/Optional.h"
@@ -481,6 +487,16 @@ static bool sendGlobalConfigRequest() {
 }
 
 static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
+  // SWIFT_ENABLE_TENSORFLOW
+#ifdef SWIFT_SOURCEKIT_USE_INPROC_LIBRARY
+  if (Opts.InMemoryClangModuleCache) {
+    SourceKit::setGlobalInMemoryOutputFileSystem(
+        new clang::InMemoryOutputFileSystem());
+  } else {
+    SourceKit::setGlobalInMemoryOutputFileSystem(nullptr);
+  }
+#endif
+
   if (!Opts.JsonRequestPath.empty())
     return handleJsonRequestPath(Opts.JsonRequestPath, Opts);
 

@@ -1604,6 +1604,9 @@ public:
   parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
                         SmallVectorImpl<TrailingClosure> &closures);
 
+  ParserResult<Expr> parseExprQuoteLiteral();
+  ParserResult<Expr> parseExprUnquote();
+  ParserResult<Expr> parseExprPoundAssert();
   /// Parse an object literal.
   ///
   /// \param LK The literal kind as determined by the first token.

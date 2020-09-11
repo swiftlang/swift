@@ -354,7 +354,9 @@ public:
         PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
         UseSwiftCall(false), UseTypeLayoutValueHandling(true),
         GenerateProfile(false), EnableDynamicReplacementChaining(false),
-        DisableRoundTripDebugTypes(false), DisableDebuggerShadowCopies(false),
+        // SWIFT_ENABLE_TENSORFLOW
+        // TODO(TF-486): Reenable round type debug types.
+        DisableRoundTripDebugTypes(true), DisableDebuggerShadowCopies(false),
         DisableConcreteTypeMetadataMangledNameAccessors(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {}
