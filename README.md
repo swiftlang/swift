@@ -440,3 +440,4 @@ The Bazel website has detailed installation instructions for
 [macOS](https://docs.bazel.build/versions/master/install-os-x.html) and
 [Ubuntu](https://docs.bazel.build/versions/master/install-ubuntu.html).
 When picking the version to download in step 2, select version 2.0.0 which can be found in the release notes [here (v2.0.0)](https://github.com/bazelbuild/bazel/releases/tag/2.0.0).
+
