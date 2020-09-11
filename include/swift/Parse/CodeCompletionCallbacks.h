@@ -190,7 +190,7 @@ public:
 
   /// Complete the import decl with importable modules.
   virtual void
-  completeImportDecl(std::vector<Located<Identifier>> &Path) {};
+  completeImportDecl(ImportPath::Builder &Path) {};
 
   /// Complete unresolved members after dot.
   virtual void completeUnresolvedMember(CodeCompletionExpr *E,

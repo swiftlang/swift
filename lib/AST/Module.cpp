@@ -170,8 +170,6 @@ class swift::SourceLookupCache {
   template<typename Range>
   void addToMemberCache(Range decls);
 public:
-  typedef ModuleDecl::AccessPathTy AccessPathTy;
-  
   SourceLookupCache(const SourceFile &SF);
   SourceLookupCache(const ModuleDecl &Mod);
 
@@ -202,17 +200,17 @@ public:
   void lookupPrecedenceGroup(Identifier name,
                              TinyPtrVector<PrecedenceGroupDecl *> &results);
 
-  void lookupVisibleDecls(AccessPathTy AccessPath,
+  void lookupVisibleDecls(ImportPath::Access AccessPath,
                           VisibleDeclConsumer &Consumer,
                           NLKind LookupKind);
   
   void populateMemberCache(const SourceFile &SF);
   void populateMemberCache(const ModuleDecl &Mod);
 
-  void lookupClassMembers(AccessPathTy AccessPath,
+  void lookupClassMembers(ImportPath::Access AccessPath,
                           VisibleDeclConsumer &consumer);
                           
-  void lookupClassMember(AccessPathTy accessPath,
+  void lookupClassMember(ImportPath::Access accessPath,
                          DeclName name,
                          SmallVectorImpl<ValueDecl*> &results);
 
@@ -372,7 +370,7 @@ void SourceLookupCache::lookupPrecedenceGroup(
     results.push_back(group);
 }
 
-void SourceLookupCache::lookupVisibleDecls(AccessPathTy AccessPath,
+void SourceLookupCache::lookupVisibleDecls(ImportPath::Access AccessPath,
                                            VisibleDeclConsumer &Consumer,
                                            NLKind LookupKind) {
   assert(AccessPath.size() <= 1 && "can only refer to top-level decls");
@@ -397,7 +395,7 @@ void SourceLookupCache::lookupVisibleDecls(AccessPathTy AccessPath,
   }
 }
 
-void SourceLookupCache::lookupClassMembers(AccessPathTy accessPath,
+void SourceLookupCache::lookupClassMembers(ImportPath::Access accessPath,
                                            VisibleDeclConsumer &consumer) {
   assert(accessPath.size() <= 1 && "can only refer to top-level decls");
   
@@ -430,7 +428,7 @@ void SourceLookupCache::lookupClassMembers(AccessPathTy accessPath,
   }
 }
 
-void SourceLookupCache::lookupClassMember(AccessPathTy accessPath,
+void SourceLookupCache::lookupClassMember(ImportPath::Access accessPath,
                                           DeclName name,
                                           SmallVectorImpl<ValueDecl*> &results) {
   assert(accessPath.size() <= 1 && "can only refer to top-level decls");
@@ -704,7 +702,7 @@ void SourceFile::lookupValue(DeclName name, NLKind lookupKind,
   getCache().lookupValue(name, lookupKind, result);
 }
 
-void ModuleDecl::lookupVisibleDecls(AccessPathTy AccessPath,
+void ModuleDecl::lookupVisibleDecls(ImportPath::Access AccessPath,
                                     VisibleDeclConsumer &Consumer,
                                     NLKind LookupKind) const {
   if (isParsedModule(this))
@@ -714,13 +712,13 @@ void ModuleDecl::lookupVisibleDecls(AccessPathTy AccessPath,
   FORWARD(lookupVisibleDecls, (AccessPath, Consumer, LookupKind));
 }
 
-void SourceFile::lookupVisibleDecls(ModuleDecl::AccessPathTy AccessPath,
+void SourceFile::lookupVisibleDecls(ImportPath::Access AccessPath,
                                     VisibleDeclConsumer &Consumer,
                                     NLKind LookupKind) const {
   getCache().lookupVisibleDecls(AccessPath, Consumer, LookupKind);
 }
 
-void ModuleDecl::lookupClassMembers(AccessPathTy accessPath,
+void ModuleDecl::lookupClassMembers(ImportPath::Access accessPath,
                                     VisibleDeclConsumer &consumer) const {
   if (isParsedModule(this)) {
     auto &cache = getSourceLookupCache();
@@ -732,14 +730,14 @@ void ModuleDecl::lookupClassMembers(AccessPathTy accessPath,
   FORWARD(lookupClassMembers, (accessPath, consumer));
 }
 
-void SourceFile::lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
+void SourceFile::lookupClassMembers(ImportPath::Access accessPath,
                                     VisibleDeclConsumer &consumer) const {
   auto &cache = getCache();
   cache.populateMemberCache(*this);
   cache.lookupClassMembers(accessPath, consumer);
 }
 
-void ModuleDecl::lookupClassMember(AccessPathTy accessPath,
+void ModuleDecl::lookupClassMember(ImportPath::Access accessPath,
                                    DeclName name,
                                    SmallVectorImpl<ValueDecl*> &results) const {
   auto *stats = getASTContext().Stats;
@@ -758,7 +756,7 @@ void ModuleDecl::lookupClassMember(AccessPathTy accessPath,
   FORWARD(lookupClassMember, (accessPath, name, results));
 }
 
-void SourceFile::lookupClassMember(ModuleDecl::AccessPathTy accessPath,
+void SourceFile::lookupClassMember(ImportPath::Access accessPath,
                                    DeclName name,
                                    SmallVectorImpl<ValueDecl*> &results) const {
   FrontendStatsTracer tracer(getASTContext().Stats,
@@ -1223,17 +1221,6 @@ void ModuleDecl::getImportedModulesForLookup(
   FORWARD(getImportedModulesForLookup, (modules));
 }
 
-bool ModuleDecl::isSameAccessPath(AccessPathTy lhs, AccessPathTy rhs) {
-  using AccessPathElem = Located<Identifier>;
-  if (lhs.size() != rhs.size())
-    return false;
-  return std::equal(lhs.begin(), lhs.end(), rhs.begin(),
-                    [](const AccessPathElem &lElem,
-                       const AccessPathElem &rElem) {
-    return lElem.Item == rElem.Item;
-  });
-}
-
 ModuleDecl::ReverseFullNameIterator::ReverseFullNameIterator(
     const ModuleDecl *M) {
   assert(M);
@@ -1294,11 +1281,10 @@ ModuleDecl::removeDuplicateImports(SmallVectorImpl<ImportedModule> &imports) {
           lhs.importedModule->getReverseFullModuleName(), {},
           rhs.importedModule->getReverseFullModuleName(), {});
     }
-    using AccessPathElem = Located<Identifier>;
     return std::lexicographical_compare(
         lhs.accessPath.begin(), lhs.accessPath.end(), rhs.accessPath.begin(),
         rhs.accessPath.end(),
-        [](const AccessPathElem &lElem, const AccessPathElem &rElem) {
+        [](const ImportPath::Element &lElem, const ImportPath::Element &rElem) {
           return lElem.Item.str() < rElem.Item.str();
         });
   });
@@ -1307,7 +1293,7 @@ ModuleDecl::removeDuplicateImports(SmallVectorImpl<ImportedModule> &imports) {
       [](const ImportedModule &lhs, const ImportedModule &rhs) -> bool {
         if (lhs.importedModule != rhs.importedModule)
           return false;
-        return ModuleDecl::isSameAccessPath(lhs.accessPath, rhs.accessPath);
+        return lhs.accessPath.isSameAs(rhs.accessPath);
       });
   imports.erase(last, imports.end());
 }
@@ -1471,7 +1457,7 @@ SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
 
   // Make sure the top-level module is first; we want pre-order-ish traversal.
   auto topLevelModule =
-      ModuleDecl::ImportedModule{ModuleDecl::AccessPathTy(), topLevel};
+      ModuleDecl::ImportedModule{ImportPath::Access(), topLevel};
   stack.emplace_back(topLevelModule);
 
   while (!stack.empty()) {

@@ -65,7 +65,7 @@ void lookupInModule(const DeclContext *moduleOrFile,
 /// reexports, observing proper shadowing rules.
 void
 lookupVisibleDeclsInModule(const DeclContext *moduleOrFile,
-                           ModuleDecl::AccessPathTy accessPath,
+                           ImportPath::Access accessPath,
                            SmallVectorImpl<ValueDecl *> &decls,
                            NLKind lookupKind,
                            ResolutionKind resolutionKind,

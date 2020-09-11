@@ -1054,13 +1054,13 @@ SourceRange GenericContext::getGenericTrailingWhereClauseSourceRange() const {
 ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
                                SourceLoc ImportLoc, ImportKind Kind,
                                SourceLoc KindLoc,
-                               ArrayRef<AccessPathElement> Path,
+                               ImportPath Path,
                                ClangNode ClangN) {
   assert(!Path.empty());
   assert(Kind == ImportKind::Module || Path.size() > 1);
   assert(ClangN.isNull() || ClangN.getAsModule() ||
          isa<clang::ImportDecl>(ClangN.getAsDecl()));
-  size_t Size = totalSizeToAlloc<AccessPathElement>(Path.size());
+  size_t Size = totalSizeToAlloc<ImportPath::Element>(Path.size());
   void *ptr = allocateMemoryForDecl<ImportDecl>(Ctx, Size, !ClangN.isNull());
   auto D = new (ptr) ImportDecl(DC, ImportLoc, Kind, KindLoc, Path);
   if (ClangN)
@@ -1069,14 +1069,14 @@ ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
 }
 
 ImportDecl::ImportDecl(DeclContext *DC, SourceLoc ImportLoc, ImportKind K,
-                       SourceLoc KindLoc, ArrayRef<AccessPathElement> Path)
+                       SourceLoc KindLoc, ImportPath Path)
   : Decl(DeclKind::Import, DC), ImportLoc(ImportLoc), KindLoc(KindLoc) {
   Bits.ImportDecl.NumPathElements = Path.size();
   assert(Bits.ImportDecl.NumPathElements == Path.size() && "Truncation error");
   Bits.ImportDecl.ImportKind = static_cast<unsigned>(K);
   assert(getImportKind() == K && "not enough bits for ImportKind");
   std::uninitialized_copy(Path.begin(), Path.end(),
-                          getTrailingObjects<AccessPathElement>());
+                          getTrailingObjects<ImportPath::Element>());
 }
 
 ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {

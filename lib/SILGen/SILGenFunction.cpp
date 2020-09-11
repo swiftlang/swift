@@ -564,12 +564,13 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     // be imported.
     ASTContext &ctx = getASTContext();
     
-    Located<Identifier> UIKitName =
+    ImportPath::Element UIKitName =
       {ctx.getIdentifier("UIKit"), SourceLoc()};
     
     ModuleDecl *UIKit = ctx
       .getClangModuleLoader()
-      ->loadModule(SourceLoc(), UIKitName);
+      ->loadModule(SourceLoc(),
+                   ImportPath::Module(llvm::makeArrayRef(UIKitName)));
     assert(UIKit && "couldn't find UIKit objc module?!");
     SmallVector<ValueDecl *, 1> results;
     UIKit->lookupQualified(UIKit,

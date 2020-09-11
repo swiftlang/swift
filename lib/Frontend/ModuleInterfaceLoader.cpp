@@ -334,7 +334,6 @@ struct ModuleRebuildInfo {
 /// normal cache, the prebuilt cache, a module adjacent to the interface, or
 /// a module that we'll build from a module interface.
 class ModuleInterfaceLoaderImpl {
-  using AccessPathElem = Located<Identifier>;
   friend class swift::ModuleInterfaceLoader;
   ASTContext &ctx;
   llvm::vfs::FileSystem &fs;
@@ -953,7 +952,7 @@ bool ModuleInterfaceLoader::isCached(StringRef DepPath) {
 /// cache or by converting it in a subordinate \c CompilerInstance, caching
 /// the results.
 std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
-  AccessPathElem ModuleID,
+  ImportPath::Element ModuleID,
   const SerializedModuleBaseName &BaseName,
   SmallVectorImpl<char> *ModuleInterfacePath,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
@@ -1520,7 +1519,7 @@ ExplicitSwiftModuleLoader::ExplicitSwiftModuleLoader(
 
 ExplicitSwiftModuleLoader::~ExplicitSwiftModuleLoader() { delete &Impl; }
 
-bool ExplicitSwiftModuleLoader::findModule(AccessPathElem ModuleID,
+bool ExplicitSwiftModuleLoader::findModule(ImportPath::Element ModuleID,
            SmallVectorImpl<char> *ModuleInterfacePath,
            std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
            std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
@@ -1596,7 +1595,7 @@ bool ExplicitSwiftModuleLoader::findModule(AccessPathElem ModuleID,
 }
 
 std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
-  AccessPathElem ModuleID,
+  ImportPath::Element ModuleID,
   const SerializedModuleBaseName &BaseName,
   SmallVectorImpl<char> *ModuleInterfacePath,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
@@ -1608,7 +1607,7 @@ std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
 }
 
 bool ExplicitSwiftModuleLoader::canImportModule(
-    Located<Identifier> mID) {
+    ImportPath::Element mID) {
   StringRef moduleName = mID.Item.str();
   auto it = Impl.ExplicitModuleMap.find(moduleName);
   // If no provided explicit module matches the name, then it cannot be imported.

@@ -40,21 +40,6 @@ using namespace SourceKit;
 using namespace swift;
 using namespace ide;
 
-static ModuleDecl *getModuleByFullName(ASTContext &Ctx, StringRef ModuleName) {
-  SmallVector<Located<Identifier>, 4>
-      AccessPath;
-  while (!ModuleName.empty()) {
-    StringRef SubModuleName;
-    std::tie(SubModuleName, ModuleName) = ModuleName.split('.');
-    AccessPath.push_back({ Ctx.getIdentifier(SubModuleName), SourceLoc() });
-  }
-  return Ctx.getModule(AccessPath);
-}
-
-static ModuleDecl *getModuleByFullName(ASTContext &Ctx, Identifier ModuleName) {
-  return Ctx.getModule({ Located<Identifier>(ModuleName, SourceLoc()) });
-}
-
 namespace {
 struct TextRange {
   unsigned Offset;
@@ -1023,11 +1008,11 @@ static void reportSourceAnnotations(const SourceTextInfo &IFaceInfo,
 static bool getModuleInterfaceInfo(ASTContext &Ctx, StringRef ModuleName,
                                    SourceTextInfo &Info) {
   // Load standard library so that Clang importer can use it.
-  auto *Stdlib = getModuleByFullName(Ctx, Ctx.StdlibModuleName);
+  auto *Stdlib = Ctx.getModuleByIdentifier(Ctx.StdlibModuleName);
   if (!Stdlib)
     return true;
 
-  auto *M = getModuleByFullName(Ctx, ModuleName);
+  auto *M = Ctx.getModuleByName(ModuleName);
   if (!M)
     return true;
 
@@ -1550,13 +1535,13 @@ findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
 
   // Load standard library so that Clang importer can use it.
   ASTContext &Ctx = CI.getASTContext();
-  auto *Stdlib = getModuleByFullName(Ctx, Ctx.StdlibModuleName);
+  auto *Stdlib = Ctx.getModuleByIdentifier(Ctx.StdlibModuleName);
   if (!Stdlib) {
     Error = "Cannot load stdlib.";
     Receiver(RequestResult<ArrayRef<StringRef>>::fromError(Error));
     return;
   }
-  auto *M = getModuleByFullName(Ctx, ModuleName);
+  auto *M = Ctx.getModuleByName(ModuleName);
   if (!M) {
     Error = "Cannot find the module.";
     Receiver(RequestResult<ArrayRef<StringRef>>::fromError(Error));

@@ -72,8 +72,7 @@ protected:
   void collectVisibleTopLevelModuleNamesImpl(SmallVectorImpl<Identifier> &names,
                                              StringRef extension) const;
 
-  using AccessPathElem = Located<Identifier>;
-  virtual bool findModule(AccessPathElem moduleID,
+  virtual bool findModule(ImportPath::Element moduleID,
                           SmallVectorImpl<char> *moduleInterfacePath,
                           std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
                           std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
@@ -93,7 +92,7 @@ protected:
   ///   modules and will defer to the remaining module loaders to look up this
   ///   module.
   virtual std::error_code findModuleFilesInDirectory(
-      AccessPathElem ModuleID,
+      ImportPath::Element ModuleID,
       const SerializedModuleBaseName &BaseName,
       SmallVectorImpl<char> *ModuleInterfacePath,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
@@ -103,19 +102,19 @@ protected:
 
   std::error_code
   openModuleFile(
-       AccessPathElem ModuleID,
+       ImportPath::Element ModuleID,
        const SerializedModuleBaseName &BaseName,
        std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer);
 
   std::error_code
   openModuleDocFileIfPresent(
-      AccessPathElem ModuleID,
+      ImportPath::Element ModuleID,
       const SerializedModuleBaseName &BaseName,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer);
 
   std::error_code
   openModuleSourceInfoFileIfPresent(
-      AccessPathElem ModuleID,
+      ImportPath::Element ModuleID,
       const SerializedModuleBaseName &BaseName,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer);
 
@@ -167,7 +166,7 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  virtual bool canImportModule(Located<Identifier> named) override;
+  virtual bool canImportModule(ImportPath::Element named) override;
 
   /// Import a module with the given module path.
   ///
@@ -180,7 +179,7 @@ public:
   /// emits a diagnostic and returns a FailedImportModule object.
   virtual ModuleDecl *
   loadModule(SourceLoc importLoc,
-             ArrayRef<Located<Identifier>> path) override;
+             ImportPath::Module path) override;
 
 
   virtual void loadExtensions(NominalTypeDecl *nominal,
@@ -225,7 +224,7 @@ class ImplicitSerializedModuleLoader : public SerializedModuleLoaderBase {
   {}
 
   std::error_code findModuleFilesInDirectory(
-      AccessPathElem ModuleID,
+      ImportPath::Element ModuleID,
       const SerializedModuleBaseName &BaseName,
       SmallVectorImpl<char> *ModuleInterfacePath,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
@@ -271,7 +270,7 @@ class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
                                    IgnoreSwiftSourceInfo) {}
 
   std::error_code findModuleFilesInDirectory(
-      AccessPathElem ModuleID,
+      ImportPath::Element ModuleID,
       const SerializedModuleBaseName &BaseName,
       SmallVectorImpl<char> *ModuleInterfacePath,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
@@ -287,20 +286,20 @@ class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
 public:
   virtual ~MemoryBufferSerializedModuleLoader();
 
-  bool canImportModule(Located<Identifier> named) override;
+  bool canImportModule(ImportPath::Element named) override;
   ModuleDecl *
   loadModule(SourceLoc importLoc,
-             ArrayRef<Located<Identifier>> path) override;
+             ImportPath::Module path) override;
 
   /// Register a memory buffer that contains the serialized module for the given
   /// access path. This API is intended to be used by LLDB to add swiftmodules
   /// discovered in the __swift_ast section of a Mach-O file (or the .swift_ast
   /// section of an ELF file) to the search path.
   ///
-  /// FIXME: make this an actual access *path* once submodules are designed.
-  void registerMemoryBuffer(StringRef AccessPath,
+  /// FIXME: make this an actual import *path* once submodules are designed.
+  void registerMemoryBuffer(StringRef importPath,
                             std::unique_ptr<llvm::MemoryBuffer> input) {
-    MemoryBuffers[AccessPath] = std::move(input);
+    MemoryBuffers[importPath] = std::move(input);
   }
 
   void collectVisibleTopLevelModuleNames(
@@ -370,15 +369,15 @@ protected:
       TinyPtrVector<PrecedenceGroupDecl *> &results) const override;
 
 public:
-  virtual void lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
+  virtual void lookupVisibleDecls(ImportPath::Access accessPath,
                                   VisibleDeclConsumer &consumer,
                                   NLKind lookupKind) const override;
 
-  virtual void lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
+  virtual void lookupClassMembers(ImportPath::Access accessPath,
                                   VisibleDeclConsumer &consumer) const override;
 
   virtual void
-  lookupClassMember(ModuleDecl::AccessPathTy accessPath, DeclName name,
+  lookupClassMember(ImportPath::Access accessPath, DeclName name,
                     SmallVectorImpl<ValueDecl*> &decls) const override;
 
   /// Find all Objective-C methods with the given selector.
