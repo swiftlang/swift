@@ -1138,19 +1138,6 @@ getCanonicalParams(AnyFunctionType *funcType,
 }
 
 StringRef TypeBase::getKindName(TypeKind K) {
-  switch (K) {
-  case TypeKind::Hole:
-  case TypeKind::TypeVariable:
-  case TypeKind::WeakStorage:
-  case TypeKind::UnownedStorage:
-  case TypeKind::UnmanagedStorage:
-  case TypeKind::LValue:
-  case TypeKind::InOut:
-  case TypeKind::Paren:
-    assert(false && "These types should never appear in diagnostics!");
-  default:
-    break;
-  }
 #define ENTRY(Kind, String)                                                    \
   case TypeKind::Kind:                                                         \
     return String
