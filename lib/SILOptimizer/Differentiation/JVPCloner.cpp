@@ -282,7 +282,8 @@ private:
     assert(originalValue->getType().isObject());
     assert(newTangentValue.getType().isObject());
     assert(originalValue->getFunction() == original);
-    LLVM_DEBUG(getADDebugStream() << "Adding tangent for " << originalValue);
+    LLVM_DEBUG(getADDebugStream()
+               << "Setting tangent value for " << originalValue);
     // The tangent value must be in the tangent space.
     assert(newTangentValue.getType() ==
            getRemappedTangentType(originalValue->getType()));
@@ -1221,10 +1222,10 @@ public:
     for (auto indRes : ai->getIndirectSILResults())
       diffArgs.push_back(getTangentBuffer(bb, indRes));
 
-    auto paramArgs = ai->getArgumentsWithoutIndirectResults();
+    auto origArgs = ai->getArgumentsWithoutIndirectResults();
     // Get the tangent value of the original arguments.
-    for (auto i : indices(paramArgs)) {
-      auto origArg = paramArgs[i];
+    for (auto i : indices(origArgs)) {
+      auto origArg = origArgs[i];
       // If the argument is not active:
       // - Skip the element, if it is not differentiable.
       // - Otherwise, add a zero value to that location.
@@ -1565,8 +1566,8 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
       // If original indirect result is non-varied, zero-initialize its tangent
       // buffer.
       if (!activityInfo.isVaried(origResult, getIndices().parameters))
-        emitZeroIndirect(diffIndResult->getType().getASTType(),
-                         diffIndResult, diffLoc);
+        emitZeroIndirect(diffIndResult->getType().getASTType(), diffIndResult,
+                         diffLoc);
       continue;
     }
     // Handle original non-wrt `inout` parameter.
@@ -1583,8 +1584,8 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
     setTangentBuffer(origEntry, origResult, diffIndResult);
     // Original `inout` parameters are initialized, so their tangent buffers
     // must also be initialized.
-    emitZeroIndirect(diffIndResult->getType().getASTType(),
-                     diffIndResult, diffLoc);
+    emitZeroIndirect(diffIndResult->getType().getASTType(), diffIndResult,
+                     diffLoc);
   }
 }
 
