@@ -3629,8 +3629,6 @@ void IRGenSILFunction::visitRetainValueInst(swift::RetainValueInst *i) {
 }
 
 void IRGenSILFunction::visitRetainValueAddrInst(swift::RetainValueAddrInst *i) {
-  assert(i->getAtomicity() == RefCountingInst::Atomicity::Atomic &&
-         "Non atomic retains are not supported");
   SILValue operandValue = i->getOperand();
   Address addr = getLoweredAddress(operandValue);
   SILType addrTy = operandValue->getType();
@@ -3704,8 +3702,6 @@ void IRGenSILFunction::visitReleaseValueInst(swift::ReleaseValueInst *i) {
 
 void IRGenSILFunction::visitReleaseValueAddrInst(
     swift::ReleaseValueAddrInst *i) {
-  assert(i->getAtomicity() == RefCountingInst::Atomicity::Atomic &&
-         "Non atomic retains are not supported");
   SILValue operandValue = i->getOperand();
   Address addr = getLoweredAddress(operandValue);
   SILType addrTy = operandValue->getType();
