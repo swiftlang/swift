@@ -62,6 +62,10 @@ option(SWIFT_STDLIB_OS_VERSIONING
     "Build stdlib with availability based on OS versions (Darwin only)."
     TRUE)
 
+option(SWIFT_ENABLE_MODULE_INTERFACES
+       "Generate .swiftinterface files alongside .swiftmodule files"
+       "${SWIFT_STDLIB_STABLE_ABI}")
+
 #
 # End of user-configurable options.
 #
