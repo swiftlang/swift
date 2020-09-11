@@ -256,6 +256,8 @@ inline void createEntryArguments(SILFunction *f) {
     auto *decl = new (ctx)
         ParamDecl(loc, loc, Identifier(), loc, Identifier(), moduleDecl);
     decl->setSpecifier(ParamDecl::Specifier::Default);
+    llvm::errs() << "CFA\n";
+    type.dump();
     entry->createFunctionArgument(type, decl);
   };
   for (auto indResTy :
