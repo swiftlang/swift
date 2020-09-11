@@ -533,6 +533,7 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
     case DIUseKind::Escape:
       continue;
     case DIUseKind::Assign:
+    case DIUseKind::AssignWrappedValue:
     case DIUseKind::IndirectIn:
     case DIUseKind::InitOrAssign:
     case DIUseKind::InOutArgument:
@@ -750,6 +751,7 @@ void LifetimeChecker::doIt() {
       continue;
         
     case DIUseKind::Assign:
+    case DIUseKind::AssignWrappedValue:
       // Instructions classified as assign are only generated when lowering
       // InitOrAssign instructions in regions known to be initialized.  Since
       // they are already known to be definitely init, don't reprocess them.
@@ -1047,16 +1049,15 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
   // an initialization or assign in the uses list so that clients know about it.
   if (isFullyUninitialized) {
     Use.Kind = DIUseKind::Initialization;
+  } else if (isFullyInitialized && isa<AssignByWrapperInst>(Use.Inst)) {
+    // If some fields are uninitialized, re-write assign_by_wrapper to assignment
+    // of the backing wrapper. If all fields are initialized, assign to the wrapped
+    // value.
+    auto allFieldsInitialized =
+        getAnyUninitializedMemberAtInst(Use.Inst, 0, TheMemory.getNumElements()) == -1;
+    Use.Kind = allFieldsInitialized ? DIUseKind::AssignWrappedValue : DIUseKind::Assign;
   } else if (isFullyInitialized) {
-    // Only re-write assign_by_wrapper to assignment if all fields have been
-    // initialized.
-    if (isa<AssignByWrapperInst>(Use.Inst) &&
-        getAnyUninitializedMemberAtInst(Use.Inst, 0,
-                                        TheMemory.getNumElements()) != -1) {
-      Use.Kind = DIUseKind::Initialization;
-    } else {
-      Use.Kind = DIUseKind::Assign;
-    }
+    Use.Kind = DIUseKind::Assign;
   } else {
     // If it is initialized on some paths, but not others, then we have an
     // inconsistent initialization, which needs dynamic control logic in the
@@ -1909,7 +1910,7 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &Use) {
       Use.Kind == DIUseKind::SelfInit)
     InitKind = IsInitialization;
   else {
-    assert(Use.Kind == DIUseKind::Assign);
+    assert(Use.Kind == DIUseKind::Assign || Use.Kind == DIUseKind::AssignWrappedValue);
     InitKind = IsNotInitialization;
   }
 
@@ -1958,14 +1959,21 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &Use) {
     Use.Inst = nullptr;
     NonLoadUses.erase(Inst);
 
-    if (TheMemory.isClassInitSelf() &&
-        Use.Kind == DIUseKind::SelfInit) {
-      assert(InitKind == IsInitialization);
-      AI->setOwnershipQualifier(AssignOwnershipQualifier::Reinit);
-    } else {
-      AI->setOwnershipQualifier((InitKind == IsInitialization
-                                 ? AssignOwnershipQualifier::Init
-                                 : AssignOwnershipQualifier::Reassign));
+    switch (Use.Kind) {
+    case DIUseKind::Initialization:
+      AI->setAssignInfo(AssignOwnershipQualifier::Init,
+                        AssignByWrapperInst::Destination::BackingWrapper);
+      break;
+    case DIUseKind::Assign:
+      AI->setAssignInfo(AssignOwnershipQualifier::Reassign,
+                        AssignByWrapperInst::Destination::BackingWrapper);
+      break;
+    case DIUseKind::AssignWrappedValue:
+      AI->setAssignInfo(AssignOwnershipQualifier::Reassign,
+                        AssignByWrapperInst::Destination::WrappedValue);
+      break;
+    default:
+      llvm_unreachable("Wrong use kind for assign_by_wrapper");
     }
 
     return;
