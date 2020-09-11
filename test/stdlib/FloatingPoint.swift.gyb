@@ -116,6 +116,47 @@ FloatingPoint.test("BinaryFloatingPoint/genericIntegerConversion") {
 }
 
 FloatingPoint.test("BinaryFloatingPoint/genericFloatingPointConversion") {
+  func convert<
+    T: BinaryFloatingPoint, U: BinaryFloatingPoint
+  >(exactly value: T, to: U.Type) -> U { U(exactly: value) }
+  
+  expectEqual(convert(exactly: 0 as Float, to: Double.self), 0.0)
+  expectEqual(convert(exactly: -0.0 as Float, to: Double.self), -0.0)
+  expectEqual(
+    convert(exactly: -0.0 as Float, to: Double.self).sign,
+    FloatingPointSign.minus)
+  expectEqual(convert(exactly: 0 as Double, to: Float.self), 0.0 as Float)
+  expectEqual(convert(exactly: -0.0 as Double, to: Float.self), -0.0 as Float)
+  expectEqual(
+    convert(exactly: -0.0 as Double, to: Float.self).sign,
+    FloatingPointSign.minus)
+  expectEqual(convert(exactly: 1 as Float, to: Double.self), 1.0)
+  expectEqual(convert(exactly: -1 as Float, to: Double.self), -1.0)
+  expectEqual(convert(exactly: 1 as Double, to: Float.self), 1.0 as Float)
+  expectEqual(convert(exactly: -1 as Double, to: Float.self), -1.0 as Float)
+  expectEqual(
+    convert(exactly: Float.infinity, to: Double.self), Double.infinity)
+  expectEqual(
+    convert(exactly: -Float.infinity, to: Double.self), -Double.infinity)
+  expectEqual(
+    convert(exactly: Double.infinity, to: Float.self), Float.infinity)
+  expectEqual(
+    convert(exactly: -Double.infinity, to: Float.self), -Float.infinity)
+  expectEqual(convert(exactly: Float.nan, to: Double.self), nil)
+  expectEqual(convert(exactly: Double.nan, to: Float.self), nil)
+  expectEqual(convert(exactly: Float.nan, to: Float.self), nil)
+  expectEqual(convert(exactly: Double.nan, to: Double.self), nil)
+  expectEqual(
+    convert(exactly: Double.leastNonzeroMagnitude, to: Float.self), nil)
+  expectEqual(
+    convert(exactly: Float.leastNonzeroMagnitude, to: Double.self),
+    Double(Float.leastNonzeroMagnitude))
+  expectEqual(
+    convert(exactly: Double.greatestFiniteMagnitude, to: Float.self), nil)
+  expectEqual(
+    convert(exactly: Float.greatestFiniteMagnitude, to: Double.self),
+    Double(Float.greatestFiniteMagnitude))
+  
   expectTrue(Double._convert(from: 0 as Float) == (value: 0, exact: true))
   expectTrue(Double._convert(from: -0.0 as Float) == (value: -0.0, exact: true))
   expectTrue(Double._convert(from: 1 as Float) == (value: 1, exact: true))
