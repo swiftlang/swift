@@ -23,12 +23,12 @@ actor class MySuperActor {
 
 actor class MyActor: MySuperActor {
   let immutable: Int = 17
-  var text: [String] = [] // expected-note 4{{mutable state is only available within the actor instance}}
+  var text: [String] = [] // expected-note 5{{mutable state is only available within the actor instance}}
 
   class func synchronousClass() { }
   static func synchronousStatic() { }
 
-  func synchronous() -> String { text.first ?? "nothing" } // expected-note 4{{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
+  func synchronous() -> String { text.first ?? "nothing" } // expected-note 5{{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
   func asynchronous() async -> String { synchronous() }
 }
 
@@ -71,20 +71,41 @@ extension MyActor {
 
     // Closures.
     let localConstant = 17
-    var localVar = 17 // expected-note 2{{var declared here}}
+    var localVar = 17 // expected-note 3{{var declared here}}
+
+    // Non-escaping closures are okay.
     acceptClosure {
-      _ = text[0] // expected-error{{actor-isolated property 'text' is unsafe to reference in code that may execute concurrently}}
-      _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' is unsafe to reference in code that may execute concurrently}}
-      _ = localVar // expected-warning{{local var 'localVar' is unsafe to reference in code that may execute concurrently}}
+      _ = text[0]
+      _ = self.synchronous()
+      _ = localVar
       _ = localConstant
     }
 
+    // Escaping closures might run concurrently.
     acceptEscapingClosure {
       _ = self.text[0] // expected-error{{actor-isolated property 'text' is unsafe to reference in code that may execute concurrently}}
       _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' is unsafe to reference in code that may execute concurrently}}
       _ = localVar // expected-warning{{local var 'localVar' is unsafe to reference in code that may execute concurrently}}
       _ = localConstant
     }
+
+    // Local functions might run concurrently.
+    func localFn1() {
+      _ = self.text[0] // expected-error{{actor-isolated property 'text' is unsafe to reference in code that may execute concurrently}}
+      _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' is unsafe to reference in code that may execute concurrently}}
+      _ = localVar // expected-warning{{local var 'localVar' is unsafe to reference in code that may execute concurrently}}
+      _ = localConstant
+    }
+
+    func localFn2() {
+      acceptClosure {
+        _ = text[0]  // expected-error{{actor-isolated property 'text' is unsafe to reference in code that may execute concurrently}}
+        _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' is unsafe to reference in code that may execute concurrently}}
+        _ = localVar // expected-warning{{local var 'localVar' is unsafe to reference in code that may execute concurrently}}
+        _ = localConstant
+      }
+    }
+
     localVar = 0
   }
 }

@@ -483,12 +483,32 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
     /// concurrently with code in the definition context.
     bool mayExecuteConcurrentlyWith(
         const DeclContext *useContext, const DeclContext *defContext) {
-      // If it's the same context, it won't execute concurrently.
-      if (useContext == defContext)
-        return false;
 
-      // Assume all child contexts can execute concurrently.
-      return true;
+      // Walk the context chain from the use to the definition.
+      while (useContext != defContext) {
+        // If we find an escaping closure, it can be run concurrently.
+        if (auto closure = dyn_cast<AbstractClosureExpr>(useContext)) {
+          if (auto type = closure->getType()) {
+            if (auto fnType = type->getAs<AnyFunctionType>())
+              if (!fnType->isNoEscape())
+                return true;
+          }
+        }
+
+        // If we find a local function, it can escape and be run concurrently.
+        if (auto func = dyn_cast<AbstractFunctionDecl>(useContext)) {
+          if (func->isLocalCapture())
+            return true;
+        }
+
+        // If we hit a module-scope context, it's not concurrent.
+        useContext = useContext->getParent();
+        if (useContext->isModuleScopeContext())
+          return false;
+      }
+
+      // We hit the same context, so it won't execute concurrently.
+      return false;
     }
 
     // Retrieve the nearest enclosing actor context.
