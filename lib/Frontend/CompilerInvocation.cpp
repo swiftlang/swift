@@ -238,6 +238,7 @@ SourceFileKind CompilerInvocation::getSourceFileKind() const {
     return SourceFileKind::SIL;
   case InputFileKind::None:
   case InputFileKind::LLVM:
+  case InputFileKind::ObjCHeader:
     llvm_unreachable("Trying to convert from unsupported InputFileKind");
   }
 

@@ -586,6 +586,7 @@ static bool shouldTreatSingleInputAsMain(InputFileKind inputKind) {
     return true;
   case InputFileKind::SwiftLibrary:
   case InputFileKind::LLVM:
+  case InputFileKind::ObjCHeader:
   case InputFileKind::None:
     return false;
   }
