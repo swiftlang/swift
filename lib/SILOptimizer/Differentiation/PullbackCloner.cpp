@@ -2432,7 +2432,8 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
         if (isSwitchEnumInstOnOptional(termInst)) {
           accumulateAdjointForOptional(bb, incomingValue, concreteBBArgAdjCopy);
         } else {
-          blockTemporaries[getPullbackBlock(predBB)].insert(concreteBBArgAdjCopy);
+          blockTemporaries[getPullbackBlock(predBB)].insert(
+              concreteBBArgAdjCopy);
           setAdjointValue(predBB, incomingValue,
                           makeConcreteAdjointValue(concreteBBArgAdjCopy));
         }
