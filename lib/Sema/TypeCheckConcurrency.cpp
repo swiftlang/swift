@@ -210,10 +210,9 @@ public:
     /// Access to the declaration is unsafe in a concurrent context.
     Unsafe,
 
-    /// The declaration can only be referenced from the given local context,
-    /// or a context that cannot execute concurrently with code in that
-    /// context.
-    Local,
+    /// The declaration is a local entity whose capture could introduce
+    /// data races. The context in which the local was defined is provided.
+    LocalCapture,
 
     /// References to this local variable that can only be made from the
     /// References to this member of an actor are only permitted on 'self'.
@@ -238,7 +237,7 @@ private:
   /// class that is isolated to the current actor instance.
   ///
   /// \returns the type of the actor.
-  static ClassDecl *getActorIsolatingInstanceMEmber(ValueDecl *value) {
+  static ClassDecl *getActorIsolatingInstanceMember(ValueDecl *value) {
     // Only instance members are isolated.
     if (!value->isInstanceMember())
       return nullptr;
@@ -263,7 +262,7 @@ public:
 
   /// Retrieve the declaration context in which a local was defined.
   DeclContext *getLocalContext() const {
-    assert(kind == Local);
+    assert(kind == LocalCapture);
     return data.localContext;
   }
 
@@ -292,8 +291,8 @@ public:
   }
 
   /// Access is restricted to code running within the given local context.
-  static IsolationRestriction forLocal(DeclContext *dc) {
-    IsolationRestriction result(Local);
+  static IsolationRestriction forLocalCapture(DeclContext *dc) {
+    IsolationRestriction result(LocalCapture);
     result.data.localContext = dc;
     return result;
   }
@@ -352,10 +351,10 @@ public:
       // Local captures can only be referenced in their local context or a
       // context that is guaranteed not to run concurrently with it.
       if (cast<ValueDecl>(decl)->isLocalCapture())
-        return forLocal(decl->getDeclContext());
+        return forLocalCapture(decl->getDeclContext());
 
       // Protected actor instance members can only be accessed on 'self'.
-      if (auto actorClass = getActorIsolatingInstanceMEmber(
+      if (auto actorClass = getActorIsolatingInstanceMember(
               cast<ValueDecl>(decl)))
         return forActorSelf(actorClass);
 
@@ -541,7 +540,7 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
       case IsolationRestriction::ActorSelf:
         llvm_unreachable("non-member reference into an actor");
 
-      case IsolationRestriction::Local:
+      case IsolationRestriction::LocalCapture:
         // Only diagnose unsafe concurrent accesses within the context of an
         // actor. This is globally unsafe, but locally enforceable.
         if (!getNearestEnclosingActorContext(getDeclContext()))
@@ -604,7 +603,7 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
         return false;
       }
 
-      case IsolationRestriction::Local:
+      case IsolationRestriction::LocalCapture:
         llvm_unreachable("Locals cannot be referenced with member syntax");
 
       case IsolationRestriction::Unsafe:
