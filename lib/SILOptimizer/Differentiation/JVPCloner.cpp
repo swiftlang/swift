@@ -88,7 +88,7 @@ private:
 
   /// Mapping from original basic blocks and original buffers to corresponding
   /// tangent buffers.
-  llvm::DenseMap<std::pair<SILBasicBlock *, SILValue>, SILValue> bufferMap;
+  llvm::DenseMap<SILValue, SILValue> bufferMap;
 
   llvm::DenseMap<SILBasicBlock *, SILValue> branchEnumFieldMap;
 
@@ -278,7 +278,7 @@ private:
   }
 
   /// Map the tangent value to the given original value.
-  void setTangentValue(SILBasicBlock *origBB, SILValue originalValue,
+  void setTangentValue(SILValue originalValue,
                        AdjointValue newTangentValue) {
 #ifndef NDEBUG
     if (auto *defInst = originalValue->getDefiningInstruction()) {
@@ -309,21 +309,21 @@ private:
 
   /// Sets the tangent buffer for the original buffer. Asserts that the
   /// original buffer does not already have a tangent buffer.
-  void setTangentBuffer(SILBasicBlock *origBB, SILValue originalBuffer,
+  void setTangentBuffer(SILValue originalBuffer,
                         SILValue tangentBuffer) {
     assert(originalBuffer->getType().isAddress());
     auto insertion =
-        bufferMap.try_emplace({origBB, originalBuffer}, tangentBuffer);
+        bufferMap.try_emplace(originalBuffer, tangentBuffer);
     assert(insertion.second && "Tangent buffer already exists");
     (void)insertion;
   }
 
   /// Returns the tangent buffer for the original buffer. Asserts that the
   /// original buffer has a tangent buffer.
-  SILValue &getTangentBuffer(SILBasicBlock *origBB, SILValue originalBuffer) {
+  SILValue &getTangentBuffer(SILValue originalBuffer) {
     assert(originalBuffer->getType().isAddress());
     assert(originalBuffer->getFunction() == original);
-    auto it = bufferMap.find({origBB, originalBuffer});
+    auto it = bufferMap.find(originalBuffer);
     assert(it != bufferMap.end() && "Tangent buffer should already exist");
     return it->getSecond();
   }
@@ -388,7 +388,11 @@ private:
                                       SILBasicBlock *origSuccBB) {
     auto *trampBB = jvpTrampolineBBMap.lookup({bb, origSuccBB});
     assert(trampBB && "trampoline block mapping should have been added");
-    auto trampBuilder = SILBuilder(trampBB);
+    SILBuilderWithScope trampBuilder(trampBB, &BBMap[bb]->back());
+    llvm::errs() << "DebugScope\n";
+    diffBBMap[bb]->back().dump();
+    llvm::errs() << diffBBMap[bb]->back().getDebugScope() << '\n';
+    llvm::errs() << diffBBMap[bb]->back().getDebugScope()->getParentFunction()->getName() << '\n';
     // Step 1: Create enum with the undef payload for the next succ bb.
     auto *succStruct = differentialInfo.getLinearMapStruct(origSuccBB);
     auto succStructLoweredTy = getLoweredType( // !! TODO ??
@@ -402,8 +406,11 @@ private:
     assert(enumEltDecl && "should have found the enum element decl.");
 //    auto enumEltType = getOpType(
 //        enumLoweredTy.getEnumElementType(enumEltDecl, getModule()));
+    //getBuilder().setCurrentDebugScope(getOpScope(bb->getTerminator()->getDebugScope()));
+    //getBuilder().setCurrentDebugScope(getOpScope)
     auto *succEnum =
         trampBuilder.createEnum(loc, undefStruct, enumEltDecl, enumLoweredTy);
+    llvm::errs() << "succ: " << succEnum->getFunction()->getName() << '\n';
 
     // Step 2: Set the successor of the current bb to be the next succ bb.
     auto *succFieldLookup = differentialInfo.lookUpLinearMapStructEnumField(bb);
@@ -546,7 +553,7 @@ public:
       for (auto i : range(bb->getNumArguments())) {
         auto arg = bb->getArgument(i);
         auto diffArg = diffBB->getArgument(i);
-        setTangentValue(bb, arg, makeConcreteTangentValue(diffArg));
+        setTangentValue(arg, makeConcreteTangentValue(diffArg));
       }
     }
     auto diffLoc = getDifferential().getLocation();
@@ -591,7 +598,7 @@ public:
     if (!shouldDifferentiate) {
       for (auto indResult : ai->getIndirectSILResults())
         if (activityInfo.isActive(indResult, getIndices())) {
-          auto &tanBuf = getTangentBuffer(ai->getParent(), indResult);
+          auto &tanBuf = getTangentBuffer(indResult);
           emitZeroIndirect(tanBuf->getType().getASTType(), tanBuf,
                            tanBuf.getLoc());
         }
@@ -828,7 +835,7 @@ public:
       field->dump();
       differential->dump();
       builder.emitStoreValueOperation(loc, differential, field,
-        StoreOwnershipQualifier::Assign);
+        StoreOwnershipQualifier::Init);
     } else {
       llvm::errs() << "C2\n";
       auto *jvpBlock = builder.getInsertionBB();
@@ -861,7 +868,8 @@ public:
     auto *origExit = ri->getParent();
     auto &builder = getBuilder();
     //auto *diffStructVal = buildDifferentialValueStructValue(ri);
-    auto diffStructVal = builder.createLoad(loc, bb0Struct, LoadOwnershipQualifier::Copy);
+    auto diffStructVal = builder.emitLoadValueOperation(loc, bb0Struct, LoadOwnershipQualifier::Take);
+    //auto diffStructVal = builder.createLoad(loc, bb0Struct, LoadOwnershipQualifier::Copy);
     //diffStructVal = builder.createLoad(loc, diffStructVal, LoadOwnershipQualifier::Copy);
     // Get the JVP value corresponding to the original functions's return value.
     auto *origRetInst = cast<ReturnInst>(origExit->getTerminator());
@@ -1012,8 +1020,7 @@ public:
     auto loc = bbi->getLoc();
     auto tanVal = materializeTangent(getTangentValue(bbi->getOperand()), loc);
     auto tanValBorrow = diffBuilder.emitBeginBorrowOperation(loc, tanVal);
-    setTangentValue(bbi->getParent(), bbi,
-                    makeConcreteTangentValue(tanValBorrow));
+    setTangentValue(bbi, makeConcreteTangentValue(tanValBorrow));
   }
 
   CLONE_AND_EMIT_TANGENT(EndBorrow, ebi) {
@@ -1035,8 +1042,7 @@ public:
     auto tan = getTangentValue(cvi->getOperand());
     auto tanVal = materializeTangent(tan, cvi->getLoc());
     auto tanValCopy = diffBuilder.emitCopyValueOperation(cvi->getLoc(), tanVal);
-    setTangentValue(cvi->getParent(), cvi,
-                    makeConcreteTangentValue(tanValCopy));
+    setTangentValue(cvi, makeConcreteTangentValue(tanValCopy));
   }
 
   /// Handle `load` instruction.
@@ -1050,7 +1056,7 @@ public:
       auto isTake =
           (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take);
       if (isTake && activityInfo.isActive(li->getOperand(), getIndices())) {
-        auto &tanBuf = getTangentBuffer(li->getParent(), li->getOperand());
+        auto &tanBuf = getTangentBuffer(li->getOperand());
         getDifferentialBuilder().emitDestroyOperation(tanBuf.getLoc(), tanBuf);
       }
       return;
@@ -1059,10 +1065,10 @@ public:
     auto &diffBuilder = getDifferentialBuilder();
     auto *bb = li->getParent();
     auto loc = li->getLoc();
-    auto tanBuf = getTangentBuffer(bb, li->getOperand());
+    auto tanBuf = getTangentBuffer(li->getOperand());
     auto tanVal = diffBuilder.emitLoadValueOperation(
         loc, tanBuf, li->getOwnershipQualifier());
-    setTangentValue(bb, li, makeConcreteTangentValue(tanVal));
+    setTangentValue(li, makeConcreteTangentValue(tanVal));
   }
 
   /// Handle `load_borrow` instruction.
@@ -1072,9 +1078,9 @@ public:
     auto &diffBuilder = getDifferentialBuilder();
     auto *bb = lbi->getParent();
     auto loc = lbi->getLoc();
-    auto tanBuf = getTangentBuffer(bb, lbi->getOperand());
+    auto tanBuf = getTangentBuffer(lbi->getOperand());
     auto tanVal = diffBuilder.emitLoadBorrowOperation(loc, tanBuf);
-    setTangentValue(bb, lbi, makeConcreteTangentValue(tanVal));
+    setTangentValue(lbi, makeConcreteTangentValue(tanVal));
   }
 
   /// Handle `store` instruction in the differential.
@@ -1086,7 +1092,7 @@ public:
     // the active buffer's tangent buffer.
     if (!differentialInfo.shouldDifferentiateInstruction(si)) {
       if (activityInfo.isActive(si->getDest(), getIndices())) {
-        auto &tanBufDest = getTangentBuffer(si->getParent(), si->getDest());
+        auto &tanBufDest = getTangentBuffer(si->getDest());
         emitZeroIndirect(tanBufDest->getType().getASTType(), tanBufDest,
                          tanBufDest.getLoc());
       }
@@ -1096,7 +1102,7 @@ public:
     auto &diffBuilder = getDifferentialBuilder();
     auto loc = si->getLoc();
     auto tanValSrc = materializeTangent(getTangentValue(si->getSrc()), loc);
-    auto &tanValDest = getTangentBuffer(si->getParent(), si->getDest());
+    auto &tanValDest = getTangentBuffer(si->getDest());
     llvm::errs() << "STORE 1089\n";
     tanValDest->dump();
     diffBuilder.emitStoreValueOperation(loc, tanValSrc, tanValDest,
@@ -1112,7 +1118,7 @@ public:
     // the active buffer's tangent buffer.
     if (!differentialInfo.shouldDifferentiateInstruction(sbi)) {
       if (activityInfo.isActive(sbi->getDest(), getIndices())) {
-        auto &tanBufDest = getTangentBuffer(sbi->getParent(), sbi->getDest());
+        auto &tanBufDest = getTangentBuffer(sbi->getDest());
         emitZeroIndirect(tanBufDest->getType().getASTType(), tanBufDest,
                          tanBufDest.getLoc());
       }
@@ -1122,7 +1128,7 @@ public:
     auto &diffBuilder = getDifferentialBuilder();
     auto loc = sbi->getLoc();
     auto tanValSrc = materializeTangent(getTangentValue(sbi->getSrc()), loc);
-    auto &tanValDest = getTangentBuffer(sbi->getParent(), sbi->getDest());
+    auto &tanValDest = getTangentBuffer(sbi->getDest());
     diffBuilder.createStoreBorrow(loc, tanValSrc, tanValDest);
   }
 
@@ -1137,13 +1143,13 @@ public:
     // the source buffer's tangent buffer.
     if (!differentialInfo.shouldDifferentiateInstruction(cai)) {
       if (activityInfo.isActive(cai->getDest(), getIndices())) {
-        auto &tanBufDest = getTangentBuffer(cai->getParent(), cai->getDest());
+        auto &tanBufDest = getTangentBuffer(cai->getDest());
         emitZeroIndirect(tanBufDest->getType().getASTType(), tanBufDest,
                          tanBufDest.getLoc());
       }
       if (cai->isTakeOfSrc() &&
           activityInfo.isActive(cai->getSrc(), getIndices())) {
-        auto &tanBufSrc = getTangentBuffer(cai->getParent(), cai->getSrc());
+        auto &tanBufSrc = getTangentBuffer(cai->getSrc());
         getDifferentialBuilder().emitDestroyOperation(tanBufSrc.getLoc(),
                                                       tanBufSrc);
       }
@@ -1153,8 +1159,8 @@ public:
     auto diffBuilder = getDifferentialBuilder();
     auto loc = cai->getLoc();
     auto *bb = cai->getParent();
-    auto &tanSrc = getTangentBuffer(bb, cai->getSrc());
-    auto tanDest = getTangentBuffer(bb, cai->getDest());
+    auto &tanSrc = getTangentBuffer(cai->getSrc());
+    auto tanDest = getTangentBuffer(cai->getDest());
     diffBuilder.createCopyAddr(loc, tanSrc, tanDest, cai->isTakeOfSrc(),
                                cai->isInitializationOfDest());
   }
@@ -1167,8 +1173,8 @@ public:
     auto diffBuilder = getDifferentialBuilder();
     auto loc = uccai->getLoc();
     auto *bb = uccai->getParent();
-    auto &tanSrc = getTangentBuffer(bb, uccai->getSrc());
-    auto tanDest = getTangentBuffer(bb, uccai->getDest());
+    auto &tanSrc = getTangentBuffer(uccai->getSrc());
+    auto tanDest = getTangentBuffer(uccai->getDest());
 
     diffBuilder.createUnconditionalCheckedCastAddr(
         loc, tanSrc, tanSrc->getType().getASTType(), tanDest,
@@ -1200,11 +1206,11 @@ public:
     auto &diffBuilder = getDifferentialBuilder();
     auto *bb = bai->getParent();
 
-    auto tanSrc = getTangentBuffer(bb, bai->getSource());
+    auto tanSrc = getTangentBuffer(bai->getSource());
     auto *tanDest = diffBuilder.createBeginAccess(
         bai->getLoc(), tanSrc, bai->getAccessKind(), bai->getEnforcement(),
         bai->hasNoNestedConflict(), bai->isFromBuiltin());
-    setTangentBuffer(bb, bai, tanDest);
+    setTangentBuffer(bai, tanDest);
   }
 
   /// Handle `end_access` instruction.
@@ -1214,7 +1220,7 @@ public:
     auto &diffBuilder = getDifferentialBuilder();
     auto *bb = eai->getParent();
     auto loc = eai->getLoc();
-    auto tanOperand = getTangentBuffer(bb, eai->getOperand());
+    auto tanOperand = getTangentBuffer(eai->getOperand());
     diffBuilder.createEndAccess(loc, tanOperand, eai->isAborting());
   }
 
@@ -1226,7 +1232,7 @@ public:
     auto *mappedAllocStackInst = diffBuilder.createAllocStack(
         asi->getLoc(), getRemappedTangentType(asi->getElementType()),
         asi->getVarInfo());
-    setTangentBuffer(asi->getParent(), asi, mappedAllocStackInst);
+    setTangentBuffer(asi, mappedAllocStackInst);
   }
 
   /// Handle `dealloc_stack` instruction.
@@ -1234,7 +1240,7 @@ public:
   ///    Tangent: dealloc_stack tan[x]
   CLONE_AND_EMIT_TANGENT(DeallocStack, dsi) {
     auto &diffBuilder = getDifferentialBuilder();
-    auto tanBuf = getTangentBuffer(dsi->getParent(), dsi->getOperand());
+    auto tanBuf = getTangentBuffer(dsi->getOperand());
     diffBuilder.createDeallocStack(dsi->getLoc(), tanBuf);
   }
 
@@ -1243,7 +1249,7 @@ public:
   ///    Tangent: destroy_addr tan[x]
   CLONE_AND_EMIT_TANGENT(DestroyAddr, dai) {
     auto &diffBuilder = getDifferentialBuilder();
-    auto tanBuf = getTangentBuffer(dai->getParent(), dai->getOperand());
+    auto tanBuf = getTangentBuffer(dai->getOperand());
     diffBuilder.createDestroyAddr(dai->getLoc(), tanBuf);
   }
 
@@ -1257,7 +1263,7 @@ public:
       tangentElements.push_back(getTangentValue(elem).getConcreteValue());
     auto tanExtract = diffBuilder.createStruct(
         si->getLoc(), getRemappedTangentType(si->getType()), tangentElements);
-    setTangentValue(si->getParent(), si, makeConcreteTangentValue(tanExtract));
+    setTangentValue(si, makeConcreteTangentValue(tanExtract));
   }
 
   /// Handle `struct_extract` instruction.
@@ -1287,7 +1293,7 @@ public:
         diffBuilder.createStructExtract(loc, tanStruct, tanField);
     // Update tangent value mapping for `struct_extract` result.
     auto tangentResult = makeConcreteTangentValue(tangentInst);
-    setTangentValue(sei->getParent(), sei, tangentResult);
+    setTangentValue(sei, tangentResult);
   }
 
   /// Handle `struct_element_addr` instruction.
@@ -1312,11 +1318,11 @@ public:
       return;
     }
     // Emit tangent `struct_element_addr`.
-    auto tanOperand = getTangentBuffer(bb, seai->getOperand());
+    auto tanOperand = getTangentBuffer(seai->getOperand());
     auto tangentInst =
         diffBuilder.createStructElementAddr(loc, tanOperand, tanField);
     // Update tangent buffer map for `struct_element_addr`.
-    setTangentBuffer(bb, seai, tangentInst);
+    setTangentBuffer(seai, tangentInst);
   }
 
   /// Handle `tuple` instruction.
@@ -1337,7 +1343,7 @@ public:
     // Emit the instruction and add the tangent mapping.
     auto tanTuple =
         joinElements(tangentTupleElements, diffBuilder, ti->getLoc());
-    setTangentValue(ti->getParent(), ti, makeConcreteTangentValue(tanTuple));
+    setTangentValue(ti, makeConcreteTangentValue(tanTuple));
   }
 
   /// Handle `tuple_extract` instruction.
@@ -1361,12 +1367,12 @@ public:
     // If the tangent value of the source does not have a tuple type, then
     // it must represent a "single element tuple type". Use it directly.
     if (!tanSource->getType().is<TupleType>()) {
-      setTangentValue(tei->getParent(), tei,
+      setTangentValue(tei,
                       makeConcreteTangentValue(tanSource));
     } else {
       auto tanElt =
           diffBuilder.createTupleExtract(loc, tanSource, tanIndex, tanType);
-      setTangentValue(tei->getParent(), tei, makeConcreteTangentValue(tanElt));
+      setTangentValue(tei, makeConcreteTangentValue(tanElt));
     }
   }
 
@@ -1385,7 +1391,7 @@ public:
         ++tanIndex;
     }
     auto tanType = getRemappedTangentType(teai->getType());
-    auto tanSource = getTangentBuffer(teai->getParent(), teai->getOperand());
+    auto tanSource = getTangentBuffer(teai->getOperand());
     SILValue tanBuf;
     // If the tangent buffer of the source does not have a tuple type, then
     // it must represent a "single element tuple type". Use it directly.
@@ -1395,7 +1401,7 @@ public:
       tanBuf = diffBuilder.createTupleElementAddr(teai->getLoc(), tanSource,
                                                   tanIndex, tanType);
     }
-    setTangentBuffer(teai->getParent(), teai, tanBuf);
+    setTangentBuffer(teai, tanBuf);
   }
 
   /// Handle `destructure_tuple` instruction.
@@ -1427,7 +1433,7 @@ public:
       auto origElt = dti->getResult(i);
       if (!getTangentSpace(origElt->getType().getASTType()))
         continue;
-      setTangentValue(bb, origElt, makeConcreteTangentValue(tanElts[tanIdx++]));
+      setTangentValue(origElt, makeConcreteTangentValue(tanElts[tanIdx++]));
     }
   }
 
@@ -1464,6 +1470,7 @@ public:
     auto enumField = branchEnumFieldMap[bb];
 
     // Emit inst.
+    //getBuilder().setCurrentDebugScope(getOpScope(bi->getDebugScope()));
     auto autoLoc = RegularLocation::getAutoGeneratedLocation();
     if (branchableBlocks.size() == 1) {
       auto *payload = diffBuilder.createUncheckedEnumData(
@@ -1512,6 +1519,7 @@ public:
     auto enumField = branchEnumFieldMap[bb];
 
     // Emit inst.
+    //getBuilder().setCurrentDebugScope(getOpScope(cbi->getDebugScope()));
     diffBuilder.createSwitchEnum(RegularLocation::getAutoGeneratedLocation(), enumField, nullptr, branchableBlocks);
   }
 
@@ -1539,7 +1547,7 @@ public:
     SmallVector<SILValue, 8> diffArgs;
 
     for (auto indRes : ai->getIndirectSILResults())
-      diffArgs.push_back(getTangentBuffer(bb, indRes));
+      diffArgs.push_back(getTangentBuffer(indRes));
 
     auto paramArgs = ai->getArgumentsWithoutIndirectResults();
     // Get the tangent value of the original arguments.
@@ -1576,7 +1584,7 @@ public:
         if (origArg->getType().isObject()) {
           tanParam = materializeTangent(getTangentValue(origArg), loc);
         } else {
-          tanParam = getTangentBuffer(ai->getParent(), origArg);
+          tanParam = getTangentBuffer(origArg);
         }
         diffArgs.push_back(tanParam);
         if (errorOccurred)
@@ -1631,7 +1639,7 @@ public:
           differentialAllResults[differentialResultIndex++];
       if (origResult->getType().isObject()) {
         if (!origResult->getType().is<TupleType>()) {
-          setTangentValue(bb, origResult,
+          setTangentValue(origResult,
                           makeConcreteTangentValue(differentialResult));
         } else if (auto *dti = getSingleDestructureTupleUser(ai)) {
           bool notSetValue = true;
@@ -1641,7 +1649,7 @@ public:
                      "This was incorrectly set, should only have one active "
                      "result from the tuple.");
               notSetValue = false;
-              setTangentValue(bb, result,
+              setTangentValue(result,
                               makeConcreteTangentValue(differentialResult));
             }
           }
@@ -1872,9 +1880,9 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
     auto *origArg = origParamArgs[*diffParamsIt];
     ++diffParamsIt;
     if (diffArg->getType().isAddress()) {
-      setTangentBuffer(origEntry, origArg, diffArg);
+      setTangentBuffer(origArg, diffArg);
     } else {
-      setTangentValue(origEntry, origArg, makeConcreteTangentValue(diffArg));
+      setTangentValue(origArg, makeConcreteTangentValue(diffArg));
     }
     LLVM_DEBUG(getADDebugStream()
                << "Assigned parameter " << *diffArg
@@ -1901,7 +1909,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
       if (origResult->getType().isObject())
         continue;
       auto diffIndResult = diffIndResults[differentialIndirectResultIndex++];
-      setTangentBuffer(origEntry, origResult, diffIndResult);
+      setTangentBuffer(origResult, diffIndResult);
       // If original indirect result is non-varied, zero-initialize its tangent
       // buffer.
       if (!activityInfo.isVaried(origResult, getIndices().parameters))
@@ -1920,7 +1928,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
     if (getIndices().parameters->contains(paramIndex))
       continue;
     auto diffIndResult = diffIndResults[differentialIndirectResultIndex++];
-    setTangentBuffer(origEntry, origResult, diffIndResult);
+    setTangentBuffer(origResult, diffIndResult);
     // Original `inout` parameters are initialized, so their tangent buffers
     // must also be initialized.
     emitZeroIndirect(diffIndResult->getType().getASTType(),
@@ -2060,7 +2068,8 @@ bool JVPCloner::Implementation::run() {
   // created yet and thus must wait until they are all created.
   for (auto &origBB : *original) {
     for (auto &succ : origBB.getSuccessors()) {
-      auto loc = origBB.getParent()->getLocation();
+      //auto loc = origBB.getParent()->getLocation();
+      auto loc = RegularLocation::getAutoGeneratedLocation();
       auto *trampBB =
           jvpTrampolineBBMap.lookup({&origBB, succ.getBB()});
       assert(trampBB && "trampoline block mapping should been found");
