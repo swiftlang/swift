@@ -5,7 +5,13 @@
 // REQUIRES: asan_runtime
 // REQUIRES: VENDOR=apple
 
-// REQUIRES: rdar68353068
+// We copy the binary but not the corresponding .dSYM for remote runs (e.g.,
+// on-device testing), and hence online symbolication fails.
+// UNSUPPORTED: remote_run
+
+// The 32-bit iOS simulator is old and has an outdated version of atos that
+// can't demangle current Swift symbol names (the mangling scheme has changed).
+// UNSUPPORTED: CPU=i386 && OS=ios
 
 // Check that Sanitizer reports are properly symbolicated on Apple platforms,
 // both out-of-process (via `atos`) and when falling back to in-process
