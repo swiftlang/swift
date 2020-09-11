@@ -244,7 +244,7 @@ function(_add_target_variant_swift_compile_flags
       "-F${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/../../../Developer/Library/Frameworks")
   endif()
 
-  swift_optimize_flag_for_build_type("${CMAKE_BUILD_TYPE}" optimize_flag)
+  swift_optimize_flag_for_build_type("${build_type}" optimize_flag)
   list(APPEND result "${optimize_flag}")
 
   is_build_type_with_debuginfo("${build_type}" debuginfo)
