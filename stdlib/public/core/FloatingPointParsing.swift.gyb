@@ -166,7 +166,13 @@ extension ${Self}: LosslessStringConvertible {
   // In particular, we still have to export
   // _swift_stdlib_strtoXYZ_clocale()
   // as ABI to support old compiled code that still requires it.
+%if bits == 16:
+  @available(iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+  @available(macOS, unavailable)
+  @available(macCatalyst, unavailable)
+%else:
   @available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+%end
   public init?(_ text: Substring) {
     self = 0.0
     let success = withUnsafeMutablePointer(to: &self) { p -> Bool in
