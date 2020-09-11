@@ -4137,6 +4137,23 @@ ERROR(actor_without_concurrency,none,
 ERROR(actor_with_nonactor_superclass,none,
       "actor class cannot inherit from non-actor class %0", (DeclName))
 
+ERROR(actor_isolated_non_self_reference,none,
+        "actor-isolated %0 %1 can only be referenced "
+        "%select{inside the actor|on 'self'}2",
+        (DescriptiveDeclKind, DeclName, bool))
+WARNING(concurrent_access,none,
+        "%select{local|actor-isolated}0 %1 %2 is unsafe to reference in code "
+        "that may execute concurrently",
+        (bool, DescriptiveDeclKind, DeclName))
+NOTE(actor_isolated_method,none,
+     "only asynchronous methods can be used outside the actor instance; "
+     "do you want to add 'async'?", ())
+NOTE(actor_mutable_state,none,
+     "mutable state is only available within the actor instance", ())
+WARNING(shared_mutable_state_access,none,
+        "reference to %0 %1 is not concurrency-safe because it involves "
+        "shared mutable state", (DescriptiveDeclKind, DeclName))
+
 //------------------------------------------------------------------------------
 // MARK: Type Check Types
 //------------------------------------------------------------------------------
