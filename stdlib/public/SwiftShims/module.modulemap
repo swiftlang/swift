@@ -48,6 +48,10 @@ module _SwiftSafariServicesOverlayShims {
   header "SafariServicesOverlayShims.h"
 }
 
+module _SwiftAppKitOverlayShims {
+  header "AppKitOverlayShims.h"
+}
+
 module _SwiftUIKitOverlayShims {
   header "UIKitOverlayShims.h"
 }
