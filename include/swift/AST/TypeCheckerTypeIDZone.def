@@ -208,7 +208,8 @@ SWIFT_REQUEST(TypeChecker, SynthesizeAccessorRequest,
 SWIFT_REQUEST(TypeChecker, TangentStoredPropertyRequest,
               llvm::Expected<VarDecl *>(VarDecl *, CanType), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeCheckFunctionBodyRequest,
-              bool(AbstractFunctionDecl *), Cached, NoLocationInfo)
+              BraceStmt *(AbstractFunctionDecl *), SeparatelyCached,
+              NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeCheckASTNodeAtLocRequest,
               bool(DeclContext *, SourceLoc),
               Uncached, NoLocationInfo)

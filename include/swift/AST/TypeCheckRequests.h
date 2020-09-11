@@ -884,14 +884,11 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Request to type check the body of the given function.
-///
-/// Produces true if an error occurred, false otherwise.
-/// FIXME: it would be far better to return the type-checked body.
-class TypeCheckFunctionBodyRequest :
-    public SimpleRequest<TypeCheckFunctionBodyRequest,
-                         bool(AbstractFunctionDecl *),
-                         RequestFlags::Cached|RequestFlags::DependencySource> {
+/// Request to retrieve the type-checked body of the given function.
+class TypeCheckFunctionBodyRequest
+    : public SimpleRequest<
+          TypeCheckFunctionBodyRequest, BraceStmt *(AbstractFunctionDecl *),
+          RequestFlags::SeparatelyCached | RequestFlags::DependencySource> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -899,10 +896,13 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, AbstractFunctionDecl *func) const;
+  BraceStmt *evaluate(Evaluator &evaluator, AbstractFunctionDecl *func) const;
 
 public:
+  // Separate caching.
   bool isCached() const { return true; }
+  Optional<BraceStmt *> getCachedResult() const;
+  void cacheResult(BraceStmt *body) const;
 
 public:
   // Incremental dependencies.

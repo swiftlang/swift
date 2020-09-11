@@ -510,8 +510,8 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
              fd->getResultInterfaceType(), fd->hasThrows(), fd->getThrowsLoc());
   prepareEpilog(true, fd->hasThrows(), CleanupLocation(fd));
 
-  emitProfilerIncrement(fd->getBody());
-  emitStmt(fd->getBody());
+  emitProfilerIncrement(fd->getTypecheckedBody());
+  emitStmt(fd->getTypecheckedBody());
 
   emitEpilog(fd);
 

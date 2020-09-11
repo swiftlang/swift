@@ -5835,6 +5835,7 @@ protected:
   };
 
   friend class ParseAbstractFunctionBodyRequest;
+  friend class TypeCheckFunctionBodyRequest;
 
   CaptureInfo Captures;
 
@@ -5968,7 +5969,12 @@ public:
   /// \sa hasBody()
   BraceStmt *getBody(bool canSynthesize = true) const;
 
-  void setBody(BraceStmt *S, BodyKind NewBodyKind = BodyKind::Parsed);
+  /// Retrieve the type-checked body of the given function, or \c nullptr if
+  /// there's no body available.
+  BraceStmt *getTypecheckedBody() const;
+
+  /// Set a new body for the function.
+  void setBody(BraceStmt *S, BodyKind NewBodyKind);
 
   /// Note that the body was skipped for this function.  Function body
   /// cannot be attached after this call.
