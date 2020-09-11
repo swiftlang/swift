@@ -2111,22 +2111,21 @@ static int doInputCompletenessTest(StringRef SourceFilename) {
 //===----------------------------------------------------------------------===//
 
 static ModuleDecl *getModuleByFullName(ASTContext &Context, StringRef ModuleName) {
-  SmallVector<Located<Identifier>, 4>
-      AccessPath;
+  ImportPath::Module::Builder builder;
   while (!ModuleName.empty()) {
     StringRef SubModuleName;
     std::tie(SubModuleName, ModuleName) = ModuleName.split('.');
-    AccessPath.push_back(
-        { Context.getIdentifier(SubModuleName), SourceLoc() });
+    builder.push_back(Context.getIdentifier(SubModuleName));
   }
-  ModuleDecl *Result = Context.getModule(AccessPath);
+  ModuleDecl *Result = Context.getModule(builder.get());
   if (!Result || Result->failedToLoad())
     return nullptr;
   return Result;
 }
 
 static ModuleDecl *getModuleByFullName(ASTContext &Context, Identifier ModuleName) {
-  ModuleDecl *Result = Context.getModule({ Located<Identifier>(ModuleName,SourceLoc()) });
+  ModuleDecl *Result = Context.getModule(
+                             ImportPath::Module::Builder(ModuleName).get());
   if (!Result || Result->failedToLoad())
     return nullptr;
   return Result;

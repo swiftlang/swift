@@ -92,18 +92,17 @@ typedef SwiftInterfaceGenContext::Implementation::TextDecl TextDecl;
 typedef SwiftInterfaceGenContext::Implementation::SourceTextInfo SourceTextInfo;
 
 static ModuleDecl *getModuleByFullName(ASTContext &Ctx, StringRef ModuleName) {
-  SmallVector<Located<Identifier>, 4>
-      AccessPath;
+  ImportPath::Module::Builder builder;
   while (!ModuleName.empty()) {
     StringRef SubModuleName;
     std::tie(SubModuleName, ModuleName) = ModuleName.split('.');
-    AccessPath.push_back({ Ctx.getIdentifier(SubModuleName), SourceLoc() });
+    builder.push_back(Ctx.getIdentifier(SubModuleName));
   }
-  return Ctx.getModule(AccessPath);
+  return Ctx.getModule(builder.get());
 }
 
 static ModuleDecl *getModuleByFullName(ASTContext &Ctx, Identifier ModuleName) {
-  return Ctx.getModule({ Located<Identifier>(ModuleName, SourceLoc()) });
+  return Ctx.getModule(ImportPath::Module::Builder(ModuleName).get());
 }
 
 namespace {

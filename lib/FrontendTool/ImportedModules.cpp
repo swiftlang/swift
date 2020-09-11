@@ -66,9 +66,9 @@ bool swift::emitImportedModules(ModuleDecl *mainModule,
     if (!ID)
       continue;
 
-    auto accessPath = ID->getModulePath();
+    auto modulePath = ID->getModulePath();
     // only the top-level name is needed (i.e. A in A.B.C)
-    Modules.insert(accessPath[0].Item.str());
+    Modules.insert(modulePath[0].Item.str());
   }
 
   // And now look in the C code we're possibly using.
@@ -97,7 +97,7 @@ bool swift::emitImportedModules(ModuleDecl *mainModule,
 
   if (opts.ImportUnderlyingModule) {
     auto underlyingModule = clangImporter->loadModule(SourceLoc(),
-      { Located<Identifier>(mainModule->getName(), SourceLoc()) });
+      ImportPath::Module::Builder(mainModule->getName()).get());
     if (!underlyingModule) {
       Context.Diags.diagnose(SourceLoc(),
                              diag::error_underlying_module_not_found,

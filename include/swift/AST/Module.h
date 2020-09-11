@@ -203,17 +203,18 @@ class ModuleDecl : public DeclContext, public TypeDecl {
   friend class DirectPrecedenceGroupLookupRequest;
 
 public:
-  typedef ArrayRef<Located<Identifier>> AccessPathTy;
+  LLVM_ATTRIBUTE_DEPRECATED(typedef ArrayRef<Located<Identifier>> AccessPathTy,
+                            "use ImportPath types instead");
   /// Convenience struct to keep track of a module along with its access path.
   struct alignas(uint64_t) ImportedModule {
     /// The access path from an import: `import Foo.Bar` -> `Foo.Bar`.
-    ModuleDecl::AccessPathTy accessPath;
+    ImportPath::Access accessPath;
     /// The actual module corresponding to the import.
     ///
     /// Invariant: The pointer is non-null.
     ModuleDecl *importedModule;
 
-    ImportedModule(ModuleDecl::AccessPathTy accessPath,
+    ImportedModule(ImportPath::Access accessPath,
                    ModuleDecl *importedModule)
         : accessPath(accessPath), importedModule(importedModule) {
       assert(this->importedModule);
@@ -225,7 +226,10 @@ public:
     }
   };
 
-  static bool matchesAccessPath(AccessPathTy AccessPath, DeclName Name) {
+  LLVM_ATTRIBUTE_DEPRECATED(
+    static bool matchesAccessPath(AccessPathTy AccessPath, DeclName Name),
+    "use ImportPath::Access::matches() instead")
+  {
     assert(AccessPath.size() <= 1 && "can only refer to top-level decls");
   
     return AccessPath.empty()
@@ -240,8 +244,8 @@ public:
       if (lhs.importedModule != rhs.importedModule)
         return std::less<const ModuleDecl *>()(lhs.importedModule,
                                                rhs.importedModule);
-      if (lhs.accessPath.data() != rhs.accessPath.data())
-        return std::less<AccessPathTy::iterator>()(lhs.accessPath.begin(),
+      if (lhs.accessPath.getRaw().data() != rhs.accessPath.getRaw().data())
+        return std::less<ImportPath::Raw::iterator>()(lhs.accessPath.begin(),
                                                    rhs.accessPath.begin());
       return lhs.accessPath.size() < rhs.accessPath.size();
     }
@@ -583,7 +587,7 @@ public:
   /// Find ValueDecls in the module and pass them to the given consumer object.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
-  void lookupVisibleDecls(AccessPathTy AccessPath,
+  void lookupVisibleDecls(ImportPath::Access AccessPath,
                           VisibleDeclConsumer &Consumer,
                           NLKind LookupKind) const;
 
@@ -596,13 +600,13 @@ public:
   /// Finds all class members defined in this module.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
-  void lookupClassMembers(AccessPathTy accessPath,
+  void lookupClassMembers(ImportPath::Access accessPath,
                           VisibleDeclConsumer &consumer) const;
 
   /// Finds class members defined in this module with the given name.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
-  void lookupClassMember(AccessPathTy accessPath,
+  void lookupClassMember(ImportPath::Access accessPath,
                          DeclName name,
                          SmallVectorImpl<ValueDecl*> &results) const;
 
@@ -757,7 +761,9 @@ public:
   /// identifiers.
   ///
   /// Source locations are ignored here.
-  static bool isSameAccessPath(AccessPathTy lhs, AccessPathTy rhs);
+  LLVM_ATTRIBUTE_DEPRECATED(
+    static bool isSameAccessPath(AccessPathTy lhs, AccessPathTy rhs),
+    "use ImportPath::Access::isSameAs() instead");
 
   /// Get the path for the file that this module came from, or an empty
   /// string if this is not applicable.
@@ -890,7 +896,7 @@ namespace llvm {
     static bool isEqual(const ModuleDecl::ImportedModule &lhs,
                         const ModuleDecl::ImportedModule &rhs) {
       return lhs.importedModule == rhs.importedModule &&
-             ModuleDecl::isSameAccessPath(lhs.accessPath, rhs.accessPath);
+             lhs.accessPath.isSameAs(rhs.accessPath);
     }
   };
 }

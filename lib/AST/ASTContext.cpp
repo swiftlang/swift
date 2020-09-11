@@ -648,6 +648,12 @@ llvm::BumpPtrAllocator &ASTContext::getAllocator(AllocationArena arena) const {
   llvm_unreachable("bad AllocationArena");
 }
 
+ImportPath::Raw
+swift::detail::ImportPathBuilder_copyToImpl(ASTContext &ctx,
+                                            ImportPath::Raw raw) {
+  return ctx.AllocateCopy(raw);
+}
+
 /// Set a new stats reporter.
 void ASTContext::setStatsReporter(UnifiedStatsReporter *stats) {
   if (stats) {
@@ -1602,7 +1608,7 @@ ModuleLoader *ASTContext::getModuleInterfaceLoader() const {
 }
 
 ModuleDecl *ASTContext::getLoadedModule(
-    ArrayRef<Located<Identifier>> ModulePath) const {
+    ImportPath::Module ModulePath) const {
   assert(!ModulePath.empty());
 
   // TODO: Swift submodules.
@@ -1867,28 +1873,28 @@ bool ASTContext::shouldPerformTypoCorrection() {
   return NumTypoCorrections <= LangOpts.TypoCorrectionLimit;
 }
 
-bool ASTContext::canImportModule(Located<Identifier> ModulePath) {
+bool ASTContext::canImportModule(ImportPath::Element ModuleName) {
   // If this module has already been successfully imported, it is importable.
-  if (getLoadedModule(ModulePath) != nullptr)
+  if (getLoadedModule(ImportPath::Module::Builder(ModuleName).get()) != nullptr)
     return true;
 
   // If we've failed loading this module before, don't look for it again.
-  if (FailedModuleImportNames.count(ModulePath.Item))
+  if (FailedModuleImportNames.count(ModuleName.Item))
     return false;
 
   // Otherwise, ask the module loaders.
   for (auto &importer : getImpl().ModuleLoaders) {
-    if (importer->canImportModule(ModulePath)) {
+    if (importer->canImportModule(ModuleName)) {
       return true;
     }
   }
 
-  FailedModuleImportNames.insert(ModulePath.Item);
+  FailedModuleImportNames.insert(ModuleName.Item);
   return false;
 }
 
 ModuleDecl *
-ASTContext::getModule(ArrayRef<Located<Identifier>> ModulePath) {
+ASTContext::getModule(ImportPath::Module ModulePath) {
   assert(!ModulePath.empty());
 
   if (auto *M = getLoadedModule(ModulePath))
@@ -1905,14 +1911,13 @@ ASTContext::getModule(ArrayRef<Located<Identifier>> ModulePath) {
 }
 
 ModuleDecl *ASTContext::getModuleByName(StringRef ModuleName) {
-  SmallVector<Located<Identifier>, 4>
-  AccessPath;
+  ImportPath::Module::Builder builder;
   while (!ModuleName.empty()) {
     StringRef SubModuleName;
     std::tie(SubModuleName, ModuleName) = ModuleName.split('.');
-    AccessPath.push_back({ getIdentifier(SubModuleName), SourceLoc() });
+    builder.push_back(getIdentifier(SubModuleName));
   }
-  return getModule(AccessPath);
+  return getModule(builder.get());
 }
 
 ModuleDecl *ASTContext::getStdlibModule(bool loadIfAbsent) {
@@ -1922,7 +1927,8 @@ ModuleDecl *ASTContext::getStdlibModule(bool loadIfAbsent) {
   if (loadIfAbsent) {
     auto mutableThis = const_cast<ASTContext*>(this);
     TheStdlibModule =
-      mutableThis->getModule({ Located<Identifier>(StdlibModuleName, SourceLoc()) });
+      mutableThis->getModule(
+                           ImportPath::Module::Builder(StdlibModuleName).get());
   } else {
     TheStdlibModule = getLoadedModule(StdlibModuleName);
   }

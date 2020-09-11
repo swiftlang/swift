@@ -2441,7 +2441,7 @@ static ModuleDecl *tryLoadModule(ASTContext &C,
   if (importForwardDeclarations)
     module = C.getLoadedModule(moduleName);
   else
-    module = C.getModule({ {moduleName, SourceLoc()} });
+    module = C.getModule(ImportPath::Module::Builder(moduleName).get());
 
   checkedModules[moduleName] = module;
   return module;
