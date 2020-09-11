@@ -1473,8 +1473,14 @@ void Remangler::mangleImplFunctionType(Node *node) {
     mangle(PatternSubs->getChild(0));
     Buffer << 'y';
     mangleChildNodes(PatternSubs->getChild(1));
-    if (PatternSubs->getNumChildren() >= 3)
-      mangleRetroactiveConformance(PatternSubs->getChild(2));
+    if (PatternSubs->getNumChildren() >= 3) {
+      NodePointer retroactiveConf = PatternSubs->getChild(2);
+      if (retroactiveConf->getKind() == Node::Kind::TypeList) {
+        mangleChildNodes(retroactiveConf);
+      } else {
+        mangleRetroactiveConformance(retroactiveConf);
+      }
+    }
   }
 
   Buffer << 'I';
