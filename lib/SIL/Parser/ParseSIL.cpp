@@ -5277,6 +5277,11 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     return true;
   }
 
+  if (!B.hasValidInsertionPoint()) {
+    P.diagnose(P.Tok, diag::expected_sil_block_name);
+    return true;
+  }
+
   SmallVector<Located<StringRef>, 4> resultNames;
   SourceLoc resultClauseBegin;
 

@@ -2413,19 +2413,6 @@ bb0:
 }
 
 
-// CHECK-LABEL:   sil @remove_dead_code_after_unreachable
-// CHECK-NEXT:      bb0
-// CHECK-NEXT:      unreachable
-// CHECK-NEXT:      } // end sil function 'remove_dead_code_after_unreachable'
-sil @remove_dead_code_after_unreachable : $@convention(thin) () -> (Int32) {
-bb0:
-  unreachable
-  %2 = integer_literal $Builtin.Int32, -2
-  %3 = struct $Int32 (%2 : $Builtin.Int32)
-  return %3 : $Int32
-}
-
-
 // CHECK-LABEL:   sil @dont_remove_code_after_cond_fail
 // CHECK:         bb0([[Cond:%.*]] : $Builtin.Int1):
 // CHECK-NEXT:      [[Ref:%.*]] = integer_literal $Builtin.Int32, -2
