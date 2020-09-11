@@ -1469,6 +1469,11 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
       return CheckKind::UsableFromInline;
   }
 
+  if (match.Witness->getAttrs().isUnavailable(getASTContext()) &&
+      !requirement->getAttrs().isUnavailable(getASTContext())) {
+    return CheckKind::WitnessUnavailable;
+  }
+
   auto requiredAvailability = AvailabilityContext::alwaysAvailable();
   if (checkWitnessAvailability(requirement, match.Witness,
                                &requiredAvailability)) {
@@ -1496,11 +1501,6 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
         }
       }
     }
-  }
-
-  if (match.Witness->getAttrs().isUnavailable(getASTContext()) &&
-      !requirement->getAttrs().isUnavailable(getASTContext())) {
-    return CheckKind::WitnessUnavailable;
   }
 
   return CheckKind::Success;
