@@ -3635,7 +3635,9 @@ void IRGenSILFunction::visitRetainValueAddrInst(swift::RetainValueAddrInst *i) {
   SILType objectT = addrTy.getObjectType();
   llvm::Type *llvmType = addr.getAddress()->getType();
   const TypeInfo &addrTI = getTypeInfo(addrTy);
-  auto *outlinedF = IGM.getOrCreateRetainFunction(addrTI, objectT, llvmType);
+  auto atomicity = i->isAtomic() ? Atomicity::Atomic : Atomicity::NonAtomic;
+  auto *outlinedF = IGM.getOrCreateRetainFunction(
+      addrTI, objectT, llvmType, atomicity);
   llvm::Value *args[] = {addr.getAddress()};
   llvm::CallInst *call = Builder.CreateCall(outlinedF, args);
   call->setCallingConv(IGM.DefaultCC);
@@ -3708,8 +3710,9 @@ void IRGenSILFunction::visitReleaseValueAddrInst(
   SILType objectT = addrTy.getObjectType();
   llvm::Type *llvmType = addr.getAddress()->getType();
   const TypeInfo &addrTI = getTypeInfo(addrTy);
+  auto atomicity = i->isAtomic() ? Atomicity::Atomic : Atomicity::NonAtomic;
   auto *outlinedF = IGM.getOrCreateReleaseFunction(
-      addrTI, objectT, llvmType);
+      addrTI, objectT, llvmType, atomicity);
   llvm::Value *args[] = {addr.getAddress()};
   llvm::CallInst *call = Builder.CreateCall(outlinedF, args);
   call->setCallingConv(IGM.DefaultCC);
