@@ -27,7 +27,6 @@ _swift_complete()
       -view-cfg-remove-use-list-comments \
       -view-cfg-only-for-function \
       -sil-print-no-color \
-      -verify-skip-unreachable-must-be-last \
       -aa \
       -cache-aa-results \
       -sil-dump-call-graph \
