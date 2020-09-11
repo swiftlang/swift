@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -verify-skip-unreachable-must-be-last | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 
 // Declare this SIL to be canonical because some tests break raw SIL
 // conventions. e.g. address-type block args. -enforce-exclusivity=none is also
@@ -2409,19 +2409,6 @@ bb0:
   %1 = integer_literal $Builtin.Int1, -1
   cond_fail %1 : $Builtin.Int1
   %3 = struct $Int32 (%0 : $Builtin.Int32)
-  return %3 : $Int32
-}
-
-
-// CHECK-LABEL:   sil @remove_dead_code_after_unreachable
-// CHECK-NEXT:      bb0
-// CHECK-NEXT:      unreachable
-// CHECK-NEXT:      } // end sil function 'remove_dead_code_after_unreachable'
-sil @remove_dead_code_after_unreachable : $@convention(thin) () -> (Int32) {
-bb0:
-  unreachable
-  %2 = integer_literal $Builtin.Int32, -2
-  %3 = struct $Int32 (%2 : $Builtin.Int32)
   return %3 : $Int32
 }
 

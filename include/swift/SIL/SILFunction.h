@@ -141,11 +141,11 @@ private:
   CanSILFunctionType LoweredType;
 
   /// The context archetypes of the function.
-  GenericEnvironment *GenericEnv;
+  GenericEnvironment *GenericEnv = nullptr;
 
   /// The information about specialization.
   /// Only set if this function is a specialization of another function.
-  const GenericSpecializationInformation *SpecializationInfo;
+  const GenericSpecializationInformation *SpecializationInfo = nullptr;
 
   /// The forwarding substitution map, lazily computed.
   SubstitutionMap ForwardingSubMap;
@@ -158,10 +158,10 @@ private:
   ValueDecl *ClangNodeOwner = nullptr;
 
   /// The source location and scope of the function.
-  const SILDebugScope *DebugScope;
+  const SILDebugScope *DebugScope = nullptr;
 
   /// The AST decl context of the function.
-  DeclContext *DeclCtxt;
+  DeclContext *DeclCtxt = nullptr;
 
   /// The profiler for instrumentation based profiling, or null if profiling is
   /// disabled.
@@ -315,8 +315,7 @@ private:
               IsTransparent_t isTrans, IsSerialized_t isSerialized,
               ProfileCounter entryCount, IsThunk_t isThunk,
               SubclassScope classSubclassScope, Inline_t inlineStrategy,
-              EffectsKind E, SILFunction *insertBefore,
-              const SILDebugScope *debugScope,
+              EffectsKind E, const SILDebugScope *debugScope,
               IsDynamicallyReplaceable_t isDynamic,
               IsExactSelfClass_t isExactSelfClass);
 
@@ -333,6 +332,18 @@ private:
          EffectsKind EffectsKindAttr = EffectsKind::Unspecified,
          SILFunction *InsertBefore = nullptr,
          const SILDebugScope *DebugScope = nullptr);
+
+  void init(SILLinkage Linkage, StringRef Name,
+                         CanSILFunctionType LoweredType,
+                         GenericEnvironment *genericEnv,
+                         Optional<SILLocation> Loc, IsBare_t isBareSILFunction,
+                         IsTransparent_t isTrans, IsSerialized_t isSerialized,
+                         ProfileCounter entryCount, IsThunk_t isThunk,
+                         SubclassScope classSubclassScope,
+                         Inline_t inlineStrategy, EffectsKind E,
+                         const SILDebugScope *DebugScope,
+                         IsDynamicallyReplaceable_t isDynamic,
+                         IsExactSelfClass_t isExactSelfClass);
 
   /// Set has ownership to the given value. True means that the function has
   /// ownership, false means it does not.
