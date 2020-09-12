@@ -598,10 +598,19 @@ bool CompilerInstance::setUpInputs() {
   // per-input setup.
   const Optional<unsigned> codeCompletionBufferID = setUpCodeCompletionBuffer();
 
-  for (const InputFile &input :
-       Invocation.getFrontendOptions().InputsAndOutputs.getAllInputs())
-    if (setUpForInput(input))
+  const auto &Inputs =
+      Invocation.getFrontendOptions().InputsAndOutputs.getAllInputs();
+  for (const InputFile &input : Inputs) {
+    bool failed = false;
+    Optional<unsigned> bufferID = getRecordedBufferID(input, failed);
+    if (failed)
       return true;
+
+    if (!bufferID.hasValue() || !input.isPrimary())
+      continue;
+
+    recordPrimaryInputBuffer(*bufferID);
+  }
 
   // Set the primary file to the code-completion point if one exists.
   if (codeCompletionBufferID.hasValue() &&
@@ -619,23 +628,6 @@ bool CompilerInstance::setUpInputs() {
   return false;
 }
 
-bool CompilerInstance::setUpForInput(const InputFile &input) {
-  bool failed = false;
-  Optional<unsigned> bufferID = getRecordedBufferID(input, failed);
-  if (failed)
-    return true;
-  if (!bufferID)
-    return false;
-
-  if (isInputSwift() &&
-      llvm::sys::path::filename(input.file()) == "main.swift") {
-    assert(MainBufferID == NO_SUCH_BUFFER && "re-setting MainBufferID");
-    MainBufferID = *bufferID;
-  }
-
-  if (input.isPrimary()) {
-    recordPrimaryInputBuffer(*bufferID);
-  }
   return false;
 }
 
