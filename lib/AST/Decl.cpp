@@ -960,6 +960,21 @@ void GenericParamList::setDeclContext(DeclContext *dc) {
     param->setDeclContext(dc);
 }
 
+GenericTypeParamDecl *GenericParamList::lookUpGenericParam(
+    Identifier name) const {
+  for (const auto *innerParams = this;
+       innerParams != nullptr;
+       innerParams = innerParams->getOuterParameters()) {
+    for (auto *paramDecl : *innerParams) {
+      if (name == paramDecl->getName()) {
+        return const_cast<GenericTypeParamDecl *>(paramDecl);
+      }
+    }
+  }
+
+  return nullptr;
+}
+
 TrailingWhereClause::TrailingWhereClause(
                        SourceLoc whereLoc,
                        ArrayRef<RequirementRepr> requirements)
