@@ -1622,7 +1622,8 @@ for host in "${ALL_HOSTS[@]}"; do
                 #
                 # This makes it easier to build target stdlibs on systems that
                 # have old toolchains without more modern linker features.
-                if [[ "$(uname -s)" != "Darwin" ]] ; then
+                # wasm: lld should be built when cross building for wasm
+                if [[ "$(uname -s)" != "Darwin" || ! "${SKIP_BUILD_WASM}" ]] ; then
                     if [[ ! "${SKIP_BUILD_LLD}" ]]; then
                         llvm_enable_projects+=("lld")
                     fi
