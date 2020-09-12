@@ -53,27 +53,30 @@ class InputFile {
 /// caller to ensure that an associated memory buffer outlives the \c InputFile.
 class InputFile final {
   std::string Filename;
-  bool IsPrimary;
-  /// Points to a buffer overriding the file's contents, or nullptr if there is
-  /// none.
-  llvm::MemoryBuffer *Buffer;
-
-  /// If there are explicit primary inputs (i.e. designated with -primary-input
-  /// or -primary-filelist), the paths specific to those inputs (other than the
-  /// input file path itself) are kept here. If there are no explicit primary
-  /// inputs (for instance for whole module optimization), the corresponding
-  /// paths are kept in the first input file.
+  file_types::ID FileID;
+  llvm::PointerIntPair<llvm::MemoryBuffer *, 1, bool> BufferAndIsPrimary;
   PrimarySpecificPaths PSPs;
 
 public:
-  /// Does not take ownership of \p buffer. Does take ownership of (copy) a
-  /// string.
+  /// Constructs an input file from the provided data.
+  ///
+  /// \warning This entrypoint infers the type of the file from its extension
+  /// and is therefore not suitable for most clients that use files synthesized
+  /// from memory buffers. Use the overload of this constructor accepting a
+  /// memory buffer and an explicit \c file_types::ID instead.
   InputFile(StringRef name, bool isPrimary,
-            llvm::MemoryBuffer *buffer = nullptr,
-            StringRef outputFilename = StringRef())
+            llvm::MemoryBuffer *buffer = nullptr)
+      : InputFile(name, isPrimary, buffer,
+                  file_types::lookupTypeForExtension(
+                      llvm::sys::path::extension(name))) {}
+
+  /// Constructs an input file from the provided data.
+  InputFile(StringRef name, bool isPrimary, llvm::MemoryBuffer *buffer,
+            file_types::ID FileID)
       : Filename(
             convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(name)),
-        IsPrimary(isPrimary), Buffer(buffer), PSPs(PrimarySpecificPaths()) {
+        FileID(FileID), BufferAndIsPrimary(buffer, isPrimary),
+        PSPs(PrimarySpecificPaths()) {
     assert(!name.empty());
   }
 
