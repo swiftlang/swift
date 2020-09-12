@@ -1639,13 +1639,9 @@ static ParamDecl *getOriginalParamFromAccessor(AbstractStorageDecl *storage,
   switch (accessor->getAccessorKind()) {
   case AccessorKind::DidSet:
   case AccessorKind::WillSet:
-  case AccessorKind::Set:
-    if (accessor->isSimpleDidSet()) {
-      // If this is a "simple" didSet, there won't be
-      // a parameter.
       return nullptr;
-    }
 
+  case AccessorKind::Set:
     if (param == accessorParams->get(0)) {
       // This is the 'newValue' parameter.
       return nullptr;
