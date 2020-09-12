@@ -2414,7 +2414,7 @@ createDispatchingDiagnosticConsumerIfNeeded(
   inputsAndOutputs.forEachInputProducingSupplementaryOutput(
       [&](const InputFile &input) -> bool {
         if (auto consumer = maybeCreateConsumerForDiagnosticsFrom(input))
-          subconsumers.emplace_back(input.file(), std::move(consumer));
+          subconsumers.emplace_back(input.getFileName(), std::move(consumer));
         return false;
       });
   // For batch mode, the compiler must sometimes swallow diagnostics pertaining
@@ -2431,7 +2431,7 @@ createDispatchingDiagnosticConsumerIfNeeded(
   if (!subconsumers.empty() && inputsAndOutputs.hasMultiplePrimaryInputs()) {
     inputsAndOutputs.forEachNonPrimaryInput(
         [&](const InputFile &input) -> bool {
-          subconsumers.emplace_back(input.file(), nullptr);
+          subconsumers.emplace_back(input.getFileName(), nullptr);
           return false;
         });
   }

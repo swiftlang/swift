@@ -633,9 +633,9 @@ bool CompilerInstance::setUpInputs() {
 
 Optional<unsigned> CompilerInstance::getRecordedBufferID(const InputFile &input,
                                                          bool &failed) {
-  if (!input.buffer()) {
+  if (!input.getBuffer()) {
     if (Optional<unsigned> existingBufferID =
-            SourceMgr.getIDForBufferIdentifier(input.file())) {
+            SourceMgr.getIDForBufferIdentifier(input.getFileName())) {
       return existingBufferID;
     }
   }
@@ -663,7 +663,7 @@ Optional<unsigned> CompilerInstance::getRecordedBufferID(const InputFile &input,
 
 Optional<ModuleBuffers> CompilerInstance::getInputBuffersIfPresent(
     const InputFile &input) {
-  if (auto b = input.buffer()) {
+  if (auto b = input.getBuffer()) {
     return ModuleBuffers(llvm::MemoryBuffer::getMemBufferCopy(b->getBuffer(),
                                                               b->getBufferIdentifier()));
   }
@@ -671,9 +671,10 @@ Optional<ModuleBuffers> CompilerInstance::getInputBuffersIfPresent(
   // or have some kind of FileManager.
   using FileOrError = llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>;
   FileOrError inputFileOrErr = swift::vfs::getFileOrSTDIN(getFileSystem(),
-                                                          input.file());
+                                                          input.getFileName());
   if (!inputFileOrErr) {
-    Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file, input.file(),
+    Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
+                         input.getFileName(),
                          inputFileOrErr.getError().message());
     return None;
   }
@@ -689,7 +690,7 @@ Optional<ModuleBuffers> CompilerInstance::getInputBuffersIfPresent(
 
 Optional<std::unique_ptr<llvm::MemoryBuffer>>
 CompilerInstance::openModuleSourceInfo(const InputFile &input) {
-  llvm::SmallString<128> pathWithoutProjectDir(input.file());
+  llvm::SmallString<128> pathWithoutProjectDir(input.getFileName());
   llvm::sys::path::replace_extension(pathWithoutProjectDir,
                   file_types::getExtension(file_types::TY_SwiftSourceInfoFile));
   llvm::SmallString<128> pathWithProjectDir = pathWithoutProjectDir.str();
@@ -708,7 +709,7 @@ CompilerInstance::openModuleSourceInfo(const InputFile &input) {
 
 Optional<std::unique_ptr<llvm::MemoryBuffer>>
 CompilerInstance::openModuleDoc(const InputFile &input) {
-  llvm::SmallString<128> moduleDocFilePath(input.file());
+  llvm::SmallString<128> moduleDocFilePath(input.getFileName());
   llvm::sys::path::replace_extension(
       moduleDocFilePath,
       file_types::getExtension(file_types::TY_SwiftModuleDocFile));
@@ -773,9 +774,12 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
 
 bool CompilerInstance::createFilesForMainModule(
     ModuleDecl *mod, SmallVectorImpl<FileUnit *> &files) const {
-  // Make sure the main file is the first file in the module.
-  if (MainBufferID != NO_SUCH_BUFFER) {
-    files.push_back(mainFile);
+  // Try to pull out the main source file, if any. This ensures that it
+  // is at the start of the list of files.
+  Optional<unsigned> MainBufferID = None;
+  if (SourceFile *mainSourceFile = computeMainSourceFileForModule(mod)) {
+    MainBufferID = mainSourceFile->getBufferID();
+    files.push_back(mainSourceFile);
   }
 
   // If we have partial modules to load, do so now, bailing if any failed to

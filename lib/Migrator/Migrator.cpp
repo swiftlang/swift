@@ -435,5 +435,5 @@ const MigratorOptions &Migrator::getMigratorOptions() const {
 const StringRef Migrator::getInputFilename() const {
   auto &PrimaryInput = StartInvocation.getFrontendOptions()
                            .InputsAndOutputs.getRequiredUniquePrimaryInput();
-  return PrimaryInput.file();
+  return PrimaryInput.getFileName();
 }

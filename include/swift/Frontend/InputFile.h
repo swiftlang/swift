@@ -13,9 +13,12 @@
 #ifndef SWIFT_FRONTEND_INPUTFILE_H
 #define SWIFT_FRONTEND_INPUTFILE_H
 
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/PrimarySpecificPaths.h"
 #include "swift/Basic/SupplementaryOutputPaths.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Path.h"
 #include <string>
 
 namespace swift {
@@ -67,9 +70,23 @@ public:
     assert(!name.empty());
   }
 
-  bool isPrimary() const { return IsPrimary; }
-  llvm::MemoryBuffer *buffer() const { return Buffer; }
-  const std::string &file() const {
+public:
+  /// Retrieves the type of this input file.
+  file_types::ID getType() const { return FileID; };
+
+  /// Retrieves whether this input file was passed as a primary to the frontend.
+  bool isPrimary() const { return BufferAndIsPrimary.getInt(); }
+
+  /// Retrieves the backing buffer for this input file, if any.
+  llvm::MemoryBuffer *getBuffer() const {
+    return BufferAndIsPrimary.getPointer();
+  }
+
+  /// The name of this \c InputFile, or `-` if this input corresponds to the
+  /// standard input stream.
+  ///
+  /// The returned file name is guaranteed not to be the empty string.
+  const std::string &getFileName() const {
     assert(!Filename.empty());
     return Filename;
   }
@@ -81,12 +98,22 @@ public:
     return filename.equals("<stdin>") ? "-" : filename;
   }
 
+  /// Retrieves the name of the output file corresponding to this input.
+  ///
+  /// If there is no such corresponding file, the result is the empty string.
+  /// If there the resulting output should be directed to the standard output
+  /// stream, the result is "-".
   std::string outputFilename() const { return PSPs.OutputFilename; }
 
+  /// If there are explicit primary inputs (i.e. designated with -primary-input
+  /// or -primary-filelist), the paths specific to those inputs (other than the
+  /// input file path itself) are kept here. If there are no explicit primary
+  /// inputs (for instance for whole module optimization), the corresponding
+  /// paths are kept in the first input file.
   const PrimarySpecificPaths &getPrimarySpecificPaths() const { return PSPs; }
 
-  void setPrimarySpecificPaths(const PrimarySpecificPaths &PSPs) {
-    this->PSPs = PSPs;
+  void setPrimarySpecificPaths(PrimarySpecificPaths &&PSPs) {
+    this->PSPs = std::move(PSPs);
   }
 
   // The next set of functions provides access to those primary-specific paths
