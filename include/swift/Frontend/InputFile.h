@@ -20,19 +20,6 @@
 
 namespace swift {
 
-enum class InputFileKind {
-  None,
-  Swift,
-  SwiftLibrary,
-  SwiftModuleInterface,
-  SIL,
-  LLVM,
-  ObjCHeader,
-};
-
-// Inputs may include buffers that override contents, and eventually should
-// always include a buffer.
-class InputFile {
 /// An \c InputFile encapsulates information about an input passed to the
 /// frontend.
 ///
