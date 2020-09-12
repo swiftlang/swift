@@ -458,7 +458,7 @@ public:
 
   /// Convenience accessor for clients that know what kind of file they're
   /// dealing with.
-  SourceFile &getMainSourceFile(SourceFileKind expectedKind) const;
+  SourceFile &getMainSourceFile() const;
 
   /// Convenience accessor for clients that know what kind of file they're
   /// dealing with.
