@@ -2104,7 +2104,10 @@ static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
 
     // If we can't validate the given input file, bail early. This covers cases
     // like passing raw SIL as a primary file.
-    if (!inputFileKindCanHaveTBDValidated(Invocation.getInputKind())) {
+    const auto &IO = Invocation.getFrontendOptions().InputsAndOutputs;
+    // FIXME: This would be a good test of the interface format.
+    if (IO.shouldTreatAsModuleInterface() || IO.shouldTreatAsSIL() ||
+        IO.shouldTreatAsLLVM() || IO.shouldTreatAsObjCHeader()) {
       return false;
     }
 
