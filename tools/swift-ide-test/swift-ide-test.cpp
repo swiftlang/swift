@@ -2158,8 +2158,7 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
 
   if (MangledNameToFind.empty()) {
     ModuleDecl *M = CI.getMainModule();
-    M->getMainSourceFile(Invocation.getSourceFileKind()).print(llvm::outs(),
-                                                               Options);
+    M->getMainSourceFile().print(llvm::outs(), Options);
     return EXIT_SUCCESS;
   }
 
