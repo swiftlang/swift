@@ -371,9 +371,11 @@ public:
   /// to create a well-formed type.
   ///
   /// \param TyR The type representation to check.
+  /// \param silParams Used to look up generic parameters in SIL mode.
   ///
   /// \returns A well-formed type that is never null, or an \c ErrorType in case of an error.
-  Type resolveType(TypeRepr *TyR) const;
+  Type resolveType(TypeRepr *TyR,
+                   GenericParamList *silParams=nullptr) const;
 
   /// Whether this type resolution uses archetypes (vs. generic parameters).
   bool usesArchetypes() const;

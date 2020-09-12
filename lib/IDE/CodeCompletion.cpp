@@ -1617,7 +1617,9 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     const auto ty = swift::performTypeResolution(
         ParsedTypeLoc.getTypeRepr(), P.Context,
         /*isSILMode=*/false,
-        /*isSILType=*/false, CurDeclContext->getGenericEnvironmentOfContext(),
+        /*isSILType=*/false,
+        CurDeclContext->getGenericEnvironmentOfContext(),
+        /*GenericParams=*/nullptr,
         CurDeclContext,
         /*ProduceDiagnostics=*/false);
     ParsedTypeLoc.setType(ty);

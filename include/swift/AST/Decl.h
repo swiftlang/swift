@@ -1332,6 +1332,12 @@ public:
 
   void print(raw_ostream &OS) const;
   SWIFT_DEBUG_DUMP;
+
+  bool walk(ASTWalker &walker);
+
+  /// Finds a generic parameter declaration by name. This should only
+  /// be used from the SIL parser.
+  GenericTypeParamDecl *lookUpGenericParam(Identifier name) const;
 };
   
 /// A trailing where clause.

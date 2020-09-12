@@ -2519,7 +2519,8 @@ public:
 
 class ResolveTypeRequest
     : public SimpleRequest<ResolveTypeRequest,
-                           Type(const TypeResolution *, TypeRepr *),
+                           Type(const TypeResolution *, TypeRepr *,
+                                GenericParamList *),
                            RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2533,7 +2534,7 @@ private:
 
   // Evaluation.
   Type evaluate(Evaluator &evaluator, const TypeResolution *resolution,
-                TypeRepr *repr) const;
+                TypeRepr *repr, GenericParamList *silParams) const;
 };
 
 void simple_display(llvm::raw_ostream &out, const TypeResolution *resolution);
