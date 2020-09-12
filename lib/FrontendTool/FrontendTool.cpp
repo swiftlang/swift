@@ -1978,7 +1978,7 @@ static bool performCompile(CompilerInstance &Instance,
   const FrontendOptions::ActionType Action = opts.RequestedAction;
 
   // To compile LLVM IR, just pass it off unmodified.
-  if (Invocation.getInputKind() == InputFileKind::LLVM)
+  if (opts.InputsAndOutputs.shouldTreatAsLLVM())
     return compileLLVMIR(Instance);
 
   // If we aren't in a parse-only context and expect an implicit stdlib import,
@@ -1996,10 +1996,12 @@ static bool performCompile(CompilerInstance &Instance,
     if (FrontendOptions::shouldActionOnlyParse(Action)) {
       // Parsing gets triggered lazily, but let's make sure we have the right
       // input kind.
-      auto kind = Invocation.getInputKind();
-      return kind == InputFileKind::Swift ||
-             kind == InputFileKind::SwiftLibrary ||
-             kind == InputFileKind::SwiftModuleInterface;
+      return llvm::all_of(
+          opts.InputsAndOutputs.getAllInputs(), [](const InputFile &IF) {
+            const auto kind = IF.getType();
+            return kind == file_types::TY_Swift ||
+                   kind == file_types::TY_SwiftModuleInterfaceFile;
+          });
     }
     return true;
   }() && "Only supports parsing .swift files");

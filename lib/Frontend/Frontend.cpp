@@ -578,21 +578,6 @@ SourceFile *CompilerInstance::getCodeCompletionFile() const {
   return evaluateOrDefault(eval, CodeCompletionFileRequest{mod}, nullptr);
 }
 
-static bool shouldTreatSingleInputAsMain(InputFileKind inputKind) {
-  switch (inputKind) {
-  case InputFileKind::Swift:
-  case InputFileKind::SwiftModuleInterface:
-  case InputFileKind::SIL:
-    return true;
-  case InputFileKind::SwiftLibrary:
-  case InputFileKind::LLVM:
-  case InputFileKind::ObjCHeader:
-  case InputFileKind::None:
-    return false;
-  }
-  llvm_unreachable("unhandled input kind");
-}
-
 bool CompilerInstance::setUpInputs() {
   // Adds to InputSourceCodeBufferIDs, so may need to happen before the
   // per-input setup.
@@ -618,15 +603,6 @@ bool CompilerInstance::setUpInputs() {
     assert(PrimaryBufferIDs.empty() && "re-setting PrimaryBufferID");
     recordPrimaryInputBuffer(*codeCompletionBufferID);
   }
-
-  if (MainBufferID == NO_SUCH_BUFFER &&
-      InputSourceCodeBufferIDs.size() == 1 &&
-      shouldTreatSingleInputAsMain(Invocation.getInputKind())) {
-    MainBufferID = InputSourceCodeBufferIDs.front();
-  }
-
-  return false;
-}
 
   return false;
 }
@@ -770,6 +746,62 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
   imports.ShouldImportUnderlyingModule = frontendOpts.ImportUnderlyingModule;
   imports.BridgingHeaderPath = frontendOpts.ImplicitObjCHeaderPath;
   return imports;
+}
+
+static Optional<SourceFileKind>
+tryMatchInputModeToSourceFileKind(FrontendOptions::ParseInputMode mode) {
+  switch (mode) {
+  case FrontendOptions::ParseInputMode::SwiftLibrary:
+      // A Swift file in -parse-as-library mode is a library file.
+    return SourceFileKind::Library;
+  case FrontendOptions::ParseInputMode::SIL:
+      // A Swift file in -parse-sil mode is a SIL file.
+    return SourceFileKind::SIL;
+  case FrontendOptions::ParseInputMode::SwiftModuleInterface:
+    return SourceFileKind::Interface;
+  case FrontendOptions::ParseInputMode::Swift:
+    return SourceFileKind::Main;
+  }
+  llvm::outs() << (unsigned)mode;
+  llvm_unreachable("Unhandled input parsing mode!");
+}
+
+SourceFile *
+CompilerInstance::computeMainSourceFileForModule(ModuleDecl *mod) const {
+  // Swift libraries cannot have a 'main'.
+  const auto &FOpts = getInvocation().getFrontendOptions();
+  const auto &Inputs = FOpts.InputsAndOutputs.getAllInputs();
+  if (FOpts.InputMode == FrontendOptions::ParseInputMode::SwiftLibrary) {
+    return nullptr;
+  }
+
+  // Try to pull out a file called 'main.swift'.
+  auto MainInputIter =
+      std::find_if(Inputs.begin(), Inputs.end(), [](const InputFile &input) {
+        return input.getType() == file_types::TY_Swift &&
+               llvm::sys::path::filename(input.getFileName()) == "main.swift";
+      });
+
+  Optional<unsigned> MainBufferID = None;
+  if (MainInputIter != Inputs.end()) {
+    MainBufferID =
+        getSourceMgr().getIDForBufferIdentifier(MainInputIter->getFileName());
+  } else if (InputSourceCodeBufferIDs.size() == 1) {
+    // Barring that, just nominate a single Swift file as the main file.
+    MainBufferID.emplace(InputSourceCodeBufferIDs.front());
+  }
+
+  if (!MainBufferID.hasValue()) {
+    return nullptr;
+  }
+
+  auto SFK = tryMatchInputModeToSourceFileKind(FOpts.InputMode);
+  if (!SFK.hasValue()) {
+    return nullptr;
+  }
+
+  return createSourceFileForMainModule(mod, *SFK,
+                                       *MainBufferID, /*isMainBuffer*/true);
 }
 
 bool CompilerInstance::createFilesForMainModule(
@@ -994,14 +1026,14 @@ CompilerInstance::getSourceFileParsingOptions(bool forPrimary) const {
 
 SourceFile *CompilerInstance::createSourceFileForMainModule(
     ModuleDecl *mod, SourceFileKind fileKind,
-    Optional<unsigned> bufferID) const {
+    Optional<unsigned> bufferID, bool isMainBuffer) const {
   auto isPrimary = bufferID && isPrimaryInput(*bufferID);
   auto opts = getSourceFileParsingOptions(isPrimary);
 
   auto *inputFile = new (*Context)
       SourceFile(*mod, fileKind, bufferID, opts, isPrimary);
 
-  if (bufferID == MainBufferID)
+  if (isMainBuffer)
     inputFile->SyntaxParsingCache = Invocation.getMainFileSyntaxParsingCache();
 
   return inputFile;

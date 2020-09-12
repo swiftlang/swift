@@ -430,9 +430,6 @@ class CompilerInstance {
   /// \c mutable as it is consumed by \c loadPartialModulesAndImplicitImports.
   mutable std::vector<ModuleBuffers> PartialModules;
 
-  enum : unsigned { NO_SUCH_BUFFER = ~0U };
-  unsigned MainBufferID = NO_SUCH_BUFFER;
-
   /// Identifies the set of input buffers in the SourceManager that are
   /// considered primaries.
   llvm::SetVector<unsigned> PrimaryBufferIDs;
@@ -602,12 +599,14 @@ private:
   /// Creates a new source file for the main module.
   SourceFile *createSourceFileForMainModule(ModuleDecl *mod,
                                             SourceFileKind FileKind,
-                                            Optional<unsigned> BufferID) const;
+                                            Optional<unsigned> BufferID,
+                                            bool isMainBuffer = false) const;
 
   /// Creates all the files to be added to the main module, appending them to
   /// \p files. If a loading error occurs, returns \c true.
   bool createFilesForMainModule(ModuleDecl *mod,
                                 SmallVectorImpl<FileUnit *> &files) const;
+  SourceFile *computeMainSourceFileForModule(ModuleDecl *mod) const;
 
 public:
   void freeASTContext();
