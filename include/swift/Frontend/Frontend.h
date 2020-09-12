@@ -351,9 +351,6 @@ public:
   setUpInputForSILTool(StringRef inputFilename, StringRef moduleNameArg,
                        bool alwaysSetModuleToMain, bool bePrimary,
                        serialization::ExtendedValidationInfo &extendedInfo);
-  bool hasSerializedAST() {
-    return FrontendOpts.InputKind == InputFileKind::SwiftLibrary;
-  }
 
   const PrimarySpecificPaths &
   getPrimarySpecificPathsForAtMostOnePrimary() const;
@@ -562,13 +559,6 @@ private:
   void setUpLLVMArguments();
   void setUpDiagnosticOptions();
   bool setUpModuleLoaders();
-  bool isInputSwift() {
-    return Invocation.getInputKind() == InputFileKind::Swift;
-  }
-  bool isInSILMode() {
-    return Invocation.getInputKind() == InputFileKind::SIL;
-  }
-
   bool setUpInputs();
   bool setUpASTContextIfNeeded();
   void setupStatsReporter();
