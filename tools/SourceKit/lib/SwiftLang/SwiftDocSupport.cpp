@@ -856,7 +856,8 @@ static bool makeParserAST(CompilerInstance &CI, StringRef Text,
   std::unique_ptr<llvm::MemoryBuffer> Buf;
   Buf = llvm::MemoryBuffer::getMemBuffer(Text, "<module-interface>");
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
-      InputFile(Buf.get()->getBufferIdentifier(), false, Buf.get()));
+      InputFile(Buf.get()->getBufferIdentifier(), /*isPrimary*/false, Buf.get(),
+                file_types::TY_Swift));
   return CI.setup(Invocation);
 }
 
@@ -1441,7 +1442,8 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
   }
   Invocation.setInputKind(InputFileKind::Swift);
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
-      InputFile(InputBuf->getBufferIdentifier(), false, InputBuf));
+      InputFile(InputBuf->getBufferIdentifier(), /*isPrimary*/false, InputBuf,
+                file_types::TY_Swift));
 
   if (ParseCI.setup(Invocation)) {
     Error = "Compiler invocation set up failed";
