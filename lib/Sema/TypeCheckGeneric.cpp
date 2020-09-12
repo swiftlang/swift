@@ -324,7 +324,7 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
   if (funcTy->getThrowsType() && funcTy->isThrowing()) {
     funcTy->getThrowsType().walk(paramsAndResultWalker);
   } else {
-    funcTy->getASTContext().getNeverType().walk(paramsAndResultWalker);
+    funcTy->getASTContext().getTypeByString("Never").walk(paramsAndResultWalker);
   }
   
 

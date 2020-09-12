@@ -1478,7 +1478,7 @@ ConstraintSystem::getTypeOfMemberReference(
     memberTy = MetatypeType::get(memberTy);
 
     auto openedType = FunctionType::get({baseObjParam}, memberTy,
-                                        getASTContext().getNeverType());
+                                        getASTContext().getTypeByString("Never"));
     return { openedType, memberTy };
   }
 
@@ -1523,7 +1523,7 @@ ConstraintSystem::getTypeOfMemberReference(
       auto indices = subscript->getInterfaceType()
                               ->castTo<AnyFunctionType>()->getParams();
       refType = FunctionType::get(indices, elementTy,
-                                  getASTContext().getNeverType());
+                                  getASTContext().getTypeByString("Never"));
     } else {
       refType =
           getUnopenedTypeOfReference(cast<VarDecl>(value), baseTy, useDC, base,
@@ -1546,10 +1546,10 @@ ConstraintSystem::getTypeOfMemberReference(
     FunctionType::Param selfParam(selfTy, Identifier(), selfFlags);
     if (auto sig = innerDC->getGenericSignatureOfContext()) {
       funcType = GenericFunctionType::get(sig, {selfParam}, refType,
-                                          getASTContext().getNeverType());
+                                          getASTContext().getTypeByString("Never"));
     } else {
       funcType = FunctionType::get({selfParam}, refType,
-                                   getASTContext().getNeverType());
+                                   getASTContext().getTypeByString("Never"));
     }
   }
 
