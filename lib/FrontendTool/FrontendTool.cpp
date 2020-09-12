@@ -990,12 +990,12 @@ getFileOutputStream(StringRef OutputFilename, ASTContext &Ctx) {
 }
 
 /// Writes the Syntax tree to the given file
-static bool emitSyntax(SourceFile *SF, StringRef OutputFilename) {
-  auto os = getFileOutputStream(OutputFilename, SF->getASTContext());
+static bool emitSyntax(SourceFile &SF, StringRef OutputFilename) {
+  auto os = getFileOutputStream(OutputFilename, SF.getASTContext());
   if (!os) return true;
 
   json::Output jsonOut(*os, /*UserInfo=*/{}, /*PrettyPrint=*/false);
-  auto Root = SF->getSyntaxRoot().getRaw();
+  auto Root = SF.getSyntaxRoot().getRaw();
   jsonOut << *Root;
   *os << "\n";
   return false;
@@ -1323,9 +1323,9 @@ static void verifyGenericSignaturesIfNeeded(const CompilerInvocation &Invocation
 }
 
 static bool dumpAndPrintScopeMap(const CompilerInstance &Instance,
-                                 SourceFile *SF) {
+                                 SourceFile &SF) {
   // Not const because may require reexpansion
-  ASTScope &scope = SF->getScope();
+  ASTScope &scope = SF.getScope();
 
   const auto &opts = Instance.getInvocation().getFrontendOptions();
   if (opts.DumpScopeMapLocations.empty()) {
@@ -1342,14 +1342,12 @@ static bool dumpAndPrintScopeMap(const CompilerInstance &Instance,
   return Instance.getASTContext().hadError();
 }
 
-static SourceFile *
+static SourceFile &
 getPrimaryOrMainSourceFile(const CompilerInstance &Instance) {
-  SourceFile *SF = Instance.getPrimarySourceFile();
-  if (!SF) {
-    SourceFileKind Kind = Instance.getInvocation().getSourceFileKind();
-    SF = &Instance.getMainModule()->getMainSourceFile(Kind);
+  if (SourceFile *SF = Instance.getPrimarySourceFile()) {
+    return *SF;
   }
-  return SF;
+  return Instance.getMainModule()->getMainSourceFile();
 }
 
 /// Dumps the AST of all available primary source files. If corresponding output
@@ -1366,8 +1364,8 @@ static bool dumpAST(CompilerInstance &Instance) {
   } else {
     // Some invocations don't have primary files. In that case, we default to
     // looking for the main file and dumping it to `stdout`.
-    auto *SF = getPrimaryOrMainSourceFile(Instance);
-    SF->dump(llvm::outs(), /*parseIfNeeded*/ true);
+    auto &SF = getPrimaryOrMainSourceFile(Instance);
+    SF.dump(llvm::outs(), /*parseIfNeeded*/ true);
   }
   return Instance.getASTContext().hadError();
 }
@@ -1902,7 +1900,7 @@ static bool performAction(CompilerInstance &Instance,
   case FrontendOptions::ActionType::PrintAST:
     return withSemanticAnalysis(
         Instance, observer, [](CompilerInstance &Instance) {
-          getPrimaryOrMainSourceFile(Instance)->print(
+          getPrimaryOrMainSourceFile(Instance).print(
               llvm::outs(), PrintOptions::printEverything());
           return Instance.getASTContext().hadError();
         });
@@ -1915,13 +1913,12 @@ static bool performAction(CompilerInstance &Instance,
   case FrontendOptions::ActionType::DumpTypeRefinementContexts:
     return withSemanticAnalysis(
         Instance, observer, [](CompilerInstance &Instance) {
-          getPrimaryOrMainSourceFile(Instance)
-              ->getTypeRefinementContext()
-              ->dump(llvm::errs(), Instance.getASTContext().SourceMgr);
+          getPrimaryOrMainSourceFile(Instance).getTypeRefinementContext()->dump(
+              llvm::errs(), Instance.getASTContext().SourceMgr);
           return Instance.getASTContext().hadError();
         });
   case FrontendOptions::ActionType::DumpInterfaceHash:
-    getPrimaryOrMainSourceFile(Instance)->dumpInterfaceHash(llvm::errs());
+    getPrimaryOrMainSourceFile(Instance).dumpInterfaceHash(llvm::errs());
     return Context.hadError();
   case FrontendOptions::ActionType::EmitSyntax:
     return emitSyntax(getPrimaryOrMainSourceFile(Instance),
