@@ -5213,7 +5213,6 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
                                  AccessorKeywordLoc,
                                  Kind, storage,
                                  StaticLoc, StaticSpellingKind::None,
-                                 /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), /*ThrowsType=*/nullptr,
                                  (GenericParams
                                   ? GenericParams->clone(P->CurDeclContext)
                                   : nullptr),
@@ -6350,7 +6349,7 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   auto *FD = FuncDecl::create(Context, StaticLoc, StaticSpelling,
                               FuncLoc, FullName, NameLoc,
                               /*Async=*/asyncLoc.isValid(), asyncLoc,
-                              /*Throws=*/throwsLoc.isValid(), throwsLoc, throwsType,
+                              /*Throws=*/throwsLoc.isValid(), throwsLoc, TypeLoc(throwsType).getType(),
                               GenericParams,
                               BodyParams, FuncRetTy,
                               CurDeclContext);

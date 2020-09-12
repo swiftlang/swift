@@ -970,14 +970,26 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
 
 Type ASTContext::getTypeByString(StringRef type) {
   SmallVector<ValueDecl *, 1> Results;
+  getStdlibModule(true);
   lookupInSwiftModule(type, Results);
   for (auto Result : Results) {
-    if (auto *FD = dyn_cast<FuncDecl>(Result)) {
-      if (FD->getDeclaredInterfaceType())
+    if (auto *FD = dyn_cast<NominalTypeDecl>(Result)) {
+      if (FD->getDeclaredInterfaceType()) {
         return FD->getDeclaredInterfaceType();
+      }
     }
   }
-  return ErrorType::get(*this);
+  auto name = getIdentifier(type);
+  SmallVector<ValueDecl *, 1> BuiltinResults;
+  TheBuiltinModule->lookupValue(name, NLKind::UnqualifiedLookup, BuiltinResults);
+  for (auto Result : BuiltinResults) {
+    if (auto *FD = dyn_cast<NominalTypeDecl>(Result)) {
+      if (FD->getDeclaredInterfaceType()) {
+        return FD->getDeclaredInterfaceType();
+      }
+    }
+  }
+  return Type();
 }
 
 /// Find the implementation for the given "intrinsic" library function.

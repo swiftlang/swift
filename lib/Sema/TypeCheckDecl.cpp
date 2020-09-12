@@ -1970,22 +1970,22 @@ Type ThrowsTypeRequest::evaluate(Evaluator &evaluator,
                                  AbstractFunctionDecl *decl) const {
   auto &ctx = decl->getASTContext();
   // Return Swift.Never, if the function doesnt throw.
-  if (!decl->hasThrows())
-    return ctx.getTypeByString("Never");
+  if (!decl->hasThrows()) {
+    if (auto never = ctx.getTypeByString("Never")) {
+      if (never->hasError())
+          return ctx.TheEmptyTupleType;
+    } else {
+      return ctx.TheEmptyTupleType;
+    }
+  }
 
-  TypeRepr *throwsTyRepr = decl->getThrowsTypeRepr();
+  Type throwsTyRepr = decl->getThrowsType();
 
   // If no type is specified, default to Swift.Error
   if (!throwsTyRepr)
     return ctx.getTypeByString("Never");
-
-  const auto options =
-      TypeResolutionOptions(TypeResolverContext::FunctionThrows);
-  auto *const dc = decl->getInnermostDeclContext();
-  auto type = TypeResolution::forInterface(dc, options, /*unboundTyOpener*/ nullptr)
-      .resolveType(throwsTyRepr);
   
-  return type;
+  return ctx.getTypeByString("Never");
 }
 
 Type
