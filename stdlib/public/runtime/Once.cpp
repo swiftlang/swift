@@ -55,12 +55,7 @@ void swift::swift_once(swift_once_t *predicate, void (*fn)(void *),
 #ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
   if (! *predicate) {
     *predicate = true;
-    // WebAssembly: hack: Swift compiler passes in a fn that doesn't take a parameter,
-    // which is invalid in WebAssembly. So swift_once casts the function.
-    // The correct way to fix this is to change 
-    // SILGenModule::emitLazyGlobalInitializer
-    // but this is OK as a proof of concept.
-    ((void (*)())fn)();
+    fn(context);
   }
 #elif defined(__APPLE__)
   dispatch_once_f(predicate, context, fn);
