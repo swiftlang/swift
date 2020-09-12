@@ -387,9 +387,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
 
-  if (FrontendOpts.InputKind == InputFileKind::SIL)
-    Opts.DisableAvailabilityChecking = true;
-  
   if (auto A = Args.getLastArg(OPT_enable_access_control,
                                OPT_disable_access_control)) {
     Opts.EnableAccessControl
@@ -675,8 +672,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
 
   // If we're parsing SIL, access control doesn't make sense to enforce.
-  if (FrontendOpts.InputKind == InputFileKind::SIL) {
+  if (Args.hasArg(OPT_parse_sil) ||
+      FrontendOpts.InputsAndOutputs.shouldTreatAsSIL()) {
     Opts.EnableAccessControl = false;
+    Opts.DisableAvailabilityChecking = true;
   }
 
   return HadError || UnsupportedOS || UnsupportedArch;
