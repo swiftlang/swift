@@ -850,7 +850,6 @@ static bool makeParserAST(CompilerInstance &CI, StringRef Text,
                           CompilerInvocation Invocation) {
   Invocation.getFrontendOptions().InputsAndOutputs.clearInputs();
   Invocation.setModuleName("main");
-  Invocation.setInputKind(InputFileKind::Swift);
   Invocation.getLangOptions().DisablePoundIfEvaluation = true;
 
   std::unique_ptr<llvm::MemoryBuffer> Buf;
@@ -1440,7 +1439,6 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
     Error = "Compiler invocation init failed";
     return nullptr;
   }
-  Invocation.setInputKind(InputFileKind::Swift);
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
       InputFile(InputBuf->getBufferIdentifier(), /*isPrimary*/false, InputBuf,
                 file_types::TY_Swift));

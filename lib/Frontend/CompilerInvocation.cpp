@@ -1859,7 +1859,7 @@ CompilerInvocation::setUpInputForSILTool(
   // If it looks like we have an AST, set the source file kind to SIL and the
   // name of the module to the file's name.
   getFrontendOptions().InputsAndOutputs.addInput(
-      InputFile(inputFilename, bePrimary, fileBufOrErr.get().get()));
+      InputFile(inputFilename, bePrimary, fileBufOrErr.get().get(), file_types::TY_SIL));
 
   auto result = serialization::validateSerializedAST(
       fileBufOrErr.get()->getBuffer(), &extendedInfo);
@@ -1870,13 +1870,14 @@ CompilerInvocation::setUpInputForSILTool(
                                ? moduleNameArg
                                : llvm::sys::path::stem(inputFilename);
     setModuleName(stem);
-    setInputKind(InputFileKind::SwiftLibrary);
+    getFrontendOptions().InputMode =
+        FrontendOptions::ParseInputMode::SwiftLibrary;
   } else {
     const StringRef name = (alwaysSetModuleToMain || moduleNameArg.empty())
                                ? "main"
                                : moduleNameArg;
     setModuleName(name);
-    setInputKind(InputFileKind::SIL);
+    getFrontendOptions().InputMode = FrontendOptions::ParseInputMode::SIL;
   }
   return fileBufOrErr;
 }

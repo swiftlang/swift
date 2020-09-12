@@ -287,13 +287,6 @@ public:
     return FrontendOpts.ParseStdlib;
   }
 
-  void setInputKind(InputFileKind K) {
-    FrontendOpts.InputKind = K;
-  }
-
-  InputFileKind getInputKind() const {
-    return FrontendOpts.InputKind;
-  }
   void setModuleName(StringRef Name) {
     FrontendOpts.ModuleName = Name.str();
     IRGenOpts.ModuleName = Name.str();
@@ -332,7 +325,7 @@ public:
 
   /// Retrieve the stdlib kind to implicitly import.
   ImplicitStdlibKind getImplicitStdlibKind() const {
-    if (getInputKind() == InputFileKind::SIL) {
+    if (FrontendOpts.InputMode == FrontendOptions::ParseInputMode::SIL) {
       return ImplicitStdlibKind::None;
     }
     if (getParseStdlib()) {

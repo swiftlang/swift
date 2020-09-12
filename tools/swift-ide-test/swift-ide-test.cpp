@@ -1322,8 +1322,6 @@ static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
     BufferText = BufferText.drop_back(1);
 
   CompilerInvocation Invocation(InitInvok);
-  Invocation.setInputKind(InputFileKind::Swift);
-
   CompilerInstance CI;
 
   // Display diagnostics to stderr.
@@ -3790,8 +3788,6 @@ int main(int argc, char *argv[]) {
 
   for (auto &File : options::InputFilenames)
     InitInvok.getFrontendOptions().InputsAndOutputs.addInputFile(File);
-  if (!options::InputFilenames.empty())
-    InitInvok.setInputKind(InputFileKind::SwiftLibrary);
 
   InitInvok.setMainExecutablePath(
       llvm::sys::fs::getMainExecutable(argv[0],

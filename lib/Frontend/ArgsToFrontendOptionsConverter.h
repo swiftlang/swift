@@ -47,7 +47,7 @@ private:
   void computePrintStatsOptions();
   void computeTBDOptions();
 
-  bool setUpInputKindAndImmediateArgs();
+  bool setUpImmediateArgs();
 
   bool checkUnusedSupplementaryOutputPaths() const;
 
