@@ -783,8 +783,6 @@ bool CompilerInstance::createFilesForMainModule(
     ModuleDecl *mod, SmallVectorImpl<FileUnit *> &files) const {
   // Make sure the main file is the first file in the module.
   if (MainBufferID != NO_SUCH_BUFFER) {
-    auto *mainFile = createSourceFileForMainModule(
-        mod, Invocation.getSourceFileKind(), MainBufferID);
     files.push_back(mainFile);
   }
 

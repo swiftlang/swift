@@ -226,25 +226,6 @@ void CompilerInvocation::setSDKPath(const std::string &Path) {
   updateRuntimeLibraryPaths(SearchPathOpts, LangOpts.Target);
 }
 
-SourceFileKind CompilerInvocation::getSourceFileKind() const {
-  switch (getInputKind()) {
-  case InputFileKind::Swift:
-    return SourceFileKind::Main;
-  case InputFileKind::SwiftLibrary:
-    return SourceFileKind::Library;
-  case InputFileKind::SwiftModuleInterface:
-    return SourceFileKind::Interface;
-  case InputFileKind::SIL:
-    return SourceFileKind::SIL;
-  case InputFileKind::None:
-  case InputFileKind::LLVM:
-  case InputFileKind::ObjCHeader:
-    llvm_unreachable("Trying to convert from unsupported InputFileKind");
-  }
-
-  llvm_unreachable("Unhandled InputFileKind in switch.");
-}
-
 static bool ParseFrontendArgs(
     FrontendOptions &opts, ArgList &args, DiagnosticEngine &diags,
     SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>> *buffers) {

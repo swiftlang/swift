@@ -294,9 +294,6 @@ public:
   InputFileKind getInputKind() const {
     return FrontendOpts.InputKind;
   }
-
-  SourceFileKind getSourceFileKind() const;
-
   void setModuleName(StringRef Name) {
     FrontendOpts.ModuleName = Name.str();
     IRGenOpts.ModuleName = Name.str();
