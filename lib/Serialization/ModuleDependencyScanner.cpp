@@ -150,7 +150,7 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
     // printed in the interface file, e.g. SwiftOnoneSupport.
     auto &imInfo = mainMod->getImplicitImportInfo();
     for (auto import: imInfo.AdditionalUnloadedImports) {
-      Result->addModuleDependency(import.module.getModulePath().front().Item.str(), &alreadyAddedModules);
+      Result->addModuleDependency(import.module.getModulePath(), &alreadyAddedModules);
     }
     return std::error_code();
   });

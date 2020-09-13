@@ -1395,14 +1395,14 @@ void swift::simple_display(llvm::raw_ostream &out,
                            const AttributedImport<ImportedModule> &import) {
   out << "import of ";
 
-  if (!import.module.accessPath.empty()) {
-    simple_display(out, import.module.accessPath.front().Item);
-    out << " in ";
-  }
-
   simple_display(out, import.module.importedModule);
 
   out << " [";
+  if (!import.module.accessPath.empty()) {
+    out << " scoped(";
+    import.module.accessPath.print(out);
+    out << ")";
+  }
   if (import.options.contains(ImportFlags::Exported))
     out << " exported";
   if (import.options.contains(ImportFlags::Testable))
@@ -1414,11 +1414,9 @@ void swift::simple_display(llvm::raw_ostream &out,
 
   if (import.options.contains(ImportFlags::SPIAccessControl)) {
     out << " spi(";
-    llvm::interleave(import.spiGroups,
-                     [&out](Identifier name) {
-                       simple_display(out, name);
-                     },
-                     [&out]() { out << " "; });
+    llvm::interleaveComma(import.spiGroups, out, [&out](Identifier name) {
+                                                   simple_display(out, name);
+                                                 });
     out << ")";
   }
 

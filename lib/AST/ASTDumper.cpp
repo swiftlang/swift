@@ -620,11 +620,7 @@ namespace {
         OS << " kind=" << getImportKindString(ID->getImportKind());
 
       OS << " '";
-      llvm::interleave(ID->getImportPath(),
-                       [&](const ImportPath::Element &Elem) {
-                         OS << Elem.Item;
-                       },
-                       [&] { OS << '.'; });
+      ID->getImportPath().print(OS);
       OS << "')";
     }
 

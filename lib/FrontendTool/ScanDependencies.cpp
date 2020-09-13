@@ -818,7 +818,7 @@ bool swift::scanDependencies(CompilerInstance &instance) {
 
     // Add any implicit module names.
     for (const auto &import : importInfo.AdditionalUnloadedImports) {
-      mainDependencies.addModuleDependency(import.module.getModulePath().front().Item.str(), &alreadyAddedModules);
+      mainDependencies.addModuleDependency(import.module.getModulePath(), &alreadyAddedModules);
     }
 
     // Already-loaded, implicitly imported module names.

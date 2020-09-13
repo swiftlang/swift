@@ -202,8 +202,7 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
       if (auto *loader = ctx.getClangModuleLoader()) {
         headerImportModule = loader->getImportedHeaderModule();
         if (headerImportModule) {
-          ImportedModule import{ImportPath::Access(), headerImportModule};
-          visitImport(import, nullptr);
+          visitImport(ImportedModule(headerImportModule), nullptr);
         }
       }
     }

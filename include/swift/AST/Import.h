@@ -28,6 +28,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 
 namespace swift {
@@ -150,6 +151,17 @@ namespace detail {
     SourceRange getSourceRange() const {
       if (empty()) return SourceRange();
       return SourceRange(raw.front().Loc, raw.back().Loc);
+    }
+
+    void print(llvm::raw_ostream &os) const {
+      llvm::interleave(*this,
+                       [&](Element elem) { os << elem.Item.str(); },
+                       [&]() { os << "."; });
+    }
+
+    void getString(SmallVectorImpl<char> &modulePathStr) const {
+      llvm::raw_svector_ostream os(modulePathStr);
+      print(os);
     }
   };
 
@@ -479,6 +491,9 @@ struct alignas(uint64_t) ImportedModule {
     assert(this->importedModule);
   }
 
+  explicit ImportedModule(ModuleDecl *importedModule)
+      : ImportedModule(ImportPath::Access(), importedModule) { }
+
   bool operator==(const ImportedModule &other) const {
     return (this->importedModule == other.importedModule) &&
            (this->accessPath == other.accessPath);
@@ -489,6 +504,10 @@ struct alignas(uint64_t) ImportedModule {
   ///
   /// The order of items in \p imports is \e not preserved.
   static void removeDuplicates(SmallVectorImpl<ImportedModule> &imports);
+
+  // Purely here to allow ImportedModule and UnloadedImportedModule to
+  // substitute into the same templates.
+  ImportPath::Access getAccessPath() const { return accessPath; }
 
   /// Arbitrarily orders ImportedModule records, for inclusion in sets and such.
   class Order {
@@ -524,7 +543,7 @@ struct AttributedImport {
   /// Names of explicitly imported SPI groups.
   ArrayRef<Identifier> spiGroups;
 
-  AttributedImport(ModuleInfo module, ImportOptions options,
+  AttributedImport(ModuleInfo module, ImportOptions options = ImportOptions(),
                    StringRef filename = {}, ArrayRef<Identifier> spiGroups = {})
       : module(module), options(options), sourceFileArg(filename),
         spiGroups(spiGroups) {
@@ -533,12 +552,21 @@ struct AttributedImport {
            options.contains(ImportFlags::Reserved));
   }
 
+  template<class OtherModuleInfo>
+  AttributedImport(ModuleInfo module, AttributedImport<OtherModuleInfo> other)
+    : AttributedImport(module, other.options, other.sourceFileArg,
+                       other.spiGroups) { }
+
   friend bool operator==(const AttributedImport<ModuleInfo> &lhs,
                          const AttributedImport<ModuleInfo> &rhs) {
     return lhs.module == rhs.module &&
            lhs.options.toRaw() == rhs.options.toRaw() &&
            lhs.sourceFileArg == rhs.sourceFileArg &&
            lhs.spiGroups == rhs.spiGroups;
+  }
+
+  AttributedImport<ImportedModule> getLoaded(ModuleDecl *loadedModule) const {
+    return { ImportedModule(module.getAccessPath(), loadedModule), *this };
   }
 };
 
