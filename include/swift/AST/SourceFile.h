@@ -82,7 +82,7 @@ private:
   /// This is the list of modules that are imported by this module.
   ///
   /// This is \c None until it is filled in by the import resolution phase.
-  Optional<ArrayRef<ImportedModuleDesc>> Imports;
+  Optional<ArrayRef<AttributedImport<ImportedModule>>> Imports;
 
   /// A unique identifier representing this file; used to mark private decls
   /// within the file to keep them from conflicting with other files in the
@@ -288,11 +288,13 @@ public:
   ~SourceFile();
 
   /// Retrieve an immutable view of the source file's imports.
-  ArrayRef<ImportedModuleDesc> getImports() const { return *Imports; }
+  ArrayRef<AttributedImport<ImportedModule>> getImports() const {
+    return *Imports;
+  }
 
   /// Set the imports for this source file. This gets called by import
   /// resolution.
-  void setImports(ArrayRef<ImportedModuleDesc> imports);
+  void setImports(ArrayRef<AttributedImport<ImportedModule>> imports);
 
   enum ImportQueryKind {
     /// Return the results for testable or private imports.

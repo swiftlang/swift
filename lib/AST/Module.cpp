@@ -1882,14 +1882,16 @@ void SourceFile::print(ASTPrinter &Printer, const PrintOptions &PO) {
   }
 }
 
-void SourceFile::setImports(ArrayRef<ImportedModuleDesc> imports) {
+void
+SourceFile::setImports(ArrayRef<AttributedImport<ImportedModule>> imports) {
   assert(!Imports && "Already computed imports");
   Imports = getASTContext().AllocateCopy(imports);
 }
 
 bool HasImplementationOnlyImportsRequest::evaluate(Evaluator &evaluator,
                                                    SourceFile *SF) const {
-  return llvm::any_of(SF->getImports(), [](ImportedModuleDesc desc) {
+  return llvm::any_of(SF->getImports(),
+                      [](AttributedImport<ImportedModule> desc) {
     return desc.importOptions.contains(ImportFlags::ImplementationOnly);
   });
 }
@@ -1911,9 +1913,8 @@ bool SourceFile::hasTestableOrPrivateImport(
     // internal/public access only needs an import marked as @_private. The
     // filename does not need to match (and we don't serialize it for such
     // decls).
-    return std::any_of(
-        Imports->begin(), Imports->end(),
-        [module, queryKind](ImportedModuleDesc desc) -> bool {
+    return llvm::any_of(*Imports,
+        [module, queryKind](AttributedImport<ImportedModule> desc) -> bool {
           if (queryKind == ImportQueryKind::TestableAndPrivate)
             return desc.module.importedModule == module &&
                    (desc.importOptions.contains(ImportFlags::PrivateImport) ||
@@ -1954,13 +1955,12 @@ bool SourceFile::hasTestableOrPrivateImport(
   if (filename.empty())
     return false;
 
-  return std::any_of(Imports->begin(), Imports->end(),
-                     [module, filename](ImportedModuleDesc desc) -> bool {
-                       return desc.module.importedModule == module &&
-                              desc.importOptions.contains(
-                                  ImportFlags::PrivateImport) &&
-                              desc.filename == filename;
-                     });
+  return llvm::any_of(*Imports,
+      [module, filename](AttributedImport<ImportedModule> desc) {
+        return desc.module.importedModule == module &&
+              desc.importOptions.contains(ImportFlags::PrivateImport) &&
+              desc.filename == filename;
+      });
 }
 
 bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {

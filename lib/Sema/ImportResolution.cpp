@@ -102,8 +102,8 @@ struct UnboundImport {
   /// Create an UnboundImport for a cross-import overlay.
   explicit UnboundImport(ASTContext &ctx,
                          const UnboundImport &base, Identifier overlayName,
-                         const ImportedModuleDesc &declaringImport,
-                         const ImportedModuleDesc &bystandingImport);
+                         const AttributedImport<ImportedModule> &declaringImport,
+                         const AttributedImport<ImportedModule> &bystandingImport);
 
   /// Diagnoses if the import would simply load the module \p SF already
   /// belongs to, with no actual effect.
@@ -133,11 +133,12 @@ struct UnboundImport {
   /// non-implementation-only import of a fragile library from a resilient one.
   void validateOptions(NullablePtr<ModuleDecl> topLevelModule, SourceFile &SF);
 
-  /// Create an \c ImportedModuleDesc from the information in this
+  /// Create an \c AttributedImport<ImportedModule> from the information in this
   /// UnboundImport.
-  ImportedModuleDesc makeDesc(ModuleDecl *module) const {
-    return ImportedModuleDesc({ accessPath, module }, options,
-                              privateImportFileName, spiGroups);
+  AttributedImport<ImportedModule>
+  makeAttributedImport(ModuleDecl *module) const {
+    return AttributedImport<ImportedModule>({ accessPath, module }, options,
+                                            privateImportFileName, spiGroups);
   }
 
 private:
@@ -165,7 +166,7 @@ class ImportResolver final : public DeclVisitor<ImportResolver> {
   SmallVector<UnboundImport, 4> unboundImports;
 
   /// The list of fully bound imports.
-  SmallVector<ImportedModuleDesc, 16> boundImports;
+  SmallVector<AttributedImport<ImportedModule>, 16> boundImports;
 
   /// All imported modules which should be considered when cross-importing.
   /// This is basically the transitive import graph, but with only top-level
@@ -174,14 +175,14 @@ class ImportResolver final : public DeclVisitor<ImportResolver> {
   /// We use a \c SmallSetVector here because this doubles as the worklist for
   /// cross-importing, so we want to keep it in order; this is feasible
   /// because this set is usually fairly small.
-  SmallSetVector<ImportedModuleDesc, 64> crossImportableModules;
+  SmallSetVector<AttributedImport<ImportedModule>, 64> crossImportableModules;
 
   /// The subset of \c crossImportableModules which may declare cross-imports.
   ///
   /// This is a performance optimization. Since most modules do not register
   /// any cross-imports, we can usually compare against this list, which is
   /// much, much smaller than \c crossImportableModules.
-  SmallVector<ImportedModuleDesc, 16> crossImportDeclaringModules;
+  SmallVector<AttributedImport<ImportedModule>, 16> crossImportDeclaringModules;
 
   /// The index of the next module in \c visibleModules that should be
   /// cross-imported.
@@ -203,7 +204,7 @@ public:
   }
 
   /// Retrieve the finalized imports.
-  ArrayRef<ImportedModuleDesc> getFinishedImports() const {
+  ArrayRef<AttributedImport<ImportedModule>> getFinishedImports() const {
     return boundImports;
   }
 
@@ -228,7 +229,7 @@ private:
 
   /// Adds \p desc and everything it re-exports to \c visibleModules using
   /// the settings from \c desc.
-  void addCrossImportableModules(ImportedModuleDesc desc);
+  void addCrossImportableModules(AttributedImport<ImportedModule> desc);
 
   /// * If \p I is a cross-import overlay, registers \p M as overlaying
   ///   \p I.underlyingModule in \c SF.
@@ -239,18 +240,19 @@ private:
   /// Discovers any cross-imports between \p newImport and
   /// \p oldImports and adds them to \c unboundImports, using source
   /// locations from \p I.
-  void findCrossImportsInLists(UnboundImport &I,
-                               ArrayRef<ImportedModuleDesc> declaring,
-                               ArrayRef<ImportedModuleDesc> bystanding,
-                               bool shouldDiagnoseRedundantCrossImports);
+  void findCrossImportsInLists(
+      UnboundImport &I,
+      ArrayRef<AttributedImport<ImportedModule>> declaring,
+      ArrayRef<AttributedImport<ImportedModule>> bystanding,
+      bool shouldDiagnoseRedundantCrossImports);
 
   /// Discovers any cross-imports between \p declaringImport and
   /// \p bystandingImport and adds them to \c unboundImports, using source
   /// locations from \p I.
   void findCrossImports(UnboundImport &I,
-                        const ImportedModuleDesc &declaringImport,
-                        const ImportedModuleDesc &bystandingImport,
-                        bool shouldDiagnoseRedundantCrossImports);
+      const AttributedImport<ImportedModule> &declaringImport,
+      const AttributedImport<ImportedModule> &bystandingImport,
+      bool shouldDiagnoseRedundantCrossImports);
 
   /// Load a module referenced by an import statement.
   ///
@@ -353,7 +355,7 @@ void ImportResolver::bindImport(UnboundImport &&I) {
 }
 
 void ImportResolver::addImport(const UnboundImport &I, ModuleDecl *M) {
-  auto importDesc = I.makeDesc(M);
+  auto importDesc = I.makeAttributedImport(M);
   addCrossImportableModules(importDesc);
   boundImports.push_back(importDesc);
 }
@@ -912,7 +914,7 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
 // MARK: Cross-import overlays
 //===----------------------------------------------------------------------===//
 
-static bool canCrossImport(const ImportedModuleDesc &import) {
+static bool canCrossImport(const AttributedImport<ImportedModule> &import) {
   if (import.importOptions.contains(ImportFlags::Testable))
     return false;
   if (import.importOptions.contains(ImportFlags::PrivateImport))
@@ -922,10 +924,10 @@ static bool canCrossImport(const ImportedModuleDesc &import) {
 }
 
 /// Create an UnboundImport for a cross-import overlay.
-UnboundImport::UnboundImport(ASTContext &ctx, const UnboundImport &base,
-                             Identifier overlayName,
-                             const ImportedModuleDesc &declaringImport,
-                             const ImportedModuleDesc &bystandingImport)
+UnboundImport::UnboundImport(
+    ASTContext &ctx, const UnboundImport &base, Identifier overlayName,
+    const AttributedImport<ImportedModule> &declaringImport,
+    const AttributedImport<ImportedModule> &bystandingImport)
     : importLoc(base.importLoc), options(), privateImportFileName(),
       // Cross-imports are not backed by an ImportDecl, so we need to provide
       // our own storage for their module paths.
@@ -1032,8 +1034,8 @@ void ImportResolver::crossImport(ModuleDecl *M, UnboundImport &I) {
 }
 
 void ImportResolver::findCrossImportsInLists(
-    UnboundImport &I, ArrayRef<ImportedModuleDesc> declaring,
-    ArrayRef<ImportedModuleDesc> bystanding,
+    UnboundImport &I, ArrayRef<AttributedImport<ImportedModule>> declaring,
+    ArrayRef<AttributedImport<ImportedModule>> bystanding,
     bool shouldDiagnoseRedundantCrossImports) {
   for (auto &declaringImport : declaring) {
     if (!canCrossImport(declaringImport))
@@ -1050,8 +1052,9 @@ void ImportResolver::findCrossImportsInLists(
 }
 
 void ImportResolver::findCrossImports(
-    UnboundImport &I, const ImportedModuleDesc &declaringImport,
-    const ImportedModuleDesc &bystandingImport,
+    UnboundImport &I,
+    const AttributedImport<ImportedModule> &declaringImport,
+    const AttributedImport<ImportedModule> &bystandingImport,
     bool shouldDiagnoseRedundantCrossImports) {
   assert(&declaringImport != &bystandingImport);
 
@@ -1120,7 +1123,8 @@ static bool isSubmodule(ModuleDecl* M) {
   return clangMod && clangMod->Parent;
 }
 
-void ImportResolver::addCrossImportableModules(ImportedModuleDesc importDesc) {
+void ImportResolver::addCrossImportableModules(
+    AttributedImport<ImportedModule> importDesc) {
   // FIXME: namelookup::getAllImports() doesn't quite do what we need (mainly
   // w.r.t. scoped imports), but it seems like we could extend it to do so, and
   // then eliminate most of this.

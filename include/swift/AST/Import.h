@@ -70,8 +70,8 @@ enum class ImportFlags {
   /// Mutually exclusive with Exported.
   ImplementationOnly = 0x8,
 
-  // The module is imported to have access to named SPIs which is an
-  // implementation detail of this file.
+  /// The module is imported to have access to named SPIs which is an
+  /// implementation detail of this file.
   SPIAccessControl = 0x10,
 
   /// Used for DenseMap.
@@ -444,8 +444,10 @@ struct alignas(uint64_t) ImportedModule {
   };
 };
 
-struct ImportedModuleDesc {
-  ImportedModule module;
+template<class ModuleInfo>
+struct AttributedImport {
+  ModuleInfo module;
+
   ImportOptions importOptions;
 
   // Filename for a @_private import.
@@ -454,9 +456,8 @@ struct ImportedModuleDesc {
   // Names of explicitly imported SPIs.
   ArrayRef<Identifier> spiGroups;
 
-  ImportedModuleDesc(ImportedModule module, ImportOptions options,
-                     StringRef filename = {},
-                     ArrayRef<Identifier> spiGroups = {})
+  AttributedImport(ModuleInfo module, ImportOptions options,
+                   StringRef filename = {}, ArrayRef<Identifier> spiGroups = {})
       : module(module), importOptions(options), filename(filename),
         spiGroups(spiGroups) {
     assert(!(importOptions.contains(ImportFlags::Exported) &&
@@ -464,6 +465,8 @@ struct ImportedModuleDesc {
            importOptions.contains(ImportFlags::Reserved));
   }
 };
+
+using ImportedModuleDesc = AttributedImport<ImportedModule>;
 
 // MARK: - Implicit imports
 
@@ -570,34 +573,35 @@ public:
   }
 };
 
-template<>
-struct DenseMapInfo<swift::ImportedModuleDesc> {
-  using ImportedModuleDesc = swift::ImportedModuleDesc;
+template<typename ModuleInfo>
+struct DenseMapInfo<swift::AttributedImport<ModuleInfo>> {
+  using AttributedImport = swift::AttributedImport<ModuleInfo>;
 
-  using ImportedModuleDMI = DenseMapInfo<swift::ImportedModule>;
+  using ModuleInfoDMI = DenseMapInfo<ModuleInfo>;
   using ImportOptionsDMI = DenseMapInfo<swift::ImportOptions>;
   using StringRefDMI = DenseMapInfo<StringRef>;
+  // FIXME: SPI groups not used by DenseMapInfo???
 
-  static inline ImportedModuleDesc getEmptyKey() {
-    return ImportedModuleDesc(ImportedModuleDMI::getEmptyKey(),
-                              ImportOptionsDMI::getEmptyKey(),
-                              StringRefDMI::getEmptyKey());
+  static inline AttributedImport getEmptyKey() {
+    return AttributedImport(ModuleInfoDMI::getEmptyKey(),
+                            ImportOptionsDMI::getEmptyKey(),
+                            StringRefDMI::getEmptyKey());
   }
-  static inline ImportedModuleDesc getTombstoneKey() {
-    return ImportedModuleDesc(ImportedModuleDMI::getTombstoneKey(),
-                              ImportOptionsDMI::getTombstoneKey(),
-                              StringRefDMI::getTombstoneKey());
+  static inline AttributedImport getTombstoneKey() {
+    return AttributedImport(ModuleInfoDMI::getTombstoneKey(),
+                            ImportOptionsDMI::getTombstoneKey(),
+                            StringRefDMI::getTombstoneKey());
   }
-  static inline unsigned getHashValue(const ImportedModuleDesc &import) {
+  static inline unsigned getHashValue(const AttributedImport &import) {
     return detail::combineHashValue(
-        ImportedModuleDMI::getHashValue(import.module),
+        ModuleInfoDMI::getHashValue(import.module),
         detail::combineHashValue(
             ImportOptionsDMI::getHashValue(import.importOptions),
             StringRefDMI::getHashValue(import.filename)));
   }
-  static bool isEqual(const ImportedModuleDesc &a,
-                      const ImportedModuleDesc &b) {
-    return ImportedModuleDMI::isEqual(a.module, b.module) &&
+  static bool isEqual(const AttributedImport &a,
+                      const AttributedImport &b) {
+    return ModuleInfoDMI::isEqual(a.module, b.module) &&
            ImportOptionsDMI::isEqual(a.importOptions, b.importOptions) &&
            StringRefDMI::isEqual(a.filename, b.filename);
   }
