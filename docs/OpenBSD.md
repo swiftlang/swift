@@ -6,13 +6,13 @@ Swift builds and runs on OpenBSD (tested on 6.8-beta), with some special conside
 
 The following packages are required to build Swift. You can install these via `pkg_add`:
 
-```
+```shell
 $ doas pkg_add bash cmake e2fsprogs git icu4c ninja py-six python3
 ```
 
 Because LLVM is built as part of building Swift and does not include some of the patches to handle the OpenBSD library naming convention, you will need to create some symlinks:
 
-```
+```shell
 $ doas ln -s /usr/lib/libc++abi.so.2.1 /usr/lib/libc++abi.so
 $ doas ln -s /usr/lib/libc++.so.4.0 /usr/lib/libc++.so
 $ doas ln -s /usr/lib/libc.so.96.0 /usr/lib/libc.so
@@ -25,17 +25,17 @@ $ doas ln -s /usr/lib/libpthread.so.26.1 /usr/lib/libpthread.so
 
 Also link `~/bin/python` to the `python2.7` binary:
 
-```
+```shell
 $ doas ln -s /usr/local/bin/python2.7 ~/bin/python
 ```
 
-Since the build requires significant amounts of memory at certain points, you may need to ensure both that the user you are using to build Swift has the appropriate limits set. Using the `staff` group in `login.conf` and ensuring the shell limits are raised is recommended.
+Since the build requires significant amounts of memory at certain points, you may need to ensure that the user you are using to build Swift has the appropriate limits set. Using the `staff` group in `login.conf` and ensuring the shell limits are raised is recommended.
 
 ## Downloading the source
 
 Download the sources with the [Getting Started](/docs/HowToGuides/GettingStarted.md) guide (see "Cloning the project"). Use the config file below when running `update-checkout` by specifying the file name with the `--config` flag. This config file just prepares cmark, LLVM, and Swift (as this is the minimal set of dependencies which has been tested for OpenBSD).
 
-```
+```json
 {
   "ssh-clone-pattern": "git@github.com:%s.git",
   "https-clone-pattern": "https://github.com/%s.git",
