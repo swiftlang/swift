@@ -3040,7 +3040,7 @@ namespace {
       }
 
       const clang::EnumDecl *canonicalClangDecl = decl->getCanonicalDecl();
-      Impl.ImportedDecls[{canonicalClangDecl, getVersion()}] = result;
+      Impl.cacheImportedDecl(result, canonicalClangDecl, getVersion());
 
       // Import each of the enumerators.
       
@@ -3301,7 +3301,7 @@ namespace {
                                  name,
                                  Impl.importSourceLoc(decl->getLocation()),
                                  None, nullptr, dc);
-      Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
+      Impl.cacheImportedDecl(result, decl->getCanonicalDecl(), getVersion());
 
       // FIXME: Figure out what to do with superclasses in C++. One possible
       // solution would be to turn them into members and add conversion
@@ -3570,7 +3570,7 @@ namespace {
                                           clang::APValue(decl->getInitVal()),
                                           ConstantConvertKind::None,
                                           /*static*/dc->isTypeContext(), decl);
-        Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
+        Impl.cacheImportedDecl(result, decl->getCanonicalDecl(), getVersion());
 
         // If this is a compatibility stub, mark it as such.
         if (correctSwiftName)
@@ -3607,7 +3607,7 @@ namespace {
                                           clang::APValue(decl->getInitVal()),
                                           ConstantConvertKind::Construction,
                                           /*static*/ false, decl);
-        Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
+        Impl.cacheImportedDecl(result, decl->getCanonicalDecl(), getVersion());
 
         // If this is a compatibility stub, mark it as such.
         if (correctSwiftName)
@@ -4528,8 +4528,8 @@ namespace {
       if (!forceClassMethod) {
         if (dc == Impl.importDeclContextOf(decl, decl->getDeclContext()) &&
             !Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}])
-          Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}]
-            = result;
+          Impl.cacheImportedDecl(result, decl->getCanonicalDecl(),
+                                 getVersion());
 
         if (importedName.isSubscriptAccessor()) {
           // If this was a subscript accessor, try to create a
@@ -4697,7 +4697,7 @@ namespace {
 
       // Create the extension declaration and record it.
       objcClass->addExtension(result);
-      Impl.ImportedDecls[{decl, getVersion()}] = result;
+      Impl.cacheImportedDecl(result, decl, getVersion());
       SmallVector<TypeLoc, 4> inheritedTypes;
       importObjCProtocols(result, decl->getReferencedProtocols(),
                           inheritedTypes);
@@ -4801,8 +4801,8 @@ namespace {
       }
 
       if (found)
-        Impl.ImportedDecls[{decl->getCanonicalDecl(),
-                            getActiveSwiftVersion()}] = found;
+        Impl.cacheImportedDecl(found, decl->getCanonicalDecl(),
+                               getActiveSwiftVersion());
 
       return found;
     }
@@ -4901,7 +4901,7 @@ namespace {
       if (declaredNative)
         markMissingSwiftDecl(result);
 
-      Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
+      Impl.cacheImportedDecl(result, decl->getCanonicalDecl(), getVersion());
 
       // Import protocols this protocol conforms to.
       SmallVector<TypeLoc, 4> inheritedTypes;
@@ -4937,7 +4937,7 @@ namespace {
                                                         SourceLoc(), name,
                                                         SourceLoc(), None,
                                                         nullptr, dc);
-        Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
+        Impl.cacheImportedDecl(result, decl->getCanonicalDecl(), getVersion());
         result->setSuperclass(Type());
         result->setAddedImplicitInitializers(); // suppress all initializers
         result->setHasMissingVTableEntries(false);
@@ -5042,7 +5042,7 @@ namespace {
         return nullptr;
       }
 
-      Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
+      Impl.cacheImportedDecl(result, decl->getCanonicalDecl(), getVersion());
       addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
 
       if (declaredNative)
@@ -5568,7 +5568,7 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
   alias->setUnderlyingType(typeDecl->getDeclaredInterfaceType());
   
   // Record that this is the official version of this declaration.
-  Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = alias;
+  Impl.cacheImportedDecl(alias, decl->getCanonicalDecl(), getVersion());
   markAsVariant(alias, correctSwiftName);
   return alias;
 }
@@ -5776,7 +5776,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
                             storedUnderlyingType);
   }
 
-  Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = structDecl;
+  Impl.cacheImportedDecl(structDecl, decl->getCanonicalDecl(), getVersion());
   return structDecl;
 }
 
@@ -6187,7 +6187,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
     return nullptr;
 
   Impl.importAttributes(getter, swiftGetter);
-  Impl.ImportedDecls[{getter, getVersion()}] = swiftGetter;
+  Impl.cacheImportedDecl(swiftGetter, getter, getVersion());
   if (swift3GetterName)
     markAsVariant(swiftGetter, *swift3GetterName);
 
@@ -6201,7 +6201,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
       return nullptr;
 
     Impl.importAttributes(setter, swiftSetter);
-    Impl.ImportedDecls[{setter, getVersion()}] = swiftSetter;
+    Impl.cacheImportedDecl(swiftSetter, setter, getVersion());
     if (swift3SetterName)
       markAsVariant(swiftSetter, *swift3SetterName);
   }
@@ -8117,7 +8117,7 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
   }
 
   if (!HadForwardDeclaration)
-    ImportedDecls[{Canon, version}] = Result;
+    cacheImportedDecl(Result, Canon, version);
 
   if (!SuperfluousTypedefsAreTransparent && TypedefIsSuperfluous)
     return nullptr;
