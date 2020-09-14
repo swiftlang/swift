@@ -228,7 +228,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       if (AttrStatus.hasCodeCompletion()) {
         if (CodeCompletion)
           CodeCompletion->setAttrTargetDeclKind(DeclKind::Param);
-        status.setHasCodeCompletion();
+        status.setHasCodeCompletionAndIsError();
       }
     }
     
@@ -574,7 +574,6 @@ mapParsedParameters(Parser &parser,
   // Collect the elements of the tuple patterns for argument and body
   // parameters.
   SmallVector<ParamDecl*, 4> elements;
-  SourceLoc ellipsisLoc;
 
   for (auto &param : params) {
     // Whether the provided name is API by default depends on the parameter
@@ -625,27 +624,26 @@ mapParsedParameters(Parser &parser,
     }
 
     // Warn when an unlabeled parameter follows a variadic parameter
-    if (ellipsisLoc.isValid() && elements.back()->isVariadic() &&
-        param.FirstName.empty()) {
-      parser.diagnose(param.FirstNameLoc,
-                      diag::unlabeled_parameter_following_variadic_parameter);
+    if (!elements.empty() && elements.back()->isVariadic() && argName.empty()) {
+      // Closure parameters can't have external labels, so use a more specific
+      // diagnostic.
+      if (paramContext == Parser::ParameterContextKind::Closure)
+        parser.diagnose(
+            param.FirstNameLoc,
+            diag::closure_unlabeled_parameter_following_variadic_parameter);
+      else
+        parser.diagnose(param.FirstNameLoc,
+                        diag::unlabeled_parameter_following_variadic_parameter);
     }
-    
-    // If this parameter had an ellipsis, check whether it's the last parameter.
-    if (param.EllipsisLoc.isValid()) {
-      if (ellipsisLoc.isValid()) {
-        parser.diagnose(param.EllipsisLoc, diag::multiple_parameter_ellipsis)
-          .highlight(ellipsisLoc)
-          .fixItRemove(param.EllipsisLoc);
 
-        param.EllipsisLoc = SourceLoc();
-      } else if (!result->getTypeRepr()) {
+    // If this parameter had an ellipsis, check it has a TypeRepr.
+    if (param.EllipsisLoc.isValid()) {
+      if (!result->getTypeRepr()) {
         parser.diagnose(param.EllipsisLoc, diag::untyped_pattern_ellipsis)
           .highlight(result->getSourceRange());
 
         param.EllipsisLoc = SourceLoc();
       } else {
-        ellipsisLoc = param.EllipsisLoc;
         result->setVariadic();
       }
     }
@@ -810,7 +808,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
         parseDeclResultType(diag::expected_type_function_result);
     retType = ResultType.getPtrOrNull();
     Status |= ResultType;
-    if (Status.isError())
+    if (Status.isErrorOrHasCompletion())
       return Status;
 
     // Check for 'throws' and 'rethrows' after the type and correct it.
@@ -921,7 +919,7 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
                                             argLabelLocs, rParenLoc,
                                             trailingClosures,
                                             SyntaxKind::Unknown);
-        if (status.isSuccess()) {
+        if (status.isSuccess() && !status.hasCodeCompletion()) {
           backtrack.cancelBacktrack();
           
           // Suggest replacing ':' with '='
@@ -1135,11 +1133,11 @@ parseOptionalPatternTypeAnnotation(ParserResult<Pattern> result) {
   Pattern *P = result.get();
   ParserStatus status;
   if (result.hasCodeCompletion())
-    status.setHasCodeCompletion();
+    status.setHasCodeCompletionAndIsError();
 
   ParserResult<TypeRepr> Ty = parseType();
   if (Ty.hasCodeCompletion()) {
-    result.setHasCodeCompletion();
+    result.setHasCodeCompletionAndIsError();
     return result;
   }
 

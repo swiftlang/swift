@@ -108,6 +108,8 @@ private:
 
   llvm::Optional<ARCBBStateInfoHandle> getBottomUpBBState(SILBasicBlock *BB);
   llvm::Optional<ARCBBStateInfoHandle> getTopDownBBState(SILBasicBlock *BB);
+
+  void dumpDataflowResults();
 };
 
 } // end swift namespace

@@ -19,6 +19,7 @@
 #include "swift/AST/FileUnit.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "clang/AST/ExternalASTSource.h"
+#include "clang/Basic/Module.h"
 
 namespace clang {
   class ASTContext;
@@ -37,7 +38,7 @@ class ClangModuleUnit final : public LoadedFile {
   llvm::PointerIntPair<ModuleDecl *, 1, bool> overlayModule;
   mutable Optional<ArrayRef<ModuleDecl::ImportedModule>> importedModulesForLookup;
   /// The metadata of the underlying Clang module.
-  clang::ExternalASTSource::ASTSourceDescriptor ASTSourceDescriptor;
+  clang::ASTSourceDescriptor ASTSourceDescriptor;
 
 public:
   /// True if the given Module contains an imported Clang module unit.
@@ -71,15 +72,15 @@ public:
   lookupNestedType(Identifier name,
                    const NominalTypeDecl *baseType) const override;
 
-  virtual void lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
+  virtual void lookupVisibleDecls(ImportPath::Access accessPath,
                                   VisibleDeclConsumer &consumer,
                                   NLKind lookupKind) const override;
 
-  virtual void lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
+  virtual void lookupClassMembers(ImportPath::Access accessPath,
                                   VisibleDeclConsumer &consumer) const override;
 
   virtual void
-  lookupClassMember(ModuleDecl::AccessPathTy accessPath, DeclName name,
+  lookupClassMember(ImportPath::Access accessPath, DeclName name,
                     SmallVectorImpl<ValueDecl*> &decls) const override;
 
   void lookupObjCMethods(
@@ -115,8 +116,7 @@ public:
 
   /// Returns the ASTSourceDescriptor of the associated Clang module if one
   /// exists.
-  Optional<clang::ExternalASTSource::ASTSourceDescriptor>
-  getASTSourceDescriptor() const;
+  Optional<clang::ASTSourceDescriptor> getASTSourceDescriptor() const;
 
   virtual StringRef getModuleDefiningPath() const override;
 

@@ -5044,6 +5044,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::StringInterpolationProtocol:
   case KnownProtocolKind::AdditiveArithmetic:
   case KnownProtocolKind::Differentiable:
+  case KnownProtocolKind::FloatingPoint:
   // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::PointwiseMultiplicative:
   case KnownProtocolKind::ElementaryFunctions:

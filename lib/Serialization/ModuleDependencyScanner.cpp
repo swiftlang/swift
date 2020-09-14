@@ -26,7 +26,7 @@ using llvm::ErrorOr;
 
 
 std::error_code ModuleDependencyScanner::findModuleFilesInDirectory(
-                                      AccessPathElem ModuleID,
+                                      ImportPath::Element ModuleID,
                                       const SerializedModuleBaseName &BaseName,
                                       SmallVectorImpl<char> *ModuleInterfacePath,
                                       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
@@ -71,7 +71,7 @@ std::error_code ModuleDependencyScanner::findModuleFilesInDirectory(
 
 
 std::error_code PlaceholderSwiftModuleScanner::findModuleFilesInDirectory(
-    AccessPathElem ModuleID, const SerializedModuleBaseName &BaseName,
+    ImportPath::Element ModuleID, const SerializedModuleBaseName &BaseName,
     SmallVectorImpl<char> *ModuleInterfacePath,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
@@ -176,13 +176,19 @@ Optional<ModuleDependencies> SerializedModuleLoaderBase::getModuleDependencies(
   auto moduleId = Ctx.getIdentifier(moduleName);
   // Instantiate dependency scanning "loaders".
   SmallVector<std::unique_ptr<ModuleDependencyScanner>, 2> scanners;
-  scanners.push_back(std::make_unique<ModuleDependencyScanner>(
-      Ctx, LoadMode, moduleId, delegate));
+  // Placeholder dependencies must be resolved first, to prevent the ModuleDependencyScanner
+  // from first discovering artifacts of a previous build. Such artifacts are captured
+  // as compiledModuleCandidates in the dependency graph of the placeholder dependency module
+  // itself.
   scanners.push_back(std::make_unique<PlaceholderSwiftModuleScanner>(
       Ctx, LoadMode, moduleId, Ctx.SearchPathOpts.PlaceholderDependencyModuleMap,
       delegate));
+  scanners.push_back(std::make_unique<ModuleDependencyScanner>(
+      Ctx, LoadMode, moduleId, delegate));
 
   // Check whether there is a module with this name that we can import.
+  assert(isa<PlaceholderSwiftModuleScanner>(scanners[0].get()) &&
+         "Expected PlaceholderSwiftModuleScanner as the first dependency scanner loader.");
   for (auto &scanner : scanners) {
     if (scanner->canImportModule({moduleId, SourceLoc()})) {
       // Record the dependencies.

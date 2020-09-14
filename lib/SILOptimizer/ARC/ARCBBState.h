@@ -137,6 +137,9 @@ public:
   /// BB. Used to create an initial state before we merge in other
   /// predecessors. This is currently a stub.
   void initPredTopDown(ARCBBState &PredBB);
+
+  void dumpBottomUpState();
+  void dumpTopDownState();
 };
 
 class ARCSequenceDataflowEvaluator::ARCBBStateInfoHandle {

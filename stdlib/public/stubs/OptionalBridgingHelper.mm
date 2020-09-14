@@ -48,6 +48,7 @@ using namespace swift;
   int fmtResult = asprintf(&str, "<%s %p depth = %u>", clsName,
                                                        (void*)self,
                                                        self->depth);
+  (void)fmtResult;
   assert(fmtResult != -1 && "unable to format description of null");
   id result = swift_stdlib_NSStringFromUTF8(str, strlen(str));
   free(str);

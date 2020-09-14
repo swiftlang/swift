@@ -443,6 +443,17 @@ def emit_module_path_EQ : Joined<["-"], "emit-module-path=">,
          ArgumentIsPath, SupplementaryOutput]>,
   Alias<emit_module_path>;
 
+def emit_module_summary :
+  Flag<["-"], "emit-module-summary">,
+  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild,
+         SupplementaryOutput]>,
+  HelpText<"Output module summary file">;
+def emit_module_summary_path :
+  Separate<["-"], "emit-module-summary-path">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
+         ArgumentIsPath, SupplementaryOutput]>,
+  MetaVarName<"<path>">, HelpText<"Output module summary file to <path>">;
+
 def emit_module_interface :
   Flag<["-"], "emit-module-interface">,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild,
@@ -1106,14 +1117,6 @@ def scan_dependencies : Flag<["-"], "scan-dependencies">,
 def scan_clang_dependencies : Flag<["-"], "scan-clang-dependencies">,
   HelpText<"Scan dependencies of the given Clang module">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
-
-def enable_astscope_lookup : Flag<["-"], "enable-astscope-lookup">,
-  Flags<[FrontendOption]>,
-  HelpText<"Enable ASTScope-based unqualified name lookup">;
-
-def disable_astscope_lookup : Flag<["-"], "disable-astscope-lookup">,
-  Flags<[FrontendOption]>,
-  HelpText<"Disable ASTScope-based unqualified name lookup">;
 
 def disable_parser_lookup : Flag<["-"], "disable-parser-lookup">,
   Flags<[FrontendOption]>,

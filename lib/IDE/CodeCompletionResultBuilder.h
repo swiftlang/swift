@@ -49,8 +49,20 @@ struct ExpectedTypeContext {
   /// Since the input may be incomplete, we take into account that the types are
   /// only a hint.
   bool isSingleExpressionBody = false;
+  bool preferNonVoid = false;
 
   bool empty() const { return possibleTypes.empty(); }
+  bool requiresNonVoid() const {
+    if (isSingleExpressionBody)
+      return false;
+    if (preferNonVoid)
+      return true;
+    if (possibleTypes.empty())
+      return false;
+    return std::all_of(possibleTypes.begin(), possibleTypes.end(), [](Type Ty) {
+      return !Ty->isVoid();
+    });
+  }
 
   ExpectedTypeContext() = default;
   ExpectedTypeContext(ArrayRef<Type> types, bool isSingleExpressionBody)

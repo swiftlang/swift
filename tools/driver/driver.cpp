@@ -192,6 +192,8 @@ static int run_driver(StringRef ExecName,
 
   if (C) {
     std::unique_ptr<sys::TaskQueue> TQ = TheDriver.buildTaskQueue(*C);
+    if (!TQ)
+        return 1;
     return C->performJobs(std::move(TQ));
   }
 

@@ -339,7 +339,7 @@ int swift::RunImmediately(CompilerInstance &CI,
   using MainFnTy = int(*)(int, char*[]);
 
   LLVM_DEBUG(llvm::dbgs() << "Running static constructors\n");
-  if (auto Err = JIT->runConstructors()) {
+  if (auto Err = JIT->initialize(JIT->getMainJITDylib())) {
     llvm::logAllUnhandledErrors(std::move(Err), llvm::errs(), "");
     return -1;
   }
@@ -356,7 +356,7 @@ int swift::RunImmediately(CompilerInstance &CI,
   int Result = llvm::orc::runAsMain(JITMain, CmdLine);
 
   LLVM_DEBUG(llvm::dbgs() << "Running static destructors\n");
-  if (auto Err = JIT->runDestructors()) {
+  if (auto Err = JIT->deinitialize(JIT->getMainJITDylib())) {
     logAllUnhandledErrors(std::move(Err), llvm::errs(), "");
     return -1;
   }

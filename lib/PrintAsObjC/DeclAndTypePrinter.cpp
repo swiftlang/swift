@@ -18,6 +18,7 @@
 #include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -32,6 +33,7 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/CharInfo.h"
+#include "clang/Basic/SourceManager.h"
 
 using namespace swift;
 using namespace swift::objc_translation;
@@ -463,6 +465,7 @@ private:
 
   Type getForeignResultType(AbstractFunctionDecl *AFD,
                             FunctionType *methodTy,
+                            Optional<ForeignAsyncConvention> asyncConvention,
                             Optional<ForeignErrorConvention> errorConvention) {
     // A foreign error convention can affect the result type as seen in
     // Objective-C.
@@ -481,6 +484,11 @@ private:
       case ForeignErrorConvention::ZeroPreservedResult:
         break;
       }
+    }
+
+    // Asynchronous methods return their results via completion handler.
+    if (asyncConvention) {
+      return getASTContext().TheEmptyTupleType;
     }
 
     auto result = methodTy->getResult();
@@ -512,16 +520,20 @@ private:
       }
     }
 
+    Optional<ForeignAsyncConvention> asyncConvention
+      = AFD->getForeignAsyncConvention();
     Optional<ForeignErrorConvention> errorConvention
       = AFD->getForeignErrorConvention();
     Type rawMethodTy = AFD->getMethodInterfaceType();
     auto methodTy = rawMethodTy->castTo<FunctionType>();
-    auto resultTy = getForeignResultType(AFD, methodTy, errorConvention);
+    auto resultTy = getForeignResultType(
+        AFD, methodTy, asyncConvention, errorConvention);
 
     // Constructors and methods returning DynamicSelf return
     // instancetype.
     if (isa<ConstructorDecl>(AFD) ||
-        (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->hasDynamicSelfResult())) {
+        (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->hasDynamicSelfResult() &&
+         !AFD->hasAsync())) {
       if (errorConvention && errorConvention->stripsResultOptionality()) {
         printNullability(OTK_Optional, NullabilityPrintKind::ContextSensitive);
       } else if (auto ctor = dyn_cast<ConstructorDecl>(AFD)) {
@@ -576,6 +588,16 @@ private:
       // Retrieve the selector piece.
       StringRef piece = selectorPieces[i].empty() ? StringRef("")
                                                   : selectorPieces[i].str();
+
+      // If we have an async convention and this is the completion handler
+      // parameter, print it.
+      if (asyncConvention &&
+          i == asyncConvention->completionHandlerParamIndex()) {
+        os << piece << ":(";
+        print(asyncConvention->completionHandlerType(), None);
+        os << ")completionHandler";
+        continue;
+      }
 
       // If we have an error convention and this is the error
       // parameter, print it.
@@ -659,7 +681,9 @@ private:
       if (looksLikeInitMethod(AFD->getObjCSelector())) {
         os << " SWIFT_METHOD_FAMILY(none)";
       }
-      if (methodTy->getResult()->isUninhabited()) {
+      if (asyncConvention) {
+        // Async methods don't have result types to annotate.
+      } else if (methodTy->getResult()->isUninhabited()) {
         os << " SWIFT_NORETURN";
       } else if (!methodTy->getResult()->isVoid() &&
                  !AFD->getAttrs().hasAttribute<DiscardableResultAttr>()) {
@@ -696,12 +720,15 @@ private:
 
   void printAbstractFunctionAsFunction(FuncDecl *FD) {
     printDocumentationComment(FD);
+    Optional<ForeignAsyncConvention> asyncConvention
+      = FD->getForeignAsyncConvention();
     Optional<ForeignErrorConvention> errorConvention
       = FD->getForeignErrorConvention();
     assert(!FD->getGenericSignature() &&
            "top-level generic functions not supported here");
     auto funcTy = FD->getInterfaceType()->castTo<FunctionType>();
-    auto resultTy = getForeignResultType(FD, funcTy, errorConvention);
+    auto resultTy = getForeignResultType(
+        FD, funcTy, asyncConvention, errorConvention);
 
     // The result type may be a partial function type we need to close
     // up later.
@@ -850,6 +877,9 @@ private:
         break;
       case PlatformKind::watchOSApplicationExtension:
         plat = "watchos_app_extension";
+        break;
+      case PlatformKind::OpenBSD:
+        plat = "openbsd";
         break;
       case PlatformKind::none:
         llvm_unreachable("handled above");

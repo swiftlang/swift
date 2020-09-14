@@ -234,7 +234,7 @@ static void collectVisibleMemberDecls(const DeclContext *CurrDC, LookupState LS,
 }
 
 static void
-synthesizePropertyWrapperStorageWrapperProperties(IterableDeclContext *IDC);
+synthesizePropertyWrapperVariables(IterableDeclContext *IDC);
 
 /// Lookup members in extensions of \p LookupType, using \p BaseType as the
 /// underlying type when checking any constraints on the extensions.
@@ -253,7 +253,7 @@ static void doGlobalExtensionLookup(Type BaseType,
                                                        extension)), false))
       continue;
 
-    synthesizePropertyWrapperStorageWrapperProperties(extension);
+    synthesizePropertyWrapperVariables(extension);
 
     collectVisibleMemberDecls(CurrDC, LS, BaseType, extension, FoundDecls);
   }
@@ -538,10 +538,10 @@ static void
                     Consumer, CurrDC, LS, Reason);
 }
 
-// Generate '$' and '_' prefixed variables that have attached property
+// Generate '$' and '_' prefixed variables for members that have attached property
 // wrappers.
 static void
-synthesizePropertyWrapperStorageWrapperProperties(IterableDeclContext *IDC) {
+synthesizePropertyWrapperVariables(IterableDeclContext *IDC) {
   auto SF = IDC->getAsGenericContext()->getParentSourceFile();
   if (!SF || SF->Kind == SourceFileKind::Interface)
     return;
@@ -578,7 +578,7 @@ static void synthesizeMemberDeclsForLookup(NominalTypeDecl *NTD,
                                            /*useResolver=*/true);
   }
 
-  synthesizePropertyWrapperStorageWrapperProperties(NTD);
+  synthesizePropertyWrapperVariables(NTD);
 }
 
 static void lookupVisibleMemberDeclsImpl(
@@ -624,7 +624,7 @@ static void lookupVisibleMemberDeclsImpl(
   // special and can't have extensions.
   if (ModuleType *MT = BaseTy->getAs<ModuleType>()) {
     AccessFilteringDeclConsumer FilteringConsumer(CurrDC, Consumer);
-    MT->getModule()->lookupVisibleDecls(ModuleDecl::AccessPathTy(),
+    MT->getModule()->lookupVisibleDecls(ImportPath::Access(),
                                         FilteringConsumer,
                                         NLKind::QualifiedLookup);
     return;

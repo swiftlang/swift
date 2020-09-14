@@ -18,6 +18,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
@@ -585,6 +586,9 @@ namespace {
       if (D->isImplicit())
         PrintWithColorRAII(OS, DeclModifierColor) << " implicit";
 
+      if (D->isHoisted())
+        PrintWithColorRAII(OS, DeclModifierColor) << " hoisted";
+
       auto R = D->getSourceRange();
       if (R.isValid()) {
         PrintWithColorRAII(OS, RangeColor) << " range=";
@@ -615,11 +619,11 @@ namespace {
         OS << " kind=" << getImportKindString(ID->getImportKind());
 
       OS << " '";
-      interleave(ID->getFullAccessPath(),
-                 [&](const ImportDecl::AccessPathElement &Elem) {
-                   OS << Elem.Item;
-                 },
-                 [&] { OS << '.'; });
+      llvm::interleave(ID->getImportPath(),
+                       [&](const ImportPath::Element &Elem) {
+                         OS << Elem.Item;
+                       },
+                       [&] { OS << '.'; });
       OS << "')";
     }
 
@@ -950,6 +954,16 @@ namespace {
       if (!D->getCaptureInfo().isTrivial()) {
         OS << " ";
         D->getCaptureInfo().print(OS);
+      }
+
+      if (auto fac = D->getForeignAsyncConvention()) {
+        OS << " foreign_async=";
+        if (auto type = fac->completionHandlerType())
+          type.print(OS);
+        OS << ",completion_handler_param="
+           << fac->completionHandlerParamIndex();
+        if (auto errorParamIndex = fac->completionHandlerErrorParamIndex())
+          OS << ",error_param=" << *errorParamIndex;
       }
 
       if (auto fec = D->getForeignErrorConvention()) {
@@ -3781,7 +3795,9 @@ namespace {
       if (!T->getClangTypeInfo().empty()) {
         std::string s;
         llvm::raw_string_ostream os(s);
-        T->getClangTypeInfo().dump(os);
+        auto &ctx = T->getASTContext().getClangModuleLoader()
+          ->getClangASTContext();
+        T->getClangTypeInfo().dump(os, ctx);
         printField("clang_type", os.str());
       }
       printAnyFunctionParams(T->getParams(), "input");

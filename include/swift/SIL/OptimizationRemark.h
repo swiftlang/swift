@@ -119,6 +119,12 @@ struct Argument {
       : Argument(ArgumentKey(ArgumentKeyKind::Default, key), msg, decl) {}
   Argument(ArgumentKey key, StringRef msg, const ValueDecl *decl)
       : key(key), val(msg), loc(decl->getLoc()) {}
+
+  Argument(StringRef key, llvm::Twine &&msg, SILLocation loc)
+      : Argument(ArgumentKey(ArgumentKeyKind::Default, key), std::move(msg),
+                 loc) {}
+  Argument(ArgumentKey key, llvm::Twine &&msg, SILLocation loc)
+      : key(key), val(msg.str()), loc(loc.getSourceLoc()) {}
 };
 
 /// Shorthand to insert named-value pairs.
@@ -131,13 +137,25 @@ struct IndentDebug {
   unsigned width;
 };
 
-enum class SourceLocInferenceBehavior {
-  None,
-  ForwardScanOnly,
-  BackwardScanOnly,
-  ForwardThenBackward,
-  BackwardThenForward,
+enum class SourceLocInferenceBehavior : unsigned {
+  None = 0,
+  ForwardScan = 0x1,
+  BackwardScan = 0x2,
+  ForwardScan2nd = 0x4,
+  AlwaysInfer = 0x8,
+
+  ForwardThenBackwards = ForwardScan | BackwardScan,
+  BackwardsThenForwards = BackwardScan | ForwardScan2nd,
+  ForwardScanAlwaysInfer = ForwardScan | AlwaysInfer,
+  BackwardScanAlwaysInfer = BackwardScan | AlwaysInfer,
 };
+
+inline SourceLocInferenceBehavior operator&(SourceLocInferenceBehavior lhs,
+                                            SourceLocInferenceBehavior rhs) {
+  auto lhsVal = std::underlying_type<SourceLocInferenceBehavior>::type(lhs);
+  auto rhsVal = std::underlying_type<SourceLocInferenceBehavior>::type(rhs);
+  return SourceLocInferenceBehavior(lhsVal & rhsVal);
+}
 
 /// Infer the proper SourceLoc to use for the given SILInstruction.
 ///

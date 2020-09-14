@@ -26,6 +26,7 @@
 
 namespace clang {
   class Type;
+  class ASTContext;
 }
 
 namespace swift {
@@ -141,11 +142,13 @@ public:
 /// PrettyStackTraceClangType - Observe that we are processing a
 /// specific Clang type.
 class PrettyStackTraceClangType : public llvm::PrettyStackTraceEntry {
+  const clang::ASTContext &Context;
   const clang::Type *TheType;
   const char *Action;
 public:
-  PrettyStackTraceClangType(const char *action, const clang::Type *type)
-    : TheType(type), Action(action) {}
+  PrettyStackTraceClangType(clang::ASTContext &ctx,
+                            const char *action, const clang::Type *type)
+    : Context(ctx), TheType(type), Action(action) {}
   virtual void print(llvm::raw_ostream &OS) const override;
 };
 

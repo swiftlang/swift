@@ -146,8 +146,7 @@ lookupTypeWitness(const std::string &MangledTypeName,
   return nullptr;
 }
 
-const TypeRef * TypeRefBuilder::
-lookupSuperclass(const TypeRef *TR) {
+const TypeRef *TypeRefBuilder::lookupSuperclass(const TypeRef *TR) {
   const auto &FD = getFieldTypeInfo(TR);
   if (FD == nullptr)
     return nullptr;
@@ -204,8 +203,8 @@ TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
 }
 
 bool TypeRefBuilder::getFieldTypeRefs(
-    const TypeRef *TR,
-    RemoteRef<FieldDescriptor> FD,
+    const TypeRef *TR, RemoteRef<FieldDescriptor> FD,
+    remote::TypeInfoProvider *ExternalTypeInfo,
     std::vector<FieldTypeInfo> &Fields) {
   if (FD == nullptr)
     return false;

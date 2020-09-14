@@ -91,6 +91,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Fibonacci
     single-source/FindStringNaive
     single-source/FlattenList
+    single-source/FloatingPointConversion
     single-source/FloatingPointParsing
     single-source/FloatingPointPrinting
     single-source/Hanoi

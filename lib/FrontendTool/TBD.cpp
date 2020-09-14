@@ -56,24 +56,6 @@ bool swift::writeTBD(ModuleDecl *M, StringRef OutputFilename,
   return false;
 }
 
-bool swift::inputFileKindCanHaveTBDValidated(InputFileKind kind) {
-  // Only things that involve an AST can have a TBD file computed, at the
-  // moment.
-  switch (kind) {
-  case InputFileKind::Swift:
-  case InputFileKind::SwiftLibrary:
-    return true;
-  case InputFileKind::SwiftModuleInterface:
-    // FIXME: This would be a good test of the interface format.
-    return false;
-  case InputFileKind::None:
-  case InputFileKind::SIL:
-  case InputFileKind::LLVM:
-    return false;
-  }
-  llvm_unreachable("unhandled kind");
-}
-
 static bool validateSymbols(DiagnosticEngine &diags,
                             const std::vector<std::string> &symbols,
                             const llvm::Module &IRModule,

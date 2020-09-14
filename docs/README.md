@@ -55,6 +55,14 @@ documentation, please create a thread on the Swift forums under the
 
 ## How-To Guides
 
+- [FAQ.md](/docs/HowToGuides/FAQ.md):
+  Answers "How do I do X?" for a variety of common tasks.
+- [FirstPullRequest.md](/docs/HowToGuides/FirstPullRequest.md):
+  Describes how to submit your first pull request. This is the place to start
+  if you're new to the project!
+- [GettingStarted.md](/docs/HowToGuides/GettingStarted.md):
+  Describes how to set up a working Swift development environment
+  for Linux and macOS, and get an edit-build-test-debug loop going.
 - [DebuggingTheCompiler.md](/docs/DebuggingTheCompiler.md):
   Describes a variety of techniques for debugging.
 - Building for Android:

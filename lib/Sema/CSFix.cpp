@@ -534,22 +534,22 @@ InsertExplicitCall *InsertExplicitCall::create(ConstraintSystem &cs,
 
 bool UsePropertyWrapper::diagnose(const Solution &solution, bool asNote) const {
   ExtraneousPropertyWrapperUnwrapFailure failure(
-      solution, Wrapped, UsingStorageWrapper, Base, Wrapper, getLocator());
+      solution, Wrapped, UsingProjection, Base, Wrapper, getLocator());
   return failure.diagnose(asNote);
 }
 
 UsePropertyWrapper *UsePropertyWrapper::create(ConstraintSystem &cs,
                                                VarDecl *wrapped,
-                                               bool usingStorageWrapper,
+                                               bool usingProjection,
                                                Type base, Type wrapper,
                                                ConstraintLocator *locator) {
   return new (cs.getAllocator()) UsePropertyWrapper(
-      cs, wrapped, usingStorageWrapper, base, wrapper, locator);
+      cs, wrapped, usingProjection, base, wrapper, locator);
 }
 
 bool UseWrappedValue::diagnose(const Solution &solution, bool asNote) const {
   MissingPropertyWrapperUnwrapFailure failure(solution, PropertyWrapper,
-                                              usingStorageWrapper(), Base,
+                                              usingProjection(), Base,
                                               Wrapper, getLocator());
   return failure.diagnose(asNote);
 }
@@ -1554,6 +1554,14 @@ AllowKeyPathWithoutComponents::create(ConstraintSystem &cs,
 
 bool IgnoreInvalidFunctionBuilderBody::diagnose(const Solution &solution,
                                                 bool asNote) const {
+  switch (Phase) {
+  // Handled below
+  case ErrorInPhase::PreCheck:
+    break;
+  case ErrorInPhase::ConstraintGeneration:
+    return true; // Already diagnosed by `matchFunctionBuilder`.
+  }
+
   auto *S = getAnchor().get<Stmt *>();
 
   class PreCheckWalker : public ASTWalker {
@@ -1580,7 +1588,7 @@ bool IgnoreInvalidFunctionBuilderBody::diagnose(const Solution &solution,
     }
 
     bool diagnosed() const {
-      return Transaction.hasDiagnostics();
+      return Transaction.hasErrors();
     }
   };
 
@@ -1590,8 +1598,8 @@ bool IgnoreInvalidFunctionBuilderBody::diagnose(const Solution &solution,
   return walker.diagnosed();
 }
 
-IgnoreInvalidFunctionBuilderBody *
-IgnoreInvalidFunctionBuilderBody::create(ConstraintSystem &cs,
-                                         ConstraintLocator *locator) {
-  return new (cs.getAllocator()) IgnoreInvalidFunctionBuilderBody(cs, locator);
+IgnoreInvalidFunctionBuilderBody *IgnoreInvalidFunctionBuilderBody::create(
+    ConstraintSystem &cs, ErrorInPhase phase, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreInvalidFunctionBuilderBody(cs, phase, locator);
 }

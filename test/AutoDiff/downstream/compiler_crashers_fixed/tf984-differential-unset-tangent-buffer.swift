@@ -1,4 +1,4 @@
-// RUN: not --crash %target-swift-emit-sil -enable-experimental-forward-mode-differentiation %s -verify
+// RUN: %target-swift-emit-sil -enable-experimental-forward-mode-differentiation %s -verify
 // REQUIRES: asserts
 
 // TF-984: Differential generation crash due to unset tangent buffer.
@@ -12,7 +12,7 @@ extension Mut {
 
 @differentiable(wrt: x)
 func activeInoutArgMutatingMethodVar(_ nonactive: inout Mut, _ x: Mut) {
-  nonactive.mutatingMethodWrtMultipleResults(x)
+  _ = nonactive.mutatingMethodWrtMultipleResults(x)
 }
 
 // [AD] Original bb0: To differentiate or not to differentiate?

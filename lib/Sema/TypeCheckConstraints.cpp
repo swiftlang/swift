@@ -39,6 +39,7 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Parse/Confusables.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Sema/CodeCompletionTypeChecking.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -542,6 +543,9 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
   //       chance to diagnose name shadowing which requires explicit
   //       name/module qualifier to access top-level name.
   lookupOptions |= NameLookupFlags::IncludeOuterResults;
+
+  if (Loc.isInvalid())
+    DC = DC->getModuleScopeContext();
 
   auto Lookup = TypeChecker::lookupUnqualified(DC, Name, Loc, lookupOptions);
 
@@ -2161,6 +2165,14 @@ TypeChecker::typeCheckExpression(
                                   "typecheck-expr", expr);
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
+  // First let's check whether given expression has a code completion
+  // token which requires special handling.
+  if (Context.CompletionCallback &&
+      typeCheckForCodeCompletion(target, [&](const constraints::Solution &S) {
+        Context.CompletionCallback->sawSolution(S);
+      }))
+    return None;
+
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
   if (ConstraintSystem::preCheckExpression(
@@ -2459,8 +2471,9 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   auto lookupOptions = defaultUnqualifiedLookupOptions;
   lookupOptions |= NameLookupFlags::KnownPrivate;
   auto matchLookup =
-      lookupUnqualified(DC, DeclNameRef(Context.Id_MatchOperator), SourceLoc(),
-                        lookupOptions);
+      lookupUnqualified(DC->getModuleScopeContext(),
+                        DeclNameRef(Context.Id_MatchOperator),
+                        SourceLoc(), lookupOptions);
   auto &diags = DC->getASTContext().Diags;
   if (!matchLookup) {
     diags.diagnose(EP->getLoc(), diag::no_match_operator);
@@ -3167,21 +3180,14 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     return CheckedCastKind::ValueCast;
   };
 
-  // Strip optional wrappers off of the destination type in sync with
-  // stripping them off the origin type.
+  // TODO: Explore optionals using the same strategy used by the
+  // runtime.
+  // For now, if the target is more optional than the source,
+  // just defer it out for the runtime to handle.
   while (auto toValueType = toType->getOptionalObjectType()) {
-    // Complain if we're trying to increase optionality, e.g.
-    // casting an NSObject? to an NSString??.  That's not a subtype
-    // relationship.
     auto fromValueType = fromType->getOptionalObjectType();
     if (!fromValueType) {
-      if (!suppressDiagnostics) {
-        diags.diagnose(diagLoc, diag::downcast_to_more_optional,
-                       origFromType, origToType)
-          .highlight(diagFromRange)
-          .highlight(diagToRange);
-      }
-      return CheckedCastKind::Unresolved;
+      return CheckedCastKind::ValueCast;
     }
 
     toType = toValueType;

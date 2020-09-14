@@ -17,6 +17,7 @@
 #ifndef SWIFT_LOCALIZATIONFORMAT_H
 #define SWIFT_LOCALIZATIONFORMAT_H
 
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
@@ -41,6 +42,20 @@ enum class DiagID : uint32_t;
 namespace diag {
 
 using namespace llvm::support;
+
+class DefToYAMLConverter {
+  llvm::ArrayRef<const char *> IDs;
+  llvm::ArrayRef<const char *> Messages;
+
+public:
+  DefToYAMLConverter(llvm::ArrayRef<const char *> ids,
+                     llvm::ArrayRef<const char *> messages)
+      : IDs(ids), Messages(messages) {
+    assert(IDs.size() == Messages.size());
+  }
+
+  void convert(llvm::raw_ostream &out);
+};
 
 class LocalizationWriterInfo {
 public:

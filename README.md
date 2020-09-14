@@ -32,9 +32,9 @@
 
 | **OS** | **Architecture** | **Build** |
 |---|:---:|:---:|
-|**[Ubuntu 16.04](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_16_04_tensorflow.json)** | x86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow)|
+|**[Ubuntu 18.04](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_18_04_tensorflow.json)** | x86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-18.04-tensorflow/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-18.04-tensorflow)|
 |**[macOS 10.13](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_macos_high_sierra_tensorflow.json)** | x86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-macOS-tensorflow/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-macOS-tensorflow)|
-|**[Ubuntu 16.04 (GPU)](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_16_04_tensorflow_gpu.json)** | x86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow-gpu/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow-gpu)|
+|**[Ubuntu 18.04 (GPU)](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_18_04_tensorflow_gpu.json)** | x86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-18.04-tensorflow-gpu/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-18.04-tensorflow-gpu)|
 
 <!-- SWIFT_ENABLE_TENSORFLOW -->
 
@@ -59,14 +59,9 @@ To learn more about the programming language, visit [swift.org](https://swift.or
 
 - [Contributing to Swift](#contributing-to-swift)
 - [Getting Started](#getting-started)
-  - [System Requirements](#system-requirements)
-  - [Getting Sources for Swift and Related Projects](#getting-sources-for-swift-and-related-projects)
-  - [Building Swift](#building-swift)
   - [Swift Toolchains](#swift-toolchains)
   - [Build Failures](#build-failures)
-- [Testing Swift](#testing-swift)
 - [Learning More](#learning-more)
-- [Build Dependencies](#build-dependencies)
 
 ## Contributing to Swift
 
@@ -86,214 +81,17 @@ well. For more, see the [Code of Conduct](https://swift.org/community/#code-of-c
 
 ## Getting Started
 
-These instructions give the most direct path to a working Swift development
-environment. To build from source you will need about 2 GB of disk space for the
-source code and up to 70 GB of disk space for the build artifacts with full
-debugging. Depending on your machine, a clean build can take a few minutes to
-several hours. Naturally, incremental builds are much faster.
+If you are interested in:
+- Contributing fixes and features to the compiler: See our
+  [How to Submit Your First Pull Request guide](/docs/HowToGuides/FirstPullRequest.md).
+- Building the compiler as a one-off: See our [Getting Started guide][].
+- Building a toolchain as a one-off: Follow the [Getting Started guide][]
+  up until the "Building the project" section. After that, follow the
+  instructions in the [Swift Toolchains](#swift-toolchains) section below.
 
-Once you are able to build things successfully and have a compile-test-debug
-loop going, check out the [development tips](docs/DevelopmentTips.md) for
-better productivity while working on the compiler.
+We also have an [FAQ](/docs/HowToGuides/FAQ.md) that answers common questions.
 
-You can also skim [docs/README.md](/docs/README.md) to understand what
-high-level documentation is available.
-
-### System Requirements
-
-macOS and Ubuntu Linux LTS 18.04 are the current supported host development
-operating systems.
-
-Please make sure you use Python 2.x. Python 3.x is not supported currently.
-
-#### macOS
-
-To build for macOS, you need [Xcode 12 beta 3](https://developer.apple.com/xcode/resources/).
-The required version of Xcode changes frequently, and is often a beta release.
-Check this document for the current required version.
-
-Swift's build tooling is meant to support spaces in the paths passed to them,
-but using spaces sometimes tickles bugs in Swift's build scripts or the tools
-they rely on. For example, [SR-13441](https://bugs.swift.org/browse/SR-13441)
-is caused by a space in the Xcode path used on macOS. If you see Swift's build
-tooling misbehave due to a space in a path, please
-[report the bug on the Swift bug tracker](https://swift.org/contributing/#reporting-bugs)
-and then change the path to work around it.
-
-You will also need [CMake](https://cmake.org) and [Ninja](https://ninja-build.org),
-and [Bazel](https://www.bazel.build), which can be installed via a package manager:
-
-**[Homebrew](https://brew.sh/)**
-
-    brew install cmake ninja
-    
-You can also use [homebrew-bundle](https://github.com/Homebrew/homebrew-bundle)
-from the root of this repository's working directory to install all of these
-dependencies:
-
-    brew bundle
-
-**[MacPorts](https://macports.org)**
-
-    sudo port install cmake ninja
-
-Additionally, [Bazel](https://www.bazel.build) is required to build with TensorFlow support. Instructions to download Bazel directly can be found [below](#bazel). You can find instructions for installing CMake, and Ninja directly [below](#build-dependencies) as well.
-
-#### Linux
-
-For Ubuntu, you'll need the following development dependencies:
-
-```
-sudo apt-get install    \
-  clang                 \
-  cmake                 \
-  git                   \
-  icu-devtools          \
-  libcurl4-openssl-dev  \
-  libedit-dev           \
-  libicu-dev            \
-  libncurses5-dev       \
-  libpython-dev         \
-  libsqlite3-dev        \
-  libxml2-dev           \
-  ninja-build           \
-  pkg-config            \
-  python                \
-  python-six            \
-  rsync                 \
-  swig                  \
-  systemtap-sdt-dev     \
-  tzdata                \
-  uuid-dev
-```
-
-**Note:** LLDB currently requires at least `swig-1.3.40` but will successfully build
-with version 2 shipped with Ubuntu.
-
-**Note:** For Ubuntu 20.04, use `libpython2-dev` in place of the libpython-dev package above.
-
-### Getting Sources for Swift and Related Projects
-
-First, create a directory for all of the Swift sources:
-
-    mkdir swift-source
-    cd swift-source
-
-**Note:** This is important since update-checkout (see below) checks out
-repositories next to the Swift source directory. This means that if one clones
-Swift and has other unrelated repositories, update-checkout may not clone those
-repositories and will update them instead. Be aware that `update-checkout`
-currently does not support paths with non-ASCII characters. If such characters
-are present in the path to `swift-source`, `update-checkout` will fail.
-
-**TensorFlow Support:** To build with TensorFlow support, the `tensorflow`
-scheme must be specified when cloning sources. The `tensorflow` scheme pins
-specific versions of every Swift companion directory and is updated with every
-upstream merge from the master branch.
-
-**Via HTTPS**  For those checking out sources as read-only, HTTPS works best:
-
-    git clone https://github.com/apple/swift.git -b tensorflow
-    ./swift/utils/update-checkout --clone --scheme tensorflow
-    cd swift
-
-**Via SSH**  For those who plan on regularly making direct commits,
-cloning over SSH may provide a better experience (which requires
-[uploading SSH keys to GitHub](https://help.github.com/articles/adding-a-new-ssh-key-to-your-github-account/)):
-
-    git clone git@github.com:apple/swift.git -b tensorflow
-    ./swift/utils/update-checkout --clone-with-ssh --scheme tensorflow
-    cd swift
-
-### Building Swift
-
-The `build-script` is a high-level build automation script that supports basic
-options such as building a Swift-compatible LLDB, building the Swift Package
-Manager, building for various platforms, running tests after builds, and more.
-
-There are two primary build systems to use: Xcode and Ninja. The Xcode build
-system allows you to work in Xcode, but Ninja is a bit faster and supports
-more environments.
-
-First, make sure that you're in the swift directory:
-
-    cd swift
-
-To build using Ninja, run:
-
-    swift/utils/build-script --release-debuginfo
-
-When developing Swift, it helps to build what you're working on in a debug
-configuration while building the rest of the project with optimizations. Below
-are some examples of using debug variants:
-
-    swift/utils/build-script --release-debuginfo --debug-swift # Swift frontend built in debug
-    swift/utils/build-script --release-debuginfo --debug-swift-stdlib # Standard library built in debug
-    swift/utils/build-script --release-debuginfo --debug-swift --force-optimized-typechecker # Swift frontend sans type checker built in debug
-
-Limiting the amount of debug code in the compiler has a very large impact on
-Swift compile times, and in turn the test execution time. If you want to build
-the entire project in debug, you can run:
-
-    swift/utils/build-script  --debug
-
-For documentation of all available arguments, as well as additional usage
-information, see the inline help:
-
-    utils/build-script -h
-
-### Build systems
-
-#### Xcode
-
-To build using Xcode, specify the `--xcode` argument on any of the above commands.
-Xcode can be used to edit the Swift source code, but it is not currently
-fully supported as a build environment for SDKs other than macOS. The generated
-Xcode project does not integrate with the test runner, but the tests can be run
-with the 'check-swift' target.
-
-#### Build Products
-
-All of the build products are placed in `swift-source/build/${TOOL}-${MODE}/${PRODUCT}-${PLATFORM}/`.
-If macOS Swift with Ninja in DebugAssert mode was built, all of the products
-would be in `swift-source/build/Ninja-DebugAssert/swift-macosx-x86_64/`. It
-helps to save this directory as an environment variable for future use.
-
-    export SWIFT_BUILD_DIR="~/swift-source/build/Ninja-DebugAssert/swift-macosx-x86_64"
-
-#### Ninja
-
-Once the first build has completed, Ninja can perform fast incremental builds of
-various products. These incremental builds are a big timesaver when developing
-and debugging.
-
-    cd ${SWIFT_BUILD_DIR}
-    ninja swift-frontend
-
-This will build the Swift compiler, but will not rebuild the standard library or
-any other target. Building the `swift-stdlib` target as an additional layer of
-testing from time to time is also a good idea. To build just the standard
-library, run:
-
-    ninja swift-stdlib
-
-It is always a good idea to do a full build after using `update-checkout`.
-
-#### Using Xcode
-
-To open the Swift project in Xcode, open `${SWIFT_BUILD_DIR}/Swift.xcodeproj`.
-It will auto-create a *lot* of schemes for all of the available targets. A
-common debug flow would involve:
-
- - Select the 'swift-frontend' scheme.
- - Pull up the scheme editor (⌘⇧<).
- - Select the 'Arguments' tab and click the '+'.
- - Add the command line options.
- - Close the scheme editor.
- - Build and run.
-
-Another option is to change the scheme to "Wait for executable to be launched",
-then run the build product in Terminal.
+[Getting Started guide]: /docs/HowToGuides/GettingStarted.md
 
 ### Swift For TensorFlow Toolchains
 
@@ -351,92 +149,23 @@ compiler crashes.
 
 ### Build Failures
 
-Make sure you are using the [correct release](#macos) of Xcode.
+Try the suggestions in
+[Troubleshooting build issues](/docs/HowToGuides/GettingStarted.md#troubleshooting-build-issues).
+
+Make sure you are using the
+[correct release](/docs/HowToGuides/GettingStarted.md#installing-dependencies)
+of Xcode.
 
 If you have changed Xcode versions but still encounter errors that appear to
 be related to the Xcode version, try passing `--clean` to `build-script`.
 
 When a new version of Xcode is released, you can update your build without
-recompiling the entire project by passing the `--reconfigure` option.
-
-Make sure all repositories are up to date with the `update-checkout` command
-described above.
-
-## Testing Swift
-
-See [docs/Testing.md](docs/Testing.md), in particular the section on [lit.py](docs/Testing.md#using-litpy).
+recompiling the entire project by passing `--reconfigure` to `build-script`.
 
 ## Learning More
 
-Be sure to look through the [docs](https://github.com/apple/swift/tree/master/docs)
-directory for more information about the compiler. In particular, the documents
-titled [Debugging the Swift Compiler](docs/DebuggingTheCompiler.md) and
+Be sure to look at the [documentation index](/docs/README.md) for a bird's eye
+view of the available documentation. In particular, the documents titled
+[Debugging the Swift Compiler](docs/DebuggingTheCompiler.md) and
 [Continuous Integration for Swift](docs/ContinuousIntegration.md) are very
 helpful to understand before submitting your first PR.
-
-### Building Documentation
-
-To read the compiler documentation, start by installing the
-[Sphinx](http://sphinx-doc.org) documentation generator tool by running the
-command:
-
-    easy_install -U "Sphinx < 2.0"
-
-Once complete, you can build the Swift documentation by changing directory into
-[docs](https://github.com/apple/swift/tree/master/docs) and typing `make`. This
-compiles the `.rst` files in the [docs](https://github.com/apple/swift/tree/master/docs)
-directory into HTML in the `docs/_build/html` directory.
-
-Many of the docs are out of date, but you can see some historical design
-documents in the `docs` directory.
-
-Another source of documentation is the standard library itself, located in
-`stdlib`. Much of the language is actually implemented in the library
-(including `Int`), and the standard library gives some examples of what can be
-expressed today.
-
-## Build Dependencies
-
-### CMake
-[CMake](https://cmake.org) is the core infrastructure used to configure builds of
-Swift and its companion projects; at least version 3.16.5 is required.
-
-On macOS, you can download the [CMake Binary Distribution](https://cmake.org/download),
-bundled as an application, copy it to `/Applications`, and add the embedded
-command line tools to your `PATH`:
-
-    export PATH=/Applications/CMake.app/Contents/bin:$PATH
-
-On Linux, if you have not already installed Swift's [development
-dependencies](#linux), you can download and install the CMake
-package separately using the following command:
-
-    sudo apt-get install cmake
-
-
-### Ninja
-[Ninja](https://ninja-build.org) is the current recommended build system
-for building Swift and is the default configuration generated by CMake. [Pre-built
-packages](https://github.com/ninja-build/ninja/wiki/Pre-built-Ninja-packages)
-are available for macOS and Linux distributions. You can also clone Ninja
-next to the other projects and it will be bootstrapped automatically:
-
-**Via HTTPS**
-
-    git clone https://github.com/ninja-build/ninja.git && cd ninja
-    git checkout release
-    cat README
-
-**Via SSH**
-
-    git clone git@github.com:ninja-build/ninja.git && cd ninja
-    git checkout release
-    cat README
-
-### Bazel
-[Bazel](https://bazel.build) is the build tool used to build TensorFlow. Installing Bazel is necessary for building Swift with TensorFlow support.
-
-The Bazel website has detailed installation instructions for
-[macOS](https://docs.bazel.build/versions/master/install-os-x.html) and
-[Ubuntu](https://docs.bazel.build/versions/master/install-ubuntu.html).
-When picking the version to download in step 2, select version 2.0.0 which can be found in the release notes [here (v2.0.0)](https://github.com/bazelbuild/bazel/releases/tag/2.0.0).

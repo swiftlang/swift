@@ -1,7 +1,10 @@
-// Checks for SPI declarations and limited exposability
+// Checks for SPI declarations and limited exportability.
 
 // RUN: %empty-directory(%t)
 // RUN: %target-typecheck-verify-swift -I %t -verify-ignore-unknown -enable-library-evolution -swift-version 5
+
+// Without -enable-library-evolution the exportability check looks at struct internal properties.
+// RUN: %target-typecheck-verify-swift -I %t -verify-ignore-unknown -swift-version 5
 
 // SPI declarations
 @_spi(MySPI) public func spiFunc() {} // expected-note {{global function 'spiFunc()' is not '@usableFromInline' or public}}
@@ -54,4 +57,27 @@ public func genFuncBad<T: SPIProtocol>(_ t: T) {} // expected-error {{cannot use
 public struct PublicStructWithProperties {
   public var a: SPIClass // expected-error {{cannot use class 'SPIClass' here; it is SPI}}
   public var b = SPIClass() // expected-error {{cannot use class 'SPIClass' here; it is SPI}}
+}
+
+@_spi(S)
+@usableFromInline
+func usableFromInlineFunc(_ a: SPIStruct) -> SPIStruct {
+  fatalError()
+}
+
+@_spi(S)
+public final class ClassWithUsables {
+    @usableFromInline
+    var usableFromInlineVar = SPIClass()
+
+    @usableFromInline
+    func usableFromInlineFunc(_ a: SPIStruct) -> SPIStruct {
+      fatalError()
+    }
+}
+
+@_spi(S)
+public struct NestedParent {
+    public struct Nested { }
+    let nested: Nested
 }

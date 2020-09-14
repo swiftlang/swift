@@ -25,7 +25,6 @@
 #include "TypeCheckType.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
@@ -583,7 +582,7 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
       // Property wrapper storage wrappers are final if the original property
       // is final.
       if (auto *original = VD->getOriginalWrappedProperty(
-            PropertyWrapperSynthesizedPropertyKind::StorageWrapper)) {
+            PropertyWrapperSynthesizedPropertyKind::Projection)) {
         if (original->isFinal())
           return true;
       }
@@ -2463,21 +2462,16 @@ namespace {
 // Utility class for deterministically ordering vtable entries for
 // synthesized methods.
 struct SortedFuncList {
-  using Entry = std::pair<std::string, AbstractFunctionDecl *>;
+  using Key = std::tuple<DeclName, std::string>;
+  using Entry = std::pair<Key, AbstractFunctionDecl *>;
   SmallVector<Entry, 2> elts;
   bool sorted = false;
 
   void add(AbstractFunctionDecl *afd) {
-    Mangle::ASTMangler mangler;
-    std::string mangledName;
-    if (auto *cd = dyn_cast<ConstructorDecl>(afd))
-      mangledName = mangler.mangleConstructorEntity(cd, /*allocator=*/false);
-    else if (auto *dd = dyn_cast<DestructorDecl>(afd))
-      mangledName = mangler.mangleDestructorEntity(dd, /*deallocating=*/false);
-    else
-      mangledName = mangler.mangleEntity(afd);
+    assert(!isa<AccessorDecl>(afd));
 
-    elts.push_back(std::make_pair(mangledName, afd));
+    Key key{afd->getName(), afd->getInterfaceType().getString()};
+    elts.emplace_back(key, afd);
   }
 
   bool empty() { return elts.empty(); }
@@ -2506,64 +2500,52 @@ struct SortedFuncList {
 } // end namespace
 
 ArrayRef<Decl *>
-EmittedMembersRequest::evaluate(Evaluator &evaluator,
-                                ClassDecl *CD) const {
-  auto &Context = CD->getASTContext();
+SemanticMembersRequest::evaluate(Evaluator &evaluator,
+                                IterableDeclContext *idc) const {
+  auto dc = cast<DeclContext>(idc->getDecl());
+  auto &Context = dc->getASTContext();
   SmallVector<Decl *, 8> result;
 
-  if (!CD->getParentSourceFile()) {
-    auto members = CD->getMembers();
+  if (!dc->getParentSourceFile()) {
+    auto members = idc->getMembers();
     result.append(members.begin(), members.end());
     return Context.AllocateCopy(result);
   }
 
-  // We need to add implicit initializers because they
-  // affect vtable layout.
-  TypeChecker::addImplicitConstructors(CD);
+  auto nominal = dyn_cast<NominalTypeDecl>(idc);
 
-  auto forceConformance = [&](ProtocolDecl *protocol) {
-    auto ref = CD->getParentModule()->lookupConformance(
-        CD->getDeclaredInterfaceType(), protocol);
-    if (ref.isInvalid()) {
-      return;
-    }
+  if (nominal) {
+    // We need to add implicit initializers because they
+    // affect vtable layout.
+    TypeChecker::addImplicitConstructors(nominal);
+  }
 
-    auto conformance = ref.getConcrete();
-    if (conformance->getDeclContext() == CD &&
-        conformance->getState() == ProtocolConformanceState::Incomplete) {
+  // Force any derivable conformances in this context. This ensures that any
+  // synthesized members will approach in the member list.
+  for (auto conformance : idc->getLocalConformances()) {
+    if (conformance->getState() == ProtocolConformanceState::Incomplete &&
+        conformance->getProtocol()->getKnownDerivableProtocolKind())
       TypeChecker::checkConformance(conformance->getRootNormalConformance());
-    }
-  };
+  }
 
-  // If the class is Encodable, Decodable or Hashable, force those
-  // conformances to ensure that the synthesized members appear in the vtable.
-  //
-  // FIXME: Generalize this to other protocols for which
-  // we can derive conformances.
-  forceConformance(Context.getProtocol(KnownProtocolKind::Decodable));
-  forceConformance(Context.getProtocol(KnownProtocolKind::Encodable));
-  forceConformance(Context.getProtocol(KnownProtocolKind::Hashable));
-  forceConformance(Context.getProtocol(KnownProtocolKind::Differentiable));
-  // SWIFT_ENABLE_TENSORFLOW
-  forceConformance(
-      Context.getProtocol(KnownProtocolKind::EuclideanDifferentiable));
-  // SWIFT_ENABLE_TENSORFLOW END
-
-  // If the class conforms to Encodable or Decodable, even via an extension,
+  // If the type conforms to Encodable or Decodable, even via an extension,
   // the CodingKeys enum is synthesized as a member of the type itself.
   // Force it into existence.
-  (void) evaluateOrDefault(Context.evaluator,
-                           ResolveImplicitMemberRequest{CD,
-                                      ImplicitMemberAction::ResolveCodingKeys},
-                           {});
+  if (nominal) {
+    (void) evaluateOrDefault(Context.evaluator,
+                             ResolveImplicitMemberRequest{nominal,
+                                        ImplicitMemberAction::ResolveCodingKeys},
+                             {});
+  }
 
-  // If the class has a @main attribute, we need to force synthesis of the
+  // If the decl has a @main attribute, we need to force synthesis of the
   // $main function.
-  (void) evaluateOrDefault(Context.evaluator,
-                           SynthesizeMainFunctionRequest{CD},
-                           nullptr);
+  (void) evaluateOrDefault(
+      Context.evaluator,
+      SynthesizeMainFunctionRequest{const_cast<Decl *>(idc->getDecl())},
+      nullptr);
 
-  for (auto *member : CD->getMembers()) {
+  for (auto *member : idc->getMembers()) {
     if (auto *var = dyn_cast<VarDecl>(member)) {
       // The projected storage wrapper ($foo) might have dynamically-dispatched
       // accessors, so force them to be synthesized.
@@ -2574,7 +2556,7 @@ EmittedMembersRequest::evaluate(Evaluator &evaluator,
 
   SortedFuncList synthesizedMembers;
 
-  for (auto *member : CD->getMembers()) {
+  for (auto *member : idc->getMembers()) {
     if (auto *afd = dyn_cast<AbstractFunctionDecl>(member)) {
       // Add synthesized members to a side table and sort them by their mangled
       // name, since they could have been added to the class in any order.

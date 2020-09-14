@@ -215,11 +215,17 @@ void swift::bindExtensions(ModuleDecl &mod) {
     if (!SF)
       continue;
 
-    for (auto D : SF->getTopLevelDecls()) {
+    auto visitTopLevelDecl = [&](Decl *D) {
       if (auto ED = dyn_cast<ExtensionDecl>(D))
         if (!tryBindExtension(ED))
-          worklist.push_back(ED);
-    }
+          worklist.push_back(ED);;
+    };
+
+    for (auto *D : SF->getTopLevelDecls())
+      visitTopLevelDecl(D);
+
+    for (auto *D : SF->getHoistedDecls())
+      visitTopLevelDecl(D);
   }
 
   // Phase 2 - repeatedly go through the worklist and attempt to bind each
@@ -251,8 +257,7 @@ static void typeCheckDelayedFunctions(SourceFile &SF) {
          ++currentFunctionIdx) {
       auto *AFD = SF.DelayedFunctions[currentFunctionIdx];
       assert(!AFD->getDeclContext()->isLocalContext());
-
-      TypeChecker::typeCheckAbstractFunctionBody(AFD);
+      (void)AFD->getTypecheckedBody();
     }
 
     // Type check synthesized functions and their bodies.
@@ -285,9 +290,8 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
   // scope-based lookups. Only the top-level scopes because extensions have not
   // been bound yet.
   auto &Ctx = SF->getASTContext();
-  if (Ctx.LangOpts.EnableASTScopeLookup)
-    SF->getScope()
-        .buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals();
+  SF->getScope()
+      .buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals();
 
   BufferIndirectlyCausingDiagnosticRAII cpr(*SF);
 
@@ -361,11 +365,11 @@ bool swift::isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF) {
 Type swift::performTypeResolution(TypeRepr *TyR, ASTContext &Ctx,
                                   bool isSILMode, bool isSILType,
                                   GenericEnvironment *GenericEnv,
+                                  GenericParamList *GenericParams,
                                   DeclContext *DC, bool ProduceDiagnostics) {
   TypeResolutionOptions options = None;
-  if (isSILMode) {
+  if (isSILMode)
     options |= TypeResolutionFlags::SILMode;
-  }
   if (isSILType)
     options |= TypeResolutionFlags::SILType;
 
@@ -381,8 +385,31 @@ Type swift::performTypeResolution(TypeRepr *TyR, ASTContext &Ctx,
   if (!ProduceDiagnostics)
     suppression.emplace(Ctx.Diags);
 
-  return resolution.resolveType(TyR);
+  return resolution.resolveType(TyR, GenericParams);
 }
+
+namespace {
+  class BindGenericParamsWalker : public ASTWalker {
+    DeclContext *dc;
+    GenericParamList *params;
+
+  public:
+    BindGenericParamsWalker(DeclContext *dc,
+                            GenericParamList *params)
+        : dc(dc), params(params) {}
+
+    bool walkToTypeReprPre(TypeRepr *T) override {
+      if (auto *ident = dyn_cast<IdentTypeRepr>(T)) {
+        auto firstComponent = ident->getComponentRange().front();
+        auto name = firstComponent->getNameRef().getBaseIdentifier();
+        if (auto *paramDecl = params->lookUpGenericParam(name))
+          firstComponent->setValue(paramDecl, dc);
+      }
+
+      return true;
+    }
+  };
+};
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
 GenericEnvironment *
@@ -392,15 +419,21 @@ swift::handleSILGenericParams(GenericParamList *genericParams,
     return nullptr;
 
   SmallVector<GenericParamList *, 2> nestedList;
-  for (; genericParams; genericParams = genericParams->getOuterParameters()) {
-    nestedList.push_back(genericParams);
+  for (auto *innerParams = genericParams;
+       innerParams != nullptr;
+       innerParams = innerParams->getOuterParameters()) {
+    nestedList.push_back(innerParams);
   }
 
   std::reverse(nestedList.begin(), nestedList.end());
 
+  BindGenericParamsWalker walker(DC, genericParams);
+
   for (unsigned i = 0, e = nestedList.size(); i < e; ++i) {
     auto genericParams = nestedList[i];
     genericParams->setDepth(i);
+
+    genericParams->walk(walker);
   }
 
   auto sig =

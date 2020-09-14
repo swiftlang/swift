@@ -975,11 +975,13 @@ _gatherGenericParameters(const ContextDescriptor *context,
 
       str += "_gatherGenericParameters: context: ";
 
+#if !defined(SWIFT_RUNTIME_MACHO_NO_DYLD)
       SymbolInfo contextInfo;
       if (lookupSymbol(context, &contextInfo)) {
         str += contextInfo.symbolName.get();
         str += " ";
       }
+#endif
 
       char *contextStr;
       swift_asprintf(&contextStr, "%p", context);

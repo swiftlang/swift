@@ -111,6 +111,10 @@ SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
 }
 
 SILModule::~SILModule() {
+#ifndef NDEBUG
+  checkForLeaks();
+#endif
+
   // Decrement ref count for each SILGlobalVariable with static initializers.
   for (SILGlobalVariable &v : silGlobals)
     v.dropAllReferences();
@@ -127,6 +131,44 @@ SILModule::~SILModule() {
   for (SILFunction &F : *this) {
     F.dropAllReferences();
     F.dropDynamicallyReplacedFunction();
+  }
+}
+
+void SILModule::checkForLeaks() const {
+  int instsInModule = 0;
+  for (const SILFunction &F : *this) {
+    for (const SILBasicBlock &block : F) {
+      instsInModule += std::distance(block.begin(), block.end());
+    }
+  }
+  for (const SILFunction &F : zombieFunctions) {
+    for (const SILBasicBlock &block : F) {
+      instsInModule += std::distance(block.begin(), block.end());
+    }
+  }
+  for (const SILGlobalVariable &global : getSILGlobals()) {
+      instsInModule += std::distance(global.StaticInitializerBlock.begin(),
+                                     global.StaticInitializerBlock.end());
+  }
+  
+  int numAllocated = SILInstruction::getNumCreatedInstructions() -
+                       SILInstruction::getNumDeletedInstructions();
+                       
+  if (numAllocated != instsInModule) {
+    llvm::errs() << "Leaking instructions!\n";
+    llvm::errs() << "Alloated instructions: " << numAllocated << '\n';
+    llvm::errs() << "Instructions in module: " << instsInModule << '\n';
+    llvm_unreachable("leaking instructions");
+  }
+}
+
+void SILModule::checkForLeaksAfterDestruction() {
+  int numAllocated = SILInstruction::getNumCreatedInstructions() -
+                     SILInstruction::getNumDeletedInstructions();
+
+  if (numAllocated != 0) {
+    llvm::errs() << "Leaking " << numAllocated << " instructions!\n";
+    llvm_unreachable("leaking instructions");
   }
 }
 
@@ -431,34 +473,47 @@ void SILModule::invalidateSILLoaderCaches() {
   getSILLoader()->invalidateCaches();
 }
 
-void SILModule::removeFromZombieList(StringRef Name) {
+SILFunction *SILModule::removeFromZombieList(StringRef Name) {
   if (auto *Zombie = ZombieFunctionTable.lookup(Name)) {
     ZombieFunctionTable.erase(Name);
     zombieFunctions.remove(Zombie);
+
+    // The owner of the function's Name is the ZombieFunctionTable key, which is
+    // freed by erase().
+    // Make sure nobody accesses the name string after it is freed.
+    Zombie->Name = StringRef();
+    return Zombie;
   }
+  return nullptr;
 }
 
 /// Erase a function from the module.
 void SILModule::eraseFunction(SILFunction *F) {
   assert(!F->isZombie() && "zombie function is in list of alive functions");
+
+  llvm::StringMapEntry<SILFunction*> *entry =
+      &*ZombieFunctionTable.insert(std::make_pair(F->getName(), nullptr)).first;
+  assert(!entry->getValue() && "Zombie function already exists");
+  StringRef zombieName = entry->getKey();
+
   // The owner of the function's Name is the FunctionTable key. As we remove
-  // the function from the table we have to store the name string elsewhere:
-  // in zombieFunctionNames.
-  StringRef copiedName = F->getName().copy(zombieFunctionNames);
+  // the function from the table we need to use the allocated name string from
+  // the ZombieFunctionTable.
   FunctionTable.erase(F->getName());
-  F->Name = copiedName;
+  F->Name = zombieName;
 
   // The function is dead, but we need it later (at IRGen) for debug info
   // or vtable stub generation. So we move it into the zombie list.
   getFunctionList().remove(F);
   zombieFunctions.push_back(F);
-  ZombieFunctionTable[copiedName] = F;
+  entry->setValue(F);
   F->setZombie();
 
   // This opens dead-function-removal opportunities for called functions.
   // (References are not needed anymore.)
   F->dropAllReferences();
   F->dropDynamicallyReplacedFunction();
+  F->getBlocks().clear();
 }
 
 void SILModule::invalidateFunctionInSILCache(SILFunction *F) {

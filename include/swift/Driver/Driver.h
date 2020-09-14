@@ -366,6 +366,11 @@ private:
                                  file_types::ID fileType,
                                  CommandOutput *output) const;
 
+  void chooseModuleSummaryPath(Compilation &C, const TypeToPathMap *OutputMap,
+                               StringRef workingDirectory,
+                               llvm::SmallString<128> &Buf,
+                               CommandOutput *Output) const;
+
   void chooseRemappingOutputPath(Compilation &C, const TypeToPathMap *OutputMap,
                                  CommandOutput *Output) const;
 

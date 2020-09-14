@@ -1,3 +1,5 @@
+#import <DaemonKit/ViolateSecondLawOfThermodynamics.h>
+
 #import <CoreDaemon.h>
 
 struct DaemonPair {

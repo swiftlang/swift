@@ -182,59 +182,48 @@ static SourceLoc inferOptRemarkSearchBackwards(SILInstruction &i) {
   return SourceLoc();
 }
 
+static llvm::cl::opt<bool> IgnoreAlwaysInferForTesting(
+    "sil-opt-remark-ignore-always-infer", llvm::cl::Hidden,
+    llvm::cl::init(false),
+    llvm::cl::desc(
+        "Disables always infer source loc behavior for testing purposes"));
+
+// Attempt to infer a SourceLoc for \p i using heuristics specified by \p
+// inferBehavior.
+//
+// NOTE: We distinguish in between situations where we always must infer
+// (retain, release) and other situations where we are ok with original source
+// locs if we are not inlined (alloc_ref, alloc_stack).
 SourceLoc swift::OptRemark::inferOptRemarkSourceLoc(
     SILInstruction &i, SourceLocInferenceBehavior inferBehavior) {
-  // Do a quick check if we already have a valid loc and it isnt an inline
-  // loc. In such a case, just return. Otherwise, we try to infer using one of
-  // our heuristics below.
+  // If we are only supposed to infer in inline contexts, see if we have a valid
+  // loc and if that loc is an inlined call site.
   auto loc = i.getLoc();
-  if (loc.getSourceLoc().isValid()) {
-    // Before we do anything, if we do not have an inlined call site, just
-    // return our loc.
-    if (!i.getDebugScope() || !i.getDebugScope()->InlinedCallSite)
-      return loc.getSourceLoc();
-  }
+  if (loc.getSourceLoc().isValid() &&
+      !(bool(inferBehavior & SourceLocInferenceBehavior::AlwaysInfer) &&
+        !IgnoreAlwaysInferForTesting) &&
+      !(i.getDebugScope() && i.getDebugScope()->InlinedCallSite))
+    return loc.getSourceLoc();
 
-  // Otherwise, try to handle the individual behavior cases, returning loc at
-  // the end of each case (its invalid, so it will get ignored). If loc is not
-  // returned, we hit an assert at the end to make it easy to identify a case
-  // was missed.
-  switch (inferBehavior) {
-  case SourceLocInferenceBehavior::None:
-    return SourceLoc();
-  case SourceLocInferenceBehavior::ForwardScanOnly: {
+  if (bool(inferBehavior & SourceLocInferenceBehavior::ForwardScan)) {
     SourceLoc newLoc = inferOptRemarkSearchForwards(i);
     if (newLoc.isValid())
       return newLoc;
-    return SourceLoc();
   }
-  case SourceLocInferenceBehavior::BackwardScanOnly: {
+
+  if (bool(inferBehavior & SourceLocInferenceBehavior::BackwardScan)) {
     SourceLoc newLoc = inferOptRemarkSearchBackwards(i);
     if (newLoc.isValid())
       return newLoc;
-    return SourceLoc();
   }
-  case SourceLocInferenceBehavior::ForwardThenBackward: {
+
+  if (bool(inferBehavior & SourceLocInferenceBehavior::ForwardScan2nd)) {
     SourceLoc newLoc = inferOptRemarkSearchForwards(i);
     if (newLoc.isValid())
       return newLoc;
-    newLoc = inferOptRemarkSearchBackwards(i);
-    if (newLoc.isValid())
-      return newLoc;
-    return SourceLoc();
-  }
-  case SourceLocInferenceBehavior::BackwardThenForward: {
-    SourceLoc newLoc = inferOptRemarkSearchBackwards(i);
-    if (newLoc.isValid())
-      return newLoc;
-    newLoc = inferOptRemarkSearchForwards(i);
-    if (newLoc.isValid())
-      return newLoc;
-    return SourceLoc();
-  }
   }
 
-  llvm_unreachable("Covered switch isn't covered?!");
+  return SourceLoc();
 }
 
 template <typename RemarkT, typename... ArgTypes>

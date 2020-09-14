@@ -165,6 +165,9 @@ struct SupplementaryOutputPaths {
   /// name per symbol, we should eventually remove this.
   std::string LdAddCFilePath;
 
+  /// The path to which we should emit module summary file.
+  std::string ModuleSummaryOutputPath;
+
   SupplementaryOutputPaths() = default;
   SupplementaryOutputPaths(const SupplementaryOutputPaths &) = default;
 
