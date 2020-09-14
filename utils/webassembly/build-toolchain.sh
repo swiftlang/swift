@@ -54,6 +54,7 @@ $SOURCE_PATH/swift/utils/build-script \
 # `build-script` invocation doesn't pick up wrong CMake config files.
 # For some reason passing `--reconfigure` to `build-script` won't do this.
 rm -rf $SOURCE_PATH/build/Ninja-ReleaseAssert/swift-*
+rm -rf $SOURCE_PATH/build/Ninja-ReleaseAssert/llvm-*
 
 # build the cross-compilled toolchain
 $SOURCE_PATH/swift/utils/build-script \
