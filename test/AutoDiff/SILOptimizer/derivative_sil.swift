@@ -28,6 +28,7 @@ func foo(_ x: Float) -> Float {
 
 // CHECK-SIL-LABEL: sil hidden [ossa] @AD__foo__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 // CHECK-SIL: bb0([[X:%.*]] : $Float):
+// CHECK-SIL:   [[DF_STRUCT_ALLOC:%.*]] = alloc_stack $_AD__foo_bb0__DF__src_0_wrt_0
 // CHECK-SIL:   [[ADD_ORIG_REF:%.*]] = function_ref @add : $@convention(method) (Float, Float, @thin Float.Type) -> Float
 // CHECK-SIL:   [[ADD_JVP_REF:%.*]] = differentiability_witness_function [jvp] [parameters 0 1] [results 0] @add
 // CHECK-SIL:   [[ADD_VJP_REF:%.*]] = differentiability_witness_function [vjp] [parameters 0 1] [results 0] @add
@@ -36,7 +37,9 @@ func foo(_ x: Float) -> Float {
 // CHECK-SIL:   end_borrow [[ADD_DIFF_FN]]
 // CHECK-SIL:   [[ADD_RESULT:%.*]] = apply [[ADD_JVP_FN]]([[X]], [[X]], {{.*}})
 // CHECK-SIL:   ([[ORIG_RES:%.*]], [[ADD_DF:%.*]]) = destructure_tuple [[ADD_RESULT]]
-// CHECK-SIL:   [[DF_STRUCT:%.*]] = struct $_AD__foo_bb0__DF__src_0_wrt_0 ([[ADD_DF]] : $@callee_guaranteed (Float, Float) -> Float)
+// CHECK-SIL:   [[DF_STRUCT_ADD_DF_ADDR:%.*]] = struct_element_addr [[DF_STRUCT_ALLOC]] : $*{{.*}}, #{{.*}}.differential_0
+// CHECK-SIL:   store [[ADD_DF]] to [init] [[DF_STRUCT_ADD_DF_ADDR]]
+// CHECK-SIL:   [[DF_STRUCT:%.*]] = load [take] [[DF_STRUCT_ALLOC]]
 // CHECK-SIL:   [[DF_REF:%.*]] = function_ref @AD__foo__differential_src_0_wrt_0 : $@convention(thin) (Float, @owned _AD__foo_bb0__DF__src_0_wrt_0) -> Float
 // CHECK-SIL:   [[DF_FN:%.*]] = partial_apply [callee_guaranteed] [[DF_REF]]([[DF_STRUCT]])
 // CHECK-SIL:   [[VJP_RESULT:%.*]] = tuple ([[ORIG_RES]] : $Float, [[DF_FN]] : $@callee_guaranteed (Float) -> Float)
