@@ -154,25 +154,36 @@ static bool diagnoseNoReturn(ADContext &context, SILFunction *original,
   return true;
 }
 
+static bool isSupportedTerminator(TermInst *term,
+                                  AutoDiffDerivativeFunctionKind kind) {
+  switch (kind) {
+  case AutoDiffDerivativeFunctionKind::VJP:
+    return isa<BranchInst>(term) || isa<CondBranchInst>(term) ||
+           isa<SwitchEnumInst>(term) || isa<SwitchEnumAddrInst>(term) ||
+           isa<CheckedCastBranchInst>(term) ||
+           isa<CheckedCastValueBranchInst>(term) ||
+           isa<CheckedCastAddrBranchInst>(term) || isa<TryApplyInst>(term);
+  case AutoDiffDerivativeFunctionKind::JVP:
+    return isa<BranchInst>(term) || isa<CondBranchInst>(term);
+  }
+}
+
 /// If the original function contains unsupported control flow, emit a "control
 /// flow unsupported" error at appropriate source locations. Returns true if
 /// error is emitted.
 ///
 /// Update as control flow support is added.
-static bool diagnoseUnsupportedControlFlow(ADContext &context,
-                                           SILFunction *original,
-                                           DifferentiationInvoker invoker) {
+static bool
+diagnoseUnsupportedControlFlow(ADContext &context, SILFunction *original,
+                               DifferentiationInvoker invoker,
+                               AutoDiffDerivativeFunctionKind kind) {
   if (original->getBlocks().size() <= 1)
     return false;
   // Diagnose unsupported branching terminators.
   for (auto &bb : *original) {
     auto *term = bb.getTerminator();
     // Check supported branching terminators.
-    if (isa<BranchInst>(term) || isa<CondBranchInst>(term) ||
-        isa<SwitchEnumInst>(term) || isa<SwitchEnumAddrInst>(term) ||
-        isa<CheckedCastBranchInst>(term) ||
-        isa<CheckedCastValueBranchInst>(term) ||
-        isa<CheckedCastAddrBranchInst>(term) || isa<TryApplyInst>(term))
+    if (isSupportedTerminator(term, kind))
       continue;
     // If terminator is an unsupported branching terminator, emit an error.
     if (term->isBranch()) {
@@ -907,7 +918,8 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
     if (context.getASTContext()
             .LangOpts.EnableExperimentalForwardModeDifferentiation &&
         (diagnoseNoReturn(context, original, invoker) ||
-         diagnoseUnsupportedControlFlow(context, original, invoker)))
+         diagnoseUnsupportedControlFlow(context, original, invoker,
+                                        AutoDiffDerivativeFunctionKind::JVP)))
       return true;
 
     // Create empty JVP.
@@ -951,7 +963,8 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
     // - Functions with no return.
     // - Functions with unsupported control flow.
     if (diagnoseNoReturn(context, original, invoker) ||
-        diagnoseUnsupportedControlFlow(context, original, invoker))
+        diagnoseUnsupportedControlFlow(context, original, invoker,
+                                       AutoDiffDerivativeFunctionKind::VJP))
       return true;
 
     // Create empty VJP.

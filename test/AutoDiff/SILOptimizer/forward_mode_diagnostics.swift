@@ -21,10 +21,7 @@ func basic(_ x: Float) -> Float {
 // Control flow
 //===----------------------------------------------------------------------===//
 
-// expected-error @+1 {{function is not differentiable}}
 @differentiable
-// expected-note @+2 {{when differentiating this function definition}}
-// expected-note @+1 {{forward-mode differentiation does not yet support control flow}}
 func cond(_ x: Float) -> Float {
   if x > 0 {
     return x * x
@@ -76,10 +73,10 @@ func activeInoutParamTuple(_ x: Float) -> Float {
 
 // expected-error @+1 {{function is not differentiable}}
 @differentiable
-// expected-note @+2 {{when differentiating this function definition}}
-// expected-note @+1 {{forward-mode differentiation does not yet support control flow}}
+// expected-note @+1 {{when differentiating this function definition}}
 func activeInoutParamControlFlow(_ array: [Float]) -> Float {
   var result: Float = 1
+  // expected-note @+1 {{cannot differentiate unsupported control flow}}
   for i in withoutDerivative(at: array).indices {
     result += array[i]
   }

@@ -534,9 +534,13 @@ public:
       auto *lastArg = diffBB->getArguments().back();
       assert(lastArg->getType() == diffStructLoweredType);
       differentialStructArguments[bb] = lastArg;
+      unsigned diffArgIndex = 0;
       for (auto i : range(bb->getNumArguments())) {
         auto arg = bb->getArgument(i);
-        auto diffArg = diffBB->getArgument(i);
+        if (!activityInfo.isActive(arg, getIndices()))
+          continue;
+        auto diffArg = diffBB->getArgument(diffArgIndex);
+        ++diffArgIndex;
         setTangentValue(arg, makeConcreteTangentValue(diffArg));
       }
     }
@@ -947,6 +951,10 @@ public:
   }
 
   void visitSwitchEnumInst(SwitchEnumInst *sei) {
+    llvm_unreachable("Unsupported SIL instruction.");
+  }
+
+  void visitSwitchEnumAddrInst(SwitchEnumAddrInst *seai) {
     llvm_unreachable("Unsupported SIL instruction.");
   }
 
@@ -1741,6 +1749,8 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
     // Copy over tangent type of original arguments for non entry blocks.
     if (!origBB.isEntry()) {
       for (auto &arg : origBB.getArguments()) {
+        if (!activityInfo.isActive(arg, getIndices()))
+          continue;
         auto diffType = getRemappedTangentType(arg->getType());
         diffBB->createPhiArgument(diffType, arg->getOwnershipKind());
       }
