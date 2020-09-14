@@ -1,6 +1,9 @@
-// RUN: %target-typecheck-verify-swift -enable-objc-interop
+// RUN: %target-typecheck-verify-swift
+// REQUIRES: objc_interop
 
 // Test requirements and conformance for Objective-C protocols.
+
+import Foundation
 
 @objc class ObjCClass { }
 
@@ -258,3 +261,25 @@ class C8SubRW: C8Base {
 class C8SubRW2: C8Base {
   var prop: Int = 0
 }
+
+// SR-13515
+// Default implementations of requirements should not suggest adding '@objc'
+// to the witness and should clarify that default implementations are not
+// allowed.
+
+@objc protocol ObjCProtocol {
+  @objc func requiredMethod() // expected-note {{requirement 'requiredMethod()' declared here}}
+  @objc var requiredProperty: Int { get } // expected-note {{requirement 'requiredProperty' declared here}}
+  @objc subscript(required: Int) -> Int { get } // expected-note {{requirement 'subscript(_:)' declared here}}
+}
+
+extension ObjCProtocol {
+  func requiredMethod() {}
+  var requiredProperty: Int { 0 }
+  subscript(required: Int) -> Int { 1 }
+}
+
+class ConformingClass: NSObject, ObjCProtocol {}
+// expected-error@-1 {{default implementations cannot be used to satisfy requirements of '@objc' protocols, such as 'requiredMethod()' in '@objc' protocol 'ObjCProtocol'}}
+// expected-error@-2 {{default implementations cannot be used to satisfy requirements of '@objc' protocols, such as 'requiredProperty' in '@objc' protocol 'ObjCProtocol'}}
+// expected-error@-3 {{default implementations cannot be used to satisfy requirements of '@objc' protocols, such as 'subscript(_:)' in '@objc' protocol 'ObjCProtocol'}}
