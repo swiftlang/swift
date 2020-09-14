@@ -409,10 +409,16 @@ StringRef SDKNodeDecl::getScreenInfo() const {
   auto &Ctx = getSDKContext();
   llvm::SmallString<64> SS;
   llvm::raw_svector_ostream OS(SS);
-  if (Ctx.getOpts().PrintModule)
-    OS << ModuleName;
-  if (!HeaderName.empty())
-    OS << "(" << HeaderName << ")";
+  if (Ctx.getOpts().CompilerStyle) {
+    // Compiler style we don't need source info
+    OS << (Ctx.checkingABI() ? "ABI breakage" : "API breakage");
+  } else {
+    // Print more source info.
+    if (Ctx.getOpts().PrintModule)
+      OS << ModuleName;
+    if (!HeaderName.empty())
+      OS << "(" << HeaderName << ")";
+  }
   if (!OS.str().empty())
     OS << ": ";
   bool IsExtension = false;
