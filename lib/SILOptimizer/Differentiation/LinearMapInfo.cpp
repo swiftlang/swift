@@ -153,7 +153,6 @@ LinearMapInfo::createBranchingTraceDecl(SILBasicBlock *originalBB,
                                         SILLoopInfo *loopInfo) {
   assert(originalBB->getParent() == original);
   auto &astCtx = original->getASTContext();
-  auto *moduleDecl = original->getModule().getSwiftModule();
   auto &file = getSynthesizedFile();
   // Create a branching trace enum.
   Mangle::ASTMangler mangler;

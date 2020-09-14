@@ -15,6 +15,7 @@ ForwardModeTests.test("Conditionals") {
    }
    expectEqual(8, derivative(at: 4, in: cond1))
    expectEqual(2, derivative(at: -10, in: cond1))
+
    func cond2(_ x: Float) -> Float {
      let y: Float
      if x > 0 {
@@ -29,6 +30,7 @@ ForwardModeTests.test("Conditionals") {
    expectEqual(8, derivative(at: 4, in: cond2))
    expectEqual(2, derivative(at: -10, in: cond2))
    expectEqual(0, derivative(at: -1337, in: cond2))
+
    func cond2_var(_ x: Float) -> Float {
      var y: Float = x
      if x > 0 {
@@ -45,6 +47,7 @@ ForwardModeTests.test("Conditionals") {
    expectEqual(8, derivative(at: 4, in: cond2_var))
    expectEqual(2, derivative(at: -10, in: cond2_var))
    expectEqual(0, derivative(at: -1337, in: cond2_var))
+
    func cond3(_ x: Float, _ y: Float) -> Float {
      if x > 0 {
        return x * y
@@ -53,6 +56,7 @@ ForwardModeTests.test("Conditionals") {
    }
    expectEqual(9, derivative(at: 4, 5, in: cond3))
    expectEqual(0, derivative(at: -3, -2, in: cond3))
+
    func cond_tuple(_ x: Float) -> Float {
      // Convoluted function returning `x + x`.
      let y: (Float, Float) = (x, x)
@@ -64,6 +68,7 @@ ForwardModeTests.test("Conditionals") {
    expectEqual((8, 2), valueWithDerivative(at: 4, in: cond_tuple))
    expectEqual((-20, 2), valueWithDerivative(at: -10, in: cond_tuple))
    expectEqual((-2674, 2), valueWithDerivative(at: -1337, in: cond_tuple))
+
    func cond_tuple2(_ x: Float) -> Float {
      // Convoluted function returning `x + x`.
      let y: (Float, Float) = (x, x)
@@ -79,6 +84,7 @@ ForwardModeTests.test("Conditionals") {
    expectEqual((8, 2), valueWithDerivative(at: 4, in: cond_tuple2))
    expectEqual((-20, 2), valueWithDerivative(at: -10, in: cond_tuple2))
    expectEqual((-2674, 2), valueWithDerivative(at: -1337, in: cond_tuple2))
+
    func cond_tuple_var(_ x: Float) -> Float {
      // Convoluted function returning `x + x`.
      var y: (Float, Float) = (x, x)
@@ -97,6 +103,7 @@ ForwardModeTests.test("Conditionals") {
    expectEqual((8, 2), valueWithDerivative(at: 4, in: cond_tuple_var))
    expectEqual((-20, 2), valueWithDerivative(at: -10, in: cond_tuple_var))
    expectEqual((-2674, 2), valueWithDerivative(at: -1337, in: cond_tuple_var))
+
    func cond_nestedtuple_var(_ x: Float) -> Float {
      // Convoluted function returning `x + x`.
      var y: (Float, Float) = (x + x, x - x)
@@ -115,6 +122,7 @@ ForwardModeTests.test("Conditionals") {
    expectEqual((8, 2), valueWithDerivative(at: 4, in: cond_nestedtuple_var))
    expectEqual((-20, 2), valueWithDerivative(at: -10, in: cond_nestedtuple_var))
    expectEqual((-2674, 2), valueWithDerivative(at: -1337, in: cond_nestedtuple_var))
+
    struct FloatPair : Differentiable {
      var first, second: Float
      init(_ first: Float, _ second: Float) {
@@ -122,6 +130,7 @@ ForwardModeTests.test("Conditionals") {
        self.second = second
      }
    }
+
    struct Pair<T : Differentiable, U : Differentiable> : Differentiable {
      var first: T
      var second: U
@@ -130,6 +139,7 @@ ForwardModeTests.test("Conditionals") {
        self.second = second
      }
    }
+
    func cond_struct(_ x: Float) -> Float {
      // Convoluted function returning `x + x`.
      let y = FloatPair(x, x)
@@ -141,6 +151,7 @@ ForwardModeTests.test("Conditionals") {
    expectEqual((8, 2), valueWithDerivative(at: 4, in: cond_struct))
    expectEqual((-20, 2), valueWithDerivative(at: -10, in: cond_struct))
    expectEqual((-2674, 2), valueWithDerivative(at: -1337, in: cond_struct))
+
    func cond_struct2(_ x: Float) -> Float {
      // Convoluted function returning `x + x`.
      let y = FloatPair(x, x)
@@ -156,6 +167,7 @@ ForwardModeTests.test("Conditionals") {
    expectEqual((8, 2), valueWithDerivative(at: 4, in: cond_struct2))
    expectEqual((-20, 2), valueWithDerivative(at: -10, in: cond_struct2))
    expectEqual((-2674, 2), valueWithDerivative(at: -1337, in: cond_struct2))
+
    func cond_struct_var(_ x: Float) -> Float {
      // Convoluted function returning `x + x`.
      var y = FloatPair(x, x)
@@ -174,6 +186,7 @@ ForwardModeTests.test("Conditionals") {
    expectEqual((8, 2), valueWithDerivative(at: 4, in: cond_struct_var))
    expectEqual((-20, 2), valueWithDerivative(at: -10, in: cond_struct_var))
    expectEqual((-2674, 2), valueWithDerivative(at: -1337, in: cond_struct_var))
+
    func cond_nestedstruct_var(_ x: Float) -> Float {
      // Convoluted function returning `x + x`.
      var y = FloatPair(x + x, x - x)
@@ -195,5 +208,3 @@ ForwardModeTests.test("Conditionals") {
 }
 
 runAllTests()
-
-
