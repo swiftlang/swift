@@ -206,8 +206,8 @@ static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
   FrontendInputsAndOutputs replacementInputsAndOutputs;
   for (const InputFile &input : inputsAndOutputs.getAllInputs()) {
     llvm::SmallString<128> newFilename;
-    if (auto err = FileSystem->getRealPath(input.file(), newFilename))
-      newFilename = input.file();
+    if (auto err = FileSystem->getRealPath(input.getFileName(), newFilename))
+      newFilename = input.getFileName();
     llvm::sys::path::native(newFilename);
     bool newIsPrimary = input.isPrimary() ||
                         (!PrimaryFile.empty() && PrimaryFile == newFilename);
@@ -216,7 +216,7 @@ static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
     }
     assert(primaryCount < 2 && "cannot handle multiple primaries");
     replacementInputsAndOutputs.addInput(
-        InputFile(newFilename.str(), newIsPrimary, input.buffer()));
+        InputFile(newFilename.str(), newIsPrimary, input.getBuffer()));
   }
 
   if (PrimaryFile.empty() || primaryCount == 1) {

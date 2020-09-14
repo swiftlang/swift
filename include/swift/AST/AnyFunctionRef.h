@@ -137,9 +137,9 @@ public:
     return cast<AutoClosureExpr>(ACE)->getBody();
   }
 
-  void setBody(BraceStmt *stmt, bool isSingleExpression) {
+  void setTypecheckedBody(BraceStmt *stmt, bool isSingleExpression) {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
-      AFD->setBody(stmt);
+      AFD->setBody(stmt, AbstractFunctionDecl::BodyKind::TypeChecked);
       AFD->setHasSingleExpressionBody(isSingleExpression);
       return;
     }

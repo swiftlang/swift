@@ -1322,8 +1322,6 @@ static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
     BufferText = BufferText.drop_back(1);
 
   CompilerInvocation Invocation(InitInvok);
-  Invocation.setInputKind(InputFileKind::Swift);
-
   CompilerInstance CI;
 
   // Display diagnostics to stderr.
@@ -2111,22 +2109,14 @@ static int doInputCompletenessTest(StringRef SourceFilename) {
 //===----------------------------------------------------------------------===//
 
 static ModuleDecl *getModuleByFullName(ASTContext &Context, StringRef ModuleName) {
-  SmallVector<Located<Identifier>, 4>
-      AccessPath;
-  while (!ModuleName.empty()) {
-    StringRef SubModuleName;
-    std::tie(SubModuleName, ModuleName) = ModuleName.split('.');
-    AccessPath.push_back(
-        { Context.getIdentifier(SubModuleName), SourceLoc() });
-  }
-  ModuleDecl *Result = Context.getModule(AccessPath);
+  ModuleDecl *Result = Context.getModuleByName(ModuleName);
   if (!Result || Result->failedToLoad())
     return nullptr;
   return Result;
 }
 
 static ModuleDecl *getModuleByFullName(ASTContext &Context, Identifier ModuleName) {
-  ModuleDecl *Result = Context.getModule({ Located<Identifier>(ModuleName,SourceLoc()) });
+  ModuleDecl *Result = Context.getModuleByIdentifier(ModuleName);
   if (!Result || Result->failedToLoad())
     return nullptr;
   return Result;
@@ -2166,8 +2156,7 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
 
   if (MangledNameToFind.empty()) {
     ModuleDecl *M = CI.getMainModule();
-    M->getMainSourceFile(Invocation.getSourceFileKind()).print(llvm::outs(),
-                                                               Options);
+    M->getMainSourceFile().print(llvm::outs(), Options);
     return EXIT_SUCCESS;
   }
 
@@ -3799,8 +3788,6 @@ int main(int argc, char *argv[]) {
 
   for (auto &File : options::InputFilenames)
     InitInvok.getFrontendOptions().InputsAndOutputs.addInputFile(File);
-  if (!options::InputFilenames.empty())
-    InitInvok.setInputKind(InputFileKind::SwiftLibrary);
 
   InitInvok.setMainExecutablePath(
       llvm::sys::fs::getMainExecutable(argv[0],

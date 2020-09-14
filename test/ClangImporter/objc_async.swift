@@ -14,9 +14,7 @@ func testSlowServer(slowServer: SlowServer) async throws {
 }
 
 func testSlowServerOldSchool(slowServer: SlowServer) {
-  var i1: Int = 0
   slowServer.doSomethingSlow("mail") { i in
-    i1 = i
+    _ = i
   }
-  print(i1)
 }

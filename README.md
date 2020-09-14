@@ -32,9 +32,9 @@
 
 | **OS** | **Architecture** | **Build** |
 |---|:---:|:---:|
-|**[Ubuntu 16.04](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_16_04_tensorflow.json)** | x86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow)|
+|**[Ubuntu 18.04](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_18_04_tensorflow.json)** | x86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-18.04-tensorflow/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-18.04-tensorflow)|
 |**[macOS 10.13](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_macos_high_sierra_tensorflow.json)** | x86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-macOS-tensorflow/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-macOS-tensorflow)|
-|**[Ubuntu 16.04 (GPU)](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_16_04_tensorflow_gpu.json)** | x86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow-gpu/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow-gpu)|
+|**[Ubuntu 18.04 (GPU)](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_18_04_tensorflow_gpu.json)** | x86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-18.04-tensorflow-gpu/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-18.04-tensorflow-gpu)|
 
 <!-- SWIFT_ENABLE_TENSORFLOW -->
 
@@ -88,6 +88,8 @@ If you are interested in:
 - Building a toolchain as a one-off: Follow the [Getting Started guide][]
   up until the "Building the project" section. After that, follow the
   instructions in the [Swift Toolchains](#swift-toolchains) section below.
+
+We also have an [FAQ](/docs/HowToGuides/FAQ.md) that answers common questions.
 
 [Getting Started guide]: /docs/HowToGuides/GettingStarted.md
 
@@ -151,14 +153,14 @@ Try the suggestions in
 [Troubleshooting build issues](/docs/HowToGuides/GettingStarted.md#troubleshooting-build-issues).
 
 Make sure you are using the
-[correct release](/docs/HowToGuides/GettingStared.md#installing-dependencies)
+[correct release](/docs/HowToGuides/GettingStarted.md#installing-dependencies)
 of Xcode.
 
 If you have changed Xcode versions but still encounter errors that appear to
 be related to the Xcode version, try passing `--clean` to `build-script`.
 
 When a new version of Xcode is released, you can update your build without
-recompiling the entire project by passing the `--reconfigure` option.
+recompiling the entire project by passing `--reconfigure` to `build-script`.
 
 ## Learning More
 

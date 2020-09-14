@@ -20,6 +20,7 @@
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/Import.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
@@ -891,12 +892,12 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  bool canImportModule(Located<Identifier> ModulePath);
+  bool canImportModule(ImportPath::Element ModulePath);
 
   /// \returns a module with a given name that was already loaded.  If the
   /// module was not loaded, returns nullptr.
   ModuleDecl *getLoadedModule(
-      ArrayRef<Located<Identifier>> ModulePath) const;
+      ImportPath::Module ModulePath) const;
 
   ModuleDecl *getLoadedModule(Identifier ModuleName) const;
 
@@ -906,9 +907,11 @@ public:
   /// be returned.
   ///
   /// \returns The requested module, or NULL if the module cannot be found.
-  ModuleDecl *getModule(ArrayRef<Located<Identifier>> ModulePath);
+  ModuleDecl *getModule(ImportPath::Module ModulePath);
 
   ModuleDecl *getModuleByName(StringRef ModuleName);
+
+  ModuleDecl *getModuleByIdentifier(Identifier ModuleID);
 
   /// Returns the standard library module, or null if the library isn't present.
   ///

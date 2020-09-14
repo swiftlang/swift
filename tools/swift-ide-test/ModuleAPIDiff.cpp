@@ -931,8 +931,7 @@ int swift::doGenerateModuleAPIDescription(StringRef MainExecutablePath,
   PrintOptions Options = PrintOptions::printEverything();
 
   ModuleDecl *M = CI.getMainModule();
-  M->getMainSourceFile(Invocation.getSourceFileKind()).print(llvm::outs(),
-                                                             Options);
+  M->getMainSourceFile().print(llvm::outs(), Options);
 
   auto SMAModel = createSMAModel(M);
   llvm::yaml::Output YOut(llvm::outs());

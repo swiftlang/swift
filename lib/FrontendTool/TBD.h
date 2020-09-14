@@ -27,7 +27,6 @@ struct TBDGenOptions;
 
 bool writeTBD(ModuleDecl *M, StringRef OutputFilename,
               const TBDGenOptions &Opts);
-bool inputFileKindCanHaveTBDValidated(InputFileKind kind);
 bool validateTBD(ModuleDecl *M,
                  const llvm::Module &IRModule,
                  const TBDGenOptions &opts,

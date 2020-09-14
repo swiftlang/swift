@@ -1389,4 +1389,15 @@ ForwardModeTests.test("ApplyNonActiveIndirectResult") {
   expectEqual(1.0, derivative(at: 2, in: applyNonactiveArgumentActiveIndirectResult))
 }
 
+ForwardModeTests.test("SR-13530") {
+  // SR-13530: Test "leaked owned value" ownership verification failure related
+  // to differential generation for `copy_value` instruction.
+  @differentiable
+  func SR_13530(_ x: NonresilientTracked<Float>) -> NonresilientTracked<Float> {
+    precondition(x >= 0)
+    return x
+  }
+  expectEqual(1, derivative(at: 2, in: SR_13530))
+}
+
 runAllTests()

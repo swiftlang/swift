@@ -419,10 +419,12 @@ StringRef SDKNodeDecl::getScreenInfo() const {
   if (auto *TD = dyn_cast<SDKNodeDeclType>(this)) {
     IsExtension = TD->isExternal();
   }
-  if (IsExtension)
-    OS << "Extension";
-  else
-    OS << getDeclKind();
+
+  // There is no particular reasons why we don't use lower-cased keyword names
+  // in non-CompilerStyle mode. This is to be backward compatible so clients
+  // don't need to update existing known breakages.
+  OS << getDeclKindStr(IsExtension? DeclKind::Extension : getDeclKind(),
+                       getSDKContext().getOpts().CompilerStyle);
   OS << " " << getFullyQualifiedName();
   return Ctx.buffer(OS.str());
 }

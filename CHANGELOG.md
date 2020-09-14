@@ -28,6 +28,20 @@ CHANGELOG
 Swift Next
 ----------
 
+* [SE-0284][]:
+
+  Functions, subscripts, and initializers may now have more than one variadic parameter, as long as all parameters which follow variadic parameters are labeled. This makes declarations like the following valid:
+
+  ```swift
+  func foo(_ a: Int..., b: Double...) { }
+
+  struct Bar {
+    subscript(a: Int..., b b: Int...) -> [Int] { a + b }
+
+    init(a: String..., b: Float...) { }
+  }
+  ```
+
 * [SE-0287][]:
 
   Implicit member expressions now support chains of member accesses, making the following valid:
@@ -8143,6 +8157,7 @@ Swift 1.0
 [SE-0276]: <https://github.com/apple/swift-evolution/blob/master/proposals/0276-multi-pattern-catch-clauses.md>
 [SE-0279]: <https://github.com/apple/swift-evolution/blob/master/proposals/0279-multiple-trailing-closures.md>
 [SE-0280]: <https://github.com/apple/swift-evolution/blob/master/proposals/0280-enum-cases-as-protocol-witnesses.md>
+[SE-0284]: <https://github.com/apple/swift-evolution/blob/master/proposals/0284-multiple-variadic-parameters.md>
 [SE-0286]: <https://github.com/apple/swift-evolution/blob/master/proposals/0286-forward-scan-trailing-closures.md>
 [SE-0287]: <https://github.com/apple/swift-evolution/blob/master/proposals/0287-implicit-member-chains.md>
 

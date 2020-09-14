@@ -530,7 +530,7 @@ public:
   void getImportDecls(SmallVectorImpl<Decl *> &Results);
 
   /// Reports all visible top-level members in this module.
-  void lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
+  void lookupVisibleDecls(ImportPath::Access accessPath,
                           VisibleDeclConsumer &consumer,
                           NLKind lookupKind);
 
@@ -567,13 +567,13 @@ public:
   /// Reports all class members in the module to the given consumer.
   ///
   /// This is intended for use with id-style lookup and code completion.
-  void lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
+  void lookupClassMembers(ImportPath::Access accessPath,
                           VisibleDeclConsumer &consumer);
 
   /// Adds class members in the module with the given name to the given vector.
   ///
   /// This is intended for use with id-style lookup.
-  void lookupClassMember(ModuleDecl::AccessPathTy accessPath,
+  void lookupClassMember(ImportPath::Access accessPath,
                          DeclName name,
                          SmallVectorImpl<ValueDecl*> &results);
 
@@ -751,7 +751,7 @@ public:
   ///
   /// If the name matches the name of the current module, a shadowed module
   /// is loaded instead.
-  ModuleDecl *getModule(ArrayRef<Identifier> name, bool allowLoading = false);
+  ModuleDecl *getModule(ImportPath::Module name, bool allowLoading = false);
 
   /// Returns the generic signature for the given ID.
   GenericSignature getGenericSignature(serialization::GenericSignatureID ID);

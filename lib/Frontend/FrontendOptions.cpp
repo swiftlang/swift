@@ -42,8 +42,8 @@ bool FrontendOptions::needsProperModuleName(ActionType action) {
   case ActionType::DumpScopeMaps:
   case ActionType::DumpTypeRefinementContexts:
   case ActionType::DumpPCM:
-    return false;
   case ActionType::EmitPCH:
+    return false;
   case ActionType::EmitSILGen:
   case ActionType::EmitSIL:
   case ActionType::EmitSIBGen:
@@ -146,6 +146,47 @@ bool FrontendOptions::doesActionRequireInputs(ActionType action) {
   case ActionType::EmitPCH:
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
+  case ActionType::CompileModuleFromInterface:
+  case ActionType::TypecheckModuleFromInterface:
+  case ActionType::ResolveImports:
+  case ActionType::Typecheck:
+  case ActionType::DumpAST:
+  case ActionType::PrintAST:
+  case ActionType::DumpScopeMaps:
+  case ActionType::DumpTypeRefinementContexts:
+  case ActionType::EmitSILGen:
+  case ActionType::EmitSIL:
+  case ActionType::EmitModuleOnly:
+  case ActionType::MergeModules:
+  case ActionType::EmitSIBGen:
+  case ActionType::EmitSIB:
+  case ActionType::Immediate:
+  case ActionType::EmitAssembly:
+  case ActionType::EmitIR:
+  case ActionType::EmitBC:
+  case ActionType::EmitObject:
+  case ActionType::DumpTypeInfo:
+    return true;
+  }
+  llvm_unreachable("Unknown ActionType");
+}
+
+bool FrontendOptions::doesActionPerformEndOfPipelineActions(ActionType action) {
+  switch (action) {
+  case ActionType::NoneAction:
+  case ActionType::PrintVersion:
+  case ActionType::EmitPCH:
+  case ActionType::EmitPCM:
+  case ActionType::DumpPCM:
+    return false;
+  case ActionType::REPL:
+  case ActionType::Parse:
+  case ActionType::DumpParse:
+  case ActionType::EmitSyntax:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::EmitImportedModules:
+  case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
   case ActionType::CompileModuleFromInterface:
   case ActionType::TypecheckModuleFromInterface:
   case ActionType::ResolveImports:

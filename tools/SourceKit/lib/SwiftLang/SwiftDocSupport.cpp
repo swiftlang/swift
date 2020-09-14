@@ -40,21 +40,6 @@ using namespace SourceKit;
 using namespace swift;
 using namespace ide;
 
-static ModuleDecl *getModuleByFullName(ASTContext &Ctx, StringRef ModuleName) {
-  SmallVector<Located<Identifier>, 4>
-      AccessPath;
-  while (!ModuleName.empty()) {
-    StringRef SubModuleName;
-    std::tie(SubModuleName, ModuleName) = ModuleName.split('.');
-    AccessPath.push_back({ Ctx.getIdentifier(SubModuleName), SourceLoc() });
-  }
-  return Ctx.getModule(AccessPath);
-}
-
-static ModuleDecl *getModuleByFullName(ASTContext &Ctx, Identifier ModuleName) {
-  return Ctx.getModule({ Located<Identifier>(ModuleName, SourceLoc()) });
-}
-
 namespace {
 struct TextRange {
   unsigned Offset;
@@ -865,13 +850,13 @@ static bool makeParserAST(CompilerInstance &CI, StringRef Text,
                           CompilerInvocation Invocation) {
   Invocation.getFrontendOptions().InputsAndOutputs.clearInputs();
   Invocation.setModuleName("main");
-  Invocation.setInputKind(InputFileKind::Swift);
   Invocation.getLangOptions().DisablePoundIfEvaluation = true;
 
   std::unique_ptr<llvm::MemoryBuffer> Buf;
   Buf = llvm::MemoryBuffer::getMemBuffer(Text, "<module-interface>");
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
-      InputFile(Buf.get()->getBufferIdentifier(), false, Buf.get()));
+      InputFile(Buf.get()->getBufferIdentifier(), /*isPrimary*/false, Buf.get(),
+                file_types::TY_Swift));
   return CI.setup(Invocation);
 }
 
@@ -1023,11 +1008,11 @@ static void reportSourceAnnotations(const SourceTextInfo &IFaceInfo,
 static bool getModuleInterfaceInfo(ASTContext &Ctx, StringRef ModuleName,
                                    SourceTextInfo &Info) {
   // Load standard library so that Clang importer can use it.
-  auto *Stdlib = getModuleByFullName(Ctx, Ctx.StdlibModuleName);
+  auto *Stdlib = Ctx.getModuleByIdentifier(Ctx.StdlibModuleName);
   if (!Stdlib)
     return true;
 
-  auto *M = getModuleByFullName(Ctx, ModuleName);
+  auto *M = Ctx.getModuleByName(ModuleName);
   if (!M)
     return true;
 
@@ -1454,9 +1439,9 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
     Error = "Compiler invocation init failed";
     return nullptr;
   }
-  Invocation.setInputKind(InputFileKind::Swift);
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
-      InputFile(InputBuf->getBufferIdentifier(), false, InputBuf));
+      InputFile(InputBuf->getBufferIdentifier(), /*isPrimary*/false, InputBuf,
+                file_types::TY_Swift));
 
   if (ParseCI.setup(Invocation)) {
     Error = "Compiler invocation set up failed";
@@ -1550,13 +1535,13 @@ findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
 
   // Load standard library so that Clang importer can use it.
   ASTContext &Ctx = CI.getASTContext();
-  auto *Stdlib = getModuleByFullName(Ctx, Ctx.StdlibModuleName);
+  auto *Stdlib = Ctx.getModuleByIdentifier(Ctx.StdlibModuleName);
   if (!Stdlib) {
     Error = "Cannot load stdlib.";
     Receiver(RequestResult<ArrayRef<StringRef>>::fromError(Error));
     return;
   }
-  auto *M = getModuleByFullName(Ctx, ModuleName);
+  auto *M = Ctx.getModuleByName(ModuleName);
   if (!M) {
     Error = "Cannot find the module.";
     Receiver(RequestResult<ArrayRef<StringRef>>::fromError(Error));

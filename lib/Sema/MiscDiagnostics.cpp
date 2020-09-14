@@ -4589,6 +4589,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   if (ctx.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(DC, E);
   diagnoseConstantArgumentRequirement(E, DC);
+  checkActorIsolation(E, DC);
 }
 
 void swift::performStmtDiagnostics(ASTContext &ctx, const Stmt *S) {

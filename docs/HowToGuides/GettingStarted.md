@@ -19,7 +19,7 @@ toolchain as a one-off, there are a couple of differences:
   - [Ubuntu Linux](#ubuntu-linux)
 - [Building the project for the first time](#building-the-project-for-the-first-time)
   - [Spot check dependencies](#spot-check-dependencies)
-  - [Understanding the pieces](#understanding-the-pieces)
+  - [The roles of different tools](#the-roles-of-different-tools)
   - [The actual build](#the-actual-build)
   - [Troubleshooting build issues](#troubleshooting-build-issues)
 - [Editing code](#editing-code)
@@ -373,7 +373,7 @@ The codebase is your oyster!
 
 Now that you have made some changes, you will need to rebuild...
 
-### Incremental rebuilds with Ninja
+### Incremental builds with Ninja
 
 To rebuild the compiler:
 ```sh
@@ -503,7 +503,7 @@ utils/build-script --release-debuginfo --debug-swift # other flags...
 # debug Stdlib + optimized Swiftc + optimized Clang/LLVM
 utils/build-script --release-debuginfo --debug-swift-stdlib # other flags...
 
-# optimized Stdlib + debug Swiftc (expect typechecker) + optimized Clang/LLVM
+# optimized Stdlib + debug Swiftc (except typechecker) + optimized Clang/LLVM
 utils/build-script --release-debuginfo --debug-swift --force-optimized-typechecker
 
 # Last resort option, it is highly unlikely that you will need this

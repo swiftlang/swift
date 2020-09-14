@@ -353,7 +353,7 @@ public:
           NB = prependLoggerCall(NB, {StartLoc, EndLoc});
 
         if (NB != B) {
-          FD->setBody(NB);
+          FD->setBody(NB, AbstractFunctionDecl::BodyKind::TypeChecked);
           TypeChecker::checkFunctionEffects(FD);
         }
       }

@@ -990,12 +990,12 @@ getFileOutputStream(StringRef OutputFilename, ASTContext &Ctx) {
 }
 
 /// Writes the Syntax tree to the given file
-static bool emitSyntax(SourceFile *SF, StringRef OutputFilename) {
-  auto os = getFileOutputStream(OutputFilename, SF->getASTContext());
+static bool emitSyntax(SourceFile &SF, StringRef OutputFilename) {
+  auto os = getFileOutputStream(OutputFilename, SF.getASTContext());
   if (!os) return true;
 
   json::Output jsonOut(*os, /*UserInfo=*/{}, /*PrettyPrint=*/false);
-  auto Root = SF->getSyntaxRoot().getRaw();
+  auto Root = SF.getSyntaxRoot().getRaw();
   jsonOut << *Root;
   *os << "\n";
   return false;
@@ -1323,9 +1323,9 @@ static void verifyGenericSignaturesIfNeeded(const CompilerInvocation &Invocation
 }
 
 static bool dumpAndPrintScopeMap(const CompilerInstance &Instance,
-                                 SourceFile *SF) {
+                                 SourceFile &SF) {
   // Not const because may require reexpansion
-  ASTScope &scope = SF->getScope();
+  ASTScope &scope = SF.getScope();
 
   const auto &opts = Instance.getInvocation().getFrontendOptions();
   if (opts.DumpScopeMapLocations.empty()) {
@@ -1342,14 +1342,12 @@ static bool dumpAndPrintScopeMap(const CompilerInstance &Instance,
   return Instance.getASTContext().hadError();
 }
 
-static SourceFile *
+static SourceFile &
 getPrimaryOrMainSourceFile(const CompilerInstance &Instance) {
-  SourceFile *SF = Instance.getPrimarySourceFile();
-  if (!SF) {
-    SourceFileKind Kind = Instance.getInvocation().getSourceFileKind();
-    SF = &Instance.getMainModule()->getMainSourceFile(Kind);
+  if (SourceFile *SF = Instance.getPrimarySourceFile()) {
+    return *SF;
   }
-  return SF;
+  return Instance.getMainModule()->getMainSourceFile();
 }
 
 /// Dumps the AST of all available primary source files. If corresponding output
@@ -1366,8 +1364,8 @@ static bool dumpAST(CompilerInstance &Instance) {
   } else {
     // Some invocations don't have primary files. In that case, we default to
     // looking for the main file and dumping it to `stdout`.
-    auto *SF = getPrimaryOrMainSourceFile(Instance);
-    SF->dump(llvm::outs(), /*parseIfNeeded*/ true);
+    auto &SF = getPrimaryOrMainSourceFile(Instance);
+    SF.dump(llvm::outs(), /*parseIfNeeded*/ true);
   }
   return Instance.getASTContext().hadError();
 }
@@ -1876,8 +1874,6 @@ static bool performAction(CompilerInstance &Instance,
                              "removed; use the LLDB-enhanced REPL instead.");
 
   // MARK: Actions for Clang and Clang Modules
-  // We've been asked to precompile a bridging header or module; we want to
-  // avoid touching any other inputs and just parse, emit and exit.
   case FrontendOptions::ActionType::EmitPCH:
     return precompileBridgingHeader(Instance);
   case FrontendOptions::ActionType::EmitPCM:
@@ -1904,7 +1900,7 @@ static bool performAction(CompilerInstance &Instance,
   case FrontendOptions::ActionType::PrintAST:
     return withSemanticAnalysis(
         Instance, observer, [](CompilerInstance &Instance) {
-          getPrimaryOrMainSourceFile(Instance)->print(
+          getPrimaryOrMainSourceFile(Instance).print(
               llvm::outs(), PrintOptions::printEverything());
           return Instance.getASTContext().hadError();
         });
@@ -1917,13 +1913,12 @@ static bool performAction(CompilerInstance &Instance,
   case FrontendOptions::ActionType::DumpTypeRefinementContexts:
     return withSemanticAnalysis(
         Instance, observer, [](CompilerInstance &Instance) {
-          getPrimaryOrMainSourceFile(Instance)
-              ->getTypeRefinementContext()
-              ->dump(llvm::errs(), Instance.getASTContext().SourceMgr);
+          getPrimaryOrMainSourceFile(Instance).getTypeRefinementContext()->dump(
+              llvm::errs(), Instance.getASTContext().SourceMgr);
           return Instance.getASTContext().hadError();
         });
   case FrontendOptions::ActionType::DumpInterfaceHash:
-    getPrimaryOrMainSourceFile(Instance)->dumpInterfaceHash(llvm::errs());
+    getPrimaryOrMainSourceFile(Instance).dumpInterfaceHash(llvm::errs());
     return Context.hadError();
   case FrontendOptions::ActionType::EmitSyntax:
     return emitSyntax(getPrimaryOrMainSourceFile(Instance),
@@ -1983,7 +1978,7 @@ static bool performCompile(CompilerInstance &Instance,
   const FrontendOptions::ActionType Action = opts.RequestedAction;
 
   // To compile LLVM IR, just pass it off unmodified.
-  if (Instance.getInvocation().getInputKind() == InputFileKind::LLVM)
+  if (opts.InputsAndOutputs.shouldTreatAsLLVM())
     return compileLLVMIR(Instance);
 
   // If we aren't in a parse-only context and expect an implicit stdlib import,
@@ -2001,10 +1996,12 @@ static bool performCompile(CompilerInstance &Instance,
     if (FrontendOptions::shouldActionOnlyParse(Action)) {
       // Parsing gets triggered lazily, but let's make sure we have the right
       // input kind.
-      auto kind = Invocation.getInputKind();
-      return kind == InputFileKind::Swift ||
-             kind == InputFileKind::SwiftLibrary ||
-             kind == InputFileKind::SwiftModuleInterface;
+      return llvm::all_of(
+          opts.InputsAndOutputs.getAllInputs(), [](const InputFile &IF) {
+            const auto kind = IF.getType();
+            return kind == file_types::TY_Swift ||
+                   kind == file_types::TY_SwiftModuleInterfaceFile;
+          });
     }
     return true;
   }() && "Only supports parsing .swift files");
@@ -2014,7 +2011,7 @@ static bool performCompile(CompilerInstance &Instance,
   // We might have freed the ASTContext already, but in that case we would
   // have already performed these actions.
   if (Instance.hasASTContext() &&
-      FrontendOptions::doesActionRequireInputs(Action)) {
+      FrontendOptions::doesActionPerformEndOfPipelineActions(Action)) {
     performEndOfPipelineActions(Instance);
     hadError |= Instance.getASTContext().hadError();
   }
@@ -2106,7 +2103,10 @@ static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
 
     // If we can't validate the given input file, bail early. This covers cases
     // like passing raw SIL as a primary file.
-    if (!inputFileKindCanHaveTBDValidated(Invocation.getInputKind())) {
+    const auto &IO = Invocation.getFrontendOptions().InputsAndOutputs;
+    // FIXME: This would be a good test of the interface format.
+    if (IO.shouldTreatAsModuleInterface() || IO.shouldTreatAsSIL() ||
+        IO.shouldTreatAsLLVM() || IO.shouldTreatAsObjCHeader()) {
       return false;
     }
 
@@ -2413,7 +2413,7 @@ createDispatchingDiagnosticConsumerIfNeeded(
   inputsAndOutputs.forEachInputProducingSupplementaryOutput(
       [&](const InputFile &input) -> bool {
         if (auto consumer = maybeCreateConsumerForDiagnosticsFrom(input))
-          subconsumers.emplace_back(input.file(), std::move(consumer));
+          subconsumers.emplace_back(input.getFileName(), std::move(consumer));
         return false;
       });
   // For batch mode, the compiler must sometimes swallow diagnostics pertaining
@@ -2430,7 +2430,7 @@ createDispatchingDiagnosticConsumerIfNeeded(
   if (!subconsumers.empty() && inputsAndOutputs.hasMultiplePrimaryInputs()) {
     inputsAndOutputs.forEachNonPrimaryInput(
         [&](const InputFile &input) -> bool {
-          subconsumers.emplace_back(input.file(), nullptr);
+          subconsumers.emplace_back(input.getFileName(), nullptr);
           return false;
         });
   }

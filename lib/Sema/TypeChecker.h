@@ -473,8 +473,6 @@ Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
 void typeCheckASTNode(ASTNode &node, DeclContext *DC,
                       bool LeaveBodyUnchecked = false);
 
-bool typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);
-
 /// Try to apply the function builder transform of the given builder type
 /// to the body of the function.
 ///
@@ -1135,8 +1133,7 @@ void checkTopLevelEffects(TopLevelCodeDecl *D);
 void checkFunctionEffects(AbstractFunctionDecl *D);
 void checkInitializerEffects(Initializer *I, Expr *E);
 void checkEnumElementEffects(EnumElementDecl *D, Expr *expr);
-void checkPropertyWrapperEffects(PatternBindingDecl *binding,
-                                       Expr *expr);
+void checkPropertyWrapperEffects(PatternBindingDecl *binding, Expr *expr);
 void checkFunctionBodyCompilerEvaluable(AbstractFunctionDecl *D);
 
 /// If an expression references 'self.init' or 'super.init' in an
@@ -1391,6 +1388,9 @@ void bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *stmt);
 /// Add notes suggesting the addition of 'async' or '@asyncHandler', as
 /// appropriate, to a diagnostic for a function that isn't an async context.
 void addAsyncNotes(FuncDecl *func);
+
+/// Check actor isolation rules.
+void checkActorIsolation(const Expr *expr, const DeclContext *dc);
 
 } // end namespace swift
 
