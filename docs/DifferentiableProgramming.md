@@ -1340,8 +1340,8 @@ cannot be included as differentiable variables (due to either lacking a
 conformance to `Differentiable` or being a non-`class`-bound `let` property) be
 marked with `@noDerivative`. When a property is not included as a differentiable
 variable and is not marked with `@noDerivative`, the compiler produces a warning
-as asking the user to make the exclusion explicit along with fix-it suggestions
-in IDEs.
+asking the user to make the exclusion explicit along with fix-it suggestions in
+IDEs.
 
 ```swift
 struct Foo<T: Differentiable, U: Differentiable>: @memberwise Differentiable {
@@ -1389,7 +1389,7 @@ Method `move(along:)` will not be synthesized because a default implementation
 already exists.
 
 ```swift
-struct Point<T: Real>: @memberwise Differentiable, AdditiveArithmetic {
+struct Point<T: Real>: @memberwise Differentiable, @memberwise AdditiveArithmetic {
     // `x` and `y` are the "differentiation properties".
     var x, y: T
 
