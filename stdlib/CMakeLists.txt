@@ -29,6 +29,10 @@ option(SWIFT_STDLIB_OS_VERSIONING
     "Build stdlib with availability based on OS versions (Darwin only)."
     TRUE)
 
+option(SWIFT_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING_FUTURE_IMPLEMENTATION
+  "Build Differentation as it would be long term (i.e. no tgmath)"
+  FALSE)
+
 #
 # End of user-configurable options.
 #

@@ -87,7 +87,13 @@ if(SWIFT_BUILD_STDLIB)
   add_subdirectory(SwiftOnoneSupport)
 
   if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
-    add_subdirectory(Differentiation)
+    if(SWIFT_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING_FUTURE_IMPLEMENTATION)
+      # This implementation will quickly evolve, so it does not make sense
+      # to share code with the other implementation
+      add_subdirectory(Differentiation_Future)
+    else()
+      add_subdirectory(Differentiation)
+    endif()
   endif()
 
   if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
