@@ -740,15 +740,18 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
   ImplicitImportInfo imports;
   imports.StdlibKind = Invocation.getImplicitStdlibKind();
 
-  auto pushImport = [&](StringRef moduleStr) {
+  auto pushImport = [&](StringRef moduleStr,
+                        ImportOptions options = ImportOptions()) {
     ImportPath::Builder importPath(Context->getIdentifier(moduleStr));
     UnloadedImportedModule import(importPath.copyTo(*Context),
                                   /*isScoped=*/false);
-    imports.AdditionalUnloadedImports.emplace_back(import, ImportOptions());
+    imports.AdditionalUnloadedImports.emplace_back(import, options);
   };
 
-  for (auto &moduleStr : frontendOpts.getImplicitImportModuleNames()) {
-    pushImport(moduleStr);
+  for (auto &moduleStrAndTestable : frontendOpts.getImplicitImportModuleNames()) {
+    pushImport(moduleStrAndTestable.first,
+               moduleStrAndTestable.second ? ImportFlags::Testable
+                                           : ImportOptions());
   }
 
   if (Invocation.shouldImportSwiftONoneSupport()) {

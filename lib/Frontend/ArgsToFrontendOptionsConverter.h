@@ -40,7 +40,8 @@ private:
   bool computeMainAndSupplementaryOutputFilenames();
   void computeDumpScopeMapLocations();
   void computeHelpOptions();
-  void computeImplicitImportModuleNames();
+  void computeImplicitImportModuleNames(llvm::opt::OptSpecifier id,
+                                        bool isTestable);
   void computeImportObjCHeaderOptions();
   void computeLLVMArgs();
   void computePlaygroundOptions();

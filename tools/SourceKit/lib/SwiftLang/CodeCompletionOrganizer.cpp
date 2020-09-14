@@ -347,9 +347,9 @@ ImportDepth::ImportDepth(ASTContext &context,
   // Imports from -import-name such as Playground auxiliary sources are treated
   // specially by applying import depth 0.
   llvm::StringSet<> auxImports;
-  for (StringRef moduleName :
+  for (const auto &pair :
        invocation.getFrontendOptions().getImplicitImportModuleNames())
-    auxImports.insert(moduleName);
+    auxImports.insert(pair.first);
 
   // Private imports from this module.
   // FIXME: only the private imports from the current source file.
