@@ -2019,9 +2019,10 @@ getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
   case ReadWriteImplKind::Modify:
     return AccessStrategy::getAccessor(AccessorKind::Modify,
                                        /*dispatch*/ false);
-  case ReadWriteImplKind::StoredWithSimpleDidSet:
-  case ReadWriteImplKind::InheritedWithSimpleDidSet:
-    if (storage->requiresOpaqueModifyCoroutine()) {
+  case ReadWriteImplKind::StoredWithDidSet:
+  case ReadWriteImplKind::InheritedWithDidSet:
+    if (storage->requiresOpaqueModifyCoroutine() &&
+        storage->getParsedAccessor(AccessorKind::DidSet)->isSimpleDidSet()) {
       return AccessStrategy::getAccessor(AccessorKind::Modify,
                                          /*dispatch*/ false);
     } else {

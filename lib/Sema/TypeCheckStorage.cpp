@@ -1761,9 +1761,10 @@ synthesizeCoroutineAccessorBody(AccessorDecl *accessor, ASTContext &ctx) {
   // serialized, which prevents them from being able to directly reference
   // didSet/willSet accessors, which are private.
   if (isModify &&
-      (storageReadWriteImpl == ReadWriteImplKind::StoredWithSimpleDidSet ||
-       storageReadWriteImpl == ReadWriteImplKind::InheritedWithSimpleDidSet) &&
-      !accessor->hasForcedStaticDispatch()) {
+      !accessor->hasForcedStaticDispatch() &&
+      (storageReadWriteImpl == ReadWriteImplKind::StoredWithDidSet ||
+       storageReadWriteImpl == ReadWriteImplKind::InheritedWithDidSet) &&
+      storage->getParsedAccessor(AccessorKind::DidSet)->isSimpleDidSet()) {
     return synthesizeModifyCoroutineBodyWithSimpleDidSet(accessor, ctx);
   }
 
@@ -2321,9 +2322,11 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
   }
 
   switch (storage->getReadWriteImpl()) {
-  case ReadWriteImplKind::StoredWithSimpleDidSet:
-  case ReadWriteImplKind::InheritedWithSimpleDidSet:
-    return false;
+  case ReadWriteImplKind::StoredWithDidSet:
+  case ReadWriteImplKind::InheritedWithDidSet:
+    if (storage->getAccessor(AccessorKind::DidSet)->isSimpleDidSet())
+      return false;
+    break;
   default:
     break;
   }
@@ -3078,10 +3081,6 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   bool hasSetter = storage->getParsedAccessor(AccessorKind::Set);
   bool hasModify = storage->getParsedAccessor(AccessorKind::Modify);
   bool hasMutableAddress = storage->getParsedAccessor(AccessorKind::MutableAddress);
-  bool hasSimpleDidSet =
-      hasDidSet && const_cast<AccessorDecl *>(
-                       storage->getParsedAccessor(AccessorKind::DidSet))
-                       ->isSimpleDidSet();
 
   // 'get', 'read', and a non-mutable addressor are all exclusive.
   ReadImplKind readImpl;
@@ -3143,22 +3142,22 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   // Check if we have observers.
   } else if (readImpl == ReadImplKind::Inherited) {
     writeImpl = WriteImplKind::InheritedWithObservers;
-    readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
 
-    if (!hasWillSet && hasSimpleDidSet) {
-      readWriteImpl = ReadWriteImplKind::InheritedWithSimpleDidSet;
-    }
+    if (hasWillSet)
+      readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
+    else
+      readWriteImpl = ReadWriteImplKind::InheritedWithDidSet;
 
   // Otherwise, it's stored.
   } else if (readImpl == ReadImplKind::Stored &&
              !cast<VarDecl>(storage)->isLet()) {
     if (hasWillSet || hasDidSet) {
       writeImpl = WriteImplKind::StoredWithObservers;
-      readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
 
-      if (!hasWillSet && hasSimpleDidSet) {
-        readWriteImpl = ReadWriteImplKind::StoredWithSimpleDidSet;
-      }
+      if (hasWillSet)
+        readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
+      else
+        readWriteImpl = ReadWriteImplKind::StoredWithDidSet;
     } else {
       writeImpl = WriteImplKind::Stored;
       readWriteImpl = ReadWriteImplKind::Stored;

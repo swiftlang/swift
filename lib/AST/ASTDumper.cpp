@@ -286,10 +286,10 @@ StringRef swift::getReadWriteImplKindName(ReadWriteImplKind kind) {
     return "materialize_to_temporary";
   case ReadWriteImplKind::Modify:
     return "modify_coroutine";
-  case ReadWriteImplKind::StoredWithSimpleDidSet:
-    return "stored_simple_didset";
-  case ReadWriteImplKind::InheritedWithSimpleDidSet:
-    return "inherited_simple_didset";
+  case ReadWriteImplKind::StoredWithDidSet:
+    return "stored_with_didset";
+  case ReadWriteImplKind::InheritedWithDidSet:
+    return "inherited_with_didset";
   }
   llvm_unreachable("bad kind");
 }
