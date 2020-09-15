@@ -65,7 +65,7 @@ class TensorFlowSwiftAPIs(product.Product):
                 '-G', 'Ninja',
                 '-D', 'BUILD_SHARED_LIBS=YES',
                 '-D', 'CMAKE_INSTALL_PREFIX={}'.format(
-                    self.install_toolchain_path()),
+                    self.install_toolchain_path(host_target)),
                 '-D', 'CMAKE_MAKE_PROGRAM={}'.format(self.toolchain.ninja),
                 '-D', 'CMAKE_Swift_COMPILER={}'.format(swiftc),
                 # SWIFT_ENABLE_TENSORFLOW
