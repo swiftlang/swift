@@ -77,6 +77,9 @@ documentation, please create a thread on the Swift forums under the
     How to build Swift on Windows using Visual Studio.
   - [WindowsCrossCompile.md](/docs/WindowsCrossCompile.md):
     How to cross compile Swift for Windows on a non-Windows host OS.
+- Building for OpenBSD:
+  - [OpenBSD.md](/docs/OpenBSD.md):
+    Overview of specific steps for building on OpenBSD.
 - [RunningIncludeWhatYouUse.md](/docs/HowToGuides/RunningIncludeWhatYouUse.md):
   Describes how to run [include-what-you-use](https://include-what-you-use.org)
   on the Swift project.
