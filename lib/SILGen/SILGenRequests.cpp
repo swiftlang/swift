@@ -60,7 +60,12 @@ evaluator::DependencySource ASTLoweringRequest::readDependencySource(
   return {dyn_cast<SourceFile>(unit), evaluator::DependencyScope::Cascading};
 }
 
-ArrayRef<FileUnit *> ASTLoweringDescriptor::getFiles() const {
+ArrayRef<FileUnit *> ASTLoweringDescriptor::getFilesToEmit() const {
+  // If we have a specific set of SILDeclRefs to emit, we don't emit any whole
+  // files.
+  if (refsToEmit)
+    return {};
+
   if (auto *mod = context.dyn_cast<ModuleDecl *>())
     return mod->getFiles();
 
@@ -71,10 +76,10 @@ ArrayRef<FileUnit *> ASTLoweringDescriptor::getFiles() const {
 
 SourceFile *ASTLoweringDescriptor::getSourceFileToParse() const {
 #ifndef NDEBUG
-  auto sfCount = llvm::count_if(getFiles(), [](FileUnit *file) {
+  auto sfCount = llvm::count_if(getFilesToEmit(), [](FileUnit *file) {
     return isa<SourceFile>(file);
   });
-  auto silFileCount = llvm::count_if(getFiles(), [](FileUnit *file) {
+  auto silFileCount = llvm::count_if(getFilesToEmit(), [](FileUnit *file) {
     auto *SF = dyn_cast<SourceFile>(file);
     return SF && SF->Kind == SourceFileKind::SIL;
   });
@@ -82,7 +87,7 @@ SourceFile *ASTLoweringDescriptor::getSourceFileToParse() const {
          "Cannot currently mix a .sil file with other SourceFiles");
 #endif
 
-  for (auto *file : getFiles()) {
+  for (auto *file : getFilesToEmit()) {
     // Skip other kinds of files.
     auto *SF = dyn_cast<SourceFile>(file);
     if (!SF)

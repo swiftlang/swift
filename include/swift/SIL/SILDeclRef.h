@@ -277,10 +277,10 @@ struct SILDeclRef {
   SILLinkage getLinkage(ForDefinition_t forDefinition) const;
 
   /// Return the hash code for the SIL declaration.
-  llvm::hash_code getHashCode() const {
-    return llvm::hash_combine(loc.getOpaqueValue(),
-                              static_cast<int>(kind),
-                              isForeign, defaultArgIndex);
+  friend llvm::hash_code hash_value(const SILDeclRef &ref) {
+    return llvm::hash_combine(ref.loc.getOpaqueValue(),
+                              static_cast<int>(ref.kind),
+                              ref.isForeign, ref.defaultArgIndex);
   }
 
   bool operator==(SILDeclRef rhs) const {

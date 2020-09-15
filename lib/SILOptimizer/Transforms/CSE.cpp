@@ -374,7 +374,7 @@ public:
     OperandValueArrayRef Operands(X->getAllOperands());
     return llvm::hash_combine(X->getKind(),
                               X->getLookupType().getPointer(),
-                              X->getMember().getHashCode(),
+                              X->getMember(),
                               X->getConformance(),
                               X->getType(),
                               !X->getTypeDependentOperands().empty(),
