@@ -77,7 +77,7 @@ documentation, please create a thread on the Swift forums under the
     How to build Swift on Windows using Visual Studio.
   - [WindowsCrossCompile.md](/docs/WindowsCrossCompile.md):
     How to cross compile Swift for Windows on a non-Windows host OS.
-- [RunningIncludeWhatYouUse.md](/docs/RunningIncludeWhatYouUse.md):
+- [RunningIncludeWhatYouUse.md](/docs/HowToGuides/RunningIncludeWhatYouUse.md):
   Describes how to run [include-what-you-use](https://include-what-you-use.org)
   on the Swift project.
 
@@ -86,6 +86,8 @@ documentation, please create a thread on the Swift forums under the
 - [ByteTree.md](/docs/ByteTree.md):
   Describes the ByteTree binary format used for serializing syntax trees
   in `libSyntax`.
+- [WebAssembly.md](/docs/WebAssembly.md):
+  Explains some decisions that were made while implementing the WebAssembly target.
 
 ### Compiler and Runtime Subsystems
 
@@ -138,10 +140,11 @@ documentation, please create a thread on the Swift forums under the
 ### Language subsystems
 
 - Swift's Object Model
-  - [LogicalObjects.md]():
+  - [LogicalObjects.md](/docs/LogicalObjects.md):
     Describes the differences between logical and physical objects and
     introduces materialization and writeback.
-  - [MutationModel.rst]() <!--: NOTE: Outdated -->
+  - [MutationModel.rst](/docs/MutationModel.rst): Outdated.
+    <!-- NOTE: Outdated -->
 - [DocumentationComments.md](/docs/DocumentationComments.md):
   Describes the format of Swift's documentation markup, including
   specially-recognized sections.
@@ -174,6 +177,29 @@ documentation, please create a thread on the Swift forums under the
   <!-- NOTE: Outdated -->
 - [Lexicon.md](/docs/Lexicon.md):
   Canonical reference for terminology used throughout the project.
+  
+### ABI
+
+- [GenericSignature.md](/docs/ABI/GenericSignature.md):
+  Describes what generic signatures are and how they are used in the ABI,
+  including the algorithms for minimization and canonicalization.
+- [KeyPaths.md](/docs/ABI/KeyPaths.md):
+  Describes the layout of key path objects (instantiated by the runtime,
+  and therefore not strictly ABI). \
+  **TODO:** The layout of key path patterns (emitted by the compiler,
+  to represent key path literals) isn't documented yet.
+- [Mangling.rst](/docs/ABI/Mangling.rst):
+  Describes the stable mangling scheme, which produces unique symbols for
+  ABI-public declarations.
+- [RegisterUsage.md](/docs/ABI/RegisterUsage.md):
+  Summarizes the register allocation for ARM64 and x86_64 calling conventions,
+  including the context register (self) and error return register.
+- [TypeLayout.rst](/docs/ABI/TypeLayout.rst):
+  Describes the algorithms/strategies for fragile struct and tuple layout;
+  class layout; fragile enum layout; and existential container layout.
+- [TypeMetadata.rst](/docs/ABI/TypeMetadata.rst):
+  Describes the fields, values, and layout of metadata records, which can be
+  used (by reflection and debugger tools) to discover information about types.
 
 ## Recommended Practices
 
@@ -188,7 +214,7 @@ documentation, please create a thread on the Swift forums under the
 - [StdlibAPIGuidelines.rst](/docs/StdlibAPIGuidelines.rst):
   Provides guidelines for designing stdlib APIs.
   <!-- NOTE: Outdated -->
-- [StandardLibraryProgrammersManual](/docs/StandardLibraryProgrammersManual.md):
+- [StandardLibraryProgrammersManual.md](/docs/StandardLibraryProgrammersManual.md):
   Provides guidelines for working code in the stdlib.
 - [OptimizationTips.rst](/docs/OptimizationTips.rst):
   Provides guidelines for writing high-performance Swift code.
@@ -199,7 +225,7 @@ documentation, please create a thread on the Swift forums under the
 
 - [Branches.md](/docs/Branches.md):
   Describes how different branches are setup and what the automerger does.
-- [ContinuousIntegration.md](ContinuousIntegration.md):
+- [ContinuousIntegration.md](/docs/ContinuousIntegration.md):
   Describes the continuous integration setup, including the `@swift_ci` bot.
 
 ## Evolution Documents
@@ -211,9 +237,9 @@ documentation, please create a thread on the Swift forums under the
     Describes the goals and design for ABI stability.
   - [LibraryEvolutionManifesto.md](/docs/LibraryEvolutionManifesto.md):
     Describes the goals and design for Library Evolution.
-- [BuildManifesto.md](BuildManifesto.md):
+- [BuildManifesto.md](/docs/BuildManifesto.md):
   Provides an outline for modularizing the build system for the Swift toolchain.
-- [CppInteroperabilityManifesto.md](CppInteroperabilityManifesto.md):
+- [CppInteroperabilityManifesto.md](/docs/CppInteroperabilityManifesto.md):
   Describes the motivation and design for first-class Swift-C++ interoperability.
 - [DifferentiableProgramming.md](/docs/DifferentiableProgramming.md):
   Outlines a vision and design for first-class differentiable programming in Swift.
@@ -232,10 +258,13 @@ More recent proposals are located in the [apple/swift-evolution][] repository.
 You can see the status of different proposals at
 <https://apple.github.io/swift-evolution/>.
 
-[swift-evolution]: https://github.com/apple/swift-evolution
+[apple/swift-evolution]: https://github.com/apple/swift-evolution
 
 ### Surveys
 
+- [CallingConvention.rst](/docs/ABI/CallingConvention.rst):
+  This whitepaper discusses the Swift calling convention (high-level semantics;
+  ownership transfer; physical representation; function signature lowering).
 - [ErrorHandlingRationale.rst](/docs/ErrorHandlingRationale.rst):
   Surveys error-handling in a variety of languages, and describes the rationale
   behind the design of error handling in Swift.
@@ -247,10 +276,10 @@ You can see the status of different proposals at
 ### Archive
 
 These documents are known to be out-of-date and are superseded by other
-documentation, primarily [The Swift Programming Language (TSPL)][].
+documentation, primarily [The Swift Programming Language][] (TSPL).
 They are preserved mostly for historical interest.
 
-- [AccessControl.rst](/docs/AccessControl.swift)
+- [AccessControl.rst](/docs/AccessControl.rst)
 - [Arrays.rst](/docs/Arrays.rst)
   <!-- Has additional notes on bridging that may be of general interest? -->
 - [Generics.rst](/docs/Generics.rst)
@@ -262,7 +291,7 @@ They are preserved mostly for historical interest.
 
 ## External Resources
 
-External resources are listed in [docs/ExternalResources.md](ExternalResources.md).
+External resources are listed in [ExternalResources.md](/docs/ExternalResources.md).
 These cover a variety of topics,
 such as the design of different aspects of the Swift compiler and runtime
 and contributing to the project more effectively.
@@ -323,9 +352,9 @@ provide greater clarity to contributors wanting to add new documentation.
   `@_hasMissingDesignatedInitializers`. Some of this is covered in
   [TSPL's initialization section][] but that doesn't include newly added
   attributes.
-- [Modules.rst](/docs/Module.rst): for Swift pre-1.0.
+- [Modules.rst](/docs/Modules.rst): for Swift pre-1.0.
 - [Swift3Compatibility.md](/docs/Swift3Compatibility.md):
   Discusses the Swift 3 -> Swift 4 migration.
-- [StoredAndComputedVariables.rst](): for Swift pre-1.0.
+- [StoredAndComputedVariables.rst](/docs/StoredAndComputedVariables.rst): for Swift pre-1.0.
 
 [TSPL's initialization section]: https://docs.swift.org/swift-book/LanguageGuide/Initialization.html

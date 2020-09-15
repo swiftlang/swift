@@ -46,21 +46,6 @@ public func _autorelease(_ x: AnyObject) {
 }
 #endif
 
-/// Invoke `body` with an allocated, but uninitialized memory suitable for a
-/// `String` value.
-///
-/// This function is primarily useful to call various runtime functions
-/// written in C++.
-internal func _withUninitializedString<R>(
-  _ body: (UnsafeMutablePointer<String>) -> R
-) -> (R, String) {
-  let stringPtr = UnsafeMutablePointer<String>.allocate(capacity: 1)
-  let bodyResult = body(stringPtr)
-  let stringResult = stringPtr.move()
-  stringPtr.deallocate()
-  return (bodyResult, stringResult)
-}
-
 // FIXME(ABI)#51 : this API should allow controlling different kinds of
 // qualification separately: qualification with module names and qualification
 // with type names that we are nested in.

@@ -1142,7 +1142,8 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     genericSubInvocation.setSDKPath(SearchPathOpts.SDKPath);
   }
 
-  genericSubInvocation.setInputKind(InputFileKind::SwiftModuleInterface);
+  genericSubInvocation.getFrontendOptions().InputMode
+      = FrontendOptions::ParseInputMode::SwiftModuleInterface;
   if (!SearchPathOpts.RuntimeResourcePath.empty()) {
     genericSubInvocation.setRuntimeResourcePath(SearchPathOpts.RuntimeResourcePath);
   }
