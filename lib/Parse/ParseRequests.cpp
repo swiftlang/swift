@@ -49,15 +49,29 @@ void swift::simple_display(llvm::raw_ostream &out,
 FingerprintAndMembers
 ParseMembersRequest::evaluate(Evaluator &evaluator,
                               IterableDeclContext *idc) const {
-  SourceFile &sf = *idc->getAsGenericContext()->getParentSourceFile();
-  unsigned bufferID = *sf.getBufferID();
+  SourceFile *sf = idc->getAsGenericContext()->getParentSourceFile();
+  ASTContext &ctx = idc->getDecl()->getASTContext();
+  if (!sf) {
+    // If there is no parent source file, this is a deserialized or synthesized
+    // declaration context, in which case `getMembers()` has all of the members.
+    // Filter out the implicitly-generated ones.
+    SmallVector<Decl *, 4> members;
+    for (auto decl : idc->getMembers()) {
+      if (!decl->isImplicit()) {
+        members.push_back(decl);
+      }
+    }
+
+    return FingerprintAndMembers{None, ctx.AllocateCopy(members)};
+  }
+
+  unsigned bufferID = *sf->getBufferID();
 
   // Lexer diaganostics have been emitted during skipping, so we disable lexer's
   // diagnostic engine here.
-  Parser parser(bufferID, sf, /*No Lexer Diags*/nullptr, nullptr, nullptr);
+  Parser parser(bufferID, *sf, /*No Lexer Diags*/nullptr, nullptr, nullptr);
   // Disable libSyntax creation in the delayed parsing.
   parser.SyntaxContext->disable();
-  ASTContext &ctx = idc->getDecl()->getASTContext();
   auto declsAndHash = parser.parseDeclListDelayed(idc);
   FingerprintAndMembers fingerprintAndMembers = {declsAndHash.second,
                                                  declsAndHash.first};

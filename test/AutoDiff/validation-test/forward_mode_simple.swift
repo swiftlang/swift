@@ -1319,352 +1319,85 @@ ForwardModeTests.test("ForceUnwrapping") {
   expectEqual(5, forceUnwrap(Float(2)))
 }
 
-//===----------------------------------------------------------------------===//
-// Array methods from ArrayDifferentiation.swift
-//===----------------------------------------------------------------------===//
-
-typealias FloatArrayTan = Array<Float>.TangentVector
-
-ForwardModeTests.test("Array.+") {
-  func sumFirstThreeConcatenating(_ a: [Float], _ b: [Float]) -> Float {
-    let c = a + b
-    return c[0] + c[1] + c[2]
+ForwardModeTests.test("NonVariedResult") {
+  @differentiable(wrt: x)
+  func nonWrtInoutParam<T: Differentiable>(_ x: T, _ y: inout T) {
+    y = x
   }
 
-  expectEqual(3, differential(at: [0, 0], [0, 0], in: sumFirstThreeConcatenating)(.init([1, 1]), .init([1, 1])))
-  expectEqual(0, differential(at: [0, 0], [0, 0], in: sumFirstThreeConcatenating)(.init([0, 0]), .init([0, 1])))
-  expectEqual(1, differential(at: [0, 0], [0, 0], in: sumFirstThreeConcatenating)(.init([0, 1]), .init([0, 1])))
-  expectEqual(1, differential(at: [0, 0], [0, 0], in: sumFirstThreeConcatenating)(.init([1, 0]), .init([0, 1])))
-  expectEqual(1, differential(at: [0, 0], [0, 0], in: sumFirstThreeConcatenating)(.init([0, 0]), .init([1, 1])))
-  expectEqual(2, differential(at: [0, 0], [0, 0], in: sumFirstThreeConcatenating)(.init([1, 1]), .init([0, 1])))
-
-  expectEqual(
-    3,
-    differential(at: [0, 0, 0, 0], [0, 0], in: sumFirstThreeConcatenating)(.init([1, 1, 1, 1]), .init([1, 1])))
-  expectEqual(
-    3,
-    differential(at: [0, 0, 0, 0], [0, 0], in: sumFirstThreeConcatenating)(.init([1, 1, 1, 0]), .init([0, 0])))
-  
-  expectEqual(
-    3,
-    differential(at: [], [0, 0, 0, 0], in: sumFirstThreeConcatenating)(.init([]), .init([1, 1, 1, 1])))
-  expectEqual(
-    0,
-    differential(at: [], [0, 0, 0, 0], in: sumFirstThreeConcatenating)(.init([]), .init([0, 0, 0, 1])))
-}
-
-ForwardModeTests.test("Array.init(repeating:count:)") {
   @differentiable
-  func repeating(_ x: Float) -> [Float] {
-    Array(repeating: x, count: 10)
+  func wrtInoutParam<T: Differentiable>(_ x: T, _ y: inout T) {
+    y = x
   }
-  expectEqual(Float(10), derivative(at: .zero) { x in
-    repeating(x).differentiableReduce(0, {$0 + $1})
-  })
-  expectEqual(Float(20), differential(at: .zero, in: { x in
-    repeating(x).differentiableReduce(0, {$0 + $1})
-  })(2))
-}
 
-ForwardModeTests.test("Array.DifferentiableView.init") {
+  @differentiable(wrt: x)
+  func nonWrtInoutParamNonVaried<T: Differentiable>(_ x: T, _ y: inout T) {}
+
+  @differentiable(wrt: x)
+  func wrtInoutParamNonVaried<T: Differentiable>(_ x: T, _ y: inout T) {}
+
   @differentiable
-  func constructView(_ x: [Float]) -> Array<Float>.DifferentiableView {
-    return Array<Float>.DifferentiableView(x)
+  func variedResultTracked(_ x: Tracked<Float>) -> Tracked<Float> {
+    var result: Tracked<Float> = 0
+    nonWrtInoutParam(x, &result)
+    return result
   }
 
-  let forward = differential(at: [5, 6, 7, 8], in: constructView)
-  expectEqual(
-    FloatArrayTan([1, 2, 3, 4]),
-    forward(FloatArrayTan([1, 2, 3, 4])))
-}
-
-ForwardModeTests.test("Array.DifferentiableView.base") {
   @differentiable
-  func accessBase(_ x: Array<Float>.DifferentiableView) -> [Float] {
-    return x.base
+  func variedResultTracked2(_ x: Tracked<Float>) -> Tracked<Float> {
+    var result: Tracked<Float> = 0
+    wrtInoutParam(x, &result)
+    return result
   }
 
-  let forward = differential(
-    at: Array<Float>.DifferentiableView([5, 6, 7, 8]),
-    in: accessBase)
-  expectEqual(
-    FloatArrayTan([1, 2, 3, 4]),
-    forward(FloatArrayTan([1, 2, 3, 4])))
+  @differentiable
+  func nonVariedResultTracked(_ x: Tracked<Float>) -> Tracked<Float> {
+    var result: Tracked<Float> = 0
+    nonWrtInoutParamNonVaried(x, &result)
+    return result
+  }
+
+  @differentiable
+  func nonVariedResultTracked2(_ x: Tracked<Float>) -> Tracked<Float> {
+    // expected-warning @+1 {{variable 'result' was never mutated}}
+    var result: Tracked<Float> = 0
+    return result
+  }
+
+  @differentiable
+  func nonVariedResultTracked3(_ x: Tracked<Float>) -> Tracked<Float> {
+    return 0
+  }
+
+  @differentiable
+  func nonVariedResultTracked4(_ x: Tracked<Float>) -> Tracked<Float> {
+    var result: Tracked<Float> = 0
+    wrtInoutParamNonVaried(x, &result)
+    return result
+  }
 }
 
-ForwardModeTests.test("Array.differentiableMap") {
-  let x: [Float] = [1, 2, 3]
-  let tan = Array<Float>.TangentVector([1, 1, 1])
+ForwardModeTests.test("ApplyNonActiveIndirectResult") {
+  func identity<T: Differentiable>(_ x: T) -> T { x }
 
-  func multiplyMap(_ a: [Float]) -> [Float] {
-    return a.differentiableMap({ x in 3 * x })
+  @differentiable
+  func applyNonactiveArgumentActiveIndirectResult(_ x: Tracked<Float>) -> Tracked<Float> {
+    var y = identity(0 as Tracked<Float>)
+    y = x
+    return y
   }
-  expectEqual([3, 3, 3], differential(at: x, in: multiplyMap)(tan))
-
-  func squareMap(_ a: [Float]) -> [Float] {
-    return a.differentiableMap({ x in x * x })
-  }
-  expectEqual([2, 4, 6], differential(at: x, in: squareMap)(tan))
+  expectEqual(1.0, derivative(at: 2, in: applyNonactiveArgumentActiveIndirectResult))
 }
 
-ForwardModeTests.test("Array.differentiableReduce") {
-  let x: [Float] = [1, 2, 3]
-  let tan = Array<Float>.TangentVector([1, 1, 1])
-
-  func sumReduce(_ a: [Float]) -> Float {
-    return a.differentiableReduce(0, { $0 + $1 })
-  }
-  expectEqual(1 + 1 + 1, differential(at: x, in: sumReduce)(tan))
-
-  func productReduce(_ a: [Float]) -> Float {
-    return a.differentiableReduce(1, { $0 * $1 })
-  }
-  expectEqual(x[1] * x[2] + x[0] * x[2] + x[0] * x[1], differential(at: x, in: productReduce)(tan))
-
-  func sumOfSquaresReduce(_ a: [Float]) -> Float {
-    return a.differentiableReduce(0, { $0 + $1 * $1 })
-  }
-  expectEqual(2 * x[0] + 2 * x[1] + 2 * x[2], differential(at: x, in: sumOfSquaresReduce)(tan))
-}
-
-//===----------------------------------------------------------------------===//
-// SIMD methods from SIMDDifferentiation.swift.gyb
-// Tests replicate reverse mode tests from test/AutoDiff/stdlib/simd.swift
-//===----------------------------------------------------------------------===//
-
-ForwardModeTests.test("init(repeating:)") {
-  func foo1(x: Float) -> SIMD4<Float> {
-    return SIMD4<Float>(repeating: 2 * x)
-  }
-  let (val1, df1) = valueWithDifferential(at: 5, in: foo1)
-  expectEqual(SIMD4<Float>(10, 10, 10, 10), val1)
-  expectEqual(SIMD4<Float>(6, 6, 6, 6), df1(3))
-}
-
-ForwardModeTests.test("Identity") {
-  let a = SIMD4<Float>(1, 2, 3, 4)
-  let g = SIMD4<Float>(1, 1, 1, 1)
-
-  func foo1(x: SIMD4<Float>) -> SIMD4<Float> {
+ForwardModeTests.test("SR-13530") {
+  // SR-13530: Test "leaked owned value" ownership verification failure related
+  // to differential generation for `copy_value` instruction.
+  @differentiable
+  func SR_13530(_ x: NonresilientTracked<Float>) -> NonresilientTracked<Float> {
+    precondition(x >= 0)
     return x
   }
-  let (val1, df1) = valueWithDifferential(at: a, in: foo1)
-  expectEqual(a, val1)
-  expectEqual(g, df1(.init(g)))
-}
-
-ForwardModeTests.test("Negate") {
-  let a = SIMD4<Float>(1, 2, 3, 4)
-  let g = SIMD4<Float>(1, 1, 1, 1)
-
-  func foo1(x: SIMD4<Float>) -> SIMD4<Float> {
-    return -x
-  }
-  let (val1, df1) = valueWithDifferential(at: a, in: foo1)
-  expectEqual(-a, val1)
-  expectEqual(-g, df1(.init(g)))
-}
-
-ForwardModeTests.test("subscript") {
-  let a = SIMD4<Float>(1, 2, 3, 4)
-
-  func foo1(x: SIMD4<Float>) -> Float {
-    return x[3]
-  }
-
-  let (val1, df1) = valueWithDifferential(at: a, in: foo1)
-  expectEqual(4, val1)
-  expectEqual(4, df1(a))
-}
-
-ForwardModeTests.test("Addition") {
-  let a = SIMD4<Float>(1, 2, 3, 4)
-  let g = SIMD4<Float>(1, 1, 1, 1)
-
-  // SIMD + SIMD
-  func foo1(x: SIMD4<Float>, y: SIMD4<Float>) -> SIMD4<Float> {
-    return x + y
-  }
-  let (val1, df1) = valueWithDifferential(at: a, a, in: foo1)
-  expectEqual(SIMD4<Float>(2, 4, 6, 8), val1)
-  expectEqual(a + g, df1(a, g))
-
-  // SIMD + Scalar
-  func foo2(x: SIMD4<Float>, y: Float) -> SIMD4<Float> {
-    return x + y
-  }
-  let (val2, df2) = valueWithDifferential(at: a, 5, in: foo2)
-  expectEqual(SIMD4<Float>(6, 7, 8, 9), val2)
-  expectEqual(g + 1, df2(g, 1))
-
-  // Scalar + SIMD
-  func foo3(x: SIMD4<Float>, y: Float) -> SIMD4<Float> {
-    return y + x
-  }
-  let (val3, df3) = valueWithDifferential(at: a, 5, in: foo3)
-  expectEqual(SIMD4<Float>(6, 7, 8, 9), val3)
-  expectEqual(2 + g, df3(g, 2))
-}
-
-ForwardModeTests.test("Subtraction") {
-  let a = SIMD4<Float>(1, 2, 3, 4)
-  let g = SIMD4<Float>(1, 1, 1, 1)
-
-  // SIMD - SIMD
-  func foo1(x: SIMD4<Float>, y: SIMD4<Float>) -> SIMD4<Float> {
-    return x - y
-  }
-  let (val1, df1) = valueWithDifferential(at: a, a, in: foo1)
-  expectEqual(SIMD4<Float>(0, 0, 0, 0), val1)
-  expectEqual(g - a, df1(g, a))
-
-  // SIMD - Scalar
-  func foo2(x: SIMD4<Float>, y: Float) -> SIMD4<Float> {
-    return x - y
-  }
-  let (val2, df2) = valueWithDifferential(at: a, 5, in: foo2)
-  expectEqual(SIMD4<Float>(-4, -3, -2, -1), val2)
-  expectEqual(g - 1, df2(g, 1))
-
-  // Scalar - SIMD
-  func foo3(x: SIMD4<Float>, y: Float) -> SIMD4<Float> {
-    return y - x
-  }
-  let (val3, df3) = valueWithDifferential(at: a, 5, in: foo3)
-  expectEqual(SIMD4<Float>(4, 3, 2, 1), val3)
-  expectEqual(2 - g, df3(g, 2))
-}
-
-ForwardModeTests.test("Multiplication") {
-  let a = SIMD4<Float>(1, 2, 3, 4)
-  let a2 = SIMD4<Float>(4, 3, 2, 1)
-  let g = SIMD4<Float>(1, 1, 1, 1)
-  let g2 = SIMD4<Float>(0, 2, 1, 3)
-
-  // SIMD * SIMD
-  func foo1(x: SIMD4<Float>, y: SIMD4<Float>) -> SIMD4<Float> {
-    return x * y
-  }
-  let (val1, df1) = valueWithDifferential(at: a, a2, in: foo1)
-  expectEqual(a * a2, val1)
-  expectEqual(a * g2 + g * a2, df1(g, g2))
-
-  // SIMD * Scalar
-  func foo2(x: SIMD4<Float>, y: Float) -> SIMD4<Float> {
-    return x * y
-  }
-  let (val2, df2) = valueWithDifferential(at: a, 5, in: foo2)
-  expectEqual(a * 5, val2)
-  expectEqual(a * 2 + g * 5, df2(g, 2))
-
-  // Scalar * SIMD
-  func foo3(x: SIMD4<Float>, y: Float) -> SIMD4<Float> {
-    return y * x
-  }
-  let (val3, df3) = valueWithDifferential(at: a, 5, in: foo3)
-  expectEqual(a * 5, val3)
-  expectEqual(a * 3 + g * 5, df3(g, 3))
-}
-
-ForwardModeTests.test("Division") {
-  let a = SIMD4<Float>(1, 2, 3, 4)
-  let g = SIMD4<Float>(1, 1, 1, 1)
-
-  // SIMD / SIMD
-  func foo1(x: SIMD4<Float>, y: SIMD4<Float>) -> SIMD4<Float> {
-    return x / y
-  }
-  let (val1, df1) = valueWithDifferential(at: a, a, in: foo1)
-  expectEqual(a / a, val1)
-  expectEqual((g * a - a * g) / (a * a)/* == 0 */, df1(g, g))
-
-  // SIMD / Scalar
-  func foo2(x: SIMD4<Float>, y: Float) -> SIMD4<Float> {
-    return x / y
-  }
-  let (val2, df2) = valueWithDifferential(at: a, 5, in: foo2)
-  expectEqual(a / 5, val2)
-  expectEqual((g * 5 - a * 2) / (5 * 5), df2(g, 2))
-
-  // Scalar / SIMD
-  func foo3(x: Float, y: SIMD4<Float>) -> SIMD4<Float> {
-    return x / y
-  }
-  let (val3, df3) = valueWithDifferential(at: 5, a, in: foo3)
-  expectEqual(5 / a, val3)
-  expectEqual((3 * a - 5 * g) / (a * a), df3(3, g))
-}
-
-ForwardModeTests.test("Generics") {
-  let a = SIMD3<Double>(1, 2, 3)
-  let g = SIMD3<Double>(1, 1, 1)
-
-  // FIXME(SR-13210): Fix forward-mode SIL verification error.
-  /*
-  func testInit<Scalar, SIMDType: SIMD>(x: Scalar) -> SIMDType
-    where SIMDType.Scalar == Scalar,
-          SIMDType : Differentiable,
-          Scalar : BinaryFloatingPoint & Differentiable,
-          SIMDType.TangentVector == SIMDType,
-          Scalar.TangentVector == Scalar {
-    return SIMDType.init(repeating: x)
-  }
-  func simd3Init(x: Double) -> SIMD3<Double> { testInit(x: x) }
-  let (val1, df1) = valueWithDifferential(at: 10, in: simd3Init)
-  expectEqual(SIMD3<Double>(10, 10, 10), val1)
-  expectEqual(SIMD3<Double>(5, 5, 5), df1(5))
-  */
-
-  // SIMDType + SIMDType
-  func testAddition<Scalar, SIMDType: SIMD>(lhs: SIMDType, rhs: SIMDType)
-    -> SIMDType
-    where SIMDType.Scalar == Scalar,
-          SIMDType : Differentiable,
-          SIMDType.TangentVector : SIMD,
-          Scalar : BinaryFloatingPoint,
-          SIMDType.TangentVector.Scalar : BinaryFloatingPoint {
-    return lhs + rhs
-  }
-  func simd3Add(lhs: SIMD3<Double>, rhs: SIMD3<Double>) -> SIMD3<Double> {
-    return testAddition(lhs: lhs, rhs: rhs)
-  }
-  let (val2, df2) = valueWithDifferential(at: a, a, in: simd3Add)
-  expectEqual(SIMD3<Double>(2, 4, 6), val2)
-  expectEqual(g + a, df2(g, a))
-
-  // Scalar - SIMDType
-  func testSubtraction<Scalar, SIMDType: SIMD>(lhs: Scalar, rhs: SIMDType)
-    -> SIMDType
-    where SIMDType.Scalar == Scalar,
-          SIMDType : Differentiable,
-          Scalar : BinaryFloatingPoint & Differentiable,
-          SIMDType.TangentVector == SIMDType,
-          Scalar.TangentVector == Scalar {
-    return lhs - rhs
-  }
-  func simd3Subtract(lhs: Double, rhs: SIMD3<Double>) -> SIMD3<Double> {
-    return testSubtraction(lhs: lhs, rhs: rhs)
-  }
-  let (val3, df3) = valueWithDifferential(at: 5, a, in: simd3Subtract)
-  expectEqual(SIMD3<Double>(4, 3, 2), val3)
-  expectEqual(2 - g, df3(2, g))
-
-  // SIMDType * Scalar
-  func testMultipication<Scalar, SIMDType: SIMD>(lhs: SIMDType, rhs: Scalar)
-    -> SIMDType
-    where SIMDType.Scalar == Scalar,
-      SIMDType : Differentiable,
-      Scalar : BinaryFloatingPoint & Differentiable,
-      SIMDType.TangentVector == SIMDType,
-      Scalar.TangentVector == Scalar {
-    return lhs * rhs
-  }
-  func simd3Multiply(lhs: SIMD3<Double>, rhs: Double) -> SIMD3<Double> {
-    return testMultipication(lhs: lhs, rhs: rhs)
-  }
-  let (val4, df4) = valueWithDifferential(at: a, 5, in: simd3Multiply)
-  expectEqual(SIMD3<Double>(5, 10, 15), val4)
-  expectEqual(a * 3 + g * 5 , df4(g, 3))
+  expectEqual(1, derivative(at: 2, in: SR_13530))
 }
 
 runAllTests()

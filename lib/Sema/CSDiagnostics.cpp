@@ -165,7 +165,7 @@ Type FailureDiagnostic::restoreGenericParameters(
 bool FailureDiagnostic::conformsToKnownProtocol(
     Type type, KnownProtocolKind protocol) const {
   auto &cs = getConstraintSystem();
-  return constraints::conformsToKnownProtocol(cs, type, protocol);
+  return constraints::conformsToKnownProtocol(cs.DC, type, protocol);
 }
 
 Type RequirementFailure::getOwnerType() const {
@@ -645,7 +645,7 @@ Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
 
 void GenericArgumentsMismatchFailure::emitNoteForMismatch(int position) {
   auto *locator = getLocator();
-  // Since there could be implicit conversions assoicated with argument
+  // Since there could be implicit conversions associated with argument
   // to parameter conversions, let's use parameter type as a source of
   // generic parameter information.
   auto paramSourceTy =
@@ -1049,6 +1049,8 @@ SourceRange MemberAccessOnOptionalBaseFailure::getSourceRange() const {
     if (componentPathElt->getIndex() == 0) {
       if (auto rootType = keyPathExpr->getRootType()) {
         return rootType->getSourceRange();
+      } else {
+        return keyPathExpr->getComponents().front().getLoc();
       }
     } else {
       auto componentIdx = componentPathElt->getIndex() - 1;
@@ -3171,7 +3173,7 @@ bool MissingCallFailure::diagnoseAsError() {
 }
 
 bool ExtraneousPropertyWrapperUnwrapFailure::diagnoseAsError() {
-  auto newPrefix = usingStorageWrapper() ? "$" : "_";
+  auto newPrefix = usingProjection() ? "$" : "_";
 
   if (auto *member = getReferencedMember()) {
     emitDiagnostic(diag::incorrect_property_wrapper_reference_member,

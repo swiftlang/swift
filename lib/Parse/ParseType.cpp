@@ -624,19 +624,19 @@ ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
 
   auto result = parseType(MessageID);
 
-  if (!result.isParseError() && Tok.is(tok::r_square)) {
+  if (!result.isParseErrorOrHasCompletion() && Tok.is(tok::r_square)) {
     auto diag = diagnose(Tok, diag::extra_rbracket);
     diag.fixItInsert(result.get()->getStartLoc(), getTokenText(tok::l_square));
     consumeToken();
     return makeParserErrorResult(new (Context)
                                      ErrorTypeRepr(getTypeErrorLoc()));
-  } else if (!result.isParseError() && Tok.is(tok::colon)) {
+  } else if (!result.isParseErrorOrHasCompletion() && Tok.is(tok::colon)) {
     auto colonTok = consumeToken();
     auto secondType = parseType(diag::expected_dictionary_value_type);
 
     auto diag = diagnose(colonTok, diag::extra_colon);
     diag.fixItInsert(result.get()->getStartLoc(), getTokenText(tok::l_square));
-    if (!secondType.isParseError()) {
+    if (!secondType.isParseErrorOrHasCompletion()) {
       if (Tok.is(tok::r_square)) {
         consumeToken();
       } else {
@@ -750,7 +750,7 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
       SmallVector<TypeRepr*, 8> GenericArgs;
       if (startsWithLess(Tok)) {
         auto genericArgsStatus = parseGenericArguments(GenericArgs, LAngle, RAngle);
-        if (genericArgsStatus.isError())
+        if (genericArgsStatus.isErrorOrHasCompletion())
           return genericArgsStatus;
       }
       EndLoc = Loc.getEndLoc();
@@ -771,7 +771,7 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
     // unless <anything> is 'Type'.
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix))) {
       if (peekToken().is(tok::code_complete)) {
-        Status.setHasCodeCompletion();
+        Status.setHasCodeCompletionAndIsError();
         break;
       }
       if (!peekToken().isContextualKeyword("Type")
@@ -793,7 +793,7 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
       }
     } else if (Tok.is(tok::code_complete)) {
       if (!Tok.isAtStartOfLine())
-        Status.setHasCodeCompletion();
+        Status.setHasCodeCompletionAndIsError();
       break;
     }
     break;
@@ -983,7 +983,7 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
   if (startsWithGreater(Tok)) {
     RAngleLoc = consumeStartingGreater();
   } else {
-    if (Status.isSuccess()) {
+    if (Status.isSuccess() && !Status.hasCodeCompletion()) {
       diagnose(Tok, diag::expected_rangle_protocol);
       diagnose(LAngleLoc, diag::opening_angle);
       Status.setIsParseError();
@@ -996,7 +996,7 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
   auto composition = CompositionTypeRepr::create(
     Context, Protocols, ProtocolLoc, {LAngleLoc, RAngleLoc});
 
-  if (Status.isSuccess()) {
+  if (Status.isSuccess() && !Status.hasCodeCompletion()) {
     // Only if we have complete protocol<...> construct, diagnose deprecated.
     SmallString<32> replacement;
     if (Protocols.empty()) {
@@ -1323,7 +1323,7 @@ SyntaxParserResult<ParsedTypeSyntax, TypeRepr> Parser::parseTypeCollection() {
     return Status;
 
   // If we couldn't parse anything for one of the types, propagate the error.
-  if (Status.isError())
+  if (Status.isErrorOrHasCompletion())
     return makeParserError();
 
   TypeRepr *TyR;

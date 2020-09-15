@@ -338,7 +338,8 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   return result;
 }
 
-bool TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl) {
+TypeChecker::UnsupportedMemberTypeAccessKind
+TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl) {
   // We don't allow lookups of a non-generic typealias of an unbound
   // generic type, because we have no way to model such a type in the
   // AST.
@@ -346,10 +347,7 @@ bool TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl) {
   // For generic typealiases, the typealias itself has an unbound
   // generic form whose parent type can be another unbound generic
   // type.
-  //
-  // FIXME: Could lift this restriction once we have sugared
-  // "member types".
-  if (type->is<UnboundGenericType>()) {
+  if (type->hasUnboundGenericType()) {
     // Generic typealiases can be accessed with an unbound generic
     // base, since we represent the member type as an unbound generic
     // type.
@@ -359,12 +357,12 @@ bool TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl) {
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
       if (!aliasDecl->isGeneric() &&
           aliasDecl->getUnderlyingType()->hasTypeParameter()) {
-        return true;
+        return UnsupportedMemberTypeAccessKind::TypeAliasOfUnboundGeneric;
       }
     }
 
     if (isa<AssociatedTypeDecl>(typeDecl))
-      return true;
+      return UnsupportedMemberTypeAccessKind::AssociatedTypeOfUnboundGeneric;
   }
 
   if (type->isExistentialType() &&
@@ -374,15 +372,13 @@ bool TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl) {
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
       if (aliasDecl->getUnderlyingType()->getCanonicalType()
           ->hasTypeParameter())
-        return true;
-    } else {
-      // Don't allow lookups of other nested types of an existential type,
-      // because there is no way to represent such types.
-      return true;
+        return UnsupportedMemberTypeAccessKind::TypeAliasOfExistential;
+    } else if (isa<AssociatedTypeDecl>(typeDecl)) {
+      return UnsupportedMemberTypeAccessKind::AssociatedTypeOfExistential;
     }
   }
 
-  return false;
+  return UnsupportedMemberTypeAccessKind::None;
 }
 
 LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
@@ -419,7 +415,8 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       continue;
     }
 
-    if (isUnsupportedMemberTypeAccess(type, typeDecl)) {
+    if (isUnsupportedMemberTypeAccess(type, typeDecl)
+          != TypeChecker::UnsupportedMemberTypeAccessKind::None) {
       auto memberType = typeDecl->getDeclaredInterfaceType();
 
       // Add the type to the result set, so that we can diagnose the

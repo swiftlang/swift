@@ -27,7 +27,38 @@ func invalidVariadic(_ e: NonExistentType) { // expected-error {{cannot find typ
   { (e: ExtraCrispy...) in }() // expected-error {{cannot find type 'ExtraCrispy' in scope}}
 }
 
-func twoVariadics(_ a: Int..., b: Int...) { } // expected-error{{only a single variadic parameter '...' is permitted}} {{38-41=}}
+func twoVariadics(_ a: Int..., b: Int...) { }
+func unlabeledFollowingVariadic(_ a: Int..., _ b: Int) { } // expected-error {{a parameter following a variadic parameter requires a label}}
+func unlabeledVariadicFollowingVariadic(_ a: Int..., _ b: Int...) { } // expected-error {{a parameter following a variadic parameter requires a label}}
+func unlabeledFollowingTwoVariadics(_ a: Int..., b: Int..., _ c: Int) { } // expected-error {{a parameter following a variadic parameter requires a label}}
+func splitVariadics(_ a: Int..., b: Int, _ c: String...) { }
+func splitByDefaultArgVariadics(_ a: Int..., b: Int = 0, _ c: String...) { }
+
+struct HasSubscripts {
+  subscript(a: Int...) -> Void { () }
+  subscript(a: Int..., b b: Int...) -> Void { () }
+  subscript(a: Int..., b: Int...) -> Void { () } // expected-error {{a parameter following a variadic parameter requires a label}}
+  subscript(a: Int..., b: Int) -> Void { () } // expected-error {{a parameter following a variadic parameter requires a label}}
+  subscript(a: Int..., b b: Int..., c c: Int) -> Void { () }
+  subscript(a: Int..., b b: Int..., c: Int) -> Void { () } // expected-error {{a parameter following a variadic parameter requires a label}}
+  subscript(a: Int..., c c: Int = 0, b: Int...) -> Void { () }
+  subscript(a: Int..., b: String = "hello, world!") -> Bool { false } // expected-error {{a parameter following a variadic parameter requires a label}}
+}
+
+struct HasInitializers {
+  init(a: Int...) {}
+  init(a: Int..., b: Int...) {}
+  init(a: Int..., _ b: Int...) {} // expected-error {{a parameter following a variadic parameter requires a label}}
+  init(a: Int..., c: Int = 0, _ b: Int...) {}
+}
+
+let closure = {(x: Int..., y: Int...) in } // expected-error {{no parameters may follow a variadic parameter in a closure}}
+let closure2 = {(x: Int..., y: Int) in } // expected-error {{no parameters may follow a variadic parameter in a closure}}
+let closure3 = {(x: Int..., y: Int, z: Int...) in } // expected-error {{no parameters may follow a variadic parameter in a closure}}
+let closure4 = {(x: Int...) in }
+let closure5 = {(x: Int, y: Int...) in }
+let closure6 = {(x: Int..., y z: Int) in } // expected-error {{closure cannot have keyword arguments}}
+// expected-error@-1 {{no parameters may follow a variadic parameter in a closure}}
 
 // rdar://22056861
 func f5(_ list: Any..., end: String = "") {}

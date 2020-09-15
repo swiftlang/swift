@@ -2980,6 +2980,70 @@ bb3:
   br bb2(%z : $Builtin.Int1)
 }
 
+// CHECK-LABEL: sil @trivial_checked_cast_addr_br : $@convention(thin) (@guaranteed Int, @guaranteed Int) -> @owned Int
+// CHECK:   [[SRC:%.*]] = alloc_stack $Int
+// CHECK:   store %0 to [[SRC]]
+// CHECK:   [[DST:%.*]] = alloc_stack $Int
+// CHECK:   [[LD1:%.*]] = load [[SRC]]
+// CHECK:   store [[LD1]] to [[DST]]
+// CHECK:   [[LD2:%.*]] = load [[DST]]
+// CHECK:   return [[LD2]]
+// CHECK: } // end sil function 'trivial_checked_cast_addr_br'
+sil @trivial_checked_cast_addr_br : $@convention(thin) (@guaranteed Int, @guaranteed Int) -> @owned Int {
+bb0(%0 : $Int, %1 : $Int):
+  %6 = alloc_stack $Int
+  store %0 to %6 : $*Int
+  %8 = alloc_stack $Int
+  checked_cast_addr_br copy_on_success Int in %6 : $*Int to Int in %8 : $*Int, bb1, bb2
+
+bb1:
+  %10 = load %8 : $*Int
+  dealloc_stack %8 : $*Int
+  br bb3(%10 : $Int)
+
+bb2:
+  retain_value %1: $Int
+  dealloc_stack %8 : $*Int
+  br bb3(%1 : $Int)
+
+bb3(%11 : $Int):
+  dealloc_stack %6 : $*Int
+  return %11 : $Int
+}
+
+// CHECK-LABEL: sil @non_trivial_checked_cast_addr_br : $@convention(thin) (@guaranteed String, @guaranteed String) -> @owned String
+// CHECK:   [[SRC:%.*]] = alloc_stack $String
+// CHECK:   store %0 to [[SRC]]
+// CHECK:   [[DST:%.*]] = alloc_stack $String
+// CHECK:   [[TEMP:%.*]] = alloc_stack $String
+// CHECK:   copy_addr [[SRC]] to [initialization] [[TEMP]]
+// CHECK:   [[LD1:%.*]] = load [[TEMP]]
+// CHECK:   store [[LD1]] to [[DST]]
+// CHECK:   [[LD2:%.*]] = load [[DST]]
+// CHECK:   return [[LD2]]
+// CHECK: } // end sil function 'non_trivial_checked_cast_addr_br'
+sil @non_trivial_checked_cast_addr_br : $@convention(thin) (@guaranteed String, @guaranteed String) -> @owned String {
+bb0(%0 : $String, %1 : $String):
+  %6 = alloc_stack $String
+  store %0 to %6 : $*String
+  %8 = alloc_stack $String
+  checked_cast_addr_br copy_on_success String in %6 : $*String to String in %8 : $*String, bb1, bb2
+
+bb1:
+  %10 = load %8 : $*String
+  dealloc_stack %8 : $*String
+  br bb3(%10 : $String)
+
+bb2:
+  retain_value %1: $String
+  dealloc_stack %8 : $*String
+  br bb3(%1 : $String)
+
+bb3(%11 : $String):
+  dealloc_stack %6 : $*String
+  return %11 : $String
+}
+
 // CHECK-LABEL: sil @dont_hang
 // CHECK:      bb6:
 // CHECK:        integer_literal $Builtin.Int64, 1

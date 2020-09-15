@@ -39,9 +39,6 @@ class FrontendOptions {
 public:
   FrontendInputsAndOutputs InputsAndOutputs;
 
-  /// The kind of input on which the frontend should operate.
-  InputFileKind InputKind = InputFileKind::Swift;
-
   void forAllOutputPaths(const InputFile &input,
                          llvm::function_ref<void(StringRef)> fn) const;
 
@@ -142,6 +139,14 @@ public:
 
   /// Indicates the action the user requested that the frontend perform.
   ActionType RequestedAction = ActionType::NoneAction;
+
+  enum class ParseInputMode {
+    Swift,
+    SwiftLibrary,
+    SwiftModuleInterface,
+    SIL,
+  };
+  ParseInputMode InputMode = ParseInputMode::Swift;
 
   /// Indicates that the input(s) should be parsed as the Swift stdlib.
   bool ParseStdlib = false;
@@ -304,6 +309,9 @@ public:
   /// \return true if the given action requires input files to be provided.
   static bool doesActionRequireInputs(ActionType action);
 
+  /// \return true if the given action requires input files to be provided.
+  static bool doesActionPerformEndOfPipelineActions(ActionType action);
+
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
   llvm::hash_code getPCHHashComponents() const {
@@ -313,8 +321,8 @@ public:
   StringRef determineFallbackModuleName() const;
 
   bool isCompilingExactlyOneSwiftFile() const {
-    return InputKind == InputFileKind::Swift &&
-           InputsAndOutputs.hasSingleInput();
+    return InputsAndOutputs.hasSingleInput() &&
+           InputMode == ParseInputMode::Swift;
   }
 
   const PrimarySpecificPaths &
@@ -340,6 +348,7 @@ private:
   static bool canActionEmitLoadedModuleTrace(ActionType);
   static bool canActionEmitModule(ActionType);
   static bool canActionEmitModuleDoc(ActionType);
+  static bool canActionEmitModuleSummary(ActionType);
   static bool canActionEmitInterface(ActionType);
 
 public:

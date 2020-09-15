@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import traceback
+from shutil import copyfile
 
 BARE_INTERFACE_SEARCH_PATHS = [
     "usr/lib/swift",
@@ -362,6 +363,16 @@ def getSDKVersion(sdkroot):
     fatal("Failed to get SDK version from: " + settingPath)
 
 
+def copySystemVersionFile(sdkroot, output):
+    sysInfoPath = os.path.join(sdkroot,
+                               'System/Library/CoreServices/SystemVersion.plist')
+    destInfoPath = os.path.join(output, 'SystemVersion.plist')
+    try:
+        copyfile(sysInfoPath, destInfoPath)
+    except BaseException as e:
+        print("cannot copy from " + sysInfoPath + " to " + destInfoPath + ": " + str(e))
+
+
 def main():
     global args, shared_output_lock
     parser = create_parser()
@@ -398,6 +409,10 @@ def main():
             xfails = json.load(xfails_file)
 
     make_dirs_if_needed(args.output_dir, args.dry_run)
+
+    # Copy a file containing SDK build version into the prebuilt module dir,
+    # so we can keep track of the SDK version we built from.
+    copySystemVersionFile(args.sdk, args.output_dir)
     if 'ANDROID_DATA' not in os.environ:
         shared_output_lock = multiprocessing.Lock()
         pool = multiprocessing.Pool(args.jobs, set_up_child,

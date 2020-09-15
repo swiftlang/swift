@@ -87,6 +87,8 @@ PROTOCOL(StringInterpolationProtocol)
 PROTOCOL(AdditiveArithmetic)
 PROTOCOL(Differentiable)
 
+PROTOCOL(FloatingPoint)
+
 // SWIFT_ENABLE_TENSORFLOW
 PROTOCOL(PointwiseMultiplicative)
 PROTOCOL(ElementaryFunctions)

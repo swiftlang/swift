@@ -20,6 +20,7 @@
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/Import.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
@@ -122,6 +123,7 @@ namespace swift {
   class IndexSubset;
   struct SILAutoDiffDerivativeFunctionKey;
   struct InterfaceSubContextDelegate;
+  class TypeCheckCompletionCallback;
 
   enum class KnownProtocolKind : uint8_t;
 
@@ -214,7 +216,9 @@ class ASTContext final {
   void operator=(const ASTContext&) = delete;
 
   ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
-             SearchPathOptions &SearchPathOpts, SourceManager &SourceMgr,
+             SearchPathOptions &SearchPathOpts,
+             ClangImporterOptions &ClangImporterOpts,
+             SourceManager &SourceMgr,
              DiagnosticEngine &Diags);
 
 public:
@@ -228,6 +232,7 @@ public:
 
   static ASTContext *get(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
                          SearchPathOptions &SearchPathOpts,
+                         ClangImporterOptions &ClangImporterOpts,
                          SourceManager &SourceMgr, DiagnosticEngine &Diags);
   ~ASTContext();
 
@@ -246,11 +251,16 @@ public:
   /// The search path options used by this AST context.
   SearchPathOptions &SearchPathOpts;
 
+  /// The clang importer options used by this AST context.
+  ClangImporterOptions &ClangImporterOpts;
+
   /// The source manager object.
   SourceManager &SourceMgr;
 
   /// Diags - The diagnostics engine.
   DiagnosticEngine &Diags;
+
+  TypeCheckCompletionCallback *CompletionCallback = nullptr;
 
   /// The request-evaluator that is used to process various requests.
   Evaluator evaluator;
@@ -882,12 +892,12 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  bool canImportModule(Located<Identifier> ModulePath);
+  bool canImportModule(ImportPath::Element ModulePath);
 
   /// \returns a module with a given name that was already loaded.  If the
   /// module was not loaded, returns nullptr.
   ModuleDecl *getLoadedModule(
-      ArrayRef<Located<Identifier>> ModulePath) const;
+      ImportPath::Module ModulePath) const;
 
   ModuleDecl *getLoadedModule(Identifier ModuleName) const;
 
@@ -897,9 +907,11 @@ public:
   /// be returned.
   ///
   /// \returns The requested module, or NULL if the module cannot be found.
-  ModuleDecl *getModule(ArrayRef<Located<Identifier>> ModulePath);
+  ModuleDecl *getModule(ImportPath::Module ModulePath);
 
   ModuleDecl *getModuleByName(StringRef ModuleName);
+
+  ModuleDecl *getModuleByIdentifier(Identifier ModuleID);
 
   /// Returns the standard library module, or null if the library isn't present.
   ///

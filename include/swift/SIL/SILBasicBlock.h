@@ -76,6 +76,9 @@ public:
   /// This method unlinks 'self' from the containing SILFunction and deletes it.
   void eraseFromParent();
 
+  /// Remove all instructions of a SILGlobalVariable's static initializer block.
+  void clearStaticInitializerBlock(SILModule &module);
+
   //===--------------------------------------------------------------------===//
   // SILInstruction List Inspection and Manipulation
   //===--------------------------------------------------------------------===//

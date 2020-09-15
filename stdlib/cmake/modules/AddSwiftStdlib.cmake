@@ -164,18 +164,17 @@ function(_add_target_variant_c_compile_flags)
     MACCATALYST_BUILD_FLAVOR "${CFLAGS_MACCATALYST_BUILD_FLAVOR}")
 
   is_build_type_optimized("${CFLAGS_BUILD_TYPE}" optimized)
-  is_build_type_with_debuginfo("${CFLAGS_BUILD_TYPE}" debuginfo)
-
-  # Add -O0/-O2/-O3/-Os/-g/... based on CFLAGS_BUILD_TYPE.
-  list(APPEND result "${CMAKE_CXX_FLAGS_${CFLAGS_BUILD_TYPE}}")
-
   if(optimized)
+    if("${CFLAGS_BUILD_TYPE}" STREQUAL "MinSizeRel")
+      list(APPEND result "-Os")
+    else()
+      list(APPEND result "-O2")
+    endif()
+
     # Omit leaf frame pointers on x86 production builds (optimized, no debug
     # info, and no asserts).
-    if(NOT debuginfo AND NOT CFLAGS_ENABLE_ASSERTIONS)
-      # Unfortunately, this cannot be folded into the standard
-      # CMAKE_CXX_FLAGS_... because Apple multi-SDK builds use different
-      # architectures for different SDKs (CFLAGS_ARCH isn't constant here).
+    is_build_type_with_debuginfo("${CFLAGS_BUILD_TYPE}" debug)
+    if(NOT debug AND NOT CFLAGS_ENABLE_ASSERTIONS)
       if("${CFLAGS_ARCH}" STREQUAL "i386" OR "${CFLAGS_ARCH}" STREQUAL "i686")
         if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
           list(APPEND result "-momit-leaf-frame-pointer")
@@ -183,6 +182,27 @@ function(_add_target_variant_c_compile_flags)
           list(APPEND result "/Oy")
         endif()
       endif()
+    endif()
+  else()
+    if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+      list(APPEND result "-O0")
+    else()
+      list(APPEND result "/Od")
+    endif()
+  endif()
+
+  # CMake automatically adds the flags for debug info if we use MSVC/clang-cl.
+  if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+    is_build_type_with_debuginfo("${CFLAGS_BUILD_TYPE}" debuginfo)
+    if(debuginfo)
+      _compute_lto_flag("${CFLAGS_ENABLE_LTO}" _lto_flag_out)
+      if(_lto_flag_out)
+        list(APPEND result "-gline-tables-only")
+      else()
+        list(APPEND result "-g")
+      endif()
+    else()
+      list(APPEND result "-g0")
     endif()
   endif()
 
@@ -298,6 +318,9 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-DSWIFT_OBJC_INTEROP=0")
   endif()
 
+  # TODO(mracek): This should get turned off for non-ABI-stable environments.
+  list(APPEND result "-DSWIFT_LIBRARY_EVOLUTION=1")
+
   if(NOT SWIFT_ENABLE_COMPATIBILITY_OVERRIDES)
     list(APPEND result "-DSWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES")
   endif()
@@ -308,6 +331,10 @@ function(_add_target_variant_c_compile_flags)
 
   if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
     list(APPEND result "-DSWIFT_STDLIB_SINGLE_THREADED_RUNTIME")
+  endif()
+
+  if(SWIFT_STDLIB_OS_VERSIONING)
+    list(APPEND result "-DSWIFT_RUNTIME_OS_VERSIONING")
   endif()
 
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)

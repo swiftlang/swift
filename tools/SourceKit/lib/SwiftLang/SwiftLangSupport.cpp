@@ -327,8 +327,11 @@ private:
 static void
 configureCompletionInstance(std::shared_ptr<CompletionInstance> CompletionInst,
                             std::shared_ptr<GlobalConfig> GlobalConfig) {
-  CompletionInst->setDependencyCheckIntervalSecond(
-      GlobalConfig->getCompletionCheckDependencyInterval());
+  auto Opts = GlobalConfig->getCompletionOpts();
+  CompletionInst->setOptions({
+    Opts.MaxASTContextReuseCount,
+    Opts.CheckDependencyInterval
+  });
 }
 
 SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
@@ -337,7 +340,7 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
   llvm::SmallString<128> LibPath(SKCtx.getRuntimeLibPath());
   llvm::sys::path::append(LibPath, "swift");
   RuntimeResourcePath = std::string(LibPath.str());
-  DiagnosticDocumentationPath = SKCtx.getDiagnosticDocumentationPath();
+  DiagnosticDocumentationPath = SKCtx.getDiagnosticDocumentationPath().str();
 
   Stats = std::make_shared<SwiftStatistics>();
   EditorDocuments = std::make_shared<SwiftEditorDocumentFileMap>();
@@ -1096,7 +1099,7 @@ bool SwiftLangSupport::performCompletionLikeOperation(
     llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
     ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    bool EnableASTCaching, std::string &Error,
+    std::string &Error,
     llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
   assert(FileSystem);
 
@@ -1152,8 +1155,7 @@ bool SwiftLangSupport::performCompletionLikeOperation(
 
   return CompletionInst->performOperation(Invocation, Args, FileSystem,
                                           newBuffer.get(), Offset,
-                                          EnableASTCaching, Error,
-                                          &CIDiags, Callback);
+                                          Error, &CIDiags, Callback);
 }
 
 CloseClangModuleFiles::~CloseClangModuleFiles() {

@@ -40,7 +40,7 @@ func foo() {
 // RUN:   -shell -- cp -R $INPUT_DIR/ClangFW.framework_mod/* %t/Frameworks/ClangFW.framework/ == \
 // RUN:   -req=complete -pos=5:3 %s -- ${COMPILER_ARGS[@]} == \
 
-// RUN:   -req=global-config -completion-check-dependency-interval ${DEPCHECK_INTERVAL} == \
+// RUN:   -req=global-config -req-opts=completion_check_dependency_interval=${DEPCHECK_INTERVAL} == \
 // RUN:   -shell -- echo '### Checking dependencies' == \
 // RUN:   -req=complete -pos=5:3 %s -- ${COMPILER_ARGS[@]} \
 

@@ -354,10 +354,10 @@ private:
   ASTScopeImpl *constructExpandAndInsert(ASTScopeImpl *parent, Args... args) {
     auto *child = new (ctx) Scope(args...);
     parent->addChild(child, ctx);
-    if (shouldBeLazy()) {
-      if (auto *ip = child->insertionPointForDeferredExpansion().getPtrOrNull())
-        return ip;
-    }
+
+    if (auto *ip = child->insertionPointForDeferredExpansion().getPtrOrNull())
+      return ip;
+
     ASTScopeImpl *insertionPoint =
         child->expandAndBeCurrentDetectingRecursion(*this);
     ASTScopeAssert(child->verifyThatThisNodeComeAfterItsPriorSibling(),
@@ -645,8 +645,6 @@ public:
     }
     return !n.isDecl(DeclKind::Var);
   }
-
-  bool shouldBeLazy() const { return ctx.LangOpts.LazyASTScopes; }
 
 public:
   /// For debugging. Return true if scope tree contains all the decl contexts in
@@ -1086,8 +1084,6 @@ void ASTScopeImpl::disownDescendants(ScopeCreator &scopeCreator) {
 
 ASTScopeImpl *
 ASTScopeImpl::expandAndBeCurrentDetectingRecursion(ScopeCreator &scopeCreator) {
-  assert(scopeCreator.getASTContext().LangOpts.EnableASTScopeLookup &&
-         "Should not be getting here if ASTScopes are disabled");
   return evaluateOrDefault(scopeCreator.getASTContext().evaluator,
                            ExpandASTScopeRequest{this, &scopeCreator}, nullptr);
 }
@@ -1123,14 +1119,13 @@ ASTScopeImpl *ASTScopeImpl::expandAndBeCurrent(ScopeCreator &scopeCreator) {
     disownDescendants(scopeCreator);
 
   auto *insertionPoint = expandSpecifically(scopeCreator);
-  if (scopeCreator.shouldBeLazy()) {
-    ASTScopeAssert(!insertionPointForDeferredExpansion() ||
-                       insertionPointForDeferredExpansion().get() ==
-                           insertionPoint,
-                   "In order for lookups into lazily-expanded scopes to be "
-                   "accurate before expansion, the insertion point before "
-                   "expansion must be the same as after expansion.");
-  }
+  ASTScopeAssert(!insertionPointForDeferredExpansion() ||
+                     insertionPointForDeferredExpansion().get() ==
+                         insertionPoint,
+                 "In order for lookups into lazily-expanded scopes to be "
+                 "accurate before expansion, the insertion point before "
+                 "expansion must be the same as after expansion.");
+
   replaceASTAncestorScopes(astAncestorScopes);
   setWasExpanded();
   beCurrent();

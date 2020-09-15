@@ -617,16 +617,17 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
     
     fileprivate init(nsIndexPath: __shared ReferenceType) {
         let count = nsIndexPath.length
-        if count == 0 {
+        switch count {
+        case 0:
             _indexes = []
-        } else if count == 1 {
+        case 1:
             _indexes = .single(nsIndexPath.index(atPosition: 0))
-        } else if count == 2 {
+        case 2:
             _indexes = .pair(nsIndexPath.index(atPosition: 0), nsIndexPath.index(atPosition: 1))
-        } else {
-            var indexes = Array<Int>(repeating: 0, count: count)
-            indexes.withUnsafeMutableBufferPointer { (buffer: inout UnsafeMutableBufferPointer<Int>) -> Void in
+        default:
+            let indexes = Array<Int>(unsafeUninitializedCapacity: count) { buffer, initializedCount in
                 nsIndexPath.getIndexes(buffer.baseAddress!, range: NSRange(location: 0, length: count))
+                initializedCount = count
             }
             _indexes = .array(indexes)
         }

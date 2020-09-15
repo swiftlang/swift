@@ -57,6 +57,20 @@ std::string removeCodeCompletionTokens(StringRef Input,
                                        StringRef TokenName,
                                        unsigned *CompletionOffset);
 
+StringRef copyString(llvm::BumpPtrAllocator &Allocator,
+                     StringRef Str);
+
+const char *copyCString(llvm::BumpPtrAllocator &Allocator,
+                        StringRef Str);
+
+template <typename T>
+ArrayRef<T> copyArray(llvm::BumpPtrAllocator &Allocator,
+                            ArrayRef<T> Arr) {
+  T *Buffer = Allocator.Allocate<T>(Arr.size());
+  std::copy(Arr.begin(), Arr.end(), Buffer);
+  return llvm::makeArrayRef(Buffer, Arr.size());
+}
+
 namespace detail {
 class CodeCompletionStringChunk {
   friend class swift::ide::CodeCompletionResultBuilder;
@@ -870,7 +884,7 @@ public:
     /// but should not hide any results.
     SingleExpressionBody,
 
-    /// There are known contextual types.
+    /// There are known contextual types, or there aren't but a nonvoid type is expected.
     Required,
   };
 

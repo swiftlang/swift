@@ -82,7 +82,9 @@ class Benchmarks(product.Product):
 
 
 def run_build_script_helper(host_target, product, args):
-    toolchain_path = args.install_destdir
+    toolchain_path = swiftpm.SwiftPM.get_install_destdir(args,
+                                                         host_target,
+                                                         product.build_dir)
     if platform.system() == 'Darwin':
         # The prefix is an absolute path, so concatenate without os.path.
         toolchain_path += \

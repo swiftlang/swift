@@ -281,17 +281,17 @@ protocol Composition : P, Q {}
 struct S : Composition {}
 func getComposition() -> P & Q { return S() }
 reflect(any: getComposition())
-// CHECK-64: Mangled name: $s12existentials1PP_AA1QPp
+// CHECK-64: Mangled name: $s12existentials1P_AA1Qp
 // CHECK-64: Demangled name: existentials.P & existentials.Q
-// CHECK-32: Mangled name: $s12existentials1PP_AA1QPp
+// CHECK-32: Mangled name: $s12existentials1P_AA1Qp
 // CHECK-32: Demangled name: existentials.P & existentials.Q
 
 // Metatype:
 reflect(any: Int.self)
-// CHECK-64: Mangled name: $sSim
-// CHECK-64: Demangled name: Swift.Int.Type
-// CHECK-32: Mangled name: $sSim
-// CHECK-32: Demangled name: Swift.Int.Type
+// CHECK-64: Mangled name: $sSiXMt
+// CHECK-64: Demangled name: @thin Swift.Int.Type
+// CHECK-32: Mangled name: $sSiXMt
+// CHECK-32: Demangled name: @thin Swift.Int.Type
 
 protocol WithType {
   associatedtype T

@@ -63,12 +63,12 @@ Assumptions:
     + [Function templates](#function-templates)
     + [Function templates: import as Swift generic functions](#function-templates-import-as-swift-generic-functions)
     + [Function templates: allow to specify template arguments](#function-templates-allow-to-specify-template-arguments)
-    + [Function templates: calls to specific specilalizations](#function-templates-calls-to-specific-specilalizations)
+    + [Function templates: calls to specific specializations](#function-templates-calls-to-specific-specializations)
     + [Function templates: calls with generic type parameters](#function-templates-calls-with-generic-type-parameters)
     + [Function templates: importing as real generic functions](#function-templates-importing-as-real-generic-functions)
     + [Class templates](#class-templates)
     + [Class templates: importing instantiation behind typedef](#class-templates-importing-instantiation-behind-typedef)
-    + [Class templates: importing specific specilalizations](#class-templates-importing-specific-specilalizations)
+    + [Class templates: importing specific specializations](#class-templates-importing-specific-specializations)
     + [Class templates: using with generic type parameters](#class-templates-using-with-generic-type-parameters)
     + [Class templates: using in generic code through a synthesized protocol](#class-templates-using-in-generic-code-through-a-synthesized-protocol)
     + [Class templates: importing as real generic structs](#class-templates-importing-as-real-generic-structs)
@@ -1902,7 +1902,7 @@ struct Employee {
   private func _getName() -> UnsafePointer<std.string>
 
   // void setName(std::string newName);
-  private func _setName(_ newName: std.string)
+  private mutating func _setName(_ newName: std.string)
 
   // Swifty API.
   public var name: std.string {
@@ -2436,7 +2436,7 @@ possible to do so when importing a C++ function template as a C++ generic
 function; "inout"-ness of an argument can't change across instantiations of a
 generic function in Swift.
 
-### Function templates: calls to specific specilalizations
+### Function templates: calls to specific specializations
 
 From an implementation point of view, it is easy to compile Swift code that
 calls C++ function templates if template arguments are concrete types that are
@@ -2615,7 +2615,7 @@ struct MagicNumber {}
 typealias WrappedMagicNumber = __CxxTemplateInst12MagicWrapperI11MagicNumberE
 ```
 
-### Class templates: importing specific specilalizations
+### Class templates: importing specific specializations
 
 Just like with calls to C++ function templates, it is easy to compile a use of a
 C++ class templates if the usage in Swift code unambiguously specifies which

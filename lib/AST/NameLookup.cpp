@@ -267,20 +267,20 @@ static void recordShadowedDeclsAfterTypeMatch(
 
     auto name = firstDecl->getBaseName();
 
-    auto isShadowed = [&](ArrayRef<ModuleDecl::AccessPathTy> paths) {
+    auto isShadowed = [&](ArrayRef<ImportPath::Access> paths) {
       for (auto path : paths) {
-        if (ModuleDecl::matchesAccessPath(path, name))
+        if (path.matches(name))
           return false;
       }
 
       return true;
     };
 
-    auto isScopedImport = [&](ArrayRef<ModuleDecl::AccessPathTy> paths) {
+    auto isScopedImport = [&](ArrayRef<ImportPath::Access> paths) {
       for (auto path : paths) {
         if (path.empty())
           continue;
-        if (ModuleDecl::matchesAccessPath(path, name))
+        if (path.matches(name))
           return true;
       }
 
@@ -1765,9 +1765,8 @@ ModuleQualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
     auto accessPaths = ctx.getImportCache().getAllVisibleAccessPaths(
         module, topLevelScope);
     if (llvm::any_of(accessPaths,
-                     [&](ModuleDecl::AccessPathTy accessPath) {
-                       return ModuleDecl::matchesAccessPath(accessPath,
-                                                            member.getFullName());
+                     [&](ImportPath::Access accessPath) {
+                       return accessPath.matches(member.getFullName());
                      })) {
       lookupInModule(module, member.getFullName(), decls,
                      NLKind::QualifiedLookup, kind, topLevelScope);

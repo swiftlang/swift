@@ -239,10 +239,14 @@ struct OverloadSignature {
   /// Whether this declaration has an opaque return type.
   unsigned HasOpaqueReturnType : 1;
 
+  /// Whether this declaration is 'async'
+  unsigned HasAsync : 1;
+
   OverloadSignature()
       : UnaryOperator(UnaryOperatorKind::None), IsInstanceMember(false),
         IsVariable(false), IsFunction(false), InProtocolExtension(false),
-        InExtensionOfGenericType(false), HasOpaqueReturnType(false) {}
+        InExtensionOfGenericType(false), HasOpaqueReturnType(false),
+        HasAsync(false) {}
 };
 
 /// Determine whether two overload signatures conflict.
@@ -284,7 +288,7 @@ class alignas(1 << DeclAlignInBits) Decl {
 protected:
   union { uint64_t OpaqueBits;
 
-  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1,
+  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1,
     Kind : bitmax(NumDeclKindBits,8),
 
     /// Whether this declaration is invalid.
@@ -301,7 +305,13 @@ protected:
 
     /// Whether this declaration was added to the surrounding
     /// DeclContext of an active #if config clause.
-    EscapedFromIfConfig : 1
+    EscapedFromIfConfig : 1,
+
+    /// Whether this declaration is syntactically scoped inside of
+    /// a local context, but should behave like a top-level
+    /// declaration for name lookup purposes. This is used by
+    /// lldb.
+    Hoisted : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(PatternBindingDecl, Decl, 1+2+16,
@@ -690,6 +700,7 @@ protected:
     Bits.Decl.Implicit = false;
     Bits.Decl.FromClang = false;
     Bits.Decl.EscapedFromIfConfig = false;
+    Bits.Decl.Hoisted = false;
   }
 
   /// Get the Clang node associated with this declaration.
@@ -836,6 +847,16 @@ public:
 
   /// Mark this declaration as implicit.
   void setImplicit(bool implicit = true) { Bits.Decl.Implicit = implicit; }
+
+  /// Determine whether this declaration is syntactically scoped inside of
+  /// a local context, but should behave like a top-level declaration
+  /// for name lookup purposes. This is used by lldb.
+  bool isHoisted() const { return Bits.Decl.Hoisted; }
+
+  /// Set whether this declaration should be syntactically scoped inside
+  /// of a local context, but should behave like a top-level declaration,
+  /// but should behave like a top-level declaration. This is used by lldb.
+  void setHoisted(bool hoisted = true) { Bits.Decl.Hoisted = hoisted; }
 
 public:
   bool escapedFromIfConfig() const {
@@ -1311,6 +1332,12 @@ public:
 
   void print(raw_ostream &OS) const;
   SWIFT_DEBUG_DUMP;
+
+  bool walk(ASTWalker &walker);
+
+  /// Finds a generic parameter declaration by name. This should only
+  /// be used from the SIL parser.
+  GenericTypeParamDecl *lookUpGenericParam(Identifier name) const;
 };
   
 /// A trailing where clause.
@@ -1436,32 +1463,14 @@ public:
 static_assert(sizeof(_GenericContext) + sizeof(DeclContext) ==
               sizeof(GenericContext), "Please add fields to _GenericContext");
 
-/// Describes what kind of name is being imported.
-///
-/// If the enumerators here are changed, make sure to update all diagnostics
-/// using ImportKind as a select index.
-enum class ImportKind : uint8_t {
-  Module = 0,
-  Type,
-  Struct,
-  Class,
-  Enum,
-  Protocol,
-  Var,
-  Func
-};
-
 /// ImportDecl - This represents a single import declaration, e.g.:
 ///   import Swift
 ///   import typealias Swift.Int
 class ImportDecl final : public Decl,
-    private llvm::TrailingObjects<ImportDecl, Located<Identifier>> {
+    private llvm::TrailingObjects<ImportDecl, ImportPath::Element> {
   friend TrailingObjects;
   friend class Decl;
-public:
-  typedef Located<Identifier> AccessPathElement;
 
-private:
   SourceLoc ImportLoc;
   SourceLoc KindLoc;
 
@@ -1469,13 +1478,13 @@ private:
   ModuleDecl *Mod = nullptr;
 
   ImportDecl(DeclContext *DC, SourceLoc ImportLoc, ImportKind K,
-             SourceLoc KindLoc, ArrayRef<AccessPathElement> Path);
+             SourceLoc KindLoc, ImportPath Path);
 
 public:
   static ImportDecl *create(ASTContext &C, DeclContext *DC,
                             SourceLoc ImportLoc, ImportKind Kind,
                             SourceLoc KindLoc,
-                            ArrayRef<AccessPathElement> Path,
+                            ImportPath Path,
                             ClangNode ClangN = ClangNode());
 
   /// Returns the import kind that is most appropriate for \p VD.
@@ -1490,26 +1499,21 @@ public:
   /// cannot be overloaded, returns None.
   static Optional<ImportKind> findBestImportKind(ArrayRef<ValueDecl *> Decls);
 
-  ArrayRef<AccessPathElement> getFullAccessPath() const {
-    return {getTrailingObjects<AccessPathElement>(),
-            static_cast<size_t>(Bits.ImportDecl.NumPathElements)};
-  }
-
-  ArrayRef<AccessPathElement> getModulePath() const {
-    auto result = getFullAccessPath();
-    if (getImportKind() != ImportKind::Module)
-      result = result.slice(0, result.size()-1);
-    return result;
-  }
-
-  ArrayRef<AccessPathElement> getDeclPath() const {
-    if (getImportKind() == ImportKind::Module)
-      return {};
-    return getFullAccessPath().back();
-  }
-
   ImportKind getImportKind() const {
     return static_cast<ImportKind>(Bits.ImportDecl.ImportKind);
+  }
+
+  ImportPath getImportPath() const {
+    return ImportPath({ getTrailingObjects<ImportPath::Element>(),
+                        static_cast<size_t>(Bits.ImportDecl.NumPathElements) });
+  }
+
+  ImportPath::Module getModulePath() const {
+    return getImportPath().getModulePath(getImportKind());
+  }
+
+  ImportPath::Access getAccessPath() const {
+    return getImportPath().getAccessPath(getImportKind());
   }
 
   bool isExported() const {
@@ -1528,9 +1532,11 @@ public:
   }
 
   SourceLoc getStartLoc() const { return ImportLoc; }
-  SourceLoc getLocFromSource() const { return getFullAccessPath().front().Loc; }
+  SourceLoc getLocFromSource() const {
+    return getImportPath().getSourceRange().Start;
+  }
   SourceRange getSourceRange() const {
-    return SourceRange(ImportLoc, getFullAccessPath().back().Loc);
+    return SourceRange(ImportLoc, getImportPath().getSourceRange().End);
   }
   SourceLoc getKindLoc() const { return KindLoc; }
 
@@ -3900,7 +3906,7 @@ class ClassDecl final : public NominalTypeDecl {
 
   friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
-  friend class EmittedMembersRequest;
+  friend class SemanticMembersRequest;
   friend class HasMissingDesignatedInitializersRequest;
   friend class InheritsSuperclassInitializersRequest;
 
@@ -4000,6 +4006,9 @@ public:
     return getForeignClassKind() != ForeignKind::Normal;
   }
 
+  /// Whether the class is an actor.
+  bool isActor() const;
+
   /// Returns true if the class has designated initializers that are not listed
   /// in its members.
   ///
@@ -4087,10 +4096,6 @@ public:
 
   /// Record the presence of an @objc method with the given selector.
   void recordObjCMethod(AbstractFunctionDecl *method, ObjCSelector selector);
-
-  /// Get all the members of this class, synthesizing any implicit members
-  /// that appear in the vtable if needed.
-  ArrayRef<Decl *> getEmittedMembers() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -4893,9 +4898,9 @@ enum class PropertyWrapperSynthesizedPropertyKind {
   /// The backing storage property, which is a stored property of the
   /// wrapper type.
   Backing,
-  /// A storage wrapper (e.g., `$foo`), which is a wrapper over the
-  /// wrapper instance's `projectedValue` property.
-  StorageWrapper,
+  /// A projection (e.g., `$foo`), which is a computed property to access the
+  /// wrapper instance's \c projectedValue property.
+  Projection,
 };
 
 /// VarDecl - 'var' and 'let' declarations.
@@ -5218,9 +5223,9 @@ public:
   /// bound generic version.
   VarDecl *getPropertyWrapperBackingProperty() const;
 
-  /// Retreive the storage wrapper for a property that has an attached
-  /// property wrapper.
-  VarDecl *getPropertyWrapperStorageWrapper() const;
+  /// Retreive the projection var for a property that has an attached
+  /// property wrapper with a \c projectedValue .
+  VarDecl *getPropertyWrapperProjectionVar() const;
 
   /// Retrieve the backing storage property for a lazy property.
   VarDecl *getLazyStorageProperty() const;
@@ -5862,6 +5867,7 @@ protected:
   };
 
   friend class ParseAbstractFunctionBodyRequest;
+  friend class TypeCheckFunctionBodyRequest;
 
   CaptureInfo Captures;
 
@@ -5995,7 +6001,12 @@ public:
   /// \sa hasBody()
   BraceStmt *getBody(bool canSynthesize = true) const;
 
-  void setBody(BraceStmt *S, BodyKind NewBodyKind = BodyKind::Parsed);
+  /// Retrieve the type-checked body of the given function, or \c nullptr if
+  /// there's no body available.
+  BraceStmt *getTypecheckedBody() const;
+
+  /// Set a new body for the function.
+  void setBody(BraceStmt *S, BodyKind NewBodyKind);
 
   /// Note that the body was skipped for this function.  Function body
   /// cannot be attached after this call.

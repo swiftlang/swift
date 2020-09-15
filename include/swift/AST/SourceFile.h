@@ -194,6 +194,10 @@ public:
 private:
 // SWIFT_ENABLE_TENSORFLOW END
 
+  /// The list of hoisted declarations. See Decl::isHoisted().
+  /// This is only used by lldb.
+  std::vector<Decl *> Hoisted;
+
   using SeparatelyImportedOverlayMap =
     llvm::SmallDenseMap<ModuleDecl *, llvm::SmallPtrSet<ModuleDecl *, 1>>;
 
@@ -238,8 +242,15 @@ public:
     Decls->insert(Decls->begin(), d);
   }
 
+  /// Add a hoisted declaration. See Decl::isHoisted().
+  void addHoistedDecl(Decl *d);
+
   /// Retrieves an immutable view of the list of top-level decls in this file.
   ArrayRef<Decl *> getTopLevelDecls() const;
+
+  /// Retrieves an immutable view of the list of hoisted decls in this file.
+  /// See Decl::isHoisted().
+  ArrayRef<Decl *> getHoistedDecls() const;
 
   /// Retrieves an immutable view of the top-level decls if they have already
   /// been parsed, or \c None if they haven't. Should only be used for dumping.
@@ -403,14 +414,14 @@ public:
   virtual void lookupValue(DeclName name, NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &result) const override;
 
-  virtual void lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
+  virtual void lookupVisibleDecls(ImportPath::Access accessPath,
                                   VisibleDeclConsumer &consumer,
                                   NLKind lookupKind) const override;
 
-  virtual void lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
+  virtual void lookupClassMembers(ImportPath::Access accessPath,
                                   VisibleDeclConsumer &consumer) const override;
   virtual void
-  lookupClassMember(ModuleDecl::AccessPathTy accessPath, DeclName name,
+  lookupClassMember(ImportPath::Access accessPath, DeclName name,
                     SmallVectorImpl<ValueDecl*> &results) const override;
 
   void lookupObjCMethods(
@@ -620,10 +631,8 @@ inline SourceFile::ParsingOptions operator|(SourceFile::ParsingFlags lhs,
   return SourceFile::ParsingOptions(lhs) | rhs;
 }
 
-inline SourceFile &
-ModuleDecl::getMainSourceFile(SourceFileKind expectedKind) const {
+inline SourceFile &ModuleDecl::getMainSourceFile() const {
   assert(!Files.empty() && "No files added yet");
-  assert(cast<SourceFile>(Files.front())->Kind == expectedKind);
   return *cast<SourceFile>(Files.front());
 }
 
@@ -699,9 +708,11 @@ struct DenseMapInfo<swift::SourceFile::ImportedModuleDesc> {
                               StringRefDMI::getTombstoneKey());
   }
   static inline unsigned getHashValue(const ImportedModuleDesc &import) {
-    return combineHashValue(ImportedModuleDMI::getHashValue(import.module),
-           combineHashValue(ImportOptionsDMI::getHashValue(import.importOptions),
-                            StringRefDMI::getHashValue(import.filename)));
+    return detail::combineHashValue(
+        ImportedModuleDMI::getHashValue(import.module),
+        detail::combineHashValue(
+            ImportOptionsDMI::getHashValue(import.importOptions),
+            StringRefDMI::getHashValue(import.filename)));
   }
   static bool isEqual(const ImportedModuleDesc &a,
                       const ImportedModuleDesc &b) {

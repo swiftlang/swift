@@ -110,7 +110,8 @@ bool LoopARCSequenceDataflowEvaluator::processLoopTopDown(const LoopRegion *R) {
 
     // Then perform the dataflow.
     NestingDetected |= SubregionData.processTopDown(
-        AA, RCFI, LRFI, DecToIncStateMap, RegionStateInfo, SetFactory);
+        AA, RCFI, LRFI, UnmatchedRefCountInsts, DecToIncStateMap,
+        RegionStateInfo, SetFactory);
   }
 
   return NestingDetected;
@@ -214,8 +215,9 @@ bool LoopARCSequenceDataflowEvaluator::processLoopBottomUp(
 
     // Then perform the region optimization.
     NestingDetected |= SubregionData.processBottomUp(
-        AA, RCFI, EAFI, LRFI, FreezeOwnedArgEpilogueReleases, IncToDecStateMap,
-        RegionStateInfo, SetFactory);
+        AA, RCFI, EAFI, LRFI, FreezeOwnedArgEpilogueReleases,
+        UnmatchedRefCountInsts, IncToDecStateMap, RegionStateInfo,
+        SetFactory);
   }
 
   return NestingDetected;
@@ -252,13 +254,39 @@ LoopARCSequenceDataflowEvaluator::~LoopARCSequenceDataflowEvaluator() {
 bool LoopARCSequenceDataflowEvaluator::runOnLoop(
     const LoopRegion *R, bool FreezeOwnedArgEpilogueReleases,
     bool RecomputePostDomReleases) {
+  LLVM_DEBUG(llvm::dbgs() << "Run on region:\n");
+  LLVM_DEBUG(R->dump(true));
   bool NestingDetected = processLoopBottomUp(R, FreezeOwnedArgEpilogueReleases);
   NestingDetected |= processLoopTopDown(R);
+  LLVM_DEBUG(
+      llvm::dbgs() << "*** Bottom-Up and Top-Down analysis results ***\n");
+  LLVM_DEBUG(dumpDataflowResults());
   return NestingDetected;
 }
 
-void LoopARCSequenceDataflowEvaluator::summarizeLoop(
-    const LoopRegion *R) {
+void LoopARCSequenceDataflowEvaluator::dumpDataflowResults() {
+  llvm::dbgs() << "IncToDecStateMap:\n";
+  for (auto it : IncToDecStateMap) {
+    if (!it.hasValue())
+      continue;
+    auto instAndState = it.getValue();
+    llvm::dbgs() << "Increment: ";
+    instAndState.first->dump();
+    instAndState.second.dump();
+  }
+
+  llvm::dbgs() << "DecToIncStateMap:\n";
+  for (auto it : DecToIncStateMap) {
+    if (!it.hasValue())
+      continue;
+    auto instAndState = it.getValue();
+    llvm::dbgs() << "Decrement: ";
+    instAndState.first->dump();
+    instAndState.second.dump();
+  }
+}
+
+void LoopARCSequenceDataflowEvaluator::summarizeLoop(const LoopRegion *R) {
   RegionStateInfo[R]->summarize(LRFI, RegionStateInfo);
 }
 
@@ -286,4 +314,35 @@ void LoopARCSequenceDataflowEvaluator::removeInterestingInst(
     SILInstruction *I) {
   auto *Region = LRFI->getRegion(I->getParent());
   RegionStateInfo[Region]->removeInterestingInst(I);
+}
+
+// Compute if a RefCountInst was unmatched and populate in the persistent
+// UnmatchedRefCountInsts.
+// This can be done by looking up the RefCountInst in IncToDecStateMap or
+// DecToIncStateMap. If the StrongIncrement was matched to a StrongDecrement,
+// it will be found in IncToDecStateMap. If the StrongDecrement was matched to
+// a StrongIncrement, it will be found in DecToIncStateMap.
+void LoopARCSequenceDataflowEvaluator::saveMatchingInfo(const LoopRegion *R) {
+  if (R->isFunction())
+    return;
+  for (unsigned SubregionID : R->getSubregions()) {
+    auto *Subregion = LRFI->getRegion(SubregionID);
+    if (!Subregion->isBlock())
+      continue;
+    auto *RegionState = RegionStateInfo[Subregion];
+    for (auto Inst : RegionState->getSummarizedInterestingInsts()) {
+      if (isa<StrongRetainInst>(Inst) || isa<RetainValueInst>(Inst)) {
+        // unmatched if not found in IncToDecStateMap
+        if (IncToDecStateMap.find(Inst) == IncToDecStateMap.end())
+          UnmatchedRefCountInsts.insert(Inst);
+        continue;
+      }
+      if (isa<StrongReleaseInst>(Inst) || isa<ReleaseValueInst>(Inst)) {
+        // unmatched if not found in DecToIncStateMap
+        if (DecToIncStateMap.find(Inst) == DecToIncStateMap.end())
+          UnmatchedRefCountInsts.insert(Inst);
+        continue;
+      }
+    }
+  }
 }

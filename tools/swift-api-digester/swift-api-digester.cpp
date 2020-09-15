@@ -26,6 +26,7 @@
 // can be reflected as source-breaking changes for API users. If they are,
 // the output of api-digester will include such changes.
 
+#include "swift/Basic/Platform.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
 #include "swift/AST/DiagnosticsModuleDiffer.h"
@@ -263,6 +264,11 @@ static llvm::cl::opt<std::string>
 SerializedDiagPath("serialize-diagnostics-path",
                    llvm::cl::desc("Serialize diagnostics to a path"),
                    llvm::cl::cat(Category));
+
+static llvm::cl::opt<std::string>
+BreakageAllowlistPath("breakage-allowlist-path",
+                      llvm::cl::desc("An allowlist of breakages to not complain about"),
+                      llvm::cl::cat(Category));
 
 } // namespace options
 
@@ -788,7 +794,8 @@ void swift::ide::api::SDKNodeDeclType::diagnose(SDKNode *Right) {
     return;
   auto Loc = R->getLoc();
   if (getDeclKind() != R->getDeclKind()) {
-    emitDiag(Loc, diag::decl_kind_changed, getDeclKindStr(R->getDeclKind()));
+    emitDiag(Loc, diag::decl_kind_changed, getDeclKindStr(R->getDeclKind(),
+      getSDKContext().getOpts().CompilerStyle));
     return;
   }
 
@@ -980,7 +987,8 @@ void swift::ide::api::SDKNodeDeclOperator::diagnose(SDKNode *Right) {
     return;
   auto Loc = RO->getLoc();
   if (getDeclKind() != RO->getDeclKind()) {
-    emitDiag(Loc, diag::decl_kind_changed, getDeclKindStr(RO->getDeclKind()));
+    emitDiag(Loc, diag::decl_kind_changed, getDeclKindStr(RO->getDeclKind(),
+      getSDKContext().getOpts().CompilerStyle));
   }
 }
 
@@ -2115,7 +2123,8 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
     if (auto *Added = findAddedDecl(Node)) {
       if (Node->getDeclKind() != DeclKind::Constructor) {
         Node->emitDiag(Added->getLoc(), diag::moved_decl,
-          Ctx.buffer((Twine(getDeclKindStr(Added->getDeclKind())) + " " +
+          Ctx.buffer((Twine(getDeclKindStr(Added->getDeclKind(),
+            Ctx.getOpts().CompilerStyle)) + " " +
             Added->getFullyQualifiedName()).str()));
         return;
       }
@@ -2127,7 +2136,8 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
       [&](TypeMemberDiffItem &Item) { return Item.usr == Node->getUsr(); });
     if (It != MemberChanges.end()) {
       Node->emitDiag(SourceLoc(), diag::renamed_decl,
-        Ctx.buffer((Twine(getDeclKindStr(Node->getDeclKind())) + " " +
+        Ctx.buffer((Twine(getDeclKindStr(Node->getDeclKind(),
+          Ctx.getOpts().CompilerStyle)) + " " +
           It->newTypeName + "." + It->newPrintedName).str()));
       return;
     }
@@ -2184,7 +2194,8 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
       DiagLoc = CD->getLoc();
     }
     Node->emitDiag(DiagLoc, diag::renamed_decl,
-        Ctx.buffer((Twine(getDeclKindStr(Node->getDeclKind())) + " " +
+        Ctx.buffer((Twine(getDeclKindStr(Node->getDeclKind(),
+          Ctx.getOpts().CompilerStyle)) + " " +
           Node->getAnnotateComment(NodeAnnotation::RenameNewName)).str()));
     return;
   }
@@ -2320,6 +2331,49 @@ createDiagConsumer(llvm::raw_ostream &OS, bool &FailOnError) {
   }
 }
 
+static int readFileLineByLine(StringRef Path, llvm::StringSet<> &Lines) {
+  auto FileBufOrErr = llvm::MemoryBuffer::getFile(Path);
+  if (!FileBufOrErr) {
+    llvm::errs() << "error opening file '" << Path << "': "
+      << FileBufOrErr.getError().message() << '\n';
+    return 1;
+  }
+
+  StringRef BufferText = FileBufOrErr.get()->getBuffer();
+  while (!BufferText.empty()) {
+    StringRef Line;
+    std::tie(Line, BufferText) = BufferText.split('\n');
+    Line = Line.trim();
+    if (Line.empty())
+      continue;
+    if (Line.startswith("// ")) // comment.
+      continue;
+    Lines.insert(Line);
+  }
+  return 0;
+}
+
+static bool readBreakageAllowlist(SDKContext &Ctx, llvm::StringSet<> &lines) {
+  if (options::BreakageAllowlistPath.empty())
+    return 0;
+  CompilerInstance instance;
+  CompilerInvocation invok;
+  invok.setModuleName("ForClangImporter");
+  if (instance.setup(invok))
+    return 1;
+  auto importer = ClangImporter::create(instance.getASTContext());
+  SmallString<128> preprocessedFilePath;
+  if (auto error = llvm::sys::fs::createTemporaryFile(
+    "breakage-allowlist-", "txt", preprocessedFilePath)) {
+    return 1;
+  }
+  if (importer->runPreprocessor(options::BreakageAllowlistPath,
+                                preprocessedFilePath.str())) {
+    return 1;
+  }
+  return readFileLineByLine(preprocessedFilePath, lines);
+}
+
 static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
                              SDKNodeRoot *RightModule, StringRef OutputPath,
                              llvm::StringSet<> ProtocolReqAllowlist) {
@@ -2337,9 +2391,14 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
     OS = FileOS.get();
   }
   bool FailOnError;
-  std::unique_ptr<DiagnosticConsumer> pConsumer =
-    createDiagConsumer(*OS, FailOnError);
-
+  auto allowedBreakages = std::make_unique<llvm::StringSet<>>();
+  if (readBreakageAllowlist(Ctx, *allowedBreakages)) {
+    Ctx.getDiags().diagnose(SourceLoc(), diag::cannot_read_allowlist,
+                            options::BreakageAllowlistPath);
+  }
+  auto pConsumer = std::make_unique<FilteringDiagnosticConsumer>(
+    createDiagConsumer(*OS, FailOnError), std::move(allowedBreakages));
+  SWIFT_DEFER { pConsumer->finishProcessing(); };
   Ctx.addDiagConsumer(*pConsumer);
   Ctx.setCommonVersion(std::min(LeftModule->getJsonFormatVersion(),
                                 RightModule->getJsonFormatVersion()));
@@ -2352,7 +2411,7 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
   // Find member hoist changes to help refine diagnostics.
   findTypeMemberDiffs(LeftModule, RightModule, Ctx.getTypeMemberDiffs());
   DiagnosisEmitter::diagnosis(LeftModule, RightModule, Ctx);
-  return FailOnError && Ctx.getDiags().hadAnyError() ? 1 : 0;
+  return FailOnError && pConsumer->hasError() ? 1 : 0;
 }
 
 static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
@@ -2372,9 +2431,8 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
   LeftCollector.deSerialize(LeftPath);
   SwiftDeclCollector RightCollector(Ctx);
   RightCollector.deSerialize(RightPath);
-  diagnoseModuleChange(Ctx, LeftCollector.getSDKRoot(), RightCollector.getSDKRoot(),
-                       OutputPath, std::move(ProtocolReqAllowlist));
-  return options::CompilerStyleDiags && Ctx.getDiags().hadAnyError() ? 1 : 0;
+  return diagnoseModuleChange(Ctx, LeftCollector.getSDKRoot(),
+    RightCollector.getSDKRoot(), OutputPath, std::move(ProtocolReqAllowlist));
 }
 
 static void populateAliasChanges(NodeMap &AliasMap, DiffVector &AllItems,
@@ -2490,28 +2548,6 @@ static int generateMigrationScript(StringRef LeftPath, StringRef RightPath,
   serializeDiffs(Fs, typeMemberDiffs);
   serializeDiffs(Fs, AllNoEscapingFuncs);
   serializeDiffs(Fs, Overloads);
-  return 0;
-}
-
-static int readFileLineByLine(StringRef Path, llvm::StringSet<> &Lines) {
-  auto FileBufOrErr = llvm::MemoryBuffer::getFile(Path);
-  if (!FileBufOrErr) {
-    llvm::errs() << "error opening file '" << Path << "': "
-      << FileBufOrErr.getError().message() << '\n';
-    return 1;
-  }
-
-  StringRef BufferText = FileBufOrErr.get()->getBuffer();
-  while (!BufferText.empty()) {
-    StringRef Line;
-    std::tie(Line, BufferText) = BufferText.split('\n');
-    Line = Line.trim();
-    if (Line.empty())
-      continue;
-    if (Line.startswith("// ")) // comment.
-      continue;
-    Lines.insert(Line);
-  }
   return 0;
 }
 
@@ -2670,11 +2706,13 @@ static CheckerOptions getCheckOpts(int argc, char *argv[]) {
   // the checking logics are language-specific.
   Opts.SwiftOnly = options::Abi || options::SwiftOnly;
   Opts.SkipOSCheck = options::DisableOSChecks;
+  Opts.CompilerStyle = options::CompilerStyleDiags ||
+    !options::SerializedDiagPath.empty();
   for (int i = 1; i < argc; ++i)
     Opts.ToolArgs.push_back(argv[i]);
 
   if (!options::SDK.empty()) {
-    auto Ver = getSDKVersion(options::SDK);
+    auto Ver = getSDKBuildVersion(options::SDK);
     if (!Ver.empty()) {
       Opts.ToolArgs.push_back("-sdk-version");
       Opts.ToolArgs.push_back(Ver);
@@ -2818,7 +2856,7 @@ static std::string getJsonOutputFilePath(llvm::Triple Triple, bool ABI) {
       exit(1);
     }
     llvm::sys::path::append(OutputPath, getBaselineFilename(Triple));
-    return OutputPath.str();
+    return OutputPath.str().str();
   }
   llvm::errs() << "Unable to decide output file path\n";
   exit(1);

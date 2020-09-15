@@ -25,7 +25,6 @@ import Foundation
 // expected-private-conformance {{Swift.CVarArg}}
 // expected-private-conformance {{Swift.CustomStringConvertible}}
 // expected-private-member {{Swift._ExpressibleByBuiltinIntegerLiteral.init}}
-// expected-private-superclass {{main.LookupFactory}}
 @objc private class LookupFactory: NSObject {
   // expected-provides {{AssignmentPrecedence}}
   // expected-provides {{IntegerLiteralType}}

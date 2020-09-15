@@ -526,8 +526,6 @@ void ASTScopeImpl::computeAndCacheSourceRangeOfScope(
 }
 
 bool ASTScopeImpl::checkLazySourceRange(const ASTContext &ctx) const {
-  if (!ctx.LangOpts.LazyASTScopes)
-    return true;
   const auto unexpandedRange = sourceRangeForDeferredExpansion();
   const auto expandedRange = computeSourceRangeOfScopeWithChildASTNodes();
   if (unexpandedRange.isInvalid() || expandedRange.isInvalid())

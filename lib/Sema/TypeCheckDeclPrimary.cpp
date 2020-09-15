@@ -1629,6 +1629,8 @@ public:
 
     checkAccessControl(PBD);
 
+    checkExplicitAvailability(PBD);
+
     // If the initializers in the PBD aren't checked yet, do so now.
     for (auto i : range(PBD->getNumPatternEntries())) {
       if (!PBD->isInitialized(i))
@@ -1682,6 +1684,8 @@ public:
     TypeChecker::checkDeclAttributes(SD);
 
     checkAccessControl(SD);
+
+    checkExplicitAvailability(SD);
 
     if (!checkOverrides(SD)) {
       // If a subscript has an override attribute but does not override
@@ -1853,9 +1857,11 @@ public:
     if (auto rawTy = ED->getRawType()) {
       // The raw type must be one of the blessed literal convertible types.
       if (!computeAutomaticEnumValueKind(ED)) {
-        DE.diagnose(ED->getInherited().front().getSourceRange().Start,
-                    diag::raw_type_not_literal_convertible, rawTy);
-        ED->getInherited().front().setType(ErrorType::get(getASTContext()));
+        if (!rawTy->is<ErrorType>()) {
+          DE.diagnose(ED->getInherited().front().getSourceRange().Start,
+                      diag::raw_type_not_literal_convertible, rawTy);
+          ED->getInherited().front().setType(ErrorType::get(getASTContext()));
+        }
       }
       
       // We need at least one case to have a raw value.
@@ -2015,7 +2021,7 @@ public:
 
     TypeChecker::checkDeclAttributes(CD);
 
-    for (Decl *Member : CD->getEmittedMembers())
+    for (Decl *Member : CD->getSemanticMembers())
       visit(Member);
 
     TypeChecker::checkPatternBindingCaptures(CD);
@@ -2297,7 +2303,7 @@ public:
       FD->diagnose(diag::func_decl_without_brace);
     } else if (FD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
-      TypeChecker::typeCheckAbstractFunctionBody(FD);
+      (void)FD->getTypecheckedBody();
     } else if (shouldSkipBodyTypechecking(FD)) {
       FD->setBodySkipped(FD->getBodySourceRange());
     } else {
@@ -2345,10 +2351,15 @@ public:
     // FIXME: This needs to be moved to its own request if we want to
     // productize @_cdecl.
     if (auto CDeclAttr = FD->getAttrs().getAttribute<swift::CDeclAttr>()) {
+      Optional<ForeignAsyncConvention> asyncConvention;
       Optional<ForeignErrorConvention> errorConvention;
       if (isRepresentableInObjC(FD, ObjCReason::ExplicitlyCDecl,
-                                errorConvention)) {
-        if (FD->hasThrows()) {
+                                asyncConvention, errorConvention)) {
+        if (FD->hasAsync()) {
+          FD->setForeignAsyncConvention(*asyncConvention);
+          getASTContext().Diags.diagnose(CDeclAttr->getLocation(),
+                                         diag::cdecl_async);
+        } else if (FD->hasThrows()) {
           FD->setForeignErrorConvention(*errorConvention);
           getASTContext().Diags.diagnose(CDeclAttr->getLocation(),
                                          diag::cdecl_throws);
@@ -2635,12 +2646,14 @@ public:
 
     checkAccessControl(CD);
 
+    checkExplicitAvailability(CD);
+
     if (requiresDefinition(CD) && !CD->hasBody()) {
       // Complain if we should have a body.
       CD->diagnose(diag::missing_initializer_def);
     } else if (CD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
-      TypeChecker::typeCheckAbstractFunctionBody(CD);
+      (void)CD->getTypecheckedBody();
     } else if (shouldSkipBodyTypechecking(CD)) {
       CD->setBodySkipped(CD->getBodySourceRange());
     } else {
@@ -2655,7 +2668,7 @@ public:
 
     if (DD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
-      TypeChecker::typeCheckAbstractFunctionBody(DD);
+      (void)DD->getTypecheckedBody();
     } else if (shouldSkipBodyTypechecking(DD)) {
       DD->setBodySkipped(DD->getBodySourceRange());
     } else {

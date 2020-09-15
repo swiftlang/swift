@@ -104,7 +104,7 @@ void swift::ide::typeCheckContextAt(DeclContext *DC, SourceLoc Loc) {
     } else if (auto *defaultArg = dyn_cast<DefaultArgumentInitializer>(DC)) {
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(defaultArg->getParent())) {
         auto *Param = AFD->getParameters()->get(defaultArg->getIndex());
-        (void*)Param->getTypeCheckedDefaultExpr();
+        (void)Param->getTypeCheckedDefaultExpr();
       }
     }
     break;
@@ -336,7 +336,7 @@ void swift::ide::collectPossibleReturnTypesFromContext(
           const auto type = swift::performTypeResolution(
               CE->getExplicitResultTypeRepr(), DC->getASTContext(),
               /*isSILMode=*/false, /*isSILType=*/false,
-              DC->getGenericEnvironmentOfContext(),
+              DC->getGenericEnvironmentOfContext(), /*GenericParams=*/nullptr,
               const_cast<DeclContext *>(DC), /*diagnostics=*/false);
 
           if (!type->hasError()) {
