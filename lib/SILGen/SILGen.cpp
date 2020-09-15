@@ -1947,14 +1947,14 @@ ASTLoweringRequest::evaluate(Evaluator &evaluator,
                                              desc.opts);
   SILGenModuleRAII scope(*silMod);
 
-  for (auto file : desc.getFiles()) {
+  for (auto file : desc.getFilesToEmit()) {
     if (auto *nextSF = dyn_cast<SourceFile>(file))
       scope.emitSourceFile(nextSF);
   }
 
   // Also make sure to process any intermediate files that may contain SIL.
   bool shouldDeserialize =
-      llvm::any_of(desc.getFiles(), [](const FileUnit *File) -> bool {
+      llvm::any_of(desc.getFilesToEmit(), [](const FileUnit *File) -> bool {
         return isa<SerializedASTFile>(File);
       });
   if (shouldDeserialize) {

@@ -52,7 +52,7 @@ SourceLoc swift::extractNearestSourceLoc(const IRGenDescriptor &desc) {
   return SourceLoc();
 }
 
-TinyPtrVector<FileUnit *> IRGenDescriptor::getFiles() const {
+TinyPtrVector<FileUnit *> IRGenDescriptor::getFilesToEmit() const {
   // For a whole module, we emit IR for all files.
   if (auto *mod = Ctx.dyn_cast<ModuleDecl *>())
     return TinyPtrVector<FileUnit *>(mod->getFiles());

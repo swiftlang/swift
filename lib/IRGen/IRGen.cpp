@@ -930,7 +930,7 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
       return GeneratedModule::null();
   }
 
-  auto filesToEmit = desc.getFiles();
+  auto filesToEmit = desc.getFilesToEmit();
   auto *primaryFile =
       dyn_cast_or_null<SourceFile>(desc.Ctx.dyn_cast<FileUnit *>());
 

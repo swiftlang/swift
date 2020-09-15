@@ -199,7 +199,7 @@ public:
   }
 
   /// Retrieves the files to perform IR generation for.
-  TinyPtrVector<FileUnit *> getFiles() const;
+  TinyPtrVector<FileUnit *> getFilesToEmit() const;
 
   /// For a single file, returns its parent module, otherwise returns the module
   /// itself.

@@ -75,9 +75,9 @@ public:
     return ASTLoweringDescriptor{mod, conv, opts};
   }
 
-  /// For a single file input, returns a single element array containing that
-  /// file. Otherwise returns an array of each file in the module.
-  ArrayRef<FileUnit *> getFiles() const;
+  /// Retrieves the files to generate SIL for. If the descriptor is configured
+  /// only to emit a specific set of SILDeclRefs, this will be empty.
+  ArrayRef<FileUnit *> getFilesToEmit() const;
 
   /// If the module or file contains SIL that needs parsing, returns the file
   /// to be parsed, or \c nullptr if parsing isn't required.
