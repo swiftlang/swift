@@ -345,9 +345,7 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
       if (auto *didSet = var->getParsedAccessor(AccessorKind::DidSet)) {
         // If there's a didSet, we call the getter for the 'oldValue', and so
         // should consider the getter's mutatingness as well
-        if (!didSet->isSimpleDidSet()) {
-          isMutating |= (mut->Getter == PropertyWrapperMutability::Mutating);
-        }
+        isMutating |= (mut->Getter == PropertyWrapperMutability::Mutating);
         isMutating |= didSet->getAttrs().hasAttribute<MutatingAttr>();
       }
       if (auto *willSet = var->getParsedAccessor(AccessorKind::WillSet))
