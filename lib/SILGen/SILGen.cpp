@@ -1884,7 +1884,8 @@ class SILGenModuleRAII {
 
 public:
   void emitSourceFile(SourceFile *sf) {
-    assert(sf->ASTStage == SourceFile::TypeChecked);
+    // Type-check the file if we haven't already.
+    performTypeChecking(*sf);
 
     SourceFileScope scope(SGM, sf);
     for (Decl *D : sf->getTopLevelDecls()) {
@@ -1908,6 +1909,9 @@ public:
         continue;
       SGM.visit(TD);
     }
+  }
+  void emitSILFunctionDefinition(SILDeclRef ref) {
+    SGM.emitFunctionDefinition(ref, SGM.getFunction(ref, ForDefinition));
   }
 
   explicit SILGenModuleRAII(SILModule &M) : SGM{M, M.getSwiftModule()} {}
@@ -1941,19 +1945,25 @@ ASTLoweringRequest::evaluate(Evaluator &evaluator,
     return llvm::cantFail(evaluator(ParseSILModuleRequest{desc}));
   }
 
-  // Otherwise perform SIL generation of the passed SourceFiles.
   auto silMod = SILModule::createEmptyModule(desc.context, desc.conv,
                                              desc.opts);
   SILGenModuleRAII scope(*silMod);
 
-  for (auto file : desc.getFiles()) {
+  // Emit a specific set of SILDeclRefs if needed.
+  if (auto refs = desc.refsToEmit) {
+    for (auto ref : *refs)
+      scope.emitSILFunctionDefinition(ref);
+  }
+
+  // Emit any whole-files needed.
+  for (auto file : desc.getFilesToEmit()) {
     if (auto *nextSF = dyn_cast<SourceFile>(file))
       scope.emitSourceFile(nextSF);
   }
 
   // Also make sure to process any intermediate files that may contain SIL.
   bool shouldDeserialize =
-      llvm::any_of(desc.getFiles(), [](const FileUnit *File) -> bool {
+      llvm::any_of(desc.getFilesToEmit(), [](const FileUnit *File) -> bool {
         return isa<SerializedASTFile>(File);
       });
   if (shouldDeserialize) {
