@@ -794,7 +794,8 @@ void swift::ide::api::SDKNodeDeclType::diagnose(SDKNode *Right) {
     return;
   auto Loc = R->getLoc();
   if (getDeclKind() != R->getDeclKind()) {
-    emitDiag(Loc, diag::decl_kind_changed, getDeclKindStr(R->getDeclKind()));
+    emitDiag(Loc, diag::decl_kind_changed, getDeclKindStr(R->getDeclKind(),
+      getSDKContext().getOpts().CompilerStyle));
     return;
   }
 
@@ -986,7 +987,8 @@ void swift::ide::api::SDKNodeDeclOperator::diagnose(SDKNode *Right) {
     return;
   auto Loc = RO->getLoc();
   if (getDeclKind() != RO->getDeclKind()) {
-    emitDiag(Loc, diag::decl_kind_changed, getDeclKindStr(RO->getDeclKind()));
+    emitDiag(Loc, diag::decl_kind_changed, getDeclKindStr(RO->getDeclKind(),
+      getSDKContext().getOpts().CompilerStyle));
   }
 }
 
@@ -2121,7 +2123,8 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
     if (auto *Added = findAddedDecl(Node)) {
       if (Node->getDeclKind() != DeclKind::Constructor) {
         Node->emitDiag(Added->getLoc(), diag::moved_decl,
-          Ctx.buffer((Twine(getDeclKindStr(Added->getDeclKind())) + " " +
+          Ctx.buffer((Twine(getDeclKindStr(Added->getDeclKind(),
+            Ctx.getOpts().CompilerStyle)) + " " +
             Added->getFullyQualifiedName()).str()));
         return;
       }
@@ -2133,7 +2136,8 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
       [&](TypeMemberDiffItem &Item) { return Item.usr == Node->getUsr(); });
     if (It != MemberChanges.end()) {
       Node->emitDiag(SourceLoc(), diag::renamed_decl,
-        Ctx.buffer((Twine(getDeclKindStr(Node->getDeclKind())) + " " +
+        Ctx.buffer((Twine(getDeclKindStr(Node->getDeclKind(),
+          Ctx.getOpts().CompilerStyle)) + " " +
           It->newTypeName + "." + It->newPrintedName).str()));
       return;
     }
@@ -2190,7 +2194,8 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
       DiagLoc = CD->getLoc();
     }
     Node->emitDiag(DiagLoc, diag::renamed_decl,
-        Ctx.buffer((Twine(getDeclKindStr(Node->getDeclKind())) + " " +
+        Ctx.buffer((Twine(getDeclKindStr(Node->getDeclKind(),
+          Ctx.getOpts().CompilerStyle)) + " " +
           Node->getAnnotateComment(NodeAnnotation::RenameNewName)).str()));
     return;
   }
@@ -2701,6 +2706,8 @@ static CheckerOptions getCheckOpts(int argc, char *argv[]) {
   // the checking logics are language-specific.
   Opts.SwiftOnly = options::Abi || options::SwiftOnly;
   Opts.SkipOSCheck = options::DisableOSChecks;
+  Opts.CompilerStyle = options::CompilerStyleDiags ||
+    !options::SerializedDiagPath.empty();
   for (int i = 1; i < argc; ++i)
     Opts.ToolArgs.push_back(argv[i]);
 

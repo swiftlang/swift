@@ -624,10 +624,8 @@ inline SourceFile::ParsingOptions operator|(SourceFile::ParsingFlags lhs,
   return SourceFile::ParsingOptions(lhs) | rhs;
 }
 
-inline SourceFile &
-ModuleDecl::getMainSourceFile(SourceFileKind expectedKind) const {
+inline SourceFile &ModuleDecl::getMainSourceFile() const {
   assert(!Files.empty() && "No files added yet");
-  assert(cast<SourceFile>(Files.front())->Kind == expectedKind);
   return *cast<SourceFile>(Files.front());
 }
 

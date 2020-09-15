@@ -209,7 +209,7 @@ private:
     if (!resolverSupports || !resolve)
       return;
     
-    auto machine = O->getELFFile()->getHeader()->e_machine;
+    auto machine = O->getELFFile()->getHeader().e_machine;
     auto relativeRelocType = getELFRelativeRelocationType(machine);
     
     for (auto &S : static_cast<const ELFObjectFileBase*>(O)

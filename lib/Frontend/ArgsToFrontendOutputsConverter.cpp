@@ -183,7 +183,7 @@ OutputFilesComputer::computeOutputFile(StringRef outputArg,
 
 Optional<std::string>
 OutputFilesComputer::deriveOutputFileFromInput(const InputFile &input) const {
-  if (input.file() == "-" || HasTextualOutput)
+  if (input.getFileName() == "-" || HasTextualOutput)
     return std::string("-");
 
   std::string baseName = determineBaseNameOfOutput(input);
@@ -210,7 +210,7 @@ std::string
 OutputFilesComputer::determineBaseNameOfOutput(const InputFile &input) const {
   std::string nameToStem =
       input.isPrimary()
-          ? input.file()
+          ? input.getFileName()
           : ModuleNameArg ? ModuleNameArg->getValue() : FirstInput;
   return llvm::sys::path::stem(nameToStem).str();
 }
@@ -474,8 +474,8 @@ StringRef SupplementaryOutputPathsComputer::
   if (!outputFilename.empty() && outputFilename != "-")
     return outputFilename;
 
-  if (input.isPrimary() && input.file() != "-")
-    return llvm::sys::path::filename(input.file());
+  if (input.isPrimary() && input.getFileName() != "-")
+    return llvm::sys::path::filename(input.getFileName());
 
   return ModuleName;
 }
@@ -600,12 +600,12 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
   InputsAndOutputs.forEachInputProducingSupplementaryOutput(
       [&](const InputFile &input) -> bool {
         const TypeToPathMap *mapForInput =
-            OFM->getOutputMapForInput(input.file());
+            OFM->getOutputMapForInput(input.getFileName());
         if (!mapForInput) {
           Diags.diagnose(
               SourceLoc(),
               diag::error_missing_entry_in_supplementary_output_file_map,
-              supplementaryFileMapPath, input.file());
+              supplementaryFileMapPath, input.getFileName());
           hadError = true;
         }
         outputPaths.push_back(createFromTypeToPathMap(mapForInput));

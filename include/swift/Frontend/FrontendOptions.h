@@ -39,9 +39,6 @@ class FrontendOptions {
 public:
   FrontendInputsAndOutputs InputsAndOutputs;
 
-  /// The kind of input on which the frontend should operate.
-  InputFileKind InputKind = InputFileKind::Swift;
-
   void forAllOutputPaths(const InputFile &input,
                          llvm::function_ref<void(StringRef)> fn) const;
 
@@ -142,6 +139,14 @@ public:
 
   /// Indicates the action the user requested that the frontend perform.
   ActionType RequestedAction = ActionType::NoneAction;
+
+  enum class ParseInputMode {
+    Swift,
+    SwiftLibrary,
+    SwiftModuleInterface,
+    SIL,
+  };
+  ParseInputMode InputMode = ParseInputMode::Swift;
 
   /// Indicates that the input(s) should be parsed as the Swift stdlib.
   bool ParseStdlib = false;
@@ -316,8 +321,8 @@ public:
   StringRef determineFallbackModuleName() const;
 
   bool isCompilingExactlyOneSwiftFile() const {
-    return InputKind == InputFileKind::Swift &&
-           InputsAndOutputs.hasSingleInput();
+    return InputsAndOutputs.hasSingleInput() &&
+           InputMode == ParseInputMode::Swift;
   }
 
   const PrimarySpecificPaths &

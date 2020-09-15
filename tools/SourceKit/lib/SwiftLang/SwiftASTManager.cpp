@@ -711,7 +711,7 @@ bool ASTProducer::shouldRebuild(
       Invok.Opts.Invok.getFrontendOptions().InputsAndOutputs.inputCount());
   for (const auto &input :
        Invok.Opts.Invok.getFrontendOptions().InputsAndOutputs.getAllInputs()) {
-    const std::string &File = input.file();
+    const std::string &File = input.getFileName();
     bool FoundSnapshot = false;
     for (auto &Snap : Snapshots) {
       if (Snap->getFilename() == File) {
@@ -906,7 +906,7 @@ void ASTProducer::findSnapshotAndOpenFiles(
   const InvocationOptions &Opts = InvokRef->Impl.Opts;
   for (const auto &input :
        Opts.Invok.getFrontendOptions().InputsAndOutputs.getAllInputs()) {
-    const std::string &File = input.file();
+    const std::string &File = input.getFileName();
     bool IsPrimary = input.isPrimary();
     bool FoundSnapshot = false;
     for (auto &Snap : Snapshots) {
