@@ -20,6 +20,7 @@
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/EvaluatorDependencies.h"
 #include "swift/AST/SimpleRequest.h"
+#include "swift/SIL/SILDeclRef.h"
 
 namespace swift {
 
@@ -40,22 +41,30 @@ template<typename Request>
 void reportEvaluatedRequest(UnifiedStatsReporter &stats,
                             const Request &request);
 
+using SILRefsToEmit = llvm::SmallVector<SILDeclRef, 1>;
+
 /// Describes a file or module to be lowered to SIL.
 struct ASTLoweringDescriptor {
   llvm::PointerUnion<FileUnit *, ModuleDecl *> context;
   Lowering::TypeConverter &conv;
   const SILOptions &opts;
 
+  /// A specific set of SILDeclRefs to emit. If set, only these refs will be
+  /// emitted. Otherwise the entire \c context will be emitted.
+  Optional<SILRefsToEmit> refsToEmit;
+
   friend llvm::hash_code hash_value(const ASTLoweringDescriptor &owner) {
     return llvm::hash_combine(owner.context, (void *)&owner.conv,
-                              (void *)&owner.opts);
+                              (void *)&owner.opts,
+                              owner.refsToEmit);
   }
 
   friend bool operator==(const ASTLoweringDescriptor &lhs,
                          const ASTLoweringDescriptor &rhs) {
     return lhs.context == rhs.context &&
            &lhs.conv == &rhs.conv &&
-           &lhs.opts == &rhs.opts;
+           &lhs.opts == &rhs.opts &&
+           lhs.refsToEmit == rhs.refsToEmit;
   }
 
   friend bool operator!=(const ASTLoweringDescriptor &lhs,
@@ -65,14 +74,16 @@ struct ASTLoweringDescriptor {
 
 public:
   static ASTLoweringDescriptor
-  forFile(FileUnit &sf, Lowering::TypeConverter &conv, const SILOptions &opts) {
-    return ASTLoweringDescriptor{&sf, conv, opts};
+  forFile(FileUnit &sf, Lowering::TypeConverter &conv, const SILOptions &opts,
+          Optional<SILRefsToEmit> refsToEmit = None) {
+    return ASTLoweringDescriptor{&sf, conv, opts, refsToEmit};
   }
 
-  static ASTLoweringDescriptor forWholeModule(ModuleDecl *mod,
-                                              Lowering::TypeConverter &conv,
-                                              const SILOptions &opts) {
-    return ASTLoweringDescriptor{mod, conv, opts};
+  static ASTLoweringDescriptor
+  forWholeModule(ModuleDecl *mod, Lowering::TypeConverter &conv,
+                 const SILOptions &opts,
+                 Optional<SILRefsToEmit> refsToEmit = None) {
+    return ASTLoweringDescriptor{mod, conv, opts, refsToEmit};
   }
 
   /// Retrieves the files to generate SIL for. If the descriptor is configured

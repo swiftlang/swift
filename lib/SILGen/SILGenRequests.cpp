@@ -61,6 +61,11 @@ evaluator::DependencySource ASTLoweringRequest::readDependencySource(
 }
 
 ArrayRef<FileUnit *> ASTLoweringDescriptor::getFilesToEmit() const {
+  // If we have a specific set of SILDeclRefs to emit, we don't emit any whole
+  // files.
+  if (refsToEmit)
+    return {};
+
   if (auto *mod = context.dyn_cast<ModuleDecl *>())
     return mod->getFiles();
 
