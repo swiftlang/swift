@@ -314,7 +314,7 @@ class alignas(1 << TypeAlignInBits) TypeBase {
   }
 
 protected:
-  enum { NumAFTExtInfoBits = 9 };
+  enum { NumAFTExtInfoBits = 10 };
   enum { NumSILExtInfoBits = 9 };
   union { uint64_t OpaqueBits;
 
@@ -2874,11 +2874,10 @@ protected:
   /// Subclasses are responsible for storing and retrieving the
   /// ClangTypeInfo value if one is present.
   AnyFunctionType(TypeKind Kind, const ASTContext *CanTypeContext,
-                  Type Output, Type ThrowsType,
-                  RecursiveTypeProperties properties,
+                  Type Output, RecursiveTypeProperties properties,
                   unsigned NumParams, ExtInfo Info)
-  : TypeBase(Kind, CanTypeContext, properties), Output(Output),
-    ThrowsType(ThrowsType) {
+  : TypeBase(Kind, CanTypeContext, properties),
+    ThrowsType(Info.getThrowsType()), Output(Output) {
     Bits.AnyFunctionType.ExtInfoBits = Info.getBits();
     Bits.AnyFunctionType.HasClangTypeInfo = !Info.getClangTypeInfo().empty();
     Bits.AnyFunctionType.NumParams = NumParams;
@@ -2919,11 +2918,21 @@ public:
                             ArrayRef<Identifier> labels);
 
   Type getResult() const { return Output; }
-  Type getThrowsType() const { return ThrowsType; }
   ArrayRef<Param> getParams() const;
   unsigned getNumParams() const { return Bits.AnyFunctionType.NumParams; }
 
   GenericSignature getOptGenericSignature() const;
+
+  ThrowsInfo getThrowsInfo() const {
+    return getExtInfo().getThrowsInfo();
+  }
+
+  ThrowsInfo::Kind getThrowsKind() const {
+    return getExtInfo().getThrowsKind();
+  }
+
+  Type getThrowsType() const { return ThrowsType; }
+  CanType getCanonicalThrowsType() const;
   
   bool hasClangTypeInfo() const {
     return Bits.AnyFunctionType.HasClangTypeInfo;
@@ -2933,7 +2942,8 @@ public:
   ClangTypeInfo getCanonicalClangTypeInfo() const;
 
   ExtInfo getExtInfo() const {
-    return ExtInfo(Bits.AnyFunctionType.ExtInfoBits, getClangTypeInfo());
+    return ExtInfo(Bits.AnyFunctionType.ExtInfoBits, getThrowsType(),
+                   getClangTypeInfo());
   }
 
   /// Get the canonical ExtInfo for the function type.
@@ -2942,11 +2952,13 @@ public:
   /// In the future, we will always use the canonical clang function type.
   ExtInfo getCanonicalExtInfo(bool useClangFunctionType) const {
     return ExtInfo(Bits.AnyFunctionType.ExtInfoBits,
+                   ThrowsType ? getCanonicalThrowsType() : ThrowsType,
                    useClangFunctionType ? getCanonicalClangTypeInfo()
                                         : ClangTypeInfo());
   }
 
-  bool hasSameExtInfoAs(const AnyFunctionType *otherFn);
+  bool
+  hasSameExtInfoAs(const AnyFunctionType *otherFn, bool considerThrowsType);
 
   /// Get the representation of the function type.
   Representation getRepresentation() const {
@@ -3090,8 +3102,6 @@ public:
 
   bool isAsync() const { return getExtInfo().isAsync(); }
 
-  bool isThrowing() const { return getExtInfo().isThrowing(); }
-
   bool isDifferentiable() const { return getExtInfo().isDifferentiable(); }
   DifferentiabilityKind getDifferentiabilityKind() const {
     return getExtInfo().getDifferentiabilityKind();
@@ -3164,7 +3174,7 @@ class FunctionType final
 
 public:
   /// 'Constructor' Factory Function
-  static FunctionType *get(ArrayRef<Param> params, Type result, Type throwsType,
+  static FunctionType *get(ArrayRef<Param> params, Type result,
                            ExtInfo info = ExtInfo());
 
   // Retrieve the input parameters of this function type.
@@ -3201,9 +3211,8 @@ private:
 };
 BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
   static CanFunctionType get(CanParamArrayRef params, CanType result,
-                             CanType throwsType, ExtInfo info = ExtInfo()) {
-    auto fnType = FunctionType::get(params.getOriginalArray(), result,
-                                    throwsType, info);
+                             ExtInfo info = ExtInfo()) {
+    auto fnType = FunctionType::get(params.getOriginalArray(), result, info);
     return cast<FunctionType>(fnType->getCanonicalType());
   }
 
@@ -3261,7 +3270,7 @@ class GenericFunctionType final : public AnyFunctionType,
   /// Construct a new generic function type.
   GenericFunctionType(GenericSignature sig,
                       ArrayRef<Param> params,
-                      Type result, Type throwsType,
+                      Type result,
                       ExtInfo info,
                       const ASTContext *ctx,
                       RecursiveTypeProperties properties);
@@ -3270,7 +3279,7 @@ public:
   /// Create a new generic function type.
   static GenericFunctionType *get(GenericSignature sig,
                                   ArrayRef<Param> params,
-                                  Type result, Type throwsType,
+                                  Type result,
                                   ExtInfo info = ExtInfo());
 
   // Retrieve the input parameters of this function type.
@@ -3319,7 +3328,7 @@ BEGIN_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
     // Knowing that the argument types are independently canonical is
     // not sufficient to guarantee that the function type will be canonical.
     auto fnType = GenericFunctionType::get(sig, params.getOriginalArray(),
-                                           result, throwsType, info);
+                                           result, info);
     return cast<GenericFunctionType>(fnType->getCanonicalType());
   }
 
@@ -3346,7 +3355,7 @@ CanAnyFunctionType::get(CanGenericSignature signature, CanParamArrayRef params,
     return CanGenericFunctionType::get(signature, params, result, throwsType,
                                        extInfo);
   } else {
-    return CanFunctionType::get(params, result, throwsType, extInfo);
+    return CanFunctionType::get(params, result, extInfo);
   }
 }
 

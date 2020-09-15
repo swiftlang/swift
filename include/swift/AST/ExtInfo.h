@@ -22,11 +22,12 @@
 
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/Type.h"
 
 #include "llvm/ADT/Optional.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include <utility>
+#include <tuple>
 
 namespace clang {
 class Type;
@@ -79,6 +80,34 @@ public:
   void printType(ClangModuleLoader *cml, llvm::raw_ostream &os) const;
 
   void dump(llvm::raw_ostream &os, const clang::ASTContext &ctx) const;
+};
+
+// MARK: - ThrowsInfo
+/// Information about the kind of a function's throws
+class ThrowsInfo {
+public:
+  enum class Kind : uint8_t {
+    Nonthrowing,
+    Untyped,
+    Typed,
+  };
+
+private:
+  friend ASTExtInfoBuilder;
+
+  Kind kind;
+
+  // Is non-null, if kind is Kind::Typed
+  Type throwsType;
+  
+  ThrowsInfo(Kind kind, Type type = nullptr): kind(kind), throwsType(type) {}
+
+public:
+  static ThrowsInfo get(bool throws, Type type);
+
+  Kind getKind() const { return kind; }
+
+  Type getThrowsType() const;
 };
 
 // MARK: - FunctionTypeRepresentation
@@ -183,41 +212,45 @@ class ASTExtInfoBuilder {
     RepresentationMask = 0xF << 0,
     NoEscapeMask = 1 << 4,
     AsyncMask = 1 << 5,
-    ThrowsMask = 1 << 6,
-    DifferentiabilityMaskOffset = 7,
+    ThrowsKindMaskOffset = 6,
+    ThrowsKindMask = 0x3 << ThrowsKindMaskOffset,
+    DifferentiabilityMaskOffset = 8,
     DifferentiabilityMask = 0x3 << DifferentiabilityMaskOffset,
-    NumMaskBits = 9
+    NumMaskBits = 10
   };
 
   unsigned bits; // Naturally sized for speed.
+
+  // Is non-null, if throwsKind is ThrowsInfo::Kind::Typed
+  Type throwsType;
 
   ClangTypeInfo clangTypeInfo;
 
   using Representation = FunctionTypeRepresentation;
 
-  ASTExtInfoBuilder(unsigned bits, ClangTypeInfo clangTypeInfo)
-      : bits(bits), clangTypeInfo(clangTypeInfo) {}
+  ASTExtInfoBuilder(unsigned bits, Type throwsType, ClangTypeInfo clangTypeInfo)
+      : bits(bits), throwsType(throwsType), clangTypeInfo(clangTypeInfo) {}
 
 public:
   // Constructor with all defaults.
-  ASTExtInfoBuilder()
-      : ASTExtInfoBuilder(Representation::Swift, false, false,
-                          DifferentiabilityKind::NonDifferentiable, nullptr) {}
+  static ASTExtInfoBuilder get() {
+    return ASTExtInfoBuilder::get(Representation::Swift, false, false, nullptr,
+                                  DifferentiabilityKind::NonDifferentiable,
+                                  nullptr);
+  }
 
   // Constructor for polymorphic type.
-  ASTExtInfoBuilder(Representation rep, bool throws)
-      : ASTExtInfoBuilder(rep, false, throws,
-                          DifferentiabilityKind::NonDifferentiable, nullptr) {}
+  static
+  ASTExtInfoBuilder get(Representation rep, bool throws, Type throwsType) {
+    return ASTExtInfoBuilder::get(rep, false, throws, throwsType,
+                                  DifferentiabilityKind::NonDifferentiable,
+                                  nullptr);
+  }
 
   // Constructor with no defaults.
-  ASTExtInfoBuilder(Representation rep, bool isNoEscape, bool throws,
-                    DifferentiabilityKind diffKind, const clang::Type *type)
-      : ASTExtInfoBuilder(
-            ((unsigned)rep) | (isNoEscape ? NoEscapeMask : 0) |
-                (throws ? ThrowsMask : 0) |
-                (((unsigned)diffKind << DifferentiabilityMaskOffset) &
-                 DifferentiabilityMask),
-            ClangTypeInfo(type)) {}
+  static ASTExtInfoBuilder get(Representation rep, bool isNoEscape, bool throws,
+                               Type throwsType, DifferentiabilityKind diffKind,
+                               const clang::Type *type);
 
   void checkInvariants() const;
 
@@ -235,7 +268,15 @@ public:
 
   constexpr bool isAsync() const { return bits & AsyncMask; }
 
-  constexpr bool isThrowing() const { return bits & ThrowsMask; }
+  constexpr ThrowsInfo::Kind getThrowsKind() const {
+    return ThrowsInfo::Kind((bits & ThrowsKindMask) >> ThrowsKindMaskOffset);
+  }
+
+  Type getThrowsType() const { return throwsType; }
+
+  ThrowsInfo getThrowsInfo() const {
+    return ThrowsInfo(getThrowsKind(), throwsType);
+  }
 
   constexpr DifferentiabilityKind getDifferentiabilityKind() const {
     return DifferentiabilityKind((bits & DifferentiabilityMask) >>
@@ -292,24 +333,27 @@ public:
   LLVM_NODISCARD
   ASTExtInfoBuilder withRepresentation(Representation rep) const {
     return ASTExtInfoBuilder((bits & ~RepresentationMask) | (unsigned)rep,
-                             clangTypeInfo);
+                             throwsType, clangTypeInfo);
   }
   LLVM_NODISCARD
   ASTExtInfoBuilder withNoEscape(bool noEscape = true) const {
     return ASTExtInfoBuilder(noEscape ? (bits | NoEscapeMask)
                                       : (bits & ~NoEscapeMask),
-                             clangTypeInfo);
+                             throwsType, clangTypeInfo);
   }
   LLVM_NODISCARD
   ASTExtInfoBuilder withAsync(bool async = true) const {
     return ASTExtInfoBuilder(async ? (bits | AsyncMask)
                                    : (bits & ~AsyncMask),
-                             clangTypeInfo);
+                             throwsType, clangTypeInfo);
   }
   LLVM_NODISCARD
-  ASTExtInfoBuilder withThrows(bool throws = true) const {
+  ASTExtInfoBuilder withThrows(bool throws, Type type) const {
+    ThrowsInfo throwsInfo = ThrowsInfo::get(throws, type);
     return ASTExtInfoBuilder(
-        throws ? (bits | ThrowsMask) : (bits & ~ThrowsMask), clangTypeInfo);
+        (bits & ~ThrowsKindMask) |
+            ((unsigned)throwsInfo.kind << ThrowsKindMaskOffset),
+        throwsInfo.throwsType, clangTypeInfo);
   }
   LLVM_NODISCARD
   ASTExtInfoBuilder
@@ -317,11 +361,11 @@ public:
     return ASTExtInfoBuilder(
         (bits & ~DifferentiabilityMask) |
             ((unsigned)differentiability << DifferentiabilityMaskOffset),
-        clangTypeInfo);
+        throwsType, clangTypeInfo);
   }
   LLVM_NODISCARD
   ASTExtInfoBuilder withClangFunctionType(const clang::Type *type) const {
-    return ASTExtInfoBuilder(bits, ClangTypeInfo(type));
+    return ASTExtInfoBuilder(bits, throwsType, ClangTypeInfo(type));
   }
 
   /// Put a SIL representation in the ExtInfo.
@@ -333,17 +377,13 @@ public:
   ASTExtInfoBuilder
   withSILRepresentation(SILFunctionTypeRepresentation rep) const {
     return ASTExtInfoBuilder((bits & ~RepresentationMask) | (unsigned)rep,
-                             clangTypeInfo);
+                             throwsType, clangTypeInfo);
   }
 
-  bool isEqualTo(ASTExtInfoBuilder other, bool useClangTypes) const {
-    return bits == other.bits &&
-      (useClangTypes ? (clangTypeInfo == other.clangTypeInfo) : true);
-  }
+  bool isEqualTo(ASTExtInfoBuilder other, bool useClangTypes,
+                 bool considerThrowsType = true) const;
 
-  constexpr std::pair<unsigned, const void *> getFuncAttrKey() const {
-    return std::make_pair(bits, clangTypeInfo.getType());
-  }
+  std::tuple<unsigned, const void *, const void *> getFuncAttrKey() const;
 }; // end ASTExtInfoBuilder
 
 // MARK: - ASTExtInfo
@@ -361,11 +401,11 @@ class ASTExtInfo {
   ASTExtInfoBuilder builder;
 
   ASTExtInfo(ASTExtInfoBuilder builder) : builder(builder) {}
-  ASTExtInfo(unsigned bits, ClangTypeInfo clangTypeInfo)
-      : builder(bits, clangTypeInfo){};
+  ASTExtInfo(unsigned bits, Type throwsType, ClangTypeInfo clangTypeInfo)
+      : builder(bits, throwsType, clangTypeInfo) {}
 
 public:
-  ASTExtInfo() : builder(){};
+  ASTExtInfo() : builder(ASTExtInfoBuilder::get()) {}
 
   /// Create a builder with the same state as \c this.
   ASTExtInfoBuilder intoBuilder() const { return builder; }
@@ -386,7 +426,13 @@ public:
 
   constexpr bool isAsync() const { return builder.isAsync(); }
 
-  constexpr bool isThrowing() const { return builder.isThrowing(); }
+  constexpr ThrowsInfo::Kind getThrowsKind() const {
+    return builder.getThrowsKind();
+  }
+
+  Type getThrowsType() const { return builder.getThrowsType(); }
+
+  ThrowsInfo getThrowsInfo() const { return builder.getThrowsInfo(); }
 
   constexpr DifferentiabilityKind getDifferentiabilityKind() const {
     return builder.getDifferentiabilityKind();
@@ -420,8 +466,8 @@ public:
   ///
   /// Prefer using \c ASTExtInfoBuilder::withThrows for chaining.
   LLVM_NODISCARD
-  ASTExtInfo withThrows(bool throws = true) const {
-    return builder.withThrows(throws).build();
+  ASTExtInfo withThrows(bool throws, Type type) const {
+    return builder.withThrows(throws, type).build();
   }
 
   /// Helper method for changing only the async field.
@@ -432,11 +478,12 @@ public:
     return builder.withAsync(async).build();
   }
 
-  bool isEqualTo(ASTExtInfo other, bool useClangTypes) const {
-    return builder.isEqualTo(other.builder, useClangTypes);
+  bool isEqualTo(ASTExtInfo other, bool useClangTypes,
+                 bool considerThrowsType = true) const {
+    return builder.isEqualTo(other.builder, useClangTypes, considerThrowsType);
   }
 
-  constexpr std::pair<unsigned, const void *> getFuncAttrKey() const {
+  std::tuple<unsigned, const void *, const void *> getFuncAttrKey() const {
     return builder.getFuncAttrKey();
   }
 }; // end ASTExtInfo

@@ -432,15 +432,14 @@ Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
     sig = genericFn->getGenericSignature();
     type = FunctionType::get(genericFn->getParams(),
                              genericFn->getResult(),
-                             genericFn->getThrowsType(),
                              genericFn->getExtInfo());
   }
 
   auto selfTy = dc->getSelfInterfaceType();
   auto selfParam = AnyFunctionType::Param(selfTy);
   if (sig)
-    return GenericFunctionType::get(sig, {selfParam}, type, dc->getASTContext().getNeverType());
-  return FunctionType::get({selfParam}, type, dc->getASTContext().getNeverType());
+    return GenericFunctionType::get(sig, {selfParam}, type);
+  return FunctionType::get({selfParam}, type);
 }
 
 void
@@ -793,12 +792,10 @@ Type TypeBase::removeArgumentLabels(unsigned numArgumentLabels) {
   if (auto *genericFnType = dyn_cast<GenericFunctionType>(fnType)) {
     return GenericFunctionType::get(genericFnType->getGenericSignature(),
                                     unlabeledParams, result,
-                                    fnType->getThrowsType(),
                                     fnType->getExtInfo());
   }
 
-  return FunctionType::get(unlabeledParams, result, fnType->getThrowsType(),
-                           fnType->getExtInfo());
+  return FunctionType::get(unlabeledParams, result, fnType->getExtInfo());
 }
 
 
@@ -832,12 +829,10 @@ Type TypeBase::replaceCovariantResultType(Type newResultType,
   if (auto genericFn = dyn_cast<GenericFunctionType>(fnType)) {
     return GenericFunctionType::get(genericFn->getGenericSignature(),
                                     inputType, resultType,
-                                    fnType->getThrowsType(),
                                     fnType->getExtInfo());
   }
   
-  return FunctionType::get(inputType, resultType, fnType->getThrowsType(),
-                           fnType->getExtInfo());
+  return FunctionType::get(inputType, resultType, fnType->getExtInfo());
 }
 
 /// Whether this parameter accepts an unlabeled trailing closure argument
@@ -977,13 +972,11 @@ Type TypeBase::replaceSelfParameterType(Type newSelf) {
     return GenericFunctionType::get(genericFnTy->getGenericSignature(),
                                     {selfParam},
                                     fnTy->getResult(),
-                                    fnTy->getThrowsType(),
                                     fnTy->getExtInfo());
   }
 
   return FunctionType::get({selfParam},
                            fnTy->getResult(),
-                           fnTy->getThrowsType(),
                            fnTy->getExtInfo());
 }
 
@@ -1253,16 +1246,13 @@ CanType TypeBase::computeCanonicalType() {
     SmallVector<AnyFunctionType::Param, 8> canParams;
     getCanonicalParams(funcTy, genericSig, canParams);
     auto resultTy = funcTy->getResult()->getCanonicalType(genericSig);
-    CanType throwsTy;
-    if (auto funcThrowsTy = funcTy->getThrowsType())
-      throwsTy = funcThrowsTy->getCanonicalType(genericSig);
 
     auto extInfo = funcTy->getCanonicalExtInfo(useClangTypes(resultTy));
     if (genericSig) {
       Result = GenericFunctionType::get(genericSig, canParams, resultTy,
-                                        throwsTy, extInfo);
+                                        extInfo);
     } else {
-      Result = FunctionType::get(canParams, resultTy, throwsTy, extInfo);
+      Result = FunctionType::get(canParams, resultTy, extInfo);
     }
     assert(Result->isCanonical());
     break;
@@ -1823,20 +1813,23 @@ public:
                              nullptr, {});
       if (!newReturn)
         return CanType();
-      
-      CanType newThrowsTy;
-      if (func->getThrowsType() && substFunc->getThrowsType())
-        newThrowsTy = visit(func->getThrowsType()->getCanonicalType(),
-                            substFunc->getThrowsType()->getCanonicalType(),
-                            nullptr, {});
 
-      if (!newThrowsTy)
-        return CanType();
+      ASTExtInfo newInfo = func->getExtInfo();
+      if (func->getThrowsKind() == ThrowsInfo::Kind::Typed &&
+          substFunc->getThrowsKind() == ThrowsInfo::Kind::Typed) {
+        CanType newThrowsTy = visit(func->getCanonicalThrowsType(),
+                            substFunc->getCanonicalThrowsType(),
+                            nullptr, {});
+        if (!newThrowsTy)
+          return CanType();
+
+        newInfo = newInfo.withThrows(true, newThrowsTy);
+      }
+
       if (!didChange && newReturn == substFunc.getResult()
-          && newThrowsTy == substFunc.getThrowsType())
+          && newInfo.getThrowsType())
         return subst;
-      return FunctionType::get(newParams, newReturn, newThrowsTy,
-                               func->getExtInfo())
+      return FunctionType::get(newParams, newReturn, newInfo)
         ->getCanonicalType();
     }
     return CanType();
@@ -2291,7 +2284,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
   if (auto functionType = type->getAs<FunctionType>()) {
     // Cannot handle async or throwing functions.
     if (functionType->getExtInfo().isAsync() ||
-        functionType->getExtInfo().isThrowing())
+        functionType->getThrowsKind() != ThrowsInfo::Kind::Nonthrowing)
       return failure();
 
     // Whether we have found any types that are bridged.
@@ -2616,7 +2609,7 @@ namespace {
 static bool matchesFunctionType(CanAnyFunctionType fn1, CanAnyFunctionType fn2,
                                 TypeMatchOptions matchMode,
                                 OptionalUnwrapping insideOptional,
-                                llvm::function_ref<bool()> paramsAndResultMatch) {
+                                llvm::function_ref<bool()> paramsThrowsTypeAndResultMatch) {
   // FIXME: Handle generic functions in non-ABI matches.
   if (!matchMode.contains(TypeMatchFlags::AllowABICompatible)) {
     if (!isa<FunctionType>(fn1) || !isa<FunctionType>(fn2))
@@ -2645,7 +2638,7 @@ static bool matchesFunctionType(CanAnyFunctionType fn1, CanAnyFunctionType fn2,
   if (!ext1.isEqualTo(ext2, useClangTypes(fn1)))
     return false;
 
-  return paramsAndResultMatch();
+  return paramsThrowsTypeAndResultMatch();
 }
 
 static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
@@ -2725,7 +2718,7 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
     if (!fn1)
       return false;
 
-    auto paramsAndResultMatch = [&]() {
+    auto paramsThrowsTypeAndResultMatch = [&]() {
       auto fn2Params = fn2.getParams();
       auto fn1Params = fn1.getParams();
       if (fn2Params.size() != fn1Params.size()) {
@@ -2741,6 +2734,13 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
         }
       }
 
+      // Throws types are covariant
+      if (!matches(fn1.getThrowsType(), fn2.getThrowsType(), matchMode,
+                   ParameterPosition::NotParameter,
+                   OptionalUnwrapping::None)) {
+        return false;
+      }
+
       // Results are covariant.
       return (matches(fn1.getResult(), fn2.getResult(), matchMode,
                       ParameterPosition::NotParameter,
@@ -2748,7 +2748,7 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
     };
 
     return matchesFunctionType(fn1, fn2, matchMode, insideOptional,
-                               paramsAndResultMatch);
+                               paramsThrowsTypeAndResultMatch);
   }
 
   // Class-to-class.
@@ -3429,6 +3429,10 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   return build(C, CanTypes, HasExplicitAnyObject);
 }
 
+CanType AnyFunctionType::getCanonicalThrowsType() const {
+  return ThrowsType->getCanonicalType();
+}
+
 ClangTypeInfo AnyFunctionType::getClangTypeInfo() const {
   switch (getKind()) {
   case TypeKind::Function:
@@ -3445,8 +3449,10 @@ ClangTypeInfo AnyFunctionType::getCanonicalClangTypeInfo() const {
   return getClangTypeInfo().getCanonical();
 }
 
-bool AnyFunctionType::hasSameExtInfoAs(const AnyFunctionType *otherFn) {
-  return getExtInfo().isEqualTo(otherFn->getExtInfo(), useClangTypes(this));
+bool AnyFunctionType::hasSameExtInfoAs(const AnyFunctionType *otherFn,
+                                       bool considerThrowsType) {
+  return getExtInfo().isEqualTo(otherFn->getExtInfo(), useClangTypes(this),
+                                considerThrowsType);
 }
 
 // [TODO: Store-SIL-Clang-type]

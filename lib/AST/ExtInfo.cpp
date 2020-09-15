@@ -16,6 +16,7 @@
 
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ExtInfo.h"
+#include "swift/AST/Types.h"
 
 #include "clang/AST/Type.h"
 
@@ -64,7 +65,37 @@ void ClangTypeInfo::dump(llvm::raw_ostream &os,
   }
 }
 
+// MARK: - ThrowsInfo
+ThrowsInfo ThrowsInfo::get(bool throws, Type type) {
+  if (!throws) return Kind::Nonthrowing;
+
+  if (!type) return Kind::Untyped;
+
+  if (type->isStructurallyUninhabited()) return Kind::Nonthrowing;
+
+  return ThrowsInfo(Kind::Typed, type);
+}
+
+Type ThrowsInfo::getThrowsType() const {
+  assert(kind == Kind::Typed && "Can only get type of typed throws");
+  return throwsType;
+}
+
 // MARK: - ASTExtInfoBuilder
+ASTExtInfoBuilder ASTExtInfoBuilder::get(Representation rep, bool isNoEscape,
+                                         bool throws, Type throwsType,
+                                         DifferentiabilityKind diffKind,
+                                         const clang::Type *type) {
+  ThrowsInfo throwsInfo = ThrowsInfo::get(throws, throwsType);
+
+  return
+      ASTExtInfoBuilder(((unsigned)rep) | (isNoEscape ? NoEscapeMask : 0) |
+                        (((unsigned)throwsInfo.kind << ThrowsKindMaskOffset) &
+                         ThrowsKindMask) |
+                        (((unsigned)diffKind << DifferentiabilityMaskOffset) &
+                         DifferentiabilityMask),
+                        throwsInfo.throwsType, ClangTypeInfo(type));
+}
 
 void ASTExtInfoBuilder::checkInvariants() const {
   // TODO: [clang-function-type-serialization] Once we start serializing
@@ -72,6 +103,22 @@ void ASTExtInfoBuilder::checkInvariants() const {
   auto Rep = Representation(bits & RepresentationMask);
   if ((Rep == Representation::CFunctionPointer) && clangTypeInfo.type)
     assertIsFunctionType(clangTypeInfo.type);
+}
+
+bool ASTExtInfoBuilder::isEqualTo(ASTExtInfoBuilder other,
+                                  bool useClangTypes,
+                                  bool considerThrowsType) const {
+  return bits == other.bits &&
+    (considerThrowsType ?
+     throwsType->getCanonicalType() == other.throwsType->getCanonicalType() :
+     true) &&
+    (useClangTypes ? (clangTypeInfo == other.clangTypeInfo) : true);
+}
+
+std::tuple<unsigned, const void *, const void *>
+ASTExtInfoBuilder::getFuncAttrKey() const {
+  return std::make_tuple(bits, throwsType->getCanonicalType().getPointer(),
+                         clangTypeInfo.getType());
 }
 
 // MARK: - ASTExtInfo
