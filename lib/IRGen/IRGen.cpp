@@ -1447,12 +1447,6 @@ GeneratedModule OptimizedIRRequest::evaluate(Evaluator &evaluator,
 
   bindExtensions(*parentMod);
 
-  // Type-check the files that need emitting.
-  for (auto *file : desc.getFiles()) {
-    if (auto *SF = dyn_cast<SourceFile>(file))
-      performTypeChecking(*SF);
-  }
-
   if (ctx.hadError())
     return GeneratedModule::null();
 

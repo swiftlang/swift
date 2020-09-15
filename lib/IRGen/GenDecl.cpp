@@ -34,6 +34,7 @@
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/GlobalDecl.h"
@@ -443,7 +444,10 @@ public:
 
 /// Emit all the top-level code in the source file.
 void IRGenModule::emitSourceFile(SourceFile &SF) {
-  assert(SF.ASTStage == SourceFile::TypeChecked);
+  // Type-check the file if we haven't already (this may be necessary for .sil
+  // files, which don't get fully type-checked by parsing).
+  performTypeChecking(SF);
+
   PrettySourceFileEmission StackEntry(SF);
 
   // Emit types and other global decls.

@@ -1884,7 +1884,8 @@ class SILGenModuleRAII {
 
 public:
   void emitSourceFile(SourceFile *sf) {
-    assert(sf->ASTStage == SourceFile::TypeChecked);
+    // Type-check the file if we haven't already.
+    performTypeChecking(*sf);
 
     SourceFileScope scope(SGM, sf);
     for (Decl *D : sf->getTopLevelDecls()) {
