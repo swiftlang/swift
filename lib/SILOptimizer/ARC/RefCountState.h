@@ -178,6 +178,9 @@ public:
   BottomUpRefCountState(BottomUpRefCountState &&) = default;
   BottomUpRefCountState &operator=(BottomUpRefCountState &&) = default;
 
+  /// Getter for LatticeState
+  LatticeState getLatticeState() const {return LatState;}
+
   /// Return true if the release can be moved to the retain.
   bool isCodeMotionSafe() const {
     return LatState != LatticeState::MightBeDecremented;
@@ -205,6 +208,8 @@ public:
   /// The main difference in between this routine and update for same loop inst
   /// is that if we see any decrements on a value, we treat it as being
   /// guaranteed used. We treat any uses as regular uses.
+  /// This function is conservative enough that the flow sensitive nature of
+  /// loop summarized instructions does not matter.
   void updateForDifferentLoopInst(
       SILInstruction *I,
       AliasAnalysis *AA);
@@ -312,6 +317,9 @@ public:
   TopDownRefCountState(TopDownRefCountState &&) = default;
   TopDownRefCountState &operator=(TopDownRefCountState &&) = default;
 
+  /// Getter for LatticeState
+  LatticeState getLatticeState() const {return LatState;}
+
   /// Return true if the retain can be moved to the release.
   bool isCodeMotionSafe() const {
     return LatState != LatticeState::MightBeUsed;
@@ -350,6 +358,8 @@ public:
   /// The main difference in between this routine and update for same loop inst
   /// is that if we see any decrements on a value, we treat it as being
   /// guaranteed used. We treat any uses as regular uses.
+  /// This function is conservative enough that the flow sensitive nature of
+  /// loop summarized instructions does not matter.
   void updateForDifferentLoopInst(
       SILInstruction *I,
       AliasAnalysis *AA);
