@@ -1897,7 +1897,8 @@ extension BinaryFloatingPoint {
 #if !os(macOS) && !(os(iOS) && targetEnvironment(macCatalyst))
     case (5, 10):
       guard #available(iOS 14.0, watchOS 7.0, tvOS 14.0, *) else {
-        self = Self._convert(from: value).value
+        // Convert signaling NaN to quiet NaN by multiplying by 1.
+        self = Self._convert(from: value).value * 1
         break
       }
       let value_ = value as? Float16 ?? Float16(
@@ -1935,7 +1936,8 @@ extension BinaryFloatingPoint {
       self = Self(value_)
 #endif
     default:
-      self = Self._convert(from: value).value
+      // Convert signaling NaN to quiet NaN by multiplying by 1.
+      self = Self._convert(from: value).value * 1
     }
   }
 
