@@ -659,7 +659,7 @@ class BuildScriptInvocation(object):
             # prioritizes CommandLineTools paths, resulting in compile errors.
             args.extra_cmake_options += [
                 '-DCMAKE_IGNORE_PATH=/usr/lib;/usr/local/lib;/lib',
-                '-DPKG_CONFIG_EXECUTABLE=/usr/bin/true',
+                '-DPKG_CONFIG_EXECUTABLE=/usr/bin/false',
             ]
 
         if toolchain.libtool is not None:
