@@ -1,6 +1,7 @@
 set(LLVM_ENABLE_PROJECTS
       clang
       clang-tools-extra
+      compiler-rt
       lld
       lldb
     CACHE STRING "")
