@@ -300,6 +300,23 @@ static void getImmediateImports(
     imports.insert(import.importedModule);
 }
 
+/// Check if a Swift module is an overlay for some Clang module.
+///
+/// FIXME: Delete this hack once SR-13363 is fixed and ModuleDecl has the
+/// right API which we can use directly.
+static bool isOverlayOfClangModule(ModuleDecl *swiftModule) {
+  assert(!swiftModule->isNonSwiftModule());
+
+  llvm::SmallPtrSet<ModuleDecl *, 8> importList;
+  ::getImmediateImports(swiftModule, importList,
+                        {ModuleDecl::ImportFilterKind::Public});
+  bool isOverlay =
+      llvm::any_of(importList, [&](ModuleDecl *importedModule) -> bool {
+        return isClangOverlayOf(swiftModule, importedModule);
+      });
+  return isOverlay;
+}
+
 namespace {
 /// Helper type for computing (approximate) information about ABI-dependencies.
 ///
@@ -344,12 +361,6 @@ class ABIDependencyEvaluator {
   /// Correct way to add entries to \c abiExportMap.
   void reexposeImportedABI(ModuleDecl *module, ModuleDecl *importedModule,
                            bool includeImportedModule = true);
-
-  /// Check if a Swift module is an overlay for some Clang module.
-  ///
-  /// FIXME: Delete this hack once SR-13363 is fixed and ModuleDecl has the
-  /// right API which we can use directly.
-  bool isOverlayOfClangModule(ModuleDecl *swiftModule);
 
   /// Check for cases where we have a fake cycle through an overlay.
   ///
@@ -484,19 +495,6 @@ void ABIDependencyEvaluator::reexposeImportedABI(
     addToABIExportMap(module, reexportedModule);
 }
 
-bool ABIDependencyEvaluator::isOverlayOfClangModule(ModuleDecl *swiftModule) {
-  assert(!swiftModule->isNonSwiftModule());
-
-  llvm::SmallPtrSet<ModuleDecl *, 8> importList;
-  ::getImmediateImports(swiftModule, importList,
-                        {ModuleDecl::ImportFilterKind::Public});
-  bool isOverlay =
-      llvm::any_of(importList, [&](ModuleDecl *importedModule) -> bool {
-        return isClangOverlayOf(swiftModule, importedModule);
-      });
-  return isOverlay;
-}
-
 // [NOTE: ABIDependencyEvaluator-fake-cycle-detection]
 //
 // First, let's consider a concrete example.
@@ -574,7 +572,7 @@ bool ABIDependencyEvaluator::isFakeCycleThroughOverlay(
   // Next, we must have zero or more modules followed by a Swift overlay for a
   // Clang module.
   return std::any_of(startOfCycle + 1, searchStack.end(),
-                     [this](ModuleDecl *module) {
+                     [](ModuleDecl *module) {
                        return !module->isNonSwiftModule() &&
                               isOverlayOfClangModule(module);
                      });
