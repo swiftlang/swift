@@ -44,7 +44,7 @@ struct ExampleFunctionBuilder {
   /// results of all iterations into a single result.
   static func buildArray(_ components: [Component]) -> Component { ... }
 
-  /// If declaration, this will be called on the partial result of an 'if
+  /// If declared, this will be called on the partial result of an 'if
   /// #available' block to allow the function builder to erase type
   /// information.
   static func buildLimitedAvailability(_ component: Component) -> Component { ... }

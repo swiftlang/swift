@@ -5170,7 +5170,7 @@ public:
           "outermost block statement to produce the final returned result";
 
     case FunctionBuilderBuildFunction::BuildLimitedAvailability:
-      return "If declaration, this will be called on the partial result of "
+      return "If declared, this will be called on the partial result of "
         "an 'if #available' block to allow the function builder to erase "
         "type information";
 
@@ -5195,9 +5195,9 @@ public:
         Builder.addAccessControlKeyword(AccessLevel::Public);
 
       if (!hasStaticOrClass)
-        Builder.addKeyword("static");
+        Builder.addTextChunk("static ");
 
-      Builder.addKeyword("func");
+      Builder.addTextChunk("func ");
     }
 
     std::string declStringWithoutFunc;

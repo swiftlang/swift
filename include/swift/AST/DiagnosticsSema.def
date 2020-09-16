@@ -5316,7 +5316,7 @@ NOTE(function_builder_missing_build_optional, none,
      "add 'buildOptional(_:)' to the function builder %0 to add support for "
      "'if' statements without an 'else'", (Type))
 NOTE(function_builder_missing_build_either, none,
-     "add 'buildEither(first:)' and `buildEither(second:)' to the function "
+     "add 'buildEither(first:)' and 'buildEither(second:)' to the function "
      "builder %0 to add support for 'if'-'else' and 'switch'", (Type))
 NOTE(function_builder_missing_build_array, none,
      "add 'buildArray(_:)' to the function builder %0 to add support for "

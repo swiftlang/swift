@@ -47,7 +47,7 @@ struct TupleBuilder { // expected-note 2 {{struct 'TupleBuilder' declared here}}
 @_functionBuilder
 struct TupleBuilderWithoutIf { // expected-note 3{{struct 'TupleBuilderWithoutIf' declared here}}
   // expected-note@-1{{add 'buildOptional(_:)' to the function builder 'TupleBuilderWithoutIf' to add support for 'if' statements without an 'else'}}{{31-31=\n    static func buildOptional(_ component: <#Component#>?) -> <#Component#> {\n      <#code#>\n    \}}}
-  // expected-note@-2{{add 'buildEither(first:)' and `buildEither(second:)' to the function builder 'TupleBuilderWithoutIf' to add support for 'if'-'else' and 'switch'}}{{31-31=\n    static func buildEither(first component: <#Component#>) -> <#Component#> {\n      <#code#>\n    \}\n\n    static func buildEither(second component: <#Component#>) -> <#Component#> {\n      <#code#>\n    \}}}
+  // expected-note@-2{{add 'buildEither(first:)' and 'buildEither(second:)' to the function builder 'TupleBuilderWithoutIf' to add support for 'if'-'else' and 'switch'}}{{31-31=\n    static func buildEither(first component: <#Component#>) -> <#Component#> {\n      <#code#>\n    \}\n\n    static func buildEither(second component: <#Component#>) -> <#Component#> {\n      <#code#>\n    \}}}
   // expected-note@-3{{add 'buildArray(_:)' to the function builder 'TupleBuilderWithoutIf' to add support for 'for'..'in' loops}}{{31-31=\n    static func buildArray(_ components: [<#Component#>]) -> <#Component#> {\n      <#code#>\n    \}}}
   static func buildBlock() -> () { }
   
