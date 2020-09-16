@@ -506,11 +506,11 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(fd);
 
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(SILDeclRef(fd));
+  emitProfilerIncrement(fd->getTypecheckedBody());
   emitProlog(captureInfo, fd->getParameters(), fd->getImplicitSelfDecl(), fd,
              fd->getResultInterfaceType(), fd->hasThrows(), fd->getThrowsLoc());
   prepareEpilog(true, fd->hasThrows(), CleanupLocation(fd));
 
-  emitProfilerIncrement(fd->getTypecheckedBody());
   emitStmt(fd->getTypecheckedBody());
 
   emitEpilog(fd);

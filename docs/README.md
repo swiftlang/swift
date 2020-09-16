@@ -24,7 +24,7 @@ It is divided into the following sections:
   valuable discussions about Swift development, in the form of talks
   and blog posts.
 - The [Uncategorized](#uncategorized) section is for documentation which does
-  not fit neatly into any of the above categories. We would like minimize
+  not fit neatly into any of the above categories. We would like to minimize
   items in this section; avoid adding new documentation here.
 
 Sometimes documentation is not enough.
@@ -77,6 +77,9 @@ documentation, please create a thread on the Swift forums under the
     How to build Swift on Windows using Visual Studio.
   - [WindowsCrossCompile.md](/docs/WindowsCrossCompile.md):
     How to cross compile Swift for Windows on a non-Windows host OS.
+- Building for OpenBSD:
+  - [OpenBSD.md](/docs/OpenBSD.md):
+    Overview of specific steps for building on OpenBSD.
 - [RunningIncludeWhatYouUse.md](/docs/HowToGuides/RunningIncludeWhatYouUse.md):
   Describes how to run [include-what-you-use](https://include-what-you-use.org)
   on the Swift project.
@@ -333,7 +336,7 @@ provide greater clarity to contributors wanting to add new documentation.
 - [OptimizerCountersAnalysis.md](/docs/OptimizerCountersAnalysis.md):
   TODO: Consider breaking up into a how-to guide
   on dumping and analyzing the counters
-  and an explanation for the the counter collection system.
+  and an explanation for the counter collection system.
 - [Testing.md](/docs/Testing.md):
   TODO: Consider splitting into a how-to guide on writing a new test case
   and an explanation for how the compiler is tested.
