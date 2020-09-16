@@ -1981,9 +1981,10 @@ void swift::printFunctionBuilderBuildFunction(
   }
 
   if (!printedResult)
-    printer << " -> " << componentTypeString << " {";
+    printer << " -> " << componentTypeString;
 
   if (stubIndent) {
+    printer << " {";
     printer.printNewline();
     printer << "  <#code#>";
     printer.printNewline();

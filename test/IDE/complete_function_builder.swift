@@ -103,12 +103,12 @@ struct AnyBuilder {
 }
 
 // IN_FUNCTION_BUILDER_DECL: Begin completions, 8 items
-// IN_FUNCTION_BUILDER_DECL: Pattern/CurrNominal:                buildBlock(_ components: Any...) -> Any { {|}; name=buildBlock(_ components: Any...) -> Any {; comment=Required by every
-// IN_FUNCTION_BUILDER_DECL: Pattern/CurrNominal:                buildExpression(_ expression: <#Expression#>) -> Any { {|}; name=buildExpression(_ expression: <#Expression#>) -> Any {; comment=
-// IN_FUNCTION_BUILDER_DECL: Pattern/CurrNominal:                buildOptional(_ component: Any?) -> Any { {|}; name=buildOptional(_ component: Any?) -> Any {; comment=
-// IN_FUNCTION_BUILDER_DECL: Pattern/CurrNominal:                buildEither(first component: Any) -> Any { {|}; name=buildEither(first component: Any) -> Any {; comment=
-// IN_FUNCTION_BUILDER_DECL: Pattern/CurrNominal:                buildEither(second component: Any) -> Any { {|}; name=buildEither(second component: Any) -> Any {; comment=
-// IN_FUNCTION_BUILDER_DECL: Pattern/CurrNominal:                buildArray(_ components: [Any]) -> Any { {|}; name=buildArray(_ components: [Any]) -> Any {; comment=
-// IN_FUNCTION_BUILDER_DECL: Pattern/CurrNominal:                buildLimitedAvailability(_ component: Any) -> Any { {|}; name=buildLimitedAvailability(_ component: Any) -> Any {; comment=
+// IN_FUNCTION_BUILDER_DECL: Pattern/CurrNominal:                buildBlock(_ components: Any...) -> Any {|}; name=buildBlock(_ components: Any...) -> Any; comment=Required by every
+// IN_FUNCTION_BUILDER_DECL: Pattern/CurrNominal:                buildExpression(_ expression: <#Expression#>) -> Any {|}; name=buildExpression(_ expression: <#Expression#>) -> Any; comment=
+// IN_FUNCTION_BUILDER_DECL: Pattern/CurrNominal:                buildOptional(_ component: Any?) -> Any {|}; name=buildOptional(_ component: Any?) -> Any; comment=
+// IN_FUNCTION_BUILDER_DECL: Pattern/CurrNominal:                buildEither(first component: Any) -> Any {|}; name=buildEither(first component: Any) -> Any; comment=
+// IN_FUNCTION_BUILDER_DECL: Pattern/CurrNominal:                buildEither(second component: Any) -> Any {|}; name=buildEither(second component: Any) -> Any; comment=
+// IN_FUNCTION_BUILDER_DECL: Pattern/CurrNominal:                buildArray(_ components: [Any]) -> Any {|}; name=buildArray(_ components: [Any]) -> Any; comment=
+// IN_FUNCTION_BUILDER_DECL: Pattern/CurrNominal:                buildLimitedAvailability(_ component: Any) -> Any {|}; name=buildLimitedAvailability(_ component: Any) -> Any; comment=
 // IN_FUNCTION_BUILDER_DECL: Pattern/CurrNominal:                buildFinalResult(_ component: Any) -> <#Result#> {|}; name=buildFinalResult(_ component: Any) -> <#Result#>; comment=
 // IN_FUNCTION_BUILDER_DECL: End completions
