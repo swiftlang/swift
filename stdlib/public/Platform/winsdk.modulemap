@@ -337,6 +337,11 @@ module WinSDK [system] {
     link "Gdi32.Lib"
   }
 
+  module WinNT {
+    header "winnt.h"
+    export *
+  }
+
   module WinReg {
     header "winreg.h"
     export *
