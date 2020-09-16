@@ -5321,6 +5321,9 @@ NOTE(function_builder_missing_build_either, none,
 NOTE(function_builder_missing_build_array, none,
      "add 'buildArray(_:)' to the function builder %0 to add support for "
      "'for'..'in' loops", (Type))
+NOTE(function_builder_missing_build_limited_availability, none,
+     "add 'buildLimitedAvailability(_:)' to the function "
+     "builder %0 to erase type information for less-available types", (Type))
 
 //------------------------------------------------------------------------------
 // MARK: Tuple Shuffle Diagnostics

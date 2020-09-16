@@ -5511,21 +5511,11 @@ void SkipUnhandledConstructInFunctionBuilderFailure::diagnosePrimary(
 
     // Emit custom notes to help the user introduce the appropriate 'build'
     // functions.
-    SourceLoc buildInsertionLoc = builder->getBraces().Start;
+    SourceLoc buildInsertionLoc;
     std::string stubIndent;
     Type componentType;
-    if (buildInsertionLoc.isValid()) {
-      buildInsertionLoc = Lexer::getLocForEndOfToken(
-          getASTContext().SourceMgr, buildInsertionLoc);
-
-      ASTContext &ctx = getASTContext();
-      StringRef extraIndent;
-      StringRef currentIndent = Lexer::getIndentationForLine(
-          ctx.SourceMgr, buildInsertionLoc, &extraIndent);
-      stubIndent = (currentIndent + extraIndent).str();
-
-      componentType = inferFunctionBuilderComponentType(builder);
-    }
+    std::tie(buildInsertionLoc, stubIndent, componentType) =
+        determineFunctionBuilderBuildFixItInfo(builder);
 
     if (buildInsertionLoc.isInvalid()) {
       // Do nothing.

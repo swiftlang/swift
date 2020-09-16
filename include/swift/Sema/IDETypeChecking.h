@@ -22,6 +22,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/SourceLoc.h"
 #include <memory>
+#include <tuple>
 
 namespace swift {
   class AbstractFunctionDecl;
@@ -277,6 +278,11 @@ namespace swift {
       NominalTypeDecl *builder, Type componentType,
       FunctionBuilderBuildFunction function,
       Optional<std::string> stubIndent, llvm::raw_ostream &out);
+
+  /// Compute the insertion location, indentation string, and component type
+  /// for a Fix-It that adds a new build* function to a function builder.
+  std::tuple<SourceLoc, std::string, Type>
+  determineFunctionBuilderBuildFixItInfo(NominalTypeDecl *builder);
 }
 
 #endif

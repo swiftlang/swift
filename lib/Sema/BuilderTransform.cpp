@@ -1247,6 +1247,32 @@ public:
           ctx.Diags.diagnose(
               loc, diag::function_builder_missing_limited_availability,
               builderTransform.builderType);
+
+          // Add a note to the function builder with a stub for
+          // buildLimitedAvailability().
+          if (auto builder = builderTransform.builderType->getAnyNominal()) {
+            SourceLoc buildInsertionLoc;
+            std::string stubIndent;
+            Type componentType;
+            std::tie(buildInsertionLoc, stubIndent, componentType) =
+                determineFunctionBuilderBuildFixItInfo(builder);
+            if (buildInsertionLoc.isValid()) {
+              std::string fixItString;
+              {
+                llvm::raw_string_ostream out(fixItString);
+                printFunctionBuilderBuildFunction(
+                    builder, componentType,
+                    FunctionBuilderBuildFunction::BuildLimitedAvailability,
+                    stubIndent, out);
+
+                builder->diagnose(
+                    diag::function_builder_missing_build_limited_availability,
+                    builderTransform.builderType)
+                  .fixItInsert(buildInsertionLoc, fixItString);
+              }
+            }
+          }
+
           return true;
         }
 
@@ -1915,6 +1941,28 @@ Type swift::inferFunctionBuilderComponentType(NominalTypeDecl *builder) {
   }
 
   return componentType;
+}
+
+std::tuple<SourceLoc, std::string, Type>
+swift::determineFunctionBuilderBuildFixItInfo(NominalTypeDecl *builder) {
+  SourceLoc buildInsertionLoc = builder->getBraces().Start;
+  std::string stubIndent;
+  Type componentType;
+
+  if (buildInsertionLoc.isInvalid())
+    return std::make_tuple(buildInsertionLoc, stubIndent, componentType);
+
+  ASTContext &ctx = builder->getASTContext();
+  buildInsertionLoc = Lexer::getLocForEndOfToken(
+      ctx.SourceMgr, buildInsertionLoc);
+
+  StringRef extraIndent;
+  StringRef currentIndent = Lexer::getIndentationForLine(
+      ctx.SourceMgr, buildInsertionLoc, &extraIndent);
+  stubIndent = (currentIndent + extraIndent).str();
+
+  componentType = inferFunctionBuilderComponentType(builder);
+  return std::make_tuple(buildInsertionLoc, stubIndent, componentType);
 }
 
 void swift::printFunctionBuilderBuildFunction(

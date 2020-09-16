@@ -3024,7 +3024,29 @@ void AttributeChecker::visitFunctionBuilderAttr(FunctionBuilderAttr *attr) {
       /*argLabels=*/{}, &potentialMatches);
 
   if (!supportsBuildBlock) {
-    diagnose(nominal->getLoc(), diag::function_builder_static_buildblock);
+    {
+      auto diag = diagnose(
+          nominal->getLoc(), diag::function_builder_static_buildblock);
+
+      // If there were no close matches, propose adding a stub.
+      SourceLoc buildInsertionLoc;
+      std::string stubIndent;
+      Type componentType;
+      std::tie(buildInsertionLoc, stubIndent, componentType) =
+          determineFunctionBuilderBuildFixItInfo(nominal);
+      if (buildInsertionLoc.isValid() && potentialMatches.empty()) {
+        std::string fixItString;
+        {
+          llvm::raw_string_ostream out(fixItString);
+          printFunctionBuilderBuildFunction(
+              nominal, componentType,
+              FunctionBuilderBuildFunction::BuildBlock,
+              stubIndent, out);
+        }
+
+        diag.fixItInsert(buildInsertionLoc, fixItString);
+      }
+    }
 
     // For any close matches, attempt to explain to the user why they aren't
     // valid.

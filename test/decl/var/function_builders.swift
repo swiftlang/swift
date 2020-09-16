@@ -7,7 +7,7 @@ var globalBuilder: Int
 func globalBuilderFunction() -> Int { return 0 }
 
 @_functionBuilder
-struct Maker {} // expected-error {{function builder must provide at least one static 'buildBlock' method}}
+struct Maker {} // expected-error {{function builder must provide at least one static 'buildBlock' method}}{{15-15=\n    static func buildBlock(_ components: <#Component#>...) -> <#Component#> {\n      <#code#>\n    \}}}
 
 @_functionBuilder
 class Inventor {} // expected-error {{function builder must provide at least one static 'buildBlock' method}}
