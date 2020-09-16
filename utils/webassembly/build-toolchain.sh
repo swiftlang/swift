@@ -40,6 +40,8 @@ DISPLAY_NAME="${DISPLAY_NAME_SHORT} ${YEAR}-${MONTH}-${DAY}"
 HOST_TOOLCHAIN_DESTDIR=$SOURCE_PATH/host-toolchain-sdk
 HOST_TOOLCHAIN_SDK=$HOST_TOOLCHAIN_DESTDIR/$TOOLCHAIN_NAME
 
+BUILD_DIR=$SOURCE_PATH/build/Ninja-ReleaseAssert
+
 # Avoid clang headers symlink issues
 mkdir -p $HOST_TOOLCHAIN_SDK/usr/lib/clang/10.0.0
 
@@ -53,12 +55,13 @@ $SOURCE_PATH/swift/utils/build-script \
 # Clean up the host toolchain build directory so that the next
 # `build-script` invocation doesn't pick up wrong CMake config files.
 # For some reason passing `--reconfigure` to `build-script` won't do this.
-rm -rf $SOURCE_PATH/build/Ninja-ReleaseAssert/swift-*
-rm -rf $SOURCE_PATH/build/Ninja-ReleaseAssert/llvm-*
+rm -rf $BUILD_DIR/swift-*
+# Clean up compiler-rt dir to cross compile it for host and wasm32
+(cd $BUILD_DIR/llvm-* && ninja compiler-rt-clear)
 
 # build the cross-compilled toolchain
 $SOURCE_PATH/swift/utils/build-script \
-  --preset=$TARGET_PRESET \
+  --preset=$TARGET_PRESET --reconfigure \
   INSTALL_DESTDIR="$SOURCE_PATH/install" \
   SOURCE_PATH="$SOURCE_PATH" \
   BUNDLE_IDENTIFIER="${BUNDLE_IDENTIFIER}" \
@@ -86,8 +89,7 @@ $UTILS_PATH/build-xctest.sh $HOST_TOOLCHAIN_SDK
 
 # Cleanup build directory on Linux CI
 if [[ -n "${CI}" && "$(uname)" == "Linux" ]]; then
-  rm -rf $SOURCE_PATH/build/Ninja-ReleaseAssert/foundation-*
-  rm -rf $SOURCE_PATH/build/Ninja-ReleaseAssert/swiftpm-*
+  rm -rf $BUILD_DIR/foundation-* $BUILD_DIR/swiftpm-*
 fi
 
 cd $HOST_TOOLCHAIN_DESTDIR
