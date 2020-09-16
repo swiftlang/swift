@@ -755,6 +755,8 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
         pattern, tanType, TypeExpansionContext::minimal());
     ParameterConvention conv;
     switch (origResConv) {
+    case ResultConvention::Unowned:
+    case ResultConvention::UnownedInnerPointer:
     case ResultConvention::Owned:
     case ResultConvention::Autoreleased:
       if (tl.isAddressOnly()) {
@@ -763,10 +765,6 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
         conv = tl.isTrivial() ? ParameterConvention::Direct_Unowned
                               : ParameterConvention::Direct_Guaranteed;
       }
-      break;
-    case ResultConvention::Unowned:
-    case ResultConvention::UnownedInnerPointer:
-      conv = ParameterConvention::Direct_Unowned;
       break;
     case ResultConvention::Indirect:
       conv = ParameterConvention::Indirect_In_Guaranteed;
