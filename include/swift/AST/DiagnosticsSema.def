@@ -2128,9 +2128,9 @@ NOTE(associated_type_deduction_witness_failed,none,
      "%select{inherited from|conformed to}3 %2",
      (Identifier, Type, Type, bool))
 NOTE(associated_type_witness_conform_impossible,none,
-     "candidate can not infer %0 = %1 because %1 "
-     "is not a struct, class or enum type and so can't conform to %2",
-     (Identifier, Type, Type))
+     "candidate can not infer %0 = %1 because %select{%1 "
+     "is a protocol used as a type and|%2 %1}3 can't conform to %4",
+     (Identifier, Type, TypeKind, bool, Type))
 NOTE(associated_type_witness_inherit_impossible,none,
      "candidate can not infer %0 = %1 because %1 "
      "is not a class type and so can't inherit from %2",
