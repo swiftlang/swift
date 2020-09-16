@@ -20,6 +20,8 @@
 #include "SolutionResult.h"
 #include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
+#include "swift/Sema/IDETypeChecking.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
@@ -1884,3 +1886,107 @@ bool TypeChecker::typeSupportsBuilderOp(
   return foundMatch;
 }
 
+Type swift::inferFunctionBuilderComponentType(NominalTypeDecl *builder) {
+  Type componentType;
+
+  SmallVector<ValueDecl *, 4> potentialMatches;
+  ASTContext &ctx = builder->getASTContext();
+  bool supportsBuildBlock = TypeChecker::typeSupportsBuilderOp(
+      builder->getDeclaredInterfaceType(), builder, ctx.Id_buildBlock,
+      /*argLabels=*/{}, &potentialMatches);
+  if (supportsBuildBlock) {
+    for (auto decl : potentialMatches) {
+      auto func = dyn_cast<FuncDecl>(decl);
+      if (!func || !func->isStatic())
+        continue;
+
+      // If we haven't seen a component type before, gather it.
+      if (!componentType) {
+        componentType = func->getResultInterfaceType();
+        continue;
+      }
+
+      // If there are inconsistent component types, bail out.
+      if (!componentType->isEqual(func->getResultInterfaceType())) {
+        componentType = Type();
+        break;
+      }
+    }
+  }
+
+  return componentType;
+}
+
+void swift::printFunctionBuilderBuildFunction(
+      NominalTypeDecl *builder, Type componentType,
+      FunctionBuilderBuildFunction function,
+      Optional<std::string> stubIndent, llvm::raw_ostream &out) {
+  // Render the component type into a string.
+  std::string componentTypeString;
+  if (componentType)
+    componentTypeString = componentType.getString();
+  else
+    componentTypeString = "<#Component#>";
+
+  // Render the code.
+  ExtraIndentStreamPrinter printer(out, stubIndent.getValueOr(std::string()));
+
+  // If we're supposed to provide a full stub, add a newline and the introducer
+  // keywords.
+  if (stubIndent) {
+    printer.printNewline();
+
+    if (builder->getFormalAccess() >= AccessLevel::Public)
+      printer << "public ";
+
+    printer << "static func ";
+  }
+
+  bool printedResult = false;
+  switch (function) {
+  case FunctionBuilderBuildFunction::BuildBlock:
+    printer << "buildBlock(_ components: " << componentTypeString << "...)";
+    break;
+
+  case FunctionBuilderBuildFunction::BuildExpression:
+    printer << "buildExpression(_ expression: <#Expression#>)";
+    break;
+
+  case FunctionBuilderBuildFunction::BuildOptional:
+    printer << "buildOptional(_ component: " << componentTypeString << "?)";
+    break;
+
+  case FunctionBuilderBuildFunction::BuildEitherFirst:
+    printer << "buildEither(first component: " << componentTypeString << ")";
+    break;
+
+  case FunctionBuilderBuildFunction::BuildEitherSecond:
+    printer << "buildEither(second component: " << componentTypeString << ")";
+    break;
+
+  case FunctionBuilderBuildFunction::BuildArray:
+    printer << "buildArray(_ components: [" << componentTypeString << "])";
+    break;
+
+  case FunctionBuilderBuildFunction::BuildLimitedAvailability:
+    printer << "buildLimitedAvailability(_ component: " << componentTypeString
+            << ")";
+    break;
+
+  case FunctionBuilderBuildFunction::BuildFinalResult:
+    printer << "buildFinalResult(_ component: " << componentTypeString
+            << ") -> <#Result#>";
+    printedResult = true;
+    break;
+  }
+
+  if (!printedResult)
+    printer << " -> " << componentTypeString << " {";
+
+  if (stubIndent) {
+    printer.printNewline();
+    printer << "  <#code#>";
+    printer.printNewline();
+    printer << "}";
+  }
+}

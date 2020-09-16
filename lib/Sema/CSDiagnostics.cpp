@@ -19,6 +19,7 @@
 #include "MiscDiagnostics.h"
 #include "TypeCheckProtocol.h"
 #include "TypoCorrection.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
@@ -5501,96 +5502,6 @@ static bool hasMissingElseInChain(IfStmt *ifStmt) {
   return false;
 }
 
-namespace  {
-  enum class MissingBuildFunction {
-    BuildOptional,
-    BuildEitherFirst,
-    BuildEitherSecond,
-    BuildArray,
-  };
-}
-
-/// Add code for a missing 'build' function to a function builder.
-static void printMissingBuildFunctionCode(
-    SourceLoc buildInsertionLoc, NominalTypeDecl *builder,
-    MissingBuildFunction missing, llvm::raw_ostream &out) {
-  // Determine the component type from the builder itself, if we can.
-  ASTContext &ctx = builder->getASTContext();
-  Type componentType;
-  bool isPublic = false;
-  {
-    SmallVector<ValueDecl *, 4> potentialMatches;
-    bool supportsBuildBlock = TypeChecker::typeSupportsBuilderOp(
-        builder->getDeclaredInterfaceType(), builder, ctx.Id_buildBlock,
-        /*argLabels=*/{}, &potentialMatches);
-    if (supportsBuildBlock) {
-      for (auto decl : potentialMatches) {
-        auto func = dyn_cast<FuncDecl>(decl);
-        if (!func || !func->isStatic())
-          continue;
-
-        // If we haven't seen a component type before, gather it.
-        if (!componentType) {
-          componentType = func->getResultInterfaceType();
-          isPublic = func->getFormalAccess() == AccessLevel::Public;
-          continue;
-        }
-
-        // If there are inconsistent component types, bail out.
-        if (!componentType->isEqual(func->getResultInterfaceType())) {
-          componentType = Type();
-          isPublic = false;
-          break;
-        }
-      }
-    }
-  }
-
-  // Render the component type into a string.
-  std::string componentTypeString;
-  if (componentType)
-    componentTypeString = componentType.getString();
-  else
-    componentTypeString = "<#Component#>";
-
-  // Render the code.
-  StringRef extraIndent;
-  StringRef currentIndent = Lexer::getIndentationForLine(
-      ctx.SourceMgr, buildInsertionLoc, &extraIndent);
-  std::string stubIndent = (currentIndent + extraIndent).str();
-
-  ExtraIndentStreamPrinter printer(out, stubIndent);
-  printer.printNewline();
-
-  if (isPublic)
-    printer << "public ";
-
-  printer << "static func ";
-  switch (missing) {
-  case MissingBuildFunction::BuildOptional:
-    printer << "buildOptional(_ component: " << componentTypeString << "?)";
-    break;
-
-  case MissingBuildFunction::BuildEitherFirst:
-    printer << "buildEither(first component: " << componentTypeString << ")";
-    break;
-
-  case MissingBuildFunction::BuildEitherSecond:
-    printer << "buildEither(second component: " << componentTypeString << ")";
-    break;
-
-  case MissingBuildFunction::BuildArray:
-    printer << "buildArray(_ components: [" << componentTypeString << "])";
-    break;
-  }
-
-  printer << " -> " << componentTypeString << " {";
-  printer.printNewline();
-  printer << "  <#code#>";
-  printer.printNewline();
-  printer << "}";
-}
-
 void SkipUnhandledConstructInFunctionBuilderFailure::diagnosePrimary(
     bool asNote) {
   if (auto stmt = unhandled.dyn_cast<Stmt *>()) {
@@ -5601,9 +5512,19 @@ void SkipUnhandledConstructInFunctionBuilderFailure::diagnosePrimary(
     // Emit custom notes to help the user introduce the appropriate 'build'
     // functions.
     SourceLoc buildInsertionLoc = builder->getBraces().Start;
+    std::string stubIndent;
+    Type componentType;
     if (buildInsertionLoc.isValid()) {
       buildInsertionLoc = Lexer::getLocForEndOfToken(
           getASTContext().SourceMgr, buildInsertionLoc);
+
+      ASTContext &ctx = getASTContext();
+      StringRef extraIndent;
+      StringRef currentIndent = Lexer::getIndentationForLine(
+          ctx.SourceMgr, buildInsertionLoc, &extraIndent);
+      stubIndent = (currentIndent + extraIndent).str();
+
+      componentType = inferFunctionBuilderComponentType(builder);
     }
 
     if (buildInsertionLoc.isInvalid()) {
@@ -5616,9 +5537,9 @@ void SkipUnhandledConstructInFunctionBuilderFailure::diagnosePrimary(
       std::string fixItString;
       {
         llvm::raw_string_ostream out(fixItString);
-        printMissingBuildFunctionCode(
-            buildInsertionLoc, builder, MissingBuildFunction::BuildOptional,
-            out);
+        printFunctionBuilderBuildFunction(
+            builder, componentType, FunctionBuilderBuildFunction::BuildOptional,
+            stubIndent, out);
       }
 
       diag.fixItInsert(buildInsertionLoc, fixItString);
@@ -5630,13 +5551,15 @@ void SkipUnhandledConstructInFunctionBuilderFailure::diagnosePrimary(
       std::string fixItString;
       {
         llvm::raw_string_ostream out(fixItString);
-        printMissingBuildFunctionCode(
-            buildInsertionLoc, builder, MissingBuildFunction::BuildEitherFirst,
-            out);
+        printFunctionBuilderBuildFunction(
+            builder, componentType,
+            FunctionBuilderBuildFunction::BuildEitherFirst,
+            stubIndent, out);
         out << '\n';
-        printMissingBuildFunctionCode(
-            buildInsertionLoc, builder, MissingBuildFunction::BuildEitherSecond,
-            out);
+        printFunctionBuilderBuildFunction(
+            builder, componentType,
+            FunctionBuilderBuildFunction::BuildEitherSecond,
+            stubIndent, out);
       }
 
       diag.fixItInsert(buildInsertionLoc, fixItString);
@@ -5648,8 +5571,9 @@ void SkipUnhandledConstructInFunctionBuilderFailure::diagnosePrimary(
       std::string fixItString;
       {
         llvm::raw_string_ostream out(fixItString);
-        printMissingBuildFunctionCode(
-            buildInsertionLoc, builder, MissingBuildFunction::BuildArray, out);
+        printFunctionBuilderBuildFunction(
+            builder, componentType, FunctionBuilderBuildFunction::BuildArray,
+            stubIndent, out);
       }
 
       diag.fixItInsert(buildInsertionLoc, fixItString);

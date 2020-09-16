@@ -5136,6 +5136,60 @@ public:
     }
   }
 
+  void addFunctionBuilderBuildCompletion(
+      NominalTypeDecl *builder, Type componentType,
+      FunctionBuilderBuildFunction function) {
+    CodeCompletionResultBuilder Builder(
+        Sink,
+        CodeCompletionResult::ResultKind::Pattern,
+        SemanticContextKind::CurrentNominal, {});
+    Builder.setExpectedTypeRelation(
+        CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
+
+    if (!hasFuncIntroducer) {
+      if (!hasAccessModifier &&
+          builder->getFormalAccess() >= AccessLevel::Public)
+        Builder.addAccessControlKeyword(AccessLevel::Public);
+
+      if (!hasStaticOrClass)
+        Builder.addKeyword("static");
+
+      Builder.addKeyword("func");
+    }
+
+    std::string declStringWithoutFunc;
+    {
+      llvm::raw_string_ostream out(declStringWithoutFunc);
+      printFunctionBuilderBuildFunction(
+          builder, componentType, function, None, out);
+    }
+    Builder.addTextChunk(declStringWithoutFunc);
+    Builder.addBraceStmtWithCursor();
+  }
+
+  /// Add completions for the various "build" functions in a function builder.
+  void addFunctionBuilderBuildCompletions(NominalTypeDecl *builder) {
+    Type componentType = inferFunctionBuilderComponentType(builder);
+
+    addFunctionBuilderBuildCompletion(
+        builder, componentType, FunctionBuilderBuildFunction::BuildBlock);
+    addFunctionBuilderBuildCompletion(
+        builder, componentType, FunctionBuilderBuildFunction::BuildExpression);
+    addFunctionBuilderBuildCompletion(
+        builder, componentType, FunctionBuilderBuildFunction::BuildOptional);
+    addFunctionBuilderBuildCompletion(
+        builder, componentType, FunctionBuilderBuildFunction::BuildEitherFirst);
+    addFunctionBuilderBuildCompletion(
+        builder, componentType, FunctionBuilderBuildFunction::BuildEitherSecond);
+    addFunctionBuilderBuildCompletion(
+        builder, componentType, FunctionBuilderBuildFunction::BuildArray);
+    addFunctionBuilderBuildCompletion(
+        builder, componentType,
+        FunctionBuilderBuildFunction::BuildLimitedAvailability);
+    addFunctionBuilderBuildCompletion(
+        builder, componentType, FunctionBuilderBuildFunction::BuildFinalResult);
+  }
+
   void getOverrideCompletions(SourceLoc Loc) {
     if (!CurrDeclContext->isTypeContext())
       return;
@@ -5153,6 +5207,10 @@ public:
                                /*includeProtocolExtensionMembers*/false);
       addDesignatedInitializers(NTD);
       addAssociatedTypes(NTD);
+    }
+
+    if (NTD && NTD->getAttrs().hasAttribute<FunctionBuilderAttr>()) {
+      addFunctionBuilderBuildCompletions(NTD);
     }
   }
 };

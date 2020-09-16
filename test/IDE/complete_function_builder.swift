@@ -1,6 +1,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLOSURE_TOP | %FileCheck %s -check-prefix=IN_CLOSURE_TOP
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLOSURE_NONTOP | %FileCheck %s -check-prefix=IN_CLOSURE_TOP
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLOSURE_COLOR_CONTEXT | %FileCheck %s -check-prefix=IN_CLOSURE_COLOR_CONTEXT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNCTION_BUILDER_DECL | %FileCheck %s -check-prefix=IN_FUNCTION_BUILDER_DECL
 
 struct Tagged<Tag, Entity> {
   let tag: Tag
@@ -93,3 +94,21 @@ struct EnumToVoidBuilder {
   static func buildBlock(_ :MyEnum, _: MyEnum, _: MyEnum) {}
 }
 func acceptBuilder(@EnumToVoidBuilder body: () -> Void) {}
+
+@_functionBuilder
+struct AnyBuilder {
+  static func buildBlock(_ components: Any...) -> Any { 5 }
+
+  static func #^IN_FUNCTION_BUILDER_DECL^#
+}
+
+// IN_FUNCTION_BUILDER_DECL: Begin completions, 8 items
+// IN_FUNCTION_BUILDER_DECL: Pattern/CurrNominal:                buildBlock(_ components: Any...) -> Any { {|}; name=buildBlock(_ components: Any...) -> Any {
+// IN_FUNCTION_BUILDER_DECL: Pattern/CurrNominal:                buildExpression(_ expression: <#Expression#>) -> Any { {|}; name=buildExpression(_ expression: <#Expression#>) -> Any {
+// IN_FUNCTION_BUILDER_DECL: Pattern/CurrNominal:                buildOptional(_ component: Any?) -> Any { {|}; name=buildOptional(_ component: Any?) -> Any {
+// IN_FUNCTION_BUILDER_DECL: Pattern/CurrNominal:                buildEither(first component: Any) -> Any { {|}; name=buildEither(first component: Any) -> Any {
+// IN_FUNCTION_BUILDER_DECL: Pattern/CurrNominal:                buildEither(second component: Any) -> Any { {|}; name=buildEither(second component: Any) -> Any {
+// IN_FUNCTION_BUILDER_DECL: Pattern/CurrNominal:                buildArray(_ components: [Any]) -> Any { {|}; name=buildArray(_ components: [Any]) -> Any {
+// IN_FUNCTION_BUILDER_DECL: Pattern/CurrNominal:                buildLimitedAvailability(_ component: Any) -> Any { {|}; name=buildLimitedAvailability(_ component: Any) -> Any {
+// IN_FUNCTION_BUILDER_DECL: Pattern/CurrNominal:                buildFinalResult(_ component: Any) -> <#Result#> {|}; name=buildFinalResult(_ component: Any) -> <#Result#>
+// IN_FUNCTION_BUILDER_DECL: End completions
