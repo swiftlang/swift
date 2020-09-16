@@ -632,17 +632,6 @@ function set_build_options_for_host() {
 
             cmake_os_sysroot="$(xcrun --sdk ${platform} --show-sdk-path)"
 
-            # Customize the CMake `find_*` search paths to search the SDK
-            # sysroot before searching `pkg-config` paths. This prevents compile
-            # failures caused when `pkg-config` returns CommandLineTools paths
-            # instead of Xcode paths.
-            #
-            # These search paths can be user customized either by setting the
-            # `CMAKE_PREFIX_PATH` environment variable, or by setting the same
-            # CMake variable via the command line (`-DCMAKE_PREFIX_PATH`).
-            # See https://cmake.org/cmake/help/latest/command/find_path.html
-            export CMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH}:${cmake_os_sysroot}/usr"
-
             cmark_cmake_options=(
                 -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
                 -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"

@@ -655,9 +655,12 @@ class BuildScriptInvocation(object):
             ]
 
             # Isolate build from the system; Darwin toolchains build against SDKs.
-            args.extra_cmake_options.append(
-                '-DCMAKE_IGNORE_PATH=/usr/lib;/usr/local/lib;/lib'
-            )
+            # For additional isolation, disable pkg-config. Homebrew's pkg-config
+            # prioritizes CommandLineTools paths, resulting in compile errors.
+            args.extra_cmake_options += [
+                '-DCMAKE_IGNORE_PATH=/usr/lib;/usr/local/lib;/lib',
+                '-DPKG_CONFIG_EXECUTABLE=/usr/bin/false',
+            ]
 
         if toolchain.libtool is not None:
             impl_args += [
