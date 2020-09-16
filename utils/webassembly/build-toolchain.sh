@@ -84,8 +84,8 @@ rsync -v -a $SOURCE_PATH/install/$TOOLCHAIN_NAME/usr/bin/ $HOST_TOOLCHAIN_SDK/us
 $UTILS_PATH/build-foundation.sh $HOST_TOOLCHAIN_SDK
 $UTILS_PATH/build-xctest.sh $HOST_TOOLCHAIN_SDK
 
-# Cleanup build directory on CI
-if [[ -n "${CI}" ]]; then
+# Cleanup build directory on Linux CI
+if [[ -n "${CI}" && "$(uname)" == "Linux" ]]; then
   rm -rf $SOURCE_PATH/build/Ninja-ReleaseAssert/
 fi
 
