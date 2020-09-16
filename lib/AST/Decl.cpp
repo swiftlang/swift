@@ -435,9 +435,15 @@ bool Decl::isInvalid() const {
   case DeclKind::Constructor:
   case DeclKind::Destructor:
   case DeclKind::Func:
-  case DeclKind::Accessor:
   case DeclKind::EnumElement:
     return cast<ValueDecl>(this)->getInterfaceType()->hasError();
+
+  case DeclKind::Accessor: {
+    auto *AD = cast<AccessorDecl>(this);
+    if (AD->hasInterfaceType() && AD->getInterfaceType()->hasError())
+      return true;
+    return AD->getStorage()->isInvalid();
+  }
   }
 
   llvm_unreachable("Unknown decl kind");
@@ -2047,9 +2053,10 @@ getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
   case ReadWriteImplKind::Modify:
     return AccessStrategy::getAccessor(AccessorKind::Modify,
                                        /*dispatch*/ false);
-  case ReadWriteImplKind::StoredWithSimpleDidSet:
-  case ReadWriteImplKind::InheritedWithSimpleDidSet:
-    if (storage->requiresOpaqueModifyCoroutine()) {
+  case ReadWriteImplKind::StoredWithDidSet:
+  case ReadWriteImplKind::InheritedWithDidSet:
+    if (storage->requiresOpaqueModifyCoroutine() &&
+        storage->getParsedAccessor(AccessorKind::DidSet)->isSimpleDidSet()) {
       return AccessStrategy::getAccessor(AccessorKind::Modify,
                                          /*dispatch*/ false);
     } else {

@@ -514,8 +514,8 @@ static unsigned getRawReadWriteImplKind(swift::ReadWriteImplKind kind) {
   CASE(MutableAddress)
   CASE(MaterializeToTemporary)
   CASE(Modify)
-  CASE(StoredWithSimpleDidSet)
-  CASE(InheritedWithSimpleDidSet)
+  CASE(StoredWithDidSet)
+  CASE(InheritedWithDidSet)
 #undef CASE
   }
   llvm_unreachable("bad kind");

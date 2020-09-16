@@ -2199,8 +2199,8 @@ getActualReadWriteImplKind(unsigned rawKind) {
   CASE(MutableAddress)
   CASE(MaterializeToTemporary)
   CASE(Modify)
-  CASE(StoredWithSimpleDidSet)
-  CASE(InheritedWithSimpleDidSet)
+  CASE(StoredWithDidSet)
+  CASE(InheritedWithDidSet)
 #undef CASE
   }
   return None;

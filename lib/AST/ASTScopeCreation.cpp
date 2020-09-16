@@ -1169,6 +1169,8 @@ NO_NEW_INSERTION_POINT(EnumElementScope)
 
 NO_NEW_INSERTION_POINT(CaptureListScope)
 NO_NEW_INSERTION_POINT(CaseStmtScope)
+NO_NEW_INSERTION_POINT(CaseLabelItemScope)
+NO_NEW_INSERTION_POINT(CaseStmtBodyScope)
 NO_NEW_INSERTION_POINT(ClosureBodyScope)
 NO_NEW_INSERTION_POINT(DefaultArgumentInitializerScope)
 NO_NEW_INSERTION_POINT(DoStmtScope)
@@ -1486,10 +1488,24 @@ void ForEachPatternScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
 
 void CaseStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
-  for (auto &caseItem : stmt->getMutableCaseLabelItems())
-    scopeCreator.addToScopeTree(caseItem.getGuardExpr(), this);
+  for (auto &item : stmt->getCaseLabelItems()) {
+    if (item.getGuardExpr()) {
+      scopeCreator.constructExpandAndInsertUncheckable<CaseLabelItemScope>(
+        this, item);
+    }
+  }
 
-  // Add a child for the case body.
+  scopeCreator.constructExpandAndInsertUncheckable<CaseStmtBodyScope>(
+      this, stmt);
+}
+
+void CaseLabelItemScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
+    ScopeCreator &scopeCreator) {
+  scopeCreator.addToScopeTree(item.getGuardExpr(), this);
+}
+
+void CaseStmtBodyScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
+    ScopeCreator &scopeCreator) {
   scopeCreator.addToScopeTree(stmt->getBody(), this);
 }
 
