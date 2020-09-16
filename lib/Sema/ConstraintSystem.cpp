@@ -2229,7 +2229,7 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
       // Okay, resolve the pattern.
       Pattern *pattern = LabelItem.getPattern();
       if (!LabelItem.isPatternResolved()) {
-        pattern = TypeChecker::resolvePattern(pattern, CS.DC,
+        pattern = TypeChecker::resolvePattern(pattern, DC,
                                        /*isStmtCondition*/false);
         if (!pattern) return false;
 
@@ -2244,7 +2244,7 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
         Type castType;
         if (auto castTypeRepr = isp->getCastTypeRepr()) {
           castType = TypeResolution::forContextual(
-                         CS.DC, TypeResolverContext::InExpression,
+                         DC, TypeResolverContext::InExpression,
                          /*unboundTyOpener*/ nullptr)
                          .resolveType(castTypeRepr);
         } else {

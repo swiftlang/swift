@@ -529,7 +529,7 @@ protected:
   // A local binding is a basically a local variable defined in that very scope
   // It is not an instance variable or inherited type.
 
-  static bool lookupLocalBindingsInPattern(Pattern *p,
+  static bool lookupLocalBindingsInPattern(const Pattern *p,
                                            DeclVisibilityKind vis,
                                            DeclConsumer consumer);
 
@@ -1933,6 +1933,42 @@ protected:
   bool isLabeledStmtLookupTerminator() const override;
 };
 
+/// The parent scope for a 'case' statement, consisting of zero or more
+/// CaseLabelItemScopes, followed by a CaseStmtBodyScope.
+///
+/// +------------------------------------------------------------------
+/// | CaseStmtScope
+/// +------------------------------------------------------------------
+/// |                               +--------------------------+
+/// |                               | CaseLabelItemScope:      |
+/// |                               +--------------------------+
+/// | case .foo(let x, let y) where | condition(x, y),         |
+/// |               ^------^--------------------^--^           |
+/// |               this guard expression sees first 'x'/'y'   |
+/// |                               +--------------------------+
+/// |
+/// |                               +--------------------------+
+/// |                               | CaseLabelItemScope:      |
+/// |                               +--------------------------+
+/// |      .foo(let x, let y) where | condition(x, y),         |
+/// |               ^------^--------------------^--^           |
+/// |               this guard expression sees second 'x'/'y'  |
+/// |                               +--------------------------+
+/// |
+/// |      .bar(let x, let y)
+/// |               this case label item doesn't have a guard, so no
+/// |               scope is created.
+/// |
+/// | +----------------------------------------------------------------
+/// | | CaseStmtBodyScope:
+/// | +----------------------------------------------------------------
+/// | | {
+/// | |    ... x, y  <-- body sees "joined" 'x'/'y' created by parser
+/// | | }
+/// | +----------------------------------------------------------------
+/// |
+/// +------------------------------------------------------------------
+
 class CaseStmtScope final : public AbstractStmtScope {
 public:
   CaseStmt *const stmt;
@@ -1947,13 +1983,62 @@ private:
 
 public:
   std::string getClassName() const override;
+  Stmt *getStmt() const override { return stmt; }
+};
+
+/// The scope used for the guard expression in a case statement. Any
+/// variables bound by the case label item's pattern are visible in
+/// this scope.
+class CaseLabelItemScope final : public ASTScopeImpl {
+public:
+  CaseLabelItem item;
+  CaseLabelItemScope(const CaseLabelItem &item) : item(item) {}
+  virtual ~CaseLabelItemScope() {}
+
+protected:
+  ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
+  std::string getClassName() const override;
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
-  Stmt *getStmt() const override { return stmt; }
 
 protected:
   bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
                              ASTScopeImpl::DeclConsumer) const override;
+};
+
+/// The scope used for the body of a 'case' statement.
+///
+/// If the 'case' statement has multiple case label items, each label
+/// item's pattern must bind the same variables; the parser creates
+/// "fake" variables to represent the join of the variables bound by
+/// each pattern.
+///
+/// These "fake" variables are visible in the 'case' statement body.
+class CaseStmtBodyScope final : public ASTScopeImpl {
+public:
+  CaseStmt *const stmt;
+  CaseStmtBodyScope(CaseStmt *e) : stmt(e) {}
+  virtual ~CaseStmtBodyScope() {}
+
+protected:
+  ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
+  std::string getClassName() const override;
+  SourceRange
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
+protected:
+  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                             ASTScopeImpl::DeclConsumer) const override;
+  bool isLabeledStmtLookupTerminator() const override;
 };
 
 class BraceStmtScope final : public AbstractStmtScope {
