@@ -640,11 +640,13 @@ public:
                        CodeCompletionString *CompletionString,
                        ExpectedTypeRelation TypeDistance,
                        CodeCompletionOperatorKind KnownOperatorKind =
-                           CodeCompletionOperatorKind::None)
+                           CodeCompletionOperatorKind::None,
+                       StringRef BriefDocComment = StringRef())
       : Kind(Kind), KnownOperatorKind(unsigned(KnownOperatorKind)),
         SemanticContext(unsigned(SemanticContext)), NotRecommended(false),
         NotRecReason(NotRecommendedReason::NoReason),
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
+        BriefDocComment(BriefDocComment),
         TypeDistance(TypeDistance) {
     assert(Kind != Declaration && "use the other constructor");
     assert(CompletionString);
@@ -664,12 +666,13 @@ public:
                        SemanticContextKind SemanticContext,
                        unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
-                       ExpectedTypeRelation TypeDistance)
+                       ExpectedTypeRelation TypeDistance,
+                       StringRef BriefDocComment = StringRef())
       : Kind(Keyword), KnownOperatorKind(0),
         SemanticContext(unsigned(SemanticContext)), NotRecommended(false),
         NotRecReason(NotRecommendedReason::NoReason),
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
-        TypeDistance(TypeDistance) {
+        BriefDocComment(BriefDocComment), TypeDistance(TypeDistance) {
     assert(CompletionString);
     AssociatedKind = static_cast<unsigned>(Kind);
     IsSystem = 0;
