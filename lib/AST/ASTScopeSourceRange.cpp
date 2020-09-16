@@ -408,20 +408,13 @@ SourceRange ForEachPatternScope::getSourceRangeOfThisASTNode(
 }
 
 SourceRange
-CaseStmtScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
-  // The scope of the case statement begins at the first guard expression,
-  // if there is one, and extends to the end of the body.
-  // FIXME: Figure out what to do about multiple pattern bindings. We might
-  // want a more restrictive rule in those cases.
-  for (const auto &caseItem : stmt->getCaseLabelItems()) {
-    if (auto guardExpr = caseItem.getGuardExpr())
-      return SourceRange(guardExpr->getStartLoc(),
-                         stmt->getBody()->getEndLoc());
-  }
+CaseLabelItemScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
+  return item.getGuardExpr()->getSourceRange();
+}
 
-  // Otherwise, it covers the body.
-  return stmt->getBody()
-      ->getSourceRange(); // The scope of the case statement begins
+SourceRange
+CaseStmtBodyScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
+  return stmt->getBody()->getSourceRange();
 }
 
 SourceRange

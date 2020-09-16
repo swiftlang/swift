@@ -168,7 +168,7 @@ namespace {
                                GenericEnvironment *GenericEnv,
                                GenericParamList *GenericParams);
 
-    void convertRequirements(SILFunction *F, ArrayRef<RequirementRepr> From,
+    void convertRequirements(ArrayRef<RequirementRepr> From,
                              SmallVectorImpl<Requirement> &To);
 
     ProtocolConformanceRef parseProtocolConformanceHelper(
@@ -845,49 +845,19 @@ static bool parseSILOptional(bool &Result, SILParser &SP, StringRef Expected) {
   return false;
 }
 
-namespace {
-  // FIXME: Nuke this.
-
-  /// A helper class to perform lookup of IdentTypes in the
-  /// current parser scope.
-  class IdentTypeReprLookup : public ASTWalker {
-    Parser &P;
-  public:
-    IdentTypeReprLookup(Parser &P) : P(P) {}
-
-    bool walkToTypeReprPre(TypeRepr *Ty) override {
-      auto *T = dyn_cast_or_null<IdentTypeRepr>(Ty);
-      auto Comp = T->getComponentRange().front();
-      if (auto Entry = P.lookupInScope(Comp->getNameRef()))
-        if (auto *TD = dyn_cast<TypeDecl>(Entry)) {
-          Comp->setValue(TD, nullptr);
-          return false;
-        }
-      return true;
-    }
-  };
-} // end anonymous namespace
-
 /// Remap RequirementReps to Requirements.
-void SILParser::convertRequirements(SILFunction *F,
-                                    ArrayRef<RequirementRepr> From,
+void SILParser::convertRequirements(ArrayRef<RequirementRepr> From,
                                     SmallVectorImpl<Requirement> &To) {
   if (From.empty()) {
     To.clear();
     return;
   }
 
-  auto *GenericEnv = F->getGenericEnvironment();
-  assert(GenericEnv);
-  (void)GenericEnv;
-
-  IdentTypeReprLookup PerformLookup(P);
   // Use parser lexical scopes to resolve references
   // to the generic parameters.
   auto ResolveToInterfaceType = [&](TypeRepr *TyR) -> Type {
-    TyR->walk(PerformLookup);
     return performTypeResolution(TyR, /*IsSILType=*/false,
-                                 ContextGenericEnv, nullptr)
+                                 ContextGenericEnv, ContextGenericParams)
         ->mapTypeOutOfContext();
   };
 
@@ -5792,8 +5762,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
         for (auto &Attr : SpecAttrs) {
           SmallVector<Requirement, 2> requirements;
           // Resolve types and convert requirements.
-          FunctionState.convertRequirements(FunctionState.F,
-                                            Attr.requirements, requirements);
+          FunctionState.convertRequirements(Attr.requirements, requirements);
           auto *fenv = FunctionState.F->getGenericEnvironment();
           auto genericSig = evaluateOrDefault(
               P.Context.evaluator,

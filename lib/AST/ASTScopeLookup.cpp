@@ -422,12 +422,18 @@ bool ForEachPatternScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
       stmt->getPattern(), DeclVisibilityKind::LocalVariable, consumer);
 }
 
-bool CaseStmtScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                                          DeclConsumer consumer) const {
-  for (auto &item : stmt->getMutableCaseLabelItems())
-    if (lookupLocalBindingsInPattern(
-            item.getPattern(), DeclVisibilityKind::LocalVariable, consumer))
-      return true;
+bool CaseLabelItemScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                                               DeclConsumer consumer) const {
+  return lookupLocalBindingsInPattern(
+      item.getPattern(), DeclVisibilityKind::LocalVariable, consumer);
+}
+
+bool CaseStmtBodyScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                                              DeclConsumer consumer) const {
+  for (auto *var : stmt->getCaseBodyVariablesOrEmptyArray())
+    if (consumer.consume({var}, DeclVisibilityKind::LocalVariable))
+        return true;
+
   return false;
 }
 
@@ -554,7 +560,7 @@ bool ConditionalClausePatternUseScope::lookupLocalsOrMembers(
       pattern, DeclVisibilityKind::LocalVariable, consumer);
 }
 
-bool ASTScopeImpl::lookupLocalBindingsInPattern(Pattern *p,
+bool ASTScopeImpl::lookupLocalBindingsInPattern(const Pattern *p,
                                                 DeclVisibilityKind vis,
                                                 DeclConsumer consumer) {
   if (!p)
@@ -890,6 +896,10 @@ bool AbstractStmtScope::isLabeledStmtLookupTerminator() const {
 }
 
 bool ForEachPatternScope::isLabeledStmtLookupTerminator() const {
+  return false;
+}
+
+bool CaseStmtBodyScope::isLabeledStmtLookupTerminator() const {
   return false;
 }
 
