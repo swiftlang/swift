@@ -1530,9 +1530,16 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
       VersionRange::allGTE(attr->Introduced.getValue())};
 
   if (!AttrRange.isContainedIn(EnclosingAnnotatedRange.getValue())) {
-    diagnose(attr->getLocation(), diag::availability_decl_more_than_enclosing);
-    diagnose(EnclosingDecl->getLoc(),
-             diag::availability_decl_more_than_enclosing_enclosing_here);
+    // Don't show this error in swiftinterfaces if it is about a context that
+    // is unavailable, this was in the stdlib at Swift 5.3.
+    SourceFile *Parent = D->getDeclContext()->getParentSourceFile();
+    if (!Parent || Parent->Kind != SourceFileKind::Interface ||
+        !EnclosingAnnotatedRange.getValue().isKnownUnreachable()) {
+      diagnose(attr->getLocation(),
+               diag::availability_decl_more_than_enclosing);
+      diagnose(EnclosingDecl->getLoc(),
+               diag::availability_decl_more_than_enclosing_enclosing_here);
+    }
   }
 }
 
