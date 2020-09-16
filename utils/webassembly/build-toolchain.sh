@@ -83,5 +83,10 @@ rsync -v -a $SOURCE_PATH/install/$TOOLCHAIN_NAME/usr/lib/ $HOST_TOOLCHAIN_SDK/us
 $UTILS_PATH/build-foundation.sh $HOST_TOOLCHAIN_SDK
 $UTILS_PATH/build-xctest.sh $HOST_TOOLCHAIN_SDK
 
+# Cleanup build directory on CI
+if [[ -n "${CI}" ]]; then
+  rm -rf $SOURCE_PATH/build/Ninja-ReleaseAssert/
+fi
+
 cd $HOST_TOOLCHAIN_DESTDIR
 tar cfz $PACKAGE_ARTIFACT $TOOLCHAIN_NAME
