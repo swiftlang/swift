@@ -137,9 +137,13 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
   if (SearchPathOpts.SkipRuntimeLibraryImportPaths)
     return;
 
-  if (!Triple.isOSDarwin())
-    llvm::sys::path::append(LibPath, swift::getMajorArchitectureName(Triple));
   SearchPathOpts.RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
+
+  // This is compatibility for <=5.3
+  if (!Triple.isOSDarwin()) {
+    llvm::sys::path::append(LibPath, swift::getMajorArchitectureName(Triple));
+    SearchPathOpts.RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
+  }
 
   if (!SearchPathOpts.SDKPath.empty()) {
     if (tripleIsMacCatalystEnvironment(Triple)) {
