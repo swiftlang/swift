@@ -1413,7 +1413,7 @@ namespace {
                           .withNumParameters(numParams)
                           .withConvention(metadataConvention)
                           .withAsync(type->isAsync())
-                          .withThrows(type->isThrowing())
+                          .withThrows(type->getExtInfo().getThrowsKind() == ThrowsInfo::Kind::Untyped)
                           .withParameterFlags(hasFlags)
                           .withEscaping(isEscaping)
                           .withDifferentiabilityKind(
@@ -2876,7 +2876,7 @@ public:
     case SILFunctionType::Representation::Thick:
       // All function types look like () -> ().
       // FIXME: It'd be nice not to have to call through the runtime here.
-      return CanFunctionType::get({}, C.TheEmptyTupleType, C.getNeverType());
+      return CanFunctionType::get({}, C.TheEmptyTupleType);
     case SILFunctionType::Representation::Block:
       // All block types look like AnyObject.
       return C.getAnyObjectType();
@@ -3075,8 +3075,7 @@ namespace {
       case SILFunctionType::Representation::Thick:
         // All function types look like () -> ().
         return emitFromValueWitnessTable(
-                 CanFunctionType::get({}, C.TheEmptyTupleType,
-                                      C.getNeverType()));
+                 CanFunctionType::get({}, C.TheEmptyTupleType));
       case SILFunctionType::Representation::Block:
         // All block types look like AnyObject.
         return emitFromValueWitnessTable(C.getAnyObjectType());

@@ -34,7 +34,7 @@ static void adjustFunctionTypeForOverride(Type &type) {
   // with one returning Never?
   auto fnType = type->castTo<AnyFunctionType>();
   auto extInfo = fnType->getExtInfo();
-  extInfo = extInfo.withThrows(false);
+  extInfo = extInfo.withThrows(false, Type());
   if (!fnType->getExtInfo().isEqualTo(extInfo, useClangTypes(fnType)))
     type = fnType->withExtInfo(extInfo);
 }
@@ -59,12 +59,10 @@ static Type dropResultOptionality(Type type, unsigned uncurryLevel) {
   if (auto genericFn = dyn_cast<GenericFunctionType>(fnType)) {
     return GenericFunctionType::get(genericFn->getGenericSignature(),
                                     parameters, resultType,
-                                    fnType->getThrowsType(),
                                     fnType->getExtInfo());
   }
 
-  return FunctionType::get(parameters, resultType,
-                           fnType->getThrowsType(), fnType->getExtInfo());
+  return FunctionType::get(parameters, resultType, fnType->getExtInfo());
 }
 
 Type swift::getMemberTypeForComparison(const ValueDecl *member,
@@ -97,8 +95,7 @@ Type swift::getMemberTypeForComparison(const ValueDecl *member,
     // For subscripts, we don't have a 'Self' type, but turn it
     // into a monomorphic function type.
     auto funcTy = memberType->castTo<AnyFunctionType>();
-    memberType = FunctionType::get(funcTy->getParams(), funcTy->getResult(),
-                                   funcTy->getASTContext().getNeverType());
+    memberType = FunctionType::get(funcTy->getParams(), funcTy->getResult());
   } else {
     // For properties, strip off ownership.
     memberType = memberType->getReferenceStorageReferent();

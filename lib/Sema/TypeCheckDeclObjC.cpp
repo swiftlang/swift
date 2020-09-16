@@ -206,7 +206,7 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
       return;
     }
 
-    if (fnTy->getExtInfo().isThrowing()) {
+    if (fnTy->getExtInfo().getThrowsKind() == ThrowsInfo::Kind::Untyped) {
       diags.diagnose(TypeRange.Start, diag::not_objc_function_type_throwing)
         .highlight(TypeRange);
       return;

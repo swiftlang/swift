@@ -3487,7 +3487,6 @@ TypeConverter::getConstantOverrideInfo(TypeExpansionContext context,
         GenericFunctionType::get(genericSig,
                                  overrideInterfaceTy->getParams(),
                                  overrideInterfaceTy->getResult(),
-                                 overrideInterfaceTy->getThrowsType(),
                                  overrideInterfaceTy->getExtInfo())
           ->getCanonicalType());
   }
@@ -4197,7 +4196,6 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
   auto inner =
     CanFunctionType::get(llvm::makeArrayRef(bridgedParams),
                          bridgedResultType,
-                         throwsTy,
                          innerExtInfo);
 
   auto curried =
@@ -4208,7 +4206,7 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
 
   // Build the uncurried function type.
   if (innerExtInfo.isThrowing()) {
-    extInfo = extInfo.withThrows(true);
+    extInfo = extInfo.withThrows(true, Type());
     if (auto funcThrowsTy = fnType->getThrowsType()) {
       throwsTy = funcThrowsTy->getCanonicalType();
     } else {

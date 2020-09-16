@@ -1400,7 +1400,6 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   auto blockParam = onceBuiltin->getParameters()->get(1);
   auto *type = blockParam->getType()->castTo<FunctionType>();
   Type initType = FunctionType::get({}, TupleType::getEmpty(C),
-                                    type->getThrowsType(),
                                     type->getExtInfo());
   auto initSILType = cast<SILFunctionType>(
       Types.getLoweredRValueType(TypeExpansionContext::minimal(), initType));

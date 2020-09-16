@@ -1820,9 +1820,12 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      ConstraintKind kind, TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator) {
   // A non-throwing function can be a subtype of a throwing function.
-  if (func1->isThrowing() != func2->isThrowing()) {
+  // TODO: Add check on ThrowsType
+  if (func1->getExtInfo().getThrowsKind() !=
+      func2->getExtInfo().getThrowsKind()) {
     // Cannot drop 'throws'.
-    if (func1->isThrowing() || kind < ConstraintKind::Subtype) {
+    if (func1->getExtInfo().getThrowsKind() == ThrowsInfo::Kind::Untyped ||
+        kind < ConstraintKind::Subtype) {
       if (!shouldAttemptFixes())
         return getTypeMatchFailure(locator);
 
@@ -5398,7 +5401,7 @@ ConstraintSystem::simplifyConstructionConstraint(
     // let's diagnose it.
     if (shouldAttemptFixes()) {
       if (valueType->isVoid() && fnType->getNumParams() > 0) {
-        auto contextualType = FunctionType::get({}, fnType->getResult(), fnType->getThrowsType());
+        auto contextualType = FunctionType::get({}, fnType->getResult());
         if (fixExtraneousArguments(
                 *this, contextualType, fnType->getParams(),
                 fnType->getNumParams(),
@@ -7656,7 +7659,6 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
 
   auto closureType =
       FunctionType::get(parameters, inferredClosureType->getResult(),
-                        inferredClosureType->getThrowsType(),
                         inferredClosureType->getExtInfo());
   assignFixedType(typeVar, closureType, closureLocator);
 
@@ -9266,8 +9268,7 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
   // Create a type variable for the argument to the `dynamicallyCall` method.
   auto tvParam = createTypeVariable(loc, TVO_CanBindToNoEscape);
   AnyFunctionType *funcType =
-    FunctionType::get({ AnyFunctionType::Param(tvParam) }, func1->getResult(),
-                      ctx.getNeverType());
+    FunctionType::get({ AnyFunctionType::Param(tvParam) }, func1->getResult());
   addConstraint(ConstraintKind::DynamicCallableApplicableFunction,
                 funcType, tv, locator);
 

@@ -2205,7 +2205,7 @@ getCanonicalSignatureOrNull(GenericSignature sig) {
 /// Get the type of a global variable accessor function, () -> RawPointer.
 static CanAnyFunctionType getGlobalAccessorType(CanType varType) {
   ASTContext &C = varType->getASTContext();
-  return CanFunctionType::get({}, C.TheRawPointerType, C.getNeverType());
+  return CanFunctionType::get({}, C.TheRawPointerType);
 }
 
 /// Removes @noescape from the given type if it's a function type. Otherwise,
@@ -2310,8 +2310,10 @@ static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
   assert((!isForeign || isDeallocating)
          && "There are no foreign destroying destructors");
   auto extInfoBuilder =
-      AnyFunctionType::ExtInfoBuilder(FunctionType::Representation::Thin,
-                                      /*throws*/ false);
+      AnyFunctionType::ExtInfoBuilder::get()
+        .withRepresentation(FunctionType::Representation::Thin)
+        .withThrows(false, Type());
+
   if (isForeign)
     extInfoBuilder = extInfoBuilder.withSILRepresentation(
         SILFunctionTypeRepresentation::ObjCMethod);
@@ -2324,7 +2326,7 @@ static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
   CanType resultTy = (isDeallocating
                       ? TupleType::getEmpty(C)
                       : C.TheNativeObjectType);
-  CanType methodTy = CanFunctionType::get({}, resultTy, C.getNeverType());
+  CanType methodTy = CanFunctionType::get({}, resultTy);
 
   auto sig = dd->getGenericSignatureOfContext();
   FunctionType::Param args[] = {FunctionType::Param(classType)};
@@ -2345,8 +2347,10 @@ static CanAnyFunctionType getIVarInitDestroyerInterfaceType(ClassDecl *cd,
                      ? TupleType::getEmpty(cd->getASTContext())
                      : classType);
   auto extInfoBuilder =
-      AnyFunctionType::ExtInfoBuilder(FunctionType::Representation::Thin,
-                                      /*throws*/ false);
+      AnyFunctionType::ExtInfoBuilder::get()
+  .withRepresentation(FunctionType::Representation::Thin)
+  .withThrows(false, Type());
+
   auto extInfo = extInfoBuilder
                      .withSILRepresentation(
                          isObjC ? SILFunctionTypeRepresentation::ObjCMethod
@@ -2354,7 +2358,6 @@ static CanAnyFunctionType getIVarInitDestroyerInterfaceType(ClassDecl *cd,
                      .build();
 
   resultType = CanFunctionType::get({}, resultType,
-                                    cd->getASTContext().getNeverType(),
                                     extInfo);
   auto sig = cd->getGenericSignature();
   FunctionType::Param args[] = {FunctionType::Param(classType)};
@@ -2376,9 +2379,10 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
   auto genericSig = getEffectiveGenericSignature(closure, captureInfo);
 
   auto innerExtInfo =
-      AnyFunctionType::ExtInfoBuilder(FunctionType::Representation::Thin,
-                                      funcType->isThrowing())
-          .build();
+      AnyFunctionType::ExtInfoBuilder::get()
+        .withRepresentation(FunctionType::Representation::Thin)
+        .withThrows(funcType->isThrowing(), Type())
+      .build();
 
   return CanAnyFunctionType::get(
       getCanonicalSignatureOrNull(genericSig),

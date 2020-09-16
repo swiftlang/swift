@@ -230,7 +230,6 @@ getDynamicResultSignature(ValueDecl *decl) {
     // signature into account for a subscript requirement.
     if (auto *genericFn = ty->getAs<GenericFunctionType>()) {
       ty = FunctionType::get(genericFn->getParams(), genericFn->getResult(),
-                             genericFn->getThrowsType(),
                              genericFn->getExtInfo());
     }
 
@@ -1477,8 +1476,7 @@ ConstraintSystem::getTypeOfMemberReference(
     // Wrap it in a metatype.
     memberTy = MetatypeType::get(memberTy);
 
-    auto openedType = FunctionType::get({baseObjParam}, memberTy,
-                                        getASTContext().getTypeByString("Never"));
+    auto openedType = FunctionType::get({baseObjParam}, memberTy);
     return { openedType, memberTy };
   }
 
@@ -1522,8 +1520,7 @@ ConstraintSystem::getTypeOfMemberReference(
 
       auto indices = subscript->getInterfaceType()
                               ->castTo<AnyFunctionType>()->getParams();
-      refType = FunctionType::get(indices, elementTy,
-                                  getASTContext().getTypeByString("Never"));
+      refType = FunctionType::get(indices, elementTy);
     } else {
       refType =
           getUnopenedTypeOfReference(cast<VarDecl>(value), baseTy, useDC, base,
@@ -1545,11 +1542,9 @@ ConstraintSystem::getTypeOfMemberReference(
     // If the storage is generic, add a generic signature.
     FunctionType::Param selfParam(selfTy, Identifier(), selfFlags);
     if (auto sig = innerDC->getGenericSignatureOfContext()) {
-      funcType = GenericFunctionType::get(sig, {selfParam}, refType,
-                                          getASTContext().getTypeByString("Never"));
+      funcType = GenericFunctionType::get(sig, {selfParam}, refType);
     } else {
-      funcType = FunctionType::get({selfParam}, refType,
-                                   getASTContext().getTypeByString("Never"));
+      funcType = FunctionType::get({selfParam}, refType);
     }
   }
 
@@ -1681,7 +1676,7 @@ ConstraintSystem::getTypeOfMemberReference(
 
       type =
           FunctionType::get(params, fnType->getResult(),
-                            fnType->getThrowsType(), fnType->getExtInfo());
+                            fnType->getExtInfo());
     }
   }
 
@@ -1741,7 +1736,6 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
   if (auto genericFn = type->getAs<GenericFunctionType>()) {
     type = FunctionType::get(genericFn->getParams(),
                              genericFn->getResult(),
-                             genericFn->getThrowsType(),
                              genericFn->getExtInfo());
   }
 
@@ -1770,8 +1764,7 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
 
       auto indices = subscript->getInterfaceType()
                        ->castTo<AnyFunctionType>()->getParams();
-      type = FunctionType::get(indices, elementTy,
-                               getASTContext().getNeverType());
+      type = FunctionType::get(indices, elementTy);
     } else if (auto var = dyn_cast<VarDecl>(decl)) {
       type = var->getValueInterfaceType();
       if (doesStorageProduceLValue(var, overload.getBaseType(), useDC))
@@ -1882,7 +1875,7 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
 
     CS.addConstraint(ConstraintKind::DynamicTypeOf, output, input,
         CS.getConstraintLocator(locator, ConstraintLocator::RValueAdjustment));
-    auto refType = FunctionType::get({inputArg}, output, ctx.getNeverType());
+    auto refType = FunctionType::get({inputArg}, output);
     return {refType, refType};
   }
   case DeclTypeCheckingSemantics::WithoutActuallyEscaping: {
@@ -1903,26 +1896,28 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
         TVO_CanBindToNoEscape);
     FunctionType::Param arg(escapeClosure);
     auto bodyClosure = FunctionType::get(
-        arg, result, ctx.getTypeByString("Never"),
-        FunctionType::ExtInfoBuilder(FunctionType::Representation::Swift,
-                                     /*noescape*/ true,
-                                     /*throws*/ true,
-                                     DifferentiabilityKind::NonDifferentiable,
-                                     /*clangFunctionType*/ nullptr)
-            .build());
+        arg, result,
+        FunctionType::ExtInfoBuilder::get()
+          .withRepresentation(FunctionType::Representation::Swift)
+          .withNoEscape(true)
+          .withThrows(true, Type())
+          .withDifferentiabilityKind(DifferentiabilityKind::NonDifferentiable)
+          .withClangFunctionType(nullptr)
+        .build());
     FunctionType::Param args[] = {
       FunctionType::Param(noescapeClosure),
       FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
     };
 
     auto refType = FunctionType::get(
-        args, result, ctx.getTypeByString("Never"),
-        FunctionType::ExtInfoBuilder(FunctionType::Representation::Swift,
-                                     /*noescape*/ false,
-                                     /*throws*/ true,
-                                     DifferentiabilityKind::NonDifferentiable,
-                                     /*clangFunctionType*/ nullptr)
-            .build());
+        args, result,
+        FunctionType::ExtInfoBuilder::get()
+          .withRepresentation(FunctionType::Representation::Swift)
+          .withNoEscape(false)
+          .withThrows(true, Type())
+          .withDifferentiabilityKind(DifferentiabilityKind::NonDifferentiable)
+          .withClangFunctionType(nullptr)
+        .build());
     return {refType, refType};
   }
   case DeclTypeCheckingSemantics::OpenExistential: {
@@ -1942,25 +1937,27 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
         TVO_CanBindToNoEscape);
     FunctionType::Param bodyArgs[] = {FunctionType::Param(openedTy)};
     auto bodyClosure = FunctionType::get(
-        bodyArgs, result, ctx.getTypeByString("Never"),
-        FunctionType::ExtInfoBuilder(FunctionType::Representation::Swift,
-                                     /*noescape*/ true,
-                                     /*throws*/ true,
-                                     DifferentiabilityKind::NonDifferentiable,
-                                     /*clangFunctionType*/ nullptr)
-            .build());
+        bodyArgs, result,
+        FunctionType::ExtInfoBuilder::get()
+          .withRepresentation(FunctionType::Representation::Swift)
+          .withNoEscape(true)
+          .withThrows(true, Type())
+          .withDifferentiabilityKind(DifferentiabilityKind::NonDifferentiable)
+          .withClangFunctionType(nullptr)
+        .build());
     FunctionType::Param args[] = {
       FunctionType::Param(existentialTy),
       FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
     };
     auto refType = FunctionType::get(
-        args, result, ctx.getTypeByString("Never"),
-        FunctionType::ExtInfoBuilder(FunctionType::Representation::Swift,
-                                     /*noescape*/ false,
-                                     /*throws*/ true,
-                                     DifferentiabilityKind::NonDifferentiable,
-                                     /*clangFunctionType*/ nullptr)
-            .build());
+        args, result,
+        FunctionType::ExtInfoBuilder::get()
+          .withRepresentation(FunctionType::Representation::Swift)
+          .withNoEscape(false)
+          .withThrows(true, Type())
+          .withDifferentiabilityKind(DifferentiabilityKind::NonDifferentiable)
+          .withClangFunctionType(nullptr)
+        .build());
     return {refType, refType};
   }
   }
@@ -2107,11 +2104,11 @@ std::pair<Type, bool> ConstraintSystem::adjustTypeOfOverloadReference(
         if (auto *genFnTy = fnTy->getAs<GenericFunctionType>()) {
           fnTy = GenericFunctionType::get(
               genFnTy->getGenericSignature(), genFnTy->getParams(),
-              OptionalType::get(ty), genFnTy->getThrowsType(),
+              OptionalType::get(ty),
               genFnTy->getExtInfo());
         } else {
           fnTy = FunctionType::get(fnTy->getParams(), OptionalType::get(ty),
-                                   fnTy->getThrowsType(), fnTy->getExtInfo());
+                                   fnTy->getExtInfo());
         }
       }
 
@@ -2551,8 +2548,7 @@ void ConstraintSystem::bindOverloadType(
           TVO_CanBindToLValue | TVO_CanBindToNoEscape);
 
       auto adjustedFnTy =
-          FunctionType::get(fnType->getParams(), subscriptResultTy,
-                            getASTContext().getNeverType());
+        FunctionType::get(fnType->getParams(), subscriptResultTy);
 
       ConstraintLocatorBuilder kpLocBuilder(keyPathLoc);
       addConstraint(
@@ -2711,12 +2707,10 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     FunctionType::Param indices[] = {
       FunctionType::Param(keyPathIndexTy, ctx.Id_keyPath),
     };
-    auto subscriptTy = FunctionType::get(indices, elementTy,
-                                         ctx.getNeverType());
+    auto subscriptTy = FunctionType::get(indices, elementTy);
 
     FunctionType::Param baseParam(choice.getBaseType());
-    auto fullTy = FunctionType::get({baseParam}, subscriptTy,
-                                    ctx.getNeverType());
+    auto fullTy = FunctionType::get({baseParam}, subscriptTy);
     openedFullType = fullTy;
     refType = subscriptTy;
 
@@ -2738,10 +2732,11 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     if (auto CD = dyn_cast<ConstructorDecl>(decl)) {
       auto boundFunctionType = boundType->getAs<AnyFunctionType>();
 
+      // TODO: make sure the logic is right with typed throws
       if (boundFunctionType &&
           CD->hasThrows() != boundFunctionType->isThrowing()) {
         boundType = boundFunctionType->withExtInfo(
-            boundFunctionType->getExtInfo().withThrows());
+          boundFunctionType->getExtInfo().withThrows(true, Type()));
       }
     }
 

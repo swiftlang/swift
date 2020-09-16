@@ -1144,7 +1144,6 @@ private:
     else if (isa<GenericFunctionType>(BaseTy)) {
       auto *fTy = cast<AnyFunctionType>(BaseTy);
       auto *nongenericTy = FunctionType::get(fTy->getParams(), fTy->getResult(),
-                                             fTy->getThrowsType(),
                                              fTy->getExtInfo());
 
       FunTy = IGM.getLoweredType(nongenericTy).castTo<SILFunctionType>();

@@ -2617,10 +2617,10 @@ mapSignatureExtInfo(AnyFunctionType::ExtInfo info,
                     bool topLevelFunction) {
   if (topLevelFunction)
     return AnyFunctionType::ExtInfo();
-  return AnyFunctionType::ExtInfoBuilder()
+  return AnyFunctionType::ExtInfoBuilder::get()
       .withRepresentation(info.getRepresentation())
       .withAsync(info.isAsync())
-      .withThrows(info.isThrowing())
+      .withThrows(info.getThrowsKind() == ThrowsInfo::Kind::Untyped, Type())
       .build();
 }
 
@@ -2673,7 +2673,7 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
   
   // Map the throws type, if any.
   Type throwsType;
-  if (funcTy->isThrowing()) {
+  if (funcTy->getExtInfo().getThrowsKind() == ThrowsInfo::Kind::Untyped) {
     if (auto afdThrowsTy = funcTy->getThrowsType()) {
       throwsType = afdThrowsTy;
     } else {
@@ -2698,9 +2698,9 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
   // Rebuild the resulting function type.
   if (auto genericFuncTy = dyn_cast<GenericFunctionType>(funcTy))
     return GenericFunctionType::get(genericFuncTy->getGenericSignature(),
-                                    newParams, resultTy, throwsType, info);
+                                    newParams, resultTy, info);
 
-  return FunctionType::get(newParams, resultTy, throwsType, info);
+  return FunctionType::get(newParams, resultTy, info);
 }
 
 OverloadSignature ValueDecl::getOverloadSignature() const {
@@ -7762,18 +7762,14 @@ Type ConstructorDecl::getInitializerInterfaceType() {
   auto resultTy = funcTy->getResult();
   assert(resultTy->is<FunctionType>());
 
-
-  auto throwsTy = funcTy->getThrowsType();
-
   // Constructors have an initializer type that takes an instance
   // instead of a metatype.
   auto initSelfParam = computeSelfParam(this, /*isInitializingCtor=*/true);
   Type initFuncTy;
   if (auto sig = getGenericSignature())
-    initFuncTy = GenericFunctionType::get(sig, {initSelfParam}, resultTy,
-                                          throwsTy);
+    initFuncTy = GenericFunctionType::get(sig, {initSelfParam}, resultTy);
   else
-    initFuncTy = FunctionType::get({initSelfParam}, resultTy, throwsTy);
+    initFuncTy = FunctionType::get({initSelfParam}, resultTy);
   InitializerInterfaceType = initFuncTy;
 
   return InitializerInterfaceType;

@@ -426,6 +426,9 @@ public:
 
   constexpr bool isAsync() const { return builder.isAsync(); }
 
+  // TODO: remove this
+  bool isThrowing() const { return getThrowsKind() == ThrowsInfo::Kind::Untyped; }
+
   constexpr ThrowsInfo::Kind getThrowsKind() const {
     return builder.getThrowsKind();
   }

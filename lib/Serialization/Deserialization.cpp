@@ -5031,11 +5031,14 @@ public:
       clangFunctionType = loadedClangType.get();
     }
 
-    auto info = FunctionType::ExtInfoBuilder(*representation, noescape, throws,
-                                             *diffKind, clangFunctionType)
-                    .withAsync(async)
-                    .withThrows(throws)
-                    .build();
+    auto info = FunctionType::ExtInfoBuilder::get()
+      .withRepresentation(*representation)
+      .withNoEscape(noescape)
+      .withDifferentiabilityKind(*diffKind)
+      .withClangFunctionType(clangFunctionType)
+      .withAsync(async)
+      .withThrows(throws, Type())
+      .build();
 
     auto resultTy = MF.getTypeChecked(resultID);
     if (!resultTy)
@@ -5083,12 +5086,11 @@ public:
 
     if (!isGeneric) {
       assert(genericSig.isNull());
-      return FunctionType::get(params, resultTy.get(), throwsTy.get(), info);
+      return FunctionType::get(params, resultTy.get(), info);
     }
 
     assert(!genericSig.isNull());
-    return GenericFunctionType::get(genericSig, params, resultTy.get(),
-                                    throwsTy.get(), info);
+    return GenericFunctionType::get(genericSig, params, resultTy.get(), info);
   }
 
   Expected<Type> deserializeFunctionType(SmallVectorImpl<uint64_t> &scratch,

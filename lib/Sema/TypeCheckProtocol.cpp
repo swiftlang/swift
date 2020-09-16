@@ -2021,7 +2021,6 @@ static Type getTypeForDisplay(ModuleDecl *module, ValueDecl *decl) {
     return GenericFunctionType::get(sigWithoutReqts,
                                     resultFn->getParams(),
                                     resultFn->getResult(),
-                                    resultFn->getThrowsType(),
                                     resultFn->getExtInfo());
   }
 
@@ -2074,11 +2073,9 @@ static Type getRequirementTypeForDisplay(ModuleDecl *module,
 
     if (genericSig) {
       return GenericFunctionType::get(genericSig, params, result,
-                                      fnTy->getThrowsType(),
                                       fnTy->getExtInfo());
     }
-    return FunctionType::get(params, result, fnTy->getThrowsType(),
-                             fnTy->getExtInfo());
+    return FunctionType::get(params, result, fnTy->getExtInfo());
   }
 
   return substType(type, /*result*/false);

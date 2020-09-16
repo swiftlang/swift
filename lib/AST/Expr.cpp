@@ -1897,7 +1897,7 @@ bool AbstractClosureExpr::isBodyThrowing() const {
   if (getType()->hasError())
     return false;
   
-  return getType()->castTo<FunctionType>()->getExtInfo().isThrowing();
+  return getType()->castTo<FunctionType>()->getExtInfo().getThrowsKind() == ThrowsInfo::Kind::Untyped;
 }
 
 bool AbstractClosureExpr::isBodyAsync() const {

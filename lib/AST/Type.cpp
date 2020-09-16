@@ -1785,7 +1785,7 @@ public:
   CanType visitFunctionType(FunctionType *func, CanType subst,
                             ArchetypeType*, ArrayRef<ProtocolConformanceRef>) {
     if (auto substFunc = dyn_cast<FunctionType>(subst)) {
-      if (!func->hasSameExtInfoAs(substFunc))
+      if (!func->hasSameExtInfoAs(substFunc, /*considerThrowsType*/true))
         return CanType();
       
       if (func->getParams().size() != substFunc->getParams().size())
@@ -2621,8 +2621,8 @@ static bool matchesFunctionType(CanAnyFunctionType fn1, CanAnyFunctionType fn2,
   auto ext1 = fn1->getExtInfo();
   auto ext2 = fn2->getExtInfo();
   if (matchMode.contains(TypeMatchFlags::AllowOverride)) {
-    if (ext2.isThrowing()) {
-      ext1 = ext1.withThrows(true);
+    if (ext2.getThrowsKind() == ThrowsInfo::Kind::Untyped) {
+      ext1 = ext1.withThrows(true, Type());
     }
   }
   // If specified, allow an escaping function parameter to override a
@@ -3480,10 +3480,9 @@ FunctionType *GenericFunctionType::substGenericArgs(
                     return param.withType(substFn(param.getPlainType()));
                   });
   auto resultTy = substFn(getResult());
-  auto throwsTy = substFn(getThrowsType());
 
   // Build the resulting (non-generic) function type.
-  return FunctionType::get(params, resultTy, throwsTy, getExtInfo());
+  return FunctionType::get(params, resultTy, getExtInfo());
 }
 
 CanFunctionType
@@ -3678,7 +3677,6 @@ static Type substGenericFunctionType(GenericFunctionType *genericFnType,
   // Substitute into the function type (without generic signature).
   auto *bareFnType = FunctionType::get(genericFnType->getParams(),
                                        genericFnType->getResult(),
-                                       genericFnType->getThrowsType(),
                                        genericFnType->getExtInfo());
   Type result =
     Type(bareFnType).subst(substitutions, lookupConformances, options);
@@ -3751,7 +3749,7 @@ static Type substGenericFunctionType(GenericFunctionType *genericFnType,
 
   // Produce the new generic function type.
   return GenericFunctionType::get(genericSig, fnType->getParams(),
-                                  fnType->getResult(), fnType->getThrowsType(),
+                                  fnType->getResult(),
                                   fnType->getExtInfo());
 }
 
@@ -4165,7 +4163,6 @@ Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
   if (auto *genericMemberType = memberType->getAs<GenericFunctionType>()) {
     memberType = FunctionType::get(genericMemberType->getParams(),
                                    genericMemberType->getResult(),
-                                   genericMemberType->getThrowsType(),
                                    genericMemberType->getExtInfo());
   }
 
@@ -4710,7 +4707,7 @@ case TypeKind::Id:
     
     // Transform throws type, if any.
     Type throwsTy;
-    if (function->isThrowing()) {
+    if (function->getExtInfo().getThrowsKind() == ThrowsInfo::Kind::Typed) {
       throwsTy = function->getThrowsType().transformRec(fn);
       if (!throwsTy) {
         return Type();
@@ -4747,12 +4744,12 @@ case TypeKind::Id:
 
       auto genericSig = genericFnType->getGenericSignature();
       return GenericFunctionType::get(genericSig, substParams, resultTy,
-                                      throwsTy, function->getExtInfo());
+                                      function->getExtInfo());
     }
 
     if (isUnchanged) return *this;
 
-    return FunctionType::get(substParams, resultTy, throwsTy,
+    return FunctionType::get(substParams, resultTy,
                              function->getExtInfo());
   }
 
@@ -5142,11 +5139,11 @@ AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {
           .withDifferentiabilityKind(DifferentiabilityKind::NonDifferentiable)
           .build();
   if (isa<FunctionType>(this))
-    return FunctionType::get(newParams, getResult(), getThrowsType(),
+    return FunctionType::get(newParams, getResult(),
                              nonDiffExtInfo);
   assert(isa<GenericFunctionType>(this));
   return GenericFunctionType::get(getOptGenericSignature(), newParams,
-                                  getResult(), getThrowsType(), nonDiffExtInfo);
+                                  getResult(), nonDiffExtInfo);
 }
 
 Optional<TangentSpace>
@@ -5212,9 +5209,9 @@ makeFunctionType(ArrayRef<AnyFunctionType::Param> parameters, Type resultType, T
                  GenericSignature genericSignature,
                  AnyFunctionType::ExtInfo extInfo) {
   if (genericSignature)
-    return GenericFunctionType::get(genericSignature, parameters, resultType, throwsType,
+    return GenericFunctionType::get(genericSignature, parameters, resultType,
                                     extInfo);
-  return FunctionType::get(parameters, resultType, throwsType, extInfo);
+  return FunctionType::get(parameters, resultType, extInfo);
 }
 
 AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
@@ -5357,8 +5354,7 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
     }
     auto differentialResult =
         hasInoutDiffParameter ? Type(ctx.TheEmptyTupleType) : resultTanType;
-    linearMapType = FunctionType::get(differentialParams, differentialResult,
-                                      ctx.getNeverType());
+    linearMapType = FunctionType::get(differentialParams, differentialResult);
     break;
   }
   case AutoDiffLinearMapKind::Pullback: {
@@ -5407,8 +5403,7 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
     auto flags = ParameterTypeFlags().withInOut(hasInoutDiffParameter);
     auto pullbackParam =
         AnyFunctionType::Param(resultTanType, Identifier(), flags);
-    linearMapType = FunctionType::get({pullbackParam}, pullbackResult,
-                                      ctx.getNeverType());
+    linearMapType = FunctionType::get({pullbackParam}, pullbackResult);
     break;
   }
   }

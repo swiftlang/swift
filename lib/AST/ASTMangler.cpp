@@ -2292,7 +2292,7 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
   appendFunctionInputType(fn->getParams(), forDecl);
   if (fn->isAsync())
     appendOperator("Y");
-  if (fn->isThrowing())
+  if (fn->getExtInfo().getThrowsKind() == ThrowsInfo::Kind::Untyped)
     appendOperator("K");
 }
 
@@ -2677,7 +2677,7 @@ CanType ASTMangler::getDeclTypeForMangling(
   if (decl->isInvalid()) {
     if (isa<AbstractFunctionDecl>(decl))
       return CanFunctionType::get({AnyFunctionType::Param(C.TheErrorType)},
-                                  C.TheErrorType, C.getNeverType());
+                                  C.TheErrorType);
     return C.TheErrorType;
   }
 
@@ -2691,7 +2691,7 @@ CanType ASTMangler::getDeclTypeForMangling(
     CurGenericSignature = gft.getGenericSignature();
 
     canTy = CanFunctionType::get(gft.getParams(), gft.getResult(),
-                                 gft.getThrowsType(), gft->getExtInfo());
+                                 gft->getExtInfo());
   }
 
   if (!canTy->hasError()) {

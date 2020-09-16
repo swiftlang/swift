@@ -791,7 +791,8 @@ public:
       : ContextualFailure(solution, fromType, toType, locator) {
     auto fnType1 = fromType->castTo<FunctionType>();
     auto fnType2 = toType->castTo<FunctionType>();
-    assert(fnType1->isThrowing() != fnType2->isThrowing());
+        assert(fnType1->getExtInfo().getThrowsKind() !=
+               fnType2->getExtInfo().getThrowsKind());
   }
 
   bool diagnoseAsError() override;

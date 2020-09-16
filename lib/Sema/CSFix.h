@@ -587,7 +587,8 @@ class DropThrowsAttribute final : public ContextualMismatch {
   DropThrowsAttribute(ConstraintSystem &cs, FunctionType *fromType,
                       FunctionType *toType, ConstraintLocator *locator)
       : ContextualMismatch(cs, fromType, toType, locator) {
-    assert(fromType->isThrowing() != toType->isThrowing());
+        assert(fromType->getExtInfo().getThrowsKind() !=
+               toType->getExtInfo().getThrowsKind());
   }
 
 public:

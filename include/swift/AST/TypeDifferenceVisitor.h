@@ -214,7 +214,7 @@ public:
 
   bool visitAnyFunctionType(CanAnyFunctionType type1,
                             CanAnyFunctionType type2) {
-    if (!type1->hasSameExtInfoAs(type2))
+    if (!type1->hasSameExtInfoAs(type2, false))
       return asImpl().visitDifferentTypeStructure(type1, type2);
 
     if (asImpl().visit(type1.getResult(), type2.getResult()))

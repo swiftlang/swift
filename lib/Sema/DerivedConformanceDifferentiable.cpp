@@ -607,7 +607,7 @@ deriveDifferentiable_zeroTangentVectorInitializer(DerivedConformance &derived) {
 
   auto tangentType =
       getTangentVectorInterfaceType(parentDC->getSelfTypeInContext(), parentDC);
-  auto returnType = FunctionType::get({}, tangentType, C.getNeverType());
+  auto returnType = FunctionType::get({}, tangentType);
 
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;

@@ -1029,17 +1029,16 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
       // function being differentiated.
       [=, &fnParamGens, &Context](BuiltinFunctionBuilder &builder) -> Type {
         auto extInfo =
-            FunctionType::ExtInfoBuilder()
+            FunctionType::ExtInfoBuilder::get()
                 .withDifferentiabilityKind(DifferentiabilityKind::Normal)
                 .withNoEscape()
-                .withThrows(throws)
+                .withThrows(throws, Type())
                 .build();
         SmallVector<FunctionType::Param, 2> params;
         for (auto &paramGen : fnParamGens)
           params.push_back(FunctionType::Param(paramGen.build(builder)));
         auto innerFunction =
-            FunctionType::get(params, fnResultGen.build(builder),
-                              Context.getNeverType());
+            FunctionType::get(params, fnResultGen.build(builder));
         return innerFunction->withExtInfo(extInfo);
       }};
   // Eagerly build the type of the first arg, then use that to compute the type
@@ -1097,17 +1096,16 @@ static ValueDecl *getAutoDiffApplyTransposeFunction(
     [=, &linearFnParamGens, &Context](BuiltinFunctionBuilder &builder) -> Type {
       FunctionType::ExtInfo ext;
       auto extInfo =
-          FunctionType::ExtInfoBuilder()
+          FunctionType::ExtInfoBuilder::get()
               .withDifferentiabilityKind(DifferentiabilityKind::Linear)
               .withNoEscape()
-              .withThrows(throws)
+              .withThrows(throws, Type())
               .build();
       SmallVector<FunctionType::Param, 2> params;
       for (auto &paramGen : linearFnParamGens)
         params.push_back(FunctionType::Param(paramGen.build(builder)));
       auto innerFunction =
-          FunctionType::get(params, linearFnResultGen.build(builder),
-                            Context.getNeverType());
+          FunctionType::get(params, linearFnResultGen.build(builder));
       return innerFunction->withExtInfo(extInfo);
     }
   };
@@ -1157,11 +1155,11 @@ static ValueDecl *getDifferentiableFunctionConstructor(
       SmallVector<FunctionType::Param, 2> params;
       for (auto &paramGen : fnArgGens)
         params.push_back(FunctionType::Param(paramGen.build(builder)));
-      return FunctionType::get(params, origResultGen.build(builder),
-                               Context.getNeverType())
-          ->withExtInfo(FunctionType::ExtInfoBuilder(
-                            FunctionTypeRepresentation::Swift, throws)
-                            .build());
+      return FunctionType::get(params, origResultGen.build(builder))
+          ->withExtInfo(FunctionType::ExtInfoBuilder::get()
+                        .withRepresentation(FunctionTypeRepresentation::Swift)
+                        .withThrows(throws, Type())
+                          .build());
     }
   };
 
@@ -1180,13 +1178,15 @@ static ValueDecl *getDifferentiableFunctionConstructor(
       auto differentialResultType = DependentMemberType::get(
           origResultType, tangentVectorDecl);
       auto differentialType =
-          FunctionType::get({differentialParams}, differentialResultType, Context.getNeverType());
+          FunctionType::get({differentialParams}, differentialResultType);
       auto jvpResultType = TupleType::get(
           {TupleTypeElt(origResultType, Context.Id_value),
            TupleTypeElt(differentialType, Context.Id_differential)}, Context);
-      auto throwsType = throws ? Context.getErrorDecl()->getInterfaceType() : Context.getNeverType();
-      return FunctionType::get(params, jvpResultType, throwsType)
-        ->withExtInfo(FunctionType::ExtInfoBuilder(FunctionTypeRepresentation::Swift, throws).build());
+      return FunctionType::get(params, jvpResultType)
+          ->withExtInfo(FunctionType::ExtInfoBuilder::get()
+                          .withRepresentation(FunctionTypeRepresentation::Swift)
+                          .withThrows(throws, Type())
+                            .build());
     }
   };
 
@@ -1208,15 +1208,15 @@ static ValueDecl *getDifferentiableFunctionConstructor(
           {pullbackParam},
           pullbackResultTupleElts.size() == 1
               ? pullbackResultTupleElts.front().getType()
-              : TupleType::get(pullbackResultTupleElts, Context), Context.getNeverType());
+              : TupleType::get(pullbackResultTupleElts, Context));
       auto vjpResultType = TupleType::get(
           {TupleTypeElt(origResultType, Context.Id_value),
            TupleTypeElt(pullbackType, Context.Id_pullback)}, Context);
-      auto throwsType = throws ? Context.getErrorDecl()->getInterfaceType() : Context.getNeverType();
-      return FunctionType::get(params, vjpResultType, throwsType)
-          ->withExtInfo(FunctionType::ExtInfoBuilder(
-                            FunctionTypeRepresentation::Swift, throws)
-                            .build());
+      return FunctionType::get(params, vjpResultType)
+        ->withExtInfo(FunctionType::ExtInfoBuilder::get()
+                    .withRepresentation(FunctionTypeRepresentation::Swift)
+                    .withThrows(throws, Type())
+                      .build());
     }
   };
 
@@ -1265,11 +1265,11 @@ static ValueDecl *getLinearFunctionConstructor(
       SmallVector<FunctionType::Param, 2> params;
       for (auto &paramGen : fnArgGens)
         params.push_back(FunctionType::Param(paramGen.build(builder)));
-      return FunctionType::get(params, origResultGen.build(builder),
-                               Context.getNeverType())
-          ->withExtInfo(FunctionType::ExtInfoBuilder(
-                            FunctionTypeRepresentation::Swift, throws)
-                            .build());
+      return FunctionType::get(params, origResultGen.build(builder))
+      ->withExtInfo(FunctionType::ExtInfoBuilder::get()
+                    .withRepresentation(FunctionTypeRepresentation::Swift)
+                    .withThrows(throws, Type())
+                      .build());
     }
   };
 
@@ -1283,8 +1283,7 @@ static ValueDecl *getLinearFunctionConstructor(
           {FunctionType::Param(origResultType)},
           resultTupleElts.size() == 1
               ? resultTupleElts.front().getType()
-              : TupleType::get(resultTupleElts, Context),
-                               Context.getNeverType());
+              : TupleType::get(resultTupleElts, Context));
     }
   };
 
@@ -1545,18 +1544,18 @@ static ValueDecl *getOnceOperation(ASTContext &Context,
   
   auto HandleTy = Context.TheRawPointerType;
   auto VoidTy = Context.TheEmptyTupleType;
-  auto NeverTy = Context.getNeverType();
   auto Thin =
-      FunctionType::ExtInfoBuilder(FunctionTypeRepresentation::CFunctionPointer,
-                                   /*throws*/ false)
-          .build();
+      FunctionType::ExtInfoBuilder::get()
+          .withRepresentation(FunctionTypeRepresentation::CFunctionPointer)
+          .withThrows(false, Type())
+        .build();
   if (withContext) {
     auto ContextTy = Context.TheRawPointerType;
     auto ContextArg = FunctionType::Param(ContextTy);
-    auto BlockTy = FunctionType::get({ContextArg}, VoidTy, NeverTy, Thin);
+    auto BlockTy = FunctionType::get({ContextArg}, VoidTy, Thin);
     return getBuiltinFunction(Id, {HandleTy, BlockTy, ContextTy}, VoidTy);
   } else {
-    auto BlockTy = FunctionType::get({}, VoidTy, NeverTy, Thin);
+    auto BlockTy = FunctionType::get({}, VoidTy, Thin);
     return getBuiltinFunction(Id, {HandleTy, BlockTy}, VoidTy);
   }
 }

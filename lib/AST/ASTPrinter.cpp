@@ -4221,7 +4221,7 @@ public:
     if (T->isAsync())
       Printer << " " << "async";
 
-    if (T->isThrowing())
+    if (T->getExtInfo().getThrowsKind() == ThrowsInfo::Kind::Untyped)
       Printer << " " << tok::kw_throws;
 
     Printer << " -> ";
@@ -4264,7 +4264,7 @@ public:
     if (T->isAsync())
       Printer << " " << "async";
 
-    if (T->isThrowing())
+    if (T->getExtInfo().getThrowsKind() == ThrowsInfo::Kind::Untyped)
       Printer << " " << tok::kw_throws;
 
     Printer << " -> ";

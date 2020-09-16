@@ -1649,7 +1649,7 @@ static Type applyNonEscapingIfNecessary(Type ty,
     // isNoEscape bit when de-sugaring.
     // <https://bugs.swift.org/browse/SR-2520>
     return FunctionType::get(funcTy->getParams(), funcTy->getResult(),
-                             funcTy->getThrowsType(), extInfo);
+                             extInfo);
   }
 
   // Note: original sugared type
@@ -2802,9 +2802,13 @@ Type TypeResolver::resolveASTFunctionType(
     }
   }
 
-  FunctionType::ExtInfoBuilder extInfoBuilder(
-      FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), diffKind,
-      /*clangFunctionType*/ nullptr);
+  FunctionType::ExtInfoBuilder extInfoBuilder =
+    FunctionType::ExtInfoBuilder::get()
+      .withRepresentation(FunctionTypeRepresentation::Swift)
+      .withNoEscape(noescape)
+      .withThrows(repr->isThrowing(), Type())
+      .withDifferentiabilityKind(diffKind)
+      .withClangFunctionType(nullptr);
 
   const clang::Type *clangFnType = parsedClangFunctionType;
   if (representation == AnyFunctionType::Representation::CFunctionPointer &&
@@ -2814,7 +2818,7 @@ Type TypeResolver::resolveASTFunctionType(
   }
   auto extInfo = extInfoBuilder.withRepresentation(representation)
                      .withAsync(repr->isAsync())
-                     .withThrows(repr->isThrowing())
+                     .withThrows(repr->isThrowing(), Type())
                      .withClangFunctionType(clangFnType)
                      .build();
 
@@ -2822,10 +2826,10 @@ Type TypeResolver::resolveASTFunctionType(
   if (auto genericEnv = repr->getGenericEnvironment()) {
     outputTy = outputTy->mapTypeOutOfContext();
     return GenericFunctionType::get(genericEnv->getGenericSignature(),
-                                    params, outputTy, throwsTy, extInfo);
+                                    params, outputTy, extInfo);
   }
 
-  auto fnTy = FunctionType::get(params, outputTy, throwsTy, extInfo);
+  auto fnTy = FunctionType::get(params, outputTy, extInfo);
   
   if (fnTy->hasError())
     return fnTy;
@@ -2843,7 +2847,7 @@ Type TypeResolver::resolveASTFunctionType(
         : "c";
       auto extInfo2 =
         extInfo.withRepresentation(AnyFunctionType::Representation::Swift);
-      auto simpleFnTy = FunctionType::get(params, outputTy, throwsTy, extInfo2);
+      auto simpleFnTy = FunctionType::get(params, outputTy, extInfo2);
       diagnose(repr->getStartLoc(), diag::objc_convention_invalid,
                simpleFnTy, strName);
     }

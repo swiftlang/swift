@@ -441,7 +441,6 @@ namespace {
 
       witnessType = FunctionType::get(gft->getParams(),
                                       gft->getResult(),
-                                      gft->getThrowsType(),
                                       gft->getExtInfo());
       witnessType = env->mapTypeIntoContext(witnessType);
 
@@ -1034,8 +1033,10 @@ namespace {
       Expr *closureBody = closureCall;
       closureBody = coerceToType(closureCall, resultTy, locator);
 
-      if (selfFnTy->getExtInfo().isThrowing()) {
-        closureBody = new (context) TryExpr(closureBody->getStartLoc(), closureBody,
+      if (selfFnTy->getExtInfo().getThrowsKind() ==
+          ThrowsInfo::Kind::Untyped) {
+        closureBody = new (context) TryExpr(closureBody->getStartLoc(),
+                                            closureBody,
                                             cs.getType(closureBody),
                                             /*implicit=*/true);
         cs.cacheType(closureBody);
@@ -1901,7 +1902,6 @@ namespace {
       auto selfParam = AnyFunctionType::Param(selfTy, Identifier(), flags);
       resultTy = FunctionType::get({selfParam},
                                    resultTy->castTo<FunctionType>()->getResult(),
-                                   resultTy->castTo<FunctionType>()->getThrowsType(),
                                    resultTy->castTo<FunctionType>()->getExtInfo());
 
       // Build the constructor reference.
@@ -4807,8 +4807,7 @@ namespace {
       //
       //     let closure = "{ $0[keyPath: $kp$] }"
       auto closureTy =
-          FunctionType::get({ FunctionType::Param(baseTy) }, leafTy,
-                            ctx.getNeverType());
+        FunctionType::get({ FunctionType::Param(baseTy) }, leafTy);
       auto closure = new (ctx)
           AutoClosureExpr(/*set body later*/nullptr, leafTy,
                           discriminator, cs.DC);
@@ -4823,8 +4822,7 @@ namespace {
       //
       //    let outerClosure = "{ $kp$ in \(closure) }"
       auto outerClosureTy =
-          FunctionType::get({ FunctionType::Param(keyPathTy) }, closureTy,
-                            ctx.getNeverType());
+        FunctionType::get({ FunctionType::Param(keyPathTy) }, closureTy);
       auto outerClosure = new (ctx)
           AutoClosureExpr(/*set body later*/nullptr, closureTy,
                           discriminator, cs.DC);
@@ -6657,8 +6655,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
             fromEI.intoBuilder()
                 .withDifferentiabilityKind(toEI.getDifferentiabilityKind())
                 .build();
-        fromFunc = FunctionType::get(toFunc->getParams(), fromFunc->getResult(),
-                                     ctx.getNeverType())
+        fromFunc = FunctionType::get(toFunc->getParams(), fromFunc->getResult())
             ->withExtInfo(newEI)
             ->castTo<FunctionType>();
         switch (toEI.getDifferentiabilityKind()) {

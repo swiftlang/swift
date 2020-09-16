@@ -523,8 +523,7 @@ getTypeOfCompletionOperatorImpl(DeclContext *DC, Expr *expr,
       argTypes.emplace_back(solution.simplifyType(CS.getType(arg)));
   }
 
-  return FunctionType::get(argTypes, solution.simplifyType(CS.getType(expr)),
-                           Context.getNeverType());
+  return FunctionType::get(argTypes, solution.simplifyType(CS.getType(expr)));
 }
 
 /// Return the type of operator function for specified LHS, or a null

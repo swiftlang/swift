@@ -2016,7 +2016,7 @@ void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {
 static bool hasThrowingFunctionParameter(CanType type) {
   // Only consider throwing function types.
   if (auto fnType = dyn_cast<AnyFunctionType>(type)) {
-    return fnType->getExtInfo().isThrowing();
+    return fnType->getExtInfo().getThrowsKind() == ThrowsInfo::Kind::Untyped;
   }
 
   // Look through tuples.
@@ -3116,14 +3116,12 @@ AttributeChecker::visitImplementationOnlyAttr(ImplementationOnlyAttr *attr) {
     auto derivedInterfaceFuncTy = derivedInterfaceTy->castTo<AnyFunctionType>();
     derivedInterfaceTy =
         FunctionType::get(derivedInterfaceFuncTy->getParams(),
-                          derivedInterfaceFuncTy->getResult(),
-                          ctx.getNeverType());
+                          derivedInterfaceFuncTy->getResult());
     auto overrideInterfaceFuncTy =
         overrideInterfaceTy->castTo<AnyFunctionType>();
     overrideInterfaceTy =
         FunctionType::get(overrideInterfaceFuncTy->getParams(),
-                          overrideInterfaceFuncTy->getResult(),
-                          ctx.getNeverType());
+                          overrideInterfaceFuncTy->getResult());
   }
 
   if (!derivedInterfaceTy->isEqual(overrideInterfaceTy)) {
@@ -3933,10 +3931,9 @@ static AnyFunctionType *
 makeFunctionType(ArrayRef<AnyFunctionType::Param> parameters, Type resultType,
                  GenericSignature genericSignature) {
   if (genericSignature)
-    return GenericFunctionType::get(genericSignature, parameters, resultType,
-                                    resultType->getASTContext().getNeverType());
-  return FunctionType::get(parameters, resultType,
-                           resultType->getASTContext().getNeverType());
+    return GenericFunctionType::get(genericSignature, parameters, resultType);
+  
+  return FunctionType::get(parameters, resultType);
 }
 
 /// Computes the original function type corresponding to the given derivative

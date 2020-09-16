@@ -3786,7 +3786,7 @@ namespace {
 
       printFlag(!T->isNoEscape(), "escaping");
       printFlag(T->isAsync(), "async");
-      printFlag(T->isThrowing(), "throws");
+      printFlag(T->getExtInfo().getThrowsKind() == ThrowsInfo::Kind::Untyped, "throws");
 
       OS << "\n";
       Indent += 2;
