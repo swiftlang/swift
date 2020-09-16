@@ -1191,7 +1191,7 @@ bool SimpleDidSetRequest::evaluate(Evaluator &evaluator,
   // If we find a reference to the implicit 'oldValue' parameter, then it is
   // not a "simple" didSet because we need to fetch it.
   auto walker = OldValueFinder(param);
-  decl->getBody()->walk(walker);
+  decl->getTypecheckedBody()->walk(walker);
   auto hasOldValueRef = walker.didFindOldValueRef();
   if (!hasOldValueRef) {
     // If the body does not refer to implicit 'oldValue', it means we can
@@ -1639,13 +1639,9 @@ static ParamDecl *getOriginalParamFromAccessor(AbstractStorageDecl *storage,
   switch (accessor->getAccessorKind()) {
   case AccessorKind::DidSet:
   case AccessorKind::WillSet:
-  case AccessorKind::Set:
-    if (accessor->isSimpleDidSet()) {
-      // If this is a "simple" didSet, there won't be
-      // a parameter.
       return nullptr;
-    }
 
+  case AccessorKind::Set:
     if (param == accessorParams->get(0)) {
       // This is the 'newValue' parameter.
       return nullptr;

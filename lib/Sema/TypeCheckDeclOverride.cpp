@@ -2031,13 +2031,30 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // Accessors determine their overrides based on their abstract storage
   // declarations.
   if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
+    auto kind = accessor->getAccessorKind();
+
+    switch (kind) {
+    case AccessorKind::Get:
+    case AccessorKind::Set:
+    case AccessorKind::Read:
+    case AccessorKind::Modify:
+      break;
+
+    case AccessorKind::WillSet:
+    case AccessorKind::DidSet:
+    case AccessorKind::Address:
+    case AccessorKind::MutableAddress:
+      // These accessors are never part of the opaque set. Bail out early
+      // to avoid computing the overridden declarations of the storage.
+      return noResults;
+    }
+
     auto overridingASD = accessor->getStorage();
 
     // Check the various overridden storage declarations.
     SmallVector<OverrideMatch, 2> matches;
     for (auto overridden : overridingASD->getOverriddenDecls()) {
       auto baseASD = cast<AbstractStorageDecl>(overridden);
-      auto kind = accessor->getAccessorKind();
 
       // If the base doesn't consider this an opaque accessor,
       // this isn't really an override.
