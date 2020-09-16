@@ -144,7 +144,7 @@ module WinSDK [system] {
       header "commdlg.h"
       export *
 
-      link "Comdlg32.lib"
+      link "ComDlg32.Lib"
     }
   }
 
