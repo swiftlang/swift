@@ -86,7 +86,8 @@ $UTILS_PATH/build-xctest.sh $HOST_TOOLCHAIN_SDK
 
 # Cleanup build directory on Linux CI
 if [[ -n "${CI}" && "$(uname)" == "Linux" ]]; then
-  rm -rf $SOURCE_PATH/build/Ninja-ReleaseAssert/
+  rm -rf $SOURCE_PATH/build/Ninja-ReleaseAssert/foundation-*
+  rm -rf $SOURCE_PATH/build/Ninja-ReleaseAssert/swiftpm-*
 fi
 
 cd $HOST_TOOLCHAIN_DESTDIR
