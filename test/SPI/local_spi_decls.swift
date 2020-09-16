@@ -50,6 +50,9 @@ func inlinable() -> SPIClass { // expected-error {{class 'SPIClass' is '@_spi' a
 @frozen public struct SPIFrozenStruct {
   var spiTypeInFrozen = SPIStruct()
   private var spiTypeInFrozen1: SPIClass
+
+  @_spi(S)
+  private var privateSPIInFrozenSPI = SPIStruct()
 }
 
 private protocol PrivateProtocol {} // expected-note {{type declared here}}
