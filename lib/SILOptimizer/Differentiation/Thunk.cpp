@@ -768,7 +768,8 @@ getOrCreateSubsetParametersThunkForLinearMap(
     if (!paramInfo.isIndirectMutating())
       continue;
     auto inoutArg = *std::next(ai->getInoutArguments().begin(), inoutArgIdx++);
-    allResults.insert(allResults.begin() + paramIdx, inoutArg);
+    unsigned mappedParamIdx = mapOriginalParameterIndex(paramIdx);
+    allResults.insert(allResults.begin() + mappedParamIdx, inoutArg);
   }
   assert(allResults.size() == actualIndices.parameters->getNumIndices() &&
          "Number of pullback results should match number of differentiability "
