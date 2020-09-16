@@ -1205,8 +1205,8 @@ StringRef TypeBase::getKindName(TypeKind K) {
     ENTRY(InOut, "inout type");
     ENTRY(Paren, "paren type");
 
-    // 'typealias' sounds better than 'typealias type'.
-    ENTRY(TypeAlias, "typealias");
+    // 'type alias' sounds better than 'type alias type'.
+    ENTRY(TypeAlias, "type alias");
 
     ENTRY(ArraySlice, "array type");
     ENTRY(Optional, "optional type");
