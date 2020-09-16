@@ -134,9 +134,18 @@ module WinSDK [system] {
     link "AuthZ.Lib"
   }
 
-  module CommCtrl {
-    header "CommCtrl.h"
-    export *
+  module Controls {
+    module CommCtrl {
+      header "CommCtrl.h"
+      export *
+    }
+
+    module CommDlg {
+      header "commdlg.h"
+      export *
+
+      link "Comdlg32.lib"
+    }
   }
 
   // FIXME(compnerd) this is a hack for the HWND typedef for DbgHelp
