@@ -3,6 +3,7 @@
 set -ex
 
 brew uninstall python@2 || true
+sudo pip install six
 brew install cmake ninja llvm sccache wasmer
 
 SOURCE_PATH="$( cd "$(dirname $0)/../../../../" && pwd  )"
