@@ -52,6 +52,11 @@ $SOURCE_PATH/swift/utils/build-script \
   TOOLCHAIN_NAME="$TOOLCHAIN_NAME" \
   C_CXX_LAUNCHER="$(which sccache)"
 
+if [[ -n "${CI}" && "$(uname)" == "Linux" ]]; then
+  echo "Exit to create a cache temporarily"
+  exit 0
+fi
+
 # Clean up the host toolchain build directory so that the next
 # `build-script` invocation doesn't pick up wrong CMake config files.
 # For some reason passing `--reconfigure` to `build-script` won't do this.
