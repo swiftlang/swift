@@ -5490,12 +5490,170 @@ SourceLoc SkipUnhandledConstructInFunctionBuilderFailure::getLoc() const {
   return unhandled.get<Decl *>()->getLoc();
 }
 
+/// Determine whether the given "if" chain has a missing "else".
+static bool hasMissingElseInChain(IfStmt *ifStmt) {
+  if (!ifStmt->getElseStmt())
+    return true;
+
+  if (auto ifElse = dyn_cast<IfStmt>(ifStmt->getElseStmt()))
+    return hasMissingElseInChain(ifElse);
+
+  return false;
+}
+
+namespace  {
+  enum class MissingBuildFunction {
+    BuildOptional,
+    BuildEitherFirst,
+    BuildEitherSecond,
+    BuildArray,
+  };
+}
+
+/// Add code for a missing 'build' function to a function builder.
+static void printMissingBuildFunctionCode(
+    SourceLoc buildInsertionLoc, NominalTypeDecl *builder,
+    MissingBuildFunction missing, llvm::raw_ostream &out) {
+  // Determine the component type from the builder itself, if we can.
+  ASTContext &ctx = builder->getASTContext();
+  Type componentType;
+  bool isPublic = false;
+  {
+    SmallVector<ValueDecl *, 4> potentialMatches;
+    bool supportsBuildBlock = TypeChecker::typeSupportsBuilderOp(
+        builder->getDeclaredInterfaceType(), builder, ctx.Id_buildBlock,
+        /*argLabels=*/{}, &potentialMatches);
+    if (supportsBuildBlock) {
+      for (auto decl : potentialMatches) {
+        auto func = dyn_cast<FuncDecl>(decl);
+        if (!func || !func->isStatic())
+          continue;
+
+        // If we haven't seen a component type before, gather it.
+        if (!componentType) {
+          componentType = func->getResultInterfaceType();
+          isPublic = func->getFormalAccess() == AccessLevel::Public;
+          continue;
+        }
+
+        // If there are inconsistent component types, bail out.
+        if (!componentType->isEqual(func->getResultInterfaceType())) {
+          componentType = Type();
+          isPublic = false;
+          break;
+        }
+      }
+    }
+  }
+
+  // Render the component type into a string.
+  std::string componentTypeString;
+  if (componentType)
+    componentTypeString = componentType.getString();
+  else
+    componentTypeString = "<#Component#>";
+
+  // Render the code.
+  StringRef extraIndent;
+  StringRef currentIndent = Lexer::getIndentationForLine(
+      ctx.SourceMgr, buildInsertionLoc, &extraIndent);
+  std::string stubIndent = (currentIndent + extraIndent).str();
+
+  ExtraIndentStreamPrinter printer(out, stubIndent);
+  printer.printNewline();
+
+  if (isPublic)
+    printer << "public ";
+
+  printer << "static func ";
+  switch (missing) {
+  case MissingBuildFunction::BuildOptional:
+    printer << "buildOptional(_ component: " << componentTypeString << "?)";
+    break;
+
+  case MissingBuildFunction::BuildEitherFirst:
+    printer << "buildEither(first component: " << componentTypeString << ")";
+    break;
+
+  case MissingBuildFunction::BuildEitherSecond:
+    printer << "buildEither(second component: " << componentTypeString << ")";
+    break;
+
+  case MissingBuildFunction::BuildArray:
+    printer << "buildArray(_ components: [" << componentTypeString << "])";
+    break;
+  }
+
+  printer << " -> " << componentTypeString << " {";
+  printer.printNewline();
+  printer << "  <#code#>";
+  printer.printNewline();
+  printer << "}";
+}
+
 void SkipUnhandledConstructInFunctionBuilderFailure::diagnosePrimary(
     bool asNote) {
-  if (unhandled.is<Stmt *>()) {
+  if (auto stmt = unhandled.dyn_cast<Stmt *>()) {
     emitDiagnostic(asNote ? diag::note_function_builder_control_flow
                           : diag::function_builder_control_flow,
                    builder->getName());
+
+    // Emit custom notes to help the user introduce the appropriate 'build'
+    // functions.
+    SourceLoc buildInsertionLoc = builder->getBraces().Start;
+    if (buildInsertionLoc.isValid()) {
+      buildInsertionLoc = Lexer::getLocForEndOfToken(
+          getASTContext().SourceMgr, buildInsertionLoc);
+    }
+
+    if (buildInsertionLoc.isInvalid()) {
+      // Do nothing.
+    } else if (isa<IfStmt>(stmt) && hasMissingElseInChain(cast<IfStmt>(stmt))) {
+      auto diag = emitDiagnosticAt(
+          builder->getLoc(), diag::function_builder_missing_build_optional,
+          builder->getDeclaredInterfaceType());
+
+      std::string fixItString;
+      {
+        llvm::raw_string_ostream out(fixItString);
+        printMissingBuildFunctionCode(
+            buildInsertionLoc, builder, MissingBuildFunction::BuildOptional,
+            out);
+      }
+
+      diag.fixItInsert(buildInsertionLoc, fixItString);
+    } else if (isa<SwitchStmt>(stmt) || isa<IfStmt>(stmt)) {
+      auto diag = emitDiagnosticAt(
+          builder->getLoc(), diag::function_builder_missing_build_either,
+          builder->getDeclaredInterfaceType());
+
+      std::string fixItString;
+      {
+        llvm::raw_string_ostream out(fixItString);
+        printMissingBuildFunctionCode(
+            buildInsertionLoc, builder, MissingBuildFunction::BuildEitherFirst,
+            out);
+        out << '\n';
+        printMissingBuildFunctionCode(
+            buildInsertionLoc, builder, MissingBuildFunction::BuildEitherSecond,
+            out);
+      }
+
+      diag.fixItInsert(buildInsertionLoc, fixItString);
+    } else if (isa<ForEachStmt>(stmt)) {
+      auto diag = emitDiagnosticAt(
+          builder->getLoc(), diag::function_builder_missing_build_array,
+          builder->getDeclaredInterfaceType());
+
+      std::string fixItString;
+      {
+        llvm::raw_string_ostream out(fixItString);
+        printMissingBuildFunctionCode(
+            buildInsertionLoc, builder, MissingBuildFunction::BuildArray, out);
+      }
+
+      diag.fixItInsert(buildInsertionLoc, fixItString);
+    }
   } else {
     emitDiagnostic(asNote ? diag::note_function_builder_decl
                           : diag::function_builder_decl,
