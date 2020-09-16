@@ -95,15 +95,12 @@ SerializedLocalizationProducer::SerializedLocalizationProducer(
       base + tableOffset, base + sizeof(offset_type), base));
 }
 
-llvm::StringRef SerializedLocalizationProducer::getMessageOr(
-    swift::DiagID id, llvm::StringRef defaultMessage) const {
+llvm::StringRef
+SerializedLocalizationProducer::getMessage(swift::DiagID id) const {
   auto value = SerializedTable.get()->find(id);
-  llvm::StringRef diagnosticMessage((const char *)value.getDataPtr(),
-                                    value.getDataLen());
-  if (diagnosticMessage.empty())
-    return defaultMessage;
-
-  return diagnosticMessage;
+  if (value.getDataLen() == 0)
+    return llvm::StringRef();
+  return {(const char *)value.getDataPtr(), value.getDataLen()};
 }
 
 YAMLLocalizationProducer::YAMLLocalizationProducer(llvm::StringRef filePath) {
@@ -114,15 +111,8 @@ YAMLLocalizationProducer::YAMLLocalizationProducer(llvm::StringRef filePath) {
   unknownIDs = std::move(yin.unknownIDs);
 }
 
-llvm::StringRef
-YAMLLocalizationProducer::getMessageOr(swift::DiagID id,
-                                       llvm::StringRef defaultMessage) const {
-  if (diagnostics.empty())
-    return defaultMessage;
-  const std::string &diagnosticMessage = diagnostics[(unsigned)id];
-  if (diagnosticMessage.empty())
-    return defaultMessage;
-  return diagnosticMessage;
+llvm::StringRef YAMLLocalizationProducer::getMessage(swift::DiagID id) const {
+  return diagnostics[(unsigned)id];
 }
 
 void YAMLLocalizationProducer::forEachAvailable(
