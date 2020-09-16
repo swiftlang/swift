@@ -1797,6 +1797,12 @@ for host in "${ALL_HOSTS[@]}"; do
                     "${swift_cmake_options[@]}"
                 )
 
+                # NOTE: This is not a dead option! It is relied upon for certain
+                # bots/build-configs!
+                #
+                # TODO: In the future when we are always cross compiling and
+                # using Toolchain files, we should put this in either a
+                # toolchain file or a cmake cache.
                 if [[ "${BUILD_TOOLCHAIN_ONLY}" ]]; then
                     cmake_options+=(
                     -DSWIFT_TOOL_SIL_OPT_BUILD=FALSE
