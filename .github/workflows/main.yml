@@ -45,11 +45,11 @@ jobs:
           ./utils/webassembly/ci.sh
           echo "Cleanup build directory to free disk space"
           rm -rf ../build
-      - name: Upload Linux installable archive
-        uses: actions/upload-artifact@v1
-        with:
-          name: linux-installable
-          path: ../swift-wasm-DEVELOPMENT-SNAPSHOT-linux.tar.gz
+#      - name: Upload Linux installable archive
+#        uses: actions/upload-artifact@v1
+#        with:
+#          name: linux-installable
+#          path: ../swift-wasm-DEVELOPMENT-SNAPSHOT-linux.tar.gz
 #      - name: Pack test results
 #        run: tar cJf swift-test-results.tar.gz ../build/*/swift-linux-x86_64/swift-test-results
 #      - name: Upload test results
