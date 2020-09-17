@@ -40,7 +40,6 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/Support/CommandLine.h"
 
 using namespace swift;
 using namespace swift::semanticarc;
@@ -48,12 +47,6 @@ using namespace swift::semanticarc;
 //===----------------------------------------------------------------------===//
 //                               Implementation
 //===----------------------------------------------------------------------===//
-
-bool swift::semanticarc::VerifyAfterTransform;
-
-static llvm::cl::opt<bool, true> VerifyAfterTransformOption(
-    "sil-semantic-arc-opts-verify-after-transform", llvm::cl::Hidden,
-    llvm::cl::location(VerifyAfterTransform), llvm::cl::init(false));
 
 bool SemanticARCOptVisitor::optimize() {
   bool madeChange = false;
@@ -65,8 +58,8 @@ bool SemanticARCOptVisitor::optimize() {
     // If we made a change, set that we assume we are at fixed point and then
     // re-run the worklist so that we can
     // properly seeded the ARC peephole map.
-    assumingAtFixedPoint = true;
-    SWIFT_DEFER { assumingAtFixedPoint = false; };
+    ctx.assumingAtFixedPoint = true;
+    SWIFT_DEFER { ctx.assumingAtFixedPoint = false; };
 
     // Add everything in visitedSinceLastMutation to the worklist so we
     // recompute our fixed point.
@@ -119,14 +112,12 @@ bool SemanticARCOptVisitor::processWorklist() {
     // the instruction).
     if (auto *defInst = next->getDefiningInstruction()) {
       if (isInstructionTriviallyDead(defInst)) {
-        assert(!assumingAtFixedPoint &&
+        assert(!ctx.assumingAtFixedPoint &&
                "Assumed was at fixed point and recomputing state?!");
         deleteAllDebugUses(defInst);
         eraseInstruction(defInst);
         madeChange = true;
-        if (VerifyAfterTransform) {
-          F.verify();
-        }
+        ctx.verify();
         continue;
       }
     }
@@ -135,11 +126,11 @@ bool SemanticARCOptVisitor::processWorklist() {
     // perhaps), try to visit that value recursively.
     if (auto *svi = dyn_cast<SingleValueInstruction>(next)) {
       bool madeSingleChange = visit(svi);
-      assert((!madeSingleChange || !assumingAtFixedPoint) &&
+      assert((!madeSingleChange || !ctx.assumingAtFixedPoint) &&
              "Assumed was at fixed point and modified state?!");
       madeChange |= madeSingleChange;
-      if (VerifyAfterTransform && madeSingleChange) {
-        F.verify();
+      if (madeSingleChange) {
+        ctx.verify();
       }
       continue;
     }
