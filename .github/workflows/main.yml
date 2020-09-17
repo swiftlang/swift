@@ -78,7 +78,6 @@ jobs:
           key: ${{ runner.os }}-sccache-v10-${{ steps.cache_timestamp.outputs.timestamp }}
           restore-keys: |
             ${{ runner.os }}-sccache-v10-
-      - uses: mxschmitt/action-tmate@v1
       - name: Build macOS installable archive
         run: |
           sudo xcode-select --switch /Applications/Xcode_12_beta.app/Contents/Developer/
