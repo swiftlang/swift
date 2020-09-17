@@ -7,7 +7,7 @@ CHANGELOG
 | Version                   | Released   | Toolchain   |
 | :------------------------ | :--------- | :---------- |
 | [Swift Next](#swift-next) |
-| [Swift 5.3](#swift-53)    |            |             |
+| [Swift 5.3](#swift-53)    | 2020-09-16 | Xcode 12.0  |
 | [Swift 5.2](#swift-52)    | 2020-03-24 | Xcode 11.4  |
 | [Swift 5.1](#swift-51)    | 2019-09-20 | Xcode 11.0  |
 | [Swift 5.0](#swift-50)    | 2019-03-25 | Xcode 10.2  |
