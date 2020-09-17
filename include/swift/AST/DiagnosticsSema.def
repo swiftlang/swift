@@ -4107,9 +4107,6 @@ NOTE(protocol_witness_async_conflict,none,
 ERROR(async_autoclosure_nonasync_function,none,
       "'async' autoclosure parameter in a non-'async' function", ())
 
-ERROR(asynchandler_attr_requires_concurrency,none,
-      "'@asyncHandler' is only valid when experimental concurrency is enabled",
-      ())
 ERROR(asynchandler_non_func,none,
       "'@asyncHandler' can only be applied to functions",
       ())
@@ -4142,8 +4139,6 @@ ERROR(satisfy_async_objc,none,
 ERROR(async_objc_dynamic_self,none,
       "asynchronous method returning 'Self' cannot be '@objc'", ())
 
-ERROR(actor_without_concurrency,none,
-      "'actor' classes require experimental concurrency support", ())
 ERROR(actor_with_nonactor_superclass,none,
       "actor class cannot inherit from non-actor class %0", (DeclName))
 

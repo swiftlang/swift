@@ -1394,6 +1394,15 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     DiscardAttribute = true;
   }
 
+  // If this attribute is only permitted when concurrency is enabled, reject it.
+  if (DeclAttribute::isConcurrencyOnly(DK) &&
+      !shouldParseExperimentalConcurrency()) {
+    diagnose(
+        Loc, diag::attr_requires_concurrency, AttrName,
+        DeclAttribute::isDeclModifier(DK));
+    DiscardAttribute = true;
+  }
+
   if (Context.LangOpts.Target.isOSBinFormatCOFF()) {
     if (DK == DAK_WeakLinked) {
       diagnose(Loc, diag::attr_unsupported_on_target, AttrName,

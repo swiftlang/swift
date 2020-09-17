@@ -161,14 +161,6 @@ bool IsActorRequest::evaluate(
     Evaluator &evaluator, ClassDecl *classDecl) const {
   // If concurrency is not enabled, we don't have actors.
   auto actorAttr = classDecl->getAttrs().getAttribute<ActorAttr>();
-  if (!classDecl->getASTContext().LangOpts.EnableExperimentalConcurrency) {
-    if (actorAttr) {
-      classDecl->diagnose(diag::actor_without_concurrency)
-          .highlight(actorAttr->getRange());
-    }
-
-    return false;
-  }
 
   // If there is a superclass, we can infer actor-ness from it.
   if (auto superclassDecl = classDecl->getSuperclassDecl()) {

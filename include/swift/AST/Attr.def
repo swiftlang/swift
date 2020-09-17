@@ -562,7 +562,7 @@ SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
   100)
 
 SIMPLE_DECL_ATTR(asyncHandler, AsyncHandler,
-  OnFunc | UserInaccessible |
+  OnFunc | ConcurrencyOnly |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   101)
 
