@@ -45,7 +45,10 @@ struct TupleBuilder { // expected-note 2 {{struct 'TupleBuilder' declared here}}
 }
 
 @_functionBuilder
-struct TupleBuilderWithoutIf { // expected-note {{struct 'TupleBuilderWithoutIf' declared here}}
+struct TupleBuilderWithoutIf { // expected-note 3{{struct 'TupleBuilderWithoutIf' declared here}}
+  // expected-note@-1{{add 'buildOptional(_:)' to the function builder 'TupleBuilderWithoutIf' to add support for 'if' statements without an 'else'}}
+  // expected-note@-2{{add 'buildEither(first:)' and 'buildEither(second:)' to the function builder 'TupleBuilderWithoutIf' to add support for 'if'-'else' and 'switch'}}
+  // expected-note@-3{{add 'buildArray(_:)' to the function builder 'TupleBuilderWithoutIf' to add support for 'for'..'in' loops}}
   static func buildBlock() -> () { }
   
   static func buildBlock<T1>(_ t1: T1) -> T1 {
@@ -104,6 +107,19 @@ func testDiags() {
   tuplifyWithoutIf(true) {
     if $0 {    // expected-error{{closure containing control flow statement cannot be used with function builder 'TupleBuilderWithoutIf'}}
       "hello"
+    }
+  }
+
+  tuplifyWithoutIf(true) {
+    if $0 {    // expected-error{{closure containing control flow statement cannot be used with function builder 'TupleBuilderWithoutIf'}}
+      "hello"
+    } else {
+    }
+  }
+
+  tuplifyWithoutIf(true) { a in
+    for x in 0..<100 {    // expected-error{{closure containing control flow statement cannot be used with function builder 'TupleBuilderWithoutIf'}}
+      x
     }
   }
 }
