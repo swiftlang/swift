@@ -788,6 +788,9 @@ class UnavailableClassExtendingUnavailableClass : ClassAvailableOn10_51 {
 // Method availability is contravariant
 
 class SuperWithAlwaysAvailableMembers {
+
+  required init() {} // expected-note {{overridden declaration is here}}
+
   func shouldAlwaysBeAvailableMethod() { // expected-note 2 {{overridden declaration is here}}
   }
   
@@ -808,6 +811,10 @@ class SuperWithAlwaysAvailableMembers {
 }
 
 class SubWithLimitedMemberAvailability : SuperWithAlwaysAvailableMembers {
+
+  @available(OSX, introduced: 10.51)
+  required init() {} // expected-error {{overriding 'init' must be as available as declaration it overrides}}
+
   @available(OSX, introduced: 10.51)
   override func shouldAlwaysBeAvailableMethod() { // expected-error {{overriding 'shouldAlwaysBeAvailableMethod' must be as available as declaration it overrides}}
   }
@@ -833,6 +840,10 @@ class SubWithLimitedMemberAvailability : SuperWithAlwaysAvailableMembers {
 }
 
 class SubWithUnavailableMembers : SuperWithAlwaysAvailableMembers {
+
+  @available(OSX, unavailable)
+  required init() {}
+
   @available(OSX, unavailable)
   override func shouldAlwaysBeAvailableMethod() { // expected-error {{overriding 'shouldAlwaysBeAvailableMethod' must be as available as declaration it overrides}}
   }
