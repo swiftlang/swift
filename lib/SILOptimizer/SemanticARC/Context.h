@@ -72,6 +72,9 @@ struct LLVM_LIBRARY_VISIBILITY Context {
   /// copy_values we /do/ allow.
   bool onlyGuaranteedOpts;
 
+  /// Callbacks that we must use to remove or RAUW values.
+  InstModCallbacks instModCallbacks;
+
   using FrozenMultiMapRange =
       decltype(joinedOwnedIntroducerToConsumedOperands)::PairToSecondEltRange;
 
@@ -81,7 +84,7 @@ struct LLVM_LIBRARY_VISIBILITY Context {
     return *deadEndBlocks;
   }
 
-  Context(SILFunction &fn, bool onlyGuaranteedOpts)
+  Context(SILFunction &fn, bool onlyGuaranteedOpts, InstModCallbacks callbacks)
       : fn(fn), deadEndBlocks(), lifetimeFrontier(),
         addressToExhaustiveWriteListCache(constructCacheValue),
         onlyGuaranteedOpts(onlyGuaranteedOpts) {}

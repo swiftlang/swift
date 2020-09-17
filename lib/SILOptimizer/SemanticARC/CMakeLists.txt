@@ -6,4 +6,5 @@ target_sources(swiftSILOptimizer PRIVATE
   CopyValueOpts.cpp
   OwnedToGuaranteedPhiOpt.cpp
   Context.cpp
+  SemanticARCOptVisitor.cpp
   )

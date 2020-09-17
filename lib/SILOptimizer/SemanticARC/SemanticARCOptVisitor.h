@@ -48,7 +48,13 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
   Context ctx;
 
   explicit SemanticARCOptVisitor(SILFunction &fn, bool onlyGuaranteedOpts)
-      : ctx(fn, onlyGuaranteedOpts) {}
+      : ctx(fn, onlyGuaranteedOpts,
+            InstModCallbacks(
+                [this](SILInstruction *inst) { eraseInstruction(inst); },
+                [](SILInstruction *) {}, [](SILValue, SILValue) {},
+                [this](SingleValueInstruction *i, SILValue value) {
+                  eraseAndRAUWSingleValueInstruction(i, value);
+                })) {}
 
   DeadEndBlocks &getDeadEndBlocks() { return ctx.getDeadEndBlocks(); }
 
@@ -190,7 +196,6 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
   bool performGuaranteedCopyValueOptimization(CopyValueInst *cvi);
   bool eliminateDeadLiveRangeCopyValue(CopyValueInst *cvi);
   bool tryJoiningCopyValueLiveRangeWithOperand(CopyValueInst *cvi);
-  bool performPostPeepholeOwnedArgElimination();
 };
 
 } // namespace semanticarc
