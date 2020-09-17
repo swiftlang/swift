@@ -24,8 +24,8 @@ public let FloatingPointConversion = [
     tags: [.validation, .api],
     setUpFunction: { blackHole(mockFloat64s) }),
   BenchmarkInfo(
-    name: "ConvertFloatingPoint.MockFloat64Exactly.bis",
-    runFunction: run_ConvertFloatingPoint_MockFloat64Exactly_bis,
+    name: "ConvertFloatingPoint.MockFloat64Exactly2",
+    runFunction: run_ConvertFloatingPoint_MockFloat64Exactly2,
     tags: [.validation, .api],
     setUpFunction: { blackHole(mockFloat64s) }),
   BenchmarkInfo(
@@ -183,7 +183,7 @@ func convert<
 
 @inline(never)
 public func run_ConvertFloatingPoint_MockFloat64Exactly(_ N: Int) {
-  for _ in 0..<(N * 100) {
+  for _ in 0..<(N * 25) {
     for element in mockFloat64s {
       let f = convert(exactly: identity(element), to: Double.self)
       blackHole(f)
@@ -192,8 +192,8 @@ public func run_ConvertFloatingPoint_MockFloat64Exactly(_ N: Int) {
 }
 
 @inline(never)
-public func run_ConvertFloatingPoint_MockFloat64Exactly_bis(_ N: Int) {
-  for _ in 0..<(N * 100) {
+public func run_ConvertFloatingPoint_MockFloat64Exactly2(_ N: Int) {
+  for _ in 0..<(N * 25) {
     for element in mockFloat64s {
       let f = convert(exactly: identity(element), to: MockFloat32.self)
       blackHole(f)
