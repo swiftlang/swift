@@ -17,8 +17,34 @@
 
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 
+#include "llvm/Support/CommandLine.h"
+
 using namespace swift;
 using namespace swift::semanticarc;
+
+namespace {
+
+/// An enum used so that at the command line, we can override
+enum class TransformToPerformKind {
+  Peepholes,
+  OwnedToGuaranteedPhi,
+};
+
+} // anonymous namespace
+
+static llvm::cl::list<TransformToPerformKind> TransformsToPerform(
+    llvm::cl::values(
+        clEnumValN(TransformToPerformKind::Peepholes,
+                   "sil-semantic-arc-peepholes",
+                   "Perform ARC canonicalizations and peepholes"),
+        clEnumValN(TransformToPerformKind::OwnedToGuaranteedPhi,
+                   "sil-semantic-arc-owned-to-guaranteed-phi",
+                   "Perform Owned To Guaranteed Phi. NOTE: Seeded by peephole "
+                   "optimizer for compile time saving purposes, so run this "
+                   "after running peepholes)")),
+    llvm::cl::desc(
+        "For testing purposes only run the specified list of semantic arc "
+        "optimization. If the list is empty, we run all transforms"));
 
 //===----------------------------------------------------------------------===//
 //                            Top Level Entrypoint
@@ -35,6 +61,42 @@ struct SemanticARCOpts : SILFunctionTransform {
   SemanticARCOpts(bool guaranteedOptsOnly)
       : guaranteedOptsOnly(guaranteedOptsOnly) {}
 
+#ifndef NDEBUG
+  void performCommandlineSpecifiedTransforms(SemanticARCOptVisitor &visitor) {
+    for (auto transform : TransformsToPerform) {
+      switch (transform) {
+      case TransformToPerformKind::Peepholes:
+        if (performPeepholes(visitor)) {
+          invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+        }
+        continue;
+      case TransformToPerformKind::OwnedToGuaranteedPhi:
+        if (tryConvertOwnedPhisToGuaranteedPhis(visitor.ctx)) {
+          invalidateAnalysis(
+              SILAnalysis::InvalidationKind::BranchesAndInstructions);
+        }
+        continue;
+      }
+    }
+  }
+#endif
+
+  bool performPeepholes(SemanticARCOptVisitor &visitor) {
+    // Add all the results of all instructions that we want to visit to the
+    // worklist.
+    for (auto &block : *getFunction()) {
+      for (auto &inst : block) {
+        if (SemanticARCOptVisitor::shouldVisitInst(&inst)) {
+          for (SILValue v : inst.getResults()) {
+            visitor.worklist.insert(v);
+          }
+        }
+      }
+    }
+    // Then process the worklist, performing peepholes.
+    return visitor.optimize();
+  }
+
   void run() override {
     SILFunction &f = *getFunction();
 
@@ -49,32 +111,29 @@ struct SemanticARCOpts : SILFunctionTransform {
 
     SemanticARCOptVisitor visitor(f, guaranteedOptsOnly);
 
-    // Add all the results of all instructions that we want to visit to the
-    // worklist.
-    for (auto &block : f) {
-      for (auto &inst : block) {
-        if (SemanticARCOptVisitor::shouldVisitInst(&inst)) {
-          for (SILValue v : inst.getResults()) {
-            visitor.worklist.insert(v);
-          }
-        }
-      }
+#ifndef NDEBUG
+    // If we are being asked for testing purposes to run a series of transforms
+    // expressed on the command line, run that and return.
+    if (!TransformsToPerform.empty()) {
+      return performCommandlineSpecifiedTransforms(visitor);
     }
+#endif
 
-    // Then process the worklist, performing peepholes.
-    bool eliminatedARCInst = visitor.optimize();
+    // Otherwise, perform our standard optimizations.
+    bool didEliminateARCInsts = performPeepholes(visitor);
 
     // Now that we have seeded the map of phis to incoming values that could be
     // converted to guaranteed, ignoring the phi, try convert those phis to be
     // guaranteed.
     if (tryConvertOwnedPhisToGuaranteedPhis(visitor.ctx)) {
-      invalidateAnalysis(
+      // We return here early to save a little compile time so we do not
+      // invalidate analyses redundantly.
+      return invalidateAnalysis(
           SILAnalysis::InvalidationKind::BranchesAndInstructions);
-      return;
     }
 
     // Otherwise, we only deleted instructions and did not touch phis.
-    if (eliminatedARCInst)
+    if (didEliminateARCInsts)
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 };
