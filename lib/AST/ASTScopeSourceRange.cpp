@@ -35,7 +35,6 @@
 using namespace swift;
 using namespace ast_scope;
 
-static SourceLoc getStartOfFirstParam(ClosureExpr *closure);
 static SourceLoc getLocEncompassingPotentialLookups(const SourceManager &,
                                                     SourceLoc endLoc);
 static SourceLoc getLocAfterExtendedNominal(const ExtensionDecl *);
@@ -232,11 +231,6 @@ SourceRange SubscriptDeclScope::getSourceRangeOfThisASTNode(
 SourceRange
 EnumElementScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
   return decl->getSourceRange();
-}
-
-SourceRange WholeClosureScope::getSourceRangeOfThisASTNode(
-    const bool omitAssertions) const {
-  return closureExpr->getSourceRange();
 }
 
 SourceRange AbstractStmtScope::getSourceRangeOfThisASTNode(
@@ -447,20 +441,15 @@ SourceRange ConditionalClausePatternUseScope::getSourceRangeOfThisASTNode(
 
 SourceRange
 CaptureListScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
-  auto *const closure = expr->getClosureBody();
-  return SourceRange(expr->getStartLoc(), getStartOfFirstParam(closure));
-}
-
-SourceRange ClosureParametersScope::getSourceRangeOfThisASTNode(
-    const bool omitAssertions) const {
+  auto *closureExpr = expr->getClosureBody();
   if (!omitAssertions)
     ASTScopeAssert(closureExpr->getInLoc().isValid(),
                    "We don't create these if no in loc");
   return SourceRange(closureExpr->getInLoc(), closureExpr->getEndLoc());
 }
 
-SourceRange
-ClosureBodyScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
+SourceRange ClosureParametersScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
   if (closureExpr->getInLoc().isValid())
     return SourceRange(closureExpr->getInLoc(), closureExpr->getEndLoc());
 
@@ -691,18 +680,6 @@ void ASTScopeImpl::widenSourceRangeForIgnoredASTNode(const ASTNode n) {
     sourceRangeOfIgnoredASTNodes = r;
   else
     sourceRangeOfIgnoredASTNodes.widen(r);
-}
-
-static SourceLoc getStartOfFirstParam(ClosureExpr *closure) {
-  if (auto *parms = closure->getParameters()) {
-    if (parms->size())
-      return parms->get(0)->getStartLoc();
-  }
-  if (closure->getInLoc().isValid())
-    return closure->getInLoc();
-  if (closure->getBody())
-    return closure->getBody()->getLBraceLoc();
-  return closure->getStartLoc();
 }
 
 #pragma mark getSourceRangeOfEnclosedParamsOfASTNode

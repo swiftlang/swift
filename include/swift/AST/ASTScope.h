@@ -1393,9 +1393,7 @@ protected:
 };
 
 
-/// Capture lists may contain initializer expressions
-/// No local bindings here (other than closures in initializers);
-/// rather include these in the params or body local bindings
+/// Capture lists introduce local bindings.
 class CaptureListScope final : public ASTScopeImpl {
 public:
   CaptureListExpr *const expr;
@@ -1416,63 +1414,17 @@ public:
   NullablePtr<Expr> getExprIfAny() const override { return expr; }
   Expr *getExpr() const { return expr; }
   NullablePtr<const void> getReferrent() const override;
-};
-
-// In order for compatibility with existing lookup, closures are represented
-// by multiple scopes: An overall scope (including the part before the "in"
-// and a body scope, including the part after the "in"
-class AbstractClosureScope : public ASTScopeImpl {
-public:
-  NullablePtr<CaptureListExpr> captureList;
-  ClosureExpr *const closureExpr;
-
-  AbstractClosureScope(ClosureExpr *closureExpr,
-                       NullablePtr<CaptureListExpr> captureList)
-      : captureList(captureList), closureExpr(closureExpr) {}
-  virtual ~AbstractClosureScope() {}
-
-  NullablePtr<ClosureExpr> getClosureIfClosureScope() const override;
-  NullablePtr<DeclContext> getDeclContext() const override {
-    return closureExpr;
-  }
-  NullablePtr<const void> addressForPrinting() const override {
-    return closureExpr;
-  }
-};
-
-class WholeClosureScope final : public AbstractClosureScope {
-  const BraceStmt *bodyWhenLastExpanded;
-
-public:
-  WholeClosureScope(ClosureExpr *closureExpr,
-                    NullablePtr<CaptureListExpr> captureList)
-      : AbstractClosureScope(closureExpr, captureList) {}
-  virtual ~WholeClosureScope() {}
-
-protected:
-  ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
-  void beCurrent() override;
-  bool isCurrentIfWasExpanded() const override;
-
-private:
-  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
-
-public:
-  std::string getClassName() const override;
-  SourceRange
-  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
-  NullablePtr<Expr> getExprIfAny() const override { return closureExpr; }
-  Expr *getExpr() const { return closureExpr; }
-  NullablePtr<const void> getReferrent() const override;
+  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                             DeclConsumer) const override;
 };
 
 /// For a closure with named parameters, this scope does the local bindings.
-/// Absent if no "in".
-class ClosureParametersScope final : public AbstractClosureScope {
+class ClosureParametersScope final : public ASTScopeImpl {
 public:
-  ClosureParametersScope(ClosureExpr *closureExpr,
-                         NullablePtr<CaptureListExpr> captureList)
-      : AbstractClosureScope(closureExpr, captureList) {}
+  ClosureExpr *const closureExpr;
+
+  ClosureParametersScope(ClosureExpr *closureExpr)
+      : closureExpr(closureExpr) {}
   virtual ~ClosureParametersScope() {}
 
   std::string getClassName() const override;
@@ -1486,22 +1438,15 @@ public:
   ///  a capture of self.
   NullablePtr<DeclContext> capturedSelfDC() const override;
 
-protected:
-  ASTScopeImpl *expandSpecifically(ScopeCreator &) override;
-  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                             DeclConsumer) const override;
-  Optional<bool> resolveIsCascadingUseForThisScope(
-      Optional<bool> isCascadingUse) const override;
-};
-
-// The body encompasses the code in the closure; the part after the "in" if
-// there is an "in"
-class ClosureBodyScope final : public AbstractClosureScope {
-public:
-  ClosureBodyScope(ClosureExpr *closureExpr,
-                   NullablePtr<CaptureListExpr> captureList)
-      : AbstractClosureScope(closureExpr, captureList) {}
-  virtual ~ClosureBodyScope() {}
+  NullablePtr<ClosureExpr> getClosureIfClosureScope() const override {
+    return closureExpr;
+  }
+  NullablePtr<DeclContext> getDeclContext() const override {
+    return closureExpr;
+  }
+  NullablePtr<Expr> getExprIfAny() const override { return closureExpr; }
+  Expr *getExpr() const { return closureExpr; }
+  NullablePtr<const void> getReferrent() const override;
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
@@ -1509,12 +1454,9 @@ protected:
 private:
   void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
 
-public:
-  std::string getClassName() const override;
-  SourceRange
-  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
-
 protected:
+  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                             DeclConsumer) const override;
   Optional<bool> resolveIsCascadingUseForThisScope(
       Optional<bool> isCascadingUse) const override;
 };

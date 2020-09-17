@@ -424,18 +424,19 @@ bool PatternEntryInitializerScope::lookupLocalsOrMembers(
   return false;
 }
 
+bool CaptureListScope::lookupLocalsOrMembers(
+    ArrayRef<const ASTScopeImpl *>, DeclConsumer consumer) const {
+  for (auto &e : expr->getCaptureList()) {
+    if (consumer.consume(
+            {e.Var},
+            DeclVisibilityKind::LocalVariable)) // or FunctionParameter??
+      return true;
+  }
+  return false;
+}
+
 bool ClosureParametersScope::lookupLocalsOrMembers(
     ArrayRef<const ASTScopeImpl *>, DeclConsumer consumer) const {
-  if (auto *cl = captureList.getPtrOrNull()) {
-    CaptureListExpr *mutableCL =
-        const_cast<CaptureListExpr *>(captureList.get());
-    for (auto &e : mutableCL->getCaptureList()) {
-      if (consumer.consume(
-              {e.Var},
-              DeclVisibilityKind::LocalVariable)) // or FunctionParameter??
-        return true;
-    }
-  }
   for (auto param : *closureExpr->getParameters())
     if (consumer.consume({param}, DeclVisibilityKind::FunctionParameter))
       return true;
@@ -699,10 +700,6 @@ DefaultArgumentInitializerScope::resolveIsCascadingUseForThisScope(
 }
 
 Optional<bool> ClosureParametersScope::resolveIsCascadingUseForThisScope(
-    Optional<bool> isCascadingUse) const {
-  return ifUnknownIsCascadingUseAccordingTo(isCascadingUse, closureExpr);
-}
-Optional<bool> ClosureBodyScope::resolveIsCascadingUseForThisScope(
     Optional<bool> isCascadingUse) const {
   return ifUnknownIsCascadingUseAccordingTo(isCascadingUse, closureExpr);
 }
