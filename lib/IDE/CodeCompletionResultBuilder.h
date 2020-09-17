@@ -92,6 +92,7 @@ class CodeCompletionResultBuilder {
   bool IsNotRecommended = false;
   CodeCompletionResult::NotRecommendedReason NotRecReason =
     CodeCompletionResult::NotRecommendedReason::NoReason;
+  StringRef BriefDocComment = StringRef();
 
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,
                         StringRef Text);
@@ -445,6 +446,10 @@ public:
   void addAnnotatedWhitespace(StringRef space) {
     addWhitespace(space);
     getLastChunk().setIsAnnotation();
+  }
+
+  void setBriefDocComment(StringRef comment) {
+    BriefDocComment = comment;
   }
 };
 

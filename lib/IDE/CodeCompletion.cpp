@@ -1345,13 +1345,17 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
 
   case CodeCompletionResult::ResultKind::Keyword:
     return new (*Sink.Allocator)
-        CodeCompletionResult(KeywordKind, SemanticContext, NumBytesToErase,
-                             CCS, ExpectedTypeRelation);
+        CodeCompletionResult(
+          KeywordKind, SemanticContext, NumBytesToErase,
+          CCS, ExpectedTypeRelation,
+          copyString(*Sink.Allocator, BriefDocComment));
 
   case CodeCompletionResult::ResultKind::BuiltinOperator:
   case CodeCompletionResult::ResultKind::Pattern:
     return new (*Sink.Allocator) CodeCompletionResult(
-        Kind, SemanticContext, NumBytesToErase, CCS, ExpectedTypeRelation);
+        Kind, SemanticContext, NumBytesToErase, CCS, ExpectedTypeRelation,
+        CodeCompletionOperatorKind::None,
+        copyString(*Sink.Allocator, BriefDocComment));
 
   case CodeCompletionResult::ResultKind::Literal:
     assert(LiteralKind.hasValue());
@@ -5136,6 +5140,100 @@ public:
     }
   }
 
+  static StringRef getFunctionBuilderDocComment(
+      FunctionBuilderBuildFunction function) {
+    switch (function) {
+    case FunctionBuilderBuildFunction::BuildArray:
+      return "Enables support for..in loops in a function builder by "
+        "combining the results of all iterations into a single result";
+
+    case FunctionBuilderBuildFunction::BuildBlock:
+      return "Required by every function builder to build combined results "
+          "from statement blocks";
+
+    case FunctionBuilderBuildFunction::BuildEitherFirst:
+      return "With buildEither(second:), enables support for 'if-else' and "
+          "'switch' statements by folding conditional results into a single "
+          "result";
+
+    case FunctionBuilderBuildFunction::BuildEitherSecond:
+      return "With buildEither(first:), enables support for 'if-else' and "
+          "'switch' statements by folding conditional results into a single "
+          "result";
+
+    case FunctionBuilderBuildFunction::BuildExpression:
+      return "If declared, provides contextual type information for statement "
+          "expressions to translate them into partial results";
+
+    case FunctionBuilderBuildFunction::BuildFinalResult:
+      return "If declared, this will be called on the partial result from the "
+          "outermost block statement to produce the final returned result";
+
+    case FunctionBuilderBuildFunction::BuildLimitedAvailability:
+      return "If declared, this will be called on the partial result of "
+        "an 'if #available' block to allow the function builder to erase "
+        "type information";
+
+    case FunctionBuilderBuildFunction::BuildOptional:
+      return "Enables support for `if` statements that do not have an `else`";
+    }
+  }
+
+  void addFunctionBuilderBuildCompletion(
+      NominalTypeDecl *builder, Type componentType,
+      FunctionBuilderBuildFunction function) {
+    CodeCompletionResultBuilder Builder(
+        Sink,
+        CodeCompletionResult::ResultKind::Pattern,
+        SemanticContextKind::CurrentNominal, {});
+    Builder.setExpectedTypeRelation(
+        CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
+
+    if (!hasFuncIntroducer) {
+      if (!hasAccessModifier &&
+          builder->getFormalAccess() >= AccessLevel::Public)
+        Builder.addAccessControlKeyword(AccessLevel::Public);
+
+      if (!hasStaticOrClass)
+        Builder.addTextChunk("static ");
+
+      Builder.addTextChunk("func ");
+    }
+
+    std::string declStringWithoutFunc;
+    {
+      llvm::raw_string_ostream out(declStringWithoutFunc);
+      printFunctionBuilderBuildFunction(
+          builder, componentType, function, None, out);
+    }
+    Builder.addTextChunk(declStringWithoutFunc);
+    Builder.addBraceStmtWithCursor();
+    Builder.setBriefDocComment(getFunctionBuilderDocComment(function));
+  }
+
+  /// Add completions for the various "build" functions in a function builder.
+  void addFunctionBuilderBuildCompletions(NominalTypeDecl *builder) {
+    Type componentType = inferFunctionBuilderComponentType(builder);
+
+    addFunctionBuilderBuildCompletion(
+        builder, componentType, FunctionBuilderBuildFunction::BuildBlock);
+    addFunctionBuilderBuildCompletion(
+        builder, componentType, FunctionBuilderBuildFunction::BuildExpression);
+    addFunctionBuilderBuildCompletion(
+        builder, componentType, FunctionBuilderBuildFunction::BuildOptional);
+    addFunctionBuilderBuildCompletion(
+        builder, componentType, FunctionBuilderBuildFunction::BuildEitherFirst);
+    addFunctionBuilderBuildCompletion(
+        builder, componentType, FunctionBuilderBuildFunction::BuildEitherSecond);
+    addFunctionBuilderBuildCompletion(
+        builder, componentType, FunctionBuilderBuildFunction::BuildArray);
+    addFunctionBuilderBuildCompletion(
+        builder, componentType,
+        FunctionBuilderBuildFunction::BuildLimitedAvailability);
+    addFunctionBuilderBuildCompletion(
+        builder, componentType, FunctionBuilderBuildFunction::BuildFinalResult);
+  }
+
   void getOverrideCompletions(SourceLoc Loc) {
     if (!CurrDeclContext->isTypeContext())
       return;
@@ -5153,6 +5251,10 @@ public:
                                /*includeProtocolExtensionMembers*/false);
       addDesignatedInitializers(NTD);
       addAssociatedTypes(NTD);
+    }
+
+    if (NTD && NTD->getAttrs().hasAttribute<FunctionBuilderAttr>()) {
+      addFunctionBuilderBuildCompletions(NTD);
     }
   }
 };
