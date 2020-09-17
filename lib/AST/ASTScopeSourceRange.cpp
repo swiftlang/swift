@@ -456,8 +456,7 @@ SourceRange ClosureParametersScope::getSourceRangeOfThisASTNode(
   if (!omitAssertions)
     ASTScopeAssert(closureExpr->getInLoc().isValid(),
                    "We don't create these if no in loc");
-  return SourceRange(getStartOfFirstParam(closureExpr),
-                     closureExpr->getInLoc());
+  return SourceRange(closureExpr->getInLoc(), closureExpr->getEndLoc());
 }
 
 SourceRange

@@ -691,7 +691,6 @@ public:
   /// \return the scopes traversed
   static llvm::SmallVector<const ast_scope::ASTScopeImpl *, 0>
   unqualifiedLookup(SourceFile *, DeclNameRef, SourceLoc,
-                    const DeclContext *startingContext,
                     namelookup::AbstractASTScopeDeclConsumer &);
 
   static Optional<bool>

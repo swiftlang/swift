@@ -35,28 +35,19 @@ using namespace swift;
 using namespace namelookup;
 using namespace ast_scope;
 
-static bool isLocWithinAnInactiveClause(const SourceLoc loc, SourceFile *SF);
-
 llvm::SmallVector<const ASTScopeImpl *, 0> ASTScopeImpl::unqualifiedLookup(
     SourceFile *sourceFile, const DeclNameRef name, const SourceLoc loc,
-    const DeclContext *const startingContext, DeclConsumer consumer) {
+    DeclConsumer consumer) {
   SmallVector<const ASTScopeImpl *, 0> history;
   const auto *start =
-      findStartingScopeForLookup(sourceFile, name, loc, startingContext);
+      findStartingScopeForLookup(sourceFile, name, loc);
   if (start)
     start->lookup(history, nullptr, nullptr, consumer);
   return history;
 }
 
 const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
-    SourceFile *sourceFile, const DeclNameRef name, const SourceLoc loc,
-    const DeclContext *const startingContext) {
-  // At present, use legacy code in unqualifiedLookup.cpp to handle module-level
-  // lookups
-  // TODO: implement module scope someday
-  if (startingContext->getContextKind() == DeclContextKind::Module)
-    return nullptr;
-
+    SourceFile *sourceFile, const DeclNameRef name, const SourceLoc loc) {
   auto *const fileScope = sourceFile->getScope().impl;
   // Parser may have added decls to source file, since previous lookup
   if (name.isOperator())
@@ -66,63 +57,7 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
   ASTScopeAssert(innermost->getWasExpanded(),
                  "If looking in a scope, it must have been expanded.");
 
-  // The legacy lookup code gets passed both a SourceLoc and a starting context.
-  // However, our ultimate intent is for clients to not have to pass in a
-  // DeclContext at all, since the SourceLoc should be enough. While we are
-  // debugging the new ASTScope lookup code, we can catch bugs by comparing the
-  // DeclContext of the ASTScope found from the desired SourceLoc to the
-  // DeclContext passed in by the client.
-
-  const auto *startingScope = innermost;
-  for (; startingScope &&
-         !startingScope->doesContextMatchStartingContext(startingContext);
-       startingScope = startingScope->getParent().getPtrOrNull()) {
-  }
-  // Someday, just use the assertion below. For now, print out lots of info for
-  // debugging.
-  if (!startingScope) {
-
-    // Be lenient in code completion mode. There are cases where the decl
-    // context doesn't match with the ASTScope. e.g. dangling attributes.
-    // FIXME: Create ASTScope tree even for invalid code.
-    if (innermost &&
-        startingContext->getASTContext().SourceMgr.hasCodeCompletionBuffer()) {
-      return innermost;
-    }
-
-    llvm::errs() << "ASTScopeImpl: resorting to startingScope hack, file: "
-                 << sourceFile->getFilename() << "\n";
-    // The check is costly, and inactive lookups will end up here, so don't
-    // do the check unless we can't find the startingScope.
-    const bool isInInactiveClause =
-        isLocWithinAnInactiveClause(loc, sourceFile);
-    if (isInInactiveClause)
-      llvm::errs() << "  because location is within an inactive clause\n";
-    llvm::errs() << "'";
-    name.print(llvm::errs());
-    llvm::errs() << "' ";
-    llvm::errs() << "loc: ";
-    loc.print(llvm::errs(), sourceFile->getASTContext().SourceMgr);
-    llvm::errs() << "\nstarting context:\n ";
-    startingContext->printContext(llvm::errs());
-    //    llvm::errs() << "\ninnermost: ";
-    //    innermost->dump();
-    //    llvm::errs() << "in: \n";
-    //    fileScope->dump();
-    llvm::errs() << "\n\n";
-
-    // Might distort things
-    //    if (fileScope->crossCheckWithAST())
-    //      llvm::errs() << "Tree creation missed some DeclContexts.\n";
-
-    // Crash compilation even if NDEBUG
-    if (isInInactiveClause)
-      llvm::report_fatal_error(
-          "A lookup was attempted into an inactive clause");
-  }
-
-  ASTScopeAssert(startingScope, "ASTScopeImpl: could not find startingScope");
-  return startingScope;
+  return innermost;
 }
 
 ASTScopeImpl *
@@ -187,53 +122,6 @@ ASTScopeImpl::findChildContaining(SourceLoc loc,
   }
 
   return nullptr;
-}
-
-#pragma mark doesContextMatchStartingContext
-// Match existing UnqualifiedLookupBehavior
-
-bool ASTScopeImpl::doesContextMatchStartingContext(
-    const DeclContext *context) const {
-  // Why are we not checking the loc for this--because already did binary search
-  // on loc to find the start First, try MY DeclContext
-  if (auto myDCForL = getDeclContext())
-    return myDCForL == context;
-  // If I don't have one, ask my parent.
-  // (Choose innermost scope with matching loc & context.)
-  if (auto p = getParent())
-    return p.get()->doesContextMatchStartingContext(context);
-  // Topmost scope always has a context, the SourceFile.
-  ASTScope_unreachable("topmost scope always has a context, the SourceFile");
-}
-
-// For a SubscriptDecl with generic parameters, the call tries to do lookups
-// with startingContext equal to either the get or set subscript
-// AbstractFunctionDecls. Since the generic parameters are in the
-// SubscriptDeclScope, and not the AbstractFunctionDecl scopes (after all how
-// could one parameter be in two scopes?), GenericParamScope intercepts the
-// match query here and tests against the accessor DeclContexts.
-bool GenericParamScope::doesContextMatchStartingContext(
-    const DeclContext *context) const {
-  if (auto *asd = dyn_cast<AbstractStorageDecl>(holder)) {
-    for (auto accessor : asd->getAllAccessors()) {
-      if (up_cast<DeclContext>(accessor) == context)
-        return true;
-    }
-  }
-  return false;
-}
-
-bool DifferentiableAttributeScope::doesContextMatchStartingContext(
-    const DeclContext *context) const {
-  // Need special logic to handle case where `attributedDeclaration` is an
-  // `AbstractStorageDecl` (`SubscriptDecl` or `VarDecl`). The initial starting
-  // context in `ASTScopeImpl::findStartingScopeForLookup` will be an accessor
-  // of the `attributedDeclaration`.
-  if (auto *asd = dyn_cast<AbstractStorageDecl>(attributedDeclaration))
-    for (auto accessor : asd->getAllAccessors())
-      if (up_cast<DeclContext>(accessor) == context)
-        return true;
-  return false;
 }
 
 #pragma mark lookup methods that run once per scope
@@ -839,39 +727,6 @@ Optional<bool> PatternEntryInitializerScope::resolveIsCascadingUseForThisScope(
     return ifUnknownIsCascadingUseAccordingTo(isCascadingUse, PBI);
 
   return isCascadingUse;
-}
-
-bool isLocWithinAnInactiveClause(const SourceLoc loc, SourceFile *SF) {
-  class InactiveClauseTester : public ASTWalker {
-    const SourceLoc loc;
-    const SourceManager &SM;
-
-  public:
-    bool wasFoundWithinInactiveClause = false;
-
-    InactiveClauseTester(const SourceLoc loc, const SourceManager &SM)
-        : loc(loc), SM(SM) {}
-
-    bool walkToDeclPre(Decl *D) override {
-      if (const auto *ifc = dyn_cast<IfConfigDecl>(D)) {
-        for (const auto &clause : ifc->getClauses()) {
-          if (clause.isActive)
-            continue;
-          for (const auto &n : clause.Elements) {
-            SourceRange sr = n.getSourceRange();
-            if (sr.isValid() && SM.rangeContainsTokenLoc(sr, loc)) {
-              wasFoundWithinInactiveClause = true;
-              return false;
-            }
-          }
-        }
-      }
-      return ASTWalker::walkToDeclPre(D);
-    }
-  };
-  InactiveClauseTester tester(loc, SF->getASTContext().SourceMgr);
-  SF->walk(tester);
-  return tester.wasFoundWithinInactiveClause;
 }
 
 #pragma mark isLabeledStmtLookupTerminator implementations
