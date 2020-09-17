@@ -24,6 +24,12 @@ export SCCACHE_DIR="$SOURCE_PATH/build-cache"
 
 $BUILD_SCRIPT
 
+
+if [[ -n "${CI}" && "$(uname)" == "Linux" ]]; then
+  echo "Exit to create a cache temporarily"
+  exit 0
+fi
+
 if [[ "$(uname)" == "Darwin" ]]; then
   # workaround: host target test directory is necessary to use run-test
   mkdir -p $BUILD_DIR/swift-macosx-x86_64/test-macosx-x86_64
