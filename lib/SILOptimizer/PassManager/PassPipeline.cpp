@@ -447,6 +447,9 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   //
   // This is done so we can push ownership through the pass pipeline first for
   // the stdlib and then everything else.
+  if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
+    return;
+
   P.addNonStdlibNonTransparentFunctionOwnershipModelEliminator();
 
   // Start by linking in referenced functions from other modules.
@@ -721,14 +724,21 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
 
   // Eliminate immediately dead functions and then clone functions from the
   // stdlib.
+  //
+  // This also performs early OSSA based optimizations on *all* swift code.
   addPerfEarlyModulePassPipeline(P);
+
+  // Then if we were asked to stop optimization before lowering OSSA (causing us
+  // to exit early from addPerfEarlyModulePassPipeline), exit early.
+  if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
+    return P;
 
   // Then run an iteration of the high-level SSA passes.
   //
   // FIXME: When *not* emitting a .swiftmodule, skip the high-level function
   // pipeline to save compile time.
   //
-  // NOTE: Ownership is now stripped within this function!
+  // NOTE: Ownership is now stripped within this function for the stdlib.
   addHighLevelFunctionPipeline(P);
 
   addHighLevelModulePipeline(P);
