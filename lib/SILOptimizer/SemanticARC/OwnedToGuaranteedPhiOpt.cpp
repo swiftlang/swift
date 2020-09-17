@@ -16,8 +16,9 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "Context.h"
 #include "OwnershipPhiOperand.h"
-#include "SemanticARCOptVisitor.h"
+#include "Transforms.h"
 
 using namespace swift;
 using namespace swift::semanticarc;
@@ -120,7 +121,7 @@ static bool getIncomingJoinedLiveRangeOperands(
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
-bool SemanticARCOptVisitor::performPostPeepholeOwnedArgElimination() {
+bool swift::semanticarc::tryConvertOwnedPhisToGuaranteedPhis(Context &ctx) {
   bool madeChange = false;
 
   // First freeze our multi-map so we can use it for map queries. Also, setup a
@@ -211,7 +212,7 @@ bool SemanticARCOptVisitor::performPostPeepholeOwnedArgElimination() {
           incomingValueUpdates.emplace_back(cvi->getOperand(), updateOffset);
         }
         std::move(lr).convertToGuaranteedAndRAUW(cvi->getOperand(),
-                                                 getCallbacks());
+                                                 ctx.instModCallbacks);
         continue;
       }
       llvm_unreachable("Unhandled optimizable introducer!");
@@ -227,7 +228,7 @@ bool SemanticARCOptVisitor::performPostPeepholeOwnedArgElimination() {
     // Then convert the phi's live range to be guaranteed.
     std::move(joinedLiveRange)
         .convertJoinedLiveRangePhiToGuaranteed(
-            getDeadEndBlocks(), ctx.lifetimeFrontier, getCallbacks());
+            ctx.getDeadEndBlocks(), ctx.lifetimeFrontier, ctx.instModCallbacks);
 
     // Now if our phi operand consumes/forwards its guaranteed input, insert a
     // begin_borrow along the incoming value edges. We have to do this after
