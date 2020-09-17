@@ -12,11 +12,12 @@
 
 #define DEBUG_TYPE "sil-semantic-arc-opts"
 
-#include "swift/Basic/LLVM.h"
-
 #include "OwnershipLiveRange.h"
 #include "OwnershipPhiOperand.h"
 #include "SemanticARCOptVisitor.h"
+#include "Transforms.h"
+
+#include "swift/Basic/LLVM.h"
 
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/Basic/FrozenMultiMap.h"
@@ -73,9 +74,6 @@ bool SemanticARCOptVisitor::optimize() {
     (void)madeAdditionalChanges;
     assert(!madeAdditionalChanges && "Should be at the fixed point");
   }
-
-  // Then use the newly seeded peephole map to
-  madeChange |= performPostPeepholeOwnedArgElimination();
 
   return madeChange;
 }
@@ -180,13 +178,21 @@ struct SemanticARCOpts : SILFunctionTransform {
       }
     }
 
-    // Then process the worklist. We only destroy instructions, so invalidate
-    // that. Once we modify the ownership of block arguments, we will need to
-    // perhaps invalidate branches as well.
-    if (visitor.optimize()) {
+    // Then process the worklist, performing peepholes.
+    bool madeChange = visitor.optimize();
+
+    // Now that we have seeded the map of phis to incoming values that could be
+    // converted to guaranteed, ignoring the phi, try convert those phis to be
+    // guaranteed.
+    if (tryConvertOwnedPhisToGuaranteedPhis(visitor.ctx)) {
       invalidateAnalysis(
           SILAnalysis::InvalidationKind::BranchesAndInstructions);
+      return;
     }
+
+    // Otherwise, we only deleted instructions and did not touch phis.
+    if (madeChange)
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 };
 
