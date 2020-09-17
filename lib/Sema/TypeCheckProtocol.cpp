@@ -21,6 +21,7 @@
 #include "TypeAccessScopeChecker.h"
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckConcurrency.h"
 #include "TypeCheckObjC.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -706,7 +707,6 @@ swift::matchWitness(
         !reqFnType->getExtInfo().isThrowing()) {
       return RequirementMatch(witness, MatchKind::ThrowsConflict);
     }
-
   } else {
     auto reqTypeIsIUO = req->isImplicitlyUnwrappedOptional();
     auto witnessTypeIsIUO = witness->isImplicitlyUnwrappedOptional();
@@ -726,6 +726,10 @@ swift::matchWitness(
       return std::move(result.getValue());
     }
   }
+
+  // Actor-isolated witnesses cannot conform to protocol requirements.
+  if (getActorIsolatingMember(witness))
+    return RequirementMatch(witness, MatchKind::ActorIsolatedWitness);
 
   // Now finalize the match.
   auto result = finalize(anyRenaming, optionalAdjustments);
@@ -2429,6 +2433,24 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
   case MatchKind::NonObjC:
     diags.diagnose(match.Witness, diag::protocol_witness_not_objc);
     break;
+  case MatchKind::ActorIsolatedWitness: {
+    bool canBeAsyncHandler = false;
+    if (auto witnessFunc = dyn_cast<FuncDecl>(match.Witness)) {
+      canBeAsyncHandler = !witnessFunc->isAsyncHandler() &&
+          !checkAsyncHandler(witnessFunc, /*diagnose=*/false);
+    }
+    auto diag = match.Witness->diagnose(
+        canBeAsyncHandler ? diag::actor_isolated_witness_could_be_async_handler
+                          : diag::actor_isolated_witness,
+        match.Witness->getDescriptiveKind(), match.Witness->getName());
+
+    if (canBeAsyncHandler) {
+      diag.fixItInsert(
+          match.Witness->getAttributeInsertionLoc(false), "@asyncHandler ");
+    }
+    break;
+  }
+
   case MatchKind::MissingDifferentiableAttr: {
     auto *witness = match.Witness;
     // Emit a note and fix-it showing the missing requirement `@differentiable`

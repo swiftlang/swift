@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "TypeCheckConcurrency.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Initializer.h"
