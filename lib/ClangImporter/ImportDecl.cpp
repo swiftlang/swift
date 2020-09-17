@@ -2937,6 +2937,54 @@ namespace {
                                            Identifier name,
                                            const clang::EnumDecl *decl);
 
+    class CaseCanonicalizer {
+    public:
+      struct Result {
+        const clang::EnumConstantDecl *clangCase;
+        Decl *swiftCase;
+      };
+
+    private:
+      llvm::SmallDenseMap<const llvm::APSInt *, Result, 8,
+                          APSIntRefDenseMapInfo> canonicalEnumConstants;
+
+    public:
+      CaseCanonicalizer(ClangImporter::Implementation &Impl, EnumKind enumKind,
+                        const clang::EnumDecl *decl) {
+        if (enumKind != EnumKind::NonFrozenEnum &&
+            enumKind != EnumKind::FrozenEnum)
+          return;
+
+        for (auto constant : decl->enumerators()) {
+          if (Impl.isUnavailableInSwift(constant))
+            continue;
+          canonicalEnumConstants.insert({ &constant->getInitVal(),
+                                          { constant, nullptr} });
+        }
+      }
+
+      using CaseImporter =
+          llvm::function_ref<Decl *(const clang::EnumConstantDecl *)>;
+
+      Result canonicalize(const clang::EnumConstantDecl *noncanon,
+                          CaseImporter importCase) {
+        auto iter = canonicalEnumConstants.find(&noncanon->getInitVal());
+
+        // Unavailable declarations aren't in the table; they get imported
+        // without being canonicalized.
+        Result resultForUnavailable = { noncanon, nullptr };
+        Result &result = iter == canonicalEnumConstants.end()
+                       ? resultForUnavailable
+                       : iter->getSecond();
+
+        assert(result.clangCase);
+        if (!result.swiftCase)
+          result.swiftCase = importCase(result.clangCase);
+
+        return result;
+      }
+    };
+
     Decl *VisitEnumDecl(const clang::EnumDecl *decl) {
       decl = decl->getDefinition();
       if (!decl) {
@@ -3217,19 +3265,10 @@ namespace {
         break;
       }
 
-      llvm::SmallDenseMap<const llvm::APSInt *,
-                          PointerUnion<const clang::EnumConstantDecl *,
-                                       EnumElementDecl *>, 8,
-                          APSIntRefDenseMapInfo> canonicalEnumConstants;
-
-      if (enumKind == EnumKind::NonFrozenEnum ||
-          enumKind == EnumKind::FrozenEnum) {
-        for (auto constant : decl->enumerators()) {
-          if (Impl.isUnavailableInSwift(constant))
-            continue;
-          canonicalEnumConstants.insert({&constant->getInitVal(), constant});
-        }
-      }
+      // For NonFrozenEnum and FrozenEnum, we precompute this table and share it
+      // between all cases we want to import. (The others don't use it, and the
+      // CaseCanonicalizer knows to not bother building itself.)
+      CaseCanonicalizer canonicalEnumConstants(Impl, enumKind, decl);
 
       const clang::EnumDecl *canonicalClangDecl = decl->getCanonicalDecl();
       auto contextIsEnum = [&](const ImportedName &name) -> bool {
@@ -3299,45 +3338,28 @@ namespace {
               Impl.getClangASTContext().getSourceManager(),
               "importing clang enum case");
 
-          auto canonicalCaseIter =
-            canonicalEnumConstants.find(&constant->getInitVal());
+          auto canonResult = canonicalEnumConstants.canonicalize(
+              constant,
+              [&](auto unimported) -> auto {
+            return SwiftDeclConverter(Impl, getActiveSwiftVersion())
+                .importEnumCase(unimported, decl, cast<EnumDecl>(result));
+          });
+          enumeratorDecl = canonResult.swiftCase;
 
-          if (canonicalCaseIter == canonicalEnumConstants.end()) {
-            // Unavailable declarations get no special treatment.
-            enumeratorDecl =
-                SwiftDeclConverter(Impl, getActiveSwiftVersion())
-                    .importEnumCase(constant, decl, cast<EnumDecl>(result));
-          } else {
-            const clang::EnumConstantDecl *unimported =
-                canonicalCaseIter->
-                  second.dyn_cast<const clang::EnumConstantDecl *>();
-
-            // Import the canonical enumerator for this case first.
-            if (unimported) {
-              enumeratorDecl = SwiftDeclConverter(Impl, getActiveSwiftVersion())
-                  .importEnumCase(unimported, decl, cast<EnumDecl>(result));
-              if (enumeratorDecl) {
-                canonicalCaseIter->getSecond() =
-                    cast<EnumElementDecl>(enumeratorDecl);
-              }
+          // If this decl was non-canonical, and if we were able to import the
+          // canonical decl, add an alias for this decl.
+          if (canonResult.clangCase != constant && enumeratorDecl) {
+            ImportedName importedName =
+                Impl.importFullName(constant, getActiveSwiftVersion());
+            Identifier name = importedName.getDeclName().getBaseIdentifier();
+            if (name.empty()) {
+              // Clear the existing declaration so we don't try to process it
+              // twice later.
+              enumeratorDecl = nullptr;
             } else {
-              enumeratorDecl =
-                  canonicalCaseIter->second.get<EnumElementDecl *>();
-            }
-
-            if (unimported != constant && enumeratorDecl) {
-              ImportedName importedName =
-                  Impl.importFullName(constant, getActiveSwiftVersion());
-              Identifier name = importedName.getDeclName().getBaseIdentifier();
-              if (name.empty()) {
-                // Clear the existing declaration so we don't try to process it
-                // twice later.
-                enumeratorDecl = nullptr;
-              } else {
-                auto original = cast<ValueDecl>(enumeratorDecl);
-                enumeratorDecl = importEnumCaseAlias(name, constant, original,
-                                                     decl, result);
-              }
+              auto original = cast<ValueDecl>(enumeratorDecl);
+              enumeratorDecl = importEnumCaseAlias(name, constant, original,
+                                                   decl, result);
             }
           }
 
