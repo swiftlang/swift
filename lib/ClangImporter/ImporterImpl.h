@@ -1412,7 +1412,11 @@ public:
   }
 
   /// Dump the Swift-specific name lookup tables we generate.
-  void dumpSwiftLookupTables();
+  void dumpSwiftLookupTables(llvm::raw_ostream &os) const;
+
+  SWIFT_DEBUG_DUMPER(dumpSwiftLookupTables()) {
+    dumpSwiftLookupTables(llvm::dbgs());
+  }
 
   void setSinglePCHImport(Optional<std::string> PCHFilename) {
     if (PCHFilename.hasValue()) {

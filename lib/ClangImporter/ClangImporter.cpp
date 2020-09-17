@@ -4011,10 +4011,11 @@ EffectiveClangContext ClangImporter::Implementation::getEffectiveClangContext(
 }
 
 void ClangImporter::dumpSwiftLookupTables() {
-  Impl.dumpSwiftLookupTables();
+  Impl.dumpSwiftLookupTables(llvm::dbgs());
 }
 
-void ClangImporter::Implementation::dumpSwiftLookupTables() {
+void ClangImporter::Implementation::
+dumpSwiftLookupTables(llvm::raw_ostream &os) const {
   // Sort the module names so we can print in a deterministic order.
   SmallVector<StringRef, 4> moduleNames;
   for (const auto &lookupTable : LookupTables) {
@@ -4024,13 +4025,16 @@ void ClangImporter::Implementation::dumpSwiftLookupTables() {
 
   // Print out the lookup tables for the various modules.
   for (auto moduleName : moduleNames) {
-    llvm::errs() << "<<" << moduleName << " lookup table>>\n";
-    LookupTables[moduleName]->deserializeAll();
-    LookupTables[moduleName]->dump(llvm::errs());
+    os << "<<" << moduleName << " lookup table>>\n";
+    auto iter = LookupTables.find(moduleName);
+    if (iter != LookupTables.end()) {
+      iter->getSecond()->deserializeAll();
+      iter->getSecond()->dump(os);
+    }
   }
 
-  llvm::errs() << "<<Bridging header lookup table>>\n";
-  BridgingHeaderLookupTable->dump(llvm::errs());
+  os << "<<Bridging header lookup table>>\n";
+  BridgingHeaderLookupTable->dump(os);
 }
 
 DeclName ClangImporter::
