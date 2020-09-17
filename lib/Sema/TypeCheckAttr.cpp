@@ -893,8 +893,10 @@ void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {
   if (auto VD = dyn_cast<ValueDecl>(D)) {
     // VD must be public or open to use an @_spi attribute.
     auto declAccess = VD->getFormalAccess();
+    auto DC = VD->getDeclContext()->getAsDecl();
     if (declAccess < AccessLevel::Public &&
-        !VD->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
+        !VD->getAttrs().hasAttribute<UsableFromInlineAttr>() &&
+        !(DC && DC->isSPI())) {
       diagnoseAndRemoveAttr(attr,
                             diag::spi_attribute_on_non_public,
                             declAccess,
@@ -904,7 +906,9 @@ void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {
     // Forbid stored properties marked SPI in frozen types.
     if (auto property = dyn_cast<AbstractStorageDecl>(VD))
       if (auto DC = dyn_cast<NominalTypeDecl>(D->getDeclContext()))
-        if (property->hasStorage() && !DC->isFormallyResilient())
+        if (property->hasStorage() &&
+            !DC->isFormallyResilient() &&
+            !DC->isSPI())
           diagnoseAndRemoveAttr(attr,
                                 diag::spi_attribute_on_frozen_stored_properties,
                                 VD->getName());
