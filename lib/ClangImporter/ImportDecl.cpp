@@ -3018,16 +3018,11 @@ namespace {
 
       switch (enumKind) {
       case EnumKind::Constants:
+        llvm_unreachable("VisitEnumDecl should bail before we get here.");
+
       case EnumKind::Unknown:
-        // We can import these via VisitEnumConstantDecl().
-        // FIXME: Could we just let that happen on demand, or do we need to
-        // force it here?
-        Impl.forEachDistinctName(constant,
-                                 [&](ImportedName newName,
-                                     ImportNameVersion nameVersion) -> bool {
-          return Impl.importDecl(constant, nameVersion);
-        });
-        break;
+        // We can import these on demand via VisitEnumConstantDecl().
+        return;
 
       case EnumKind::Options: {
         clang::PrettyStackTraceDecl(constant, clang::SourceLocation(),
