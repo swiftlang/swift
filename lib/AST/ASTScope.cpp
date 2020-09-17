@@ -40,12 +40,10 @@ using namespace ast_scope;
 
 llvm::SmallVector<const ASTScopeImpl *, 0> ASTScope::unqualifiedLookup(
     SourceFile *SF, DeclNameRef name, SourceLoc loc,
-    const DeclContext *startingContext,
     namelookup::AbstractASTScopeDeclConsumer &consumer) {
   if (auto *s = SF->getASTContext().Stats)
     ++s->getFrontendCounters().NumASTScopeLookups;
-  return ASTScopeImpl::unqualifiedLookup(SF, name, loc, startingContext,
-                                         consumer);
+  return ASTScopeImpl::unqualifiedLookup(SF, name, loc, consumer);
 }
 
 Optional<bool> ASTScope::computeIsCascadingUse(

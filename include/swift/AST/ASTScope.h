@@ -411,8 +411,7 @@ public:
 
   /// Entry point into ASTScopeImpl-land for lookups
   static llvm::SmallVector<const ASTScopeImpl *, 0>
-  unqualifiedLookup(SourceFile *, DeclNameRef, SourceLoc,
-                    const DeclContext *startingContext, DeclConsumer);
+  unqualifiedLookup(SourceFile *, DeclNameRef, SourceLoc, DeclConsumer);
 
   /// Entry point into ASTScopeImpl-land for labeled statement lookups.
   static llvm::SmallVector<LabeledStmt *, 4>
@@ -429,11 +428,7 @@ public:
 private:
   static const ASTScopeImpl *findStartingScopeForLookup(SourceFile *,
                                                         const DeclNameRef name,
-                                                        const SourceLoc where,
-                                                        const DeclContext *ctx);
-
-protected:
-  virtual bool doesContextMatchStartingContext(const DeclContext *) const;
+                                                        const SourceLoc where);
 
 protected:
   /// Not const because may reexpand some scopes.
@@ -1006,7 +1001,6 @@ public:
 protected:
   bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
                              DeclConsumer) const override;
-  bool doesContextMatchStartingContext(const DeclContext *) const override;
   Optional<bool>
   resolveIsCascadingUseForThisScope(Optional<bool>) const override;
 };
@@ -1622,7 +1616,6 @@ protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &) override;
   bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
                              DeclConsumer) const override;
-  bool doesContextMatchStartingContext(const DeclContext *) const override;
 };
 
 class SubscriptDeclScope final : public ASTScopeImpl {

@@ -544,7 +544,7 @@ void UnqualifiedLookupFactory::lookInASTScopes() {
 #endif
 
   ASTScope::unqualifiedLookup(DC->getParentSourceFile(),
-                              Name, Loc, DC, consumer);
+                              Name, Loc, consumer);
 }
 
 bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
