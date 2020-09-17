@@ -1123,10 +1123,8 @@ ArrayRef<StringRef> copyAssociatedUSRs(llvm::BumpPtrAllocator &Allocator,
   return ArrayRef<StringRef>();
 }
 
-static CodeCompletionResult::ExpectedTypeRelation calculateTypeRelation(
-                                                                Type Ty,
-                                                                Type ExpectedTy,
-                                                                DeclContext *DC) {
+static CodeCompletionResult::ExpectedTypeRelation
+calculateTypeRelation(Type Ty, Type ExpectedTy, const DeclContext *DC) {
   if (Ty.isNull() || ExpectedTy.isNull() ||
       Ty->is<ErrorType>() ||
       ExpectedTy->is<ErrorType>())
@@ -1142,7 +1140,8 @@ static CodeCompletionResult::ExpectedTypeRelation calculateTypeRelation(
     isAny |= ExpectedTy->is<ArchetypeType>() &&
              !ExpectedTy->castTo<ArchetypeType>()->hasRequirements();
 
-    if (!isAny && isConvertibleTo(Ty, ExpectedTy, /*openArchetypes=*/true, *DC))
+    if (!isAny && isConvertibleTo(Ty, ExpectedTy, /*openArchetypes=*/true,
+                                  *const_cast<DeclContext *>(DC)))
       return CodeCompletionResult::ExpectedTypeRelation::Convertible;
   }
   if (auto FT = Ty->getAs<AnyFunctionType>()) {
@@ -1153,51 +1152,16 @@ static CodeCompletionResult::ExpectedTypeRelation calculateTypeRelation(
 }
 
 static CodeCompletionResult::ExpectedTypeRelation
-calculateTypeRelationForDecl(const Decl *D, Type ExpectedType,
-                             bool IsImplicitlyCurriedInstanceMethod,
-                             bool UseFuncResultType){
-  auto VD = dyn_cast<ValueDecl>(D);
-  auto DC = D->getDeclContext();
-  if (!VD)
-    return CodeCompletionResult::ExpectedTypeRelation::Unrelated;
-
-  if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
-    auto funcType = FD->getInterfaceType()->getAs<AnyFunctionType>();
-    if (DC->isTypeContext() && funcType && funcType->is<AnyFunctionType>() &&
-        !IsImplicitlyCurriedInstanceMethod)
-      funcType = funcType->getResult()->getAs<AnyFunctionType>();
-    if (funcType) {
-      funcType = funcType->removeArgumentLabels(1)->castTo<AnyFunctionType>();
-      auto relation = calculateTypeRelation(funcType, ExpectedType, DC);
-      if (UseFuncResultType)
-        relation =
-            std::max(relation, calculateTypeRelation(funcType->getResult(),
-                                                     ExpectedType, DC));
-      return relation;
-    }
-  }
-  if (auto EED = dyn_cast<EnumElementDecl>(VD)) {
-    return calculateTypeRelation(
-        EED->getParentEnum()->TypeDecl::getDeclaredInterfaceType(),
-        ExpectedType, DC);
-  }
-  if (auto NTD = dyn_cast<NominalTypeDecl>(VD)) {
-    return std::max(
-        calculateTypeRelation(NTD->getInterfaceType(), ExpectedType, DC),
-        calculateTypeRelation(NTD->getDeclaredInterfaceType(), ExpectedType, DC));
-  }
-  return calculateTypeRelation(VD->getInterfaceType(), ExpectedType, DC);
-}
-
-static CodeCompletionResult::ExpectedTypeRelation
-calculateMaxTypeRelationForDecl(const Decl *D,
-                                const ExpectedTypeContext &typeContext,
-                                bool IsImplicitlyCurriedInstanceMethod) {
+calculateMaxTypeRelation(Type Ty, const ExpectedTypeContext &typeContext,
+                         const DeclContext *DC) {
   if (typeContext.empty())
     return CodeCompletionResult::ExpectedTypeRelation::Unknown;
 
+  if (auto funcTy = Ty->getAs<AnyFunctionType>())
+    Ty = funcTy->removeArgumentLabels(1);
+
   auto Result = CodeCompletionResult::ExpectedTypeRelation::Unrelated;
-  for (auto Type : typeContext.possibleTypes) {
+  for (auto expectedTy : typeContext.possibleTypes) {
     // Do not use Void type context for a single-expression body, since the
     // implicit return does not constrain the expression.
     //
@@ -1207,12 +1171,10 @@ calculateMaxTypeRelationForDecl(const Decl *D,
     //
     //     { ... -> Int in x }        // x must be Int
     //     { ... -> ()  in return x } // x must be Void
-    if (typeContext.isSingleExpressionBody && Type->isVoid())
+    if (typeContext.isSingleExpressionBody && expectedTy->isVoid())
       continue;
 
-    Result = std::max(Result, calculateTypeRelationForDecl(
-                                  D, Type, IsImplicitlyCurriedInstanceMethod,
-                                  /*UseFuncResultTy*/true));
+    Result = std::max(Result, calculateTypeRelation(Ty, expectedTy, DC));
 
     // Map invalid -> unrelated when in a single-expression body, since the
     // input may be incomplete.
@@ -1327,20 +1289,12 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
       }
     }
 
-    auto typeRelation = ExpectedTypeRelation;
-    // FIXME: we don't actually have enough info to compute
-    // IsImplicitlyCurriedInstanceMethod here.
-    if (typeRelation == CodeCompletionResult::Unknown)
-      typeRelation =
-          calculateMaxTypeRelationForDecl(AssociatedDecl, declTypeContext,
-                                          /*IsImplicitlyCurriedMethod*/false);
-
     return new (*Sink.Allocator) CodeCompletionResult(
         SemanticContext, NumBytesToErase, CCS, AssociatedDecl, ModuleName,
         /*NotRecommended=*/IsNotRecommended, NotRecReason,
         copyString(*Sink.Allocator, BriefComment),
         copyAssociatedUSRs(*Sink.Allocator, AssociatedDecl),
-        copyArray(*Sink.Allocator, CommentWords), typeRelation);
+        copyArray(*Sink.Allocator, CommentWords), ExpectedTypeRelation);
   }
 
   case CodeCompletionResult::ResultKind::Keyword:
@@ -1904,19 +1858,31 @@ private:
     Builder.addDeclDocCommentWords(llvm::makeArrayRef(Pairs));
   }
 
-  bool shouldUseFunctionReference(AbstractFunctionDecl *D) {
+  bool shouldUseFunctionReference(AbstractFunctionDecl *D,
+                                  const DynamicLookupInfo &dynamicLookupInfo) {
     if (PreferFunctionReferencesToCalls)
       return true;
     bool isImplicitlyCurriedIM = isImplicitlyCurriedInstanceMethod(D);
+
+    auto funcTy =
+        getTypeOfMember(D, dynamicLookupInfo)->getAs<AnyFunctionType>();
+    if (funcTy && D->getDeclContext()->isTypeContext() &&
+        !isImplicitlyCurriedIM) {
+      funcTy = funcTy->getResult()->getAs<AnyFunctionType>();
+    }
+    if (!funcTy)
+      return false;
+    funcTy = funcTy->removeArgumentLabels(1)->castTo<AnyFunctionType>();
+
     for (auto expectedType : expectedTypeContext.possibleTypes) {
-      if (expectedType &&
-          expectedType->lookThroughAllOptionalTypes()
-              ->is<AnyFunctionType>() &&
-          calculateTypeRelationForDecl(D, expectedType, isImplicitlyCurriedIM,
-                                       /*UseFuncResultType=*/false) >=
-              CodeCompletionResult::ExpectedTypeRelation::Convertible) {
+      if (!expectedType ||
+          !expectedType->lookThroughAllOptionalTypes()->is<AnyFunctionType>())
+        continue;
+
+      auto relation =
+          calculateTypeRelation(funcTy, expectedType, CurrDeclContext);
+      if (relation >= CodeCompletionResult::ExpectedTypeRelation::Convertible)
         return true;
-      }
     }
     return false;
   }
@@ -2283,17 +2249,21 @@ public:
       Builder.addLeadingDot();
   }
 
-  void addTypeAnnotation(CodeCompletionResultBuilder &Builder, Type T) {
+  void addTypeAnnotation(CodeCompletionResultBuilder &Builder, Type T,
+                         GenericSignature genericSig = GenericSignature()) {
     PrintOptions PO;
     PO.OpaqueReturnTypePrinting =
         PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
     if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
       PO.setBaseType(typeContext->getDeclaredTypeInContext());
-    Builder.addTypeAnnotation(T, PO);
+    Builder.addTypeAnnotation(eraseArchetypes(T, genericSig), PO);
+    Builder.setExpectedTypeRelation(
+        calculateMaxTypeRelation(T, expectedTypeContext, CurrDeclContext));
   }
 
   void addTypeAnnotationForImplicitlyUnwrappedOptional(
       CodeCompletionResultBuilder &Builder, Type T,
+      GenericSignature genericSig = GenericSignature(),
       bool dynamicOrOptional = false) {
 
     std::string suffix;
@@ -2310,7 +2280,9 @@ public:
         PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
     if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
       PO.setBaseType(typeContext->getDeclaredTypeInContext());
-    Builder.addTypeAnnotation(T, PO, suffix);
+    Builder.addTypeAnnotation(eraseArchetypes(T, genericSig), PO, suffix);
+    Builder.setExpectedTypeRelation(
+        calculateMaxTypeRelation(T, expectedTypeContext, CurrDeclContext));
   }
 
   /// For printing in code completion results, replace archetypes with
@@ -2442,9 +2414,6 @@ public:
   }
 
   Type getTypeOfMember(const ValueDecl *VD, Type ExprType) {
-    auto GenericSig = VD->getInnermostDeclContext()
-        ->getGenericSignatureOfContext();
-
     Type T = VD->getInterfaceType();
     assert(!T.isNull());
 
@@ -2490,7 +2459,7 @@ public:
       }
     }
 
-    return eraseArchetypes(T, GenericSig);
+    return T;
   }
 
   Type getAssociatedTypeType(const AssociatedTypeDecl *ATD) {
@@ -2561,11 +2530,14 @@ public:
       // Optional<T> type.  Same applies to optional members.
       VarType = OptionalType::get(VarType);
     }
+
+    auto genericSig =
+        VD->getInnermostDeclContext()->getGenericSignatureOfContext();
     if (VD->isImplicitlyUnwrappedOptional())
-      addTypeAnnotationForImplicitlyUnwrappedOptional(Builder, VarType,
-                                                      DynamicOrOptional);
+      addTypeAnnotationForImplicitlyUnwrappedOptional(
+          Builder, VarType, genericSig, DynamicOrOptional);
     else
-      addTypeAnnotation(Builder, VarType);
+      addTypeAnnotation(Builder, VarType, genericSig);
 
     if (isUnresolvedMemberIdealType(VarType))
       Builder.setSemanticContext(SemanticContextKind::ExpressionSpecific);
@@ -2593,6 +2565,7 @@ public:
   bool addCallArgumentPatterns(CodeCompletionResultBuilder &Builder,
                                ArrayRef<AnyFunctionType::Param> typeParams,
                                ArrayRef<const ParamDecl *> declParams,
+                               GenericSignature genericSig,
                                bool includeDefaultArgs = true) {
     assert(declParams.empty() || typeParams.size() == declParams.size());
 
@@ -2658,7 +2631,8 @@ public:
       if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
         contextTy = typeContext->getDeclaredTypeInContext();
 
-      Builder.addCallParameter(argName, bodyName, paramTy, contextTy,
+      Builder.addCallParameter(argName, bodyName,
+                               eraseArchetypes(paramTy, genericSig), contextTy,
                                isVariadic, isInOut, isIUO, isAutoclosure,
                                /*useUnderscoreLabel=*/false,
                                /*isLabeledTrailingClosure=*/false);
@@ -2674,12 +2648,13 @@ public:
   bool addCallArgumentPatterns(CodeCompletionResultBuilder &Builder,
                                const AnyFunctionType *AFT,
                                const ParameterList *Params,
+                               GenericSignature genericSig,
                                bool includeDefaultArgs = true) {
     ArrayRef<const ParamDecl *> declParams;
     if (Params)
       declParams = Params->getArray();
     return addCallArgumentPatterns(Builder, AFT->getParams(), declParams,
-                                   includeDefaultArgs);
+                                   genericSig, includeDefaultArgs);
   }
 
   static void addThrows(CodeCompletionResultBuilder &Builder,
@@ -2771,12 +2746,9 @@ public:
       const AnyFunctionType *AFT, const SubscriptDecl *SD,
       const Optional<SemanticContextKind> SemanticContext = None) {
     foundFunction(AFT);
-    if (SD) {
-      auto genericSig =
-          SD->getInnermostDeclContext()->getGenericSignatureOfContext();
-      AFT = eraseArchetypes(const_cast<AnyFunctionType *>(AFT), genericSig)
-                ->castTo<AnyFunctionType>();
-    }
+    GenericSignature genericSig;
+    if (SD)
+      genericSig = SD->getGenericSignatureOfContext();
 
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
@@ -2796,27 +2768,25 @@ public:
     ArrayRef<const ParamDecl *> declParams;
     if (SD)
       declParams = SD->getIndices()->getArray();
-    addCallArgumentPatterns(Builder, AFT->getParams(), declParams);
+    addCallArgumentPatterns(Builder, AFT->getParams(), declParams, genericSig);
     if (!HaveLParen)
       Builder.addRightBracket();
     else
       Builder.addAnnotatedRightBracket();
     if (SD && SD->isImplicitlyUnwrappedOptional())
       addTypeAnnotationForImplicitlyUnwrappedOptional(Builder,
-                                                      AFT->getResult());
+                                                      AFT->getResult(),
+                                                      genericSig);
     else
-      addTypeAnnotation(Builder, AFT->getResult());
+      addTypeAnnotation(Builder, AFT->getResult(), genericSig);
   }
 
   void addFunctionCallPattern(
       const AnyFunctionType *AFT, const AbstractFunctionDecl *AFD = nullptr,
       const Optional<SemanticContextKind> SemanticContext = None) {
-    if (AFD) {
-      auto genericSig =
-          AFD->getInnermostDeclContext()->getGenericSignatureOfContext();
-      AFT = eraseArchetypes(const_cast<AnyFunctionType *>(AFT), genericSig)
-                ->castTo<AnyFunctionType>();
-    }
+    GenericSignature genericSig;
+    if (AFD)
+      genericSig = AFD->getGenericSignatureOfContext();
 
     // Add the pattern, possibly including any default arguments.
     auto addPattern = [&](ArrayRef<const ParamDecl *> declParams = {},
@@ -2839,7 +2809,7 @@ public:
         Builder.addAnnotatedLeftParen();
 
       addCallArgumentPatterns(Builder, AFT->getParams(), declParams,
-                              includeDefaultArgs);
+                              genericSig, includeDefaultArgs);
 
       // The rparen matches the lparen here so that we insert both or neither.
       if (!HaveLParen)
@@ -2852,9 +2822,10 @@ public:
       if (AFD &&
           AFD->isImplicitlyUnwrappedOptional())
         addTypeAnnotationForImplicitlyUnwrappedOptional(Builder,
-                                                        AFT->getResult());
+                                                        AFT->getResult(),
+                                                        genericSig);
       else
-        addTypeAnnotation(Builder, AFT->getResult());
+        addTypeAnnotation(Builder, AFT->getResult(), genericSig);
     };
 
     if (!AFD || !AFD->getInterfaceType()->is<AnyFunctionType>()) {
@@ -2975,14 +2946,15 @@ public:
         Builder.addOptionalMethodCallTail();
 
       if (!AFT) {
-        Builder.addTypeAnnotation(FunctionType, PrintOptions());
+        addTypeAnnotation(Builder, FunctionType,
+                          FD->getGenericSignatureOfContext());
         return;
       }
-
       if (IsImplicitlyCurriedInstanceMethod) {
         Builder.addLeftParen();
         addCallArgumentPatterns(Builder, AFT->getParams(),
                                 {FD->getImplicitSelfDecl()},
+                                FD->getGenericSignatureOfContext(),
                                 includeDefaultArgs);
         Builder.addRightParen();
       } else if (trivialTrailingClosure) {
@@ -2991,6 +2963,7 @@ public:
       } else {
         Builder.addLeftParen();
         addCallArgumentPatterns(Builder, AFT, FD->getParameters(),
+                                FD->getGenericSignatureOfContext(),
                                 includeDefaultArgs);
         Builder.addRightParen();
         addThrows(Builder, AFT, FD);
@@ -3011,40 +2984,44 @@ public:
       PO.PrintOptionalAsImplicitlyUnwrapped = IsIUO;
       if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
         PO.setBaseType(typeContext->getDeclaredTypeInContext());
-
+      Type AnnotationTy =
+          eraseArchetypes(ResultType, FD->getGenericSignatureOfContext());
       if (Builder.shouldAnnotateResults()) {
         Builder.withNestedGroup(
             CodeCompletionString::Chunk::ChunkKind::TypeAnnotationBegin, [&] {
               AnnotatedTypePrinter printer(Builder);
               if (IsImplicitlyCurriedInstanceMethod) {
-                auto *FnType = ResultType->castTo<AnyFunctionType>();
+                auto *FnType = AnnotationTy->castTo<AnyFunctionType>();
                 AnyFunctionType::printParams(FnType->getParams(), printer,
                                              PrintOptions());
-                ResultType = FnType->getResult();
+                AnnotationTy = FnType->getResult();
                 printer.printText(" -> ");
               }
 
               // What's left is the result type.
-              if (ResultType->isVoid())
-                ResultType = Ctx.getVoidDecl()->getDeclaredInterfaceType();
-              ResultType.print(printer, PO);
+              if (AnnotationTy->isVoid())
+                AnnotationTy = Ctx.getVoidDecl()->getDeclaredInterfaceType();
+              AnnotationTy.print(printer, PO);
             });
       } else {
         llvm::SmallString<32> TypeStr;
         llvm::raw_svector_ostream OS(TypeStr);
         if (IsImplicitlyCurriedInstanceMethod) {
-          auto *FnType = ResultType->castTo<AnyFunctionType>();
+          auto *FnType = AnnotationTy->castTo<AnyFunctionType>();
           AnyFunctionType::printParams(FnType->getParams(), OS);
-          ResultType = FnType->getResult();
+          AnnotationTy = FnType->getResult();
           OS << " -> ";
         }
 
         // What's left is the result type.
-        if (ResultType->isVoid())
-          ResultType = Ctx.getVoidDecl()->getDeclaredInterfaceType();
-        ResultType.print(OS, PO);
+        if (AnnotationTy->isVoid())
+          AnnotationTy = Ctx.getVoidDecl()->getDeclaredInterfaceType();
+        AnnotationTy.print(OS, PO);
         Builder.addTypeAnnotation(TypeStr);
       }
+
+      Builder.setExpectedTypeRelation(calculateMaxTypeRelation(
+          ResultType, expectedTypeContext, CurrDeclContext));
 
       if (isUnresolvedMemberIdealType(ResultType))
         Builder.setSemanticContext(SemanticContextKind::ExpressionSpecific);
@@ -3110,7 +3087,8 @@ public:
       }
 
       if (!ConstructorType) {
-        addTypeAnnotation(Builder, MemberType);
+        addTypeAnnotation(Builder, MemberType,
+                          CD->getGenericSignatureOfContext());
         return;
       }
 
@@ -3120,6 +3098,7 @@ public:
         Builder.addAnnotatedLeftParen();
 
       addCallArgumentPatterns(Builder, ConstructorType, CD->getParameters(),
+                              CD->getGenericSignatureOfContext(),
                               includeDefaultArgs);
 
       // The rparen matches the lparen here so that we insert both or neither.
@@ -3130,14 +3109,13 @@ public:
 
       addThrows(Builder, ConstructorType, CD);
 
+      if (!Result.hasValue())
+        Result = ConstructorType->getResult();
       if (CD->isImplicitlyUnwrappedOptional()) {
         addTypeAnnotationForImplicitlyUnwrappedOptional(
-            Builder, Result.hasValue() ? Result.getValue()
-                                       : ConstructorType->getResult());
+            Builder, *Result, CD->getGenericSignatureOfContext());
       } else {
-        addTypeAnnotation(Builder, Result.hasValue()
-                                       ? Result.getValue()
-                                       : ConstructorType->getResult());
+        addTypeAnnotation(Builder, *Result, CD->getGenericSignatureOfContext());
       }
     };
 
@@ -3204,7 +3182,8 @@ public:
     }
 
     Builder.addLeftBracket();
-    addCallArgumentPatterns(Builder, subscriptType, SD->getIndices(), true);
+    addCallArgumentPatterns(Builder, subscriptType, SD->getIndices(),
+                            SD->getGenericSignatureOfContext(), true);
     Builder.addRightBracket();
 
     // Add a type annotation.
@@ -3214,7 +3193,7 @@ public:
       // Optional<T> type.
       resultTy = OptionalType::get(resultTy);
     }
-    addTypeAnnotation(Builder, resultTy);
+    addTypeAnnotation(Builder, resultTy, SD->getGenericSignatureOfContext());
   }
 
   void addNominalTypeRef(const NominalTypeDecl *NTD, DeclVisibilityKind Reason,
@@ -3230,7 +3209,21 @@ public:
     setClangDeclKeywords(NTD, Pairs, Builder);
     addLeadingDot(Builder);
     Builder.addBaseName(NTD->getName().str());
+
     addTypeAnnotation(Builder, NTD->getDeclaredType());
+
+    // Override the type relation for NominalTypes. Use the better relation
+    // for the metatypes and the instance type. For example,
+    //
+    //   func receiveInstance(_: Int) {}
+    //   func receiveMetatype(_: Int.Type) {}
+    //
+    // We want to suggest 'Int' as 'Identical' for both arguments.
+    Builder.setExpectedTypeRelation(std::max(
+        calculateMaxTypeRelation(NTD->getDeclaredInterfaceType(),
+                                 expectedTypeContext, CurrDeclContext),
+        calculateMaxTypeRelation(NTD->getInterfaceType(), expectedTypeContext,
+                                 CurrDeclContext)));
   }
 
   void addTypeAliasRef(const TypeAliasDecl *TAD, DeclVisibilityKind Reason,
@@ -3332,14 +3325,15 @@ public:
     if (EnumType->is<FunctionType>()) {
       Builder.addLeftParen();
       addCallArgumentPatterns(Builder, EnumType->castTo<FunctionType>(),
-                              EED->getParameterList());
+                              EED->getParameterList(),
+                              EED->getGenericSignatureOfContext());
       Builder.addRightParen();
 
       // Extract result as the enum type.
       EnumType = EnumType->castTo<FunctionType>()->getResult();
     }
 
-    addTypeAnnotation(Builder, EnumType);
+    addTypeAnnotation(Builder, EnumType, EED->getGenericSignatureOfContext());
 
     if (isUnresolvedMemberIdealType(EnumType))
       Builder.setSemanticContext(SemanticContextKind::ExpressionSpecific);
@@ -3427,6 +3421,16 @@ public:
 
       Builder.addRightParen();
     }
+
+    auto funcTy = getTypeOfMember(AFD, dynamicLookupInfo)->getAs<AnyFunctionType>();
+    if (funcTy && AFD->getDeclContext()->isTypeContext() &&
+        !isImplicitlyCurriedInstanceMethod(AFD)) {
+      funcTy = funcTy->getResult()->getAs<AnyFunctionType>();
+    }
+    if (funcTy) {
+      funcTy = funcTy->removeArgumentLabels(1)->castTo<AnyFunctionType>();
+      addTypeAnnotation(Builder, funcTy, AFD->getGenericSignatureOfContext());
+    }
   }
 
   // Implement swift::VisibleDeclConsumer.
@@ -3451,7 +3455,7 @@ public:
     case LookupKind::ValueExpr:
       if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
         // Do we want compound function names here?
-        if (shouldUseFunctionReference(CD)) {
+        if (shouldUseFunctionReference(CD, dynamicLookupInfo)) {
           addCompoundFunctionName(CD, Reason, dynamicLookupInfo);
           return;
         }
@@ -3525,7 +3529,7 @@ public:
           return;
 
         // Do we want compound function names here?
-        if (shouldUseFunctionReference(FD)) {
+        if (shouldUseFunctionReference(FD, dynamicLookupInfo)) {
           addCompoundFunctionName(FD, Reason, dynamicLookupInfo);
           return;
         }
