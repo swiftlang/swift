@@ -2985,6 +2985,176 @@ namespace {
       }
     };
 
+    static void
+    importEnumConstant(ClangImporter::Implementation &Impl,
+                       const clang::EnumConstantDecl *constant,
+                       const clang::EnumDecl *clangEnum,
+                       NominalTypeDecl *swiftEnum,
+                       NominalTypeDecl *errorWrapper,
+                       EnumKind enumKind,
+                       CaseCanonicalizer &canonicalEnumConstants) {
+      const clang::EnumDecl *canonicalClangDecl = clangEnum->getCanonicalDecl();
+      auto contextIsEnum = [&](const ImportedName &name) -> bool {
+        EffectiveClangContext importContext = name.getEffectiveContext();
+        switch (importContext.getKind()) {
+        case EffectiveClangContext::DeclContext:
+          return importContext.getAsDeclContext() == canonicalClangDecl;
+        case EffectiveClangContext::TypedefContext: {
+          auto *typedefName = importContext.getTypedefName();
+          clang::QualType underlyingTy = typedefName->getUnderlyingType();
+          return underlyingTy->getAsTagDecl() == canonicalClangDecl;
+        }
+        case EffectiveClangContext::UnresolvedContext:
+          // Assume this is a context other than the enum.
+          return false;
+        }
+        llvm_unreachable("unhandled kind");
+      };
+
+      // Declarations to add to the type as members. Note that we don't fill
+      // these in when we import a case as a free constant.
+      Decl *enumeratorDecl = nullptr;       ///< Primary member to add to type
+      TinyPtrVector<Decl *> variantDecls;   ///< Other members to add to type
+
+      switch (enumKind) {
+      case EnumKind::Constants:
+      case EnumKind::Unknown:
+        // We can import these via VisitEnumConstantDecl().
+        // FIXME: Could we just let that happen on demand, or do we need to
+        // force it here?
+        Impl.forEachDistinctName(constant,
+                                 [&](ImportedName newName,
+                                     ImportNameVersion nameVersion) -> bool {
+          return Impl.importDecl(constant, nameVersion);
+        });
+        break;
+
+      case EnumKind::Options: {
+        clang::PrettyStackTraceDecl(constant, clang::SourceLocation(),
+            Impl.getClangASTContext().getSourceManager(),
+            "importing option enum constant");
+        Impl.forEachDistinctName(constant,
+                                 [&](ImportedName newName,
+                                     ImportNameVersion nameVersion) -> bool {
+          if (!contextIsEnum(newName))
+            return true;
+
+          SwiftDeclConverter converter(Impl, nameVersion);
+          Decl *imported =
+              converter.importOptionConstant(constant, clangEnum, swiftEnum);
+          if (!imported)
+            return false;
+
+          Impl.cacheImportedDecl(imported, constant, nameVersion);
+          if (nameVersion == Impl.CurrentVersion)
+            enumeratorDecl = imported;
+          else
+            variantDecls.push_back(imported);
+          return true;
+        });
+        break;
+      }
+
+      case EnumKind::NonFrozenEnum:
+      case EnumKind::FrozenEnum: {
+        // Make sure we first import for the active version.
+        auto canonResult = canonicalEnumConstants.canonicalize(
+            constant, [&](auto unimported) -> auto {
+          clang::PrettyStackTraceDecl(unimported, clang::SourceLocation(),
+              Impl.getClangASTContext().getSourceManager(),
+              "importing canonical enum constant");
+          SwiftDeclConverter converter(Impl, Impl.CurrentVersion);
+
+          auto imported = converter.importEnumCase(unimported, clangEnum,
+                                                   cast<EnumDecl>(swiftEnum));
+          return imported;
+        });
+        enumeratorDecl = canonResult.swiftCase;
+
+        // If this decl was non-canonical, and if we were able to import the
+        // canonical decl, add an alias for this decl.
+        if (canonResult.clangCase != constant && enumeratorDecl) {
+          ImportedName importedName =
+              Impl.importFullName(constant, Impl.CurrentVersion);
+          Identifier name = importedName.getDeclName().getBaseIdentifier();
+          if (name.empty()) {
+            // Clear the existing declaration so we don't try to process it
+            // twice later.
+            enumeratorDecl = nullptr;
+          } else {
+            auto original = cast<ValueDecl>(enumeratorDecl);
+
+            clang::PrettyStackTraceDecl(constant, clang::SourceLocation(),
+                Impl.getClangASTContext().getSourceManager(),
+                "importing alias enum constant");
+            SwiftDeclConverter converter(Impl, Impl.CurrentVersion);
+            enumeratorDecl =
+                converter.importEnumCaseAlias(name, constant, original,
+                                              clangEnum, swiftEnum);
+          }
+        }
+
+        Impl.forEachDistinctName(constant,
+                                 [&](ImportedName newName,
+                                     ImportNameVersion nameVersion) -> bool {
+          if (nameVersion == Impl.CurrentVersion)
+            return true;
+          if (!contextIsEnum(newName))
+            return true;
+
+          clang::PrettyStackTraceDecl(constant, clang::SourceLocation(),
+              Impl.getClangASTContext().getSourceManager(),
+              "importing previous version enum constant");
+          SwiftDeclConverter converter(Impl, nameVersion);
+          Decl *imported = converter.importEnumCase(constant, clangEnum,
+                                                    cast<EnumDecl>(swiftEnum),
+                                                    enumeratorDecl);
+          if (!imported)
+            return false;
+          variantDecls.push_back(imported);
+          return true;
+        });
+        break;
+      }
+      }
+
+      if (!enumeratorDecl)
+        return;
+
+      // Add a member enumerator to the given nominal type.
+      auto addDecl = [&](NominalTypeDecl *nominal, Decl *decl) {
+        if (!decl) return;
+        nominal->addMember(decl);
+      };
+
+      addDecl(swiftEnum, enumeratorDecl);
+      for (auto *variant : variantDecls)
+        addDecl(swiftEnum, variant);
+
+      // If there is an error wrapper, add an alias within the
+      // wrapper to the corresponding value within the enumerator
+      // context.
+      if (!errorWrapper)
+        return;
+
+      auto enumeratorValue = cast<ValueDecl>(enumeratorDecl);
+      auto name = enumeratorValue->getBaseIdentifier();
+
+      clang::PrettyStackTraceDecl(constant, clang::SourceLocation(),
+          Impl.getClangASTContext().getSourceManager(),
+          "importing error wrapper alias constant");
+      SwiftDeclConverter converter(Impl, Impl.CurrentVersion);
+
+      auto alias = converter.importEnumCaseAlias(name, constant,
+                                                 enumeratorValue,
+                                                 clangEnum, swiftEnum,
+                                                 errorWrapper);
+      if (!alias)
+        return;
+
+      addDecl(errorWrapper, alias);
+    }
+
     Decl *VisitEnumDecl(const clang::EnumDecl *decl) {
       decl = decl->getDefinition();
       if (!decl) {
@@ -3250,168 +3420,16 @@ namespace {
 
       Impl.cacheImportedDecl(result, decl, getVersion());
 
-      // Import each of the enumerators.
-      
-      bool addEnumeratorsAsMembers;
-      switch (enumKind) {
-      case EnumKind::Constants:
-      case EnumKind::Unknown:
-        addEnumeratorsAsMembers = false;
-        break;
-      case EnumKind::Options:
-      case EnumKind::NonFrozenEnum:
-      case EnumKind::FrozenEnum:
-        addEnumeratorsAsMembers = true;
-        break;
-      }
-
       // For NonFrozenEnum and FrozenEnum, we precompute this table and share it
       // between all cases we want to import. (The others don't use it, and the
       // CaseCanonicalizer knows to not bother building itself.)
       CaseCanonicalizer canonicalEnumConstants(Impl, enumKind, decl);
 
-      const clang::EnumDecl *canonicalClangDecl = decl->getCanonicalDecl();
-      auto contextIsEnum = [&](const ImportedName &name) -> bool {
-        EffectiveClangContext importContext = name.getEffectiveContext();
-        switch (importContext.getKind()) {
-        case EffectiveClangContext::DeclContext:
-          return importContext.getAsDeclContext() == canonicalClangDecl;
-        case EffectiveClangContext::TypedefContext: {
-          auto *typedefName = importContext.getTypedefName();
-          clang::QualType underlyingTy = typedefName->getUnderlyingType();
-          return underlyingTy->getAsTagDecl() == canonicalClangDecl;
-        }
-        case EffectiveClangContext::UnresolvedContext:
-          // Assume this is a context other than the enum.
-          return false;
-        }
-        llvm_unreachable("unhandled kind");
-      };
-
-      for (auto constant : decl->enumerators()) {
-        Decl *enumeratorDecl = nullptr;
-        TinyPtrVector<Decl *> variantDecls;
-        switch (enumKind) {
-        case EnumKind::Constants:
-        case EnumKind::Unknown:
-          Impl.forEachDistinctName(constant,
-                                   [&](ImportedName newName,
-                                       ImportNameVersion nameVersion) -> bool {
-            Decl *imported = Impl.importDecl(constant, nameVersion);
-            if (!imported)
-              return false;
-            if (nameVersion == getActiveSwiftVersion())
-              enumeratorDecl = imported;
-            else
-              variantDecls.push_back(imported);
-            return true;
-          });
-          break;
-        case EnumKind::Options: {
-          clang::PrettyStackTraceDecl(
-              constant, clang::SourceLocation(),
-              Impl.getClangASTContext().getSourceManager(),
-              "importing clang OptionSet constant");
-
-          Impl.forEachDistinctName(constant,
-                                   [&](ImportedName newName,
-                                       ImportNameVersion nameVersion) -> bool {
-            if (!contextIsEnum(newName))
-              return true;
-            SwiftDeclConverter converter(Impl, nameVersion);
-            Decl *imported =
-                converter.importOptionConstant(constant, decl, result);
-            if (!imported)
-              return false;
-            if (nameVersion == getActiveSwiftVersion())
-              enumeratorDecl = imported;
-            else
-              variantDecls.push_back(imported);
-            return true;
-          });
-          break;
-        }
-        case EnumKind::NonFrozenEnum:
-        case EnumKind::FrozenEnum: {
-          clang::PrettyStackTraceDecl(
-              constant, clang::SourceLocation(),
-              Impl.getClangASTContext().getSourceManager(),
-              "importing clang enum case");
-
-          auto canonResult = canonicalEnumConstants.canonicalize(
-              constant,
-              [&](auto unimported) -> auto {
-            return SwiftDeclConverter(Impl, getActiveSwiftVersion())
-                .importEnumCase(unimported, decl, cast<EnumDecl>(result));
-          });
-          enumeratorDecl = canonResult.swiftCase;
-
-          // If this decl was non-canonical, and if we were able to import the
-          // canonical decl, add an alias for this decl.
-          if (canonResult.clangCase != constant && enumeratorDecl) {
-            ImportedName importedName =
-                Impl.importFullName(constant, getActiveSwiftVersion());
-            Identifier name = importedName.getDeclName().getBaseIdentifier();
-            if (name.empty()) {
-              // Clear the existing declaration so we don't try to process it
-              // twice later.
-              enumeratorDecl = nullptr;
-            } else {
-              auto original = cast<ValueDecl>(enumeratorDecl);
-              enumeratorDecl = importEnumCaseAlias(name, constant, original,
-                                                   decl, result);
-            }
-          }
-
-          Impl.forEachDistinctName(constant,
-                                   [&](ImportedName newName,
-                                       ImportNameVersion nameVersion) -> bool {
-            if (nameVersion == getActiveSwiftVersion())
-              return true;
-            if (!contextIsEnum(newName))
-              return true;
-            SwiftDeclConverter converter(Impl, nameVersion);
-            Decl *imported =
-                converter.importEnumCase(constant, decl, cast<EnumDecl>(result),
-                                         enumeratorDecl);
-            if (!imported)
-              return false;
-            variantDecls.push_back(imported);
-            return true;
-          });
-          break;
-        }
-        }
-        if (!enumeratorDecl)
-          continue;
-
-        if (addEnumeratorsAsMembers) {
-          // Add a member enumerator to the given nominal type.
-          auto addDecl = [&](NominalTypeDecl *nominal, Decl *decl) {
-            if (!decl) return;
-            nominal->addMember(decl);
-          };
-
-          addDecl(result, enumeratorDecl);
-          for (auto *variant : variantDecls)
-            addDecl(result, variant);
-          
-          // If there is an error wrapper, add an alias within the
-          // wrapper to the corresponding value within the enumerator
-          // context.
-          if (errorWrapper) {
-            auto enumeratorValue = cast<ValueDecl>(enumeratorDecl);
-            auto name = enumeratorValue->getBaseIdentifier();
-            auto alias = importEnumCaseAlias(name,
-                                             constant,
-                                             enumeratorValue,
-                                             decl,
-                                             result,
-                                             errorWrapper);
-            addDecl(errorWrapper, alias);
-          }
-        }
-      }
+      // Import each of the enumerators.
+      for (auto constant : decl->enumerators())
+        SwiftDeclConverter::importEnumConstant(Impl, constant, decl, result,
+                                               errorWrapper, enumKind,
+                                               canonicalEnumConstants);
 
       return result;
     }
@@ -3942,6 +3960,7 @@ namespace {
         // The enumeration was mapped to a high-level Swift type, and its
         // elements were created as children of that enum. They aren't available
         // independently.
+        // See importEnumConstant().
 
         // FIXME: This is gross. We shouldn't have to import
         // everything to get at the individual constants.
