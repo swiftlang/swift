@@ -1858,35 +1858,6 @@ private:
     Builder.addDeclDocCommentWords(llvm::makeArrayRef(Pairs));
   }
 
-  bool shouldUseFunctionReference(AbstractFunctionDecl *D,
-                                  const DynamicLookupInfo &dynamicLookupInfo) {
-    if (PreferFunctionReferencesToCalls)
-      return true;
-    bool isImplicitlyCurriedIM = isImplicitlyCurriedInstanceMethod(D);
-
-    auto funcTy =
-        getTypeOfMember(D, dynamicLookupInfo)->getAs<AnyFunctionType>();
-    if (funcTy && D->getDeclContext()->isTypeContext() &&
-        !isImplicitlyCurriedIM) {
-      funcTy = funcTy->getResult()->getAs<AnyFunctionType>();
-    }
-    if (!funcTy)
-      return false;
-    funcTy = funcTy->removeArgumentLabels(1)->castTo<AnyFunctionType>();
-
-    for (auto expectedType : expectedTypeContext.possibleTypes) {
-      if (!expectedType ||
-          !expectedType->lookThroughAllOptionalTypes()->is<AnyFunctionType>())
-        continue;
-
-      auto relation =
-          calculateTypeRelation(funcTy, expectedType, CurrDeclContext);
-      if (relation >= CodeCompletionResult::ExpectedTypeRelation::Convertible)
-        return true;
-    }
-    return false;
-  }
-
   /// Returns \c true if \p TAD is usable as a first type of a requirement in
   /// \c where clause for a context.
   /// \p selfTy must be a \c Self type of the context.
@@ -3388,9 +3359,27 @@ public:
   }
 
   /// Add the compound function name for the given function.
-  void addCompoundFunctionName(AbstractFunctionDecl *AFD,
-                               DeclVisibilityKind Reason,
-                               DynamicLookupInfo dynamicLookupInfo) {
+  /// Returns \c true if the compound function name is actually used.
+  bool addCompoundFunctionNameIfDesiable(AbstractFunctionDecl *AFD,
+                                         DeclVisibilityKind Reason,
+                                         DynamicLookupInfo dynamicLookupInfo) {
+    auto funcTy =
+        getTypeOfMember(AFD, dynamicLookupInfo)->getAs<AnyFunctionType>();
+    if (funcTy && AFD->getDeclContext()->isTypeContext() &&
+        !isImplicitlyCurriedInstanceMethod(AFD)) {
+      funcTy = funcTy->getResult()->getAs<AnyFunctionType>();
+    }
+
+    bool useFunctionReference = PreferFunctionReferencesToCalls;
+    if (!useFunctionReference && funcTy) {
+      auto maxRel = calculateMaxTypeRelation(funcTy, expectedTypeContext,
+                                             CurrDeclContext);
+      useFunctionReference =
+          maxRel >= CodeCompletionResult::ExpectedTypeRelation::Convertible;
+    }
+    if (!useFunctionReference)
+      return false;
+
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Declaration,
@@ -3422,15 +3411,10 @@ public:
       Builder.addRightParen();
     }
 
-    auto funcTy = getTypeOfMember(AFD, dynamicLookupInfo)->getAs<AnyFunctionType>();
-    if (funcTy && AFD->getDeclContext()->isTypeContext() &&
-        !isImplicitlyCurriedInstanceMethod(AFD)) {
-      funcTy = funcTy->getResult()->getAs<AnyFunctionType>();
-    }
-    if (funcTy) {
-      funcTy = funcTy->removeArgumentLabels(1)->castTo<AnyFunctionType>();
+    if (funcTy)
       addTypeAnnotation(Builder, funcTy, AFD->getGenericSignatureOfContext());
-    }
+
+    return true;
   }
 
   // Implement swift::VisibleDeclConsumer.
@@ -3455,10 +3439,8 @@ public:
     case LookupKind::ValueExpr:
       if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
         // Do we want compound function names here?
-        if (shouldUseFunctionReference(CD, dynamicLookupInfo)) {
-          addCompoundFunctionName(CD, Reason, dynamicLookupInfo);
+        if (addCompoundFunctionNameIfDesiable(CD, Reason, dynamicLookupInfo))
           return;
-        }
 
         if (auto MT = ExprType->getAs<AnyMetatypeType>()) {
           Type Ty = MT->getInstanceType();
@@ -3529,10 +3511,8 @@ public:
           return;
 
         // Do we want compound function names here?
-        if (shouldUseFunctionReference(FD, dynamicLookupInfo)) {
-          addCompoundFunctionName(FD, Reason, dynamicLookupInfo);
+        if (addCompoundFunctionNameIfDesiable(FD, Reason, dynamicLookupInfo))
           return;
-        }
 
         addMethodCall(FD, Reason, dynamicLookupInfo);
 
