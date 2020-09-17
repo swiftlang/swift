@@ -2955,34 +2955,6 @@ namespace {
                                            Identifier name,
                                            const clang::EnumDecl *decl);
 
-    static void
-    importEnumConstantAsOption(ClangImporter::Implementation &Impl,
-                               const clang::EnumConstantDecl *constant,
-                               const clang::EnumDecl *clangEnum,
-                               NominalTypeDecl *swiftEnum) {
-      const clang::EnumDecl *canonicalClangEnum = clangEnum->getCanonicalDecl();
-
-      clang::PrettyStackTraceDecl(constant, clang::SourceLocation(),
-          Impl.getClangASTContext().getSourceManager(),
-          "importing option enum constant");
-      Impl.forEachDistinctName(constant,
-                               [&](ImportedName newName,
-                                   ImportNameVersion nameVersion) -> bool {
-        if (!contextIsEnum(newName, canonicalClangEnum))
-          return true;
-
-        SwiftDeclConverter converter(Impl, nameVersion);
-        Decl *imported =
-            converter.importOptionConstant(constant, clangEnum, swiftEnum);
-        if (!imported)
-          return false;
-
-        Impl.cacheImportedDecl(imported, constant, nameVersion);
-        swiftEnum->addMember(imported);
-        return true;
-      });
-    }
-
     class CaseCanonicalizer {
     public:
       struct Result {
@@ -3151,7 +3123,6 @@ namespace {
 
       // Create the enum declaration and record it.
       StructDecl *errorWrapper = nullptr;
-      NominalTypeDecl *result;
       auto enumInfo = Impl.getEnumInfo(decl);
       auto enumKind = enumInfo.getKind();
       switch (enumKind) {
@@ -3183,8 +3154,7 @@ namespace {
                              KnownProtocolKind::Equatable},
                             options, /*setterAccess=*/AccessLevel::Public);
 
-        result = structDecl;
-        break;
+        return structDecl;
       }
 
       case EnumKind::NonFrozenEnum:
@@ -3360,59 +3330,51 @@ namespace {
 
           // Add the 'Code' enum to the error wrapper.
           errorWrapper->addMember(enumDecl);
-          Impl.addAlternateDecl(enumDecl, errorWrapper);
 
           // Stash the 'Code' enum so we can find it later.
           Impl.ErrorCodeEnums[errorWrapper] = enumDecl;
         }
 
-        // The enumerators go into this enumeration.
-        result = enumDecl;
-        break;
-      }
+        // We will immediately import members (see below), so add to Impl's
+        // caches right away.
+        Impl.cacheImportedDecl(enumDecl, decl, getVersion());
+        if (errorWrapper)
+          Impl.addAlternateDecl(enumDecl, errorWrapper);
 
-      case EnumKind::Options: {
-        result = importAsOptionSetType(dc, name, decl);
-        if (!result)
-          return nullptr;
-
-        // HACK: Make sure PrintAsObjC always omits the 'enum' tag for
-        // option set enums.
-        Impl.DeclsWithSuperfluousTypedefs.insert(decl);
-        break;
-      }
-      }
-
-      Impl.cacheImportedDecl(result, decl, getVersion());
-
-      // Import each of the enumerators.
-      switch (enumKind) {
-      case EnumKind::Constants:
-        llvm_unreachable("VisitEnumDecl should bail before we get here.");
-
-      case EnumKind::Unknown:
-        // We can import these on demand via VisitEnumConstantDecl().
-        break;
-
-      case EnumKind::Options:
-        for (auto constant : decl->enumerators())
-          SwiftDeclConverter::importEnumConstantAsOption(Impl, constant, decl,
-                                                         result);
-        break;
-
-      case EnumKind::NonFrozenEnum:
-      case EnumKind::FrozenEnum: {
+        // In most EnumKinds, the enum constants are all imported as Swift
+        // constants in some DeclContext or another; this is done lazily via
+        // VisitEnumConstantDecl(). But in FrozenEnum and NonFrozenEnum, some
+        // constants (the "canonical" ones) are imported as cases instead, and
+        // some are also duplicated onto the errorWrapper.
+        //
+        // We handle these extra complications by computing which constants we
+        // will consider to be the "canonical" ones (the ones mapped to cases)
+        // and then adding all of these members up front.
+        //
+        // FIXME: This could be refactored to be lazy-loadable too.
         CaseCanonicalizer canonicalEnumConstants(Impl, decl);
         for (auto constant : decl->enumerators())
           SwiftDeclConverter::
-              importEnumConstantAsCaseOrAlias(Impl, constant, decl, result,
+              importEnumConstantAsCaseOrAlias(Impl, constant, decl, enumDecl,
                                               errorWrapper,
                                               canonicalEnumConstants);
-        break;
+
+        return enumDecl;
+      }
+
+      case EnumKind::Options: {
+        auto result = importAsOptionSetType(dc, name, decl);
+
+        // HACK: Make sure PrintAsObjC always omits the 'enum' tag for
+        // option set enums.
+        if (result)
+          Impl.DeclsWithSuperfluousTypedefs.insert(decl);
+
+        return result;
       }
       }
 
-      return result;
+      llvm_unreachable("unknown EnumKind");
     }
 
     bool isCxxRecordImportable(const clang::CXXRecordDecl *decl) {
@@ -3935,10 +3897,30 @@ namespace {
         return result;
       }
 
-      case EnumKind::NonFrozenEnum:
-      case EnumKind::FrozenEnum:
       case EnumKind::Options: {
-        // The enumeration was mapped to a high-level Swift type, and its
+        // The context where the constant will be introduced.
+        auto dc =
+            Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
+        if (!dc)
+          return nullptr;
+
+        // Get the parent type.
+        auto *swiftEnum = dc->getSelfStructDecl();
+        if (!swiftEnum)
+          return nullptr;
+
+        auto *result = importOptionConstant(decl, clangEnum, swiftEnum);
+        if (!result)
+          return nullptr;
+
+        Impl.cacheImportedDecl(result, decl, version);
+
+        return result;
+      }
+
+      case EnumKind::NonFrozenEnum:
+      case EnumKind::FrozenEnum: {
+        // The enumeration was mapped to a Swift enum, and its
         // elements were created as children of that enum. They aren't available
         // independently.
         // See importEnumConstant().
@@ -6566,6 +6548,9 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
   auto selfType = structDecl->getDeclaredInterfaceType();
   addSynthesizedTypealias(structDecl, ctx.Id_Element, selfType);
   addSynthesizedTypealias(structDecl, ctx.Id_ArrayLiteralElement, selfType);
+
+  structDecl->setMemberLoader(&Impl, 0);
+
   return structDecl;
 }
 
@@ -9414,6 +9399,13 @@ ClangImporter::Implementation::importDeclContextOf(
     decl->getDeclContext()->getRedeclContext()->isTranslationUnit();
   if (!isGlobal) return importedDC;
 
+  // Enum constants don't use import-as-member unless they belong to anonymous
+  // enums.
+  if (isa<clang::EnumConstantDecl>(decl) &&
+      cast<clang::EnumDecl>(decl->getDeclContext())->hasNameForLinkage()) {
+    return importedDC;
+  }
+
   // If the resulting declaration context is not a nominal type,
   // we're done.
   auto nominal = dyn_cast<NominalTypeDecl>(importedDC);
@@ -9788,11 +9780,16 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
   // Check whether we're importing an Objective-C container of some sort.
   auto objcContainer =
     dyn_cast_or_null<clang::ObjCContainerDecl>(D->getClangDecl());
-
-  // If not, we're importing globals-as-members into an extension.
   if (objcContainer) {
     loadAllMembersOfSuperclassIfNeeded(dyn_cast<ClassDecl>(D));
     loadAllMembersOfObjcContainer(D, objcContainer);
+    return;
+  }
+
+  auto enumDecl =
+    dyn_cast_or_null<clang::EnumDecl>(D->getClangDecl());
+  if (enumDecl) {
+    loadAllMembersOfLazilyLoadedEnum(D, enumDecl);
     return;
   }
 
@@ -9819,6 +9816,7 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
     return;
   }
 
+  // If not, we're importing globals-as-members into an extension.
   loadAllMembersIntoExtension(D, extra);
 }
 
@@ -9942,6 +9940,30 @@ void ClangImporter::Implementation::loadAllMembersOfObjcContainer(
 
   SmallVector<Decl *, 16> members;
   collectMembersToAdd(objcContainer, D, cast<DeclContext>(D), members);
+
+  auto *IDC = cast<IterableDeclContext>(D);
+  for (auto member : members) {
+    if (!isa<AccessorDecl>(member))
+      IDC->addMember(member);
+  }
+}
+
+void ClangImporter::Implementation::loadAllMembersOfLazilyLoadedEnum(
+    Decl *D, const clang::EnumDecl *enumDecl) {
+  assert(isa<StructDecl>(D) &&
+         !D->getAttrs().hasAttribute<ClangImporterSynthesizedTypeAttr>() &&
+         "only OptionSets, not enums or their error wrappers, can have members "
+         "loaded lazily");
+
+  clang::PrettyStackTraceDecl trace(enumDecl, clang::SourceLocation(),
+                                    Instance->getSourceManager(),
+                                    "loading option constants for");
+
+  startedImportingEntity();
+
+  SmallVector<Decl *, 16> members;
+  for (auto constant : enumDecl->enumerators())
+    insertMembersAndAlternates(constant, members);
 
   auto *IDC = cast<IterableDeclContext>(D);
   for (auto member : members) {

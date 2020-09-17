@@ -1359,6 +1359,9 @@ private:
                                   SmallVectorImpl<Decl *> &members);
   void loadAllMembersIntoExtension(Decl *D, uint64_t extra);
 
+  void loadAllMembersOfLazilyLoadedEnum(Decl *D,
+                                        const clang::EnumDecl *enumDecl);
+
   /// Imports \p decl under \p nameVersion with the name \p newName, and adds
   /// it and its alternates to \p ext.
   ///
