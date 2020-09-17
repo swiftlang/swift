@@ -74,6 +74,7 @@ $SOURCE_PATH/swift/utils/build-script \
   DISPLAY_NAME_SHORT="${DISPLAY_NAME_SHORT}" \
   TOOLCHAIN_NAME="${TOOLCHAIN_NAME}" \
   TOOLCHAIN_VERSION="${TOOLCHAIN_VERSION}" \
+  TOOLS_BIN_DIR="${HOST_TOOLCHAIN_SDK}/usr/bin" \
   C_CXX_LAUNCHER="$(which sccache)"
 
 # Merge wasi-sdk and the toolchain
