@@ -12,15 +12,19 @@
 // RUN: %target-swift-frontend -emit-module %t/SPIHelper.swiftinterface -emit-module-path %t/SPIHelper-from-public-swiftinterface.swiftmodule -swift-version 5 -module-name SPIHelper -enable-library-evolution
 
 /// Test the textual interfaces generated from this test.
-// RUN: %target-swift-frontend -typecheck %s -emit-module-interface-path %t/main.swiftinterface -emit-private-module-interface-path %t/main.private.swiftinterface -enable-library-evolution -swift-version 5 -I %t
-// RUN: %FileCheck -check-prefix=CHECK-PUBLIC %s < %t/main.swiftinterface
-// RUN: %FileCheck -check-prefix=CHECK-PRIVATE %s < %t/main.private.swiftinterface
+// RUN: %target-swift-frontend -typecheck %s -emit-module-interface-path %t/Main.swiftinterface -emit-private-module-interface-path %t/Main.private.swiftinterface -enable-library-evolution -swift-version 5 -I %t -module-name Main
+// RUN: %FileCheck -check-prefix=CHECK-PUBLIC %s < %t/Main.swiftinterface
+// RUN: %FileCheck -check-prefix=CHECK-PRIVATE %s < %t/Main.private.swiftinterface
+// RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/Main.swiftinterface
+// RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/Main.private.swiftinterface -module-name Main
 
 /// Serialize and deserialize this module, then print.
-// RUN: %target-swift-frontend -emit-module %s -emit-module-path %t/merged-partial.swiftmodule -swift-version 5 -I %t -module-name merged -enable-library-evolution
-// RUN: %target-swift-frontend -merge-modules %t/merged-partial.swiftmodule -module-name merged -emit-module -emit-module-path %t/merged.swiftmodule -I %t -emit-module-interface-path %t/merged.swiftinterface -emit-private-module-interface-path %t/merged.private.swiftinterface -enable-library-evolution -swift-version 5 -I %t
-// RUN: %FileCheck -check-prefix=CHECK-PUBLIC %s < %t/merged.swiftinterface
-// RUN: %FileCheck -check-prefix=CHECK-PRIVATE %s < %t/merged.private.swiftinterface
+// RUN: %target-swift-frontend -emit-module %s -emit-module-path %t/Merged-partial.swiftmodule -swift-version 5 -I %t -module-name Merged -enable-library-evolution
+// RUN: %target-swift-frontend -merge-modules %t/Merged-partial.swiftmodule -module-name Merged -emit-module -emit-module-path %t/Merged.swiftmodule -I %t -emit-module-interface-path %t/Merged.swiftinterface -emit-private-module-interface-path %t/Merged.private.swiftinterface -enable-library-evolution -swift-version 5 -I %t
+// RUN: %FileCheck -check-prefix=CHECK-PUBLIC %s < %t/Merged.swiftinterface
+// RUN: %FileCheck -check-prefix=CHECK-PRIVATE %s < %t/Merged.private.swiftinterface
+// RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/Merged.swiftinterface
+// RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/Merged.private.swiftinterface -module-name Merged
 
 @_spi(HelperSPI) @_spi(OtherSPI) @_spi(OtherSPI) import SPIHelper
 // CHECK-PUBLIC: import SPIHelper
@@ -161,6 +165,18 @@ public protocol LocalPublicProto {}
 extension IOIPublicStruct : LocalPublicProto {}
 // CHECK-PRIVATE-NOT: IOIPublicStruct
 // CHECK-PUBLIC-NOT: IOIPublicStruct
+
+@_spi(S)
+@frozen public struct SPIFrozenStruct {
+// CHECK-PRIVATE: struct SPIFrozenStruct
+// CHECK-PUBLIC-NOT: SPIFrozenStruct
+
+  var spiTypeInFrozen = SPIStruct()
+  // CHECK-PRIVATE: @_spi(S) internal var spiTypeInFrozen
+
+  private var spiTypeInFrozen1: SPIClass
+  // CHECK-PRIVATE: @_spi(S) private var spiTypeInFrozen1
+}
 
 // The dummy conformance should be only in the private swiftinterface for
 // SPI extensions.
