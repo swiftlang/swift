@@ -71,10 +71,10 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   if (D->getDeclContext()->isLocalContext())
     return false;
 
-  // Public non-SPI declarations are OK.
+  // Public declarations or SPI used from SPI are OK.
   if (D->getFormalAccessScope(/*useDC=*/nullptr,
                               Kind.allowUsableFromInline).isPublic() &&
-      !D->isSPI())
+      !(D->isSPI() && !DC->getInnermostDeclarationDeclContext()->isSPI()))
     return false;
 
   auto &Context = DC->getASTContext();
@@ -149,14 +149,15 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
 
 static bool diagnoseDeclExportability(SourceLoc loc, const ValueDecl *D,
                                       const SourceFile &userSF,
+                                      const DeclContext *userDC,
                                       FragileFunctionKind fragileKind) {
   assert(fragileKind.kind != FragileFunctionKind::None);
 
   auto definingModule = D->getModuleContext();
 
-  bool isImplementationOnly =
-    userSF.isImportedImplementationOnly(definingModule);
-  if (!isImplementationOnly && !userSF.isImportedAsSPI(D))
+  auto originKind = getDisallowedOriginKind(
+      D, userSF, userDC->getInnermostDeclarationDeclContext());
+  if (originKind == DisallowedOriginKind::None)
     return false;
 
   // TODO: different diagnostics
@@ -165,7 +166,7 @@ static bool diagnoseDeclExportability(SourceLoc loc, const ValueDecl *D,
                      D->getDescriptiveKind(), D->getName(),
                      static_cast<unsigned>(fragileKind.kind),
                      definingModule->getName(),
-                     static_cast<unsigned>(!isImplementationOnly));
+                     static_cast<unsigned>(originKind));
   return true;
 }
 
@@ -234,7 +235,7 @@ TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
     return false;
 
   const ValueDecl *D = declRef.getDecl();
-  if (diagnoseDeclExportability(loc, D, *userSF, fragileKind))
+  if (diagnoseDeclExportability(loc, D, *userSF, DC, fragileKind))
     return true;
   if (diagnoseGenericArgumentsExportability(loc, declRef.getSubstitutions(),
                                             *userSF, DC)) {
