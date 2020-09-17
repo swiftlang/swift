@@ -64,6 +64,10 @@ module SwiftGlibc [system] {
       export *
       export stddef
     }
+    module stdint {
+      header "${GLIBC_INCLUDE_PATH}/stdint.h"
+      export *
+    }
     module string {
       header "${GLIBC_INCLUDE_PATH}/string.h"
       export *
