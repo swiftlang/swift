@@ -72,6 +72,8 @@ TYPE("tbd",                 TBD,                       "tbd",             "")
 // Swift section of the internal wiki.
 TYPE("module-trace",        ModuleTrace,               "trace.json",      "")
 
+TYPE("module-import-graph", ModuleImportGraph,         "import-graph.dot","")
+
 // Complete dependency information for the given Swift files as JSON.
 TYPE("json-dependencies",   JSONDependencies,          "dependencies.json",      "")
 

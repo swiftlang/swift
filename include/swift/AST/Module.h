@@ -667,6 +667,15 @@ public:
     /// this flag is specified.
     ShadowedBySeparateOverlay = 1 << 4
   };
+
+  static constexpr std::array<ImportFilterKind, 5> AllImportFilterKinds {
+    ImportFilterKind::Public,
+    ImportFilterKind::Private,
+    ImportFilterKind::ImplementationOnly,
+    ImportFilterKind::SPIAccessControl,
+    ImportFilterKind::ShadowedBySeparateOverlay,
+  };
+
   /// \sa getImportedModules
   using ImportFilter = OptionSet<ImportFilterKind>;
 

@@ -40,6 +40,7 @@
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/FileSystem.h"
+#include "swift/Basic/GraphViz.h"
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/Platform.h"
@@ -70,6 +71,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/Module.h"
 
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
@@ -210,9 +212,10 @@ static void emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
       });
 }
 
+namespace {
+
 // MARK: - Module Trace
 
-namespace {
 struct SwiftModuleTraceInfo {
   Identifier Name;
   std::string Path;
@@ -266,8 +269,8 @@ template <> struct ObjectTraits<LoadedModuleTraceFormat> {
 }
 }
 
-static bool isClangOverlayOf(ModuleDecl *potentialOverlay,
-                             ModuleDecl *potentialUnderlying) {
+static bool isClangOverlayOf(const ModuleDecl *potentialOverlay,
+                             const ModuleDecl *potentialUnderlying) {
   return !potentialOverlay->isNonSwiftModule()
       && potentialUnderlying->isNonSwiftModule()
       && potentialOverlay->getName() == potentialUnderlying->getName();
@@ -284,7 +287,7 @@ static bool contains(const SetLike &setLike, Item item) {
 ///
 /// By default, all imports are included.
 static void getImmediateImports(
-    ModuleDecl *module,
+    const ModuleDecl *module,
     SmallPtrSetImpl<ModuleDecl *> &imports,
     ModuleDecl::ImportFilter importFilter = {
       ModuleDecl::ImportFilterKind::Public,
@@ -300,29 +303,119 @@ static void getImmediateImports(
     imports.insert(import.importedModule);
 }
 
-/// Check if a Swift module is an overlay for some Clang module.
-///
 /// FIXME: Delete this hack once SR-13363 is fixed and ModuleDecl has the
 /// right API which we can use directly.
-static bool isOverlayOfClangModule(ModuleDecl *swiftModule) {
+static ModuleDecl *tryGetUnderlyingClangModule(const ModuleDecl *swiftModule) {
   assert(!swiftModule->isNonSwiftModule());
 
   llvm::SmallPtrSet<ModuleDecl *, 8> importList;
   ::getImmediateImports(swiftModule, importList,
                         {ModuleDecl::ImportFilterKind::Public});
-  bool isOverlay =
-      llvm::any_of(importList, [&](ModuleDecl *importedModule) -> bool {
-        return isClangOverlayOf(swiftModule, importedModule);
-      });
-  return isOverlay;
+  for (auto importedModule: importList) {
+    if (::isClangOverlayOf(swiftModule, importedModule))
+      return importedModule;
+  }
+  return nullptr;
+}
+
+/// Check if a Swift module is an overlay for some Clang module.
+static bool isOverlayOfClangModule(const ModuleDecl *swiftModule) {
+  return (bool)::tryGetUnderlyingClangModule(swiftModule);
+}
+
+static bool isCrossImportOverlay(ModuleDecl *swiftModule) {
+  SmallPtrSet<ModuleDecl *, 4> imports;
+  ::getImmediateImports(swiftModule, imports,
+                        {ModuleDecl::ImportFilterKind::Public});
+  return llvm::any_of(imports,
+                      [&](auto importedModule) {
+    return swiftModule->isCrossImportOverlayOf(importedModule);
+  });
 }
 
 namespace {
+
+// MARK: - ImportGraphTraversal
+
+/// Depth-first traversal of an import graph rooted at a "start" module.
+class ImportGraphTraversal {
+protected:
+  SmallVector<ModuleDecl *, 32> traversalStack;
+
+  /// Set of modules for which all imported modules have been processed.
+  llvm::DenseSet<ModuleDecl *> visited;
+
+  virtual ~ImportGraphTraversal() = default;
+
+  /// Check if the cycle encountered in the import graph is acceptable.
+  ///
+  /// \param startOfCycle A pointer to the element of \c traversalStack where
+  ///        the module first appeared.
+  ///
+  /// \pre The module on top of \c traversalStack is the same module as
+  ///      *startOfCycle.
+  ///
+  /// \pre searchStack.begin() <= startOfCycle < searchStack.end()
+  virtual bool isPermissibleCycle(ModuleDecl **startOfCycle) = 0;
+  virtual void processSwiftModule(ModuleDecl *module) = 0;
+  virtual void processClangModule(ModuleDecl *module) = 0;
+
+  void reportCycle(ModuleDecl *endOfCycle, llvm::raw_ostream &os);
+
+  void processModuleRecursiveStep(ModuleDecl *module);
+
+  bool
+  skipImportForClangModule(ModuleDecl *clangModule, ModuleDecl *import) const;
+
+public:
+  /// Print information about a \c ModuleDecl for debugging and crash messages.
+  static void printModule(const ModuleDecl *module, llvm::raw_ostream &os);
+
+  template<typename SetLike>
+  static void printModuleSet(const SetLike &set, llvm::raw_ostream &os) {
+    os << "{ ";
+    llvm::interleaveComma(set, os, [&](auto *mod) { printModule(mod, os); });
+    os << "}";
+  };
+};
+
+class ImportGraphConstructor : ImportGraphTraversal {
+  virtual ~ImportGraphConstructor() = default;
+
+  using Edge = ModuleDecl::ImportFilterKind;
+  using EdgeSet = llvm::SmallSet<Edge, 2>;
+  using Graph = MultiGraph<ModuleDecl *, Edge, EdgeSet>;
+
+  std::unique_ptr<Graph> moduleGraph;
+
+  ImportGraphConstructor();
+
+  bool isPermissibleCycle(ModuleDecl **startOfCycle) override { return true; }
+  void processSwiftModule(ModuleDecl *module) override;
+  void processClangModule(ModuleDecl *module) override;
+  void processAnyModule(
+      ModuleDecl *module,
+      llvm::function_ref<bool (ModuleDecl *, ModuleDecl *)> skip = nullptr);
+
+  /// Wrapper around \c MultiGraph::updateEdge to handle uninteresting edges.
+  ///
+  /// For example, self-edges and edges related to submodules are not very
+  /// interesting, so we ignore those.
+  void addEdge(ModuleDecl *from, ModuleDecl *to,
+               ModuleDecl::ImportFilterKind importKind);
+
+public:
+  /// Traverse the import graph and return the corresponding graph structure.
+  static std::unique_ptr<Graph> getImportGraph(ModuleDecl *startModule);
+};
+
+// MARK: ABIDependencyEvaluator
+
 /// Helper type for computing (approximate) information about ABI-dependencies.
 ///
 /// This misses out on details such as typealiases and more.
 /// See the "isImportedDirectly" field above for more details.
-class ABIDependencyEvaluator {
+class ABIDependencyEvaluator : ImportGraphTraversal {
   /// Map of ABIs exported by a particular module, excluding itself.
   ///
   /// For example, consider (primed letters represent Clang modules):
@@ -343,24 +436,11 @@ class ABIDependencyEvaluator {
   /// \b WARNING: Use \c reexposeImportedABI instead of inserting directly.
   llvm::DenseMap<ModuleDecl *, llvm::DenseSet<ModuleDecl *>> abiExportMap;
 
-  /// Stack for depth-first traversal.
-  SmallVector<ModuleDecl *, 32> searchStack;
-
-  llvm::DenseSet<ModuleDecl *> visited;
-
-  /// Helper function to handle invariant violations as crashes in debug mode.
-  void crashOnInvariantViolation(
-    llvm::function_ref<void (llvm::raw_string_ostream &)> f) const;
-
-  /// Computes the ABI exports for \p importedModule and adds them to
-  /// \p module's ABI exports.
-  ///
-  /// If \p includeImportedModule is true, also adds \p importedModule to
-  /// \p module's ABI exports.
-  ///
-  /// Correct way to add entries to \c abiExportMap.
-  void reexposeImportedABI(ModuleDecl *module, ModuleDecl *importedModule,
-                           bool includeImportedModule = true);
+  bool isPermissibleCycle(ModuleDecl **startOfCycle) override {
+    return isFakeCycleThroughOverlay(startOfCycle);
+  }
+  void processSwiftModule(ModuleDecl *module) override;
+  void processClangModule(ModuleDecl *module) override;
 
   /// Check for cases where we have a fake cycle through an overlay.
   ///
@@ -375,124 +455,263 @@ class ABIDependencyEvaluator {
   ///
   /// For more details, see [NOTE: ABIDependencyEvaluator-fake-cycle-detection]
   ///
-  /// \param startOfCycle A pointer to the element of \c searchStack where
-  ///        the module \em first appeared.
-  ///
-  /// \pre The module on top of \c searchStack is the same module as
-  ///      *startOfCycle.
-  ///
-  /// \pre searchStack.begin() <= startOfCycle < searchStack.end()
   bool isFakeCycleThroughOverlay(ModuleDecl **startOfCycle);
 
-  /// Recursive step in computing ABI dependencies.
+  /// Computes the ABI exports for \p importedModule and adds them to
+  /// \p module's ABI exports.
   ///
-  /// Use this method instead of using the \c forClangModule/\c forSwiftModule
-  /// methods.
-  void computeABIDependenciesForModule(ModuleDecl *module);
-  void computeABIDependenciesForSwiftModule(ModuleDecl *module);
-  void computeABIDependenciesForClangModule(ModuleDecl *module);
+  /// If \p includeImportedModule is true, also adds \p importedModule to
+  /// \p module's ABI exports.
+  ///
+  /// Correct way to add entries to \c abiExportMap.
+  void reexposeImportedABI(ModuleDecl *module, ModuleDecl *importedModule,
+                           bool includeImportedModule = true);
 
-  static void printModule(const ModuleDecl *module, llvm::raw_ostream &os);
+  void computeABIDependenciesForModule(ModuleDecl *module) {
+    processModuleRecursiveStep(module);
+  }
+  void computeABIDependenciesForSwiftModule(ModuleDecl *swiftModule) {
+    processSwiftModule(swiftModule);
+  }
+  void computeABIDependenciesForClangModule(ModuleDecl *clangModule) {
+    processClangModule(clangModule);
+  }
 
-  template<typename SetLike>
-  static void printModuleSet(const SetLike &set, llvm::raw_ostream &os);
+  /// Helper function to handle invariant violations as crashes in debug mode.
+  void crashOnInvariantViolation(
+    llvm::function_ref<void (llvm::raw_string_ostream &)> f) const;
 
 public:
-  ABIDependencyEvaluator() = default;
-  ABIDependencyEvaluator(const ABIDependencyEvaluator &) = delete;
-  ABIDependencyEvaluator(ABIDependencyEvaluator &&) = default;
+  virtual ~ABIDependencyEvaluator() = default;
 
   void getABIDependenciesForSwiftModule(
-    ModuleDecl *module, SmallPtrSetImpl<ModuleDecl *> &abiDependencies);
+      ModuleDecl *module, SmallPtrSetImpl<ModuleDecl *> &abiDependencies);
 
   void printABIExportMap(llvm::raw_ostream &os) const;
 };
 } // end anonymous namespace
 
-// See [NOTE: Bailing-vs-crashing-in-trace-emission].
-// TODO: Use PrettyStackTrace instead?
-void ABIDependencyEvaluator::crashOnInvariantViolation(
-  llvm::function_ref<void (llvm::raw_string_ostream &)> f) const {
-#ifndef NDEBUG
-  std::string msg;
-  llvm::raw_string_ostream os(msg);
-  os << "error: invariant violation: ";
-  f(os);
-  llvm::report_fatal_error(os.str());
-#endif
+bool ImportGraphTraversal::skipImportForClangModule(
+    ModuleDecl *clangModule, ModuleDecl *import) const {
+  // There are three cases here which can potentially create cycles:
+  //
+  // 1. Clang modules importing the stdlib.
+  //    See [NOTE: Pure-Clang-modules-privately-import-stdlib].
+  // 2. Overlay S @_exported-imports underlying module S' and another Clang
+  //    module C'. C' (transitively) #imports S' but it gets treated as if
+  //    C' imports S. This creates a cycle: S -> C' -> ... -> S.
+  //    In practice, this case is hit for
+  //      Darwin (Swift) -> SwiftOverlayShims (Clang) -> Darwin (Swift).
+  //    We may also hit this in a slightly different direction, in case
+  //    the module directly imports SwiftOverlayShims:
+  //      SwiftOverlayShims -> Darwin (Swift) -> SwiftOverlayShims
+  //    The latter is handled later by isFakeCycleThroughOverlay.
+  // 3. [NOTE: Intra-module-leafwards-traversal]
+  //    Cycles within the same top-level module.
+  //    These don't matter for us, since we only care about the dependency
+  //    graph at the granularity of top-level modules. So we ignore these
+  //    by only considering parent -> submodule dependencies.
+  //    See also [NOTE: Trace-Clang-submodule-complexity].
+  //
+  // All of these are "uninteresting" for the trace and the import graph.
+  if (import->isStdlibModule())
+    return true;
+  if (!import->isNonSwiftModule() && isOverlayOfClangModule(import)
+      && llvm::find(traversalStack, import) != traversalStack.end())
+    return true;
+  if (import->isNonSwiftModule()
+      && clangModule->getTopLevelModule() == import->getTopLevelModule()
+      && (clangModule == import
+          || !import->findUnderlyingClangModule()
+             ->isSubModuleOf(clangModule->findUnderlyingClangModule())))
+    return true;
+  return false;
 }
 
-// [NOTE: Trace-Clang-submodule-complexity]
-//
-// A Clang module may have zero or more submodules. In practice, when traversing
-// the imports of a module, we observe that different submodules of the same
-// top-level module (almost) freely import each other. Despite this, we still
-// need to conceptually traverse the tree formed by the submodule relationship
-// (with the top-level module being the root).
-//
-// This needs to be taken care of in two ways:
-// 1. We need to make sure we only go towards the leaves. It's okay if we "jump"
-//    branches, so long as we don't try to visit an ancestor when one of its
-//    descendants is still on the traversal stack, so that we don't end up with
-//    arbitrarily complex intra-module cycles.
-//    See also: [NOTE: Intra-module-leafwards-traversal].
-// 2. When adding entries to the ABI export map, we need to avoid marking
-//    dependencies within the same top-level module. This step is needed in
-//    addition to step 1 to avoid creating cycles like
-//    Overlay -> Underlying -> Submodule -> Overlay.
+void ImportGraphTraversal::reportCycle(ModuleDecl *endOfCycle,
+                                           llvm::raw_ostream &os) {
+ os << "unexpected cycle in import graph!\n";
+ for (auto m: traversalStack) {
+   printModule(m, os);
+   os << "\ndepends on ";
+ }
+ printModule(endOfCycle, os); os << '\n';
+}
 
-void ABIDependencyEvaluator::reexposeImportedABI(
-    ModuleDecl *module, ModuleDecl *importedModule,
-    bool includeImportedModule) {
-  if (module == importedModule) {
-    crashOnInvariantViolation([&](llvm::raw_string_ostream &os) {
-      os << "module "; printModule(module, os); os << " imports itself!\n";
-    });
+void ImportGraphTraversal::processModuleRecursiveStep(ModuleDecl *module) {
+  auto moduleIter = llvm::find(traversalStack, module);
+  if (moduleIter != traversalStack.end()) {
+    if (isPermissibleCycle(moduleIter))
+      return;
+    std::string errMsg;
+    llvm::raw_string_ostream os(errMsg);
+    os << "error: invariant violation: ";
+    reportCycle(module, os);
+    llvm::report_fatal_error(os.str());
     return;
   }
+  if (::contains(visited, module))
+    return;
+  traversalStack.push_back(module);
+  if (module->isNonSwiftModule())
+    processClangModule(module);
+  else
+    processSwiftModule(module);
+  traversalStack.pop_back();
+  visited.insert(module);
+}
 
-  auto addToABIExportMap = [this](ModuleDecl *module, ModuleDecl *reexport) {
-    if (module == reexport) {
-      crashOnInvariantViolation([&](llvm::raw_string_ostream &os){
-        os << "expected module "; printModule(reexport, os);
-        os << "  to not re-export itself\n";
-      });
-      return;
-    }
-    if (reexport->isNonSwiftModule()
-        && module->isNonSwiftModule()
-        && module->getTopLevelModule() == reexport->getTopLevelModule()) {
-      // Dependencies within the same top-level Clang module are not useful.
-      // See also: [NOTE: Trace-Clang-submodule-complexity].
-      return;
-    }
-
-    // We only care about dependencies across top-level modules and we want to
-    // avoid exploding abiExportMap with submodules. So we only insert entries
-    // after calling getTopLevelModule().
-
-    if (::isClangOverlayOf(module, reexport)) {
-      // For overlays, we need to have a dependency on the underlying module.
-      // Otherwise, we might accidentally create a Swift -> Swift cycle.
-      abiExportMap[module].insert(
-        reexport->getTopLevelModule(/*preferOverlay*/false));
-      return;
-    }
-    abiExportMap[module].insert(
-        reexport->getTopLevelModule(/*preferOverlay*/true));
-  };
-
-  computeABIDependenciesForModule(importedModule);
-  if (includeImportedModule) {
-    addToABIExportMap(module, importedModule);
+void ImportGraphTraversal::printModule(const ModuleDecl *module,
+                                           llvm::raw_ostream &os) {
+  module->getReverseFullModuleName().printForward(os);
+  if (module->isNonSwiftModule()) {
+    os << " (Clang)";
+  } else {
+    os << " (Swift, isOverlay = ";
+    os << (::isOverlayOfClangModule(module) ? "true)" : "false)");
   }
-  // Force creation of default value if missing. This prevents abiExportMap from
-  // growing (and moving) when calling addToABIExportMap. If abiExportMap gets
-  // moved, then abiExportMap[importedModule] will be moved, forcing us to
-  // create a defensive copy to avoid iterator invalidation on move.
-  (void)abiExportMap[module];
-  for (auto reexportedModule: abiExportMap[importedModule])
-    addToABIExportMap(module, reexportedModule);
+  os << " @ " << llvm::format("0x%llx", reinterpret_cast<uintptr_t>(module));
+}
+
+ImportGraphConstructor::ImportGraphConstructor() : moduleGraph(new Graph()) {
+  moduleGraph->compareNodes = [](ModuleDecl *m1, ModuleDecl *m2) -> int {
+    return std::strcmp(m1->getNameStr().data(), m2->getNameStr().data());
+  };
+  moduleGraph->compareEdges = [](Edge e1, Edge e2) -> int {
+    return std::underlying_type_t<Edge>(e1) - std::underlying_type_t<Edge>(e2);
+  };
+  moduleGraph->defaultNodeAttrs += ", color = \"orange\"";
+  moduleGraph->printNodeName = [](ModuleDecl *m, llvm::raw_ostream &os) {
+    os << '"';
+    m->getReverseFullModuleName().printForward(os);
+    os << " (";
+    if (m->isNonSwiftModule()) {
+      os << "C";
+    } else {
+      os << "S";
+      if (::isOverlayOfClangModule(m))
+        os << ", Ov";
+      else if (::isCrossImportOverlay(m))
+        os << ", X-Ov";
+    }
+    os << ")\"";
+  };
+  moduleGraph->printNodeAttr = [](ModuleDecl *m, llvm::raw_ostream &os) {
+    if (m->isNonSwiftModule()) {
+      os << "[color = \"grey\"]";
+    }
+  };
+  moduleGraph->printEdgeSet = [](ModuleDecl *from, ModuleDecl *to,
+                                 const SmallVectorImpl<Edge> &importKinds,
+                                 llvm::raw_ostream &os) {
+    if (from->isNonSwiftModule() && to->isNonSwiftModule()) {
+      os << "#import/#include";
+      return;
+    }
+    SmallVector<ModuleDecl::ImportFilterKind, 5> importKindsVec;
+    auto allImportKinds = ModuleDecl::AllImportFilterKinds;
+    for (auto importKind: allImportKinds) {
+      if (llvm::find(importKinds, importKind) != importKinds.end())
+        importKindsVec.push_back(importKind);
+    }
+    llvm::interleaveComma(importKindsVec, os, [&os](auto importKind) {
+      using Kind = ModuleDecl::ImportFilterKind;
+      switch (importKind) {
+      case Kind::Public: os << "Exp"; break;
+      case Kind::Private: os << "Def"; break;
+      case Kind::ImplementationOnly: os << "IO"; break;
+      case Kind::SPIAccessControl: os << "SPI"; break;
+      case Kind::ShadowedBySeparateOverlay: os << "SCOO"; break;
+      }
+    });
+  };
+}
+
+void ImportGraphConstructor::processSwiftModule(ModuleDecl *currentModule) {
+  processAnyModule(currentModule);
+}
+
+void ImportGraphConstructor::processClangModule(ModuleDecl *currentModule) {
+  processAnyModule(currentModule,
+                   [this](ModuleDecl *current,
+                          ModuleDecl *imported) {
+    return skipImportForClangModule(current, imported);
+  });
+}
+
+void ImportGraphConstructor::processAnyModule(
+    ModuleDecl *currentModule,
+    llvm::function_ref<bool (ModuleDecl *, ModuleDecl *)> skipFn) {
+  SmallPtrSet<ModuleDecl *, 8> scratch;
+  SmallPtrSet<ModuleDecl *, 32> allImports;
+  auto allImportKinds = ModuleDecl::AllImportFilterKinds;
+  for (auto &importKind: allImportKinds) {
+    ::getImmediateImports(currentModule, scratch, {importKind});
+    for (auto importedModule: scratch) {
+      if (skipFn && skipFn(currentModule, importedModule))
+        continue;
+      addEdge(currentModule, importedModule, importKind);
+      allImports.insert(importedModule);
+    }
+    scratch.clear();
+  }
+  for (auto module: allImports) {
+    processModuleRecursiveStep(module);
+  }
+}
+
+void ImportGraphConstructor::addEdge(ModuleDecl *from, ModuleDecl *to,
+                                  ModuleDecl::ImportFilterKind importKind) {
+  auto fromTop = from->getTopLevelModule(/*overlay*/false);
+  auto toTop = to->getTopLevelModule(/*overlay*/false);
+  if (fromTop == toTop)
+    return;
+  if (fromTop->isNonSwiftModule()
+      && !toTop->isNonSwiftModule()) {
+    if (auto underlying = tryGetUnderlyingClangModule(toTop)) {
+      toTop = underlying;
+    }
+  }
+  moduleGraph->updateEdge(fromTop, toTop, importKind);
+}
+
+std::unique_ptr<ImportGraphConstructor::Graph>
+ImportGraphConstructor::getImportGraph(ModuleDecl *startModule) {
+  ImportGraphConstructor explorer{};
+  explorer.processModuleRecursiveStep(startModule);
+  return std::move(explorer.moduleGraph);
+}
+
+void ABIDependencyEvaluator::processSwiftModule(
+    ModuleDecl *module) {
+  SmallPtrSet<ModuleDecl *, 32> allImports;
+  ::getImmediateImports(module, allImports);
+  for (auto import: allImports) {
+    computeABIDependenciesForModule(import);
+    if (::isClangOverlayOf(module, import)) {
+      reexposeImportedABI(module, import,
+                          /*includeImportedModule=*/false);
+    }
+  }
+
+  SmallPtrSet<ModuleDecl *, 32> reexportedImports;
+  ::getImmediateImports(module, reexportedImports,
+                        {ModuleDecl::ImportFilterKind::Public});
+  for (auto reexportedImport: reexportedImports) {
+    reexposeImportedABI(module, reexportedImport);
+  }
+}
+
+void ABIDependencyEvaluator::processClangModule(
+    ModuleDecl *module) {
+  SmallPtrSet<ModuleDecl *, 32> imports;
+  ::getImmediateImports(module, imports);
+  for (auto import: imports) {
+    if (skipImportForClangModule(module, import))
+      continue;
+    computeABIDependenciesForModule(import);
+    reexposeImportedABI(module, import);
+  }
 }
 
 // [NOTE: ABIDependencyEvaluator-fake-cycle-detection]
@@ -563,112 +782,104 @@ void ABIDependencyEvaluator::reexposeImportedABI(
 
 bool ABIDependencyEvaluator::isFakeCycleThroughOverlay(
     ModuleDecl **startOfCycle) {
-  assert(startOfCycle >= searchStack.begin() &&
-         startOfCycle < searchStack.end() &&
+  assert(startOfCycle >= traversalStack.begin() &&
+         startOfCycle < traversalStack.end() &&
          "startOfCycleIter points to an element in searchStack");
   // The startOfCycle module must be a Clang module.
   if (!(*startOfCycle)->isNonSwiftModule())
     return false;
   // Next, we must have zero or more modules followed by a Swift overlay for a
   // Clang module.
-  return std::any_of(startOfCycle + 1, searchStack.end(),
+  return std::any_of(startOfCycle + 1, traversalStack.end(),
                      [](ModuleDecl *module) {
                        return !module->isNonSwiftModule() &&
                               isOverlayOfClangModule(module);
                      });
 }
 
-void ABIDependencyEvaluator::computeABIDependenciesForModule(
-    ModuleDecl *module) {
-  auto moduleIter = llvm::find(searchStack, module);
-  if (moduleIter != searchStack.end()) {
-    if (isFakeCycleThroughOverlay(moduleIter))
-      return;
+// [NOTE: Trace-Clang-submodule-complexity]
+//
+// A Clang module may have zero or more submodules. In practice, when traversing
+// the imports of a module, we observe that different submodules of the same
+// top-level module (almost) freely import each other. Despite this, we still
+// need to conceptually traverse the tree formed by the submodule relationship
+// (with the top-level module being the root).
+//
+// This needs to be taken care of in two ways:
+// 1. We need to make sure we only go towards the leaves. It's okay if we "jump"
+//    branches, so long as we don't try to visit an ancestor when one of its
+//    descendants is still on the traversal stack, so that we don't end up with
+//    arbitrarily complex intra-module cycles.
+//    See also: [NOTE: Intra-module-leafwards-traversal].
+// 2. When adding entries to the ABI export map, we need to avoid marking
+//    dependencies within the same top-level module. This step is needed in
+//    addition to step 1 to avoid creating cycles like
+//    Overlay -> Underlying -> Submodule -> Overlay.
+
+void ABIDependencyEvaluator::reexposeImportedABI(
+    ModuleDecl *module, ModuleDecl *importedModule, bool includeImportedModule) {
+  if (module == importedModule) {
     crashOnInvariantViolation([&](llvm::raw_string_ostream &os) {
-      os << "unexpected cycle in import graph!\n";
-      for (auto m: searchStack) {
-        printModule(m, os);
-        if (!m->isNonSwiftModule()) {
-          os << " (isOverlay = " << isOverlayOfClangModule(m) << ")";
-        }
-        os << "\ndepends on ";
-      }
-      printModule(module, os); os << '\n';
+      os << "module "; printModule(module, os); os << " imports itself!\n";
     });
     return;
   }
-  if (::contains(visited, module))
-    return;
-  searchStack.push_back(module);
-  if (module->isNonSwiftModule())
-    computeABIDependenciesForClangModule(module);
-  else
-    computeABIDependenciesForSwiftModule(module);
-  searchStack.pop_back();
-  visited.insert(module);
+
+  auto addToABIExportMap = [this](ModuleDecl *module, ModuleDecl *reexport) {
+    if (module == reexport) {
+      crashOnInvariantViolation([&](llvm::raw_string_ostream &os){
+        os << "expected module "; printModule(reexport, os);
+        os << "  to not re-export itself\n";
+      });
+      return;
+    }
+    if (reexport->isNonSwiftModule()
+        && module->isNonSwiftModule()
+        && module->getTopLevelModule() == reexport->getTopLevelModule()) {
+      // Dependencies within the same top-level Clang module are not useful.
+      // See also: [NOTE: Trace-Clang-submodule-complexity].
+      return;
+    }
+
+    // We only care about dependencies across top-level modules and we want to
+    // avoid exploding abiExportMap with submodules. So we only insert entries
+    // after calling getTopLevelModule().
+
+    if (::isClangOverlayOf(module, reexport)) {
+      // For overlays, we need to have a dependency on the underlying module.
+      // Otherwise, we might accidentally create a Swift -> Swift cycle.
+      abiExportMap[module].insert(
+        reexport->getTopLevelModule(/*preferOverlay*/false));
+      return;
+    }
+    abiExportMap[module].insert(
+        reexport->getTopLevelModule(/*preferOverlay*/true));
+  };
+
+  computeABIDependenciesForModule(importedModule);
+  if (includeImportedModule) {
+    addToABIExportMap(module, importedModule);
+  }
+  // Force creation of default value if missing. This prevents abiExportMap from
+  // growing (and moving) when calling addToABIExportMap. If abiExportMap gets
+  // moved, then abiExportMap[importedModule] will be moved, forcing us to
+  // create a defensive copy to avoid iterator invalidation on move.
+  (void)abiExportMap[module];
+  for (auto reexportedModule: abiExportMap[importedModule])
+    addToABIExportMap(module, reexportedModule);
 }
 
-void ABIDependencyEvaluator::computeABIDependenciesForSwiftModule(
-    ModuleDecl *module) {
-  SmallPtrSet<ModuleDecl *, 32> allImports;
-  ::getImmediateImports(module, allImports);
-  for (auto import: allImports) {
-    computeABIDependenciesForModule(import);
-    if (::isClangOverlayOf(module, import)) {
-      reexposeImportedABI(module, import,
-                          /*includeImportedModule=*/false);
-    }
-  }
-
-  SmallPtrSet<ModuleDecl *, 32> reexportedImports;
-  ::getImmediateImports(module, reexportedImports,
-                        {ModuleDecl::ImportFilterKind::Public});
-  for (auto reexportedImport: reexportedImports) {
-    reexposeImportedABI(module, reexportedImport);
-  }
-}
-
-void ABIDependencyEvaluator::computeABIDependenciesForClangModule(
-    ModuleDecl *module) {
-  SmallPtrSet<ModuleDecl *, 32> imports;
-  ::getImmediateImports(module, imports);
-  for (auto import: imports) {
-    // There are three cases here which can potentially create cycles:
-    //
-    // 1. Clang modules importing the stdlib.
-    //    See [NOTE: Pure-Clang-modules-privately-import-stdlib].
-    // 2. Overlay S @_exported-imports underlying module S' and another Clang
-    //    module C'. C' (transitively) #imports S' but it gets treated as if
-    //    C' imports S. This creates a cycle: S -> C' -> ... -> S.
-    //    In practice, this case is hit for
-    //      Darwin (Swift) -> SwiftOverlayShims (Clang) -> Darwin (Swift).
-    //    We may also hit this in a slightly different direction, in case
-    //    the module directly imports SwiftOverlayShims:
-    //      SwiftOverlayShims -> Darwin (Swift) -> SwiftOverlayShims
-    //    The latter is handled later by isFakeCycleThroughOverlay.
-    // 3. [NOTE: Intra-module-leafwards-traversal]
-    //    Cycles within the same top-level module.
-    //    These don't matter for us, since we only care about the dependency
-    //    graph at the granularity of top-level modules. So we ignore these
-    //    by only considering parent -> submodule dependencies.
-    //    See also [NOTE: Trace-Clang-submodule-complexity].
-    if (import->isStdlibModule()) {
-      continue;
-    }
-    if (!import->isNonSwiftModule() && isOverlayOfClangModule(import) &&
-        llvm::find(searchStack, import) != searchStack.end()) {
-      continue;
-    }
-    if (import->isNonSwiftModule()
-        && module->getTopLevelModule() == import->getTopLevelModule()
-        && (module == import
-            || !import->findUnderlyingClangModule()
-                      ->isSubModuleOf(module->findUnderlyingClangModule()))) {
-      continue;
-    }
-    computeABIDependenciesForModule(import);
-    reexposeImportedABI(module, import);
-  }
+// See [NOTE: Bailing-vs-crashing-in-trace-emission].
+// TODO: Use PrettyStackTrace instead?
+void ABIDependencyEvaluator::crashOnInvariantViolation(
+  llvm::function_ref<void (llvm::raw_string_ostream &)> f) const {
+#ifndef NDEBUG
+  std::string msg;
+  llvm::raw_string_ostream os(msg);
+  os << "error: invariant violation: ";
+  f(os);
+  llvm::report_fatal_error(os.str());
+#endif
 }
 
 void ABIDependencyEvaluator::getABIDependenciesForSwiftModule(
@@ -682,23 +893,6 @@ void ABIDependencyEvaluator::getABIDependenciesForSwiftModule(
       abiDependencies.insert(exposedDependency);
     }
   }
-}
-
-void ABIDependencyEvaluator::printModule(
-    const ModuleDecl *module, llvm::raw_ostream &os) {
-  module->getReverseFullModuleName().printForward(os);
-  os << (module->isNonSwiftModule() ? " (Clang)" : " (Swift)");
-  os << " @ " << llvm::format("0x%llx", reinterpret_cast<uintptr_t>(module));
-}
-
-template<typename SetLike>
-void ABIDependencyEvaluator::printModuleSet(
-    const SetLike &set, llvm::raw_ostream &os) {
-  os << "{ ";
-  for (auto module: set) {
-    printModule(module, os); os << ", ";
-  }
-  os << "}";
 }
 
 void ABIDependencyEvaluator::printABIExportMap(llvm::raw_ostream &os) const {
@@ -951,6 +1145,24 @@ emitLoadedModuleTraceForAllPrimariesIfNeeded(ModuleDecl *mainModule,
           mainModule, depTracker, opts.PrebuiltModuleCachePath,
           input.loadedModuleTracePath());
       });
+}
+
+static bool
+emitModuleImportGraphIfNeeded(ModuleDecl *mainModule,
+                              StringRef importGraphPath) {
+  if (importGraphPath.empty())
+    return true;
+  std::error_code EC;
+  llvm::raw_fd_ostream out(importGraphPath, EC, llvm::sys::fs::FA_Write);
+  if (out.has_error() || EC) {
+    mainModule->getASTContext().Diags.diagnose(SourceLoc(),
+                                               diag::error_opening_output,
+                                               importGraphPath, EC.message());
+    out.clear_error();
+    return true;
+  }
+  ImportGraphConstructor::getImportGraph(mainModule)->printAsGraphviz(out, true);
+  return false;
 }
 
 /// Gets an output stream for the provided output filename, or diagnoses to the
@@ -1738,6 +1950,12 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
 
   // Verify generic signatures if we've been asked to.
   verifyGenericSignaturesIfNeeded(Invocation, ctx);
+
+  opts.InputsAndOutputs.forEachInputProducingSupplementaryOutput(
+      [&Instance](const InputFile &input) -> bool {
+    return emitModuleImportGraphIfNeeded(
+        Instance.getMainModule(), input.moduleImportGraphPath());
+  });
 
   // Emit any additional outputs that we only need for a successful compilation.
   // We don't want to unnecessarily delay getting any errors back to the user.

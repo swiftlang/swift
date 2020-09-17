@@ -126,6 +126,9 @@ struct SupplementaryOutputPaths {
   /// TARGET. This format is subject to arbitrary change, however.
   std::string LoadedModuleTracePath;
 
+  /// Path for storing a module import graph in Graphviz DOT format.
+  std::string ModuleImportGraphPath;
+
   /// The path to which we should output a TBD file.
   ///
   /// "TBD" stands for "text-based dylib". It's a YAML-based format that
@@ -176,7 +179,8 @@ struct SupplementaryOutputPaths {
            ModuleDocOutputPath.empty() && DependenciesFilePath.empty() &&
            ReferenceDependenciesFilePath.empty() &&
            SerializedDiagnosticsPath.empty() && LoadedModuleTracePath.empty() &&
-           TBDPath.empty() && ModuleInterfaceOutputPath.empty() &&
+           ModuleImportGraphPath.empty() && TBDPath.empty() &&
+           ModuleInterfaceOutputPath.empty() &&
            ModuleSourceInfoOutputPath.empty() && LdAddCFilePath.empty();
   }
 };

@@ -78,6 +78,7 @@ bool file_types::isTextual(ID Id) {
   case file_types::TY_ImportedModules:
   case file_types::TY_TBD:
   case file_types::TY_ModuleTrace:
+  case file_types::TY_ModuleImportGraph:
   case file_types::TY_YAMLOptRecord:
   case file_types::TY_SwiftModuleInterfaceFile:
   case file_types::TY_PrivateSwiftModuleInterfaceFile:
@@ -150,6 +151,7 @@ bool file_types::isAfterLLVM(ID Id) {
   case file_types::TY_Remapping:
   case file_types::TY_IndexData:
   case file_types::TY_ModuleTrace:
+  case file_types::TY_ModuleImportGraph:
   case file_types::TY_YAMLOptRecord:
   case file_types::TY_BitstreamOptRecord:
   case file_types::TY_SwiftModuleInterfaceFile:
@@ -202,6 +204,7 @@ bool file_types::isPartOfSwiftCompilation(ID Id) {
   case file_types::TY_Remapping:
   case file_types::TY_IndexData:
   case file_types::TY_ModuleTrace:
+  case file_types::TY_ModuleImportGraph:
   case file_types::TY_YAMLOptRecord:
   case file_types::TY_BitstreamOptRecord:
   case file_types::TY_JSONDependencies:
