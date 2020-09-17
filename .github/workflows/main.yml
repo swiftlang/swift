@@ -39,7 +39,7 @@ jobs:
           path: ../build-cache
           key: ${{ runner.os }}-sccache-v10-${{ steps.cache_timestamp.outputs.timestamp }}
           restore-keys: |
-            ${{ runner.os }}-v10-
+            ${{ runner.os }}-sccache-v10-
       - name: Build Linux installable archive
         run: |
           ./utils/webassembly/ci.sh
@@ -77,7 +77,7 @@ jobs:
           path: ../build-cache
           key: ${{ runner.os }}-sccache-v10-${{ steps.cache_timestamp.outputs.timestamp }}
           restore-keys: |
-            ${{ runner.os }}-v10-
+            ${{ runner.os }}-sccache-v10-
       - name: Build macOS installable archive
         run: |
           sudo xcode-select --switch /Applications/Xcode_12_beta.app/Contents/Developer/
