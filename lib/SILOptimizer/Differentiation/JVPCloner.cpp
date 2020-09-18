@@ -944,7 +944,6 @@ public:
     trueArgs.push_back(payloadPointer);
     falseArgs.push_back(payloadPointer);
 
-    builder.setCurrentDebugScope(getOpScope(cbi->getDebugScope()));
     builder.createCondBranch(loc, getOpValue(cbi->getCondition()), trueBB,
                              trueArgs, falseBB, falseArgs);
     emitTangentForCondBranchInst(cbi);
