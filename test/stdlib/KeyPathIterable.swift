@@ -33,6 +33,7 @@ struct Nested : KeyPathIterable, Equatable {
 struct ComplexNested : KeyPathIterable, Equatable {
   var float: Float
   let simple: Simple
+  let optional: Simple?
   let array: [Simple]
   var dictionary: [String : Simple]
 }
@@ -125,16 +126,22 @@ KeyPathIterableTests.test("SimpleNested") {
 
 KeyPathIterableTests.test("ComplexNested") {
   var x = ComplexNested(float: 1, simple: Simple(w: 3, b: 4),
+                        optional: Simple(w: 5, b: 6),
                         array: [Simple(w: 5, b: 6), Simple(w: 7, b: 8)],
                         dictionary: ["foo" : Simple(w: 1, b: 2),
                                      "bar" : Simple(w: 3, b: 4)])
   expectEqual([\ComplexNested.float, \ComplexNested.simple,
-               \ComplexNested.array, \ComplexNested.dictionary],
+               \ComplexNested.optional, \ComplexNested.array,
+               \ComplexNested.dictionary],
               x.allKeyPaths)
   expectEqual([\ComplexNested.float,
                \ComplexNested.simple,
                \ComplexNested.simple.w,
                \ComplexNested.simple.b,
+               \ComplexNested.optional,
+               \ComplexNested.optional!,
+               \ComplexNested.optional!.w,
+               \ComplexNested.optional!.b,
                \ComplexNested.array,
                \ComplexNested.array[0],
                \ComplexNested.array[0].w,
@@ -153,6 +160,8 @@ KeyPathIterableTests.test("ComplexNested") {
   expectEqual([\ComplexNested.float,
                \ComplexNested.simple.w,
                \ComplexNested.simple.b,
+               \ComplexNested.optional!.w,
+               \ComplexNested.optional!.b,
                \ComplexNested.array[0].w,
                \ComplexNested.array[0].b,
                \ComplexNested.array[1].w,
@@ -175,6 +184,7 @@ KeyPathIterableTests.test("ComplexNested") {
   }
   // Check that recursively all `Float` properties have been mutated.
   let expected = ComplexNested(float: 2, simple: Simple(w: 3, b: 4),
+                               optional: Simple(w: 5, b: 6),
                                array: [Simple(w: 5, b: 6), Simple(w: 7, b: 8)],
                                dictionary: ["foo" : Simple(w: 2, b: 3),
                                             "bar" : Simple(w: 4, b: 5)])
