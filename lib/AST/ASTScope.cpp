@@ -96,10 +96,6 @@ NullablePtr<ClosureExpr> BraceStmtScope::parentClosureIfAny() const {
 NullablePtr<ClosureExpr> ASTScopeImpl::getClosureIfClosureScope() const {
   return nullptr;
 }
-NullablePtr<ClosureExpr>
-AbstractClosureScope::getClosureIfClosureScope() const {
-  return closureExpr;
-}
 
 // Conservative, because using precise info would be circular
 SourceRange
@@ -231,9 +227,7 @@ DEFINE_GET_CLASS_NAME(PatternEntryInitializerScope)
 DEFINE_GET_CLASS_NAME(ConditionalClauseScope)
 DEFINE_GET_CLASS_NAME(ConditionalClausePatternUseScope)
 DEFINE_GET_CLASS_NAME(CaptureListScope)
-DEFINE_GET_CLASS_NAME(WholeClosureScope)
 DEFINE_GET_CLASS_NAME(ClosureParametersScope)
-DEFINE_GET_CLASS_NAME(ClosureBodyScope)
 DEFINE_GET_CLASS_NAME(TopLevelCodeScope)
 DEFINE_GET_CLASS_NAME(SpecializeAttributeScope)
 DEFINE_GET_CLASS_NAME(DifferentiableAttributeScope)
