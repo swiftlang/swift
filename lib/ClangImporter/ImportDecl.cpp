@@ -9234,8 +9234,6 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
                                   "import-clang-decl", ClangDecl);
   clang::PrettyStackTraceDecl trace(ClangDecl, clang::SourceLocation(),
                                     Instance->getSourceManager(), "importing");
-  ImportDecision decision(*this, ClangDecl, version);
-
   assert((UseCanonicalDecl || isa<clang::ObjCCategoryDecl>(ClangDecl)) &&
          "should always UseCanonicalDecl for non-categories");
   auto Canon = cast<clang::NamedDecl>(UseCanonicalDecl? ClangDecl->getCanonicalDecl(): ClangDecl);
@@ -9244,7 +9242,6 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
     if (!SuperfluousTypedefsAreTransparent &&
         SuperfluousTypedefs.count(Canon))
       return nullptr;
-    decision.alreadyDecided();
     return Known;
   }
 
@@ -9252,6 +9249,8 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
   bool HadForwardDeclaration = false;
 
   startedImportingEntity();
+  ImportDecision decision(*this, ClangDecl, version);
+
   Decl *Result = importDeclImpl(ClangDecl, version, TypedefIsSuperfluous,
                                 HadForwardDeclaration, decision);
   if (!Result)
@@ -9264,7 +9263,6 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
   }
 
   if (!HadForwardDeclaration)
-    // FIXME: may have been called earlier; decide if that's okay
     decision.importAndCache(Result);
 
   if (!SuperfluousTypedefsAreTransparent && TypedefIsSuperfluous)
