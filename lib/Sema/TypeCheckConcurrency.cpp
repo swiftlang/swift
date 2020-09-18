@@ -13,6 +13,7 @@
 // This file implements type checking support for Swift's concurrency model.
 //
 //===----------------------------------------------------------------------===//
+#include "TypeCheckConcurrency.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ParameterList.h"
@@ -21,14 +22,7 @@
 
 using namespace swift;
 
-/// Check whether the @asyncHandler attribute can be applied to the given
-/// function declaration.
-///
-/// \param diagnose Whether to emit a diagnostic when a problem is encountered.
-///
-/// \returns \c true if there was a problem with adding the attribute, \c false
-/// otherwise.
-static bool checkAsyncHandler(FuncDecl *func, bool diagnose) {
+bool swift::checkAsyncHandler(FuncDecl *func, bool diagnose) {
   if (!func->getResultInterfaceType()->isVoid()) {
     if (diagnose) {
       func->diagnose(diag::asynchandler_returns_value)
@@ -233,30 +227,6 @@ private:
 
   explicit IsolationRestriction(Kind kind) : kind(kind) { }
 
-  /// Determine whether the given value is an instance member of an actor
-  /// class that is isolated to the current actor instance.
-  ///
-  /// \returns the type of the actor.
-  static ClassDecl *getActorIsolatingInstanceMember(ValueDecl *value) {
-    // Only instance members are isolated.
-    if (!value->isInstanceMember())
-      return nullptr;
-
-    // Are we within an actor class?
-    auto classDecl = value->getDeclContext()->getSelfClassDecl();
-    if (!classDecl || !classDecl->isActor())
-      return nullptr;
-
-    // Functions that are an asynchronous context can be accessed from anywhere.
-    if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
-      if (func->isAsyncContext())
-        return nullptr;
-    }
-
-    // This member is part of the isolated state.
-    return classDecl;
-  }
-
 public:
   Kind getKind() const { return kind; }
 
@@ -354,8 +324,7 @@ public:
         return forLocalCapture(decl->getDeclContext());
 
       // Protected actor instance members can only be accessed on 'self'.
-      if (auto actorClass = getActorIsolatingInstanceMember(
-              cast<ValueDecl>(decl)))
+      if (auto actorClass = getActorIsolatingMember(cast<ValueDecl>(decl)))
         return forActorSelf(actorClass);
 
       // All other accesses are unsafe.
@@ -634,4 +603,24 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
 
   ActorIsolationWalker walker(dc);
   const_cast<Expr *>(expr)->walk(walker);
+}
+
+ClassDecl *swift::getActorIsolatingMember(ValueDecl *value) {
+  // Only instance members are isolated.
+  if (!value->isInstanceMember())
+    return nullptr;
+
+  // Are we within an actor class?
+  auto classDecl = value->getDeclContext()->getSelfClassDecl();
+  if (!classDecl || !classDecl->isActor())
+    return nullptr;
+
+  // Functions that are an asynchronous context can be accessed from anywhere.
+  if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
+    if (func->isAsyncContext())
+      return nullptr;
+  }
+
+  // This member is part of the isolated state.
+  return classDecl;
 }
