@@ -149,3 +149,25 @@ extension Dictionary: KeyPathIterable {
     return result
   }
 }
+
+extension Optional: KeyPathIterable {
+  public typealias AllKeyPaths = [PartialKeyPath<Self>]
+
+  public var allKeyPaths: [PartialKeyPath<Self>] {
+    if self != nil {
+      return [\.!]
+    }
+    return []
+  }
+}
+
+extension Optional.TangentVector: KeyPathIterable {
+  public typealias AllKeyPaths = [PartialKeyPath<Self>]
+
+  public var allKeyPaths: [PartialKeyPath<Self>] {
+    if value != nil {
+      return [\Self.value!]
+    }
+    return []
+  }
+}
