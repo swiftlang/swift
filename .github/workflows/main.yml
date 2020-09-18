@@ -22,6 +22,8 @@ jobs:
           sudo apt-get purge libgcc-9-dev gcc-9 libstdc++-9-dev
           sudo swapoff -a
           sudo rm -f /swapfile
+          sudo rm -rf /opt/hostedtoolcache
+          sudo rm -rf /usr/share/dotnet
           sudo apt clean
           docker rmi $(docker image ls -aq)
           df -h
