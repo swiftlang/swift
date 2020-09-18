@@ -315,12 +315,21 @@ public:
       if (cast<ValueDecl>(decl)->isLocalCapture())
         return forLocalCapture(decl->getDeclContext());
 
-      // Protected actor instance members can only be accessed on 'self'.
-      if (auto actorClass = getActorIsolatingMember(cast<ValueDecl>(decl)))
-        return forActorSelf(actorClass);
+      // Determine the actor isolation of the given declaration.
+      switch (auto isolation = getActorIsolation(cast<ValueDecl>(decl))) {
+      case ActorIsolation::ActorInstance:
+        // Protected actor instance members can only be accessed on 'self'.
+        return forActorSelf(isolation.getActor());
 
-      // All other accesses are unsafe.
-      return forUnsafe();
+      case ActorIsolation::Independent:
+      case ActorIsolation::ActorPrivileged:
+        // Actor-independent and actor-privileged declarations have no
+        // restrictions on their access.
+        return forUnrestricted();
+
+      case ActorIsolation::Unspecified:
+        return forUnsafe();
+      }
     }
   }
 
@@ -569,6 +578,26 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
           return true;
         }
 
+        // Check whether the context of 'self' is actor-isolated.
+        switch (getActorIsolation(
+                   cast<ValueDecl>(selfVar->getDeclContext()->getAsDecl()))) {
+          case ActorIsolation::ActorInstance:
+          case ActorIsolation::ActorPrivileged:
+          case ActorIsolation::Unspecified:
+            // Okay
+            break;
+
+          case ActorIsolation::Independent:
+            // The 'self' is for an actor-independent member, which means
+            // we cannot refer to actor-isolated state.
+            ctx.Diags.diagnose(
+                memberLoc, diag::actor_isolated_self_independent_context,
+                member->getDescriptiveKind(),
+                member->getName());
+            noteIsolatedActorMember(member);
+            break;
+        }
+
         // Check whether we are in a context that will not execute concurrently
         // with the context of 'self'.
         if (mayExecuteConcurrentlyWith(
@@ -597,22 +626,42 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
   const_cast<Expr *>(expr)->walk(walker);
 }
 
-ClassDecl *swift::getActorIsolatingMember(ValueDecl *value) {
-  // Only instance members are isolated.
-  if (!value->isInstanceMember())
-    return nullptr;
-
-  // Are we within an actor class?
-  auto classDecl = value->getDeclContext()->getSelfClassDecl();
-  if (!classDecl || !classDecl->isActor())
-    return nullptr;
-
-  // Functions that are an asynchronous context can be accessed from anywhere.
-  if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
-    if (func->isAsyncContext())
-      return nullptr;
+ActorIsolation ActorIsolationRequest::evaluate(
+    Evaluator &evaluator, ValueDecl *value) const {
+  // If the attribute is explicitly marked @actorIndependent, report it as
+  // independent.
+  if (value->getAttrs().hasAttribute<ActorIndependentAttr>()) {
+    return ActorIsolation::forIndependent();
   }
 
-  // This member is part of the isolated state.
-  return classDecl;
+  // If the declaration overrides another declaration, it must have the same
+  // actor isolation.
+  if (auto overriddenValue = value->getOverriddenDecl()) {
+    if (auto isolation = getActorIsolation(overriddenValue))
+      return isolation;
+  }
+
+  // Check for instance members of actor classes, which are part of
+  // actor-isolated state.
+  auto classDecl = value->getDeclContext()->getSelfClassDecl();
+  if (classDecl && classDecl->isActor() && value->isInstanceMember()) {
+    // A function that is an asynchronous context is actor-privileged.
+    if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
+      if (func->isAsyncContext())
+        return ActorIsolation::forActorPrivileged(classDecl);
+    }
+
+    // Everything else is part of the actor's isolated state.
+    return ActorIsolation::forActorInstance(classDecl);
+  }
+
+  // Everything else is unspecified.
+  return ActorIsolation::forUnspecified();
+}
+
+ActorIsolation swift::getActorIsolation(ValueDecl *value) {
+  auto &ctx = value->getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator, ActorIsolationRequest{value},
+      ActorIsolation::forUnspecified());
 }

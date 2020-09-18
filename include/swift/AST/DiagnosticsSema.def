@@ -4146,6 +4146,10 @@ ERROR(actor_isolated_non_self_reference,none,
         "actor-isolated %0 %1 can only be referenced "
         "%select{inside the actor|on 'self'}2",
         (DescriptiveDeclKind, DeclName, bool))
+ERROR(actor_isolated_self_independent_context,none,
+        "actor-isolated %0 %1 can not be referenced from an "
+        "'@actorIndependent' context",
+        (DescriptiveDeclKind, DeclName))
 WARNING(concurrent_access_local,none,
         "local %0 %1 is unsafe to reference in code that may execute "
         "concurrently",
@@ -4169,6 +4173,24 @@ NOTE(actor_isolated_witness_could_be_async_handler,none,
      "actor-isolated %0 %1 cannot be used to satisfy a protocol requirement; "
      "did you mean to make it an asychronous handler?",
      (DescriptiveDeclKind, DeclName))
+
+ERROR(actorisolated_let,none,
+      "'@actorIsolated' is meaningless on 'let' declarations because "
+      "they are immutable",
+      ())
+ERROR(actorisolated_mutable_storage,none,
+      "'@actorIsolated' can not be applied to stored properties",
+      ())
+ERROR(actorisolated_local_var,none,
+      "'@actorIsolated' can not be applied to local variables",
+      ())
+ERROR(actorisolated_not_actor_member,none,
+      "'@actorIsolated' can only be applied to actor members and "
+      "global/static variables",
+      ())
+ERROR(actorisolated_not_actor_instance_member,none,
+      "'@actorIsolated' can only be applied to instance members of actors",
+      ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Types

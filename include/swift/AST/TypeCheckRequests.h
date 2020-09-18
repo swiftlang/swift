@@ -16,6 +16,7 @@
 #ifndef SWIFT_TYPE_CHECK_REQUESTS_H
 #define SWIFT_TYPE_CHECK_REQUESTS_H
 
+#include "swift/AST/ActorIsolation.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/GenericSignature.h"
@@ -811,6 +812,24 @@ private:
   friend SimpleRequest;
 
   bool evaluate(Evaluator &evaluator, ClassDecl *classDecl) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
+/// Determine the actor isolation for the given declaration.
+class ActorIsolationRequest :
+    public SimpleRequest<ActorIsolationRequest,
+                         ActorIsolation(ValueDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ActorIsolation evaluate(Evaluator &evaluator, ValueDecl *value) const;
 
 public:
   // Caching
