@@ -81,6 +81,10 @@ public:
   /// Whether to stop the optimization pipeline after serializing SIL.
   bool StopOptimizationAfterSerialization = false;
 
+  /// Whether to stop the optimization pipeline right before we lower ownership
+  /// and go from OSSA to non-ownership SIL.
+  bool StopOptimizationBeforeLoweringOwnership = false;
+
   /// Whether to skip emitting non-inlinable function bodies.
   bool SkipNonInlinableFunctionBodies = false;
 
