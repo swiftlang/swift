@@ -42,7 +42,6 @@ jobs:
           key: ${{ runner.os }}-sccache-v10-${{ steps.cache_timestamp.outputs.timestamp }}
           restore-keys: |
             ${{ runner.os }}-sccache-v10-
-      - uses: mxschmitt/action-tmate@v3
       - name: Build Linux installable archive
         run: |
           ./utils/webassembly/ci.sh
