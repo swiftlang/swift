@@ -88,6 +88,9 @@ PROTOCOL(StringInterpolationProtocol)
 PROTOCOL(AdditiveArithmetic)
 PROTOCOL(Differentiable)
 
+PROTOCOL(AsyncSequence)
+PROTOCOL(GeneratorProtocol)
+
 PROTOCOL(FloatingPoint)
 
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByArrayLiteral, "Array", false)

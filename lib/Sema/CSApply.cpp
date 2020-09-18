@@ -7966,7 +7966,9 @@ static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
   // Get the conformance of the sequence type to the Sequence protocol.
   auto stmt = forEachStmtInfo.stmt;
   auto sequenceProto = TypeChecker::getProtocol(
-      cs.getASTContext(), stmt->getForLoc(), KnownProtocolKind::Sequence);
+      cs.getASTContext(), stmt->getForLoc(), 
+      stmt->getAwaitLoc().isValid() ? 
+        KnownProtocolKind::AsyncSequence : KnownProtocolKind::Sequence);
   auto sequenceConformance = TypeChecker::conformsToProtocol(
       forEachStmtInfo.sequenceType, sequenceProto, cs.DC);
   assert(!sequenceConformance.isInvalid() &&

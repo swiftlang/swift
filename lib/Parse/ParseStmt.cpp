@@ -2124,6 +2124,13 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
   // lookahead to resolve what is going on.
   bool IsCStyleFor = isStmtForCStyle(*this);
   auto StartOfControl = Tok.getLoc();
+  bool IsAsync = false;
+
+  if (shouldParseExperimentalConcurrency() && 
+    Tok.isContextualKeyword("await")) {
+    consumeToken();
+    IsAsync = true;
+  }
 
   // Parse the pattern.  This is either 'case <refutable pattern>' or just a
   // normal pattern.
@@ -2218,7 +2225,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
 
   return makeParserResult(
       Status,
-      new (Context) ForEachStmt(LabelInfo, ForLoc, pattern.get(), InLoc,
+      new (Context) ForEachStmt(LabelInfo, ForLoc, IsAsync, pattern.get(), InLoc,
                                 Container.get(), WhereLoc, Where.getPtrOrNull(),
                                 Body.get()));
 }

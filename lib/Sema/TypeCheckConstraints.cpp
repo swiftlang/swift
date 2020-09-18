@@ -562,7 +562,9 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
   };
 
   auto sequenceProto = TypeChecker::getProtocol(
-      dc->getASTContext(), stmt->getForLoc(), KnownProtocolKind::Sequence);
+      dc->getASTContext(), stmt->getForLoc(), 
+      stmt->isAsync() ? 
+        KnownProtocolKind::AsyncSequence : KnownProtocolKind::Sequence);
   if (!sequenceProto)
     return failed();
 
