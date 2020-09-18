@@ -1243,7 +1243,12 @@ CaptureListExpr *CaptureListExpr::create(ASTContext &ctx,
                                          ClosureExpr *closureBody) {
   auto size = totalSizeToAlloc<CaptureListEntry>(captureList.size());
   auto mem = ctx.Allocate(size, alignof(CaptureListExpr));
-  return ::new(mem) CaptureListExpr(captureList, closureBody);
+  auto *expr = ::new(mem) CaptureListExpr(captureList, closureBody);
+
+  for (auto capture : captureList)
+    capture.Var->setParentCaptureList(expr);
+
+  return expr;
 }
 
 DestructureTupleExpr *

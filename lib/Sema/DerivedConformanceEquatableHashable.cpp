@@ -205,7 +205,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
       for (unsigned i : indices(lhsPayloadVars)) {
         auto *vOld = lhsPayloadVars[i];
         auto *vNew = new (C) VarDecl(
-            /*IsStatic*/ false, vOld->getIntroducer(), false /*IsCaptureList*/,
+            /*IsStatic*/ false, vOld->getIntroducer(),
             vOld->getNameLoc(), vOld->getName(), vOld->getDeclContext());
         vNew->setHasNonPatternBindingInit();
         vNew->setImplicit();
@@ -730,7 +730,7 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
       for (unsigned i : indices(payloadVars)) {
         auto *vOld = payloadVars[i];
         auto *vNew = new (C) VarDecl(
-            /*IsStatic*/ false, vOld->getIntroducer(), false /*IsCaptureList*/,
+            /*IsStatic*/ false, vOld->getIntroducer(),
             vOld->getNameLoc(), vOld->getName(), vOld->getDeclContext());
         vNew->setHasNonPatternBindingInit();
         vNew->setImplicit();
@@ -881,8 +881,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
 
   VarDecl *hashValueDecl =
     new (C) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
-                    /*IsCaptureList*/false, SourceLoc(),
-                    C.Id_hashValue, parentDC);
+                    SourceLoc(), C.Id_hashValue, parentDC);
   hashValueDecl->setInterfaceType(intType);
 
   ParameterList *params = ParameterList::createEmpty(C);

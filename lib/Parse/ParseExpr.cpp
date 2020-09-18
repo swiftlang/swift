@@ -1990,7 +1990,7 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
     // Make the variable which will contain our temporary value.
     auto InterpolationVar =
       new (Context) VarDecl(/*IsStatic=*/false, VarDecl::Introducer::Var,
-                            /*IsCaptureList=*/false, /*NameLoc=*/SourceLoc(),
+                            /*NameLoc=*/SourceLoc(),
                             Context.Id_dollarInterpolation, CurDeclContext);
     InterpolationVar->setImplicit(true);
     InterpolationVar->setHasNonPatternBindingInit(true);
@@ -2573,7 +2573,6 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
                          ? VarDecl::Introducer::Let
                          : VarDecl::Introducer::Var);
       auto *VD = new (Context) VarDecl(/*isStatic*/false, introducer,
-                                       /*isCaptureList*/true,
                                        nameLoc, name, CurDeclContext);
         
       // If we captured something under the name "self", remember that.
@@ -2592,9 +2591,10 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
           /*VarLoc*/ nameLoc, pattern, /*EqualLoc*/ equalLoc, initializer,
           CurDeclContext);
 
-        auto CLE = CaptureListEntry(VD, PBD);
-        if (CLE.isSimpleSelfCapture())
-          VD->setIsSelfParamCapture();
+      auto CLE = CaptureListEntry(VD, PBD);
+      if (CLE.isSimpleSelfCapture())
+        VD->setIsSelfParamCapture();
+
       captureList.push_back(CLE);
     } while (HasNext);
 
