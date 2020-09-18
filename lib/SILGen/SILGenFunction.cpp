@@ -510,8 +510,8 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
              fd->getResultInterfaceType(), fd->hasThrows(), fd->getThrowsLoc());
   prepareEpilog(true, fd->hasThrows(), CleanupLocation(fd));
 
-  emitProfilerIncrement(fd->getBody());
-  emitStmt(fd->getBody());
+  emitProfilerIncrement(fd->getTypecheckedBody());
+  emitStmt(fd->getTypecheckedBody());
 
   emitEpilog(fd);
 
@@ -564,12 +564,13 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     // be imported.
     ASTContext &ctx = getASTContext();
     
-    Located<Identifier> UIKitName =
+    ImportPath::Element UIKitName =
       {ctx.getIdentifier("UIKit"), SourceLoc()};
     
     ModuleDecl *UIKit = ctx
       .getClangModuleLoader()
-      ->loadModule(SourceLoc(), UIKitName);
+      ->loadModule(SourceLoc(),
+                   ImportPath::Module(llvm::makeArrayRef(UIKitName)));
     assert(UIKit && "couldn't find UIKit objc module?!");
     SmallVector<ValueDecl *, 1> results;
     UIKit->lookupQualified(UIKit,

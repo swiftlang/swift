@@ -974,20 +974,20 @@ public:
 
 class PropertyWrapperReferenceFailure : public ContextualFailure {
   VarDecl *Property;
-  bool UsingStorageWrapper;
+  bool UsingProjection;
 
 public:
   PropertyWrapperReferenceFailure(const Solution &solution, VarDecl *property,
-                                  bool usingStorageWrapper, Type base,
+                                  bool usingProjection, Type base,
                                   Type wrapper, ConstraintLocator *locator)
       : ContextualFailure(solution, base, wrapper, locator), Property(property),
-        UsingStorageWrapper(usingStorageWrapper) {}
+        UsingProjection(usingProjection) {}
 
   VarDecl *getProperty() const { return Property; }
 
   Identifier getPropertyName() const { return Property->getName(); }
 
-  bool usingStorageWrapper() const { return UsingStorageWrapper; }
+  bool usingProjection() const { return UsingProjection; }
 
   ValueDecl *getReferencedMember() const {
     auto *locator = getLocator();

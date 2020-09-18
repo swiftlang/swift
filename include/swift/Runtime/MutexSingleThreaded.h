@@ -17,6 +17,8 @@
 #ifndef SWIFT_RUNTIME_MUTEX_SINGLE_THREADED_H
 #define SWIFT_RUNTIME_MUTEX_SINGLE_THREADED_H
 
+#include "swift/Runtime/Debug.h"
+
 namespace swift {
 
 typedef void* ConditionHandle;
@@ -35,7 +37,9 @@ struct ConditionPlatformHelper {
   static void destroy(ConditionHandle &condition) {}
   static void notifyOne(ConditionHandle &condition) {}
   static void notifyAll(ConditionHandle &condition) {}
-  static void wait(ConditionHandle &condition, MutexHandle &mutex);
+  static void wait(ConditionHandle &condition, MutexHandle &mutex) {
+    fatalError(0, "single-threaded runtime cannot wait for condition");
+  }
 };
 
 struct MutexPlatformHelper {

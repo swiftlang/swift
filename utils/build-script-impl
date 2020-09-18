@@ -114,6 +114,7 @@ KNOWN_SETTINGS=(
     darwin-toolchain-installer-package            ""                "The path to installer pkg"
     darwin-toolchain-name                         ""                "Directory name for xctoolchain"
     darwin-toolchain-version                      ""                "Version for xctoolchain info plist and installer pkg"
+    darwin-toolchain-require-use-os-runtime       "0"               "When setting up a plist for a toolchain, require the users of the toolchain to link against the OS instead of the packaged toolchain runtime. 0 for false, 1 for true"
     darwin-xcrun-toolchain                        "default"         "the name of the toolchain to use on Darwin"
 
     ## Build Types for Components
@@ -195,6 +196,7 @@ KNOWN_SETTINGS=(
     swift-enable-compatibility-overrides          "1"               "whether to support back-deploying compatibility fixes for newer apps running on older runtimes"
     swift-runtime-macho-no-dyld                   "0"               "whether to build stdlib assuming the runtime environment does not support dynamic modules"
     swift-stdlib-single-threaded-runtime          "0"               "whether to build stdlib as a single-threaded runtime only"
+    swift-stdlib-os-versioning                    "1"               "whether to build stdlib with availability based on OS versions (Darwin only)"
 
     ## FREESTANDING Stdlib Options
     swift-freestanding-sdk                      ""                "which SDK to use when building the FREESTANDING stdlib"
@@ -424,6 +426,7 @@ function set_build_options_for_host() {
     swift_cmake_options=()
     cmark_cmake_options=()
     lldb_cmake_options=()
+    llbuild_cmake_options=()
     SWIFT_HOST_VARIANT=
     SWIFT_HOST_VARIANT_SDK=
     SWIFT_HOST_VARIANT_ARCH=
@@ -645,6 +648,7 @@ function set_build_options_for_host() {
                 -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
                 -DCMAKE_OSX_SYSROOT:PATH="${cmake_os_sysroot}"
                 -DCMAKE_OSX_DEPLOYMENT_TARGET="${cmake_osx_deployment_target}"
+                -DCMAKE_OSX_ARCHITECTURES="${architecture}"
             )
             llvm_cmake_options=(
                 -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING="${cmake_osx_deployment_target}"
@@ -654,6 +658,7 @@ function set_build_options_for_host() {
                 -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
                 -DSANITIZER_MIN_OSX_VERSION="${cmake_osx_deployment_target}"
                 -DLLVM_ENABLE_MODULES:BOOL="$(true_false ${LLVM_ENABLE_MODULES})"
+                -DCMAKE_OSX_ARCHITECTURES="${architecture}"
             )
             if [[ $(is_llvm_lto_enabled) == "TRUE" ]]; then
                 llvm_cmake_options+=(
@@ -685,6 +690,10 @@ function set_build_options_for_host() {
 
             lldb_cmake_options+=(
                 -DCMAKE_OSX_SYSROOT:PATH="${cmake_os_sysroot}"
+                -DCMAKE_OSX_ARCHITECTURES="${architecture}"
+            )
+            llbuild_cmake_options+=(
+                -DCMAKE_OSX_ARCHITECTURES="${architecture}"
             )
             ;;
     esac
@@ -1551,13 +1560,14 @@ for host in "${ALL_HOSTS[@]}"; do
                     # build of Swift depend on these for building and testing.
                     build_targets=(llvm-tblgen clang-resource-headers intrinsics_gen clang-tablegen-targets)
                     # If we are not performing a toolchain only build, then we
-                    # also want to include FileCheck and not for testing
+                    # also want to include FileCheck, not, llvm-nm for testing
                     # purposes.
                     if [[ ! "${BUILD_TOOLCHAIN_ONLY}" ]] ; then
                       build_targets=(
                           "${build_targets[@]}"
                           FileCheck
                           not
+                          llvm-nm
                       )
                     fi
                 fi
@@ -1580,6 +1590,8 @@ for host in "${ALL_HOSTS[@]}"; do
                     "${cmake_options[@]}"
                     -DCMAKE_C_FLAGS="$(llvm_c_flags ${host})"
                     -DCMAKE_CXX_FLAGS="$(llvm_c_flags ${host})"
+                    -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
+                    -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
                     -DCMAKE_BUILD_TYPE:STRING="${LLVM_BUILD_TYPE}"
                     -DLLVM_TOOL_SWIFT_BUILD:BOOL=NO
                     -DLLVM_TOOL_LLD_BUILD:BOOL=TRUE
@@ -1758,6 +1770,8 @@ for host in "${ALL_HOSTS[@]}"; do
                     "${cmake_options[@]}"
                     -DCMAKE_C_FLAGS="$(swift_c_flags ${host})"
                     -DCMAKE_CXX_FLAGS="$(swift_c_flags ${host})"
+                    -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
+                    -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
                     -DCMAKE_BUILD_TYPE:STRING="${SWIFT_BUILD_TYPE}"
                     -DLLVM_ENABLE_ASSERTIONS:BOOL=$(true_false "${SWIFT_ENABLE_ASSERTIONS}")
                     -DSWIFT_ANALYZE_CODE_COVERAGE:STRING=$(toupper "${SWIFT_ANALYZE_CODE_COVERAGE}")
@@ -1767,6 +1781,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_STDLIB_SINGLE_THREADED_RUNTIME:BOOL=$(true_false "${SWIFT_STDLIB_SINGLE_THREADED_RUNTIME}")
                     -DSWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS:BOOL=$(true_false "${SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS}")
                     -DSWIFT_RUNTIME_MACHO_NO_DYLD:BOOL=$(true_false "${SWIFT_RUNTIME_MACHO_NO_DYLD}")
+                    -DSWIFT_STDLIB_OS_VERSIONING:BOOL=$(true_false "${SWIFT_STDLIB_OS_VERSIONING}")
                     -DSWIFT_NATIVE_LLVM_TOOLS_PATH:STRING="${native_llvm_tools_path}"
                     -DSWIFT_NATIVE_CLANG_TOOLS_PATH:STRING="${native_clang_tools_path}"
                     -DSWIFT_NATIVE_SWIFT_TOOLS_PATH:STRING="${native_swift_tools_path}"
@@ -1949,6 +1964,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     DOTEST_EXTRA="${DOTEST_EXTRA} -L${FOUNDATION_BUILD_DIR}/Sources/Foundation"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -L${FOUNDATION_BUILD_DIR}/Sources/FoundationNetworking"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -L${FOUNDATION_BUILD_DIR}/Sources/FoundationXML"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -L${FOUNDATION_BUILD_DIR}/lib"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${LIBDISPATCH_BUILD_DIR}"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${LIBDISPATCH_BUILD_DIR}/src"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${FOUNDATION_BUILD_DIR}"
@@ -1956,6 +1972,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${FOUNDATION_BUILD_DIR}/Sources/Foundation"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${FOUNDATION_BUILD_DIR}/Sources/FoundationNetworking"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${FOUNDATION_BUILD_DIR}/Sources/FoundationXML"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${FOUNDATION_BUILD_DIR}/lib"
                 fi
 
                 # Watchpoint testing is currently disabled: see rdar://38566150.
@@ -2028,6 +2045,7 @@ for host in "${ALL_HOSTS[@]}"; do
             llbuild)
                 cmake_options=(
                     "${cmake_options[@]}"
+                    "${llbuild_cmake_options[@]}"
 
                     -DCMAKE_BUILD_TYPE:STRING="${LLBUILD_BUILD_TYPE}"
                     -DCMAKE_C_COMPILER:PATH="${CLANG_BIN}/clang"
@@ -3039,11 +3057,7 @@ function build_and_test_installable_package() {
         local host_install_destdir="$(get_host_install_destdir ${host})"
         local host_install_prefix="$(get_host_install_prefix ${host})"
 
-        if [[ $(has_cross_compile_hosts) ]]; then
-            package_for_host="${INSTALLABLE_PACKAGE}-${host}"
-        else
-            package_for_host="${INSTALLABLE_PACKAGE}"
-        fi
+        package_for_host="${INSTALLABLE_PACKAGE}"
 
         echo "--- Creating installable package ---"
         echo "-- Package file: ${package_for_host} --"
@@ -3060,6 +3074,11 @@ function build_and_test_installable_package() {
           COMPATIBILITY_VERSION=2
           COMPATIBILITY_VERSION_DISPLAY_STRING="Xcode 8.0"
           DARWIN_TOOLCHAIN_CREATED_DATE="$(date -u +'%a %b %d %T GMT %Y')"
+
+          SWIFT_USE_DEVELOPMENT_TOOLCHAIN_RUNTIME="YES"
+          if [[ "${DARWIN_TOOLCHAIN_REQUIRE_USE_OS_RUNTIME}" -eq "1" ]]; then
+              SWIFT_USE_DEVELOPMENT_TOOLCHAIN_RUNTIME="NO"
+          fi
 
           echo "-- Removing: ${DARWIN_TOOLCHAIN_INFO_PLIST}"
           call rm -f ${DARWIN_TOOLCHAIN_INFO_PLIST}
@@ -3079,7 +3098,7 @@ function build_and_test_installable_package() {
           call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:SWIFT_DISABLE_REQUIRED_ARCLITE string 'YES'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
           call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:SWIFT_LINK_OBJC_RUNTIME string 'YES'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
           call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:SWIFT_DEVELOPMENT_TOOLCHAIN string 'YES'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
-          call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:SWIFT_USE_DEVELOPMENT_TOOLCHAIN_RUNTIME string 'YES'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+          call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:SWIFT_USE_DEVELOPMENT_TOOLCHAIN_RUNTIME string '${SWIFT_USE_DEVELOPMENT_TOOLCHAIN_RUNTIME}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
 
           call chmod a+r "${DARWIN_TOOLCHAIN_INFO_PLIST}"
 
@@ -3113,7 +3132,7 @@ function build_and_test_installable_package() {
             PKG_TESTS_SANDBOX_PARENT="$(build_directory swift_package_sandbox_${host} none)"
             PKG_TESTS_TEMPS="${PKG_TESTS_SANDBOX_PARENT}"/"tests"
 
-            if [[ "${host}" == "macosx-"* ]] ; then
+            if [[ "${host}" == "macosx-"* ]] || [[ "${host}" == "merged-hosts" ]]; then
                 PKG_TESTS_SANDBOX="${PKG_TESTS_SANDBOX_PARENT}"/"${TOOLCHAIN_PREFIX}"
             else # Linux
                 PKG_TESTS_SANDBOX="${PKG_TESTS_SANDBOX_PARENT}"
@@ -3127,8 +3146,11 @@ function build_and_test_installable_package() {
             with_pushd "${PKG_TESTS_SANDBOX_PARENT}" \
                 call tar xzf "${package_for_host}"
 
+            if python -c "import psutil" ; then
+              TIMEOUT_ARGS=--timeout=1200 # 20 minutes
+            fi
             with_pushd "${PKG_TESTS_SOURCE_DIR}" \
-                call python "${LIT_EXECUTABLE_PATH}" . -sv --param package-path="${PKG_TESTS_SANDBOX}" --param test-exec-root="${PKG_TESTS_TEMPS}" --param llvm-bin-dir="${LLVM_BIN_DIR}"
+                call python "${LIT_EXECUTABLE_PATH}" . -sv --param package-path="${PKG_TESTS_SANDBOX}" --param test-exec-root="${PKG_TESTS_TEMPS}" --param llvm-bin-dir="${LLVM_BIN_DIR}" ${TIMEOUT_ARGS}
         fi
     fi
 }
@@ -3154,7 +3176,7 @@ if [[ ${#LIPO_SRC_DIRS[@]} -gt 0 ]]; then
     # This is from multiple hosts; Which host should we say it is?
     # Let's call it 'merged-hosts' so that we can identify it.
 
-    if [[ $(should_execute_action "${mergedHost}-lipo") ]]; then
+    if [[ $(should_execute_action "${mergedHost}-lipo") || $(should_execute_action "${mergedHost}-lipo-core") ]]; then
         # Allow passing lipo with --host-lipo
         if [[ -z "${HOST_LIPO}" ]] ; then
             LIPO_PATH=$(xcrun_find_tool lipo)
@@ -3163,8 +3185,10 @@ if [[ ${#LIPO_SRC_DIRS[@]} -gt 0 ]]; then
         fi
         call "${SWIFT_SOURCE_DIR}"/utils/recursive-lipo --lipo=${LIPO_PATH} --copy-subdirs="$(get_host_install_prefix ${host})lib/swift $(get_host_install_prefix ${host})lib/swift_static" --destination="$(get_host_install_destdir ${mergedHost})" ${LIPO_SRC_DIRS[@]}
 
-        # Build and test the lipo-ed package.
-        build_and_test_installable_package ${mergedHost}
+        if [[ $(should_execute_action "${mergedHost}-lipo") ]]; then
+            # Build and test the lipo-ed package.
+            build_and_test_installable_package ${mergedHost}
+        fi
     fi
 fi
 # END

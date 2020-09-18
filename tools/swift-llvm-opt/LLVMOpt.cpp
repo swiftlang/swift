@@ -36,7 +36,7 @@
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
-#include "llvm/CodeGen/CommandFlags.inc"
+#include "llvm/CodeGen/CommandFlags.h"
 #include "llvm/CodeGen/TargetPassConfig.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DebugInfo.h"
@@ -68,6 +68,8 @@
 
 using namespace swift;
 
+static llvm::codegen::RegisterCodeGenFlags CGF;
+
 //===----------------------------------------------------------------------===//
 //                            Option Declarations
 //===----------------------------------------------------------------------===//
@@ -96,19 +98,19 @@ static llvm::cl::opt<bool>
     PrintStats("print-stats",
                llvm::cl::desc("Should LLVM Statistics be printed"));
 
-static cl::opt<std::string> InputFilename(cl::Positional,
-                                          cl::desc("<input file>"),
-                                          cl::init("-"),
-                                          cl::value_desc("filename"));
+static llvm::cl::opt<std::string> InputFilename(llvm::cl::Positional,
+                                          llvm::cl::desc("<input file>"),
+                                          llvm::cl::init("-"),
+                                          llvm::cl::value_desc("filename"));
 
-static cl::opt<std::string> OutputFilename("o",
-                                           cl::desc("Override output filename"),
-                                           cl::value_desc("filename"));
+static llvm::cl::opt<std::string>
+    OutputFilename("o", llvm::cl::desc("Override output filename"),
+                   llvm::cl::value_desc("filename"));
 
-static cl::opt<std::string> DefaultDataLayout(
+static llvm::cl::opt<std::string> DefaultDataLayout(
     "default-data-layout",
-    cl::desc("data layout string to use if not specified by module"),
-    cl::value_desc("layout-string"), cl::init(""));
+    llvm::cl::desc("data layout string to use if not specified by module"),
+    llvm::cl::value_desc("layout-string"), llvm::cl::init(""));
 
 //===----------------------------------------------------------------------===//
 //                               Helper Methods
@@ -117,8 +119,8 @@ static cl::opt<std::string> DefaultDataLayout(
 static llvm::CodeGenOpt::Level GetCodeGenOptLevel() {
   // TODO: Is this the right thing to do here?
   if (Optimized)
-    return CodeGenOpt::Default;
-  return CodeGenOpt::None;
+    return llvm::CodeGenOpt::Default;
+  return llvm::CodeGenOpt::None;
 }
 
 // Returns the TargetMachine instance or zero if no triple is provided.
@@ -126,8 +128,8 @@ static llvm::TargetMachine *
 getTargetMachine(llvm::Triple TheTriple, StringRef CPUStr,
                  StringRef FeaturesStr, const llvm::TargetOptions &Options) {
   std::string Error;
-  const auto *TheTarget =
-      llvm::TargetRegistry::lookupTarget(MArch, TheTriple, Error);
+  const auto *TheTarget = llvm::TargetRegistry::lookupTarget(
+      llvm::codegen::getMArch(), TheTriple, Error);
   // Some modules don't specify a triple, and this is okay.
   if (!TheTarget) {
     return nullptr;
@@ -135,12 +137,13 @@ getTargetMachine(llvm::Triple TheTriple, StringRef CPUStr,
 
   return TheTarget->createTargetMachine(
       TheTriple.getTriple(), CPUStr, FeaturesStr, Options,
-      Optional<Reloc::Model>(RelocModel), getCodeModel(), GetCodeGenOptLevel());
+      Optional<llvm::Reloc::Model>(llvm::codegen::getExplicitRelocModel()),
+      llvm::codegen::getExplicitCodeModel(), GetCodeGenOptLevel());
 }
 
 static void dumpOutput(llvm::Module &M, llvm::raw_ostream &os) {
   // For now just always dump assembly.
-  legacy::PassManager EmitPasses;
+  llvm::legacy::PassManager EmitPasses;
   EmitPasses.add(createPrintModulePass(os));
   EmitPasses.run(M);
 }
@@ -152,11 +155,12 @@ static void dumpOutput(llvm::Module &M, llvm::raw_ostream &os) {
 // without being given the address of a function in the main executable).
 void anchorForGetMainExecutable() {}
 
-static inline void addPass(legacy::PassManagerBase &PM, Pass *P) {
+static inline void addPass(llvm::legacy::PassManagerBase &PM, llvm::Pass *P) {
   // Add the pass to the pass manager...
   PM.add(P);
   if (P->getPassID() == &SwiftAAWrapperPass::ID) {
-    PM.add(createExternalAAWrapperPass([](Pass &P, Function &, AAResults &AAR) {
+    PM.add(llvm::createExternalAAWrapperPass([](llvm::Pass &P, llvm::Function &,
+                                                llvm::AAResults &AAR) {
       if (auto *WrapperPass = P.getAnalysisIfAvailable<SwiftAAWrapperPass>())
         AAR.addAAResult(WrapperPass->getResult());
     }));
@@ -164,7 +168,7 @@ static inline void addPass(legacy::PassManagerBase &PM, Pass *P) {
 
   // If we are verifying all of the intermediate steps, add the verifier...
   if (VerifyEach)
-    PM.add(createVerifierPass());
+    PM.add(llvm::createVerifierPass());
 }
 
 static void runSpecificPasses(StringRef Binary, llvm::Module *M,
@@ -172,7 +176,7 @@ static void runSpecificPasses(StringRef Binary, llvm::Module *M,
                               llvm::Triple &ModuleTriple) {
   llvm::legacy::PassManager Passes;
   llvm::TargetLibraryInfoImpl TLII(ModuleTriple);
-  Passes.add(new TargetLibraryInfoWrapperPass(TLII));
+  Passes.add(new llvm::TargetLibraryInfoWrapperPass(TLII));
 
   const llvm::DataLayout &DL = M->getDataLayout();
   if (DL.isDefault() && !DefaultDataLayout.empty()) {
@@ -180,13 +184,13 @@ static void runSpecificPasses(StringRef Binary, llvm::Module *M,
   }
 
   // Add internal analysis passes from the target machine.
-  Passes.add(createTargetTransformInfoWrapperPass(TM ? TM->getTargetIRAnalysis()
-                                                     : TargetIRAnalysis()));
+  Passes.add(createTargetTransformInfoWrapperPass(
+      TM ? TM->getTargetIRAnalysis() : llvm::TargetIRAnalysis()));
 
   if (TM) {
     // FIXME: We should dyn_cast this when supported.
-    auto &LTM = static_cast<LLVMTargetMachine &>(*TM);
-    Pass *TPC = LTM.createPassConfig(Passes);
+    auto &LTM = static_cast<llvm::LLVMTargetMachine &>(*TM);
+    llvm::Pass *TPC = LTM.createPassConfig(Passes);
     Passes.add(TPC);
   }
 
@@ -195,8 +199,9 @@ static void runSpecificPasses(StringRef Binary, llvm::Module *M,
     if (PassInfo->getNormalCtor())
       P = PassInfo->getNormalCtor()();
     else
-      errs() << Binary << ": cannot create pass: " << PassInfo->getPassName()
-             << "\n";
+      llvm::errs() << Binary
+                   << ": cannot create pass: " << PassInfo->getPassName()
+                   << "\n";
     if (P) {
       addPass(Passes, P);
     }
@@ -215,7 +220,7 @@ int main(int argc, char **argv) {
   INITIALIZE_LLVM();
 
   // Initialize passes
-  PassRegistry &Registry = *PassRegistry::getPassRegistry();
+  llvm::PassRegistry &Registry = *llvm::PassRegistry::getPassRegistry();
   initializeCore(Registry);
   initializeScalarOpts(Registry);
   initializeObjCARCOpts(Registry);
@@ -252,16 +257,16 @@ int main(int argc, char **argv) {
 
   // Load the input module...
   auto LLVMContext = std::make_unique<llvm::LLVMContext>();
-  std::unique_ptr<Module> M =
+  std::unique_ptr<llvm::Module> M =
       parseIRFile(InputFilename, Err, *LLVMContext.get());
 
   if (!M) {
-    Err.print(argv[0], errs());
+    Err.print(argv[0], llvm::errs());
     return 1;
   }
 
-  if (verifyModule(*M, &errs())) {
-    errs() << argv[0] << ": " << InputFilename
+  if (verifyModule(*M, &llvm::errs())) {
+    llvm::errs() << argv[0] << ": " << InputFilename
            << ": error: input module is broken!\n";
     return 1;
   }
@@ -280,18 +285,19 @@ int main(int argc, char **argv) {
   Out.reset(
       new llvm::ToolOutputFile(OutputFilename, EC, llvm::sys::fs::F_None));
   if (EC) {
-    errs() << EC.message() << '\n';
+    llvm::errs() << EC.message() << '\n';
     return 1;
   }
 
   llvm::Triple ModuleTriple(M->getTargetTriple());
   std::string CPUStr, FeaturesStr;
   llvm::TargetMachine *Machine = nullptr;
-  const llvm::TargetOptions Options = InitTargetOptionsFromCodeGenFlags();
+  const llvm::TargetOptions Options =
+      llvm::codegen::InitTargetOptionsFromCodeGenFlags();
 
   if (ModuleTriple.getArch()) {
-    CPUStr = getCPUStr();
-    FeaturesStr = getFeaturesStr();
+    CPUStr = llvm::codegen::getCPUStr();
+    FeaturesStr = llvm::codegen::getFeaturesStr();
     Machine = getTargetMachine(ModuleTriple, CPUStr, FeaturesStr, Options);
   }
 
@@ -299,7 +305,7 @@ int main(int argc, char **argv) {
 
   // Override function attributes based on CPUStr, FeaturesStr, and command line
   // flags.
-  setFunctionAttributes(CPUStr, FeaturesStr, *M);
+  llvm::codegen::setFunctionAttributes(CPUStr, FeaturesStr, *M);
 
   if (Optimized) {
     IRGenOptions Opts;

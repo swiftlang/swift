@@ -12,7 +12,7 @@ func foo(value: MyStruct) {
 // RUN: cp %S/Inputs/checkdeps/MyProject/LibraryExt.swift %t/VFS/
 
 // RUN: %sourcekitd-test \
-// RUN:   -req=global-config -completion-check-dependency-interval ${DEPCHECK_INTERVAL} == \
+// RUN:   -req=global-config -req-opts=completion_check_dependency_interval=${DEPCHECK_INTERVAL} == \
 
 // RUN:   -shell -- echo "### Initial" == \
 // RUN:   -req=complete.open -pos=2:9 -pass-as-sourcetext -vfs-files=%t/VFS/Main.swift=@%s,%t/VFS/Library.swift=@%S/Inputs/checkdeps/MyProject/Library.swift %t/VFS/Main.swift -- -target %target-triple %t/VFS/Main.swift %t/VFS/LibraryExt.swift %t/VFS/Library.swift == \

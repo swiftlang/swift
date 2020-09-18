@@ -473,8 +473,6 @@ Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
 void typeCheckASTNode(ASTNode &node, DeclContext *DC,
                       bool LeaveBodyUnchecked = false);
 
-bool typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);
-
 /// Try to apply the function builder transform of the given builder type
 /// to the body of the function.
 ///
@@ -636,8 +634,11 @@ FunctionType *getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
 /// it doesn't mutate given expression, even if there is a single valid
 /// solution, and constraint solver is allowed to produce partially correct
 /// solutions. Such solutions can have any number of holes in them.
-void typeCheckForCodeCompletion(
-    Expr *expr, DeclContext *DC, Type contextualType, ContextualTypePurpose CTP,
+///
+/// \returns `true` if target was applicable and it was possible to infer
+/// types for code completion, `false` othrewise.
+bool typeCheckForCodeCompletion(
+    constraints::SolutionApplicationTarget &target,
     llvm::function_ref<void(const constraints::Solution &)> callback);
 
 /// Check the key-path expression.
@@ -927,9 +928,18 @@ PrecedenceGroupDecl *lookupPrecedenceGroupForInfixOperator(DeclContext *dc,
 PrecedenceGroupLookupResult
 lookupPrecedenceGroup(DeclContext *dc, Identifier name, SourceLoc nameLoc);
 
+enum class UnsupportedMemberTypeAccessKind : uint8_t {
+  None,
+  TypeAliasOfUnboundGeneric,
+  TypeAliasOfExistential,
+  AssociatedTypeOfUnboundGeneric,
+  AssociatedTypeOfExistential
+};
+
 /// Check whether the given declaration can be written as a
 /// member of the given base type.
-bool isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl);
+UnsupportedMemberTypeAccessKind
+isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl);
 
 /// @}
 
@@ -1123,8 +1133,7 @@ void checkTopLevelEffects(TopLevelCodeDecl *D);
 void checkFunctionEffects(AbstractFunctionDecl *D);
 void checkInitializerEffects(Initializer *I, Expr *E);
 void checkEnumElementEffects(EnumElementDecl *D, Expr *expr);
-void checkPropertyWrapperEffects(PatternBindingDecl *binding,
-                                       Expr *expr);
+void checkPropertyWrapperEffects(PatternBindingDecl *binding, Expr *expr);
 void checkFunctionBodyCompilerEvaluable(AbstractFunctionDecl *D);
 
 /// If an expression references 'self.init' or 'super.init' in an
@@ -1213,6 +1222,13 @@ bool requireArrayLiteralIntrinsics(ASTContext &ctx, SourceLoc loc);
 /// If \c expr is not part of a member chain or the base is something other than
 /// an \c UnresolvedMemberExpr, \c nullptr is returned.
 UnresolvedMemberExpr *getUnresolvedMemberChainBase(Expr *expr);
+
+/// Checks whether a function builder type has a well-formed function builder
+/// method with the given name. If provided and non-empty, the argument labels
+/// are verified against any candidates.
+bool typeSupportsBuilderOp(Type builderType, DeclContext *dc, Identifier fnName,
+                           ArrayRef<Identifier> argLabels = {},
+                           SmallVectorImpl<ValueDecl *> *allResults = nullptr);
 }; // namespace TypeChecker
 
 /// Temporary on-stack storage and unescaping for encoded diagnostic
@@ -1372,6 +1388,9 @@ void bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *stmt);
 /// Add notes suggesting the addition of 'async' or '@asyncHandler', as
 /// appropriate, to a diagnostic for a function that isn't an async context.
 void addAsyncNotes(FuncDecl *func);
+
+/// Check actor isolation rules.
+void checkActorIsolation(const Expr *expr, const DeclContext *dc);
 
 } // end namespace swift
 

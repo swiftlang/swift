@@ -170,7 +170,8 @@ DECL_NODES = [
                        'lazy', 'optional', 'override', 'postfix', 'prefix',
                        'required', 'static', 'unowned', 'weak', 'private',
                        'fileprivate', 'internal', 'public', 'open',
-                       'mutating', 'nonmutating', 'indirect', '__consuming'
+                       'mutating', 'nonmutating', 'indirect', '__consuming',
+                       'actor'
                    ]),
              Child('DetailLeftParen', kind='LeftParenToken', is_optional=True),
              Child('Detail', kind='IdentifierToken', is_optional=True),
@@ -480,12 +481,14 @@ DECL_NODES = [
                    is_optional=True),
          ]),
 
+    # FIXME: technically misnamed; should be "ImportPathComponent"
     Node('AccessPathComponent', kind='Syntax',
          children=[
             Child('Name', kind='IdentifierToken'),
             Child('TrailingDot', kind='PeriodToken', is_optional=True),
          ]),
 
+    # FIXME: technically misnamed; should be "ImportPath"
     Node('AccessPath', kind='SyntaxCollection', element='AccessPathComponent'),
 
     Node('ImportDecl', kind='Decl',

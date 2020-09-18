@@ -49,8 +49,8 @@ class ClangNode {
   template <typename T>
   using Box = detail::ClangNodeBox<T>;
 
-  llvm::PointerUnion4<Box<clang::Decl>, Box<clang::MacroInfo>,
-                      Box<clang::ModuleMacro>, Box<clang::Module>> Ptr;
+  llvm::PointerUnion<Box<clang::Decl>, Box<clang::MacroInfo>,
+                     Box<clang::ModuleMacro>, Box<clang::Module>> Ptr;
 
 public:
   ClangNode() = default;

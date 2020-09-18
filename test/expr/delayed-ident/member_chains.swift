@@ -344,3 +344,30 @@ extension CurriedGeneric where T == Int {
 
 let _: CurriedGeneric = .createInt(CurriedGeneric())()
 let _: CurriedGeneric = .create(CurriedGeneric())(Int.self)
+
+// rdar://problem/68094328 - failed to compile unresolved member with implicit optional promotion
+func rdar68094328() {
+  struct S {
+    init(string: String) {}
+
+    var value: S {
+      get { S(string: "") }
+    }
+
+    func baz(str: String) -> S {
+      S(string: str)
+    }
+  }
+
+  class C {
+    func bar(_: S) {}
+  }
+
+  func foo<T>(_: (C) -> (T) -> Void, _: T?) {}
+
+  func test(str: String) {
+    foo(C.bar, .init(string: str)) // Ok
+    foo(C.bar, .init(string: str).value) // Ok
+    foo(C.bar, .init(string: str).baz(str: "")) // Ok
+  }
+}

@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift
 // RUN: %target-swift-emit-sil -Xllvm -debug-only=differentiation -o /dev/null 2>&1 %s | %FileCheck %s
 // REQUIRES: executable_test
+// REQUIRES: asserts
 
 // Test differentiation of `Optional` properties.
 

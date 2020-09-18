@@ -248,6 +248,12 @@ namespace {
     void writeSILBlock(const SILModule *SILMod);
     void writeIndexTables();
 
+    void writeNoOperandLayout(const SILInstruction *I) {
+      unsigned abbrCode = SILAbbrCodes[SILInstNoOperandLayout::Code];
+      SILInstNoOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                         (unsigned)I->getKind());
+    }
+
     void writeConversionLikeInstruction(const SingleValueInstruction *I,
                                         unsigned attrs);
     void writeOneTypeLayout(SILInstructionKind valueKind,
@@ -433,9 +439,9 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       Out, ScratchRecord, abbrCode, toStableSILLinkage(Linkage),
       (unsigned)F.isTransparent(), (unsigned)F.isSerialized(),
       (unsigned)F.isThunk(), (unsigned)F.isWithoutActuallyEscapingThunk(),
-      (unsigned)F.getSpecialPurpose(),
-      (unsigned)F.getInlineStrategy(), (unsigned)F.getOptimizationMode(),
-      (unsigned)F.getClassSubclassScope(), (unsigned)F.getEffectsKind(),
+      (unsigned)F.getSpecialPurpose(), (unsigned)F.getInlineStrategy(),
+      (unsigned)F.getOptimizationMode(), (unsigned)F.getClassSubclassScope(),
+      (unsigned)F.hasCReferences(), (unsigned)F.getEffectsKind(),
       (unsigned)numSpecAttrs, (unsigned)F.hasOwnership(),
       F.isAlwaysWeakImported(), LIST_VER_TUPLE_PIECES(available),
       (unsigned)F.isDynamicallyReplaceable(), (unsigned)F.isExactSelfClass(),
@@ -763,9 +769,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       
   case SILInstructionKind::UnwindInst:
   case SILInstructionKind::UnreachableInst: {
-    unsigned abbrCode = SILAbbrCodes[SILInstNoOperandLayout::Code];
-    SILInstNoOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                       (unsigned)SI.getKind());
+    writeNoOperandLayout(&SI);
     break;
   }
   case SILInstructionKind::AllocExistentialBoxInst:

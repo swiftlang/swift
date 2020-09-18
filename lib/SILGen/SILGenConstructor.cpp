@@ -393,9 +393,9 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     emitMemberInitializers(ctor, selfDecl, nominal);
   }
 
-  emitProfilerIncrement(ctor->getBody());
+  emitProfilerIncrement(ctor->getTypecheckedBody());
   // Emit the constructor body.
-  emitStmt(ctor->getBody());
+  emitStmt(ctor->getTypecheckedBody());
 
   
   // Build a custom epilog block, since the AST representation of the
@@ -622,7 +622,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   SILValue initedSelfValue = emitApplyWithRethrow(Loc, initVal.forward(*this),
                                                   initTy, subMap, args);
 
-  emitProfilerIncrement(ctor->getBody());
+  emitProfilerIncrement(ctor->getTypecheckedBody());
 
   // Return the initialized 'self'.
   B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(Loc),
@@ -632,7 +632,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
 void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(ctor);
 
-  assert(ctor->getBody() && "Class constructor without a body?");
+  assert(ctor->getTypecheckedBody() && "Class constructor without a body?");
 
   // True if this constructor delegates to a peer constructor with self.init().
   bool isDelegating = false;
@@ -775,9 +775,9 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     emitMemberInitializers(ctor, selfDecl, selfClassDecl);
   }
 
-  emitProfilerIncrement(ctor->getBody());
+  emitProfilerIncrement(ctor->getTypecheckedBody());
   // Emit the constructor body.
-  emitStmt(ctor->getBody());
+  emitStmt(ctor->getTypecheckedBody());
 
   // Emit the call to super.init() right before exiting from the initializer.
   if (NeedsBoxForSelf) {

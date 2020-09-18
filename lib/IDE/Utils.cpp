@@ -13,6 +13,7 @@
 #include "swift/IDE/Utils.h"
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Platform.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
@@ -25,8 +26,8 @@
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/TextDiagnosticBuffer.h"
 #include "clang/Lex/PreprocessorOptions.h"
-#include "clang/Serialization/ASTReader.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
+#include "clang/Serialization/ASTReader.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -205,8 +206,8 @@ static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
   FrontendInputsAndOutputs replacementInputsAndOutputs;
   for (const InputFile &input : inputsAndOutputs.getAllInputs()) {
     llvm::SmallString<128> newFilename;
-    if (auto err = FileSystem->getRealPath(input.file(), newFilename))
-      newFilename = input.file();
+    if (auto err = FileSystem->getRealPath(input.getFileName(), newFilename))
+      newFilename = input.getFileName();
     llvm::sys::path::native(newFilename);
     bool newIsPrimary = input.isPrimary() ||
                         (!PrimaryFile.empty() && PrimaryFile == newFilename);
@@ -215,7 +216,7 @@ static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
     }
     assert(primaryCount < 2 && "cannot handle multiple primaries");
     replacementInputsAndOutputs.addInput(
-        InputFile(newFilename.str(), newIsPrimary, input.buffer()));
+        InputFile(newFilename.str(), newIsPrimary, input.getBuffer()));
   }
 
   if (PrimaryFile.empty() || primaryCount == 1) {
@@ -668,46 +669,6 @@ ide::replacePlaceholders(std::unique_ptr<llvm::MemoryBuffer> InputBuf,
     if (HadPlaceholder)
       *HadPlaceholder = true;
   });
-}
-
-static std::string getPlistEntry(const llvm::Twine &Path, StringRef KeyName) {
-  auto BufOrErr = llvm::MemoryBuffer::getFile(Path);
-  if (!BufOrErr) {
-    llvm::errs() << "could not open '" << Path << "': " << BufOrErr.getError().message() << '\n';
-    return {};
-  }
-
-  std::string Key = "<key>";
-  Key += KeyName;
-  Key += "</key>";
-
-  StringRef Lines = BufOrErr.get()->getBuffer();
-  while (!Lines.empty()) {
-    StringRef CurLine;
-    std::tie(CurLine, Lines) = Lines.split('\n');
-    if (CurLine.find(Key) != StringRef::npos) {
-      std::tie(CurLine, Lines) = Lines.split('\n');
-      unsigned Begin = CurLine.find("<string>") + strlen("<string>");
-      unsigned End = CurLine.find("</string>");
-      return CurLine.substr(Begin, End - Begin).str();
-    }
-  }
-
-  return {};
-}
-
-std::string ide::getSDKName(StringRef Path) {
-  std::string Name = getPlistEntry(llvm::Twine(Path)+"/SDKSettings.plist",
-                                   "CanonicalName");
-  if (Name.empty() && Path.endswith(".sdk")) {
-    Name = llvm::sys::path::filename(Path).drop_back(strlen(".sdk")).str();
-  }
-  return Name;
-}
-
-std::string ide::getSDKVersion(StringRef Path) {
-  return getPlistEntry(llvm::Twine(Path)+"/System/Library/CoreServices/"
-                       "SystemVersion.plist", "ProductBuildVersion");
 }
 
 // Modules failing to load are commented-out.

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s -enable-experimental-concurrency
+// RUN: %target-swift-frontend -typecheck -verify %s -enable-experimental-concurrency -verify-syntax-tree
 
 func test1(asyncfp : () async -> Int, fp : () -> Int) async {
   _ = await asyncfp()
@@ -71,4 +71,65 @@ func testClosure() {
   }
 
   let _: () -> Int = closure2 // expected-error{{cannot convert value of type '() async -> Int' to specified type '() -> Int'}}
+}
+
+// Nesting async and await together
+func throwingAndAsync() async throws -> Int { return 0 }
+
+enum HomeworkError : Error {
+  case dogAteIt
+}
+
+func testThrowingAndAsync() async throws {
+  _ = await try throwingAndAsync()
+  _ = try await throwingAndAsync()
+  _ = await (try throwingAndAsync())
+  _ = try (await throwingAndAsync())
+
+  // Errors
+  _ = await throwingAndAsync() // expected-error{{call can throw but is not marked with 'try'}}
+  // expected-note@-1{{did you mean to use 'try'?}}
+  // expected-note@-2{{did you mean to handle error as optional value?}}
+  // expected-note@-3{{did you mean to disable error propagation?}}
+  _ = try throwingAndAsync() // expected-error{{call is 'async' but is not marked with 'await'}}
+}
+
+func testExhaustiveDoCatch() async {
+  do {
+    _ = await try throwingAndAsync()
+  } catch {
+  }
+
+  do {
+    _ = await try throwingAndAsync()
+    // expected-error@-1{{errors thrown from here are not handled because the enclosing catch is not exhaustive}}
+  } catch let e as HomeworkError {
+  }
+
+  // Ensure that we infer 'async' through an exhaustive do-catch.
+  let fn = {
+    do {
+      _ = await try throwingAndAsync()
+    } catch {
+    }
+  }
+
+  let _: Int = fn // expected-error{{cannot convert value of type '() async -> ()'}}
+
+  // Ensure that we infer 'async' through a non-exhaustive do-catch.
+  let fn2 = {
+    do {
+      _ = await try throwingAndAsync()
+    } catch let e as HomeworkError {
+    }
+  }
+
+  let _: Int = fn2 // expected-error{{cannot convert value of type '() async throws -> ()'}}
+}
+
+// String interpolation
+func testStringInterpolation() async throws {
+  _ = "Eventually produces \(getInt())" // expected-error{{call is 'async' but is not marked with 'await'}}
+  _ = "Eventually produces \(await getInt())"
+  _ = await "Eventually produces \(getInt())"
 }

@@ -145,32 +145,8 @@ class BuilderClosureVisitor
       return known->second;
     }
 
-    bool found = false;
-    SmallVector<ValueDecl *, 4> foundDecls;
-    dc->lookupQualified(
-        builderType, DeclNameRef(fnName),
-        NL_QualifiedDefault | NL_ProtocolMembers, foundDecls);
-    for (auto decl : foundDecls) {
-      if (auto func = dyn_cast<FuncDecl>(decl)) {
-        // Function must be static.
-        if (!func->isStatic())
-          continue;
-
-        // Function must have the right argument labels, if provided.
-        if (!argLabels.empty()) {
-          auto funcLabels = func->getName().getArgumentNames();
-          if (argLabels.size() > funcLabels.size() ||
-              funcLabels.slice(0, argLabels.size()) != argLabels)
-            continue;
-        }
-
-        // Okay, it's a good-enough match.
-        found = true;
-        break;
-      }
-    }
-
-    return supportedOps[fnName] = found;
+    return supportedOps[fnName] = TypeChecker::typeSupportsBuilderOp(
+               builderType, dc, fnName, argLabels);
   }
 
   /// Build an implicit variable in this context.
@@ -1655,6 +1631,13 @@ ConstraintSystem::matchFunctionBuilder(
   assert(builder && "Bad function builder type");
   assert(builder->getAttrs().hasAttribute<FunctionBuilderAttr>());
 
+  if (InvalidFunctionBuilderBodies.count(fn)) {
+    (void)recordFix(
+        IgnoreInvalidFunctionBuilderBody::duringConstraintGeneration(
+            *this, getConstraintLocator(fn.getBody())));
+    return getTypeMatchSuccess();
+  }
+
   // Pre-check the body: pre-check any expressions in it and look
   // for return statements.
   auto request =
@@ -1669,7 +1652,7 @@ ConstraintSystem::matchFunctionBuilder(
     if (!shouldAttemptFixes())
       return getTypeMatchFailure(locator);
 
-    if (recordFix(IgnoreInvalidFunctionBuilderBody::create(
+    if (recordFix(IgnoreInvalidFunctionBuilderBody::duringPreCheck(
             *this, getConstraintLocator(fn.getBody()))))
       return getTypeMatchFailure(locator);
 
@@ -1711,9 +1694,25 @@ ConstraintSystem::matchFunctionBuilder(
   BuilderClosureVisitor visitor(getASTContext(), this, dc, builderType,
                                 bodyResultType);
 
-  auto applied = visitor.apply(fn.getBody());
-  if (!applied)
-    return getTypeMatchFailure(locator);
+  Optional<AppliedBuilderTransform> applied = None;
+  {
+    DiagnosticTransaction transaction(dc->getASTContext().Diags);
+
+    applied = visitor.apply(fn.getBody());
+    if (!applied)
+      return getTypeMatchFailure(locator);
+
+    if (transaction.hasErrors()) {
+      InvalidFunctionBuilderBodies.insert(fn);
+
+      if (recordFix(
+              IgnoreInvalidFunctionBuilderBody::duringConstraintGeneration(
+                  *this, getConstraintLocator(fn.getBody()))))
+        return getTypeMatchFailure(locator);
+
+      return getTypeMatchSuccess();
+    }
+  }
 
   Type transformedType = getType(applied->returnExpr);
   assert(transformedType && "Missing type");
@@ -1800,7 +1799,7 @@ public:
 
       HasError |= ConstraintSystem::preCheckExpression(
           E, DC, /*replaceInvalidRefsWithErrors=*/false);
-      HasError |= transaction.hasDiagnostics();
+      HasError |= transaction.hasErrors();
 
       if (SuppressDiagnostics)
         transaction.abort();
@@ -1851,3 +1850,37 @@ std::vector<ReturnStmt *> TypeChecker::findReturnStatements(AnyFunctionRef fn) {
   (void)precheck.run();
   return precheck.getReturnStmts();
 }
+
+bool TypeChecker::typeSupportsBuilderOp(
+    Type builderType, DeclContext *dc, Identifier fnName,
+    ArrayRef<Identifier> argLabels, SmallVectorImpl<ValueDecl *> *allResults) {
+  bool foundMatch = false;
+  SmallVector<ValueDecl *, 4> foundDecls;
+  dc->lookupQualified(
+      builderType, DeclNameRef(fnName),
+      NL_QualifiedDefault | NL_ProtocolMembers, foundDecls);
+  for (auto decl : foundDecls) {
+    if (auto func = dyn_cast<FuncDecl>(decl)) {
+      // Function must be static.
+      if (!func->isStatic())
+        continue;
+
+      // Function must have the right argument labels, if provided.
+      if (!argLabels.empty()) {
+        auto funcLabels = func->getName().getArgumentNames();
+        if (argLabels.size() > funcLabels.size() ||
+            funcLabels.slice(0, argLabels.size()) != argLabels)
+          continue;
+      }
+
+      foundMatch = true;
+      break;
+    }
+  }
+
+  if (allResults)
+    allResults->append(foundDecls.begin(), foundDecls.end());
+
+  return foundMatch;
+}
+

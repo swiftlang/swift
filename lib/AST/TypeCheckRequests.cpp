@@ -1404,6 +1404,33 @@ void TypeCheckSourceFileRequest::cacheResult(evaluator::SideEffect) const {
 // TypeCheckFunctionBodyRequest computation.
 //----------------------------------------------------------------------------//
 
+Optional<BraceStmt *> TypeCheckFunctionBodyRequest::getCachedResult() const {
+  using BodyKind = AbstractFunctionDecl::BodyKind;
+  auto *afd = std::get<0>(getStorage());
+  switch (afd->getBodyKind()) {
+  case BodyKind::Deserialized:
+  case BodyKind::MemberwiseInitializer:
+  case BodyKind::None:
+  case BodyKind::Skipped:
+    // These cases don't have any body available.
+    return nullptr;
+
+  case BodyKind::TypeChecked:
+    return afd->Body;
+
+  case BodyKind::Synthesize:
+  case BodyKind::Parsed:
+  case BodyKind::Unparsed:
+    return None;
+  }
+  llvm_unreachable("Unhandled BodyKind in switch");
+}
+
+void TypeCheckFunctionBodyRequest::cacheResult(BraceStmt *body) const {
+  auto *afd = std::get<0>(getStorage());
+  afd->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
+}
+
 evaluator::DependencySource
 TypeCheckFunctionBodyRequest::readDependencySource(
     const evaluator::DependencyRecorder &e) const {

@@ -157,8 +157,6 @@ std::vector<Completion *> SourceKit::CodeCompletion::extendCompletions(
   return results;
 }
 
-static StringRef copyString(llvm::BumpPtrAllocator &allocator, StringRef str);
-
 bool SourceKit::CodeCompletion::addCustomCompletions(
     CompletionSink &sink, std::vector<Completion *> &completions,
     ArrayRef<CustomCompletionInfo> customCompletions,
@@ -404,12 +402,6 @@ ImportDepth::ImportDepth(ASTContext &context,
 //===----------------------------------------------------------------------===//
 // CodeCompletionOrganizer::Impl utilities
 //===----------------------------------------------------------------------===//
-
-static StringRef copyString(llvm::BumpPtrAllocator &allocator, StringRef str) {
-  char *newStr = allocator.Allocate<char>(str.size());
-  std::copy(str.begin(), str.end(), newStr);
-  return StringRef(newStr, str.size());
-}
 
 static std::unique_ptr<Group> make_group(StringRef name) {
   auto g = std::make_unique<Group>();

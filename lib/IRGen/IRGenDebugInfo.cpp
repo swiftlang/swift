@@ -550,7 +550,7 @@ private:
 
     case DeclContextKind::Module:
       return getOrCreateModule(
-          {ModuleDecl::AccessPathTy(), cast<ModuleDecl>(DC)});
+          {ImportPath::Access(), cast<ModuleDecl>(DC)});
     case DeclContextKind::FileUnit:
       // A module may contain multiple files.
       return getOrCreateContext(DC->getParent());
@@ -672,7 +672,7 @@ private:
     return M;
   }
 
-  using ASTSourceDescriptor = clang::ExternalASTSource::ASTSourceDescriptor;
+  using ASTSourceDescriptor = clang::ASTSourceDescriptor;
   /// Create a DIModule from a clang module or PCH.
   /// The clang::Module pointer is passed separately because the recursive case
   /// needs to fudge the AST descriptor.
@@ -1020,7 +1020,8 @@ private:
     SmallVector<llvm::Metadata *, 16> TemplateParams;
     for (auto Param : BGT->getGenericArgs()) {
       TemplateParams.push_back(DBuilder.createTemplateTypeParameter(
-          TheCU, "", getOrCreateType(DebugTypeInfo::getForwardDecl(Param))));
+          TheCU, "", getOrCreateType(DebugTypeInfo::getForwardDecl(Param)),
+          false));
     }
     return DBuilder.getOrCreateArray(TemplateParams);
   }
@@ -2088,7 +2089,7 @@ void IRGenDebugInfoImpl::emitImport(ImportDecl *D) {
     return;
 
   assert(D->getModule() && "compiler-synthesized ImportDecl is incomplete");
-  ModuleDecl::ImportedModule Imported = {D->getModulePath(), D->getModule()};
+  ModuleDecl::ImportedModule Imported = { D->getAccessPath(), D->getModule() };
   auto DIMod = getOrCreateModule(Imported);
   auto L = getDebugLoc(*this, D);
   auto *File = getOrCreateFile(L.Filename);

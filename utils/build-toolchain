@@ -35,6 +35,9 @@ function usage() {
   echo "--preset-prefix"
   echo "Customize the preset invoked by prepending a prefix"
   echo ""
+  echo "--use-os-runtime"
+  echo "Require this toolchain to link against against the OS runtime rather than the toolchains packaged runtime"
+  echo ""
 }
 
 RESULT_DIR=$PWD
@@ -46,6 +49,8 @@ DRY_RUN=
 BUNDLE_PREFIX=
 PRESET_FILE_FLAGS=
 PRESET_PREFIX=
+PRESET_SUFFIX=
+
 case $(uname -s) in
   Darwin)
     SWIFT_PACKAGE=buildbot_osx_package,no_test
@@ -85,6 +90,9 @@ while [ $# -ne 0 ]; do
     --preset-prefix)
       shift
       PRESET_PREFIX="$1"
+  ;;
+    --use-os-runtime)
+      PRESET_SUFFIX=",use_os_runtime"
   ;;
   -h|--help)
     usage
@@ -133,7 +141,8 @@ DRY_RUN="${DRY_RUN}"
 DISTCC_FLAG="${DISTCC_FLAG}"
 PRESET_FILE_FLAGS="${PRESET_FILE_FLAGS}"
 
-./utils/build-script ${DRY_RUN} ${DISTCC_FLAG} ${PRESET_FILE_FLAGS} --preset="${PRESET_PREFIX}${SWIFT_PACKAGE}" \
+./utils/build-script ${DRY_RUN} ${DISTCC_FLAG} ${PRESET_FILE_FLAGS} \
+        --preset="${PRESET_PREFIX}${SWIFT_PACKAGE}${PRESET_SUFFIX}" \
         install_destdir="${SWIFT_INSTALL_DIR}" \
         installable_package="${SWIFT_INSTALLABLE_PACKAGE}" \
         install_toolchain_dir="${SWIFT_TOOLCHAIN_DIR}" \
@@ -144,4 +153,5 @@ PRESET_FILE_FLAGS="${PRESET_FILE_FLAGS}"
         darwin_toolchain_display_name_short="${DISPLAY_NAME_SHORT}" \
         darwin_toolchain_xctoolchain_name="${TOOLCHAIN_NAME}" \
         darwin_toolchain_version="${TOOLCHAIN_VERSION}" \
-        darwin_toolchain_alias="Local"
+        darwin_toolchain_alias="Local" \
+        darwin_toolchain_require_use_os_runtime="${REQUIRE_USE_OS_RUNTIME}"

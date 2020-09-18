@@ -135,7 +135,7 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
   // Return early if there was code completion token.
   if (Result.hasCodeCompletion())
     return Result;
-  auto Invalid = Result.isError();
+  auto Invalid = Result.isErrorOrHasCompletion();
 
   // Parse the optional where-clause.
   SourceLoc WhereLoc;
@@ -143,7 +143,7 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
   bool FirstTypeInComplete;
   if (Tok.is(tok::kw_where) &&
       parseGenericWhereClause(WhereLoc, Requirements,
-                              FirstTypeInComplete).isError()) {
+                              FirstTypeInComplete).isErrorOrHasCompletion()) {
     Invalid = true;
   }
   
@@ -283,7 +283,7 @@ ParserStatus Parser::parseGenericWhereClause(
       if (CodeCompletion)
         CodeCompletion->completeGenericRequirement();
       consumeToken(tok::code_complete);
-      Status.setHasCodeCompletion();
+      Status.setHasCodeCompletionAndIsError();
       break;
     }
 
@@ -293,7 +293,7 @@ ParserStatus Parser::parseGenericWhereClause(
 
     if (FirstType.hasCodeCompletion()) {
       BodyContext->setTransparent();
-      Status.setHasCodeCompletion();
+      Status.setHasCodeCompletionAndIsError();
       FirstTypeInComplete = true;
     }
 
@@ -399,7 +399,7 @@ parseFreestandingGenericWhereClause(GenericContext *genCtx) {
   bool FirstTypeInComplete;
   auto result = parseGenericWhereClause(WhereLoc, Requirements,
                                         FirstTypeInComplete);
-  if (result.shouldStopParsing() || Requirements.empty())
+  if (result.isErrorOrHasCompletion() || Requirements.empty())
     return result;
 
   genCtx->setTrailingWhereClause(
@@ -417,7 +417,7 @@ ParserStatus Parser::parseProtocolOrAssociatedTypeWhereClause(
   bool firstTypeInComplete;
   auto whereStatus =
       parseGenericWhereClause(whereLoc, requirements, firstTypeInComplete);
-  if (whereStatus.isSuccess()) {
+  if (whereStatus.isSuccess() && !whereStatus.hasCodeCompletion()) {
     trailingWhere =
         TrailingWhereClause::create(Context, whereLoc, requirements);
   } else if (whereStatus.hasCodeCompletion()) {

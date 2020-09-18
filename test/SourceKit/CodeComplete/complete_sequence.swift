@@ -19,8 +19,9 @@ func bar(arg: Bar) {
 
 // Disabled.
 // RUN: %sourcekitd-test \
-// RUN:   -req=complete -req-opts=reuseastcontext=0 -pos=12:11 %s -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=0 -pos=15:11 %s -- %s > %t.response
+// RUN:   -req=global-config -req-opts=completion_max_astcontext_reuse_count=0 ==\
+// RUN:   -req=complete -pos=12:11 %s -- %s == \
+// RUN:   -req=complete -pos=15:11 %s -- %s > %t.response
 // RUN: %FileCheck --check-prefix=RESULT_SLOW %s < %t.response
 
 // Enabled.

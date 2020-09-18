@@ -108,17 +108,17 @@ class alignas(ModuleDecl::ImportedModule) ImportCache {
   llvm::DenseMap<const DeclContext *, ImportSet *> ImportSetForDC;
   llvm::DenseMap<std::tuple<const ModuleDecl *,
                             const DeclContext *>,
-                 ArrayRef<ModuleDecl::AccessPathTy>> VisibilityCache;
+                 ArrayRef<ImportPath::Access>> VisibilityCache;
   llvm::DenseMap<std::tuple<const ModuleDecl *,
                             const ModuleDecl *,
                             const DeclContext *>,
-                 ArrayRef<ModuleDecl::AccessPathTy>> ShadowCache;
+                 ArrayRef<ImportPath::Access>> ShadowCache;
 
-  ModuleDecl::AccessPathTy EmptyAccessPath;
+  ImportPath::Access EmptyAccessPath;
 
-  ArrayRef<ModuleDecl::AccessPathTy> allocateArray(
+  ArrayRef<ImportPath::Access> allocateArray(
       ASTContext &ctx,
-      SmallVectorImpl<ModuleDecl::AccessPathTy> &results);
+      SmallVectorImpl<ImportPath::Access> &results);
 
   ImportSet &getImportSet(ASTContext &ctx,
                           ArrayRef<ModuleDecl::ImportedModule> topLevelImports);
@@ -132,7 +132,7 @@ public:
 
   /// Returns all access paths into 'mod' that are visible from 'dc',
   /// including transitively, via re-exports.
-  ArrayRef<ModuleDecl::AccessPathTy>
+  ArrayRef<ImportPath::Access>
   getAllVisibleAccessPaths(const ModuleDecl *mod, const DeclContext *dc);
 
   bool isImportedBy(const ModuleDecl *mod,
@@ -142,7 +142,7 @@ public:
 
   /// Returns all access paths in 'mod' that are visible from 'dc' if we
   /// subtract imports of 'other'.
-  ArrayRef<ModuleDecl::AccessPathTy>
+  ArrayRef<ImportPath::Access>
   getAllAccessPathsNotShadowedBy(const ModuleDecl *mod,
                                  const ModuleDecl *other,
                                  const DeclContext *dc);

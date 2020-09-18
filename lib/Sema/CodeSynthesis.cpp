@@ -550,10 +550,11 @@ configureInheritedDesignatedInitAttributes(ClassDecl *classDecl,
 
   // If the superclass constructor is @objc but the subclass constructor is
   // not representable in Objective-C, add @nonobjc implicitly.
+  Optional<ForeignAsyncConvention> asyncConvention;
   Optional<ForeignErrorConvention> errorConvention;
   if (superclassCtor->isObjC() &&
       !isRepresentableInObjC(ctor, ObjCReason::MemberOfObjCSubclass,
-                             errorConvention))
+                             asyncConvention, errorConvention))
     ctor->getAttrs().add(new (ctx) NonObjCAttr(/*isImplicit=*/true));
 }
 

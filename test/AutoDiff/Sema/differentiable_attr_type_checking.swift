@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend-typecheck -verify -disable-availability-checking %s
+// RUN: %target-swift-frontend-typecheck -enable-testing -verify -disable-availability-checking %s
 
 import _Differentiation
 

@@ -2358,15 +2358,11 @@ private:
   }
 
   void insertImpl(SILInstruction *TheInst) {
-    if (BB == 0)
-      return;
-
+    assert(hasValidInsertionPoint());
     BB->insert(InsertPt, TheInst);
 
     C.notifyInserted(TheInst);
 
-// TODO: We really shouldn't be creating instructions unless we are going to
-// insert them into a block... This failed in SimplifyCFG.
 #ifndef NDEBUG
     TheInst->verifyOperandOwnership();
 #endif

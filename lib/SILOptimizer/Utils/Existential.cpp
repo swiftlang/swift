@@ -433,3 +433,40 @@ ConcreteOpenedExistentialInfo::ConcreteOpenedExistentialInfo(
   }
   CEI->isConcreteValueCopied |= OAI.isOpenedValueCopied;
 }
+
+void LLVM_ATTRIBUTE_USED OpenedArchetypeInfo::dump() const {
+  if (!isValid()) {
+    llvm::dbgs() << "invalid OpenedArchetypeInfo\n";
+    return;
+  }
+  llvm::dbgs() << "OpendArchetype: ";
+  OpenedArchetype->dump(llvm::dbgs());
+  llvm::dbgs() << "OpendArchetypeValue: ";
+  OpenedArchetypeValue->dump();
+  llvm::dbgs() << (isOpenedValueCopied ? "copied " : "") << "ExistentialValue: ";
+  ExistentialValue->dump();
+}
+
+void LLVM_ATTRIBUTE_USED ConcreteExistentialInfo::dump() const {
+  llvm::dbgs() << "ExistentialType: ";
+  ExistentialType->dump(llvm::dbgs());
+  llvm::dbgs() << "ConcreteType: ";
+  ConcreteType->dump(llvm::dbgs());
+  llvm::dbgs() << (isConcreteValueCopied ? "copied " : "") << "ConcreteValue: ";
+  ConcreteValue->dump();
+  if (ConcreteTypeDef) {
+    llvm::dbgs() << "ConcreteTypeDef: ";
+    ConcreteTypeDef->dump();
+  }
+  ExistentialSubs.dump(llvm::dbgs());
+  llvm::dbgs() << '\n';
+}
+
+void LLVM_ATTRIBUTE_USED ConcreteOpenedExistentialInfo::dump() const {
+  OAI.dump();
+  if (CEI) {
+    CEI->dump();
+  } else {
+    llvm::dbgs() << "no ConcreteExistentialInfo\n";
+  }
+}

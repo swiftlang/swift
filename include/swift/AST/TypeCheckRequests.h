@@ -799,6 +799,24 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Determine whether the given class is an actor.
+class IsActorRequest :
+    public SimpleRequest<IsActorRequest,
+                         bool(ClassDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, ClassDecl *classDecl) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
 /// Request whether the storage has a mutating getter.
 class IsGetterMutatingRequest :
     public SimpleRequest<IsGetterMutatingRequest,
@@ -884,14 +902,11 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Request to type check the body of the given function.
-///
-/// Produces true if an error occurred, false otherwise.
-/// FIXME: it would be far better to return the type-checked body.
-class TypeCheckFunctionBodyRequest :
-    public SimpleRequest<TypeCheckFunctionBodyRequest,
-                         bool(AbstractFunctionDecl *),
-                         RequestFlags::Cached|RequestFlags::DependencySource> {
+/// Request to retrieve the type-checked body of the given function.
+class TypeCheckFunctionBodyRequest
+    : public SimpleRequest<
+          TypeCheckFunctionBodyRequest, BraceStmt *(AbstractFunctionDecl *),
+          RequestFlags::SeparatelyCached | RequestFlags::DependencySource> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -899,10 +914,13 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, AbstractFunctionDecl *func) const;
+  BraceStmt *evaluate(Evaluator &evaluator, AbstractFunctionDecl *func) const;
 
 public:
+  // Separate caching.
   bool isCached() const { return true; }
+  Optional<BraceStmt *> getCachedResult() const;
+  void cacheResult(BraceStmt *body) const;
 
 public:
   // Incremental dependencies.
@@ -1080,9 +1098,9 @@ public:
   void cacheResult(AccessorDecl *value) const;
 };
 
-class EmittedMembersRequest :
-    public SimpleRequest<EmittedMembersRequest,
-                         ArrayRef<Decl *>(ClassDecl *),
+class SemanticMembersRequest :
+    public SimpleRequest<SemanticMembersRequest,
+                         ArrayRef<Decl *>(IterableDeclContext *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1092,7 +1110,7 @@ private:
 
   // Evaluation.
   ArrayRef<Decl *>
-  evaluate(Evaluator &evaluator, ClassDecl *classDecl) const;
+  evaluate(Evaluator &evaluator, IterableDeclContext *idc) const;
 
 public:
   bool isCached() const { return true; }
@@ -2501,7 +2519,8 @@ public:
 
 class ResolveTypeRequest
     : public SimpleRequest<ResolveTypeRequest,
-                           Type(const TypeResolution *, TypeRepr *),
+                           Type(const TypeResolution *, TypeRepr *,
+                                GenericParamList *),
                            RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2515,7 +2534,7 @@ private:
 
   // Evaluation.
   Type evaluate(Evaluator &evaluator, const TypeResolution *resolution,
-                TypeRepr *repr) const;
+                TypeRepr *repr, GenericParamList *silParams) const;
 };
 
 void simple_display(llvm::raw_ostream &out, const TypeResolution *resolution);

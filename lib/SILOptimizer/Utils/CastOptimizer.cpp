@@ -918,25 +918,32 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
       return nullptr;
     }
 
-    // For CopyOnSuccess casts, we could insert an explicit copy here, but this
-    // case does not happen in practice.
-    //
     // Both TakeOnSuccess and TakeAlways can be reduced to an
     // UnconditionalCheckedCast, since the failure path is irrelevant.
+    AllocStackInst *copiedSrc = nullptr;
     switch (Inst->getConsumptionKind()) {
     case CastConsumptionKind::BorrowAlways:
       llvm_unreachable("checked_cast_addr_br never has BorrowAlways");
     case CastConsumptionKind::CopyOnSuccess:
-      return nullptr;
+      if (!Src->getType().isTrivial(*BB->getParent())) {
+        copiedSrc = Builder.createAllocStack(Loc, Src->getType());
+        Builder.createCopyAddr(Loc, Src, copiedSrc, IsNotTake, IsInitialization);
+        Src = copiedSrc;
+      }
+      break;
     case CastConsumptionKind::TakeAlways:
     case CastConsumptionKind::TakeOnSuccess:
       break;
     }
 
-    if (!emitSuccessfulIndirectUnconditionalCast(Builder, Loc, dynamicCast)) {
-      // No optimization was possible.
-      return nullptr;
-    }
+    bool result = emitSuccessfulIndirectUnconditionalCast(
+      Builder, Builder.getModule().getSwiftModule(), Loc, Src,
+      Inst->getSourceFormalType(), Dest, Inst->getTargetFormalType(), Inst);
+    (void)result;
+    assert(result && "emit cannot fail for an checked_cast_addr_br");
+
+    if (copiedSrc)
+      Builder.createDeallocStack(Loc, copiedSrc);
     eraseInstAction(Inst);
   }
   SILInstruction *NewI = &BB->back();
