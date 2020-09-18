@@ -90,32 +90,45 @@ WARNING(import_multiple_mainactor_attr,none,
 ERROR(module_map_not_found, none, "module map file '%0' not found", (StringRef))
 
 REMARK(imported_clang_decl_as,none,
-       "imported as %select{|unavailable }0%1 '%2'",
-       (bool, DescriptiveDeclKind, StringRef))
+       "%0%select{| %1}1 imported as "
+       "%select{|unavailable }2%3 '%4'",
+       (StringRef, const clang::NamedDecl *, bool, DescriptiveDeclKind,
+        StringRef))
 REMARK(also_imported_clang_decl_as,none,
-       "also imported as %select{|unavailable }0%1 '%2",
-       (bool, DescriptiveDeclKind, StringRef))
+       "%0%select{| %1}1 also imported as "
+       "%select{|unavailable }2%3 '%4",
+       (StringRef, const clang::NamedDecl *, bool, DescriptiveDeclKind,
+        StringRef))
 REMARK(did_not_import_clang_decl,none,
-       "did not import",
-       ())
+       "could not import %0%select{| %1}1",
+       (StringRef, const clang::NamedDecl *))
 REMARK(did_not_import_clang_decl_because,none,
-       "could not import: %select{%error|%error|Swift cannot import forward "
-       "declarations|Swift cannot import instance variables|the "
-       "declaration it belongs to cannot be imported|it uses a type that "
-       "can't be imported|initializer can't be imported as an accessor|its "
-       "name can't be imported; it may have an invalid Swift name attribute|"
+       "could not import %0%select{| %1}1: %select{%error|%error|"
+       "Swift cannot import forward declarations|"
+       "Swift cannot import instance variables|"
+       "the declaration it belongs to cannot be imported|"
+       "it uses a type that can't be imported|"
+       "Swift can't import an '-init' method as an accessor|"
+       "its name can't be imported; it may have an invalid Swift name "
+           "attribute|"
        "methods with the name 'print()' in older language versions are not "
-       "imported|could not find property corresponding to accessor|the method "
-       "is marked as an accessor, but a matching property wasn't found|the "
-       "parameter list could not be imported|the raw type could not be "
-       "imported|property was redeclared in a potentially invalid way|"
+           "imported|"
+       "could not find the property corresponding to this accessor|"
+       "the method is marked as an accessor, but a matching property wasn't "
+            "found|"
+       "the parameter list could not be imported|"
+       "the raw type could not be imported|"
+       "property is being redeclared in a potentially invalid way|"
        "overriding a method with a property is not valid in Swift|"
        "property will not be imported, but its accessors will be imported as "
-       "methods|Swift cannot import '@implementation' blocks|its Objective-C "
-       "generic signature could not be imported|the 'NSObject' type could not "
-       "be found|the class being extended could not be imported|a different "
-       "initializer with the same Swift name is being imported instead}0",
-       (uint8_t))
+           "methods|"
+       "Swift cannot import '@implementation' blocks|"
+       "its Objective-C generic signature could not be imported|"
+       "the 'NSObject' type could not be found|"
+       "the class being extended could not be imported|"
+       "a different initializer with the same Swift name is being imported "
+           "instead}2",
+       (StringRef, const clang::NamedDecl *, uint8_t))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

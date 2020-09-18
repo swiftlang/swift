@@ -4398,13 +4398,50 @@ static std::string getDeclName(Decl *decl) {
   return "";
 }
 
+StringRef getClangDeclDescription(const clang::Decl *D) {
+  switch (D->getKind()) {
+  case clang::Decl::Kind::Record:
+    return "C struct";
+  case clang::Decl::Kind::Typedef:
+    return "C typedef";
+  case clang::Decl::Kind::ObjCInterface:
+    return "Objective-C class interface";
+  case clang::Decl::Kind::ObjCMethod:
+    return "Objective-C method";
+  case clang::Decl::Kind::ObjCIvar:
+    return "Objective-C instance variable";
+  case clang::Decl::Kind::ObjCProperty:
+    return "Objective-C property";
+  case clang::Decl::Kind::ObjCProtocol:
+    return "Objective-C protocol";
+  case clang::Decl::Kind::ObjCCategory:
+    return "Objective-C category";
+  case clang::Decl::Kind::Function:
+    return "C function";
+  case clang::Decl::Kind::Field:
+    return "C field";
+  case clang::Decl::Kind::Enum:
+    return "C enum";
+  case clang::Decl::Kind::EnumConstant:
+    return "C enum constant";
+  case clang::Decl::Kind::Var:
+    return "C variable";
+  default:
+    return D->getDeclKindName();
+  }
+}
+
 void ImportRemark::diagnose(ClangImporter::Implementation &impl) {
+  StringRef clangDeclKind = getClangDeclDescription(clangDecl);
+  const clang::NamedDecl *namedClangDecl = dyn_cast<clang::NamedDecl>(clangDecl);
+
   switch (reason) {
   case ImportReason::Unspecified:
     if (swiftDecl) {
       auto name = getDeclName(swiftDecl);
       if (!name.empty())
         ::diagnose(impl, clangDecl, version, diag::imported_clang_decl_as,
+                   clangDeclKind, namedClangDecl,
                    swiftDecl->getAttrs().isUnavailable(impl.SwiftContext),
                    swiftDecl->getDescriptiveKind(), name);
 
@@ -4413,11 +4450,13 @@ void ImportRemark::diagnose(ClangImporter::Implementation &impl) {
         if (!name.empty())
           ::diagnose(impl, clangDecl, version,
                      diag::also_imported_clang_decl_as,
+                     clangDeclKind, namedClangDecl,
                      altDecl->getAttrs().isUnavailable(impl.SwiftContext),
                      altDecl->getDescriptiveKind(), name);
       }
     } else {
-      ::diagnose(impl, clangDecl, version, diag::did_not_import_clang_decl);
+      ::diagnose(impl, clangDecl, version, diag::did_not_import_clang_decl,
+                 clangDeclKind, namedClangDecl);
     }
     break;
 
@@ -4427,6 +4466,7 @@ void ImportRemark::diagnose(ClangImporter::Implementation &impl) {
 
   default:
     ::diagnose(impl, clangDecl, version,
-               diag::did_not_import_clang_decl_because, (uint8_t)reason);
+               diag::did_not_import_clang_decl_because,
+               clangDeclKind, namedClangDecl, (uint8_t)reason);
   }
 }
