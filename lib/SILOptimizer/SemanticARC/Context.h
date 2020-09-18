@@ -87,7 +87,7 @@ struct LLVM_LIBRARY_VISIBILITY Context {
   Context(SILFunction &fn, bool onlyGuaranteedOpts, InstModCallbacks callbacks)
       : fn(fn), deadEndBlocks(), lifetimeFrontier(),
         addressToExhaustiveWriteListCache(constructCacheValue),
-        onlyGuaranteedOpts(onlyGuaranteedOpts) {}
+        onlyGuaranteedOpts(onlyGuaranteedOpts), instModCallbacks(callbacks) {}
 
   void verify() const;
 
