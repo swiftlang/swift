@@ -4082,9 +4082,35 @@ swift::getModuleCachePathFromClang(const clang::CompilerInstance &Clang) {
   return llvm::sys::path::parent_path(SpecificModuleCachePath).str();
 }
 
-void
-ClangImporter::Implementation::addImportRemark(const ImportRemark &remark) {
-  ImportRemarks.push_back(remark);
+static bool moduleNameStartsWith(StringRef actual, StringRef expected) {
+  return actual.startswith(expected)
+         && (actual.size() == expected.size()
+             || actual[expected.size()] == '.');
+}
+
+bool ClangImporter::Implementation::
+shouldEmitImportRemark(const ImportRemark &remark) {
+  if (remark.version != CurrentVersion)
+    return false;
+
+  bool success = remark.swiftDecl != nullptr || remark.alreadyDecided;
+  auto &opts = SwiftContext.ClangImporterOpts;
+
+  // FIXME: String comparison is a pretty silly way to check for membership in a
+  // module.
+  auto declModule = remark.clangDecl->getOwningModule()->getFullModuleName();
+
+  for (const auto &pair : opts.EmitImportDecisionRemarks) {
+    bool emitForAll = std::get<1>(pair);
+    if (success && !emitForAll)
+      continue;
+
+    const std::string &module = std::get<0>(pair);
+    if (moduleNameStartsWith(declModule, module))
+      return true;
+  }
+
+  return false;
 }
 
 void ClangImporter::Implementation::emitImportRemarks() {
