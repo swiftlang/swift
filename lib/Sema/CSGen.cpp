@@ -1731,6 +1731,23 @@ namespace {
               .fixItInsert(expr->getEndLoc(), ":");
           return nullptr;
         }
+        if (numElements == 1 && CS.isForCodeCompletion()) {
+          // If a single-element array has a dictionary contextual type, pretend
+          // it was parsed as a dictionary literal for code completion purposes,
+          // as it is likely the value has just not been written yet.
+          CS.getASTContext();
+          auto *dict = DictionaryExpr::create(CS.getASTContext(),
+                                              expr->getLBracketLoc(),
+                                              expr->getElements(),
+                                              expr->getCommaLocs(),
+                                              expr->getRBracketLoc());
+          Type dictTy = visitDictionaryExpr(dict);
+          ConstraintLocator *loc =
+              CS.getConstraintLocator(dict, LocatorPathElt::ContextualType());
+          CS.recordFix(ContextualMismatch::create(CS, contextualType, dictTy,
+                                                  loc));
+          return dictTy;
+        }
 
         bool isIniting =
             CS.getContextualTypePurpose(expr) == CTP_Initialization;

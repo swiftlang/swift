@@ -11,7 +11,12 @@
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=CLOSURE_FUNCBUILDER | %FileCheck %s --check-prefix=POINT_MEMBER
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=MULTICLOSURE_FUNCBUILDER | %FileCheck %s --check-prefix=POINT_MEMBER
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=MULTICLOSURE_FUNCBUILDER_ERROR | %FileCheck %s --check-prefix=POINT_MEMBER
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=MULTICLOSURE_FUNCBUILDER_FALLBACK | %FileCheck %s --check-prefix=POINT_MEMBER
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=MULTICLOSURE_FUNCBUILDER_FIXME | %FileCheck %s --check-prefix=NORESULTS
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=OVERLOADEDINIT | %FileCheck %s --check-prefix=OVERLOADEDINIT
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=OVERLOADEDFUNC_BAR | %FileCheck %s --check-prefix=OVERLOADEDFUNC_BAR
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=OVERLOADEDFUNC_FOO | %FileCheck %s --check-prefix=OVERLOADEDFUNC_FOO
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=OVERLOADEDFUNC_MISSINGLABEL | %FileCheck %s --check-prefix=OVERLOADEDFUNC_MISSINGLABEL
 
 struct A {
   func doAThings() -> A { return self }
@@ -163,9 +168,54 @@ CreateThings {
 // FIXME: No results in multi-statement closure with erroreous sibling function builder element
 CreateThings {
     Thing { point in
-      print("hello")
+      _ = Thing { innerPoint in innerPoint.#^MULTICLOSURE_FUNCBUILDER_FALLBACK^# };
       point.#^MULTICLOSURE_FUNCBUILDER_FIXME^#
     }
     Thing. // ErrorExpr
 }
 
+enum EnumFoo { case foo }
+enum EnumBar { case bar }
+
+struct TestStruct {
+  init(_: EnumFoo, arg2: Int) {}
+  init(_: EnumBar) {}
+
+  static func test(foo: EnumFoo) {}
+  static func test(bar: EnumBar) {}
+}
+
+func testOverloadedInitNoLabel() {
+  TestStruct(.#^OVERLOADEDINIT^#
+}
+
+// OVERLOADEDINIT: Begin completions, 4 items
+// OVERLOADEDINIT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: bar[#EnumBar#]; name=bar
+// OVERLOADEDINIT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: foo[#EnumFoo#]; name=foo
+// OVERLOADEDINIT-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): EnumBar#})[#(into: inout Hasher) -> Void#]; name=hash(self: EnumBar)
+// OVERLOADEDINIT-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): EnumFoo#})[#(into: inout Hasher) -> Void#]; name=hash(self: EnumFoo)
+// OVERLOADEDINIT: End completions
+
+func testOverloadFuncWithBarLabel() {
+  TestStruct.test(bar: .#^OVERLOADEDFUNC_BAR^#);
+  TestStruct.test(foo: .#^OVERLOADEDFUNC_FOO^#);
+  TestStruct.test(.#^OVERLOADEDFUNC_MISSINGLABEL^#, extraArg: 89);
+}
+
+// OVERLOADEDFUNC_BAR: Begin completions, 2 items
+// OVERLOADEDFUNC_BAR-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: bar[#EnumBar#]; name=bar
+// OVERLOADEDFUNC_BAR-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): EnumBar#})[#(into: inout Hasher) -> Void#]; name=hash(self: EnumBar)
+// OVERLOADEDFUNC_BAR: End completions
+
+// OVERLOADEDFUNC_FOO: Begin completions, 2 items
+// OVERLOADEDFUNC_FOO-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: foo[#EnumFoo#]; name=foo
+// OVERLOADEDFUNC_FOO-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): EnumFoo#})[#(into: inout Hasher) -> Void#]; name=hash(self: EnumFoo)
+// OVERLOADEDFUNC_FOO: End completions
+
+// FIXME: Should this include the missing label in the completion text? A follow-up missing label diagnostic has a fixit at the moment.
+// OVERLOADEDFUNC_MISSINGLABEL: Begin completions, 4 items
+// OVERLOADEDFUNC_MISSINGLABEL-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: bar[#EnumBar#]; name=bar
+// OVERLOADEDFUNC_MISSINGLABEL-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): EnumBar#})[#(into: inout Hasher) -> Void#]; name=hash(self: EnumBar)
+// OVERLOADEDFUNC_MISSINGLABEL-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: foo[#EnumFoo#]; name=foo
+// OVERLOADEDFUNC_MISSINGLABEL-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): EnumFoo#})[#(into: inout Hasher) -> Void#]; name=hash(self: EnumFoo)
+// OVERLOADEDFUNC_MISSINGLABEL: End completions

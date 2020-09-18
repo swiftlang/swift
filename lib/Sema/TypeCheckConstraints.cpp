@@ -2152,11 +2152,13 @@ TypeChecker::typeCheckExpression(
 
   // First let's check whether given expression has a code completion
   // token which requires special handling.
-  if (Context.CompletionCallback &&
-      typeCheckForCodeCompletion(target, [&](const constraints::Solution &S) {
-        Context.CompletionCallback->sawSolution(S);
-      }))
-    return None;
+  if (Context.CompletionCallback) {
+    if (typeCheckForCodeCompletion(target, [&](const constraints::Solution &S) {
+          Context.CompletionCallback->sawSolution(S);
+        }))
+      return None;
+    expr = target.getAsExpr();
+  }
 
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.

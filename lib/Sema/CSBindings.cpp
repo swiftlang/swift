@@ -1249,7 +1249,7 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
         if (keyPathRoot) {
           fix = SpecifyKeyPathRootType::create(
               cs, keyPathRoot->getImpl().getLocator());
-        } else {
+        } else if (!cs.isForCodeCompletion()) {
           auto path = dstLocator->getPath();
           // Drop `generic parameter` locator element so that all missing
           // generic parameters related to the same path can be coalesced later.

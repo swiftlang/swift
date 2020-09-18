@@ -1672,7 +1672,7 @@ public:
 
 private:
   void addKeywords(CodeCompletionResultSink &Sink, bool MaybeFuncBody);
-  bool trySolverCompletion();
+  bool trySolverCompletion(bool MaybeFuncBody);
 };
 } // end anonymous namespace
 
@@ -4315,6 +4315,8 @@ public:
 
   void getUnresolvedMemberCompletions(ArrayRef<Type> Types) {
     NeedLeadingDot = !HaveDot;
+    ASTContext &Ctx = CurrDeclContext->getASTContext();
+
     for (auto T : Types) {
       if (!T)
         continue;
@@ -4325,7 +4327,7 @@ public:
 
         // Add 'nil' keyword with erasing '.' instruction.
         unsigned bytesToErase = 0;
-        auto &SM = CurrDeclContext->getASTContext().SourceMgr;
+        auto &SM = Ctx.SourceMgr;
         if (DotLoc.isValid())
           bytesToErase = SM.getByteDistance(DotLoc, SM.getCodeCompletionLoc());
         addKeyword("nil", T, SemanticContextKind::None,
@@ -6014,6 +6016,29 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
                                    DCForModules);
 }
 
+void deliverUnresolvedMemberResults(
+    ArrayRef<UnresolvedMemberTypeCheckCompletionCallback::Result> Results,
+    DeclContext *DC, SourceLoc DotLoc,
+    ide::CodeCompletionContext &CompletionCtx,
+    CodeCompletionConsumer &Consumer) {
+  ASTContext &Ctx = DC->getASTContext();
+  CompletionLookup Lookup(CompletionCtx.getResultSink(), Ctx, DC,
+                          &CompletionCtx);
+
+  assert(DotLoc.isValid());
+  Lookup.setHaveDot(DotLoc);
+  for (auto &Result: Results) {
+    ArrayRef<Type> ExpectedTys = {Result.ExpectedTy};
+    Lookup.setExpectedTypes(ExpectedTys,
+                            Result.IsSingleExpressionBody,
+                            /*expectsNonVoid*/true);
+    Lookup.setIdealExpectedType(Result.ExpectedTy);
+    Lookup.getUnresolvedMemberCompletions(ExpectedTys);
+  }
+  SourceFile *SF = DC->getParentSourceFile();
+  deliverCompletionResults(CompletionCtx, Lookup, *SF, Consumer);
+}
+
 void deliverDotExprResults(
     ArrayRef<DotExprTypeCheckCompletionCallback::Result> Results,
     Expr *BaseExpr, DeclContext *DC, SourceLoc DotLoc, bool IsInSelector,
@@ -6054,25 +6079,7 @@ void deliverDotExprResults(
   deliverCompletionResults(CompletionCtx, Lookup, *SF, Consumer);
 }
 
-bool CodeCompletionCallbacksImpl::trySolverCompletion() {
-  CompletionContext.CodeCompletionKind = Kind;
-
-  if (Kind == CompletionKind::None)
-    return true;
-
-  bool MaybeFuncBody = true;
-  if (CurDeclContext) {
-    auto *CD = CurDeclContext->getLocalContext();
-    if (!CD || CD->getContextKind() == DeclContextKind::Initializer ||
-        CD->getContextKind() == DeclContextKind::TopLevelCodeDecl)
-      MaybeFuncBody = false;
-  }
-
-  if (auto *DC = dyn_cast_or_null<DeclContext>(ParsedDecl)) {
-    if (DC->isChildContextOf(CurDeclContext))
-      CurDeclContext = DC;
-  }
-
+bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
   assert(ParsedExpr || CurDeclContext);
 
   SourceLoc CompletionLoc = ParsedExpr
@@ -6106,16 +6113,69 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion() {
                           Consumer);
     return true;
   }
+  case CompletionKind::UnresolvedMember: {
+    assert(CodeCompleteTokenExpr);
+    assert(CurDeclContext);
+
+    UnresolvedMemberTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr);
+    llvm::SaveAndRestore<TypeCheckCompletionCallback*>
+      CompletionCollector(Context.CompletionCallback, &Lookup);
+    typeCheckContextAt(CurDeclContext, CompletionLoc);
+
+    if (!Lookup.gotCallback())
+      Lookup.fallbackTypeCheck(CurDeclContext);
+
+    addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
+    deliverUnresolvedMemberResults(Lookup.getResults(), CurDeclContext, DotLoc,
+                                   CompletionContext, Consumer);
+    return true;
+  }
   default:
     return false;
   }
 }
 
+// FIXME: Remove this once all expression position completions are migrated
+// to work via TypeCheckCompletionCallback.
+static void undoSingleExpressionReturn(DeclContext *DC) {
+  auto updateBody = [](BraceStmt *BS, ASTContext &Ctx) -> bool {
+    if (Ctx.CompletionCallback)
+      return false;
+
+    SourceManager &SM = Ctx.SourceMgr;
+    ASTNode FirstElem = BS->getFirstElement();
+    auto *RS = dyn_cast_or_null<ReturnStmt>(FirstElem.dyn_cast<Stmt*>());
+
+    if (!RS || !RS->isImplicit())
+      return false;
+
+    SourceRange Range = RS->getSourceRange();
+    if (Range.isInvalid())
+      return false;
+
+    if (!SM.rangeContainsCodeCompletionLoc(Range))
+      return false;
+    BS->setFirstElement(RS->getResult());
+    return true;
+  };
+
+  while (ClosureExpr *CE = dyn_cast_or_null<ClosureExpr>(DC)) {
+    if (CE->hasSingleExpressionBody()) {
+      if (updateBody(CE->getBody(), CE->getASTContext()))
+        CE->setBody(CE->getBody(), false);
+    }
+    DC = DC->getParent();
+  }
+  if (FuncDecl *FD = dyn_cast_or_null<FuncDecl>(DC)) {
+    if (FD->hasSingleExpressionBody()) {
+      if (updateBody(FD->getBody(), FD->getASTContext()))
+        FD->setHasSingleExpressionBody(false);
+    }
+  }
+}
+
 void CodeCompletionCallbacksImpl::doneParsing() {
   CompletionContext.CodeCompletionKind = Kind;
-
-  if (trySolverCompletion())
-    return;
 
   if (Kind == CompletionKind::None) {
     return;
@@ -6134,6 +6194,10 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       CurDeclContext = DC;
   }
 
+  if (trySolverCompletion(MaybeFuncBody))
+    return;
+
+  undoSingleExpressionReturn(CurDeclContext);
   typeCheckContextAt(
       CurDeclContext,
       ParsedExpr

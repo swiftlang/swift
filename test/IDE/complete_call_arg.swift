@@ -613,7 +613,12 @@ func testSubscript(obj: HasSubscript, intValue: Int, strValue: String) {
 // SUBSCRIPT_2-NEXT: Pattern/ExprSpecific: {#default: String#}[#String#];
 
   let _ = obj[42, .#^SUBSCRIPT_2_DOT^#
-// SUBSCRIPT_2_DOT-NOT: Begin completions
+// Note: the arg label is missing, but diagnostics will give a fixit for it.
+// SUBSCRIPT_2_DOT: Begin completions
+// SUBSCRIPT_2_DOT-NOT: i1
+// SUBSCRIPT_2_DOT-NOT: s1
+// SUBSCRIPT_2_DOT-DAG: Decl[Constructor]/CurrNominal/IsSystem/TypeRelation[Identical]: init()[#String#]; name=init()
+// SUBSCRIPT_2_DOT-DAG: Decl[Constructor]/CurrNominal/IsSystem/TypeRelation[Identical]: init({#(c): Character#})[#String#]; name=init(c: Character)
 
   let _ = obj[42, default: #^SUBSCRIPT_3^#
 // SUBSCRIPT_3: Begin completions

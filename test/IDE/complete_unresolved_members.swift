@@ -28,8 +28,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_19 | %FileCheck %s -check-prefix=UNRESOLVED_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_20 | %FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_21 | %FileCheck %s -check-prefix=UNRESOLVED_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_22 | %FileCheck %s -check-prefix=UNRESOLVED_1_NOTIDEAL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_22_noreturn | %FileCheck %s -check-prefix=UNRESOLVED_1_NOTIDEAL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_22 | %FileCheck %s -check-prefix=UNRESOLVED_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_22_noreturn | %FileCheck %s -check-prefix=UNRESOLVED_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_23 | %FileCheck %s -check-prefix=UNRESOLVED_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_24 | %FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_25 | %FileCheck %s -check-prefix=UNRESOLVED_3
@@ -45,9 +45,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_34 | %FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_35 | %FileCheck %s -check-prefix=UNRESOLVED_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_36 | %FileCheck %s -check-prefix=UNRESOLVED_3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_37 | %FileCheck %s -check-prefix=UNRESOLVED_3_NOTIDEAL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_37 | %FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_38 | %FileCheck %s -check-prefix=UNRESOLVED_3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_39 | %FileCheck %s -check-prefix=UNRESOLVED_3_NOTIDEAL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_39 | %FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_40 | %FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_41 | %FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_42 | %FileCheck %s -check-prefix=UNRESOLVED_3
@@ -78,7 +78,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_1 | %FileCheck %s -check-prefix=GENERIC_1 -check-prefix=GENERIC_1_INT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_2 | %FileCheck %s -check-prefix=GENERIC_1 -check-prefix=GENERIC_1_INT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_3 | %FileCheck %s -check-prefix=GENERIC_1 -check-prefix=GENERIC_1_U
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_4 | %FileCheck %s -check-prefix=GENERIC_1 -check-prefix=GENERIC_1_INT_NOTIDEAL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_4 | %FileCheck %s -check-prefix=GENERIC_1 -check-prefix=GENERIC_1_INT
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STATIC_CLOSURE_1 | %FileCheck %s -check-prefix=STATIC_CLOSURE_1
 
@@ -119,8 +119,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_2 | %FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_3 | %FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_4 | %FileCheck %s -check-prefix=UNRESOLVED_3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_5 | %FileCheck %s -check-prefix=UNRESOLVED_3_NOTIDEAL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_6 | %FileCheck %s -check-prefix=UNRESOLVED_3_NOTIDEAL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_5 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_6 | %FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_CONDITION | %FileCheck %s -check-prefix=TERNARY_CONDITION
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOADED_CLOSURE_RETURN | %FileCheck %s -check-prefix=OVERLOADED_CLOSURE_RETURN
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AUTOCLOSURE | %FileCheck %s -check-prefix=UNRESOLVED_3
@@ -620,16 +620,10 @@ case let .#^GENERIC_4^#
 // GENERIC_1_INT-DAG: Decl[StaticMethod]/ExprSpecific/TypeRelation[Identical]: create({#Int#})[#Generic<Int>#];
 // GENERIC_1_INT: End completions
 
-// GENERIC_1_INT_NOTIDEAL: Begin completions
-// GENERIC_1_INT_NOTIDEAL-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: contains({#content: Int#})[#Generic<Int>#];
-// GENERIC_1_INT_NOTIDEAL-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: empty[#Generic<Int>#];
-// GENERIC_1_INT_NOTIDEAL-DAG: Decl[StaticMethod]/CurrNominal/TypeRelation[Identical]: create({#Int#})[#Generic<Int>#];
-// GENERIC_1_INT_NOTIDEAL: End completions
-
 // GENERIC_1_U: Begin completions
-// GENERIC_1_U-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: contains({#content: U#})[#Generic<U>#];
-// GENERIC_1_U-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: empty[#Generic<U>#];
-// GENERIC_1_U-DAG: Decl[StaticMethod]/CurrNominal/TypeRelation[Identical]: create({#U#})[#Generic<U>#];
+// GENERIC_1_U-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: contains({#content: U#})[#Generic<U>#];
+// GENERIC_1_U-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: empty[#Generic<U>#];
+// GENERIC_1_U-DAG: Decl[StaticMethod]/ExprSpecific/TypeRelation[Identical]: create({#U#})[#Generic<U>#];
 // GENERIC_1_U: End completions
 
 struct HasCreator {
@@ -655,11 +649,11 @@ struct HasOverloaded {
 func testOverload(val: HasOverloaded) {
   let _ = val.takeEnum(.#^OVERLOADED_METHOD_1^#)
 // OVERLOADED_METHOD_1: Begin completions, 6 items
-// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: South[#SomeEnum1#]; name=South
-// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: North[#SomeEnum1#]; name=North
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: South[#SomeEnum1#]; name=South
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: North[#SomeEnum1#]; name=North
 // OVERLOADED_METHOD_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): SomeEnum1#})[#(into: inout Hasher) -> Void#];
-// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: East[#SomeEnum2#]; name=East
-// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: West[#SomeEnum2#]; name=West
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: East[#SomeEnum2#]; name=East
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: West[#SomeEnum2#]; name=West
 // OVERLOADED_METHOD_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): SomeEnum2#})[#(into: inout Hasher) -> Void#];
 // OVERLOADED_METHOD_1: End completions
 
@@ -819,11 +813,11 @@ func testClosureReturnTypeForOverloaded() {
     .#^OVERLOADED_CLOSURE_RETURN^#
   }
 // OVERLOADED_CLOSURE_RETURN: Begin completions, 6 items
-// OVERLOADED_CLOSURE_RETURN-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: South[#SomeEnum1#];
-// OVERLOADED_CLOSURE_RETURN-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: North[#SomeEnum1#];
+// OVERLOADED_CLOSURE_RETURN-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: South[#SomeEnum1#];
+// OVERLOADED_CLOSURE_RETURN-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: North[#SomeEnum1#];
 // OVERLOADED_CLOSURE_RETURN-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): SomeEnum1#})[#(into: inout Hasher) -> Void#];
-// OVERLOADED_CLOSURE_RETURN-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: East[#SomeEnum2#];
-// OVERLOADED_CLOSURE_RETURN-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: West[#SomeEnum2#];
+// OVERLOADED_CLOSURE_RETURN-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: East[#SomeEnum2#];
+// OVERLOADED_CLOSURE_RETURN-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: West[#SomeEnum2#];
 // OVERLOADED_CLOSURE_RETURN-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): SomeEnum2#})[#(into: inout Hasher) -> Void#];
 // OVERLOADED_CLOSURE_RETURN: End completions
 }

@@ -153,7 +153,7 @@ struct TestSingleExprClosureUnresolved {
 }
 // TestSingleExprClosureUnresolved: Begin completions
 // TestSingleExprClosureUnresolved-NOT: notMine
-// TestSingleExprClosureUnresolved: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: myEnum[#MyEnum#];
+// TestSingleExprClosureUnresolved: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: myEnum[#MyEnum#];
 // TestSingleExprClosureUnresolved-NOT: notMine
 // TestSingleExprClosureUnresolved: End completions
 
@@ -268,7 +268,7 @@ struct TestSingleExprFuncUnresolved {
 
 // TestSingleExprFuncUnresolved: Begin completions
 // TestSingleExprFuncUnresolved-NOT: notMine
-// TestSingleExprFuncUnresolved: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: myEnum[#MyEnum#];
+// TestSingleExprFuncUnresolved: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: myEnum[#MyEnum#];
 // TestSingleExprFuncUnresolved-NOT: notMine
 // TestSingleExprFuncUnresolved: End completions
 }
@@ -378,7 +378,7 @@ struct TestSingleExprAccessorUnresolved {
 
 // TestSingleExprAccessorUnresolved: Begin completions
 // TestSingleExprAccessorUnresolved-NOT: notMine
-// TestSingleExprAccessorUnresolved: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: myEnum[#MyEnum#];
+// TestSingleExprAccessorUnresolved: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: myEnum[#MyEnum#];
 // TestSingleExprAccessorUnresolved-NOT: notMine
 // TestSingleExprAccessorUnresolved: End completions
 }
@@ -530,7 +530,7 @@ struct TestSingleExprSubscriptUnresolved {
 
 // TestSingleExprSubscriptUnresolved: Begin completions
 // TestSingleExprSubscriptUnresolved-NOT: notMine
-// TestSingleExprSubscriptUnresolved: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: myEnum[#MyEnum#];
+// TestSingleExprSubscriptUnresolved: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: myEnum[#MyEnum#];
 // TestSingleExprSubscriptUnresolved-NOT: notMine
 // TestSingleExprSubscriptUnresolved: End completions
 }
@@ -635,7 +635,7 @@ enum TopLevelEnum {
   case foo
 }
 
-// TopLevelEnum: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: foo[#TopLevelEnum#];
+// TopLevelEnum: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: foo[#TopLevelEnum#];
 
 var testAccessorUnresolvedTopLevel: TopLevelEnum {
   .#^testAccessorUnresolvedTopLevel^#
