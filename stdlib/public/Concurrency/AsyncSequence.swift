@@ -7,6 +7,8 @@ public protocol GeneratorProtocol {
 }
 
 public protocol AsyncSequence {
-  associatedtype Generator: GeneratorProtocol
+  associatedtype Element
+  associatedtype Generator: GeneratorProtocol where Generator.Element == Element
+
   func makeGenerator() -> Generator
 }
