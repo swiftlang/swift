@@ -4343,11 +4343,11 @@ static void diagnose(ClangImporter::Implementation &impl,
 }
 
 static std::string getDeclName(Decl *decl) {
-  std::string str;
-  llvm::raw_string_ostream os(str);
   if (auto *VD = dyn_cast<ValueDecl>(decl))
-    VD->getName().printPretty(os);        // FIXME: do better
-  return str;
+    return VD->printRef();
+  if (auto *ED = dyn_cast<ExtensionDecl>(decl))
+    return "extension " + ED->getExtendedType().getString();
+  return "";
 }
 
 void ImportRemark::diagnose(ClangImporter::Implementation &impl) {
