@@ -1228,13 +1228,30 @@ UnresolvedSpecializeExpr *UnresolvedSpecializeExpr::create(ASTContext &ctx,
 }
 
 bool CaptureListEntry::isSimpleSelfCapture() const {
+  auto &ctx = Var->getASTContext();
+
+  if (Var->getName() != ctx.Id_self)
+    return false;
+
+  if (auto *attr = Var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
+    if (attr->get() == ReferenceOwnership::Weak)
+      return false;
+
   if (Init->getPatternList().size() != 1)
     return false;
-  if (auto *DRE = dyn_cast<DeclRefExpr>(Init->getInit(0)))
+
+  auto *expr = Init->getInit(0);
+
+  if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
     if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
-      return (VD->isSelfParameter() || VD->isSelfParamCapture())
-             && VD->getName() == Var->getName();
+      return VD->getName() == ctx.Id_self;
     }
+  }
+
+  if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
+    return UDRE->getName().isSimpleName(ctx.Id_self);
+  }
+
   return false;
 }
 
