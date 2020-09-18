@@ -1416,12 +1416,8 @@ void AbstractFunctionDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
   // We create body scopes when there is no body for source kit to complete
   // erroneous code in bodies.
   if (decl->getBodySourceRange().isValid()) {
-    if (AbstractFunctionBodyScope::isAMethod(decl))
-      scopeCreator.constructExpandAndInsertUncheckable<MethodBodyScope>(leaf,
+    scopeCreator.constructExpandAndInsertUncheckable<FunctionBodyScope>(leaf,
                                                                         decl);
-    else
-      scopeCreator.constructExpandAndInsertUncheckable<PureFunctionBodyScope>(
-          leaf, decl);
   }
 }
 

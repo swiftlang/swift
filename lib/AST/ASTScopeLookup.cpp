@@ -335,22 +335,15 @@ bool AbstractFunctionBodyScope::lookupLocalsOrMembers(
   return false;
 }
 
-bool MethodBodyScope::lookupLocalsOrMembers(
+bool FunctionBodyScope::lookupLocalsOrMembers(
     ArrayRef<const ASTScopeImpl *> history, DeclConsumer consumer) const {
-  ASTScopeAssert(isAMethod(decl), "Asking for members of a non-method.");
   if (AbstractFunctionBodyScope::lookupLocalsOrMembers(history, consumer))
     return true;
-  return consumer.consume({decl->getImplicitSelfDecl()},
-                          DeclVisibilityKind::FunctionParameter);
-}
 
-bool PureFunctionBodyScope::lookupLocalsOrMembers(
-    ArrayRef<const ASTScopeImpl *> history, DeclConsumer consumer) const {
-  ASTScopeAssert(
-      !isAMethod(decl),
-      "Should have called lookupLocalsOrMembers instead of this function.");
-  if (AbstractFunctionBodyScope::lookupLocalsOrMembers(history, consumer))
-    return true;
+  if (decl->getDeclContext()->isTypeContext()) {
+    return consumer.consume({decl->getImplicitSelfDecl()},
+                            DeclVisibilityKind::FunctionParameter);
+  }
 
   // Consider \c var t: T { (did/will/)get/set { ... t }}
   // Lookup needs to find t, but if the var is inside of a type the baseDC needs
@@ -361,6 +354,7 @@ bool PureFunctionBodyScope::lookupLocalsOrMembers(
       if (consumer.consume({storage}, DeclVisibilityKind::LocalVariable))
         return true;
   }
+
   return false;
 }
 
@@ -629,8 +623,10 @@ PatternEntryInitializerScope::computeSelfDCForParent() const {
 }
 
 Optional<NullablePtr<DeclContext>>
-MethodBodyScope::computeSelfDCForParent() const {
-  return NullablePtr<DeclContext>(decl);
+FunctionBodyScope::computeSelfDCForParent() const {
+  if (decl->getDeclContext()->isTypeContext())
+    return NullablePtr<DeclContext>(decl);
+  return None;
 }
 
 #pragma mark capturedSelfDC

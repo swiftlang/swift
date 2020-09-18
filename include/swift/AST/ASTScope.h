@@ -1113,7 +1113,6 @@ public:
   }
   virtual NullablePtr<Decl> getDeclIfAny() const override { return decl; }
   Decl *getDecl() const { return decl; }
-  static bool isAMethod(const AbstractFunctionDecl *);
 
   NullablePtr<ASTScopeImpl> getParentOfASTAncestorScopesToBeRescued() override;
 
@@ -1128,25 +1127,15 @@ public:
   SourceRange sourceRangeForDeferredExpansion() const override;
 };
 
-/// Body of methods, functions in types.
-class MethodBodyScope final : public AbstractFunctionBodyScope {
+/// Body of functions and methods.
+class FunctionBodyScope final : public AbstractFunctionBodyScope {
 public:
-  MethodBodyScope(AbstractFunctionDecl *e) : AbstractFunctionBodyScope(e) {}
-  std::string getClassName() const override;
-  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                             DeclConsumer consumer) const override;
-
-  Optional<NullablePtr<DeclContext>> computeSelfDCForParent() const override;
-};
-
-/// Body of "pure" functions, functions without an implicit "self".
-class PureFunctionBodyScope final : public AbstractFunctionBodyScope {
-public:
-  PureFunctionBodyScope(AbstractFunctionDecl *e)
+  FunctionBodyScope(AbstractFunctionDecl *e)
       : AbstractFunctionBodyScope(e) {}
   std::string getClassName() const override;
   bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
                              DeclConsumer consumer) const override;
+  Optional<NullablePtr<DeclContext>> computeSelfDCForParent() const override;
 };
 
 class DefaultArgumentInitializerScope final : public ASTScopeImpl {
