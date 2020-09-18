@@ -636,40 +636,92 @@ Coroutine Types
 
 A coroutine is a function which can suspend itself and return control to
 its caller without terminating the function.  That is, it does not need to
-obey a strict stack discipline.
+obey a strict stack discipline. Different kinds of coroutines in SIL have
+different representations, reflecting the different capabilities and
+structural constraints of different language-level features:
 
-SIL supports two kinds of coroutine: ``@yield_many`` and ``@yield_once``.
-Either of these attributes may be written before a function type to
-indicate that it is a coroutine type.
+Yielding Coroutines
+...................
 
-A coroutine type may declare any number of *yielded values*, which is to
+Some kinds of coroutine have control flow that is tightly integrated with
+their callers, and pass information back and forth between caller and callee
+in a structured way. *Generalized accessors* and generators in Swift fit this
+description: a ``read`` or ``modify`` accessor coroutine projects a single
+value, yields ownership of that one value temporarily to the caller, and then
+takes ownership back when resumed, allowing the coroutine to clean up resources
+or otherwise react to mutations done by the caller. *Generators* similarly
+yield a stream of values one at a time to their caller, temporarily yielding
+ownership of each value in turn to the caller. The tight coupling of the
+caller's control flow with these coroutines allows the caller to *borrow*
+values produced by the coroutine, where a normal function return would need to
+transfer ownership of its return value, since a normal function's context
+ceases to exist and be able to maintain ownership of the value after it
+returns.
+
+To support these concepts, SIL supports two kinds of *yielding coroutine*:
+``@yield_many`` and ``@yield_once``. Either of these attributes may be
+written before a function type to indicate that it is a yielding coroutine type.
+
+A yielding coroutine type may declare any number of *yielded values*, which is to
 say, values which are provided to the caller at a yield point.  Yielded
 values are written in the result list of a function type, prefixed by
 the ``@yields`` attribute.  A yielded value may have a convention attribute,
 taken from the set of parameter attributes and interpreted as if the yield
 site were calling back to the calling function.
 
-Currently, a coroutine may not have normal results.
+Currently, a yielding coroutine may not have normal results.
 
-Coroutine functions may be used in many of the same ways as normal
+Yielding coroutine functions may be used in many of the same ways as normal
 function values.  However, they cannot be called with the standard
 ``apply`` or ``try_apply`` instructions.  A non-throwing yield-once
 coroutine can be called with the ``begin_apply`` instruction.  There
 is no support yet for calling a throwing yield-once coroutine or for
 calling a yield-many coroutine of any kind.
 
-Coroutines may contain the special ``yield`` and ``unwind`` instructions.
+Yielding coroutines may contain the special ``yield`` and ``unwind``
+instructions.
 
 A ``@yield_many`` coroutine may yield as many times as it desires.
 A ``@yield_once`` coroutine may yield exactly once before returning,
 although it may also ``throw`` before reaching that point.
 
-This coroutine representation is well-suited to coroutines whose control
-flow is tightly integrated with their callers and which intend to pass
-information back and forth.  This matches the needs of generalized
-accessor and generator features in Swift.  It is not a particularly good
-match for ``async``/``await``-style features; a simpler representation
-would probably do fine for that.
+Async Coroutines
+................
+
+``async`` coroutines are quite different from yielding coroutines.
+Async coroutines are almost like threads in that they
+have largely independent execution contexts, and do not generally directly
+transfer values between each other without going through synchronization
+abstractions. Unlike ``@yield_once`` or ``@yield_many`` coroutine functions, an
+individual async function does not represent an entire coroutine unto itself,
+but is an individual unit of code that may run inside an async coroutine.
+Unlike preemptive threads, async functions have explicit *suspend points* where
+they allow their coroutine's execution to be suspended so that a different
+coroutine may run.
+
+In SIL, a function type has the ``@async`` attribute to
+indicate it may contain suspend points. Being ``@async`` is orthogonal to being
+a yielding coroutine--the ``@async`` attribute can be applied
+both to functions and to both kinds of yielding coroutine. ``@async`` functions
+can only be called from other ``@async`` functions, but otherwise can be
+invoked with the normal ``apply`` and ``try_apply`` instructions (or
+``begin_apply`` if they are yielding coroutines). An ``@async`` function may
+only use the special ``yield`` and ``unwind`` instructions if it is 
+a yielding coroutine in addition to being async.
+
+``@async`` functions may
+express primitive suspend points by using the ``begin_async_continuation[_addr]`` and
+``await_async_continuation`` instructions. ``begin_async_continuation[_addr]``
+creates a *continuation* value that can be used to resume the coroutine when it
+suspends, feeding a value back into the currently-running function or causing
+it to fail with an error when it resumes. The resulting continuation value can
+then be passed into a completion handler, registered with an event loop, or
+scheduled by some other mechanism. The ``await_continuation`` instruction
+suspends execution of the coroutine until the continuation is invoked to resume
+it.  All continuation values must be used to resume the async coroutine exactly
+once. It is undefined behavior to attempt to resume the same continuation more
+than once. Failing to resume a continuation will leave the coroutine stuck in
+the suspended state, leaking any memory or other resources it owns.
 
 Properties of Types
 ```````````````````
@@ -2607,6 +2659,76 @@ Initialize the storage for a global variable. This instruction has
 undefined behavior if the global variable has already been initialized.
 
 The type operand must be a lowered object type.
+
+begin_async_continuation
+````````````````````````
+
+::
+
+  sil-instruction ::= 'begin_async_continuation' '[throws]'? sil-type
+
+  %0 = begin_async_continuation $T
+  %0 = begin_async_continuation [throws] $U
+
+Begins a suspension of an ``@async`` function. This instruction can only be
+used inside an ``@async`` function. The result of the instruction is an
+``UnsafeContinuation<T>`` value, where ``T`` is the formal type argument to the
+instruction, or an ``UnsafeThrowingContinuation<T>`` if the instruction
+carries the ``[throws]`` attribute. ``T`` must be a loadable type.
+The continuation must be consumed by a ``await_async_continuation`` terminator
+on all paths. Between ``begin_async_continuation`` and
+``await_async_continuation``, the following restrictions apply:
+
+- The function cannot ``return``, ``throw``, ``yield``, or ``unwind``.
+- There cannot be nested suspend points; namely, the function cannot call
+  another ``@async`` function, nor can it initiate another suspend point with
+  ``begin_async_continuation``.
+
+The function suspends execution when the matching ``await_async_continuation``
+terminator is reached, and resumes execution when the continuation is resumed.
+The continuation resumption operation takes a value of type ``T`` which is
+passed back into the function when it resumes execution in the ``await_async_continuation`` instruction's
+``resume`` successor block. If the instruction
+has the ``[throws]`` attribute, it can also be resumed in an error state, in
+which case the matching ``await_async_continuation`` instruction must also
+have an ``error`` successor.
+
+Within the enclosing SIL function, the result continuation is consumed by the
+``await_async_continuation``, and cannot be referenced after the
+``await_async_continuation`` executes. Dynamically, the continuation value must
+be resumed exactly once in the course of the program's execution; it is
+undefined behavior to resume the continuation more than once. Conversely,
+failing to resume the continuation will leave the suspended async coroutine
+hung in its suspended state, leaking any resources it may be holding.
+
+begin_async_continuation_addr
+`````````````````````````````
+
+::
+
+  sil-instruction ::= 'begin_async_continuation_addr' '[throws]'? sil-type ',' sil-operand
+
+  %1 = begin_async_continuation_addr $T, %0 : $*T
+  %1 = begin_async_continuation_addr [throws] $U, %0 : $*U
+
+Begins a suspension of an ``@async`` function, like ``begin_async_continuation``,
+while binding a specific memory location to the resulting continuation for
+receiving the value the continuation is resumed with.  The operand must be an
+address whose type is the maximally-abstracted lowered type of the formal
+resume type. The memory must be uninitialized, and must remain valid until the
+matching ``await_async_continuation`` instruction(s) consuming the result
+continuation have executed. The behavior is otherwise the same as
+``begin_async_continuation``, and the same restrictions apply on code appearing
+between ``begin_async_continuation_addr`` and ``await_async_continuation`` as
+apply between ``begin_async_continuation`` and ``await_async_continuation``.
+Additionally, the state of the memory referenced by the operand is indefinite
+between the execution of ``begin_async_continuation_addr`` and
+``await_async_continuation``, and it is undefined behavior to read or modify
+the memory during this time. After the ``await_async_continuation`` resumes
+normally to its ``resume`` successor, the memory referenced by the operand
+is initialized with the resume value, and that value is then owned by the
+current function. If ``await_async_continuation`` instead resumes to
+its ``error`` successor, then the memory remains uninitialized.
 
 dealloc_stack
 `````````````
@@ -5870,7 +5992,7 @@ yield
   sil-yield-values ::= '(' (sil-operand (',' sil-operand)*)? ')'
 
 Temporarily suspends the current function and provides the given
-values to the calling function. The current function must be a coroutine,
+values to the calling function. The current function must be a yielding coroutine,
 and the yield values must match the yield types of the coroutine.
 If the calling function resumes the coroutine normally, control passes to
 the ``resume`` destination. If the calling function aborts the coroutine,
@@ -5898,7 +6020,7 @@ unwind
 
 Exits the current function and returns control to the calling function,
 completing an unwind from a ``yield``. The current function must be a
-coroutine.
+yielding coroutine.
 
 ``unwind`` is only permitted in blocks reachable from the ``unwind`` edges
 of ``yield`` instructions.
@@ -6229,6 +6351,54 @@ destination (if it returns with ``throw``).
 ``%0`` must have a function type with an error result.
 
 The rules on generic substitutions are identical to those of ``apply``.
+
+await_async_continuation
+````````````````````````
+
+::
+
+  sil-terminator ::= 'await_async_continuation' sil-value
+                        ',' 'resume' sil-identifier
+                        (',' 'error' sil-identifier)?
+
+  await_async_continuation %0 : $UnsafeContinuation<T>, resume bb1
+  await_async_continuation %0 : $UnsafeThrowingContinuation<T>, resume bb1, error bb2
+
+  bb1(%1 : $T):
+  bb2(%2 : $Error):
+
+Suspends execution of an ``@async`` function until the continuation operation
+is resumed. The continuation must be the result of a
+``begin_async_continuation`` or ``begin_async_continuation_addr``
+instruction within the same function; see the documentation for
+``begin_async_continuation`` for discussion of further constraints on the
+IR between ``begin_async_continuation[_addr]`` and ``await_async_continuation``.
+This terminator can only appear inside an ``@async`` function. The
+instruction must always have a ``resume`` successor, but must have an
+``error`` successor if and only if the operand is an
+``UnsafeThrowingContinuation<T>``.
+
+If the operand is the result of a
+``begin_async_continuation`` instruction, then the ``resume`` successor block
+must take an argument whose type is the maximally-abstracted lowered type
+of ``T``, matching the type argument of the ``Unsafe[Throwing]Continuation<T>``
+operand. The value of the ``resume`` argument is owned by the current
+function. If the operand is the result of a ``begin_async_continuation_addr``
+instruction, then the ``resume`` successor block must *not* take an argument;
+the resume value will be written to the memory referenced by the operand to the
+``begin_async_continuation_addr`` instruction, after which point the value in
+that memory becomes owned by the current function. With either variant,
+if the ``await_async_continuation`` instruction has an ``error`` successor block,
+the ``error`` block must take a single ``Error`` argument, and that argument
+is owned by the enclosing function. The memory referenced by a
+``begin_async_continuation_addr`` instruction remains uninitialized when
+``await_async_continuation`` resumes on the ``error`` successor.
+
+It is possible for a continuation to be resumed before ``await_async_continuation``.
+In this case, the resume operation returns immediately, and
+``await_async_continuation`` immediately transfers control to its ``resume``
+or ``error`` successor block, with the resume or error value that the
+continuation was resumed with.
 
 Differentiable Programming
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
