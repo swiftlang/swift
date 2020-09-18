@@ -294,7 +294,7 @@ class C4 {
 // UNRESOLVED_3_NOTIDEAL-NOT: none
 // UNRESOLVED_3_NOTIDEAL-NOT: some(
 
-// UNRESOLVED_3_OPT: Begin completions, 9 items
+// UNRESOLVED_3_OPT: Begin completions, 21 items
 // UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]: North[#SomeEnum1#];
 // UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]: South[#SomeEnum1#];
 // UNRESOLVED_3_OPT-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): SomeEnum1#})[#(into: inout Hasher) -> Void#];
@@ -307,7 +307,7 @@ class C4 {
 // UNRESOLVED_3_OPT-NOT: init({#nilLiteral:
 // UNRESOLVED_3_OPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem/TypeRelation[Invalid]: hash({#(self): Optional<SomeEnum1>#})[#(into: inout Hasher) -> Void#];
 
-// UNRESOLVED_3_OPTOPTOPT: Begin completions, 9 items
+// UNRESOLVED_3_OPTOPTOPT: Begin completions, 21 items
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]: North[#SomeEnum1#];
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]: South[#SomeEnum1#];
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): SomeEnum1#})[#(into: inout Hasher) -> Void#];
@@ -329,7 +329,7 @@ extension Optional where Wrapped == Somewhere {
 }
 func testOptionalWithCustomExtension() {
   var _: Somewhere? = .#^UNRESOLVED_OPT_4^#
-// UNRESOLVED_OPT_4: Begin completions, 11 items
+// UNRESOLVED_OPT_4: Begin completions, 23 items
 // UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]:     earth[#Somewhere#];
 // UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]:     mars[#Somewhere#];
 // UNRESOLVED_OPT_4-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): Somewhere#})[#(into: inout Hasher) -> Void#];
