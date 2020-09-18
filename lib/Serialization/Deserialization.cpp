@@ -2731,7 +2731,7 @@ public:
                                   StringRef blobData) {
     IdentifierID nameID;
     DeclContextID contextID;
-    bool isImplicit, isObjC, isStatic, hasNonPatternBindingInit;
+    bool isImplicit, isObjC, isStatic;
     uint8_t rawIntroducer;
     bool isGetterMutating, isSetterMutating;
     bool isLazyStorageProperty;
@@ -2749,7 +2749,6 @@ public:
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID,
                                        isImplicit, isObjC, isStatic, rawIntroducer,
-                                       hasNonPatternBindingInit,
                                        isGetterMutating, isSetterMutating,
                                        isLazyStorageProperty,
                                        isTopLevelGlobal,
@@ -2822,7 +2821,6 @@ public:
 
     auto var = MF.createDecl<VarDecl>(/*IsStatic*/ isStatic, *introducer,
                                       SourceLoc(), name, DC);
-    var->setHasNonPatternBindingInit(hasNonPatternBindingInit);
     var->setIsGetterMutating(isGetterMutating);
     var->setIsSetterMutating(isSetterMutating);
     declOrOffset = var;

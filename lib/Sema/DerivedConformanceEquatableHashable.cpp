@@ -207,7 +207,6 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
         auto *vNew = new (C) VarDecl(
             /*IsStatic*/ false, vOld->getIntroducer(),
             vOld->getNameLoc(), vOld->getName(), vOld->getDeclContext());
-        vNew->setHasNonPatternBindingInit();
         vNew->setImplicit();
         copy[i] = vNew;
       }
@@ -732,7 +731,6 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
         auto *vNew = new (C) VarDecl(
             /*IsStatic*/ false, vOld->getIntroducer(),
             vOld->getNameLoc(), vOld->getName(), vOld->getDeclContext());
-        vNew->setHasNonPatternBindingInit();
         vNew->setImplicit();
         copy[i] = vNew;
       }

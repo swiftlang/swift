@@ -802,6 +802,5 @@ VarDecl *DerivedConformance::indexedVarDecl(char prefixChar, int index, Type typ
                                  SourceLoc(), C.getIdentifier(indexStrRef),
                                  varContext);
   varDecl->setInterfaceType(type);
-  varDecl->setHasNonPatternBindingInit(true);
   return varDecl;
 }

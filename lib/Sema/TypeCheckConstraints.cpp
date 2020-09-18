@@ -2464,7 +2464,6 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
 
   matchVar->setImplicit();
   EP->setMatchVar(matchVar);
-  matchVar->setHasNonPatternBindingInit();
 
   // Find '~=' operators for the match.
   auto lookupOptions = defaultUnqualifiedLookupOptions;

@@ -1249,7 +1249,6 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
   auto *Tmp1VD = new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
                                    SourceLoc(), Ctx.getIdentifier("tmp1"), Get);
   Tmp1VD->setInterfaceType(VD->getValueInterfaceType());
-  Tmp1VD->setHasNonPatternBindingInit();
   Tmp1VD->setImplicit();
 
   auto *Named = NamedPattern::createImplicit(Ctx, Tmp1VD);

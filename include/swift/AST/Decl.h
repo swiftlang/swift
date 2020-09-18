@@ -353,17 +353,12 @@ protected:
     IsStatic : 1
   );
 
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+1+1+1+1+1,
     /// Encodes whether this is a 'let' binding.
     Introducer : 1,
 
     /// Whether this declaration captures the 'self' param under the same name.
     IsSelfParamCapture : 1,
-
-    /// Whether this vardecl has an initial value bound to it in a way
-    /// that isn't represented in the AST with an initializer in the pattern
-    /// binding.  This happens in cases like "for i in ...", switch cases, etc.
-    HasNonPatternBindingInit : 1,
 
     /// Whether this is a property used in expressions in the debugger.
     /// It is up to the debugger to instruct SIL how to access this variable.
@@ -5113,16 +5108,6 @@ public:
   bool isSelfParamCapture() const { return Bits.VarDecl.IsSelfParamCapture; }
   void setIsSelfParamCapture(bool IsSelfParamCapture = true) {
       Bits.VarDecl.IsSelfParamCapture = IsSelfParamCapture;
-  }
-
-  /// Return true if this vardecl has an initial value bound to it in a way
-  /// that isn't represented in the AST with an initializer in the pattern
-  /// binding.  This happens in cases like "for i in ...", switch cases, etc.
-  bool hasNonPatternBindingInit() const {
-    return Bits.VarDecl.HasNonPatternBindingInit;
-  }
-  void setHasNonPatternBindingInit(bool V = true) {
-    Bits.VarDecl.HasNonPatternBindingInit = V;
   }
 
   /// Determines if this var has an initializer expression that should be
