@@ -264,8 +264,7 @@ bool GenericTypeOrExtensionWhereOrBodyPortion::lookupMembersOf(
   auto nt = scope->getCorrespondingNominalTypeDecl().getPtrOrNull();
   if (!nt)
     return false;
-  auto selfDC = computeSelfDC(history);
-  return consumer.lookInMembers(selfDC, scope->getDeclContext().get(), nt,
+  return consumer.lookInMembers(scope->getDeclContext().get(), nt,
                                 [&](Optional<bool> initialIsCascadingUse) {
                                   return ASTScopeImpl::computeIsCascadingUse(
                                              history, initialIsCascadingUse)
@@ -456,69 +455,6 @@ bool ASTScopeImpl::lookupLocalBindingsInPattern(const Pattern *p,
   return isDone;
 }
 
-#pragma mark computeSelfDC
-
-NullablePtr<DeclContext>
-GenericTypeOrExtensionWhereOrBodyPortion::computeSelfDC(
-    ArrayRef<const ASTScopeImpl *> history) {
-  ASTScopeAssert(history.size() != 0, "includes current scope");
-  size_t i = history.size() - 1; // skip last entry (this scope)
-  while (i != 0) {
-    Optional<NullablePtr<DeclContext>> maybeSelfDC =
-        history[--i]->computeSelfDCForParent();
-    if (maybeSelfDC) {
-      // If we've found a selfDC, we'll definitely be returning something.
-      // However, we may have captured 'self' somewhere down the tree, so we
-      // can't return outright without checking the nested scopes.
-      NullablePtr<DeclContext> nestedCapturedSelfDC =
-          checkNestedScopesForSelfCapture(history, i);
-      return nestedCapturedSelfDC ? nestedCapturedSelfDC : *maybeSelfDC;
-    }
-  }
-  return nullptr;
-}
-
-#pragma mark checkNestedScopesForSelfCapture
-
-NullablePtr<DeclContext>
-GenericTypeOrExtensionWhereOrBodyPortion::checkNestedScopesForSelfCapture(
-    ArrayRef<const ASTScopeImpl *> history, size_t start) {
-  NullablePtr<DeclContext> innerCapturedSelfDC;
-  // Start with the next scope down the tree.
-  size_t j = start;
-
-  // Note: even though having this loop nested inside the while loop from
-  // GenericTypeOrExtensionWhereOrBodyPortion::computeSelfDC may appear to
-  // result in quadratic blowup, complexity actually remains linear with respect
-  // to the size of history. This relies on the fact that
-  // GenericTypeOrExtensionScope::computeSelfDCForParent returns a null pointer,
-  // which will cause this method to bail out of the search early. Thus, this
-  // method is called once per type body in the lookup history, and will not
-  // end up re-checking the bodies of nested types that have already been
-  // covered by earlier calls, so the total impact of this method across all
-  // calls in a single lookup is O(n).
-  while (j != 0) {
-      auto *entry = history[--j];
-    Optional<NullablePtr<DeclContext>> selfDCForParent =
-      entry->computeSelfDCForParent();
-
-    // If we encounter a scope that should cause us to forget the self
-    // context (such as a nested type), bail out and use whatever the
-    // the last inner captured context was.
-    if (selfDCForParent && (*selfDCForParent).isNull())
-      break;
-
-    // Otherwise, if we have a captured self context for this scope, then
-    // remember it since it is now the innermost scope we have encountered.
-    NullablePtr<DeclContext> capturedSelfDC = entry->capturedSelfDC();
-    if (!capturedSelfDC.isNull())
-      innerCapturedSelfDC = entry->capturedSelfDC();
-
-    // Continue searching in the next scope down.
-  }
-  return innerCapturedSelfDC;
-}
-
 #pragma mark compute isCascadingUse
 
 Optional<bool> ASTScopeImpl::computeIsCascadingUse(
@@ -585,65 +521,6 @@ NullablePtr<const ASTScopeImpl> ASTScopeImpl::ancestorWithDeclSatisfying(
     }
   }
   return nullptr;
-}
-
-#pragma mark computeSelfDCForParent
-
-// If the lookup depends on implicit self, selfDC is its context.
-// (Names in extensions never depend on self.)
-// Lookup can propagate it up from, say a method to the enclosing type body.
-
-// By default, propagate the selfDC up to a NomExt decl, body,
-// or where clause
-Optional<NullablePtr<DeclContext>>
-ASTScopeImpl::computeSelfDCForParent() const {
-  return None;
-}
-
-// Forget the "self" declaration:
-Optional<NullablePtr<DeclContext>>
-GenericTypeOrExtensionScope::computeSelfDCForParent() const {
-  return NullablePtr<DeclContext>();
-}
-
-Optional<NullablePtr<DeclContext>>
-PatternEntryInitializerScope::computeSelfDCForParent() const {
-  // Pattern binding initializers are only interesting insofar as they
-  // affect lookup in an enclosing nominal type or extension thereof.
-  if (auto *ic = getPatternEntry().getInitContext()) {
-    if (auto *bindingInit = dyn_cast<PatternBindingInitializer>(ic)) {
-      // Lazy variable initializer contexts have a 'self' parameter for
-      // instance member lookup.
-      if (bindingInit->getImplicitSelfDecl()) {
-        return NullablePtr<DeclContext>(bindingInit);
-      }
-    }
-  }
-  return None;
-}
-
-Optional<NullablePtr<DeclContext>>
-FunctionBodyScope::computeSelfDCForParent() const {
-  if (decl->getDeclContext()->isTypeContext())
-    return NullablePtr<DeclContext>(decl);
-  return None;
-}
-
-#pragma mark capturedSelfDC
-
-// Closures may explicitly capture the self param, in which case the lookup
-// should use the closure as the context for implicit self lookups.
-
-// By default, there is no such context to return.
-NullablePtr<DeclContext> ASTScopeImpl::capturedSelfDC() const {
-  return NullablePtr<DeclContext>();
-}
-
-// Closures track this information explicitly.
-NullablePtr<DeclContext> ClosureParametersScope::capturedSelfDC() const {
-  if (closureExpr->capturesSelfEnablingImplictSelf())
-    return NullablePtr<DeclContext>(closureExpr);
-  return NullablePtr<DeclContext>();
 }
 
 #pragma mark ifUnknownIsCascadingUseAccordingTo

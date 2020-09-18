@@ -248,8 +248,7 @@ public:
                NullablePtr<DeclContext> baseDC = nullptr) override;
 
   /// returns true if finished and new value for isCascadingUse
-  bool lookInMembers(NullablePtr<DeclContext> selfDC,
-                     DeclContext *const scopeDC, NominalTypeDecl *const nominal,
+  bool lookInMembers(DeclContext *const scopeDC, NominalTypeDecl *const nominal,
                      function_ref<bool(Optional<bool>)>) override;
 
 #ifndef NDEBUG
@@ -642,7 +641,7 @@ bool ASTScopeDeclGatherer::consume(ArrayRef<ValueDecl *> valuesArg,
 
 // TODO: in future, migrate this functionality into ASTScopes
 bool ASTScopeDeclConsumerForUnqualifiedLookup::lookInMembers(
-    NullablePtr<DeclContext> selfDC, DeclContext *const scopeDC,
+    DeclContext *const scopeDC,
     NominalTypeDecl *const nominal,
     function_ref<bool(Optional<bool>)> calculateIsCascadingUse) {
   if (candidateSelfDC) {

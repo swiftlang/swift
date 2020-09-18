@@ -1955,19 +1955,6 @@ bool ClosureExpr::hasEmptyBody() const {
   return getBody()->empty();
 }
 
-bool ClosureExpr::capturesSelfEnablingImplictSelf() const {
-  if (auto *VD = getCapturedSelfDecl()) {
-    if (!VD->isSelfParamCapture())
-      return false;
-
-    if (auto *attr = VD->getAttrs().getAttribute<ReferenceOwnershipAttr>())
-      return attr->get() != ReferenceOwnership::Weak;
-
-    return true;
-  }
-  return false;
-}
-
 void ClosureExpr::setExplicitResultType(Type ty) {
   assert(ty && !ty->hasTypeVariable() && !ty->hasHole());
   ExplicitResultTypeAndBodyState.getPointer()
