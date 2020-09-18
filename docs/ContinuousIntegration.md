@@ -237,6 +237,9 @@ apple/swift-lldb#48
 
 4. Watch the public incremental build on [ci.swift.org](https://ci.swift.org/) to make sure that you did not make any mistakes. It should complete within 30-40 minutes depending on what else was being committed in the mean time.
 
+**NOTE:** At the moment, Windows CI does not support cross repository testing
+([SR-13565](https://bugs.swift.org/browse/SR-13565)).
+
 ### Swift Community Hosted CI Pull Request Testing
 
 Currently, supported pull request testing triggers:
