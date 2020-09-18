@@ -878,6 +878,8 @@ public:
   /// \param scratch Scratch space to use.
   StringRef getString(llvm::SmallVectorImpl<char> &scratch) const;
 
+  SWIFT_DEBUG_HELPER(bool isString(StringRef str) const);
+
   ObjCSelectorFamily getSelectorFamily() const;
 
   void *getOpaqueValue() const { return Storage.getOpaqueValue(); }
