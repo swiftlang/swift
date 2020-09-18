@@ -1148,6 +1148,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
   Opts.EmitSortedSIL |= Args.hasArg(OPT_emit_sorted_sil);
   Opts.PrintInstCounts |= Args.hasArg(OPT_print_inst_counts);
+  Opts.StopOptimizationBeforeLoweringOwnership |=
+      Args.hasArg(OPT_sil_stop_optzns_before_lowering_ownership);
   if (const Arg *A = Args.getLastArg(OPT_external_pass_pipeline_filename))
     Opts.ExternalPassPipelineFilename = A->getValue();
 
