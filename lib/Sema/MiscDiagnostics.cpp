@@ -17,6 +17,7 @@
 #include "MiscDiagnostics.h"
 #include "ConstraintSystem.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckConcurrency.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"

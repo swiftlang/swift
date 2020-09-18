@@ -1384,13 +1384,6 @@ void checkUnknownAttrRestrictions(
 /// it to later stages.
 void bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *stmt);
 
-/// Add notes suggesting the addition of 'async' or '@asyncHandler', as
-/// appropriate, to a diagnostic for a function that isn't an async context.
-void addAsyncNotes(FuncDecl *func);
-
-/// Check actor isolation rules.
-void checkActorIsolation(const Expr *expr, const DeclContext *dc);
-
 } // end namespace swift
 
 #endif
