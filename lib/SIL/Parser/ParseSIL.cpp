@@ -136,6 +136,7 @@ namespace {
     ArrayRef<RequirementRepr> requirements;
     bool exported;
     SILSpecializeAttr::SpecializationKind kind;
+    SILFunction *target = nullptr;
   };
 
   class SILParser {
@@ -1050,10 +1051,32 @@ static bool parseDeclSILOptional(bool *isTransparent,
       SpecAttr.exported = false;
       SpecAttr.kind = SILSpecializeAttr::SpecializationKind::Full;
       SpecializeAttr *Attr;
+      StringRef targetFunctionName;
 
-      if (!SP.P.parseSpecializeAttribute(tok::r_square, AtLoc, Loc, Attr))
+      if (!SP.P.parseSpecializeAttribute(
+              tok::r_square, AtLoc, Loc, Attr,
+              [&targetFunctionName](Parser &P) -> bool {
+                if (P.Tok.getKind() != tok::string_literal) {
+                  P.diagnose(P.Tok, diag::expected_in_attribute_list);
+                  return true;
+                }
+                // Drop the double quotes.
+                targetFunctionName = P.Tok.getText().drop_front().drop_back();
+
+                P.consumeToken(tok::string_literal);
+                return true;
+              }))
         return true;
-
+      SILFunction *targetFunction = nullptr;
+      if (!targetFunctionName.empty()) {
+        targetFunction = M.lookUpFunction(targetFunctionName.str());
+        if (!targetFunction) {
+          Identifier Id = SP.P.Context.getIdentifier(targetFunctionName);
+          SP.P.diagnose(SP.P.Tok, diag::sil_specialize_target_func_not_found,
+                        Id);
+          return true;
+        }
+      }
       // Convert SpecializeAttr into ParsedSpecAttr.
       SpecAttr.requirements = Attr->getTrailingWhereClause()->getRequirements();
       SpecAttr.kind = Attr->getSpecializationKind() ==
@@ -1061,6 +1084,7 @@ static bool parseDeclSILOptional(bool *isTransparent,
                           ? SILSpecializeAttr::SpecializationKind::Full
                           : SILSpecializeAttr::SpecializationKind::Partial;
       SpecAttr.exported = Attr->isExported();
+      SpecAttr.target = targetFunction;
       SpecAttrs->emplace_back(SpecAttr);
       continue;
     }
@@ -5848,7 +5872,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
                 GenericSignature());
           FunctionState.F->addSpecializeAttr(SILSpecializeAttr::create(
               FunctionState.F->getModule(), genericSig, Attr.exported,
-              Attr.kind));
+              Attr.kind, Attr.target));
         }
       }
 

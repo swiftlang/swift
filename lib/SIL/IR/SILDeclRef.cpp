@@ -20,6 +20,7 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILLocation.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
@@ -160,6 +161,12 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign)
   isForeign = asForeign;
 }
 
+SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
+                       GenericSignature prespecializedSig)
+    : SILDeclRef(baseLoc, false) {
+  specializedSignature = prespecializedSig;
+}
+
 Optional<AnyFunctionRef> SILDeclRef::getAnyFunctionRef() const {
   if (auto vd = loc.dyn_cast<ValueDecl*>()) {
     if (auto afd = dyn_cast<AbstractFunctionDecl>(vd)) {
@@ -223,6 +230,12 @@ bool SILDeclRef::isImplicit() const {
 }
 
 SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
+
+  // Prespecializations are public.
+  if (specializedSignature) {
+    return SILLinkage::Public;
+  }
+
   if (getAbstractClosureExpr()) {
     return isSerialized() ? SILLinkage::Shared : SILLinkage::Private;
   }
@@ -700,6 +713,17 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
         }
       }
     }
+  }
+
+  // Mangle prespecializations.
+  if (specializedSignature) {
+    SILDeclRef nonSpecializedDeclRef = *this;
+    nonSpecializedDeclRef.specializedSignature = GenericSignature();
+    auto mangledNonSpecializedString = nonSpecializedDeclRef.mangle();
+    auto *funcDecl = cast<AbstractFunctionDecl>(getDecl());
+    auto genericSig = funcDecl->getGenericSignature();
+    return GenericSpecializationMangler::manglePrespecialization(
+        mangledNonSpecializedString, genericSig, specializedSignature);
   }
 
   ASTMangler::SymbolKind SKind = ASTMangler::SymbolKind::Default;

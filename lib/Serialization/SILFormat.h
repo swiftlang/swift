@@ -302,7 +302,8 @@ namespace sil_block {
       BCRecordLayout<SIL_SPECIALIZE_ATTR,
                      BCFixed<1>, // exported
                      BCFixed<1>, // specialization kind
-                     GenericSignatureIDField // specialized signature
+                     GenericSignatureIDField, // specialized signature
+                     DeclIDField // Target SILFunction name or 0.
                      >;
 
   // Has an optional argument list where each argument is a typed valueref.

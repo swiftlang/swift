@@ -418,6 +418,10 @@ namespace {
 class AccessControlChecker : public AccessControlCheckerBase,
                              public DeclVisitor<AccessControlChecker> {
 public:
+
+  AccessControlChecker(bool allowUsableFromInline)
+    : AccessControlCheckerBase(allowUsableFromInline) {}
+
   AccessControlChecker()
       : AccessControlCheckerBase(/*checkUsableFromInline=*/false) {}
 
@@ -2073,7 +2077,9 @@ DisallowedOriginKind swift::getDisallowedOriginKind(const Decl *decl,
 
 void swift::checkAccessControl(Decl *D) {
   if (isa<ValueDecl>(D) || isa<PatternBindingDecl>(D)) {
-    AccessControlChecker().visit(D);
+    bool allowInlineable =
+        D->getDeclContext()->isInSpecializeExtensionContext();
+    AccessControlChecker(allowInlineable).visit(D);
     UsableFromInlineChecker().visit(D);
   } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
     checkExtensionGenericParamAccess(ED);

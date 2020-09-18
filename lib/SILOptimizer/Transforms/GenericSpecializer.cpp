@@ -81,7 +81,7 @@ bool GenericSpecializer::specializeAppliesInFunction(SILFunction &F) {
       auto *Callee = Apply.getReferencedFunctionOrNull();
       if (!Callee)
         continue;
-      if (!Callee->isDefinition()) {
+      if (!Callee->isDefinition() && !Callee->hasPrespecialization()) {
         ORE.emit([&]() {
           using namespace OptRemark;
           return RemarkMissed("NoDef", I)

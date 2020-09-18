@@ -3482,6 +3482,9 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
       requirements = specializedSig->getRequirements();
     }
   }
+  if (targetFunction) {
+    OS << "target: \"" << targetFunction->getName() << "\", ";
+  }
   if (!requirements.empty()) {
     OS << "where ";
     SILFunction *F = getFunction();

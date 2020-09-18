@@ -5113,6 +5113,12 @@ ERROR(specialize_attr_missing_constraint,none,
       "Missing constraint for %0 in '_specialize' attribute", (DeclName))
 ERROR(specialize_attr_unsupported_kind_of_req,none,
       "Only same-type and layout requirements are supported by '_specialize' attribute", ())
+ERROR(specialize_target_function_not_found, none,
+     "target function %0 could not be found", (DeclNameRef))
+ERROR(specialize_target_function_of_type_not_found, none,
+      "target function %0 of type %1 could not be found", (DeclNameRef, Type))
+NOTE(specialize_found_function_of_type, none,
+      "found function %0 of type %1", (DeclName, Type))
 
 //------------------------------------------------------------------------------
 // MARK: Variable usage diagnostics

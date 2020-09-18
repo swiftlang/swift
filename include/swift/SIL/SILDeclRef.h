@@ -20,6 +20,7 @@
 #define SWIFT_SIL_SILDeclRef_H
 
 #include "swift/AST/ClangNode.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/TypeAlignments.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/DenseMap.h"
@@ -48,6 +49,7 @@ namespace swift {
   class SILLocation;
   enum class SILLinkage : uint8_t;
   class AnyFunctionRef;
+  class GenericSignature;
 
 /// How a method is dispatched.
 enum class MethodDispatch {
@@ -151,6 +153,8 @@ struct SILDeclRef {
   /// The derivative function identifier.
   AutoDiffDerivativeFunctionIdentifier *derivativeFunctionIdentifier = nullptr;
 
+  GenericSignature specializedSignature;
+
   /// Produces a null SILDeclRef.
   SILDeclRef()
       : loc(), kind(Kind::Func), isForeign(0), defaultArgIndex(0),
@@ -173,6 +177,9 @@ struct SILDeclRef {
   /// - If 'loc' is a global VarDecl, this returns its GlobalAccessor
   ///   SILDeclRef.
   explicit SILDeclRef(Loc loc, bool isForeign = false);
+
+  /// See above put produces a prespecialization according to the signature.
+  explicit SILDeclRef(Loc loc, GenericSignature prespecializationSig);
 
   /// Produce a SIL constant for a default argument generator.
   static SILDeclRef getDefaultArgGenerator(Loc loc, unsigned defaultArgIndex);

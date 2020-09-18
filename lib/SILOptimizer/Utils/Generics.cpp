@@ -1769,9 +1769,12 @@ void ReabstractionInfo::finishPartialSpecializationPreparation(
 /// This constructor is used when processing @_specialize.
 ReabstractionInfo::ReabstractionInfo(ModuleDecl *targetModule,
                                      bool isWholeModule, SILFunction *Callee,
-                                     GenericSignature SpecializedSig)
-    : TargetModule(targetModule), isWholeModule(isWholeModule) {
-  Serialized = Callee->isSerialized();
+                                     GenericSignature SpecializedSig,
+                                     bool isPrespecialization)
+    : TargetModule(targetModule), isWholeModule(isWholeModule),
+      isPrespecialization(isPrespecialization) {
+  Serialized =
+      this->isPrespecialization ? IsNotSerialized : Callee->isSerialized();
 
   if (shouldNotSpecialize(Callee, nullptr))
     return;
@@ -1805,7 +1808,8 @@ GenericFuncSpecializer::GenericFuncSpecializer(
       ParamSubs(ParamSubs),
       ReInfo(ReInfo) {
 
-  assert(GenericFunc->isDefinition() && "Expected definition to specialize!");
+  assert((GenericFunc->isDefinition() || ReInfo.isPrespecialized()) &&
+         "Expected definition or pre-specialized entry-point to specialize!");
   auto FnTy = ReInfo.getSpecializedType();
 
   if (ReInfo.isPartialSpecialization()) {
@@ -1814,7 +1818,8 @@ GenericFuncSpecializer::GenericFuncSpecializer(
     ClonedName = Mangler.mangle();
   } else {
     Mangle::GenericSpecializationMangler Mangler(
-        GenericFunc, ParamSubs, ReInfo.isSerialized(), /*isReAbstracted*/ true);
+        GenericFunc, ParamSubs, ReInfo.isSerialized(), /*isReAbstracted*/ true,
+        /*isInlined*/ false, ReInfo.isPrespecialized());
     ClonedName = Mangler.mangle();
   }
   LLVM_DEBUG(llvm::dbgs() << "    Specialized function " << ClonedName << '\n');
@@ -1849,9 +1854,10 @@ void ReabstractionInfo::verify() const {
 }
 
 /// Create a new specialized function if possible, and cache it.
-SILFunction *GenericFuncSpecializer::tryCreateSpecialization() {
+SILFunction *
+GenericFuncSpecializer::tryCreateSpecialization(bool forcePrespecialization) {
   // Do not create any new specializations at Onone.
-  if (!GenericFunc->shouldOptimize())
+  if (!GenericFunc->shouldOptimize() && !forcePrespecialization)
     return nullptr;
 
   LLVM_DEBUG(llvm::dbgs() << "Creating a specialization: "
@@ -2416,6 +2422,51 @@ static bool createPrespecializations(ApplySite Apply, SILFunction *ProxyFunc,
   return prespecializeFound;
 }
 
+static SILFunction *
+lookupOrCreatePrespecialization(SILOptFunctionBuilder &funcBuilder,
+                                SILFunction *origF, std::string clonedName,
+                                ReabstractionInfo &reInfo) {
+
+  if (auto *specializedF = funcBuilder.getModule().lookUpFunction(clonedName)) {
+    assert(reInfo.getSpecializedType() ==
+               specializedF->getLoweredFunctionType() &&
+           "Previously specialized function does not match expected type.");
+    return specializedF;
+  }
+
+  auto *declaration =
+      GenericCloner::createDeclaration(funcBuilder, origF, reInfo, clonedName);
+  declaration->setLinkage(SILLinkage::PublicExternal);
+
+  return declaration;
+}
+
+static SILFunction *
+usePrespecialized(SILOptFunctionBuilder &funcBuilder, ApplySite apply,
+                  SILFunction *refF, const ReabstractionInfo &specializedReInfo,
+                  ReabstractionInfo &prespecializedReInfo) {
+  for (auto *SA : refF->getSpecializeAttrs()) {
+    if (!SA->isExported())
+      continue;
+    ReabstractionInfo reInfo(funcBuilder.getModule().getSwiftModule(),
+                             funcBuilder.getModule().isWholeModule(), refF,
+                             SA->getSpecializedSignature(),
+                             /*isPrespecialization*/ true);
+    if (specializedReInfo.getSpecializedType() != reInfo.getSpecializedType())
+      continue;
+
+    Mangle::GenericSpecializationMangler mangler(
+        refF, reInfo.getCalleeParamSubstitutionMap(), reInfo.isSerialized(),
+        /*isReAbstracted*/ true, /*isInlined*/ false,
+        reInfo.isPrespecialized());
+
+    prespecializedReInfo = reInfo;
+    return lookupOrCreatePrespecialization(funcBuilder, refF, mangler.mangle(),
+                                           reInfo);
+  }
+  return nullptr;
+}
+
 void swift::trySpecializeApplyOfGeneric(
     SILOptFunctionBuilder &FuncBuilder,
     ApplySite Apply, DeadInstructionSet &DeadApplies,
@@ -2464,6 +2515,18 @@ void swift::trySpecializeApplyOfGeneric(
                            Apply.getSubstitutionMap(), Serialized,
                            /*ConvertIndirectToDirect=*/true, &ORE);
   if (!ReInfo.canBeSpecialized())
+    return;
+
+  // Check if there is a pre-specialization available in a library.
+  SILFunction *prespecializedF = nullptr;
+  ReabstractionInfo prespecializedReInfo;
+  if ((prespecializedF = usePrespecialized(FuncBuilder, Apply, RefF, ReInfo,
+                                           prespecializedReInfo))) {
+    ReInfo = prespecializedReInfo;
+  }
+
+  // If there is not pre-specialization and we don't have a body give up.
+  if (!prespecializedF && !RefF->isDefinition())
     return;
 
   SILModule &M = F->getModule();
@@ -2521,7 +2584,9 @@ void swift::trySpecializeApplyOfGeneric(
   GenericFuncSpecializer FuncSpecializer(FuncBuilder,
                                          RefF, Apply.getSubstitutionMap(),
                                          ReInfo);
-  SILFunction *SpecializedF = FuncSpecializer.lookupSpecialization();
+  SILFunction *SpecializedF = prespecializedF
+                                  ? prespecializedF
+                                  : FuncSpecializer.lookupSpecialization();
   if (!SpecializedF) {
     SpecializedF = FuncSpecializer.tryCreateSpecialization();
     if (!SpecializedF)
@@ -2710,4 +2775,3 @@ SILFunction *swift::lookupPrespecializedSymbol(SILModule &M,
 
   return Specialization;
 }
-

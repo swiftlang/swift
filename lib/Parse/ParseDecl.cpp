@@ -581,16 +581,21 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
 bool Parser::parseSpecializeAttributeArguments(
     swift::tok ClosingBrace, bool &DiscardAttribute, Optional<bool> &Exported,
     Optional<SpecializeAttr::SpecializationKind> &Kind,
-    swift::TrailingWhereClause *&TrailingWhereClause) {
+    swift::TrailingWhereClause *&TrailingWhereClause,
+    DeclNameRef &targetFunction,
+    llvm::function_ref<bool(Parser &)> parseSILTargetName) {
   SyntaxParsingContext ContentContext(SyntaxContext,
                                       SyntaxKind::SpecializeAttributeSpecList);
   // Parse optional "exported" and "kind" labeled parameters.
   while (!Tok.is(tok::kw_where)) {
-    SyntaxParsingContext ArgumentContext(SyntaxContext,
-                                         SyntaxKind::LabeledSpecializeEntry);
     if (Tok.is(tok::identifier)) {
       auto ParamLabel = Tok.getText();
-      if (ParamLabel != "exported" && ParamLabel != "kind") {
+      SyntaxParsingContext ArgumentContext(
+          SyntaxContext, ParamLabel == "target"
+                             ? SyntaxKind::TargetFunctionEntry
+                             : SyntaxKind::LabeledSpecializeEntry);
+      if (ParamLabel != "exported" && ParamLabel != "kind" &&
+          ParamLabel != "target") {
         diagnose(Tok.getLoc(), diag::attr_specialize_unknown_parameter_name,
                  ParamLabel);
       }
@@ -618,9 +623,6 @@ bool Parser::parseSpecializeAttributeArguments(
       if (ParamLabel == "exported") {
         auto trueLoc = Tok.getLoc();
         bool isTrue = consumeIf(tok::kw_true);
-        if (isTrue) {
-          diagnose(trueLoc, diag::attr_specialize_export_true_no_op);
-        }
         bool isFalse = consumeIf(tok::kw_false);
         if (!isTrue && !isFalse) {
           diagnose(Tok.getLoc(), diag::attr_specialize_expected_bool_value);
@@ -659,6 +661,18 @@ bool Parser::parseSpecializeAttributeArguments(
                    diag::attr_specialize_expected_partial_or_full);
         }
       }
+      if (ParamLabel == "target") {
+        if (!parseSILTargetName(*this)) {
+          SyntaxParsingContext ContentContext(SyntaxContext,
+                                              SyntaxKind::DeclName);
+          DeclNameLoc loc;
+          targetFunction = parseDeclNameRef(
+              loc, diag::attr_specialize_expected_function,
+              DeclNameFlag::AllowZeroArgCompoundNames |
+                  DeclNameFlag::AllowKeywordsUsingSpecialNames |
+                  DeclNameFlag::AllowOperators);
+        }
+      }
       if (!consumeIf(tok::comma)) {
         diagnose(Tok.getLoc(), diag::attr_specialize_missing_comma);
         skipUntil(tok::comma, tok::kw_where);
@@ -695,8 +709,10 @@ bool Parser::parseSpecializeAttributeArguments(
   return true;
 }
 
-bool Parser::parseSpecializeAttribute(swift::tok ClosingBrace, SourceLoc AtLoc,
-                                      SourceLoc Loc, SpecializeAttr *&Attr) {
+bool Parser::parseSpecializeAttribute(
+    swift::tok ClosingBrace, SourceLoc AtLoc, SourceLoc Loc,
+    SpecializeAttr *&Attr,
+    llvm::function_ref<bool(Parser &)> parseSILTargetName) {
   assert(ClosingBrace == tok::r_paren || ClosingBrace == tok::r_square);
 
   SourceLoc lParenLoc = consumeToken();
@@ -708,8 +724,10 @@ bool Parser::parseSpecializeAttribute(swift::tok ClosingBrace, SourceLoc AtLoc,
 
   TrailingWhereClause *trailingWhereClause = nullptr;
 
+  DeclNameRef targetFunction;
   if (!parseSpecializeAttributeArguments(ClosingBrace, DiscardAttribute,
-                                         exported, kind, trailingWhereClause)) {
+                                         exported, kind, trailingWhereClause,
+                                         targetFunction, parseSILTargetName)) {
     return false;
   }
 
@@ -738,7 +756,7 @@ bool Parser::parseSpecializeAttribute(swift::tok ClosingBrace, SourceLoc AtLoc,
   // Store the attribute.
   Attr = SpecializeAttr::create(Context, AtLoc, SourceRange(Loc, rParenLoc),
                                 trailingWhereClause, exported.getValue(),
-                                kind.getValue());
+                                kind.getValue(), targetFunction);
   return true;
 }
 

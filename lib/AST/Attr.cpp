@@ -902,9 +902,11 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     auto *attr = cast<SpecializeAttr>(this);
     auto exported = attr->isExported() ? "true" : "false";
     auto kind = attr->isPartialSpecialization() ? "partial" : "full";
-
+    auto target = attr->getTargetFunctionName();
     Printer << "exported: "<<  exported << ", ";
     Printer << "kind: " << kind << ", ";
+    if (target)
+      Printer << "target: " << target << ", ";
     SmallVector<Requirement, 4> requirementsScratch;
     ArrayRef<Requirement> requirements;
     if (auto sig = attr->getSpecializedSignature())
@@ -1559,11 +1561,13 @@ SpecializeAttr::SpecializeAttr(SourceLoc atLoc, SourceRange range,
                                TrailingWhereClause *clause,
                                bool exported,
                                SpecializationKind kind,
-                               GenericSignature specializedSignature)
+                               GenericSignature specializedSignature,
+                               DeclNameRef targetFunctionName)
     : DeclAttribute(DAK_Specialize, atLoc, range,
                     /*Implicit=*/clause == nullptr),
       trailingWhereClause(clause),
-      specializedSignature(specializedSignature) {
+      specializedSignature(specializedSignature),
+      targetFunctionName(targetFunctionName) {
   Bits.SpecializeAttr.exported = exported;
   Bits.SpecializeAttr.kind = unsigned(kind);
 }
@@ -1577,9 +1581,40 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                        TrailingWhereClause *clause,
                                        bool exported,
                                        SpecializationKind kind,
+                                       DeclNameRef targetFunctionName,
                                        GenericSignature specializedSignature) {
   return new (Ctx) SpecializeAttr(atLoc, range, clause, exported, kind,
-                                  specializedSignature);
+                                  specializedSignature, targetFunctionName);
+}
+
+SpecializeAttr *SpecializeAttr::create(ASTContext &ctx, bool exported,
+                                SpecializationKind kind,
+                                GenericSignature specializedSignature,
+                                DeclNameRef targetFunctionName) {
+  return new (ctx)
+      SpecializeAttr(SourceLoc(), SourceRange(), nullptr, exported, kind,
+                     specializedSignature, targetFunctionName);
+}
+
+SpecializeAttr *SpecializeAttr::create(ASTContext &ctx, bool exported,
+                                       SpecializationKind kind,
+                                       GenericSignature specializedSignature,
+                                       DeclNameRef targetFunctionName,
+                                       LazyMemberLoader *resolver,
+                                       uint64_t data) {
+  auto *attr =  new (ctx)
+      SpecializeAttr(SourceLoc(), SourceRange(), nullptr, exported, kind,
+                     specializedSignature, targetFunctionName);
+  attr->resolver = resolver;
+  attr->resolverContextData = data;
+  return attr;
+}
+
+ValueDecl * SpecializeAttr::getTargetFunctionDecl(const ValueDecl *onDecl) const {
+  return evaluateOrDefault(onDecl->getASTContext().evaluator,
+                           SpecializeAttrTargetDeclRequest{
+                               onDecl, const_cast<SpecializeAttr *>(this)},
+                           nullptr);
 }
 
 SPIAccessControlAttr::SPIAccessControlAttr(SourceLoc atLoc, SourceRange range,

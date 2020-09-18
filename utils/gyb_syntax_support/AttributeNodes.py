@@ -102,6 +102,7 @@ ATTRIBUTE_NODES = [
          element='Syntax', element_name='SpecializeAttribute',
          element_choices=[
              'LabeledSpecializeEntry',
+             'TargetFunctionEntry',
              'GenericWhereClause',
          ]),
 
@@ -125,6 +126,28 @@ ATTRIBUTE_NODES = [
                    A trailing comma if this argument is followed by another one
                    '''),
          ]),
+    # Representation of e.g. 'exported: true,'
+    # labeled-specialize-entry -> identifier ':' token ','?
+    Node('TargetFunctionEntry', kind='Syntax',
+         description='''
+         A labeled argument for the `@_specialize` attribute with a function
+         decl value like
+         `target: myFunc(_:)`
+         ''',
+         traits=['WithTrailingComma'],
+         children=[
+             Child('Label', kind='IdentifierToken',
+                   description='The label of the argument'),
+             Child('Colon', kind='ColonToken',
+                   description='The colon separating the label and the value'),
+             Child('Delcname', kind='DeclName',
+                   description='The value for this argument'),
+             Child('TrailingComma', kind='CommaToken',
+                   is_optional=True, description='''
+                   A trailing comma if this argument is followed by another one
+                   '''),
+         ]),
+
     # The argument of '@_dynamic_replacement(for:)' or '@_private(sourceFile:)'
     # named-attribute-string-arg -> 'name': string-literal
     Node('NamedAttributeStringArgument', kind='Syntax',

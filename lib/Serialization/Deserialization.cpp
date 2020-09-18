@@ -4255,18 +4255,33 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         unsigned specializationKindVal;
         GenericSignatureID specializedSigID;
 
+        ArrayRef<uint64_t> rawPieceIDs;
+        uint64_t numArgs;
+        DeclID targetFunID;
+
         serialization::decls_block::SpecializeDeclAttrLayout::readRecord(
-          scratch, exported, specializationKindVal, specializedSigID);
+            scratch, exported, specializationKindVal, specializedSigID,
+            targetFunID, numArgs, rawPieceIDs);
 
         specializationKind = specializationKindVal
                                  ? SpecializeAttr::SpecializationKind::Partial
                                  : SpecializeAttr::SpecializationKind::Full;
+        // The 'target' parameter.
+        DeclNameRef replacedFunctionName;
+        if (numArgs) {
+          auto baseName = MF.getDeclBaseName(rawPieceIDs[0]);
+          SmallVector<Identifier, 4> pieces;
+          for (auto pieceID : rawPieceIDs.slice(1))
+            pieces.push_back(MF.getIdentifier(pieceID));
+          replacedFunctionName = (numArgs == 1)
+                                     ? DeclNameRef({baseName}) // simple name
+                                     : DeclNameRef({ctx, baseName, pieces});
+        }
 
         auto specializedSig = MF.getGenericSignature(specializedSigID);
-        Attr = SpecializeAttr::create(ctx, SourceLoc(), SourceRange(),
-                                      nullptr, exported != 0,
-                                      specializationKind,
-                                      specializedSig);
+        Attr = SpecializeAttr::create(ctx, exported != 0, specializationKind,
+                                      specializedSig, replacedFunctionName, &MF,
+                                      targetFunID);
         break;
       }
 
@@ -6025,6 +6040,13 @@ ValueDecl *ModuleFile::loadDynamicallyReplacedFunctionDecl(
 AbstractFunctionDecl *
 ModuleFile::loadReferencedFunctionDecl(const DerivativeAttr *DA,
                                        uint64_t contextData) {
+  return cast<AbstractFunctionDecl>(getDecl(contextData));
+}
+
+ValueDecl *ModuleFile::loadTargetFunctionDecl(const SpecializeAttr *attr,
+                                              uint64_t contextData) {
+  if (contextData == 0)
+    return nullptr;
   return cast<AbstractFunctionDecl>(getDecl(contextData));
 }
 

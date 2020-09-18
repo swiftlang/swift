@@ -2187,7 +2187,8 @@ public:
   /// implementations for the requirements of a public protocol, even when
   /// the default implementations are not visible to name lookup.
   bool isAccessibleFrom(const DeclContext *DC,
-                        bool forConformance = false) const;
+                        bool forConformance = false,
+                        bool includeInlineable = false) const;
 
   /// Returns whether this declaration should be treated as \c open from
   /// \p useDC. This is very similar to #getFormalAccess, but takes

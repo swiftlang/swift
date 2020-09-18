@@ -2177,6 +2177,25 @@ public:
   bool isCached() const { return true; }
 };
 
+class SpecializeAttrTargetDeclRequest
+    : public SimpleRequest<SpecializeAttrTargetDeclRequest,
+                           ValueDecl *(const ValueDecl *, SpecializeAttr *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ValueDecl *evaluate(Evaluator &evaluator, const ValueDecl *vd,
+                      SpecializeAttr *attr) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 class TypeCheckSourceFileRequest
     : public SimpleRequest<
           TypeCheckSourceFileRequest, evaluator::SideEffect(SourceFile *),

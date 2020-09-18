@@ -1409,6 +1409,8 @@ public:
 /// The @_specialize attribute, which forces specialization on the specified
 /// type list.
 class SpecializeAttr : public DeclAttribute {
+  friend class SpecializeAttrTargetDeclRequest;
+
 public:
   // NOTE: When adding new kinds, you must update the inline bitfield macro.
   enum class SpecializationKind {
@@ -1420,17 +1422,34 @@ private:
   TrailingWhereClause *trailingWhereClause;
   GenericSignature specializedSignature;
 
+  DeclNameRef targetFunctionName;
+  LazyMemberLoader *resolver = nullptr;
+  uint64_t resolverContextData;
+
   SpecializeAttr(SourceLoc atLoc, SourceRange Range,
                  TrailingWhereClause *clause, bool exported,
                  SpecializationKind kind,
-                 GenericSignature specializedSignature);
+                 GenericSignature specializedSignature,
+                 DeclNameRef targetFunctionName);
 
 public:
   static SpecializeAttr *create(ASTContext &Ctx, SourceLoc atLoc,
                                 SourceRange Range, TrailingWhereClause *clause,
                                 bool exported, SpecializationKind kind,
+                                DeclNameRef targetFunctionName,
                                 GenericSignature specializedSignature
                                     = nullptr);
+
+  static SpecializeAttr *create(ASTContext &ctx, bool exported,
+                                SpecializationKind kind,
+                                GenericSignature specializedSignature,
+                                DeclNameRef replacedFunction);
+
+  static SpecializeAttr *create(ASTContext &ctx, bool exported,
+                                SpecializationKind kind,
+                                GenericSignature specializedSignature,
+                                DeclNameRef replacedFunction,
+                                LazyMemberLoader *resolver, uint64_t data);
 
   TrailingWhereClause *getTrailingWhereClause() const;
 
@@ -1457,6 +1476,13 @@ public:
   bool isPartialSpecialization() const {
     return getSpecializationKind() == SpecializationKind::Partial;
   }
+
+  DeclNameRef getTargetFunctionName() const {
+    return targetFunctionName;
+  }
+
+  /// \p forDecl is the value decl that the attribute belongs to.
+  ValueDecl *getTargetFunctionDecl(const ValueDecl *forDecl) const;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Specialize;

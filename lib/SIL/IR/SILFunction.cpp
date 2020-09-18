@@ -32,15 +32,21 @@ using namespace swift;
 using namespace Lowering;
 
 SILSpecializeAttr::SILSpecializeAttr(bool exported, SpecializationKind kind,
-                                     GenericSignature specializedSig)
-    : kind(kind), exported(exported), specializedSignature(specializedSig) { }
+                                     GenericSignature specializedSig,
+                                     SILFunction *target)
+    : kind(kind), exported(exported), specializedSignature(specializedSig),
+      targetFunction(target) {
+        if (targetFunction)
+          targetFunction->incrementRefCount();
+      }
 
 SILSpecializeAttr *SILSpecializeAttr::create(SILModule &M,
                                              GenericSignature specializedSig,
                                              bool exported,
-                                             SpecializationKind kind) {
+                                             SpecializationKind kind,
+                                             SILFunction *target) {
   void *buf = M.allocate(sizeof(SILSpecializeAttr), alignof(SILSpecializeAttr));
-  return ::new (buf) SILSpecializeAttr(exported, kind, specializedSig);
+  return ::new (buf) SILSpecializeAttr(exported, kind, specializedSig, target);
 }
 
 void SILFunction::addSpecializeAttr(SILSpecializeAttr *Attr) {
@@ -48,6 +54,19 @@ void SILFunction::addSpecializeAttr(SILSpecializeAttr *Attr) {
     Attr->F = this;
     SpecializeAttrSet.push_back(Attr);
   }
+}
+
+void SILFunction::removeSpecializeAttr(SILSpecializeAttr *attr) {
+  // Drop the reference to the _specialize(target:) function.
+  if (auto *targetFun = attr->getTargetFunction()) {
+    targetFun->decrementRefCount();
+  }
+  SpecializeAttrSet.erase(std::remove_if(SpecializeAttrSet.begin(),
+                                         SpecializeAttrSet.end(),
+                                         [attr](SILSpecializeAttr *member) {
+                                           return member == attr;
+                                         }),
+                          SpecializeAttrSet.end());
 }
 
 SILFunction *
@@ -688,4 +707,21 @@ template<>
 const UnifiedStatsReporter::TraceFormatter*
 FrontendStatsTracer::getTraceFormatter<const SILFunction *>() {
   return &TF;
+}
+
+bool SILFunction::hasPrespecialization() const {
+  for (auto *attr : getSpecializeAttrs()) {
+    if (attr->isExported())
+      return true;
+  }
+  return false;
+}
+
+void SILFunction::forEachSpecializeAttrTargetFunction(
+      llvm::function_ref<void(SILFunction *)> action) {
+  for (auto *attr : getSpecializeAttrs()) {
+    if (auto *f = attr->getTargetFunction()) {
+      action(f);
+    }
+  }
 }
