@@ -1037,8 +1037,6 @@ public:
 
   NullablePtr<const void> getReferrent() const override;
 
-  static bool shouldCreateAccessorScope(const AccessorDecl *);
-
 protected:
   SourceRange
   getSourceRangeOfEnclosedParamsOfASTNode(bool omitAssertions) const override;

@@ -2004,11 +2004,6 @@ ASTScopeImpl::rescueASTAncestorScopesForReuseFromMe() {
   return astAncestorScopes;
 }
 
-bool AbstractFunctionDeclScope::shouldCreateAccessorScope(
-    const AccessorDecl *const ad) {
-  return isLocalizable(ad);
-}
-
 #pragma mark verification
 
 namespace {
