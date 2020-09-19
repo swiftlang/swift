@@ -161,6 +161,10 @@ def Robjc_import_failures : Separate<["-"], "Robjc-import-failures">,
   HelpText<"Emit remarks describing which Objective-C declarations in this "
            "module cannot be imported and why">;
 
+def Robjc_imports_natural_only : Flag<["-"], "Robjc-imports-natural-only">,
+  HelpText<"Don't force unnecessary imports of Objective-C declarations just "
+           "to get remarks from -Robjc-imports or -Robjc-import-failures">;
+
 def serialize_debugging_options : Flag<["-"], "serialize-debugging-options">,
   HelpText<"Always serialize options for debugging (default: only for apps)">;
 def no_serialize_debugging_options :

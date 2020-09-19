@@ -4348,6 +4348,28 @@ void ClangImporter::Implementation::emitImportRemarks() {
 }
 
 void ClangImporter::emitImportRemarks() {
+  auto &opts = Impl.SwiftContext.ClangImporterOpts;
+  if (opts.ForceImportDecisions) {
+    for (auto pair : opts.EmitImportDecisionRemarks) {
+      ImportPath::Module::Builder modulePath(Impl.SwiftContext,
+                                             std::get<0>(pair), '.');
+      auto module = loadModule(SourceLoc(), modulePath.get());
+
+      // FIXME: I'm not convinced this actually touches everything. Is there a
+      // better way to do this?
+      class CuriousDeclConsumer : public VisibleDeclConsumer {
+        virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                               DynamicLookupInfo dynamicLookupInfo = {}) override {
+
+          if (auto *IDC = dyn_cast<IterableDeclContext>(VD))
+            (void)IDC->getMembers();
+        }
+      };
+      CuriousDeclConsumer consumer;
+      module->lookupVisibleDecls({}, consumer, NLKind::QualifiedLookup);
+    }
+  }
+
   Impl.emitImportRemarks();
 }
 

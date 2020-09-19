@@ -648,6 +648,10 @@ namespace swift {
     /// If true, emit for all decisions; if false, emit only for failures.
     std::vector<std::tuple<std::string, bool>> EmitImportDecisionRemarks;
 
+    /// If true, deliberately import as many declarations as possible in the
+    /// modules listed in \c EmitImportDecisionRemarks.
+    bool ForceImportDecisions = false;
+
     /// Disable validating the persistent PCH.
     bool PCHDisableValidation = false;
 

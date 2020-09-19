@@ -933,6 +933,10 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
   ParseRImportArg(Opts.EmitImportDecisionRemarks, false, Args,
                   OPT_Robjc_import_failures);
 
+  if (!Opts.EmitImportDecisionRemarks.empty()
+      && !Args.hasArg(OPT_Robjc_imports_natural_only))
+    Opts.ForceImportDecisions = true;
+
   for (auto A : Args.getAllArgValues(OPT_debug_prefix_map)) {
     // Forward -debug-prefix-map arguments from Swift to Clang as
     // -fdebug-prefix-map. This is required to ensure DIFiles created there,
