@@ -3112,12 +3112,11 @@ ERROR(overriding_decl_missing_differentiable_attr,none,
       "overriding declaration is missing attribute '%0'", (StringRef))
 NOTE(protocol_witness_missing_differentiable_attr,none,
      "candidate is missing attribute '%0'", (StringRef))
-NOTE(protocol_witness_missing_differentiable_attr_nonpublic_other_file,none,
-     "non-public %1 %2 must have explicit '%0' attribute to satisfy "
-     "requirement %3 %4 (in protocol %6) because it is declared in a different "
-     "file than the conformance of %5 to %6",
-     (StringRef, DescriptiveDeclKind, DeclName, DescriptiveDeclKind, DeclName,
-      Type, Type))
+NOTE(protocol_witness_missing_differentiable_attr_invalid_context,none,
+     "candidate is missing explicit '%0' attribute to satisfy requirement %1 "
+     "(in protocol %3); explicit attribute is necessary because candidate is "
+     "declared in a different type context or file than the conformance of %2 "
+     "to %3", (StringRef, DeclName, Type, Type))
 
 // @derivative
 ERROR(derivative_attr_expected_result_tuple,none,
