@@ -645,7 +645,7 @@ func testGuardCase(x:FooStruct?) {
 // FOOSTRUCT_LOCALVAL: End completions
 
 // OPTIONAL_FOOSTRUCT: Begin completions, 21 items
-// OPTIONAL_FOOSTRUCT-DAG: Keyword[nil]/None/Erase[1]/TypeRelation[Identical]:         nil[#FooStruct?#]; name=nil
+// OPTIONAL_FOOSTRUCT-DAG: Keyword[nil]/None/Erase[1]/TypeRelation[Identical]: nil[#FooStruct?#]; name=nil
 // OPTIONAL_FOOSTRUCT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: none[#Optional<FooStruct>#]; name=none
 // OPTIONAL_FOOSTRUCT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: some({#FooStruct#})[#Optional<FooStruct>#]; name=some(FooStruct)
 // FIXME: 'FooStruct' members should not be shown.
