@@ -96,5 +96,17 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     ${PLATFORM_TARGET_LINK_LIBRARIES}
     ${swift_runtime_test_extra_libraries}
     )
+
+  if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
+    # Because we link libswiftCore with the install_name_dir as /usr/lib/swift
+    # it gets installed as this name as a dependency for this unit test. This is
+    # incorrect because at load time we look at the system library vs. the
+    # just built stdlib that we statically link against. Use install_name_tool
+    # to change the dylib name in the unit test.
+    add_custom_command(TARGET SwiftRuntimeTests
+      POST_BUILD COMMAND
+      ${CMAKE_INSTALL_NAME_TOOL} -change /usr/lib/swift/libswiftCore.dylib @rpath/libswiftCore.dylib
+      $<TARGET_FILE:SwiftRuntimeTests>)
+  endif()
 endif()
 
