@@ -5101,7 +5101,7 @@ SourceLoc constraints::getLoc(ASTNode anchor) {
     return T->getLoc();
   } else if (auto *V = anchor.dyn_cast<Decl *>()) {
     if (auto VD = dyn_cast<VarDecl>(V))
-      return VD->getNameLoc();
+      return VD->getNameLoc().getBaseNameLoc();
     return anchor.getStartLoc();
   } else if (auto *S = anchor.dyn_cast<Stmt *>()) {
     return S->getStartLoc();

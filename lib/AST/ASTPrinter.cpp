@@ -473,7 +473,8 @@ static bool escapeKeywordInContext(StringRef keyword, PrintNameContext context){
   llvm_unreachable("Unhandled PrintNameContext in switch.");
 }
 
-void ASTPrinter::printName(Identifier Name, PrintNameContext Context) {
+void ASTPrinter::printName(DeclName Name, PrintNameContext Context) {
+  assert(!Name.isSpecial());
   callPrintNamePre(Context);
 
   if (Name.empty()) {
@@ -482,11 +483,15 @@ void ASTPrinter::printName(Identifier Name, PrintNameContext Context) {
     return;
   }
 
-  bool shouldEscapeKeyword = escapeKeywordInContext(Name.str(), Context);
+  // TODO(Compound variable names): We'll need to handle escaped keywords
+  // differently...
+  assert(Name.isSimpleName());
+  auto nameStr = Name.getBaseIdentifier().str();
+  bool shouldEscapeKeyword = escapeKeywordInContext(nameStr, Context);
 
   if (shouldEscapeKeyword)
     *this << "`";
-  *this << Name.str();
+  *this << nameStr;
   if (shouldEscapeKeyword)
     *this << "`";
 
@@ -5047,7 +5052,7 @@ void swift::printEnumElementsAsCases(
     for (auto i = PL->begin(); i != PL->end(); ++i) {
       auto *param = *i;
       if (param->hasName()) {
-        OS << tok::kw_let << " " << param->getName().str();
+        OS << tok::kw_let << " " << param->getName();
       } else {
         OS << "_";
       }

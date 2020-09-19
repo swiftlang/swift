@@ -3547,7 +3547,7 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   SmallVector<TupleTypeElt, 8> elements;
   elements.reserve(repr->getNumElements());
 
-  llvm::SmallDenseSet<Identifier> seenEltNames;
+  llvm::SmallDenseSet<DeclName> seenEltNames;
   seenEltNames.reserve(repr->getNumElements());
 
   auto elementOptions = options;
@@ -3595,7 +3595,7 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
       && !(options & TypeResolutionFlags::SILType)) {
     if (!complained) {
       diagnose(repr->getElementNameLoc(0), diag::tuple_single_element)
-        .fixItRemoveChars(repr->getElementNameLoc(0),
+        .fixItRemoveChars(repr->getElementNameLoc(0).getStartLoc(),
                           repr->getElementType(0)->getStartLoc());
     }
 

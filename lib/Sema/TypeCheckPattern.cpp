@@ -1125,7 +1125,8 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       diags.diagnose(NP->getLoc(), diag, NP->getDecl()->getName(), type,
                      NP->getDecl()->isLet());
       diags.diagnose(NP->getLoc(), diag::add_explicit_type_annotation_to_silence)
-          .fixItInsertAfter(var->getNameLoc(), ": " + type->getWithoutParens()->getString());
+          .fixItInsertAfter(var->getNameLoc().getEndLoc(),
+                            ": " + type->getWithoutParens()->getString());
     }
 
     return P;
@@ -1198,7 +1199,8 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       // the label for the tuple type being matched.
       if (!hadError && !elt.getLabel().empty() &&
           elt.getLabel() != tupleTy->getElement(i).getName()) {
-        diags.diagnose(elt.getLabelLoc(), diag::tuple_pattern_label_mismatch,
+        diags.diagnose(elt.getLabelLoc().getBaseNameLoc(),
+                       diag::tuple_pattern_label_mismatch,
                        elt.getLabel(), tupleTy->getElement(i).getName());
         hadError = true;
       }
@@ -1534,7 +1536,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       if (auto *TTy = dyn_cast<TupleType>(elementType.getPointer())) {
         for (auto &elt : TTy->getElements()) {
           auto *subPattern = AnyPattern::createImplicit(Context);
-          elements.push_back(TuplePatternElt(elt.getName(), SourceLoc(),
+          elements.push_back(TuplePatternElt(elt.getName(), DeclNameLoc(),
                                              subPattern));
         }
       } else {
@@ -1543,7 +1545,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
         (void)parenTy;
         
         auto *subPattern = AnyPattern::createImplicit(Context);
-        elements.push_back(TuplePatternElt(Identifier(), SourceLoc(),
+        elements.push_back(TuplePatternElt(Identifier(), DeclNameLoc(),
                                            subPattern));
       }
       Pattern *sub = TuplePattern::createSimple(Context, SourceLoc(),

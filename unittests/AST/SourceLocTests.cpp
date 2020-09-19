@@ -155,7 +155,7 @@ TEST(SourceLoc, StmtConditionElement) {
   auto vardecl = new (C.Ctx) VarDecl(/*IsStatic*/false,
                                      VarDecl::Introducer::Let,
                                      /*IsCaptureList*/false,
-                                     start.getAdvancedLoc(7)
+                                     DeclNameLoc(start.getAdvancedLoc(7))
                                     , C.Ctx.getIdentifier("x")
                                     , nullptr);
   auto pattern = new (C.Ctx) NamedPattern(vardecl);
@@ -247,7 +247,7 @@ TEST(SourceLoc, TupleExpr) {
   
   // a tuple with only invalid elements
   SmallVector<Expr *, 2> subExprsInvalid({ two, three });
-  SmallVector<Identifier, 2> subExprNamesInvalid(2, Identifier());
+  SmallVector<DeclName, 2> subExprNamesInvalid(2, DeclName());
   auto allInvalid = TupleExpr::createImplicit(C.Ctx, subExprsInvalid, subExprNamesInvalid);
   
   EXPECT_EQ(SourceLoc(), allInvalid->getStartLoc());
@@ -256,7 +256,7 @@ TEST(SourceLoc, TupleExpr) {
   
   // the tuple from the example
   SmallVector<Expr *, 2> subExprsRight({ one, two });
-  SmallVector<Identifier, 2> subExprNamesRight(2, Identifier());
+  SmallVector<DeclName, 2> subExprNamesRight(2, DeclName());
   auto rightInvalidTuple = TupleExpr::createImplicit(C.Ctx, subExprsRight, subExprNamesRight);
   
   EXPECT_EQ(start, rightInvalidTuple->getStartLoc());
@@ -264,7 +264,7 @@ TEST(SourceLoc, TupleExpr) {
   EXPECT_EQ(SourceRange(start, start), rightInvalidTuple->getSourceRange());
 
   SmallVector<Expr *, 2> subExprsLeft({ two, one });
-  SmallVector<Identifier, 2> subExprNamesLeft(2, Identifier());
+  SmallVector<DeclName, 2> subExprNamesLeft(2, DeclName());
   auto leftInvalidTuple = TupleExpr::createImplicit(C.Ctx, subExprsLeft, subExprNamesLeft);
   
   EXPECT_EQ(start, leftInvalidTuple->getStartLoc());
@@ -274,7 +274,7 @@ TEST(SourceLoc, TupleExpr) {
   // Some TupleExprs are triples. If only the middle expr has a valid SourceLoc
   // then the TupleExpr's SourceLoc should point at that.
   SmallVector<Expr *, 3> subExprsTriple({ two, one, two });
-  SmallVector<Identifier, 3> subExprNamesTriple(3, Identifier());
+  SmallVector<DeclName, 3> subExprNamesTriple(3, DeclName());
   auto tripleValidMid = TupleExpr::createImplicit(C.Ctx, subExprsTriple, subExprNamesTriple);
   EXPECT_EQ(start, tripleValidMid->getStartLoc());
   EXPECT_EQ(start, tripleValidMid->getEndLoc());
@@ -283,7 +283,7 @@ TEST(SourceLoc, TupleExpr) {
   // Some TupleExprs are quadruples. Quadruples should point at the range from
   // the first to the last valid exprs.
   SmallVector<Expr *, 4> subExprsQuad({ one, two, four, three });
-  SmallVector<Identifier, 4> subExprNamesQuad(4, Identifier());
+  SmallVector<DeclName, 4> subExprNamesQuad(4, DeclName());
   auto quadValidMids = TupleExpr::createImplicit(C.Ctx, subExprsQuad, subExprNamesQuad);
   EXPECT_EQ(start, quadValidMids->getStartLoc());
   EXPECT_EQ(start.getAdvancedLoc(4), quadValidMids->getEndLoc());

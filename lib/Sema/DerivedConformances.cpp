@@ -456,7 +456,7 @@ DerivedConformance::declareDerivedProperty(Identifier name,
 
   VarDecl *propDecl = new (Context)
       VarDecl(/*IsStatic*/ isStatic, VarDecl::Introducer::Var,
-              /*IsCaptureList*/ false, SourceLoc(), name, parentDC);
+              /*IsCaptureList*/ false, DeclNameLoc(), name, parentDC);
   propDecl->setImplicit();
   propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyInterfaceType);
@@ -629,7 +629,7 @@ DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &st
   Type intType = C.getIntDecl()->getDeclaredInterfaceType();
 
   auto indexVar = new (C) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
-                                  /*IsCaptureList*/false, SourceLoc(),
+                                  /*IsCaptureList*/false, DeclNameLoc(),
                                   C.getIdentifier(indexName),
                                   funcDecl);
   indexVar->setInterfaceType(intType);
@@ -760,7 +760,7 @@ DerivedConformance::enumElementPayloadSubpattern(EnumElementDecl *enumElementDec
       auto letPattern =
           BindingPattern::createImplicit(C, /*isLet*/ true, namedPattern);
       elementPatterns.push_back(TuplePatternElt(tupleElement.getName(),
-                                                SourceLoc(), letPattern));
+                                                DeclNameLoc(), letPattern));
     }
 
     auto pat = TuplePattern::createImplicit(C, elementPatterns);
@@ -800,7 +800,7 @@ VarDecl *DerivedConformance::indexedVarDecl(char prefixChar, int index, Type typ
   auto indexStrRef = StringRef(indexStr.data(), indexStr.size());
 
   auto varDecl = new (C) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
-                                 /*IsCaptureList*/true, SourceLoc(),
+                                 /*IsCaptureList*/true, DeclNameLoc(),
                                  C.getIdentifier(indexStrRef),
                                  varContext);
   varDecl->setInterfaceType(type);

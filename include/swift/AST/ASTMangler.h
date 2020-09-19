@@ -328,7 +328,7 @@ protected:
                                 const ValueDecl *forDecl = nullptr);
 
   void appendTypeList(Type listTy, const ValueDecl *forDecl = nullptr);
-  void appendTypeListElement(Identifier name, Type elementType,
+  void appendTypeListElement(DeclName name, Type elementType,
                              ParameterTypeFlags flags,
                              const ValueDecl *forDecl = nullptr);
 

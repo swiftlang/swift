@@ -338,7 +338,7 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
       Identifier label = getIdentifier(labelID);
 
       Pattern *subPattern = readPatternUnchecked(owningDC);
-      elements.push_back(TuplePatternElt(label, SourceLoc(), subPattern));
+      elements.push_back(TuplePatternElt(label, DeclNameLoc(), subPattern));
     }
 
     auto result = TuplePattern::createImplicit(getContext(), elements);
@@ -2821,7 +2821,7 @@ public:
       MF.fatal();
 
     auto var = MF.createDecl<VarDecl>(/*IsStatic*/ isStatic, *introducer,
-                                      /*IsCaptureList*/ false, SourceLoc(),
+                                      /*IsCaptureList*/ false, DeclNameLoc(),
                                       name, DC);
     var->setHasNonPatternBindingInit(hasNonPatternBindingInit);
     var->setIsGetterMutating(isGetterMutating);
@@ -2952,7 +2952,7 @@ public:
       MF.fatal();
 
     auto param = MF.createDecl<ParamDecl>(SourceLoc(), SourceLoc(), argName,
-                                          SourceLoc(), paramName, DC);
+                                          DeclNameLoc(), paramName, DC);
     param->setSpecifier(*specifier);
 
     declOrOffset = param;

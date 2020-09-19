@@ -718,12 +718,12 @@ AbstractFunctionDeclScope::getParmsSourceLocOfAFD(AbstractFunctionDecl *decl) {
     return c->getParameters()->getLParenLoc();
 
   if (auto *dd = dyn_cast<DestructorDecl>(decl))
-    return dd->getNameLoc();
+    return dd->getDestructorLoc();
 
   auto *fd = cast<FuncDecl>(decl);
   // clang-format off
   return isa<AccessorDecl>(fd) ? fd->getLoc()
-       : fd->isDeferBody()     ? fd->getNameLoc()
+       : fd->isDeferBody()     ? fd->getBaseNameLoc()
        :                         fd->getParameters()->getLParenLoc();
   // clang-format on
 }

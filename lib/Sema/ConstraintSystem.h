@@ -582,8 +582,10 @@ public:
 
   /// \returns The label for the argument being applied.
   Identifier getArgLabel() const {
-    if (auto *te = dyn_cast<TupleExpr>(ArgListExpr))
-      return te->getElementName(ArgIdx);
+    if (auto *te = dyn_cast<TupleExpr>(ArgListExpr)) {
+      assert(!te->getElementName(ArgIdx).isSpecial());
+      return te->getElementName(ArgIdx).getBaseIdentifier();
+    }
 
     assert(isa<ParenExpr>(ArgListExpr));
     return Identifier();

@@ -43,7 +43,7 @@ static SILValue emitConstructorMetatypeArg(SILGenFunction &SGF,
   auto &AC = SGF.getASTContext();
   auto VD =
       new (AC) ParamDecl(SourceLoc(), SourceLoc(),
-                         AC.getIdentifier("$metatype"), SourceLoc(),
+                         AC.getIdentifier("$metatype"), DeclNameLoc(),
                          AC.getIdentifier("$metatype"), DC);
   VD->setSpecifier(ParamSpecifier::Default);
   VD->setInterfaceType(metatype);
@@ -73,7 +73,7 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
   auto &AC = SGF.getASTContext();
   auto VD = new (AC) ParamDecl(SourceLoc(), SourceLoc(),
                                AC.getIdentifier("$implicit_value"),
-                               SourceLoc(),
+                               DeclNameLoc(),
                                AC.getIdentifier("$implicit_value"),
                                DC);
   VD->setSpecifier(ParamSpecifier::Default);
@@ -168,7 +168,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
     auto &AC = SGF.getASTContext();
     auto VD = new (AC) ParamDecl(SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),
-                                 SourceLoc(),
+                                 DeclNameLoc(),
                                  AC.getIdentifier("$return_value"),
                                  ctor);
     VD->setSpecifier(ParamSpecifier::InOut);
@@ -493,7 +493,7 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
     auto &AC = getASTContext();
     auto VD = new (AC) ParamDecl(SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),
-                                 SourceLoc(),
+                                 DeclNameLoc(),
                                  AC.getIdentifier("$return_value"),
                                  element->getDeclContext());  
     VD->setSpecifier(ParamSpecifier::InOut);

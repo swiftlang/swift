@@ -384,7 +384,7 @@ deriveEquatable_eq(
 
   auto getParamDecl = [&](StringRef s) -> ParamDecl * {
     auto *param = new (C) ParamDecl(SourceLoc(),
-                                    SourceLoc(), Identifier(), SourceLoc(),
+                                    SourceLoc(), Identifier(), DeclNameLoc(),
                                     C.getIdentifier(s), parentDC);
     param->setSpecifier(ParamSpecifier::Default);
     param->setInterfaceType(selfIfaceTy);
@@ -534,8 +534,9 @@ deriveHashable_hashInto(
 
   // Params: self (implicit), hasher
   auto *hasherParamDecl = new (C) ParamDecl(SourceLoc(),
-                                            SourceLoc(), C.Id_into, SourceLoc(),
-                                            C.Id_hasher, parentDC);
+                                            SourceLoc(), C.Id_into,
+                                            DeclNameLoc(), C.Id_hasher,
+                                            parentDC);
   hasherParamDecl->setSpecifier(ParamSpecifier::InOut);
   hasherParamDecl->setInterfaceType(hasherType);
 
@@ -881,7 +882,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
 
   VarDecl *hashValueDecl =
     new (C) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
-                    /*IsCaptureList*/false, SourceLoc(),
+                    /*IsCaptureList*/false, DeclNameLoc(),
                     C.Id_hashValue, parentDC);
   hashValueDecl->setInterfaceType(intType);
 

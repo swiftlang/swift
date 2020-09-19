@@ -1089,7 +1089,9 @@ static llvm::Constant *getTupleLabelsString(IRGenModule &IGM,
   for (auto &elt : type->getElements()) {
     if (elt.hasName()) {
       hasLabels = true;
-      buffer.append(elt.getName().str());
+      // TODO(Compound variable names)
+      assert(elt.getName().isSimpleName());
+      buffer.append(elt.getName().getBaseIdentifier().str());
     }
 
     // Each label is space-terminated.

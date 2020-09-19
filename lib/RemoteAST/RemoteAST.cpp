@@ -215,9 +215,11 @@ private:
   /// Look for an instance property of the given nominal type that's
   /// known to be stored.
   VarDecl *findField(NominalTypeDecl *typeDecl, StringRef memberName) {
+    llvm::SmallString<32> scratch;
     for (auto field : typeDecl->getStoredProperties()) {
-      if (field->getName().str() == memberName)
+      if (field->getName().getString(scratch) == memberName)
         return field;
+      scratch.clear();
     }
     return nullptr;
   }

@@ -151,7 +151,7 @@ public:
 
   /// Returns the name directly bound by this pattern, or the null
   /// identifier if the pattern does not bind a name directly.
-  Identifier getBoundName() const;
+  DeclName getBoundName() const;
 
   /// If this pattern binds a single variable without any
   /// destructuring or conditionalizing, return that variable.
@@ -270,21 +270,21 @@ public:
 /// The Init and DefArgKind fields are only used in argument lists for
 /// functions.  They are not parsed as part of normal pattern grammar.
 class TuplePatternElt {
-  Identifier Label;
-  SourceLoc LabelLoc;
+  DeclName Label;
+  DeclNameLoc LabelLoc;
   Pattern *ThePattern;
 
 public:
   TuplePatternElt() = default;
   explicit TuplePatternElt(Pattern *P) : ThePattern(P) {}
 
-  TuplePatternElt(Identifier Label, SourceLoc LabelLoc, Pattern *p)
+  TuplePatternElt(DeclName Label, DeclNameLoc LabelLoc, Pattern *p)
     : Label(Label), LabelLoc(LabelLoc), ThePattern(p) {}
 
-  Identifier getLabel() const { return Label; }
-  SourceLoc getLabelLoc() const { return LabelLoc; }
-  void setLabel(Identifier I, SourceLoc Loc) {
-    Label = I;
+  DeclName getLabel() const { return Label; }
+  DeclNameLoc getLabelLoc() const { return LabelLoc; }
+  void setLabel(DeclName N, DeclNameLoc Loc) {
+    Label = N;
     LabelLoc = Loc;
   }
 
@@ -364,8 +364,10 @@ public:
   }
 
   VarDecl *getDecl() const { return Var; }
-  Identifier getBoundName() const;
-  StringRef getNameStr() const { return Var->getNameStr(); }
+  DeclName getBoundName() const;
+  StringRef getNameStr(llvm::SmallVectorImpl<char> &scratch) const {
+      return Var->getNameStr(scratch);
+  }
 
   SourceLoc getLoc() const { return Var->getLoc(); }
   SourceRange getSourceRange() const { return Var->getSourceRange(); }

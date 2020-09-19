@@ -483,7 +483,8 @@ CharSourceRange innerCharSourceRangeFromSourceRange(const SourceManager &SM,
   return CharSourceRange(SM, SRS, (SR.End != SR.Start) ? SR.End : SRS);
 }
 
-CharSourceRange parameterNameRangeOfCallArg(const TupleExpr *TE,
+CharSourceRange parameterNameRangeOfCallArg(const SourceManager &SM,
+                                            const TupleExpr *TE,
                                             const Expr *Arg) {
   if (!TE->hasElementNameLocs() || !TE->hasElementNames())
     return CharSourceRange();
@@ -496,10 +497,11 @@ CharSourceRange parameterNameRangeOfCallArg(const TupleExpr *TE,
   unsigned i = 0;
   for (auto E : TE->getElements()) {
     if (E == Arg) {
-      SourceLoc NL = TE->getElementNameLoc(i);
-      Identifier Name = TE->getElementName(i);
+      DeclNameLoc NL = TE->getElementNameLoc(i);
+      DeclName Name = TE->getElementName(i);
       if (NL.isValid() && !Name.empty())
-        return CharSourceRange(NL, Name.getLength());
+        return CharSourceRange(SM, NL.getStartLoc(),
+                               Lexer::getLocForEndOfToken(SM, NL.getEndLoc()));
 
       return CharSourceRange();
     }
@@ -551,7 +553,7 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
         !isCurrentCallArgExpr(ParentTupleExpr))
       return;
 
-    CharSourceRange NR = parameterNameRangeOfCallArg(ParentTupleExpr, Elem);
+    CharSourceRange NR = parameterNameRangeOfCallArg(SM, ParentTupleExpr, Elem);
     SyntaxStructureNode SN;
     SN.Kind = SyntaxStructureKind::Argument;
     SN.NameRange = NR;
@@ -989,8 +991,9 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     auto bracesRange = VD->getBracesRange();
     if (bracesRange.isValid())
       SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, bracesRange);
-    SourceLoc NRStart = VD->getNameLoc();
-    SourceLoc NREnd = NRStart.getAdvancedLoc(VD->getName().getLength());
+    SourceLoc NRStart = VD->getNameLoc().getStartLoc();
+    SourceLoc NREnd = Lexer::getLocForEndOfToken(SM,
+                                                 VD->getNameLoc().getEndLoc());
     SN.NameRange = CharSourceRange(SM, NRStart, NREnd);
     SN.TypeRange = charSourceRangeFromSourceRange(SM,
                                         VD->getTypeSourceRangeForDiagnostics());
@@ -1057,11 +1060,11 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
         SN.Range = charSourceRangeFromSourceRange(SM,
                                                   EnumElemD->getSourceRange());
         if (auto ParamList = EnumElemD->getParameterList()) {
-          SourceRange NameRange = SourceRange(EnumElemD->getNameLoc(),
+          SourceRange NameRange = SourceRange(EnumElemD->getBaseNameLoc(),
                                               ParamList->getSourceRange().End);
           SN.NameRange = charSourceRangeFromSourceRange(SM, NameRange);
         } else {
-          SN.NameRange = CharSourceRange(EnumElemD->getNameLoc(),
+          SN.NameRange = CharSourceRange(EnumElemD->getBaseNameLoc(),
                                          EnumElemD->getBaseIdentifier()
                                            .getLength());
         }

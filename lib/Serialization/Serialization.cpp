@@ -2690,8 +2690,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       abbrCode = S.DeclTypeAbbrCodes[TuplePatternEltLayout::Code];
       for (auto &elt : tuple->getElements()) {
         // FIXME: Default argument expressions?
-        TuplePatternEltLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                          S.addDeclBaseNameRef(elt.getLabel()));
+        // TODO(Compound variable names)
+        assert(elt.getLabel().isSimpleName());
+        auto id = S.addDeclBaseNameRef(elt.getLabel().getBaseName());
+        TuplePatternEltLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode, id);
         writePattern(elt.getPattern());
       }
       break;
@@ -3331,8 +3333,10 @@ public:
     unsigned numVTableEntries = getNumberOfRequiredVTableEntries(var);
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[VarLayout::Code];
+    // TODO(Compound variable names)
+    assert(var->getName().isSimpleName());
     VarLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                          S.addDeclBaseNameRef(var->getName()),
+                          S.addDeclBaseNameRef(var->getName().getBaseName()),
                           contextID.getOpaqueValue(),
                           var->isImplicit(),
                           var->isObjC(),
@@ -3377,9 +3381,11 @@ public:
         param->getDefaultValueStringRepresentation(scratch);
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[ParamLayout::Code];
+    // TODO(Compound variable names)
+    assert(param->getName().isSimpleName());
     ParamLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
         S.addDeclBaseNameRef(param->getArgumentName()),
-        S.addDeclBaseNameRef(param->getName()),
+        S.addDeclBaseNameRef(param->getName().getBaseName()),
         contextID.getOpaqueValue(),
         getRawStableParamDeclSpecifier(param->getSpecifier()),
         S.addTypeRef(interfaceType),
@@ -4004,9 +4010,11 @@ public:
     abbrCode = S.DeclTypeAbbrCodes[TupleTypeEltLayout::Code];
     for (auto &elt : tupleTy->getElements()) {
       assert(elt.getParameterFlags().isNone());
+      // TODO(Compound variable names)
+      assert(elt.getName().isSimpleName());
       TupleTypeEltLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode,
-          S.addDeclBaseNameRef(elt.getName()),
+          S.addDeclBaseNameRef(elt.getName().getBaseName()),
           S.addTypeRef(elt.getType()));
     }
   }

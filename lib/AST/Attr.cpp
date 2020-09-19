@@ -485,7 +485,7 @@ static std::string getDifferentiationParametersClauseString(
       switch (parameterKind) {
       // Print differentiability parameters by name.
       case DifferentiationParameterKind::Differentiability:
-        printer << function->getParameters()->get(index)->getName().str();
+        printer << function->getParameters()->get(index)->getName();
         break;
       // Print linearity parameters by index.
       case DifferentiationParameterKind::Linearity:
@@ -514,7 +514,8 @@ static std::string getDifferentiationParametersClauseString(
         assert(param.getIndex() <= paramList->size() &&
                "wrt parameter is out of range");
         auto *funcParam = paramList->get(param.getIndex());
-        printer << funcParam->getNameStr();
+        llvm::SmallString<32> scratch;
+        printer << funcParam->getNameStr(scratch);
         break;
       }
     }, [&] { printer << ", "; });

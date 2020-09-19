@@ -254,7 +254,8 @@ inline void createEntryArguments(SILFunction *f) {
     // Necessary to prevent crash during argument explosion optimization.
     auto loc = f->getLocation().getSourceLoc();
     auto *decl = new (ctx)
-        ParamDecl(loc, loc, Identifier(), loc, Identifier(), moduleDecl);
+        ParamDecl(loc, loc, Identifier(), DeclNameLoc(loc), Identifier(),
+                  moduleDecl);
     decl->setSpecifier(ParamDecl::Specifier::Default);
     entry->createFunctionArgument(type, decl);
   };

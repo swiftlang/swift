@@ -327,8 +327,10 @@ static void getPathStringToElementRec(TypeExpansionContext context,
 
     if (EltNo < NumFieldElements) {
       Result += '.';
-      if (Field.hasName())
-        Result += Field.getName().str();
+      if (Field.hasName()) {
+        llvm::SmallString<32> scratch;
+        Result += Field.getName().getString(scratch);
+      }
       else
         Result += llvm::utostr(FieldNo);
       return getPathStringToElementRec(context, Module, FieldTy, EltNo, Result);
@@ -369,10 +371,11 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
         if (Element < NumFieldElements) {
           Result += '.';
           auto originalProperty = VD->getOriginalWrappedProperty();
+          llvm::SmallString<32> scratch;
           if (originalProperty) {
-            Result += originalProperty->getName().str();
+            Result += originalProperty->getName().getString(scratch);
           } else {
-            Result += VD->getName().str();
+            Result += VD->getName().getString(scratch);
           }
           getPathStringToElementRec(expansionContext, Module, FieldType,
                                     Element, Result);

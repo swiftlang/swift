@@ -476,7 +476,8 @@ static void emitIndirectResultParameters(SILGenFunction &SGF, Type resultType,
   }
   auto &ctx = SGF.getASTContext();
   auto var = new (ctx) ParamDecl(SourceLoc(), SourceLoc(),
-                                 ctx.getIdentifier("$return_value"), SourceLoc(),
+                                 ctx.getIdentifier("$return_value"),
+                                 DeclNameLoc(),
                                  ctx.getIdentifier("$return_value"),
                                  DC);
   var->setSpecifier(ParamSpecifier::InOut);

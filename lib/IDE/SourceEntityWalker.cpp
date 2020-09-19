@@ -749,14 +749,14 @@ bool SemaAnnotator::passCallArgNames(Expr *Fn, TupleExpr *TupleE) {
   if (!D)
     return true; // continue.
 
-  ArrayRef<Identifier> ArgNames = TupleE->getElementNames();
-  ArrayRef<SourceLoc> ArgLocs = TupleE->getElementNameLocs();
+  ArrayRef<DeclName> ArgNames = TupleE->getElementNames();
+  ArrayRef<DeclNameLoc> ArgLocs = TupleE->getElementNameLocs();
   for (auto i : indices(ArgNames)) {
-    Identifier Name = ArgNames[i];
+    Identifier Name = ArgNames[i].getBaseIdentifier();
     if (Name.empty())
       continue;
 
-    SourceLoc Loc = ArgLocs[i];
+    SourceLoc Loc = ArgLocs[i].getBaseNameLoc();
     if (Loc.isInvalid())
       continue;
 

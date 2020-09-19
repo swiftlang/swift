@@ -825,7 +825,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
     auto &ctx = getASTContext();
     auto param = new (ctx) ParamDecl(SourceLoc(), SourceLoc(),
                                      ctx.getIdentifier("$input_value"),
-                                     SourceLoc(),
+                                     DeclNameLoc(),
                                      ctx.getIdentifier("$input_value"),
                                      dc);
     param->setSpecifier(ParamSpecifier::Owned);

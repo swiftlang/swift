@@ -1012,9 +1012,10 @@ namespace {
                                              /*hasTrailingClosure=*/false);
         closureArg->setImplicit();
       } else {
-        closureArg = TupleExpr::create(context, SourceLoc(), args, labels, labelLocs,
-                                       SourceLoc(), /*hasTrailingClosure=*/false,
-                                       /*implicit=*/true);
+        closureArg = TupleExpr::createArgTuple(context, SourceLoc(), args,
+                                               labels, labelLocs, SourceLoc(),
+                                               /*hasTrailingClosure=*/false,
+                                               /*implicit=*/true);
       }
 
       auto argTy = AnyFunctionType::composeInput(context, calleeParams,
@@ -1380,7 +1381,7 @@ namespace {
         auto selfParamDecl = new (context) ParamDecl(
             SourceLoc(),
             /*argument label*/ SourceLoc(), Identifier(),
-            /*parameter name*/ SourceLoc(), context.Id_self,
+            /*parameter name*/ DeclNameLoc(), context.Id_self,
             cs.DC);
 
         auto selfParamTy = selfParam.getPlainType();
@@ -3164,7 +3165,7 @@ namespace {
           TupleType::get(TupleTypeElt(paramTy, ctx.Id_dynamicMember), ctx);
 
       Expr *index =
-          TupleExpr::createImplicit(ctx, argExpr, ctx.Id_dynamicMember);
+          TupleExpr::createImplicit(ctx, argExpr, {ctx.Id_dynamicMember});
       index->setType(tupleTy);
       cs.cacheType(index);
 
@@ -4812,7 +4813,7 @@ namespace {
       auto param = new (ctx) ParamDecl(
           SourceLoc(),
           /*argument label*/ SourceLoc(), Identifier(),
-          /*parameter name*/ SourceLoc(), ctx.getIdentifier("$0"), closure);
+          /*parameter name*/ DeclNameLoc(), ctx.getIdentifier("$0"), closure);
       param->setInterfaceType(baseTy->mapTypeOutOfContext());
       param->setSpecifier(ParamSpecifier::Default);
 
@@ -4827,7 +4828,7 @@ namespace {
       auto outerParam =
           new (ctx) ParamDecl(SourceLoc(),
                               /*argument label*/ SourceLoc(), Identifier(),
-                              /*parameter name*/ SourceLoc(),
+                              /*parameter name*/ DeclNameLoc(),
                               ctx.getIdentifier("$kp$"), outerClosure);
       outerParam->setInterfaceType(keyPathTy->mapTypeOutOfContext());
       outerParam->setSpecifier(ParamSpecifier::Default);
@@ -5175,7 +5176,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr,
 
   // Convert each OpaqueValueExpr to the correct type.
   SmallVector<Expr *, 4> converted;
-  SmallVector<Identifier, 4> labels;
+  SmallVector<DeclName, 4> labels;
   SmallVector<TupleTypeElt, 4> convertedElts;
 
   bool anythingShuffled = false;
@@ -5617,7 +5618,7 @@ Expr *ExprRewriter::coerceCallArguments(
 
   auto getLabelLoc = [&](unsigned i) -> SourceLoc {
     if (argTuple)
-      return argTuple->getElementNameLoc(i);
+      return argTuple->getElementNameLoc(i).getBaseNameLoc();
 
     assert(i == 0 && "Scalar only has a single argument");
     return SourceLoc();
@@ -5837,9 +5838,10 @@ Expr *ExprRewriter::coerceCallArguments(
       }
     } else {
       // Build a new TupleExpr, re-using source location information.
-      arg = TupleExpr::create(ctx, lParenLoc, rParenLoc, newArgs, newLabels,
-                              newLabelLocs, unlabeledTrailingClosureIndex,
-                              /*implicit=*/arg->isImplicit());
+      arg = TupleExpr::createArgTuple(ctx, lParenLoc, rParenLoc, newArgs,
+                                      newLabels, newLabelLocs,
+                                      unlabeledTrailingClosureIndex,
+                                      /*implicit=*/arg->isImplicit());
     }
   }
 
@@ -7132,7 +7134,7 @@ ExprRewriter::buildDynamicCallable(ApplyExpr *apply, SelectedOverload selected,
 
   // Construct expression referencing the `dynamicallyCall` method.
   auto member = buildMemberRef(fn, SourceLoc(), selected,
-                               DeclNameLoc(method->getNameLoc()), loc, loc,
+                               DeclNameLoc(method->getBaseNameLoc()), loc, loc,
                                /*implicit=*/true, AccessSemantics::Ordinary);
 
   // Construct argument to the method (either an array or dictionary
@@ -7154,9 +7156,10 @@ ExprRewriter::buildDynamicCallable(ApplyExpr *apply, SelectedOverload selected,
     SmallVector<Identifier, 4> names;
     SmallVector<Expr *, 4> dictElements;
     for (unsigned i = 0, n = arg->getNumElements(); i < n; ++i) {
+      auto argLabel = arg->getElementName(i).getBaseIdentifier();
       Expr *labelExpr =
-        new (ctx) StringLiteralExpr(arg->getElementName(i).get(),
-                                    arg->getElementNameLoc(i),
+        new (ctx) StringLiteralExpr(argLabel.get(),
+                                    arg->getElementNameLoc(i).getBaseNameLoc(),
                                     /*Implicit*/ true);
       cs.setType(labelExpr, keyType);
       handleStringLiteralExpr(cast<LiteralExpr>(labelExpr));
@@ -8012,12 +8015,12 @@ static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
     // Create a local variable to capture the iterator.
     std::string name;
     if (auto np = dyn_cast_or_null<NamedPattern>(stmt->getPattern()))
-      name = "$"+np->getBoundName().str().str();
+      name = "$"+np->getBoundName().getBaseIdentifier().str().str();
     name += "$generator";
 
     iterator = new (ctx) VarDecl(
         /*IsStatic*/ false, VarDecl::Introducer::Var,
-        /*IsCaptureList*/ false, stmt->getInLoc(),
+        /*IsCaptureList*/ false, DeclNameLoc(stmt->getInLoc()),
         ctx.getIdentifier(name), dc);
     iterator->setInterfaceType(
         forEachStmtInfo.iteratorType->mapTypeOutOfContext());

@@ -575,7 +575,7 @@ std::string AccessSummaryAnalysis::getSubPathDescription(
     }
 
     if (auto tupleTy = containingType.getAs<TupleType>()) {
-      Identifier elementName = tupleTy->getElement(index).getName();
+      DeclName elementName = tupleTy->getElement(index).getName();
       if (elementName.empty())
         os << index;
       else

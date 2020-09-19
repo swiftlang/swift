@@ -2315,7 +2315,7 @@ class OpaqueTypeDecl;
 /// have a type, etc.
 class ValueDecl : public Decl {
   DeclName Name;
-  SourceLoc NameLoc;
+  DeclNameLoc NameLoc;
   llvm::PointerIntPair<Type, 3, OptionalEnum<AccessLevel>> TypeAndAccess;
   unsigned LocalDiscriminator = 0;
 
@@ -2365,11 +2365,11 @@ class ValueDecl : public Decl {
   friend class InterfaceTypeRequest;
   friend class CheckRedeclarationRequest;
   friend class Decl;
-  SourceLoc getLocFromSource() const { return NameLoc; }
+  SourceLoc getLocFromSource() const { return NameLoc.getBaseNameLoc(); }
 protected:
   ValueDecl(DeclKind K,
             llvm::PointerUnion<DeclContext *, ASTContext *> context,
-            DeclName name, SourceLoc NameLoc)
+            DeclName name, DeclNameLoc NameLoc)
     : Decl(K, context), Name(name), NameLoc(NameLoc) {
     Bits.ValueDecl.AlreadyInLookupTable = false;
     Bits.ValueDecl.CheckedRedeclaration = false;
@@ -2446,7 +2446,7 @@ public:
   /// Objective-C name, if used to satisfy the given requirement.
   bool canInferObjCFromRequirement(ValueDecl *requirement);
 
-  SourceLoc getNameLoc() const { return NameLoc; }
+  DeclNameLoc getNameLoc() const { return NameLoc; }
 
   bool isUsableFromInline() const;
 
@@ -2783,7 +2783,7 @@ protected:
   TypeDecl(DeclKind K, llvm::PointerUnion<DeclContext *, ASTContext *> context,
            Identifier name, SourceLoc NameLoc,
            MutableArrayRef<TypeLoc> inherited) :
-    ValueDecl(K, context, name, NameLoc), Inherited(inherited) {}
+    ValueDecl(K, context, name, DeclNameLoc(NameLoc)), Inherited(inherited) {}
 
 public:
   Identifier getName() const { return getBaseIdentifier(); }
@@ -2791,6 +2791,10 @@ public:
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
     return hasName() ? getBaseIdentifier().str() : "_";
+  }
+
+  SourceLoc getNameLoc() const {
+    return ValueDecl::getNameLoc().getBaseNameLoc();
   }
 
   /// The type of this declaration's values. For the type of the
@@ -4589,7 +4593,7 @@ private:
 
 protected:
   AbstractStorageDecl(DeclKind Kind, bool IsStatic, DeclContext *DC,
-                      DeclName Name, SourceLoc NameLoc,
+                      DeclName Name, DeclNameLoc NameLoc,
                       StorageIsMutable_t supportsMutation)
     : ValueDecl(Kind, DC, Name, NameLoc),
       ImplInfo(StorageImplInfo::getSimpleStored(supportsMutation)) {
@@ -4895,22 +4899,20 @@ protected:
   PointerUnion<PatternBindingDecl *, Stmt *, VarDecl *> Parent;
 
   VarDecl(DeclKind kind, bool isStatic, Introducer introducer,
-          bool isCaptureList, SourceLoc nameLoc, Identifier name,
+          bool isCaptureList, DeclNameLoc nameLoc, DeclName name,
           DeclContext *dc, StorageIsMutable_t supportsMutation);
 
 public:
   VarDecl(bool isStatic, Introducer introducer, bool isCaptureList,
-          SourceLoc nameLoc, Identifier name, DeclContext *dc)
+          DeclNameLoc nameLoc, DeclName name, DeclContext *dc)
     : VarDecl(DeclKind::Var, isStatic, introducer, isCaptureList, nameLoc,
               name, dc, StorageIsMutable_t(introducer == Introducer::Var)) {}
 
   SourceRange getSourceRange() const;
 
-  Identifier getName() const { return getBaseIdentifier(); }
-
-  /// Returns the string for the base name, or "_" if this is unnamed.
-  StringRef getNameStr() const {
-    return hasName() ? getBaseIdentifier().str() : "_";
+  /// Returns the string for the name, or "_" if this is unnamed.
+  StringRef getNameStr(llvm::SmallVectorImpl<char> &scratch) const {
+    return hasName() ? getName().getString(scratch) : "_";
   }
 
   /// Get the type of the variable within its context. If the context is generic,
@@ -5303,7 +5305,7 @@ class ParamDecl : public VarDecl {
   friend class DefaultArgumentExprRequest;
 
   llvm::PointerIntPair<Identifier, 1, bool> ArgumentNameAndDestructured;
-  SourceLoc ParameterNameLoc;
+  DeclNameLoc ParameterNameLoc;
   SourceLoc ArgumentNameLoc;
   SourceLoc SpecifierLoc;
 
@@ -5340,8 +5342,8 @@ class ParamDecl : public VarDecl {
 
 public:
   ParamDecl(SourceLoc specifierLoc, SourceLoc argumentNameLoc,
-            Identifier argumentName, SourceLoc parameterNameLoc,
-            Identifier parameterName, DeclContext *dc);
+            Identifier argumentName, DeclNameLoc parameterNameLoc,
+            DeclName parameterName, DeclContext *dc);
 
   /// Create a new ParamDecl identical to the first except without the interface type.
   static ParamDecl *cloneWithoutType(const ASTContext &Ctx, ParamDecl *PD);
@@ -5352,7 +5354,7 @@ public:
   }
 
   /// Retrieve the parameter (local) name for this function parameter.
-  Identifier getParameterName() const { return getName(); }
+  DeclName getParameterName() const { return getName(); }
 
   /// Retrieve the source location of the argument (API) name.
   ///
@@ -5360,7 +5362,7 @@ public:
   /// was specified separately from the parameter name.
   SourceLoc getArgumentNameLoc() const { return ArgumentNameLoc; }
 
-  SourceLoc getParameterNameLoc() const { return ParameterNameLoc; }
+  DeclNameLoc getParameterNameLoc() const { return ParameterNameLoc; }
 
   SourceLoc getSpecifierLoc() const { return SpecifierLoc; }
 
@@ -5640,7 +5642,7 @@ class SubscriptDecl : public GenericContext, public AbstractStorageDecl {
     : GenericContext(DeclContextKind::SubscriptDecl, Parent, GenericParams),
       AbstractStorageDecl(DeclKind::Subscript,
                           StaticSpelling != StaticSpellingKind::None,
-                          Parent, Name, SubscriptLoc,
+                          Parent, Name, DeclNameLoc(SubscriptLoc),
                           /*will be overwritten*/ StorageIsNotMutable),
       StaticLoc(StaticLoc), ArrowLoc(ArrowLoc),
       Indices(nullptr), ElementTy(ElementTyR) {
@@ -5675,7 +5677,7 @@ public:
   }
   
   SourceLoc getStaticLoc() const { return StaticLoc; }
-  SourceLoc getSubscriptLoc() const { return getNameLoc(); }
+  SourceLoc getSubscriptLoc() const { return getNameLoc().getBaseNameLoc(); }
   
   SourceLoc getStartLoc() const {
     return getStaticLoc().isValid() ? getStaticLoc() : getSubscriptLoc();
@@ -5865,7 +5867,7 @@ protected:
                        bool HasImplicitSelfDecl,
                        GenericParamList *GenericParams)
       : GenericContext(DeclContextKind::AbstractFunctionDecl, Parent, GenericParams),
-        ValueDecl(Kind, Parent, Name, NameLoc),
+        ValueDecl(Kind, Parent, Name, DeclNameLoc(NameLoc)),
         Body(nullptr), AsyncLoc(AsyncLoc), ThrowsLoc(ThrowsLoc) {
     setBodyKind(BodyKind::None);
     Bits.AbstractFunctionDecl.HasImplicitSelfDecl = HasImplicitSelfDecl;
@@ -5897,6 +5899,12 @@ public:
     assert(!getName().isSpecial() && "Cannot get string for special names");
     return hasName() ? getBaseIdentifier().str() : "_";
   }
+
+  /// Returns the location of the function's base name.
+  SourceLoc getBaseNameLoc() const {
+      return ValueDecl::getNameLoc().getBaseNameLoc();
+  }
+  DeclNameLoc getNameLoc() const = delete;
 
   /// Should this declaration be treated as if annotated with transparent
   /// attribute.
@@ -6686,9 +6694,13 @@ public:
   EnumCaseDecl *getParentCase() const;
 
   SourceLoc getStartLoc() const {
-    return getNameLoc();
+    return getBaseNameLoc();
   }
   SourceRange getSourceRange() const;
+  SourceLoc getBaseNameLoc() const {
+    return ValueDecl::getNameLoc().getBaseNameLoc();
+  }
+  DeclName getNameLoc() const = delete;
   
   bool hasAssociatedValues() const {
     return getParameterList() != nullptr;
@@ -6794,7 +6806,9 @@ public:
                   GenericParamList *GenericParams, 
                   DeclContext *Parent);
 
-  SourceLoc getConstructorLoc() const { return getNameLoc(); }
+  SourceLoc getConstructorLoc() const {
+      return ValueDecl::getNameLoc().getBaseNameLoc();
+  }
   SourceLoc getStartLoc() const { return getConstructorLoc(); }
   SourceRange getSourceRange() const;
 
@@ -6958,7 +6972,9 @@ public:
 
   ParamDecl **getImplicitSelfDeclStorage() { return &SelfDecl; }
 
-  SourceLoc getDestructorLoc() const { return getNameLoc(); }
+  SourceLoc getDestructorLoc() const {
+      return ValueDecl::getNameLoc().getBaseNameLoc();
+  }
   SourceLoc getStartLoc() const { return getDestructorLoc(); }
   SourceRange getSourceRange() const;
 

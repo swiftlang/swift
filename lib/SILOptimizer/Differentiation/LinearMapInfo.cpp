@@ -76,7 +76,7 @@ VarDecl *LinearMapInfo::addVarDecl(NominalTypeDecl *nominal, StringRef name,
   auto id = astCtx.getIdentifier(name);
   auto *varDecl = new (astCtx) VarDecl(
       /*IsStatic*/ false, VarDecl::Introducer::Var, /*IsCaptureList*/ false,
-      SourceLoc(), id, nominal);
+      DeclNameLoc(), id, nominal);
   varDecl->setAccess(nominal->getEffectiveAccess());
   if (type->hasArchetype())
     varDecl->setInterfaceType(type->mapTypeOutOfContext());
@@ -151,7 +151,8 @@ LinearMapInfo::createBranchingTraceDecl(SILBasicBlock *originalBB,
         linearMapStruct->getDeclaredInterfaceType()->getCanonicalType();
     // Create dummy declaration representing enum case parameter.
     auto *decl = new (astCtx)
-        ParamDecl(loc, loc, Identifier(), loc, Identifier(), moduleDecl);
+        ParamDecl(loc, loc, Identifier(), DeclNameLoc(loc), Identifier(),
+                  moduleDecl);
     decl->setSpecifier(ParamDecl::Specifier::Default);
     if (linearMapStructTy->hasArchetype())
       decl->setInterfaceType(linearMapStructTy->mapTypeOutOfContext());

@@ -837,7 +837,8 @@ class UseWrappedValue final : public ConstraintFix {
         PropertyWrapper(propertyWrapper), Base(base), Wrapper(wrapper) {}
 
   bool usingProjection() const {
-    auto nameStr = PropertyWrapper->getName().str();
+    assert(PropertyWrapper->getName().isSimpleName());
+    auto nameStr = PropertyWrapper->getName().getBaseIdentifier().str();
     return !nameStr.startswith("_");
   }
 

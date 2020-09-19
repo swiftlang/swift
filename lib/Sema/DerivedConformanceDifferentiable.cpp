@@ -330,7 +330,9 @@ deriveBodyDifferentiable_move(AbstractFunctionDecl *funcDecl, void *) {
   SmallVector<Identifier, 2> memberNames;
   for (auto *member : diffProperties) {
     memberMethodCallExprs.push_back(createMemberMethodCallExpr(member));
-    memberNames.push_back(member->getName());
+    // TODO(Compound variable names)
+    assert(member->getName().isSimpleName());
+    memberNames.push_back(member->getName().getBaseIdentifier());
   }
   auto *braceStmt = BraceStmt::create(C, SourceLoc(), memberMethodCallExprs,
                                       SourceLoc(), true);
@@ -454,11 +456,15 @@ deriveBodyDifferentiable_zeroTangentVectorInitializer(
   auto createMemberZeroTanInitCaptureListEntry =
       [&](VarDecl *member) -> CaptureListEntry {
     // Create `<member>_zeroTangentVectorInitializer` capture var declaration.
-    auto memberCaptureName = C.getIdentifier(std::string(member->getNameStr()) +
+    // TODO(Compound variable names)
+    assert(member->getName().isSimpleName());
+    llvm::SmallString<32> scratch;
+    auto nameStr = member->getNameStr(scratch);
+    auto memberCaptureName = C.getIdentifier(std::string(nameStr) +
                                              "_zeroTangentVectorInitializer");
     auto *memberZeroTanInitCaptureDecl = new (C) VarDecl(
         /*isStatic*/ false, VarDecl::Introducer::Let, /*isCaptureList*/ true,
-        SourceLoc(), memberCaptureName, funcDecl);
+        DeclNameLoc(), memberCaptureName, funcDecl);
     memberZeroTanInitCaptureDecl->setImplicit();
     auto *memberZeroTanInitPattern =
         NamedPattern::createImplicit(C, memberZeroTanInitCaptureDecl);
@@ -510,7 +516,9 @@ deriveBodyDifferentiable_zeroTangentVectorInitializer(
   SmallVector<Expr *, 4> memberZeroTanExprs;
   SmallVector<CaptureListEntry, 2> memberZeroTanInitCaptures;
   for (auto *member : diffProperties) {
-    memberNames.push_back(member->getName());
+    // TODO(Compound variable names)
+    assert(member->getName().isSimpleName());
+    memberNames.push_back(member->getName().getBaseIdentifier());
     auto memberZeroTanInitCapture =
         createMemberZeroTanInitCaptureListEntry(member);
     memberZeroTanInitCaptures.push_back(memberZeroTanInitCapture);
@@ -566,7 +574,7 @@ static ValueDecl *deriveDifferentiable_method(
   auto *parentDC = derived.getConformanceContext();
 
   auto *param = new (C) ParamDecl(SourceLoc(), SourceLoc(), argumentName,
-                                  SourceLoc(), parameterName, parentDC);
+                                  DeclNameLoc(), parameterName, parentDC);
   param->setSpecifier(ParamDecl::Specifier::Default);
   param->setInterfaceType(parameterType);
   ParameterList *params = ParameterList::create(C, {param});
@@ -672,7 +680,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     // name and `TangentVector` type of the original property.
     auto *tangentProperty = new (C) VarDecl(
         member->isStatic(), member->getIntroducer(), member->isCaptureList(),
-        /*NameLoc*/ SourceLoc(), member->getName(), structDecl);
+        /*NameLoc*/ DeclNameLoc(), member->getName(), structDecl);
     // Note: `tangentProperty` is not marked as implicit here, because that
     // incorrectly affects memberwise initializer synthesis.
     auto memberContextualType =

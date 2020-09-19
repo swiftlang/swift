@@ -2113,7 +2113,7 @@ public:
 /// used to represent the operands to a binary operator.  Note that
 /// expressions like '(4)' are represented with a ParenExpr.
 class TupleExpr final : public Expr,
-    private llvm::TrailingObjects<TupleExpr, Expr *, Identifier, SourceLoc> {
+    private llvm::TrailingObjects<TupleExpr, Expr *, DeclName, DeclNameLoc> {
   friend TrailingObjects;
 
   SourceLoc LParenLoc;
@@ -2124,33 +2124,33 @@ class TupleExpr final : public Expr,
   size_t numTrailingObjects(OverloadToken<Expr *>) const {
     return getNumElements();
   }
-  size_t numTrailingObjects(OverloadToken<Identifier>) const {
+  size_t numTrailingObjects(OverloadToken<DeclName>) const {
     return hasElementNames() ? getNumElements() : 0;
   }
-  size_t numTrailingObjects(OverloadToken<SourceLoc>) const {
+  size_t numTrailingObjects(OverloadToken<DeclNameLoc>) const {
     return hasElementNames() ? getNumElements() : 0;
   }
 
   /// Retrieve the buffer containing the element names.
-  MutableArrayRef<Identifier> getElementNamesBuffer() {
+  MutableArrayRef<DeclName> getElementNamesBuffer() {
     if (!hasElementNames())
       return { };
 
-    return { getTrailingObjects<Identifier>(), getNumElements() };
+    return { getTrailingObjects<DeclName>(), getNumElements() };
   }
 
   /// Retrieve the buffer containing the element name locations.
-  MutableArrayRef<SourceLoc> getElementNameLocsBuffer() {
+  MutableArrayRef<DeclNameLoc> getElementNameLocsBuffer() {
     if (!hasElementNameLocs())
       return { };
     
-    return { getTrailingObjects<SourceLoc>(), getNumElements() };
+    return { getTrailingObjects<DeclNameLoc>(), getNumElements() };
   }
 
   TupleExpr(SourceLoc LParenLoc, SourceLoc RParenLoc,
             ArrayRef<Expr *> SubExprs,
-            ArrayRef<Identifier> ElementNames,
-            ArrayRef<SourceLoc> ElementNameLocs,
+            ArrayRef<DeclName> ElementNames,
+            ArrayRef<DeclNameLoc> ElementNameLocs,
             Optional<unsigned> FirstTrailingArgumentAt, bool Implicit, Type Ty);
 
 public:
@@ -2158,8 +2158,8 @@ public:
   static TupleExpr *create(ASTContext &ctx,
                            SourceLoc LParenLoc, 
                            ArrayRef<Expr *> SubExprs,
-                           ArrayRef<Identifier> ElementNames, 
-                           ArrayRef<SourceLoc> ElementNameLocs,
+                           ArrayRef<DeclName> ElementNames,
+                           ArrayRef<DeclNameLoc> ElementNameLocs,
                            SourceLoc RParenLoc, bool HasTrailingClosure, 
                            bool Implicit, Type Ty = Type());
 
@@ -2167,10 +2167,29 @@ public:
                            SourceLoc LParenLoc,
                            SourceLoc RParenLoc,
                            ArrayRef<Expr *> SubExprs,
-                           ArrayRef<Identifier> ElementNames,
-                           ArrayRef<SourceLoc> ElementNameLocs,
+                           ArrayRef<DeclName> ElementNames,
+                           ArrayRef<DeclNameLoc> ElementNameLocs,
                            Optional<unsigned> FirstTrailingArgumentAt,
                            bool Implicit, Type Ty = Type());
+
+  /// Create a tuple for representing a call argument. These tuples always have
+  /// non-compound element names.
+  static TupleExpr *createArgTuple(ASTContext &ctx,
+                                   SourceLoc LParenLoc,
+                                   ArrayRef<Expr *> SubExprs,
+                                   ArrayRef<Identifier> ArgLabels,
+                                   ArrayRef<SourceLoc> ArgLabelLocs,
+                                   SourceLoc RParenLoc, bool HasTrailingClosure,
+                                   bool Implicit, Type Ty = Type());
+
+  static TupleExpr *createArgTuple(ASTContext &ctx,
+                                   SourceLoc LParenLoc,
+                                   SourceLoc RParenLoc,
+                                   ArrayRef<Expr *> SubExprs,
+                                   ArrayRef<Identifier> ArgLabels,
+                                   ArrayRef<SourceLoc> ArgLabelLocs,
+                                   Optional<unsigned> FirstTrailingArgumentAt,
+                                   bool Implicit, Type Ty = Type());
 
   /// Create an empty tuple.
   static TupleExpr *createEmpty(ASTContext &ctx, SourceLoc LParenLoc, 
@@ -2178,7 +2197,7 @@ public:
 
   /// Create an implicit tuple with no source information.
   static TupleExpr *createImplicit(ASTContext &ctx, ArrayRef<Expr *> SubExprs,
-                                   ArrayRef<Identifier> ElementNames);
+                                   ArrayRef<DeclName> ElementNames);
 
   SourceLoc getLParenLoc() const { return LParenLoc; }
   SourceLoc getRParenLoc() const { return RParenLoc; }
@@ -2244,13 +2263,13 @@ public:
   }
 
   /// Retrieve the element names for a tuple.
-  ArrayRef<Identifier> getElementNames() const { 
+  ArrayRef<DeclName> getElementNames() const {
     return const_cast<TupleExpr *>(this)->getElementNamesBuffer();
   }
   
   /// Retrieve the ith element name.
-  Identifier getElementName(unsigned i) const {
-    return hasElementNames() ? getElementNames()[i] : Identifier();
+  DeclName getElementName(unsigned i) const {
+    return hasElementNames() ? getElementNames()[i] : DeclName();
   }
   
   /// Whether this tuple has element name locations.
@@ -2259,16 +2278,16 @@ public:
   }
 
   /// Retrieve the locations of the element names for a tuple.
-  ArrayRef<SourceLoc> getElementNameLocs() const {
+  ArrayRef<DeclNameLoc> getElementNameLocs() const {
     return const_cast<TupleExpr *>(this)->getElementNameLocsBuffer();
   }
 
   /// Retrieve the location of the ith label, if known.
-  SourceLoc getElementNameLoc(unsigned i) const {
+  DeclNameLoc getElementNameLoc(unsigned i) const {
     if (hasElementNameLocs())
       return getElementNameLocs()[i];
     
-    return SourceLoc();
+    return DeclNameLoc();
   }
 
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Tuple; }

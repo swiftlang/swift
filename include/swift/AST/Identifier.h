@@ -533,6 +533,13 @@ public:
   bool isOperator() const {
     return getBaseName().isOperator();
   }
+
+  /// Determines whether the \c DeclName is empty. Note that if the name
+  /// contains argument labels it is always considered non-empty, even if the
+  /// labels themselves are all empty.
+  bool empty() const {
+    return isSimpleName() && getBaseName().empty();
+  }
   
   /// True if this name should be found by a decl ref or member ref under the
   /// name specified by 'refName'.

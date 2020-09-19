@@ -85,7 +85,7 @@ static bool isKeyPathCurriedThunkCallExpr(Expr *E) {
   if (!thunk)
     return false;
   if (thunk->getParameters()->size() != 1 ||
-      thunk->getParameters()->get(0)->getParameterName().str() != "$kp$")
+      !thunk->getParameters()->get(0)->getParameterName().isSimpleName("$kp$"))
     return false;
 
   auto PE = dyn_cast<ParenExpr>(CE->getArg());
@@ -289,14 +289,14 @@ public:
       return result;
     }
 
-    return TupleExpr::create(C,
-                             argList.lParenLoc,
-                             argList.args,
-                             argList.labels,
-                             argList.labelLocs,
-                             argList.rParenLoc,
-                             argList.hasTrailingClosure,
-                             /*implicit=*/true);
+    return TupleExpr::createArgTuple(C,
+                                     argList.lParenLoc,
+                                     argList.args,
+                                     argList.labels,
+                                     argList.labelLocs,
+                                     argList.rParenLoc,
+                                     argList.hasTrailingClosure,
+                                     /*implicit=*/true);
   }
 
   Expr *walkToExprPost(Expr *expr) override {
