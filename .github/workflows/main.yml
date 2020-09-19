@@ -45,8 +45,6 @@ jobs:
       - name: Build Linux installable archive
         run: |
           ./utils/webassembly/ci.sh
-          echo "Cleanup build directory to free disk space"
-          rm -rf ../build
       - name: Upload Linux installable archive
         uses: actions/upload-artifact@v1
         with:
@@ -90,7 +88,7 @@ jobs:
           name: macos-installable
           path: ../swift-wasm-DEVELOPMENT-SNAPSHOT-osx.tar.gz
       - name: Pack test results
-        run: tar cJf swift-test-results.tar.gz ../build/*/swift-macosx-x86_64/swift-test-results
+        run: tar cJf swift-test-results.tar.gz ../target-build/*/swift-macosx-x86_64/swift-test-results
       - name: Upload test results
         uses: actions/upload-artifact@v1
         with:
