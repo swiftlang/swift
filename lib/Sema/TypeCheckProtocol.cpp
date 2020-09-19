@@ -388,11 +388,15 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
       // conditions for creating an implicit witness `@differentiable` attribute
       // with the exact derivative configuration.
 
-      // If witness is declared in a different file as the conformance, we
-      // should not create an implicit `@differentiable` attribute on the
-      // witness. Produce an error.
-      if (dc->getModuleScopeContext() !=
-          witness->getDeclContext()->getModuleScopeContext()) {
+      // If witness is declared in a different file or type context than the
+      // conformance, we should not create an implicit `@differentiable`
+      // attribute on the witness. Produce an error.
+      auto sameTypeContext =
+          dc->getInnermostTypeContext() ==
+          witness->getDeclContext()->getInnermostTypeContext();
+      auto sameModule = dc->getModuleScopeContext() ==
+                        witness->getDeclContext()->getModuleScopeContext();
+      if (!sameTypeContext || !sameModule) {
         // FIXME(TF-1014): `@differentiable` attribute diagnostic does not
         // appear if associated type inference is involved.
         if (auto *vdWitness = dyn_cast<VarDecl>(witness)) {
@@ -2454,14 +2458,19 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     llvm::raw_string_ostream os(reqDiffAttrString);
     reqAttr->print(os, req, omitWrtClause);
     os.flush();
-    // If the witness is declared in a different file than the conformance, emit
-    // a specialized diagnostic.
-    if (conformance->getDeclContext()->getModuleScopeContext() !=
-            witness->getDeclContext()->getModuleScopeContext()) {
+    // If the witness is declared in a different file or type context than the
+    // conformance, emit a specialized diagnostic.
+    auto sameModule = conformance->getDeclContext()->getModuleScopeContext() !=
+                      witness->getDeclContext()->getModuleScopeContext();
+    auto sameTypeContext =
+        conformance->getDeclContext()->getInnermostTypeContext() !=
+        witness->getDeclContext()->getInnermostTypeContext();
+    if (sameModule || sameTypeContext) {
       diags
           .diagnose(
               witness,
-              diag::protocol_witness_missing_differentiable_attr_other_file,
+              diag::
+                  protocol_witness_missing_differentiable_attr_invalid_context,
               reqDiffAttrString, req->getName(), conformance->getType(),
               conformance->getProtocol()->getDeclaredInterfaceType())
           .fixItInsert(match.Witness->getStartLoc(), reqDiffAttrString + ' ');

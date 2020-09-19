@@ -32,20 +32,20 @@ protocol Protocol2: Differentiable {
 
 struct ConformingStruct: Differentiable {
   // Error for missing `@differentiable` attribute.
-  // expected-note @+1 {{candidate is missing explicit '@differentiable' attribute to satisfy requirement 'internalMethod1' (in protocol 'Protocol1') because it is declared in a different file than the conformance of 'ConformingStruct' to 'Protocol1'}} {{3-3=@differentiable }}
+  // expected-note @+1 {{candidate is missing explicit '@differentiable' attribute to satisfy requirement 'internalMethod1' (in protocol 'Protocol1'); explicit attribute is necessary because candidate is declared in a different type context or file than the conformance of 'ConformingStruct' to 'Protocol1'}} {{3-3=@differentiable }}
   func internalMethod1(_ x: Float) -> Float {
     x
   }
 
   // Error for missing `@differentiable` superset attribute.
-  // expected-note @+2 {{candidate is missing explicit '@differentiable' attribute to satisfy requirement 'internalMethod2' (in protocol 'Protocol1') because it is declared in a different file than the conformance of 'ConformingStruct' to 'Protocol1'}} {{3-3=@differentiable }}
+  // expected-note @+2 {{candidate is missing explicit '@differentiable' attribute to satisfy requirement 'internalMethod2' (in protocol 'Protocol1'); explicit attribute is necessary because candidate is declared in a different type context or file than the conformance of 'ConformingStruct' to 'Protocol1'}} {{3-3=@differentiable }}
   @differentiable(wrt: x)
   func internalMethod2(_ x: Float) -> Float {
     x
   }
 
   // Error for missing `@differentiable` subset attribute.
-  // expected-note @+2 {{candidate is missing explicit '@differentiable(wrt: x)' attribute to satisfy requirement 'internalMethod3' (in protocol 'Protocol1') because it is declared in a different file than the conformance of 'ConformingStruct' to 'Protocol1'}} {{3-3=@differentiable(wrt: x) }}
+  // expected-note @+2 {{candidate is missing explicit '@differentiable(wrt: x)' attribute to satisfy requirement 'internalMethod3' (in protocol 'Protocol1'); explicit attribute is necessary because candidate is declared in a different type context or file than the conformance of 'ConformingStruct' to 'Protocol1'}} {{3-3=@differentiable(wrt: x) }}
   @differentiable(wrt: (self, x))
   func internalMethod3(_ x: Float) -> Float {
     x
