@@ -978,11 +978,13 @@ void DiagnosticVerifier::handleDiagnostic(SourceManager &SM,
 bool DiagnosticVerifier::finishProcessing() {
   DiagnosticVerifier::Result Result = {false, false};
 
-  for (auto &BufferID : BufferIDs) {
-    DiagnosticVerifier::Result FileResult = verifyFile(BufferID);
-    Result.HadError |= FileResult.HadError;
-    Result.HadUnexpectedDiag |= FileResult.HadUnexpectedDiag;
-  }
+  ArrayRef<unsigned> BufferIDLists[2] = { BufferIDs, AdditionalBufferIDs };
+  for (ArrayRef<unsigned> BufferIDList : BufferIDLists)
+    for (auto &BufferID : BufferIDList) {
+      DiagnosticVerifier::Result FileResult = verifyFile(BufferID);
+      Result.HadError |= FileResult.HadError;
+      Result.HadUnexpectedDiag |= FileResult.HadUnexpectedDiag;
+    }
   if (!IgnoreUnknown) {
     bool HadError = verifyUnknown(SM, CapturedDiagnostics);
     Result.HadError |= HadError;

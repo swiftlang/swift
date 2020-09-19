@@ -552,8 +552,11 @@ private:
   bool setUpInputs();
   bool setUpASTContextIfNeeded();
   void setupStatsReporter();
-  void setupDiagnosticVerifierIfNeeded();
   void setupDependencyTrackerIfNeeded();
+
+  /// \return false if successsful, true on error.
+  bool setupDiagnosticVerifierIfNeeded();
+
   Optional<unsigned> setUpCodeCompletionBuffer();
 
   /// Find a buffer for a given input file and ensure it is recorded in

@@ -112,6 +112,8 @@ def tbd_is_installapi: Flag<["-"], "tbd-is-installapi">,
 def verify : Flag<["-"], "verify">,
   HelpText<"Verify diagnostics against expected-{error|warning|note} "
            "annotations">;
+def verify_additional_file : Separate<["-"], "verify-additional-file">,
+  HelpText<"Verify diagnostics in this file in addition to source files">;
 def verify_apply_fixes : Flag<["-"], "verify-apply-fixes">,
   HelpText<"Like -verify, but updates the original source file">;
 def verify_ignore_unknown: Flag<["-"], "verify-ignore-unknown">,

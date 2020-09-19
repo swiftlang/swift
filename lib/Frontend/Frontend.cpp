@@ -282,15 +282,31 @@ void CompilerInstance::setupStatsReporter() {
   Stats = std::move(Reporter);
 }
 
-void CompilerInstance::setupDiagnosticVerifierIfNeeded() {
+bool CompilerInstance::setupDiagnosticVerifierIfNeeded() {
   auto &diagOpts = Invocation.getDiagnosticOptions();
+  bool hadError = false;
+
   if (diagOpts.VerifyMode != DiagnosticOptions::NoVerify) {
     DiagVerifier = std::make_unique<DiagnosticVerifier>(
         SourceMgr, InputSourceCodeBufferIDs,
         diagOpts.VerifyMode == DiagnosticOptions::VerifyAndApplyFixes,
         diagOpts.VerifyIgnoreUnknown);
+    for (const auto &filename : diagOpts.AdditionalVerifierFiles) {
+      auto result = getFileSystem().getBufferForFile(filename);
+      if (!result) {
+        Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
+                             filename, result.getError().message());
+        hadError |= true;
+      }
+
+      auto bufferID = SourceMgr.addNewSourceBuffer(std::move(result.get()));
+      DiagVerifier->appendAdditionalBufferID(bufferID);
+    }
+
     addDiagnosticConsumer(DiagVerifier.get());
   }
+
+  return hadError;
 }
 
 void CompilerInstance::setupDependencyTrackerIfNeeded() {
@@ -339,7 +355,9 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
     return true;
 
   setupStatsReporter();
-  setupDiagnosticVerifierIfNeeded();
+
+  if (setupDiagnosticVerifierIfNeeded())
+    return true;
 
   return false;
 }

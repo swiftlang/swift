@@ -928,6 +928,9 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   Opts.ShowDiagnosticsAfterFatalError |=
     Args.hasArg(OPT_show_diagnostics_after_fatal);
 
+  for (Arg *A : Args.filtered(OPT_verify_additional_file))
+    Opts.AdditionalVerifierFiles.push_back(A->getValue());
+
   Opts.UseColor |=
       Args.hasFlag(OPT_color_diagnostics,
                    OPT_no_color_diagnostics,
