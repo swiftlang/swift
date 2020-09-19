@@ -24,16 +24,8 @@ cmake -G Ninja \
 ninja -v
 ninja -v install
 
-# On macOS the target CoreFoundation shadows the CoreFoundation suppplied by Xcode.
-# On Linux though there's no system CoreFoundation, its headers have to be shipped
-# in the installable archive and serve for both host and target.
-if [[ "$(uname)" == "Darwin" ]]; then
-  mv $DESTINATION_TOOLCHAIN/usr/lib/swift_static/CoreFoundation \
-    $DESTINATION_TOOLCHAIN/usr/lib/swift/wasi/wasm32/CoreFoundation
-else
-  mv $DESTINATION_TOOLCHAIN/usr/lib/swift_static/CoreFoundation \
-    $DESTINATION_TOOLCHAIN/usr/lib/swift/CoreFoundation
-fi
+mv $DESTINATION_TOOLCHAIN/usr/lib/swift_static/CoreFoundation \
+  $DESTINATION_TOOLCHAIN/usr/lib/swift/wasi/wasm32/CoreFoundation
 
 # .swiftdoc and .swiftmodule files should live in `swift`, not in `swift_static`
 mv $DESTINATION_TOOLCHAIN/usr/lib/swift_static/wasi/wasm32/Foundation.swift* \
