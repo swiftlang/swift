@@ -108,16 +108,22 @@ void ASTExtInfoBuilder::checkInvariants() const {
 bool ASTExtInfoBuilder::isEqualTo(ASTExtInfoBuilder other,
                                   bool useClangTypes,
                                   bool considerThrowsType) const {
+
+  bool throwsTypeEquivalent = (throwsType && other.throwsType) ?
+    (throwsType->getCanonicalType() == other.throwsType->getCanonicalType()) :
+      false;
+
   return bits == other.bits &&
-    (considerThrowsType ?
-     throwsType->getCanonicalType() == other.throwsType->getCanonicalType() :
-     true) &&
+    (considerThrowsType ? throwsTypeEquivalent : true) &&
     (useClangTypes ? (clangTypeInfo == other.clangTypeInfo) : true);
 }
 
 std::tuple<unsigned, const void *, const void *>
 ASTExtInfoBuilder::getFuncAttrKey() const {
-  return std::make_tuple(bits, throwsType->getCanonicalType().getPointer(),
+  return std::make_tuple(bits,
+                         throwsType ?
+                            throwsType->getCanonicalType().getPointer() :
+                            nullptr,
                          clangTypeInfo.getType());
 }
 
