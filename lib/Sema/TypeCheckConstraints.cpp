@@ -2457,7 +2457,6 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   // Create a 'let' binding to stand in for the RHS value.
   auto *matchVar = new (Context) VarDecl(/*IsStatic*/false,
                                          VarDecl::Introducer::Let,
-                                         /*IsCaptureList*/false,
                                          EP->getLoc(),
                                          Context.getIdentifier("$match"),
                                          DC);
@@ -2465,7 +2464,6 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
 
   matchVar->setImplicit();
   EP->setMatchVar(matchVar);
-  matchVar->setHasNonPatternBindingInit();
 
   // Find '~=' operators for the match.
   auto lookupOptions = defaultUnqualifiedLookupOptions;

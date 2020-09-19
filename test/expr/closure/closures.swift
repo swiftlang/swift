@@ -326,7 +326,7 @@ func testCaptureBehavior(_ ptr : SomeClass) {
   doStuff { [weak v1, weak v2] in v1!.foo() + v2!.foo() }
 
   let i = 42
-  // expected-warning @+1 {{variable 'i' was never mutated}} {{19-20=let}}
+  // expected-warning @+1 {{variable 'i' was never mutated}}
   doStuff { [weak i] in i! }   // expected-error {{'weak' may only be applied to class and class-bound protocol types, not 'Int'}}
 }
 

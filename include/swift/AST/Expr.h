@@ -3941,12 +3941,6 @@ public:
   VarDecl *getCapturedSelfDecl() const {
     return CapturedSelfDecl;
   }
-  
-  /// Whether this closure captures the \c self param in its body in such a
-  /// way that implicit \c self is enabled within its body (i.e. \c self is
-  /// captured non-weakly).
-  bool capturesSelfEnablingImplictSelf() const;
-
 
   /// Get the type checking state of this closure's body.
   BodyState getBodyState() const {

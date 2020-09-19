@@ -5719,7 +5719,6 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
   if (!storage) {
     storage = new (Context) VarDecl(StaticLoc.isValid(),
                                     VarDecl::Introducer::Var,
-                                    /*is capture list*/ false,
                                     VarLoc, Identifier(),
                                     CurDeclContext);
     storage->setImplicit(true);

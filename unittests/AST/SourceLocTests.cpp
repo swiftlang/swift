@@ -154,7 +154,6 @@ TEST(SourceLoc, StmtConditionElement) {
   
   auto vardecl = new (C.Ctx) VarDecl(/*IsStatic*/false,
                                      VarDecl::Introducer::Let,
-                                     /*IsCaptureList*/false,
                                      start.getAdvancedLoc(7)
                                     , C.Ctx.getIdentifier("x")
                                     , nullptr);

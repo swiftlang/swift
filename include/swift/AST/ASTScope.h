@@ -474,16 +474,6 @@ protected:
               NullablePtr<const GenericParamList> lastListSearched,
               DeclConsumer consumer) const;
 
-public:
-  /// Returns the SelfDC for parent (and possibly ancestor) scopes.
-  /// A return of None indicates that the previous child (in history) should be
-  /// asked.
-  virtual Optional<NullablePtr<DeclContext>> computeSelfDCForParent() const;
-
-  /// Returns the context that should be used when a nested scope (e.g. a
-  /// closure) captures self explicitly.
-  virtual NullablePtr<DeclContext> capturedSelfDC() const;
-
 protected:
   /// Find either locals or members (no scope has both)
   /// \param history The scopes visited since the start of lookup (including
@@ -691,27 +681,6 @@ public:
     bool lookupMembersOf(const GenericTypeOrExtensionScope *scope,
                          ArrayRef<const ASTScopeImpl *>,
                          ASTScopeImpl::DeclConsumer consumer) const override;
-
-  private:
-    /// A client needs to know if a lookup result required the dynamic implicit
-    /// self value. It is required if the lookup originates from a method body
-    /// or a lazy pattern initializer. So, one approach would be to call the
-    /// consumer to find members right from those scopes. However, because
-    /// members aren't the first things searched, generics are, that approache
-    /// ends up duplicating code from the \c GenericTypeOrExtensionScope. So we
-    /// take the approach of doing those lookups there, and using this function
-    /// to compute the selfDC from the history.
-    static NullablePtr<DeclContext>
-    computeSelfDC(ArrayRef<const ASTScopeImpl *> history);
-    
-    /// If we find a lookup result that requires the dynamic implict self value,
-    /// we need to check the nested scopes to see if any closures explicitly
-    /// captured \c self. In that case, the appropriate selfDC is that of the
-    /// innermost closure which captures a \c self value from one of this type's
-    /// methods.
-    static NullablePtr<DeclContext>
-    checkNestedScopesForSelfCapture(ArrayRef<const ASTScopeImpl *> history,
-                                    size_t start);
 };
 
 /// Behavior specific to representing the trailing where clause of a
@@ -810,7 +779,6 @@ public:
   virtual std::string declKindName() const = 0;
   virtual bool doesDeclHaveABody() const;
   const char *portionName() const { return portion->portionName; }
-  Optional<NullablePtr<DeclContext>> computeSelfDCForParent() const override;
 
 protected:
   Optional<bool> resolveIsCascadingUseForThisScope(
@@ -1037,8 +1005,6 @@ public:
 
   NullablePtr<const void> getReferrent() const override;
 
-  static bool shouldCreateAccessorScope(const AccessorDecl *);
-
 protected:
   SourceRange
   getSourceRangeOfEnclosedParamsOfASTNode(bool omitAssertions) const override;
@@ -1115,7 +1081,6 @@ public:
   }
   virtual NullablePtr<Decl> getDeclIfAny() const override { return decl; }
   Decl *getDecl() const { return decl; }
-  static bool isAMethod(const AbstractFunctionDecl *);
 
   NullablePtr<ASTScopeImpl> getParentOfASTAncestorScopesToBeRescued() override;
 
@@ -1130,21 +1095,10 @@ public:
   SourceRange sourceRangeForDeferredExpansion() const override;
 };
 
-/// Body of methods, functions in types.
-class MethodBodyScope final : public AbstractFunctionBodyScope {
+/// Body of functions and methods.
+class FunctionBodyScope final : public AbstractFunctionBodyScope {
 public:
-  MethodBodyScope(AbstractFunctionDecl *e) : AbstractFunctionBodyScope(e) {}
-  std::string getClassName() const override;
-  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                             DeclConsumer consumer) const override;
-
-  Optional<NullablePtr<DeclContext>> computeSelfDCForParent() const override;
-};
-
-/// Body of "pure" functions, functions without an implicit "self".
-class PureFunctionBodyScope final : public AbstractFunctionBodyScope {
-public:
-  PureFunctionBodyScope(AbstractFunctionDecl *e)
+  FunctionBodyScope(AbstractFunctionDecl *e)
       : AbstractFunctionBodyScope(e) {}
   std::string getClassName() const override;
   bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
@@ -1317,8 +1271,6 @@ public:
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   virtual NullablePtr<DeclContext> getDeclContext() const override;
 
-  Optional<NullablePtr<DeclContext>> computeSelfDCForParent() const override;
-
 protected:
   bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
                              DeclConsumer) const override;
@@ -1430,13 +1382,6 @@ public:
   std::string getClassName() const override;
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
-  
-  /// Since explicit captures of \c self by closures enable the use of implicit
-  /// \c self, we need to make sure that the appropriate \c self is used as the
-  /// base decl for these uses (otherwise, the capture would be marked as
-  /// unused. \c ClosureParametersScope::capturedSelfDC() checks if we have such
-  ///  a capture of self.
-  NullablePtr<DeclContext> capturedSelfDC() const override;
 
   NullablePtr<ClosureExpr> getClosureIfClosureScope() const override {
     return closureExpr;
