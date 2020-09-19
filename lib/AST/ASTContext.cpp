@@ -298,7 +298,8 @@ struct ASTContext::Implementation {
   /// Map from normal protocol conformances to missing witnesses that have
   /// been delayed until the conformance is fully checked, so that we can
   /// issue a fixit that fills the entire protocol stub.
-  llvm::DenseMap<NormalProtocolConformance *, std::vector<ValueDecl*>>
+  llvm::DenseMap<
+      NormalProtocolConformance *, std::unique_ptr<MissingWitnessesBase>>
     DelayedMissingWitnesses;
 
   /// Stores information about lazy deserialization of various declarations.
@@ -2139,22 +2140,24 @@ bool ASTContext::hasDelayedConformanceErrors() const {
   return false;
 }
 
+MissingWitnessesBase::~MissingWitnessesBase() { }
+
 void ASTContext::addDelayedConformanceDiag(
        NormalProtocolConformance *conformance,
        DelayedConformanceDiag fn) {
   getImpl().DelayedConformanceDiags[conformance].push_back(std::move(fn));
 }
 
-void ASTContext::
-addDelayedMissingWitnesses(NormalProtocolConformance *conformance,
-                           ArrayRef<ValueDecl*> witnesses) {
-  auto &bucket = getImpl().DelayedMissingWitnesses[conformance];
-  bucket.insert(bucket.end(), witnesses.begin(), witnesses.end());
+void ASTContext::addDelayedMissingWitnesses(
+    NormalProtocolConformance *conformance,
+    std::unique_ptr<MissingWitnessesBase> missingWitnesses) {
+  getImpl().DelayedMissingWitnesses[conformance] = std::move(missingWitnesses);
 }
 
-std::vector<ValueDecl*> ASTContext::
-takeDelayedMissingWitnesses(NormalProtocolConformance *conformance) {
-  std::vector<ValueDecl*> result;
+std::unique_ptr<MissingWitnessesBase>
+ASTContext::takeDelayedMissingWitnesses(
+    NormalProtocolConformance *conformance) {
+  std::unique_ptr<MissingWitnessesBase> result;
   auto known = getImpl().DelayedMissingWitnesses.find(conformance);
   if (known != getImpl().DelayedMissingWitnesses.end()) {
     result = std::move(known->second);

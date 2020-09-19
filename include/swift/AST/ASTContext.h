@@ -199,6 +199,16 @@ public:
 
 class SILLayout; // From SIL
 
+/// A set of missing witnesses for a given conformance. These are temporarily
+/// stashed in the ASTContext so the type checker can get at them.
+///
+/// The only subclass is owned by the type checker, so it can hide its own
+/// data structures.
+class MissingWitnessesBase {
+public:
+  virtual ~MissingWitnessesBase();
+};
+
 /// ASTContext - This object creates and owns the AST objects.
 /// However, this class does more than just maintain context within an AST.
 /// It is the closest thing to thread-local or compile-local storage in this
@@ -949,12 +959,13 @@ public:
   takeDelayedConformanceDiags(NormalProtocolConformance *conformance);
 
   /// Add delayed missing witnesses for the given normal protocol conformance.
-  void addDelayedMissingWitnesses(NormalProtocolConformance *conformance,
-                                  ArrayRef<ValueDecl*> witnesses);
+  void addDelayedMissingWitnesses(
+      NormalProtocolConformance *conformance,
+      std::unique_ptr<MissingWitnessesBase> missingWitnesses);
 
   /// Retrieve the delayed missing witnesses for the given normal protocol
   /// conformance.
-  std::vector<ValueDecl*>
+  std::unique_ptr<MissingWitnessesBase>
   takeDelayedMissingWitnesses(NormalProtocolConformance *conformance);
 
   /// Produce a specialized conformance, which takes a generic

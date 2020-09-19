@@ -648,6 +648,31 @@ enum class MissingWitnessDiagnosisKind {
 class AssociatedTypeInference;
 class MultiConformanceChecker;
 
+/// Describes a missing witness during conformance checking.
+class MissingWitness {
+public:
+  /// The requirement that is missing a witness.
+  ValueDecl *requirement;
+
+  /// The set of potential matching witnesses.
+  std::vector<RequirementMatch> matches;
+
+  MissingWitness(ValueDecl *requirement,
+                 ArrayRef<RequirementMatch> matches)
+    : requirement(requirement),
+      matches(matches.begin(), matches.end()) { }
+};
+
+/// Capture missing witnesses that have been delayed and will be stored
+/// in the ASTContext for later.
+class DelayedMissingWitnesses : public MissingWitnessesBase {
+public:
+  std::vector<MissingWitness> missingWitnesses;
+
+  DelayedMissingWitnesses(ArrayRef<MissingWitness> missingWitnesses)
+      : missingWitnesses(missingWitnesses.begin(), missingWitnesses.end()) { }
+};
+
 /// The protocol conformance checker.
 ///
 /// This helper class handles most of the details of checking whether a
@@ -670,7 +695,7 @@ class ConformanceChecker : public WitnessChecker {
   /// Keep track of missing witnesses, either type or value, for later
   /// diagnosis emits. This may contain witnesses that are external to the
   /// protocol under checking.
-  llvm::SetVector<ValueDecl*> &GlobalMissingWitnesses;
+  llvm::SetVector<MissingWitness> &GlobalMissingWitnesses;
 
   /// Keep track of the slice in GlobalMissingWitnesses that is local to
   /// this protocol under checking.
@@ -751,7 +776,7 @@ class ConformanceChecker : public WitnessChecker {
          ValueDecl *requirement, bool isError,
          std::function<void(NormalProtocolConformance *)> fn);
 
-  ArrayRef<ValueDecl*> getLocalMissingWitness() {
+  ArrayRef<MissingWitness> getLocalMissingWitness() {
     return GlobalMissingWitnesses.getArrayRef().
       slice(LocalMissingWitnessesStartIndex,
             GlobalMissingWitnesses.size() - LocalMissingWitnessesStartIndex);
@@ -769,7 +794,7 @@ public:
   void emitDelayedDiags();
 
   ConformanceChecker(ASTContext &ctx, NormalProtocolConformance *conformance,
-                     llvm::SetVector<ValueDecl *> &GlobalMissingWitnesses,
+                     llvm::SetVector<MissingWitness> &GlobalMissingWitnesses,
                      bool suppressDiagnostics = true);
 
   /// Resolve all of the type witnesses.
@@ -1034,4 +1059,26 @@ void diagnoseConformanceFailure(Type T,
 
 }
 
+namespace llvm {
+
+template<>
+struct DenseMapInfo<swift::MissingWitness> {
+  using MissingWitness = swift::MissingWitness;
+  using RequirementPointerTraits = DenseMapInfo<swift::ValueDecl *>;
+
+  static inline MissingWitness getEmptyKey() {
+    return MissingWitness(RequirementPointerTraits::getEmptyKey(), {});
+  }
+  static inline MissingWitness getTombstoneKey() {
+    return MissingWitness(RequirementPointerTraits::getTombstoneKey(), {});
+  }
+  static inline unsigned getHashValue(MissingWitness missing) {
+    return RequirementPointerTraits::getHashValue(missing.requirement);
+  }
+  static bool isEqual(MissingWitness a, MissingWitness b) {
+    return a.requirement == b.requirement;
+  }
+};
+
+}
 #endif // SWIFT_SEMA_PROTOCOL_H

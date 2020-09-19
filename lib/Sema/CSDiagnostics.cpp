@@ -2865,7 +2865,7 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
   {
     llvm::SmallString<128> Text;
     llvm::raw_svector_ostream SS(Text);
-    llvm::SetVector<ValueDecl *> missingWitnesses;
+    llvm::SetVector<MissingWitness> missingWitnesses;
     for (auto protocol : missingProtocols) {
       auto conformance = NormalProtocolConformance(
           nominal->getDeclaredType(), protocol, SourceLoc(), nominal,
@@ -2877,7 +2877,7 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
     }
 
     for (auto decl : missingWitnesses) {
-      swift::printRequirementStub(decl, nominal, nominal->getDeclaredType(),
+      swift::printRequirementStub(decl.requirement, nominal, nominal->getDeclaredType(),
                                   nominal->getStartLoc(), SS);
     }
 
