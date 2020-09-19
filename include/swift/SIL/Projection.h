@@ -302,10 +302,9 @@ public:
     assert(isValid());
     assert((getKind() == ProjectionKind::Struct ||
             getKind() == ProjectionKind::Class));
-    assert(BaseType.getNominalOrBoundGenericNominal() &&
-           "This should only be called with a nominal type");
-    auto *NDecl = BaseType.getNominalOrBoundGenericNominal();
-    return NDecl->getStoredProperties()[getIndex()];
+    auto *nominalDecl = BaseType.getNominalOrBoundGenericNominal();
+    assert(nominalDecl && "This should only be called with a nominal type");
+    return getIndexedField(nominalDecl, getIndex());
   }
 
   EnumElementDecl *getEnumElementDecl(SILType BaseType) const {

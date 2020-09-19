@@ -321,6 +321,10 @@ void Projection::getFirstLevelProjections(
 
   if (auto *C = Ty.getClassOrBoundGenericClass()) {
     unsigned Count = 0;
+    for (auto *superDecl = C->getSuperclassDecl(); superDecl != nullptr;
+         superDecl = superDecl->getSuperclassDecl()) {
+      Count += superDecl->getStoredProperties().size();
+    }
     for (auto *VDecl : C->getStoredProperties()) {
       (void) VDecl;
       Projection P(ProjectionKind::Class, Count++);

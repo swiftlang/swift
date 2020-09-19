@@ -156,7 +156,7 @@ const ValueDecl *AccessedStorage::getDecl() const {
 
   case Class: {
     auto *decl = getObject()->getType().getNominalOrBoundGenericNominal();
-    return decl->getStoredProperties()[getPropertyIndex()];
+    return getIndexedField(decl, getPropertyIndex());
   }
   case Tail:
     return nullptr;

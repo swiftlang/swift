@@ -5757,6 +5757,26 @@ public:
   }
 };
 
+/// Get a unique index for a struct or class field in layout order.
+///
+/// Precondition: \p decl must be a non-resilient struct or class.
+///
+/// Precondition: \p field must be a stored property declared in \p decl,
+///               not in a superclass.
+///
+/// Postcondition: The returned index is unique across all properties in the
+///                object, including properties declared in a superclass.
+unsigned getFieldIndex(NominalTypeDecl *decl, VarDecl *property);
+
+/// Get the property for a struct or class by its unique index.
+///
+/// Precondition: \p decl must be a non-resilient struct or class.
+///
+/// Precondition: \p index must be the index of a stored property
+///               (as returned by getFieldIndex()) which is declared
+///               in \p decl, not in a superclass.
+VarDecl *getIndexedField(NominalTypeDecl *decl, unsigned index);
+
 /// A common base for instructions that require a cached field index.
 ///
 /// "Field" is a term used here to refer to the ordered, accessible stored
