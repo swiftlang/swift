@@ -1228,13 +1228,30 @@ UnresolvedSpecializeExpr *UnresolvedSpecializeExpr::create(ASTContext &ctx,
 }
 
 bool CaptureListEntry::isSimpleSelfCapture() const {
+  auto &ctx = Var->getASTContext();
+
+  if (Var->getName() != ctx.Id_self)
+    return false;
+
+  if (auto *attr = Var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
+    if (attr->get() == ReferenceOwnership::Weak)
+      return false;
+
   if (Init->getPatternList().size() != 1)
     return false;
-  if (auto *DRE = dyn_cast<DeclRefExpr>(Init->getInit(0)))
+
+  auto *expr = Init->getInit(0);
+
+  if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
     if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
-      return (VD->isSelfParameter() || VD->isSelfParamCapture())
-             && VD->getName() == Var->getName();
+      return VD->getName() == ctx.Id_self;
     }
+  }
+
+  if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
+    return UDRE->getName().isSimpleName(ctx.Id_self);
+  }
+
   return false;
 }
 
@@ -1243,7 +1260,12 @@ CaptureListExpr *CaptureListExpr::create(ASTContext &ctx,
                                          ClosureExpr *closureBody) {
   auto size = totalSizeToAlloc<CaptureListEntry>(captureList.size());
   auto mem = ctx.Allocate(size, alignof(CaptureListExpr));
-  return ::new(mem) CaptureListExpr(captureList, closureBody);
+  auto *expr = ::new(mem) CaptureListExpr(captureList, closureBody);
+
+  for (auto capture : captureList)
+    capture.Var->setParentCaptureList(expr);
+
+  return expr;
 }
 
 DestructureTupleExpr *
@@ -1931,19 +1953,6 @@ Expr *ClosureExpr::getSingleExpressionBody() const {
 
 bool ClosureExpr::hasEmptyBody() const {
   return getBody()->empty();
-}
-
-bool ClosureExpr::capturesSelfEnablingImplictSelf() const {
-  if (auto *VD = getCapturedSelfDecl()) {
-    if (!VD->isSelfParamCapture())
-      return false;
-
-    if (auto *attr = VD->getAttrs().getAttribute<ReferenceOwnershipAttr>())
-      return attr->get() != ReferenceOwnership::Weak;
-
-    return true;
-  }
-  return false;
 }
 
 void ClosureExpr::setExplicitResultType(Type ty) {

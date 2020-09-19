@@ -157,7 +157,7 @@ class BuilderClosureVisitor
     Identifier name = ctx.getIdentifier(
         ("$__builder" + Twine(varCounter++)).str());
     auto var = new (ctx) VarDecl(/*isStatic=*/false, VarDecl::Introducer::Var,
-                                 /*isCaptureList=*/false, loc, name, dc);
+                                 loc, name, dc);
     var->setImplicit();
     return var;
   }

@@ -1087,7 +1087,7 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
     auto errorName = P.Context.Id_error;
     auto var = new (P.Context) VarDecl(/*IsStatic*/false,
                                        VarDecl::Introducer::Let,
-                                       /*IsCaptureList*/false, loc, errorName,
+                                       loc, errorName,
                                        P.CurDeclContext);
     var->setImplicit();
     auto namePattern = new (P.Context) NamedPattern(var);
@@ -1128,10 +1128,6 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
       if (VD->hasName()) P.addToScope(VD);
       boundDecls.push_back(VD);
     });
-
-    // Now that we have them, mark them as being initialized without a PBD.
-    for (auto VD : boundDecls)
-      VD->setHasNonPatternBindingInit();
 
     // Parse the optional 'where' guard.
     parseWhereGuard(P, result, status, parsingContext, isExprBasic);
@@ -1177,10 +1173,6 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
         P.diagnose(previous->getLoc(), diag::extra_var_in_multiple_pattern_list, previous->getName());
         status.setIsParseError();
       }
-    }
-    
-    for (auto VD : repeatedDecls) {
-      VD->setHasNonPatternBindingInit();
     }
 
     // Parse the optional 'where' guard, with this particular pattern's bound
@@ -1544,7 +1536,6 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     setLocalDiscriminator(VD);
     if (VD->hasName())
       addToScope(VD);
-    VD->setHasNonPatternBindingInit();
   });
   return Status;
 }
@@ -2032,9 +2023,8 @@ ParserResult<CaseStmt> Parser::parseStmtCatch() {
     for (unsigned i : indices(tmp)) {
       auto *vOld = tmp[i];
       auto *vNew = new (Context) VarDecl(
-          /*IsStatic*/ false, vOld->getIntroducer(), false /*IsCaptureList*/,
+          /*IsStatic*/ false, vOld->getIntroducer(),
           vOld->getNameLoc(), vOld->getName(), vOld->getDeclContext());
-      vNew->setHasNonPatternBindingInit();
       vNew->setImplicit();
       Result[i] = vNew;
     }
@@ -2144,9 +2134,6 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
   } else if (!IsCStyleFor) {
     parseToken(tok::kw_in, InLoc, diag::expected_foreach_in);
   }
-
-  // Bound variables all get their initial values from the generator.
-  pattern.get()->markHasNonPatternBindingInit();
 
   if (IsCStyleFor) {
     // Skip until start of body part.
@@ -2379,9 +2366,8 @@ parseStmtCase(Parser &P, SourceLoc &CaseLoc,
     for (unsigned i : indices(tmp)) {
       auto *vOld = tmp[i];
       auto *vNew = new (P.Context) VarDecl(
-          /*IsStatic*/ false, vOld->getIntroducer(), false /*IsCaptureList*/,
+          /*IsStatic*/ false, vOld->getIntroducer(),
           vOld->getNameLoc(), vOld->getName(), vOld->getDeclContext());
-      vNew->setHasNonPatternBindingInit();
       vNew->setImplicit();
       Result[i] = vNew;
     }

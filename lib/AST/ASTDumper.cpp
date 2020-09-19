@@ -842,8 +842,6 @@ namespace {
       printCommon(VD, "var_decl");
       if (VD->isLet())
         PrintWithColorRAII(OS, DeclModifierColor) << " let";
-      if (VD->hasNonPatternBindingInit())
-        PrintWithColorRAII(OS, DeclModifierColor) << " non_pattern_init";
       if (VD->getAttrs().hasAttribute<LazyAttr>())
         PrintWithColorRAII(OS, DeclModifierColor) << " lazy";
       printStorageImpl(VD);

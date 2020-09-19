@@ -118,20 +118,6 @@ Stmt *LabeledConditionalStmtScope::getStmt() const {
   return getLabeledConditionalStmt();
 }
 
-bool AbstractFunctionBodyScope::isAMethod(
-    const AbstractFunctionDecl *const afd) {
-  // What makes this interesting is that a method named "init" which is not
-  // in a nominal type or extension decl body still gets an implicit self
-  // parameter (even though the program is illegal).
-  // So when choosing between creating a MethodBodyScope and a
-  // PureFunctionBodyScope do we go by the enclosing Decl (i.e.
-  // "afd->getDeclContext()->isTypeContext()") or by
-  // "bool(afd->getImplicitSelfDecl())"?
-  //
-  // Since the code uses \c getImplicitSelfDecl, use that.
-  return afd->getImplicitSelfDecl();
-}
-
 #pragma mark getLabeledConditionalStmt
 LabeledConditionalStmt *IfStmtScope::getLabeledConditionalStmt() const {
   return stmt;
@@ -218,8 +204,7 @@ DEFINE_GET_CLASS_NAME(ASTSourceFileScope)
 DEFINE_GET_CLASS_NAME(GenericParamScope)
 DEFINE_GET_CLASS_NAME(AbstractFunctionDeclScope)
 DEFINE_GET_CLASS_NAME(ParameterListScope)
-DEFINE_GET_CLASS_NAME(MethodBodyScope)
-DEFINE_GET_CLASS_NAME(PureFunctionBodyScope)
+DEFINE_GET_CLASS_NAME(FunctionBodyScope)
 DEFINE_GET_CLASS_NAME(DefaultArgumentInitializerScope)
 DEFINE_GET_CLASS_NAME(AttachedPropertyWrapperScope)
 DEFINE_GET_CLASS_NAME(PatternEntryDeclScope)

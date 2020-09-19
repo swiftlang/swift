@@ -190,14 +190,6 @@ public:
 
   bool isNeverDefaultInitializable() const;
 
-  /// Mark all vardecls in this pattern as having non-pattern initial
-  /// values bound into them.
-  void markHasNonPatternBindingInit() {
-    forEachVariable([&](VarDecl *VD) {
-      VD->setHasNonPatternBindingInit();
-    });
-  }
-
   /// Mark all vardecls in this pattern as having an owning statement for
   /// the pattern.
   void markOwnedByStatement(Stmt *S) {

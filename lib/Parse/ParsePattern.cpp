@@ -965,7 +965,7 @@ ParserResult<Pattern> Parser::parsePattern() {
         SF.Kind == SourceFileKind::Interface) {
       PatternCtx.setCreateSyntax(SyntaxKind::IdentifierPattern);
       auto VD = new (Context) VarDecl(
-        /*IsStatic*/false, introducer, /*IsCaptureList*/false,
+        /*IsStatic*/false, introducer,
         consumeToken(tok::kw__), Identifier(), CurDeclContext);
       return makeParserResult(NamedPattern::createImplicit(Context, VD));
     }
@@ -1038,8 +1038,7 @@ ParserResult<Pattern> Parser::parsePattern() {
 Pattern *Parser::createBindingFromPattern(SourceLoc loc, Identifier name,
                                           VarDecl::Introducer introducer) {
   auto var = new (Context) VarDecl(/*IsStatic*/false, introducer,
-                                   /*IsCaptureList*/false, loc, name,
-                                   CurDeclContext);
+                                   loc, name, CurDeclContext);
   return new (Context) NamedPattern(var);
 }
 

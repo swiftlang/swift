@@ -32,6 +32,7 @@ namespace swift {
   class ASTContext;
   class AttributeBase;
   class BraceStmt;
+  class CaptureListExpr;
   class Decl;
   class DeclContext;
   class Expr;
@@ -112,6 +113,7 @@ LLVM_DECLARE_TYPE_ALIGNMENT(swift::BraceStmt, swift::StmtAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::ASTContext, 2);
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::DeclContext, swift::DeclContextAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::Expr, swift::ExprAlignInBits)
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::CaptureListExpr, swift::ExprAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::AbstractClosureExpr, swift::ExprAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::OpaqueValueExpr, swift::ExprAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::ProtocolConformance, swift::DeclAlignInBits)

@@ -2166,7 +2166,7 @@ namespace {
         // FIXME: This should be handled in the solver, not here.
         //
         // Otherwise, create a new type variable.
-        if (!var->hasNonPatternBindingInit() &&
+        if (var->getParentPatternBinding() &&
             !var->hasAttachedPropertyWrapper() &&
             optionality != ReferenceOwnershipOptionality::Required) {
           if (auto boundExpr = locator.trySimplifyToExpr()) {
