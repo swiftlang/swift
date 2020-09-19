@@ -2363,8 +2363,8 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
   bool throws = expr->getThrowsLoc().isValid();
   bool async = expr->getAsyncLoc().isValid();
   if (throws || async) {
-    return ASTExtInfoBuilder()
-      .withThrows(throws)
+    return ASTExtInfoBuilder::get()
+      .withThrows(throws, Type())
       .withAsync(async)
       .build();
   }
@@ -2378,8 +2378,8 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
   body->walk(throwFinder);
   auto asyncFinder = FindInnerAsync();
   body->walk(asyncFinder);
-  auto result = ASTExtInfoBuilder()
-    .withThrows(throwFinder.foundThrow())
+  auto result = ASTExtInfoBuilder::get()
+    .withThrows(throwFinder.foundThrow(), Type())
     .withAsync(asyncFinder.foundAsync())
     .build();
   closureEffectsCache[expr] = result;
