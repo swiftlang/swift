@@ -2014,8 +2014,10 @@ auto AssociatedTypeInference::solve(ConformanceChecker &checker)
     return None;
 
   // Save the missing type witnesses for later diagnosis.
-  checker.GlobalMissingWitnesses.insert(unresolvedAssocTypes.begin(),
-                                        unresolvedAssocTypes.end());
+  for (auto assocType : unresolvedAssocTypes) {
+    checker.GlobalMissingWitnesses.insert({assocType, {}});
+  }
+
   return None;
 }
 
