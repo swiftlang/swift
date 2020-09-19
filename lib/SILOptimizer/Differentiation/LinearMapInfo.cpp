@@ -75,7 +75,7 @@ VarDecl *LinearMapInfo::addVarDecl(NominalTypeDecl *nominal, StringRef name,
   auto &astCtx = nominal->getASTContext();
   auto id = astCtx.getIdentifier(name);
   auto *varDecl = new (astCtx) VarDecl(
-      /*IsStatic*/ false, VarDecl::Introducer::Var, /*IsCaptureList*/ false,
+      /*IsStatic*/ false, VarDecl::Introducer::Var,
       SourceLoc(), id, nominal);
   varDecl->setAccess(nominal->getEffectiveAccess());
   if (type->hasArchetype())

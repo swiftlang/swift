@@ -3345,7 +3345,6 @@ public:
                           var->isObjC(),
                           var->isStatic(),
                           rawIntroducer,
-                          var->hasNonPatternBindingInit(),
                           var->isGetterMutating(),
                           var->isSetterMutating(),
                           var->isLazyStorageProperty(),
