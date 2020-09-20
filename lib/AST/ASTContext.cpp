@@ -3937,8 +3937,7 @@ GenericEnvironment *OpenedArchetypeType::getGenericEnvironment() const {
   auto thisType = Type(const_cast<OpenedArchetypeType*>(this));
   auto &ctx = thisType->getASTContext();
   // Create a generic environment to represent the opened type.
-  auto signature =
-      ctx.getOpenedArchetypeSignature(Opened->getCanonicalType(), nullptr);
+  auto signature = ctx.getOpenedArchetypeSignature(Opened);
   auto *builder = signature->getGenericSignatureBuilder();
   auto *env = GenericEnvironment::getIncomplete(signature, builder);
   env->addMapping(signature->getGenericParams()[0], thisType);
@@ -4567,9 +4566,10 @@ CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
 // Type::getExistentialLayout()). In particular, the opened archetype signature
 // does not have requirements for conformances inherited from superclass
 // constraints while existential values do.
-CanGenericSignature ASTContext::getOpenedArchetypeSignature(CanType existential,
-                                                            ModuleDecl *mod) {
-  assert(existential.isExistentialType());
+CanGenericSignature ASTContext::getOpenedArchetypeSignature(Type type) {
+  assert(type->isExistentialType());
+
+  const CanType existential = type->getCanonicalType();
 
   // The opened archetype signature for a protocol type is identical
   // to the protocol's own canonical generic signature.

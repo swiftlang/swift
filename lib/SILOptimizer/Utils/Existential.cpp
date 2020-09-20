@@ -255,8 +255,7 @@ void ConcreteExistentialInfo::initializeSubstitutionMap(
   // than their corresponding existential, ExistentialConformances needs to be
   // filtered when using it with this (phony) generic signature.
   CanGenericSignature ExistentialSig =
-      M->getASTContext().getOpenedArchetypeSignature(ExistentialType,
-                                                     M->getSwiftModule());
+      M->getASTContext().getOpenedArchetypeSignature(ExistentialType);
   ExistentialSubs = SubstitutionMap::get(
       ExistentialSig, [&](SubstitutableType *type) { return ConcreteType; },
       [&](CanType /*depType*/, Type /*replaceType*/,
