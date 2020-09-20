@@ -1992,14 +1992,15 @@ NOTE(witness_self_weaken_same_type,none,
       "consider weakening the same-type requirement %0 == %1 to a superclass "
       "requirement", (Type, Type))
 ERROR(witness_requires_dynamic_self,none,
-      "method %0 in non-final class %1 must return 'Self' to conform to "
-      "protocol %2",
-      (DeclName, Type, Type))
+      "%select{%error|method|property|subscript}0 %1 in non-final class %2 "
+      "must %select{%error|return|specify type|return}0 'Self' "
+      "to conform to protocol %3",
+      (RequirementKind, DeclName, Type, Type))
 ERROR(witness_requires_class_implementation,none,
-      "method %0 in non-final class %1 cannot be implemented in a "
-      "protocol extension because it returns 'Self' and has associated type "
-      "requirements",
-      (DeclName, Type))
+      "%select{%error|method|%error|subscript}0 %1 in non-final class %2 "
+      "cannot be implemented in a protocol extension because it returns 'Self' "
+      "and has associated type requirements",
+      (RequirementKind, DeclName, Type))
 ERROR(witness_not_accessible_proto,none,
       "%select{initializer %1|method %1|%select{|setter for }2property %1"
       "|subscript%select{| setter}2}0 must be declared "
