@@ -303,11 +303,6 @@ static bool isDefer(DeclContext *dc) {
 /// same label.
 static void checkLabeledStmtShadowing(
     ASTContext &ctx, SourceFile *sourceFile, LabeledStmt *ls) {
-  // If ASTScope lookup is disabled, don't do this check at all.
-  // FIXME: Enable ASTScope lookup everywhere.
-  if (!ctx.LangOpts.EnableASTScopeLookup)
-    return;
-
   auto name = ls->getLabelInfo().Name;
   if (name.empty() || !sourceFile || ls->getStartLoc().isInvalid())
     return;
@@ -404,20 +399,11 @@ static LabeledStmt *findUnlabeledBreakOrContinueStmtTarget(
 static LabeledStmt *findBreakOrContinueStmtTarget(
     ASTContext &ctx, SourceFile *sourceFile,
     SourceLoc loc, Identifier targetName, SourceLoc targetLoc,
-    bool isContinue, DeclContext *dc,
-    ArrayRef<LabeledStmt *> oldActiveLabeledStmts) {
+    bool isContinue, DeclContext *dc) {
 
   // Retrieve the active set of labeled statements.
-  // FIXME: Once everything uses ASTScope lookup, \c oldActiveLabeledStmts
-  // can go away.
   SmallVector<LabeledStmt *, 4> activeLabeledStmts;
-  if (ctx.LangOpts.EnableASTScopeLookup) {
-    activeLabeledStmts = ASTScope::lookupLabeledStmts(sourceFile, loc);
-  } else {
-    activeLabeledStmts.insert(
-        activeLabeledStmts.end(),
-        oldActiveLabeledStmts.rbegin(), oldActiveLabeledStmts.rend());
-  }
+  activeLabeledStmts = ASTScope::lookupLabeledStmts(sourceFile, loc);
 
   // Handle an unlabeled break separately; that's the easy case.
   if (targetName.empty()) {
@@ -614,22 +600,13 @@ static void checkFallthroughPatternBindingsAndTypes(
 /// Check the correctness of a 'fallthrough' statement.
 ///
 /// \returns true if an error occurred.
-static bool checkFallthroughStmt(
-    DeclContext *dc, FallthroughStmt *stmt,
-    CaseStmt *oldFallthroughSource, CaseStmt *oldFallthroughDest) {
+static bool checkFallthroughStmt(DeclContext *dc, FallthroughStmt *stmt) {
   CaseStmt *fallthroughSource;
   CaseStmt *fallthroughDest;
   ASTContext &ctx = dc->getASTContext();
-  if (ctx.LangOpts.EnableASTScopeLookup) {
-    auto sourceFile = dc->getParentSourceFile();
-    std::tie(fallthroughSource, fallthroughDest) =
-        ASTScope::lookupFallthroughSourceAndDest(sourceFile, stmt->getLoc());
-    assert(fallthroughSource == oldFallthroughSource);
-    assert(fallthroughDest == oldFallthroughDest);
-  } else {
-    fallthroughSource = oldFallthroughSource;
-    fallthroughDest = oldFallthroughDest;
-  }
+  auto sourceFile = dc->getParentSourceFile();
+  std::tie(fallthroughSource, fallthroughDest) =
+      ASTScope::lookupFallthroughSourceAndDest(sourceFile, stmt->getLoc());
 
   if (!fallthroughSource) {
     ctx.Diags.diagnose(stmt->getLoc(), diag::fallthrough_outside_switch);
@@ -655,84 +632,11 @@ public:
   /// DC - This is the current DeclContext.
   DeclContext *DC;
 
-  // Scope information for control flow statements
-  // (break, continue, fallthrough).
-
-  /// The level of loop nesting. 'break' and 'continue' are valid only in scopes
-  /// where this is greater than one.
-  /// FIXME: Only required because EnableASTScopeLookup can be false
-  SmallVector<LabeledStmt*, 2> ActiveLabeledStmts;
-
-  /// The destination block for a 'fallthrough' statement. Null if the switch
-  /// scope depth is zero or if we are checking the final 'case' of the current
-  /// switch.
-  /// FIXME: Only required because EnableASTScopeLookup can be false
-  CaseStmt /*nullable*/ *FallthroughSource = nullptr;
-  CaseStmt /*nullable*/ *FallthroughDest = nullptr;
-
   /// Skip type checking any elements inside 'BraceStmt', also this is
   /// propagated to ConstraintSystem.
   bool LeaveBraceStmtBodyUnchecked = false;
 
   ASTContext &getASTContext() const { return Ctx; };
-  
-  struct AddLabeledStmt {
-    StmtChecker &SC;
-    AddLabeledStmt(StmtChecker &SC, LabeledStmt *LS) : SC(SC) {
-      // Verify that we don't have label shadowing.
-      auto sourceFile = SC.DC->getParentSourceFile();
-      checkLabeledStmtShadowing(SC.getASTContext(), sourceFile, LS);
-
-      // In any case, remember that we're in this labeled statement so that
-      // break and continue are aware of it.
-      SC.ActiveLabeledStmts.push_back(LS);
-
-      // Verify that the ASTScope-based query for active labeled statements
-      // is equivalent to what we have here.
-      if (LS->getStartLoc().isValid() && sourceFile &&
-          SC.getASTContext().LangOpts.EnableASTScopeLookup &&
-          !SC.getASTContext().Diags.hadAnyError()) {
-        // The labeled statements from ASTScope lookup have the
-        // innermost labeled statement first, so reverse it to
-        // match the data structure maintained here.
-        auto activeFromASTScope = ASTScope::lookupLabeledStmts(
-            sourceFile, LS->getStartLoc());
-        assert(activeFromASTScope.front() == LS);
-        std::reverse(activeFromASTScope.begin(), activeFromASTScope.end());
-        if (activeFromASTScope != SC.ActiveLabeledStmts) {
-          llvm::errs() << "Old: ";
-          llvm::interleave(SC.ActiveLabeledStmts, [&](LabeledStmt *LS) {
-            llvm::errs() << LS;
-          }, [&] {
-            llvm::errs() << ' ';
-          });
-          llvm::errs() << "\nNew: ";
-          llvm::interleave(activeFromASTScope, [&](LabeledStmt *LS) {
-            llvm::errs() << LS;
-          }, [&] {
-            llvm::errs() << ' ';
-          });
-          llvm::errs() << "\n";
-        }
-        assert(activeFromASTScope == SC.ActiveLabeledStmts);
-      }
-    }
-    ~AddLabeledStmt() {
-      SC.ActiveLabeledStmts.pop_back();
-    }
-  };
-  
-  struct AddSwitchNest {
-    StmtChecker &SC;
-    CaseStmt *OuterFallthroughDest;
-    AddSwitchNest(StmtChecker &SC) : SC(SC),
-        OuterFallthroughDest(SC.FallthroughDest) {
-    }
-    
-    ~AddSwitchNest() {
-      SC.FallthroughDest = OuterFallthroughDest;
-    }
-  };
 
   StmtChecker(DeclContext *DC) : Ctx(DC->getASTContext()), DC(DC) { }
 
@@ -988,7 +892,8 @@ public:
   Stmt *visitIfStmt(IfStmt *IS) {
     typeCheckConditionForStatement(IS, DC);
 
-    AddLabeledStmt ifNest(*this, IS);
+    auto sourceFile = DC->getParentSourceFile();
+    checkLabeledStmtShadowing(getASTContext(), sourceFile, IS);
 
     Stmt *S = IS->getThenStmt();
     typeCheckStmt(S);
@@ -1012,7 +917,9 @@ public:
   }
 
   Stmt *visitDoStmt(DoStmt *DS) {
-    AddLabeledStmt loopNest(*this, DS);
+    auto sourceFile = DC->getParentSourceFile();
+    checkLabeledStmtShadowing(getASTContext(), sourceFile, DS);
+
     BraceStmt *S = DS->getBody();
     typeCheckStmt(S);
     DS->setBody(S);
@@ -1022,7 +929,9 @@ public:
   Stmt *visitWhileStmt(WhileStmt *WS) {
     typeCheckConditionForStatement(WS, DC);
 
-    AddLabeledStmt loopNest(*this, WS);
+    auto sourceFile = DC->getParentSourceFile();
+    checkLabeledStmtShadowing(getASTContext(), sourceFile, WS);
+
     Stmt *S = WS->getBody();
     typeCheckStmt(S);
     WS->setBody(S);
@@ -1030,12 +939,12 @@ public:
     return WS;
   }
   Stmt *visitRepeatWhileStmt(RepeatWhileStmt *RWS) {
-    {
-      AddLabeledStmt loopNest(*this, RWS);
-      Stmt *S = RWS->getBody();
-      typeCheckStmt(S);
-      RWS->setBody(S);
-    }
+    auto sourceFile = DC->getParentSourceFile();
+    checkLabeledStmtShadowing(getASTContext(), sourceFile, RWS);
+
+    Stmt *S = RWS->getBody();
+    typeCheckStmt(S);
+    RWS->setBody(S);
 
     Expr *E = RWS->getCond();
     TypeChecker::typeCheckCondition(E, DC);
@@ -1048,7 +957,9 @@ public:
       return nullptr;
 
     // Type-check the body of the loop.
-    AddLabeledStmt loopNest(*this, S);
+    auto sourceFile = DC->getParentSourceFile();
+    checkLabeledStmtShadowing(getASTContext(), sourceFile, S);
+
     BraceStmt *Body = S->getBody();
     typeCheckStmt(Body);
     S->setBody(Body);
@@ -1060,7 +971,7 @@ public:
     if (auto target = findBreakOrContinueStmtTarget(
             getASTContext(), DC->getParentSourceFile(), S->getLoc(),
             S->getTargetName(), S->getTargetLoc(), /*isContinue=*/false,
-            DC, ActiveLabeledStmts)) {
+            DC)) {
       S->setTarget(target);
     }
 
@@ -1071,7 +982,7 @@ public:
     if (auto target = findBreakOrContinueStmtTarget(
             getASTContext(), DC->getParentSourceFile(), S->getLoc(),
             S->getTargetName(), S->getTargetLoc(), /*isContinue=*/true,
-            DC, ActiveLabeledStmts)) {
+            DC)) {
       S->setTarget(target);
     }
 
@@ -1079,7 +990,7 @@ public:
   }
 
   Stmt *visitFallthroughStmt(FallthroughStmt *S) {
-    if (checkFallthroughStmt(DC, S, FallthroughSource, FallthroughDest))
+    if (checkFallthroughStmt(DC, S))
       return nullptr;
 
     return S;
@@ -1225,13 +1136,6 @@ public:
     for (auto i = casesBegin; i != casesEnd; ++i) {
       auto *caseBlock = *i;
 
-      if (parentKind == CaseParentKind::Switch) {
-        // Fallthrough transfers control to the next case block. In the
-        // final case block, it is invalid. Only switch supports fallthrough.
-        FallthroughSource = caseBlock;
-        FallthroughDest = std::next(i) == casesEnd ? nullptr : *std::next(i);
-      }
-
       // Check restrictions on '@unknown'.
       if (caseBlock->hasUnknownAttr()) {
         assert(parentKind == CaseParentKind::Switch &&
@@ -1258,8 +1162,8 @@ public:
     Type subjectType = switchStmt->getSubjectExpr()->getType();
 
     // Type-check the case blocks.
-    AddSwitchNest switchNest(*this);
-    AddLabeledStmt labelNest(*this, switchStmt);
+    auto sourceFile = DC->getParentSourceFile();
+    checkLabeledStmtShadowing(getASTContext(), sourceFile, switchStmt);
 
     // Pre-emptively visit all Decls (#if/#warning/#error) that still exist in
     // the list of raw cases.
@@ -1290,7 +1194,8 @@ public:
     // The labels are in scope for both the 'do' and all of the catch
     // clauses.  This allows the user to break out of (or restart) the
     // entire construct.
-    AddLabeledStmt loopNest(*this, S);
+    auto sourceFile = DC->getParentSourceFile();
+    checkLabeledStmtShadowing(getASTContext(), sourceFile, S);
 
     // Type-check the 'do' body.  Type failures in here will generally
     // not cause type failures in the 'catch' clauses.
@@ -1698,7 +1603,7 @@ static Type getFunctionBuilderType(FuncDecl *FD) {
 bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   auto res = evaluateOrDefault(AFD->getASTContext().evaluator,
                                TypeCheckFunctionBodyRequest{AFD}, true);
-  TypeChecker::checkFunctionErrorHandling(AFD);
+  TypeChecker::checkFunctionEffects(AFD);
   TypeChecker::computeCaptures(AFD);
   return res;
 }
@@ -1754,19 +1659,21 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
   // For an implicitly generated super.init() call, make sure there's
   // only one designated initializer.
   if (implicitlyGenerated) {
-    auto superclassTy = ctor->getDeclContext()->getDeclaredInterfaceType();
-    auto lookupOptions = defaultConstructorLookupOptions;
-    lookupOptions |= NameLookupFlags::KnownPrivate;
+    auto *dc = ctor->getDeclContext();
+    auto *superclassDecl = dc->getSelfClassDecl();
 
-    // If a constructor is only visible as a witness for a protocol
-    // requirement, it must be an invalid override. Also, protocol
-    // extensions cannot yet define designated initializers.
-    lookupOptions -= NameLookupFlags::ProtocolMembers;
-    lookupOptions -= NameLookupFlags::PerformConformanceCheck;
+    superclassDecl->synthesizeSemanticMembersIfNeeded(
+        DeclBaseName::createConstructor());
 
-    for (auto member : TypeChecker::lookupConstructors(fromCtor, superclassTy,
-                                                       lookupOptions)) {
-      auto superclassCtor = dyn_cast<ConstructorDecl>(member.getValueDecl());
+    NLOptions subOptions = NL_QualifiedDefault | NL_KnownNonCascadingDependency;
+
+    SmallVector<ValueDecl *, 4> lookupResults;
+    fromCtor->lookupQualified(superclassDecl,
+                              DeclNameRef::createConstructor(),
+                              subOptions, lookupResults);
+
+    for (auto decl : lookupResults) {
+      auto superclassCtor = dyn_cast<ConstructorDecl>(decl);
       if (!superclassCtor || !superclassCtor->isDesignatedInit() ||
           superclassCtor == ctor)
         continue;
@@ -2073,8 +1980,7 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
   // Typechecking, in particular ApplySolution is going to replace closures
   // with OpaqueValueExprs and then try to do lookups into the closures.
   // So, build out the body now.
-  if (ctx.LangOpts.EnableASTScopeLookup)
-    ASTScope::expandFunctionBody(AFD);
+  ASTScope::expandFunctionBody(AFD);
 
   // Type check the function body if needed.
   bool hadError = false;
@@ -2152,7 +2058,7 @@ void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   BraceStmt *Body = TLCD->getBody();
   StmtChecker(TLCD).typeCheckStmt(Body);
   TLCD->setBody(Body);
-  checkTopLevelErrorHandling(TLCD);
+  checkTopLevelEffects(TLCD);
   performTopLevelDeclDiagnostics(TLCD);
 }
 

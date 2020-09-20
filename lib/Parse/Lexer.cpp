@@ -2706,12 +2706,12 @@ static SourceLoc getLocForStartOfTokenInBuf(SourceManager &SM,
 // Find the start of the given line.
 static const char *findStartOfLine(const char *bufStart, const char *current) {
   while (current != bufStart) {
-    if (current[0] == '\n' || current[0] == '\r') {
+    --current;
+
+    if (current[0] == '\n') {
       ++current;
       break;
     }
-
-    --current;
   }
 
   return current;
@@ -2779,19 +2779,16 @@ SourceLoc Lexer::getLocForEndOfLine(SourceManager &SM, SourceLoc Loc) {
   if (BufferID < 0)
     return SourceLoc();
 
-  // Use fake language options; language options only affect validity
-  // and the exact token produced.
-  LangOptions FakeLangOpts;
+  CharSourceRange entireRange = SM.getRangeForBuffer(BufferID);
+  StringRef Buffer = SM.extractText(entireRange);
 
-  // Here we return comments as tokens because either the caller skipped
-  // comments and normally we won't be at the beginning of a comment token
-  // (making this option irrelevant), or the caller lexed comments and
-  // we need to lex just the comment token.
-  Lexer L(FakeLangOpts, SM, BufferID, nullptr, LexerMode::Swift,
-          HashbangMode::Allowed, CommentRetentionMode::ReturnAsTokens);
-  L.restoreState(State(Loc));
-  L.skipToEndOfLine(/*EatNewline=*/true);
-  return getSourceLoc(L.CurPtr);
+  // Windows line endings are \r\n. Since we want the start of the next
+  // line, just look for \n so the \r is skipped through.
+  size_t Offset = SM.getLocOffsetInBuffer(Loc, BufferID);
+  Offset = Buffer.find('\n', Offset);
+  if (Offset == StringRef::npos)
+    return SourceLoc();
+  return getSourceLoc(Buffer.data() + Offset + 1);
 }
 
 StringRef Lexer::getIndentationForLine(SourceManager &SM, SourceLoc Loc,

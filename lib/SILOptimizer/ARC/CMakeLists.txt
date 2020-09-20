@@ -4,6 +4,7 @@ target_sources(swiftSILOptimizer PRIVATE
   ARCMatchingSet.cpp
   ARCRegionState.cpp
   ARCSequenceOpts.cpp
+  ARCSequenceOptUtils.cpp
   GlobalARCSequenceDataflow.cpp
   GlobalLoopARCSequenceDataflow.cpp
   RCStateTransition.cpp

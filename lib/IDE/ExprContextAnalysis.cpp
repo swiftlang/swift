@@ -46,9 +46,11 @@ void swift::ide::typeCheckContextAt(DeclContext *DC, SourceLoc Loc) {
   while (isa<AbstractClosureExpr>(DC))
     DC = DC->getParent();
 
-  // Make sure the extension has been bound, in case it is in an inactive #if
-  // or something weird like that.
+  // Make sure the extension has been bound.
   {
+    // Even if the extension is invalid (e.g. nested in a function or another
+    // type), we want to know the "intended nominal" of the extension so that
+    // we can know the type of 'Self'.
     SmallVector<ExtensionDecl *, 1> extensions;
     for (auto typeCtx = DC->getInnermostTypeContext(); typeCtx != nullptr;
          typeCtx = typeCtx->getParent()->getInnermostTypeContext()) {
@@ -58,6 +60,20 @@ void swift::ide::typeCheckContextAt(DeclContext *DC, SourceLoc Loc) {
     while (!extensions.empty()) {
       extensions.back()->computeExtendedNominal();
       extensions.pop_back();
+    }
+
+    // If the completion happens in the inheritance clause of the extension,
+    // 'DC' is the parent of the extension. We need to iterate the top level
+    // decls to find it. In theory, we don't need the extended nominal in the
+    // inheritance clause, but ASTScope lookup requires that. We don't care
+    // unless 'DC' is not 'SourceFile' because non-toplevel extensions are
+    // 'canNeverBeBound()' anyway.
+    if (auto *SF = dyn_cast<SourceFile>(DC)) {
+      auto &SM = DC->getASTContext().SourceMgr;
+      for (auto *decl : SF->getTopLevelDecls())
+        if (auto *ext = dyn_cast<ExtensionDecl>(decl))
+          if (SM.rangeContainsTokenLoc(ext->getSourceRange(), Loc))
+            ext->computeExtendedNominal();
     }
   }
 
@@ -84,6 +100,11 @@ void swift::ide::typeCheckContextAt(DeclContext *DC, SourceLoc Loc) {
           if (!PBD->isInitializerChecked(i))
             typeCheckPatternBinding(PBD, i);
         }
+      }
+    } else if (auto *defaultArg = dyn_cast<DefaultArgumentInitializer>(DC)) {
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(defaultArg->getParent())) {
+        auto *Param = AFD->getParameters()->get(defaultArg->getIndex());
+        (void)Param->getTypeCheckedDefaultExpr();
       }
     }
     break;
@@ -558,6 +579,31 @@ static void collectPossibleCalleesByQualifiedLookup(
   }
 }
 
+/// For the given \p unresolvedMemberExpr, collect possible callee types and
+/// declarations.
+static bool collectPossibleCalleesForUnresolvedMember(
+    DeclContext &DC, UnresolvedMemberExpr *unresolvedMemberExpr,
+    SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
+  auto collectMembers = [&](Type expectedTy) {
+    if (!expectedTy->mayHaveMembers())
+      return;
+    collectPossibleCalleesByQualifiedLookup(DC, MetatypeType::get(expectedTy),
+                                            unresolvedMemberExpr->getName(),
+                                            candidates);
+  };
+
+  // Get the context of the expression itself.
+  ExprContextInfo contextInfo(&DC, unresolvedMemberExpr);
+  for (auto expectedTy : contextInfo.getPossibleTypes()) {
+    collectMembers(expectedTy);
+    // If this is an optional type, let's also check its base type.
+    if (auto baseTy = expectedTy->getOptionalObjectType()) {
+      collectMembers(baseTy->lookThroughAllOptionalTypes());
+    }
+  }
+  return !candidates.empty();
+}
+
 /// For the given \c callExpr, collect possible callee types and declarations.
 static bool collectPossibleCalleesForApply(
     DeclContext &DC, ApplyExpr *callExpr,
@@ -599,6 +645,8 @@ static bool collectPossibleCalleesForApply(
   } else if (auto CRCE = dyn_cast<ConstructorRefCallExpr>(fnExpr)) {
     collectPossibleCalleesByQualifiedLookup(
         DC, CRCE->getArg(), DeclNameRef::createConstructor(), candidates);
+  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(fnExpr)) {
+    collectPossibleCalleesForUnresolvedMember(DC, UME, candidates);
   }
 
   if (!candidates.empty())
@@ -658,39 +706,6 @@ static bool collectPossibleCalleesForSubscript(
     collectPossibleCalleesByQualifiedLookup(DC, subscriptExpr->getBase(),
                                             DeclNameRef::createSubscript(),
                                             candidates);
-  }
-  return !candidates.empty();
-}
-
-/// For the given \p unresolvedMemberExpr, collect possible callee types and
-/// declarations.
-static bool collectPossibleCalleesForUnresolvedMember(
-    DeclContext &DC, UnresolvedMemberExpr *unresolvedMemberExpr,
-    SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
-  auto currModule = DC.getParentModule();
-
-  auto collectMembers = [&](Type expectedTy) {
-    if (!expectedTy->mayHaveMembers())
-      return;
-    SmallVector<FunctionTypeAndDecl, 2> members;
-    collectPossibleCalleesByQualifiedLookup(DC, MetatypeType::get(expectedTy),
-                                            unresolvedMemberExpr->getName(),
-                                            members);
-    for (auto member : members) {
-      if (isReferenceableByImplicitMemberExpr(currModule, &DC, expectedTy,
-                                              member.Decl))
-        candidates.push_back(member);
-    }
-  };
-
-  // Get the context of the expression itself.
-  ExprContextInfo contextInfo(&DC, unresolvedMemberExpr);
-  for (auto expectedTy : contextInfo.getPossibleTypes()) {
-    collectMembers(expectedTy);
-    // If this is an optional type, let's also check its base type.
-    if (auto baseTy = expectedTy->getOptionalObjectType()) {
-      collectMembers(baseTy->lookThroughAllOptionalTypes());
-    }
   }
   return !candidates.empty();
 }
@@ -761,11 +776,6 @@ class ExprContextAnalyzer {
       if (!collectPossibleCalleesForSubscript(*DC, subscriptExpr, Candidates))
         return false;
       Arg = subscriptExpr->getIndex();
-    } else if (auto *unresolvedMemberExpr = dyn_cast<UnresolvedMemberExpr>(E)) {
-      if (!collectPossibleCalleesForUnresolvedMember(*DC, unresolvedMemberExpr,
-                                                     Candidates))
-        return false;
-      Arg = unresolvedMemberExpr->getArgument();
     } else {
       llvm_unreachable("unexpected expression kind");
     }
@@ -840,7 +850,6 @@ class ExprContextAnalyzer {
     switch (Parent->getKind()) {
     case ExprKind::Call:
     case ExprKind::Subscript:
-    case ExprKind::UnresolvedMember:
     case ExprKind::Binary:
     case ExprKind::PrefixUnary: {
       analyzeApplyExpr(Parent);
@@ -848,8 +857,10 @@ class ExprContextAnalyzer {
     }
     case ExprKind::Array: {
       if (auto type = ParsedExpr->getType()) {
-        recordPossibleType(type);
-        break;
+        if (!type->is<UnresolvedType>()) {
+          recordPossibleType(type);
+          break;
+        }
       }
 
       // Check context types of the array literal expression.
@@ -1144,7 +1155,6 @@ public:
         case ExprKind::Assign:
         case ExprKind::Dictionary:
         case ExprKind::If:
-        case ExprKind::UnresolvedMember:
           return true;
         case ExprKind::Array:
           return (!Parent.getAsExpr() ||
@@ -1153,8 +1163,7 @@ public:
           auto ParentE = Parent.getAsExpr();
           return !ParentE ||
                  (!isa<CallExpr>(ParentE) && !isa<SubscriptExpr>(ParentE) &&
-                  !isa<BinaryExpr>(ParentE) &&
-                  !isa<UnresolvedMemberExpr>(ParentE));
+                  !isa<BinaryExpr>(ParentE));
         }
         case ExprKind::Closure:
           return isSingleExpressionBodyForCodeCompletion(
@@ -1227,74 +1236,4 @@ ExprContextInfo::ExprContextInfo(DeclContext *DC, Expr *TargetExpr) {
                                PossibleCallees, AnalyzedExpr,
                                singleExpressionBody);
   Analyzer.Analyze();
-}
-
-//===----------------------------------------------------------------------===//
-// isReferenceableByImplicitMemberExpr(ModuleD, DeclContext, Type, ValueDecl)
-//===----------------------------------------------------------------------===//
-
-bool swift::ide::isReferenceableByImplicitMemberExpr(
-        ModuleDecl *CurrModule, DeclContext *DC, Type T, ValueDecl *VD) {
-
-  if (VD->isOperator())
-    return false;
-
-  if (T->getOptionalObjectType() &&
-      VD->getModuleContext()->isStdlibModule()) {
-    // In optional context, ignore '.init(<some>)', 'init(nilLiteral:)',
-    if (isa<ConstructorDecl>(VD))
-      return false;
-    // TODO: Ignore '.some(<Wrapped>)' and '.none' too *in expression
-    // context*. They are useful in pattern context though.
-  }
-
-  // Enum element decls can always be referenced by implicit member
-  // expression.
-  if (isa<EnumElementDecl>(VD))
-    return true;
-
-  // Only non-failable constructors are implicitly referenceable.
-  if (auto CD = dyn_cast<ConstructorDecl>(VD)) {
-    return (!CD->isFailable() || CD->isImplicitlyUnwrappedOptional());
-  }
-
-  // Otherwise, check the result type matches the contextual type.
-  auto declTy = T->getTypeOfMember(CurrModule, VD);
-  if (declTy->is<ErrorType>())
-    return false;
-
-  // Member types can also be implicitly referenceable as long as it's
-  // convertible to the contextual type.
-  if (auto CD = dyn_cast<TypeDecl>(VD)) {
-    declTy = declTy->getMetatypeInstanceType();
-
-    // Emit construction for the same type via typealias doesn't make sense
-    // because we are emitting all `.init()`s.
-    if (declTy->isEqual(T))
-      return false;
-
-    // Only non-protocol nominal type can be instantiated.
-    auto nominal = declTy->getAnyNominal();
-    if (!nominal || isa<ProtocolDecl>(nominal))
-      return false;
-
-    return swift::isConvertibleTo(declTy, T, /*openArchetypes=*/true, *DC);
-  }
-
-  // Only static member can be referenced.
-  if (!VD->isStatic())
-    return false;
-
-  if (isa<FuncDecl>(VD)) {
-    // Strip '(Self.Type) ->' and parameters.
-    declTy = declTy->castTo<AnyFunctionType>()->getResult();
-    declTy = declTy->castTo<AnyFunctionType>()->getResult();
-  } else if (auto FT = declTy->getAs<AnyFunctionType>()) {
-    // The compiler accepts 'static var factory: () -> T' for implicit
-    // member expression.
-    // FIXME: This emits just 'factory'. We should emit 'factory()' instead.
-    declTy = FT->getResult();
-  }
-  return declTy->isEqual(T) ||
-         swift::isConvertibleTo(declTy, T, /*openArchetypes=*/true, *DC);
 }

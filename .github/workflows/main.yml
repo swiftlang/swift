@@ -22,21 +22,29 @@ jobs:
           sudo apt-get purge libgcc-9-dev gcc-9 libstdc++-9-dev
           sudo swapoff -a
           sudo rm -f /swapfile
+          sudo rm -rf /opt/hostedtoolcache
+          sudo rm -rf /usr/share/dotnet
           sudo apt clean
           docker rmi $(docker image ls -aq)
           df -h
       - uses: actions/checkout@v1
         with:
           path: swift
+      - name: Prepare sccache timestamp
+        id: cache_timestamp
+        shell: cmake -P {0}
+        run: |
+          string(TIMESTAMP current_date "%Y-%m-%d-%H;%M;%S" UTC)
+          message("::set-output name=timestamp::${current_date}")
       - uses: actions/cache@v1
         with:
           path: ../build-cache
-          key: ${{ runner.os }}-sccache-v9
+          key: ${{ runner.os }}-sccache-v10-${{ steps.cache_timestamp.outputs.timestamp }}
+          restore-keys: |
+            ${{ runner.os }}-sccache-v10-
       - name: Build Linux installable archive
         run: |
           ./utils/webassembly/ci.sh
-          echo "Cleanup build directory to free disk space"
-          rm -rf ../build
       - name: Upload Linux installable archive
         uses: actions/upload-artifact@v1
         with:
@@ -58,10 +66,18 @@ jobs:
       - uses: actions/checkout@v1
         with:
           path: swift
+      - name: Prepare sccache timestamp
+        id: cache_timestamp
+        shell: cmake -P {0}
+        run: |
+          string(TIMESTAMP current_date "%Y-%m-%d-%H;%M;%S" UTC)
+          message("::set-output name=timestamp::${current_date}")
       - uses: actions/cache@v1
         with:
           path: ../build-cache
-          key: ${{ runner.os }}-sccache-v9
+          key: ${{ runner.os }}-sccache-v10-${{ steps.cache_timestamp.outputs.timestamp }}
+          restore-keys: |
+            ${{ runner.os }}-sccache-v10-
       - name: Build macOS installable archive
         run: |
           sudo xcode-select --switch /Applications/Xcode_12_beta.app/Contents/Developer/
@@ -72,7 +88,7 @@ jobs:
           name: macos-installable
           path: ../swift-wasm-DEVELOPMENT-SNAPSHOT-osx.tar.gz
       - name: Pack test results
-        run: tar cJf swift-test-results.tar.gz ../build/*/swift-macosx-x86_64/swift-test-results
+        run: tar cJf swift-test-results.tar.gz ../target-build/*/swift-macosx-x86_64/swift-test-results
       - name: Upload test results
         uses: actions/upload-artifact@v1
         with:

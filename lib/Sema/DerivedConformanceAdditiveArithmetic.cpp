@@ -190,14 +190,12 @@ static ValueDecl *deriveMathOperator(DerivedConformance &derived,
 
   auto operatorId = C.getIdentifier(getMathOperatorName(op));
   DeclName operatorDeclName(C, operatorId, params);
-  auto operatorDecl =
-      FuncDecl::create(C, SourceLoc(), StaticSpellingKind::KeywordStatic,
-                       SourceLoc(), operatorDeclName, SourceLoc(),
-                       /*Async*/ false, SourceLoc(),
-                       /*Throws*/ false, SourceLoc(),
-                       /*GenericParams=*/nullptr, params,
-                       TypeLoc::withoutLoc(selfInterfaceType), parentDC);
-  operatorDecl->setImplicit();
+  auto *const operatorDecl = FuncDecl::createImplicit(
+      C, StaticSpellingKind::KeywordStatic, operatorDeclName,
+      /*NameLoc=*/SourceLoc(),
+      /*Async=*/false,
+      /*Throws=*/false,
+      /*GenericParams=*/nullptr, params, selfInterfaceType, parentDC);
   auto bodySynthesizer = [](AbstractFunctionDecl *funcDecl,
                             void *ctx) -> std::pair<BraceStmt *, bool> {
     auto op = (MathOperator) reinterpret_cast<intptr_t>(ctx);

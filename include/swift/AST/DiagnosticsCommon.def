@@ -185,5 +185,22 @@ WARNING(cross_imported_by_both_modules, none,
 ERROR(scanner_find_cycle, none,
       "dependency scanner detected dependency cycle: '%0'", (StringRef))
 
+ERROR(scanner_arguments_invalid, none,
+      "dependencies scanner cannot be configured with arguments: '%0'", (StringRef))
+
+//------------------------------------------------------------------------------
+// MARK: custom attribute diagnostics
+//------------------------------------------------------------------------------
+
+ERROR(ambiguous_custom_attribute_ref,none,
+      "ambiguous use of attribute %0", (Identifier))
+NOTE(ambiguous_custom_attribute_ref_fix,none,
+     "use '%0.' to reference the attribute %1 in module %2",
+     (StringRef, Identifier, Identifier))
+NOTE(found_attribute_candidate,none,
+     "found this attribute", ())
+ERROR(unknown_attribute,none,
+      "unknown attribute '%0'", (StringRef))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

@@ -121,6 +121,8 @@ ERROR(error_mode_cannot_emit_module_source_info,none,
       "this mode does not support emitting module source info files", ())
 ERROR(error_mode_cannot_emit_interface,none,
       "this mode does not support emitting module interface files", ())
+ERROR(error_mode_cannot_emit_module_summary,none,
+      "this mode does not support emitting module summary files", ())
 ERROR(cannot_emit_ir_skipping_function_bodies,none,
       "-experimental-skip-non-inlinable-function-bodies does not support "
       "emitting IR", ())
@@ -270,6 +272,14 @@ ERROR(placeholder_dependency_module_map_corrupted,none,
       "Swift placeholder dependency module map from %0 is malformed",
       (StringRef))
 
+ERROR(batch_scan_input_file_missing,none,
+      "cannot open batch dependencies scan input file from %0",
+      (StringRef))
+
+ERROR(batch_scan_input_file_corrupted,none,
+      "batch dependencies scan input file from %0 is malformed",
+      (StringRef))
+
 REMARK(default_previous_install_name, none,
       "default previous install name for %0 is %1", (StringRef, StringRef))
 
@@ -316,11 +326,11 @@ ERROR(error_optimization_remark_pattern, none, "%0 in '%1'",
       (StringRef, StringRef))
 
 ERROR(error_invalid_debug_prefix_map, none,
-      "invalid argument '%0' to -debug-prefix-map; it must be of the form "
-      "'original=remapped'", (StringRef))
+      "values for '-debug-prefix-map' must be in the format 'original=remapped'"
+      ", but '%0' was provided", (StringRef))
 ERROR(error_invalid_coverage_prefix_map, none,
-      "invalid argument '%0' to -coverage-prefix-map; it must be of the form "
-      "'original=remapped'", (StringRef))
+      "values for '-coverage-prefix-map' must be in the format "
+      "'original=remapped', but '%0' was provided", (StringRef))
 
 
 ERROR(error_unable_to_write_swift_ranges_file, none,
@@ -354,6 +364,9 @@ ERROR(error_extracting_flags_from_module_interface,none,
       "error extracting flags from module interface", ())
 REMARK(rebuilding_module_from_interface,none,
        "rebuilding module '%0' from interface '%1'", (StringRef, StringRef))
+NOTE(sdk_version_pbm_version,none,
+     "SDK build version is '%0'; prebuilt modules were "
+     "built using SDK build version: '%1'", (StringRef, StringRef))
 NOTE(out_of_date_module_here,none,
      "%select{compiled|cached|forwarding|prebuilt}0 module is out of date: '%1'",
      (unsigned, StringRef))

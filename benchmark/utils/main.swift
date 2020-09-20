@@ -79,6 +79,7 @@ import ExistentialPerformance
 import Fibonacci
 import FindStringNaive
 import FlattenList
+import FloatingPointConversion
 import FloatingPointParsing
 import FloatingPointPrinting
 import Hanoi
@@ -131,6 +132,7 @@ import PrefixWhile
 import Prims
 import PrimsNonStrongRef
 import PrimsSplit
+import ProtocolConformance
 import ProtocolDispatch
 import ProtocolDispatch2
 import Queue
@@ -265,6 +267,7 @@ registerBenchmark(Fibonacci)
 registerBenchmark(FindStringNaive)
 registerBenchmark(FlattenListLoop)
 registerBenchmark(FlattenListFlatMap)
+registerBenchmark(FloatingPointConversion)
 registerBenchmark(FloatingPointParsing)
 registerBenchmark(FloatingPointPrinting)
 registerBenchmark(Hanoi)
@@ -317,6 +320,7 @@ registerBenchmark(PrefixWhile)
 registerBenchmark(Prims)
 registerBenchmark(PrimsNonStrongRef)
 registerBenchmark(PrimsSplit)
+registerBenchmark(ProtocolConformance)
 registerBenchmark(ProtocolDispatch)
 registerBenchmark(ProtocolDispatch2)
 registerBenchmark(QueueGeneric)

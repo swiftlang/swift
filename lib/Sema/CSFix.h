@@ -266,13 +266,19 @@ enum class FixKind : uint8_t {
 
   /// Specify key path root type when it cannot be infered from context.
   SpecifyKeyPathRootType,
-  
+
   /// Unwrap optional base on key path application.
   UnwrapOptionalBaseKeyPathApplication,
 
   /// Explicitly specify a label to match trailing closure to a certain
   /// parameter in the call.
   SpecifyLabelToAssociateTrailingClosure,
+
+  /// Allow key path expressions with no components.
+  AllowKeyPathWithoutComponents,
+
+  /// Ignore function builder body which fails `pre-check` call.
+  IgnoreInvalidFunctionBuilderBody,
 };
 
 class ConstraintFix {
@@ -793,15 +799,15 @@ public:
 
 class UsePropertyWrapper final : public ConstraintFix {
   VarDecl *Wrapped;
-  bool UsingStorageWrapper;
+  bool UsingProjection;
   Type Base;
   Type Wrapper;
 
   UsePropertyWrapper(ConstraintSystem &cs, VarDecl *wrapped,
-                     bool usingStorageWrapper, Type base, Type wrapper,
+                     bool usingProjection, Type base, Type wrapper,
                      ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::UsePropertyWrapper, locator),
-        Wrapped(wrapped), UsingStorageWrapper(usingStorageWrapper), Base(base),
+        Wrapped(wrapped), UsingProjection(usingProjection), Base(base),
         Wrapper(wrapper) {}
 
 public:
@@ -816,7 +822,7 @@ public:
   }
 
   static UsePropertyWrapper *create(ConstraintSystem &cs, VarDecl *wrapped,
-                                    bool usingStorageWrapper, Type base,
+                                    bool usingProjection, Type base,
                                     Type wrapper, ConstraintLocator *locator);
 };
 
@@ -830,7 +836,7 @@ class UseWrappedValue final : public ConstraintFix {
       : ConstraintFix(cs, FixKind::UseWrappedValue, locator),
         PropertyWrapper(propertyWrapper), Base(base), Wrapper(wrapper) {}
 
-  bool usingStorageWrapper() const {
+  bool usingProjection() const {
     auto nameStr = PropertyWrapper->getName().str();
     return !nameStr.startswith("_");
   }
@@ -1694,9 +1700,9 @@ class CoerceToCheckedCast final : public ContextualMismatch {
                            locator) {}
 
 public:
-  std::string getName() const { return "as to as!"; }
+  std::string getName() const override { return "as to as!"; }
 
-  bool diagnose(const Solution &solution, bool asNote = false) const;
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
 
   static CoerceToCheckedCast *attempt(ConstraintSystem &cs, Type fromType,
                                       Type toType, ConstraintLocator *locator);
@@ -1707,11 +1713,11 @@ class RemoveInvalidCall final : public ConstraintFix {
       : ConstraintFix(cs, FixKind::RemoveCall, locator) {}
 
 public:
-  std::string getName() const {
+  std::string getName() const override {
     return "remove extraneous call from value of non-function type";
   }
 
-  bool diagnose(const Solution &solution, bool asNote = false) const;
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
 
   static RemoveInvalidCall *create(ConstraintSystem &cs,
                                    ConstraintLocator *locator);
@@ -1749,13 +1755,13 @@ class SpecifyBaseTypeForContextualMember final : public ConstraintFix {
         MemberName(member) {}
 
 public:
-  std::string getName() const {
+  std::string getName() const override {
     const auto baseName = MemberName.getBaseName();
     return "specify base type in reference to member '" +
            baseName.userFacingName().str() + "'";
   }
 
-  bool diagnose(const Solution &solution, bool asNote = false) const;
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
 
   static SpecifyBaseTypeForContextualMember *
   create(ConstraintSystem &cs, DeclNameRef member, ConstraintLocator *locator);
@@ -1766,9 +1772,9 @@ class SpecifyClosureParameterType final : public ConstraintFix {
       : ConstraintFix(cs, FixKind::SpecifyClosureParameterType, locator) {}
 
 public:
-  std::string getName() const;
+  std::string getName() const override;
 
-  bool diagnose(const Solution &solution, bool asNote = false) const;
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
 
   static SpecifyClosureParameterType *create(ConstraintSystem &cs,
                                              ConstraintLocator *locator);
@@ -1779,11 +1785,11 @@ class SpecifyClosureReturnType final : public ConstraintFix {
       : ConstraintFix(cs, FixKind::SpecifyClosureReturnType, locator) {}
 
 public:
-  std::string getName() const {
+  std::string getName() const override {
     return "specify closure return type";
   }
 
-  bool diagnose(const Solution &solution, bool asNote = false) const;
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
 
   static SpecifyClosureReturnType *create(ConstraintSystem &cs,
                                           ConstraintLocator *locator);
@@ -1794,11 +1800,11 @@ class SpecifyObjectLiteralTypeImport final : public ConstraintFix {
       : ConstraintFix(cs, FixKind::SpecifyObjectLiteralTypeImport, locator) {}
 
 public:
-  std::string getName() const {
+  std::string getName() const override {
     return "import required module to gain access to a default literal type";
   }
 
-  bool diagnose(const Solution &solution, bool asNote = false) const;
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
 
   static SpecifyObjectLiteralTypeImport *create(ConstraintSystem &cs,
                                                 ConstraintLocator *locator);
@@ -1810,11 +1816,11 @@ class AddQualifierToAccessTopLevelName final : public ConstraintFix {
       : ConstraintFix(cs, FixKind::AddQualifierToAccessTopLevelName, locator) {}
 
 public:
-  std::string getName() const {
+  std::string getName() const override {
     return "qualify reference to access top-level function";
   }
 
-  bool diagnose(const Solution &solution, bool asNote = false) const;
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
 
   static AddQualifierToAccessTopLevelName *create(ConstraintSystem &cs,
                                                   ConstraintLocator *locator);
@@ -1825,11 +1831,11 @@ class AllowNonClassTypeToConvertToAnyObject final : public ContextualMismatch {
                                         ConstraintLocator *locator);
 
 public:
-  std::string getName() const {
+  std::string getName() const override {
     return "allow non-class type to convert to 'AnyObject'";
   }
 
-  bool diagnose(const Solution &solution, bool asNote = false) const;
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
 
   static AllowNonClassTypeToConvertToAnyObject *
   create(ConstraintSystem &cs, Type type, ConstraintLocator *locator);
@@ -1852,11 +1858,11 @@ class AllowCoercionToForceCast final : public ContextualMismatch {
                            toType, locator, /*warning*/ true) {}
 
 public:
-  std::string getName() const {
+  std::string getName() const override {
     return "allow coercion to be treated as a force-cast";
   }
 
-  bool diagnose(const Solution &solution, bool asNote = false) const;
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
 
   static AllowCoercionToForceCast *create(ConstraintSystem &cs, Type fromType,
                                           Type toType,
@@ -1894,11 +1900,11 @@ class SpecifyKeyPathRootType final : public ConstraintFix {
         : ConstraintFix(cs, FixKind::SpecifyKeyPathRootType, locator) {}
 
   public:
-    std::string getName() const {
+    std::string getName() const override {
       return "specify key path root type";
     }
 
-    bool diagnose(const Solution &solution, bool asNote = false) const;
+    bool diagnose(const Solution &solution, bool asNote = false) const override;
 
     static SpecifyKeyPathRootType *create(ConstraintSystem &cs,
                                           ConstraintLocator *locator);
@@ -1956,6 +1962,64 @@ public:
 
   static SpecifyLabelToAssociateTrailingClosure *
   create(ConstraintSystem &cs, ConstraintLocator *locator);
+};
+
+/// Diagnose situations where we have a key path with no components.
+///
+/// \code
+/// let _ : KeyPath<A, B> = \A
+/// \endcode
+class AllowKeyPathWithoutComponents final : public ConstraintFix {
+  AllowKeyPathWithoutComponents(ConstraintSystem &cs,
+                                ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowKeyPathWithoutComponents, locator) {}
+
+public:
+  std::string getName() const override { return "key path missing component"; }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowKeyPathWithoutComponents *create(ConstraintSystem &cs,
+                                               ConstraintLocator *locator);
+};
+
+class IgnoreInvalidFunctionBuilderBody final : public ConstraintFix {
+  enum class ErrorInPhase {
+    PreCheck,
+    ConstraintGeneration,
+  };
+
+  ErrorInPhase Phase;
+
+  IgnoreInvalidFunctionBuilderBody(ConstraintSystem &cs, ErrorInPhase phase,
+                                   ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::IgnoreInvalidFunctionBuilderBody, locator),
+        Phase(phase) {}
+
+public:
+  std::string getName() const override {
+    return "ignore invalid function builder body";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static IgnoreInvalidFunctionBuilderBody *
+  duringPreCheck(ConstraintSystem &cs, ConstraintLocator *locator) {
+    return create(cs, ErrorInPhase::PreCheck, locator);
+  }
+
+  static IgnoreInvalidFunctionBuilderBody *
+  duringConstraintGeneration(ConstraintSystem &cs, ConstraintLocator *locator) {
+    return create(cs, ErrorInPhase::ConstraintGeneration, locator);
+  }
+
+private:
+  static IgnoreInvalidFunctionBuilderBody *
+  create(ConstraintSystem &cs, ErrorInPhase phase, ConstraintLocator *locator);
 };
 
 } // end namespace constraints

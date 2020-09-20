@@ -152,6 +152,8 @@ static SourceLoc inferOptRemarkSearchForwards(SILInstruction &i) {
   for (auto &inst :
        llvm::make_range(std::next(i.getIterator()), i.getParent()->end())) {
     auto newLoc = inst.getLoc().getSourceLoc();
+    if (auto inlinedLoc = inst.getDebugScope()->getOutermostInlineLocation())
+      newLoc = inlinedLoc.getSourceLoc();
     if (newLoc.isValid())
       return newLoc;
   }
@@ -167,7 +169,9 @@ static SourceLoc inferOptRemarkSearchBackwards(SILInstruction &i) {
   for (auto &inst : llvm::make_range(std::next(i.getReverseIterator()),
                                      i.getParent()->rend())) {
     auto loc = inst.getLoc();
-    if (!bool(loc))
+    if (auto inlinedLoc = inst.getDebugScope()->getOutermostInlineLocation())
+      loc = inlinedLoc;
+    if (!loc.getSourceLoc().isValid())
       continue;
 
     auto range = loc.getSourceRange();
@@ -178,55 +182,48 @@ static SourceLoc inferOptRemarkSearchBackwards(SILInstruction &i) {
   return SourceLoc();
 }
 
+static llvm::cl::opt<bool> IgnoreAlwaysInferForTesting(
+    "sil-opt-remark-ignore-always-infer", llvm::cl::Hidden,
+    llvm::cl::init(false),
+    llvm::cl::desc(
+        "Disables always infer source loc behavior for testing purposes"));
+
+// Attempt to infer a SourceLoc for \p i using heuristics specified by \p
+// inferBehavior.
+//
+// NOTE: We distinguish in between situations where we always must infer
+// (retain, release) and other situations where we are ok with original source
+// locs if we are not inlined (alloc_ref, alloc_stack).
 SourceLoc swift::OptRemark::inferOptRemarkSourceLoc(
     SILInstruction &i, SourceLocInferenceBehavior inferBehavior) {
-  auto loc = i.getLoc().getSourceLoc();
+  // If we are only supposed to infer in inline contexts, see if we have a valid
+  // loc and if that loc is an inlined call site.
+  auto loc = i.getLoc();
+  if (loc.getSourceLoc().isValid() &&
+      !(bool(inferBehavior & SourceLocInferenceBehavior::AlwaysInfer) &&
+        !IgnoreAlwaysInferForTesting) &&
+      !(i.getDebugScope() && i.getDebugScope()->InlinedCallSite))
+    return loc.getSourceLoc();
 
-  // Do a quick check if we already have a valid loc. In such a case, just
-  // return. Otherwise, we try to infer using one of our heuristics below.
-  if (loc.isValid())
-    return loc;
-
-  // Otherwise, try to handle the individual behavior cases, returning loc at
-  // the end of each case (its invalid, so it will get ignored). If loc is not
-  // returned, we hit an assert at the end to make it easy to identify a case
-  // was missed.
-  switch (inferBehavior) {
-  case SourceLocInferenceBehavior::None:
-    return loc;
-  case SourceLocInferenceBehavior::ForwardScanOnly: {
+  if (bool(inferBehavior & SourceLocInferenceBehavior::ForwardScan)) {
     SourceLoc newLoc = inferOptRemarkSearchForwards(i);
     if (newLoc.isValid())
       return newLoc;
-    return loc;
   }
-  case SourceLocInferenceBehavior::BackwardScanOnly: {
+
+  if (bool(inferBehavior & SourceLocInferenceBehavior::BackwardScan)) {
     SourceLoc newLoc = inferOptRemarkSearchBackwards(i);
     if (newLoc.isValid())
       return newLoc;
-    return loc;
   }
-  case SourceLocInferenceBehavior::ForwardThenBackward: {
+
+  if (bool(inferBehavior & SourceLocInferenceBehavior::ForwardScan2nd)) {
     SourceLoc newLoc = inferOptRemarkSearchForwards(i);
     if (newLoc.isValid())
       return newLoc;
-    newLoc = inferOptRemarkSearchBackwards(i);
-    if (newLoc.isValid())
-      return newLoc;
-    return loc;
-  }
-  case SourceLocInferenceBehavior::BackwardThenForward: {
-    SourceLoc newLoc = inferOptRemarkSearchBackwards(i);
-    if (newLoc.isValid())
-      return newLoc;
-    newLoc = inferOptRemarkSearchForwards(i);
-    if (newLoc.isValid())
-      return newLoc;
-    return loc;
-  }
   }
 
-  llvm_unreachable("Covered switch isn't covered?!");
+  return SourceLoc();
 }
 
 template <typename RemarkT, typename... ArgTypes>

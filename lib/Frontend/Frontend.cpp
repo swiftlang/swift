@@ -33,6 +33,7 @@
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
+#include "swift/Serialization/ModuleDependencyScanner.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
@@ -192,7 +193,9 @@ void CompilerInstance::recordPrimaryInputBuffer(unsigned BufID) {
 
 bool CompilerInstance::setUpASTContextIfNeeded() {
   if (Invocation.getFrontendOptions().RequestedAction ==
-      FrontendOptions::ActionType::CompileModuleFromInterface) {
+          FrontendOptions::ActionType::CompileModuleFromInterface ||
+      Invocation.getFrontendOptions().RequestedAction ==
+          FrontendOptions::ActionType::TypecheckModuleFromInterface) {
     // Compiling a module interface from source uses its own CompilerInstance
     // with options read from the input file. Don't bother setting up an
     // ASTContext at this level.
@@ -201,7 +204,9 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
 
   Context.reset(ASTContext::get(
       Invocation.getLangOptions(), Invocation.getTypeCheckerOptions(),
-      Invocation.getSearchPathOptions(), SourceMgr, Diagnostics));
+      Invocation.getSearchPathOptions(),
+      Invocation.getClangImporterOptions(),
+      SourceMgr, Diagnostics));
   registerParseRequestFunctions(Context->evaluator);
   registerTypeCheckerRequestFunctions(Context->evaluator);
   registerSILGenRequestFunctions(Context->evaluator);
@@ -478,8 +483,8 @@ bool CompilerInstance::setUpModuleLoaders() {
   // Otherwise, we just keep it around as our interface to Clang's ABI
   // knowledge.
   std::unique_ptr<ClangImporter> clangImporter =
-    ClangImporter::create(*Context, Invocation.getClangImporterOptions(),
-                          Invocation.getPCHHash(), getDependencyTracker());
+    ClangImporter::create(*Context, Invocation.getPCHHash(),
+                          getDependencyTracker());
   if (!clangImporter) {
     Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
     return true;
@@ -520,8 +525,35 @@ bool CompilerInstance::setUpModuleLoaders() {
     this->DefaultSerializedLoader = ISML.get();
     Context->addModuleLoader(std::move(ISML));
   }
-  
+
   Context->addModuleLoader(std::move(clangImporter), /*isClang*/ true);
+
+  // When scanning for dependencies, we must add the scanner loaders in order to handle
+  // ASTContext operations such as canImportModule
+  if (Invocation.getFrontendOptions().RequestedAction ==
+      FrontendOptions::ActionType::ScanDependencies) {
+    auto ModuleCachePath = getModuleCachePathFromClang(Context
+                                                       ->getClangModuleLoader()->getClangInstance());
+    auto &FEOpts = Invocation.getFrontendOptions();
+    ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
+    InterfaceSubContextDelegateImpl ASTDelegate(Context->SourceMgr, Context->Diags,
+                                                Context->SearchPathOpts, Context->LangOpts,
+                                                Context->ClangImporterOpts,
+                                                LoaderOpts,
+                                                /*buildModuleCacheDirIfAbsent*/false,
+                                                ModuleCachePath,
+                                                FEOpts.PrebuiltModuleCachePath,
+                                                FEOpts.SerializeModuleInterfaceDependencyHashes,
+                                                FEOpts.shouldTrackSystemDependencies());
+    auto mainModuleName = Context->getIdentifier(FEOpts.ModuleName);
+    std::unique_ptr<PlaceholderSwiftModuleScanner> PSMS =
+      std::make_unique<PlaceholderSwiftModuleScanner>(*Context,
+                                                      MLM,
+                                                      mainModuleName,
+                                                      Context->SearchPathOpts.PlaceholderDependencyModuleMap,
+                                                      ASTDelegate);
+    Context->addModuleLoader(std::move(PSMS));
+  }
 
   return false;
 }
@@ -818,7 +850,7 @@ void CompilerInstance::setMainModule(ModuleDecl *newMod) {
   Context->addLoadedModule(newMod);
 }
 
-void CompilerInstance::performParseAndResolveImportsOnly() {
+bool CompilerInstance::performParseAndResolveImportsOnly() {
   FrontendStatsTracer tracer(getStatsReporter(), "parse-and-resolve-imports");
 
   // Resolve imports for all the source files.
@@ -837,6 +869,7 @@ void CompilerInstance::performParseAndResolveImportsOnly() {
   mainModule->setHasResolvedImports();
 
   bindExtensions(*mainModule);
+  return Context->hadError();
 }
 
 void CompilerInstance::performSema() {

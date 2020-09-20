@@ -90,6 +90,9 @@ struct SwiftModuleDetails: Codable {
   /// arguments to the generic PCM build arguments reported from the dependency
   /// graph.
   var extraPcmArgs: [String]?
+
+  /// A flag to indicate whether or not this module is a framework.
+  var isFramework: Bool
 }
 
 /// Details specific to Swift external modules.

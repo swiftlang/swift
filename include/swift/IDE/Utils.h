@@ -81,6 +81,14 @@ SourceCompleteResult
 isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf, SourceFileKind SFKind);
 SourceCompleteResult isSourceInputComplete(StringRef Text, SourceFileKind SFKind);
 
+bool initCompilerInvocation(
+    CompilerInvocation &Invocation, ArrayRef<const char *> OrigArgs,
+    DiagnosticEngine &Diags, StringRef UnresolvedPrimaryFile,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    const std::string &runtimeResourcePath,
+    const std::string &diagnosticDocumentationPath,
+    bool shouldOptimizeForIDE, time_t sessionTimestamp, std::string &Error);
+
 bool initInvocationByClangArguments(ArrayRef<const char *> ArgList,
                                     CompilerInvocation &Invok,
                                     std::string &Error);
@@ -92,10 +100,6 @@ void walkOverriddenDecls(const ValueDecl *VD,
                              const ValueDecl*, const clang::NamedDecl*>)> Fn);
 
 void collectModuleNames(StringRef SDKPath, std::vector<std::string> &Modules);
-
-std::string getSDKName(StringRef Path);
-
-std::string getSDKVersion(StringRef Path);
 
 struct PlaceholderOccurrence {
   /// The complete placeholder string.

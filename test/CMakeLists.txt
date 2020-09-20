@@ -102,6 +102,7 @@ function(get_test_dependencies SDK result_var_name)
      ("${SDK}" STREQUAL "IOS_SIMULATOR") OR
      ("${SDK}" STREQUAL "TVOS_SIMULATOR") OR
      ("${SDK}" STREQUAL "WATCHOS_SIMULATOR") OR
+     ("${SDK}" STREQUAL "FREESTANDING") OR
      ("${SDK}" STREQUAL "LINUX") OR
      ("${SDK}" STREQUAL "CYGWIN") OR
      ("${SDK}" STREQUAL "FREEBSD") OR
@@ -355,7 +356,7 @@ _Block_release(void) { }\n")
       endif()
 
       execute_process(COMMAND
-          $<TARGET_FILE:Python2::Interpreter> "-c" "import psutil"
+          $<TARGET_FILE:Python3::Interpreter> "-c" "import psutil"
           RESULT_VARIABLE python_psutil_status
           TIMEOUT 1 # second
           ERROR_QUIET)
@@ -419,7 +420,7 @@ _Block_release(void) { }\n")
             ${command_upload_swift_reflection_test}
             ${command_clean_test_results_dir}
             COMMAND
-              $<TARGET_FILE:Python2::Interpreter> "${LIT}"
+              $<TARGET_FILE:Python3::Interpreter> "${LIT}"
               ${LIT_ARGS}
               "--param" "swift_test_subset=${test_subset}"
               "--param" "swift_test_mode=${test_mode}"
@@ -438,7 +439,7 @@ _Block_release(void) { }\n")
             ${command_upload_swift_reflection_test}
             ${command_clean_test_results_dir}
             COMMAND
-              $<TARGET_FILE:Python2::Interpreter> "${LIT}"
+              $<TARGET_FILE:Python3::Interpreter> "${LIT}"
               ${LIT_ARGS}
               "--param" "swift_test_subset=${test_subset}"
               "--param" "swift_test_mode=${test_mode}"

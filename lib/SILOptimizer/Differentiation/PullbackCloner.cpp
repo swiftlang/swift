@@ -562,7 +562,7 @@ private:
   ///
   /// This method first tries to find an existing entry in the adjoint buffer
   /// mapping. If no entry exists, creates a zero adjoint buffer.
-  SILValue &getAdjointBuffer(SILBasicBlock *origBB, SILValue originalValue) {
+  SILValue getAdjointBuffer(SILBasicBlock *origBB, SILValue originalValue) {
     assert(getTangentValueCategory(originalValue) == SILValueCategory::Address);
     assert(originalValue->getFunction() == &getOriginal());
     auto insertion = bufferMap.try_emplace({origBB, originalValue}, SILValue());
@@ -1011,28 +1011,68 @@ public:
     auto *bb = si->getParent();
     auto loc = si->getLoc();
     auto *structDecl = si->getStructDecl();
-    auto av = getAdjointValue(bb, si);
-    switch (av.getKind()) {
-    case AdjointValueKind::Zero:
-      for (auto *field : structDecl->getStoredProperties()) {
-        auto fv = si->getFieldValue(field);
-        addAdjointValue(
-            bb, fv, makeZeroAdjointValue(getRemappedTangentType(fv->getType())),
-            loc);
+    switch (getTangentValueCategory(si)) {
+    case SILValueCategory::Object: {
+      auto av = getAdjointValue(bb, si);
+      switch (av.getKind()) {
+      case AdjointValueKind::Zero: {
+        for (auto *field : structDecl->getStoredProperties()) {
+          auto fv = si->getFieldValue(field);
+          addAdjointValue(
+              bb, fv,
+              makeZeroAdjointValue(getRemappedTangentType(fv->getType())), loc);
+        }
+        break;
       }
-      break;
-    case AdjointValueKind::Concrete: {
-      auto adjStruct = materializeAdjointDirect(std::move(av), loc);
-      auto *dti = builder.createDestructureStruct(si->getLoc(), adjStruct);
+      case AdjointValueKind::Concrete: {
+        auto adjStruct = materializeAdjointDirect(std::move(av), loc);
+        auto *dti = builder.createDestructureStruct(si->getLoc(), adjStruct);
 
-      // Find the struct `TangentVector` type.
-      auto structTy = remapType(si->getType()).getASTType();
+        // Find the struct `TangentVector` type.
+        auto structTy = remapType(si->getType()).getASTType();
 #ifndef NDEBUG
-      auto tangentVectorTy = getTangentSpace(structTy)->getCanonicalType();
-      assert(!getTypeLowering(tangentVectorTy).isAddressOnly());
-      assert(tangentVectorTy->getStructOrBoundGenericStruct());
+        auto tangentVectorTy = getTangentSpace(structTy)->getCanonicalType();
+        assert(!getTypeLowering(tangentVectorTy).isAddressOnly());
+        assert(tangentVectorTy->getStructOrBoundGenericStruct());
 #endif
 
+        // Accumulate adjoints for the fields of the `struct` operand.
+        unsigned fieldIndex = 0;
+        for (auto it = structDecl->getStoredProperties().begin();
+             it != structDecl->getStoredProperties().end();
+             ++it, ++fieldIndex) {
+          VarDecl *field = *it;
+          if (field->getAttrs().hasAttribute<NoDerivativeAttr>())
+            continue;
+          // Find the corresponding field in the tangent space.
+          auto *tanField = getTangentStoredProperty(
+              getContext(), field, structTy, loc, getInvoker());
+          if (!tanField) {
+            errorOccurred = true;
+            return;
+          }
+          auto tanElt = dti->getResult(fieldIndex);
+          addAdjointValue(bb, si->getFieldValue(field),
+                          makeConcreteAdjointValue(tanElt), si->getLoc());
+        }
+        break;
+      }
+      case AdjointValueKind::Aggregate: {
+        // Note: All user-called initializations go through the calls to the
+        // initializer, and synthesized initializers only have one level of
+        // struct formation which will not result into any aggregate adjoint
+        // valeus.
+        llvm_unreachable(
+            "Aggregate adjoint values should not occur for `struct` "
+            "instructions");
+      }
+      }
+      break;
+    }
+    case SILValueCategory::Address: {
+      auto adjBuf = getAdjointBuffer(bb, si);
+      // Find the struct `TangentVector` type.
+      auto structTy = remapType(si->getType()).getASTType();
       // Accumulate adjoints for the fields of the `struct` operand.
       unsigned fieldIndex = 0;
       for (auto it = structDecl->getStoredProperties().begin();
@@ -1047,19 +1087,25 @@ public:
           errorOccurred = true;
           return;
         }
-        auto tanElt = dti->getResult(fieldIndex);
-        addAdjointValue(bb, si->getFieldValue(field),
-                        makeConcreteAdjointValue(tanElt), si->getLoc());
+        auto *adjFieldBuf =
+            builder.createStructElementAddr(loc, adjBuf, tanField);
+        auto fieldValue = si->getFieldValue(field);
+        switch (getTangentValueCategory(fieldValue)) {
+        case SILValueCategory::Object: {
+          auto adjField = builder.emitLoadValueOperation(
+              loc, adjFieldBuf, LoadOwnershipQualifier::Copy);
+          recordTemporary(adjField);
+          addAdjointValue(bb, fieldValue, makeConcreteAdjointValue(adjField),
+                          loc);
+          break;
+        }
+        case SILValueCategory::Address: {
+          addToAdjointBuffer(bb, fieldValue, adjFieldBuf, loc);
+          break;
+        }
+        }
       }
-      break;
-    }
-    case AdjointValueKind::Aggregate: {
-      // Note: All user-called initializations go through the calls to the
-      // initializer, and synthesized initializers only have one level of struct
-      // formation which will not result into any aggregate adjoint valeus.
-      llvm_unreachable("Aggregate adjoint values should not occur for `struct` "
-                       "instructions");
-    }
+    } break;
     }
   }
 
@@ -1071,41 +1117,75 @@ public:
   void visitStructExtractInst(StructExtractInst *sei) {
     auto *bb = sei->getParent();
     auto loc = getValidLocation(sei);
-    auto structTy = remapType(sei->getOperand()->getType()).getASTType();
-    auto tangentVectorTy = getTangentSpace(structTy)->getCanonicalType();
-    assert(!getTypeLowering(tangentVectorTy).isAddressOnly());
-    auto tangentVectorSILTy = SILType::getPrimitiveObjectType(tangentVectorTy);
-    auto *tangentVectorDecl = tangentVectorTy->getStructOrBoundGenericStruct();
-    assert(tangentVectorDecl);
     // Find the corresponding field in the tangent space.
+    auto structTy = remapType(sei->getOperand()->getType()).getASTType();
     auto *tanField =
         getTangentStoredProperty(getContext(), sei, structTy, getInvoker());
-    assert(tanField && "Invalid projections should have been diagnosed");
-    // Accumulate adjoint for the `struct_extract` operand.
-    auto av = getAdjointValue(bb, sei);
-    switch (av.getKind()) {
-    case AdjointValueKind::Zero:
-      addAdjointValue(bb, sei->getOperand(),
-                      makeZeroAdjointValue(tangentVectorSILTy), loc);
-      break;
-    case AdjointValueKind::Concrete:
-    case AdjointValueKind::Aggregate: {
-      SmallVector<AdjointValue, 8> eltVals;
-      for (auto *field : tangentVectorDecl->getStoredProperties()) {
-        if (field == tanField) {
-          eltVals.push_back(av);
-        } else {
-          auto substMap = tangentVectorTy->getMemberSubstitutionMap(
-              field->getModuleContext(), field);
-          auto fieldTy = field->getType().subst(substMap);
-          auto fieldSILTy = getTypeLowering(fieldTy).getLoweredType();
-          assert(fieldSILTy.isObject());
-          eltVals.push_back(makeZeroAdjointValue(fieldSILTy));
+    // Check the `struct_extract` operand's value tangent category.
+    switch (getTangentValueCategory(sei->getOperand())) {
+    case SILValueCategory::Object: {
+      auto tangentVectorTy = getTangentSpace(structTy)->getCanonicalType();
+      auto *tangentVectorDecl =
+          tangentVectorTy->getStructOrBoundGenericStruct();
+      assert(tangentVectorDecl);
+      auto tangentVectorSILTy =
+          SILType::getPrimitiveObjectType(tangentVectorTy);
+      assert(tanField && "Invalid projections should have been diagnosed");
+      // Accumulate adjoint for the `struct_extract` operand.
+      auto av = getAdjointValue(bb, sei);
+      switch (av.getKind()) {
+      case AdjointValueKind::Zero:
+        addAdjointValue(bb, sei->getOperand(),
+                        makeZeroAdjointValue(tangentVectorSILTy), loc);
+        break;
+      case AdjointValueKind::Concrete:
+      case AdjointValueKind::Aggregate: {
+        SmallVector<AdjointValue, 8> eltVals;
+        for (auto *field : tangentVectorDecl->getStoredProperties()) {
+          if (field == tanField) {
+            eltVals.push_back(av);
+          } else {
+            auto substMap = tangentVectorTy->getMemberSubstitutionMap(
+                field->getModuleContext(), field);
+            auto fieldTy = field->getType().subst(substMap);
+            auto fieldSILTy = getTypeLowering(fieldTy).getLoweredType();
+            assert(fieldSILTy.isObject());
+            eltVals.push_back(makeZeroAdjointValue(fieldSILTy));
+          }
         }
+        addAdjointValue(bb, sei->getOperand(),
+                        makeAggregateAdjointValue(tangentVectorSILTy, eltVals),
+                        loc);
       }
-      addAdjointValue(bb, sei->getOperand(),
-                      makeAggregateAdjointValue(tangentVectorSILTy, eltVals),
-                      loc);
+      }
+      break;
+    }
+    case SILValueCategory::Address: {
+      auto adjBase = getAdjointBuffer(bb, sei->getOperand());
+      auto *adjBaseElt =
+          builder.createStructElementAddr(loc, adjBase, tanField);
+      // Check the `struct_extract`'s value tangent category.
+      switch (getTangentValueCategory(sei)) {
+      case SILValueCategory::Object: {
+        auto adjElt = getAdjointValue(bb, sei);
+        auto concreteAdjElt = materializeAdjointDirect(adjElt, loc);
+        auto concreteAdjEltCopy =
+            builder.emitCopyValueOperation(loc, concreteAdjElt);
+        auto *alloc = builder.createAllocStack(loc, adjElt.getType());
+        builder.emitStoreValueOperation(loc, concreteAdjEltCopy, alloc,
+                                        StoreOwnershipQualifier::Init);
+        accumulateIndirect(adjBaseElt, alloc, loc);
+        builder.createDestroyAddr(loc, alloc);
+        builder.createDeallocStack(loc, alloc);
+        break;
+      }
+      case SILValueCategory::Address: {
+        auto adjElt = getAdjointBuffer(bb, sei);
+        accumulateIndirect(adjBaseElt, adjElt, loc);
+        break;
+      }
+      }
+      break;
     }
     }
   }
@@ -1171,52 +1251,73 @@ public:
   ///                         excluding non-differentiable elements
   void visitTupleInst(TupleInst *ti) {
     auto *bb = ti->getParent();
-    auto av = getAdjointValue(bb, ti);
-    switch (av.getKind()) {
-    case AdjointValueKind::Zero:
-      for (auto elt : ti->getElements()) {
-        if (!getTangentSpace(elt->getType().getASTType()))
-          continue;
-        addAdjointValue(
-            bb, elt,
-            makeZeroAdjointValue(getRemappedTangentType(elt->getType())),
-            ti->getLoc());
+    auto loc = ti->getLoc();
+    switch (getTangentValueCategory(ti)) {
+    case SILValueCategory::Object: {
+      auto av = getAdjointValue(bb, ti);
+      switch (av.getKind()) {
+      case AdjointValueKind::Zero:
+        for (auto elt : ti->getElements()) {
+          if (!getTangentSpace(elt->getType().getASTType()))
+            continue;
+          addAdjointValue(
+              bb, elt,
+              makeZeroAdjointValue(getRemappedTangentType(elt->getType())),
+              loc);
+        }
+        break;
+      case AdjointValueKind::Concrete: {
+        auto adjVal = av.getConcreteValue();
+        auto adjValCopy = builder.emitCopyValueOperation(loc, adjVal);
+        SmallVector<SILValue, 4> adjElts;
+        if (!adjVal->getType().getAs<TupleType>()) {
+          recordTemporary(adjValCopy);
+          adjElts.push_back(adjValCopy);
+        } else {
+          auto *dti = builder.createDestructureTuple(loc, adjValCopy);
+          for (auto adjElt : dti->getResults())
+            recordTemporary(adjElt);
+          adjElts.append(dti->getResults().begin(), dti->getResults().end());
+        }
+        // Accumulate adjoints for `tuple` operands, skipping the
+        // non-`Differentiable` ones.
+        unsigned adjIndex = 0;
+        for (auto i : range(ti->getNumOperands())) {
+          if (!getTangentSpace(ti->getOperand(i)->getType().getASTType()))
+            continue;
+          auto adjElt = adjElts[adjIndex++];
+          addAdjointValue(bb, ti->getOperand(i),
+                          makeConcreteAdjointValue(adjElt), loc);
+        }
+        break;
       }
-      break;
-    case AdjointValueKind::Concrete: {
-      auto adjVal = av.getConcreteValue();
-      unsigned adjIdx = 0;
-      auto adjValCopy = builder.emitCopyValueOperation(ti->getLoc(), adjVal);
-      SmallVector<SILValue, 4> adjElts;
-      if (!adjVal->getType().getAs<TupleType>()) {
-        recordTemporary(adjValCopy);
-        adjElts.push_back(adjValCopy);
-      } else {
-        auto *dti = builder.createDestructureTuple(ti->getLoc(), adjValCopy);
-        for (auto adjElt : dti->getResults())
-          recordTemporary(adjElt);
-        adjElts.append(dti->getResults().begin(), dti->getResults().end());
-      }
-      // Accumulate adjoints for `tuple` operands, skipping the
-      // non-differentiable ones.
-      for (auto i : range(ti->getNumOperands())) {
-        if (!getTangentSpace(ti->getOperand(i)->getType().getASTType()))
-          continue;
-        auto adjElt = adjElts[adjIdx++];
-        addAdjointValue(bb, ti->getOperand(i), makeConcreteAdjointValue(adjElt),
-                        ti->getLoc());
+      case AdjointValueKind::Aggregate:
+        unsigned adjIndex = 0;
+        for (auto i : range(ti->getElements().size())) {
+          if (!getTangentSpace(ti->getElement(i)->getType().getASTType()))
+            continue;
+          addAdjointValue(bb, ti->getElement(i),
+                          av.getAggregateElement(adjIndex++), loc);
+        }
+        break;
       }
       break;
     }
-    case AdjointValueKind::Aggregate:
-      unsigned adjIdx = 0;
-      for (auto i : range(ti->getElements().size())) {
-        if (!getTangentSpace(ti->getElement(i)->getType().getASTType()))
+    case SILValueCategory::Address: {
+      auto adjBuf = getAdjointBuffer(bb, ti);
+      // Accumulate adjoints for `tuple` operands, skipping the
+      // non-`Differentiable` ones.
+      unsigned adjIndex = 0;
+      for (auto i : range(ti->getNumOperands())) {
+        if (!getTangentSpace(ti->getOperand(i)->getType().getASTType()))
           continue;
-        addAdjointValue(bb, ti->getElement(i), av.getAggregateElement(adjIdx++),
-                        ti->getLoc());
+        auto adjBufElt =
+            builder.createTupleElementAddr(loc, adjBuf, adjIndex++);
+        auto adjElt = getAdjointBuffer(bb, ti->getOperand(i));
+        accumulateIndirect(adjElt, adjBufElt, loc);
       }
       break;
+    }
     }
   }
 
@@ -1276,26 +1377,58 @@ public:
   ///             adj[x].n += adj[yn]
   void visitDestructureTupleInst(DestructureTupleInst *dti) {
     auto *bb = dti->getParent();
+    auto loc = dti->getLoc();
     auto tupleTanTy = getRemappedTangentType(dti->getOperand()->getType());
-    SmallVector<AdjointValue, 8> adjValues;
-    for (auto origElt : dti->getResults()) {
-      if (!getTangentSpace(remapType(origElt->getType()).getASTType()))
-        continue;
-      adjValues.push_back(getAdjointValue(bb, origElt));
+    // Check the `destructure_tuple` operand's value tangent category.
+    switch (getTangentValueCategory(dti->getOperand())) {
+    case SILValueCategory::Object: {
+      SmallVector<AdjointValue, 8> adjValues;
+      for (auto origElt : dti->getResults()) {
+        // Skip non-`Differentiable` tuple elements.
+        if (!getTangentSpace(remapType(origElt->getType()).getASTType()))
+          continue;
+        adjValues.push_back(getAdjointValue(bb, origElt));
+      }
+      // Handle tuple tangent type.
+      // Add adjoints for every tuple element that has a tangent space.
+      if (tupleTanTy.is<TupleType>()) {
+        assert(adjValues.size() > 1);
+        addAdjointValue(bb, dti->getOperand(),
+                        makeAggregateAdjointValue(tupleTanTy, adjValues), loc);
+      }
+      // Handle non-tuple tangent type.
+      // Add adjoint for the single tuple element that has a tangent space.
+      else {
+        assert(adjValues.size() == 1);
+        addAdjointValue(bb, dti->getOperand(), adjValues.front(), loc);
+      }
+      break;
     }
-    // Handle tuple tangent type.
-    // Add adjoints for every tuple element that has a tangent space.
-    if (tupleTanTy.is<TupleType>()) {
-      assert(adjValues.size() > 1);
-      addAdjointValue(bb, dti->getOperand(),
-                      makeAggregateAdjointValue(tupleTanTy, adjValues),
-                      dti->getLoc());
+    case SILValueCategory::Address: {
+      auto adjBuf = getAdjointBuffer(bb, dti->getOperand());
+      unsigned adjIndex = 0;
+      for (auto origElt : dti->getResults()) {
+        // Skip non-`Differentiable` tuple elements.
+        if (!getTangentSpace(remapType(origElt->getType()).getASTType()))
+          continue;
+        // Handle tuple tangent type.
+        // Add adjoints for every tuple element that has a tangent space.
+        if (tupleTanTy.is<TupleType>()) {
+          auto adjEltBuf = getAdjointBuffer(bb, origElt);
+          auto adjBufElt =
+              builder.createTupleElementAddr(loc, adjBuf, adjIndex);
+          accumulateIndirect(adjBufElt, adjEltBuf, loc);
+        }
+        // Handle non-tuple tangent type.
+        // Add adjoint for the single tuple element that has a tangent space.
+        else {
+          auto adjEltBuf = getAdjointBuffer(bb, origElt);
+          addToAdjointBuffer(bb, dti->getOperand(), adjEltBuf, loc);
+        }
+        ++adjIndex;
+      }
+      break;
     }
-    // Handle non-tuple tangent type.
-    // Add adjoint for the single tuple element that has a tangent space.
-    else {
-      assert(adjValues.size() == 1);
-      addAdjointValue(bb, dti->getOperand(), adjValues.front(), dti->getLoc());
     }
   }
 
@@ -1337,7 +1470,7 @@ public:
   ///    Adjoint: adj[x] += load adj[y]; adj[y] = 0
   void visitStoreOperation(SILBasicBlock *bb, SILLocation loc, SILValue origSrc,
                            SILValue origDest) {
-    auto &adjBuf = getAdjointBuffer(bb, origDest);
+    auto adjBuf = getAdjointBuffer(bb, origDest);
     switch (getTangentValueCategory(origSrc)) {
     case SILValueCategory::Object: {
       auto adjVal = builder.emitLoadValueOperation(
@@ -1369,7 +1502,7 @@ public:
   ///    Adjoint: adj[x] += adj[y]; adj[y] = 0
   void visitCopyAddrInst(CopyAddrInst *cai) {
     auto *bb = cai->getParent();
-    auto &adjDest = getAdjointBuffer(bb, cai->getDest());
+    auto adjDest = getAdjointBuffer(bb, cai->getDest());
     auto destType = remapType(adjDest->getType());
     addToAdjointBuffer(bb, cai->getSrc(), adjDest, cai->getLoc());
     builder.emitDestroyAddrAndFold(cai->getLoc(), adjDest);
@@ -1388,7 +1521,7 @@ public:
       break;
     }
     case SILValueCategory::Address: {
-      auto &adjDest = getAdjointBuffer(bb, cvi);
+      auto adjDest = getAdjointBuffer(bb, cvi);
       auto destType = remapType(adjDest->getType());
       addToAdjointBuffer(bb, cvi->getOperand(), adjDest, cvi->getLoc());
       builder.emitDestroyAddrAndFold(cvi->getLoc(), adjDest);
@@ -1410,7 +1543,7 @@ public:
       break;
     }
     case SILValueCategory::Address: {
-      auto &adjDest = getAdjointBuffer(bb, bbi);
+      auto adjDest = getAdjointBuffer(bb, bbi);
       auto destType = remapType(adjDest->getType());
       addToAdjointBuffer(bb, bbi->getOperand(), adjDest, bbi->getLoc());
       builder.emitDestroyAddrAndFold(bbi->getLoc(), adjDest);
@@ -1449,8 +1582,8 @@ public:
   void visitUnconditionalCheckedCastAddrInst(
       UnconditionalCheckedCastAddrInst *uccai) {
     auto *bb = uccai->getParent();
-    auto &adjDest = getAdjointBuffer(bb, uccai->getDest());
-    auto &adjSrc = getAdjointBuffer(bb, uccai->getSrc());
+    auto adjDest = getAdjointBuffer(bb, uccai->getDest());
+    auto adjSrc = getAdjointBuffer(bb, uccai->getSrc());
     auto destType = remapType(adjDest->getType());
     auto castBuf = builder.createAllocStack(uccai->getLoc(), adjSrc->getType());
     builder.createUnconditionalCheckedCastAddr(
@@ -1479,7 +1612,7 @@ public:
       break;
     }
     case SILValueCategory::Address: {
-      auto &adjDest = getAdjointBuffer(bb, urci);
+      auto adjDest = getAdjointBuffer(bb, urci);
       auto destType = remapType(adjDest->getType());
       addToAdjointBuffer(bb, urci->getOperand(), adjDest, urci->getLoc());
       builder.emitDestroyAddrAndFold(urci->getLoc(), adjDest);
@@ -1506,7 +1639,7 @@ public:
       break;
     }
     case SILValueCategory::Address: {
-      auto &adjDest = getAdjointBuffer(bb, ui);
+      auto adjDest = getAdjointBuffer(bb, ui);
       auto destType = remapType(adjDest->getType());
       addToAdjointBuffer(bb, ui->getOperand(), adjDest, ui->getLoc());
       builder.emitDestroyAddrAndFold(ui->getLoc(), adjDest);
@@ -1721,22 +1854,36 @@ bool PullbackCloner::Implementation::run() {
     domOrder.pushChildren(bb);
   }
 
-  // Create pullback blocks and arguments, visiting original blocks in
-  // post-order post-dominance order.
-  SmallVector<SILBasicBlock *, 8> postOrderPostDomOrder;
-  // Start from the root node, which may have a marker `nullptr` block if
-  // there are multiple roots.
-  PostOrderPostDominanceOrder postDomOrder(postDomInfo->getRootNode(),
-                                           postOrderInfo, original.size());
-  while (auto *origNode = postDomOrder.getNext()) {
-    auto *origBB = origNode->getBlock();
-    postDomOrder.pushChildren(origNode);
-    // If node is the `nullptr` marker basic block, do not push it.
-    if (!origBB)
-      continue;
-    postOrderPostDomOrder.push_back(origBB);
+  // Create pullback blocks and arguments, visiting original blocks using BFS
+  // starting from the original exit block. Unvisited original basic blocks
+  // (e.g unreachable blocks) are not relevant for pullback generation and thus
+  // ignored.
+  // The original blocks in traversal order for pullback generation.
+  SmallVector<SILBasicBlock *, 8> originalBlocks;
+  // The set of visited original blocks.
+  SmallDenseSet<SILBasicBlock *, 8> visitedBlocks;
+
+  // Perform BFS from the original exit block.
+  {
+    std::deque<SILBasicBlock *> worklist = {};
+    worklist.push_back(origExit);
+    visitedBlocks.insert(origExit);
+    while (!worklist.empty()) {
+      auto *BB = worklist.front();
+      worklist.pop_front();
+
+      originalBlocks.push_back(BB);
+
+      for (auto *nextBB : BB->getPredecessorBlocks()) {
+        if (!visitedBlocks.count(nextBB)) {
+          worklist.push_back(nextBB);
+          visitedBlocks.insert(nextBB);
+        }
+      }
+    }
   }
-  for (auto *origBB : postOrderPostDomOrder) {
+
+  for (auto *origBB : originalBlocks) {
     auto *pullbackBB = pullback.createBasicBlock();
     pullbackBBMap.insert({origBB, pullbackBB});
     auto pbStructLoweredType =
@@ -1801,6 +1948,9 @@ bool PullbackCloner::Implementation::run() {
     //   struct argument. They branch from a pullback successor block to the
     //   pullback original block, passing adjoint values of active values.
     for (auto *succBB : origBB->getSuccessorBlocks()) {
+      // Skip generating pullback block for original unreachable blocks.
+      if (!visitedBlocks.count(succBB))
+        continue;
       auto *pullbackTrampolineBB = pullback.createBasicBlockBefore(pullbackBB);
       pullbackTrampolineBBMap.insert({{origBB, succBB}, pullbackTrampolineBB});
       // Get the enum element type (i.e. the pullback struct type). The enum
@@ -1870,7 +2020,7 @@ bool PullbackCloner::Implementation::run() {
   // Visit original blocks blocks in post-order and perform differentiation
   // in corresponding pullback blocks. If errors occurred, back out.
   else {
-    for (auto *bb : postOrderPostDomOrder) {
+    for (auto *bb : originalBlocks) {
       visitSILBasicBlock(bb);
       if (errorOccurred)
         return true;
@@ -2018,12 +2168,10 @@ void PullbackCloner::Implementation::accumulateAdjointForOptional(
     SILBasicBlock *bb, SILValue optionalValue, SILValue wrappedAdjoint) {
   auto pbLoc = getPullback().getLocation();
   // Handle `switch_enum` on `Optional`.
-  auto *optionalEnumDecl = getASTContext().getOptionalDecl();
-  auto optionalTy = optionalValue->getType();
-  assert(optionalTy.getASTType().getEnumOrBoundGenericEnum() ==
-         optionalEnumDecl);
   // `Optional<T>`
-  optionalTy = remapType(optionalTy);
+  auto optionalTy = remapType(optionalValue->getType());
+  assert(optionalTy.getASTType().getEnumOrBoundGenericEnum() ==
+         getASTContext().getOptionalDecl());
   // `T`
   auto wrappedType = optionalTy.getOptionalObjectType();
   // `T.TangentVector`
@@ -2056,8 +2204,8 @@ void PullbackCloner::Implementation::accumulateAdjointForOptional(
   // Find `Optional<T.TangentVector>.some` EnumElementDecl.
   auto someEltDecl = builder.getASTContext().getOptionalSomeDecl();
 
-  // Initialize a `Optional<T.TangentVector>` buffer from `wrappedAdjoint`as the
-  // input for `Optional<T>.TangentVector.init`.
+  // Initialize an `Optional<T.TangentVector>` buffer from `wrappedAdjoint` as
+  // the input for `Optional<T>.TangentVector.init`.
   auto *optArgBuf = builder.createAllocStack(pbLoc, optionalOfWrappedTanType);
   if (optionalOfWrappedTanType.isLoadableOrOpaque(builder.getFunction())) {
     // %enum = enum $Optional<T.TangentVector>, #Optional.some!enumelt,
@@ -2066,7 +2214,7 @@ void PullbackCloner::Implementation::accumulateAdjointForOptional(
                                         optionalOfWrappedTanType);
     // store %enum to %optArgBuf
     builder.emitStoreValueOperation(pbLoc, enumInst, optArgBuf,
-                                    StoreOwnershipQualifier::Trivial);
+                                    StoreOwnershipQualifier::Init);
   } else {
     // %enumAddr = init_enum_data_addr %optArgBuf $Optional<T.TangentVector>,
     //                                 #Optional.some!enumelt
@@ -2279,14 +2427,15 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
       for (auto pair : incomingValues) {
         auto *predBB = std::get<0>(pair);
         auto incomingValue = std::get<1>(pair);
-        blockTemporaries[getPullbackBlock(predBB)].insert(concreteBBArgAdjCopy);
         // Handle `switch_enum` on `Optional`.
         auto termInst = bbArg->getSingleTerminator();
-        if (isSwitchEnumInstOnOptional(termInst))
+        if (isSwitchEnumInstOnOptional(termInst)) {
           accumulateAdjointForOptional(bb, incomingValue, concreteBBArgAdjCopy);
-        else
+        } else {
+          blockTemporaries[getPullbackBlock(predBB)].insert(concreteBBArgAdjCopy);
           setAdjointValue(predBB, incomingValue,
                           makeConcreteAdjointValue(concreteBBArgAdjCopy));
+        }
       }
       break;
     }
@@ -2413,7 +2562,7 @@ bool PullbackCloner::Implementation::runForSemanticMemberGetter() {
 
   // Switch based on the base tangent struct's value category.
   // TODO(TF-1255): Simplify using unified adjoint value data structure.
-  switch (tangentVectorSILTy.getCategory()) {
+  switch (getTangentValueCategory(origSelf)) {
   case SILValueCategory::Object: {
     auto adjResult = getAdjointValue(origEntry, origResult);
     switch (adjResult.getKind()) {
@@ -2454,7 +2603,7 @@ bool PullbackCloner::Implementation::runForSemanticMemberGetter() {
       if (field == tanField) {
         // Switch based on the property's value category.
         // TODO(TF-1255): Simplify using unified adjoint value data structure.
-        switch (origResult->getType().getCategory()) {
+        switch (getTangentValueCategory(origResult)) {
         case SILValueCategory::Object: {
           auto adjResult = getAdjointValue(origEntry, origResult);
           auto adjResultValue = materializeAdjointDirect(adjResult, pbLoc);

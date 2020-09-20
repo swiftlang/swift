@@ -145,28 +145,8 @@ class BuilderClosureVisitor
       return known->second;
     }
 
-    bool found = false;
-    for (auto decl : builder->lookupDirect(fnName)) {
-      if (auto func = dyn_cast<FuncDecl>(decl)) {
-        // Function must be static.
-        if (!func->isStatic())
-          continue;
-
-        // Function must have the right argument labels, if provided.
-        if (!argLabels.empty()) {
-          auto funcLabels = func->getName().getArgumentNames();
-          if (argLabels.size() > funcLabels.size() ||
-              funcLabels.slice(0, argLabels.size()) != argLabels)
-            continue;
-        }
-
-        // Okay, it's a good-enough match.
-        found = true;
-        break;
-      }
-    }
-
-    return supportedOps[fnName] = found;
+    return supportedOps[fnName] = TypeChecker::typeSupportsBuilderOp(
+               builderType, dc, fnName, argLabels);
   }
 
   /// Build an implicit variable in this context.
@@ -306,10 +286,6 @@ protected:
   }
 
   VarDecl *visitBraceStmt(BraceStmt *braceStmt) {
-    return visitBraceStmt(braceStmt, ctx.Id_buildBlock);
-  }
-
-  VarDecl *visitBraceStmt(BraceStmt *braceStmt, Identifier builderFunction) {
     SmallVector<Expr *, 4> expressions;
     auto addChild = [&](VarDecl *childVar) {
       if (!childVar)
@@ -376,7 +352,7 @@ protected:
 
     // Call Builder.buildBlock(... args ...)
     auto call = buildCallIfWanted(braceStmt->getStartLoc(),
-                                  builderFunction, expressions,
+                                  ctx.Id_buildBlock, expressions,
                                   /*argLabels=*/{ });
     if (!call)
       return nullptr;
@@ -391,13 +367,7 @@ protected:
   }
 
   VarDecl *visitDoStmt(DoStmt *doStmt) {
-    if (!builderSupports(ctx.Id_buildDo)) {
-      if (!unhandledNode)
-        unhandledNode = doStmt;
-      return nullptr;
-    }
-
-    auto childVar = visitBraceStmt(doStmt->getBody(), ctx.Id_buildDo);
+    auto childVar = visitBraceStmt(doStmt->getBody());
     if (!childVar)
       return nullptr;
 
@@ -902,6 +872,26 @@ protected:
     return finalForEachVar;
   }
 
+  /// Visit a throw statement, which never produces a result.
+  VarDecl *visitThrowStmt(ThrowStmt *throwStmt) {
+    Type exnType = ctx.getErrorDecl()->getDeclaredInterfaceType();
+    if (!exnType) {
+      hadError = true;
+    }
+
+    if (cs) {
+     SolutionApplicationTarget target(
+         throwStmt->getSubExpr(), dc, CTP_ThrowStmt, exnType,
+         /*isDiscarded=*/false);
+     if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow))
+       hadError = true;
+
+     cs->setSolutionApplicationTarget(throwStmt, target);
+   }
+
+    return nullptr;
+  }
+
   CONTROL_FLOW_STMT(Guard)
   CONTROL_FLOW_STMT(While)
   CONTROL_FLOW_STMT(DoCatch)
@@ -911,7 +901,6 @@ protected:
   CONTROL_FLOW_STMT(Continue)
   CONTROL_FLOW_STMT(Fallthrough)
   CONTROL_FLOW_STMT(Fail)
-  CONTROL_FLOW_STMT(Throw)
   CONTROL_FLOW_STMT(PoundAssert)
 
 #undef CONTROL_FLOW_STMT
@@ -1147,6 +1136,14 @@ public:
       }
 
       if (auto stmt = node.dyn_cast<Stmt *>()) {
+        // "throw" statements produce no value. Transform them directly.
+        if (auto throwStmt = dyn_cast<ThrowStmt>(stmt)) {
+          if (auto newStmt = visitThrowStmt(throwStmt)) {
+            newElements.push_back(stmt);
+          }
+          continue;
+        }
+
         // Each statement turns into a (potential) temporary variable
         // binding followed by the statement itself.
         auto captured = takeCapturedStmt(stmt);
@@ -1435,6 +1432,22 @@ public:
         ctx, forEachStmt->getStartLoc(), outerBodySteps, newBody->getEndLoc());
   }
 
+  Stmt *visitThrowStmt(ThrowStmt *throwStmt) {
+    // Rewrite the error.
+    auto target = *solution.getConstraintSystem()
+        .getSolutionApplicationTarget(throwStmt);
+    if (auto result = rewriteTarget(target))
+      throwStmt->setSubExpr(result->getAsExpr());
+    else
+      return nullptr;
+
+    return throwStmt;
+  }
+
+  Stmt *visitThrowStmt(ThrowStmt *throwStmt, FunctionBuilderTarget target) {
+    llvm_unreachable("Throw statements produce no value");
+  }
+
 #define UNHANDLED_FUNCTION_BUILDER_STMT(STMT) \
   Stmt *visit##STMT##Stmt(STMT##Stmt *stmt, FunctionBuilderTarget target) { \
     llvm_unreachable("Function builders do not allow statement of kind " \
@@ -1452,7 +1465,6 @@ public:
   UNHANDLED_FUNCTION_BUILDER_STMT(Continue)
   UNHANDLED_FUNCTION_BUILDER_STMT(Fallthrough)
   UNHANDLED_FUNCTION_BUILDER_STMT(Fail)
-  UNHANDLED_FUNCTION_BUILDER_STMT(Throw)
   UNHANDLED_FUNCTION_BUILDER_STMT(PoundAssert)
 #undef UNHANDLED_FUNCTION_BUILDER_STMT
 };
@@ -1485,9 +1497,11 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
   // If we encountered an error or there was an explicit result type,
   // bail out and report that to the caller.
   auto &ctx = func->getASTContext();
-  auto request = PreCheckFunctionBuilderRequest{AnyFunctionRef(func)};
-  switch (evaluateOrDefault(
-              ctx.evaluator, request, FunctionBuilderBodyPreCheck::Error)) {
+  auto request =
+      PreCheckFunctionBuilderRequest{{AnyFunctionRef(func),
+                                      /*SuppressDiagnostics=*/false}};
+  switch (evaluateOrDefault(ctx.evaluator, request,
+                            FunctionBuilderBodyPreCheck::Error)) {
   case FunctionBuilderBodyPreCheck::Okay:
     // If the pre-check was okay, apply the function-builder transform.
     break;
@@ -1617,18 +1631,33 @@ ConstraintSystem::matchFunctionBuilder(
   assert(builder && "Bad function builder type");
   assert(builder->getAttrs().hasAttribute<FunctionBuilderAttr>());
 
+  if (InvalidFunctionBuilderBodies.count(fn)) {
+    (void)recordFix(
+        IgnoreInvalidFunctionBuilderBody::duringConstraintGeneration(
+            *this, getConstraintLocator(fn.getBody())));
+    return getTypeMatchSuccess();
+  }
+
   // Pre-check the body: pre-check any expressions in it and look
   // for return statements.
-  auto request = PreCheckFunctionBuilderRequest{fn};
+  auto request =
+      PreCheckFunctionBuilderRequest{{fn, /*SuppressDiagnostics=*/true}};
   switch (evaluateOrDefault(getASTContext().evaluator, request,
                             FunctionBuilderBodyPreCheck::Error)) {
   case FunctionBuilderBodyPreCheck::Okay:
     // If the pre-check was okay, apply the function-builder transform.
     break;
 
-  case FunctionBuilderBodyPreCheck::Error:
-    // If the pre-check had an error, flag that.
-    return getTypeMatchFailure(locator);
+  case FunctionBuilderBodyPreCheck::Error: {
+    if (!shouldAttemptFixes())
+      return getTypeMatchFailure(locator);
+
+    if (recordFix(IgnoreInvalidFunctionBuilderBody::duringPreCheck(
+            *this, getConstraintLocator(fn.getBody()))))
+      return getTypeMatchFailure(locator);
+
+    return getTypeMatchSuccess();
+  }
 
   case FunctionBuilderBodyPreCheck::HasReturnStmt:
     // If the body has a return statement, suppress the transform but
@@ -1665,9 +1694,25 @@ ConstraintSystem::matchFunctionBuilder(
   BuilderClosureVisitor visitor(getASTContext(), this, dc, builderType,
                                 bodyResultType);
 
-  auto applied = visitor.apply(fn.getBody());
-  if (!applied)
-    return getTypeMatchFailure(locator);
+  Optional<AppliedBuilderTransform> applied = None;
+  {
+    DiagnosticTransaction transaction(dc->getASTContext().Diags);
+
+    applied = visitor.apply(fn.getBody());
+    if (!applied)
+      return getTypeMatchFailure(locator);
+
+    if (transaction.hasErrors()) {
+      InvalidFunctionBuilderBodies.insert(fn);
+
+      if (recordFix(
+              IgnoreInvalidFunctionBuilderBody::duringConstraintGeneration(
+                  *this, getConstraintLocator(fn.getBody()))))
+        return getTypeMatchFailure(locator);
+
+      return getTypeMatchSuccess();
+    }
+  }
 
   Type transformedType = getType(applied->returnExpr);
   assert(transformedType && "Missing type");
@@ -1705,14 +1750,17 @@ namespace {
 class PreCheckFunctionBuilderApplication : public ASTWalker {
   AnyFunctionRef Fn;
   bool SkipPrecheck = false;
+  bool SuppressDiagnostics = false;
   std::vector<ReturnStmt *> ReturnStmts;
   bool HasError = false;
 
   bool hasReturnStmt() const { return !ReturnStmts.empty(); }
 
 public:
-  PreCheckFunctionBuilderApplication(AnyFunctionRef fn, bool skipPrecheck)
-    : Fn(fn), SkipPrecheck(skipPrecheck) {}
+  PreCheckFunctionBuilderApplication(AnyFunctionRef fn, bool skipPrecheck,
+                                     bool suppressDiagnostics)
+      : Fn(fn), SkipPrecheck(skipPrecheck),
+        SuppressDiagnostics(suppressDiagnostics) {}
 
   const std::vector<ReturnStmt *> getReturnStmts() const { return ReturnStmts; }
 
@@ -1736,16 +1784,28 @@ public:
   }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    if (SkipPrecheck)
+      return std::make_pair(false, E);
+
     // Pre-check the expression.  If this fails, abort the walk immediately.
     // Otherwise, replace the expression with the result of pre-checking.
     // In either case, don't recurse into the expression.
-    if (!SkipPrecheck &&
-        ConstraintSystem::preCheckExpression(E, /*DC*/ Fn.getAsDeclContext())) {
-      HasError = true;
-      return std::make_pair(false, nullptr);
-    }
+    {
+      auto *DC = Fn.getAsDeclContext();
+      auto &diagEngine = DC->getASTContext().Diags;
 
-    return std::make_pair(false, E);
+      // Suppress any diangostics which could be produced by this expression.
+      DiagnosticTransaction transaction(diagEngine);
+
+      HasError |= ConstraintSystem::preCheckExpression(
+          E, DC, /*replaceInvalidRefsWithErrors=*/false);
+      HasError |= transaction.hasErrors();
+
+      if (SuppressDiagnostics)
+        transaction.abort();
+
+      return std::make_pair(false, HasError ? nullptr : E);
+    }
   }
 
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
@@ -1778,11 +1838,49 @@ FunctionBuilderBodyPreCheck PreCheckFunctionBuilderRequest::evaluate(
           owner.Fn.getAbstractClosureExpr()))
     skipPrecheck = shouldTypeCheckInEnclosingExpression(closure);
 
-  return PreCheckFunctionBuilderApplication(owner.Fn, false).run();
+  return PreCheckFunctionBuilderApplication(
+             owner.Fn, /*skipPrecheck=*/false,
+             /*suppressDiagnostics=*/owner.SuppressDiagnostics)
+      .run();
 }
 
 std::vector<ReturnStmt *> TypeChecker::findReturnStatements(AnyFunctionRef fn) {
-  PreCheckFunctionBuilderApplication precheck(fn, true);
+  PreCheckFunctionBuilderApplication precheck(fn, /*skipPreCheck=*/true,
+                                              /*SuppressDiagnostics=*/true);
   (void)precheck.run();
   return precheck.getReturnStmts();
 }
+
+bool TypeChecker::typeSupportsBuilderOp(
+    Type builderType, DeclContext *dc, Identifier fnName,
+    ArrayRef<Identifier> argLabels, SmallVectorImpl<ValueDecl *> *allResults) {
+  bool foundMatch = false;
+  SmallVector<ValueDecl *, 4> foundDecls;
+  dc->lookupQualified(
+      builderType, DeclNameRef(fnName),
+      NL_QualifiedDefault | NL_ProtocolMembers, foundDecls);
+  for (auto decl : foundDecls) {
+    if (auto func = dyn_cast<FuncDecl>(decl)) {
+      // Function must be static.
+      if (!func->isStatic())
+        continue;
+
+      // Function must have the right argument labels, if provided.
+      if (!argLabels.empty()) {
+        auto funcLabels = func->getName().getArgumentNames();
+        if (argLabels.size() > funcLabels.size() ||
+            funcLabels.slice(0, argLabels.size()) != argLabels)
+          continue;
+      }
+
+      foundMatch = true;
+      break;
+    }
+  }
+
+  if (allResults)
+    allResults->append(foundDecls.begin(), foundDecls.end());
+
+  return foundMatch;
+}
+

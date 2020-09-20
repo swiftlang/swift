@@ -62,6 +62,7 @@ namespace swift {
   class BoundGenericType;
   class ClangModuleLoader;
   class ClangNode;
+  class ClangTypeConverter;
   class ConcreteDeclRef;
   class ConstructorDecl;
   class Decl;
@@ -213,7 +214,9 @@ class ASTContext final {
   void operator=(const ASTContext&) = delete;
 
   ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
-             SearchPathOptions &SearchPathOpts, SourceManager &SourceMgr,
+             SearchPathOptions &SearchPathOpts,
+             ClangImporterOptions &ClangImporterOpts,
+             SourceManager &SourceMgr,
              DiagnosticEngine &Diags);
 
 public:
@@ -227,6 +230,7 @@ public:
 
   static ASTContext *get(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
                          SearchPathOptions &SearchPathOpts,
+                         ClangImporterOptions &ClangImporterOpts,
                          SourceManager &SourceMgr, DiagnosticEngine &Diags);
   ~ASTContext();
 
@@ -244,6 +248,9 @@ public:
 
   /// The search path options used by this AST context.
   SearchPathOptions &SearchPathOpts;
+
+  /// The clang importer options used by this AST context.
+  ClangImporterOptions &ClangImporterOpts;
 
   /// The source manager object.
   SourceManager &SourceMgr;
@@ -586,6 +593,10 @@ public:
   Type getBridgedToObjC(const DeclContext *dc, Type type,
                         Type *bridgedValueType = nullptr) const;
 
+private:
+  ClangTypeConverter &getClangTypeConverter();
+
+public:
   /// Get the Clang type corresponding to a Swift function type.
   ///
   /// \param params The function parameters.
@@ -594,6 +605,14 @@ public:
   const clang::Type *
   getClangFunctionType(ArrayRef<AnyFunctionType::Param> params, Type resultTy,
                        FunctionTypeRepresentation trueRep);
+
+  /// Get the canonical Clang type corresponding to a SIL function type.
+  ///
+  /// SIL analog of \c ASTContext::getClangFunctionType .
+  const clang::Type *
+  getCanonicalClangFunctionType(
+    ArrayRef<SILParameterInfo> params, Optional<SILResultInfo> result,
+    SILFunctionType::Representation trueRep);
 
   /// Get the Swift declaration that a Clang declaration was exported from,
   /// if applicable.
@@ -669,6 +688,10 @@ public:
   /// compiler for the target platform.
   AvailabilityContext getSwift53Availability();
 
+  /// Get the runtime availability of features introduced in the Swift 5.4
+  /// compiler for the target platform.
+  AvailabilityContext getSwift54Availability();
+
   /// Get the runtime availability of features that have been introduced in the
   /// Swift compiler for future versions of the target platform.
   AvailabilityContext getSwiftFutureAvailability();
@@ -732,6 +755,12 @@ public:
   Optional<ModuleDependencies> getModuleDependencies(
       StringRef moduleName,
       bool isUnderlyingClangModule,
+      ModuleDependenciesCache &cache,
+      InterfaceSubContextDelegate &delegate);
+
+  /// Retrieve the module dependencies for the Swift module with the given name.
+  Optional<ModuleDependencies> getSwiftModuleDependencies(
+      StringRef moduleName,
       ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate);
 

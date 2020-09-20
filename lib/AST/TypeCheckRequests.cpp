@@ -935,23 +935,28 @@ void ParamSpecifierRequest::cacheResult(ParamSpecifier specifier) const {
 // ResultTypeRequest computation.
 //----------------------------------------------------------------------------//
 
-TypeLoc &ResultTypeRequest::getResultTypeLoc() const {
-  auto *decl = std::get<0>(getStorage());
-  if (auto *funcDecl = dyn_cast<FuncDecl>(decl))
-    return funcDecl->getBodyResultTypeLoc();
-  auto *subscriptDecl = cast<SubscriptDecl>(decl);
-  return subscriptDecl->getElementTypeLoc();
-}
-
 Optional<Type> ResultTypeRequest::getCachedResult() const {
-  if (auto type = getResultTypeLoc().getType())
-    return type;
+  Type type;
+  auto *const decl = std::get<0>(getStorage());
+  if (const auto *const funcDecl = dyn_cast<FuncDecl>(decl)) {
+    type = funcDecl->FnRetType.getType();
+  } else {
+    type = cast<SubscriptDecl>(decl)->ElementTy.getType();
+  }
 
-  return None;
+  if (type.isNull())
+    return None;
+
+  return type;
 }
 
 void ResultTypeRequest::cacheResult(Type type) const {
-  getResultTypeLoc().setType(type);
+  auto *const decl = std::get<0>(getStorage());
+  if (auto *const funcDecl = dyn_cast<FuncDecl>(decl)) {
+    funcDecl->FnRetType.setType(type);
+  } else {
+    cast<SubscriptDecl>(decl)->ElementTy.setType(type);
+  }
 }
 
 //----------------------------------------------------------------------------//
@@ -1008,6 +1013,7 @@ void InterfaceTypeRequest::cacheResult(Type type) const {
   auto *decl = std::get<0>(getStorage());
   if (type) {
     assert(!type->hasTypeVariable() && "Type variable in interface type");
+    assert(!type->hasHole() && "Type hole in interface type");
     assert(!type->is<InOutType>() && "Interface type must be materializable");
     assert(!type->hasArchetype() && "Archetype in interface type");
   }

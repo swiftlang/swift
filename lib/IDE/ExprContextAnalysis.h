@@ -114,10 +114,6 @@ public:
   }
 };
 
-/// Returns whether \p VD is referenceable with implicit member expression.
-bool isReferenceableByImplicitMemberExpr(
-    ModuleDecl *CurrModule, DeclContext *DC, Type T, ValueDecl *VD);
-
 } // namespace ide
 } // namespace swift
 

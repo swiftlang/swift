@@ -235,21 +235,24 @@ func cmpxchg_test(_ ptr: Builtin.RawPointer, a: Builtin.Int32, b: Builtin.Int32)
   // CHECK: [[Z_VAL:%.*]] = extractvalue { i32, i1 } [[Z_RES]], 0
   // CHECK: [[Z_SUCCESS:%.*]] = extractvalue { i32, i1 } [[Z_RES]], 1
   // CHECK: store i32 [[Z_VAL]], i32* {{.*}}, align 4
-  // CHECK: store i1 [[Z_SUCCESS]], i1* {{.*}}, align 1
+  // CHECK: [[Z_SUCCESS_B:%.*]] = zext i1 [[Z_SUCCESS]] to i8
+  // CHECK: store i8 [[Z_SUCCESS_B]], i8* {{.*}}, align 1
   var (z, zSuccess) = Builtin.cmpxchg_acquire_acquire_Int32(ptr, a, b)
 
   // CHECK: [[Y_RES:%.*]] = cmpxchg volatile i32* {{.*}}, i32 {{.*}}, i32 {{.*}} monotonic monotonic
   // CHECK: [[Y_VAL:%.*]] = extractvalue { i32, i1 } [[Y_RES]], 0
   // CHECK: [[Y_SUCCESS:%.*]] = extractvalue { i32, i1 } [[Y_RES]], 1
   // CHECK: store i32 [[Y_VAL]], i32* {{.*}}, align 4
-  // CHECK: store i1 [[Y_SUCCESS]], i1* {{.*}}, align 1
+  // CHECK: [[Y_SUCCESS_B:%.*]] = zext i1 [[Y_SUCCESS]] to i8
+  // CHECK: store i8 [[Y_SUCCESS_B]], i8* {{.*}}, align 1
   var (y, ySuccess) = Builtin.cmpxchg_monotonic_monotonic_volatile_Int32(ptr, a, b)
 
   // CHECK: [[X_RES:%.*]] = cmpxchg volatile i32* {{.*}}, i32 {{.*}}, i32 {{.*}} syncscope("singlethread") acquire monotonic
   // CHECK: [[X_VAL:%.*]] = extractvalue { i32, i1 } [[X_RES]], 0
   // CHECK: [[X_SUCCESS:%.*]] = extractvalue { i32, i1 } [[X_RES]], 1
   // CHECK: store i32 [[X_VAL]], i32* {{.*}}, align 4
-  // CHECK: store i1 [[X_SUCCESS]], i1* {{.*}}, align 1
+  // CHECK: [[X_SUCCESS_B:%.*]] = zext i1 [[X_SUCCESS]] to i8
+  // CHECK: store i8 [[X_SUCCESS_B]], i8* {{.*}}, align 1
   var (x, xSuccess) = Builtin.cmpxchg_acquire_monotonic_volatile_singlethread_Int32(ptr, a, b)
 
   // CHECK: [[W_RES:%.*]] = cmpxchg volatile i64* {{.*}}, i64 {{.*}}, i64 {{.*}} seq_cst seq_cst
@@ -257,7 +260,8 @@ func cmpxchg_test(_ ptr: Builtin.RawPointer, a: Builtin.Int32, b: Builtin.Int32)
   // CHECK: [[W_SUCCESS:%.*]] = extractvalue { i64, i1 } [[W_RES]], 1
   // CHECK: [[W_VAL_PTR:%.*]] = inttoptr i64 [[W_VAL]] to i8*
   // CHECK: store i8* [[W_VAL_PTR]], i8** {{.*}}, align 8
-  // CHECK: store i1 [[W_SUCCESS]], i1* {{.*}}, align 1
+  // CHECK: [[W_SUCCESS_B:%.*]] = zext i1 [[W_SUCCESS]] to i8
+  // CHECK: store i8 [[W_SUCCESS_B]], i8* {{.*}}, align 1
   var (w, wSuccess) = Builtin.cmpxchg_seqcst_seqcst_volatile_singlethread_RawPointer(ptr, ptr, ptr)
 
   // CHECK: [[V_RES:%.*]] = cmpxchg weak volatile i64* {{.*}}, i64 {{.*}}, i64 {{.*}} seq_cst seq_cst
@@ -265,7 +269,8 @@ func cmpxchg_test(_ ptr: Builtin.RawPointer, a: Builtin.Int32, b: Builtin.Int32)
   // CHECK: [[V_SUCCESS:%.*]] = extractvalue { i64, i1 } [[V_RES]], 1
   // CHECK: [[V_VAL_PTR:%.*]] = inttoptr i64 [[V_VAL]] to i8*
   // CHECK: store i8* [[V_VAL_PTR]], i8** {{.*}}, align 8
-  // CHECK: store i1 [[V_SUCCESS]], i1* {{.*}}, align 1
+  // CHECK: [[V_SUCCESS_B:%.*]] = zext i1 [[V_SUCCESS]] to i8
+  // CHECK: store i8 [[V_SUCCESS_B]], i8* {{.*}}, align 1
   var (v, vSuccess) = Builtin.cmpxchg_seqcst_seqcst_weak_volatile_singlethread_RawPointer(ptr, ptr, ptr)
 }
 
@@ -558,7 +563,8 @@ struct Pair { var i: Int, b: Bool }
 // CHECK:  [[FLDI:%.*]] = getelementptr inbounds {{.*}} [[PAIR]], i32 0, i32 0
 // CHECK:  store i32 0, i32* [[FLDI]]
 // CHECK:  [[FLDB:%.*]] = getelementptr inbounds {{.*}} [[PAIR]], i32 0, i32 1
-// CHECK:  store i1 false, i1* [[FLDB]]
+// CHECK:  [[BYTE_ADDR:%.*]] = bitcast i1* [[FLDB]] to i8*
+// CHECK:  store i8 0, i8* [[BYTE_ADDR]]
 // CHECK:  [[RET:%.*]] = getelementptr inbounds {{.*}} [[ALLOCA]], i32 0, i32 0
 // CHECK:  [[RES:%.*]] = load i64, i64* [[RET]]
 // CHECK:  ret i64 [[RES]]
@@ -575,7 +581,8 @@ func zeroInitializer() -> (Empty, Pair) {
 // CHECK:  [[FLDI:%.*]] = getelementptr inbounds {{.*}} [[PAIR]], i32 0, i32 0
 // CHECK:  store i32 0, i32* [[FLDI]]
 // CHECK:  [[FLDB:%.*]] = getelementptr inbounds {{.*}} [[PAIR]], i32 0, i32 1
-// CHECK:  store i1 false, i1* [[FLDB]]
+// CHECK:  [[BYTE_ADDR:%.*]] = bitcast i1* [[FLDB]] to i8*
+// CHECK:  store i8 0, i8* [[BYTE_ADDR]]
 // CHECK:  [[RET:%.*]] = getelementptr inbounds {{.*}} [[ALLOCA]], i32 0, i32 0
 // CHECK:  [[RES:%.*]] = load i64, i64* [[RET]]
 // CHECK:  ret i64 [[RES]]
@@ -695,14 +702,16 @@ func generic_ispod_test<T>(_: T) {
   // CHECK-NEXT: [[FLAGS:%.*]] = load i32, i32* [[T0]]
   // CHECK-NEXT: [[ISNOTPOD:%.*]] = and i32 [[FLAGS]], 65536
   // CHECK-NEXT: [[ISPOD:%.*]] = icmp eq i32 [[ISNOTPOD]], 0
-  // CHECK-NEXT: store i1 [[ISPOD]], i1* [[S:%.*]]
+  // CHECK-NEXT: [[BYTE_ADDR:%.*]] = bitcast i1* [[S:%.*]] to i8*
+  // CHECK-NEXT: [[BYTE:%.*]] = zext i1 [[ISPOD]] to i8
+  // CHECK-NEXT: store i8 [[BYTE]], i8* [[BYTE_ADDR]]
   var s = Builtin.ispod(T.self)
 }
 
 // CHECK-LABEL: define {{.*}} @{{.*}}ispod_test
 func ispod_test() {
-  // CHECK: store i1 true, i1*
-  // CHECK: store i1 false, i1*
+  // CHECK: store i8 1, i8*
+  // CHECK: store i8 0, i8*
   var t = Builtin.ispod(Int.self)
   var f = Builtin.ispod(Builtin.NativeObject.self)
 }
@@ -713,17 +722,19 @@ func generic_isbitwisetakable_test<T>(_: T) {
   // CHECK-NEXT: [[FLAGS:%.*]] = load i32, i32* [[T0]]
   // CHECK-NEXT: [[ISNOTBITWISETAKABLE:%.*]] = and i32 [[FLAGS]], 1048576
   // CHECK-NEXT: [[ISBITWISETAKABLE:%.*]] = icmp eq i32 [[ISNOTBITWISETAKABLE]], 0
-  // CHECK-NEXT: store i1 [[ISBITWISETAKABLE]], i1* [[S:%.*]]
+  // CHECK-NEXT: [[BYTE_ADDR:%.*]] = bitcast i1* [[S:%.*]]
+  // CHECK-NEXT: [[BYTE:%.*]] = zext i1 [[ISBITWISETAKABLE]] to i8
+  // CHECK-NEXT: store i8 [[BYTE]], i8* [[BYTE_ADDR]]
   var s = Builtin.isbitwisetakable(T.self)
 }
 
 // CHECK-LABEL: define {{.*}} @{{.*}}isbitwisetakable_test
 func isbitwisetakable_test() {
-  // CHECK: store i1 true, i1*
-  // CHECK: store i1 true, i1*
-  // CHECK: store i1 true, i1*
-  // CHECK: store i1 true, i1*
-  // CHECK: store i1 false, i1*
+  // CHECK: store i8 1, i8*
+  // CHECK: store i8 1, i8*
+  // CHECK: store i8 1, i8*
+  // CHECK: store i8 1, i8*
+  // CHECK: store i8 0, i8*
   var t1 = Builtin.isbitwisetakable(Int.self)
   var t2 = Builtin.isbitwisetakable(C.self)
   var t3 = Builtin.isbitwisetakable(Abc.self)

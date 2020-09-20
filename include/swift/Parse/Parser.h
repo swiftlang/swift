@@ -125,9 +125,6 @@ public:
   CodeCompletionCallbacks *CodeCompletion = nullptr;
   std::vector<Located<std::vector<ParamDecl*>>> AnonClosureVars;
 
-  /// Tracks parsed decls that LLDB requires to be inserted at the top-level.
-  std::vector<Decl *> ContextSwitchedTopLevelDecls;
-
   /// The current token hash, or \c None if the parser isn't computing a hash
   /// for the token stream.
   Optional<llvm::MD5> CurrentTokenHash;
@@ -146,7 +143,6 @@ public:
   ArrayRef<VarDecl *> DisabledVars;
   Diag<> DisabledVarReason;
   
-  llvm::SmallPtrSet<Decl *, 2> AlreadyHandledDecls;
   enum {
     /// InVarOrLetPattern has this value when not parsing a pattern.
     IVOLP_NotInVarOrLet,
@@ -688,6 +684,14 @@ public:
   Optional<StringRef>
   getStringLiteralIfNotInterpolated(SourceLoc Loc, StringRef DiagText);
 
+  /// Returns true to indicate that experimental concurrency syntax should be
+  /// parsed if the parser is generating only a syntax tree or if the user has
+  /// passed the `-enable-experimental-concurrency` flag to the frontend.
+  bool shouldParseExperimentalConcurrency() const {
+    return Context.LangOpts.EnableExperimentalConcurrency ||
+      Context.LangOpts.ParseForSyntaxTreeOnly;
+  }
+
 public:
   InFlightDiagnostic diagnose(SourceLoc Loc, Diagnostic Diag) {
     if (Diags.isDiagnosticPointsToFirstBadToken(Diag.getID()) &&
@@ -922,14 +926,8 @@ public:
   void consumeDecl(ParserPosition BeginParserPosition, ParseDeclOptions Flags,
                    bool IsTopLevel);
 
-  // When compiling for the Debugger, some Decl's need to be moved from the
-  // current scope.  In which case although the Decl will be returned in the
-  // ParserResult, it should not be inserted into the Decl list for the current
-  // context.  markWasHandled asserts that the Decl is already where it
-  // belongs, and declWasHandledAlready is used to check this assertion.
-  // To keep the handled decl array small, we remove the Decl when it is
-  // checked, so you can only call declWasAlreadyHandled once for a given
-  // decl.
+  /// FIXME: Remove this, it's vestigial.
+  llvm::SmallPtrSet<Decl *, 2> AlreadyHandledDecls;
 
   void markWasHandled(Decl *D) {
     AlreadyHandledDecls.insert(D);
@@ -1125,8 +1123,7 @@ public:
                                        ParseDeclOptions Flags,
                                        DeclAttributes &Attributes,
                                        bool HasFuncKeyword = true);
-  ParserResult<BraceStmt>
-  parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD);
+  BraceStmt *parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD);
   void parseAbstractFunctionBody(AbstractFunctionDecl *AFD);
   BraceStmt *parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
   ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,
@@ -1572,6 +1569,7 @@ public:
           SmallVectorImpl<CaptureListEntry> &captureList,
           VarDecl *&capturedSelfParamDecl,
           ParameterList *&params,
+          SourceLoc &asyncLoc,
           SourceLoc &throwsLoc,
           SourceLoc &arrowLoc,
           TypeExpr *&explicitResultType,

@@ -30,7 +30,6 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
-#include "swift/ClangImporter/ClangImporterOptions.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
@@ -329,11 +328,6 @@ public:
     return CodeCompletionOffset != ~0U;
   }
 
-  /// Called from lldb, see rdar://53971116
-  void disableASTScopeLookup() {
-    LangOpts.EnableASTScopeLookup = false;
-  }
-
   /// Retrieve a module hash string that is suitable for uniquely
   /// identifying the conditions under which the module was built, for use
   /// in generating a cached PCH file for the bridging header.
@@ -621,7 +615,7 @@ public:
   ///
   /// This is similar to a parse-only invocation, but module imports will also
   /// be processed.
-  void performParseAndResolveImportsOnly();
+  bool performParseAndResolveImportsOnly();
 
   /// Performs mandatory, diagnostic, and optimization passes over the SIL.
   /// \param silModule The SIL module that was generated during SILGen.

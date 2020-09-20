@@ -197,7 +197,7 @@ Type TypeResolution::resolveDependentMemberType(
     TypoCorrectionResults corrections(ref->getNameRef(), ref->getNameLoc());
     TypeChecker::performTypoCorrection(DC, DeclRefKind::Ordinary,
                                        MetatypeType::get(baseTy),
-                                       NameLookupFlags::ProtocolMembers,
+                                       defaultMemberLookupOptions,
                                        corrections, builder);
 
     // Check whether we have a single type result.
@@ -597,26 +597,18 @@ static bool isPointerToVoid(ASTContext &Ctx, Type Ty, bool &IsMutable) {
   return BGT->getGenericArgs().front()->isVoid();
 }
 
-static Type checkContextualRequirements(Type type,
-                                        SourceLoc loc,
-                                        DeclContext *dc) {
-  // Even if the type is not generic, it might be inside of a generic
-  // context, so we need to check requirements.
-  GenericTypeDecl *decl;
-  Type parentTy;
-  if (auto *aliasTy = dyn_cast<TypeAliasType>(type.getPointer())) {
-    decl = aliasTy->getDecl();
-    parentTy = aliasTy->getParent();
-  } else if (auto *nominalTy = type->getAs<NominalType>()) {
-    decl = nominalTy->getDecl();
-    parentTy = nominalTy->getParent();
-  } else {
-    return type;
-  }
-
+/// Even if the type is not generic, it might be inside of a generic
+/// context or have a free-standing 'where' clause, so we need to
+/// those check requirements too.
+///
+/// Return true on success.
+bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
+                                              Type parentTy,
+                                              SourceLoc loc,
+                                              DeclContext *dc) {
   if (!parentTy || parentTy->hasUnboundGenericType() ||
       parentTy->hasTypeVariable()) {
-    return type;
+    return true;
   }
 
   auto &ctx = dc->getASTContext();
@@ -631,7 +623,7 @@ static Type checkContextualRequirements(Type type,
     else if (ext && ext->isConstrainedExtension())
       noteLoc = ext->getLoc();
     else
-      return type;
+      return true;
 
     if (noteLoc.isInvalid())
       noteLoc = loc;
@@ -640,15 +632,18 @@ static Type checkContextualRequirements(Type type,
   const auto subMap = parentTy->getContextSubstitutions(decl->getDeclContext());
   const auto genericSig = decl->getGenericSignature();
   if (!genericSig) {
-    ctx.Diags.diagnose(loc, diag::recursive_decl_reference,
-                       decl->getDescriptiveKind(), decl->getName());
-    decl->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
-    return ErrorType::get(ctx);
+    if (loc.isValid()) {
+      ctx.Diags.diagnose(loc, diag::recursive_decl_reference,
+                         decl->getDescriptiveKind(), decl->getName());
+      decl->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
+    }
+    return false;
   }
 
   const auto result =
     TypeChecker::checkGenericArguments(
-        dc, loc, noteLoc, type,
+        dc, loc, noteLoc,
+        decl->getDeclaredInterfaceType(),
         genericSig->getGenericParams(),
         genericSig->getRequirements(),
         QueryTypeSubstitutionMap{subMap});
@@ -656,9 +651,9 @@ static Type checkContextualRequirements(Type type,
   switch (result) {
   case RequirementCheckResult::Failure:
   case RequirementCheckResult::SubstitutionFailure:
-    return ErrorType::get(ctx);
+    return false;
   case RequirementCheckResult::Success:
-    return type;
+    return true;
   }
   llvm_unreachable("invalid requirement check type");
 }
@@ -709,7 +704,22 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
     if (resolution.getStage() == TypeResolutionStage::Structural)
       return type;
 
-    return checkContextualRequirements(type, loc, dc);
+    GenericTypeDecl *decl;
+    Type parentTy;
+    if (auto *aliasTy = dyn_cast<TypeAliasType>(type.getPointer())) {
+      decl = aliasTy->getDecl();
+      parentTy = aliasTy->getParent();
+    } else if (auto *nominalTy = type->getAs<NominalType>()) {
+      decl = nominalTy->getDecl();
+      parentTy = nominalTy->getParent();
+    } else {
+      return type;
+    }
+
+    if (TypeChecker::checkContextualRequirements(decl, parentTy, loc, dc))
+      return type;
+
+    return ErrorType::get(resolution.getASTContext());
   }
 
   if (type->hasError()) {
@@ -935,21 +945,32 @@ Type TypeChecker::applyUnboundGenericArguments(GenericTypeDecl *decl,
 
 /// Diagnose a use of an unbound generic type.
 static void diagnoseUnboundGenericType(Type ty, SourceLoc loc) {
-  auto unbound = ty->castTo<UnboundGenericType>();
-  {
-    auto &ctx = ty->getASTContext();
-    InFlightDiagnostic diag = ctx.Diags.diagnose(loc,
-        diag::generic_type_requires_arguments, ty);
-    if (auto *genericD = unbound->getDecl()) {
+  auto &ctx = ty->getASTContext();
+  if (auto unbound = ty->getAs<UnboundGenericType>()) {
+    auto *decl = unbound->getDecl();
+    {
+      InFlightDiagnostic diag = ctx.Diags.diagnose(loc,
+          diag::generic_type_requires_arguments, ty);
       SmallString<64> genericArgsToAdd;
       if (TypeChecker::getDefaultGenericArgumentsString(genericArgsToAdd,
-                                                        genericD))
+                                                        decl))
         diag.fixItInsertAfter(loc, genericArgsToAdd);
     }
+
+    decl->diagnose(diag::kind_declname_declared_here,
+                   DescriptiveDeclKind::GenericType,
+                   decl->getName());
+  } else {
+    ty.findIf([&](Type t) -> bool {
+      if (auto unbound = t->getAs<UnboundGenericType>()) {
+        ctx.Diags.diagnose(loc,
+            diag::generic_type_requires_arguments, t);
+        return true;
+      }
+
+      return false;
+    });
   }
-  unbound->getDecl()->diagnose(diag::kind_declname_declared_here,
-                               DescriptiveDeclKind::GenericType,
-                               unbound->getDecl()->getName());
 }
 
 // Produce a diagnostic if the type we referenced was an
@@ -1407,22 +1428,29 @@ static Type resolveNestedIdentTypeComponent(TypeResolution resolution,
 
   auto maybeDiagnoseBadMemberType = [&](TypeDecl *member, Type memberType,
                                         AssociatedTypeDecl *inferredAssocType) {
-    // Diagnose invalid cases.
-    if (TypeChecker::isUnsupportedMemberTypeAccess(parentTy, member)) {
-      if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
-        if (parentTy->is<UnboundGenericType>())
-          diagnoseUnboundGenericType(parentTy, parentRange.End);
-        else if (parentTy->isExistentialType() &&
-                 isa<AssociatedTypeDecl>(member)) {
-          diags.diagnose(comp->getNameLoc(), diag::assoc_type_outside_of_protocol,
-                         comp->getNameRef());
-        } else if (parentTy->isExistentialType() &&
-                   isa<TypeAliasDecl>(member)) {
-          diags.diagnose(comp->getNameLoc(), diag::typealias_outside_of_protocol,
-                         comp->getNameRef());
-        }
-      }
+    if (options.contains(TypeResolutionFlags::SilenceErrors)) {
+      if (TypeChecker::isUnsupportedMemberTypeAccess(parentTy, member)
+            != TypeChecker::UnsupportedMemberTypeAccessKind::None)
+        return ErrorType::get(ctx);
+    }
 
+    switch (TypeChecker::isUnsupportedMemberTypeAccess(parentTy, member)) {
+    case TypeChecker::UnsupportedMemberTypeAccessKind::None:
+      break;
+
+    case TypeChecker::UnsupportedMemberTypeAccessKind::TypeAliasOfUnboundGeneric:
+    case TypeChecker::UnsupportedMemberTypeAccessKind::AssociatedTypeOfUnboundGeneric:
+      diagnoseUnboundGenericType(parentTy, parentRange.End);
+      return ErrorType::get(ctx);
+
+    case TypeChecker::UnsupportedMemberTypeAccessKind::TypeAliasOfExistential:
+      diags.diagnose(comp->getNameLoc(), diag::typealias_outside_of_protocol,
+                     comp->getNameRef());
+      return ErrorType::get(ctx);
+
+    case TypeChecker::UnsupportedMemberTypeAccessKind::AssociatedTypeOfExistential:
+      diags.diagnose(comp->getNameLoc(), diag::assoc_type_outside_of_protocol,
+                     comp->getNameRef());
       return ErrorType::get(ctx);
     }
 
@@ -1489,8 +1517,6 @@ static Type resolveNestedIdentTypeComponent(TypeResolution resolution,
   NameLookupOptions lookupOptions = defaultMemberLookupOptions;
   if (isKnownNonCascading)
     lookupOptions |= NameLookupFlags::KnownPrivate;
-  if (options.is(TypeResolverContext::ExtensionBinding))
-    lookupOptions -= NameLookupFlags::ProtocolMembers;
   LookupTypeResult memberTypes;
   if (parentTy->mayHaveMembers())
     memberTypes = TypeChecker::lookupMemberType(DC, parentTy,
@@ -2070,7 +2096,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   static const TypeAttrKind FunctionAttrs[] = {
     TAK_convention, TAK_pseudogeneric,
     TAK_callee_owned, TAK_callee_guaranteed, TAK_noescape, TAK_autoclosure,
-    TAK_differentiable, TAK_escaping, TAK_yield_once, TAK_yield_many
+    TAK_differentiable, TAK_escaping, TAK_yield_once, TAK_yield_many, TAK_async
   };
 
   auto checkUnsupportedAttr = [&](TypeAttrKind attr) {
@@ -2216,7 +2242,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       // [TODO: Store-SIL-Clang-type]
       auto extInfo = SILFunctionType::ExtInfoBuilder(
                          rep, attrs.has(TAK_pseudogeneric),
-                         attrs.has(TAK_noescape), diffKind, nullptr)
+                         attrs.has(TAK_noescape), attrs.has(TAK_async), 
+                         diffKind, nullptr)
                          .build();
 
       ty = resolveSILFunctionType(fnRepr, options, coroutineKind, extInfo,
@@ -2460,6 +2487,13 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   if ((options & TypeResolutionFlags::SILMode) && attrs.has(TAK_dynamic_self)) {
     ty = rebuildWithDynamicSelf(getASTContext(), ty);
     attrs.clearAttribute(TAK_dynamic_self);
+  }
+
+  // In SIL *only*, allow @async to specify an async function
+  if ((options & TypeResolutionFlags::SILMode) && attrs.has(TAK_async)) {
+    if (fnRepr != nullptr) {
+      attrs.clearAttribute(TAK_async);
+    }
   }
 
   for (unsigned i = 0; i != TypeAttrKind::TAK_Count; ++i)

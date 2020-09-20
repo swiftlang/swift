@@ -29,6 +29,7 @@
 #include <memory>
 
 namespace llvm {
+  class raw_pwrite_stream;
   class GlobalVariable;
   class MemoryBuffer;
   class Module;

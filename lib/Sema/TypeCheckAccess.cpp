@@ -873,7 +873,8 @@ public:
           });
     }
 
-    checkTypeAccess(SD->getElementTypeLoc(), SD, /*mayBeInferred*/false,
+    checkTypeAccess(SD->getElementInterfaceType(), SD->getElementTypeRepr(),
+                    SD, /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *thisComplainRepr,
                         DowngradeToWarning downgradeDiag) {
@@ -937,7 +938,8 @@ public:
 
     bool problemIsResult = false;
     if (auto FD = dyn_cast<FuncDecl>(fn)) {
-      checkTypeAccess(FD->getBodyResultTypeLoc(), FD, /*mayBeInferred*/false,
+      checkTypeAccess(FD->getResultInterfaceType(), FD->getResultTypeRepr(),
+                      FD, /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *thisComplainRepr,
                           DowngradeToWarning downgradeDiag) {
@@ -1375,7 +1377,8 @@ public:
           });
     }
 
-    checkTypeAccess(SD->getElementTypeLoc(), SD, /*mayBeInferred*/false,
+    checkTypeAccess(SD->getElementInterfaceType(), SD->getElementTypeRepr(),
+                    SD, /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeDiag) {
@@ -1418,7 +1421,8 @@ public:
     }
 
     if (auto FD = dyn_cast<FuncDecl>(fn)) {
-      checkTypeAccess(FD->getBodyResultTypeLoc(), FD, /*mayBeInferred*/false,
+      checkTypeAccess(FD->getResultInterfaceType(), FD->getResultTypeRepr(),
+                      FD, /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeDiag) {
@@ -1450,46 +1454,39 @@ public:
   }
 };
 
+/// Returns the kind of origin, implementation-only import or SPI declaration,
+/// that restricts exporting \p decl from the given file and context.
+///
+/// Local variant to swift::getDisallowedOriginKind for downgrade to warnings.
+DisallowedOriginKind
+getDisallowedOriginKind(const Decl *decl,
+                        const SourceFile &userSF,
+                        const Decl *userContext,
+                        DowngradeToWarning &downgradeToWarning) {
+  downgradeToWarning = DowngradeToWarning::No;
+  ModuleDecl *M = decl->getModuleContext();
+  if (userSF.isImportedImplementationOnly(M)) {
+    // Temporarily downgrade implementation-only exportability in SPI to
+    // a warning.
+    if (userContext->isSPI())
+      downgradeToWarning = DowngradeToWarning::Yes;
+
+    // Implementation-only imported, cannot be reexported.
+    return DisallowedOriginKind::ImplementationOnly;
+  } else if (decl->isSPI() && !userContext->isSPI()) {
+    // SPI can only be exported in SPI.
+    return userContext->getModuleContext() == M ?
+      DisallowedOriginKind::SPILocal :
+      DisallowedOriginKind::SPIImported;
+  }
+
+  return DisallowedOriginKind::None;
+};
+
 // Diagnose public APIs exposing types that are either imported as
 // implementation-only or declared as SPI.
 class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
   class Diagnoser;
-
-  // Problematic origin of an exported type.
-  //
-  // This enum must be kept in sync with
-  // diag::decl_from_hidden_module and
-  // diag::conformance_from_implementation_only_module.
-  enum class DisallowedOriginKind : uint8_t {
-    ImplementationOnly,
-    SPIImported,
-    SPILocal,
-    None
-  };
-
-  // If there's an exportability problem with \p typeDecl, get its origin kind.
-  static DisallowedOriginKind getDisallowedOriginKind(
-      const TypeDecl *typeDecl, const SourceFile &SF, const Decl *context,
-      DowngradeToWarning &downgradeToWarning) {
-    downgradeToWarning = DowngradeToWarning::No;
-    ModuleDecl *M = typeDecl->getModuleContext();
-    if (SF.isImportedImplementationOnly(M)) {
-      // Temporarily downgrade implementation-only exportability in SPI to
-      // a warning.
-      if (context->isSPI())
-        downgradeToWarning = DowngradeToWarning::Yes;
-
-      // Implementation-only imported, cannot be reexported.
-      return DisallowedOriginKind::ImplementationOnly;
-    } else if (typeDecl->isSPI() && !context->isSPI()) {
-      // SPI can only be exported in SPI.
-      return context->getModuleContext() == M ?
-        DisallowedOriginKind::SPILocal :
-        DisallowedOriginKind::SPIImported;
-    }
-
-    return DisallowedOriginKind::None;
-  };
 
   void checkTypeImpl(
       Type type, const TypeRepr *typeRepr, const SourceFile &SF,
@@ -1556,10 +1553,12 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
 
           const RootProtocolConformance *rootConf =
               concreteConf->getRootConformance();
-          ModuleDecl *M = rootConf->getDeclContext()->getParentModule();
-          if (!SF.isImportedImplementationOnly(M))
+          auto originKind = getDisallowedOriginKind(
+              rootConf->getDeclContext()->getAsDecl(),
+              SF, context);
+          if (originKind == DisallowedOriginKind::None)
             continue;
-          diagnoser.diagnoseConformance(rootConf);
+          diagnoser.diagnoseConformance(rootConf, originKind);
         }
       }
 
@@ -1670,12 +1669,14 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
       highlightOffendingType(diag, complainRepr);
     }
 
-    void diagnoseConformance(const ProtocolConformance *offendingConformance) const {
+    void diagnoseConformance(const ProtocolConformance *offendingConformance,
+                             DisallowedOriginKind originKind) const {
       ModuleDecl *M = offendingConformance->getDeclContext()->getParentModule();
       D->diagnose(diag::conformance_from_implementation_only_module,
                   offendingConformance->getType(),
                   offendingConformance->getProtocol()->getName(),
-                  static_cast<unsigned>(reason), M->getName());
+                  static_cast<unsigned>(reason), M->getName(),
+                  static_cast<unsigned>(originKind));
     }
 
     void diagnoseClangFunctionType(Type fnType, const clang::Type *type) const {
@@ -1916,7 +1917,8 @@ public:
       checkType(P->getInterfaceType(), P->getTypeRepr(), SD,
                 getDiagnoser(SD));
     }
-    checkType(SD->getElementTypeLoc(), SD, getDiagnoser(SD));
+    checkType(SD->getElementInterfaceType(), SD->getElementTypeRepr(), SD,
+              getDiagnoser(SD));
   }
 
   void visitAbstractFunctionDecl(AbstractFunctionDecl *fn) {
@@ -1929,7 +1931,8 @@ public:
 
   void visitFuncDecl(FuncDecl *FD) {
     visitAbstractFunctionDecl(FD);
-    checkType(FD->getBodyResultTypeLoc(), FD, getDiagnoser(FD));
+    checkType(FD->getResultInterfaceType(), FD->getResultTypeRepr(), FD,
+              getDiagnoser(FD));
   }
 
   void visitEnumElementDecl(EnumElementDecl *EED) {
@@ -2059,6 +2062,13 @@ static void checkExtensionGenericParamAccess(const ExtensionDecl *ED) {
 
   AccessControlChecker().checkGenericParamAccess(
       ED, ED, desiredAccessScope, userSpecifiedAccess);
+}
+
+DisallowedOriginKind swift::getDisallowedOriginKind(const Decl *decl,
+                                                    const SourceFile &userSF,
+                                                    const Decl *declContext) {
+  auto downgradeToWarning = DowngradeToWarning::No;
+  return getDisallowedOriginKind(decl, userSF, declContext, downgradeToWarning);
 }
 
 void swift::checkAccessControl(Decl *D) {

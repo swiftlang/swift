@@ -133,13 +133,22 @@ class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
   explicit ExplicitSwiftModuleLoader(ASTContext &ctx, DependencyTracker *tracker,
                                      ModuleLoadingMode loadMode,
                                      bool IgnoreSwiftSourceInfoFile);
+
+  bool findModule(AccessPathElem moduleID,
+                  SmallVectorImpl<char> *moduleInterfacePath,
+                  std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
+                  std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
+                  std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
+                  bool &isFramework, bool &isSystemModule) override;
+
   std::error_code findModuleFilesInDirectory(
-    AccessPathElem ModuleID,
-    const SerializedModuleBaseName &BaseName,
-    SmallVectorImpl<char> *ModuleInterfacePath,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) override;
+                  AccessPathElem ModuleID,
+                  const SerializedModuleBaseName &BaseName,
+                  SmallVectorImpl<char> *ModuleInterfacePath,
+                  std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+                  std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+                  std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+                  bool IsFramework) override;
 
   bool canImportModule(Located<Identifier> mID) override;
 
@@ -172,6 +181,8 @@ struct ExplicitModuleInfo {
   std::string moduleSourceInfoPath;
   // Opened buffer for the .swiftmodule file.
   std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
+  // A flag that indicates whether this module is a framework
+  bool isFramework;
 };
 
 /// Parser of explicit module maps passed into the compiler.
@@ -181,12 +192,14 @@ struct ExplicitModuleInfo {
 //      "modulePath": "A.swiftmodule",
 //      "docPath": "A.swiftdoc",
 //      "sourceInfoPath": "A.swiftsourceinfo"
+//      "isFramework": false
 //    },
 //    {
 //      "moduleName": "B",
 //      "modulePath": "B.swiftmodule",
 //      "docPath": "B.swiftdoc",
 //      "sourceInfoPath": "B.swiftsourceinfo"
+//      "isFramework": false
 //    }
 //  ]
 class ExplicitModuleMapParser {
@@ -248,6 +261,15 @@ private:
         result.moduleDocPath = val.str();
       } else if (key == "sourceInfoPath") {
         result.moduleSourceInfoPath = val.str();
+      } else if (key == "isFramework") {
+        auto valStr = val.str();
+        valStr.erase(std::remove(valStr.begin(), valStr.end(), '\n'), valStr.end());
+        if (valStr.compare("true") == 0)
+          result.isFramework = true;
+        else if (valStr.compare("false") == 0)
+          result.isFramework = false;
+        else
+          llvm_unreachable("Unexpected JSON value for isFramework");
       } else {
         // Being forgiving for future fields.
         continue;
@@ -263,6 +285,8 @@ private:
 };
 
 struct ModuleInterfaceLoaderOptions {
+  FrontendOptions::ActionType requestedAction =
+      FrontendOptions::ActionType::EmitModuleOnly;
   bool remarkOnRebuildFromInterface = false;
   bool disableInterfaceLock = false;
   bool disableImplicitSwiftModule = false;
@@ -271,7 +295,17 @@ struct ModuleInterfaceLoaderOptions {
     remarkOnRebuildFromInterface(Opts.RemarkOnRebuildFromModuleInterface),
     disableInterfaceLock(Opts.DisableInterfaceFileLock),
     disableImplicitSwiftModule(Opts.DisableImplicitModules),
-    mainExecutablePath(Opts.MainExecutablePath) {}
+    mainExecutablePath(Opts.MainExecutablePath)
+  {
+    switch (Opts.RequestedAction) {
+    case FrontendOptions::ActionType::TypecheckModuleFromInterface:
+      requestedAction = FrontendOptions::ActionType::Typecheck;
+      break;
+    default:
+      requestedAction = FrontendOptions::ActionType::EmitModuleOnly;
+      break;
+    }
+  }
   ModuleInterfaceLoaderOptions() = default;
 };
 
@@ -298,12 +332,13 @@ class ModuleInterfaceLoader : public SerializedModuleLoaderBase {
   ModuleInterfaceLoaderOptions Opts;
 
   std::error_code findModuleFilesInDirectory(
-    AccessPathElem ModuleID,
-    const SerializedModuleBaseName &BaseName,
-    SmallVectorImpl<char> *ModuleInterfacePath,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) override;
+     AccessPathElem ModuleID,
+     const SerializedModuleBaseName &BaseName,
+     SmallVectorImpl<char> *ModuleInterfacePath,
+     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+     bool IsFramework) override;
 
   bool isCached(StringRef DepPath) override;
 public:
@@ -385,24 +420,25 @@ public:
                                   DiagnosticEngine &Diags,
                                   const SearchPathOptions &searchPathOpts,
                                   const LangOptions &langOpts,
+                                  const ClangImporterOptions &clangImporterOpts,
                                   ModuleInterfaceLoaderOptions LoaderOpts,
-                                  ClangModuleLoader *clangImporter,
                                   bool buildModuleCacheDirIfAbsent,
                                   StringRef moduleCachePath,
                                   StringRef prebuiltCachePath,
                                   bool serializeDependencyHashes,
                                   bool trackSystemDependencies);
-  bool runInSubContext(StringRef moduleName,
-                       StringRef interfacePath,
-                       StringRef outputPath,
-                       SourceLoc diagLoc,
-    llvm::function_ref<bool(ASTContext&, ModuleDecl*, ArrayRef<StringRef>,
-                            ArrayRef<StringRef>, StringRef)> action) override;
-  bool runInSubCompilerInstance(StringRef moduleName,
-                                StringRef interfacePath,
-                                StringRef outputPath,
-                                SourceLoc diagLoc,
-            llvm::function_ref<bool(SubCompilerInstanceInfo&)> action) override;
+  std::error_code runInSubContext(StringRef moduleName,
+                                  StringRef interfacePath,
+                                  StringRef outputPath,
+                                  SourceLoc diagLoc,
+    llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*,
+                                       ArrayRef<StringRef>, ArrayRef<StringRef>,
+                                       StringRef)> action) override;
+  std::error_code runInSubCompilerInstance(StringRef moduleName,
+                                           StringRef interfacePath,
+                                           StringRef outputPath,
+                                           SourceLoc diagLoc,
+    llvm::function_ref<std::error_code(SubCompilerInstanceInfo&)> action) override;
 
   ~InterfaceSubContextDelegateImpl() = default;
 
@@ -412,7 +448,6 @@ public:
                                     llvm::SmallString<256> &OutPath,
                                     StringRef &CacheHash);
   std::string getCacheHash(StringRef useInterfacePath);
-  void addExtraClangArg(StringRef Arg);
 };
 }
 

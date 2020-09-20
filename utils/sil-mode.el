@@ -259,6 +259,7 @@
 ;; *NOTE* viewcfg must be in the $PATH and .dot files should be associated with
 ;; the graphviz app.
 (defvar sil-mode-viewcfg-program-name "viewcfg")
+(defvar sil-mode-viewcfg-renderer "dot")
 (defvar sil-mode-viewcfg-buffer-name "*viewcfg*")
 
 (defcustom sil-mode-viewcfg-command-default "viewcfg"
@@ -281,7 +282,8 @@
          (process-connection-type nil))
      (let ((p (start-process sil-mode-viewcfg-program-name
                              sil-mode-viewcfg-buffer-name
-                             sil-mode-viewcfg-command)))
+                             sil-mode-viewcfg-command
+                             (concat "--renderer=" sil-mode-viewcfg-renderer))))
        (process-send-region p brace-start brace-end)
        (process-send-eof p)))))
 

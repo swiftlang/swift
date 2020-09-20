@@ -2,20 +2,6 @@
 include(AddSwift)
 include(SwiftSource)
 
-function(is_darwin_based_sdk sdk_name out_var)
-  if ("${sdk_name}" STREQUAL "OSX" OR
-      "${sdk_name}" STREQUAL "IOS" OR
-      "${sdk_name}" STREQUAL "IOS_SIMULATOR" OR
-      "${sdk_name}" STREQUAL "TVOS" OR
-      "${sdk_name}" STREQUAL "TVOS_SIMULATOR" OR
-      "${sdk_name}" STREQUAL "WATCHOS" OR
-      "${sdk_name}" STREQUAL "WATCHOS_SIMULATOR")
-    set(${out_var} TRUE PARENT_SCOPE)
-  else()
-    set(${out_var} FALSE PARENT_SCOPE)
-  endif()
-endfunction()
-
 function(add_dependencies_multiple_targets)
   cmake_parse_arguments(
       ADMT # prefix
@@ -63,8 +49,7 @@ function(_add_target_variant_c_compile_link_flags)
 
   set(result ${${CFLAGS_RESULT_VAR_NAME}})
 
-  is_darwin_based_sdk("${CFLAGS_SDK}" IS_DARWIN)
-  if(IS_DARWIN)
+  if("${CFLAGS_SDK}" IN_LIST SWIFT_APPLE_PLATFORMS)
     # Check if there's a specific OS deployment version needed for this invocation
     if("${CFLAGS_SDK}" STREQUAL "OSX")
       if(DEFINED maccatalyst_build_flavor)
@@ -98,7 +83,7 @@ function(_add_target_variant_c_compile_link_flags)
   endif()
 
   set(_sysroot "${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_PATH}")
-  if(IS_DARWIN)
+  if(SWIFT_SDK_${CFLAGS_SDK}_USE_ISYSROOT)
     list(APPEND result "-isysroot" "${_sysroot}")
   elseif(NOT SWIFT_COMPILER_IS_MSVC_LIKE AND NOT "${_sysroot}" STREQUAL "/")
     list(APPEND result "--sysroot=${_sysroot}")
@@ -113,7 +98,7 @@ function(_add_target_variant_c_compile_link_flags)
     endif()
   endif()
 
-  if(IS_DARWIN)
+  if("${CFLAGS_SDK}" IN_LIST SWIFT_APPLE_PLATFORMS)
     # We collate -F with the framework path to avoid unwanted deduplication
     # of options by target_compile_options -- this way no undesired
     # side effects are introduced should a new search path be added.
@@ -179,13 +164,18 @@ function(_add_target_variant_c_compile_flags)
     MACCATALYST_BUILD_FLAVOR "${CFLAGS_MACCATALYST_BUILD_FLAVOR}")
 
   is_build_type_optimized("${CFLAGS_BUILD_TYPE}" optimized)
-  if(optimized)
-    list(APPEND result "-O2")
+  is_build_type_with_debuginfo("${CFLAGS_BUILD_TYPE}" debuginfo)
 
+  # Add -O0/-O2/-O3/-Os/-g/... based on CFLAGS_BUILD_TYPE.
+  list(APPEND result "${CMAKE_CXX_FLAGS_${CFLAGS_BUILD_TYPE}}")
+
+  if(optimized)
     # Omit leaf frame pointers on x86 production builds (optimized, no debug
     # info, and no asserts).
-    is_build_type_with_debuginfo("${CFLAGS_BUILD_TYPE}" debug)
-    if(NOT debug AND NOT CFLAGS_ENABLE_ASSERTIONS)
+    if(NOT debuginfo AND NOT CFLAGS_ENABLE_ASSERTIONS)
+      # Unfortunately, this cannot be folded into the standard
+      # CMAKE_CXX_FLAGS_... because Apple multi-SDK builds use different
+      # architectures for different SDKs (CFLAGS_ARCH isn't constant here).
       if("${CFLAGS_ARCH}" STREQUAL "i386" OR "${CFLAGS_ARCH}" STREQUAL "i686")
         if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
           list(APPEND result "-momit-leaf-frame-pointer")
@@ -193,27 +183,6 @@ function(_add_target_variant_c_compile_flags)
           list(APPEND result "/Oy")
         endif()
       endif()
-    endif()
-  else()
-    if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-      list(APPEND result "-O0")
-    else()
-      list(APPEND result "/Od")
-    endif()
-  endif()
-
-  # CMake automatically adds the flags for debug info if we use MSVC/clang-cl.
-  if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-    is_build_type_with_debuginfo("${CFLAGS_BUILD_TYPE}" debuginfo)
-    if(debuginfo)
-      _compute_lto_flag("${CFLAGS_ENABLE_LTO}" _lto_flag_out)
-      if(_lto_flag_out)
-        list(APPEND result "-gline-tables-only")
-      else()
-        list(APPEND result "-g")
-      endif()
-    else()
-      list(APPEND result "-g0")
     endif()
   endif()
 
@@ -327,6 +296,22 @@ function(_add_target_variant_c_compile_flags)
 
   if("${CFLAGS_SDK}" STREQUAL "WASI")
     list(APPEND result "-D_WASI_EMULATED_MMAN")
+  endif()
+
+  if(SWIFT_DISABLE_OBJC_INTEROP)
+    list(APPEND result "-DSWIFT_OBJC_INTEROP=0")
+  endif()
+
+  if(NOT SWIFT_ENABLE_COMPATIBILITY_OVERRIDES)
+    list(APPEND result "-DSWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES")
+  endif()
+
+  if(SWIFT_RUNTIME_MACHO_NO_DYLD)
+    list(APPEND result "-DSWIFT_RUNTIME_MACHO_NO_DYLD")
+  endif()
+
+  if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+    list(APPEND result "-DSWIFT_STDLIB_SINGLE_THREADED_RUNTIME")
   endif()
 
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
@@ -497,7 +482,7 @@ function(_add_swift_lipo_target)
     list(APPEND source_binaries $<TARGET_FILE:${source_target}>)
   endforeach()
 
-  if(${LIPO_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
+  if("${SWIFT_SDK_${LIPO_SDK}_OBJECT_FORMAT}" STREQUAL "MACHO")
     if(LIPO_CODESIGN)
       set(codesign_command COMMAND "codesign" "-f" "-s" "-" "${LIPO_OUTPUT}")
     endif()

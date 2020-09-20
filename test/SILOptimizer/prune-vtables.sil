@@ -14,9 +14,9 @@ sil @PrivateA_yesOverrides : $@convention(method) (@guaranteed PrivateA) -> ()
 sil @PrivateA_isFinal      : $@convention(method) (@guaranteed PrivateA) -> ()
 
 // NOWMO-LABEL: sil_vtable PrivateA {
-// NOWMO:         #PrivateA.noOverrides{{.*}} [nonoverridden]
+// NOWMO:         #PrivateA.noOverrides{{[^[]]*}}
 // NOWMO-NOT:     #PrivateA.yesOverrides{{.*}} [nonoverridden]
-// NOWMO:         #PrivateA.isFinal{{.*}} [nonoverridden]
+// NOWMO:         #PrivateA.isFinal{{[^[]]*}}
 
 // WMO-LABEL: sil_vtable PrivateA {
 // WMO:         #PrivateA.noOverrides{{.*}} [nonoverridden]
@@ -35,9 +35,9 @@ private class PrivateB: PrivateA {
 sil @PrivateB_yesOverrides : $@convention(method) (@guaranteed PrivateB) -> ()
 
 // NOWMO-LABEL: sil_vtable PrivateB {
-// NOWMO:         #PrivateA.noOverrides{{.*}} [nonoverridden]
+// NOWMO:         #PrivateA.noOverrides{{[^[]]*}}
 // NOWMO-NOT:     #PrivateA.yesOverrides{{.*}} [nonoverridden]
-// NOWMO:         #PrivateA.isFinal{{.*}} [nonoverridden]
+// NOWMO:         #PrivateA.isFinal{{[^[]]*}}
 
 // WMO-LABEL: sil_vtable PrivateB {
 // WMO:         #PrivateA.noOverrides{{.*}} [nonoverridden]
@@ -62,7 +62,7 @@ sil @InternalA_isFinal      : $@convention(method) (@guaranteed InternalA) -> ()
 // NOWMO-LABEL: sil_vtable InternalA {
 // NOWMO-NOT:     #InternalA.noOverrides{{.*}} [nonoverridden]
 // NOWMO-NOT:     #InternalA.yesOverrides{{.*}} [nonoverridden]
-// NOWMO:         #InternalA.isFinal{{.*}} [nonoverridden]
+// NOWMO:         #InternalA.isFinal{{[^[]]*}}
 
 // WMO-LABEL: sil_vtable InternalA {
 // WMO:         #InternalA.noOverrides{{.*}} [nonoverridden]
@@ -83,7 +83,7 @@ sil @InternalB_yesOverrides : $@convention(method) (@guaranteed InternalB) -> ()
 // NOWMO-LABEL: sil_vtable InternalB {
 // NOWMO-NOT:     #InternalA.noOverrides{{.*}} [nonoverridden]
 // NOWMO-NOT:     #InternalA.yesOverrides{{.*}} [nonoverridden]
-// NOWMO:         #InternalA.isFinal{{.*}} [nonoverridden]
+// NOWMO:         #InternalA.isFinal{{[^[]]*}}
 
 // WMO-LABEL: sil_vtable InternalB {
 // WMO:         #InternalA.noOverrides{{.*}} [nonoverridden]
@@ -108,7 +108,7 @@ sil @PublicA_isFinal      : $@convention(method) (@guaranteed PublicA) -> ()
 // NOWMO-LABEL: sil_vtable PublicA {
 // NOWMO-NOT:     #PublicA.noOverrides{{.*}} [nonoverridden]
 // NOWMO-NOT:     #PublicA.yesOverrides{{.*}} [nonoverridden]
-// NOWMO:         #PublicA.isFinal{{.*}} [nonoverridden]
+// NOWMO:         #PublicA.isFinal{{[^[]]*}}
 
 // WMO-LABEL: sil_vtable PublicA {
 // WMO:         #PublicA.noOverrides{{.*}} [nonoverridden]
@@ -129,7 +129,7 @@ sil @PublicB_yesOverrides : $@convention(method) (@guaranteed PublicB) -> ()
 // NOWMO-LABEL: sil_vtable PublicB {
 // NOWMO-NOT:     #PublicA.noOverrides{{.*}} [nonoverridden]
 // NOWMO-NOT:     #PublicA.yesOverrides{{.*}} [nonoverridden]
-// NOWMO:         #PublicA.isFinal{{.*}} [nonoverridden]
+// NOWMO:         #PublicA.isFinal{{[^[]]*}}
 
 // WMO-LABEL: sil_vtable PublicB {
 // WMO:         #PublicA.noOverrides{{.*}} [nonoverridden]
@@ -154,7 +154,7 @@ sil @OpenA_isFinal      : $@convention(method) (@guaranteed OpenA) -> ()
 // NOWMO-LABEL: sil_vtable OpenA {
 // NOWMO-NOT:     #OpenA.noOverrides{{.*}} [nonoverridden]
 // NOWMO-NOT:     #OpenA.yesOverrides{{.*}} [nonoverridden]
-// NOWMO:         #OpenA.isFinal{{.*}} [nonoverridden]
+// NOWMO:         #OpenA.isFinal{{[^[]]*}}
 
 // WMO-LABEL: sil_vtable OpenA {
 // WMO-NOT:     #OpenA.noOverrides{{.*}} [nonoverridden]
@@ -175,7 +175,7 @@ sil @OpenB_yesOverrides : $@convention(method) (@guaranteed OpenB) -> ()
 // NOWMO-LABEL: sil_vtable OpenB {
 // NOWMO-NOT:     #OpenA.noOverrides{{.*}} [nonoverridden]
 // NOWMO-NOT:     #OpenA.yesOverrides{{.*}} [nonoverridden]
-// NOWMO:         #OpenA.isFinal{{.*}} [nonoverridden]
+// NOWMO:         #OpenA.isFinal{{[^[]]*}}
 
 // WMO-LABEL: sil_vtable OpenB {
 // WMO-NOT:     #OpenA.noOverrides{{.*}} [nonoverridden]

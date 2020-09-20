@@ -9,6 +9,26 @@ project(swift-stdlib LANGUAGES C CXX)
 list(APPEND CMAKE_MODULE_PATH
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
+#
+# User-configurable options for the standard library.
+#
+
+option(SWIFT_ENABLE_COMPATIBILITY_OVERRIDES
+  "Support back-deploying compatibility fixes for newer apps running on older runtimes."
+  TRUE)
+
+option(SWIFT_RUNTIME_MACHO_NO_DYLD
+  "Build stdlib assuming the runtime environment uses Mach-O but does not support dynamic modules."
+  FALSE)
+
+option(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+    "Build the standard libraries assuming that they will be used in an environment with only a single thread."
+    FALSE)
+
+#
+# End of user-configurable options.
+#
+
 include(AddSwiftStdlib)
 
 # Create convenience targets for the Swift standard library.

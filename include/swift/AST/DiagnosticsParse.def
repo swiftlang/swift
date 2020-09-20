@@ -882,8 +882,6 @@ ERROR(expected_parameter_colon,PointsToFirstBadToken,
       "expected ':' following argument label and parameter name", ())
 ERROR(expected_assignment_instead_of_comparison_operator,none,
       "expected '=' instead of '==' to assign default value for parameter", ())
-ERROR(multiple_parameter_ellipsis,none,
-      "only a single variadic parameter '...' is permitted", ())
 ERROR(parameter_vararg_default,none,
       "variadic parameter cannot have a default value", ())
 ERROR(parameter_specifier_as_attr_disallowed,none,
@@ -916,6 +914,8 @@ ERROR(initializer_as_typed_pattern,none,
 
 ERROR(unlabeled_parameter_following_variadic_parameter,none,
       "a parameter following a variadic parameter requires a label", ())
+ERROR(closure_unlabeled_parameter_following_variadic_parameter,none,
+      "no parameters may follow a variadic parameter in a closure", ())
 
 ERROR(enum_element_empty_arglist,none,
       "enum element with associated values must have at least one "
@@ -1324,8 +1324,6 @@ ERROR(replace_equal_with_colon_for_value,none,
       "'=' has been replaced with ':' in attribute arguments", ())
 ERROR(expected_attribute_name,none,
       "expected an attribute name", ())
-ERROR(unknown_attribute,none,
-      "unknown attribute '%0'", (StringRef))
 ERROR(unexpected_lparen_in_attribute,none,
       "unexpected '(' in attribute '%0'", (StringRef))
 ERROR(duplicate_attribute,none,

@@ -178,20 +178,8 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
                 ->areAllParamsConcrete());
   }
 
-  // Emit the lazy initialization token for the initialization expression.
-  auto counter = anonymousSymbolCounter++;
-
-  // Pick one variable of the pattern. Usually it's only one variable, but it
-  // can also be something like: var (a, b) = ...
-  Pattern *pattern = pd->getPattern(pbdEntry);
-  VarDecl *varDecl = nullptr;
-  pattern->forEachVariable([&](VarDecl *D) {
-    varDecl = D;
-  });
-  assert(varDecl);
-
   Mangle::ASTMangler TokenMangler;
-  std::string onceTokenBuffer = TokenMangler.mangleGlobalInit(varDecl, counter,
+  std::string onceTokenBuffer = TokenMangler.mangleGlobalInit(pd, pbdEntry,
                                                               false);
   
   auto onceTy = BuiltinIntegerType::getWordType(M.getASTContext());
@@ -207,7 +195,7 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
 
   // Emit the initialization code into a function.
   Mangle::ASTMangler FuncMangler;
-  std::string onceFuncBuffer = FuncMangler.mangleGlobalInit(varDecl, counter,
+  std::string onceFuncBuffer = FuncMangler.mangleGlobalInit(pd, pbdEntry,
                                                             true);
   
   SILFunction *onceFunc = emitLazyGlobalInitializer(onceFuncBuffer, pd,
@@ -223,6 +211,19 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
 void SILGenFunction::emitLazyGlobalInitializer(PatternBindingDecl *binding,
                                                unsigned pbdEntry) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(binding->getDeclContext());
+
+  ASTContext &C = getASTContext();
+  // wasm: Lazy global init is used with swift_once which passes a context
+  // pointer parameter. If lazy global init doesn't take a context argument,
+  // caller and callee signatures are mismatched and it causes runtime
+  // exception on WebAssembly runtime. So we need to add dummy argument
+  // to consume the context pointer.
+  // See also: emitLazyGlobalInitializer
+  if (C.LangOpts.Target.isOSBinFormatWasm()) {
+    auto UnsafeRawPointer = C.getUnsafeRawPointerDecl();
+    auto UnsafeRawPtrTy = getLoweredType(UnsafeRawPointer->getDeclaredInterfaceType());
+    F.front().createFunctionArgument(UnsafeRawPtrTy);
+  }
 
   {
     Scope scope(Cleanups, binding);

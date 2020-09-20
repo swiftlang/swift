@@ -477,14 +477,61 @@ static bool findNonMembers(ArrayRef<LookupResultEntry> lookupResults,
   return AllDeclRefs;
 }
 
+/// Find the next element in a chain of members. If this expression is (or
+/// could be) the base of such a chain, this will return \c nullptr.
+static Expr *getMemberChainSubExpr(Expr *expr) {
+  assert(expr && "getMemberChainSubExpr called with null expr!");
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
+    return UDE->getBase();
+  } else if (auto *CE = dyn_cast<CallExpr>(expr)) {
+    return CE->getFn();
+  } else if (auto *BOE = dyn_cast<BindOptionalExpr>(expr)) {
+    return BOE->getSubExpr();
+  } else if (auto *FVE = dyn_cast<ForceValueExpr>(expr)) {
+    return FVE->getSubExpr();
+  } else if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
+    return SE->getBase();
+  } else if (auto *CCE = dyn_cast<CodeCompletionExpr>(expr)) {
+    return CCE->getBase();
+  } else {
+    return nullptr;
+  }
+}
+
+UnresolvedMemberExpr *TypeChecker::getUnresolvedMemberChainBase(Expr *expr) {
+  if (auto *subExpr = getMemberChainSubExpr(expr))
+    return getUnresolvedMemberChainBase(subExpr);
+  else
+    return dyn_cast<UnresolvedMemberExpr>(expr);
+}
+
+/// Whether this expression is a member of a member chain.
+static bool isMemberChainMember(Expr *expr) {
+  return getMemberChainSubExpr(expr) != nullptr;
+}
+/// Whether this expression sits at the end of a chain of member accesses.
+static bool isMemberChainTail(Expr *expr, Expr *parent) {
+  assert(expr && "isMemberChainTail called with null expr!");
+  // If this expression's parent is not itself part of a chain (or, this expr
+  // has no parent expr), this must be the tail of the chain.
+  return parent == nullptr || !isMemberChainMember(parent);
+}
+
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
 /// returning the resultant expression. Context is the DeclContext used
 /// for the lookup.
 Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
-                                      DeclContext *DC) {
+                                      DeclContext *DC,
+                                      bool replaceInvalidRefsWithErrors) {
   // Process UnresolvedDeclRefExpr by doing an unqualified lookup.
   DeclNameRef Name = UDRE->getName();
   SourceLoc Loc = UDRE->getLoc();
+
+  auto errorResult = [&]() -> Expr * {
+    if (replaceInvalidRefsWithErrors)
+      return new (DC->getASTContext()) ErrorExpr(UDRE->getSourceRange());
+    return UDRE;
+  };
 
   // Perform standard value name lookup.
   NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
@@ -496,6 +543,9 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
   //       name/module qualifier to access top-level name.
   lookupOptions |= NameLookupFlags::IncludeOuterResults;
 
+  if (Loc.isInvalid())
+    DC = DC->getModuleScopeContext();
+
   auto Lookup = TypeChecker::lookupUnqualified(DC, Name, Loc, lookupOptions);
 
   auto &Context = DC->getASTContext();
@@ -506,7 +556,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     if (diagnoseRangeOperatorMisspell(Context.Diags, UDRE) ||
         diagnoseIncDecOperator(Context.Diags, UDRE) ||
         diagnoseOperatorJuxtaposition(UDRE, DC)) {
-      return new (Context) ErrorExpr(UDRE->getSourceRange());
+      return errorResult();
     }
 
     // Try ignoring access control.
@@ -531,7 +581,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
 
       // Don't try to recover here; we'll get more access-related diagnostics
       // downstream if the type of the inaccessible decl is also inaccessible.
-      return new (Context) ErrorExpr(UDRE->getSourceRange());
+      return errorResult();
     }
 
     // TODO: Name will be a compound name if it was written explicitly as
@@ -625,7 +675,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     // TODO: consider recovering from here.  We may want some way to suppress
     // downstream diagnostics, though.
 
-    return new (Context) ErrorExpr(UDRE->getSourceRange());
+    return errorResult();
   }
 
   // FIXME: Need to refactor the way we build an AST node from a lookup result!
@@ -916,6 +966,10 @@ namespace {
 
     Expr *ParentExpr;
 
+    /// Indicates whether pre-check is allowed to insert
+    /// implicit `ErrorExpr` in place of invalid references.
+    bool UseErrorExprs;
+
     /// A stack of expressions being walked, used to determine where to
     /// insert RebindSelfInConstructorExpr nodes.
     llvm::SmallVector<Expr *, 8> ExprStack;
@@ -962,12 +1016,12 @@ namespace {
       public:
         StrangeInterpolationRewriter(ASTContext &Ctx) : Context(Ctx) {}
 
-        virtual bool walkToDeclPre(Decl *D) {
+        virtual bool walkToDeclPre(Decl *D) override {
           // We don't want to look inside decls.
           return false;
         }
 
-        virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) {
+        virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
           // One InterpolatedStringLiteralExpr should never be nested inside
           // another except as a child of a CallExpr, and we don't recurse into
           // the children of CallExprs.
@@ -1055,8 +1109,10 @@ namespace {
     }
 
   public:
-    PreCheckExpression(DeclContext *dc, Expr *parent)
-        : Ctx(dc->getASTContext()), DC(dc), ParentExpr(parent) {}
+    PreCheckExpression(DeclContext *dc, Expr *parent,
+                       bool replaceInvalidRefsWithErrors)
+        : Ctx(dc->getASTContext()), DC(dc), ParentExpr(parent),
+          UseErrorExprs(replaceInvalidRefsWithErrors) {}
 
     ASTContext &getASTContext() const { return Ctx; }
 
@@ -1070,13 +1126,6 @@ namespace {
         if (!isa<SelfApplyExpr>(expr)) {
           CallArgs.insert(call->getArg());
         }
-      }
-
-      // If this is an unresolved member with a call argument (e.g.,
-      // .some(x)), record the argument expression.
-      if (auto unresolvedMember = dyn_cast<UnresolvedMemberExpr>(expr)) {
-        if (auto arg = unresolvedMember->getArgument())
-          CallArgs.insert(arg);
       }
 
       // FIXME(diagnostics): `InOutType` could appear here as a result
@@ -1122,7 +1171,8 @@ namespace {
       if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
         TypeChecker::checkForForbiddenPrefix(
             getASTContext(), unresolved->getName().getBaseName());
-        return finish(true, TypeChecker::resolveDeclRefExpr(unresolved, DC));
+        return finish(true, TypeChecker::resolveDeclRefExpr(unresolved, DC,
+                                                            UseErrorExprs));
       }
 
       // Let's try to figure out if `InOutExpr` is out of place early
@@ -1311,6 +1361,14 @@ namespace {
 
       if (auto *simplified = simplifyTypeConstructionWithLiteralArg(expr))
         return simplified;
+
+      // If we find an unresolved member chain, wrap it in an
+      // UnresolvedMemberChainResultExpr (unless this has already been done).
+      auto *parent = Parent.getAsExpr();
+      if (isMemberChainTail(expr, parent))
+        if (auto *UME = TypeChecker::getUnresolvedMemberChainBase(expr))
+          if (!parent || !isa<UnresolvedMemberChainResultExpr>(parent))
+            return new (ctx) UnresolvedMemberChainResultExpr(expr, UME);
 
       return expr;
     }
@@ -1900,7 +1958,6 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
 
   // Key paths must be spelled with at least one component.
   if (components.empty()) {
-    DE.diagnose(KPE->getLoc(), diag::expr_swift_keypath_empty);
     // Passes further down the pipeline expect keypaths to always have at least
     // one component, so stuff an invalid component in the AST for recovery.
     components.push_back(KeyPathExpr::Component());
@@ -1980,8 +2037,9 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
 
 /// Pre-check the expression, validating any types that occur in the
 /// expression and folding sequence expressions.
-bool ConstraintSystem::preCheckExpression(Expr *&expr, DeclContext *dc) {
-  PreCheckExpression preCheck(dc, expr);
+bool ConstraintSystem::preCheckExpression(Expr *&expr, DeclContext *dc,
+                                          bool replaceInvalidRefsWithErrors) {
+  PreCheckExpression preCheck(dc, expr, replaceInvalidRefsWithErrors);
   // Perform the pre-check.
   if (auto result = expr->walk(preCheck)) {
     expr = result;
@@ -2108,7 +2166,8 @@ TypeChecker::typeCheckExpression(
 
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
-  if (ConstraintSystem::preCheckExpression(expr, dc)) {
+  if (ConstraintSystem::preCheckExpression(
+          expr, dc, /*replaceInvalidRefsWithErrors=*/true)) {
     target.setExpr(expr);
     return None;
   }
@@ -2337,13 +2396,15 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
 
   // Precheck the sequence.
   Expr *sequence = stmt->getSequence();
-  if (ConstraintSystem::preCheckExpression(sequence, dc))
+  if (ConstraintSystem::preCheckExpression(
+          sequence, dc, /*replaceInvalidRefsWithErrors=*/true))
     return failed();
   stmt->setSequence(sequence);
 
   // Precheck the filtering condition.
   if (Expr *whereExpr = stmt->getWhere()) {
-    if (ConstraintSystem::preCheckExpression(whereExpr, dc))
+    if (ConstraintSystem::preCheckExpression(
+            whereExpr, dc, /*replaceInvalidRefsWithErrors=*/true))
       return failed();
 
     stmt->setWhere(whereExpr);
@@ -2401,8 +2462,9 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   auto lookupOptions = defaultUnqualifiedLookupOptions;
   lookupOptions |= NameLookupFlags::KnownPrivate;
   auto matchLookup =
-      lookupUnqualified(DC, DeclNameRef(Context.Id_MatchOperator), SourceLoc(),
-                        lookupOptions);
+      lookupUnqualified(DC->getModuleScopeContext(),
+                        DeclNameRef(Context.Id_MatchOperator),
+                        SourceLoc(), lookupOptions);
   auto &diags = DC->getASTContext().Diags;
   if (!matchLookup) {
     diags.diagnose(EP->getLoc(), diag::no_match_operator);
@@ -2905,7 +2967,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
         out << " as ";
         Type(fixed).print(out, PO);
       } else {
-        getPotentialBindings(tv).dump(out, 1);
+        inferBindingsFor(tv).dump(out, 1);
       }
     } else {
       out << " equivalent to ";
@@ -3109,21 +3171,14 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     return CheckedCastKind::ValueCast;
   };
 
-  // Strip optional wrappers off of the destination type in sync with
-  // stripping them off the origin type.
+  // TODO: Explore optionals using the same strategy used by the
+  // runtime.
+  // For now, if the target is more optional than the source,
+  // just defer it out for the runtime to handle.
   while (auto toValueType = toType->getOptionalObjectType()) {
-    // Complain if we're trying to increase optionality, e.g.
-    // casting an NSObject? to an NSString??.  That's not a subtype
-    // relationship.
     auto fromValueType = fromType->getOptionalObjectType();
     if (!fromValueType) {
-      if (!suppressDiagnostics) {
-        diags.diagnose(diagLoc, diag::downcast_to_more_optional,
-                       origFromType, origToType)
-          .highlight(diagFromRange)
-          .highlight(diagToRange);
-      }
-      return CheckedCastKind::Unresolved;
+      return CheckedCastKind::ValueCast;
     }
 
     toType = toValueType;

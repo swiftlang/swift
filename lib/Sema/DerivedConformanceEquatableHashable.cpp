@@ -406,17 +406,11 @@ deriveEquatable_eq(
   }
 
   DeclName name(C, generatedIdentifier, params);
-  auto eqDecl =
-    FuncDecl::create(C, /*StaticLoc=*/SourceLoc(),
-                     StaticSpellingKind::KeywordStatic,
-                     /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
-                     /*Async*/ false, SourceLoc(),
-                     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                     /*GenericParams=*/nullptr,
-                     params,
-                     TypeLoc::withoutLoc(boolTy),
-                     parentDC);
-  eqDecl->setImplicit();
+  auto *const eqDecl = FuncDecl::createImplicit(
+      C, StaticSpellingKind::KeywordStatic, name, /*NameLoc=*/SourceLoc(),
+      /*Async=*/false,
+      /*Throws=*/false,
+      /*GenericParams=*/nullptr, params, boolTy, parentDC);
   eqDecl->setUserAccessible(false);
 
   // Add the @_implements(Equatable, ==(_:_:)) attribute
@@ -549,15 +543,11 @@ deriveHashable_hashInto(
 
   // Func name: hash(into: inout Hasher) -> ()
   DeclName name(C, C.Id_hash, params);
-  auto *hashDecl = FuncDecl::create(C,
-                                    SourceLoc(), StaticSpellingKind::None,
-                                    SourceLoc(), name, SourceLoc(),
-                                    /*Async*/ false, SourceLoc(),
-                                    /*Throws=*/false, SourceLoc(),
-                                    nullptr, params,
-                                    TypeLoc::withoutLoc(returnType),
-                                    parentDC);
-  hashDecl->setImplicit();
+  auto *const hashDecl = FuncDecl::createImplicit(
+      C, StaticSpellingKind::None, name, /*NameLoc=*/SourceLoc(),
+      /*Async=*/false,
+      /*Throws=*/false,
+      /*GenericParams=*/nullptr, params, returnType, parentDC);
   hashDecl->setBodySynthesizer(bodySynthesizer);
 
   hashDecl->copyFormalAccessFrom(derived.Nominal);
@@ -899,7 +889,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       /*GenericParams=*/nullptr, params,
-      TypeLoc::withoutLoc(intType), parentDC);
+      intType, parentDC);
   getterDecl->setImplicit();
   getterDecl->setBodySynthesizer(&deriveBodyHashable_hashValue);
   getterDecl->setIsTransparent(false);

@@ -349,17 +349,14 @@ ModuleFile::getModuleName(ASTContext &Ctx, StringRef modulePath,
     llvm::MemoryBuffer::getMemBuffer(llvm::MemoryBufferRef(*moduleBuf.get()),
     /*RequiresNullTerminator=*/false);
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
-  ExtendedValidationInfo ExtInfo;
   bool isFramework = false;
   serialization::ValidationInfo loadInfo =
      ModuleFileSharedCore::load(modulePath.str(),
                       std::move(newBuf),
                       nullptr,
                       nullptr,
-                      /*isFramework*/isFramework, loadedModuleFile,
-                      &ExtInfo);
-
-  Name = loadedModuleFile->Name;
+                      /*isFramework*/isFramework, loadedModuleFile);
+  Name = loadedModuleFile->Name.str();
   return std::move(moduleBuf.get());
 }
 

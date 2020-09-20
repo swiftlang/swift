@@ -462,18 +462,20 @@ static void printSILFunctionNameAndType(
     llvm::DenseMap<CanType, Identifier> &sugaredTypeNames) {
   function->printName(OS);
   OS << " : $";
-  auto genSig =
-    function->getLoweredFunctionType()->getInvocationGenericSignature();
   auto *genEnv = function->getGenericEnvironment();
-  // If `genSig` and `genEnv` are both defined, get sugared names of generic
+  const GenericSignatureImpl *genSig = nullptr;
+
+  // If `genEnv` is defined, get sugared names of generic
   // parameter types for printing.
-  if (genSig && genEnv) {
+  if (genEnv) {
+    genSig = genEnv->getGenericSignature().getPointer();
+
     llvm::DenseSet<Identifier> usedNames;
     llvm::SmallString<16> disambiguatedNameBuf;
     unsigned disambiguatedNameCounter = 1;
     for (auto *paramTy : genSig->getGenericParams()) {
       // Get a uniqued sugared name for the generic parameter type.
-      auto sugaredTy = genEnv->getSugaredType(paramTy);
+      auto sugaredTy = genEnv->getGenericSignature()->getSugaredType(paramTy);
       Identifier name = sugaredTy->getName();
       while (!usedNames.insert(name).second) {
         disambiguatedNameBuf.clear();
@@ -495,7 +497,7 @@ static void printSILFunctionNameAndType(
     }
   }
   auto printOptions = PrintOptions::printSIL();
-  printOptions.GenericEnv = genEnv;
+  printOptions.GenericSig = genSig;
   printOptions.AlternativeTypeNames =
       sugaredTypeNames.empty() ? nullptr : &sugaredTypeNames;
   function->getLoweredFunctionType()->print(OS, printOptions);
@@ -2397,7 +2399,7 @@ public:
       break;
     }
     *this << "] ";
-    *this << getIDAndType(lfei->getFunctionOperand());
+    *this << getIDAndType(lfei->getOperand());
   }
 
   void visitDifferentiabilityWitnessFunctionInst(
@@ -2598,14 +2600,14 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (isWithoutActuallyEscapingThunk())
     OS << "[without_actually_escaping] ";
 
-  if (isAsync())
-    OS << "[async] ";
-
   switch (getSpecialPurpose()) {
   case SILFunction::Purpose::None:
     break;
   case SILFunction::Purpose::GlobalInit:
     OS << "[global_init] ";
+    break;
+  case SILFunction::Purpose::GlobalInitOnceFunction:
+    OS << "[global_init_once_fn] ";
     break;
   case SILFunction::Purpose::LazyPropertyGetter:
     OS << "[lazy_getter] ";
@@ -3248,8 +3250,9 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
     OS << "[serialized] ";
 
   getConformance()->printName(OS, Options);
-  Options.GenericEnv =
-    getConformance()->getDeclContext()->getGenericEnvironmentOfContext();
+  Options.GenericSig =
+    getConformance()->getDeclContext()->getGenericSignatureOfContext()
+      .getPointer();
 
   if (isDeclaration()) {
     OS << "\n\n";
@@ -3292,7 +3295,7 @@ void SILDefaultWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   OS << getProtocol()->getName() << " {\n";
   
   PrintOptions options = PrintOptions::printSIL();
-  options.GenericEnv = Protocol->getGenericEnvironmentOfContext();
+  options.GenericSig = Protocol->getGenericSignatureOfContext().getPointer();
 
   for (auto &witness : getEntries()) {
     witness.print(OS, Verbose, options);
@@ -3443,12 +3446,17 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
   OS << "exported: " << exported << ", ";
   OS << "kind: " << kind << ", ";
 
+  auto *genericEnv = getFunction()->getGenericEnvironment();
+  GenericSignature genericSig;
+  if (genericEnv)
+    genericSig = genericEnv->getGenericSignature();
+
   ArrayRef<Requirement> requirements;
   SmallVector<Requirement, 4> requirementsScratch;
   if (auto specializedSig = getSpecializedSignature()) {
-    if (auto env = getFunction()->getGenericEnvironment()) {
+    if (genericSig) {
       requirementsScratch = specializedSig->requirementsNotSatisfiedBy(
-          env->getGenericSignature());
+          genericSig);
       requirements = requirementsScratch;
     } else {
       requirements = specializedSig->getRequirements();
@@ -3458,19 +3466,18 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
     OS << "where ";
     SILFunction *F = getFunction();
     assert(F);
-    auto GenericEnv = F->getGenericEnvironment();
     interleave(requirements,
                [&](Requirement req) {
-                 if (!GenericEnv) {
+                 if (!genericSig) {
                    req.print(OS, SubPrinter);
                    return;
                  }
                  // Use GenericEnvironment to produce user-friendly
                  // names instead of something like t_0_0.
-                 auto FirstTy = GenericEnv->getSugaredType(req.getFirstType());
+                 auto FirstTy = genericSig->getSugaredType(req.getFirstType());
                  if (req.getKind() != RequirementKind::Layout) {
                    auto SecondTy =
-                       GenericEnv->getSugaredType(req.getSecondType());
+                       genericSig->getSugaredType(req.getSecondType());
                    Requirement ReqWithDecls(req.getKind(), FirstTy, SecondTy);
                    ReqWithDecls.print(OS, SubPrinter);
                  } else {

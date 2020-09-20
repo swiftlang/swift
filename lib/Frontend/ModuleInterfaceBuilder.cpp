@@ -161,10 +161,10 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
       llvm::RestorePrettyStackState(savedInnerPrettyStackState);
     };
 
-    SubError = subASTDelegate.runInSubCompilerInstance(moduleName,
-                                                       interfacePath,
-                                                       OutPath,
-                                                       diagnosticLoc,
+    SubError = (bool)subASTDelegate.runInSubCompilerInstance(moduleName,
+                                                             interfacePath,
+                                                             OutPath,
+                                                             diagnosticLoc,
                                            [&](SubCompilerInstanceInfo &info) {
     auto &SubInstance = *info.Instance;
     auto subInvocation = SubInstance.getInvocation();
@@ -173,9 +173,11 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
         .getModuleInterfaceLoader())->tryEmitForwardingModule(moduleName,
                                                               interfacePath,
                                                   CompiledCandidates, OutPath)) {
-      return false;
+      return std::error_code();
     }
     FrontendOptions &FEOpts = subInvocation.getFrontendOptions();
+    bool isTypeChecking =
+        (FEOpts.RequestedAction == FrontendOptions::ActionType::Typecheck);
     const auto &InputInfo = FEOpts.InputsAndOutputs.firstInput();
     StringRef InPath = InputInfo.file();
     const auto &OutputInfo =
@@ -198,9 +200,9 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
             getSwiftInterfaceCompilerVersionForCurrentCompiler(
                 SubInstance.getASTContext());
         StringRef emittedByCompiler = info.CompilerVersion;
-        diagnose(diag::module_interface_build_failed, moduleName,
-                 emittedByCompiler == builtByCompiler, emittedByCompiler,
-                 builtByCompiler);
+        diagnose(diag::module_interface_build_failed, isTypeChecking,
+                 moduleName, emittedByCompiler == builtByCompiler,
+                 emittedByCompiler, builtByCompiler);
       }
     };
 
@@ -208,7 +210,7 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     SubInstance.performSema();
     if (SubInstance.getASTContext().hadError()) {
       LLVM_DEBUG(llvm::dbgs() << "encountered errors\n");
-      return true;
+      return std::make_error_code(std::errc::not_supported);
     }
 
     SILOptions &SILOpts = subInvocation.getSILOptions();
@@ -217,7 +219,7 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     auto SILMod = performASTLowering(Mod, TC, SILOpts);
     if (!SILMod) {
       LLVM_DEBUG(llvm::dbgs() << "SILGen did not produce a module\n");
-      return true;
+      return std::make_error_code(std::errc::not_supported);
     }
 
     // Setup the callbacks for serialization, which can occur during the
@@ -237,11 +239,14 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     SmallVector<FileDependency, 16> Deps;
     bool serializeHashes = FEOpts.SerializeModuleInterfaceDependencyHashes;
     if (collectDepsForSerialization(SubInstance, Deps, serializeHashes)) {
-      return true;
+      return std::make_error_code(std::errc::not_supported);
     }
     if (ShouldSerializeDeps)
       SerializationOpts.Dependencies = Deps;
     SILMod->setSerializeSILAction([&]() {
+      if (isTypeChecking)
+        return;
+
       // We don't want to serialize module docs in the cache -- they
       // will be serialized beside the interface file.
       serializeToBuffers(Mod, SerializationOpts, ModuleBuffer,
@@ -253,9 +258,12 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     LLVM_DEBUG(llvm::dbgs() << "Running SIL processing passes\n");
     if (SubInstance.performSILProcessing(SILMod.get())) {
       LLVM_DEBUG(llvm::dbgs() << "encountered errors\n");
-      return true;
+      return std::make_error_code(std::errc::not_supported);
     }
-    return SubInstance.getDiags().hadAnyError();
+    if (SubInstance.getDiags().hadAnyError()) {
+      return std::make_error_code(std::errc::not_supported);
+    }
+    return std::error_code();
     });
   });
   return !RunSuccess || SubError;

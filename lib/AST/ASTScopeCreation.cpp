@@ -354,10 +354,10 @@ private:
   ASTScopeImpl *constructExpandAndInsert(ASTScopeImpl *parent, Args... args) {
     auto *child = new (ctx) Scope(args...);
     parent->addChild(child, ctx);
-    if (shouldBeLazy()) {
-      if (auto *ip = child->insertionPointForDeferredExpansion().getPtrOrNull())
-        return ip;
-    }
+
+    if (auto *ip = child->insertionPointForDeferredExpansion().getPtrOrNull())
+      return ip;
+
     ASTScopeImpl *insertionPoint =
         child->expandAndBeCurrentDetectingRecursion(*this);
     ASTScopeAssert(child->verifyThatThisNodeComeAfterItsPriorSibling(),
@@ -479,23 +479,6 @@ public:
   }
 
 public:
-  /// When ASTScopes are enabled for code completion,
-  /// IfConfigs will pose a challenge because we may need to field lookups into
-  /// the inactive clauses, but the AST contains redundancy: the active clause's
-  /// elements are present in the members or elements of an IterableTypeDecl or
-  /// BraceStmt alongside of the IfConfigDecl. In addition there are two more
-  /// complications:
-  ///
-  /// 1. The active clause's elements may be nested inside an init self
-  /// rebinding decl (as in StringObject.self).
-  ///
-  /// 2. The active clause may be before or after the inactive ones
-  ///
-  /// So, when encountering an IfConfigDecl, we will expand  the inactive
-  /// elements. Also, always sort members or elements so that the child scopes
-  /// are in source order (Just one of several reasons we need to sort.)
-  ///
-  static const bool includeInactiveIfConfigClauses = false;
 
 private:
   static std::vector<ASTNode> expandIfConfigClauses(ArrayRef<ASTNode> input) {
@@ -526,9 +509,6 @@ private:
               if (isa<IfConfigDecl>(d))
                 expandIfConfigClausesInto(expansion, {d}, true);
           }
-        } else if (includeInactiveIfConfigClauses) {
-          expandIfConfigClausesInto(expansion, clause.Elements,
-                                    /*isInAnActiveNode=*/false);
         }
       }
     }
@@ -666,8 +646,6 @@ public:
     return !n.isDecl(DeclKind::Var);
   }
 
-  bool shouldBeLazy() const { return ctx.LangOpts.LazyASTScopes; }
-
 public:
   /// For debugging. Return true if scope tree contains all the decl contexts in
   /// the AST May modify the scope tree in order to update obsolete scopes.
@@ -762,10 +740,6 @@ void ASTScope::
   impl->buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals();
 }
 
-bool ASTScope::areInactiveIfConfigClausesSupported() {
-  return ScopeCreator::includeInactiveIfConfigClauses;
-}
-
 void ASTScope::expandFunctionBody(AbstractFunctionDecl *AFD) {
   auto *const SF = AFD->getParentSourceFile();
   SF->getScope().expandFunctionBodyImpl(AFD);
@@ -795,7 +769,7 @@ void ASTSourceFileScope::
 void ASTSourceFileScope::expandFunctionBody(AbstractFunctionDecl *AFD) {
   if (!AFD)
     return;
-  auto sr = AFD->getBodySourceRange();
+  auto sr = AFD->getOriginalBodySourceRange();
   if (sr.isInvalid())
     return;
   ASTScopeImpl *bodyScope = findInnermostEnclosingScope(sr.Start, nullptr);
@@ -1110,8 +1084,6 @@ void ASTScopeImpl::disownDescendants(ScopeCreator &scopeCreator) {
 
 ASTScopeImpl *
 ASTScopeImpl::expandAndBeCurrentDetectingRecursion(ScopeCreator &scopeCreator) {
-  assert(scopeCreator.getASTContext().LangOpts.EnableASTScopeLookup &&
-         "Should not be getting here if ASTScopes are disabled");
   return evaluateOrDefault(scopeCreator.getASTContext().evaluator,
                            ExpandASTScopeRequest{this, &scopeCreator}, nullptr);
 }
@@ -1147,14 +1119,13 @@ ASTScopeImpl *ASTScopeImpl::expandAndBeCurrent(ScopeCreator &scopeCreator) {
     disownDescendants(scopeCreator);
 
   auto *insertionPoint = expandSpecifically(scopeCreator);
-  if (scopeCreator.shouldBeLazy()) {
-    ASTScopeAssert(!insertionPointForDeferredExpansion() ||
-                       insertionPointForDeferredExpansion().get() ==
-                           insertionPoint,
-                   "In order for lookups into lazily-expanded scopes to be "
-                   "accurate before expansion, the insertion point before "
-                   "expansion must be the same as after expansion.");
-  }
+  ASTScopeAssert(!insertionPointForDeferredExpansion() ||
+                     insertionPointForDeferredExpansion().get() ==
+                         insertionPoint,
+                 "In order for lookups into lazily-expanded scopes to be "
+                 "accurate before expansion, the insertion point before "
+                 "expansion must be the same as after expansion.");
+
   replaceASTAncestorScopes(astAncestorScopes);
   setWasExpanded();
   beCurrent();
@@ -1596,11 +1567,6 @@ ASTScopeImpl *GenericTypeOrExtensionWholePortion::expandScope(
   // Get now in case recursion emancipates scope
   auto *const ip = scope->getParent().get();
   
-  // Prevent circular request bugs caused by illegal input and
-  // doing lookups that getExtendedNominal in the midst of getExtendedNominal.
-  if (scope->shouldHaveABody() && !scope->doesDeclHaveABody())
-    return ip;
-
   auto *context = scope->getGenericContext();
   auto *genericParams = (isa<TypeAliasDecl>(context)
                          ? context->getParsedGenericParams()
@@ -1609,6 +1575,12 @@ ASTScopeImpl *GenericTypeOrExtensionWholePortion::expandScope(
       scope->getDecl(), genericParams, scope);
   if (context->getTrailingWhereClause())
     scope->createTrailingWhereClauseScope(deepestScope, scopeCreator);
+
+  // Prevent circular request bugs caused by illegal input and
+  // doing lookups that getExtendedNominal in the midst of getExtendedNominal.
+  if (scope->shouldHaveABody() && !scope->doesDeclHaveABody())
+    return ip;
+
   scope->createBodyScope(deepestScope, scopeCreator);
   return ip;
 }
@@ -2082,10 +2054,8 @@ public:
     //    catchForDebugging(D, "DictionaryBridging.swift", 694);
     if (const auto *dc = dyn_cast<DeclContext>(D))
       record(dc);
-    if (auto *icd = dyn_cast<IfConfigDecl>(D)) {
-      walkToClauses(icd);
+    if (isa<IfConfigDecl>(D))
       return false;
-    }
     if (auto *pd = dyn_cast<ParamDecl>(D))
       record(pd->getDefaultArgumentInitContext());
     else if (auto *pbd = dyn_cast<PatternBindingDecl>(D))
@@ -2103,18 +2073,6 @@ public:
   }
 
 private:
-  void walkToClauses(IfConfigDecl *icd) {
-    for (auto &clause : icd->getClauses()) {
-      // Generate scopes for any closures in the condition
-      if (ScopeCreator::includeInactiveIfConfigClauses && clause.isActive) {
-        if (clause.Cond)
-          clause.Cond->walk(*this);
-        for (auto n : clause.Elements)
-          n.walk(*this);
-      }
-    }
-  }
-
   void recordInitializers(PatternBindingDecl *pbd) {
     for (auto idx : range(pbd->getNumPatternEntries()))
       record(pbd->getInitContext(idx));

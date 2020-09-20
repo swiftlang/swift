@@ -1,0 +1,323 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=1 -arc-sequence-opts %s | %FileCheck %s
+sil_stage canonical
+
+import Builtin
+import Swift
+
+final class ChildCls {
+  var id: Int
+  init(_ i:Int)
+}
+struct S {
+  var child1 : ChildCls
+  var child2 : ChildCls
+  init()
+}
+class Cls {
+  var child1 : ChildCls
+  var child2 : ChildCls
+  init()
+}
+
+// CHECK-LABEL: sil hidden @$unmatched_rr_loop :
+// CHECK: bb0(%0 : $Cls):
+// CHECK:   strong_retain %0 : $Cls
+// CHECK: bb2:
+// CHECK:   strong_release %0 : $Cls
+// CHECK:   strong_release %0 : $Cls
+// CHECK-LABEL: } // end sil function '$unmatched_rr_loop'
+sil hidden @$unmatched_rr_loop : $@convention(thin) (@owned Cls) -> () {
+bb0(%0 : $Cls):
+  strong_retain %0 : $Cls
+  br bb1
+  
+bb1:
+  strong_release %0 : $Cls
+  strong_retain %0 : $Cls
+  cond_br undef, bb1, bb2
+  
+bb2:
+  strong_release %0 : $Cls
+  strong_release %0 : $Cls
+  %4 = tuple()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil hidden @$matched_rr_loop :
+// CHECK: bb0(%0 : $Cls):
+// CHECK-NOT:   strong_retain %0 : $Cls
+// CHECK: bb2:
+// CHECK-NEXT:   strong_release %0 : $Cls
+// CHECK-NEXT:   [[RET:%.*]] = tuple ()
+// CHECK-NEXT:   return [[RET]]
+// CHECK-LABEL: } // end sil function '$matched_rr_loop'
+sil hidden @$matched_rr_loop : $@convention(thin) (@owned Cls) -> () {
+bb0(%0 : $Cls):
+  strong_retain %0 : $Cls
+  br bb1
+  
+bb1:
+  strong_retain %0 : $Cls
+  strong_release %0 : $Cls
+  cond_br undef, bb1, bb2
+  
+bb2:
+  strong_release %0 : $Cls
+  strong_release %0 : $Cls
+  %4 = tuple()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil hidden @$unmatched_rr_aliasing_loop :
+// CHECK: bb0(%0 : $S, %1 : $ChildCls):
+// CHECK:   retain_value %0 : $S
+// CHECK: bb2:
+// CHECK:   release_value %0 : $S
+// CHECK:   release_value %0 : $S
+// CHECK-LABEL: } // end sil function '$unmatched_rr_aliasing_loop'
+sil hidden @$unmatched_rr_aliasing_loop : $@convention(thin) (@owned S, ChildCls) -> () {
+bb0(%0 : $S, %1 : $ChildCls):
+  retain_value %0 : $S
+  br bb1
+
+bb1:
+  strong_release %1 : $ChildCls
+  strong_retain %1 : $ChildCls
+  cond_br undef, bb1, bb2
+
+bb2:
+  release_value %0 : $S
+  release_value %0 : $S
+  %ret = tuple()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil hidden @$matched_rr_aliasing_loop :
+// CHECK: bb0(%0 : $S, %1 : $ChildCls):
+// CHECK-NOT:   retain_value %0 : $S
+// CHECK: bb2:
+// CHECK-NEXT:   release_value %0 : $S
+// CHECK-NEXT:   [[RET:%.*]] = tuple ()
+// CHECK-NEXT:   return [[RET]]
+// CHECK-LABEL: } // end sil function '$matched_rr_aliasing_loop'
+sil hidden @$matched_rr_aliasing_loop : $@convention(thin) (@owned S, ChildCls) -> () {
+bb0(%0 : $S, %1 : $ChildCls):
+  retain_value %0 : $S
+  br bb1
+
+bb1:
+  strong_retain %1 : $ChildCls
+  strong_release %1 : $ChildCls
+  cond_br undef, bb1, bb2
+
+bb2:
+  release_value %0 : $S
+  release_value %0 : $S
+  %ret = tuple()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil hidden @$unmatched_rr_subobject_loop :
+// CHECK: bb0(%0 : $Cls):
+// CHECK:   retain_value %0 : $Cls
+// CHECK: bb2:
+// CHECK:   release_value %0 : $Cls
+// CHECK:   release_value %0 : $Cls
+// CHECK-LABEL: } // end sil function '$unmatched_rr_subobject_loop'
+sil hidden @$unmatched_rr_subobject_loop : $@convention(thin) (@owned Cls) -> () {
+bb0(%0 : $Cls):
+  retain_value %0 : $Cls
+  br bb1
+
+bb1:
+  %1 = ref_element_addr %0 : $Cls, #Cls.child1
+  %2 = load %1 : $*ChildCls
+  strong_release %2 : $ChildCls
+  strong_retain %2 : $ChildCls
+  cond_br undef, bb1, bb2
+
+bb2:
+  release_value %0 : $Cls
+  release_value %0 : $Cls
+  %ret = tuple()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil hidden @$matched_rr_subobject_loop :
+// CHECK: bb0(%0 : $Cls):
+// CHECK-NOT:   retain_value %0 : $Cls
+// CHECK: bb2:
+// CHECK-NEXT:   release_value %0 : $Cls
+// CHECK-NEXT:   [[RET:%.*]] = tuple ()
+// CHECK-NEXT:   return [[RET]]
+// CHECK-LABEL: } // end sil function '$matched_rr_subobject_loop'
+sil hidden @$matched_rr_subobject_loop : $@convention(thin) (@owned Cls) -> () {
+bb0(%0 : $Cls):
+  retain_value %0 : $Cls
+  br bb1
+
+bb1:
+  %1 = ref_element_addr %0 : $Cls, #Cls.child1
+  %2 = load %1 : $*ChildCls
+  strong_retain %2 : $ChildCls
+  strong_release %2 : $ChildCls
+  cond_br undef, bb1, bb2
+
+bb2:
+  release_value %0 : $Cls
+  release_value %0 : $Cls
+  %ret = tuple()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil hidden @$unmatched_rr_subobject_nested_knownsafety_loop :
+// CHECK: bb0(%0 : $S):
+// CHECK:   retain_value %0 : $S
+// CHECK:   retain_value %0 : $S
+// CHECK: bb2:
+// CHECK:   release_value %0 : $S
+// CHECK:   release_value %0 : $S
+// CHECK:   release_value %0 : $S
+// CHECK-LABEL: } // end sil function '$unmatched_rr_subobject_nested_knownsafety_loop'
+sil hidden @$unmatched_rr_subobject_nested_knownsafety_loop : $@convention(thin) (@owned S) -> () {
+bb0(%0 : $S):
+  retain_value %0 : $S
+  retain_value %0 : $S
+  br bb1
+
+bb1:
+  %1 = struct_extract %0 : $S, #S.child1
+  strong_release %1 : $ChildCls
+  strong_retain %1 : $ChildCls
+  cond_br undef, bb1, bb2
+
+bb2:
+  release_value %0 : $S
+  release_value %0 : $S
+  release_value %0 : $S
+  %ret = tuple()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil hidden @$unmatched_rr_loop_early_exit :
+// CHECK: bb1
+// CHECK:   strong_release %0 : $Cls
+// CHECK:   cond_br undef, bb3, bb2
+// CHECK: bb3:
+// CHECK:   strong_retain %0 : $Cls
+// CHECK:   cond_br undef, bb1, bb4
+// CHECK-LABEL: } // end sil function '$unmatched_rr_loop_early_exit'
+sil hidden @$unmatched_rr_loop_early_exit : $@convention(thin) (@owned Cls) -> () {
+bb0(%0 : $Cls):
+  strong_retain %0 : $Cls
+  br bb1
+  
+bb1:
+  strong_release %0 : $Cls
+  cond_br undef, bb2, bb3
+
+bb2:
+  strong_retain %0 : $Cls
+  cond_br undef, bb1, bb3
+  
+bb3:
+  strong_release %0 : $Cls
+  strong_release %0 : $Cls
+  %4 = tuple()
+  return %4 : $()
+}
+
+// This case does not get optimized by KnownSafety as well.
+// This is because the ref count state gets cleared due to non local successors while merging successors of bb1.
+// So the retain/release within the loop do not get matched. And KnownSafety outside the loop gets cleared.
+// CHECK-LABEL: sil hidden @$matched_rr_loop_early_exit :
+// CHECK: bb1
+// CHECK:   strong_retain %0 : $Cls
+// CHECK:   cond_br undef, bb3, bb2
+// CHECK: bb3:
+// CHECK:   strong_release %0 : $Cls
+// CHECK:   cond_br undef, bb1, bb4
+// CHECK-LABEL: } // end sil function '$matched_rr_loop_early_exit'
+sil hidden @$matched_rr_loop_early_exit : $@convention(thin) (@owned Cls) -> () {
+bb0(%0 : $Cls):
+  strong_retain %0 : $Cls
+  br bb1
+  
+bb1:
+  strong_retain %0 : $Cls
+  cond_br undef, bb2, bb3
+
+bb2:
+  strong_release %0 : $Cls
+  cond_br undef, bb1, bb3
+  
+bb3:
+  strong_release %0 : $Cls
+  strong_release %0 : $Cls
+  %4 = tuple()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil hidden @$unmatched_rr_loop_early_exit_allowsleaks :
+// CHECK: bb1
+// CHECK:   strong_release %0 : $Cls
+// CHECK:   cond_br undef, bb2, bb3
+// CHECK: bb2:
+// CHECK:   strong_retain %0 : $Cls
+// CHECK:   cond_br undef, bb1, bb4
+// CHECK-LABEL: } // end sil function '$unmatched_rr_loop_early_exit_allowsleaks'
+sil hidden @$unmatched_rr_loop_early_exit_allowsleaks : $@convention(thin) (@owned Cls) -> () {
+bb0(%0 : $Cls):
+  strong_retain %0 : $Cls
+  br bb1
+  
+bb1:
+  strong_release %0 : $Cls
+  cond_br undef, bb2, bb3
+
+bb2:
+  strong_retain %0 : $Cls
+  cond_br undef, bb1, bb4
+  
+bb3:
+  unreachable
+
+bb4:
+  strong_release %0 : $Cls
+  strong_release %0 : $Cls
+  %4 = tuple()
+  return %4 : $()
+}
+
+// Unlike $matched_rr_loop_early_exit this case gets optimized due to KnownSafety
+// Since AllowsLeaks is set, we do not clear ref count state on seeing the non local successor in bb1
+// CHECK-LABEL: sil hidden @$matched_rr_loop_early_exit_allowsleaks :
+// CHECK: bb1
+// CHECK-NOT:   strong_release %0 : $Cls
+// CHECK:   cond_br undef, bb2, bb3
+// CHECK: bb2:
+// CHECK-NOT:   strong_retain %0 : $Cls
+// CHECK:   cond_br undef, bb1, bb4
+// CHECK-LABEL: } // end sil function '$matched_rr_loop_early_exit_allowsleaks'
+sil hidden @$matched_rr_loop_early_exit_allowsleaks : $@convention(thin) (@owned Cls) -> () {
+bb0(%0 : $Cls):
+  strong_retain %0 : $Cls
+  br bb1
+  
+bb1:
+  strong_retain %0 : $Cls
+  cond_br undef, bb2, bb3
+
+bb2:
+  strong_release %0 : $Cls
+  cond_br undef, bb1, bb4
+  
+bb3:
+  unreachable
+
+bb4:
+  strong_release %0 : $Cls
+  strong_release %0 : $Cls
+  %4 = tuple()
+  return %4 : $()
+}

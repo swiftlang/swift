@@ -264,7 +264,7 @@
 ///     let colors = ["periwinkle", "rose", "moss"]
 ///     let moreColors: [String?] = ["ochre", "pine"]
 ///
-///     let url = NSURL(fileURLWithPath: "names.plist")
+///     let url = URL(fileURLWithPath: "names.plist")
 ///     (colors as NSArray).write(to: url, atomically: true)
 ///     // true
 ///
@@ -852,14 +852,14 @@ extension Array: RangeReplaceableCollection {
   /// `LazyMapCollection<Dictionary<String, Int>, Int>` to a simple
   /// `[String]`.
   ///
-  ///     func cacheImagesWithNames(names: [String]) {
+  ///     func cacheImages(withNames names: [String]) {
   ///         // custom image loading and caching
   ///      }
   ///
   ///     let namedHues: [String: Int] = ["Vermillion": 18, "Magenta": 302,
   ///             "Gold": 50, "Cerise": 320]
   ///     let colorNames = Array(namedHues.keys)
-  ///     cacheImagesWithNames(colorNames)
+  ///     cacheImages(withNames: colorNames)
   ///
   ///     print(colorNames)
   ///     // Prints "["Gold", "Cerise", "Magenta", "Vermillion"]"

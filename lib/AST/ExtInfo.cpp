@@ -19,6 +19,18 @@
 
 #include "clang/AST/Type.h"
 
+static void assertIsFunctionType(const clang::Type *type) {
+#ifndef NDEBUG
+  if (!(type->isFunctionPointerType() || type->isBlockPointerType() ||
+        type->isFunctionReferenceType())) {
+    llvm::errs() << "Expected a Clang function type wrapped in a pointer type "
+                 << "or a block pointer type but found:\n";
+    type->dump();
+    llvm_unreachable("\nUnexpected Clang type when creating ExtInfo!");
+  }
+#endif
+}
+
 namespace swift {
 
 // MARK: - ClangTypeInfo
@@ -43,9 +55,10 @@ void ClangTypeInfo::printType(ClangModuleLoader *cml,
   cml->printClangType(type, os);
 }
 
-void ClangTypeInfo::dump(llvm::raw_ostream &os) const {
+void ClangTypeInfo::dump(llvm::raw_ostream &os,
+                         const clang::ASTContext &ctx) const {
   if (type) {
-    type->dump(os);
+    type->dump(os, ctx);
   } else {
     os << "<nullptr>";
   }
@@ -53,23 +66,12 @@ void ClangTypeInfo::dump(llvm::raw_ostream &os) const {
 
 // MARK: - ASTExtInfoBuilder
 
-void ASTExtInfoBuilder::assertIsFunctionType(const clang::Type *type) {
-#ifndef NDEBUG
-  if (!(type->isFunctionPointerType() || type->isBlockPointerType() ||
-        type->isFunctionReferenceType())) {
-    SmallString<256> buf;
-    llvm::raw_svector_ostream os(buf);
-    os << "Expected a Clang function type wrapped in a pointer type or "
-       << "a block pointer type but found:\n";
-    type->dump(os);
-    llvm_unreachable(os.str().data());
-  }
-#endif
-  return;
-}
-
 void ASTExtInfoBuilder::checkInvariants() const {
-  // TODO: Add validation checks here while making sure things don't blow up.
+  // TODO: [clang-function-type-serialization] Once we start serializing
+  // the Clang type, we should also assert that the pointer is non-null.
+  auto Rep = Representation(bits & RepresentationMask);
+  if ((Rep == Representation::CFunctionPointer) && clangTypeInfo.type)
+    assertIsFunctionType(clangTypeInfo.type);
 }
 
 // MARK: - ASTExtInfo

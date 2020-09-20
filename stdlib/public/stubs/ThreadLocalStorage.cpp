@@ -54,43 +54,19 @@ _stdlib_thread_key_create(__swift_thread_key_t * _Nonnull key,
 
 #endif
 
-#if defined(__wasi__)
-#include <map>
-using __swift_thread_key_destructor = void (*)(void *);
+#if defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
 
-struct _stdlib_tls_element_t {
-  const void *value;
-  __swift_thread_key_destructor destructor;
-};
-
-using _stdlib_tls_map_t = std::map<__swift_thread_key_t, _stdlib_tls_element_t>;
-static void *_stdlib_tls_map;
-
-static inline int _stdlib_thread_key_create(__swift_thread_key_t *key,
-                          __swift_thread_key_destructor destructor) {
-  if (!_stdlib_tls_map)
-      _stdlib_tls_map = new _stdlib_tls_map_t();
-  auto *map = (_stdlib_tls_map_t *)_stdlib_tls_map;
-  *key = map->size();
-  _stdlib_tls_element_t element = { nullptr, destructor };
-  map->insert(std::make_pair(*key, element));
-  return 0;
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void *
+_swift_stdlib_threadLocalStorageGet(void) {
+  static void *value;
+  if (!value) {
+    value = _stdlib_createTLS();
+  }
+  return value;
 }
 
-static inline void *_stdlib_thread_getspecific(__swift_thread_key_t key) {
-  auto *map = (_stdlib_tls_map_t *)_stdlib_tls_map;
-  return const_cast<void *>(map->operator[](key).value);
-}
-
-static inline int _stdlib_thread_setspecific(__swift_thread_key_t key, const void *value) {
-  auto *map = (_stdlib_tls_map_t *)_stdlib_tls_map;
-  map->operator[](key).value = value;
-  return 0;
-}
-
-#endif
-
-#if SWIFT_TLS_HAS_RESERVED_PTHREAD_SPECIFIC
+#elif SWIFT_TLS_HAS_RESERVED_PTHREAD_SPECIFIC
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 void *

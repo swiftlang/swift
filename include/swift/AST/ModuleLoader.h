@@ -24,6 +24,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "swift/AST/ModuleDependencies.h"
+#include <system_error>
 
 namespace llvm {
 class FileCollector;
@@ -103,17 +104,18 @@ struct SubCompilerInstanceInfo {
 
 /// Abstract interface to run an action in a sub ASTContext.
 struct InterfaceSubContextDelegate {
-  virtual bool runInSubContext(StringRef moduleName,
-                               StringRef interfacePath,
-                               StringRef outputPath,
-                               SourceLoc diagLoc,
-  llvm::function_ref<bool(ASTContext&, ModuleDecl*, ArrayRef<StringRef>,
-                          ArrayRef<StringRef>, StringRef)> action) = 0;
-  virtual bool runInSubCompilerInstance(StringRef moduleName,
-                                        StringRef interfacePath,
-                                        StringRef outputPath,
-                                        SourceLoc diagLoc,
-                    llvm::function_ref<bool(SubCompilerInstanceInfo&)> action) = 0;
+  virtual std::error_code runInSubContext(StringRef moduleName,
+                                          StringRef interfacePath,
+                                          StringRef outputPath,
+                                          SourceLoc diagLoc,
+    llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*,
+                                       ArrayRef<StringRef>,
+                                       ArrayRef<StringRef>, StringRef)> action) = 0;
+  virtual std::error_code runInSubCompilerInstance(StringRef moduleName,
+                                                   StringRef interfacePath,
+                                                   StringRef outputPath,
+                                                   SourceLoc diagLoc,
+    llvm::function_ref<std::error_code(SubCompilerInstanceInfo&)> action) = 0;
 
   virtual ~InterfaceSubContextDelegate() = default;
 };

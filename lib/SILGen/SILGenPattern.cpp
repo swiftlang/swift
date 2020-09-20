@@ -1038,20 +1038,35 @@ void PatternMatchEmission::emitDispatch(ClauseMatrix &clauses, ArgArray args,
         SGF.eraseBasicBlock(contBB);
         return;
       }
-      
+
       // Otherwise, if there is no fallthrough, then the next row is
-      // unreachable: emit a dead code diagnostic.
+      // unreachable: emit a dead code diagnostic if:
+      // 1) It's for a 'default' case (since Space Engine already handles
+      //    unreachable enum case patterns) or it's for a enum case which
+      //    has expression patterns since redundancy checking for such
+      //    patterns isn't sufficiently done by the Space Engine.
+      // 2) It's for a case statement in a do-catch.
       if (!clauses[firstRow].hasFallthroughTo()) {
         SourceLoc Loc;
         bool isDefault = false;
+        bool isParentDoCatch = false;
+        bool caseHasExprPattern = false;
         if (auto *S = clauses[firstRow].getClientData<Stmt>()) {
           Loc = S->getStartLoc();
-          if (auto *CS = dyn_cast<CaseStmt>(S))
+          if (auto *CS = dyn_cast<CaseStmt>(S)) {
+            caseHasExprPattern = llvm::any_of(
+                CS->getCaseLabelItems(), [&](const CaseLabelItem item) {
+                  return item.getPattern()->getKind() == PatternKind::Expr;
+                });
+            isParentDoCatch = CS->getParentKind() == CaseParentKind::DoCatch;
             isDefault = CS->isDefault();
+          }
         } else {
           Loc = clauses[firstRow].getCasePattern()->getStartLoc();
         }
-        SGF.SGM.diagnose(Loc, diag::unreachable_case, isDefault);
+        if (isParentDoCatch || isDefault || caseHasExprPattern) {
+          SGF.SGM.diagnose(Loc, diag::unreachable_case, isDefault);
+        }
       }
     }
   }

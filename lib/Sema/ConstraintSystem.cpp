@@ -562,21 +562,7 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
   }
 
   if (auto *UME = getAsExpr<UnresolvedMemberExpr>(anchor)) {
-    auto *calleeLoc =
-        getConstraintLocator(UME, ConstraintLocator::UnresolvedMember);
-
-    // Handle special cases for applies of non-function types.
-    // FIXME: Consider re-designing the AST such that an unresolved member expr
-    // with arguments uses a CallExpr, which would make this logic unnecessary
-    // and clean up a bunch of other special cases. Doing so may require a bit
-    // of hacking in CSGen though.
-    if (UME->hasArguments()) {
-      if (auto overload = getOverloadFor(calleeLoc)) {
-        if (auto *loc = getSpecialFnCalleeLoc(overload->boundType))
-          return loc;
-      }
-    }
-    return calleeLoc;
+    return getConstraintLocator(UME, ConstraintLocator::UnresolvedMember);
   }
 
   if (isExpr<MemberRefExpr>(anchor))
@@ -970,7 +956,7 @@ getPropertyWrapperInformationFromOverload(
 }
 
 Optional<std::pair<VarDecl *, Type>>
-ConstraintSystem::getStorageWrapperInformation(
+ConstraintSystem::getPropertyWrapperProjectionInfo(
     SelectedOverload resolvedOverload) {
   return getPropertyWrapperInformationFromOverload(
       resolvedOverload, DC,
@@ -978,12 +964,12 @@ ConstraintSystem::getStorageWrapperInformation(
         if (!decl->hasAttachedPropertyWrapper())
           return None;
 
-        auto storageWrapper = decl->getPropertyWrapperStorageWrapper();
-        if (!storageWrapper)
+        auto projectionVar = decl->getPropertyWrapperProjectionVar();
+        if (!projectionVar)
           return None;
 
-        return std::make_pair(storageWrapper,
-                              storageWrapper->getInterfaceType());
+        return std::make_pair(projectionVar,
+                              projectionVar->getInterfaceType());
       });
 }
 
@@ -2617,11 +2603,13 @@ Type ConstraintSystem::simplifyTypeImpl(Type type,
           // there will be a missing conformance fix applied in diagnostic mode,
           // so the concrete dependent member type is considered a "hole" in
           // order to continue solving.
+          auto memberTy = DependentMemberType::get(lookupBaseType, assocType);
           if (shouldAttemptFixes() &&
-              getPhase() == ConstraintSystemPhase::Solving)
-            return getASTContext().TheUnresolvedType;
+              getPhase() == ConstraintSystemPhase::Solving) {
+            return HoleType::get(getASTContext(), memberTy);
+          }
 
-          return DependentMemberType::get(lookupBaseType, assocType);
+          return memberTy;
         }
 
         auto subs = SubstitutionMap::getProtocolSubstitutions(
@@ -2653,16 +2641,23 @@ Type ConstraintSystem::simplifyType(Type type) const {
 }
 
 Type Solution::simplifyType(Type type) const {
-  if (!type->hasTypeVariable())
+  if (!(type->hasTypeVariable() || type->hasHole()))
     return type;
 
   // Map type variables to fixed types from bindings.
-  return getConstraintSystem().simplifyTypeImpl(type,
-      [&](TypeVariableType *tvt) -> Type {
-        auto known = typeBindings.find(tvt);
-        assert(known != typeBindings.end());
-        return known->second;
-      });
+  auto &cs = getConstraintSystem();
+  auto resolvedType = cs.simplifyTypeImpl(
+      type, [&](TypeVariableType *tvt) -> Type { return getFixedType(tvt); });
+
+  // Holes shouldn't be reachable through a solution, they are only
+  // useful to determine what went wrong exactly.
+  if (resolvedType->hasHole()) {
+    return resolvedType.transform([&](Type type) {
+      return type->isHole() ? Type(cs.getASTContext().TheUnresolvedType) : type;
+    });
+  }
+
+  return resolvedType;
 }
 
 size_t Solution::getTotalMemory() const {
@@ -3153,9 +3148,7 @@ static bool diagnoseAmbiguityWithContextualType(
 
       auto type = solution.simplifyType(overload.boundType);
 
-      if (isExpr<ApplyExpr>(anchor) || isExpr<SubscriptExpr>(anchor) ||
-          (isExpr<UnresolvedMemberExpr>(anchor) &&
-           castToExpr<UnresolvedMemberExpr>(anchor)->hasArguments())) {
+      if (isExpr<ApplyExpr>(anchor) || isExpr<SubscriptExpr>(anchor)) {
         auto fnType = type->castTo<FunctionType>();
         DE.diagnose(
             loc, diag::cannot_convert_candidate_result_to_contextual_type,
@@ -3665,11 +3658,6 @@ void constraints::simplifyLocator(ASTNode &anchor,
         continue;
       }
 
-      if (auto *UME = getAsExpr<UnresolvedMemberExpr>(anchor)) {
-        anchor = UME->getArgument();
-        path = path.slice(1);
-        continue;
-      }
       break;
     }
 
@@ -3679,6 +3667,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
     }
 
     case ConstraintLocator::ApplyFunction:
+    case ConstraintLocator::FunctionResult:
       // Extract application function.
       if (auto applyExpr = getAsExpr<ApplyExpr>(anchor)) {
         anchor = applyExpr->getFn();
@@ -3691,15 +3680,6 @@ void constraints::simplifyLocator(ASTNode &anchor,
         anchor = subscriptExpr;
         path = path.slice(1);
         continue;
-      }
-
-      // The unresolved member itself is the function.
-      if (auto unresolvedMember = getAsExpr<UnresolvedMemberExpr>(anchor)) {
-        if (unresolvedMember->getArgument()) {
-          anchor = unresolvedMember;
-          path = path.slice(1);
-          continue;
-        }
       }
 
       break;
@@ -3858,6 +3838,13 @@ void constraints::simplifyLocator(ASTNode &anchor,
       break;
     }
 
+    case ConstraintLocator::UnresolvedMemberChainResult: {
+      auto *resultExpr = castToExpr<UnresolvedMemberChainResultExpr>(anchor);
+      anchor = resultExpr->getSubExpr();
+      path = path.slice(1);
+      continue;
+    }
+
     default:
       // FIXME: Lots of other cases to handle.
       break;
@@ -3890,8 +3877,6 @@ Expr *constraints::getArgumentExpr(ASTNode node, unsigned index) {
   Expr *argExpr = nullptr;
   if (auto *AE = dyn_cast<ApplyExpr>(expr))
     argExpr = AE->getArg();
-  else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(expr))
-    argExpr = UME->getArgument();
   else if (auto *SE = dyn_cast<SubscriptExpr>(expr))
     argExpr = SE->getIndex();
   else
@@ -4646,7 +4631,7 @@ SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
   // Determine the contextual type for the initialization.
   TypeLoc contextualType;
   if (!(isa<OptionalSomePattern>(pattern) && !pattern->isImplicit()) &&
-      patternType && !patternType->isHole()) {
+      patternType && !patternType->is<UnresolvedType>()) {
     contextualType = TypeLoc::withoutLoc(patternType);
 
     // Only provide a TypeLoc if it makes sense to allow diagnostics.

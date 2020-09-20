@@ -188,27 +188,12 @@ inline TypeCheckExprOptions operator|(TypeCheckExprFlags flag1,
 enum class NameLookupFlags {
   /// Whether we know that this lookup is always a private dependency.
   KnownPrivate = 0x01,
-  /// Whether name lookup should be able to find protocol members.
-  ProtocolMembers = 0x02,
-  /// Whether we should map the requirement to the witness if we
-  /// find a protocol member and the base type is a concrete type.
-  ///
-  /// If this is not set but ProtocolMembers is set, we will
-  /// find protocol extension members, but not protocol requirements
-  /// that do not yet have a witness (such as inferred associated
-  /// types, or witnesses for derived conformances).
-  PerformConformanceCheck = 0x04,
-  /// Whether to perform 'dynamic' name lookup that finds @objc
-  /// members of any class or protocol.
-  DynamicLookup = 0x08,
   /// Whether to ignore access control for this lookup, allowing inaccessible
   /// results to be returned.
   IgnoreAccessControl = 0x10,
   /// Whether to include results from outside the innermost scope that has a
   /// result.
   IncludeOuterResults = 0x20,
-  /// Whether to consider synonyms declared through @_implements().
-  IncludeAttributeImplements = 0x40,
 };
 
 /// A set of options that control name lookup.
@@ -220,24 +205,13 @@ inline NameLookupOptions operator|(NameLookupFlags flag1,
 }
 
 /// Default options for member name lookup.
-const NameLookupOptions defaultMemberLookupOptions
-  = NameLookupFlags::ProtocolMembers |
-    NameLookupFlags::PerformConformanceCheck;
-
-/// Default options for constructor lookup.
-const NameLookupOptions defaultConstructorLookupOptions
-  = NameLookupFlags::ProtocolMembers |
-    NameLookupFlags::PerformConformanceCheck;
+const NameLookupOptions defaultMemberLookupOptions;
 
 /// Default options for member type lookup.
-const NameLookupOptions defaultMemberTypeLookupOptions
-  = NameLookupFlags::ProtocolMembers |
-    NameLookupFlags::PerformConformanceCheck;
+const NameLookupOptions defaultMemberTypeLookupOptions;
 
 /// Default options for unqualified name lookup.
-const NameLookupOptions defaultUnqualifiedLookupOptions
-  = NameLookupFlags::ProtocolMembers |
-    NameLookupFlags::PerformConformanceCheck;
+const NameLookupOptions defaultUnqualifiedLookupOptions;
 
 /// Describes the result of comparing two entities, of which one may be better
 /// or worse than the other, or they are unordered.
@@ -315,7 +289,11 @@ Type getOptionalType(SourceLoc loc, Type elementType);
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
 /// returning the resultant expression.  Context is the DeclContext used
 /// for the lookup.
-Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context);
+///
+/// \param replaceInvalidRefsWithErrors Indicates whether it's allowed
+/// to replace any discovered invalid member references with `ErrorExpr`.
+Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
+                         bool replaceInvalidRefsWithErrors);
 
 /// Check for unsupported protocol types in the given declaration.
 void checkUnsupportedProtocolType(Decl *decl);
@@ -600,6 +578,11 @@ RequirementCheckResult checkGenericArguments(
     TypeArrayView<GenericTypeParamType> genericParams,
     ArrayRef<Requirement> requirements, TypeSubstitutionFn substitutions,
     SubstOptions options = None);
+
+bool checkContextualRequirements(GenericTypeDecl *decl,
+                                 Type parentTy,
+                                 SourceLoc loc,
+                                 DeclContext *dc);
 
 /// Add any implicitly-defined constructors required for the given
 /// struct or class.
@@ -936,17 +919,6 @@ LookupTypeResult
 lookupMemberType(DeclContext *dc, Type type, DeclNameRef name,
                  NameLookupOptions options = defaultMemberTypeLookupOptions);
 
-/// Look up the constructors of the given type.
-///
-/// \param dc The context that needs the constructor.
-/// \param type The type for which we will look for constructors.
-/// \param options Options that control name lookup.
-///
-/// \returns the constructors found for this type.
-LookupResult lookupConstructors(
-    DeclContext *dc, Type type,
-    NameLookupOptions options = defaultConstructorLookupOptions);
-
 /// Given an expression that's known to be an infix operator,
 /// look up its precedence group.
 PrecedenceGroupDecl *lookupPrecedenceGroupForInfixOperator(DeclContext *dc,
@@ -955,9 +927,18 @@ PrecedenceGroupDecl *lookupPrecedenceGroupForInfixOperator(DeclContext *dc,
 PrecedenceGroupLookupResult
 lookupPrecedenceGroup(DeclContext *dc, Identifier name, SourceLoc nameLoc);
 
+enum class UnsupportedMemberTypeAccessKind : uint8_t {
+  None,
+  TypeAliasOfUnboundGeneric,
+  TypeAliasOfExistential,
+  AssociatedTypeOfUnboundGeneric,
+  AssociatedTypeOfExistential
+};
+
 /// Check whether the given declaration can be written as a
 /// member of the given base type.
-bool isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl);
+UnsupportedMemberTypeAccessKind
+isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl);
 
 /// @}
 
@@ -1147,11 +1128,11 @@ void diagnoseIfDeprecated(SourceRange SourceRange,
 void checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name);
 
 /// Check error handling in the given type-checked top-level code.
-void checkTopLevelErrorHandling(TopLevelCodeDecl *D);
-void checkFunctionErrorHandling(AbstractFunctionDecl *D);
-void checkInitializerErrorHandling(Initializer *I, Expr *E);
-void checkEnumElementErrorHandling(EnumElementDecl *D, Expr *expr);
-void checkPropertyWrapperErrorHandling(PatternBindingDecl *binding,
+void checkTopLevelEffects(TopLevelCodeDecl *D);
+void checkFunctionEffects(AbstractFunctionDecl *D);
+void checkInitializerEffects(Initializer *I, Expr *E);
+void checkEnumElementEffects(EnumElementDecl *D, Expr *expr);
+void checkPropertyWrapperEffects(PatternBindingDecl *binding,
                                        Expr *expr);
 
 /// If an expression references 'self.init' or 'super.init' in an
@@ -1235,6 +1216,18 @@ bool requirePointerArgumentIntrinsics(ASTContext &ctx, SourceLoc loc);
 /// Require that the library intrinsics for creating
 /// array literals exist.
 bool requireArrayLiteralIntrinsics(ASTContext &ctx, SourceLoc loc);
+
+/// Gets the \c UnresolvedMemberExpr at the base of a chain of member accesses.
+/// If \c expr is not part of a member chain or the base is something other than
+/// an \c UnresolvedMemberExpr, \c nullptr is returned.
+UnresolvedMemberExpr *getUnresolvedMemberChainBase(Expr *expr);
+
+/// Checks whether a function builder type has a well-formed function builder
+/// method with the given name. If provided and non-empty, the argument labels
+/// are verified against any candidates.
+bool typeSupportsBuilderOp(Type builderType, DeclContext *dc, Identifier fnName,
+                           ArrayRef<Identifier> argLabels = {},
+                           SmallVectorImpl<ValueDecl *> *allResults = nullptr);
 }; // namespace TypeChecker
 
 /// Temporary on-stack storage and unescaping for encoded diagnostic
@@ -1390,6 +1383,10 @@ void checkUnknownAttrRestrictions(
 /// let vs. var. This function does not perform any of that validation, leaving
 /// it to later stages.
 void bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *stmt);
+
+/// Add notes suggesting the addition of 'async' or '@asyncHandler', as
+/// appropriate, to a diagnostic for a function that isn't an async context.
+void addAsyncNotes(FuncDecl *func);
 
 } // end namespace swift
 

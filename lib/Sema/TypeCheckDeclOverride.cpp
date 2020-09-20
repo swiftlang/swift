@@ -1169,7 +1169,8 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
       // Private migration help for overrides of Objective-C methods.
       TypeLoc resultTL;
       if (auto *methodAsFunc = dyn_cast<FuncDecl>(method))
-        resultTL = methodAsFunc->getBodyResultTypeLoc();
+        resultTL = TypeLoc(methodAsFunc->getResultTypeRepr(),
+                           methodAsFunc->getResultInterfaceType());
 
       emittedMatchError |= diagnoseMismatchedOptionals(
           method, method->getParameters(), resultTL, baseDecl,
@@ -1197,9 +1198,11 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
       emittedMatchError = true;
 
     } else if (mayHaveMismatchedOptionals) {
+      TypeLoc elementTL(subscript->getElementTypeRepr(),
+                        subscript->getElementInterfaceType());
       emittedMatchError |= diagnoseMismatchedOptionals(
           subscript, subscript->getIndices(),
-          subscript->getElementTypeLoc(), baseDecl,
+          elementTL, baseDecl,
           cast<SubscriptDecl>(baseDecl)->getIndices(), owningTy,
           mayHaveMismatchedOptionals);
     }
@@ -1416,6 +1419,7 @@ namespace  {
     UNINTERESTING_ATTR(AccessControl)
     UNINTERESTING_ATTR(Alignment)
     UNINTERESTING_ATTR(AlwaysEmitIntoClient)
+    UNINTERESTING_ATTR(AsyncHandler)
     UNINTERESTING_ATTR(Borrowed)
     UNINTERESTING_ATTR(CDecl)
     UNINTERESTING_ATTR(Consuming)

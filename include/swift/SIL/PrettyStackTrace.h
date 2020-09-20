@@ -39,7 +39,7 @@ public:
   PrettyStackTraceSILLocation(const char *action, SILLocation loc,
                               ASTContext &C)
     : Loc(loc), Action(action), Context(C) {}
-  virtual void print(llvm::raw_ostream &OS) const;
+  virtual void print(llvm::raw_ostream &OS) const override;
 };
 
 
@@ -62,7 +62,7 @@ public:
   PrettyStackTraceSILFunction(llvm::Twine &&twine, const SILFunction *func)
       : func(func), data(), action(twine.toNullTerminatedStringRef(data)) {}
 
-  virtual void print(llvm::raw_ostream &os) const;
+  virtual void print(llvm::raw_ostream &os) const override;
 
 protected:
   void printFunctionInfo(llvm::raw_ostream &out) const;
@@ -77,7 +77,7 @@ public:
   PrettyStackTraceSILNode(const char *action, const SILNode *node)
     : Node(node), Action(action) {}
 
-  virtual void print(llvm::raw_ostream &OS) const;
+  virtual void print(llvm::raw_ostream &OS) const override;
 };
 
 } // end namespace swift

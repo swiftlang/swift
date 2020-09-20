@@ -20,7 +20,6 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticSuppression.h"
-#include "swift/AST/LocalizationFormat.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrintOptions.h"
@@ -28,6 +27,7 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Config.h"
+#include "swift/Localization/LocalizationFormat.h"
 #include "swift/Parse/Lexer.h" // bad dependency
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
@@ -1010,8 +1010,9 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
     emitDiagnostic(childNote);
 }
 
-const char *DiagnosticEngine::diagnosticStringFor(const DiagID id,
-                                                  bool printDiagnosticName) {
+llvm::StringRef
+DiagnosticEngine::diagnosticStringFor(const DiagID id,
+                                      bool printDiagnosticName) {
   // TODO: Print diagnostic names from `localization`.
   if (printDiagnosticName) {
     return debugDiagnosticStrings[(unsigned)id];
@@ -1020,7 +1021,7 @@ const char *DiagnosticEngine::diagnosticStringFor(const DiagID id,
   if (localization) {
     auto localizedMessage =
         localization.get()->getMessageOr(id, defaultMessage);
-    return localizedMessage.data();
+    return localizedMessage;
   }
   return defaultMessage;
 }

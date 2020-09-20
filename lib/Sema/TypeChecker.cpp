@@ -215,11 +215,17 @@ void swift::bindExtensions(ModuleDecl &mod) {
     if (!SF)
       continue;
 
-    for (auto D : SF->getTopLevelDecls()) {
+    auto visitTopLevelDecl = [&](Decl *D) {
       if (auto ED = dyn_cast<ExtensionDecl>(D))
         if (!tryBindExtension(ED))
-          worklist.push_back(ED);
-    }
+          worklist.push_back(ED);;
+    };
+
+    for (auto *D : SF->getTopLevelDecls())
+      visitTopLevelDecl(D);
+
+    for (auto *D : SF->getHoistedDecls())
+      visitTopLevelDecl(D);
   }
 
   // Phase 2 - repeatedly go through the worklist and attempt to bind each
@@ -285,9 +291,8 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
   // scope-based lookups. Only the top-level scopes because extensions have not
   // been bound yet.
   auto &Ctx = SF->getASTContext();
-  if (Ctx.LangOpts.EnableASTScopeLookup)
-    SF->getScope()
-        .buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals();
+  SF->getScope()
+      .buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals();
 
   BufferIndirectlyCausingDiagnosticRAII cpr(*SF);
 

@@ -358,7 +358,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     bool WalkGenerics = visitGenericParamListIfNeeded(SD);
 
     visit(SD->getIndices());
-    if (auto *const TyR = SD->getElementTypeLoc().getTypeRepr())
+    if (auto *const TyR = SD->getElementTypeRepr())
       if (doIt(TyR))
         return true;
 
@@ -394,7 +394,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
     if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
       if (!isa<AccessorDecl>(FD))
-        if (auto *const TyR = FD->getBodyResultTypeLoc().getTypeRepr())
+        if (auto *const TyR = FD->getResultTypeRepr())
           if (doIt(TyR))
             return true;
     }
@@ -504,17 +504,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   Expr *visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *E) { return E; }
   Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) { return E; }
 
-  Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) { 
-    if (E->getArgument()) {
-      if (auto arg = doIt(E->getArgument())) {
-        E->setArgument(arg);
-        return E;
-      }
-
-      return nullptr;
-    }
-    return E; 
-  }
+  Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) { return E; }
 
   Expr *visitOpaqueValueExpr(OpaqueValueExpr *E) { return E; }
 

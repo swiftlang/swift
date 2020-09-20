@@ -20,8 +20,9 @@
 
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/DiagnosticConsumer.h"
-#include "swift/AST/LocalizationFormat.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/Localization/LocalizationFormat.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/FileSystem.h"
@@ -987,7 +988,8 @@ namespace swift {
     void emitTentativeDiagnostics();
 
   public:
-    const char *diagnosticStringFor(const DiagID id, bool printDiagnosticName);
+    llvm::StringRef diagnosticStringFor(const DiagID id,
+                                        bool printDiagnosticName);
 
     /// If there is no clear .dia file for a diagnostic, put it in the one
     /// corresponding to the SourceLoc given here.
@@ -1054,6 +1056,21 @@ namespace swift {
         Engine.TransactionStrings.clear();
         Engine.TransactionAllocator.Reset();
       }
+    }
+
+    bool hasErrors() const {
+      ArrayRef<Diagnostic> diagnostics(Engine.TentativeDiagnostics.begin() +
+                                           PrevDiagnostics,
+                                       Engine.TentativeDiagnostics.end());
+
+      for (auto &diagnostic : diagnostics) {
+        auto behavior = Engine.state.determineBehavior(diagnostic.getID());
+        if (behavior == DiagnosticState::Behavior::Fatal ||
+            behavior == DiagnosticState::Behavior::Error)
+          return true;
+      }
+
+      return false;
     }
 
     /// Abort and close this transaction and erase all diagnostics

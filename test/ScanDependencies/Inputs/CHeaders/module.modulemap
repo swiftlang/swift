@@ -27,3 +27,18 @@ module G {
   header "G.h"
   export *
 }
+
+module H {
+  header "H.h"
+  export *
+}
+
+module I {
+  header "I.h"
+  export *
+}
+
+module X {
+  header "X.h"
+  export *
+}

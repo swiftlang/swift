@@ -286,10 +286,18 @@ struct ModuleRebuildInfo {
   /// Emits a diagnostic for all out-of-date compiled or forwarding modules
   /// encountered while trying to load a module.
   void diagnose(ASTContext &ctx, SourceLoc loc, StringRef moduleName,
-                 StringRef interfacePath) {
+                 StringRef interfacePath, StringRef prebuiltCacheDir) {
     ctx.Diags.diagnose(loc, diag::rebuilding_module_from_interface,
                        moduleName, interfacePath);
-
+    auto SDKVer = getSDKBuildVersion(ctx.SearchPathOpts.SDKPath);
+    llvm::SmallString<64> buffer = prebuiltCacheDir;
+    llvm::sys::path::append(buffer, "SystemVersion.plist");
+    auto PBMVer = getSDKBuildVersionFromPlist(buffer.str());
+    if (!SDKVer.empty() && !PBMVer.empty()) {
+      // Remark the potential version difference.
+      ctx.Diags.diagnose(loc, diag::sdk_version_pbm_version, SDKVer,
+                         PBMVer);
+    }
     // We may have found multiple failing modules, that failed for different
     // reasons. Emit a note for each of them.
     for (auto &mod : outOfDateModules) {
@@ -624,7 +632,7 @@ class ModuleInterfaceLoaderImpl {
 
     if (shouldLoadAdjacentModule) {
       if (fs.exists(modulePath)) {
-        result.first = modulePath;
+        result.first = modulePath.str();
       }
     }
 
@@ -641,7 +649,7 @@ class ModuleInterfaceLoaderImpl {
       }
       if (path) {
         if (fs.exists(*path)) {
-          result.second = *path;
+          result.second = path->str();
         }
       }
     }
@@ -844,8 +852,8 @@ class ModuleInterfaceLoaderImpl {
     }
     InterfaceSubContextDelegateImpl astDelegate(ctx.SourceMgr, ctx.Diags,
                                                 ctx.SearchPathOpts, ctx.LangOpts,
+                                                ctx.ClangImporterOpts,
                                                 Opts,
-                                                ctx.getClangModuleLoader(),
                                                 /*buildModuleCacheDirIfAbsent*/true,
                                                 cacheDir,
                                                 prebuiltCacheDir,
@@ -911,7 +919,7 @@ class ModuleInterfaceLoaderImpl {
     // Diagnose that we didn't find a loadable module, if we were asked to.
     auto remarkRebuild = [&]() {
       rebuildInfo.diagnose(ctx, diagnosticLoc, moduleName,
-                           interfacePath);
+                           interfacePath, prebuiltCacheDir);
     };
     // If we found an out-of-date .swiftmodule, we still want to add it as
     // a dependency of the .swiftinterface. That way if it's updated, but
@@ -950,7 +958,8 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   SmallVectorImpl<char> *ModuleInterfacePath,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-  std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) {
+  std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+  bool IsFramework) {
 
   // If running in OnlySerialized mode, ModuleInterfaceLoader
   // should not have been constructed at all.
@@ -1083,20 +1092,12 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
     bool SerializeDependencyHashes, bool TrackSystemDependencies,
     ModuleInterfaceLoaderOptions LoaderOpts) {
   InterfaceSubContextDelegateImpl astDelegate(SourceMgr, Diags,
-                                              SearchPathOpts, LangOpts,
+                                              SearchPathOpts, LangOpts, ClangOpts,
                                               LoaderOpts,
-                                              /*clangImporter*/nullptr,
                                               /*CreateCacheDirIfAbsent*/true,
                                               CacheDir, PrebuiltCacheDir,
                                               SerializeDependencyHashes,
                                               TrackSystemDependencies);
-  // At this point we don't have an ClangImporter instance because the instance
-  // is created later when we create a new ASTContext to build the interface.
-  // Thus, we have to add these extra clang flags manually here to ensure explict
-  // module building works.
-  for (auto &Arg: ClangOpts.ExtraArgs) {
-    astDelegate.addExtraClangArg(Arg);
-  }
   ModuleInterfaceBuilder builder(SourceMgr, Diags, astDelegate, InPath,
                                  ModuleName, CacheDir, PrebuiltCacheDir,
                                  LoaderOpts.disableInterfaceLock);
@@ -1204,7 +1205,7 @@ bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
 
   if (CompRe.match(SB, &CompMatches)) {
     assert(CompMatches.size() == 2);
-    CompilerVersion = ArgSaver.save(CompMatches[1]);
+    CompilerVersion = ArgSaver.save(CompMatches[1]).str();
   }
   else {
     // Don't diagnose; handwritten module interfaces don't include this field.
@@ -1237,19 +1238,13 @@ bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
   return false;
 }
 
-void InterfaceSubContextDelegateImpl::addExtraClangArg(StringRef arg) {
-  genericSubInvocation.getClangImporterOptions().ExtraArgs.push_back(arg);
-  GenericArgs.push_back("-Xcc");
-  GenericArgs.push_back(ArgSaver.save(arg));
-}
-
 InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     SourceManager &SM,
     DiagnosticEngine &Diags,
     const SearchPathOptions &searchPathOpts,
     const LangOptions &langOpts,
+    const ClangImporterOptions &clangImporterOpts,
     ModuleInterfaceLoaderOptions LoaderOpts,
-    ClangModuleLoader *clangImporter,
     bool buildModuleCacheDirIfAbsent,
     StringRef moduleCachePath,
     StringRef prebuiltCachePath,
@@ -1259,7 +1254,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   inheritOptionsForBuildingInterface(searchPathOpts, langOpts);
   // Configure front-end input.
   auto &SubFEOpts = genericSubInvocation.getFrontendOptions();
-  SubFEOpts.RequestedAction = FrontendOptions::ActionType::EmitModuleOnly;
+  SubFEOpts.RequestedAction = LoaderOpts.requestedAction;
   if (!moduleCachePath.empty()) {
     genericSubInvocation.setClangModuleCachePath(moduleCachePath);
   }
@@ -1286,23 +1281,22 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   // FIXME: we shouldn't need this. Remove it?
   StringRef explictSwiftModuleMap = searchPathOpts.ExplicitSwiftModuleMap;
   genericSubInvocation.getSearchPathOptions().ExplicitSwiftModuleMap =
-    explictSwiftModuleMap;
-  if (clangImporter) {
-    // We need to add these extra clang flags because explict module building
-    // related flags are all there: -fno-implicit-modules, -fmodule-map-file=,
-    // and -fmodule-file=.
-    // If we don't add these flags, the interface will be built with implicit
-    // PCMs.
-    for (auto arg: static_cast<ClangImporter*>(clangImporter)->getExtraClangArgs()) {
-      addExtraClangArg(arg);
-    }
-    // Respect the detailed-record preprocessor setting of the parent context.
-    // This, and the "raw" clang module format it implicitly enables, are
-    // required by sourcekitd.
-    auto &Opts = clangImporter->getClangInstance().getPreprocessorOpts();
-    if (Opts.DetailedRecord) {
-      genericSubInvocation.getClangImporterOptions().DetailedPreprocessingRecord = true;
-    }
+    explictSwiftModuleMap.str();
+  auto &subClangImporterOpts = genericSubInvocation.getClangImporterOptions();
+  // Respect the detailed-record preprocessor setting of the parent context.
+  // This, and the "raw" clang module format it implicitly enables, are
+  // required by sourcekitd.
+  subClangImporterOpts.DetailedPreprocessingRecord =
+    clangImporterOpts.DetailedPreprocessingRecord;
+  // We need to add these extra clang flags because explict module building
+  // related flags are all there: -fno-implicit-modules, -fmodule-map-file=,
+  // and -fmodule-file=.
+  // If we don't add these flags, the interface will be built with implicit
+  // PCMs.
+  subClangImporterOpts.ExtraArgs = clangImporterOpts.ExtraArgs;
+  for (auto arg: subClangImporterOpts.ExtraArgs) {
+    GenericArgs.push_back("-Xcc");
+    GenericArgs.push_back(ArgSaver.save(arg));
   }
 
   // Tell the genericSubInvocation to serialize dependency hashes if asked to do so.
@@ -1392,11 +1386,12 @@ InterfaceSubContextDelegateImpl::getCacheHash(StringRef useInterfacePath) {
   return llvm::APInt(64, H).toString(36, /*Signed=*/false);
 }
 
-bool InterfaceSubContextDelegateImpl::runInSubContext(StringRef moduleName,
-                                                      StringRef interfacePath,
-                                                      StringRef outputPath,
-                                                      SourceLoc diagLoc,
-    llvm::function_ref<bool(ASTContext&, ModuleDecl*, ArrayRef<StringRef>,
+std::error_code
+InterfaceSubContextDelegateImpl::runInSubContext(StringRef moduleName,
+                                                 StringRef interfacePath,
+                                                 StringRef outputPath,
+                                                 SourceLoc diagLoc,
+    llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*, ArrayRef<StringRef>,
                             ArrayRef<StringRef>, StringRef)> action) {
   return runInSubCompilerInstance(moduleName, interfacePath, outputPath, diagLoc,
                                   [&](SubCompilerInstanceInfo &info){
@@ -1408,11 +1403,12 @@ bool InterfaceSubContextDelegateImpl::runInSubContext(StringRef moduleName,
   });
 }
 
-bool InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
-                                                               StringRef interfacePath,
-                                                               StringRef outputPath,
-                                                               SourceLoc diagLoc,
-                  llvm::function_ref<bool(SubCompilerInstanceInfo&)> action) {
+std::error_code
+InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
+                                                          StringRef interfacePath,
+                                                          StringRef outputPath,
+                                                          SourceLoc diagLoc,
+                  llvm::function_ref<std::error_code(SubCompilerInstanceInfo&)> action) {
   // We are about to mess up the compiler invocation by using the compiler
   // arguments in the textual interface file. So copy to use a new compiler
   // invocation.
@@ -1442,7 +1438,10 @@ bool InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleN
   std::vector<std::string> outputFiles{"/<unused>"};
   std::vector<SupplementaryOutputPaths> ModuleOutputPaths;
   ModuleOutputPaths.emplace_back();
-  ModuleOutputPaths.back().ModuleOutputPath = outputPath.str();
+  if (subInvocation.getFrontendOptions().RequestedAction ==
+          FrontendOptions::ActionType::EmitModuleOnly) {
+    ModuleOutputPaths.back().ModuleOutputPath = outputPath.str();
+  }
   assert(subInvocation.getFrontendOptions().InputsAndOutputs.isWholeModule());
   subInvocation.getFrontendOptions().InputsAndOutputs
     .setMainAndSupplementaryOutputs(outputFiles, ModuleOutputPaths);
@@ -1456,12 +1455,12 @@ bool InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleN
                                           CompilerVersion,
                                           interfacePath,
                                           diagLoc)) {
-    return true;
+    return std::make_error_code(std::errc::not_supported);
   }
   // Insert arguments collected from the interface file.
   BuildArgs.insert(BuildArgs.end(), SubArgs.begin(), SubArgs.end());
   if (subInvocation.parseArgs(SubArgs, Diags)) {
-    return true;
+    return std::make_error_code(std::errc::not_supported);
   }
   CompilerInstance subInstance;
   SubCompilerInstanceInfo info;
@@ -1473,7 +1472,7 @@ bool InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleN
   ForwardingDiagnosticConsumer FDC(Diags);
   subInstance.addDiagnosticConsumer(&FDC);
   if (subInstance.setup(subInvocation)) {
-    return true;
+    return std::make_error_code(std::errc::not_supported);
   }
   info.BuildArguments = BuildArgs;
   info.Hash = CacheHash;
@@ -1521,27 +1520,29 @@ ExplicitSwiftModuleLoader::ExplicitSwiftModuleLoader(
 
 ExplicitSwiftModuleLoader::~ExplicitSwiftModuleLoader() { delete &Impl; }
 
-std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
-    AccessPathElem ModuleID,
-    const SerializedModuleBaseName &BaseName,
-    SmallVectorImpl<char> *ModuleInterfacePath,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) {
+bool ExplicitSwiftModuleLoader::findModule(AccessPathElem ModuleID,
+           SmallVectorImpl<char> *ModuleInterfacePath,
+           std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+           std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+           std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+           bool &IsFramework, bool &IsSystemModule) {
   StringRef moduleName = ModuleID.Item.str();
   auto it = Impl.ExplicitModuleMap.find(moduleName);
   // If no explicit module path is given matches the name, return with an
   // error code.
   if (it == Impl.ExplicitModuleMap.end()) {
-    return std::make_error_code(std::errc::not_supported);
+    return false;
   }
   auto &moduleInfo = it->getValue();
   if (moduleInfo.moduleBuffer) {
     // We found an explicit module matches the given name, give the buffer
     // back to the caller side.
     *ModuleBuffer = std::move(moduleInfo.moduleBuffer);
-    return std::error_code();
+    return true;
   }
+
+  // Set IsFramework bit according to the moduleInfo
+  IsFramework = moduleInfo.isFramework;
 
   auto &fs = *Ctx.SourceMgr.getFileSystem();
   // Open .swiftmodule file
@@ -1550,7 +1551,7 @@ std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
     // We cannot read the module content, diagnose.
     Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_explicit_module_file,
                        moduleInfo.modulePath);
-    return moduleBuf.getError();
+    return false;
   }
 
   assert(moduleBuf);
@@ -1566,13 +1567,13 @@ std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
         // We cannot read the module content, diagnose.
         Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_explicit_module_file,
                            moduleInfo.modulePath);
-        return moduleBuf.getError();
+        return false;
       }
     } else {
       // We cannot read the module content, diagnose.
       Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_explicit_module_file,
                          moduleInfo.modulePath);
-      return forwardingModule.getError();
+      return false;
     }
   }
   assert(moduleBuf);
@@ -1591,7 +1592,19 @@ std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
     if (moduleSourceInfoBuf)
       *ModuleSourceInfoBuffer = std::move(moduleSourceInfoBuf.get());
   }
-  return std::error_code();
+  return true;
+}
+
+std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
+  AccessPathElem ModuleID,
+  const SerializedModuleBaseName &BaseName,
+  SmallVectorImpl<char> *ModuleInterfacePath,
+  std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+  std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+  std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+  bool IsFramework) {
+  llvm_unreachable("Not supported in the Explicit Swift Module Loader.");
+  return std::make_error_code(std::errc::not_supported);
 }
 
 bool ExplicitSwiftModuleLoader::canImportModule(

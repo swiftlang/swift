@@ -754,35 +754,38 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
             declToDiagnose->diagnose(diag::invalid_redecl_implicit,
                                      current->getDescriptiveKind(),
                                      isProtocolRequirement, other->getName());
-          }
 
-          // Emit a specialized note if the one of the declarations is
-          // the backing storage property ('_foo') or projected value
-          // property ('$foo') for a wrapped property. The backing or
-          // projected var has the same source location as the wrapped
-          // property we diagnosed above, so we don't need to extract
-          // the original property.
-          const VarDecl *varToDiagnose = nullptr;
-          auto kind = PropertyWrapperSynthesizedPropertyKind::Backing;
-          if (auto currentVD = dyn_cast<VarDecl>(current)) {
-            if (auto currentKind =
-                    currentVD->getPropertyWrapperSynthesizedPropertyKind()) {
-              varToDiagnose = currentVD;
-              kind = *currentKind;
+            // Emit a specialized note if the one of the declarations is
+            // the backing storage property ('_foo') or projected value
+            // property ('$foo') for a wrapped property. The backing or
+            // projected var has the same source location as the wrapped
+            // property we diagnosed above, so we don't need to extract
+            // the original property.
+            const VarDecl *varToDiagnose = nullptr;
+            auto kind = PropertyWrapperSynthesizedPropertyKind::Backing;
+            if (auto currentVD = dyn_cast<VarDecl>(current)) {
+              if (auto currentKind =
+                      currentVD->getPropertyWrapperSynthesizedPropertyKind()) {
+                varToDiagnose = currentVD;
+                kind = *currentKind;
+              }
             }
-          }
-          if (auto otherVD = dyn_cast<VarDecl>(other)) {
-            if (auto otherKind =
-                    otherVD->getPropertyWrapperSynthesizedPropertyKind()) {
-              varToDiagnose = otherVD;
-              kind = *otherKind;
+            if (auto otherVD = dyn_cast<VarDecl>(other)) {
+              if (auto otherKind =
+                      otherVD->getPropertyWrapperSynthesizedPropertyKind()) {
+                varToDiagnose = otherVD;
+                kind = *otherKind;
+              }
             }
-          }
 
-          if (varToDiagnose) {
-            varToDiagnose->diagnose(
-                diag::invalid_redecl_implicit_wrapper, varToDiagnose->getName(),
-                kind == PropertyWrapperSynthesizedPropertyKind::Backing);
+            if (varToDiagnose) {
+              assert(declToDiagnose);
+              varToDiagnose->diagnose(
+                  diag::invalid_redecl_implicit_wrapper, varToDiagnose->getName(),
+                  kind == PropertyWrapperSynthesizedPropertyKind::Backing);
+            }
+
+            current->setInvalid();
           }
         } else {
           ctx.Diags.diagnoseWithNotes(
@@ -790,8 +793,9 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
                               current->getName()), [&]() {
             other->diagnose(diag::invalid_redecl_prev, other->getName());
           });
+
+          current->setInvalid();
         }
-        current->setInvalid();
       }
 
       // Make sure we don't do this checking again for the same decl. We also
@@ -881,7 +885,7 @@ Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
     return new (ctx) ErrorExpr(initExpr->getSourceRange(), ErrorType::get(ctx));
   }
 
-  TypeChecker::checkInitializerErrorHandling(dc, initExpr);
+  TypeChecker::checkInitializerEffects(dc, initExpr);
 
   // Walk the checked initializer and contextualize any closures
   // we saw there.
@@ -1136,8 +1140,7 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
           { C, DeclBaseName::createConstructor(), { C.Id_from } });
       auto result =
           TypeChecker::lookupMember(superclassDecl, superclassType, initFrom,
-                                    NameLookupFlags::ProtocolMembers |
-                                        NameLookupFlags::IgnoreAccessControl);
+                                    NameLookupFlags::IgnoreAccessControl);
 
       if (!result.empty() && !result.front().getValueDecl()->isImplicit())
         diagDest = result.front().getValueDecl();
@@ -1657,7 +1660,7 @@ public:
               PBD->getInitContext(i));
           if (initContext) {
             // Check safety of error-handling in the declaration, too.
-            TypeChecker::checkInitializerErrorHandling(initContext, init);
+            TypeChecker::checkInitializerEffects(initContext, init);
             TypeChecker::contextualizeInitializer(initContext, init);
           }
         }
@@ -1850,9 +1853,11 @@ public:
     if (auto rawTy = ED->getRawType()) {
       // The raw type must be one of the blessed literal convertible types.
       if (!computeAutomaticEnumValueKind(ED)) {
-        DE.diagnose(ED->getInherited().front().getSourceRange().Start,
-                    diag::raw_type_not_literal_convertible, rawTy);
-        ED->getInherited().front().setInvalidType(getASTContext());
+        if (!rawTy->is<ErrorType>()) {
+          DE.diagnose(ED->getInherited().front().getSourceRange().Start,
+                      diag::raw_type_not_literal_convertible, rawTy);
+          ED->getInherited().front().setType(ErrorType::get(getASTContext()));
+        }
       }
       
       // We need at least one case to have a raw value.
@@ -2012,7 +2017,7 @@ public:
 
     TypeChecker::checkDeclAttributes(CD);
 
-    for (Decl *Member : CD->getEmittedMembers())
+    for (Decl *Member : CD->getSemanticMembers())
       visit(Member);
 
     TypeChecker::checkPatternBindingCaptures(CD);
@@ -2342,10 +2347,15 @@ public:
     // FIXME: This needs to be moved to its own request if we want to
     // productize @_cdecl.
     if (auto CDeclAttr = FD->getAttrs().getAttribute<swift::CDeclAttr>()) {
+      Optional<ForeignAsyncConvention> asyncConvention;
       Optional<ForeignErrorConvention> errorConvention;
       if (isRepresentableInObjC(FD, ObjCReason::ExplicitlyCDecl,
-                                errorConvention)) {
-        if (FD->hasThrows()) {
+                                asyncConvention, errorConvention)) {
+        if (FD->hasAsync()) {
+          FD->setForeignAsyncConvention(*asyncConvention);
+          getASTContext().Diags.diagnose(CDeclAttr->getLocation(),
+                                         diag::cdecl_async);
+        } else if (FD->hasThrows()) {
           FD->setForeignErrorConvention(*errorConvention);
           getASTContext().Diags.diagnose(CDeclAttr->getLocation(),
                                          diag::cdecl_throws);

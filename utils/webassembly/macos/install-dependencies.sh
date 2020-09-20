@@ -2,7 +2,7 @@
 
 set -ex
 
-brew uninstall python@2 || true
+brew uninstall $(brew list | grep python@2)
 brew install cmake ninja llvm sccache wasmer
 
 SOURCE_PATH="$( cd "$(dirname $0)/../../../../" && pwd  )"

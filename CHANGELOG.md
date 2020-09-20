@@ -4,28 +4,99 @@ CHANGELOG
 <details>
 <summary>Note: This is in reverse chronological order, so newer entries are added to the top.</summary>
 
-| Version                | Released   | Toolchain   |
-| :--------------------- | :--------- | :---------- |
-| [Swift 5.3](#swift-53) |            |             |
-| [Swift 5.2](#swift-52) | 2020-03-24 | Xcode 11.4  |
-| [Swift 5.1](#swift-51) | 2019-09-20 | Xcode 11.0  |
-| [Swift 5.0](#swift-50) | 2019-03-25 | Xcode 10.2  |
-| [Swift 4.2](#swift-42) | 2018-09-17 | Xcode 10.0  |
-| [Swift 4.1](#swift-41) | 2018-03-29 | Xcode 9.3   |
-| [Swift 4.0](#swift-40) | 2017-09-19 | Xcode 9.0   |
-| [Swift 3.1](#swift-31) | 2017-03-27 | Xcode 8.3   |
-| [Swift 3.0](#swift-30) | 2016-09-13 | Xcode 8.0   |
-| [Swift 2.2](#swift-22) | 2016-03-21 | Xcode 7.3   |
-| [Swift 2.1](#swift-21) | 2015-10-21 | Xcode 7.1   |
-| [Swift 2.0](#swift-20) | 2015-09-17 | Xcode 7.0   |
-| [Swift 1.2](#swift-12) | 2015-04-08 | Xcode 6.3   |
-| [Swift 1.1](#swift-11) | 2014-12-02 | Xcode 6.1.1 |
-| [Swift 1.0](#swift-10) | 2014-09-15 | Xcode 6.0   |
+| Version                   | Released   | Toolchain   |
+| :------------------------ | :--------- | :---------- |
+| [Swift Next](#swift-next) |
+| [Swift 5.3](#swift-53)    |            |             |
+| [Swift 5.2](#swift-52)    | 2020-03-24 | Xcode 11.4  |
+| [Swift 5.1](#swift-51)    | 2019-09-20 | Xcode 11.0  |
+| [Swift 5.0](#swift-50)    | 2019-03-25 | Xcode 10.2  |
+| [Swift 4.2](#swift-42)    | 2018-09-17 | Xcode 10.0  |
+| [Swift 4.1](#swift-41)    | 2018-03-29 | Xcode 9.3   |
+| [Swift 4.0](#swift-40)    | 2017-09-19 | Xcode 9.0   |
+| [Swift 3.1](#swift-31)    | 2017-03-27 | Xcode 8.3   |
+| [Swift 3.0](#swift-30)    | 2016-09-13 | Xcode 8.0   |
+| [Swift 2.2](#swift-22)    | 2016-03-21 | Xcode 7.3   |
+| [Swift 2.1](#swift-21)    | 2015-10-21 | Xcode 7.1   |
+| [Swift 2.0](#swift-20)    | 2015-09-17 | Xcode 7.0   |
+| [Swift 1.2](#swift-12)    | 2015-04-08 | Xcode 6.3   |
+| [Swift 1.1](#swift-11)    | 2014-12-02 | Xcode 6.1.1 |
+| [Swift 1.0](#swift-10)    | 2014-09-15 | Xcode 6.0   |
 
 </details>
 
+Swift Next
+----------
+
+* [SE-0287][]:
+
+  Implicit member expressions now support chains of member accesses, making the following valid:
+  
+  ```swift
+  let milky: UIColor = .white.withAlphaComponent(0.5)
+  let milky2: UIColor = .init(named: "white")!.withAlphaComponent(0.5)
+  let milkyChance: UIColor? = .init(named: "white")?.withAlphaComponent(0.5)
+  ```
+  
+  As is the case with the existing implicit member expression syntax, the resulting type of the chain must be the same as the (implicit) base, so it is not well-formed to write:
+  
+  ```swift
+  let cgMilky: CGColor = .white.withAlphaComponent(0.5).cgColor
+  ```
+  
+  (Unless, of course, appropriate `white` and `withAlphaComponent` members were defined on `CGColor`.)
+  
+  Members of a "chain" can be properties, method calls, subscript accesses, force unwraps, or optional chaining question marks. Furthermore, the type of each member along the chain is permitted to differ (again, as long as the base of the chain matches the resulting type) meaning the following successfully typechecks:
+  
+  ```swift
+  struct Foo {
+    static var foo = Foo()
+    static var bar = Bar()
+    
+    var anotherFoo: Foo { Foo() }
+    func getFoo() -> Foo { Foo() }
+    var optionalFoo: Foo? { Foo() }
+    subscript() -> Foo { Foo() }
+  }
+  
+  struct Bar {
+    var anotherFoo = Foo()
+  }
+
+  let _: Foo? = .bar.anotherFoo.getFoo().optionalFoo?.optionalFoo![]
+  ```
+
 Swift 5.3
 ---------
+
+* [SE-0279][] & [SE-0286][]:
+
+  Trailing closure syntax has been extended to allow additional labeled closures to follow the initial unlabeled closure:
+  
+  ```swift
+  // Single trailing closure argument
+  UIView.animate(withDuration: 0.3) {
+    self.view.alpha = 0
+  }
+  // Multiple trailing closure arguments
+  UIView.animate(withDuration: 0.3) {
+    self.view.alpha = 0
+  } completion: { _ in
+    self.view.removeFromSuperview()
+  }
+  ```
+  
+  Additionally, trailing closure arguments now match the appropriate parameter according to a forward-scan rule (as opposed to the previous backward-scan rule):
+  
+  ```swift
+  func takesClosures(first: () -> Void, second: (Int) -> Void = { _ in }) {}
+  
+  takesClosures {
+    print("First")
+  }
+  ```
+  
+  In the above example, the trailing closure argument matches parameter `first`, whereas pre-Swift-5.3 it would have matched `second`. In order to ease the transition to this new rule, cases in which the forward-scan and backward-scan match a single trailing closure to different parameters, the backward-scan result is preferred and a warning is emitted. This is expected to be upgraded to an error in the next major version of Swift.
 
 * [SR-7083][]:
 
@@ -8070,7 +8141,10 @@ Swift 1.0
 [SE-0268]: <https://github.com/apple/swift-evolution/blob/master/proposals/0268-didset-semantics.md>
 [SE-0269]: <https://github.com/apple/swift-evolution/blob/master/proposals/0269-implicit-self-explicit-capture.md>
 [SE-0276]: <https://github.com/apple/swift-evolution/blob/master/proposals/0276-multi-pattern-catch-clauses.md>
+[SE-0279]: <https://github.com/apple/swift-evolution/blob/master/proposals/0279-multiple-trailing-closures.md>
 [SE-0280]: <https://github.com/apple/swift-evolution/blob/master/proposals/0280-enum-cases-as-protocol-witnesses.md>
+[SE-0286]: <https://github.com/apple/swift-evolution/blob/master/proposals/0286-forward-scan-trailing-closures.md>
+[SE-0287]: <https://github.com/apple/swift-evolution/blob/master/proposals/0287-implicit-member-chains.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
