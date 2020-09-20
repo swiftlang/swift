@@ -43,6 +43,8 @@ module WinSDK [system] {
 
     module console {
       header "consoleapi.h"
+      header "consoleapi2.h"
+      header "consoleapi3.h"
       export *
     }
 
