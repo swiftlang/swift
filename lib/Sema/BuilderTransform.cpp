@@ -20,6 +20,8 @@
 #include "SolutionResult.h"
 #include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
+#include "swift/Sema/IDETypeChecking.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
@@ -155,7 +157,7 @@ class BuilderClosureVisitor
     Identifier name = ctx.getIdentifier(
         ("$__builder" + Twine(varCounter++)).str());
     auto var = new (ctx) VarDecl(/*isStatic=*/false, VarDecl::Introducer::Var,
-                                 /*isCaptureList=*/false, loc, name, dc);
+                                 loc, name, dc);
     var->setImplicit();
     return var;
   }
@@ -1245,6 +1247,32 @@ public:
           ctx.Diags.diagnose(
               loc, diag::function_builder_missing_limited_availability,
               builderTransform.builderType);
+
+          // Add a note to the function builder with a stub for
+          // buildLimitedAvailability().
+          if (auto builder = builderTransform.builderType->getAnyNominal()) {
+            SourceLoc buildInsertionLoc;
+            std::string stubIndent;
+            Type componentType;
+            std::tie(buildInsertionLoc, stubIndent, componentType) =
+                determineFunctionBuilderBuildFixItInfo(builder);
+            if (buildInsertionLoc.isValid()) {
+              std::string fixItString;
+              {
+                llvm::raw_string_ostream out(fixItString);
+                printFunctionBuilderBuildFunction(
+                    builder, componentType,
+                    FunctionBuilderBuildFunction::BuildLimitedAvailability,
+                    stubIndent, out);
+
+                builder->diagnose(
+                    diag::function_builder_missing_build_limited_availability,
+                    builderTransform.builderType)
+                  .fixItInsert(buildInsertionLoc, fixItString);
+              }
+            }
+          }
+
           return true;
         }
 
@@ -1884,3 +1912,130 @@ bool TypeChecker::typeSupportsBuilderOp(
   return foundMatch;
 }
 
+Type swift::inferFunctionBuilderComponentType(NominalTypeDecl *builder) {
+  Type componentType;
+
+  SmallVector<ValueDecl *, 4> potentialMatches;
+  ASTContext &ctx = builder->getASTContext();
+  bool supportsBuildBlock = TypeChecker::typeSupportsBuilderOp(
+      builder->getDeclaredInterfaceType(), builder, ctx.Id_buildBlock,
+      /*argLabels=*/{}, &potentialMatches);
+  if (supportsBuildBlock) {
+    for (auto decl : potentialMatches) {
+      auto func = dyn_cast<FuncDecl>(decl);
+      if (!func || !func->isStatic())
+        continue;
+
+      // If we haven't seen a component type before, gather it.
+      if (!componentType) {
+        componentType = func->getResultInterfaceType();
+        continue;
+      }
+
+      // If there are inconsistent component types, bail out.
+      if (!componentType->isEqual(func->getResultInterfaceType())) {
+        componentType = Type();
+        break;
+      }
+    }
+  }
+
+  return componentType;
+}
+
+std::tuple<SourceLoc, std::string, Type>
+swift::determineFunctionBuilderBuildFixItInfo(NominalTypeDecl *builder) {
+  SourceLoc buildInsertionLoc = builder->getBraces().Start;
+  std::string stubIndent;
+  Type componentType;
+
+  if (buildInsertionLoc.isInvalid())
+    return std::make_tuple(buildInsertionLoc, stubIndent, componentType);
+
+  ASTContext &ctx = builder->getASTContext();
+  buildInsertionLoc = Lexer::getLocForEndOfToken(
+      ctx.SourceMgr, buildInsertionLoc);
+
+  StringRef extraIndent;
+  StringRef currentIndent = Lexer::getIndentationForLine(
+      ctx.SourceMgr, buildInsertionLoc, &extraIndent);
+  stubIndent = (currentIndent + extraIndent).str();
+
+  componentType = inferFunctionBuilderComponentType(builder);
+  return std::make_tuple(buildInsertionLoc, stubIndent, componentType);
+}
+
+void swift::printFunctionBuilderBuildFunction(
+      NominalTypeDecl *builder, Type componentType,
+      FunctionBuilderBuildFunction function,
+      Optional<std::string> stubIndent, llvm::raw_ostream &out) {
+  // Render the component type into a string.
+  std::string componentTypeString;
+  if (componentType)
+    componentTypeString = componentType.getString();
+  else
+    componentTypeString = "<#Component#>";
+
+  // Render the code.
+  ExtraIndentStreamPrinter printer(out, stubIndent.getValueOr(std::string()));
+
+  // If we're supposed to provide a full stub, add a newline and the introducer
+  // keywords.
+  if (stubIndent) {
+    printer.printNewline();
+
+    if (builder->getFormalAccess() >= AccessLevel::Public)
+      printer << "public ";
+
+    printer << "static func ";
+  }
+
+  bool printedResult = false;
+  switch (function) {
+  case FunctionBuilderBuildFunction::BuildBlock:
+    printer << "buildBlock(_ components: " << componentTypeString << "...)";
+    break;
+
+  case FunctionBuilderBuildFunction::BuildExpression:
+    printer << "buildExpression(_ expression: <#Expression#>)";
+    break;
+
+  case FunctionBuilderBuildFunction::BuildOptional:
+    printer << "buildOptional(_ component: " << componentTypeString << "?)";
+    break;
+
+  case FunctionBuilderBuildFunction::BuildEitherFirst:
+    printer << "buildEither(first component: " << componentTypeString << ")";
+    break;
+
+  case FunctionBuilderBuildFunction::BuildEitherSecond:
+    printer << "buildEither(second component: " << componentTypeString << ")";
+    break;
+
+  case FunctionBuilderBuildFunction::BuildArray:
+    printer << "buildArray(_ components: [" << componentTypeString << "])";
+    break;
+
+  case FunctionBuilderBuildFunction::BuildLimitedAvailability:
+    printer << "buildLimitedAvailability(_ component: " << componentTypeString
+            << ")";
+    break;
+
+  case FunctionBuilderBuildFunction::BuildFinalResult:
+    printer << "buildFinalResult(_ component: " << componentTypeString
+            << ") -> <#Result#>";
+    printedResult = true;
+    break;
+  }
+
+  if (!printedResult)
+    printer << " -> " << componentTypeString;
+
+  if (stubIndent) {
+    printer << " {";
+    printer.printNewline();
+    printer << "  <#code#>";
+    printer.printNewline();
+    printer << "}";
+  }
+}

@@ -135,6 +135,11 @@ https://medium.com/kinandcartacreated/contributing-to-swift-part-2-efebcf7b6c93
 
 ## Code generation, runtime and ABI
 
+- The Swift Runtime ([Part 1: Heap Objects][], [Part 2: Type Layout][])
+  by Jordan Rose (blog post series, Aug-Sep 2020): This blog post series
+  describes the runtime layout for classes, closures and structs, as well
+  as basic runtime functionality such as retain/release that needs to be
+  handled when porting Swift to a new platform, such as [Mac OS 9][].
 - [How Swift Achieved Dynamic Linking Where Rust Couldn't][] by Alexis
   Beingessner (blog post, Nov 2019): This blog post describes Swift's approach
   for compiling polymorphic functions, contrasting it with the strategy used by
@@ -169,6 +174,9 @@ https://medium.com/kinandcartacreated/contributing-to-swift-part-2-efebcf7b6c93
   value witness tables, type metadata, abstraction patterns, reabstraction,
   reabstraction thunks and protocol witness tables.
 
+[Part 1: Heap Objects]: https://belkadan.com/blog/2020/08/Swift-Runtime-Heap-Objects/
+[Part 2: Type Layout]: https://belkadan.com/blog/2020/09/Swift-Runtime-Type-Layout/
+[Mac OS 9]: https://belkadan.com/blog/2020/04/Swift-on-Mac-OS-9/
 [How Swift Achieved Dynamic Linking Where Rust Couldn't]: https://gankra.github.io/blah/swift-abi/
 [arm64e: An ABI for Pointer Authentication]: https://youtu.be/C1nZvpEBfYA
 [Exploiting The Swift ABI]: https://youtu.be/0rHG_Pa86oA

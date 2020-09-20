@@ -2684,10 +2684,13 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
             collectAccessorCaptures(AccessorKind::MutableAddress);
             break;
           case ReadWriteImplKind::Modify:
-          case ReadWriteImplKind::StoredWithSimpleDidSet:
-          case ReadWriteImplKind::InheritedWithSimpleDidSet:
             collectAccessorCaptures(AccessorKind::Modify);
             break;
+          case ReadWriteImplKind::StoredWithDidSet:
+            // We've already processed the didSet operation.
+            break;
+          case ReadWriteImplKind::InheritedWithDidSet:
+            llvm_unreachable("inherited local variable");
           }
         }
 

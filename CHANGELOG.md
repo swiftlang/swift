@@ -4,29 +4,42 @@ CHANGELOG
 <details>
 <summary>Note: This is in reverse chronological order, so newer entries are added to the top.</summary>
 
-| Version                   | Released   | Toolchain   |
-| :------------------------ | :--------- | :---------- |
-| [Swift Next](#swift-next) |
-| [Swift 5.3](#swift-53)    |            |             |
-| [Swift 5.2](#swift-52)    | 2020-03-24 | Xcode 11.4  |
-| [Swift 5.1](#swift-51)    | 2019-09-20 | Xcode 11.0  |
-| [Swift 5.0](#swift-50)    | 2019-03-25 | Xcode 10.2  |
-| [Swift 4.2](#swift-42)    | 2018-09-17 | Xcode 10.0  |
-| [Swift 4.1](#swift-41)    | 2018-03-29 | Xcode 9.3   |
-| [Swift 4.0](#swift-40)    | 2017-09-19 | Xcode 9.0   |
-| [Swift 3.1](#swift-31)    | 2017-03-27 | Xcode 8.3   |
-| [Swift 3.0](#swift-30)    | 2016-09-13 | Xcode 8.0   |
-| [Swift 2.2](#swift-22)    | 2016-03-21 | Xcode 7.3   |
-| [Swift 2.1](#swift-21)    | 2015-10-21 | Xcode 7.1   |
-| [Swift 2.0](#swift-20)    | 2015-09-17 | Xcode 7.0   |
-| [Swift 1.2](#swift-12)    | 2015-04-08 | Xcode 6.3   |
-| [Swift 1.1](#swift-11)    | 2014-12-02 | Xcode 6.1.1 |
-| [Swift 1.0](#swift-10)    | 2014-09-15 | Xcode 6.0   |
+| Version                | Released   | Toolchain   |
+| :--------------------- | :--------- | :---------- |
+| [Swift 5.3](#swift-53) | 2020-09-16 | Xcode 12.0  |
+| [Swift 5.2](#swift-52) | 2020-03-24 | Xcode 11.4  |
+| [Swift 5.1](#swift-51) | 2019-09-20 | Xcode 11.0  |
+| [Swift 5.0](#swift-50) | 2019-03-25 | Xcode 10.2  |
+| [Swift 4.2](#swift-42) | 2018-09-17 | Xcode 10.0  |
+| [Swift 4.1](#swift-41) | 2018-03-29 | Xcode 9.3   |
+| [Swift 4.0](#swift-40) | 2017-09-19 | Xcode 9.0   |
+| [Swift 3.1](#swift-31) | 2017-03-27 | Xcode 8.3   |
+| [Swift 3.0](#swift-30) | 2016-09-13 | Xcode 8.0   |
+| [Swift 2.2](#swift-22) | 2016-03-21 | Xcode 7.3   |
+| [Swift 2.1](#swift-21) | 2015-10-21 | Xcode 7.1   |
+| [Swift 2.0](#swift-20) | 2015-09-17 | Xcode 7.0   |
+| [Swift 1.2](#swift-12) | 2015-04-08 | Xcode 6.3   |
+| [Swift 1.1](#swift-11) | 2014-12-02 | Xcode 6.1.1 |
+| [Swift 1.0](#swift-10) | 2014-09-15 | Xcode 6.0   |
 
 </details>
 
 Swift Next
 ----------
+
+* [SE-0284][]:
+
+  Functions, subscripts, and initializers may now have more than one variadic parameter, as long as all parameters which follow variadic parameters are labeled. This makes declarations like the following valid:
+
+  ```swift
+  func foo(_ a: Int..., b: Double...) { }
+
+  struct Bar {
+    subscript(a: Int..., b b: Int...) -> [Int] { a + b }
+
+    init(a: String..., b: Float...) { }
+  }
+  ```
 
 * [SE-0287][]:
 
@@ -66,8 +79,12 @@ Swift Next
   let _: Foo? = .bar.anotherFoo.getFoo().optionalFoo?.optionalFoo![]
   ```
 
+**Add new entries to the top of this section, not here!**
+
 Swift 5.3
 ---------
+
+### 2020-09-16 (Xcode 12.0)
 
 * [SE-0279][] & [SE-0286][]:
 
@@ -8143,6 +8160,7 @@ Swift 1.0
 [SE-0276]: <https://github.com/apple/swift-evolution/blob/master/proposals/0276-multi-pattern-catch-clauses.md>
 [SE-0279]: <https://github.com/apple/swift-evolution/blob/master/proposals/0279-multiple-trailing-closures.md>
 [SE-0280]: <https://github.com/apple/swift-evolution/blob/master/proposals/0280-enum-cases-as-protocol-witnesses.md>
+[SE-0284]: <https://github.com/apple/swift-evolution/blob/master/proposals/0284-multiple-variadic-parameters.md>
 [SE-0286]: <https://github.com/apple/swift-evolution/blob/master/proposals/0286-forward-scan-trailing-closures.md>
 [SE-0287]: <https://github.com/apple/swift-evolution/blob/master/proposals/0287-implicit-member-chains.md>
 

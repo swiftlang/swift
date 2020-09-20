@@ -360,6 +360,14 @@ void ConstraintSystem::PotentialBindings::finalize(
     if (locator->isLastElement<LocatorPathElt::MemberRefBase>())
       PotentiallyIncomplete = true;
 
+    // Delay resolution of the code completion expression until
+    // the very end to give it a chance to be bound to some
+    // contextual type even if it's a hole.
+    if (locator->directlyAt<CodeCompletionExpr>()) {
+      FullyBound = true;
+      PotentiallyIncomplete = true;
+    }
+
     addPotentialBinding(PotentialBinding::forHole(TypeVar, locator));
   }
 

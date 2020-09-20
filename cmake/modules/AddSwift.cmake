@@ -130,18 +130,17 @@ function(_add_host_variant_c_compile_flags target)
   _add_host_variant_c_compile_link_flags(${target})
 
   is_build_type_optimized("${CMAKE_BUILD_TYPE}" optimized)
-  is_build_type_with_debuginfo("${CMAKE_BUILD_TYPE}" debuginfo)
-
-  # Add -O0/-O2/-O3/-Os/-g/-momit-leaf-frame-pointer/... based on CMAKE_BUILD_TYPE.
-  target_compile_options(${target} PRIVATE "${CMAKE_CXX_FLAGS_${CMAKE_BUILD_TYPE}}")
-
   if(optimized)
+    if("${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel")
+      target_compile_options(${target} PRIVATE -Os)
+    else()
+      target_compile_options(${target} PRIVATE -O2)
+    endif()
+
     # Omit leaf frame pointers on x86 production builds (optimized, no debug
     # info, and no asserts).
-    if(NOT debuginfo AND NOT LLVM_ENABLE_ASSERTIONS)
-      # Unfortunately, this cannot be folded into the standard
-      # CMAKE_CXX_FLAGS_... because Apple multi-SDK builds use different
-      # architectures for different SDKs.
+    is_build_type_with_debuginfo("${CMAKE_BUILD_TYPE}" debug)
+    if(NOT debug AND NOT LLVM_ENABLE_ASSERTIONS)
       if(SWIFT_HOST_VARIANT_ARCH MATCHES "i?86")
         if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
           target_compile_options(${target} PRIVATE -momit-leaf-frame-pointer)
@@ -149,6 +148,27 @@ function(_add_host_variant_c_compile_flags target)
           target_compile_options(${target} PRIVATE /Oy)
         endif()
       endif()
+    endif()
+  else()
+    if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+      target_compile_options(${target} PRIVATE -O0)
+    else()
+      target_compile_options(${target} PRIVATE /Od)
+    endif()
+  endif()
+
+  # CMake automatically adds the flags for debug info if we use MSVC/clang-cl.
+  if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+    is_build_type_with_debuginfo("${CMAKE_BUILD_TYPE}" debuginfo)
+    if(debuginfo)
+      _compute_lto_flag("${SWIFT_TOOLS_ENABLE_LTO}" _lto_flag_out)
+      if(_lto_flag_out)
+        target_compile_options(${target} PRIVATE -gline-tables-only)
+      else()
+        target_compile_options(${target} PRIVATE -g)
+      endif()
+    else()
+      target_compile_options(${target} PRIVATE -g0)
     endif()
   endif()
 

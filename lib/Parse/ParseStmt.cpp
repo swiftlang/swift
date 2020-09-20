@@ -388,11 +388,11 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
     } else if (Tok.is(tok::pound_line)) {
       ParserStatus Status = parseLineDirective(true);
       BraceItemsStatus |= Status;
-      NeedParseErrorRecovery = Status.isError();
+      NeedParseErrorRecovery = Status.isErrorOrHasCompletion();
     } else if (Tok.is(tok::pound_sourceLocation)) {
       ParserStatus Status = parseLineDirective(false);
       BraceItemsStatus |= Status;
-      NeedParseErrorRecovery = Status.isError();
+      NeedParseErrorRecovery = Status.isErrorOrHasCompletion();
     } else if (isStartOfSwiftDecl()) {
       SmallVector<Decl*, 8> TmpDecls;
       ParserResult<Decl> DeclResult = 
@@ -411,7 +411,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
                           FD->setHasTopLevelLocalContextCaptures();
                     });
       BraceItemsStatus |= DeclResult;
-      if (DeclResult.isParseError()) {
+      if (DeclResult.isParseErrorOrHasCompletion()) {
         NeedParseErrorRecovery = true;
         if (DeclResult.hasCodeCompletion() && IsTopLevel &&
             isCodeCompletionFirstPass()) {
@@ -443,7 +443,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
         Entries.push_back(TLCD);
         return Status;
       }
-      if (Status.isError())
+      if (Status.isErrorOrHasCompletion())
         NeedParseErrorRecovery = true;
       else if (!allowTopLevelCode()) {
         diagnose(StartLoc,
@@ -674,6 +674,10 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
                          diag::expected_rbrace_in_brace_stmt, LBLoc)) {
     // Synthesize a r-brace if the source doesn't have any.
     LocalContext.synthesize(tok::r_brace, LBLoc.getAdvancedLoc(1));
+  } else {
+    // We recovered do don't propagate any error status (but still preserve
+    // HasCodeCompletion).
+    Status.clearIsError();
   }
 
   return makeParserResult(Status,
@@ -756,7 +760,7 @@ ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
     if (CodeCompletion) {
       CodeCompletion->completeReturnStmt(CCE);
     }
-    Result.setHasCodeCompletion();
+    Result.setHasCodeCompletionAndIsError();
     consumeToken();
     return Result;
   }
@@ -825,7 +829,7 @@ ParserResult<Stmt> Parser::parseStmtYield(SourceLoc tryLoc) {
     if (CodeCompletion) {
       CodeCompletion->completeYieldStmt(cce, /*index=*/ None);
     }
-    result.setHasCodeCompletion();
+    result.setHasCodeCompletionAndIsError();
     consumeToken();
     return result;
   }
@@ -872,7 +876,7 @@ ParserResult<Stmt> Parser::parseStmtYield(SourceLoc tryLoc) {
     auto expr = parseExpr(diag::expected_expr_yield);
     if (expr.hasCodeCompletion())
       return makeParserCodeCompletionResult<Stmt>();
-    if (expr.isParseError()) {
+    if (expr.isParseErrorOrHasCompletion()) {
       auto endLoc = (Tok.getLoc() == beginLoc ? beginLoc : PreviousLoc);
       yields.push_back(
         new (Context) ErrorExpr(SourceRange(beginLoc, endLoc)));
@@ -915,7 +919,7 @@ ParserResult<Stmt> Parser::parseStmtThrow(SourceLoc tryLoc) {
   }
 
   if (hasCodeCompletion)
-    Result.setHasCodeCompletion();
+    Result.setHasCodeCompletionAndIsError();
 
   return makeParserResult(Result,
               new (Context) ThrowStmt(throwLoc, Result.get()));
@@ -1071,7 +1075,7 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
       }
     }
     P.consumeToken(tok::code_complete);
-    status.setHasCodeCompletion();
+    status.setHasCodeCompletionAndIsError();
     return;
   }
 
@@ -1083,7 +1087,7 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
     auto errorName = P.Context.Id_error;
     auto var = new (P.Context) VarDecl(/*IsStatic*/false,
                                        VarDecl::Introducer::Let,
-                                       /*IsCaptureList*/false, loc, errorName,
+                                       loc, errorName,
                                        P.CurDeclContext);
     var->setImplicit();
     auto namePattern = new (P.Context) NamedPattern(var);
@@ -1124,10 +1128,6 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
       if (VD->hasName()) P.addToScope(VD);
       boundDecls.push_back(VD);
     });
-
-    // Now that we have them, mark them as being initialized without a PBD.
-    for (auto VD : boundDecls)
-      VD->setHasNonPatternBindingInit();
 
     // Parse the optional 'where' guard.
     parseWhereGuard(P, result, status, parsingContext, isExprBasic);
@@ -1173,10 +1173,6 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
         P.diagnose(previous->getLoc(), diag::extra_var_in_multiple_pattern_list, previous->getName());
         status.setIsParseError();
       }
-    }
-    
-    for (auto VD : repeatedDecls) {
-      VD->setHasNonPatternBindingInit();
     }
 
     // Parse the optional 'where' guard, with this particular pattern's bound
@@ -1365,7 +1361,7 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs) {
     }
   }
 
-  if (Status.isSuccess())
+  if (Status.isSuccess() && !Status.hasCodeCompletion())
     validateAvailabilitySpecList(*this, Specs);
 
   return Status;
@@ -1498,7 +1494,7 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
 
   ThePattern = parseOptionalPatternTypeAnnotation(ThePattern);
   if (ThePattern.hasCodeCompletion()) {
-    Status.setHasCodeCompletion();
+    Status.setHasCodeCompletionAndIsError();
 
     // Skip to '=' so that the completion can see the expected type of the
     // pattern which is determined by the initializer. 
@@ -1524,7 +1520,7 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
   }
 
   if (Init.hasCodeCompletion())
-    Status.setHasCodeCompletion();
+    Status.setHasCodeCompletionAndIsError();
 
   if (Init.isNull()) {
     // Recover by creating ErrorExpr.
@@ -1540,7 +1536,6 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     setLocalDiscriminator(VD);
     if (VD->hasName())
       addToScope(VD);
-    VD->setHasNonPatternBindingInit();
   });
   return Status;
 }
@@ -1578,7 +1573,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
                                               SyntaxKind::ConditionElement);
     Status |= parseStmtConditionElement(result, DefaultID, ParentKind,
                                         BindingKindStr);
-    if (Status.shouldStopParsing())
+    if (Status.isErrorOrHasCompletion())
       break;
 
     // If a comma exists consume it and succeed.
@@ -1664,7 +1659,7 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo,
     } else {
       Status |= parseStmtCondition(Condition, diag::expected_condition_if,
                                    StmtKind::If);
-      if (Status.isError() || Status.hasCodeCompletion())
+      if (Status.isErrorOrHasCompletion())
         return recoverWithCond(Status, Condition);
     }
 
@@ -1708,7 +1703,7 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo,
     } else if (Tok.is(tok::code_complete)) {
       if (CodeCompletion)
         CodeCompletion->completeAfterIfStmt(/*hasElse*/true);
-      Status.setHasCodeCompletion();
+      Status.setHasCodeCompletionAndIsError();
       consumeToken(tok::code_complete);
     } else {
       ElseBody = parseBraceItemList(diag::expected_lbrace_or_if_after_else);
@@ -1717,7 +1712,7 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo,
   } else if (Tok.is(tok::code_complete)) {
     if (CodeCompletion)
       CodeCompletion->completeAfterIfStmt(/*hasElse*/false);
-    Status.setHasCodeCompletion();
+    Status.setHasCodeCompletionAndIsError();
     consumeToken(tok::code_complete);
   }
 
@@ -1763,7 +1758,7 @@ ParserResult<Stmt> Parser::parseStmtGuard() {
   } else {
     Status |= parseStmtCondition(Condition, diag::expected_condition_guard,
                                  StmtKind::Guard);
-    if (Status.isError() || Status.hasCodeCompletion()) {
+    if (Status.isErrorOrHasCompletion()) {
       // FIXME: better recovery
       return recoverWithCond(Status, Condition);
     }
@@ -1840,7 +1835,7 @@ ParserResult<Stmt> Parser::parseStmtWhile(LabeledStmtInfo LabelInfo) {
   } else {
     Status |= parseStmtCondition(Condition, diag::expected_condition_while,
                                  StmtKind::While);
-    if (Status.isError() || Status.hasCodeCompletion())
+    if (Status.isErrorOrHasCompletion())
       return recoverWithCond(Status, Condition);
   }
 
@@ -1942,7 +1937,7 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo,
     // Recover from all of the clauses failing to parse by returning a
     // normal do-statement.
     if (allClauses.empty()) {
-      assert(status.isError());
+      assert(status.isErrorOrHasCompletion());
       return makeParserResult(status,
                         new (Context) DoStmt(labelInfo, doLoc, body.get()));
     }
@@ -2028,9 +2023,8 @@ ParserResult<CaseStmt> Parser::parseStmtCatch() {
     for (unsigned i : indices(tmp)) {
       auto *vOld = tmp[i];
       auto *vNew = new (Context) VarDecl(
-          /*IsStatic*/ false, vOld->getIntroducer(), false /*IsCaptureList*/,
+          /*IsStatic*/ false, vOld->getIntroducer(),
           vOld->getNameLoc(), vOld->getName(), vOld->getDeclContext());
-      vNew->setHasNonPatternBindingInit();
       vNew->setImplicit();
       Result[i] = vNew;
     }
@@ -2141,9 +2135,6 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
     parseToken(tok::kw_in, InLoc, diag::expected_foreach_in);
   }
 
-  // Bound variables all get their initial values from the generator.
-  pattern.get()->markHasNonPatternBindingInit();
-
   if (IsCStyleFor) {
     // Skip until start of body part.
     if (Tok.is(tok::l_paren)) {
@@ -2170,7 +2161,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
   } else if (Tok.is(tok::code_complete)) {
     Container =
         makeParserResult(new (Context) CodeCompletionExpr(Tok.getLoc()));
-    Container.setHasCodeCompletion();
+    Container.setHasCodeCompletionAndIsError();
     Status |= Container;
     if (CodeCompletion)
       CodeCompletion->completeForEachSequenceBeginning(
@@ -2181,7 +2172,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
     Status |= Container;
     if (Container.isNull())
       Container = makeParserErrorResult(new (Context) ErrorExpr(Tok.getLoc()));
-    if (Container.isParseError())
+    if (Container.isParseErrorOrHasCompletion())
       // Recover.
       skipUntilDeclStmtRBrace(tok::l_brace, tok::kw_where);
   }
@@ -2375,9 +2366,8 @@ parseStmtCase(Parser &P, SourceLoc &CaseLoc,
     for (unsigned i : indices(tmp)) {
       auto *vOld = tmp[i];
       auto *vNew = new (P.Context) VarDecl(
-          /*IsStatic*/ false, vOld->getIntroducer(), false /*IsCaptureList*/,
+          /*IsStatic*/ false, vOld->getIntroducer(),
           vOld->getNameLoc(), vOld->getName(), vOld->getDeclContext());
-      vNew->setHasNonPatternBindingInit();
       vNew->setImplicit();
       Result[i] = vNew;
     }
@@ -2541,7 +2531,7 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
   SourceLoc StartOfBody = Tok.getLoc();
   if (Tok.isNot(tok::r_brace) && !isAtStartOfSwitchCase(*this)) {
     Status |= parseBraceItems(BodyItems, BraceItemListKind::Case);
-  } else if (Status.isSuccess()) {
+  } else if (Status.isSuccess() && !Status.hasCodeCompletion()) {
     diagnose(CaseLoc, diag::case_stmt_without_body,
              CaseLabelItems.back().isDefault())
         .highlight(SourceRange(CaseLoc, ColonLoc))
@@ -2578,7 +2568,7 @@ ParserResult<Stmt> Parser::parseStmtPoundAssert() {
   SourceLoc LBLoc = consumeToken(tok::l_paren);
 
   auto conditionExprResult = parseExpr(diag::pound_assert_expected_expression);
-  if (conditionExprResult.isParseError())
+  if (conditionExprResult.isParseErrorOrHasCompletion())
     return ParserStatus(conditionExprResult);
 
   StringRef message;

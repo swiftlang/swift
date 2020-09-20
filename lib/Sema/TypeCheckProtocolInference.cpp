@@ -809,33 +809,37 @@ AssociatedTypeDecl *AssociatedTypeInference::findDefaultedAssociatedType(
 
 Type AssociatedTypeInference::computeFixedTypeWitness(
                                             AssociatedTypeDecl *assocType) {
+  Type resultType;
+  auto *const structuralTy = DependentMemberType::get(
+      proto->getSelfInterfaceType(), assocType->getName());
+
   // Look at all of the inherited protocols to determine whether they
   // require a fixed type for this associated type.
-  Type resultType;
   for (auto conformedProto : adoptee->getAnyNominal()->getAllProtocols()) {
     if (conformedProto != assocType->getProtocol() &&
         !conformedProto->inheritsFrom(assocType->getProtocol()))
       continue;
 
-    const auto genericSig = conformedProto->getGenericSignature();
-    if (!genericSig) return Type();
+    const auto ty =
+        conformedProto->getGenericSignature()->getCanonicalTypeInContext(
+            structuralTy);
 
-    const auto nestedType = genericSig->getCanonicalTypeInContext(
-        DependentMemberType::get(conformedProto->getSelfInterfaceType(),
-                                 assocType->getName()));
-    if (nestedType->isEqual(conformedProto->getSelfInterfaceType())) {
-      // Self is a valid fixed type witness.
-    } else if (nestedType->isTypeParameter()) {
-      continue;
+    // A dependent member type with an identical base and name indicates that
+    // the protocol does not same-type constrain it in any way; move on to
+    // the next protocol.
+    if (auto *const memberTy = ty->getAs<DependentMemberType>()) {
+      if (memberTy->getBase()->isEqual(structuralTy->getBase()) &&
+          memberTy->getName() == structuralTy->getName())
+        continue;
     }
 
     if (!resultType) {
-      resultType = nestedType;
+      resultType = ty;
       continue;
     }
 
     // FIXME: Bailing out on ambiguity.
-    if (!resultType->isEqual(nestedType))
+    if (!resultType->isEqual(ty))
       return Type();
   }
 
@@ -2010,8 +2014,10 @@ auto AssociatedTypeInference::solve(ConformanceChecker &checker)
     return None;
 
   // Save the missing type witnesses for later diagnosis.
-  checker.GlobalMissingWitnesses.insert(unresolvedAssocTypes.begin(),
-                                        unresolvedAssocTypes.end());
+  for (auto assocType : unresolvedAssocTypes) {
+    checker.GlobalMissingWitnesses.insert({assocType, {}});
+  }
+
   return None;
 }
 

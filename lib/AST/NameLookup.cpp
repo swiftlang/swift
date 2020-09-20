@@ -267,20 +267,20 @@ static void recordShadowedDeclsAfterTypeMatch(
 
     auto name = firstDecl->getBaseName();
 
-    auto isShadowed = [&](ArrayRef<ModuleDecl::AccessPathTy> paths) {
+    auto isShadowed = [&](ArrayRef<ImportPath::Access> paths) {
       for (auto path : paths) {
-        if (ModuleDecl::matchesAccessPath(path, name))
+        if (path.matches(name))
           return false;
       }
 
       return true;
     };
 
-    auto isScopedImport = [&](ArrayRef<ModuleDecl::AccessPathTy> paths) {
+    auto isScopedImport = [&](ArrayRef<ImportPath::Access> paths) {
       for (auto path : paths) {
         if (path.empty())
           continue;
-        if (ModuleDecl::matchesAccessPath(path, name))
+        if (path.matches(name))
           return true;
       }
 
@@ -1765,9 +1765,8 @@ ModuleQualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
     auto accessPaths = ctx.getImportCache().getAllVisibleAccessPaths(
         module, topLevelScope);
     if (llvm::any_of(accessPaths,
-                     [&](ModuleDecl::AccessPathTy accessPath) {
-                       return ModuleDecl::matchesAccessPath(accessPath,
-                                                            member.getFullName());
+                     [&](ImportPath::Access accessPath) {
+                       return accessPath.matches(member.getFullName());
                      })) {
       lookupInModule(module, member.getFullName(), decls,
                      NLKind::QualifiedLookup, kind, topLevelScope);
@@ -1947,7 +1946,33 @@ static DirectlyReferencedTypeDecls
 directReferencesForUnqualifiedTypeLookup(DeclNameRef name,
                                          SourceLoc loc, DeclContext *dc,
                                          LookupOuterResults lookupOuter) {
+  // In a protocol or protocol extension, the 'where' clause can refer to
+  // associated types without 'Self' qualification:
+  //
+  // protocol MyProto where AssocType : Q { ... }
+  //
+  // extension MyProto where AssocType == Int { ... }
+  //
+  // For this reason, ASTScope maps source locations inside the 'where'
+  // clause to a scope that performs the lookup into the protocol or
+  // protocol extension.
+  //
+  // However, protocol and protocol extensions can also put bounds on 'Self',
+  // for example:
+  //
+  // protocol MyProto where Self : MyClass { ... }
+  //
+  // We must start searching for 'MyClass' at the top level, otherwise
+  // we end up with a cycle, because qualified lookup wants to resolve
+  // 'Self' bounds to build the set of declarations to search inside of.
+  //
+  // To make this work, we handle the top-level lookup case explicitly
+  // here, bypassing unqualified lookup and ASTScope altogether.
+  if (dc->isModuleScopeContext())
+    loc = SourceLoc();
+
   DirectlyReferencedTypeDecls results;
+
   UnqualifiedLookupOptions options =
       UnqualifiedLookupFlags::TypeLookup |
       UnqualifiedLookupFlags::AllowProtocolMembers;
@@ -1959,8 +1984,8 @@ directReferencesForUnqualifiedTypeLookup(DeclNameRef name,
   auto lookup = evaluateOrDefault(ctx.evaluator,
                                   UnqualifiedLookupRequest{descriptor}, {});
   for (const auto &result : lookup.allResults()) {
-    if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl()))
-      results.push_back(typeDecl);
+    auto typeDecl = cast<TypeDecl>(result.getValueDecl());
+    results.push_back(typeDecl);
   }
 
   return results;

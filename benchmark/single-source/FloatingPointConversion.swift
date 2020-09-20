@@ -14,18 +14,13 @@ import TestsUtils
 
 public let FloatingPointConversion = [
   BenchmarkInfo(
-    name: "ConvertFloatingPoint.ConcreteDoubleToDouble",
-    runFunction: run_ConvertFloatingPoint_ConcreteDoubleToDouble,
-    tags: [.validation, .api],
-    setUpFunction: { blackHole(doubles) }),
-  BenchmarkInfo(
-    name: "ConvertFloatingPoint.GenericDoubleToDouble",
-    runFunction: run_ConvertFloatingPoint_GenericDoubleToDouble,
-    tags: [.validation, .api],
-    setUpFunction: { blackHole(doubles) }),
-  BenchmarkInfo(
     name: "ConvertFloatingPoint.MockFloat64ToDouble",
     runFunction: run_ConvertFloatingPoint_MockFloat64ToDouble,
+    tags: [.validation, .api],
+    setUpFunction: { blackHole(mockFloat64s) }),
+  BenchmarkInfo(
+    name: "ConvertFloatingPoint.MockFloat64ToInt64",
+    runFunction: run_ConvertFloatingPoint_MockFloat64ToInt64,
     tags: [.validation, .api],
     setUpFunction: { blackHole(mockFloat64s) }),
 ]
@@ -61,9 +56,9 @@ extension MockBinaryFloatingPoint {
   init(_ value: Int) { self.init(_Value(value)) }
   init(_ value: Float) { self.init(_Value(value)) }
   init(_ value: Double) { self.init(_Value(value)) }
-  #if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
-    init(_ value: Float80) { self.init(_Value(value)) }
-  #endif
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+  init(_ value: Float80) { self.init(_Value(value)) }
+#endif
   init(integerLiteral value: _Value.IntegerLiteralType) {
     self.init(_Value(integerLiteral: value))
   }
@@ -159,25 +154,7 @@ func convert<
   U(value)
 }
 
-@inline(never)
-public func run_ConvertFloatingPoint_ConcreteDoubleToDouble(_ N: Int) {
-  for _ in 0..<(N * 100) {
-    for element in doubles {
-      let f = Double(identity(element))
-      blackHole(f)
-    }
-  }
-}
-
-@inline(never)
-public func run_ConvertFloatingPoint_GenericDoubleToDouble(_ N: Int) {
-  for _ in 0..<(N * 100) {
-    for element in doubles {
-      let f = convert(identity(element), to: Double.self)
-      blackHole(f)
-    }
-  }
-}
+// See also: test/SILOptimizer/floating_point_conversion.swift
 
 @inline(never)
 public func run_ConvertFloatingPoint_MockFloat64ToDouble(_ N: Int) {
@@ -185,6 +162,16 @@ public func run_ConvertFloatingPoint_MockFloat64ToDouble(_ N: Int) {
     for element in mockFloat64s {
       let f = Double(identity(element))
       blackHole(f)
+    }
+  }
+}
+
+@inline(never)
+public func run_ConvertFloatingPoint_MockFloat64ToInt64(_ N: Int) {
+  for _ in 0..<(N * 1000) {
+    for element in mockFloat64s {
+      let i = Int64(identity(element))
+      blackHole(i)
     }
   }
 }

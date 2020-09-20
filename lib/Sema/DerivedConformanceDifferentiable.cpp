@@ -457,7 +457,7 @@ deriveBodyDifferentiable_zeroTangentVectorInitializer(
     auto memberCaptureName = C.getIdentifier(std::string(member->getNameStr()) +
                                              "_zeroTangentVectorInitializer");
     auto *memberZeroTanInitCaptureDecl = new (C) VarDecl(
-        /*isStatic*/ false, VarDecl::Introducer::Let, /*isCaptureList*/ true,
+        /*isStatic*/ false, VarDecl::Introducer::Let,
         SourceLoc(), memberCaptureName, funcDecl);
     memberZeroTanInitCaptureDecl->setImplicit();
     auto *memberZeroTanInitPattern =
@@ -671,7 +671,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     // Add a tangent stored property to the `TangentVector` struct, with the
     // name and `TangentVector` type of the original property.
     auto *tangentProperty = new (C) VarDecl(
-        member->isStatic(), member->getIntroducer(), member->isCaptureList(),
+        member->isStatic(), member->getIntroducer(),
         /*NameLoc*/ SourceLoc(), member->getName(), structDecl);
     // Note: `tangentProperty` is not marked as implicit here, because that
     // incorrectly affects memberwise initializer synthesis.

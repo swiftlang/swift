@@ -1020,12 +1020,10 @@ public:
                         bool setIsNoInline = false);
 
   llvm::Constant *getOrCreateRetainFunction(const TypeInfo &objectTI, SILType t,
-                                            llvm::Type *llvmType, 
-                                            irgen::Atomicity atomicity);
+                              llvm::Type *llvmType, Atomicity atomicity);
 
   llvm::Constant *getOrCreateReleaseFunction(const TypeInfo &objectTI, SILType t,
-                                             llvm::Type *llvmType, 
-                                             irgen::Atomicity atomicity);
+                              llvm::Type *llvmType, Atomicity atomicity);
 
   llvm::Constant *getOrCreateOutlinedInitializeWithTakeFunction(
                               SILType objectType, const TypeInfo &objectTI,

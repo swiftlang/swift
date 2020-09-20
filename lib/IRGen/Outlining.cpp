@@ -397,7 +397,7 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedDestroyFunction(
 llvm::Constant *IRGenModule::getOrCreateRetainFunction(const TypeInfo &ti,
                                                        SILType t,
                                                        llvm::Type *llvmType,
-                                                       irgen::Atomicity atomicity) {
+                                                       Atomicity atomicity) {
   auto *loadableTI = cast<LoadableTypeInfo>(&ti);
   IRGenMangler mangler;
   auto manglingBits =
@@ -424,7 +424,7 @@ llvm::Constant *
 IRGenModule::getOrCreateReleaseFunction(const TypeInfo &ti,
                                         SILType t,
                                         llvm::Type *llvmType,
-                                        irgen::Atomicity atomicity) {
+                                        Atomicity atomicity) {
   auto *loadableTI = cast<LoadableTypeInfo>(&ti);
   IRGenMangler mangler;
   auto manglingBits =

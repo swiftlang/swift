@@ -228,7 +228,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       if (AttrStatus.hasCodeCompletion()) {
         if (CodeCompletion)
           CodeCompletion->setAttrTargetDeclKind(DeclKind::Param);
-        status.setHasCodeCompletion();
+        status.setHasCodeCompletionAndIsError();
       }
     }
     
@@ -808,7 +808,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
         parseDeclResultType(diag::expected_type_function_result);
     retType = ResultType.getPtrOrNull();
     Status |= ResultType;
-    if (Status.isError())
+    if (Status.isErrorOrHasCompletion())
       return Status;
 
     // Check for 'throws' and 'rethrows' after the type and correct it.
@@ -919,7 +919,7 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
                                             argLabelLocs, rParenLoc,
                                             trailingClosures,
                                             SyntaxKind::Unknown);
-        if (status.isSuccess()) {
+        if (status.isSuccess() && !status.hasCodeCompletion()) {
           backtrack.cancelBacktrack();
           
           // Suggest replacing ':' with '='
@@ -965,7 +965,7 @@ ParserResult<Pattern> Parser::parsePattern() {
         SF.Kind == SourceFileKind::Interface) {
       PatternCtx.setCreateSyntax(SyntaxKind::IdentifierPattern);
       auto VD = new (Context) VarDecl(
-        /*IsStatic*/false, introducer, /*IsCaptureList*/false,
+        /*IsStatic*/false, introducer,
         consumeToken(tok::kw__), Identifier(), CurDeclContext);
       return makeParserResult(NamedPattern::createImplicit(Context, VD));
     }
@@ -1038,8 +1038,7 @@ ParserResult<Pattern> Parser::parsePattern() {
 Pattern *Parser::createBindingFromPattern(SourceLoc loc, Identifier name,
                                           VarDecl::Introducer introducer) {
   auto var = new (Context) VarDecl(/*IsStatic*/false, introducer,
-                                   /*IsCaptureList*/false, loc, name,
-                                   CurDeclContext);
+                                   loc, name, CurDeclContext);
   return new (Context) NamedPattern(var);
 }
 
@@ -1133,11 +1132,11 @@ parseOptionalPatternTypeAnnotation(ParserResult<Pattern> result) {
   Pattern *P = result.get();
   ParserStatus status;
   if (result.hasCodeCompletion())
-    status.setHasCodeCompletion();
+    status.setHasCodeCompletionAndIsError();
 
   ParserResult<TypeRepr> Ty = parseType();
   if (Ty.hasCodeCompletion()) {
-    result.setHasCodeCompletion();
+    result.setHasCodeCompletionAndIsError();
     return result;
   }
 

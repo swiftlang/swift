@@ -550,7 +550,7 @@ private:
 
     case DeclContextKind::Module:
       return getOrCreateModule(
-          {ModuleDecl::AccessPathTy(), cast<ModuleDecl>(DC)});
+          {ImportPath::Access(), cast<ModuleDecl>(DC)});
     case DeclContextKind::FileUnit:
       // A module may contain multiple files.
       return getOrCreateContext(DC->getParent());
@@ -2089,7 +2089,7 @@ void IRGenDebugInfoImpl::emitImport(ImportDecl *D) {
     return;
 
   assert(D->getModule() && "compiler-synthesized ImportDecl is incomplete");
-  ModuleDecl::ImportedModule Imported = {D->getModulePath(), D->getModule()};
+  ModuleDecl::ImportedModule Imported = { D->getAccessPath(), D->getModule() };
   auto DIMod = getOrCreateModule(Imported);
   auto L = getDebugLoc(*this, D);
   auto *File = getOrCreateFile(L.Filename);

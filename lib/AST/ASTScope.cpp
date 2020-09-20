@@ -40,12 +40,10 @@ using namespace ast_scope;
 
 llvm::SmallVector<const ASTScopeImpl *, 0> ASTScope::unqualifiedLookup(
     SourceFile *SF, DeclNameRef name, SourceLoc loc,
-    const DeclContext *startingContext,
     namelookup::AbstractASTScopeDeclConsumer &consumer) {
   if (auto *s = SF->getASTContext().Stats)
     ++s->getFrontendCounters().NumASTScopeLookups;
-  return ASTScopeImpl::unqualifiedLookup(SF, name, loc, startingContext,
-                                         consumer);
+  return ASTScopeImpl::unqualifiedLookup(SF, name, loc, consumer);
 }
 
 Optional<bool> ASTScope::computeIsCascadingUse(
@@ -98,10 +96,6 @@ NullablePtr<ClosureExpr> BraceStmtScope::parentClosureIfAny() const {
 NullablePtr<ClosureExpr> ASTScopeImpl::getClosureIfClosureScope() const {
   return nullptr;
 }
-NullablePtr<ClosureExpr>
-AbstractClosureScope::getClosureIfClosureScope() const {
-  return closureExpr;
-}
 
 // Conservative, because using precise info would be circular
 SourceRange
@@ -122,20 +116,6 @@ SourceManager &ASTScopeImpl::getSourceManager() const {
 
 Stmt *LabeledConditionalStmtScope::getStmt() const {
   return getLabeledConditionalStmt();
-}
-
-bool AbstractFunctionBodyScope::isAMethod(
-    const AbstractFunctionDecl *const afd) {
-  // What makes this interesting is that a method named "init" which is not
-  // in a nominal type or extension decl body still gets an implicit self
-  // parameter (even though the program is illegal).
-  // So when choosing between creating a MethodBodyScope and a
-  // PureFunctionBodyScope do we go by the enclosing Decl (i.e.
-  // "afd->getDeclContext()->isTypeContext()") or by
-  // "bool(afd->getImplicitSelfDecl())"?
-  //
-  // Since the code uses \c getImplicitSelfDecl, use that.
-  return afd->getImplicitSelfDecl();
 }
 
 #pragma mark getLabeledConditionalStmt
@@ -224,8 +204,7 @@ DEFINE_GET_CLASS_NAME(ASTSourceFileScope)
 DEFINE_GET_CLASS_NAME(GenericParamScope)
 DEFINE_GET_CLASS_NAME(AbstractFunctionDeclScope)
 DEFINE_GET_CLASS_NAME(ParameterListScope)
-DEFINE_GET_CLASS_NAME(MethodBodyScope)
-DEFINE_GET_CLASS_NAME(PureFunctionBodyScope)
+DEFINE_GET_CLASS_NAME(FunctionBodyScope)
 DEFINE_GET_CLASS_NAME(DefaultArgumentInitializerScope)
 DEFINE_GET_CLASS_NAME(AttachedPropertyWrapperScope)
 DEFINE_GET_CLASS_NAME(PatternEntryDeclScope)
@@ -233,9 +212,7 @@ DEFINE_GET_CLASS_NAME(PatternEntryInitializerScope)
 DEFINE_GET_CLASS_NAME(ConditionalClauseScope)
 DEFINE_GET_CLASS_NAME(ConditionalClausePatternUseScope)
 DEFINE_GET_CLASS_NAME(CaptureListScope)
-DEFINE_GET_CLASS_NAME(WholeClosureScope)
 DEFINE_GET_CLASS_NAME(ClosureParametersScope)
-DEFINE_GET_CLASS_NAME(ClosureBodyScope)
 DEFINE_GET_CLASS_NAME(TopLevelCodeScope)
 DEFINE_GET_CLASS_NAME(SpecializeAttributeScope)
 DEFINE_GET_CLASS_NAME(DifferentiableAttributeScope)
@@ -253,6 +230,8 @@ DEFINE_GET_CLASS_NAME(SwitchStmtScope)
 DEFINE_GET_CLASS_NAME(ForEachStmtScope)
 DEFINE_GET_CLASS_NAME(ForEachPatternScope)
 DEFINE_GET_CLASS_NAME(CaseStmtScope)
+DEFINE_GET_CLASS_NAME(CaseLabelItemScope)
+DEFINE_GET_CLASS_NAME(CaseStmtBodyScope)
 DEFINE_GET_CLASS_NAME(BraceStmtScope)
 
 #undef DEFINE_GET_CLASS_NAME

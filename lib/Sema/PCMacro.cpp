@@ -353,7 +353,7 @@ public:
           NB = prependLoggerCall(NB, {StartLoc, EndLoc});
 
         if (NB != B) {
-          FD->setBody(NB);
+          FD->setBody(NB, AbstractFunctionDecl::BodyKind::TypeChecked);
           TypeChecker::checkFunctionEffects(FD);
         }
       }
@@ -510,8 +510,7 @@ public:
 
     VarDecl *VD =
         new (Context) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
-                              /*IsCaptureList*/false, SourceLoc(),
-                              Context.getIdentifier(NameBuf),
+                              SourceLoc(), Context.getIdentifier(NameBuf),
                               TypeCheckDC);
     VD->setInterfaceType(MaybeLoadInitExpr->getType()->mapTypeOutOfContext());
     VD->setImplicit();

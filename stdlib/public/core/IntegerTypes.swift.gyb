@@ -1195,9 +1195,11 @@ public struct ${Self}
     // undefined if it overflows.
 %     if not (FloatBits == 16 and bits >= 32): # Float16 is always in-range for 32- and 64-bit ints.
     guard source > ${str(lower)}.0 && source < ${str(upper)}.0 else {
+%     else:
+    guard source.isFinite else {
+%     end
       return nil
     }
-%     end
     guard source == source.rounded(.towardZero) else {
       return nil
     }

@@ -179,7 +179,7 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     bool isTypeChecking =
         (FEOpts.RequestedAction == FrontendOptions::ActionType::Typecheck);
     const auto &InputInfo = FEOpts.InputsAndOutputs.firstInput();
-    StringRef InPath = InputInfo.file();
+    StringRef InPath = InputInfo.getFileName();
     const auto &OutputInfo =
     InputInfo.getPrimarySpecificPaths().SupplementaryOutputs;
     StringRef OutPath = OutputInfo.ModuleOutputPath;

@@ -383,21 +383,51 @@ public:
 
   void addExprToScopeTree(Expr *expr, ASTScopeImpl *parent) {
     // Use the ASTWalker to find buried captures and closures
-    forEachClosureIn(expr, [&](NullablePtr<CaptureListExpr> captureList,
-                               ClosureExpr *closureExpr) {
-      ifUniqueConstructExpandAndInsert<WholeClosureScope>(parent, closureExpr,
-                                                          captureList);
-    });
+    ASTScopeAssert(expr,
+                 "If looking for closures, must have an expression to search.");
+
+    /// AST walker that finds top-level closures in an expression.
+    class ClosureFinder : public ASTWalker {
+      ScopeCreator &scopeCreator;
+      ASTScopeImpl *parent;
+
+    public:
+      ClosureFinder(ScopeCreator &scopeCreator, ASTScopeImpl *parent)
+          : scopeCreator(scopeCreator), parent(parent) {}
+
+      std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+        if (auto *closure = dyn_cast<ClosureExpr>(E)) {
+          scopeCreator
+              .ifUniqueConstructExpandAndInsert<ClosureParametersScope>(
+                  parent, closure);
+          return {false, E};
+        }
+        if (auto *capture = dyn_cast<CaptureListExpr>(E)) {
+          scopeCreator
+              .ifUniqueConstructExpandAndInsert<CaptureListScope>(
+                  parent, capture);
+          return {false, E};
+        }
+        return {true, E};
+      }
+      std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+        if (isa<BraceStmt>(S)) { // closures hidden in here
+          return {true, S};
+        }
+        return {false, S};
+      }
+      std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
+        return {false, P};
+      }
+      bool walkToDeclPre(Decl *D) override { return false; }
+      bool walkToTypeReprPre(TypeRepr *T) override { return false; }
+      bool walkToParameterListPre(ParameterList *PL) override { return false; }
+    };
+
+    expr->walk(ClosureFinder(*this, parent));
   }
 
 private:
-  /// Find all of the (non-nested) closures (and associated capture lists)
-  /// referenced within this expression.
-  void forEachClosureIn(
-      Expr *expr,
-      function_ref<void(NullablePtr<CaptureListExpr>, ClosureExpr *)>
-          foundClosure);
-
   // A safe way to discover this, without creating a circular request.
   // Cannot call getAttachedPropertyWrappers.
   static bool hasAttachedPropertyWrapper(VarDecl *vd) {
@@ -1169,7 +1199,9 @@ NO_NEW_INSERTION_POINT(EnumElementScope)
 
 NO_NEW_INSERTION_POINT(CaptureListScope)
 NO_NEW_INSERTION_POINT(CaseStmtScope)
-NO_NEW_INSERTION_POINT(ClosureBodyScope)
+NO_NEW_INSERTION_POINT(CaseLabelItemScope)
+NO_NEW_INSERTION_POINT(CaseStmtBodyScope)
+NO_NEW_INSERTION_POINT(ClosureParametersScope)
 NO_NEW_INSERTION_POINT(DefaultArgumentInitializerScope)
 NO_NEW_INSERTION_POINT(DoStmtScope)
 NO_NEW_INSERTION_POINT(DoCatchStmtScope)
@@ -1181,10 +1213,8 @@ NO_NEW_INSERTION_POINT(SubscriptDeclScope)
 NO_NEW_INSERTION_POINT(SwitchStmtScope)
 NO_NEW_INSERTION_POINT(VarDeclScope)
 NO_NEW_INSERTION_POINT(WhileStmtScope)
-NO_NEW_INSERTION_POINT(WholeClosureScope)
 
 NO_EXPANSION(GenericParamScope)
-NO_EXPANSION(ClosureParametersScope)
 NO_EXPANSION(SpecializeAttributeScope)
 NO_EXPANSION(DifferentiableAttributeScope)
 NO_EXPANSION(ConditionalClausePatternUseScope)
@@ -1386,12 +1416,8 @@ void AbstractFunctionDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
   // We create body scopes when there is no body for source kit to complete
   // erroneous code in bodies.
   if (decl->getBodySourceRange().isValid()) {
-    if (AbstractFunctionBodyScope::isAMethod(decl))
-      scopeCreator.constructExpandAndInsertUncheckable<MethodBodyScope>(leaf,
+    scopeCreator.constructExpandAndInsertUncheckable<FunctionBodyScope>(leaf,
                                                                         decl);
-    else
-      scopeCreator.constructExpandAndInsertUncheckable<PureFunctionBodyScope>(
-          leaf, decl);
   }
 }
 
@@ -1486,10 +1512,24 @@ void ForEachPatternScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
 
 void CaseStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
-  for (auto &caseItem : stmt->getMutableCaseLabelItems())
-    scopeCreator.addToScopeTree(caseItem.getGuardExpr(), this);
+  for (auto &item : stmt->getCaseLabelItems()) {
+    if (item.getGuardExpr()) {
+      scopeCreator.constructExpandAndInsertUncheckable<CaseLabelItemScope>(
+        this, item);
+    }
+  }
 
-  // Add a child for the case body.
+  scopeCreator.constructExpandAndInsertUncheckable<CaseStmtBodyScope>(
+      this, stmt);
+}
+
+void CaseLabelItemScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
+    ScopeCreator &scopeCreator) {
+  scopeCreator.addToScopeTree(item.getGuardExpr(), this);
+}
+
+void CaseStmtBodyScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
+    ScopeCreator &scopeCreator) {
   scopeCreator.addToScopeTree(stmt->getBody(), this);
 }
 
@@ -1509,35 +1549,15 @@ void SubscriptDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
   scopeCreator.addChildrenForAllLocalizableAccessorsInSourceOrder(sub, params);
 }
 
-void WholeClosureScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
-    ScopeCreator &scopeCreator) {
-  if (auto *cl = captureList.getPtrOrNull())
-    scopeCreator.ensureUniqueThenConstructExpandAndInsert<CaptureListScope>(
-        this, cl);
-  ASTScopeImpl *bodyParent = this;
-  if (closureExpr->getInLoc().isValid())
-    bodyParent =
-        scopeCreator
-            .constructExpandAndInsertUncheckable<ClosureParametersScope>(
-                this, closureExpr, captureList);
-  scopeCreator.constructExpandAndInsertUncheckable<ClosureBodyScope>(
-      bodyParent, closureExpr, captureList);
-}
-
 void CaptureListScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
-  // Patterns here are implicit, so need to dig out the intializers
-  for (const CaptureListEntry &captureListEntry : expr->getCaptureList()) {
-    for (unsigned patternEntryIndex = 0;
-         patternEntryIndex < captureListEntry.Init->getNumPatternEntries();
-         ++patternEntryIndex) {
-      Expr *init = captureListEntry.Init->getInit(patternEntryIndex);
-      scopeCreator.addExprToScopeTree(init, this);
-    }
-  }
+  auto *closureExpr = expr->getClosureBody();
+  scopeCreator
+      .ifUniqueConstructExpandAndInsert<ClosureParametersScope>(
+          this, closureExpr);
 }
 
-void ClosureBodyScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
+void ClosureParametersScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   scopeCreator.addToScopeTree(closureExpr->getBody(), this);
 }
@@ -1717,51 +1737,6 @@ bool ASTScopeImpl::isATypeDeclScope() const {
   return pd && (isa<NominalTypeDecl>(pd) || isa<ExtensionDecl>(pd));
 }
 
-void ScopeCreator::forEachClosureIn(
-    Expr *expr, function_ref<void(NullablePtr<CaptureListExpr>, ClosureExpr *)>
-                    foundClosure) {
-  ASTScopeAssert(expr,
-                 "If looking for closures, must have an expression to search.");
-
-  /// AST walker that finds top-level closures in an expression.
-  class ClosureFinder : public ASTWalker {
-    function_ref<void(NullablePtr<CaptureListExpr>, ClosureExpr *)>
-        foundClosure;
-
-  public:
-    ClosureFinder(
-        function_ref<void(NullablePtr<CaptureListExpr>, ClosureExpr *)>
-            foundClosure)
-        : foundClosure(foundClosure) {}
-
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      if (auto *closure = dyn_cast<ClosureExpr>(E)) {
-        foundClosure(nullptr, closure);
-        return {false, E};
-      }
-      if (auto *capture = dyn_cast<CaptureListExpr>(E)) {
-        foundClosure(capture, capture->getClosureBody());
-        return {false, E};
-      }
-      return {true, E};
-    }
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-      if (isa<BraceStmt>(S)) { // closures hidden in here
-        return {true, S};
-      }
-      return {false, S};
-    }
-    std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
-      return {false, P};
-    }
-    bool walkToDeclPre(Decl *D) override { return false; }
-    bool walkToTypeReprPre(TypeRepr *T) override { return false; }
-    bool walkToParameterListPre(ParameterList *PL) override { return false; }
-  };
-
-  expr->walk(ClosureFinder(foundClosure));
-}
-
 #pragma mark new operators
 void *ASTScopeImpl::operator new(size_t bytes, const ASTContext &ctx,
                                  unsigned alignment) {
@@ -1823,7 +1798,7 @@ GET_REFERRENT(VarDeclScope, getDecl())
 GET_REFERRENT(GenericParamScope, paramList->getParams()[index])
 GET_REFERRENT(AbstractStmtScope, getStmt())
 GET_REFERRENT(CaptureListScope, getExpr())
-GET_REFERRENT(WholeClosureScope, getExpr())
+GET_REFERRENT(ClosureParametersScope, getExpr())
 GET_REFERRENT(SpecializeAttributeScope, specializeAttr)
 GET_REFERRENT(DifferentiableAttributeScope, differentiableAttr)
 GET_REFERRENT(GenericTypeOrExtensionScope, portion->getReferrentOfScope(this));
@@ -1964,13 +1939,6 @@ bool PatternEntryDeclScope::isCurrentIfWasExpanded() const {
   return getPatternEntry().getNumBoundVariables() == varCountWhenLastExpanded;
 }
 
-void WholeClosureScope::beCurrent() {
-  bodyWhenLastExpanded = closureExpr->getBody();
-}
-bool WholeClosureScope::isCurrentIfWasExpanded() const {
-  return bodyWhenLastExpanded == closureExpr->getBody();
-}
-
 #pragma mark getParentOfASTAncestorScopesToBeRescued
 NullablePtr<ASTScopeImpl>
 ASTScopeImpl::getParentOfASTAncestorScopesToBeRescued() {
@@ -2030,11 +1998,6 @@ ASTScopeImpl::rescueASTAncestorScopesForReuseFromMe() {
   }
   resetASTAncestorScopeCount();
   return astAncestorScopes;
-}
-
-bool AbstractFunctionDeclScope::shouldCreateAccessorScope(
-    const AccessorDecl *const ad) {
-  return isLocalizable(ad);
 }
 
 #pragma mark verification

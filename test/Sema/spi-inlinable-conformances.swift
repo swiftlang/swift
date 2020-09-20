@@ -241,9 +241,8 @@ extension NormalProtoAssocHolder {
 
 @_spi(AcceptInSPI)
 @inlinable public func SPIlocalTypeAlias() {
-  // FIXME these should be accepted.
-  typealias LocalUser = NormalProtoAssocHolder<NormalStruct> // expected-error{{cannot use conformance of 'NormalStruct' to 'NormalProto' here; the conformance is declared as SPI}}
-  typealias LocalGenericUser<T> = (T, NormalProtoAssocHolder<NormalStruct>) // expected-error{{cannot use conformance of 'NormalStruct' to 'NormalProto' here; the conformance is declared as SPI}}
+  typealias LocalUser = NormalProtoAssocHolder<NormalStruct>
+  typealias LocalGenericUser<T> = (T, NormalProtoAssocHolder<NormalStruct>)
 
   typealias LocalProtoAssoc<T: NormalProto> = T.Assoc
   _ = LocalProtoAssoc<NormalStruct>()
@@ -258,9 +257,8 @@ extension NormalProtoAssocHolder {
 
 @_spi(AcceptInSPI)
 @inlinable public func SPIlocalFunctions() {
-  // FIXME these should be accepted.
-  func local(_: NormalProtoAssocHolder<NormalStruct>) {} // expected-error{{cannot use conformance of 'NormalStruct' to 'NormalProto' here; the conformance is declared as SPI}}
-  func localReturn() -> NormalProtoAssocHolder<NormalStruct> { fatalError() } // expected-error{{cannot use conformance of 'NormalStruct' to 'NormalProto' here; the conformance is declared as SPI}}
+  func local(_: NormalProtoAssocHolder<NormalStruct>) {}
+  func localReturn() -> NormalProtoAssocHolder<NormalStruct> { fatalError() }
   let _ = { (_: NormalProtoAssocHolder<NormalStruct>) in return }
   let _ = { () -> NormalProtoAssocHolder<NormalStruct> in fatalError() }
 }

@@ -58,7 +58,8 @@ SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
 }
 
 SILGlobalVariable::~SILGlobalVariable() {
-  getModule().GlobalVariableMap.erase(Name);
+  StaticInitializerBlock.dropAllReferences();
+  StaticInitializerBlock.clearStaticInitializerBlock(Module);
 }
 
 /// Get this global variable's fragile attribute.

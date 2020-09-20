@@ -2014,35 +2014,31 @@ ModuleDecl *ModuleFile::getModule(ModuleID MID) {
       llvm_unreachable("implementation detail only");
     }
   }
-  return getModule(getIdentifier(MID),
+  return getModule(ImportPath::Module::Builder(getIdentifier(MID)).get(),
                    getContext().LangOpts.AllowDeserializingImplementationOnly);
 }
 
-ModuleDecl *ModuleFile::getModule(ArrayRef<Identifier> name,
+ModuleDecl *ModuleFile::getModule(ImportPath::Module name,
                                   bool allowLoading) {
-  if (name.empty() || name.front().empty())
+  if (name.empty() || name.front().Item.empty())
     return getContext().TheBuiltinModule;
 
   // FIXME: duplicated from ImportResolver::getModule
   if (name.size() == 1 &&
-      name.front() == FileContext->getParentModule()->getName()) {
+      name.front().Item == FileContext->getParentModule()->getName()) {
     if (!UnderlyingModule && allowLoading) {
       auto importer = getContext().getClangModuleLoader();
       assert(importer && "no way to import shadowed module");
-      UnderlyingModule = importer->loadModule(SourceLoc(),
-                                              {{name.front(), SourceLoc()}});
+      UnderlyingModule =
+          importer->loadModule(SourceLoc(), name.getTopLevelPath());
     }
 
     return UnderlyingModule;
   }
 
-  SmallVector<ImportDecl::AccessPathElement, 4> importPath;
-  for (auto pathElem : name)
-    importPath.push_back({ pathElem, SourceLoc() });
-
   if (allowLoading)
-    return getContext().getModule(importPath);
-  return getContext().getLoadedModule(importPath);
+    return getContext().getModule(name);
+  return getContext().getLoadedModule(name);
 }
 
 
@@ -2203,8 +2199,8 @@ getActualReadWriteImplKind(unsigned rawKind) {
   CASE(MutableAddress)
   CASE(MaterializeToTemporary)
   CASE(Modify)
-  CASE(StoredWithSimpleDidSet)
-  CASE(InheritedWithSimpleDidSet)
+  CASE(StoredWithDidSet)
+  CASE(InheritedWithDidSet)
 #undef CASE
   }
   return None;
@@ -2735,7 +2731,7 @@ public:
                                   StringRef blobData) {
     IdentifierID nameID;
     DeclContextID contextID;
-    bool isImplicit, isObjC, isStatic, hasNonPatternBindingInit;
+    bool isImplicit, isObjC, isStatic;
     uint8_t rawIntroducer;
     bool isGetterMutating, isSetterMutating;
     bool isLazyStorageProperty;
@@ -2753,7 +2749,6 @@ public:
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID,
                                        isImplicit, isObjC, isStatic, rawIntroducer,
-                                       hasNonPatternBindingInit,
                                        isGetterMutating, isSetterMutating,
                                        isLazyStorageProperty,
                                        isTopLevelGlobal,
@@ -2825,9 +2820,7 @@ public:
       MF.fatal();
 
     auto var = MF.createDecl<VarDecl>(/*IsStatic*/ isStatic, *introducer,
-                                      /*IsCaptureList*/ false, SourceLoc(),
-                                      name, DC);
-    var->setHasNonPatternBindingInit(hasNonPatternBindingInit);
+                                      SourceLoc(), name, DC);
     var->setIsGetterMutating(isGetterMutating);
     var->setIsSetterMutating(isSetterMutating);
     declOrOffset = var;

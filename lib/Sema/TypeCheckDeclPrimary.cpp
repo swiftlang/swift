@@ -1629,6 +1629,8 @@ public:
 
     checkAccessControl(PBD);
 
+    checkExplicitAvailability(PBD);
+
     // If the initializers in the PBD aren't checked yet, do so now.
     for (auto i : range(PBD->getNumPatternEntries())) {
       if (!PBD->isInitialized(i))
@@ -1682,6 +1684,8 @@ public:
     TypeChecker::checkDeclAttributes(SD);
 
     checkAccessControl(SD);
+
+    checkExplicitAvailability(SD);
 
     if (!checkOverrides(SD)) {
       // If a subscript has an override attribute but does not override
@@ -2299,7 +2303,7 @@ public:
       FD->diagnose(diag::func_decl_without_brace);
     } else if (FD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
-      TypeChecker::typeCheckAbstractFunctionBody(FD);
+      (void)FD->getTypecheckedBody();
     } else if (shouldSkipBodyTypechecking(FD)) {
       FD->setBodySkipped(FD->getBodySourceRange());
     } else {
@@ -2642,12 +2646,14 @@ public:
 
     checkAccessControl(CD);
 
+    checkExplicitAvailability(CD);
+
     if (requiresDefinition(CD) && !CD->hasBody()) {
       // Complain if we should have a body.
       CD->diagnose(diag::missing_initializer_def);
     } else if (CD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
-      TypeChecker::typeCheckAbstractFunctionBody(CD);
+      (void)CD->getTypecheckedBody();
     } else if (shouldSkipBodyTypechecking(CD)) {
       CD->setBodySkipped(CD->getBodySourceRange());
     } else {
@@ -2662,7 +2668,7 @@ public:
 
     if (DD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
-      TypeChecker::typeCheckAbstractFunctionBody(DD);
+      (void)DD->getTypecheckedBody();
     } else if (shouldSkipBodyTypechecking(DD)) {
       DD->setBodySkipped(DD->getBodySourceRange());
     } else {

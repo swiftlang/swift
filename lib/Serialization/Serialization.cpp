@@ -514,8 +514,8 @@ static unsigned getRawReadWriteImplKind(swift::ReadWriteImplKind kind) {
   CASE(MutableAddress)
   CASE(MaterializeToTemporary)
   CASE(Modify)
-  CASE(StoredWithSimpleDidSet)
-  CASE(InheritedWithSimpleDidSet)
+  CASE(StoredWithDidSet)
+  CASE(InheritedWithDidSet)
 #undef CASE
   }
   llvm_unreachable("bad kind");
@@ -1044,7 +1044,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   auto clangImporter =
     static_cast<ClangImporter *>(M->getASTContext().getClangModuleLoader());
   ModuleDecl *bridgingHeaderModule = clangImporter->getImportedHeaderModule();
-  ModuleDecl::ImportedModule bridgingHeaderImport{ModuleDecl::AccessPathTy(),
+  ModuleDecl::ImportedModule bridgingHeaderImport{ImportPath::Access(),
                                                   bridgingHeaderModule};
 
   // Make sure the bridging header module is always at the top of the import
@@ -3338,7 +3338,6 @@ public:
                           var->isObjC(),
                           var->isStatic(),
                           rawIntroducer,
-                          var->hasNonPatternBindingInit(),
                           var->isGetterMutating(),
                           var->isSetterMutating(),
                           var->isLazyStorageProperty(),

@@ -1009,23 +1009,9 @@ namespace {
     virtual Type visitCodeCompletionExpr(CodeCompletionExpr *E) {
       CS.Options |= ConstraintSystemFlags::SuppressDiagnostics;
       auto locator = CS.getConstraintLocator(E);
-      auto ty = CS.createTypeVariable(locator,
-                                      TVO_CanBindToLValue |
-                                      TVO_CanBindToNoEscape);
-
-      // Defaults to the type of the base expression if we have a base
-      // expression.
-      // FIXME: This is just to keep the old behavior where `foo(base.<HERE>)`
-      // the argument is type checked to the type of the 'base'. Ideally, code
-      // completion expression should be defauled to 'UnresolvedType'
-      // regardless of the existence of the base expression. But the constraint
-      // system is simply not ready for that.
-      if (auto base = E->getBase()) {
-        CS.addConstraint(ConstraintKind::Defaultable, ty, CS.getType(base),
-                         locator);
-      }
-      
-      return ty;
+      return CS.createTypeVariable(locator, TVO_CanBindToLValue |
+                                                TVO_CanBindToNoEscape |
+                                                TVO_CanBindToHole);
     }
 
     Type visitNilLiteralExpr(NilLiteralExpr *expr) {
@@ -1767,11 +1753,11 @@ namespace {
 
         auto type = contextualType->lookThroughAllOptionalTypes();
         if (conformsToKnownProtocol(
-                CS, type, KnownProtocolKind::ExpressibleByArrayLiteral))
+                CS.DC, type, KnownProtocolKind::ExpressibleByArrayLiteral))
           return false;
 
         return conformsToKnownProtocol(
-            CS, type, KnownProtocolKind::ExpressibleByDictionaryLiteral);
+            CS.DC, type, KnownProtocolKind::ExpressibleByDictionaryLiteral);
       };
 
       if (isDictionaryContextualType(contextualType)) {
@@ -2045,7 +2031,7 @@ namespace {
         }
       }
 
-      auto extInfo = closureEffects(closure);
+      auto extInfo = CS.closureEffects(closure);
 
       // Closure expressions always have function type. In cases where a
       // parameter or return type is omitted, a fresh type variable is used to
@@ -2180,7 +2166,7 @@ namespace {
         // FIXME: This should be handled in the solver, not here.
         //
         // Otherwise, create a new type variable.
-        if (!var->hasNonPatternBindingInit() &&
+        if (var->getParentPatternBinding() &&
             !var->hasAttachedPropertyWrapper() &&
             optionality != ReferenceOwnershipOptionality::Required) {
           if (auto boundExpr = locator.trySimplifyToExpr()) {
@@ -2499,214 +2485,6 @@ namespace {
     Type visitCaptureListExpr(CaptureListExpr *expr) {
       // The type of the capture list is just the type of its closure.
       return CS.getType(expr->getClosureBody());
-    }
-
-    /// Walk a closure AST to determine its effects.
-    ///
-    /// \returns a function's extended info describing the effects, as
-    /// determined syntactically.
-    FunctionType::ExtInfo closureEffects(ClosureExpr *expr) {
-      // A walker that looks for 'try' and 'throw' expressions
-      // that aren't nested within closures, nested declarations,
-      // or exhaustive catches.
-      class FindInnerThrows : public ASTWalker {
-        ConstraintSystem &CS;
-        DeclContext *DC;
-        bool FoundThrow = false;
-        
-        std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-          // If we've found a 'try', record it and terminate the traversal.
-          if (isa<TryExpr>(expr)) {
-            FoundThrow = true;
-            return { false, nullptr };
-          }
-
-          // Don't walk into a 'try!' or 'try?'.
-          if (isa<ForceTryExpr>(expr) || isa<OptionalTryExpr>(expr)) {
-            return { false, expr };
-          }
-          
-          // Do not recurse into other closures.
-          if (isa<ClosureExpr>(expr))
-            return { false, expr };
-          
-          return { true, expr };
-        }
-        
-        bool walkToDeclPre(Decl *decl) override {
-          // Do not walk into function or type declarations.
-          if (!isa<PatternBindingDecl>(decl))
-            return false;
-          
-          return true;
-        }
-
-        bool isSyntacticallyExhaustive(DoCatchStmt *stmt) {
-          for (auto catchClause : stmt->getCatches()) {
-            for (auto &LabelItem : catchClause->getMutableCaseLabelItems()) {
-              if (isSyntacticallyExhaustive(catchClause->getStartLoc(),
-                                            LabelItem))
-                return true;
-            }
-          }
-
-          return false;
-        }
-
-        bool isSyntacticallyExhaustive(SourceLoc CatchLoc,
-                                       CaseLabelItem &LabelItem) {
-          // If it's obviously non-exhaustive, great.
-          if (LabelItem.getGuardExpr())
-            return false;
-
-          // If we can show that it's exhaustive without full
-          // type-checking, great.
-          if (LabelItem.isSyntacticallyExhaustive())
-            return true;
-
-          // Okay, resolve the pattern.
-          Pattern *pattern = LabelItem.getPattern();
-          if (!LabelItem.isPatternResolved()) {
-            pattern = TypeChecker::resolvePattern(pattern, CS.DC,
-                                           /*isStmtCondition*/false);
-            if (!pattern) return false;
-
-            // Save that aside while we explore the type.
-            LabelItem.setPattern(pattern, /*resolved=*/true);
-          }
-
-          // Require the pattern to have a particular shape: a number
-          // of is-patterns applied to an irrefutable pattern.
-          pattern = pattern->getSemanticsProvidingPattern();
-          while (auto isp = dyn_cast<IsPattern>(pattern)) {
-            const Type castType = TypeResolution::forContextual(
-                                      CS.DC, TypeResolverContext::InExpression,
-                                      /*unboundTyOpener*/ nullptr)
-                                      .resolveType(isp->getCastTypeRepr());
-            if (castType->hasError()) {
-              return false;
-            }
-
-            if (!isp->hasSubPattern()) {
-              pattern = nullptr;
-              break;
-            } else {
-              pattern = isp->getSubPattern()->getSemanticsProvidingPattern();
-            }
-          }
-          if (pattern && pattern->isRefutablePattern()) {
-            return false;
-          }
-
-          // Okay, now it should be safe to coerce the pattern.
-          // Pull the top-level pattern back out.
-          pattern = LabelItem.getPattern();
-          Type exnType = CS.getASTContext().getErrorDecl()->getDeclaredInterfaceType();
-
-          if (!exnType)
-            return false;
-          auto contextualPattern =
-              ContextualPattern::forRawPattern(pattern, DC);
-          pattern = TypeChecker::coercePatternToType(
-            contextualPattern, exnType, TypeResolverContext::InExpression);
-          if (!pattern)
-            return false;
-
-          LabelItem.setPattern(pattern, /*resolved=*/true);
-          return LabelItem.isSyntacticallyExhaustive();
-        }
-
-        std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
-          // If we've found a 'throw', record it and terminate the traversal.
-          if (isa<ThrowStmt>(stmt)) {
-            FoundThrow = true;
-            return { false, nullptr };
-          }
-
-          // Handle do/catch differently.
-          if (auto doCatch = dyn_cast<DoCatchStmt>(stmt)) {
-            // Only walk into the 'do' clause of a do/catch statement
-            // if the catch isn't syntactically exhaustive.
-            if (!isSyntacticallyExhaustive(doCatch)) {
-              if (!doCatch->getBody()->walk(*this))
-                return { false, nullptr };
-            }
-
-            // Walk into all the catch clauses.
-            for (auto catchClause : doCatch->getCatches()) {
-              if (!catchClause->walk(*this))
-                return { false, nullptr };
-            }
-
-            // We've already walked all the children we care about.
-            return { false, stmt };
-          }
-          
-          return { true, stmt };
-        }
-        
-      public:
-        FindInnerThrows(ConstraintSystem &cs, DeclContext *dc)
-            : CS(cs), DC(dc) {}
-
-        bool foundThrow() { return FoundThrow; }
-      };
-
-      // A walker that looks for 'async' and 'await' expressions
-      // that aren't nested within closures or nested declarations.
-      class FindInnerAsync : public ASTWalker {
-        bool FoundAsync = false;
-
-        std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-          // If we've found an 'await', record it and terminate the traversal.
-          if (isa<AwaitExpr>(expr)) {
-            FoundAsync = true;
-            return { false, nullptr };
-          }
-
-          // Do not recurse into other closures.
-          if (isa<ClosureExpr>(expr))
-            return { false, expr };
-
-          return { true, expr };
-        }
-
-        bool walkToDeclPre(Decl *decl) override {
-          // Do not walk into function or type declarations.
-          if (!isa<PatternBindingDecl>(decl))
-            return false;
-
-          return true;
-        }
-
-      public:
-        bool foundAsync() { return FoundAsync; }
-      };
-
-      // If either 'throws' or 'async' was explicitly specified, use that
-      // set of effects.
-      bool throws = expr->getThrowsLoc().isValid();
-      bool async = expr->getAsyncLoc().isValid();
-      if (throws || async) {
-        return ASTExtInfoBuilder()
-          .withThrows(throws)
-          .withAsync(async)
-          .build();
-      }
-
-      // Scan the body to determine the effects.
-      auto body = expr->getBody();
-      if (!body)
-        return FunctionType::ExtInfo();
-
-      auto throwFinder = FindInnerThrows(CS, expr);
-      body->walk(throwFinder);
-      auto asyncFinder = FindInnerAsync();
-      body->walk(asyncFinder);
-      return ASTExtInfoBuilder()
-        .withThrows(throwFinder.foundThrow())
-        .withAsync(asyncFinder.foundAsync())
-        .build();
     }
 
     Type visitClosureExpr(ClosureExpr *closure) {

@@ -692,6 +692,15 @@ public:
       Context.LangOpts.ParseForSyntaxTreeOnly;
   }
 
+  /// If a function or closure body consists of a single expression, determine
+  /// whether we should turn wrap it in a return statement or not.
+  ///
+  /// We don't do this transformation for non-solver-based code completion
+  /// positions, as the source may be incomplete and the type mismatch in the
+  /// return statement will just confuse the type checker.
+  bool shouldSuppressSingleExpressionBodyTransform(
+      ParserStatus Status, MutableArrayRef<ASTNode> BodyElems);
+
 public:
   InFlightDiagnostic diagnose(SourceLoc Loc, Diagnostic Diag) {
     if (Diags.isDiagnosticPointsToFirstBadToken(Diag.getID()) &&

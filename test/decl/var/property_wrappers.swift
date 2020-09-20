@@ -446,6 +446,15 @@ struct UseWillSetDidSet {
   }
 }
 
+struct DidSetUsesSelf {
+  @Wrapper
+  var x: Int {
+    didSet {
+      print(self)
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Mutating/nonmutating
 // ---------------------------------------------------------------------------

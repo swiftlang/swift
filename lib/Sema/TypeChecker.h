@@ -473,8 +473,6 @@ Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
 void typeCheckASTNode(ASTNode &node, DeclContext *DC,
                       bool LeaveBodyUnchecked = false);
 
-bool typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);
-
 /// Try to apply the function builder transform of the given builder type
 /// to the body of the function.
 ///
@@ -636,8 +634,11 @@ FunctionType *getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
 /// it doesn't mutate given expression, even if there is a single valid
 /// solution, and constraint solver is allowed to produce partially correct
 /// solutions. Such solutions can have any number of holes in them.
-void typeCheckForCodeCompletion(
-    Expr *expr, DeclContext *DC, Type contextualType, ContextualTypePurpose CTP,
+///
+/// \returns `true` if target was applicable and it was possible to infer
+/// types for code completion, `false` othrewise.
+bool typeCheckForCodeCompletion(
+    constraints::SolutionApplicationTarget &target,
     llvm::function_ref<void(const constraints::Solution &)> callback);
 
 /// Check the key-path expression.
@@ -1132,8 +1133,7 @@ void checkTopLevelEffects(TopLevelCodeDecl *D);
 void checkFunctionEffects(AbstractFunctionDecl *D);
 void checkInitializerEffects(Initializer *I, Expr *E);
 void checkEnumElementEffects(EnumElementDecl *D, Expr *expr);
-void checkPropertyWrapperEffects(PatternBindingDecl *binding,
-                                       Expr *expr);
+void checkPropertyWrapperEffects(PatternBindingDecl *binding, Expr *expr);
 
 /// If an expression references 'self.init' or 'super.init' in an
 /// initializer context, returns the implicit 'self' decl of the constructor.
@@ -1383,10 +1383,6 @@ void checkUnknownAttrRestrictions(
 /// let vs. var. This function does not perform any of that validation, leaving
 /// it to later stages.
 void bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *stmt);
-
-/// Add notes suggesting the addition of 'async' or '@asyncHandler', as
-/// appropriate, to a diagnostic for a function that isn't an async context.
-void addAsyncNotes(FuncDecl *func);
 
 } // end namespace swift
 

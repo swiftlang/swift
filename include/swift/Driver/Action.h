@@ -329,15 +329,19 @@ public:
 class DynamicLinkJobAction : public JobAction {
   virtual void anchor() override;
   LinkKind Kind;
+  bool ShouldPerformLTO;
 
 public:
-  DynamicLinkJobAction(ArrayRef<const Action *> Inputs, LinkKind K)
+  DynamicLinkJobAction(ArrayRef<const Action *> Inputs, LinkKind K,
+                       bool ShouldPerformLTO)
       : JobAction(Action::Kind::DynamicLinkJob, Inputs, file_types::TY_Image),
-        Kind(K) {
+        Kind(K), ShouldPerformLTO(ShouldPerformLTO) {
     assert(Kind != LinkKind::None && Kind != LinkKind::StaticLibrary);
   }
 
   LinkKind getKind() const { return Kind; }
+
+  bool shouldPerformLTO() const { return ShouldPerformLTO; }
 
   static bool classof(const Action *A) {
     return A->getKind() == Action::Kind::DynamicLinkJob;

@@ -700,6 +700,9 @@ enum ScoreKind {
   SK_Hole,
   /// A reference to an @unavailable declaration.
   SK_Unavailable,
+  /// A reference to an async function in a synchronous context, or
+  /// vice versa.
+  SK_AsyncSyncMismatch,
   /// A use of the "forward" scan for trailing closures.
   SK_ForwardTrailingClosure,
   /// A use of a disfavored overload.
@@ -1186,6 +1189,8 @@ public:
                                           ArrayRef<LocatorPathElt> path) const;
 
   void setExprTypes(Expr *expr) const;
+
+  bool hasType(ASTNode node) const;
 
   /// Retrieve the type of the given node, as recorded in this solution.
   Type getType(ASTNode node) const;
@@ -2121,6 +2126,9 @@ private:
   /// The set of functions that have been transformed by a function builder.
   std::vector<std::pair<AnyFunctionRef, AppliedBuilderTransform>>
       functionBuilderTransformed;
+
+  /// Cache of the effects any closures visited.
+  llvm::SmallDenseMap<ClosureExpr *, FunctionType::ExtInfo, 4> closureEffectsCache;
 
 public:
   /// The locators of \c Defaultable constraints whose defaults were used.
@@ -3061,6 +3069,16 @@ public:
       TrailingClosureMatching trailingClosureMatch) {
     trailingClosureMatchingChoices.push_back({locator, trailingClosureMatch});
   }
+
+  /// Walk a closure AST to determine its effects.
+  ///
+  /// \returns a function's extended info describing the effects, as
+  /// determined syntactically.
+  FunctionType::ExtInfo closureEffects(ClosureExpr *expr);
+
+  /// Determine whether the given context is asynchronous, e.g., an async
+  /// function or closure.
+  bool isAsynchronousContext(DeclContext *dc);
 
   /// Determine whether constraint system already has a fix recorded
   /// for a particular location.
@@ -5018,21 +5036,15 @@ public:
   /// solution, and constraint solver is allowed to produce partially correct
   /// solutions. Such solutions can have any number of holes in them.
   ///
-  /// \param expr The expression involved in code completion.
+  /// \param target The expression involved in code completion.
   ///
-  /// \param DC The declaration context this expression is found in.
+  /// \param solutions The solutions produced for the given target without
+  /// filtering.
   ///
-  /// \param contextualType The type \p expr is being converted to.
-  ///
-  /// \param CTP When contextualType is specified, this indicates what
-  /// the conversion is doing.
-  ///
-  /// \param callback The callback to be used to provide results to
-  /// code completion.
-  static void
-  solveForCodeCompletion(Expr *expr, DeclContext *DC, Type contextualType,
-                         ContextualTypePurpose CTP,
-                         llvm::function_ref<void(const Solution &)> callback);
+  /// \returns `false` if this call fails (e.g. pre-check or constraint
+  /// generation fails), `true` otherwise.
+  bool solveForCodeCompletion(SolutionApplicationTarget &target,
+                              SmallVectorImpl<Solution> &solutions);
 
 private:
   /// Solve the system of constraints.
@@ -5505,7 +5517,7 @@ bool hasAppliedSelf(const OverloadChoice &choice,
                     llvm::function_ref<Type(Type)> getFixedType);
 
 /// Check whether type conforms to a given known protocol.
-bool conformsToKnownProtocol(ConstraintSystem &cs, Type type,
+bool conformsToKnownProtocol(DeclContext *dc, Type type,
                              KnownProtocolKind protocol);
 
 /// Check whether given type conforms to `RawPepresentable` protocol

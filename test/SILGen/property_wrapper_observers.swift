@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -primary-file %s | %FileCheck %s
 
 // 1. Make sure the wrapped property setter calls the observers
 // 2. Make sure the synthesized _modify coroutine calls the wrapped property setter
@@ -108,3 +108,34 @@ struct MutatingWillSet {
 // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_observers15MutatingWillSetV5value33_{{.*}}Sivs : $@convention(method) (Int, @inout MutatingWillSet) -> () {
 // CHECK: function_ref @$s26property_wrapper_observers15MutatingWillSetV5value33_{{.*}}Sivw : $@convention(method) (Int, @inout MutatingWillSet) -> ()
 // CHECK: function_ref @$s26property_wrapper_observers5StateV12wrappedValueSivs : $@convention(method) (Int, State) -> ()
+
+@propertyWrapper struct MutatingGetter {
+  var wrappedValue: Int {
+    mutating get {
+      return 3
+    }
+    nonmutating set {}
+  }
+}
+
+struct HasMutatingGetter {
+  @MutatingGetter var hasDidSet: Int {
+    didSet {}
+  }
+
+  @MutatingGetter var hasWillSet: Int {
+    willSet {}
+  }
+}
+
+// The didSet causes the setter to become mutating:
+
+// CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_observers17HasMutatingGetterV9hasDidSetSivg : $@convention(method) (@inout HasMutatingGetter) -> Int {
+// CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_observers17HasMutatingGetterV9hasDidSetSivs : $@convention(method) (Int, @inout HasMutatingGetter) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_observers17HasMutatingGetterV9hasDidSetSivM : $@yield_once @convention(method) (@inout HasMutatingGetter) -> @yields @inout Int {
+
+// The willSet does not:
+
+// CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_observers17HasMutatingGetterV10hasWillSetSivg : $@convention(method) (@inout HasMutatingGetter) -> Int {
+// CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_observers17HasMutatingGetterV10hasWillSetSivs : $@convention(method) (Int, HasMutatingGetter) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_observers17HasMutatingGetterV10hasWillSetSivM : $@yield_once @convention(method) (@inout HasMutatingGetter) -> @yields @inout Int {
