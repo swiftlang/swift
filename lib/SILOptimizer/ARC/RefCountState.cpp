@@ -493,6 +493,8 @@ void BottomUpRefCountState::checkAndResetKnownSafety(
   clearKnownSafe();
 }
 
+// This function is conservative enough that the flow sensitive nature of
+// loop summarized instructions does not matter.
 void BottomUpRefCountState::updateForDifferentLoopInst(SILInstruction *I,
                                                        AliasAnalysis *AA) {
   // If we are not tracking anything, bail.
@@ -500,6 +502,8 @@ void BottomUpRefCountState::updateForDifferentLoopInst(SILInstruction *I,
     return;
 
   if (valueCanBeGuaranteedUsedGivenLatticeState()) {
+    // Any instruction that may need guaranteed use or may decrement the
+    // refcount will turn off CodeMotionSafety
     if (mayGuaranteedUseValue(I, getRCRoot(), AA) ||
         mayDecrementRefCount(I, getRCRoot(), AA)) {
       LLVM_DEBUG(llvm::dbgs() << "    Found potential guaranteed use:\n        "
@@ -917,12 +921,16 @@ void TopDownRefCountState::checkAndResetKnownSafety(
   clearKnownSafe();
 }
 
+// This function is conservative enough that the flow sensitive nature of
+// loop summarized instructions does not matter.
 void TopDownRefCountState::updateForDifferentLoopInst(SILInstruction *I,
                                                       AliasAnalysis *AA) {
   // If we are not tracking anything, bail.
   if (!isTrackingRefCount())
     return;
 
+  // Any instruction that may need guaranteed use or may decrement the
+  // refcount will turn off CodeMotionSafety
   if (valueCanBeGuaranteedUsedGivenLatticeState()) {
     if (mayGuaranteedUseValue(I, getRCRoot(), AA) ||
         mayDecrementRefCount(I, getRCRoot(), AA)) {

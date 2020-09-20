@@ -1149,11 +1149,14 @@ namespace {
     friend class SILCloner<TrivialCloner>;
     friend class SILInstructionVisitor<TrivialCloner>;
     SILInstruction *Result = nullptr;
-    TrivialCloner(SILFunction *F) : SILCloner(*F) {}
+    TrivialCloner(SILFunction *F, SILInstruction *InsertPt) : SILCloner(*F) {
+      Builder.setInsertionPoint(InsertPt);
+    }
+
   public:
 
-    static SILInstruction *doIt(SILInstruction *I) {
-      TrivialCloner TC(I->getFunction());
+    static SILInstruction *doIt(SILInstruction *I, SILInstruction *InsertPt) {
+      TrivialCloner TC(I->getFunction(), InsertPt);
       TC.visit(I);
       return TC.Result;
     }
@@ -1204,10 +1207,7 @@ bool SILInstruction::isDeallocatingStack() const {
 /// then the new instruction is inserted before the specified point, otherwise
 /// the new instruction is returned without a parent.
 SILInstruction *SILInstruction::clone(SILInstruction *InsertPt) {
-  SILInstruction *NewInst = TrivialCloner::doIt(this);
-
-  if (NewInst && InsertPt)
-    InsertPt->getParent()->insert(InsertPt, NewInst);
+  SILInstruction *NewInst = TrivialCloner::doIt(this, InsertPt);
   return NewInst;
 }
 
@@ -1266,6 +1266,7 @@ bool SILInstruction::mayTrap() const {
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::UnconditionalCheckedCastInst:
   case SILInstructionKind::UnconditionalCheckedCastAddrInst:
+  case SILInstructionKind::UnconditionalCheckedCastValueInst:
     return true;
   default:
     return false;

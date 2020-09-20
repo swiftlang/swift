@@ -1600,14 +1600,6 @@ static Type getFunctionBuilderType(FuncDecl *FD) {
   return builderType;
 }
 
-bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
-  auto res = evaluateOrDefault(AFD->getASTContext().evaluator,
-                               TypeCheckFunctionBodyRequest{AFD}, true);
-  TypeChecker::checkFunctionEffects(AFD);
-  TypeChecker::computeCaptures(AFD);
-  return res;
-}
-
 static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
                                       ClassDecl *ClDecl) {
   ASTContext &Context = ctor->getASTContext();
@@ -1910,6 +1902,11 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
       // Wire up the function body now.
       func->setBody(*optBody, AbstractFunctionDecl::BodyKind::TypeChecked);
       return false;
+    } else if (func->hasSingleExpressionBody() &&
+                func->getResultInterfaceType()->isVoid()) {
+       // The function returns void.  We don't need an explicit return, no matter
+       // what the type of the expression is.  Take the inserted return back out.
+      func->getBody()->setFirstElement(func->getSingleExpressionBody());
     }
   }
 
@@ -1928,7 +1925,7 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
   return false;
 }
 
-bool
+BraceStmt *
 TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
                                        AbstractFunctionDecl *AFD) const {
   ASTContext &ctx = AFD->getASTContext();
@@ -1939,8 +1936,22 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
     timer.emplace(AFD);
 
   BraceStmt *body = AFD->getBody();
-  if (!body || AFD->isBodyTypeChecked())
-    return false;
+  assert(body && "Expected body to type-check");
+
+  // It's possible we sythesized an already type-checked body, in which case
+  // we're done.
+  if (AFD->isBodyTypeChecked())
+    return body;
+
+  auto errorBody = [&]() {
+    // If we had an error, return an ErrorExpr body instead of returning the
+    // un-type-checked body.
+    // FIXME: This should be handled by typeCheckExpression.
+    auto range = AFD->getBodySourceRange();
+    return BraceStmt::create(ctx, range.Start,
+                             {new (ctx) ErrorExpr(range, ErrorType::get(ctx))},
+                             range.End);
+  };
 
   bool alreadyTypeChecked = false;
   if (auto *func = dyn_cast<FuncDecl>(AFD)) {
@@ -1949,7 +1960,7 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
               TypeChecker::applyFunctionBuilderBodyTransform(
                 func, builderType)) {
         if (!*optBody)
-          return true;
+          return errorBody();
 
         body = *optBody;
         alreadyTypeChecked = true;
@@ -2012,14 +2023,18 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  // Wire up the function body now.
+  // Temporarily wire up the function body for some extra checks.
+  // FIXME: Eliminate this.
   AFD->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
 
   // If nothing went wrong yet, perform extra checking.
   if (!hadError)
     performAbstractFuncDeclDiagnostics(AFD);
 
-  return hadError;
+  TypeChecker::checkFunctionEffects(AFD);
+  TypeChecker::computeCaptures(AFD);
+
+  return hadError ? errorBody() : body;
 }
 
 bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {

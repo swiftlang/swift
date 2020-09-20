@@ -16,6 +16,7 @@
 #include "swift/Localization/LocalizationFormat.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/FileSystem.h"
@@ -48,6 +49,9 @@ static constexpr const char *const diagnosticMessages[] = {
 };
 
 struct LocalizationTest : public ::testing::Test {
+  llvm::SmallVector<std::string, 4> TempFiles;
+
+public:
   std::string YAMLPath;
 
   LocalizationTest() {
@@ -59,14 +63,21 @@ struct LocalizationTest : public ::testing::Test {
     assert(!failed && "failed to generate a YAML file");
   }
 
-  static std::string createTemporaryFile(std::string prefix,
-                                         std::string suffix) {
+  void TearDown() override {
+    for (auto &tmp : TempFiles)
+      llvm::sys::fs::remove(tmp);
+  }
+
+  std::string createTemporaryFile(std::string prefix, std::string suffix) {
     llvm::SmallString<128> tempFile;
     std::error_code error =
         llvm::sys::fs::createTemporaryFile(prefix, suffix, tempFile);
     assert(!error);
-    llvm::sys::RemoveFileOnSignal(tempFile);
-    return std::string(tempFile);
+    // Can't use llvm::sys::RemoveFileOnSignal(tempFile) because
+    // signals are not available on Windows.
+    auto tmp = std::string(tempFile);
+    TempFiles.push_back(tmp);
+    return tmp;
   }
 
   /// Random number in [0,n)

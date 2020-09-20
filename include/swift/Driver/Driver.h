@@ -101,6 +101,14 @@ public:
   /// The output type which should be used for compile actions.
   file_types::ID CompilerOutputType = file_types::ID::TY_INVALID;
 
+  enum class LTOKind {
+    None,
+    LLVMThin,
+    LLVMFull,
+  };
+
+  LTOKind LTOVariant = LTOKind::None;
+
   /// Describes if and how the output of compile actions should be
   /// linked together.
   LinkKind LinkAction = LinkKind::None;

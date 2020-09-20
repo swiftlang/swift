@@ -81,4 +81,15 @@ EDUCATIONAL_NOTES(type_cannot_conform, "protocol-type-non-conformance.md")
 EDUCATIONAL_NOTES(unlabeled_trailing_closure_deprecated,
                   "trailing-closure-matching.md")
 
+EDUCATIONAL_NOTES(function_builder_static_buildblock,
+                  "function-builder-methods.md")
+EDUCATIONAL_NOTES(function_builder_missing_limited_availability,
+                  "function-builder-methods.md")
+EDUCATIONAL_NOTES(function_builder_missing_build_optional,
+                  "function-builder-methods.md")
+EDUCATIONAL_NOTES(function_builder_missing_build_either,
+                  "function-builder-methods.md")
+EDUCATIONAL_NOTES(function_builder_missing_build_array,
+                  "function-builder-methods.md")
+
 #undef EDUCATIONAL_NOTES

@@ -2199,25 +2199,25 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
   getModuleEntities(decl, ModuleEnts);
 
   ArrayRef<ModuleEntity> Mods = ModuleEnts;
-  interleave(decl->getFullAccessPath(),
-             [&](const ImportDecl::AccessPathElement &Elem) {
-               if (!Mods.empty()) {
-                 Identifier Name = Elem.Item;
-                 if (Options.MapCrossImportOverlaysToDeclaringModule) {
-                   if (auto *MD = Mods.front().getAsSwiftModule()) {
-                     ModuleDecl *Declaring = const_cast<ModuleDecl*>(MD)
-                       ->getDeclaringModuleIfCrossImportOverlay();
-                     if (Declaring)
-                       Name = Declaring->getName();
-                   }
-                 }
-                 Printer.printModuleRef(Mods.front(), Name);
-                 Mods = Mods.slice(1);
-               } else {
-                 Printer << Elem.Item.str();
-               }
-             },
-             [&] { Printer << "."; });
+  llvm::interleave(decl->getImportPath(),
+                   [&](const ImportPath::Element &Elem) {
+                     if (!Mods.empty()) {
+                       Identifier Name = Elem.Item;
+                       if (Options.MapCrossImportOverlaysToDeclaringModule) {
+                         if (auto *MD = Mods.front().getAsSwiftModule()) {
+                           ModuleDecl *Declaring = const_cast<ModuleDecl*>(MD)
+                             ->getDeclaringModuleIfCrossImportOverlay();
+                           if (Declaring)
+                             Name = Declaring->getName();
+                         }
+                       }
+                       Printer.printModuleRef(Mods.front(), Name);
+                       Mods = Mods.slice(1);
+                     } else {
+                       Printer << Elem.Item.str();
+                     }
+                   },
+                   [&] { Printer << "."; });
 }
 
 static void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,

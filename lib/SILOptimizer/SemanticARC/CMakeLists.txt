@@ -4,4 +4,7 @@ target_sources(swiftSILOptimizer PRIVATE
   LoadCopyToLoadBorrowOpt.cpp
   BorrowScopeOpts.cpp
   CopyValueOpts.cpp
-  OwnedToGuaranteedPhiOpt.cpp)
+  OwnedToGuaranteedPhiOpt.cpp
+  Context.cpp
+  SemanticARCOptVisitor.cpp
+  )

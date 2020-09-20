@@ -6035,10 +6035,8 @@ inline ArrayRef<AnyFunctionType::Param> AnyFunctionType::getParams() const {
   }
 }
 
-/// If this is a method in a type or extension thereof, compute
-/// and return a parameter to be used for the 'self' argument.  The type of
-/// the parameter is the empty Type() if no 'self' argument should exist. This
-/// can only be used after types have been resolved.
+/// If this is a method in a type or extension thereof, return the
+/// 'self' parameter.
 ///
 /// \param isInitializingCtor Specifies whether we're computing the 'self'
 /// type of an initializing constructor, which accepts an instance 'self'

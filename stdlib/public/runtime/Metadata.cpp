@@ -733,6 +733,7 @@ MetadataResponse swift::swift_getCanonicalSpecializedMetadata(
       auto key = MetadataCacheKey(cache.NumKeyParameters, cache.NumWitnessTables,
                                   arguments);
       auto result = cache.getOrInsert(key, MetadataRequest(MetadataState::Complete, /*isNonBlocking*/true), canonicalMetadata);
+      (void)result;
       assert(result.second.Value == canonicalMetadata);
     }
   } else {
@@ -744,6 +745,7 @@ MetadataResponse swift::swift_getCanonicalSpecializedMetadata(
       auto key = MetadataCacheKey(cache.NumKeyParameters, cache.NumWitnessTables,
                                   arguments);
       auto result = cache.getOrInsert(key, MetadataRequest(MetadataState::Complete, /*isNonBlocking*/true), canonicalMetadata);
+      (void)result;
       assert(result.second.Value == canonicalMetadata);
     }
   }

@@ -223,11 +223,11 @@ enum class ReadWriteImplKind {
   /// There's a modify coroutine.
   Modify,
 
-  /// We have a didSet which doesn't use the oldValue
-  StoredWithSimpleDidSet,
-
-  /// We have a didSet which doesn't use the oldValue
-  InheritedWithSimpleDidSet,
+  /// We have a didSet, so we're either going to use
+  /// MaterializeOrTemporary or the "simple didSet"
+  // access pattern.
+  StoredWithDidSet,
+  InheritedWithDidSet,
 };
 enum { NumReadWriteImplKindBits = 4 };
 
@@ -273,13 +273,13 @@ public:
     case WriteImplKind::StoredWithObservers:
       assert(readImpl == ReadImplKind::Stored);
       assert(readWriteImpl == ReadWriteImplKind::MaterializeToTemporary ||
-             readWriteImpl == ReadWriteImplKind::StoredWithSimpleDidSet);
+             readWriteImpl == ReadWriteImplKind::StoredWithDidSet);
       return;
 
     case WriteImplKind::InheritedWithObservers:
       assert(readImpl == ReadImplKind::Inherited);
       assert(readWriteImpl == ReadWriteImplKind::MaterializeToTemporary ||
-             readWriteImpl == ReadWriteImplKind::InheritedWithSimpleDidSet);
+             readWriteImpl == ReadWriteImplKind::InheritedWithDidSet);
       return;
 
     case WriteImplKind::Set:

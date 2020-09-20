@@ -104,7 +104,6 @@ Note that although this mechanism was explicitly designed to simplify Swift inte
 
 The `_ObjectiveCBridgeable` protocol defines an associated reference type `_ObjectiveCType`, along with a collection of methods that support casting to and from the associated `_ObjectiveCType`.
 This protocol allows library code to provide tailored mechanisms for casting Swift types to reference types.
-When casting to `AnyObject`, the casting logic prefers this tailored mechanism to the general `_SwiftValue` container mentioned above.
 
 Note: The associated `_ObjectiveCType` is constrained to be a subtype of `AnyObject`; it is not limited to being an actual Objective-C type.
 In particular, this mechanism is equally available to the Swift implementation of Foundation on non-Apple platforms and the Objective-C Foundation on Apple platforms.
@@ -344,14 +343,22 @@ Invariants
 
 Any class, enum, struct, tuple, function, metatype, or existential metatype instance can be cast to `AnyObject`.
 
-XXX TODO The runtime logic has code to cast protocol types to `AnyObject` only if they are compatible with `__SwiftValue`.  What is the practical effect of this logic?  Does it mean that casting a protocol type to `AnyObject` will sometimes unwrap (if the protocol is incompatible) and sometimes not?  What protocols are affected by this?
-
 The contents of an `AnyObject` container can be accessed by casting to another type:
 * Weak existential invariant: If `t` is any instance, `U` is any type, `t is AnyObject`, and `t is U`, then `(t as! AnyObject) as? U` will produce the same result as `t as? U`
 
-Implementation Note: `AnyObject` is represented in memory as a pointer to a refcounted object.  The dynamic type of the object can be recovered from the "isa" field of the object.  The optional form `AnyObject?` is the same except that it allows null.  Reference types (class, metatype, or existential metatype instances) can be directly assigned to an `AnyObject` without any conversion.  For non-reference types -- including struct, enum, and tuple types -- the casting logic will first look for an `_ObjectiveCBridgeable` conformance that it can use to convert the source into a tailored reference type.  If that fails, the value will be copied into an opaque `_SwiftValue` container.
+#### Implementation Notes
 
-(See "The _ObjectiveCBridgeable Protocol" below for more details.)
+`AnyObject` is represented in memory as a pointer to a reference-counted object.  The dynamic type of the object can be recovered from the "isa" field of the object.  The optional form `AnyObject?` is the same except that it allows null.
+
+Reference types (class, metatype, or existential metatype instances) can be directly assigned to an `AnyObject` without any conversion.
+
+For non-reference types -- including struct, enum, and tuple types -- the casting logic will first look for an `_ObjectiveCBridgeable` conformance that it can use to convert the source into a tailored reference type.  (See "The _ObjectiveCBridgeable Protocol" below for more details.)
+
+If bridging fails, the value will be copied into an opaque heap-allocated container that is compatible with Objective-C memory management.  The sole purpose of this container is to allow arbitrary Swift types to be cast to and from `AnyObject` so they may be shared with Objective-C functions that need to call Swift code.  The Objective-C code cannot use the contents of this container; it can only store the reference and pass it back into Swift functions.
+
+For platforms that do not support an Objective-C runtime, there is an alternate implementation of the internal container type that supports the same casting operations with `AnyObject`.
+
+XXX TODO The runtime logic has code to cast protocol types to `AnyObject` only if they are compatible with `__SwiftValue`.  What is the practical effect of this logic?  Does it mean that casting a protocol type to `AnyObject` will sometimes unwrap (if the protocol is incompatible) and sometimes not?  What protocols are affected by this?
 
 ### Error (SE-0112)
 
@@ -613,7 +620,7 @@ print(b is P)
 struct S {}
 let s = S()
 // Swift 5.3: Compiler crash (in asserts build)
-// Specification:  Succeeds via _SwiftValue boxing
+// Specification:  Succeeds via __SwiftValue boxing
 s as? AnyObject
 ```
 

@@ -109,7 +109,14 @@ public:
     // Handle the high unicode case out of line.
     return isOperatorSlow();
   }
-  
+
+  // Returns whether this is a standard comparison operator,
+  // such as '==', '>=' or '!=='.
+  bool isStandardComparisonOperator() const {
+    return is("==") || is("!=") || is("===") || is("!==") || is("<") ||
+           is(">") || is("<=") || is(">=");
+  }
+
   /// isOperatorStartCodePoint - Return true if the specified code point is a
   /// valid start of an operator.
   static bool isOperatorStartCodePoint(uint32_t C) {

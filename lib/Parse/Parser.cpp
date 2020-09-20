@@ -1102,8 +1102,8 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
       return Status;
     }
     // If we haven't made progress, or seeing any error, skip ahead.
-    if (Tok.getLoc() == StartLoc || Status.isError()) {
-      assert(Status.isError() && "no progress without error");
+    if (Tok.getLoc() == StartLoc || Status.isErrorOrHasCompletion()) {
+      assert(Status.isErrorOrHasCompletion() && "no progress without error");
       skipListUntilDeclRBrace(LeftLoc, RightK, tok::comma);
       if (Tok.is(RightK) || Tok.isNot(tok::comma))
         break;
@@ -1136,7 +1136,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
 
   ListContext.reset();
 
-  if (Status.isError()) {
+  if (Status.isErrorOrHasCompletion()) {
     // If we've already got errors, don't emit missing RightK diagnostics.
     if (Tok.is(RightK)) {
       RightLoc = consumeToken();
@@ -1183,6 +1183,34 @@ Parser::getStringLiteralIfNotInterpolated(SourceLoc Loc,
 
   return SourceMgr.extractText(CharSourceRange(Segments.front().Loc,
                                                Segments.front().Length));
+}
+
+bool Parser::
+shouldSuppressSingleExpressionBodyTransform(ParserStatus Status,
+                                            MutableArrayRef<ASTNode> BodyElems) {
+  if (BodyElems.size() != 1)
+    return true;
+
+  if (!Status.hasCodeCompletion())
+    return false;
+
+  struct HasMemberCompletion: public ASTWalker {
+    bool Value = false;
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (auto *CCE = dyn_cast<CodeCompletionExpr>(E)) {
+        // If it has a base expression this is member completion, which is
+        // performed using the new solver-based mechanism, so it's ok to go
+        // ahead with the transform (and necessary to pick up the correct
+        // expected type).
+        Value = CCE->getBase();
+        return {false, nullptr};
+      }
+      return {true, E};
+    }
+  };
+  HasMemberCompletion Check;
+  BodyElems.front().walk(Check);
+  return !Check.Value;
 }
 
 struct ParserUnit::Implementation {

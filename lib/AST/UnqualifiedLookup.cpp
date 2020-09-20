@@ -231,18 +231,24 @@ class ASTScopeDeclConsumerForUnqualifiedLookup
     : public AbstractASTScopeDeclConsumer {
   UnqualifiedLookupFactory &factory;
 
+  /// The 'self' parameter from the innermost scope containing the lookup
+  /// location to be used when an instance member of a type is accessed,
+  /// or nullptr if instance members should not be 'self' qualified.
+  DeclContext *candidateSelfDC;
+
 public:
   ASTScopeDeclConsumerForUnqualifiedLookup(UnqualifiedLookupFactory &factory)
-      : factory(factory) {}
+      : factory(factory), candidateSelfDC(nullptr) {}
 
   virtual ~ASTScopeDeclConsumerForUnqualifiedLookup() = default;
+
+  void maybeUpdateSelfDC(VarDecl *var);
 
   bool consume(ArrayRef<ValueDecl *> values, DeclVisibilityKind vis,
                NullablePtr<DeclContext> baseDC = nullptr) override;
 
   /// returns true if finished and new value for isCascadingUse
-  bool lookInMembers(NullablePtr<DeclContext> selfDC,
-                     DeclContext *const scopeDC, NominalTypeDecl *const nominal,
+  bool lookInMembers(DeclContext *const scopeDC, NominalTypeDecl *const nominal,
                      function_ref<bool(Optional<bool>)>) override;
 
 #ifndef NDEBUG
@@ -544,7 +550,47 @@ void UnqualifiedLookupFactory::lookInASTScopes() {
 #endif
 
   ASTScope::unqualifiedLookup(DC->getParentSourceFile(),
-                              Name, Loc, DC, consumer);
+                              Name, Loc, consumer);
+}
+
+void ASTScopeDeclConsumerForUnqualifiedLookup::maybeUpdateSelfDC(
+    VarDecl *var) {
+  // We have a binding named 'self'.
+  //
+  // There are three possibilities:
+  //
+  // 1) This binding is the 'self' parameter of a method,
+  // 2) This binding is a bona-fide 'self' capture, meaning a capture
+  //    list entry named 'self' with initial value expression 'self',
+  // 3) None of the above.
+  //
+  // How we handle these cases depends on whether we've already seen
+  // another 'self' binding.
+  if (candidateSelfDC == nullptr) {
+    // We haven't seen one yet, so record it.
+    if (var->isSelfParameter())
+      candidateSelfDC = var->getDeclContext();
+    else if (var->isSelfParamCapture())
+      candidateSelfDC = var->getParentCaptureList()->getClosureBody();
+  } else {
+    // If we see a binding named 'self' that is not a bona-fide
+    // 'self', we have to forget about the previous 'self' capture
+    // because it's not going to be the right one for accessing
+    // instance members of the innermost nominal type. Eg,
+    //
+    // class C {
+    //   func bar() {}
+    //   func foo() {
+    //     _ { [self=12] { [self] bar() } }
+    //   }
+    // }
+    //
+    // Instead, we're going to move on and look for the next-innermost
+    // 'self' binding.
+    if (!var->isSelfParameter() &&
+        !var->isSelfParamCapture())
+      candidateSelfDC = nullptr;
+  }
 }
 
 bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
@@ -553,6 +599,15 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
   for (auto *value: values) {
     if (factory.isOriginallyTypeLookup && !isa<TypeDecl>(value))
       continue;
+
+    // Try to resolve the base for unqualified instance member
+    // references. This is used by lookInMembers().
+    if (auto *var = dyn_cast<VarDecl>(value)) {
+      if (var->getName() == factory.Ctx.Id_self) {
+        maybeUpdateSelfDC(var);
+      }
+    }
+
     if (!value->getName().matchesRef(factory.Name.getFullName()))
       continue;
 
@@ -586,22 +641,36 @@ bool ASTScopeDeclGatherer::consume(ArrayRef<ValueDecl *> valuesArg,
 
 // TODO: in future, migrate this functionality into ASTScopes
 bool ASTScopeDeclConsumerForUnqualifiedLookup::lookInMembers(
-    NullablePtr<DeclContext> selfDC, DeclContext *const scopeDC,
+    DeclContext *const scopeDC,
     NominalTypeDecl *const nominal,
     function_ref<bool(Optional<bool>)> calculateIsCascadingUse) {
-  if (selfDC) {
-    if (auto *d = selfDC.get()->getAsDecl()) {
-      if (auto *afd = dyn_cast<AbstractFunctionDecl>(d))
-        assert(!factory.isOutsideBodyOfFunction(afd) && "Should be inside");
+  if (candidateSelfDC) {
+    if (auto *afd = dyn_cast<AbstractFunctionDecl>(candidateSelfDC)) {
+      assert(!factory.isOutsideBodyOfFunction(afd) && "Should be inside");
     }
   }
+
+  // We're looking for members of a type.
+  //
+  // If we started the looking from inside a scope where a 'self' parameter
+  // is visible, instance members are returned with the 'self' parameter's
+  // DeclContext as the base, which is how the expression checker knows to
+  // convert the unqualified reference into a self member access.
   auto resultFinder = UnqualifiedLookupFactory::ResultFinderForTypeContext(
-      &factory, selfDC ? selfDC.get() : scopeDC, scopeDC);
+      &factory, candidateSelfDC ? candidateSelfDC : scopeDC, scopeDC);
   const bool isCascadingUse =
       calculateIsCascadingUse(factory.getInitialIsCascadingUse());
   factory.findResultsAndSaveUnavailables(scopeDC, std::move(resultFinder),
                                          isCascadingUse, factory.baseNLOptions);
   factory.recordCompletionOfAScope();
+
+  // We're done looking inside a nominal type declaration. It is possible
+  // that this nominal type is nested inside of another type, in which case
+  // we will visit the outer type next. Make sure to clear out the known
+  // 'self' parameeter context, since any members of the outer type are
+  // not accessed via the innermost 'self' parameter.
+  candidateSelfDC = nullptr;
+
   return factory.isFirstResultEnough();
 }
 

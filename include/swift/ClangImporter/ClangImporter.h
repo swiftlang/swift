@@ -186,7 +186,7 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  virtual bool canImportModule(Located<Identifier> named) override;
+  virtual bool canImportModule(ImportPath::Element named) override;
 
   /// Import a module with the given module path.
   ///
@@ -202,7 +202,7 @@ public:
   /// emits a diagnostic and returns NULL.
   virtual ModuleDecl *loadModule(
                         SourceLoc importLoc,
-                        ArrayRef<Located<Identifier>> path)
+                        ImportPath::Module path)
                       override;
 
   /// Determine whether \c overlayDC is within an overlay module for the
@@ -440,7 +440,7 @@ public:
   /// Given the path of a Clang module, collect the names of all its submodules.
   /// Calling this function does not load the module.
   void collectSubModuleNames(
-      ArrayRef<Located<Identifier>> path,
+      ImportPath::Module path,
       std::vector<std::string> &names) const;
 
   /// Given a Clang module, decide whether this module is imported already.

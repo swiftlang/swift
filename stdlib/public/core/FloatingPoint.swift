@@ -1890,25 +1890,54 @@ extension BinaryFloatingPoint {
   /// - Parameter value: A floating-point value to be converted.
   @inlinable
   public init<Source: BinaryFloatingPoint>(_ value: Source) {
+    // If two IEEE 754 binary interchange formats share the same exponent bit
+    // count and significand bit count, then they must share the same encoding
+    // for finite and infinite values.
+    switch (Source.exponentBitCount, Source.significandBitCount) {
 #if !os(macOS) && !(os(iOS) && targetEnvironment(macCatalyst))
-    if #available(iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
-      if case let value_ as Float16 = value {
-        self = Self(Float(value_))
-        return
+    case (5, 10):
+      guard #available(iOS 14.0, watchOS 7.0, tvOS 14.0, *) else {
+        // Convert signaling NaN to quiet NaN by multiplying by 1.
+        self = Self._convert(from: value).value * 1
+        break
       }
-    }
+      let value_ = value as? Float16 ?? Float16(
+        sign: value.sign,
+        exponentBitPattern:
+          UInt(truncatingIfNeeded: value.exponentBitPattern),
+        significandBitPattern:
+          UInt16(truncatingIfNeeded: value.significandBitPattern))
+      self = Self(Float(value_))
 #endif
-    switch value {
-    case let value_ as Float:
+    case (8, 23):
+      let value_ = value as? Float ?? Float(
+        sign: value.sign,
+        exponentBitPattern:
+          UInt(truncatingIfNeeded: value.exponentBitPattern),
+        significandBitPattern:
+          UInt32(truncatingIfNeeded: value.significandBitPattern))
       self = Self(value_)
-    case let value_ as Double:
+    case (11, 52):
+      let value_ = value as? Double ?? Double(
+        sign: value.sign,
+        exponentBitPattern:
+          UInt(truncatingIfNeeded: value.exponentBitPattern),
+        significandBitPattern:
+          UInt64(truncatingIfNeeded: value.significandBitPattern))
       self = Self(value_)
 #if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
-    case let value_ as Float80:
+    case (15, 63):
+      let value_ = value as? Float80 ?? Float80(
+        sign: value.sign,
+        exponentBitPattern:
+          UInt(truncatingIfNeeded: value.exponentBitPattern),
+        significandBitPattern:
+          UInt64(truncatingIfNeeded: value.significandBitPattern))
       self = Self(value_)
 #endif
     default:
-      self = Self._convert(from: value).value
+      // Convert signaling NaN to quiet NaN by multiplying by 1.
+      self = Self._convert(from: value).value * 1
     }
   }
 

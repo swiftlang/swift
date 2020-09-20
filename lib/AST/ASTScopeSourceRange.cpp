@@ -35,7 +35,6 @@
 using namespace swift;
 using namespace ast_scope;
 
-static SourceLoc getStartOfFirstParam(ClosureExpr *closure);
 static SourceLoc getLocEncompassingPotentialLookups(const SourceManager &,
                                                     SourceLoc endLoc);
 static SourceLoc getLocAfterExtendedNominal(const ExtensionDecl *);
@@ -234,11 +233,6 @@ EnumElementScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
   return decl->getSourceRange();
 }
 
-SourceRange WholeClosureScope::getSourceRangeOfThisASTNode(
-    const bool omitAssertions) const {
-  return closureExpr->getSourceRange();
-}
-
 SourceRange AbstractStmtScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
   return getStmt()->getSourceRange();
@@ -408,20 +402,13 @@ SourceRange ForEachPatternScope::getSourceRangeOfThisASTNode(
 }
 
 SourceRange
-CaseStmtScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
-  // The scope of the case statement begins at the first guard expression,
-  // if there is one, and extends to the end of the body.
-  // FIXME: Figure out what to do about multiple pattern bindings. We might
-  // want a more restrictive rule in those cases.
-  for (const auto &caseItem : stmt->getCaseLabelItems()) {
-    if (auto guardExpr = caseItem.getGuardExpr())
-      return SourceRange(guardExpr->getStartLoc(),
-                         stmt->getBody()->getEndLoc());
-  }
+CaseLabelItemScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
+  return item.getGuardExpr()->getSourceRange();
+}
 
-  // Otherwise, it covers the body.
-  return stmt->getBody()
-      ->getSourceRange(); // The scope of the case statement begins
+SourceRange
+CaseStmtBodyScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
+  return stmt->getBody()->getSourceRange();
 }
 
 SourceRange
@@ -454,21 +441,15 @@ SourceRange ConditionalClausePatternUseScope::getSourceRangeOfThisASTNode(
 
 SourceRange
 CaptureListScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
-  auto *const closure = expr->getClosureBody();
-  return SourceRange(expr->getStartLoc(), getStartOfFirstParam(closure));
+  auto *closureExpr = expr->getClosureBody();
+  if (!omitAssertions)
+    ASTScopeAssert(closureExpr->getInLoc().isValid(),
+                   "We don't create these if no in loc");
+  return SourceRange(closureExpr->getInLoc(), closureExpr->getEndLoc());
 }
 
 SourceRange ClosureParametersScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
-  if (!omitAssertions)
-    ASTScopeAssert(closureExpr->getInLoc().isValid(),
-                   "We don't create these if no in loc");
-  return SourceRange(getStartOfFirstParam(closureExpr),
-                     closureExpr->getInLoc());
-}
-
-SourceRange
-ClosureBodyScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
   if (closureExpr->getInLoc().isValid())
     return SourceRange(closureExpr->getInLoc(), closureExpr->getEndLoc());
 
@@ -699,18 +680,6 @@ void ASTScopeImpl::widenSourceRangeForIgnoredASTNode(const ASTNode n) {
     sourceRangeOfIgnoredASTNodes = r;
   else
     sourceRangeOfIgnoredASTNodes.widen(r);
-}
-
-static SourceLoc getStartOfFirstParam(ClosureExpr *closure) {
-  if (auto *parms = closure->getParameters()) {
-    if (parms->size())
-      return parms->get(0)->getStartLoc();
-  }
-  if (closure->getInLoc().isValid())
-    return closure->getInLoc();
-  if (closure->getBody())
-    return closure->getBody()->getLBraceLoc();
-  return closure->getStartLoc();
 }
 
 #pragma mark getSourceRangeOfEnclosedParamsOfASTNode

@@ -633,7 +633,7 @@ public:
 
   /// Eventually this functionality should move into ASTScopeLookup
   virtual bool
-  lookInMembers(NullablePtr<DeclContext> selfDC, DeclContext *const scopeDC,
+  lookInMembers(DeclContext *const scopeDC,
                 NominalTypeDecl *const nominal,
                 function_ref<bool(Optional<bool>)> calculateIsCascadingUse) = 0;
 
@@ -656,7 +656,7 @@ public:
                NullablePtr<DeclContext> baseDC = nullptr) override;
 
   /// Eventually this functionality should move into ASTScopeLookup
-  bool lookInMembers(NullablePtr<DeclContext>, DeclContext *const,
+  bool lookInMembers(DeclContext *const,
                      NominalTypeDecl *const,
                      function_ref<bool(Optional<bool>)>) override {
     return false;
@@ -691,7 +691,6 @@ public:
   /// \return the scopes traversed
   static llvm::SmallVector<const ast_scope::ASTScopeImpl *, 0>
   unqualifiedLookup(SourceFile *, DeclNameRef, SourceLoc,
-                    const DeclContext *startingContext,
                     namelookup::AbstractASTScopeDeclConsumer &);
 
   static Optional<bool>

@@ -45,6 +45,28 @@ introduces [reabstraction](#reabstraction) conversions when a value is used with
 different abstraction pattern. (This is where the infamous "reabstraction
 thunk helpers" sometimes seen in Swift backtraces come from.)
 
+## access path
+
+Broadly, an "access path" is a list of "accesses" which must be chained together
+to compute some output from an input. For instance, the generics system has a
+type called a `ConformanceAccessPath` which explains how to, for example,
+walk from `T: Collection` to `T: Sequence` to `T.Iterator: IteratorProtocol`.
+There are several different kinds of "access path" in different parts of the compiler,
+but they all follow this basic theme.
+
+In the specific context of imports, an "access path" is the `Bar` portion of a scoped
+import like `import class Foo.Bar`. Theoretically, it could have several identifiers
+to designate a nested type, although the compiler doesn't currently support this. It can
+also be empty, matching all top-level declarations in the module.
+
+Note, however, that there has historically been some confusion about the meaning of
+"access path" with regards to imports. You might see some code use "access path"
+to include the `Foo` part or even to describe a chain of submodule names where a
+declaration is not valid at all. (Strictly, the chain of module names is a "module path"
+and the combination of module path + access path is an "import path".)
+
+See `ImportPath` and the types nested inside it for more on this.
+
 ## archetype
 
 A placeholder for a generic parameter or an associated type within a

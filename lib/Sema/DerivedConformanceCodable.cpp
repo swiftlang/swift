@@ -342,8 +342,7 @@ static VarDecl *createKeyedContainer(ASTContext &C, DeclContext *DC,
 
   // let container : Keyed*Container<KeyType>
   auto *containerDecl = new (C) VarDecl(/*IsStatic=*/false, introducer,
-                                        /*IsCaptureList=*/false, SourceLoc(),
-                                        C.Id_container, DC);
+                                        SourceLoc(), C.Id_container, DC);
   containerDecl->setImplicit();
   containerDecl->setInterfaceType(containerType);
   return containerDecl;

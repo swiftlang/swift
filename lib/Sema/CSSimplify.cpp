@@ -7168,17 +7168,18 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
                                MemberLookupResult::ErrorAlreadyDiagnosed);
       auto *fix = DefineMemberBasedOnUse::create(*this, baseTy, member,
                                                  alreadyDiagnosed, locator);
-      // Impact is higher if the base is expected to be inferred from context,
-      // because a failure to find a member ultimately means that base type is
-      // not a match in this case.
-      auto impact =
-          locator->findLast<LocatorPathElt::UnresolvedMember>() ? 2 : 1;
 
+      auto instanceTy = baseObjTy->getMetatypeInstanceType();
+
+      auto impact = 2;
       // Impact is higher if the the base type is any function type
       // because function types can't have any members other than self
-      if (baseObjTy->is<AnyFunctionType>()) {
-          impact += 10;
+      if (instanceTy->is<AnyFunctionType>()) {
+        impact += 10;
       }
+
+      if (instanceTy->isAny() || instanceTy->isAnyObject())
+        impact += 5;
 
       if (recordFix(fix, impact))
         return SolutionKind::Error;
@@ -7288,8 +7289,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
           auto descriptor = UnqualifiedLookupDescriptor(
               DeclNameRef(param->getName()),
-              paramDecl->getDeclContext()->getParentForLookup(),
-              paramDecl->getStartLoc(),
+              paramDecl->getDeclContext()->getParentSourceFile(),
+              SourceLoc(),
               UnqualifiedLookupFlags::KnownPrivate |
                   UnqualifiedLookupFlags::TypeLookup);
           auto lookup = evaluateOrDefault(

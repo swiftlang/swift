@@ -251,7 +251,7 @@ void ImplicitSerializedModuleLoader::collectVisibleTopLevelModuleNames(
 }
 
 std::error_code SerializedModuleLoaderBase::openModuleDocFileIfPresent(
-  AccessPathElem ModuleID,
+  ImportPath::Element ModuleID,
   const SerializedModuleBaseName &BaseName,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) {
 
@@ -285,7 +285,7 @@ SerializedModuleLoaderBase::getModuleName(ASTContext &Ctx, StringRef modulePath,
 
 std::error_code
 SerializedModuleLoaderBase::openModuleSourceInfoFileIfPresent(
-    AccessPathElem ModuleID,
+    ImportPath::Element ModuleID,
     const SerializedModuleBaseName &BaseName,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) {
   if (IgnoreSwiftSourceInfoFile || !ModuleSourceInfoBuffer)
@@ -324,7 +324,7 @@ SerializedModuleLoaderBase::openModuleSourceInfoFileIfPresent(
 }
 
 std::error_code SerializedModuleLoaderBase::openModuleFile(
-    AccessPathElem ModuleID, const SerializedModuleBaseName &BaseName,
+    ImportPath::Element ModuleID, const SerializedModuleBaseName &BaseName,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer) {
   llvm::vfs::FileSystem &FS = *Ctx.SourceMgr.getFileSystem();
 
@@ -416,7 +416,7 @@ llvm::ErrorOr<ModuleDependencies> SerializedModuleLoaderBase::scanModuleFile(
 }
 
 std::error_code ImplicitSerializedModuleLoader::findModuleFilesInDirectory(
-    AccessPathElem ModuleID,
+    ImportPath::Element ModuleID,
     const SerializedModuleBaseName &BaseName,
     SmallVectorImpl<char> *ModuleInterfacePath,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
@@ -510,7 +510,7 @@ std::string SerializedModuleBaseName::getName(file_types::ID fileTy) const {
 }
 
 bool
-SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
+SerializedModuleLoaderBase::findModule(ImportPath::Element moduleID,
            SmallVectorImpl<char> *moduleInterfacePath,
            std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
            std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
@@ -586,17 +586,17 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
         case SearchPathKind::RuntimeLibrary: {
           isFramework = false;
 
-          bool checkTargetSpecificModule;
-          if (Kind == SearchPathKind::RuntimeLibrary) {
-            // Apple platforms always use target-specific files within a
-            // .swiftmodule directory for the stdlib; non-Apple platforms
-            // always use single-architecture swiftmodules.
-            checkTargetSpecificModule = Ctx.LangOpts.Target.isOSDarwin();
-          } else {
+          // On Apple platforms, we can assume that the runtime libraries use
+          // target-specifi module files wihtin a `.swiftmodule` directory.
+          // This was not always true on non-Apple platforms, and in order to
+          // ease the transition, check both layouts.
+          bool checkTargetSpecificModule = true;
+          if (Kind != SearchPathKind::RuntimeLibrary ||
+              !Ctx.LangOpts.Target.isOSDarwin()) {
             auto modulePath = currPath;
             llvm::sys::path::append(modulePath, genericModuleFileName);
-
             llvm::ErrorOr<llvm::vfs::Status> statResult = fs.status(modulePath);
+
             // Even if stat fails, we can't just return the error; the path
             // we're looking for might not be "Foo.swiftmodule".
             checkTargetSpecificModule = statResult && statResult->isDirectory();
@@ -930,7 +930,7 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
 }
 
 bool SerializedModuleLoaderBase::canImportModule(
-    Located<Identifier> mID) {
+    ImportPath::Element mID) {
   // Look on disk.
   SmallVector<char, 0> *unusedModuleInterfacePath = nullptr;
   std::unique_ptr<llvm::MemoryBuffer> *unusedModuleBuffer = nullptr;
@@ -944,14 +944,14 @@ bool SerializedModuleLoaderBase::canImportModule(
 }
 
 bool MemoryBufferSerializedModuleLoader::canImportModule(
-    Located<Identifier> mID) {
+    ImportPath::Element mID) {
   // See if we find it in the registered memory buffers.
   return MemoryBuffers.count(mID.Item.str());
 }
 
 ModuleDecl *
 SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
-                                       ModuleDecl::AccessPathTy path) {
+                                       ImportPath::Module path) {
   // FIXME: Swift submodules?
   if (path.size() > 1)
     return nullptr;
@@ -1000,7 +1000,7 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
 
 ModuleDecl *
 MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
-                                               ModuleDecl::AccessPathTy path) {
+                                               ImportPath::Module path) {
   // FIXME: Swift submodules?
   if (path.size() > 1)
     return nullptr;
@@ -1070,7 +1070,7 @@ void SerializedModuleLoaderBase::loadDerivativeFunctionConfigurations(
 }
 
 std::error_code MemoryBufferSerializedModuleLoader::findModuleFilesInDirectory(
-    AccessPathElem ModuleID,
+    ImportPath::Element ModuleID,
     const SerializedModuleBaseName &BaseName,
     SmallVectorImpl<char> *ModuleInterfacePath,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
@@ -1179,19 +1179,19 @@ void SerializedASTFile::lookupPrecedenceGroupDirect(
     results.push_back(group);
 }
 
-void SerializedASTFile::lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
+void SerializedASTFile::lookupVisibleDecls(ImportPath::Access accessPath,
                                            VisibleDeclConsumer &consumer,
                                            NLKind lookupKind) const {
   File.lookupVisibleDecls(accessPath, consumer, lookupKind);
 }
 
-void SerializedASTFile::lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
+void SerializedASTFile::lookupClassMembers(ImportPath::Access accessPath,
                                            VisibleDeclConsumer &consumer) const{
   File.lookupClassMembers(accessPath, consumer);
 }
 
 void
-SerializedASTFile::lookupClassMember(ModuleDecl::AccessPathTy accessPath,
+SerializedASTFile::lookupClassMember(ImportPath::Access accessPath,
                                      DeclName name,
                                      SmallVectorImpl<ValueDecl*> &decls) const {
   File.lookupClassMember(accessPath, name, decls);

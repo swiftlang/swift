@@ -169,7 +169,7 @@ public:
 
   /// Returns a buffer ID for a previously added buffer with the given
   /// buffer identifier, or None if there is no such buffer.
-  Optional<unsigned> getIDForBufferIdentifier(StringRef BufIdentifier);
+  Optional<unsigned> getIDForBufferIdentifier(StringRef BufIdentifier) const;
 
   /// Returns the identifier for the buffer with the given ID.
   ///

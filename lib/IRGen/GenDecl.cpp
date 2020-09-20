@@ -34,6 +34,7 @@
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/GlobalDecl.h"
@@ -443,7 +444,10 @@ public:
 
 /// Emit all the top-level code in the source file.
 void IRGenModule::emitSourceFile(SourceFile &SF) {
-  assert(SF.ASTStage == SourceFile::TypeChecked);
+  // Type-check the file if we haven't already (this may be necessary for .sil
+  // files, which don't get fully type-checked by parsing).
+  performTypeChecking(SF);
+
   PrettySourceFileEmission StackEntry(SF);
 
   // Emit types and other global decls.
@@ -1132,7 +1136,7 @@ void IRGenModule::finishEmitAfterTopLevel() {
   if (DebugInfo) {
     if (ModuleDecl *TheStdlib = Context.getStdlibModule()) {
       if (TheStdlib != getSwiftModule()) {
-        Located<swift::Identifier> AccessPath[] = {
+        Located<swift::Identifier> moduleName[] = {
           { Context.StdlibModuleName, swift::SourceLoc() }
         };
 
@@ -1140,7 +1144,7 @@ void IRGenModule::finishEmitAfterTopLevel() {
                                       getSwiftModule(),
                                       SourceLoc(),
                                       ImportKind::Module, SourceLoc(),
-                                      AccessPath);
+                                      llvm::makeArrayRef(moduleName));
         Imp->setModule(TheStdlib);
         DebugInfo->emitImport(Imp);
       }

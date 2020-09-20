@@ -580,6 +580,11 @@ def sil_debug_serialization : Flag<["-"], "sil-debug-serialization">,
   HelpText<"Do not eliminate functions in Mandatory Inlining/SILCombine dead "
            "functions. (for debugging only)">;
 
+def sil_stop_optzns_before_lowering_ownership :
+  Flag<["-"], "sil-stop-optzns-before-lowering-ownership">,
+  HelpText<"Stop optimizing at SIL time before we lower ownership from SIL. "
+           "Intended only for SIL ossa tests">;
+
 def print_inst_counts : Flag<["-"], "print-inst-counts">,
   HelpText<"Before IRGen, count all the various SIL instructions. Must be used "
            "in conjunction with -print-stats.">;

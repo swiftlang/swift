@@ -39,6 +39,7 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Parse/Confusables.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Sema/CodeCompletionTypeChecking.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -2164,6 +2165,14 @@ TypeChecker::typeCheckExpression(
                                   "typecheck-expr", expr);
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
+  // First let's check whether given expression has a code completion
+  // token which requires special handling.
+  if (Context.CompletionCallback &&
+      typeCheckForCodeCompletion(target, [&](const constraints::Solution &S) {
+        Context.CompletionCallback->sawSolution(S);
+      }))
+    return None;
+
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
   if (ConstraintSystem::preCheckExpression(
@@ -2448,7 +2457,6 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   // Create a 'let' binding to stand in for the RHS value.
   auto *matchVar = new (Context) VarDecl(/*IsStatic*/false,
                                          VarDecl::Introducer::Let,
-                                         /*IsCaptureList*/false,
                                          EP->getLoc(),
                                          Context.getIdentifier("$match"),
                                          DC);
@@ -2456,7 +2464,6 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
 
   matchVar->setImplicit();
   EP->setMatchVar(matchVar);
-  matchVar->setHasNonPatternBindingInit();
 
   // Find '~=' operators for the match.
   auto lookupOptions = defaultUnqualifiedLookupOptions;

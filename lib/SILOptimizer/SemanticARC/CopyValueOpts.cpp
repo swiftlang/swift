@@ -61,7 +61,7 @@ using namespace swift::semanticarc;
 bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
     CopyValueInst *cvi) {
   // For now, do not run this optimization. This is just to be careful.
-  if (onlyGuaranteedOpts)
+  if (ctx.onlyGuaranteedOpts)
     return false;
 
   SmallVector<BorrowedValue, 4> borrowScopeIntroducers;
@@ -83,7 +83,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
   // (e.x. storing into memory).
   OwnershipLiveRange lr(cvi);
   auto hasUnknownConsumingUseState =
-      lr.hasUnknownConsumingUse(assumingAtFixedPoint);
+      lr.hasUnknownConsumingUse(ctx.assumingAtFixedPoint);
   if (hasUnknownConsumingUseState ==
       OwnershipLiveRange::HasConsumingUse_t::Yes) {
     return false;
@@ -222,8 +222,8 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
 
     if (canOptimizePhi) {
       opPhi.visitResults([&](SILValue value) {
-        joinedOwnedIntroducerToConsumedOperands.insert(value,
-                                                       opPhi.getOperand());
+        ctx.joinedOwnedIntroducerToConsumedOperands.insert(value,
+                                                           opPhi.getOperand());
         return true;
       });
     }

@@ -19,6 +19,7 @@
 #include "MiscDiagnostics.h"
 #include "TypeCheckProtocol.h"
 #include "TypoCorrection.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
@@ -165,7 +166,7 @@ Type FailureDiagnostic::restoreGenericParameters(
 bool FailureDiagnostic::conformsToKnownProtocol(
     Type type, KnownProtocolKind protocol) const {
   auto &cs = getConstraintSystem();
-  return constraints::conformsToKnownProtocol(cs, type, protocol);
+  return constraints::conformsToKnownProtocol(cs.DC, type, protocol);
 }
 
 Type RequirementFailure::getOwnerType() const {
@@ -2864,7 +2865,7 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
   {
     llvm::SmallString<128> Text;
     llvm::raw_svector_ostream SS(Text);
-    llvm::SetVector<ValueDecl *> missingWitnesses;
+    llvm::SetVector<MissingWitness> missingWitnesses;
     for (auto protocol : missingProtocols) {
       auto conformance = NormalProtocolConformance(
           nominal->getDeclaredType(), protocol, SourceLoc(), nominal,
@@ -2876,7 +2877,7 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
     }
 
     for (auto decl : missingWitnesses) {
-      swift::printRequirementStub(decl, nominal, nominal->getDeclaredType(),
+      swift::printRequirementStub(decl.requirement, nominal, nominal->getDeclaredType(),
                                   nominal->getStartLoc(), SS);
     }
 
@@ -5490,12 +5491,83 @@ SourceLoc SkipUnhandledConstructInFunctionBuilderFailure::getLoc() const {
   return unhandled.get<Decl *>()->getLoc();
 }
 
+/// Determine whether the given "if" chain has a missing "else".
+static bool hasMissingElseInChain(IfStmt *ifStmt) {
+  if (!ifStmt->getElseStmt())
+    return true;
+
+  if (auto ifElse = dyn_cast<IfStmt>(ifStmt->getElseStmt()))
+    return hasMissingElseInChain(ifElse);
+
+  return false;
+}
+
 void SkipUnhandledConstructInFunctionBuilderFailure::diagnosePrimary(
     bool asNote) {
-  if (unhandled.is<Stmt *>()) {
+  if (auto stmt = unhandled.dyn_cast<Stmt *>()) {
     emitDiagnostic(asNote ? diag::note_function_builder_control_flow
                           : diag::function_builder_control_flow,
                    builder->getName());
+
+    // Emit custom notes to help the user introduce the appropriate 'build'
+    // functions.
+    SourceLoc buildInsertionLoc;
+    std::string stubIndent;
+    Type componentType;
+    std::tie(buildInsertionLoc, stubIndent, componentType) =
+        determineFunctionBuilderBuildFixItInfo(builder);
+
+    if (buildInsertionLoc.isInvalid()) {
+      // Do nothing.
+    } else if (isa<IfStmt>(stmt) && hasMissingElseInChain(cast<IfStmt>(stmt))) {
+      auto diag = emitDiagnosticAt(
+          builder->getLoc(), diag::function_builder_missing_build_optional,
+          builder->getDeclaredInterfaceType());
+
+      std::string fixItString;
+      {
+        llvm::raw_string_ostream out(fixItString);
+        printFunctionBuilderBuildFunction(
+            builder, componentType, FunctionBuilderBuildFunction::BuildOptional,
+            stubIndent, out);
+      }
+
+      diag.fixItInsert(buildInsertionLoc, fixItString);
+    } else if (isa<SwitchStmt>(stmt) || isa<IfStmt>(stmt)) {
+      auto diag = emitDiagnosticAt(
+          builder->getLoc(), diag::function_builder_missing_build_either,
+          builder->getDeclaredInterfaceType());
+
+      std::string fixItString;
+      {
+        llvm::raw_string_ostream out(fixItString);
+        printFunctionBuilderBuildFunction(
+            builder, componentType,
+            FunctionBuilderBuildFunction::BuildEitherFirst,
+            stubIndent, out);
+        out << '\n';
+        printFunctionBuilderBuildFunction(
+            builder, componentType,
+            FunctionBuilderBuildFunction::BuildEitherSecond,
+            stubIndent, out);
+      }
+
+      diag.fixItInsert(buildInsertionLoc, fixItString);
+    } else if (isa<ForEachStmt>(stmt)) {
+      auto diag = emitDiagnosticAt(
+          builder->getLoc(), diag::function_builder_missing_build_array,
+          builder->getDeclaredInterfaceType());
+
+      std::string fixItString;
+      {
+        llvm::raw_string_ostream out(fixItString);
+        printFunctionBuilderBuildFunction(
+            builder, componentType, FunctionBuilderBuildFunction::BuildArray,
+            stubIndent, out);
+      }
+
+      diag.fixItInsert(buildInsertionLoc, fixItString);
+    }
   } else {
     emitDiagnostic(asNote ? diag::note_function_builder_decl
                           : diag::function_builder_decl,

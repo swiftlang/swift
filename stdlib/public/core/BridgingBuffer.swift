@@ -25,6 +25,7 @@ internal final class __BridgingBufferStorage
 internal typealias _BridgingBuffer
   = ManagedBufferPointer<_BridgingBufferHeader, AnyObject>
 
+@available(OpenBSD, unavailable, message: "malloc_size is unavailable.")
 extension ManagedBufferPointer
 where Header == _BridgingBufferHeader, Element == AnyObject {
   internal init(_ count: Int) {

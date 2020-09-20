@@ -75,7 +75,7 @@ VarDecl *LinearMapInfo::addVarDecl(NominalTypeDecl *nominal, StringRef name,
   auto &astCtx = nominal->getASTContext();
   auto id = astCtx.getIdentifier(name);
   auto *varDecl = new (astCtx) VarDecl(
-      /*IsStatic*/ false, VarDecl::Introducer::Var, /*IsCaptureList*/ false,
+      /*IsStatic*/ false, VarDecl::Introducer::Var,
       SourceLoc(), id, nominal);
   varDecl->setAccess(nominal->getEffectiveAccess());
   if (type->hasArchetype())
@@ -536,10 +536,6 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
     if (isa<RefCountingInst>(inst) || isa<EndAccessInst>(inst) ||
         isa<EndBorrowInst>(inst) || isa<DeallocationInst>(inst) ||
         isa<DestroyValueInst>(inst) || isa<DestroyAddrInst>(inst))
-      return true;
-    // Should differentiate any instruction that creates an SSA copy of an
-    // active operand.
-    if (isa<CopyValueInst>(inst))
       return true;
   }
   return false;

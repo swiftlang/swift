@@ -411,8 +411,7 @@ public:
 
   /// Entry point into ASTScopeImpl-land for lookups
   static llvm::SmallVector<const ASTScopeImpl *, 0>
-  unqualifiedLookup(SourceFile *, DeclNameRef, SourceLoc,
-                    const DeclContext *startingContext, DeclConsumer);
+  unqualifiedLookup(SourceFile *, DeclNameRef, SourceLoc, DeclConsumer);
 
   /// Entry point into ASTScopeImpl-land for labeled statement lookups.
   static llvm::SmallVector<LabeledStmt *, 4>
@@ -429,11 +428,7 @@ public:
 private:
   static const ASTScopeImpl *findStartingScopeForLookup(SourceFile *,
                                                         const DeclNameRef name,
-                                                        const SourceLoc where,
-                                                        const DeclContext *ctx);
-
-protected:
-  virtual bool doesContextMatchStartingContext(const DeclContext *) const;
+                                                        const SourceLoc where);
 
 protected:
   /// Not const because may reexpand some scopes.
@@ -479,16 +474,6 @@ protected:
               NullablePtr<const GenericParamList> lastListSearched,
               DeclConsumer consumer) const;
 
-public:
-  /// Returns the SelfDC for parent (and possibly ancestor) scopes.
-  /// A return of None indicates that the previous child (in history) should be
-  /// asked.
-  virtual Optional<NullablePtr<DeclContext>> computeSelfDCForParent() const;
-
-  /// Returns the context that should be used when a nested scope (e.g. a
-  /// closure) captures self explicitly.
-  virtual NullablePtr<DeclContext> capturedSelfDC() const;
-
 protected:
   /// Find either locals or members (no scope has both)
   /// \param history The scopes visited since the start of lookup (including
@@ -529,7 +514,7 @@ protected:
   // A local binding is a basically a local variable defined in that very scope
   // It is not an instance variable or inherited type.
 
-  static bool lookupLocalBindingsInPattern(Pattern *p,
+  static bool lookupLocalBindingsInPattern(const Pattern *p,
                                            DeclVisibilityKind vis,
                                            DeclConsumer consumer);
 
@@ -696,27 +681,6 @@ public:
     bool lookupMembersOf(const GenericTypeOrExtensionScope *scope,
                          ArrayRef<const ASTScopeImpl *>,
                          ASTScopeImpl::DeclConsumer consumer) const override;
-
-  private:
-    /// A client needs to know if a lookup result required the dynamic implicit
-    /// self value. It is required if the lookup originates from a method body
-    /// or a lazy pattern initializer. So, one approach would be to call the
-    /// consumer to find members right from those scopes. However, because
-    /// members aren't the first things searched, generics are, that approache
-    /// ends up duplicating code from the \c GenericTypeOrExtensionScope. So we
-    /// take the approach of doing those lookups there, and using this function
-    /// to compute the selfDC from the history.
-    static NullablePtr<DeclContext>
-    computeSelfDC(ArrayRef<const ASTScopeImpl *> history);
-    
-    /// If we find a lookup result that requires the dynamic implict self value,
-    /// we need to check the nested scopes to see if any closures explicitly
-    /// captured \c self. In that case, the appropriate selfDC is that of the
-    /// innermost closure which captures a \c self value from one of this type's
-    /// methods.
-    static NullablePtr<DeclContext>
-    checkNestedScopesForSelfCapture(ArrayRef<const ASTScopeImpl *> history,
-                                    size_t start);
 };
 
 /// Behavior specific to representing the trailing where clause of a
@@ -815,7 +779,6 @@ public:
   virtual std::string declKindName() const = 0;
   virtual bool doesDeclHaveABody() const;
   const char *portionName() const { return portion->portionName; }
-  Optional<NullablePtr<DeclContext>> computeSelfDCForParent() const override;
 
 protected:
   Optional<bool> resolveIsCascadingUseForThisScope(
@@ -1006,7 +969,6 @@ public:
 protected:
   bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
                              DeclConsumer) const override;
-  bool doesContextMatchStartingContext(const DeclContext *) const override;
   Optional<bool>
   resolveIsCascadingUseForThisScope(Optional<bool>) const override;
 };
@@ -1042,8 +1004,6 @@ public:
   getEnclosingAbstractStorageDecl() const override;
 
   NullablePtr<const void> getReferrent() const override;
-
-  static bool shouldCreateAccessorScope(const AccessorDecl *);
 
 protected:
   SourceRange
@@ -1121,7 +1081,6 @@ public:
   }
   virtual NullablePtr<Decl> getDeclIfAny() const override { return decl; }
   Decl *getDecl() const { return decl; }
-  static bool isAMethod(const AbstractFunctionDecl *);
 
   NullablePtr<ASTScopeImpl> getParentOfASTAncestorScopesToBeRescued() override;
 
@@ -1136,21 +1095,10 @@ public:
   SourceRange sourceRangeForDeferredExpansion() const override;
 };
 
-/// Body of methods, functions in types.
-class MethodBodyScope final : public AbstractFunctionBodyScope {
+/// Body of functions and methods.
+class FunctionBodyScope final : public AbstractFunctionBodyScope {
 public:
-  MethodBodyScope(AbstractFunctionDecl *e) : AbstractFunctionBodyScope(e) {}
-  std::string getClassName() const override;
-  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                             DeclConsumer consumer) const override;
-
-  Optional<NullablePtr<DeclContext>> computeSelfDCForParent() const override;
-};
-
-/// Body of "pure" functions, functions without an implicit "self".
-class PureFunctionBodyScope final : public AbstractFunctionBodyScope {
-public:
-  PureFunctionBodyScope(AbstractFunctionDecl *e)
+  FunctionBodyScope(AbstractFunctionDecl *e)
       : AbstractFunctionBodyScope(e) {}
   std::string getClassName() const override;
   bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
@@ -1323,8 +1271,6 @@ public:
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   virtual NullablePtr<DeclContext> getDeclContext() const override;
 
-  Optional<NullablePtr<DeclContext>> computeSelfDCForParent() const override;
-
 protected:
   bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
                              DeclConsumer) const override;
@@ -1399,9 +1345,7 @@ protected:
 };
 
 
-/// Capture lists may contain initializer expressions
-/// No local bindings here (other than closures in initializers);
-/// rather include these in the params or body local bindings
+/// Capture lists introduce local bindings.
 class CaptureListScope final : public ASTScopeImpl {
 public:
   CaptureListExpr *const expr;
@@ -1422,92 +1366,32 @@ public:
   NullablePtr<Expr> getExprIfAny() const override { return expr; }
   Expr *getExpr() const { return expr; }
   NullablePtr<const void> getReferrent() const override;
-};
-
-// In order for compatibility with existing lookup, closures are represented
-// by multiple scopes: An overall scope (including the part before the "in"
-// and a body scope, including the part after the "in"
-class AbstractClosureScope : public ASTScopeImpl {
-public:
-  NullablePtr<CaptureListExpr> captureList;
-  ClosureExpr *const closureExpr;
-
-  AbstractClosureScope(ClosureExpr *closureExpr,
-                       NullablePtr<CaptureListExpr> captureList)
-      : captureList(captureList), closureExpr(closureExpr) {}
-  virtual ~AbstractClosureScope() {}
-
-  NullablePtr<ClosureExpr> getClosureIfClosureScope() const override;
-  NullablePtr<DeclContext> getDeclContext() const override {
-    return closureExpr;
-  }
-  NullablePtr<const void> addressForPrinting() const override {
-    return closureExpr;
-  }
-};
-
-class WholeClosureScope final : public AbstractClosureScope {
-  const BraceStmt *bodyWhenLastExpanded;
-
-public:
-  WholeClosureScope(ClosureExpr *closureExpr,
-                    NullablePtr<CaptureListExpr> captureList)
-      : AbstractClosureScope(closureExpr, captureList) {}
-  virtual ~WholeClosureScope() {}
-
-protected:
-  ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
-  void beCurrent() override;
-  bool isCurrentIfWasExpanded() const override;
-
-private:
-  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
-
-public:
-  std::string getClassName() const override;
-  SourceRange
-  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
-  NullablePtr<Expr> getExprIfAny() const override { return closureExpr; }
-  Expr *getExpr() const { return closureExpr; }
-  NullablePtr<const void> getReferrent() const override;
+  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                             DeclConsumer) const override;
 };
 
 /// For a closure with named parameters, this scope does the local bindings.
-/// Absent if no "in".
-class ClosureParametersScope final : public AbstractClosureScope {
+class ClosureParametersScope final : public ASTScopeImpl {
 public:
-  ClosureParametersScope(ClosureExpr *closureExpr,
-                         NullablePtr<CaptureListExpr> captureList)
-      : AbstractClosureScope(closureExpr, captureList) {}
+  ClosureExpr *const closureExpr;
+
+  ClosureParametersScope(ClosureExpr *closureExpr)
+      : closureExpr(closureExpr) {}
   virtual ~ClosureParametersScope() {}
 
   std::string getClassName() const override;
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
-  
-  /// Since explicit captures of \c self by closures enable the use of implicit
-  /// \c self, we need to make sure that the appropriate \c self is used as the
-  /// base decl for these uses (otherwise, the capture would be marked as
-  /// unused. \c ClosureParametersScope::capturedSelfDC() checks if we have such
-  ///  a capture of self.
-  NullablePtr<DeclContext> capturedSelfDC() const override;
 
-protected:
-  ASTScopeImpl *expandSpecifically(ScopeCreator &) override;
-  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                             DeclConsumer) const override;
-  Optional<bool> resolveIsCascadingUseForThisScope(
-      Optional<bool> isCascadingUse) const override;
-};
-
-// The body encompasses the code in the closure; the part after the "in" if
-// there is an "in"
-class ClosureBodyScope final : public AbstractClosureScope {
-public:
-  ClosureBodyScope(ClosureExpr *closureExpr,
-                   NullablePtr<CaptureListExpr> captureList)
-      : AbstractClosureScope(closureExpr, captureList) {}
-  virtual ~ClosureBodyScope() {}
+  NullablePtr<ClosureExpr> getClosureIfClosureScope() const override {
+    return closureExpr;
+  }
+  NullablePtr<DeclContext> getDeclContext() const override {
+    return closureExpr;
+  }
+  NullablePtr<Expr> getExprIfAny() const override { return closureExpr; }
+  Expr *getExpr() const { return closureExpr; }
+  NullablePtr<const void> getReferrent() const override;
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
@@ -1515,12 +1399,9 @@ protected:
 private:
   void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
 
-public:
-  std::string getClassName() const override;
-  SourceRange
-  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
-
 protected:
+  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                             DeclConsumer) const override;
   Optional<bool> resolveIsCascadingUseForThisScope(
       Optional<bool> isCascadingUse) const override;
 };
@@ -1622,7 +1503,6 @@ protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &) override;
   bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
                              DeclConsumer) const override;
-  bool doesContextMatchStartingContext(const DeclContext *) const override;
 };
 
 class SubscriptDeclScope final : public ASTScopeImpl {
@@ -1933,6 +1813,42 @@ protected:
   bool isLabeledStmtLookupTerminator() const override;
 };
 
+/// The parent scope for a 'case' statement, consisting of zero or more
+/// CaseLabelItemScopes, followed by a CaseStmtBodyScope.
+///
+/// +------------------------------------------------------------------
+/// | CaseStmtScope
+/// +------------------------------------------------------------------
+/// |                               +--------------------------+
+/// |                               | CaseLabelItemScope:      |
+/// |                               +--------------------------+
+/// | case .foo(let x, let y) where | condition(x, y),         |
+/// |               ^------^--------------------^--^           |
+/// |               this guard expression sees first 'x'/'y'   |
+/// |                               +--------------------------+
+/// |
+/// |                               +--------------------------+
+/// |                               | CaseLabelItemScope:      |
+/// |                               +--------------------------+
+/// |      .foo(let x, let y) where | condition(x, y),         |
+/// |               ^------^--------------------^--^           |
+/// |               this guard expression sees second 'x'/'y'  |
+/// |                               +--------------------------+
+/// |
+/// |      .bar(let x, let y)
+/// |               this case label item doesn't have a guard, so no
+/// |               scope is created.
+/// |
+/// | +----------------------------------------------------------------
+/// | | CaseStmtBodyScope:
+/// | +----------------------------------------------------------------
+/// | | {
+/// | |    ... x, y  <-- body sees "joined" 'x'/'y' created by parser
+/// | | }
+/// | +----------------------------------------------------------------
+/// |
+/// +------------------------------------------------------------------
+
 class CaseStmtScope final : public AbstractStmtScope {
 public:
   CaseStmt *const stmt;
@@ -1947,13 +1863,62 @@ private:
 
 public:
   std::string getClassName() const override;
+  Stmt *getStmt() const override { return stmt; }
+};
+
+/// The scope used for the guard expression in a case statement. Any
+/// variables bound by the case label item's pattern are visible in
+/// this scope.
+class CaseLabelItemScope final : public ASTScopeImpl {
+public:
+  CaseLabelItem item;
+  CaseLabelItemScope(const CaseLabelItem &item) : item(item) {}
+  virtual ~CaseLabelItemScope() {}
+
+protected:
+  ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
+  std::string getClassName() const override;
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
-  Stmt *getStmt() const override { return stmt; }
 
 protected:
   bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
                              ASTScopeImpl::DeclConsumer) const override;
+};
+
+/// The scope used for the body of a 'case' statement.
+///
+/// If the 'case' statement has multiple case label items, each label
+/// item's pattern must bind the same variables; the parser creates
+/// "fake" variables to represent the join of the variables bound by
+/// each pattern.
+///
+/// These "fake" variables are visible in the 'case' statement body.
+class CaseStmtBodyScope final : public ASTScopeImpl {
+public:
+  CaseStmt *const stmt;
+  CaseStmtBodyScope(CaseStmt *e) : stmt(e) {}
+  virtual ~CaseStmtBodyScope() {}
+
+protected:
+  ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
+  std::string getClassName() const override;
+  SourceRange
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
+protected:
+  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                             ASTScopeImpl::DeclConsumer) const override;
+  bool isLabeledStmtLookupTerminator() const override;
 };
 
 class BraceStmtScope final : public AbstractStmtScope {

@@ -8016,8 +8016,7 @@ static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
     name += "$generator";
 
     iterator = new (ctx) VarDecl(
-        /*IsStatic*/ false, VarDecl::Introducer::Var,
-        /*IsCaptureList*/ false, stmt->getInLoc(),
+        /*IsStatic*/ false, VarDecl::Introducer::Var, stmt->getInLoc(),
         ctx.getIdentifier(name), dc);
     iterator->setInterfaceType(
         forEachStmtInfo.iteratorType->mapTypeOutOfContext());
@@ -8407,6 +8406,15 @@ ProtocolConformanceRef Solution::resolveConformance(
   }
 
   return ProtocolConformanceRef::forInvalid();
+}
+
+bool Solution::hasType(ASTNode node) const {
+  auto result = nodeTypes.find(node);
+  if (result != nodeTypes.end())
+    return true;
+
+  auto &cs = getConstraintSystem();
+  return cs.hasType(node);
 }
 
 Type Solution::getType(ASTNode node) const {

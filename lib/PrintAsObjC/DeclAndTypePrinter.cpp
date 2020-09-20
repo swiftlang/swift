@@ -878,6 +878,9 @@ private:
       case PlatformKind::watchOSApplicationExtension:
         plat = "watchos_app_extension";
         break;
+      case PlatformKind::OpenBSD:
+        plat = "openbsd";
+        break;
       case PlatformKind::none:
         llvm_unreachable("handled above");
       }

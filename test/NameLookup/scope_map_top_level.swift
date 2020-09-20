@@ -42,7 +42,7 @@ var i: Int = b.my_identity()
 // CHECK-EXPANDED-NEXT:           `-LookupParentDiversionScope, [9:1 - 21:28]
 // CHECK-EXPANDED-NEXT:             |-AbstractFunctionDeclScope {{.*}}, [11:1 - 11:13] 'foo()'
 // CHECK-EXPANDED-NEXT:               `-ParameterListScope {{.*}}, [11:9 - 11:13]
-// CHECK-EXPANDED-NEXT:                 `-PureFunctionBodyScope {{.*}}, [11:12 - 11:13]
+// CHECK-EXPANDED-NEXT:                 `-FunctionBodyScope {{.*}}, [11:12 - 11:13]
 // CHECK-EXPANDED-NEXT:                   `-BraceStmtScope {{.*}}, [11:12 - 11:13]
 // CHECK-EXPANDED-NEXT:             `-TopLevelCodeScope {{.*}}, [13:1 - 21:28]
 // CHECK-EXPANDED-NEXT:               `-BraceStmtScope {{.*}}, [13:1 - 21:28]
@@ -53,7 +53,7 @@ var i: Int = b.my_identity()
 // CHECK-EXPANDED-NEXT:                   `-ExtensionBodyScope {{.*}}, [17:15 - 19:1]
 // CHECK-EXPANDED-NEXT:                     `-AbstractFunctionDeclScope {{.*}}, [18:3 - 18:43] 'my_identity()'
 // CHECK-EXPANDED-NEXT:                       `-ParameterListScope {{.*}}, [18:19 - 18:43]
-// CHECK-EXPANDED-NEXT:                         `-MethodBodyScope {{.*}}, [18:29 - 18:43]
+// CHECK-EXPANDED-NEXT:                         `-FunctionBodyScope {{.*}}, [18:29 - 18:43]
 // CHECK-EXPANDED-NEXT:                           `-BraceStmtScope {{.*}}, [18:29 - 18:43]
 // CHECK-EXPANDED-NEXT:                 `-TopLevelCodeScope {{.*}}, [21:1 - 21:28]
 // CHECK-EXPANDED-NEXT:                   `-BraceStmtScope {{.*}}, [21:1 - 21:28]

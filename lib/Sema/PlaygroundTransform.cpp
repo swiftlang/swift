@@ -293,7 +293,7 @@ public:
         TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Return);
         BraceStmt *NB = transformBraceStmt(B);
         if (NB != B) {
-          FD->setBody(NB);
+          FD->setBody(NB, AbstractFunctionDecl::BodyKind::TypeChecked);
           TypeChecker::checkFunctionEffects(FD);
         }
       }
@@ -757,8 +757,7 @@ public:
 
     VarDecl *VD =
         new (Context) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
-                              /*IsCaptureList*/false, SourceLoc(),
-                              Context.getIdentifier(NameBuf),
+                              SourceLoc(), Context.getIdentifier(NameBuf),
                               TypeCheckDC);
     VD->setInterfaceType(MaybeLoadInitExpr->getType()->mapTypeOutOfContext());
     VD->setImplicit();
@@ -892,7 +891,7 @@ void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
             Instrumenter I(ctx, FD, RNG, HighPerformance, TmpNameIndex);
             BraceStmt *NewBody = I.transformBraceStmt(Body);
             if (NewBody != Body) {
-              FD->setBody(NewBody);
+              FD->setBody(NewBody, AbstractFunctionDecl::BodyKind::TypeChecked);
               TypeChecker::checkFunctionEffects(FD);
             }
             return false;

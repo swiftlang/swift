@@ -3,7 +3,7 @@
 
 struct IntBox {
   int value;
-  IntBox operator+(IntBox rhs) { return IntBox{.value = value + rhs.value}; }
+  IntBox operator-(IntBox rhs) { return IntBox{.value = value - rhs.value}; }
 };
 
 #endif

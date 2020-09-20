@@ -481,6 +481,8 @@ public:
       return false;
     assert(nominal->isGenericContext());
 
+    if (printOptions.PrintSPIs)
+      out << "@_spi(" << DummyProtocolName << ")\n";
     out << "@available(*, unavailable)\nextension ";
     nominal->getDeclaredType().print(out, printOptions);
     out << " : ";
