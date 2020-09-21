@@ -689,10 +689,20 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
       if (auto *E = VD->getParentInitializer())
         DeclLoc = E->getSourceRange().End;
 
+    auto &SM = Context.SourceMgr;
+
+    // FIXME: When doing code completions, anything outside the replaced
+    // range is going to be visible.
+    if (auto replacedRange = SM.getReplacedRange()) {
+      if (SM.rangeContainsTokenLoc(replacedRange.New, Loc) &&
+          !SM.rangeContainsTokenLoc(replacedRange.New, DeclLoc))
+        return true;
+    }
+
     if (Loc.isValid() && DeclLoc.isValid() &&
         D->getDeclContext()->isLocalContext() &&
         D->getDeclContext() == DC &&
-        !Context.SourceMgr.isBeforeInBuffer(DeclLoc, Loc) &&
+        !SM.isBeforeInBuffer(DeclLoc, Loc) &&
         !isa<TypeDecl>(D)) {
       localDeclAfterUse = D;
       return false;
