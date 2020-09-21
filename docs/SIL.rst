@@ -640,7 +640,8 @@ tasks, and can have explicit *suspend points* where they suspend execution.
 otherwise can be invoked with the normal ``apply`` and ``try_apply``
 instructions (or ``begin_apply`` if they are coroutines).
 
-``@async`` functions may express primitive suspend points by using the
+In Swift, the ``withUnsafeContinuation`` primitive is used to implement
+primitive suspend points. In SIL, ``@async`` functions represent this abstraction
 ``begin_async_continuation[_addr]`` and ``await_async_continuation``
 instructions. ``begin_async_continuation[_addr]`` creates a *continuation*
 value that can be used to resume the coroutine when it suspends, feeding a
@@ -649,10 +650,49 @@ error when it resumes. The resulting continuation value can then be passed
 into a completion handler, registered with an event loop, or scheduled by
 some other mechanism. The ``await_async_continuation`` instruction suspends
 execution of the coroutine until the continuation is invoked to resume it.
-All continuation values must be used to resume the async coroutine exactly
-once. It is undefined behavior to attempt to resume the same continuation
-more than once. Failing to resume a continuation will leave the coroutine
-stuck in the suspended state, leaking any memory or other resources it owns.
+A use of ``withUnsafeContinuation`` in Swift::
+
+  func waitForCallback() async -> Int {
+    return await withUnsafeContinuation { cc in
+      registerCallback { cc.resume($0) }
+    }
+  }
+
+might lower to the following SIL::
+
+  sil @waitForCallback : $@convention(thin) @async () -> Int {
+  entry:
+    %cc = begin_async_continuation $Int
+    %closure = function_ref @waitForCallback_closure
+      : $@convention(thin) (UnsafeContinuation<Int>) -> ()
+    apply %closure(%cc)
+    await_async_continuation %cc, resume resume_cc
+
+  resume_cc(%result : $Int):
+    return %result
+  }
+
+The closure may then be inlined into the ``waitForCallback`` function::
+
+  sil @waitForCallback : $@convention(thin) @async () -> Int {
+  entry:
+    %cc = begin_async_continuation $Int
+    %registerCallback = function_ref @registerCallback
+      : $@convention(thin) (@convention(thick) () -> ()) -> ()
+    %callback_fn = function_ref @waitForCallback_callback
+    %callback = partial_apply %callback_fn(%cc)
+    apply %registerCallback(%callback)
+    await_async_continuation %cc, resume resume_cc
+
+  resume_cc(%result : $Int):
+    return %result
+  }
+
+Every continuation value must be used exactly once to resume its associated
+async coroutine once. It is undefined behavior to attempt to resume the same
+continuation more than once. On the flip side, failing to resume a continuation
+will leave the async task stuck in the suspended state, leaking any memory or
+other resources it owns.
 
 Coroutine Types
 ```````````````
