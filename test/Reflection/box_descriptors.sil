@@ -5,6 +5,9 @@
 // SR-10758
 // UNSUPPORTED: linux
 
+// SR-12893
+// XFAIL: openbsd
+
 sil_stage canonical
 
 import Builtin
