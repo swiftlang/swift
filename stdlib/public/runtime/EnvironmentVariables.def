@@ -44,7 +44,7 @@ VARIABLE(SWIFT_ENABLE_MANGLED_NAME_VERIFICATION, bool, false,
 VARIABLE(SWIFT_DEBUG_ENABLE_MALLOC_SCRIBBLE, bool, false,
          "Scribble on runtime allocations such as metadata allocations.")
 
-VARIABLE(SWIFT_DEBUG_ENABLE_COW_SANITY_CHECKS, bool, false,
-         "Enable sanity checks for copy-on-write operations.")
+VARIABLE(SWIFT_DEBUG_ENABLE_COW_CHECKS, bool, false,
+         "Enable internal checks for copy-on-write operations.")
 
 #undef VARIABLE
