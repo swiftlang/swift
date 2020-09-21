@@ -1748,6 +1748,11 @@ ERROR(pound_available_package_description_not_allowed, none,
 ERROR(availability_query_repeated_platform, none,
       "version for '%0' already specified", (StringRef))
 
+ERROR(attr_requires_concurrency,none,
+      "'%0' %select{attribute|modifier}1 is only valid when experimental "
+      "concurrency is enabled",
+      (StringRef, bool))
+
 //------------------------------------------------------------------------------
 // MARK: syntax parsing diagnostics
 //------------------------------------------------------------------------------

@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+SWIFT_TYPEID(ActorIsolation)
 SWIFT_TYPEID(AncestryFlags)
 SWIFT_TYPEID(CtorInitializerKind)
 SWIFT_TYPEID(FunctionBuilderBodyPreCheck)
