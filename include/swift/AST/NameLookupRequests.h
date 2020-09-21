@@ -169,8 +169,7 @@ public:
 class InheritedProtocolsRequest
     : public SimpleRequest<
           InheritedProtocolsRequest, ArrayRef<ProtocolDecl *>(ProtocolDecl *),
-          RequestFlags::SeparatelyCached | RequestFlags::DependencySink |
-              RequestFlags::DependencySource> {
+          RequestFlags::SeparatelyCached | RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -189,8 +188,6 @@ public:
 
 public:
   // Incremental dependencies
-  evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyRecorder &e) const;
   void writeDependencySink(evaluator::DependencyCollector &tracker,
                            ArrayRef<ProtocolDecl *> result) const;
 };
@@ -310,8 +307,7 @@ public:
 /// Finds or synthesizes a destructor for the given class.
 class GetDestructorRequest
     : public SimpleRequest<GetDestructorRequest, DestructorDecl *(ClassDecl *),
-                           RequestFlags::SeparatelyCached |
-                               RequestFlags::DependencySource> {
+                           RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -327,11 +323,6 @@ public:
   bool isCached() const { return true; }
   Optional<DestructorDecl *> getCachedResult() const;
   void cacheResult(DestructorDecl *value) const;
-
-public:
-  // Incremental dependencies.
-  evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyRecorder &) const;
 };
 
 class GenericParamListRequest :
@@ -420,7 +411,7 @@ SourceLoc extractNearestSourceLoc(const UnqualifiedLookupDescriptor &desc);
 class UnqualifiedLookupRequest
     : public SimpleRequest<UnqualifiedLookupRequest,
                            LookupResult(UnqualifiedLookupDescriptor),
-                           RequestFlags::Uncached | RequestFlags::DependencySource |
+                           RequestFlags::Uncached |
                                RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -434,8 +425,6 @@ private:
 
 public:
   // Incremental dependencies
-  evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyRecorder &) const;
   void writeDependencySink(evaluator::DependencyCollector &tracker,
                            LookupResult res) const;
 };
@@ -495,7 +484,7 @@ class ModuleQualifiedLookupRequest
                            QualifiedLookupResult(const DeclContext *,
                                                  ModuleDecl *, DeclNameRef,
                                                  NLOptions),
-                           RequestFlags::Uncached | RequestFlags::DependencySource |
+                           RequestFlags::Uncached |
                               RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -511,8 +500,6 @@ private:
 
 public:
   // Incremental dependencies
-  evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyRecorder &) const;
   void writeDependencySink(evaluator::DependencyCollector &tracker,
                            QualifiedLookupResult lookupResult) const;
 };
@@ -522,7 +509,7 @@ class QualifiedLookupRequest
                            QualifiedLookupResult(const DeclContext *,
                                                  SmallVector<NominalTypeDecl *, 4>,
                                                  DeclNameRef, NLOptions),
-                           RequestFlags::Uncached | RequestFlags::DependencySource> {
+                           RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -535,11 +522,6 @@ private:
            SmallVector<NominalTypeDecl *, 4> decls,
            DeclNameRef name,
            NLOptions opts) const;
-
-public:
-  // Incremental dependencies.
-  evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyRecorder &) const;
 };
 
 /// The input type for a direct lookup request.

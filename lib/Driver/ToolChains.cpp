@@ -281,9 +281,6 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
       options::OPT_disable_fuzzy_forward_scan_trailing_closure_matching);
   inputArgs.AddLastArg(arguments,
                        options::OPT_verify_incremental_dependencies);
-  inputArgs.AddLastArg(arguments,
-                       options::OPT_enable_direct_intramodule_dependencies,
-                       options::OPT_disable_direct_intramodule_dependencies);
 
   // SWIFT_ENABLE_TENSORFLOW
   inputArgs.AddLastArg(

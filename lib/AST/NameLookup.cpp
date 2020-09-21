@@ -119,7 +119,6 @@ void swift::simple_display(llvm::raw_ostream &out,
       {UnqualifiedLookupFlags::AllowProtocolMembers, "AllowProtocolMembers"},
       {UnqualifiedLookupFlags::IgnoreAccessControl, "IgnoreAccessControl"},
       {UnqualifiedLookupFlags::IncludeOuterResults, "IncludeOuterResults"},
-      {UnqualifiedLookupFlags::KnownPrivate, "KnownPrivate"},
       {UnqualifiedLookupFlags::TypeLookup, "TypeLookup"},
   };
 
@@ -815,9 +814,8 @@ namespace {
 /// Retrieve the set of type declarations that are directly referenced from
 /// the given parsed type representation.
 static DirectlyReferencedTypeDecls
-directReferencesForTypeRepr(Evaluator &evaluator,
-                            ASTContext &ctx, TypeRepr *typeRepr,
-                            DeclContext *dc);
+directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
+                            TypeRepr *typeRepr, DeclContext *dc);
 
 /// Retrieve the set of type declarations that are directly referenced from
 /// the given type.
@@ -839,7 +837,8 @@ SelfBounds SelfBoundsFromWhereClauseRequest::evaluate(
   auto *protoDecl = dyn_cast_or_null<const ProtocolDecl>(typeDecl);
   auto *extDecl = decl.dyn_cast<const ExtensionDecl *>();
 
-  DeclContext *dc = protoDecl ? (DeclContext *)protoDecl : (DeclContext *)extDecl;
+  const DeclContext *dc =
+      protoDecl ? (const DeclContext *)protoDecl : (const DeclContext *)extDecl;
 
   // A protocol or extension 'where' clause can reference associated types of
   // the protocol itself, so we have to start unqualified lookup from 'dc'.
@@ -2193,7 +2192,7 @@ DirectlyReferencedTypeDecls InheritedDeclsReferencedRequest::evaluate(
       dc = (DeclContext *)decl.get<const ExtensionDecl *>();
 
     return directReferencesForTypeRepr(evaluator, dc->getASTContext(), typeRepr,
-                                       dc);
+                                       const_cast<DeclContext *>(dc));
   }
 
   // Fall back to semantic types.
@@ -2797,8 +2796,6 @@ void swift::simple_display(llvm::raw_ostream &out, NLOptions options) {
     FLAG(NL_RemoveNonVisible)
     FLAG(NL_RemoveOverridden)
     FLAG(NL_IgnoreAccessControl)
-    FLAG(NL_KnownNonCascadingDependency)
-    FLAG(NL_KnownCascadingDependency)
     FLAG(NL_OnlyTypes)
     FLAG(NL_IncludeAttributeImplements)
 #undef FLAG
