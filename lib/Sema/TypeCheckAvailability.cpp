@@ -203,21 +203,27 @@ private:
     
     return NewTRC;
   }
-  
+
   /// Returns true if the declaration should introduce a new refinement context.
   bool declarationIntroducesNewContext(Decl *D) {
     if (!isa<ValueDecl>(D) && !isa<ExtensionDecl>(D)) {
       return false;
     }
-    
+
+    // Explicit inlinability may to the decl being used on an earlier OS
+    // version when inlined on the client side. This check assumes that
+    // implicit decls are handled elsewhere.
+    bool isExplicitlyInlinable = !D->isImplicit() &&
+      (D->getAttrs().hasAttribute<InlinableAttr>() ||
+       D->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>());
+
     // No need to introduce a context if the declaration does not have an
-    // availability or inlinable attribute.
+    // availability or non-implicit inlinable attribute.
     if (!hasActiveAvailableAttribute(D, Context) &&
-        !D->getAttrs().hasAttribute<InlinableAttr>() &&
-        !D->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
+        !isExplicitlyInlinable) {
       return false;
     }
-    
+
     // Only introduce for an AbstractStorageDecl if it is not local.
     // We introduce for the non-local case because these may
     // have getters and setters (and these may be synthesized, so they might
@@ -228,7 +234,7 @@ private:
         return false;
       }
     }
-    
+
     return true;
   }
 
