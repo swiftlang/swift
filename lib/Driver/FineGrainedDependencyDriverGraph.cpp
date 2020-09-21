@@ -220,9 +220,8 @@ void ModuleDepGraph::forEachUntracedJobDirectlyDependentOnExternalSwiftDeps(
     StringRef externalSwiftDeps, function_ref<void(const Job *)> fn) {
   // TODO move nameForDep into key
   // These nodes will depend on the *interface* of the external Decl.
-  DependencyKey key =
-      DependencyKey::createDependedUponKey<NodeKind::externalDepend>(
-          externalSwiftDeps.str());
+  DependencyKey key(NodeKind::externalDepend, DeclAspect::interface, "",
+                    externalSwiftDeps.str());
   for (const ModuleDepGraphNode *useNode : usesByDef[key]) {
     if (!useNode->getHasBeenTraced())
       fn(getJob(useNode->getSwiftDepsOfProvides()));
