@@ -429,7 +429,7 @@ bool DependencyVerifier::constructObligations(const SourceFile *SF,
   auto &Ctx = SF->getASTContext();
   Ctx.evaluator.enumerateReferencesInFile(
       SF, [&](const auto &reference) {
-        const auto isCascadingUse = reference.cascades;
+        const auto isCascadingUse = false;
         using NodeKind = evaluator::DependencyCollector::Reference::Kind;
         switch (reference.kind) {
         case NodeKind::Empty:

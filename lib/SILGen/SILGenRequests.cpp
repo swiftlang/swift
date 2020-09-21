@@ -52,12 +52,11 @@ evaluator::DependencySource ASTLoweringRequest::readDependencySource(
 
   // We don't track dependencies in whole-module mode.
   if (auto *mod = desc.context.dyn_cast<ModuleDecl *>()) {
-    return {nullptr, e.getActiveSourceScope()};
+    return nullptr;
   }
 
   // If we have a single source file, it's the source of dependencies.
-  auto *unit = desc.context.get<FileUnit *>();
-  return {dyn_cast<SourceFile>(unit), evaluator::DependencyScope::Cascading};
+  return dyn_cast<SourceFile>(desc.context.get<FileUnit *>());
 }
 
 ArrayRef<FileUnit *> ASTLoweringDescriptor::getFilesToEmit() const {

@@ -157,15 +157,6 @@ void SuperclassTypeRequest::cacheResult(Type value) const {
     protocolDecl->LazySemanticInfo.SuperclassType.setPointerAndInt(value, true);
 }
 
-evaluator::DependencySource SuperclassTypeRequest::readDependencySource(
-    const evaluator::DependencyRecorder &e) const {
-  const auto access = std::get<0>(getStorage())->getFormalAccess();
-  return {
-    e.getActiveDependencySourceOrNull(),
-    evaluator::getScopeForAccessLevel(access)
-  };
-}
-
 void SuperclassTypeRequest::writeDependencySink(
     evaluator::DependencyCollector &tracker, Type value) const {
   if (!value)
@@ -1285,12 +1276,8 @@ void CheckRedeclarationRequest::cacheResult(evaluator::SideEffect) const {
 
 evaluator::DependencySource CheckRedeclarationRequest::readDependencySource(
     const evaluator::DependencyRecorder &eval) const {
-  auto *current = std::get<0>(getStorage());
-  auto *currentDC = current->getDeclContext();
-  return {
-    currentDC->getParentSourceFile(),
-    evaluator::getScopeForAccessLevel(current->getFormalAccess())
-  };
+  auto *currentDC = std::get<0>(getStorage())->getDeclContext();
+  return currentDC->getParentSourceFile();
 }
 
 void CheckRedeclarationRequest::writeDependencySink(
@@ -1316,21 +1303,6 @@ void CheckRedeclarationRequest::writeDependencySink(
 //----------------------------------------------------------------------------//
 // LookupAllConformancesInContextRequest computation.
 //----------------------------------------------------------------------------//
-
-evaluator::DependencySource
-LookupAllConformancesInContextRequest::readDependencySource(
-    const evaluator::DependencyRecorder &collector) const {
-  const auto *nominal = std::get<0>(getStorage())
-                            ->getAsGenericContext()
-                            ->getSelfNominalTypeDecl();
-  if (!nominal) {
-    return {collector.getActiveDependencySourceOrNull(),
-            evaluator::DependencyScope::Cascading};
-  }
-
-  return {collector.getActiveDependencySourceOrNull(),
-          evaluator::getScopeForAccessLevel(nominal->getFormalAccess())};
-}
 
 void LookupAllConformancesInContextRequest::writeDependencySink(
     evaluator::DependencyCollector &tracker,
@@ -1369,7 +1341,7 @@ void ResolveTypeEraserTypeRequest::cacheResult(Type value) const {
 
 evaluator::DependencySource TypeCheckSourceFileRequest::readDependencySource(
     const evaluator::DependencyRecorder &e) const {
-  return {std::get<0>(getStorage()), evaluator::DependencyScope::Cascading};
+  return std::get<0>(getStorage());
 }
 
 Optional<evaluator::SideEffect>
@@ -1429,12 +1401,7 @@ void TypeCheckFunctionBodyRequest::cacheResult(BraceStmt *body) const {
 evaluator::DependencySource
 TypeCheckFunctionBodyRequest::readDependencySource(
     const evaluator::DependencyRecorder &e) const {
-  // We're going under a function body scope, unconditionally flip the scope
-  // to private.
-  return {
-    std::get<0>(getStorage())->getParentSourceFile(),
-    evaluator::DependencyScope::Private
-  };
+  return std::get<0>(getStorage())->getParentSourceFile();
 }
 
 //----------------------------------------------------------------------------//

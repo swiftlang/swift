@@ -186,14 +186,12 @@ inline TypeCheckExprOptions operator|(TypeCheckExprFlags flag1,
 
 /// Flags that can be used to control name lookup.
 enum class NameLookupFlags {
-  /// Whether we know that this lookup is always a private dependency.
-  KnownPrivate = 0x01,
   /// Whether to ignore access control for this lookup, allowing inaccessible
   /// results to be returned.
-  IgnoreAccessControl = 0x10,
+  IgnoreAccessControl = 1 << 0,
   /// Whether to include results from outside the innermost scope that has a
   /// result.
-  IncludeOuterResults = 0x20,
+  IncludeOuterResults = 1 << 1,
 };
 
 /// A set of options that control name lookup.

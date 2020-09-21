@@ -207,8 +207,6 @@ namespace {
 static UnqualifiedLookupOptions
 convertToUnqualifiedLookupOptions(NameLookupOptions options) {
   UnqualifiedLookupOptions newOptions = UnqualifiedLookupFlags::AllowProtocolMembers;
-  if (options.contains(NameLookupFlags::KnownPrivate))
-    newOptions |= UnqualifiedLookupFlags::KnownPrivate;
   if (options.contains(NameLookupFlags::IgnoreAccessControl))
     newOptions |= UnqualifiedLookupFlags::IgnoreAccessControl;
   if (options.contains(NameLookupFlags::IncludeOuterResults))
@@ -312,8 +310,6 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
 
   LookupResult result;
   NLOptions subOptions = (NL_QualifiedDefault | NL_ProtocolMembers);
-  if (options.contains(NameLookupFlags::KnownPrivate))
-    subOptions |= NL_KnownNonCascadingDependency;
   if (options.contains(NameLookupFlags::IgnoreAccessControl))
     subOptions |= NL_IgnoreAccessControl;
 
@@ -388,8 +384,6 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
   SmallVector<ValueDecl *, 4> decls;
   NLOptions subOptions = (NL_QualifiedDefault | NL_OnlyTypes | NL_ProtocolMembers);
 
-  if (options.contains(NameLookupFlags::KnownPrivate))
-    subOptions |= NL_KnownNonCascadingDependency;
   if (options.contains(NameLookupFlags::IgnoreAccessControl))
     subOptions |= NL_IgnoreAccessControl;
 

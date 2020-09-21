@@ -1111,7 +1111,6 @@ static Type diagnoseUnknownType(TypeResolution resolution,
 
     // Try ignoring access control.
     NameLookupOptions relookupOptions = lookupOptions;
-    relookupOptions |= NameLookupFlags::KnownPrivate;
     relookupOptions |= NameLookupFlags::IgnoreAccessControl;
     auto inaccessibleResults =
     TypeChecker::lookupUnqualifiedType(dc, comp->getNameRef(),
@@ -1177,7 +1176,6 @@ static Type diagnoseUnknownType(TypeResolution resolution,
 
   // Try ignoring access control.
   NameLookupOptions relookupOptions = lookupOptions;
-  relookupOptions |= NameLookupFlags::KnownPrivate;
   relookupOptions |= NameLookupFlags::IgnoreAccessControl;
   auto inaccessibleMembers =
     TypeChecker::lookupMemberType(dc, parentType, comp->getNameRef(),
@@ -1212,8 +1210,6 @@ static Type diagnoseUnknownType(TypeResolution resolution,
     // identifier not found as a member type vs. not found at all.
     NameLookupOptions memberLookupOptions = lookupOptions;
     memberLookupOptions |= NameLookupFlags::IgnoreAccessControl;
-    memberLookupOptions |= NameLookupFlags::KnownPrivate;
-
     memberLookup = TypeChecker::lookupMember(dc, parentType,
                                              comp->getNameRef(),
                                              memberLookupOptions);
@@ -1325,11 +1321,8 @@ static Type resolveTopLevelIdentTypeComponent(TypeResolution resolution,
     }
   }
 
-  NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
-  if (options.contains(TypeResolutionFlags::KnownNonCascadingDependency))
-    lookupOptions |= NameLookupFlags::KnownPrivate;
   auto globals = TypeChecker::lookupUnqualifiedType(DC, id, comp->getLoc(),
-                                                    lookupOptions);
+                                                    defaultUnqualifiedLookupOptions);
 
   // Process the names we found.
   Type current;
@@ -1407,7 +1400,7 @@ static Type resolveTopLevelIdentTypeComponent(TypeResolution resolution,
       return ErrorType::get(ctx);
 
     return diagnoseUnknownType(resolution, nullptr, SourceRange(), comp,
-                               lookupOptions);
+                               defaultUnqualifiedLookupOptions);
   }
 
   comp->setValue(currentDecl, currentDC);
@@ -1529,20 +1522,11 @@ static Type resolveNestedIdentTypeComponent(TypeResolution resolution,
   // Phase 1: Find and bind the component decl.
 
   // Look for member types with the given name.
-  bool isKnownNonCascading = options.contains(TypeResolutionFlags::KnownNonCascadingDependency);
-  if (!isKnownNonCascading && options.isAnyExpr()) {
-    // Expressions cannot affect a function's signature.
-    isKnownNonCascading = isa<AbstractFunctionDecl>(DC);
-  }
-
-  NameLookupOptions lookupOptions = defaultMemberLookupOptions;
-  if (isKnownNonCascading)
-    lookupOptions |= NameLookupFlags::KnownPrivate;
   LookupTypeResult memberTypes;
   if (parentTy->mayHaveMembers())
     memberTypes = TypeChecker::lookupMemberType(DC, parentTy,
                                                 comp->getNameRef(),
-                                                lookupOptions);
+                                                defaultMemberLookupOptions);
 
   // Name lookup was ambiguous. Complain.
   // FIXME: Could try to apply generic arguments first, and see whether
@@ -1565,7 +1549,7 @@ static Type resolveNestedIdentTypeComponent(TypeResolution resolution,
       return ErrorType::get(ctx);
 
     memberType = diagnoseUnknownType(resolution, parentTy, parentRange, comp,
-                                     lookupOptions);
+                                     defaultMemberLookupOptions);
     member = comp->getBoundDecl();
     if (!member)
       return ErrorType::get(ctx);
