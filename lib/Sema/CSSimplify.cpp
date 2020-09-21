@@ -6693,8 +6693,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     // Ignore access control so we get candidates that might have been missed
     // before.
     lookupOptions |= NameLookupFlags::IgnoreAccessControl;
-    // This is only used for diagnostics, so always use KnownPrivate.
-    lookupOptions |= NameLookupFlags::KnownPrivate;
 
     auto lookup =
         TypeChecker::lookupMember(DC, instanceTy, memberName, lookupOptions);
@@ -7291,8 +7289,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
               DeclNameRef(param->getName()),
               paramDecl->getDeclContext()->getParentSourceFile(),
               SourceLoc(),
-              UnqualifiedLookupFlags::KnownPrivate |
-                  UnqualifiedLookupFlags::TypeLookup);
+              UnqualifiedLookupFlags::TypeLookup);
           auto lookup = evaluateOrDefault(
               Context.evaluator, UnqualifiedLookupRequest{descriptor}, {});
           for (auto &result : lookup) {
