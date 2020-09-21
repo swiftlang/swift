@@ -30,6 +30,7 @@ namespace swift {
     const char *OutputPath = nullptr;
     const char *DocOutputPath = nullptr;
     const char *SourceInfoOutputPath = nullptr;
+    std::string SymbolGraphOutputDir;
 
     StringRef GroupInfoPath;
     StringRef ImportedHeader;

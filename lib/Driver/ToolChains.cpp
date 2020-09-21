@@ -556,6 +556,11 @@ ToolChain::constructInvocation(const CompileJobAction &job,
       options::
           OPT_disable_autolinking_runtime_compatibility_dynamic_replacements);
 
+  if (context.OI.CompilerMode == OutputInfo::Mode::SingleCompile) {
+    context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph);
+    context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph_dir);
+  }
+
   return II;
 }
 
@@ -1038,6 +1043,9 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
                    file_types::TY_ObjCHeader, "-emit-objc-header-path");
   addOutputsOfType(Arguments, context.Output, context.Args, file_types::TY_TBD,
                    "-emit-tbd-path");
+
+  context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph);
+  context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph_dir);
 
   context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
 

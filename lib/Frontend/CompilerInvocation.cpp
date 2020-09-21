@@ -682,6 +682,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.AttachCommentsToDecls = true;
   }
 
+  // If we are emitting a symbol graph file, configure lexing and parsing to
+  // remember comments.
+  if (FrontendOpts.EmitSymbolGraph) {
+    Opts.AttachCommentsToDecls = true;
+  }
+
   // If we're parsing SIL, access control doesn't make sense to enforce.
   if (Args.hasArg(OPT_parse_sil) ||
       FrontendOpts.InputsAndOutputs.shouldTreatAsSIL()) {

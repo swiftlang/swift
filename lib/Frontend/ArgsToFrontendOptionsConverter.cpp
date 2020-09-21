@@ -234,6 +234,12 @@ bool ArgsToFrontendOptionsConverter::convert(
   computeImplicitImportModuleNames(OPT_testable_import_module, /*isTestable=*/true);
   computeLLVMArgs();
 
+  Opts.EmitSymbolGraph |= Args.hasArg(OPT_emit_symbol_graph);
+  
+  if (const Arg *A = Args.getLastArg(OPT_emit_symbol_graph_dir)) {
+    Opts.SymbolGraphOutputDir = A->getValue();
+  }
+
   return false;
 }
 
@@ -579,6 +585,11 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
   if (!FrontendOptions::canActionEmitModuleSummary(Opts.RequestedAction) &&
       Opts.InputsAndOutputs.hasModuleSummaryOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_summary);
+    return true;
+  }
+  if (!FrontendOptions::canActionEmitModule(Opts.RequestedAction) &&
+      !Opts.SymbolGraphOutputDir.empty()) {
+    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_symbol_graph);
     return true;
   }
   return false;

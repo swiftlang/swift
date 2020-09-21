@@ -12,6 +12,8 @@
 
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/Path.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/FileSystem.h"
 #include "swift/SymbolGraphGen/SymbolGraphGen.h"
 
 #include "SymbolGraphASTWalker.h"
@@ -49,18 +51,11 @@ int serializeSymbolGraph(SymbolGraph &SG,
   SmallString<1024> OutputPath(Options.OutputDir);
   llvm::sys::path::append(OutputPath, FileName);
 
-  std::error_code Error;
-  llvm::raw_fd_ostream OS(OutputPath, Error, llvm::sys::fs::FA_Write);
-  if (Error) {
-    llvm::errs() << "Couldn't open output file '" << OutputPath
-        << " for writing: "
-        << Error.message() << "\n";
-    return EXIT_FAILURE;
-  }
-
-  llvm::json::OStream J(OS, Options.PrettyPrint ? 2 : 0);
-  SG.serialize(J);
-  return EXIT_SUCCESS;
+  return withOutputFile(SG.M.getASTContext().Diags, OutputPath, [&](raw_ostream &OS) {
+    llvm::json::OStream J(OS, Options.PrettyPrint ? 2 : 0);
+    SG.serialize(J);
+    return false;
+  });
 }
 
 } // end anonymous namespace

@@ -48,6 +48,8 @@
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Strings.h"
 #include "clang/AST/DeclTemplate.h"
+#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
+#include "swift/SymbolGraphGen/SymbolGraphGen.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
@@ -5543,5 +5545,21 @@ void swift::serialize(ModuleOrSourceFile DC,
       writeSourceInfoToStream(out, DC);
       return false;
     });
+  }
+
+  if (!options.SymbolGraphOutputDir.empty()) {
+    if (DC.is<ModuleDecl *>()) {
+      auto *M = DC.get<ModuleDecl*>();
+      FrontendStatsTracer tracer(getContext(DC).Stats,
+                                 "Serialization, symbolgraph");
+      symbolgraphgen::SymbolGraphOptions SGOpts {
+        options.SymbolGraphOutputDir,
+        M->getASTContext().LangOpts.Target,
+        /* PrettyPrint */false,
+        AccessLevel::Public,
+        /*EmitSynthesizedMembers*/true,
+      };
+      symbolgraphgen::emitSymbolGraphForModule(M, SGOpts);
+    }
   }
 }

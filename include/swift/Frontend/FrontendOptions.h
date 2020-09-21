@@ -373,6 +373,19 @@ public:
 
   /// Whether we're configured to track system intermodule dependencies.
   bool shouldTrackSystemDependencies() const;
+  
+  /// Whether to emit symbol graphs for the output module.
+  bool EmitSymbolGraph = false;
+
+  /// The directory to which we should emit a symbol graph JSON files.
+  /// It is valid whenever there are any inputs.
+  ///
+  /// These are JSON file that describes the public interface of a module for
+  /// curating documentation, separated into files for each module this module
+  /// extends.
+  ///
+  /// \sa SymbolGraphASTWalker
+  std::string SymbolGraphOutputDir;
 
 private:
   static bool canActionEmitDependencies(ActionType);

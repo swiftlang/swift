@@ -1159,4 +1159,15 @@ def disable_autolinking_runtime_compatibility_dynamic_replacements
       HelpText<"Do not use autolinking for the dynamic replacement runtime "
                "compatibility library">;
 
+def emit_symbol_graph: Flag<["-"], "emit-symbol-graph">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
+         SupplementaryOutput, HelpHidden]>,
+  HelpText<"Emit a symbol graph">;
+
+def emit_symbol_graph_dir : Separate<["-"], "emit-symbol-graph-dir">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
+         ArgumentIsPath, SupplementaryOutput, HelpHidden]>,
+  HelpText<"Emit a symbol graph to directory <dir>">,
+  MetaVarName<"<dir>">;
+
 include "FrontendOptions.td"
