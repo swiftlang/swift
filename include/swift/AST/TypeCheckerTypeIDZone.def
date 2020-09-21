@@ -85,6 +85,9 @@ SWIFT_REQUEST(TypeChecker, IsAsyncHandlerRequest, bool(FuncDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsActorRequest, bool(ClassDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ActorIsolationRequest,
+              ActorIsolationState(ValueDecl *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, FunctionOperatorRequest, OperatorDecl *(FuncDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(NameLookup, GenericSignatureRequest,

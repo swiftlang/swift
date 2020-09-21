@@ -1496,3 +1496,25 @@ void CustomAttrTypeRequest::cacheResult(Type value) const {
   auto *attr = std::get<0>(getStorage());
   attr->setType(value);
 }
+
+
+void swift::simple_display(
+    llvm::raw_ostream &out, const ActorIsolation &state) {
+  switch (state) {
+    case ActorIsolation::ActorInstance:
+      out << "actor-isolated to instance of " << state.getActor()->getName();
+      break;
+
+    case ActorIsolation::ActorPrivileged:
+      out << "actor-privileged to instance of " << state.getActor()->getName();
+      break;
+
+    case ActorIsolation::Independent:
+      out << "actor-independent";
+      break;
+
+    case ActorIsolation::Unspecified:
+      out << "unspecified actor isolation";
+      break;
+  }
+}
