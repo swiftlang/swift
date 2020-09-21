@@ -957,7 +957,6 @@ public:
 protected:
   bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
                              DeclConsumer) const override;
-  bool doesContextMatchStartingContext(const DeclContext *) const override;
 };
 
 /// Concrete class for a function/initializer/deinitializer
@@ -1367,42 +1366,6 @@ public:
   NullablePtr<Expr> getExprIfAny() const override { return closureExpr; }
   Expr *getExpr() const { return closureExpr; }
   NullablePtr<const void> getReferrent() const override;
-};
-
-/// For a closure with named parameters, this scope does the local bindings.
-/// Absent if no "in".
-class ClosureParametersScope final : public AbstractClosureScope {
-public:
-  ClosureParametersScope(ClosureExpr *closureExpr,
-                         NullablePtr<CaptureListExpr> captureList)
-      : AbstractClosureScope(closureExpr, captureList) {}
-  virtual ~ClosureParametersScope() {}
-
-  std::string getClassName() const override;
-  SourceRange
-  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
-  
-  /// Since explicit captures of \c self by closures enable the use of implicit
-  /// \c self, we need to make sure that the appropriate \c self is used as the
-  /// base decl for these uses (otherwise, the capture would be marked as
-  /// unused. \c ClosureParametersScope::capturedSelfDC() checks if we have such
-  ///  a capture of self.
-  NullablePtr<DeclContext> capturedSelfDC() const override;
-
-protected:
-  ASTScopeImpl *expandSpecifically(ScopeCreator &) override;
-  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                             DeclConsumer) const override;
-};
-
-// The body encompasses the code in the closure; the part after the "in" if
-// there is an "in"
-class ClosureBodyScope final : public AbstractClosureScope {
-public:
-  ClosureBodyScope(ClosureExpr *closureExpr,
-                   NullablePtr<CaptureListExpr> captureList)
-      : AbstractClosureScope(closureExpr, captureList) {}
-  virtual ~ClosureBodyScope() {}
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
@@ -1413,10 +1376,6 @@ private:
 protected:
   bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
                              DeclConsumer) const override;
-public:
-  std::string getClassName() const override;
-  SourceRange
-  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
 };
 
 class TopLevelCodeScope final : public ASTScopeImpl {
