@@ -14,16 +14,8 @@ import SwiftShims
 
 #if INTERNAL_CHECKS_ENABLED
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-@_silgen_name("swift_COWSanityChecksEnabled")
-public func _COWSanityChecksEnabled() -> Bool
-
-@_alwaysEmitIntoClient
-internal func doCOWSanityChecks() -> Bool {
-  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
-    return _COWSanityChecksEnabled()
-  }
-  return false
-}
+@_silgen_name("swift_COWChecksEnabled")
+public func _COWChecksEnabled() -> Bool
 #endif
 
 /// Class used whose sole instance is used as storage for empty
@@ -468,25 +460,29 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   @_alwaysEmitIntoClient
   internal var isImmutable: Bool {
     get {
-      if doCOWSanityChecks() {
-        return capacity == 0 || _swift_isImmutableCOWBuffer(_storage)
+      if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+        if (_COWChecksEnabled()) {
+          return capacity == 0 || _swift_isImmutableCOWBuffer(_storage)
+        }
       }
       return true
     }
     nonmutating set {
-      if doCOWSanityChecks() {
-        if newValue {
-          if capacity > 0 {
-            let wasImmutable = _swift_setImmutableCOWBuffer(_storage, true)
-            _internalInvariant(!wasImmutable,
-              "re-setting immutable array buffer to immutable")
+      if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+        if (_COWChecksEnabled()) {
+          if newValue {
+            if capacity > 0 {
+              let wasImmutable = _swift_setImmutableCOWBuffer(_storage, true)
+              _internalInvariant(!wasImmutable,
+                "re-setting immutable array buffer to immutable")
+            }
+          } else {
+            _internalInvariant(capacity > 0,
+              "setting empty array buffer to mutable")
+             let wasImmutable = _swift_setImmutableCOWBuffer(_storage, false)
+            _internalInvariant(wasImmutable,
+              "re-setting mutable array buffer to mutable")
           }
-        } else {
-          _internalInvariant(capacity > 0,
-            "setting empty array buffer to mutable")
-           let wasImmutable = _swift_setImmutableCOWBuffer(_storage, false)
-          _internalInvariant(wasImmutable,
-            "re-setting mutable array buffer to mutable")
         }
       }
     }
@@ -494,8 +490,10 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   
   @_alwaysEmitIntoClient
   internal var isMutable: Bool {
-    if doCOWSanityChecks() {
-      return !_swift_isImmutableCOWBuffer(_storage)
+    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+      if (_COWChecksEnabled()) {
+        return !_swift_isImmutableCOWBuffer(_storage)
+      }
     }
     return true
   }
