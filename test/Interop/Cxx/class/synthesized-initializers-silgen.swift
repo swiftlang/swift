@@ -2,36 +2,26 @@
 
 import SynthesizedInitializers
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [ossa] @$sSo11EmptyStructVABycfC : $@convention(method) (@thin EmptyStruct.Type) -> EmptyStruct
-// CHECK: bb0(%{{[0-9]+}} : $@thin EmptyStruct.Type):
-// CHECK-NEXT: [[BOX:%.*]] = alloc_box ${ var EmptyStruct }
-// CHECK-NEXT: [[UNINIT:%.*]] = mark_uninitialized [rootself] [[BOX]] : ${ var EmptyStruct }
-// CHECK-NEXT: [[PTR:%.*]] = project_box [[UNINIT]] : ${ var EmptyStruct }, 0
-// CHECK-NEXT: [[OBJ:%.*]] = builtin "zeroInitializer"<EmptyStruct>() : $EmptyStruct
-// CHECK-NEXT: [[PA:%.*]] = begin_access [modify] [unknown] [[PTR]] : $*EmptyStruct
-// CHECK-NEXT: assign [[OBJ]] to [[PA]]
-// CHECK-NEXT: end_access [[PA]]
-// CHECK-NEXT: [[OUT:%.*]] = load [trivial] [[PTR]]
-// CHECK-NEXT: destroy_value [[UNINIT]]
-// CHECK-NEXT: return [[OUT]]
-// CHECK-LABEL: end sil function '$sSo11EmptyStructVABycfC'
+// CHECK-LABEL: sil [ossa] @$s4main18emptyTypeNoArgInityyF : $@convention(thin) () -> ()
+// CHECK: [[AS:%.*]] = alloc_stack $EmptyStruct
+// CHECK: [[META:%.*]] = metatype $@thin EmptyStruct.Type
+// CHECK: [[FN:%.*]] = function_ref @{{_ZN11EmptyStructC1Ev|\?\?0EmptyStruct@@QEAA@XZ}} : $@convention(c) (@thin EmptyStruct.Type) -> @out EmptyStruct
+// CHECK: apply [[FN]]([[AS]], [[META]]) : $@convention(c) (@thin EmptyStruct.Type) -> @out EmptyStruct
+// CHECK-LABEL: end sil function '$s4main18emptyTypeNoArgInityyF'
+
+// CHECL-LABEL: sil [clang EmptyStruct.init] @{{_ZN11EmptyStructC1Ev|\?\?0EmptyStruct@@QEAA@XZ}} : $@convention(c) (@thin EmptyStruct.Type) -> @out EmptyStruct
 public func emptyTypeNoArgInit() {
   let e = EmptyStruct()
 }
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [ossa] @$sSo6IntBoxVABycfC : $@convention(method) (@thin IntBox.Type) -> IntBox
-// CHECK: bb0(%{{[0-9]+}} : $@thin IntBox.Type):
-// CHECK-NEXT: [[BOX:%.*]] = alloc_box ${ var IntBox }
-// CHECK-NEXT: [[UNINIT:%.*]] = mark_uninitialized [rootself] [[BOX]] : ${ var IntBox }
-// CHECK-NEXT: [[PTR:%.*]] = project_box [[UNINIT]] : ${ var IntBox }, 0
-// CHECK-NEXT: [[OBJ:%.*]] = builtin "zeroInitializer"<IntBox>() : $IntBox
-// CHECK-NEXT: [[PA:%.*]] = begin_access [modify] [unknown] [[PTR]] : $*IntBox
-// CHECK-NEXT: assign [[OBJ]] to [[PA]]
-// CHECK-NEXT: end_access [[PA]]
-// CHECK-NEXT: [[OUT:%.*]] = load [trivial] [[PTR]]
-// CHECK-NEXT: destroy_value [[UNINIT]]
-// CHECK-NEXT: return [[OUT]]
-// CHECK-LABEL: end sil function '$sSo6IntBoxVABycfC'
+// CHECK-LABEL: sil [ossa] @$s4main25singleMemberTypeNoArgInityyF : $@convention(thin) () -> ()
+// CHECK: [[AS:%.*]] = alloc_stack $IntBox
+// CHECK: [[META:%.*]] = metatype $@thin IntBox.Type
+// CHECK: [[FN:%.*]] = function_ref @{{_ZN6IntBoxC1Ev|\?\?0IntBox@@QEAA@XZ}} : $@convention(c) (@thin IntBox.Type) -> @out IntBox
+// CHECK: apply [[FN]]([[AS]], [[META]]) : $@convention(c) (@thin IntBox.Type) -> @out IntBox
+// CHECK-LABEL: end sil function '$s4main25singleMemberTypeNoArgInityyF'
+
+//CHECK-LABEL: sil [clang IntBox.init] @{{_ZN6IntBoxC1Ev|\?\?0IntBox@@QEAA@XZ}} : $@convention(c) (@thin IntBox.Type) -> @out IntBox
 public func singleMemberTypeNoArgInit() {
   let i = IntBox()
 }

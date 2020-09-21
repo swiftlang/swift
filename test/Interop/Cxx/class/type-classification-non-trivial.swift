@@ -11,12 +11,12 @@ import StdlibUnittest
 var AddressOnlyTestSuite = TestSuite("Address Only Types")
 
 AddressOnlyTestSuite.test("Test struct with copy constructor") {
-  let obj = StructWithCopyConstructorAndValue(value: 42)
+  let obj = StructWithCopyConstructorAndValue(42)
   expectEqual(obj.value, 42)
 }
 
 AddressOnlyTestSuite.test("Test struct with member with copy constructor") {
-  let member = StructWithCopyConstructorAndValue(value: 42)
+  let member = StructWithCopyConstructorAndValue(42)
   let obj = StructWithSubobjectCopyConstructorAndValue(member: member)
   expectEqual(obj.member.value, 42)
 }
@@ -24,9 +24,9 @@ AddressOnlyTestSuite.test("Test struct with member with copy constructor") {
 AddressOnlyTestSuite.test(
   "Test struct with copy constructor and member with copy constructor"
 ) {
-  let member = StructWithCopyConstructorAndValue(value: 42)
+  let member = StructWithCopyConstructorAndValue(42)
   let obj = StructWithCopyConstructorAndSubobjectCopyConstructorAndValue(
-    member: member
+    member
   )
   expectEqual(obj.member.value, 42)
 }
