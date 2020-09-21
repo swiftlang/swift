@@ -737,9 +737,17 @@ swift::matchWitness(
     }
   }
 
-  // Actor-isolated witnesses cannot conform to protocol requirements.
-  if (getActorIsolatingMember(witness))
+  // Check for actor-isolation consistency.
+  switch (getActorIsolation(witness)) {
+  case ActorIsolation::ActorInstance:
+    // Actor-isolated witnesses cannot conform to protocol requirements.
     return RequirementMatch(witness, MatchKind::ActorIsolatedWitness);
+
+  case ActorIsolation::ActorPrivileged:
+  case ActorIsolation::Independent:
+  case ActorIsolation::Unspecified:
+    break;
+  }
 
   // Now finalize the match.
   auto result = finalize(anyRenaming, optionalAdjustments);

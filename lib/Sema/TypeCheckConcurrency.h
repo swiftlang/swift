@@ -19,6 +19,7 @@
 
 namespace swift {
 
+class ActorIsolation;
 class ClassDecl;
 class DeclContext;
 class Expr;
@@ -41,11 +42,8 @@ void addAsyncNotes(FuncDecl *func);
 /// Check actor isolation rules.
 void checkActorIsolation(const Expr *expr, const DeclContext *dc);
 
-/// Determine whether the given value is an instance member of an actor
-/// class that is isolated to the current actor instance.
-///
-/// \returns the type of the actor.
-ClassDecl *getActorIsolatingMember(ValueDecl *value);
+/// Determine how the given value declaration is isolated.
+ActorIsolation getActorIsolation(ValueDecl *value);
 
 } // end namespace swift
 

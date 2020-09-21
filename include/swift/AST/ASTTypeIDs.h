@@ -23,6 +23,7 @@
 namespace swift {
 
 class AbstractFunctionDecl;
+class ActorIsolation;
 class BraceStmt;
 class ClosureExpr;
 class CodeCompletionCallbacksFactory;
