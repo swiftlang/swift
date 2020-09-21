@@ -186,7 +186,7 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
 
 evaluator::DependencySource ParseSourceFileRequest::readDependencySource(
     const evaluator::DependencyRecorder &e) const {
-  return {std::get<0>(getStorage()), evaluator::DependencyScope::Cascading};
+  return std::get<0>(getStorage());
 }
 
 Optional<SourceFileParsingResult>
@@ -229,7 +229,7 @@ void swift::simple_display(llvm::raw_ostream &out,
 evaluator::DependencySource
 CodeCompletionSecondPassRequest::readDependencySource(
     const evaluator::DependencyRecorder &e) const {
-  return {std::get<0>(getStorage()), e.getActiveSourceScope()};
+  return std::get<0>(getStorage());
 }
 
 // Define request evaluation functions for each of the type checker requests.

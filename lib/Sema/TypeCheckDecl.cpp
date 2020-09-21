@@ -1751,11 +1751,6 @@ UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
                                      ? TypeResolverContext::GenericTypeAliasDecl
                                      : TypeResolverContext::TypeAliasDecl));
 
-  if (!typeAlias->getDeclContext()->isCascadingContextForLookup(
-          /*functionsAreNonCascading*/ true)) {
-    options |= TypeResolutionFlags::KnownNonCascadingDependency;
-  }
-
   // This can happen when code completion is attempted inside
   // of typealias underlying type e.g. `typealias F = () -> Int#^TOK^#`
   auto *underlyingRepr = typeAlias->getUnderlyingTypeRepr();

@@ -445,52 +445,6 @@ bool DeclContext::isInnermostContextGeneric() const {
   return false;
 }
 
-bool
-DeclContext::isCascadingContextForLookup(bool functionsAreNonCascading) const {
-  // FIXME: This is explicitly checking for attributes in some cases because
-  // it can be called before access control is computed.
-  switch (getContextKind()) {
-  case DeclContextKind::AbstractClosureExpr:
-    break;
-
-  case DeclContextKind::SerializedLocal:
-    llvm_unreachable("should not perform lookups in deserialized contexts");
-
-  case DeclContextKind::Initializer:
-    // Default arguments still require a type.
-    if (isa<DefaultArgumentInitializer>(this))
-      return false;
-    break;
-
-  case DeclContextKind::TopLevelCodeDecl:
-    // FIXME: Pattern initializers at top-level scope end up here.
-    return true;
-
-  case DeclContextKind::AbstractFunctionDecl:
-    if (functionsAreNonCascading)
-      return false;
-    break;
-
-  case DeclContextKind::SubscriptDecl:
-    break;
-
-  case DeclContextKind::EnumElementDecl:
-    break;
-
-  case DeclContextKind::Module:
-  case DeclContextKind::FileUnit:
-    return true;
-
-  case DeclContextKind::GenericTypeDecl:
-    break;
-
-  case DeclContextKind::ExtensionDecl:
-    return true;
-  }
-
-  return getParent()->isCascadingContextForLookup(true);
-}
-
 unsigned DeclContext::getSyntacticDepth() const {
   // Module scope == depth 0.
   if (isModuleScopeContext())

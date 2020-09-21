@@ -247,11 +247,7 @@ LookupResult &ConstraintSystem::lookupMember(Type base, DeclNameRef name) {
   if (result) return *result;
 
   // Lookup the member.
-  NameLookupOptions lookupOptions = defaultMemberLookupOptions;
-  if (isa<AbstractFunctionDecl>(DC))
-    lookupOptions |= NameLookupFlags::KnownPrivate;
-
-  result = TypeChecker::lookupMember(DC, base, name, lookupOptions);
+  result = TypeChecker::lookupMember(DC, base, name, defaultMemberLookupOptions);
 
   // If we aren't performing dynamic lookup, we're done.
   if (!*result || !base->isAnyObject())
