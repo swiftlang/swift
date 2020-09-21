@@ -535,54 +535,6 @@ func testSR_12341() {
   _ = SR_12341(condition: true)
 }
 
-class TestLeak: CustomStringConvertible {
-  let val: Int
-  init(val: Int) { self.val = val }
-  deinit { print("    .. \(self).deinit") }
-  var description: String { "TestLeak(\(val))" }
-}
-
-struct SR_13495 {
-  @Wrapper var wrapped: TestLeak
-  var str: String
-
-  init() {
-     wrapped = TestLeak(val: 42)
-     str = ""
-     wrapped = TestLeak(val: 27)
-  }
-
-  init(conditionalInit: Bool) {
-    if (conditionalInit) {
-      wrapped = TestLeak(val: 42)
-    }
-    str = ""
-    wrapped = TestLeak(val: 27)
-  }
-}
-
-func testSR_13495() {
-  // CHECK: ## SR_13495
-  print("\n## SR_13495")
-
-  // CHECK-NEXT:   .. init TestLeak(42)
-  // CHECK-NEXT:     .. TestLeak(42).deinit
-  // CHECK-NEXT:   .. set TestLeak(27)
-  // CHECK-NEXT:     .. TestLeak(27).deinit
-  _ = SR_13495()
-
-  // CHECK-NEXT:   .. init TestLeak(42)
-  // CHECK-NEXT:     .. TestLeak(42).deinit
-  // CHECK-NEXT:   .. init TestLeak(27)
-  // CHECK-NEXT:     .. TestLeak(27).deinit
-  _ = SR_13495(conditionalInit: true)
-
-  // CHECK-NEXT:   .. init TestLeak(27)
-  // CHECK-NEXT:     .. TestLeak(27).deinit
-  _ = SR_13495(conditionalInit: false)
-}
-
-
 @propertyWrapper
 struct NonMutatingSetterWrapper<Value> {
     var value: Value
@@ -621,5 +573,4 @@ testDefaultNilOptIntStruct()
 testComposed()
 testWrapperInitWithDefaultArg()
 testSR_12341()
-testSR_13495()
 testNonMutatingSetterStruct()
