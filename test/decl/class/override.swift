@@ -161,15 +161,15 @@ class H : G {
 }
 
 class J {
-  func f1(_: Int, int1: Int) { } // expected-note{{potential overridden instance method 'f1(_:int1:)' here}} {{none}}
-  func f1(_: Int, int1: Int, int2: Int) { } // expected-note{{potential overridden instance method 'f1(_:int1:int2:)' here}} {{none}}
-  func f1(_: Int, string1: String, int2: Int) { } // expected-note{{potential overridden instance method 'f1(_:sting1:int2:)' here}} {{none}}
+  func f1(_: Int, int1: Int) { } // expected-note{{potential overridden instance method 'f1(_:int1:)' here}} {{26-26=, int1: Int}}
+  func f1(_: Int, int1: Int, int2: Int) { } // expected-note{{potential overridden instance method 'f1(_:int1:int2:)' here}} {{26-26=, int1: Int, int2: Int}}
+  func f1(_: Int, string1: String, int2: Int) { } // expected-note{{potential overridden instance method 'f1(_:sting1:int2:)' here}} {{26-26=, string1: String, int2: Int}}
   
-  func g1(_: Int, string1: String) { } // expected-note{{potential overridden instance method 'g1(_:string1:)' here}} {{none}}
-  func g1(_: Int, int1: inout Int, _ a: Int..., d: String, closure: ((Int, Int) -> Void)?) { } // expected-note{{potential overridden instance method 'g1(_:int1:_:d:closure:)' here}} {{none}}
+  func g1(_: Int, string1: String) { } // expected-note{{potential overridden instance method 'g1(_:string1:)' here}} {{26-26=, string1: String}}
+  func g1(_: Int, int1: inout Int, _ a: Int..., d: String) { } // expected-note{{potential overridden instance method 'g1(_:int1:_:d:closure:)' here}} {{26-26=, int1: inout Int, _ a: Int..., d: String}}
   
-  init(a: Int, int1: Int) {} // expected-note{{potential overridden instance method 'init(_:int1:)' here}} {{none}}
-  init(a: Int, string: String) {} // expected-note{{potential overridden instance method 'init(_:string:)' here}} {{none}}
+  init(a: Int, int1: Int) {} // expected-note{{potential overridden instance method 'init(_:int1:)' here}} {{23-23=, int1: Int}}
+  init(a: Int, string: String) {} // expected-note{{potential overridden instance method 'init(_:string:)' here}} {{23-23=, string: String}}
 }
 
 class K: J {
@@ -177,7 +177,7 @@ class K: J {
   
   override func g1(_: Int) { } // expected-error{{method does not override any method from its superclass}} {{none}}
   
-  init(a: Int) {} // expected-error{{declaration 'init(a:)' has different argument labels from any potential overrides}} {{none}}
+  override init(a: Int) {} // expected-error{{declaration 'init(a:)' has different argument labels from any potential overrides}} {{none}}
 }
 
 @objc class IUOTestBaseClass {

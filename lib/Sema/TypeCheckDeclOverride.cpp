@@ -549,6 +549,10 @@ static bool fixMissingParameters(InFlightDiagnostic &diag, ValueDecl *decl,
     
     if (baseParam->isInOut())
       fixIt << "inout ";
+    
+    if (!baseParamTy->isNoEscape()) {
+      fixIt << "@escaping ";
+    }
       
     if (baseParam->isVariadic()) {
       fixIt << baseParam->getVarargBaseTy() << "...";
@@ -556,14 +560,12 @@ static bool fixMissingParameters(InFlightDiagnostic &diag, ValueDecl *decl,
       fixIt << baseParamTy;
     }
       
-    
     if (i + 1 < n)
       fixIt << ", ";
   }
     
   // The location where to insert stubs.
   SourceLoc FixitLocation;
-  derivedParams->getArray().end();
   FixitLocation = derivedParams->get(derivedParams->size()-1)->getEndLoc();
   diag.fixItInsertAfter(FixitLocation, fixIt.str());
   
