@@ -579,7 +579,6 @@ public:
   void enumerateAllUses() {
     auto &Ctx = SF->getASTContext();
     Ctx.evaluator.enumerateReferencesInFile(SF, [&](const auto &ref) {
-      const auto cascades = false;
       std::string name = ref.name.userFacingName().str();
       const auto *nominal = ref.subject;
       using Kind = evaluator::DependencyCollector::Reference::Kind;
@@ -589,19 +588,19 @@ public:
       case Kind::Tombstone:
         llvm_unreachable("Cannot enumerate dead reference!");
       case Kind::TopLevel:
-        return enumerateUse<NodeKind::topLevel>("", name, cascades);
+        return enumerateUse<NodeKind::topLevel>("", name);
       case Kind::Dynamic:
-        return enumerateUse<NodeKind::dynamicLookup>("", name, cascades);
+        return enumerateUse<NodeKind::dynamicLookup>("", name);
       case Kind::PotentialMember: {
         std::string context = DependencyKey::computeContextForProvidedEntity<
             NodeKind::potentialMember>(nominal);
-        return enumerateUse<NodeKind::potentialMember>(context, "", cascades);
+        return enumerateUse<NodeKind::potentialMember>(context, "");
       }
       case Kind::UsedMember: {
         std::string context =
             DependencyKey::computeContextForProvidedEntity<NodeKind::member>(
                 nominal);
-        return enumerateUse<NodeKind::member>(context, name, cascades);
+        return enumerateUse<NodeKind::member>(context, name);
       }
       }
     });
@@ -611,11 +610,11 @@ public:
 
 private:
   template <NodeKind kind>
-  void enumerateUse(StringRef context, StringRef name, bool isCascadingUse) {
+  void enumerateUse(StringRef context, StringRef name) {
     // Assume that what is depended-upon is the interface
     createDefUse(
         DependencyKey(kind, DeclAspect::interface, context.str(), name.str()),
-        isCascadingUse ? sourceFileInterface : sourceFileImplementation);
+        sourceFileImplementation);
   }
 
   void enumerateNominalUses() {
@@ -634,14 +633,13 @@ private:
       std::string context =
           DependencyKey::computeContextForProvidedEntity<NodeKind::nominal>(
               subject);
-      enumerateUse<NodeKind::nominal>(context, "", /*isCascadingUse*/ false);
+      enumerateUse<NodeKind::nominal>(context, "");
     });
   }
 
   void enumerateExternalUses() {
-    // external dependencies always cascade
     for (StringRef s : depTracker.getDependencies())
-      enumerateUse<NodeKind::externalDepend>("", s, true);
+      enumerateUse<NodeKind::externalDepend>("", s);
   }
 };
 } // end namespace
