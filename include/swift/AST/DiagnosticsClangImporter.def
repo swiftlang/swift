@@ -197,5 +197,10 @@ NOTE(note_cannot_import_alias_for_unavailable_case,none,
      "cannot import alias %0 for %1 %2 because it is unavailable",
      (Identifier, DescriptiveDeclKind, ValueDecl *))
 
+NOTE(note_imported_from_swift_part,none,
+     "replaced by definition for %0 %1 from the Swift %select{part of|overlay "
+     "for}2 this module",
+     (DescriptiveDeclKind, ValueDecl *, /*overlay=*/bool))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
