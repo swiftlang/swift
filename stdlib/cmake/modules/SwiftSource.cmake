@@ -247,7 +247,7 @@ function(_add_target_variant_swift_compile_flags
   if(debuginfo)
     list(APPEND result "-g")
   elseif("${build_type}" STREQUAL "MinSizeRel")
-    # MinSizeRel builds of stdlib should get debug info
+    # MinSizeRel builds of stdlib (but not the compiler) should get debug info
     list(APPEND result "-g")
   endif()
 
