@@ -201,6 +201,7 @@ KNOWN_SETTINGS=(
     ## FREESTANDING Stdlib Options
     swift-freestanding-sdk                      ""                "which SDK to use when building the FREESTANDING stdlib"
     swift-freestanding-triple-name              ""                "which triple name (e.g. 'none-macho') to use when building the FREESTANDING stdlib"
+    swift-freestanding-module-name              ""                "which .swiftmodule name (e.g. 'freestanding') to use when building the FREESTANDING stdlib"
     swift-freestanding-archs                    ""                "space-separated list of which architectures to build when building the FREESTANDING stdlib"
 
     ## Uncategorised
@@ -1890,6 +1891,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_FREESTANDING_TRIPLE_NAME:STRING="${SWIFT_FREESTANDING_TRIPLE_NAME}"
+                    )
+                fi
+
+                if [ "${SWIFT_FREESTANDING_MODULE_NAME}" ] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_FREESTANDING_MODULE_NAME:STRING="${SWIFT_FREESTANDING_MODULE_NAME}"
                     )
                 fi
 
