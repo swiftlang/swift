@@ -4934,16 +4934,31 @@ namespace {
     template <typename T, typename U>
     T *resolveSwiftDecl(const U *decl, Identifier name,
                         bool hasKnownSwiftName, ClangModuleUnit *clangModule) {
-      if (auto overlay = clangModule->getOverlayModule())
-        return resolveSwiftDeclImpl<T>(decl, name, hasKnownSwiftName, overlay);
+      ImportRemark::Note::Conditions either = {
+        ImportRemark::Outcome::Imported,
+        ImportRemark::Outcome::NotImported
+      };
+      if (auto overlay = clangModule->getOverlayModule()) {
+        if (T *result = resolveSwiftDeclImpl<T>(decl, name, hasKnownSwiftName,
+                                                overlay)) {
+          // FIXME: We'd like to diagnose this with a Swift SourceLoc.
+          decision.noteIf(either, None, diag::note_imported_from_swift_part,
+                          result->getDescriptiveKind(), result, true);
+          return result;
+        }
+      }
       if (clangModule == Impl.ImportedHeaderUnit) {
         // Use an index-based loop because new owners can come in as we're
         // iterating.
         for (size_t i = 0; i < Impl.ImportedHeaderOwners.size(); ++i) {
           ModuleDecl *owner = Impl.ImportedHeaderOwners[i];
           if (T *result = resolveSwiftDeclImpl<T>(decl, name,
-                                                  hasKnownSwiftName, owner))
+                                                  hasKnownSwiftName, owner)) {
+            // FIXME: We'd like to diagnose this with a Swift SourceLoc.
+            decision.noteIf(either, None, diag::note_imported_from_swift_part,
+                            result->getDescriptiveKind(), result, false);
             return result;
+          }
         }
       }
       return nullptr;
@@ -5015,10 +5030,8 @@ namespace {
 
       ProtocolDecl *nativeDecl;
       bool declaredNative = hasNativeSwiftDecl(decl, name, dc, nativeDecl);
-      if (declaredNative && nativeDecl) {
-        decision.alreadyDecided();
+      if (declaredNative && nativeDecl)
         return nativeDecl;
-      }
 
       // Create the protocol declaration and record it.
       auto result = Impl.createDeclWithClangNode<ProtocolDecl>(
@@ -5120,9 +5133,8 @@ namespace {
         if (auto clangModule = Impl.getClangModuleForDecl(decl, true)) {
           if (auto native = resolveSwiftDecl<ClassDecl>(decl, name,
                                                         hasKnownSwiftName,
-                                                        clangModule)) {
+                                                        clangModule))
             return native;
-          }
         }
 
         if (Impl.ImportForwardDeclarations) {
