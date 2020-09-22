@@ -929,12 +929,13 @@ public:
   NullablePtr<const void> addressForPrinting() const override { return params; }
 };
 
-class AbstractFunctionBodyScope : public ASTScopeImpl {
+/// Body of functions, methods, constructors, destructors and accessors.
+class FunctionBodyScope : public ASTScopeImpl {
 public:
   AbstractFunctionDecl *const decl;
 
-  AbstractFunctionBodyScope(AbstractFunctionDecl *e) : decl(e) {}
-  virtual ~AbstractFunctionBodyScope() {}
+  FunctionBodyScope(AbstractFunctionDecl *e) : decl(e) {}
+  virtual ~FunctionBodyScope() {}
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
@@ -956,17 +957,9 @@ protected:
   bool lookupLocalsOrMembers(DeclConsumer) const override;
 
 public:
+  std::string getClassName() const override;
   NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion() override;
   SourceRange sourceRangeForDeferredExpansion() const override;
-};
-
-/// Body of functions and methods.
-class FunctionBodyScope final : public AbstractFunctionBodyScope {
-public:
-  FunctionBodyScope(AbstractFunctionDecl *e)
-      : AbstractFunctionBodyScope(e) {}
-  std::string getClassName() const override;
-  bool lookupLocalsOrMembers(DeclConsumer consumer) const override;
 };
 
 class DefaultArgumentInitializerScope final : public ASTScopeImpl {

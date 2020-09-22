@@ -213,7 +213,7 @@ SourceRange DifferentiableAttributeScope::getSourceRangeOfThisASTNode(
   return differentiableAttr->getRange();
 }
 
-SourceRange AbstractFunctionBodyScope::getSourceRangeOfThisASTNode(
+SourceRange FunctionBodyScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
   return decl->getOriginalBodySourceRange();
 }
@@ -592,7 +592,7 @@ SourceRange ASTScopeImpl::sourceRangeForDeferredExpansion() const {
 SourceRange IterableTypeScope::sourceRangeForDeferredExpansion() const {
   return portion->sourceRangeForDeferredExpansion(this);
 }
-SourceRange AbstractFunctionBodyScope::sourceRangeForDeferredExpansion() const {
+SourceRange FunctionBodyScope::sourceRangeForDeferredExpansion() const {
   const auto bsr = decl->getOriginalBodySourceRange();
   const SourceLoc endEvenIfNoCloseBraceAndEndsWithInterpolatedStringLiteral =
       getLocEncompassingPotentialLookups(getSourceManager(), bsr.End);

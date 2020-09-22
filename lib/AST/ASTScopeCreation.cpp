@@ -984,7 +984,7 @@ CREATES_NEW_INSERTION_POINT(GenericTypeOrExtensionScope)
 CREATES_NEW_INSERTION_POINT(BraceStmtScope)
 CREATES_NEW_INSERTION_POINT(TopLevelCodeScope)
 
-NO_NEW_INSERTION_POINT(AbstractFunctionBodyScope)
+NO_NEW_INSERTION_POINT(FunctionBodyScope)
 NO_NEW_INSERTION_POINT(AbstractFunctionDeclScope)
 NO_NEW_INSERTION_POINT(AttachedPropertyWrapperScope)
 NO_NEW_INSERTION_POINT(EnumElementScope)
@@ -1224,7 +1224,7 @@ void EnumElementScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
   // scopeCreator.addToScopeTree(decl->getStructuralRawValueExpr(), this);
 }
 
-void AbstractFunctionBodyScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
+void FunctionBodyScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   expandBody(scopeCreator);
 }
@@ -1552,7 +1552,7 @@ void *ScopeCreator::operator new(size_t bytes, const ASTContext &ctx,
 
 #pragma mark - expandBody
 
-void AbstractFunctionBodyScope::expandBody(ScopeCreator &scopeCreator) {
+void FunctionBodyScope::expandBody(ScopeCreator &scopeCreator) {
   scopeCreator.addToScopeTree(decl->getBody(), this);
 }
 
@@ -1615,7 +1615,7 @@ NullablePtr<ASTScopeImpl> ASTScopeImpl::insertionPointForDeferredExpansion() {
 }
 
 NullablePtr<ASTScopeImpl>
-AbstractFunctionBodyScope::insertionPointForDeferredExpansion() {
+FunctionBodyScope::insertionPointForDeferredExpansion() {
   return getParent().get();
 }
 
