@@ -273,11 +273,6 @@ public:
     // Implicit nodes may not have source information for name lookup.
     if (!isLocalizable(d))
       return false;
-    /// In \c Parser::parseDeclVarGetSet fake PBDs are created. Ignore them.
-    /// Example:
-    /// \code
-    /// class SR10903 { static var _: Int { 0 } }
-    /// \endcode
 
     // Commented out for
     // validation-test/compiler_crashers_fixed/27962-swift-rebindselfinconstructorexpr-getcalledconstructor.swift
@@ -502,9 +497,6 @@ public:
   std::vector<ASTNode> expandIfConfigClausesThenCullAndSortElementsOrMembers(
       ArrayRef<ASTNode> input) const {
     auto cleanedupNodes = sortBySourceRange(cull(expandIfConfigClauses(input)));
-    // TODO: uncomment when working on not creating two pattern binding decls at
-    // same location.
-    //    findCollidingPatterns(cleanedupNodes);
     return cleanedupNodes;
   }
 
@@ -560,73 +552,6 @@ private:
              !n.isDecl(DeclKind::EnumCase);
     });
     return culled;
-  }
-
-  /// TODO: The parser yields two decls at the same source loc with the same
-  /// kind. TODO:  me when fixing parser's proclivity to create two
-  /// PatternBindingDecls at the same source location, then move this to
-  /// ASTVerifier.
-  ///
-  /// In all cases the first pattern seems to carry the initializer, and the
-  /// second, the accessor
-  void findCollidingPatterns(ArrayRef<ASTNode> input) const {
-    auto dumpPBD = [&](PatternBindingDecl *pbd, const char *which) {
-      llvm::errs() << "*** " << which
-                   << " pbd isImplicit: " << pbd->isImplicit()
-                   << ", #entries: " << pbd->getNumPatternEntries() << " :";
-      pbd->getSourceRange().print(llvm::errs(), pbd->getASTContext().SourceMgr,
-                                  false);
-      llvm::errs() << "\n";
-      llvm::errs() << "init: " << pbd->getInit(0) << "\n";
-      if (pbd->getInit(0)) {
-        llvm::errs() << "SR (init): ";
-        pbd->getInit(0)->getSourceRange().print(
-            llvm::errs(), pbd->getASTContext().SourceMgr, false);
-        llvm::errs() << "\n";
-        pbd->getInit(0)->dump(llvm::errs(), 0);
-      }
-      llvm::errs() << "vars:\n";
-      pbd->getPattern(0)->forEachVariable([&](VarDecl *vd) {
-        llvm::errs() << "  " << vd->getName()
-                     << " implicit: " << vd->isImplicit()
-                     << " #accs: " << vd->getAllAccessors().size()
-                     << "\nSR (var):";
-        vd->getSourceRange().print(llvm::errs(), pbd->getASTContext().SourceMgr,
-                                   false);
-        llvm::errs() << "\nSR (braces)";
-        vd->getBracesRange().print(llvm::errs(), pbd->getASTContext().SourceMgr,
-                                   false);
-        llvm::errs() << "\n";
-        for (auto *a : vd->getAllAccessors()) {
-          llvm::errs() << "SR (acc): ";
-          a->getSourceRange().print(llvm::errs(),
-                                    pbd->getASTContext().SourceMgr, false);
-          llvm::errs() << "\n";
-          a->dump(llvm::errs(), 0);
-        }
-      });
-    };
-
-    Decl *lastD = nullptr;
-    for (auto n : input) {
-      auto *d = n.dyn_cast<Decl *>();
-      if (!d || !lastD || lastD->getStartLoc() != d->getStartLoc() ||
-          lastD->getKind() != d->getKind()) {
-        lastD = d;
-        continue;
-      }
-      if (auto *pbd = dyn_cast<PatternBindingDecl>(lastD))
-        dumpPBD(pbd, "prev");
-      if (auto *pbd = dyn_cast<PatternBindingDecl>(d)) {
-        dumpPBD(pbd, "curr");
-        ASTScope_unreachable("found colliding pattern binding decls");
-      }
-      llvm::errs() << "Two same kind decls at same loc: \n";
-      lastD->dump(llvm::errs());
-      llvm::errs() << "and\n";
-      d->dump(llvm::errs());
-      ASTScope_unreachable("Two same kind decls; unexpected kinds");
-    }
   }
 
   /// Templated to work on either ASTNodes, Decl*'s, or whatnot.
@@ -962,24 +887,6 @@ public:
                      : DeclVisibilityKind::LocalVariable;
     auto *insertionPoint = parentScope;
     for (auto i : range(patternBinding->getNumPatternEntries())) {
-      // TODO: Won't need to do so much work to avoid creating one without
-      // a SourceRange once parser is fixed to not create two
-      // PatternBindingDecls with same locaiton and getSourceRangeOfThisASTNode
-      // for PatternEntryDeclScope is simplified to use the PatternEntry's
-      // source range.
-      if (!patternBinding->getOriginalInit(i)) {
-        bool found = false;
-        patternBinding->getPattern(i)->forEachVariable([&](VarDecl *vd) {
-          if (!vd->isImplicit())
-            found = true;
-          else
-            found |= llvm::any_of(vd->getAllAccessors(), [&](AccessorDecl *a) {
-              return isLocalizable(a);
-            });
-        });
-        if (!found)
-          continue;
-      }
       insertionPoint =
           scopeCreator
               .ifUniqueConstructExpandAndInsert<PatternEntryDeclScope>(

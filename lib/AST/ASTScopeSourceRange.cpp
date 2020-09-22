@@ -247,16 +247,6 @@ SourceRange DefaultArgumentInitializerScope::getSourceRangeOfThisASTNode(
 
 SourceRange PatternEntryDeclScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
-  // TODO: Once the creation of two PatternBindingDecls at same location is
-  // eliminated, the following may be able to be simplified.
-  if (!getChildren().empty()) { // why needed???
-    bool hasOne = false;
-    getPattern()->forEachVariable([&](VarDecl *) { hasOne = true; });
-    if (!hasOne)
-      return SourceRange(); // just the init
-    if (!getPatternEntry().getInit())
-      return SourceRange(); // just the var decls
-  }
   return getPatternEntry().getSourceRange();
 }
 
