@@ -228,8 +228,7 @@ public:
                          ASTScopeImpl *const organicInsertionPoint,
                          ArrayRef<ASTNode> nodesOrDeclsToAdd) {
     auto *ip = insertionPoint;
-    for (auto nd : expandIfConfigClausesThenCullAndSortElementsOrMembers(
-             nodesOrDeclsToAdd)) {
+    for (auto nd : sortBySourceRange(cull(nodesOrDeclsToAdd))) {
       if (!shouldThisNodeBeScopedWhenFoundInSourceFileBraceStmtOrType(nd)) {
         // FIXME: Could the range get lost if the node is ever reexpanded?
         ip->widenSourceRangeForIgnoredASTNode(nd);
@@ -494,48 +493,9 @@ public:
       fn(diffAttr);
   }
 
-  std::vector<ASTNode> expandIfConfigClausesThenCullAndSortElementsOrMembers(
-      ArrayRef<ASTNode> input) const {
-    auto cleanedupNodes = sortBySourceRange(cull(expandIfConfigClauses(input)));
-    return cleanedupNodes;
-  }
-
 public:
 
 private:
-  static std::vector<ASTNode> expandIfConfigClauses(ArrayRef<ASTNode> input) {
-    std::vector<ASTNode> expansion;
-    expandIfConfigClausesInto(expansion, input, /*isInAnActiveNode=*/true);
-    return expansion;
-  }
-
-  static void expandIfConfigClausesInto(std::vector<ASTNode> &expansion,
-                                        ArrayRef<ASTNode> input,
-                                        const bool isInAnActiveNode) {
-    for (auto n : input) {
-      if (!n.isDecl(DeclKind::IfConfig)) {
-        expansion.push_back(n);
-        continue;
-      }
-      auto *const icd = cast<IfConfigDecl>(n.get<Decl *>());
-      for (auto &clause : icd->getClauses()) {
-        if (auto *const cond = clause.Cond)
-          expansion.push_back(cond);
-        if (clause.isActive) {
-          // TODO: Move this check into ASTVerifier
-          ASTScopeAssert(isInAnActiveNode, "Clause should not be marked active "
-                                           "unless it's context is active");
-          // get inactive nodes that nest in active clauses
-          for (auto n : clause.Elements) {
-            if (auto *const d = n.dyn_cast<Decl *>())
-              if (isa<IfConfigDecl>(d))
-                expandIfConfigClausesInto(expansion, {d}, true);
-          }
-        }
-      }
-    }
-  }
-
   /// Remove VarDecls because we'll find them when we expand the
   /// PatternBindingDecls. Remove EnunCases
   /// because they overlap EnumElements and AST includes the elements in the
@@ -548,8 +508,10 @@ private:
       ASTScopeAssert(
           !n.isDecl(DeclKind::Accessor),
           "Should not find accessors in iterable types or brace statements");
-      return isLocalizable(n) && !n.isDecl(DeclKind::Var) &&
-             !n.isDecl(DeclKind::EnumCase);
+      return isLocalizable(n) &&
+             !n.isDecl(DeclKind::Var) &&
+             !n.isDecl(DeclKind::EnumCase) &&
+             !n.isDecl(DeclKind::IfConfig);
     });
     return culled;
   }
