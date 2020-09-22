@@ -2400,13 +2400,9 @@ Type ErrorType::get(Type originalType) {
   return entry = new (mem) ErrorType(ctx, originalType, properties);
 }
 
-Type HoleType::get(ASTContext &ctx, OriginatorType originator) {
+Type HoleType::get(ASTContext &ctx, Originator originator) {
   assert(originator);
-  auto properties = reinterpret_cast<TypeBase *>(originator.getOpaqueValue())
-                        ->getRecursiveProperties();
-  properties |= RecursiveTypeProperties::HasTypeHole;
-
-  auto arena = getArena(properties);
+  auto arena = getArena(RecursiveTypeProperties::HasTypeHole);
   return new (ctx, arena)
       HoleType(ctx, originator, RecursiveTypeProperties::HasTypeHole);
 }

@@ -1012,7 +1012,7 @@ sawSolution(const constraints::Solution &S) {
       return S.simplifyType(completionTy.transform([&](Type type) {
         if (auto *hole = type->getAs<HoleType>()) {
           if (auto *typeVar =
-                  hole->getOriginatorType().dyn_cast<TypeVariableType *>()) {
+                  hole->getOriginator().dyn_cast<TypeVariableType *>()) {
             if (auto *GP = typeVar->getImpl().getGenericParameter()) {
               // Code completion depends on generic parameter type being
               // represented in terms of `ArchetypeType` since it's easy

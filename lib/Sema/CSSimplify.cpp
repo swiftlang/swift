@@ -7016,7 +7016,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       // type but a hole.
       auto shouldRecordFixForHole = [&](HoleType *baseType) {
         auto *originator =
-            baseType->getOriginatorType().dyn_cast<TypeVariableType *>();
+            baseType->getOriginator().dyn_cast<TypeVariableType *>();
 
         if (!originator)
           return false;
