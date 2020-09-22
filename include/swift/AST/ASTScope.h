@@ -1133,9 +1133,6 @@ public:
 };
 
 class PatternEntryDeclScope final : public AbstractPatternEntryScope {
-  const Expr *initWhenLastExpanded;
-  unsigned varCountWhenLastExpanded = 0;
-
 public:
   PatternEntryDeclScope(PatternBindingDecl *pbDecl, unsigned entryIndex,
                         DeclVisibilityKind vis)
@@ -1144,8 +1141,6 @@ public:
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
-  void beCurrent() override;
-  bool isCurrentIfWasExpanded() const override;
 
 private:
   AnnotatedInsertionPoint

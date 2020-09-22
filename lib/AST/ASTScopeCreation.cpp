@@ -1695,27 +1695,6 @@ bool ASTSourceFileScope::isCurrentIfWasExpanded() const {
   return SF->getTopLevelDecls().size() == numberOfDeclsAlreadySeen;
 }
 
-// Try to avoid the work of counting
-static const bool assumeVarsDoNotGetAdded = true;
-
-void PatternEntryDeclScope::beCurrent() {
-  initWhenLastExpanded = getPatternEntry().getOriginalInit();
-  if (assumeVarsDoNotGetAdded && varCountWhenLastExpanded)
-    return;
-  varCountWhenLastExpanded = getPatternEntry().getNumBoundVariables();
-}
-bool PatternEntryDeclScope::isCurrentIfWasExpanded() const {
-  if (initWhenLastExpanded != getPatternEntry().getOriginalInit())
-    return false;
-  if (assumeVarsDoNotGetAdded && varCountWhenLastExpanded) {
-    ASTScopeAssert(varCountWhenLastExpanded ==
-                       getPatternEntry().getNumBoundVariables(),
-                   "Vars were not supposed to be added to a pattern entry.");
-    return true;
-  }
-  return getPatternEntry().getNumBoundVariables() == varCountWhenLastExpanded;
-}
-
 #pragma mark getParentOfASTAncestorScopesToBeRescued
 NullablePtr<ASTScopeImpl>
 ASTScopeImpl::getParentOfASTAncestorScopesToBeRescued() {
