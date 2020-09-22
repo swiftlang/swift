@@ -998,7 +998,7 @@ function(_add_swift_target_library_single target name)
   elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "LINUX")
     set_target_properties("${target}"
       PROPERTIES
-      INSTALL_RPATH "$ORIGIN:/usr/lib/swift/linux")
+      INSTALL_RPATH "$ORIGIN")
   elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "CYGWIN")
     set_target_properties("${target}"
       PROPERTIES
