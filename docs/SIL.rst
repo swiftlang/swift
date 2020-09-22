@@ -641,16 +641,18 @@ otherwise can be invoked with the normal ``apply`` and ``try_apply``
 instructions (or ``begin_apply`` if they are coroutines).
 
 In Swift, the ``withUnsafeContinuation`` primitive is used to implement
-primitive suspend points. In SIL, ``@async`` functions represent this abstraction
-``begin_async_continuation[_addr]`` and ``await_async_continuation``
-instructions. ``begin_async_continuation[_addr]`` creates a *continuation*
-value that can be used to resume the coroutine when it suspends, feeding a
-value back into the currently-running function or causing it to fail with an
-error when it resumes. The resulting continuation value can then be passed
-into a completion handler, registered with an event loop, or scheduled by
-some other mechanism. The ``await_async_continuation`` instruction suspends
-execution of the coroutine until the continuation is invoked to resume it.
-A use of ``withUnsafeContinuation`` in Swift::
+primitive suspend points. In SIL, ``@async`` functions represent this
+abstraction using the ``get_async_continuation[_addr]`` and
+``await_async_continuation`` instructions. ``get_async_continuation[_addr]``
+accesses a *continuation* value that can be used to resume the coroutine after
+it suspends. The resulting continuation value can then be passed into a
+completion handler, registered with an event loop, or scheduled by some other
+mechanism. Operations on the continuation can resume the async function's
+execution by passing a value back to the async function, or passing in an error
+that propagates as an error in the async function's context.
+The ``await_async_continuation`` instruction suspends execution of
+the coroutine until the continuation is invoked to resume it.  A use of
+``withUnsafeContinuation`` in Swift::
 
   func waitForCallback() async -> Int {
     return await withUnsafeContinuation { cc in
@@ -662,7 +664,7 @@ might lower to the following SIL::
 
   sil @waitForCallback : $@convention(thin) @async () -> Int {
   entry:
-    %cc = begin_async_continuation $Int
+    %cc = get_async_continuation $Int
     %closure = function_ref @waitForCallback_closure
       : $@convention(thin) (UnsafeContinuation<Int>) -> ()
     apply %closure(%cc)
@@ -676,7 +678,7 @@ The closure may then be inlined into the ``waitForCallback`` function::
 
   sil @waitForCallback : $@convention(thin) @async () -> Int {
   entry:
-    %cc = begin_async_continuation $Int
+    %cc = get_async_continuation $Int
     %registerCallback = function_ref @registerCallback
       : $@convention(thin) (@convention(thick) () -> ()) -> ()
     %callback_fn = function_ref @waitForCallback_callback
@@ -2682,15 +2684,15 @@ undefined behavior if the global variable has already been initialized.
 
 The type operand must be a lowered object type.
 
-begin_async_continuation
-````````````````````````
+get_async_continuation
+``````````````````````
 
 ::
 
-  sil-instruction ::= 'begin_async_continuation' '[throws]'? sil-type
+  sil-instruction ::= 'get_async_continuation' '[throws]'? sil-type
 
-  %0 = begin_async_continuation $T
-  %0 = begin_async_continuation [throws] $U
+  %0 = get_async_continuation $T
+  %0 = get_async_continuation [throws] $U
 
 Begins a suspension of an ``@async`` function. This instruction can only be
 used inside an ``@async`` function. The result of the instruction is an
@@ -2698,13 +2700,13 @@ used inside an ``@async`` function. The result of the instruction is an
 instruction, or an ``UnsafeThrowingContinuation<T>`` if the instruction
 carries the ``[throws]`` attribute. ``T`` must be a loadable type.
 The continuation must be consumed by a ``await_async_continuation`` terminator
-on all paths. Between ``begin_async_continuation`` and
+on all paths. Between ``get_async_continuation`` and
 ``await_async_continuation``, the following restrictions apply:
 
 - The function cannot ``return``, ``throw``, ``yield``, or ``unwind``.
 - There cannot be nested suspend points; namely, the function cannot call
   another ``@async`` function, nor can it initiate another suspend point with
-  ``begin_async_continuation``.
+  ``get_async_continuation``.
 
 The function suspends execution when the matching ``await_async_continuation``
 terminator is reached, and resumes execution when the continuation is resumed.
@@ -2723,34 +2725,34 @@ undefined behavior to resume the continuation more than once. Conversely,
 failing to resume the continuation will leave the suspended async coroutine
 hung in its suspended state, leaking any resources it may be holding.
 
-begin_async_continuation_addr
-`````````````````````````````
+get_async_continuation_addr
+```````````````````````````
 
 ::
 
-  sil-instruction ::= 'begin_async_continuation_addr' '[throws]'? sil-type ',' sil-operand
+  sil-instruction ::= 'get_async_continuation_addr' '[throws]'? sil-type ',' sil-operand
 
-  %1 = begin_async_continuation_addr $T, %0 : $*T
-  %1 = begin_async_continuation_addr [throws] $U, %0 : $*U
+  %1 = get_async_continuation_addr $T, %0 : $*T
+  %1 = get_async_continuation_addr [throws] $U, %0 : $*U
 
-Begins a suspension of an ``@async`` function, like ``begin_async_continuation``,
-while binding a specific memory location to the resulting continuation for
-receiving the value the continuation is resumed with.  The operand must be an
-address whose type is the maximally-abstracted lowered type of the formal
-resume type. The memory must be uninitialized, and must remain valid until the
-matching ``await_async_continuation`` instruction(s) consuming the result
-continuation have executed. The behavior is otherwise the same as
-``begin_async_continuation``, and the same restrictions apply on code appearing
-between ``begin_async_continuation_addr`` and ``await_async_continuation`` as
-apply between ``begin_async_continuation`` and ``await_async_continuation``.
+Begins a suspension of an ``@async`` function, like ``get_async_continuation``,
+additionally binding a specific memory location for receiving the value
+when the result continuation is resumed.  The operand must be an address whose
+type is the maximally-abstracted lowered type of the formal resume type. The
+memory must be uninitialized, and must remain allocated until the matching
+``await_async_continuation`` instruction(s) consuming the result continuation
+have executed. The behavior is otherwise the same as
+``get_async_continuation``, and the same restrictions apply on code appearing
+between ``get_async_continuation_addr`` and ``await_async_continuation`` as
+apply between ``get_async_continuation`` and ``await_async_continuation``.
 Additionally, the state of the memory referenced by the operand is indefinite
-between the execution of ``begin_async_continuation_addr`` and
+between the execution of ``get_async_continuation_addr`` and
 ``await_async_continuation``, and it is undefined behavior to read or modify
 the memory during this time. After the ``await_async_continuation`` resumes
-normally to its ``resume`` successor, the memory referenced by the operand
-is initialized with the resume value, and that value is then owned by the
-current function. If ``await_async_continuation`` instead resumes to
-its ``error`` successor, then the memory remains uninitialized.
+normally to its ``resume`` successor, the memory referenced by the operand is
+initialized with the resume value, and that value is then owned by the current
+function. If ``await_async_continuation`` instead resumes to its ``error``
+successor, then the memory remains uninitialized.
 
 dealloc_stack
 `````````````
@@ -6386,33 +6388,33 @@ await_async_continuation
   await_async_continuation %0 : $UnsafeContinuation<T>, resume bb1
   await_async_continuation %0 : $UnsafeThrowingContinuation<T>, resume bb1, error bb2
 
-  bb1(%1 : $T):
-  bb2(%2 : $Error):
+  bb1(%1 : @owned $T):
+  bb2(%2 : @owned $Error):
 
 Suspends execution of an ``@async`` function until the continuation
 is resumed. The continuation must be the result of a
-``begin_async_continuation`` or ``begin_async_continuation_addr``
+``get_async_continuation`` or ``get_async_continuation_addr``
 instruction within the same function; see the documentation for
-``begin_async_continuation`` for discussion of further constraints on the
-IR between ``begin_async_continuation[_addr]`` and ``await_async_continuation``.
+``get_async_continuation`` for discussion of further constraints on the
+IR between ``get_async_continuation[_addr]`` and ``await_async_continuation``.
 This terminator can only appear inside an ``@async`` function. The
 instruction must always have a ``resume`` successor, but must have an
 ``error`` successor if and only if the operand is an
 ``UnsafeThrowingContinuation<T>``.
 
-If the operand is the result of a ``begin_async_continuation`` instruction,
+If the operand is the result of a ``get_async_continuation`` instruction,
 then the ``resume`` successor block must take an argument whose type is the
 maximally-abstracted lowered type of ``T``, matching the type argument of the
 ``Unsafe[Throwing]Continuation<T>`` operand. The value of the ``resume``
 argument is owned by the current function. If the operand is the result of a
-``begin_async_continuation_addr`` instruction, then the ``resume`` successor
+``get_async_continuation_addr`` instruction, then the ``resume`` successor
 block must *not* take an argument; the resume value will be written to the
-memory referenced by the operand to the ``begin_async_continuation_addr``
+memory referenced by the operand to the ``get_async_continuation_addr``
 instruction, after which point the value in that memory becomes owned by the
 current function. With either variant, if the ``await_async_continuation``
 instruction has an ``error`` successor block, the ``error`` block must take a
 single ``Error`` argument, and that argument is owned by the enclosing
-function. The memory referenced by a ``begin_async_continuation_addr``
+function. The memory referenced by a ``get_async_continuation_addr``
 instruction remains uninitialized when ``await_async_continuation`` resumes on
 the ``error`` successor.
 
