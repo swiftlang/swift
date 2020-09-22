@@ -229,18 +229,13 @@ public:
                          ArrayRef<ASTNode> nodesOrDeclsToAdd) {
     auto *ip = insertionPoint;
     for (auto nd : sortBySourceRange(cull(nodesOrDeclsToAdd))) {
-      if (!shouldThisNodeBeScopedWhenFoundInSourceFileBraceStmtOrType(nd)) {
-        // FIXME: Could the range get lost if the node is ever reexpanded?
-        ip->widenSourceRangeForIgnoredASTNode(nd);
-      } else {
-        const unsigned preCount = ip->getChildren().size();
-        auto *const newIP =
-            addToScopeTreeAndReturnInsertionPoint(nd, ip).getPtrOr(ip);
-        if (ip != organicInsertionPoint)
-          ip->increaseASTAncestorScopeCount(ip->getChildren().size() -
-                                            preCount);
-        ip = newIP;
-      }
+      const unsigned preCount = ip->getChildren().size();
+      auto *const newIP =
+          addToScopeTreeAndReturnInsertionPoint(nd, ip).getPtrOr(ip);
+      if (ip != organicInsertionPoint)
+        ip->increaseASTAncestorScopeCount(ip->getChildren().size() -
+                                          preCount);
+      ip = newIP;
     }
     return ip;
   }
@@ -535,32 +530,6 @@ private:
     const int signum = ASTScopeImpl::compare(r1, r2, ctx.SourceMgr,
                                              /*ensureDisjoint=*/true);
     return -1 == signum;
-  }
-
-  static bool isVarDeclInPatternBindingDecl(ASTNode n1, ASTNode n2) {
-    if (auto *d1 = n1.dyn_cast<Decl *>())
-      if (auto *vd = dyn_cast<VarDecl>(d1))
-        if (auto *d2 = n2.dyn_cast<Decl *>())
-          if (auto *pbd = dyn_cast<PatternBindingDecl>(d2))
-            return vd->getParentPatternBinding() == pbd;
-    return false;
-  }
-
-public:
-  bool shouldThisNodeBeScopedWhenFoundInSourceFileBraceStmtOrType(ASTNode n) {
-    // Do not scope VarDecls because
-    // they get created directly by the pattern code.
-    // Doing otherwise distorts the source range
-    // of their parents.
-    ASTScopeAssert(!n.isDecl(DeclKind::Accessor),
-                   "Should not see accessors here");
-    // Can occur in illegal code
-    // non-empty brace stmt could define a new insertion point
-    if (auto *const s = n.dyn_cast<Stmt *>()) {
-      if (auto *const bs = dyn_cast<BraceStmt>(s))
-        return !bs->empty();
-    }
-    return !n.isDecl(DeclKind::Var);
   }
 
 public:
