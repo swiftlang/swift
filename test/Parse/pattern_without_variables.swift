@@ -40,5 +40,4 @@ func testVarLetPattern(a : SimpleEnum) {
 
 class SR10903 {
   static var _: Int { 0 } //expected-error {{getter/setter can only be defined for a single variable}}
-  //expected-error@-1 {{property declaration does not bind any variables}}
 }
