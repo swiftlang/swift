@@ -1695,14 +1695,6 @@ bool ASTSourceFileScope::isCurrentIfWasExpanded() const {
   return SF->getTopLevelDecls().size() == numberOfDeclsAlreadySeen;
 }
 
-void AbstractFunctionBodyScope::beCurrent() {
-  bodyWhenLastExpanded = decl->getBody(false);
-}
-bool AbstractFunctionBodyScope::isCurrentIfWasExpanded() const {
-  // Pass in false to keep the compiler from synthesizing one.
-  return bodyWhenLastExpanded == decl->getBody(false);
-}
-
 // Try to avoid the work of counting
 static const bool assumeVarsDoNotGetAdded = true;
 

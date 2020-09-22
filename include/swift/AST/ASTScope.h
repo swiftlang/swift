@@ -986,18 +986,11 @@ class AbstractFunctionBodyScope : public ASTScopeImpl {
 public:
   AbstractFunctionDecl *const decl;
 
-  /// \c Parser::parseAbstractFunctionBodyDelayed can call \c
-  /// AbstractFunctionDecl::setBody after the tree has been constructed. So if
-  /// this changes, have to rebuild body.
-  NullablePtr<BraceStmt> bodyWhenLastExpanded;
-
   AbstractFunctionBodyScope(AbstractFunctionDecl *e) : decl(e) {}
   virtual ~AbstractFunctionBodyScope() {}
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
-  void beCurrent() override;
-  bool isCurrentIfWasExpanded() const override;
 
 private:
   void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
