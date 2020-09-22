@@ -618,7 +618,7 @@ function(_add_swift_host_library_single target)
   elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
     set_target_properties("${target}"
       PROPERTIES
-      INSTALL_RPATH "$ORIGIN:/usr/lib/swift/linux")
+      INSTALL_RPATH "$ORIGIN")
   elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "CYGWIN")
     set_target_properties("${target}"
       PROPERTIES
