@@ -371,7 +371,7 @@ bool DifferentiableAttributeScope::lookupLocalsOrMembers(
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(attributedDeclaration)) {
     return visitAbstractFunctionDecl(afd);
   } else if (auto *asd = dyn_cast<AbstractStorageDecl>(attributedDeclaration)) {
-    for (auto *accessor : asd->getAllAccessors())
+    if (auto *accessor = asd->getParsedAccessor(AccessorKind::Get))
       if (visitAbstractFunctionDecl(accessor))
         return true;
   }
