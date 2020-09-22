@@ -659,6 +659,8 @@ static bool scanModuleDependencies(CompilerInstance &instance,
                                               FEOpts.PrebuiltModuleCachePath,
                                               FEOpts.SerializeModuleInterfaceDependencyHashes,
                                               FEOpts.shouldTrackSystemDependencies());
+  std::error_code EC;
+  llvm::raw_fd_ostream out(outputPath, EC, llvm::sys::fs::F_None);
   Optional<ModuleDependencies> rootDeps;
   if (isClang) {
     // Loading the clang module using Clang importer.
@@ -677,6 +679,12 @@ static bool scanModuleDependencies(CompilerInstance &instance,
   allModules.insert({moduleName.str(), isClang ? ModuleDependenciesKind::Clang:
     ModuleDependenciesKind::Swift});
 
+  // Output module prescan.
+  if (FEOpts.ImportPrescan) {
+    writePrescanJSON(out, rootDeps.getValue());
+    return false;
+  }
+
   // Explore the dependencies of every module.
   for (unsigned currentModuleIdx = 0;
        currentModuleIdx < allModules.size();
@@ -687,8 +695,6 @@ static bool scanModuleDependencies(CompilerInstance &instance,
     allModules.insert(discoveredModules.begin(), discoveredModules.end());
   }
   // Write out the JSON description.
-  std::error_code EC;
-  llvm::raw_fd_ostream out(outputPath, EC, llvm::sys::fs::F_None);
   writeJSON(out, instance, cache, ASTDelegate, allModules.getArrayRef());
   return false;
 }
