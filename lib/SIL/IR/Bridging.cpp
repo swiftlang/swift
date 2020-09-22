@@ -205,11 +205,15 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
                                bridging,
                                /*non-optional*/false);
 
+      auto clangType = Context.getClangFunctionType(
+          newParams, {newResult}, FunctionTypeRepresentation::Block);
+
       return FunctionType::get(
           newParams, newResult,
           funTy->getExtInfo()
               .intoBuilder()
-              .withSILRepresentation(SILFunctionType::Representation::Block)
+              .withRepresentation(FunctionType::Representation::Block)
+              .withClangFunctionType(clangType)
               .build());
     }
     }

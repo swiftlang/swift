@@ -3840,6 +3840,14 @@ namespace {
       OS << '\n';
       T->getInvocationSubstitutions().dump(OS, SubstitutionMap::DumpStyle::Full,
                                            Indent+2);
+      if (!T->getClangTypeInfo().empty()) {
+        std::string s;
+        llvm::raw_string_ostream os(s);
+        auto &ctx =
+            T->getASTContext().getClangModuleLoader()->getClangASTContext();
+        T->getClangTypeInfo().dump(os, ctx);
+        printField("clang_type", os.str());
+      }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 

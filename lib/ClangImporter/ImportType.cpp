@@ -487,11 +487,15 @@ namespace {
       if (!pointeeType)
         return Type();
       FunctionType *fTy = pointeeType->castTo<FunctionType>();
-      
-      auto rep = FunctionType::Representation::Block;
+
+      auto extInfo =
+          fTy->getExtInfo()
+              .intoBuilder()
+              .withRepresentation(FunctionType::Representation::Block)
+              .withClangFunctionType(type)
+              .build();
       auto funcTy =
-          FunctionType::get(fTy->getParams(), fTy->getResult(),
-                            fTy->getExtInfo().withRepresentation(rep));
+          FunctionType::get(fTy->getParams(), fTy->getResult(), extInfo);
       return { funcTy, ImportHint::Block };
     }
 
@@ -1407,7 +1411,14 @@ static ImportedType adjustTypeForConcreteImport(
     auto fTy = importedType->castTo<FunctionType>();
     FunctionType::ExtInfo einfo = fTy->getExtInfo();
     if (einfo.getRepresentation() != requiredFunctionTypeRepr) {
-      einfo = einfo.withRepresentation(requiredFunctionTypeRepr);
+      const clang::Type *clangType = nullptr;
+      if (shouldStoreClangType(requiredFunctionTypeRepr))
+        clangType = fTy->getASTContext().getClangFunctionType(
+            fTy->getParams(), fTy->getResult(), requiredFunctionTypeRepr);
+      einfo = einfo.intoBuilder()
+                  .withRepresentation(requiredFunctionTypeRepr)
+                  .withClangFunctionType(clangType)
+                  .build();
       importedType = fTy->withExtInfo(einfo);
     }
     break;

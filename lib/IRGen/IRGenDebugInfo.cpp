@@ -24,6 +24,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/TypeDifferenceVisitor.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"
@@ -72,6 +73,26 @@ llvm::cl::opt<bool> VerifyLineTable(
 namespace {
 using TrackingDIRefMap =
     llvm::DenseMap<const llvm::MDString *, llvm::TrackingMDNodeRef>;
+
+class EqualUpToClangTypes
+    : public CanTypeDifferenceVisitor<EqualUpToClangTypes> {
+public:
+  bool visitDifferentTypeStructure(CanType t1, CanType t2) {
+#define COMPARE_UPTO_CLANG_TYPE(CLASS)                                         \
+  if (auto f1 = dyn_cast<CLASS>(t1)) {                                         \
+    auto f2 = cast<CLASS>(t2);                                                 \
+    return !f1->getExtInfo().isEqualTo(f2->getExtInfo(),                       \
+                                       /*useClangTypes*/ false);               \
+  }
+    COMPARE_UPTO_CLANG_TYPE(FunctionType);
+    COMPARE_UPTO_CLANG_TYPE(SILFunctionType);
+#undef COMPARE_UPTO_CLANG_TYPE
+    return true;
+  }
+  bool check(Type t1, Type t2) {
+    return !visit(t1->getCanonicalType(), t2->getCanonicalType());
+  };
+};
 
 class IRGenDebugInfoImpl : public IRGenDebugInfo {
   friend class IRGenDebugInfoImpl;
@@ -815,7 +836,9 @@ private:
         llvm::errs() << "Original type:\n";
         Ty->dump(llvm::errs());
         abort();
-      } else if (!Reconstructed->isEqual(Ty)) {
+      } else if (!Reconstructed->isEqual(Ty) &&
+                 !EqualUpToClangTypes().check(Reconstructed, Ty)) {
+        // [FIXME: Include-Clang-type-in-mangling] Remove second check
         llvm::errs() << "Incorrect reconstructed type for " << Result << "\n";
         llvm::errs() << "Original type:\n";
         Ty->dump(llvm::errs());

@@ -74,9 +74,10 @@ getIndirectApplyAbstractionPattern(SILGenFunction &SGF,
   case FunctionTypeRepresentation::Block: {
     // C and block function parameters and results are implicitly
     // bridged to a foreign type.
-    auto bridgedType =
-      SGF.SGM.Types.getBridgedFunctionType(pattern, fnType,
-                                           Bridgeability::Full);
+    auto silRep =
+        SILFunctionTypeRepresentation(fnType->getExtInfo().getRepresentation());
+    auto bridgedType = SGF.SGM.Types.getBridgedFunctionType(
+        pattern, fnType, Bridgeability::Full, silRep);
     pattern.rewriteType(CanGenericSignature(), bridgedType);
     return pattern;
   }
