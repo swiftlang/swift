@@ -938,6 +938,9 @@ ExpandASTScopeRequest::evaluate(Evaluator &evaluator, ASTScopeImpl *parent,
 }
 
 ASTScopeImpl *ASTScopeImpl::expandAndBeCurrent(ScopeCreator &scopeCreator) {
+  ASTScopeAssert(!getWasExpanded(),
+                 "Cannot expand the same scope twice");
+
   auto *insertionPoint = expandSpecifically(scopeCreator);
   ASTScopeAssert(!insertionPointForDeferredExpansion() ||
                      insertionPointForDeferredExpansion().get() ==
