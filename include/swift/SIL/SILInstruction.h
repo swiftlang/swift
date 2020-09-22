@@ -3978,10 +3978,9 @@ public:
   Destination getAssignDestination() const { return AssignDest; }
 
   void setAssignInfo(AssignOwnershipQualifier qualifier, Destination dest) {
-    using Qualifier = AssignOwnershipQualifier;
-    assert(qualifier == Qualifier::Init && dest == Destination::BackingWrapper ||
-           qualifier == Qualifier::Reassign && dest == Destination::BackingWrapper ||
-           qualifier == Qualifier::Reassign && dest == Destination::WrappedValue);
+    assert(qualifier == AssignOwnershipQualifier::Init && dest == Destination::BackingWrapper ||
+           qualifier == AssignOwnershipQualifier::Reassign && dest == Destination::BackingWrapper ||
+           qualifier == AssignOwnershipQualifier::Reassign && dest == Destination::WrappedValue);
 
     SILInstruction::Bits.AssignByWrapperInst.OwnershipQualifier = unsigned(qualifier);
     AssignDest = dest;
