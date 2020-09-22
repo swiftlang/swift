@@ -407,7 +407,7 @@ public:
   using DeclConsumer = namelookup::AbstractASTScopeDeclConsumer &;
 
   /// Entry point into ASTScopeImpl-land for lookups
-  static llvm::SmallVector<const ASTScopeImpl *, 0>
+  static void
   unqualifiedLookup(SourceFile *, DeclNameRef, SourceLoc, DeclConsumer);
 
   /// Entry point into ASTScopeImpl-land for labeled statement lookups.
@@ -457,22 +457,17 @@ protected:
   /// duplicating work.
   ///
   /// Look in this scope.
-  /// \param history are the scopes traversed for this lookup (including this
-  /// one) \param limit A scope into which lookup should not go. See \c
+  /// \param limit A scope into which lookup should not go. See \c
   /// getLookupLimit. \param lastListSearched Last list searched.
   /// \param consumer is the object to which found decls are reported.
-  void lookup(llvm::SmallVectorImpl<const ASTScopeImpl *> &history,
-              NullablePtr<const ASTScopeImpl> limit,
+  void lookup(NullablePtr<const ASTScopeImpl> limit,
               NullablePtr<const GenericParamList> lastListSearched,
               DeclConsumer consumer) const;
 
 protected:
   /// Find either locals or members (no scope has both)
-  /// \param history The scopes visited since the start of lookup (including
-  /// this one)
   /// \return True if lookup is done
-  virtual bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *> history,
-                                     DeclConsumer consumer) const;
+  virtual bool lookupLocalsOrMembers(DeclConsumer consumer) const;
 
   /// Returns isDone and the list searched, if any
   std::pair<bool, NullablePtr<const GenericParamList>>
@@ -606,7 +601,6 @@ public:
                             bool omitAssertions) const = 0;
 
   virtual bool lookupMembersOf(const GenericTypeOrExtensionScope *scope,
-                               ArrayRef<const ASTScopeImpl *>,
                                ASTScopeImpl::DeclConsumer consumer) const;
 
   virtual NullablePtr<const ASTScopeImpl>
@@ -668,7 +662,6 @@ public:
     virtual ~GenericTypeOrExtensionWhereOrBodyPortion() {}
 
     bool lookupMembersOf(const GenericTypeOrExtensionScope *scope,
-                         ArrayRef<const ASTScopeImpl *>,
                          ASTScopeImpl::DeclConsumer consumer) const override;
 };
 
@@ -681,7 +674,6 @@ public:
       : GenericTypeOrExtensionWhereOrBodyPortion("Where") {}
 
   bool lookupMembersOf(const GenericTypeOrExtensionScope *scope,
-                       ArrayRef<const ASTScopeImpl *>,
                        ASTScopeImpl::DeclConsumer consumer) const override;
 
   ASTScopeImpl *expandScope(GenericTypeOrExtensionScope *,
@@ -785,8 +777,7 @@ public:
 
 protected:
   bool
-  lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *> history,
-                        ASTScopeImpl::DeclConsumer consumer) const override;
+  lookupLocalsOrMembers(ASTScopeImpl::DeclConsumer consumer) const override;
   void printSpecifics(llvm::raw_ostream &out) const override;
 
 public:
@@ -952,8 +943,7 @@ public:
   }
 
 protected:
-  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                             DeclConsumer) const override;
+  bool lookupLocalsOrMembers(DeclConsumer) const override;
 };
 
 /// Concrete class for a function/initializer/deinitializer
@@ -1058,8 +1048,7 @@ public:
   NullablePtr<ASTScopeImpl> getParentOfASTAncestorScopesToBeRescued() override;
 
 protected:
-  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                             DeclConsumer) const override;
+  bool lookupLocalsOrMembers(DeclConsumer) const override;
 
 public:
   NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion() override;
@@ -1072,8 +1061,7 @@ public:
   FunctionBodyScope(AbstractFunctionDecl *e)
       : AbstractFunctionBodyScope(e) {}
   std::string getClassName() const override;
-  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                             DeclConsumer consumer) const override;
+  bool lookupLocalsOrMembers(DeclConsumer consumer) const override;
 };
 
 class DefaultArgumentInitializerScope final : public ASTScopeImpl {
@@ -1211,8 +1199,7 @@ public:
   NullablePtr<const void> getReferrent() const override;
 
 protected:
-  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                             DeclConsumer) const override;
+  bool lookupLocalsOrMembers(DeclConsumer) const override;
 };
 
 class PatternEntryInitializerScope final : public AbstractPatternEntryScope {
@@ -1239,8 +1226,7 @@ public:
   virtual NullablePtr<DeclContext> getDeclContext() const override;
 
 protected:
-  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                             DeclConsumer) const override;
+  bool lookupLocalsOrMembers(DeclConsumer) const override;
 };
 
 /// The scope introduced by a conditional clause in an if/guard/while
@@ -1302,8 +1288,7 @@ public:
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &) override;
-  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                             DeclConsumer) const override;
+  bool lookupLocalsOrMembers(DeclConsumer) const override;
   void printSpecifics(llvm::raw_ostream &out) const override;
   bool isLabeledStmtLookupTerminator() const override;
 };
@@ -1330,8 +1315,7 @@ public:
   NullablePtr<Expr> getExprIfAny() const override { return expr; }
   Expr *getExpr() const { return expr; }
   NullablePtr<const void> getReferrent() const override;
-  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                             DeclConsumer) const override;
+  bool lookupLocalsOrMembers(DeclConsumer) const override;
 };
 
 /// For a closure with named parameters, this scope does the local bindings.
@@ -1364,8 +1348,7 @@ private:
   void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
 
 protected:
-  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                             DeclConsumer) const override;
+  bool lookupLocalsOrMembers(DeclConsumer) const override;
 };
 
 class TopLevelCodeScope final : public ASTScopeImpl {
@@ -1429,8 +1412,7 @@ public:
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &) override;
-  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                             DeclConsumer) const override;
+  bool lookupLocalsOrMembers(DeclConsumer) const override;
 };
 
 /// A `@differentiable` attribute scope.
@@ -1463,8 +1445,7 @@ public:
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &) override;
-  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                             DeclConsumer) const override;
+  bool lookupLocalsOrMembers(DeclConsumer) const override;
 };
 
 class SubscriptDeclScope final : public ASTScopeImpl {
@@ -1763,8 +1744,7 @@ public:
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
 
 protected:
-  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                             DeclConsumer) const override;
+  bool lookupLocalsOrMembers(DeclConsumer) const override;
   bool isLabeledStmtLookupTerminator() const override;
 };
 
@@ -1842,8 +1822,7 @@ public:
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
 
 protected:
-  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                             ASTScopeImpl::DeclConsumer) const override;
+  bool lookupLocalsOrMembers(ASTScopeImpl::DeclConsumer) const override;
 };
 
 /// The scope used for the body of a 'case' statement.
@@ -1871,8 +1850,7 @@ public:
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
 protected:
-  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                             ASTScopeImpl::DeclConsumer) const override;
+  bool lookupLocalsOrMembers(ASTScopeImpl::DeclConsumer) const override;
   bool isLabeledStmtLookupTerminator() const override;
 };
 
@@ -1900,8 +1878,7 @@ public:
   Stmt *getStmt() const override { return stmt; }
 
 protected:
-  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                             DeclConsumer) const override;
+  bool lookupLocalsOrMembers(DeclConsumer) const override;
 };
 } // namespace ast_scope
 } // namespace swift
