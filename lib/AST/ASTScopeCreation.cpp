@@ -965,15 +965,6 @@ void ScopeCreator::addChildrenForAllLocalizableAccessorsInSourceOrder(
   // Accessors are always nested within their abstract storage
   // declaration. The nesting may not be immediate, because subscripts may
   // have intervening scopes for generics.
-  AbstractStorageDecl *const enclosingAbstractStorageDecl =
-      parent->getEnclosingAbstractStorageDecl().get();
-
-  std::vector<AccessorDecl *> accessorsToScope;
-  // Assume we don't have to deal with inactive clauses of IfConfigs here
-  llvm::copy_if(asd->getAllAccessors(), std::back_inserter(accessorsToScope),
-                [&](AccessorDecl *ad) {
-                  return enclosingAbstractStorageDecl == ad->getStorage();
-                });
 
   // Create scopes for `@differentiable` attributes.
   forEachDifferentiableAttrInSourceOrder(
@@ -982,9 +973,15 @@ void ScopeCreator::addChildrenForAllLocalizableAccessorsInSourceOrder(
             parent, diffAttr, asd);
       });
 
-  // Sort in order to include synthesized ones, which are out of order.
-  for (auto *accessor : sortBySourceRange(accessorsToScope))
-    addToScopeTree(accessor, parent);
+  AbstractStorageDecl *enclosingAbstractStorageDecl =
+      parent->getEnclosingAbstractStorageDecl().get();
+
+  asd->visitParsedAccessors([&](AccessorDecl *ad) {
+    assert(enclosingAbstractStorageDecl == ad->getStorage());
+    (void) enclosingAbstractStorageDecl;
+
+    this->addToScopeTree(ad, parent);
+  });
 }
 
 #pragma mark creation helpers
@@ -1600,8 +1597,12 @@ AbstractPatternEntryScope::AbstractPatternEntryScope(
 void AbstractPatternEntryScope::forEachVarDeclWithLocalizableAccessors(
     ScopeCreator &scopeCreator, function_ref<void(VarDecl *)> foundOne) const {
   getPatternEntry().getPattern()->forEachVariable([&](VarDecl *var) {
-    if (llvm::any_of(var->getAllAccessors(),
-                     [&](AccessorDecl *a) { return isLocalizable(a); }))
+    bool hasParsedAccessors = false;
+    var->visitParsedAccessors([&](AccessorDecl *) {
+      hasParsedAccessors = true;
+    });
+
+    if (hasParsedAccessors)
       foundOne(var);
   });
 }
@@ -1930,9 +1931,11 @@ public:
       record(pd->getDefaultArgumentInitContext());
     else if (auto *pbd = dyn_cast<PatternBindingDecl>(D))
       recordInitializers(pbd);
-    else if (auto *vd = dyn_cast<VarDecl>(D))
-      for (auto *ad : vd->getAllAccessors())
+    else if (auto *vd = dyn_cast<VarDecl>(D)) {
+      vd->visitParsedAccessors([&](AccessorDecl *ad) {
         ad->walk(*this);
+      });
+    }
     return ASTWalker::walkToDeclPre(D);
   }
 
