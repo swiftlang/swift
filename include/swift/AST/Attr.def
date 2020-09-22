@@ -562,7 +562,7 @@ SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
   100)
 
 SIMPLE_DECL_ATTR(asyncHandler, AsyncHandler,
-  OnFunc | UserInaccessible |
+  OnFunc | ConcurrencyOnly |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   101)
 
@@ -571,6 +571,12 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(actor, Actor,
   ABIBreakingToAdd | ABIBreakingToRemove |
   APIBreakingToAdd | APIBreakingToRemove,
   102)
+
+SIMPLE_DECL_ATTR(actorIndependent, ActorIndependent,
+  OnFunc | OnVar | OnSubscript | ConcurrencyOnly |
+  ABIStableToAdd | ABIStableToRemove |
+  APIStableToAdd | APIBreakingToRemove,
+  103)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

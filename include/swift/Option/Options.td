@@ -576,16 +576,6 @@ def enable_fuzzy_forward_scan_trailing_closure_matching : Flag<["-"],
   Flags<[FrontendOption]>,
   HelpText<"Enable fuzzy forward-scan trailing closure matching">;
 
-def enable_direct_intramodule_dependencies : Flag<["-"],
-    "enable-direct-intramodule-dependencies">,
-  Flags<[FrontendOption, HelpHidden]>,
-  HelpText<"Enable experimental dependency tracking that never cascades">;
-
-def disable_direct_intramodule_dependencies : Flag<["-"],
-    "disable-direct-intramodule-dependencies">,
-  Flags<[FrontendOption, HelpHidden]>,
-  HelpText<"Disable experimental dependency tracking that never cascades">;
-
 def enable_experimental_cxx_interop :
   Flag<["-"], "enable-experimental-cxx-interop">,
   HelpText<"Allow importing C++ modules into Swift (experimental feature)">;

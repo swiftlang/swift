@@ -119,10 +119,9 @@ lookupUnqualifiedEnumMemberElement(DeclContext *DC, DeclNameRef name,
   // FIXME: We should probably pay attention to argument labels someday.
   name = name.withoutArgumentLabels();
 
-  auto lookupOptions = defaultUnqualifiedLookupOptions;
-  lookupOptions |= NameLookupFlags::KnownPrivate;
   auto lookup =
-      TypeChecker::lookupUnqualified(DC, name, UseLoc, lookupOptions);
+      TypeChecker::lookupUnqualified(DC, name, UseLoc,
+                                     defaultUnqualifiedLookupOptions);
   return filterForEnumElement(DC, UseLoc,
                               /*unqualifiedLookup=*/true, lookup);
 }

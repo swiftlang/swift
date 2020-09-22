@@ -737,9 +737,17 @@ swift::matchWitness(
     }
   }
 
-  // Actor-isolated witnesses cannot conform to protocol requirements.
-  if (getActorIsolatingMember(witness))
+  // Check for actor-isolation consistency.
+  switch (getActorIsolation(witness)) {
+  case ActorIsolation::ActorInstance:
+    // Actor-isolated witnesses cannot conform to protocol requirements.
     return RequirementMatch(witness, MatchKind::ActorIsolatedWitness);
+
+  case ActorIsolation::ActorPrivileged:
+  case ActorIsolation::Independent:
+  case ActorIsolation::Unspecified:
+    break;
+  }
 
   // Now finalize the match.
   auto result = finalize(anyRenaming, optionalAdjustments);
@@ -1164,12 +1172,9 @@ WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
 
   if (req->isOperator()) {
     // Operator lookup is always global.
-    auto lookupOptions = defaultUnqualifiedLookupOptions;
-    if (!DC->isCascadingContextForLookup(false))
-      lookupOptions |= NameLookupFlags::KnownPrivate;
     auto lookup = TypeChecker::lookupUnqualified(DC->getModuleScopeContext(),
                                                  reqBaseName, SourceLoc(),
-                                                 lookupOptions);
+                                                 defaultUnqualifiedLookupOptions);
     for (auto candidate : lookup) {
       auto decl = candidate.getValueDecl();
       if (swift::isMemberOperator(cast<FuncDecl>(decl), Adoptee)) {
@@ -1249,10 +1254,9 @@ bool WitnessChecker::findBestWitness(
       if (!overlay)
         continue;
 
-      auto lookupOptions = defaultUnqualifiedLookupOptions;
-      lookupOptions |= NameLookupFlags::KnownPrivate;
       auto lookup = TypeChecker::lookupUnqualified(
-          overlay, requirement->createNameRef(), SourceLoc(), lookupOptions);
+          overlay, requirement->createNameRef(), SourceLoc(),
+          defaultUnqualifiedLookupOptions);
       for (auto candidate : lookup)
         witnesses.push_back(candidate.getValueDecl());
       break;
@@ -2370,13 +2374,16 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
       if (auto FD = dyn_cast<FuncDecl>(witness)) {
         loc = FD->getStaticLoc();
       } else if (auto VD = dyn_cast<VarDecl>(witness)) {
-        loc = VD->getParentPatternBinding()->getStaticLoc();
+        if (auto PBD = VD->getParentPatternBinding()) {
+          loc = PBD->getStaticLoc();
+        }
       } else if (auto SD = dyn_cast<SubscriptDecl>(witness)) {
         loc = SD->getStaticLoc();
       } else {
         llvm_unreachable("Unexpected witness");
       }
-      diag.fixItRemove(loc);
+      if (loc.isValid())
+        diag.fixItRemove(loc);
     } else {
       diag.fixItInsert(witness->getAttributeInsertionLoc(true), "static ");
     }

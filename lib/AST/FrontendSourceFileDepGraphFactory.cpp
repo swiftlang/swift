@@ -233,47 +233,6 @@ std::string DependencyKey::computeNameForProvidedEntity<
 }
 
 //==============================================================================
-// MARK: createDependedUponKey
-//==============================================================================
-
-template <>
-DependencyKey
-DependencyKey::createDependedUponKey<NodeKind::topLevel>(StringRef name) {
-  return DependencyKey(NodeKind::topLevel, DeclAspect::interface, "",
-                       name.str());
-}
-
-template <>
-DependencyKey
-DependencyKey::createDependedUponKey<NodeKind::dynamicLookup>(StringRef name) {
-  return DependencyKey(NodeKind::dynamicLookup, DeclAspect::interface, "",
-                       name.str());
-}
-
-template <>
-DependencyKey
-DependencyKey::createDependedUponKey<NodeKind::externalDepend>(StringRef name) {
-  return DependencyKey(NodeKind::externalDepend, DeclAspect::interface, "",
-                       name.str());
-}
-
-template <>
-DependencyKey
-DependencyKey::createDependedUponKey<NodeKind::nominal>(StringRef mangledName) {
-  return DependencyKey(NodeKind::nominal, DeclAspect::interface,
-                       mangledName.str(), "");
-}
-
-DependencyKey DependencyKey::createDependedUponKey(StringRef mangledHolderName,
-                                                   StringRef memberBaseName) {
-  const bool isMemberBlank = memberBaseName.empty();
-  const auto kind =
-      isMemberBlank ? NodeKind::potentialMember : NodeKind::member;
-  return DependencyKey(kind, DeclAspect::interface, mangledHolderName.str(),
-                       isMemberBlank ? "" : memberBaseName.str());
-}
-
-//==============================================================================
 // MARK: Entry point into frontend graph construction
 //==============================================================================
 
@@ -578,9 +537,7 @@ public:
 public:
   void enumerateAllUses() {
     auto &Ctx = SF->getASTContext();
-    std::unordered_set<std::string> holdersOfCascadingMembers;
     Ctx.evaluator.enumerateReferencesInFile(SF, [&](const auto &ref) {
-      const auto cascades = ref.cascades;
       std::string name = ref.name.userFacingName().str();
       const auto *nominal = ref.subject;
       using Kind = evaluator::DependencyCollector::Reference::Kind;
@@ -590,56 +547,36 @@ public:
       case Kind::Tombstone:
         llvm_unreachable("Cannot enumerate dead reference!");
       case Kind::TopLevel:
-        return enumerateUse<NodeKind::topLevel>("", name, cascades);
+        return enumerateUse<NodeKind::topLevel>("", name);
       case Kind::Dynamic:
-        return enumerateUse<NodeKind::dynamicLookup>("", name, cascades);
+        return enumerateUse<NodeKind::dynamicLookup>("", name);
       case Kind::PotentialMember: {
         std::string context = DependencyKey::computeContextForProvidedEntity<
             NodeKind::potentialMember>(nominal);
-        appendHolderOfCascadingMembers(holdersOfCascadingMembers, nominal,
-                                       cascades);
-        return enumerateUse<NodeKind::potentialMember>(context, "", cascades);
+        return enumerateUse<NodeKind::potentialMember>(context, "");
       }
       case Kind::UsedMember: {
         std::string context =
             DependencyKey::computeContextForProvidedEntity<NodeKind::member>(
                 nominal);
-        appendHolderOfCascadingMembers(holdersOfCascadingMembers, nominal,
-                                       cascades);
-        return enumerateUse<NodeKind::member>(context, name, cascades);
+        return enumerateUse<NodeKind::member>(context, name);
       }
       }
     });
     enumerateExternalUses();
-    enumerateNominalUses(std::move(holdersOfCascadingMembers));
+    enumerateNominalUses();
   }
 
 private:
   template <NodeKind kind>
-  void enumerateUse(StringRef context, StringRef name, bool isCascadingUse) {
+  void enumerateUse(StringRef context, StringRef name) {
     // Assume that what is depended-upon is the interface
     createDefUse(
         DependencyKey(kind, DeclAspect::interface, context.str(), name.str()),
-        isCascadingUse ? sourceFileInterface : sourceFileImplementation);
+        sourceFileImplementation);
   }
 
-  void appendHolderOfCascadingMembers(std::unordered_set<std::string> &holders,
-                                      const NominalTypeDecl *subject,
-                                      bool isCascading) {
-    bool isPrivate = subject->isPrivateToEnclosingFile();
-    if (isPrivate && !includeIntrafileDeps)
-      return;
-
-    std::string context =
-        DependencyKey::computeContextForProvidedEntity<NodeKind::nominal>(
-            subject);
-    if (isCascading) {
-      holders.insert(context);
-    }
-  }
-
-  void enumerateNominalUses(
-      const std::unordered_set<std::string> &&holdersOfCascadingMembers) {
+  void enumerateNominalUses() {
     auto &Ctx = SF->getASTContext();
     Ctx.evaluator.enumerateReferencesInFile(SF, [&](const auto &ref) {
       const NominalTypeDecl *subject = ref.subject;
@@ -655,15 +592,13 @@ private:
       std::string context =
           DependencyKey::computeContextForProvidedEntity<NodeKind::nominal>(
               subject);
-      const bool isCascadingUse = holdersOfCascadingMembers.count(context) != 0;
-      enumerateUse<NodeKind::nominal>(context, "", isCascadingUse);
+      enumerateUse<NodeKind::nominal>(context, "");
     });
   }
 
   void enumerateExternalUses() {
-    // external dependencies always cascade
     for (StringRef s : depTracker.getDependencies())
-      enumerateUse<NodeKind::externalDepend>("", s, true);
+      enumerateUse<NodeKind::externalDepend>("", s);
   }
 };
 } // end namespace

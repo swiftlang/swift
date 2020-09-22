@@ -341,14 +341,11 @@ static bool diagnoseOperatorJuxtaposition(UnresolvedDeclRefExpr *UDRE,
 
     // Perform name lookup for the first and second pieces.  If either fail to
     // be found, then it isn't a valid split.
-    NameLookupOptions LookupOptions = defaultUnqualifiedLookupOptions;
-    // This is only used for diagnostics, so always use KnownPrivate.
-    LookupOptions |= NameLookupFlags::KnownPrivate;
     auto startLookup = TypeChecker::lookupUnqualified(
-        DC, startName, UDRE->getLoc(), LookupOptions);
+        DC, startName, UDRE->getLoc(), defaultUnqualifiedLookupOptions);
     if (!startLookup) continue;
     auto endLookup = TypeChecker::lookupUnqualified(DC, endName, UDRE->getLoc(),
-                                                    LookupOptions);
+                                                    defaultUnqualifiedLookupOptions);
     if (!endLookup) continue;
 
     // If the overall operator is a binary one, then we're looking at
@@ -536,9 +533,6 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
 
   // Perform standard value name lookup.
   NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
-  if (isa<AbstractFunctionDecl>(DC))
-    lookupOptions |= NameLookupFlags::KnownPrivate;
-
   // TODO: Include all of the possible members to give a solver a
   //       chance to diagnose name shadowing which requires explicit
   //       name/module qualifier to access top-level name.
@@ -562,7 +556,6 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
 
     // Try ignoring access control.
     NameLookupOptions relookupOptions = lookupOptions;
-    relookupOptions |= NameLookupFlags::KnownPrivate;
     relookupOptions |= NameLookupFlags::IgnoreAccessControl;
     auto inaccessibleResults =
         TypeChecker::lookupUnqualified(DC, Name, Loc, relookupOptions);
@@ -1424,14 +1417,10 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
   // and not a TypeExpr.
   if (auto *DRE = dyn_cast<DeclRefExpr>(UDE->getBase())) {
     if (auto *TD = dyn_cast<TypeDecl>(DRE->getDecl())) {
-      auto lookupOptions = defaultMemberLookupOptions;
-      if (isa<AbstractFunctionDecl>(DC) ||
-          isa<AbstractClosureExpr>(DC))
-        lookupOptions |= NameLookupFlags::KnownPrivate;
-
       // See if the type has a member type with this name.
       auto Result = TypeChecker::lookupMemberType(
-          DC, TD->getDeclaredInterfaceType(), Name, lookupOptions);
+          DC, TD->getDeclaredInterfaceType(), Name,
+          defaultMemberLookupOptions);
 
       // If there is no nested type with this name, we have a lookup of
       // a non-type member, so leave the expression as-is.
@@ -1484,14 +1473,10 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
     const auto BaseTy = resolution.resolveType(InnerTypeRepr);
 
     if (BaseTy->mayHaveMembers()) {
-      auto lookupOptions = defaultMemberLookupOptions;
-      if (isa<AbstractFunctionDecl>(DC) ||
-          isa<AbstractClosureExpr>(DC))
-        lookupOptions |= NameLookupFlags::KnownPrivate;
-
       // See if there is a member type with this name.
       auto Result =
-          TypeChecker::lookupMemberType(DC, BaseTy, Name, lookupOptions);
+          TypeChecker::lookupMemberType(DC, BaseTy, Name,
+                                        defaultMemberLookupOptions);
 
       // If there is no nested type with this name, we have a lookup of
       // a non-type member, so leave the expression as-is.
@@ -2466,12 +2451,10 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   EP->setMatchVar(matchVar);
 
   // Find '~=' operators for the match.
-  auto lookupOptions = defaultUnqualifiedLookupOptions;
-  lookupOptions |= NameLookupFlags::KnownPrivate;
   auto matchLookup =
       lookupUnqualified(DC->getModuleScopeContext(),
                         DeclNameRef(Context.Id_MatchOperator),
-                        SourceLoc(), lookupOptions);
+                        SourceLoc(), defaultUnqualifiedLookupOptions);
   auto &diags = DC->getASTContext().Diags;
   if (!matchLookup) {
     diags.diagnose(EP->getLoc(), diag::no_match_operator);
@@ -3884,8 +3867,6 @@ IsCallableNominalTypeRequest::evaluate(Evaluator &evaluator, CanType ty,
                                        DeclContext *dc) const {
   auto options = defaultMemberLookupOptions;
   options |= NameLookupFlags::IgnoreAccessControl;
-  if (isa<AbstractFunctionDecl>(dc))
-    options |= NameLookupFlags::KnownPrivate;
 
   // Look for a callAsFunction method.
   auto &ctx = ty->getASTContext();

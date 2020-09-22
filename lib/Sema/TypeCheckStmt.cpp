@@ -1657,7 +1657,7 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
     superclassDecl->synthesizeSemanticMembersIfNeeded(
         DeclBaseName::createConstructor());
 
-    NLOptions subOptions = NL_QualifiedDefault | NL_KnownNonCascadingDependency;
+    NLOptions subOptions = NL_QualifiedDefault;
 
     SmallVector<ValueDecl *, 4> lookupResults;
     fromCtor->lookupQualified(superclassDecl,
@@ -1669,7 +1669,7 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
       if (!superclassCtor || !superclassCtor->isDesignatedInit() ||
           superclassCtor == ctor)
         continue;
-      
+
       // Found another designated initializer in the superclass. Don't add the
       // super.init() call.
       return true;
@@ -1683,6 +1683,7 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
           fragileKind);
     }
   }
+
 
   return false;
 }

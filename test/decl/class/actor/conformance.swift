@@ -24,6 +24,8 @@ protocol SyncProtocol {
 
   func syncMethodB()
 
+  func syncMethodC() -> Int
+
   subscript (index: Int) -> String { get }
   // expected-note@-1{{do you want to add a stub}}
 
@@ -45,6 +47,10 @@ actor class OtherActor: SyncProtocol { // expected-error{{type 'OtherActor' does
   // Async handlers are okay.
   @asyncHandler
   func syncMethodB() { }
+
+  // @actorIndependent methods are okay.
+  // FIXME: Consider suggesting @actorIndependent if this didn't match.
+  @actorIndependent func syncMethodC() -> Int { 5 }
 
   subscript (index: Int) -> String { "\(index)" }
   // expected-note@-1{{actor-isolated subscript 'subscript(_:)' cannot be used to satisfy a protocol requirement}}

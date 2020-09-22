@@ -46,12 +46,6 @@ llvm::SmallVector<const ASTScopeImpl *, 0> ASTScope::unqualifiedLookup(
   return ASTScopeImpl::unqualifiedLookup(SF, name, loc, consumer);
 }
 
-Optional<bool> ASTScope::computeIsCascadingUse(
-    ArrayRef<const ast_scope::ASTScopeImpl *> history,
-    Optional<bool> initialIsCascadingUse) {
-  return ASTScopeImpl::computeIsCascadingUse(history, initialIsCascadingUse);
-}
-
 llvm::SmallVector<LabeledStmt *, 4> ASTScope::lookupLabeledStmts(
     SourceFile *sourceFile, SourceLoc loc) {
   return ASTScopeImpl::lookupLabeledStmts(sourceFile, loc);
