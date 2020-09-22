@@ -126,12 +126,6 @@ static void addSwiftContractPass(const PassManagerBuilder &Builder,
     PM.add(createSwiftARCContractPass());
 }
 
-static void addSwiftMergeFunctionsPass(const PassManagerBuilder &Builder,
-                                       PassManagerBase &PM) {
-  if (Builder.OptLevel > 0)
-    PM.add(createSwiftMergeFunctionsPass());
-}
-
 static void addAddressSanitizerPasses(const PassManagerBuilder &Builder,
                                       legacy::PassManagerBase &PM) {
   auto &BuilderWrapper =
@@ -249,9 +243,16 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
     PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
                            addSanitizerCoveragePass);
   }
-  if (RunSwiftSpecificLLVMOptzns)
+  if (RunSwiftSpecificLLVMOptzns) {
     PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
-                           addSwiftMergeFunctionsPass);
+      [&](const PassManagerBuilder &Builder, PassManagerBase &PM) {
+        if (Builder.OptLevel > 0) {
+          const PointerAuthSchema &schema = Opts.PointerAuth.FunctionPointers;
+          unsigned key = (schema.isEnabled() ? schema.getKey() : 0);
+          PM.add(createSwiftMergeFunctionsPass(schema.isEnabled(), key));
+        }
+      });
+  }
 
   // Configure the function passes.
   legacy::FunctionPassManager FunctionPasses(Module);
