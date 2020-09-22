@@ -59,7 +59,7 @@
             "repos": {
                 "llvm-project": "swift/master",
                 "swift": "master",
-                "cmark": "master",
+                "cmark": "main",
                 "llbuild": "master",
                 "swift-tools-support-core": "master",
                 "swiftpm": "master",
@@ -89,7 +89,7 @@
             "repos": {
                 "llvm-project": "swift/master-next",
                 "swift": "master-next",
-                "cmark": "master",
+                "cmark": "main",
                 "llbuild": "master",
                 "swift-tools-support-core": "master",
                 "swiftpm": "master",
@@ -312,7 +312,7 @@
             "repos": {
                 "llvm-project": "swift/master-rebranch",
                 "swift": "master-rebranch",
-                "cmark": "master",
+                "cmark": "main",
                 "llbuild": "master",
                 "swift-tools-support-core": "master",
                 "swiftpm": "master",
