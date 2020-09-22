@@ -1293,6 +1293,11 @@ enum class ConstraintSystemFlags {
   /// Don't try to type check closure bodies, and leave them unchecked. This is
   /// used for source tooling functionalities.
   LeaveClosureBodyUnchecked = 0x20,
+
+  /// If set, we are solving specifically to determine the type of a
+  /// CodeCompletionExpr, and should continue in the presence of errors wherever
+  /// possible.
+  ForCodeCompletion = 0x40,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -3055,6 +3060,12 @@ public:
 
   bool shouldReusePrecheckedType() const {
     return Options.contains(ConstraintSystemFlags::ReusePrecheckedType);
+  }
+
+  /// Whether we are solving to determine the possible types of a
+  /// \c CodeCompletionExpr.
+  bool isForCodeCompletion() const {
+    return Options.contains(ConstraintSystemFlags::ForCodeCompletion);
   }
 
   /// Log and record the application of the fix. Return true iff any
