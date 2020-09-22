@@ -609,8 +609,6 @@ public:
   virtual const Decl *
   getReferrentOfScope(const GenericTypeOrExtensionScope *s) const;
 
-  virtual void beCurrent(IterableTypeScope *) const = 0;
-  virtual bool isCurrentIfWasExpanded(const IterableTypeScope *) const = 0;
   virtual NullablePtr<ASTScopeImpl>
   insertionPointForDeferredExpansion(IterableTypeScope *) const = 0;
   virtual SourceRange
@@ -635,19 +633,6 @@ public:
 
     const Decl *
     getReferrentOfScope(const GenericTypeOrExtensionScope *s) const override;
-
-    /// Make whole portion lazy to avoid circularity in lookup of generic
-    /// parameters of extensions. When \c bindExtension is called, it needs to
-    /// unqualifed-lookup the type being extended. That causes an \c
-    /// ExtensionScope
-    /// (\c GenericTypeOrExtensionWholePortion) to be built.
-    /// The building process needs the generic parameters, but that results in a
-    /// request for the extended nominal type of the \c ExtensionDecl, which is
-    /// an endless recursion. Although we only need to make \c ExtensionScope
-    /// lazy, might as well do it for all \c IterableTypeScopes.
-
-    void beCurrent(IterableTypeScope *) const override;
-    bool isCurrentIfWasExpanded(const IterableTypeScope *) const override;
 
     NullablePtr<ASTScopeImpl>
     insertionPointForDeferredExpansion(IterableTypeScope *) const override;
@@ -682,9 +667,6 @@ public:
   SourceRange getChildlessSourceRangeOf(const GenericTypeOrExtensionScope *,
                                         bool omitAssertions) const override;
 
-  void beCurrent(IterableTypeScope *) const override;
-  bool isCurrentIfWasExpanded(const IterableTypeScope *) const override;
-
   NullablePtr<ASTScopeImpl>
   insertionPointForDeferredExpansion(IterableTypeScope *) const override;
   SourceRange
@@ -704,8 +686,6 @@ public:
   SourceRange getChildlessSourceRangeOf(const GenericTypeOrExtensionScope *,
                                         bool omitAssertions) const override;
 
-  void beCurrent(IterableTypeScope *) const override;
-  bool isCurrentIfWasExpanded(const IterableTypeScope *) const override;
   NullablePtr<ASTScopeImpl>
   insertionPointForDeferredExpansion(IterableTypeScope *) const override;
   SourceRange
@@ -796,11 +776,6 @@ protected:
 };
 
 class IterableTypeScope : public GenericTypeScope {
-  /// Because of \c parseDelayedDecl members can get added after the tree is
-  /// constructed, and they can be out of order. Detect this happening by
-  /// remembering the member count.
-  unsigned memberCount = 0;
-
 public:
   IterableTypeScope(const Portion *p) : GenericTypeScope(p) {}
   virtual ~IterableTypeScope() {}
@@ -810,15 +785,7 @@ public:
   bool doesDeclHaveABody() const override;
   void expandBody(ScopeCreator &) override;
 
-protected:
-  void beCurrent() override;
-  bool isCurrentIfWasExpanded() const override;
-
 public:
-  void makeWholeCurrent();
-  bool isWholeCurrent() const;
-  void makeBodyCurrent();
-  bool isBodyCurrent() const;
   NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion() override;
   SourceRange sourceRangeForDeferredExpansion() const override;
 

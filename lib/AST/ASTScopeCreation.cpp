@@ -330,14 +330,6 @@ public:
     return nullptr;
   }
 
-  template <typename Scope, typename... Args>
-  ASTScopeImpl *ensureUniqueThenConstructExpandAndInsert(ASTScopeImpl *parent,
-                                                         Args... args) {
-    if (auto s = ifUniqueConstructExpandAndInsert<Scope>(parent, args...))
-      return s.get();
-    ASTScope_unreachable("Scope should have been unique");
-  }
-
 private:
   template <typename Scope, typename... Args>
   ASTScopeImpl *constructExpandAndInsert(ASTScopeImpl *parent, Args... args) {
@@ -1701,46 +1693,6 @@ void ASTSourceFileScope::beCurrent() {
 }
 bool ASTSourceFileScope::isCurrentIfWasExpanded() const {
   return SF->getTopLevelDecls().size() == numberOfDeclsAlreadySeen;
-}
-
-void IterableTypeScope::beCurrent() { portion->beCurrent(this); }
-bool IterableTypeScope::isCurrentIfWasExpanded() const {
-  return portion->isCurrentIfWasExpanded(this);
-}
-
-void GenericTypeOrExtensionWholePortion::beCurrent(IterableTypeScope *s) const {
-  s->makeWholeCurrent();
-}
-bool GenericTypeOrExtensionWholePortion::isCurrentIfWasExpanded(
-    const IterableTypeScope *s) const {
-  return s->isWholeCurrent();
-}
-void GenericTypeOrExtensionWherePortion::beCurrent(IterableTypeScope *) const {}
-bool GenericTypeOrExtensionWherePortion::isCurrentIfWasExpanded(
-    const IterableTypeScope *) const {
-  return true;
-}
-void IterableTypeBodyPortion::beCurrent(IterableTypeScope *s) const {
-  s->makeBodyCurrent();
-}
-bool IterableTypeBodyPortion::isCurrentIfWasExpanded(
-    const IterableTypeScope *s) const {
-  return s->isBodyCurrent();
-}
-
-void IterableTypeScope::makeWholeCurrent() {
-  ASTScopeAssert(getWasExpanded(), "Should have been expanded");
-}
-bool IterableTypeScope::isWholeCurrent() const {
-  // Whole starts out unexpanded, and is lazily built but will have at least a
-  // body scope child
-  return getWasExpanded();
-}
-void IterableTypeScope::makeBodyCurrent() {
-  memberCount = getIterableDeclContext().get()->getMemberCount();
-}
-bool IterableTypeScope::isBodyCurrent() const {
-  return memberCount == getIterableDeclContext().get()->getMemberCount();
 }
 
 void AbstractFunctionBodyScope::beCurrent() {
