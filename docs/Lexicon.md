@@ -100,18 +100,6 @@ These can usually be directly compared to test whether two types are the
 same; the exception is when generics get involved. In this case you'll need
 a [generic environment](#generic-environment). Contrast with [sugared type](#sugared-type).
 
-## cascading dependency
-
-A kind of dependency edge relevant to the incremental name tracking
-subsystem. A cascading dependency (as opposed to a
-[private dependency](#private-dependency) requires the Swift driver to
-transitively consider dependency edges in the file that defines the used
-name when incremental compilation is enabled. A cascading dependency is much
-safer to produce than its private counterpart, but it comes at the cost of
-increased usage of compilation resources - even if those resources are being
-wasted on rebuilding a file that didn't actually require rebuilding.
-See [DependencyAnalysis.md](DependencyAnalysis.md).
-
 ## Clang importer
 
 The part of the compiler that reads C and Objective-C declarations and
@@ -451,18 +439,6 @@ See also [SR](#SR).
 The file currently being compiled, as opposed to the other files that are
 only needed for context. See also
 [Whole-Module Optimization](#wmo-whole-module-optimization).
-
-## private dependency
-
-A kind of dependency edge relevant to the incremental name tracking
-subsystem. A private dependency (as opposed to a
-[cascading dependency](#cascading-dependency)) declares a dependency edge
-from one file to a name referenced in that file that does not
-require further transitive evaluation of dependency edges by the Swift
-driver. Private dependencies are therefore cheaper than cascading
-dependencies, but must be used with the utmost care or dependent files will
-fail to rebuild and the result will most certainly be a miscompile.
-See [DependencyAnalysis](DependencyAnalysis.md).
 
 ## QoI
 
