@@ -1116,7 +1116,7 @@ public:
                            ParsedAccessors &accessors,
                            AbstractStorageDecl *storage,
                            SourceLoc StaticLoc);
-  ParserResult<VarDecl> parseDeclVarGetSet(Pattern *pattern,
+  ParserResult<VarDecl> parseDeclVarGetSet(PatternBindingEntry &entry,
                                            ParseDeclOptions Flags,
                                            SourceLoc StaticLoc,
                                            StaticSpellingKind StaticSpelling,

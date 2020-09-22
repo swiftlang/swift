@@ -8,9 +8,9 @@ fileprivate protocol FilePrivateProtocol { } // expected-provides {{FilePrivateP
 private protocol PrivateProtocol { } // expected-provides {{PrivateProtocol}}
 
 public struct PublicConformance { } // expected-provides {{PublicConformance}}
-// expected-private-member {{main.PublicConformance.init}}
+// expected-member {{main.PublicConformance.init}}
 
-// expected-private-conformance {{main.PublicConformance}}
+// expected-conformance {{main.PublicConformance}}
 extension PublicConformance: PublicProtocol { }
 extension PublicConformance: InternalProtocol { }
 extension PublicConformance: FilePrivateProtocol { }
@@ -18,11 +18,11 @@ extension PublicConformance: PrivateProtocol { }
 
 
 private struct PrivateConformance { } // expected-provides {{PrivateConformance}}
-// expected-private-member {{main.PrivateConformance.init}}
+// expected-member {{main.PrivateConformance.init}}
 
-// expected-private-conformance {{main.PrivateConformance}}
-extension PrivateConformance: PublicProtocol { } // expected-private-conformance {{main.PublicProtocol}}
-extension PrivateConformance: InternalProtocol { } // expected-private-conformance {{main.InternalProtocol}}
-extension PrivateConformance: FilePrivateProtocol { } // expected-private-conformance {{main.FilePrivateProtocol}}
-extension PrivateConformance: PrivateProtocol { } // expected-private-conformance {{main.PrivateProtocol}}
+// expected-conformance {{main.PrivateConformance}}
+extension PrivateConformance: PublicProtocol { } // expected-conformance {{main.PublicProtocol}}
+extension PrivateConformance: InternalProtocol { } // expected-conformance {{main.InternalProtocol}}
+extension PrivateConformance: FilePrivateProtocol { } // expected-conformance {{main.FilePrivateProtocol}}
+extension PrivateConformance: PrivateProtocol { } // expected-conformance {{main.PrivateProtocol}}
 

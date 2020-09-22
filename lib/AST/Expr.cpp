@@ -1678,6 +1678,12 @@ CallExpr::CallExpr(Expr *fn, Expr *arg, bool Implicit,
   Bits.CallExpr.HasArgLabelLocs = !argLabelLocs.empty();
   Bits.CallExpr.HasTrailingClosure = hasTrailingClosure;
   initializeCallArguments(argLabels, argLabelLocs);
+
+#ifndef NDEBUG
+  Expr *calleeFn = fn->getSemanticsProvidingExpr();
+  if (auto *calleeDRE = dyn_cast<DeclRefExpr>(calleeFn))
+    assert(!calleeDRE->getDecl()->isInstanceMember());
+#endif
 }
 
 CallExpr *CallExpr::create(ASTContext &ctx, Expr *fn, Expr *arg,
@@ -1749,6 +1755,33 @@ Expr *CallExpr::getDirectCallee() const {
 
     return fn;
   }
+}
+
+SourceLoc DotSyntaxCallExpr::getLoc() const {
+  if (isImplicit()) {
+    SourceLoc baseLoc = getBase()->getLoc();
+    return baseLoc.isValid() ? baseLoc : getFn()->getLoc();
+  }
+
+  return getFn()->getLoc();
+}
+
+SourceLoc DotSyntaxCallExpr::getStartLoc() const {
+  if (isImplicit()) {
+    SourceLoc baseLoc = getBase()->getStartLoc();
+    return baseLoc.isValid() ? baseLoc : getFn()->getStartLoc();
+  }
+
+  return getBase()->getStartLoc();
+}
+
+SourceLoc DotSyntaxCallExpr::getEndLoc() const {
+  if (isImplicit()) {
+    SourceLoc fnLoc = getFn()->getEndLoc();
+    return fnLoc.isValid() ? fnLoc : getBase()->getEndLoc();
+  }
+
+  return getFn()->getEndLoc();
 }
 
 void ExplicitCastExpr::setCastType(Type type) {

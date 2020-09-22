@@ -4070,8 +4070,8 @@ public:
           info.getSILRepresentation() == SILFunctionType::Representation::Thick)
         return;
 
-      bool printNameOnly = Options.PrintFunctionRepresentationAttrs ==
-                           PrintOptions::FunctionRepresentationMode::NameOnly;
+      bool printClangType = Options.PrintFunctionRepresentationAttrs ==
+                            PrintOptions::FunctionRepresentationMode::Full;
       Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
       Printer.printAttrName("@convention");
       Printer << "(";
@@ -4084,13 +4084,13 @@ public:
         break;
       case SILFunctionType::Representation::Block:
         Printer << "block";
+        if (printClangType && !info.getClangTypeInfo().empty())
+          printCType(Ctx, Printer, info);
         break;
       case SILFunctionType::Representation::CFunctionPointer:
         Printer << "c";
-        // [TODO: Clang-type-plumbing] Remove the second check.
-        if (printNameOnly || info.getClangTypeInfo().empty())
-          break;
-        printCType(Ctx, Printer, info);
+        if (printClangType && !info.getClangTypeInfo().empty())
+          printCType(Ctx, Printer, info);
         break;
       case SILFunctionType::Representation::Method:
         Printer << "method";
@@ -4137,8 +4137,8 @@ public:
           info.getRepresentation() == SILFunctionType::Representation::Thick)
         break;
 
-      bool printNameOnly = Options.PrintFunctionRepresentationAttrs ==
-                           PrintOptions::FunctionRepresentationMode::NameOnly;
+      bool printClangType = Options.PrintFunctionRepresentationAttrs ==
+                            PrintOptions::FunctionRepresentationMode::Full;
       Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
       Printer.printAttrName("@convention");
       Printer << "(";
@@ -4150,13 +4150,13 @@ public:
         break;
       case SILFunctionType::Representation::Block:
         Printer << "block";
+        if (printClangType)
+          printCType(Ctx, Printer, info);
         break;
       case SILFunctionType::Representation::CFunctionPointer:
         Printer << "c";
-        // [TODO: Clang-type-plumbing] Remove the second check.
-        if (printNameOnly || info.getClangTypeInfo().empty())
-          break;
-        printCType(Ctx, Printer, info);
+        if (printClangType)
+          printCType(Ctx, Printer, info);
         break;
       case SILFunctionType::Representation::Method:
         Printer << "method";

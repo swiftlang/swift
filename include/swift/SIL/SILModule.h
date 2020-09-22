@@ -684,8 +684,7 @@ public:
   /// \param Opts The SIL options, used to determine printing verbosity and
   ///        and sorting.
   /// \param PrintASTDecls If set to true print AST decls.
-  void print(raw_ostream& OS,
-             ModuleDecl *M = nullptr,
+  void print(raw_ostream &OS, ModuleDecl *M = nullptr,
              const SILOptions &Opts = SILOptions(),
              bool PrintASTDecls = true) const {
     SILPrintContext PrintCtx(OS, Opts);

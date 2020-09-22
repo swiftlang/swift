@@ -1064,6 +1064,8 @@ private:
     auto pbd = PatternBindingDecl::create(
         ctx, SourceLoc(), StaticSpellingKind::None, temporaryVar->getLoc(),
         pattern, SourceLoc(), initExpr, dc);
+    if (temporaryVar->isImplicit())
+      pbd->setImplicit();
     elements.push_back(temporaryVar);
     elements.push_back(pbd);
   }
