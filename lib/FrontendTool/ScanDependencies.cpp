@@ -387,6 +387,17 @@ namespace {
   }
 }
 
+static void writePrescanJSON(llvm::raw_ostream &out,
+                             const ModuleDependencies &mainModuleDependencies) {
+  // Write out a JSON containing all main module imports.
+  out << "{\n";
+  SWIFT_DEFER {
+    out << "}\n";
+  };
+
+  writeJSONSingleField(out, "imports", mainModuleDependencies.getModuleDependencies(), 0, false);
+}
+
 static void writeJSON(llvm::raw_ostream &out,
                       CompilerInstance &instance,
                       ModuleDependenciesCache &cache,
@@ -648,6 +659,8 @@ static bool scanModuleDependencies(CompilerInstance &instance,
                                               FEOpts.PrebuiltModuleCachePath,
                                               FEOpts.SerializeModuleInterfaceDependencyHashes,
                                               FEOpts.shouldTrackSystemDependencies());
+  std::error_code EC;
+  llvm::raw_fd_ostream out(outputPath, EC, llvm::sys::fs::F_None);
   Optional<ModuleDependencies> rootDeps;
   if (isClang) {
     // Loading the clang module using Clang importer.
@@ -666,6 +679,12 @@ static bool scanModuleDependencies(CompilerInstance &instance,
   allModules.insert({moduleName.str(), isClang ? ModuleDependenciesKind::Clang:
     ModuleDependenciesKind::Swift});
 
+  // Output module prescan.
+  if (FEOpts.ImportPrescan) {
+    writePrescanJSON(out, rootDeps.getValue());
+    return false;
+  }
+
   // Explore the dependencies of every module.
   for (unsigned currentModuleIdx = 0;
        currentModuleIdx < allModules.size();
@@ -676,8 +695,6 @@ static bool scanModuleDependencies(CompilerInstance &instance,
     allModules.insert(discoveredModules.begin(), discoveredModules.end());
   }
   // Write out the JSON description.
-  std::error_code EC;
-  llvm::raw_fd_ostream out(outputPath, EC, llvm::sys::fs::F_None);
   writeJSON(out, instance, cache, ASTDelegate, allModules.getArrayRef());
   return false;
 }
@@ -774,6 +791,8 @@ bool swift::scanDependencies(CompilerInstance &instance) {
       "-Xcc", "-target", "-Xcc", instance.getASTContext().LangOpts.Target.str(),
       "-Xcc", apinotesVer
     });
+
+  // Compute Implicit dependencies of the main module
   {
     llvm::StringSet<> alreadyAddedModules;
     for (auto fileUnit : mainModule->getFiles()) {
@@ -818,6 +837,17 @@ bool swift::scanDependencies(CompilerInstance &instance) {
       mainDependencies.addModuleDependency(mainModule->getName().str(),
                                            &alreadyAddedModules);
     }
+  }
+
+  // If import-prescan is specified, discover and serialize main module dependencies only and exit.
+  if (opts.ImportPrescan) {
+    writePrescanJSON(out, mainDependencies);
+    // This process succeeds regardless of whether any errors occurred.
+    // FIXME: We shouldn't need this, but it's masking bugs in our scanning
+    // logic where we don't create a fresh context when scanning Swift interfaces
+    // that includes their own command-line flags.
+    Context.Diags.resetHadAnyError();
+    return false;
   }
 
   // Add the main module.

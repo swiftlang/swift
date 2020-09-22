@@ -272,6 +272,10 @@ public:
   /// built and given to the compiler invocation.
   bool DisableImplicitModules = false;
 
+  /// When performing a dependency scanning action, only identify and output all imports
+  /// of the main Swift module's source files.
+  bool ImportPrescan = false;
+
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {
     Default,        ///< Do the default validation for the current platform.

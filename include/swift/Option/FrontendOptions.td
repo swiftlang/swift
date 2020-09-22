@@ -226,8 +226,11 @@ def placeholder_dependency_module_map
 def batch_scan_input_file
   : Separate<["-"], "batch-scan-input-file">, MetaVarName<"<path>">,
     HelpText<"Specify a JSON file containing modules to perform batch dependencies scanning">;
-}
 
+def import_prescan : Flag<["-"], "import-prescan">,
+   HelpText<"When performing a dependency scan, only dentify all imports of the main Swift module sources">;
+
+}
 
 // HIDDEN FLAGS
 let Flags = [FrontendOption, NoDriverOption, HelpHidden] in {
