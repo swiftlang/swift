@@ -530,12 +530,6 @@ public:
   ScopeCreator *const scopeCreator;
   ASTScopeImpl *insertionPoint;
 
-  /// The number of \c Decls in the \c SourceFile that were already seen.
-  /// Since parsing can be interleaved with type-checking, on every
-  /// lookup, look at creating scopes for any \c Decls beyond this number.
-  /// TODO: Unify with numberOfChildrenWhenLastExpanded
-  size_t numberOfDeclsAlreadySeen = 0;
-
   ASTSourceFileScope(SourceFile *SF, ScopeCreator *scopeCreator);
 
   std::string getClassName() const override;
@@ -560,8 +554,6 @@ public:
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
-  bool isCurrentIfWasExpanded() const override;
-  void beCurrent() override;
   bool doesExpansionOnlyAddNewDeclsAtEnd() const override;
 
   ScopeCreator &getScopeCreator() override;

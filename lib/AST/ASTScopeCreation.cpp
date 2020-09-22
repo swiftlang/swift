@@ -1056,8 +1056,7 @@ ASTSourceFileScope::expandAScopeThatCreatesANewInsertionPoint(
   ASTScopeAssert(SF, "Must already have a SourceFile.");
   ArrayRef<Decl *> decls = SF->getTopLevelDecls();
   // Assume that decls are only added at the end, in source order
-  ArrayRef<Decl *> newDecls = decls.slice(numberOfDeclsAlreadySeen);
-  std::vector<ASTNode> newNodes(newDecls.begin(), newDecls.end());
+  std::vector<ASTNode> newNodes(decls.begin(), decls.end());
   insertionPoint =
       scopeCreator.addSiblingsToScopeTree(insertionPoint, this, newNodes);
   // Too slow to perform all the time:
@@ -1687,13 +1686,6 @@ bool ASTScopeImpl::isCurrent() const {
 
 void ASTScopeImpl::beCurrent() {}
 bool ASTScopeImpl::isCurrentIfWasExpanded() const { return true; }
-
-void ASTSourceFileScope::beCurrent() {
-  numberOfDeclsAlreadySeen = SF->getTopLevelDecls().size();
-}
-bool ASTSourceFileScope::isCurrentIfWasExpanded() const {
-  return SF->getTopLevelDecls().size() == numberOfDeclsAlreadySeen;
-}
 
 #pragma mark getParentOfASTAncestorScopesToBeRescued
 NullablePtr<ASTScopeImpl>
