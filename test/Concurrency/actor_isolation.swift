@@ -13,7 +13,7 @@ func acceptEscapingClosure<T>(_: @escaping () -> T) { }
 actor class MySuperActor {
   var superState: Int = 25
 
-  func superMethod() { }
+  func superMethod() { } // expected-note 2 {{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
   func superAsyncMethod() async { }
 
   subscript (index: Int) -> String { // expected-note{{subscript declared here}}
@@ -28,7 +28,7 @@ actor class MyActor: MySuperActor {
   class func synchronousClass() { }
   static func synchronousStatic() { }
 
-  func synchronous() -> String { text.first ?? "nothing" } // expected-note 6{{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
+  func synchronous() -> String { text.first ?? "nothing" } // expected-note 8{{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
   func asynchronous() async -> String { synchronous() }
 }
 
@@ -46,6 +46,7 @@ extension MyActor {
     // @actorIndependent
     _ = actorIndependentFunc(otherActor: self)
     _ = actorIndependentVar
+
     actorIndependentVar = 17
     _ = self.actorIndependentFunc(otherActor: self)
     _ = self.actorIndependentVar
@@ -59,6 +60,10 @@ extension MyActor {
     // Global data is okay if it is immutable.
     _ = immutableGlobal
     _ = mutableGlobal // expected-warning{{reference to var 'mutableGlobal' is not concurrency-safe because it involves shared mutable state}}
+
+    // Partial application
+    _ = synchronous  // expected-error{{actor-isolated instance method 'synchronous()' can not be partially applied}}
+    _ = super.superMethod // expected-error{{actor-isolated instance method 'superMethod()' can not be partially applied}}
 
     return 5
   }
@@ -137,6 +142,10 @@ extension MyActor {
     }
 
     localVar = 0
+
+    // Partial application
+    _ = synchronous  // expected-error{{actor-isolated instance method 'synchronous()' can not be partially applied}}
+    _ = super.superMethod // expected-error{{actor-isolated instance method 'superMethod()' can not be partially applied}}
   }
 }
 

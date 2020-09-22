@@ -566,6 +566,25 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
         return false;
 
       case IsolationRestriction::ActorSelf: {
+        // Cannot refer to actor-isolated state in a partial application.
+        if (auto autoclosure = dyn_cast<AutoClosureExpr>(getDeclContext())) {
+          switch (autoclosure->getThunkKind()) {
+          case AutoClosureExpr::Kind::DoubleCurryThunk:
+          case AutoClosureExpr::Kind::SingleCurryThunk:
+            ctx.Diags.diagnose(
+                memberLoc, diag::actor_isolated_partial_apply,
+                member->getDescriptiveKind(),
+                member->getName());
+            noteIsolatedActorMember(member);
+            return true;
+
+          case AutoClosureExpr::Kind::None:
+            // Not in a partial application.
+            break;
+          }
+        }
+
+        // Must reference actor-isolated state on 'self'.
         auto selfVar = getSelfReference(base);
         if (!selfVar) {
           ctx.Diags.diagnose(
