@@ -5680,14 +5680,16 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
 
 /// Parse the brace-enclosed getter and setter for a variable.
 ParserResult<VarDecl>
-Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
+Parser::parseDeclVarGetSet(PatternBindingEntry &entry, ParseDeclOptions Flags,
                            SourceLoc StaticLoc,
                            StaticSpellingKind StaticSpelling,
                            SourceLoc VarLoc, bool hasInitializer,
                            const DeclAttributes &Attributes,
                            SmallVectorImpl<Decl *> &Decls) {
   bool Invalid = false;
-  
+
+  auto *pattern = entry.getPattern();
+
   // The grammar syntactically requires a simple identifier for the variable
   // name. Complain if that isn't what we got. But for recovery purposes,
   // make an effort to look through other things anyway.
@@ -5730,22 +5732,12 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
                                     VarDecl::Introducer::Var,
                                     VarLoc, Identifier(),
                                     CurDeclContext);
-    storage->setImplicit(true);
     storage->setInvalid();
 
-    Pattern *pattern =
+    pattern =
       TypedPattern::createImplicit(Context, new (Context) NamedPattern(storage),
                                    ErrorType::get(Context));
-    PatternBindingEntry entry(pattern, /*EqualLoc*/ SourceLoc(),
-                              /*Init*/ nullptr, /*InitContext*/ nullptr);
-    auto binding = PatternBindingDecl::create(Context, StaticLoc,
-                                              StaticSpelling,
-                                              VarLoc, entry, CurDeclContext);
-    binding->setInvalid();
-    storage->setParentPatternBinding(binding);
-
-    Decls.push_back(binding);
-    Decls.push_back(storage);
+    entry.setPattern(pattern);
   }
 
   // Parse getter and setter.
@@ -6157,7 +6149,8 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     if (Tok.is(tok::l_brace)) {
       HasAccessors = true;
       auto boundVar =
-          parseDeclVarGetSet(pattern, Flags, StaticLoc, StaticSpelling, VarLoc,
+          parseDeclVarGetSet(PBDEntries.back(),
+                             Flags, StaticLoc, StaticSpelling, VarLoc,
                              PatternInit != nullptr, Attributes, Decls);
       if (boundVar.hasCodeCompletion())
         return makeResult(makeParserCodeCompletionStatus());
