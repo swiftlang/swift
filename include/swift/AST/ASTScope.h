@@ -1321,20 +1321,16 @@ protected:
 class TopLevelCodeScope final : public ASTScopeImpl {
 public:
   TopLevelCodeDecl *const decl;
-  BraceStmt *bodyWhenLastExpanded;
 
   TopLevelCodeScope(TopLevelCodeDecl *e) : decl(e) {}
   virtual ~TopLevelCodeScope() {}
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
-  void beCurrent() override;
-  bool isCurrentIfWasExpanded() const override;
 
 private:
   AnnotatedInsertionPoint
   expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
-  std::vector<ASTScopeImpl *> rescueBodyScopesToReuse();
 
 public:
   std::string getClassName() const override;

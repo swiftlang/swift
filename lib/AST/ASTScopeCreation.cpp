@@ -1703,11 +1703,6 @@ bool AbstractFunctionBodyScope::isCurrentIfWasExpanded() const {
   return bodyWhenLastExpanded == decl->getBody(false);
 }
 
-void TopLevelCodeScope::beCurrent() { bodyWhenLastExpanded = decl->getBody(); }
-bool TopLevelCodeScope::isCurrentIfWasExpanded() const {
-  return bodyWhenLastExpanded == decl->getBody();
-}
-
 // Try to avoid the work of counting
 static const bool assumeVarsDoNotGetAdded = true;
 
