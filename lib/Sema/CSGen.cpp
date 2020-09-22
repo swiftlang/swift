@@ -1241,10 +1241,9 @@ namespace {
       if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
         knownType = CS.getTypeIfAvailable(VD);
         if (!knownType)
-          knownType = VD->getType();
+          knownType = CS.getVarType(VD);
 
         if (knownType) {
-          assert(!knownType->isHole());
           // If the known type has an error, bail out.
           if (knownType->hasError()) {
             if (!CS.hasType(E))
@@ -1252,8 +1251,10 @@ namespace {
             return nullptr;
           }
 
-          // Set the favored type for this expression to the known type.
-          CS.setFavoredType(E, knownType.getPointer());
+          if (!knownType->hasHole()) {
+            // Set the favored type for this expression to the known type.
+            CS.setFavoredType(E, knownType.getPointer());
+          }
         }
 
         // This can only happen when failure diagnostics is trying
@@ -2016,7 +2017,7 @@ namespace {
 
           Type externalType;
           if (param->getTypeRepr()) {
-            auto declaredTy = param->getType();
+            auto declaredTy = CS.getVarType(param);
             externalType = CS.openUnboundGenericTypes(declaredTy, paramLoc);
           } else {
             // Let's allow parameters which haven't been explicitly typed
@@ -3884,7 +3885,7 @@ bool ConstraintSystem::generateConstraints(
                                                getConstraintLocator(typeRepr));
     setType(typeRepr, backingType);
 
-    auto propertyType = wrappedVar->getType();
+    auto propertyType = getVarType(wrappedVar);
     if (propertyType->hasError())
       return true;
 
