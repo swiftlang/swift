@@ -2311,13 +2311,16 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
       if (auto FD = dyn_cast<FuncDecl>(witness)) {
         loc = FD->getStaticLoc();
       } else if (auto VD = dyn_cast<VarDecl>(witness)) {
-        loc = VD->getParentPatternBinding()->getStaticLoc();
+        if (auto PBD = VD->getParentPatternBinding()) {
+          loc = PBD->getStaticLoc();
+        }
       } else if (auto SD = dyn_cast<SubscriptDecl>(witness)) {
         loc = SD->getStaticLoc();
       } else {
         llvm_unreachable("Unexpected witness");
       }
-      diag.fixItRemove(loc);
+      if (loc.isValid())
+        diag.fixItRemove(loc);
     } else {
       diag.fixItInsert(witness->getAttributeInsertionLoc(true), "static ");
     }
