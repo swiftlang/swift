@@ -167,9 +167,14 @@ static void validateDependencyScanningArgs(DiagnosticEngine &diags,
                                            const ArgList &args) {
   const Arg *ExternalDependencyMap = args.getLastArg(options::OPT_placeholder_dependency_module_map);
   const Arg *ScanDependencies = args.getLastArg(options::OPT_scan_dependencies);
+  const Arg *Prescan = args.getLastArg(options::OPT_import_prescan);
   if (ExternalDependencyMap && !ScanDependencies) {
     diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
                    "-placeholder-dependency-module-map-file", "-scan-dependencies");
+  }
+  if (Prescan && !ScanDependencies) {
+    diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
+                   "-import-prescan", "-scan-dependencies");
   }
 }
 

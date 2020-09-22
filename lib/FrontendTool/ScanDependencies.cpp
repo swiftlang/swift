@@ -387,6 +387,17 @@ namespace {
   }
 }
 
+static void writePrescanJSON(llvm::raw_ostream &out,
+                             const ModuleDependencies &mainModuleDependencies) {
+  // Write out a JSON containing all main module imports.
+  out << "{\n";
+  SWIFT_DEFER {
+    out << "}\n";
+  };
+
+  writeJSONSingleField(out, "imports", mainModuleDependencies.getModuleDependencies(), 0, false);
+}
+
 static void writeJSON(llvm::raw_ostream &out,
                       CompilerInstance &instance,
                       ModuleDependenciesCache &cache,
@@ -774,6 +785,8 @@ bool swift::scanDependencies(CompilerInstance &instance) {
       "-Xcc", "-target", "-Xcc", instance.getASTContext().LangOpts.Target.str(),
       "-Xcc", apinotesVer
     });
+
+  // Compute Implicit dependencies of the main module
   {
     llvm::StringSet<> alreadyAddedModules;
     for (auto fileUnit : mainModule->getFiles()) {
@@ -818,6 +831,17 @@ bool swift::scanDependencies(CompilerInstance &instance) {
       mainDependencies.addModuleDependency(mainModule->getName().str(),
                                            &alreadyAddedModules);
     }
+  }
+
+  // If import-prescan is specified, discover and serialize main module dependencies only and exit.
+  if (opts.ImportPrescan) {
+    writePrescanJSON(out, mainDependencies);
+    // This process succeeds regardless of whether any errors occurred.
+    // FIXME: We shouldn't need this, but it's masking bugs in our scanning
+    // logic where we don't create a fresh context when scanning Swift interfaces
+    // that includes their own command-line flags.
+    Context.Diags.resetHadAnyError();
+    return false;
   }
 
   // Add the main module.
