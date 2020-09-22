@@ -298,9 +298,6 @@ protected:
   bool verifyThatChildrenAreContainedWithin(SourceRange) const;
   bool verifyThatThisNodeComeAfterItsPriorSibling() const;
 
-  virtual SourceRange
-  getSourceRangeOfEnclosedParamsOfASTNode(bool omitAssertions) const;
-
 private:
   bool checkSourceRangeAfterExpansion(const ASTContext &) const;
 
@@ -992,13 +989,6 @@ public:
   NullablePtr<const void> getReferrent() const override;
 
 protected:
-  SourceRange
-  getSourceRangeOfEnclosedParamsOfASTNode(bool omitAssertions) const override;
-
-private:
-  static SourceLoc getParmsSourceLocOfAFD(AbstractFunctionDecl *);
-
-protected:
   NullablePtr<const GenericParamList> genericParams() const override;
 };
 
@@ -1507,9 +1497,6 @@ public:
   NullablePtr<const void> getReferrent() const override;
 
 protected:
-  SourceRange
-  getSourceRangeOfEnclosedParamsOfASTNode(bool omitAssertions) const override;
-
   NullablePtr<const GenericParamList> genericParams() const override;
   NullablePtr<AbstractStorageDecl>
   getEnclosingAbstractStorageDecl() const override {
@@ -1565,10 +1552,6 @@ public:
   NullablePtr<DeclContext> getDeclContext() const override { return decl; }
   NullablePtr<Decl> getDeclIfAny() const override { return decl; }
   Decl *getDecl() const { return decl; }
-
-protected:
-  SourceRange
-  getSourceRangeOfEnclosedParamsOfASTNode(bool omitAssertions) const override;
 
 private:
   void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);

@@ -1298,24 +1298,23 @@ void AbstractFunctionDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
             .ifUniqueConstructExpandAndInsert<DifferentiableAttributeScope>(
                 this, diffAttr, decl);
       });
+
   // Create scopes for generic and ordinary parameters.
   // For a subscript declaration, the generic and ordinary parameters are in an
   // ancestor scope, so don't make them here.
   ASTScopeImpl *leaf = this;
+
   if (!isa<AccessorDecl>(decl)) {
     leaf = scopeCreator.addNestedGenericParamScopesToTree(
         decl, decl->getGenericParams(), leaf);
-    if (isLocalizable(decl) && getParmsSourceLocOfAFD(decl).isValid()) {
-      // swift::createDesignatedInitOverride just clones the parameters, so they
-      // end up with a bogus SourceRange, maybe *before* the start of the
-      // function.
-      if (!decl->isImplicit()) {
-        leaf = scopeCreator
-                   .constructExpandAndInsertUncheckable<ParameterListScope>(
-                       leaf, decl->getParameters(), nullptr);
-      }
+
+    auto *params = decl->getParameters();
+    if (params->size() > 0) {
+      scopeCreator.constructExpandAndInsertUncheckable<ParameterListScope>(
+          leaf, params, nullptr);
     }
   }
+
   // Create scope for the body.
   // We create body scopes when there is no body for source kit to complete
   // erroneous code in bodies.
