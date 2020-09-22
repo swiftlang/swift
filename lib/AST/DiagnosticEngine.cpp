@@ -593,6 +593,53 @@ void swift::printClangDeclName(const clang::NamedDecl *D, llvm::raw_ostream &os)
   D->getNameForDiagnostic(os, D->getASTContext().getPrintingPolicy(), true);
 }
 
+unsigned DiagnosticArgument::getSelection() const {
+  switch (getKind()) {
+  case DiagnosticArgumentKind::Integer:
+    assert(getAsInteger() >= 0 && "Negative selection index");
+    return unsigned(getAsInteger());
+  case DiagnosticArgumentKind::Unsigned:
+    return getAsUnsigned();
+  case DiagnosticArgumentKind::String:
+    return getAsString().empty() ? 0 : 1;
+  case DiagnosticArgumentKind::Identifier:
+    return !getAsIdentifier() ? 0 : 1;
+  case DiagnosticArgumentKind::ObjCSelector:
+    return !getAsObjCSelector() ? 0 : 1;
+  case DiagnosticArgumentKind::ValueDecl:
+    return !getAsValueDecl() ? 0 : 1;
+  case DiagnosticArgumentKind::Type:
+    return !getAsType() ? 0 : 1;
+  case DiagnosticArgumentKind::TypeRepr:
+    return !getAsTypeRepr() ? 0 : 1;
+  case DiagnosticArgumentKind::PatternKind:
+    return unsigned(getAsPatternKind());
+  case DiagnosticArgumentKind::SelfAccessKind:
+    return unsigned(getAsSelfAccessKind());
+  case DiagnosticArgumentKind::ReferenceOwnership:
+    return unsigned(getAsReferenceOwnership());
+  case DiagnosticArgumentKind::StaticSpellingKind:
+    return unsigned(getAsStaticSpellingKind());
+  case DiagnosticArgumentKind::DescriptiveDeclKind:
+    return unsigned(getAsDescriptiveDeclKind());
+  case DiagnosticArgumentKind::DeclAttribute:
+    return !getAsDeclAttribute() ? 0 : 1;
+  case DiagnosticArgumentKind::VersionTuple:
+    return getAsVersionTuple().empty() ? 0 : 1;
+  case DiagnosticArgumentKind::LayoutConstraint:
+    return getAsLayoutConstraint().isNull() ? 0 : 1;
+  case DiagnosticArgumentKind::FullyQualifiedType:
+    return !getAsFullyQualifiedType().getType() ? 0 : 1;
+  case DiagnosticArgumentKind::ActorIsolation:
+      return (getAsActorIsolation() == ActorIsolation::Independent ||
+              getAsActorIsolation() == ActorIsolation::Unspecified) ? 0 : 1;
+  case DiagnosticArgumentKind::Diagnostic:
+      return getAsDiagnostic() != nullptr;
+  case DiagnosticArgumentKind::ClangDecl:
+    return !getAsClangDecl() ? 0 : 1;
+  }
+}
+
 /// Format a single diagnostic argument and write it to the given
 /// stream.
 static void formatDiagnosticArgument(StringRef Modifier,
@@ -602,54 +649,46 @@ static void formatDiagnosticArgument(StringRef Modifier,
                                      DiagnosticFormatOptions FormatOpts,
                                      llvm::raw_ostream &Out) {
   const DiagnosticArgument &Arg = Args[ArgIndex];
+
+  if (Modifier == "select") {
+    unsigned selection = Arg.getSelection();
+    formatSelectionArgument(ModifierArguments, Args, selection, FormatOpts,
+                            Out);
+    return;
+  }
+  else if (Modifier == "s") {
+    unsigned selection = Arg.getSelection();
+    if (selection != 1)
+      Out << 's';
+    return;
+  }
+
+  if (!Modifier.empty()) {
+    Out << "<<INTERNAL ERROR: improper modifier '" << Modifier
+        << "' for arugment #" << ArgIndex << " in diagnostic string>>";
+    assert(false && "Unknown modifier for argument");
+  }
+
   switch (Arg.getKind()) {
   case DiagnosticArgumentKind::Integer:
-    if (Modifier == "select") {
-      assert(Arg.getAsInteger() >= 0 && "Negative selection index");
-      formatSelectionArgument(ModifierArguments, Args, Arg.getAsInteger(),
-                              FormatOpts, Out);
-    } else if (Modifier == "s") {
-      if (Arg.getAsInteger() != 1)
-        Out << 's';
-    } else {
-      assert(Modifier.empty() && "Improper modifier for integer argument");
-      Out << Arg.getAsInteger();
-    }
+    Out << Arg.getAsInteger();
     break;
 
   case DiagnosticArgumentKind::Unsigned:
-    if (Modifier == "select") {
-      formatSelectionArgument(ModifierArguments, Args, Arg.getAsUnsigned(),
-                              FormatOpts, Out);
-    } else if (Modifier == "s") {
-      if (Arg.getAsUnsigned() != 1)
-        Out << 's';
-    } else {
-      assert(Modifier.empty() && "Improper modifier for unsigned argument");
-      Out << Arg.getAsUnsigned();
-    }
+    Out << Arg.getAsUnsigned();
     break;
 
   case DiagnosticArgumentKind::String:
-    if (Modifier == "select") {
-      formatSelectionArgument(ModifierArguments, Args,
-                              Arg.getAsString().empty() ? 0 : 1, FormatOpts,
-                              Out);
-    } else {
-      assert(Modifier.empty() && "Improper modifier for string argument");
-      Out << Arg.getAsString();
-    }
+    Out << Arg.getAsString();
     break;
 
   case DiagnosticArgumentKind::Identifier:
-    assert(Modifier.empty() && "Improper modifier for identifier argument");
     Out << FormatOpts.OpeningQuotationMark;
     Arg.getAsIdentifier().printPretty(Out);
     Out << FormatOpts.ClosingQuotationMark;
     break;
 
   case DiagnosticArgumentKind::ObjCSelector:
-    assert(Modifier.empty() && "Improper modifier for selector argument");
     Out << FormatOpts.OpeningQuotationMark << Arg.getAsObjCSelector()
         << FormatOpts.ClosingQuotationMark;
     break;
@@ -662,8 +701,6 @@ static void formatDiagnosticArgument(StringRef Modifier,
 
   case DiagnosticArgumentKind::FullyQualifiedType:
   case DiagnosticArgumentKind::Type: {
-    assert(Modifier.empty() && "Improper modifier for Type argument");
-    
     // Strip extraneous parentheses; they add no value.
     Type type;
     bool needsQualification = false;
@@ -747,62 +784,32 @@ static void formatDiagnosticArgument(StringRef Modifier,
   }
 
   case DiagnosticArgumentKind::TypeRepr:
-    assert(Modifier.empty() && "Improper modifier for TypeRepr argument");
     assert(Arg.getAsTypeRepr() && "TypeRepr argument is null");
     Out << FormatOpts.OpeningQuotationMark << Arg.getAsTypeRepr()
         << FormatOpts.ClosingQuotationMark;
     break;
 
   case DiagnosticArgumentKind::PatternKind:
-    assert(Modifier.empty() && "Improper modifier for PatternKind argument");
     Out << Arg.getAsPatternKind();
     break;
 
   case DiagnosticArgumentKind::SelfAccessKind:
-    if (Modifier == "select") {
-      formatSelectionArgument(ModifierArguments, Args,
-                              unsigned(Arg.getAsSelfAccessKind()),
-                              FormatOpts, Out);
-    } else {
-      assert(Modifier.empty() &&
-             "Improper modifier for SelfAccessKind argument");
-      Out << Arg.getAsSelfAccessKind();
-    }
+    Out << Arg.getAsSelfAccessKind();
     break;
 
   case DiagnosticArgumentKind::ReferenceOwnership:
-    if (Modifier == "select") {
-      formatSelectionArgument(ModifierArguments, Args,
-                              unsigned(Arg.getAsReferenceOwnership()),
-                              FormatOpts, Out);
-    } else {
-      assert(Modifier.empty() &&
-             "Improper modifier for ReferenceOwnership argument");
-      Out << Arg.getAsReferenceOwnership();
-    }
+    Out << Arg.getAsReferenceOwnership();
     break;
 
   case DiagnosticArgumentKind::StaticSpellingKind:
-    if (Modifier == "select") {
-      formatSelectionArgument(ModifierArguments, Args,
-                              unsigned(Arg.getAsStaticSpellingKind()),
-                              FormatOpts, Out);
-    } else {
-      assert(Modifier.empty() &&
-             "Improper modifier for StaticSpellingKind argument");
-      Out << Arg.getAsStaticSpellingKind();
-    }
+    Out << Arg.getAsStaticSpellingKind();
     break;
 
   case DiagnosticArgumentKind::DescriptiveDeclKind:
-    assert(Modifier.empty() &&
-           "Improper modifier for DescriptiveDeclKind argument");
     Out << Decl::getDescriptiveKindName(Arg.getAsDescriptiveDeclKind());
     break;
 
   case DiagnosticArgumentKind::DeclAttribute:
-    assert(Modifier.empty() &&
-           "Improper modifier for DeclAttribute argument");
     if (Arg.getAsDeclAttribute()->isDeclModifier())
       Out << FormatOpts.OpeningQuotationMark
           << Arg.getAsDeclAttribute()->getAttrName()
@@ -812,12 +819,10 @@ static void formatDiagnosticArgument(StringRef Modifier,
     break;
 
   case DiagnosticArgumentKind::VersionTuple:
-    assert(Modifier.empty() &&
-           "Improper modifier for VersionTuple argument");
     Out << Arg.getAsVersionTuple().getAsString();
     break;
+
   case DiagnosticArgumentKind::LayoutConstraint:
-    assert(Modifier.empty() && "Improper modifier for LayoutConstraint argument");
     Out << FormatOpts.OpeningQuotationMark << Arg.getAsLayoutConstraint()
         << FormatOpts.ClosingQuotationMark;
     break;

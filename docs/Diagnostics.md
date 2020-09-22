@@ -127,7 +127,7 @@ If you run into any issues or have questions while following the steps above, fe
 
 - `%0`, `%1`, etc - Formats the specified diagnostic argument based on its type.
 
-- `%select{a|b|c}0` - Chooses from a list of alternatives, separated by vertical bars, based on the value of the given argument. In this example, a value of 2 in diagnostic argument 0 would result in "c" being output. The argument to the %select may be an integer, enum, or StringRef. If it's a StringRef, the specifier acts as an emptiness check.
+- `%select{a|b|c}0` - Chooses from a list of alternatives, separated by vertical bars, based on the value of the given argument. In this example, a value of 2 in diagnostic argument 0 would result in "c" being output. Any argument may be used in `%select`. For integer types, the first alternative is used for `0`, the second for `1`, and so on. For enums, the raw values are mapped to integers and the integer logic is applied. For other types, the first alternative is used for that type's "empty" or "null" value and the second for any other value.
 
 - `%s0` - Produces an "s" if the given argument is anything other than 1, as meant for an English plural. This isn't particularly localizable without a more general `%plural` form, but most diagnostics try to avoid cases where a plural/singular distinction would be necessary in the first place.
 

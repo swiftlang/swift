@@ -269,6 +269,8 @@ namespace swift {
 
     DiagnosticArgumentKind getKind() const { return Kind; }
 
+    unsigned getSelection() const;
+
     StringRef getAsString() const {
       assert(Kind == DiagnosticArgumentKind::String);
       return StringVal;
