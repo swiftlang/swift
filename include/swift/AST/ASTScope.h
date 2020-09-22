@@ -146,9 +146,6 @@ private:
 
   bool wasExpanded = false;
 
-  /// For use-before-def, ASTAncestor scopes may be added to a BraceStmt.
-  unsigned astAncestorScopeCount = 0;
-
   /// Can clear storedChildren, so must remember this
   bool haveAddedCleanup = false;
 
@@ -192,26 +189,10 @@ protected:
 
   const Children &getChildren() const { return storedChildren; }
 
-  /// Get ride of descendants and remove them from scopedNodes so the scopes
-  /// can be recreated. Needed because typechecking inserts a return statment
-  /// into initializers.
-  void disownDescendants(ScopeCreator &);
-
-public: // for addReusedBodyScopes
+public:
   void addChild(ASTScopeImpl *child, ASTContext &);
-  std::vector<ASTScopeImpl *> rescueASTAncestorScopesForReuseFromMe();
-
-  /// When reexpanding, do we always create a new body?
-  virtual NullablePtr<ASTScopeImpl> getParentOfASTAncestorScopesToBeRescued();
-  std::vector<ASTScopeImpl *>
-  rescueASTAncestorScopesForReuseFromMeOrDescendants();
-  void replaceASTAncestorScopes(ArrayRef<ASTScopeImpl *>);
 
 private:
-  void removeChildren();
-
-private:
-  void emancipate() { parent = nullptr; }
   NullablePtr<ASTScopeImpl> getPriorSibling() const;
 
 public:
@@ -278,12 +259,6 @@ private:
 private:
   void clearCachedSourceRangesOfMeAndAncestors();
 
-public:
-  /// Since source ranges are cached but depend on child ranges,
-  /// when descendants are added, my and my ancestor ranges must be
-  /// recalculated.
-  void ensureSourceRangesAreCorrectWhenAddingDescendants(function_ref<void()>);
-
 public: // public for debugging
   /// Returns source range of this node alone, without factoring in any
   /// children.
@@ -349,23 +324,11 @@ public:
   /// fact, above and beyond adding Decls to the SourceFile.
   ASTScopeImpl *expandAndBeCurrent(ScopeCreator &);
 
-  unsigned getASTAncestorScopeCount() const { return astAncestorScopeCount; }
   bool getWasExpanded() const { return wasExpanded; }
 
 protected:
-  void resetASTAncestorScopeCount() { astAncestorScopeCount = 0; }
-  void increaseASTAncestorScopeCount(unsigned c) { astAncestorScopeCount += c; }
   void setWasExpanded() { wasExpanded = true; }
   virtual ASTScopeImpl *expandSpecifically(ScopeCreator &) = 0;
-  virtual void beCurrent();
-  virtual bool doesExpansionOnlyAddNewDeclsAtEnd() const;
-
-public:
-  bool isExpansionNeeded(const ScopeCreator &) const;
-
-protected:
-  bool isCurrent() const;
-  virtual bool isCurrentIfWasExpanded() const;
 
 private:
   /// Compare the pre-expasion range with the post-expansion range and return
@@ -382,13 +345,6 @@ public:
   virtual SourceRange sourceRangeForDeferredExpansion() const;
 
 public:
-  // Some nodes (VarDecls and Accessors) are created directly from
-  // pattern scope code and should neither be deferred nor should
-  // contribute to widenSourceRangeForIgnoredASTNode.
-  // Closures and captures are also created directly but are
-  // screened out because they are expressions.
-  static bool isHandledSpeciallyByPatterns(const ASTNode n);
-
   virtual NullablePtr<AbstractStorageDecl>
   getEnclosingAbstractStorageDecl() const;
 
@@ -554,7 +510,6 @@ public:
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
-  bool doesExpansionOnlyAddNewDeclsAtEnd() const override;
 
   ScopeCreator &getScopeCreator() override;
 
@@ -997,8 +952,6 @@ public:
   virtual NullablePtr<Decl> getDeclIfAny() const override { return decl; }
   Decl *getDecl() const { return decl; }
 
-  NullablePtr<ASTScopeImpl> getParentOfASTAncestorScopesToBeRescued() override;
-
 protected:
   bool lookupLocalsOrMembers(DeclConsumer) const override;
 
@@ -1322,8 +1275,6 @@ public:
   virtual NullablePtr<Decl> getDeclIfAny() const override { return decl; }
   Decl *getDecl() const { return decl; }
   NullablePtr<const void> getReferrent() const override;
-
-  NullablePtr<ASTScopeImpl> getParentOfASTAncestorScopesToBeRescued() override;
 };
 
 /// The \c _@specialize attribute.

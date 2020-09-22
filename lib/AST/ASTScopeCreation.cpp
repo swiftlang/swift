@@ -229,12 +229,8 @@ public:
                          ArrayRef<ASTNode> nodesOrDeclsToAdd) {
     auto *ip = insertionPoint;
     for (auto nd : sortBySourceRange(cull(nodesOrDeclsToAdd))) {
-      const unsigned preCount = ip->getChildren().size();
       auto *const newIP =
           addToScopeTreeAndReturnInsertionPoint(nd, ip).getPtrOr(ip);
-      if (ip != organicInsertionPoint)
-        ip->increaseASTAncestorScopeCount(ip->getChildren().size() -
-                                          preCount);
       ip = newIP;
     }
     return ip;
@@ -923,20 +919,6 @@ void ASTScopeImpl::addChild(ASTScopeImpl *child, ASTContext &ctx) {
   clearCachedSourceRangesOfMeAndAncestors();
 }
 
-void ASTScopeImpl::removeChildren() {
-  clearCachedSourceRangesOfMeAndAncestors();
-  storedChildren.clear();
-}
-
-void ASTScopeImpl::disownDescendants(ScopeCreator &scopeCreator) {
-  for (auto *c : getChildren()) {
-    c->disownDescendants(scopeCreator);
-    c->emancipate();
-    scopeCreator.scopedNodes.erase(c);
-  }
-  removeChildren();
-}
-
 #pragma mark implementations of expansion
 
 ASTScopeImpl *
@@ -955,26 +937,7 @@ ExpandASTScopeRequest::evaluate(Evaluator &evaluator, ASTScopeImpl *parent,
   return insertionPoint;
 }
 
-bool ASTScopeImpl::doesExpansionOnlyAddNewDeclsAtEnd() const { return false; }
-bool ASTSourceFileScope::doesExpansionOnlyAddNewDeclsAtEnd() const {
-  return true;
-}
-
 ASTScopeImpl *ASTScopeImpl::expandAndBeCurrent(ScopeCreator &scopeCreator) {
-
-  // We might be reexpanding, so save any scopes that were inserted here from
-  // above it in the AST
-  auto astAncestorScopes = rescueASTAncestorScopesForReuseFromMeOrDescendants();
-  ASTScopeAssert(astAncestorScopes.empty() ||
-                     !doesExpansionOnlyAddNewDeclsAtEnd(),
-                 "ASTSourceFileScope has no ancestors to be rescued.");
-
-  // If reexpanding, we need to remove descendant decls from the duplication set
-  // in order to re-add them as sub-scopes. Since expansion only adds new Decls
-  // at end, don't bother with descendants
-  if (!doesExpansionOnlyAddNewDeclsAtEnd())
-    disownDescendants(scopeCreator);
-
   auto *insertionPoint = expandSpecifically(scopeCreator);
   ASTScopeAssert(!insertionPointForDeferredExpansion() ||
                      insertionPointForDeferredExpansion().get() ==
@@ -983,9 +946,8 @@ ASTScopeImpl *ASTScopeImpl::expandAndBeCurrent(ScopeCreator &scopeCreator) {
                  "accurate before expansion, the insertion point before "
                  "expansion must be the same as after expansion.");
 
-  replaceASTAncestorScopes(astAncestorScopes);
   setWasExpanded();
-  beCurrent();
+
   ASTScopeAssert(checkSourceRangeAfterExpansion(scopeCreator.getASTContext()),
                  "Bad range.");
   return insertionPoint;
@@ -1675,79 +1637,6 @@ IterableTypeBodyPortion::insertionPointForDeferredExpansion(
   return s->getParent().get();
 }
 
-bool ASTScopeImpl::isExpansionNeeded(const ScopeCreator &scopeCreator) const {
-  return !isCurrent() ||
-         scopeCreator.getASTContext().LangOpts.StressASTScopeLookup;
-}
-
-bool ASTScopeImpl::isCurrent() const {
-  return getWasExpanded() && isCurrentIfWasExpanded();
-}
-
-void ASTScopeImpl::beCurrent() {}
-bool ASTScopeImpl::isCurrentIfWasExpanded() const { return true; }
-
-#pragma mark getParentOfASTAncestorScopesToBeRescued
-NullablePtr<ASTScopeImpl>
-ASTScopeImpl::getParentOfASTAncestorScopesToBeRescued() {
-  return this;
-}
-NullablePtr<ASTScopeImpl>
-AbstractFunctionBodyScope::getParentOfASTAncestorScopesToBeRescued() {
-  // Reexpansion always creates a new body as the first child
-  // That body contains the scopes to be rescued.
-  return getChildren().empty() ? nullptr : getChildren().front();
-}
-NullablePtr<ASTScopeImpl>
-TopLevelCodeScope::getParentOfASTAncestorScopesToBeRescued() {
-  // Reexpansion always creates a new body as the first child
-  // That body contains the scopes to be rescued.
-  return getChildren().empty() ? nullptr : getChildren().front();
-}
-
-#pragma mark rescuing & reusing
-std::vector<ASTScopeImpl *>
-ASTScopeImpl::rescueASTAncestorScopesForReuseFromMeOrDescendants() {
-  if (auto *p = getParentOfASTAncestorScopesToBeRescued().getPtrOrNull()) {
-    return p->rescueASTAncestorScopesForReuseFromMe();
-  }
-  ASTScopeAssert(
-      getASTAncestorScopeCount() == 0,
-      "If receives ASTAncestor scopes, must know where to find parent");
-  return {};
-}
-
-void ASTScopeImpl::replaceASTAncestorScopes(
-    ArrayRef<ASTScopeImpl *> scopesToAdd) {
-  auto *p = getParentOfASTAncestorScopesToBeRescued().getPtrOrNull();
-  if (!p) {
-    ASTScopeAssert(scopesToAdd.empty(), "Non-empty body disappeared?!");
-    return;
-  }
-  auto &ctx = getASTContext();
-  for (auto *s : scopesToAdd) {
-    p->addChild(s, ctx);
-    ASTScopeAssert(s->verifyThatThisNodeComeAfterItsPriorSibling(),
-                   "Ensure search will work");
-  }
-  p->increaseASTAncestorScopeCount(scopesToAdd.size());
-}
-
-std::vector<ASTScopeImpl *>
-ASTScopeImpl::rescueASTAncestorScopesForReuseFromMe() {
-  std::vector<ASTScopeImpl *> astAncestorScopes;
-  for (unsigned i = getChildren().size() - getASTAncestorScopeCount();
-       i < getChildren().size(); ++i)
-    astAncestorScopes.push_back(getChildren()[i]);
-  // So they don't get disowned and children cleared.
-  for (unsigned i = 0; i < getASTAncestorScopeCount(); ++i) {
-    storedChildren.back()->emancipate();
-    storedChildren.pop_back();
-  }
-  resetASTAncestorScopeCount();
-  return astAncestorScopes;
-}
-
 #pragma mark verification
 
 namespace {
@@ -1830,8 +1719,7 @@ void ast_scope::simple_display(llvm::raw_ostream &out,
 
 bool ExpandASTScopeRequest::isCached() const {
   ASTScopeImpl *scope = std::get<0>(getStorage());
-  ScopeCreator *scopeCreator = std::get<1>(getStorage());
-  return !scope->isExpansionNeeded(*scopeCreator);
+  return scope->getWasExpanded();
 }
 
 Optional<ASTScopeImpl *> ExpandASTScopeRequest::getCachedResult() const {
