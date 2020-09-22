@@ -55,7 +55,7 @@
     "default-branch-scheme": "master",
     "branch-schemes": {
        "master": {
-            "aliases": ["master", "swift/master"],
+            "aliases": ["master", "swift/master", "main"],
             "repos": {
                 "llvm-project": "swift/master",
                 "swift": "master",
