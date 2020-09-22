@@ -3937,6 +3937,16 @@ class AssignByWrapperInst
     : public AssignInstBase<SILInstructionKind::AssignByWrapperInst, 4> {
   friend SILBuilder;
 
+public:
+  /// The assignment destination for the property wrapper
+  enum class Destination {
+    BackingWrapper,
+    WrappedValue,
+  };
+
+private:
+  Destination AssignDest = Destination::WrappedValue;
+
   AssignByWrapperInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest,
                        SILValue Initializer, SILValue Setter,
                        AssignOwnershipQualifier Qualifier =
@@ -3951,8 +3961,17 @@ public:
     return AssignOwnershipQualifier(
       SILInstruction::Bits.AssignByWrapperInst.OwnershipQualifier);
   }
-  void setOwnershipQualifier(AssignOwnershipQualifier qualifier) {
+
+  Destination getAssignDestination() const { return AssignDest; }
+
+  void setAssignInfo(AssignOwnershipQualifier qualifier, Destination dest) {
+    using Qualifier = AssignOwnershipQualifier;
+    assert(qualifier == Qualifier::Init && dest == Destination::BackingWrapper ||
+           qualifier == Qualifier::Reassign && dest == Destination::BackingWrapper ||
+           qualifier == Qualifier::Reassign && dest == Destination::WrappedValue);
+
     SILInstruction::Bits.AssignByWrapperInst.OwnershipQualifier = unsigned(qualifier);
+    AssignDest = dest;
   }
 };
 
