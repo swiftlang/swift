@@ -11,7 +11,7 @@ on:
       - swiftwasm-release/5.3
 
 jobs:
-  linux_build:
+  ubuntu_18.04_build:
     timeout-minutes: 0
     runs-on: ubuntu-18.04
 
@@ -48,8 +48,54 @@ jobs:
       - name: Upload Linux installable archive
         uses: actions/upload-artifact@v1
         with:
-          name: linux-installable
+          name: ubuntu_18.04-installable
           path: ../swift-wasm-DEVELOPMENT-SNAPSHOT-linux.tar.gz
+#      - name: Pack test results
+#        run: tar cJf swift-test-results.tar.gz ../build/*/swift-linux-x86_64/swift-test-results
+#      - name: Upload test results
+#        uses: actions/upload-artifact@v1
+#        with:
+#          name: linux-test-results
+#          path: ./swift-test-results.tar.gz
+
+  ubuntu_20.04_build:
+    timeout-minutes: 0
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Free disk space
+        run: |
+          df -h
+          sudo swapoff -a
+          sudo rm -f /swapfile
+          sudo rm -rf /opt/hostedtoolcache
+          sudo rm -rf /usr/share/dotnet
+          sudo apt clean
+          docker rmi $(docker image ls -aq)
+          df -h
+      - uses: actions/checkout@v1
+        with:
+          path: swift
+      - name: Prepare sccache timestamp
+        id: cache_timestamp
+        shell: cmake -P {0}
+        run: |
+          string(TIMESTAMP current_date "%Y-%m-%d-%H;%M;%S" UTC)
+          message("::set-output name=timestamp::${current_date}")
+      - uses: actions/cache@v1
+        with:
+          path: ../build-cache
+          key: ${{ runner.os }}-sccache-v10-${{ steps.cache_timestamp.outputs.timestamp }}
+          restore-keys: |
+            ${{ runner.os }}-sccache-v10-
+      - name: Build Linux installable archive
+        run: |
+          ./utils/webassembly/ci.sh
+#       - name: Upload Linux installable archive
+#         uses: actions/upload-artifact@v1
+#         with:
+#           name: linux-installable
+#           path: ../swift-wasm-DEVELOPMENT-SNAPSHOT-linux.tar.gz
 #      - name: Pack test results
 #        run: tar cJf swift-test-results.tar.gz ../build/*/swift-linux-x86_64/swift-test-results
 #      - name: Upload test results
@@ -129,10 +175,11 @@ jobs:
         with:
           name: macos-hello.wasm
           path: hello.wasm
-  linux_smoke_test:
+
+  ubuntu_18.04_smoke_test:
     name: Run smoke tests on Linux
     runs-on: ubuntu-18.04
-    needs: linux_build
+    needs: ubuntu_18.04_build
     steps:
       - name: Download installable Linux archive
         uses: actions/download-artifact@v1
