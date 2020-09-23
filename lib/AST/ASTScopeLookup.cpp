@@ -368,7 +368,8 @@ bool BraceStmtScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
   for (auto braceElement : stmt->getElements()) {
     if (auto localBinding = braceElement.dyn_cast<Decl *>()) {
       if (auto *vd = dyn_cast<ValueDecl>(localBinding))
-        localBindings.push_back(vd);
+        if (isa<FuncDecl>(vd) || isa<TypeDecl>(vd))
+          localBindings.push_back(vd);
     }
   }
   return consumer.consume(localBindings, DeclVisibilityKind::LocalVariable);
