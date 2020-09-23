@@ -279,9 +279,10 @@ bool GenericParamScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
 }
 
 bool PatternEntryDeclScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
-  if (vis != DeclVisibilityKind::LocalVariable)
-    return false; // look in self type will find this later
-  return lookupLocalBindingsInPattern(getPattern(), vis, consumer);
+  ASTScopeAssert(decl->getDeclContext()->isLocalContext(),
+                 "Only local bindings need their own scope");
+  return lookupLocalBindingsInPattern(getPattern(), DeclVisibilityKind::LocalVariable,
+                                      consumer);
 }
 
 bool ForEachPatternScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
@@ -507,6 +508,10 @@ bool ForEachPatternScope::isLabeledStmtLookupTerminator() const {
 }
 
 bool CaseStmtBodyScope::isLabeledStmtLookupTerminator() const {
+  return false;
+}
+
+bool PatternEntryDeclScope::isLabeledStmtLookupTerminator() const {
   return false;
 }
 

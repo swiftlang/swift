@@ -38,11 +38,6 @@
 using namespace swift;
 using namespace ast_scope;
 
-/// If true, nest scopes so a variable is out of scope before its declaration
-/// Does not handle capture rules for local functions properly.
-/// If false don't push uses down into subscopes after decls.
-static const bool handleUseBeforeDef = false;
-
 #pragma mark source range utilities
 static bool rangeableIsIgnored(const Decl *d) { return d->isImplicit(); }
 static bool rangeableIsIgnored(const Expr *d) {
@@ -215,6 +210,10 @@ public:
   ScopeCreator(const ScopeCreator &) = delete;  // ensure no copies
   ScopeCreator(const ScopeCreator &&) = delete; // ensure no moves
 
+  SourceManager &getSourceManager() const {
+    return ctx.SourceMgr;
+  }
+
   /// Given an array of ASTNodes or Decl pointers, add them
   /// Return the resultant insertionPoint
   ASTScopeImpl *
@@ -283,7 +282,7 @@ public:
     /// \endcode
     /// I'm seeing a dumped AST include:
     /// (pattern_binding_decl range=[test.swift:13:8 - line:12:29]
-    const auto &SM = d->getASTContext().SourceMgr;
+    const auto &SM = getSourceManager();
 
     // Once we allow invalid PatternBindingDecls (see
     // isWorthTryingToCreateScopeFor), then
@@ -746,22 +745,62 @@ public:
     if (auto *var = patternBinding->getSingleVar())
       scopeCreator.addChildrenForKnownAttributes(var, parentScope);
 
-    const bool isInTypeDecl = parentScope->isATypeDeclScope();
+    const bool isLocalBinding = patternBinding->getDeclContext()->isLocalContext();
 
-    const DeclVisibilityKind vis =
-        isInTypeDecl ? DeclVisibilityKind::MemberOfCurrentNominal
-                     : DeclVisibilityKind::LocalVariable;
     auto *insertionPoint = parentScope;
     for (auto i : range(patternBinding->getNumPatternEntries())) {
-      insertionPoint =
+      // Create a child for the initializer, if present.
+      // Cannot trust the source range given in the ASTScopeImpl for the end of the
+      // initializer (because of InterpolatedLiteralStrings and EditorPlaceHolders),
+      // so compute it ourselves.
+      // Even if this predicate fails, there may be an initContext but
+      // we cannot make a scope for it, since no source range.
+      if (auto *expr = patternBinding->getOriginalInit(i)) {
+        if (isLocalizable(expr)) {
+          ASTScopeAssert(
+              !scopeCreator.getSourceManager().isBeforeInBuffer(
+                  expr->getStartLoc(), patternBinding->getStartLoc()),
+              "Original inits are always after the '='");
           scopeCreator
-              .ifUniqueConstructExpandAndInsert<PatternEntryDeclScope>(
-                  insertionPoint, patternBinding, i, vis)
-              .getPtrOr(insertionPoint);
+              .constructExpandAndInsertUncheckable<PatternEntryInitializerScope>(
+                  insertionPoint, patternBinding, i);
+        }
+      }
+
+      // Add accessors for the variables in this pattern.
+      patternBinding->getPattern(i)->forEachVariable([&](VarDecl *var) {
+        scopeCreator.addChildrenForAllLocalizableAccessorsInSourceOrder(
+            var, insertionPoint);
+      });
+
+      // For local bindings, introduce the scope where the names become
+      // visible.
+      if(isLocalBinding) {
+        // Don't create the scope if the start is past the end of the buffer.
+        //
+        // This can happen with invalid code missing an end delimiter, eg
+        //
+        // func foo() { var x = 123<EOF>
+        //
+        // The PatternEntryDeclScope for 'x' should begin immediately after
+        // the 123, but that is not a valid location, so we drop the scope
+        // since we're not going to be able to see it anyway.
+        auto loc = PatternEntryDeclScope::getStartLocForBinding(
+            scopeCreator.getSourceManager(),
+            insertionPoint, patternBinding, i);
+        if (loc.isValid()) {
+          insertionPoint =
+              scopeCreator
+                  .ifUniqueConstructExpandAndInsert<PatternEntryDeclScope>(
+                      insertionPoint, patternBinding, i, loc)
+                  .getPtrOr(insertionPoint);
+        }
+      }
     }
+
     // If in a type decl, the type search will find these,
     // but if in a brace stmt, must continue under the last binding.
-    return isInTypeDecl ? parentScope : insertionPoint;
+    return isLocalBinding ? insertionPoint : parentScope;
   }
 
   NullablePtr<ASTScopeImpl> visitEnumElementDecl(EnumElementDecl *eed,
@@ -947,7 +986,6 @@ ASTScopeImpl *ASTScopeImpl::expandAndBeCurrent(ScopeCreator &scopeCreator) {
 CREATES_NEW_INSERTION_POINT(ASTSourceFileScope)
 CREATES_NEW_INSERTION_POINT(ConditionalClauseScope)
 CREATES_NEW_INSERTION_POINT(GuardStmtScope)
-CREATES_NEW_INSERTION_POINT(PatternEntryDeclScope)
 CREATES_NEW_INSERTION_POINT(GenericTypeOrExtensionScope)
 CREATES_NEW_INSERTION_POINT(BraceStmtScope)
 CREATES_NEW_INSERTION_POINT(TopLevelCodeScope)
@@ -976,6 +1014,7 @@ NO_NEW_INSERTION_POINT(SwitchStmtScope)
 NO_NEW_INSERTION_POINT(WhileStmtScope)
 
 NO_EXPANSION(GenericParamScope)
+NO_EXPANSION(PatternEntryDeclScope)
 NO_EXPANSION(SpecializeAttributeScope)
 NO_EXPANSION(DifferentiableAttributeScope)
 NO_EXPANSION(ConditionalClausePatternUseScope)
@@ -1011,41 +1050,6 @@ ParameterListScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
           .constructExpandAndInsertUncheckable<DefaultArgumentInitializerScope>(
               this, pd);
   }
-}
-
-AnnotatedInsertionPoint
-PatternEntryDeclScope::expandAScopeThatCreatesANewInsertionPoint(
-    ScopeCreator &scopeCreator) {
-  // Initializers come before VarDecls, e.g. PCMacro/didSet.swift 19
-  auto patternEntry = getPatternEntry();
-
-  // Create a child for the initializer, if present.
-  // Cannot trust the source range given in the ASTScopeImpl for the end of the
-  // initializer (because of InterpolatedLiteralStrings and EditorPlaceHolders),
-  // so compute it ourselves.
-  // Even if this predicate fails, there may be an initContext but
-  // we cannot make a scope for it, since no source range.
-  if (patternEntry.getOriginalInit() &&
-      isLocalizable(patternEntry.getOriginalInit())) {
-    ASTScopeAssert(
-        !getSourceManager().isBeforeInBuffer(
-            patternEntry.getOriginalInit()->getStartLoc(), decl->getStartLoc()),
-        "Original inits are always after the '='");
-    scopeCreator
-        .constructExpandAndInsertUncheckable<PatternEntryInitializerScope>(
-            this, decl, patternEntryIndex, vis);
-  }
-
-  // Add accessors for the variables in this pattern.
-  patternEntry.getPattern()->forEachVariable([&](VarDecl *var) {
-    scopeCreator.addChildrenForAllLocalizableAccessorsInSourceOrder(var, this);
-  });
-
-  ASTScopeAssert(!handleUseBeforeDef,
-                 "next line is wrong otherwise; would need a use scope");
-
-  return {getParent().get(), "When not handling use-before-def, succeeding "
-                             "code just goes in the same scope as this one"};
 }
 
 void
@@ -1417,16 +1421,10 @@ ASTScopeImpl *LabeledConditionalStmtScope::createNestedConditionalClauseScopes(
 }
 
 AbstractPatternEntryScope::AbstractPatternEntryScope(
-    PatternBindingDecl *declBeingScoped, unsigned entryIndex,
-    DeclVisibilityKind vis)
-    : decl(declBeingScoped), patternEntryIndex(entryIndex), vis(vis) {
+    PatternBindingDecl *declBeingScoped, unsigned entryIndex)
+    : decl(declBeingScoped), patternEntryIndex(entryIndex) {
   ASTScopeAssert(entryIndex < declBeingScoped->getPatternList().size(),
                  "out of bounds");
-}
-
-bool ASTScopeImpl::isATypeDeclScope() const {
-  Decl *const pd = getDeclIfAny().getPtrOrNull();
-  return pd && (isa<NominalTypeDecl>(pd) || isa<ExtensionDecl>(pd));
 }
 
 #pragma mark new operators
@@ -1481,8 +1479,6 @@ ScopeCreator &ASTSourceFileScope::getScopeCreator() { return *scopeCreator; }
   }
 
 GET_REFERRENT(AbstractFunctionDeclScope, getDecl())
-// If the PatternBindingDecl is a dup, detect it for the first
-// PatternEntryDeclScope; the others are subscopes.
 GET_REFERRENT(PatternEntryDeclScope, getPattern())
 GET_REFERRENT(TopLevelCodeScope, getDecl())
 GET_REFERRENT(SubscriptDeclScope, getDecl())

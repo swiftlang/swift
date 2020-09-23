@@ -344,9 +344,6 @@ public:
   virtual NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion();
   virtual SourceRange sourceRangeForDeferredExpansion() const;
 
-public:
-  bool isATypeDeclScope() const;
-
 private:
   virtual ScopeCreator &getScopeCreator();
 
@@ -1018,31 +1015,25 @@ private:
 /// PatternBindingDecl's (PBDs) are tricky (See the comment for \c
 /// PatternBindingDecl):
 ///
-/// A PBD contains a list of "patterns", e.g.
-///   var (a, b) = foo(), (c,d) = bar() which has two patterns.
+/// A PBD contains a list of "pattern binding entries", eg
+///   var (a, b) = foo(), (c,d) = bar() has two pattern bindings.
 ///
-/// For each pattern, there will be potentially three scopes:
-/// always one for the declarations, maybe one for the initializers, and maybe
-/// one for users of that pattern.
+/// A pattern binding entry consists of a "pattern" which binds zero or more
+/// names, together with an optional initializer expression.
 ///
-/// If a PBD occurs in code, its initializer can access all prior declarations.
-/// Thus, a new scope must be created, nested in the scope of the PBD.
-/// In contrast, if a PBD occurs in a type declaration body, its initializer
-/// cannot access prior declarations in that body.
+/// The initializer expression gets its own scope. This scope can introduce
+/// a 'self' binding. Currently this is only used by initializer expressions
+/// of 'lazy' properties, which can access the containing 'self' binding.
 ///
-/// As a further complication, we get VarDecls and their accessors in deferred
-/// which really must go into one of the PBD scopes. So we discard them in
-/// createIfNeeded, and special-case their creation in
-/// addVarDeclScopesAndTheirAccessors.
-
+/// Pattern binding entries in local context also define a scope to
+/// introduce the bindings. This scope begins immediately after the
+/// initializer expression (or parent) ends.
 class AbstractPatternEntryScope : public ASTScopeImpl {
 public:
   PatternBindingDecl *const decl;
   const unsigned patternEntryIndex;
-  const DeclVisibilityKind vis;
 
-  AbstractPatternEntryScope(PatternBindingDecl *, unsigned entryIndex,
-                            DeclVisibilityKind);
+  AbstractPatternEntryScope(PatternBindingDecl *, unsigned entryIndex);
   virtual ~AbstractPatternEntryScope() {}
 
   const PatternBindingEntry &getPatternEntry() const;
@@ -1057,18 +1048,18 @@ public:
 };
 
 class PatternEntryDeclScope final : public AbstractPatternEntryScope {
+  /// The first source location where this pattern binding entry's
+  /// bindings become visible.
+  SourceLoc loc;
+
 public:
   PatternEntryDeclScope(PatternBindingDecl *pbDecl, unsigned entryIndex,
-                        DeclVisibilityKind vis)
-      : AbstractPatternEntryScope(pbDecl, entryIndex, vis) {}
+                        SourceLoc loc)
+      : AbstractPatternEntryScope(pbDecl, entryIndex), loc(loc) {}
   virtual ~PatternEntryDeclScope() {}
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
-
-private:
-  AnnotatedInsertionPoint
-  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
 
 public:
   std::string getClassName() const override;
@@ -1077,17 +1068,23 @@ public:
 
   NullablePtr<const void> getReferrent() const override;
 
+  static SourceLoc
+  getStartLocForBinding(SourceManager &SM,
+                        ASTScopeImpl *parent,
+                        PatternBindingDecl *decl,
+                        unsigned entryIndex);
+
 protected:
   bool lookupLocalsOrMembers(DeclConsumer) const override;
+  bool isLabeledStmtLookupTerminator() const override;
 };
 
 class PatternEntryInitializerScope final : public AbstractPatternEntryScope {
   Expr *initAsWrittenWhenCreated;
 
 public:
-  PatternEntryInitializerScope(PatternBindingDecl *pbDecl, unsigned entryIndex,
-                               DeclVisibilityKind vis)
-      : AbstractPatternEntryScope(pbDecl, entryIndex, vis),
+  PatternEntryInitializerScope(PatternBindingDecl *pbDecl, unsigned entryIndex)
+      : AbstractPatternEntryScope(pbDecl, entryIndex),
         initAsWrittenWhenCreated(pbDecl->getOriginalInit(entryIndex)) {}
   virtual ~PatternEntryInitializerScope() {}
 

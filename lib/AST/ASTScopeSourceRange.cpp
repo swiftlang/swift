@@ -247,7 +247,23 @@ SourceRange DefaultArgumentInitializerScope::getSourceRangeOfThisASTNode(
 
 SourceRange PatternEntryDeclScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
-  return getPatternEntry().getSourceRange();
+  return loc;
+}
+
+SourceLoc
+PatternEntryDeclScope::getStartLocForBinding(SourceManager &SM,
+                                             ASTScopeImpl *parent,
+                                             PatternBindingDecl *decl,
+                                             unsigned entryIndex) {
+  // FIXME: This feels more complicated than it should be.
+  auto end = decl->getPatternList()[entryIndex].getSourceRange().End;
+  auto next = Lexer::getLocForEndOfToken(SM, end);
+
+  auto endOfParent = parent->getSourceRangeOfThisASTNode(true).End;
+  if (SM.isBeforeInBuffer(endOfParent, next))
+    return SourceLoc();
+
+  return next;
 }
 
 SourceRange PatternEntryInitializerScope::getSourceRangeOfThisASTNode(
