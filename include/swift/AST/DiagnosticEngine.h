@@ -29,6 +29,8 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/VersionTuple.h"
 
+namespace clang { class NamedDecl; }
+
 namespace swift {
   class Decl;
   class DeclAttribute;
@@ -93,6 +95,7 @@ namespace swift {
     DeclAttribute,
     VersionTuple,
     LayoutConstraint,
+    ClangDecl,
   };
 
   namespace diag {
@@ -122,6 +125,7 @@ namespace swift {
       const DeclAttribute *DeclAttributeVal;
       llvm::VersionTuple VersionVal;
       LayoutConstraint LayoutConstraintVal;
+      const clang::NamedDecl *ClangDecl;
     };
     
   public:
@@ -209,6 +213,11 @@ namespace swift {
     DiagnosticArgument(LayoutConstraint L)
       : Kind(DiagnosticArgumentKind::LayoutConstraint), LayoutConstraintVal(L) {
     }
+
+    DiagnosticArgument(const clang::NamedDecl *ND)
+      : Kind(DiagnosticArgumentKind::ClangDecl), ClangDecl(ND) {
+    }
+
     /// Initializes a diagnostic argument using the underlying type of the
     /// given enum.
     template<
@@ -298,6 +307,11 @@ namespace swift {
     LayoutConstraint getAsLayoutConstraint() const {
       assert(Kind == DiagnosticArgumentKind::LayoutConstraint);
       return LayoutConstraintVal;
+    }
+
+    const clang::NamedDecl *getAsClangDecl() const {
+      assert(Kind == DiagnosticArgumentKind::ClangDecl);
+      return ClangDecl;
     }
   };
   
@@ -1155,6 +1169,10 @@ namespace swift {
     parentDiag.flush();
     builder();
   }
+
+  /// Prints the qualified name of a Clang declaration in a form suitable for
+  /// diagnostics or debug logging.
+  void printClangDeclName(const clang::NamedDecl *D, llvm::raw_ostream &os);
 
 } // end namespace swift
 
