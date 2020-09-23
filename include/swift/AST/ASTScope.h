@@ -990,17 +990,19 @@ public:
 
 class AttachedPropertyWrapperScope final : public ASTScopeImpl {
 public:
-  VarDecl *const decl;
+  CustomAttr *attr;
+  VarDecl *decl;
+
   /// Because we have to avoid request cycles, we approximate the test for an
   /// AttachedPropertyWrapper with one based on source location. We might get
   /// false positives, that that doesn't hurt anything. However, the result of
   /// the conservative source range computation doesn't seem to be stable. So
   /// keep the original here, and use it for source range queries.
-
   const SourceRange sourceRangeWhenCreated;
 
-  AttachedPropertyWrapperScope(VarDecl *e)
-      : decl(e), sourceRangeWhenCreated(getSourceRangeOfVarDecl(e)) {
+  AttachedPropertyWrapperScope(CustomAttr *attr, VarDecl *decl)
+      : attr(attr), decl(decl),
+        sourceRangeWhenCreated(attr->getTypeRepr()->getSourceRange()) {
     ASTScopeAssert(sourceRangeWhenCreated.isValid(),
                    "VarDecls must have ranges to be looked-up");
   }
@@ -1016,7 +1018,10 @@ public:
   NullablePtr<const void> addressForPrinting() const override { return decl; }
   virtual NullablePtr<DeclContext> getDeclContext() const override;
 
-  static SourceRange getSourceRangeOfVarDecl(const VarDecl *);
+  NullablePtr<DeclAttribute> getDeclAttributeIfAny() const override {
+    return attr;
+  }
+  NullablePtr<const void> getReferrent() const override;
 
 private:
   void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);

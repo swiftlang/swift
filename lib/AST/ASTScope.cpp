@@ -91,19 +91,6 @@ NullablePtr<ClosureExpr> ASTScopeImpl::getClosureIfClosureScope() const {
   return nullptr;
 }
 
-// Conservative, because using precise info would be circular
-SourceRange
-AttachedPropertyWrapperScope::getSourceRangeOfVarDecl(const VarDecl *const vd) {
-  SourceRange sr;
-  for (auto *attr : vd->getAttrs().getAttributes<CustomAttr>()) {
-    if (sr.isInvalid())
-      sr = attr->getTypeRepr()->getSourceRange();
-    else
-      sr.widen(attr->getTypeRepr()->getSourceRange());
-  }
-  return sr;
-}
-
 SourceManager &ASTScopeImpl::getSourceManager() const {
   return getASTContext().SourceMgr;
 }

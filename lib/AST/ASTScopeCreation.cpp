@@ -61,12 +61,6 @@ template <typename Rangeable>
 static SourceRange getRangeableSourceRange(const Rangeable *const p) {
   return p->getSourceRange();
 }
-static SourceRange getRangeableSourceRange(const SpecializeAttr *a) {
-  return a->getRange();
-}
-static SourceRange getRangeableSourceRange(const DifferentiableAttr *a) {
-  return a->getRange();
-}
 static SourceRange getRangeableSourceRange(const ASTNode n) {
   return n.getSourceRange();
 }
@@ -404,27 +398,6 @@ public:
     expr->walk(ClosureFinder(*this, parent));
   }
 
-private:
-  // A safe way to discover this, without creating a circular request.
-  // Cannot call getAttachedPropertyWrappers.
-  static bool hasAttachedPropertyWrapper(VarDecl *vd) {
-    return AttachedPropertyWrapperScope::getSourceRangeOfVarDecl(vd).isValid();
-  }
-
-public:
-  /// If the pattern has an attached property wrapper, create a scope for it
-  /// so it can be looked up.
-
-  void
-  addAnyAttachedPropertyWrappersToScopeTree(PatternBindingDecl *patternBinding,
-                                            ASTScopeImpl *parent) {
-    patternBinding->getPattern(0)->forEachVariable([&](VarDecl *vd) {
-      if (hasAttachedPropertyWrapper(vd))
-        constructExpandAndInsertUncheckable<AttachedPropertyWrapperScope>(
-            parent, vd);
-    });
-  }
-
 public:
   /// Create the matryoshka nested generic param scopes (if any)
   /// that are subscopes of the receiver. Return
@@ -447,34 +420,8 @@ public:
   addChildrenForAllLocalizableAccessorsInSourceOrder(AbstractStorageDecl *asd,
                                                      ASTScopeImpl *parent);
 
-  void
-  forEachSpecializeAttrInSourceOrder(Decl *declBeingSpecialized,
-                                     function_ref<void(SpecializeAttr *)> fn) {
-    std::vector<SpecializeAttr *> sortedSpecializeAttrs;
-    for (auto *attr : declBeingSpecialized->getAttrs()) {
-      if (auto *specializeAttr = dyn_cast<SpecializeAttr>(attr))
-        sortedSpecializeAttrs.push_back(specializeAttr);
-    }
-    // TODO: rm extra copy
-    for (auto *specializeAttr : sortBySourceRange(sortedSpecializeAttrs))
-      fn(specializeAttr);
-  }
-
-  void forEachDifferentiableAttrInSourceOrder(
-      Decl *decl, function_ref<void(DifferentiableAttr *)> fn) {
-    std::vector<DifferentiableAttr *> sortedDifferentiableAttrs;
-    for (auto *attr : decl->getAttrs())
-      if (auto *diffAttr = dyn_cast<DifferentiableAttr>(attr))
-        // NOTE(TF-835): Skipping implicit `@differentiable` attributes is
-        // necessary to avoid verification failure in
-        // `ASTScopeImpl::verifyThatChildrenAreContainedWithin`.
-        // Perhaps this check may no longer be necessary after TF-835: robust
-        // `@derivative` attribute lowering.
-        if (!diffAttr->isImplicit())
-          sortedDifferentiableAttrs.push_back(diffAttr);
-    for (auto *diffAttr : sortBySourceRange(sortedDifferentiableAttrs))
-      fn(diffAttr);
-  }
+  void addChildrenForKnownAttributes(ValueDecl *decl,
+                                     ASTScopeImpl *parent);
 
 public:
 
@@ -796,8 +743,8 @@ public:
   visitPatternBindingDecl(PatternBindingDecl *patternBinding,
                           ASTScopeImpl *parentScope,
                           ScopeCreator &scopeCreator) {
-    scopeCreator.addAnyAttachedPropertyWrappersToScopeTree(patternBinding,
-                                                           parentScope);
+    if (auto *var = patternBinding->getSingleVar())
+      scopeCreator.addChildrenForKnownAttributes(var, parentScope);
 
     const bool isInTypeDecl = parentScope->isATypeDeclScope();
 
@@ -881,26 +828,49 @@ ScopeCreator::addToScopeTreeAndReturnInsertionPoint(ASTNode n,
 
 void ScopeCreator::addChildrenForAllLocalizableAccessorsInSourceOrder(
     AbstractStorageDecl *asd, ASTScopeImpl *parent) {
-  // Accessors are always nested within their abstract storage
-  // declaration. The nesting may not be immediate, because subscripts may
-  // have intervening scopes for generics.
-
-  // Create scopes for `@differentiable` attributes.
-  forEachDifferentiableAttrInSourceOrder(
-      asd, [&](DifferentiableAttr *diffAttr) {
-        ifUniqueConstructExpandAndInsert<DifferentiableAttributeScope>(
-            parent, diffAttr, asd);
-      });
-
-  AbstractStorageDecl *enclosingAbstractStorageDecl =
-      parent->getEnclosingAbstractStorageDecl().get();
-
   asd->visitParsedAccessors([&](AccessorDecl *ad) {
-    assert(enclosingAbstractStorageDecl == ad->getStorage());
-    (void) enclosingAbstractStorageDecl;
-
+    assert(asd == ad->getStorage());
     this->addToScopeTree(ad, parent);
   });
+}
+
+void ScopeCreator::addChildrenForKnownAttributes(ValueDecl *decl,
+                                                 ASTScopeImpl *parent) {
+  SmallVector<DeclAttribute *, 2> relevantAttrs;
+
+  for (auto *attr : decl->getAttrs()) {
+    if (isa<DifferentiableAttr>(attr)) {
+      if (!attr->isImplicit())
+        relevantAttrs.push_back(attr);
+    }
+
+    if (isa<SpecializeAttr>(attr))
+      relevantAttrs.push_back(attr);
+
+    if (isa<CustomAttr>(attr))
+      relevantAttrs.push_back(attr);
+  }
+
+  // Decl::getAttrs() is a linked list with head insertion, so the
+  // attributes are in reverse source order.
+  std::reverse(relevantAttrs.begin(), relevantAttrs.end());
+
+  for (auto *attr : relevantAttrs) {
+    if (auto *diffAttr = dyn_cast<DifferentiableAttr>(attr)) {
+      ifUniqueConstructExpandAndInsert<DifferentiableAttributeScope>(
+          parent, diffAttr, decl);
+    } else if (auto *specAttr = dyn_cast<SpecializeAttr>(attr)) {
+      if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl)) {
+        ifUniqueConstructExpandAndInsert<SpecializeAttributeScope>(
+            parent, specAttr, afd);
+      }
+    } else if (auto *customAttr = dyn_cast<CustomAttr>(attr)) {
+      if (auto *vd = dyn_cast<VarDecl>(decl)) {
+        ifUniqueConstructExpandAndInsert<AttachedPropertyWrapperScope>(
+            parent, customAttr, vd);
+      }
+    }
+  }
 }
 
 #pragma mark creation helpers
@@ -1172,19 +1142,7 @@ TopLevelCodeScope::expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &
 
 void AbstractFunctionDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
-  // Create scopes for specialize attributes
-  scopeCreator.forEachSpecializeAttrInSourceOrder(
-      decl, [&](SpecializeAttr *specializeAttr) {
-        scopeCreator.ifUniqueConstructExpandAndInsert<SpecializeAttributeScope>(
-            this, specializeAttr, decl);
-      });
-  // Create scopes for `@differentiable` attributes.
-  scopeCreator.forEachDifferentiableAttrInSourceOrder(
-      decl, [&](DifferentiableAttr *diffAttr) {
-        scopeCreator
-            .ifUniqueConstructExpandAndInsert<DifferentiableAttributeScope>(
-                this, diffAttr, decl);
-      });
+  scopeCreator.addChildrenForKnownAttributes(decl, this);
 
   // Create scopes for generic and ordinary parameters.
   // For a subscript declaration, the generic and ordinary parameters are in an
@@ -1330,13 +1288,12 @@ void VarDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
 
 void SubscriptDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
-  auto *sub = decl;
+  scopeCreator.addChildrenForKnownAttributes(decl, this);
   auto *leaf = scopeCreator.addNestedGenericParamScopesToTree(
-      sub, sub->getGenericParams(), this);
-  auto *params =
-      scopeCreator.constructExpandAndInsertUncheckable<ParameterListScope>(
-          leaf, sub->getIndices(), sub->getAccessor(AccessorKind::Get));
-  scopeCreator.addChildrenForAllLocalizableAccessorsInSourceOrder(sub, params);
+      decl, decl->getGenericParams(), this);
+  scopeCreator.constructExpandAndInsertUncheckable<ParameterListScope>(
+      leaf, decl->getIndices(), decl->getAccessor(AccessorKind::Get));
+  scopeCreator.addChildrenForAllLocalizableAccessorsInSourceOrder(decl, leaf);
 }
 
 void CaptureListScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
@@ -1364,10 +1321,8 @@ void DefaultArgumentInitializerScope::
 void AttachedPropertyWrapperScope::
     expandAScopeThatDoesNotCreateANewInsertionPoint(
         ScopeCreator &scopeCreator) {
-  for (auto *attr : decl->getAttrs().getAttributes<CustomAttr>()) {
-    if (auto *expr = attr->getArg())
+  if (auto *expr = attr->getArg())
       scopeCreator.addToScopeTree(expr, this);
-  }
 }
 
 #pragma mark expandScope
@@ -1595,6 +1550,7 @@ GET_REFERRENT(CaptureListScope, getExpr())
 GET_REFERRENT(ClosureParametersScope, getExpr())
 GET_REFERRENT(SpecializeAttributeScope, specializeAttr)
 GET_REFERRENT(DifferentiableAttributeScope, differentiableAttr)
+GET_REFERRENT(AttachedPropertyWrapperScope, attr)
 GET_REFERRENT(GenericTypeOrExtensionScope, portion->getReferrentOfScope(this));
 
 const Decl *
