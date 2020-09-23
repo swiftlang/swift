@@ -11,7 +11,7 @@ on:
       - swiftwasm-release/5.3
 
 jobs:
-  ubuntu_18.04_build:
+  ubuntu_1804_build:
     timeout-minutes: 0
     runs-on: ubuntu-18.04
 
@@ -58,7 +58,7 @@ jobs:
 #          name: linux-test-results
 #          path: ./swift-test-results.tar.gz
 
-  ubuntu_20.04_build:
+  ubuntu_2004_build:
     timeout-minutes: 0
     runs-on: ubuntu-20.04
 
