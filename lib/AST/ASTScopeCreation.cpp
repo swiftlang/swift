@@ -1424,35 +1424,6 @@ AbstractPatternEntryScope::AbstractPatternEntryScope(
                  "out of bounds");
 }
 
-// Following must be after uses to ensure templates get instantiated
-#pragma mark getEnclosingAbstractStorageDecl
-
-NullablePtr<AbstractStorageDecl>
-ASTScopeImpl::getEnclosingAbstractStorageDecl() const {
-  return nullptr;
-}
-
-NullablePtr<AbstractStorageDecl>
-SpecializeAttributeScope::getEnclosingAbstractStorageDecl() const {
-  return getParent().get()->getEnclosingAbstractStorageDecl();
-}
-NullablePtr<AbstractStorageDecl>
-DifferentiableAttributeScope::getEnclosingAbstractStorageDecl() const {
-  return getParent().get()->getEnclosingAbstractStorageDecl();
-}
-NullablePtr<AbstractStorageDecl>
-AbstractFunctionDeclScope::getEnclosingAbstractStorageDecl() const {
-  return getParent().get()->getEnclosingAbstractStorageDecl();
-}
-NullablePtr<AbstractStorageDecl>
-ParameterListScope::getEnclosingAbstractStorageDecl() const {
-  return getParent().get()->getEnclosingAbstractStorageDecl();
-}
-NullablePtr<AbstractStorageDecl>
-GenericParamScope::getEnclosingAbstractStorageDecl() const {
-  return getParent().get()->getEnclosingAbstractStorageDecl();
-}
-
 bool ASTScopeImpl::isATypeDeclScope() const {
   Decl *const pd = getDeclIfAny().getPtrOrNull();
   return pd && (isa<NominalTypeDecl>(pd) || isa<ExtensionDecl>(pd));

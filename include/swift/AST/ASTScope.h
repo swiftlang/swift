@@ -345,9 +345,6 @@ public:
   virtual SourceRange sourceRangeForDeferredExpansion() const;
 
 public:
-  virtual NullablePtr<AbstractStorageDecl>
-  getEnclosingAbstractStorageDecl() const;
-
   bool isATypeDeclScope() const;
 
 private:
@@ -845,9 +842,6 @@ protected:
   void printSpecifics(llvm::raw_ostream &out) const override;
 
 public:
-  NullablePtr<AbstractStorageDecl>
-  getEnclosingAbstractStorageDecl() const override;
-
   NullablePtr<const void> addressForPrinting() const override {
     return paramList;
   }
@@ -883,9 +877,6 @@ public:
   virtual NullablePtr<Decl> getDeclIfAny() const override { return decl; }
   Decl *getDecl() const { return decl; }
 
-  NullablePtr<AbstractStorageDecl>
-  getEnclosingAbstractStorageDecl() const override;
-
   NullablePtr<const void> getReferrent() const override;
 
 protected:
@@ -919,8 +910,6 @@ public:
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   virtual NullablePtr<DeclContext> getDeclContext() const override;
 
-  NullablePtr<AbstractStorageDecl>
-  getEnclosingAbstractStorageDecl() const override;
   NullablePtr<const void> addressForPrinting() const override { return params; }
 };
 
@@ -1285,9 +1274,6 @@ public:
     return specializeAttr;
   }
 
-  NullablePtr<AbstractStorageDecl>
-  getEnclosingAbstractStorageDecl() const override;
-
   NullablePtr<DeclAttribute> getDeclAttributeIfAny() const override {
     return specializeAttr;
   }
@@ -1317,9 +1303,6 @@ public:
   NullablePtr<const void> addressForPrinting() const override {
     return differentiableAttr;
   }
-
-  NullablePtr<AbstractStorageDecl>
-  getEnclosingAbstractStorageDecl() const override;
 
   NullablePtr<DeclAttribute> getDeclAttributeIfAny() const override {
     return differentiableAttr;
@@ -1362,10 +1345,6 @@ public:
 
 protected:
   NullablePtr<const GenericParamList> genericParams() const override;
-  NullablePtr<AbstractStorageDecl>
-  getEnclosingAbstractStorageDecl() const override {
-    return decl;
-  }
 };
 
 class EnumElementScope : public ASTScopeImpl {
