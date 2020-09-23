@@ -3822,8 +3822,15 @@ public:
   void visitHoleType(HoleType *T) {
     if (Options.PrintTypesForDebugging) {
       Printer << "<<hole for ";
-      auto originatorTy = T->getOriginatorType();
-      visit(Type(reinterpret_cast<TypeBase *>(originatorTy.getOpaqueValue())));
+      auto originator = T->getOriginator();
+      if (auto *typeVar = originator.dyn_cast<TypeVariableType *>()) {
+        visit(typeVar);
+      } else if (auto *VD = originator.dyn_cast<VarDecl *>()) {
+        Printer << "decl = ";
+        Printer << VD->getName();
+      } else {
+        visit(originator.get<DependentMemberType *>());
+      }
       Printer << ">>";
     } else {
       Printer << "<<hole>>";
