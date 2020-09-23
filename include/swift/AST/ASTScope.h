@@ -1061,8 +1061,6 @@ public:
 
 protected:
   void printSpecifics(llvm::raw_ostream &out) const override;
-  void forEachVarDeclWithLocalizableAccessors(
-      ScopeCreator &scopeCreator, function_ref<void(VarDecl *)> foundOne) const;
 
 public:
   NullablePtr<Decl> getDeclIfAny() const override { return decl; }
@@ -1364,37 +1362,6 @@ public:
 
 protected:
   NullablePtr<const GenericParamList> genericParams() const override;
-  NullablePtr<AbstractStorageDecl>
-  getEnclosingAbstractStorageDecl() const override {
-    return decl;
-  }
-};
-
-class VarDeclScope final : public ASTScopeImpl {
-
-public:
-  VarDecl *const decl;
-  VarDeclScope(VarDecl *e) : decl(e) {}
-  virtual ~VarDeclScope() {}
-
-protected:
-  ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
-
-private:
-  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
-
-public:
-  std::string getClassName() const override;
-  SourceRange
-  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
-
-protected:
-  void printSpecifics(llvm::raw_ostream &out) const override;
-
-public:
-  virtual NullablePtr<Decl> getDeclIfAny() const override { return decl; }
-  Decl *getDecl() const { return decl; }
-  NullablePtr<const void> getReferrent() const override;
   NullablePtr<AbstractStorageDecl>
   getEnclosingAbstractStorageDecl() const override {
     return decl;

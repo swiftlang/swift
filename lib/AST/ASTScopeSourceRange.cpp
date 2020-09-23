@@ -258,12 +258,6 @@ SourceRange PatternEntryInitializerScope::getSourceRangeOfThisASTNode(
   return initAsWrittenWhenCreated->getSourceRange();
 }
 
-SourceRange
-VarDeclScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
-  const auto br = decl->getBracesRange();
-  return br.isValid() ? br : decl->getSourceRange();
-}
-
 SourceRange GenericParamScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
   auto nOrE = holder;

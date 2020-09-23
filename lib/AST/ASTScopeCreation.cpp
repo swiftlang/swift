@@ -973,7 +973,6 @@ NO_NEW_INSERTION_POINT(IfStmtScope)
 NO_NEW_INSERTION_POINT(RepeatWhileScope)
 NO_NEW_INSERTION_POINT(SubscriptDeclScope)
 NO_NEW_INSERTION_POINT(SwitchStmtScope)
-NO_NEW_INSERTION_POINT(VarDeclScope)
 NO_NEW_INSERTION_POINT(WhileStmtScope)
 
 NO_EXPANSION(GenericParamScope)
@@ -1019,6 +1018,7 @@ PatternEntryDeclScope::expandAScopeThatCreatesANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   // Initializers come before VarDecls, e.g. PCMacro/didSet.swift 19
   auto patternEntry = getPatternEntry();
+
   // Create a child for the initializer, if present.
   // Cannot trust the source range given in the ASTScopeImpl for the end of the
   // initializer (because of InterpolatedLiteralStrings and EditorPlaceHolders),
@@ -1035,10 +1035,12 @@ PatternEntryDeclScope::expandAScopeThatCreatesANewInsertionPoint(
         .constructExpandAndInsertUncheckable<PatternEntryInitializerScope>(
             this, decl, patternEntryIndex, vis);
   }
+
   // Add accessors for the variables in this pattern.
-  forEachVarDeclWithLocalizableAccessors(scopeCreator, [&](VarDecl *var) {
-    scopeCreator.ifUniqueConstructExpandAndInsert<VarDeclScope>(this, var);
+  patternEntry.getPattern()->forEachVariable([&](VarDecl *var) {
+    scopeCreator.addChildrenForAllLocalizableAccessorsInSourceOrder(var, this);
   });
+
   ASTScopeAssert(!handleUseBeforeDef,
                  "next line is wrong otherwise; would need a use scope");
 
@@ -1273,11 +1275,6 @@ void CaseStmtBodyScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
   scopeCreator.addToScopeTree(stmt->getBody(), this);
 }
 
-void VarDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
-    ScopeCreator &scopeCreator) {
-  scopeCreator.addChildrenForAllLocalizableAccessorsInSourceOrder(decl, this);
-}
-
 void SubscriptDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   scopeCreator.addChildrenForKnownAttributes(decl, this);
@@ -1427,19 +1424,6 @@ AbstractPatternEntryScope::AbstractPatternEntryScope(
                  "out of bounds");
 }
 
-void AbstractPatternEntryScope::forEachVarDeclWithLocalizableAccessors(
-    ScopeCreator &scopeCreator, function_ref<void(VarDecl *)> foundOne) const {
-  getPatternEntry().getPattern()->forEachVariable([&](VarDecl *var) {
-    bool hasParsedAccessors = false;
-    var->visitParsedAccessors([&](AccessorDecl *) {
-      hasParsedAccessors = true;
-    });
-
-    if (hasParsedAccessors)
-      foundOne(var);
-  });
-}
-
 // Following must be after uses to ensure templates get instantiated
 #pragma mark getEnclosingAbstractStorageDecl
 
@@ -1531,7 +1515,6 @@ GET_REFERRENT(AbstractFunctionDeclScope, getDecl())
 GET_REFERRENT(PatternEntryDeclScope, getPattern())
 GET_REFERRENT(TopLevelCodeScope, getDecl())
 GET_REFERRENT(SubscriptDeclScope, getDecl())
-GET_REFERRENT(VarDeclScope, getDecl())
 GET_REFERRENT(GenericParamScope, paramList->getParams()[index])
 GET_REFERRENT(AbstractStmtScope, getStmt())
 GET_REFERRENT(CaptureListScope, getExpr())
