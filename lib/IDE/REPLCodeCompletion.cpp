@@ -227,7 +227,7 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   // Carry over the private imports from the last module.
   SmallVector<ModuleDecl::ImportedModule, 8> imports;
   lastModule->getImportedModules(imports,
-                                 ModuleDecl::ImportFilterKind::Private);
+                                 ModuleDecl::ImportFilterKind::Default);
   for (auto &import : imports) {
     implicitImports.AdditionalModules.emplace_back(import.importedModule,
                                                    /*exported*/ false);

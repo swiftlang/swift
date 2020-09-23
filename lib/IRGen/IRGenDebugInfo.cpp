@@ -1843,8 +1843,8 @@ void IRGenDebugInfoImpl::finalize() {
   // from all ImportDecls).
   SmallVector<ModuleDecl::ImportedModule, 8> ModuleWideImports;
   IGM.getSwiftModule()->getImportedModules(
-      ModuleWideImports, {ModuleDecl::ImportFilterKind::Public,
-                          ModuleDecl::ImportFilterKind::Private,
+      ModuleWideImports, {ModuleDecl::ImportFilterKind::Exported,
+                          ModuleDecl::ImportFilterKind::Default,
                           ModuleDecl::ImportFilterKind::ImplementationOnly});
   for (auto M : ModuleWideImports)
     if (!ImportedModules.count(M.importedModule))

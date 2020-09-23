@@ -427,7 +427,7 @@ void ModuleFile::getImportedModules(
 
   for (auto &dep : Dependencies) {
     if (dep.isExported()) {
-      if (!filter.contains(ModuleDecl::ImportFilterKind::Public))
+      if (!filter.contains(ModuleDecl::ImportFilterKind::Exported))
         continue;
 
     } else if (dep.isImplementationOnly()) {
@@ -440,7 +440,7 @@ void ModuleFile::getImportedModules(
       }
 
     } else {
-      if (!filter.contains(ModuleDecl::ImportFilterKind::Private))
+      if (!filter.contains(ModuleDecl::ImportFilterKind::Default))
         continue;
     }
 

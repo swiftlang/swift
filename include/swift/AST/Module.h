@@ -648,17 +648,16 @@ public:
   /// \sa getImportedModules
   enum class ImportFilterKind {
     /// Include imports declared with `@_exported`.
-    Public = 1 << 0,
+    Exported = 1 << 0,
     /// Include "regular" imports with no special annotation.
-    Private = 1 << 1,
+    Default = 1 << 1,
     /// Include imports declared with `@_implementationOnly`.
     ImplementationOnly = 1 << 2,
     /// Include imports of SPIs declared with `@_spi`
     SPIAccessControl = 1 << 3,
-    /// Include imports shadowed by a separately-imported overlay (i.e. a
-    /// cross-import overlay). Unshadowed imports are included whether or not
-    /// this flag is specified.
-    ShadowedBySeparateOverlay = 1 << 4
+    /// Include imports shadowed by a cross-import overlay. Unshadowed imports
+    /// are included whether or not this flag is specified.
+    ShadowedByCrossImportOverlay = 1 << 4
   };
   /// \sa getImportedModules
   using ImportFilter = OptionSet<ImportFilterKind>;
@@ -668,7 +667,7 @@ public:
   /// \p filter controls whether public, private, or any imports are included
   /// in this list.
   void getImportedModules(SmallVectorImpl<ImportedModule> &imports,
-                          ImportFilter filter = ImportFilterKind::Public) const;
+                          ImportFilter filter = ImportFilterKind::Exported) const;
 
   /// Looks up which modules are imported by this module, ignoring any that
   /// won't contain top-level decls.

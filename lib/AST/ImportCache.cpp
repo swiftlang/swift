@@ -176,7 +176,7 @@ ImportSet &ImportCache::getImportSet(const DeclContext *dc) {
 
   if (file) {
     file->getImportedModules(imports,
-                             {ModuleDecl::ImportFilterKind::Private,
+                             {ModuleDecl::ImportFilterKind::Default,
                               ModuleDecl::ImportFilterKind::ImplementationOnly,
                               ModuleDecl::ImportFilterKind::SPIAccessControl});
   }
@@ -261,7 +261,7 @@ ImportCache::getAllAccessPathsNotShadowedBy(const ModuleDecl *mod,
 
   if (auto *file = dyn_cast<FileUnit>(dc)) {
     file->getImportedModules(stack,
-                             {ModuleDecl::ImportFilterKind::Private,
+                             {ModuleDecl::ImportFilterKind::Default,
                               ModuleDecl::ImportFilterKind::ImplementationOnly,
                               ModuleDecl::ImportFilterKind::SPIAccessControl});
   }
