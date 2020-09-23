@@ -35,15 +35,13 @@ using namespace swift;
 using namespace namelookup;
 using namespace ast_scope;
 
-llvm::SmallVector<const ASTScopeImpl *, 0> ASTScopeImpl::unqualifiedLookup(
+void ASTScopeImpl::unqualifiedLookup(
     SourceFile *sourceFile, const DeclNameRef name, const SourceLoc loc,
     DeclConsumer consumer) {
-  SmallVector<const ASTScopeImpl *, 0> history;
   const auto *start =
       findStartingScopeForLookup(sourceFile, name, loc);
   if (start)
-    start->lookup(history, nullptr, nullptr, consumer);
-  return history;
+    start->lookup(nullptr, nullptr, consumer);
 }
 
 const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
@@ -126,12 +124,9 @@ ASTScopeImpl::findChildContaining(SourceLoc loc,
 
 #pragma mark lookup methods that run once per scope
 
-void ASTScopeImpl::lookup(SmallVectorImpl<const ASTScopeImpl *> &history,
-                          const NullablePtr<const ASTScopeImpl> limit,
+void ASTScopeImpl::lookup(const NullablePtr<const ASTScopeImpl> limit,
                           NullablePtr<const GenericParamList> lastListSearched,
                           DeclConsumer consumer) const {
-
-  history.push_back(this);
 
 #ifndef NDEBUG
   consumer.startingNextLookupStep();
@@ -154,7 +149,7 @@ void ASTScopeImpl::lookup(SmallVectorImpl<const ASTScopeImpl *> &history,
   if (doneAndListSearched.first)
     return;
 
-  if (lookupLocalsOrMembers(history, consumer))
+  if (lookupLocalsOrMembers(consumer))
     return;
 
   const auto *const lookupParent = getLookupParent().getPtrOrNull();
@@ -169,7 +164,7 @@ void ASTScopeImpl::lookup(SmallVectorImpl<const ASTScopeImpl *> &history,
   const NullablePtr<const ASTScopeImpl> limitForParent =
       limit ? limit : getLookupLimit();
 
-  return lookupParent->lookup(history, limitForParent, lastListSearched,
+  return lookupParent->lookup(limitForParent, lastListSearched,
                               consumer);
 }
 
@@ -238,26 +233,22 @@ bool ASTScopeImpl::lookInGenericParametersOf(
 
 #pragma mark looking in locals or members - members
 
-bool ASTScopeImpl::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                                         DeclConsumer) const {
+bool ASTScopeImpl::lookupLocalsOrMembers(DeclConsumer) const {
   return false; // many kinds of scopes have none
 }
 
 bool GenericTypeOrExtensionScope::lookupLocalsOrMembers(
-    ArrayRef<const ASTScopeImpl *> history,
     ASTScopeImpl::DeclConsumer consumer) const {
-  return portion->lookupMembersOf(this, history, consumer);
+  return portion->lookupMembersOf(this, consumer);
 }
 
 bool Portion::lookupMembersOf(const GenericTypeOrExtensionScope *,
-                              ArrayRef<const ASTScopeImpl *>,
                               ASTScopeImpl::DeclConsumer) const {
   return false;
 }
 
 bool GenericTypeOrExtensionWhereOrBodyPortion::lookupMembersOf(
     const GenericTypeOrExtensionScope *scope,
-    ArrayRef<const ASTScopeImpl *> history,
     ASTScopeImpl::DeclConsumer consumer) const {
   auto nt = scope->getCorrespondingNominalTypeDecl().getPtrOrNull();
   if (!nt)
@@ -267,13 +258,12 @@ bool GenericTypeOrExtensionWhereOrBodyPortion::lookupMembersOf(
 
 bool GenericTypeOrExtensionWherePortion::lookupMembersOf(
     const GenericTypeOrExtensionScope *scope,
-    ArrayRef<const ASTScopeImpl *> history,
     ASTScopeImpl::DeclConsumer consumer) const {
   if (!scope->areMembersVisibleFromWhereClause())
     return false;
 
   return GenericTypeOrExtensionWhereOrBodyPortion::lookupMembersOf(
-    scope, history, consumer);
+    scope, consumer);
 }
 
 bool GenericTypeOrExtensionScope::areMembersVisibleFromWhereClause() const {
@@ -283,33 +273,28 @@ bool GenericTypeOrExtensionScope::areMembersVisibleFromWhereClause() const {
 
 #pragma mark looking in locals or members - locals
 
-bool GenericParamScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                                              DeclConsumer consumer) const {
+bool GenericParamScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
   auto *param = paramList->getParams()[index];
   return consumer.consume({param}, DeclVisibilityKind::GenericParameter);
 }
 
-bool PatternEntryDeclScope::lookupLocalsOrMembers(
-    ArrayRef<const ASTScopeImpl *>, DeclConsumer consumer) const {
+bool PatternEntryDeclScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
   if (vis != DeclVisibilityKind::LocalVariable)
     return false; // look in self type will find this later
   return lookupLocalBindingsInPattern(getPattern(), vis, consumer);
 }
 
-bool ForEachPatternScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                                                DeclConsumer consumer) const {
+bool ForEachPatternScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
   return lookupLocalBindingsInPattern(
       stmt->getPattern(), DeclVisibilityKind::LocalVariable, consumer);
 }
 
-bool CaseLabelItemScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                                               DeclConsumer consumer) const {
+bool CaseLabelItemScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
   return lookupLocalBindingsInPattern(
       item.getPattern(), DeclVisibilityKind::LocalVariable, consumer);
 }
 
-bool CaseStmtBodyScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                                              DeclConsumer consumer) const {
+bool CaseStmtBodyScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
   for (auto *var : stmt->getCaseBodyVariablesOrEmptyArray())
     if (consumer.consume({var}, DeclVisibilityKind::LocalVariable))
         return true;
@@ -318,7 +303,7 @@ bool CaseStmtBodyScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
 }
 
 bool AbstractFunctionBodyScope::lookupLocalsOrMembers(
-    ArrayRef<const ASTScopeImpl *>, DeclConsumer consumer) const {
+    DeclConsumer consumer) const {
   if (auto *paramList = decl->getParameters()) {
     for (auto *paramDecl : *paramList)
       if (consumer.consume({paramDecl}, DeclVisibilityKind::FunctionParameter))
@@ -327,9 +312,8 @@ bool AbstractFunctionBodyScope::lookupLocalsOrMembers(
   return false;
 }
 
-bool FunctionBodyScope::lookupLocalsOrMembers(
-    ArrayRef<const ASTScopeImpl *> history, DeclConsumer consumer) const {
-  if (AbstractFunctionBodyScope::lookupLocalsOrMembers(history, consumer))
+bool FunctionBodyScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
+  if (AbstractFunctionBodyScope::lookupLocalsOrMembers(consumer))
     return true;
 
   if (decl->getDeclContext()->isTypeContext()) {
@@ -351,7 +335,7 @@ bool FunctionBodyScope::lookupLocalsOrMembers(
 }
 
 bool SpecializeAttributeScope::lookupLocalsOrMembers(
-    ArrayRef<const ASTScopeImpl *>, DeclConsumer consumer) const {
+    DeclConsumer consumer) const {
   if (auto *params = whatWasSpecialized->getGenericParams())
     for (auto *param : params->getParams())
       if (consumer.consume({param}, DeclVisibilityKind::GenericParameter))
@@ -360,7 +344,7 @@ bool SpecializeAttributeScope::lookupLocalsOrMembers(
 }
 
 bool DifferentiableAttributeScope::lookupLocalsOrMembers(
-    ArrayRef<const ASTScopeImpl *>, DeclConsumer consumer) const {
+    DeclConsumer consumer) const {
   auto visitAbstractFunctionDecl = [&](AbstractFunctionDecl *afd) {
     if (auto *params = afd->getGenericParams())
       for (auto *param : params->getParams())
@@ -378,8 +362,7 @@ bool DifferentiableAttributeScope::lookupLocalsOrMembers(
   return false;
 }
 
-bool BraceStmtScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                                           DeclConsumer consumer) const {
+bool BraceStmtScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
   // All types and functions are visible anywhere within a brace statement
   // scope. When ordering matters (i.e. var decl) we will have split the brace
   // statement into nested scopes.
@@ -397,7 +380,7 @@ bool BraceStmtScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
 }
 
 bool PatternEntryInitializerScope::lookupLocalsOrMembers(
-    ArrayRef<const ASTScopeImpl *>, DeclConsumer consumer) const {
+    DeclConsumer consumer) const {
   // 'self' is available within the pattern initializer of a 'lazy' variable.
   auto *initContext = dyn_cast_or_null<PatternBindingInitializer>(
       decl->getInitContext(0));
@@ -410,8 +393,7 @@ bool PatternEntryInitializerScope::lookupLocalsOrMembers(
   return false;
 }
 
-bool CaptureListScope::lookupLocalsOrMembers(
-    ArrayRef<const ASTScopeImpl *>, DeclConsumer consumer) const {
+bool CaptureListScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
   for (auto &e : expr->getCaptureList()) {
     if (consumer.consume(
             {e.Var},
@@ -422,7 +404,7 @@ bool CaptureListScope::lookupLocalsOrMembers(
 }
 
 bool ClosureParametersScope::lookupLocalsOrMembers(
-    ArrayRef<const ASTScopeImpl *>, DeclConsumer consumer) const {
+    DeclConsumer consumer) const {
   for (auto param : *closureExpr->getParameters())
     if (consumer.consume({param}, DeclVisibilityKind::FunctionParameter))
       return true;
@@ -430,7 +412,7 @@ bool ClosureParametersScope::lookupLocalsOrMembers(
 }
 
 bool ConditionalClausePatternUseScope::lookupLocalsOrMembers(
-    ArrayRef<const ASTScopeImpl *>, DeclConsumer consumer) const {
+    DeclConsumer consumer) const {
   return lookupLocalBindingsInPattern(
       pattern, DeclVisibilityKind::LocalVariable, consumer);
 }

@@ -228,20 +228,14 @@ public:
                          ASTScopeImpl *const organicInsertionPoint,
                          ArrayRef<ASTNode> nodesOrDeclsToAdd) {
     auto *ip = insertionPoint;
-    for (auto nd : expandIfConfigClausesThenCullAndSortElementsOrMembers(
-             nodesOrDeclsToAdd)) {
-      if (!shouldThisNodeBeScopedWhenFoundInSourceFileBraceStmtOrType(nd)) {
-        // FIXME: Could the range get lost if the node is ever reexpanded?
-        ip->widenSourceRangeForIgnoredASTNode(nd);
-      } else {
-        const unsigned preCount = ip->getChildren().size();
-        auto *const newIP =
-            addToScopeTreeAndReturnInsertionPoint(nd, ip).getPtrOr(ip);
-        if (ip != organicInsertionPoint)
-          ip->increaseASTAncestorScopeCount(ip->getChildren().size() -
-                                            preCount);
-        ip = newIP;
-      }
+    for (auto nd : sortBySourceRange(cull(nodesOrDeclsToAdd))) {
+      const unsigned preCount = ip->getChildren().size();
+      auto *const newIP =
+          addToScopeTreeAndReturnInsertionPoint(nd, ip).getPtrOr(ip);
+      if (ip != organicInsertionPoint)
+        ip->increaseASTAncestorScopeCount(ip->getChildren().size() -
+                                          preCount);
+      ip = newIP;
     }
     return ip;
   }
@@ -494,48 +488,9 @@ public:
       fn(diffAttr);
   }
 
-  std::vector<ASTNode> expandIfConfigClausesThenCullAndSortElementsOrMembers(
-      ArrayRef<ASTNode> input) const {
-    auto cleanedupNodes = sortBySourceRange(cull(expandIfConfigClauses(input)));
-    return cleanedupNodes;
-  }
-
 public:
 
 private:
-  static std::vector<ASTNode> expandIfConfigClauses(ArrayRef<ASTNode> input) {
-    std::vector<ASTNode> expansion;
-    expandIfConfigClausesInto(expansion, input, /*isInAnActiveNode=*/true);
-    return expansion;
-  }
-
-  static void expandIfConfigClausesInto(std::vector<ASTNode> &expansion,
-                                        ArrayRef<ASTNode> input,
-                                        const bool isInAnActiveNode) {
-    for (auto n : input) {
-      if (!n.isDecl(DeclKind::IfConfig)) {
-        expansion.push_back(n);
-        continue;
-      }
-      auto *const icd = cast<IfConfigDecl>(n.get<Decl *>());
-      for (auto &clause : icd->getClauses()) {
-        if (auto *const cond = clause.Cond)
-          expansion.push_back(cond);
-        if (clause.isActive) {
-          // TODO: Move this check into ASTVerifier
-          ASTScopeAssert(isInAnActiveNode, "Clause should not be marked active "
-                                           "unless it's context is active");
-          // get inactive nodes that nest in active clauses
-          for (auto n : clause.Elements) {
-            if (auto *const d = n.dyn_cast<Decl *>())
-              if (isa<IfConfigDecl>(d))
-                expandIfConfigClausesInto(expansion, {d}, true);
-          }
-        }
-      }
-    }
-  }
-
   /// Remove VarDecls because we'll find them when we expand the
   /// PatternBindingDecls. Remove EnunCases
   /// because they overlap EnumElements and AST includes the elements in the
@@ -548,8 +503,10 @@ private:
       ASTScopeAssert(
           !n.isDecl(DeclKind::Accessor),
           "Should not find accessors in iterable types or brace statements");
-      return isLocalizable(n) && !n.isDecl(DeclKind::Var) &&
-             !n.isDecl(DeclKind::EnumCase);
+      return isLocalizable(n) &&
+             !n.isDecl(DeclKind::Var) &&
+             !n.isDecl(DeclKind::EnumCase) &&
+             !n.isDecl(DeclKind::IfConfig);
     });
     return culled;
   }
@@ -573,32 +530,6 @@ private:
     const int signum = ASTScopeImpl::compare(r1, r2, ctx.SourceMgr,
                                              /*ensureDisjoint=*/true);
     return -1 == signum;
-  }
-
-  static bool isVarDeclInPatternBindingDecl(ASTNode n1, ASTNode n2) {
-    if (auto *d1 = n1.dyn_cast<Decl *>())
-      if (auto *vd = dyn_cast<VarDecl>(d1))
-        if (auto *d2 = n2.dyn_cast<Decl *>())
-          if (auto *pbd = dyn_cast<PatternBindingDecl>(d2))
-            return vd->getParentPatternBinding() == pbd;
-    return false;
-  }
-
-public:
-  bool shouldThisNodeBeScopedWhenFoundInSourceFileBraceStmtOrType(ASTNode n) {
-    // Do not scope VarDecls because
-    // they get created directly by the pattern code.
-    // Doing otherwise distorts the source range
-    // of their parents.
-    ASTScopeAssert(!n.isDecl(DeclKind::Accessor),
-                   "Should not see accessors here");
-    // Can occur in illegal code
-    // non-empty brace stmt could define a new insertion point
-    if (auto *const s = n.dyn_cast<Stmt *>()) {
-      if (auto *const bs = dyn_cast<BraceStmt>(s))
-        return !bs->empty();
-    }
-    return !n.isDecl(DeclKind::Var);
   }
 
 public:
@@ -1298,24 +1229,23 @@ void AbstractFunctionDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
             .ifUniqueConstructExpandAndInsert<DifferentiableAttributeScope>(
                 this, diffAttr, decl);
       });
+
   // Create scopes for generic and ordinary parameters.
   // For a subscript declaration, the generic and ordinary parameters are in an
   // ancestor scope, so don't make them here.
   ASTScopeImpl *leaf = this;
+
   if (!isa<AccessorDecl>(decl)) {
     leaf = scopeCreator.addNestedGenericParamScopesToTree(
         decl, decl->getGenericParams(), leaf);
-    if (isLocalizable(decl) && getParmsSourceLocOfAFD(decl).isValid()) {
-      // swift::createDesignatedInitOverride just clones the parameters, so they
-      // end up with a bogus SourceRange, maybe *before* the start of the
-      // function.
-      if (!decl->isImplicit()) {
-        leaf = scopeCreator
-                   .constructExpandAndInsertUncheckable<ParameterListScope>(
-                       leaf, decl->getParameters(), nullptr);
-      }
+
+    auto *params = decl->getParameters();
+    if (params->size() > 0) {
+      scopeCreator.constructExpandAndInsertUncheckable<ParameterListScope>(
+          leaf, params, nullptr);
     }
   }
+
   // Create scope for the body.
   // We create body scopes when there is no body for source kit to complete
   // erroneous code in bodies.
