@@ -199,10 +199,9 @@ static llvm::cl::opt<std::string>
 ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"));
 
 static llvm::cl::opt<bool>
-EnableSILSortOutput("emit-sorted-sil", llvm::cl::Hidden,
-                    llvm::cl::init(false),
-                    llvm::cl::desc("Sort Functions, VTables, Globals, "
-                                   "WitnessTables by name to ease diffing."));
+    EmitSortedSIL("emit-sorted-sil", llvm::cl::Hidden, llvm::cl::init(false),
+                  llvm::cl::desc("Sort Functions, VTables, Globals, "
+                                 "WitnessTables by name to ease diffing."));
 
 static llvm::cl::opt<bool>
 DisableASTDump("sil-disable-ast-dump", llvm::cl::Hidden,
@@ -401,6 +400,8 @@ int main(int argc, char **argv) {
       break;
     }
   }
+  SILOpts.EmitVerboseSIL |= EmitVerboseSIL;
+  SILOpts.EmitSortedSIL |= EmitSortedSIL;
 
   SILOpts.EnableSpeculativeDevirtualization = EnableSpeculativeDevirtualization;
   SILOpts.IgnoreAlwaysInline = IgnoreAlwaysInline;
@@ -530,7 +531,7 @@ int main(int argc, char **argv) {
                                    StringRef(OutputFilename) : "-";
     auto SILOpts = SILOptions();
     SILOpts.EmitVerboseSIL = EmitVerboseSIL;
-    SILOpts.EmitSortedSIL = EnableSILSortOutput;
+    SILOpts.EmitSortedSIL = EmitSortedSIL;
     if (OutputFile == "-") {
       SILMod->print(llvm::outs(), CI.getMainModule(), SILOpts, !DisableASTDump);
     } else {

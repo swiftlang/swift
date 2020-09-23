@@ -62,7 +62,7 @@ void ASTScopeImpl::dumpOneScopeMapLocation(
 
   namelookup::ASTScopeDeclGatherer gatherer;
   // Print the local bindings introduced by this scope.
-  locScope->lookupLocalsOrMembers({this}, gatherer);
+  locScope->lookupLocalsOrMembers(gatherer);
   if (!gatherer.getDecls().empty()) {
     llvm::errs() << "Local bindings: ";
     llvm::interleave(

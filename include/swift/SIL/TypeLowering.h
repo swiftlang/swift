@@ -55,20 +55,17 @@ CanAnyFunctionType adjustFunctionType(CanAnyFunctionType type,
                                       AnyFunctionType::ExtInfo extInfo);
 
 /// Change the given function type's representation.
-inline CanAnyFunctionType adjustFunctionType(CanAnyFunctionType t,
-                                          SILFunctionType::Representation rep) {
-  auto extInfo =
-      t->getExtInfo().intoBuilder().withSILRepresentation(rep).build();
-  return adjustFunctionType(t, extInfo);  
+inline CanAnyFunctionType
+adjustFunctionType(CanAnyFunctionType t, AnyFunctionType::Representation rep,
+                   ClangTypeInfo clangTypeInfo) {
+  auto extInfo = t->getExtInfo()
+                     .intoBuilder()
+                     .withRepresentation(rep)
+                     .withClangFunctionType(clangTypeInfo.getType())
+                     .build();
+  return adjustFunctionType(t, extInfo);
 }
 
-/// Change the given function type's representation.
-inline CanAnyFunctionType adjustFunctionType(CanAnyFunctionType t,
-                                          AnyFunctionType::Representation rep) {
-  auto extInfo = t->getExtInfo().withRepresentation(rep);
-  return adjustFunctionType(t, extInfo);  
-}
-  
 /// Given a SIL function type, return a type that is identical except
 /// for using the given ExtInfo.
 CanSILFunctionType
@@ -992,7 +989,8 @@ public:
   /// Given a function type, yield its bridged formal type.
   CanAnyFunctionType getBridgedFunctionType(AbstractionPattern fnPattern,
                                             CanAnyFunctionType fnType,
-                                            Bridgeability bridging);
+                                            Bridgeability bridging,
+                                            SILFunctionTypeRepresentation rep);
 
   /// Given a referenced value and the substituted formal type of a
   /// resulting l-value expression, produce the substituted formal
@@ -1121,7 +1119,7 @@ private:
 CanSILFunctionType getNativeSILFunctionType(
     Lowering::TypeConverter &TC, TypeExpansionContext context,
     Lowering::AbstractionPattern origType, CanAnyFunctionType substType,
-    Optional<SILDeclRef> origConstant = None,
+    SILExtInfo silExtInfo, Optional<SILDeclRef> origConstant = None,
     Optional<SILDeclRef> constant = None,
     Optional<SubstitutionMap> reqtSubs = None,
     ProtocolConformanceRef witnessMethodConformance = ProtocolConformanceRef());

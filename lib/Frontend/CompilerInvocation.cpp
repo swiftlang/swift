@@ -1142,6 +1142,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
   Opts.EmitSortedSIL |= Args.hasArg(OPT_emit_sorted_sil);
+  Opts.PrintFullConvention |=
+      Args.hasArg(OPT_experimental_print_full_convention);
   Opts.PrintInstCounts |= Args.hasArg(OPT_print_inst_counts);
   Opts.StopOptimizationBeforeLoweringOwnership |=
       Args.hasArg(OPT_sil_stop_optzns_before_lowering_ownership);
