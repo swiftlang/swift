@@ -1424,11 +1424,6 @@ AbstractPatternEntryScope::AbstractPatternEntryScope(
                  "out of bounds");
 }
 
-bool ASTScopeImpl::isATypeDeclScope() const {
-  Decl *const pd = getDeclIfAny().getPtrOrNull();
-  return pd && (isa<NominalTypeDecl>(pd) || isa<ExtensionDecl>(pd));
-}
-
 #pragma mark new operators
 void *ASTScopeImpl::operator new(size_t bytes, const ASTContext &ctx,
                                  unsigned alignment) {

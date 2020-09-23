@@ -344,9 +344,6 @@ public:
   virtual NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion();
   virtual SourceRange sourceRangeForDeferredExpansion() const;
 
-public:
-  bool isATypeDeclScope() const;
-
 private:
   virtual ScopeCreator &getScopeCreator();
 
