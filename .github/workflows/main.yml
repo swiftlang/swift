@@ -42,10 +42,10 @@ jobs:
           key: ${{ runner.os }}-sccache-v10-${{ steps.cache_timestamp.outputs.timestamp }}
           restore-keys: |
             ${{ runner.os }}-sccache-v10-
-      - name: Build Linux installable archive
+      - name: Build Ubuntu 18.04 installable archive
         run: |
           ./utils/webassembly/ci.sh
-      - name: Upload Linux installable archive
+      - name: Upload Ubuntu 18.04 installable archive
         uses: actions/upload-artifact@v1
         with:
           name: ubuntu_18.04-installable
@@ -88,7 +88,7 @@ jobs:
           key: ${{ runner.os }}-sccache-v10-${{ steps.cache_timestamp.outputs.timestamp }}
           restore-keys: |
             ${{ runner.os }}-sccache-v10-
-      - name: Build Linux installable archive
+      - name: Build Ubuntu 20.04 installable archive
         run: |
           ./utils/webassembly/ci.sh
 #       - name: Upload Linux installable archive
@@ -177,11 +177,11 @@ jobs:
           path: hello.wasm
 
   ubuntu_1804_smoke_test:
-    name: Run smoke tests on Linux
+    name: Run smoke tests on Ubuntu 18.04
     runs-on: ubuntu-18.04
     needs: ubuntu_1804_build
     steps:
-      - name: Download installable Linux archive
+      - name: Download installable Ubuntu 18.04 archive
         uses: actions/download-artifact@v1
         with:
           name: ubuntu_18.04-installable
@@ -206,7 +206,7 @@ jobs:
           cd test
           $TOOLCHAIN_PATH/usr/bin/swift package init
           $TOOLCHAIN_PATH/usr/bin/swift build --triple wasm32-unknown-wasi
-      - name: Upload hello.wasm compiled with Linux package
+      - name: Upload hello.wasm compiled with Ubuntu 18.04 package
         uses: actions/upload-artifact@v1
         with:
           name: linux-hello.wasm
