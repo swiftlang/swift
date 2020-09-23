@@ -11,7 +11,7 @@ on:
       - swiftwasm-release/5.3
 
 jobs:
-  ubuntu_1804_build:
+  ubuntu1804_build:
     timeout-minutes: 0
     runs-on: ubuntu-18.04
 
@@ -48,8 +48,8 @@ jobs:
       - name: Upload Ubuntu 18.04 installable archive
         uses: actions/upload-artifact@v1
         with:
-          name: ubuntu_18.04-installable
-          path: ../swift-wasm-DEVELOPMENT-SNAPSHOT-linux.tar.gz
+          name: ubuntu18.04-installable
+          path: ../swift-wasm-DEVELOPMENT-SNAPSHOT-ubuntu18.04.tar.gz
 #      - name: Pack test results
 #        run: tar cJf swift-test-results.tar.gz ../build/*/swift-linux-x86_64/swift-test-results
 #      - name: Upload test results
@@ -58,7 +58,7 @@ jobs:
 #          name: linux-test-results
 #          path: ./swift-test-results.tar.gz
 
-  ubuntu_2004_build:
+  ubuntu2004_build:
     timeout-minutes: 0
     runs-on: ubuntu-20.04
 
@@ -91,11 +91,11 @@ jobs:
       - name: Build Ubuntu 20.04 installable archive
         run: |
           ./utils/webassembly/ci.sh
-#       - name: Upload Linux installable archive
-#         uses: actions/upload-artifact@v1
-#         with:
-#           name: linux-installable
-#           path: ../swift-wasm-DEVELOPMENT-SNAPSHOT-linux.tar.gz
+      - name: Upload Ubuntu 20.04 installable archive
+        uses: actions/upload-artifact@v1
+        with:
+          name: ubuntu20.04-installable
+          path: ../swift-wasm-DEVELOPMENT-SNAPSHOT-ubuntu20.04.tar.gz
 #      - name: Pack test results
 #        run: tar cJf swift-test-results.tar.gz ../build/*/swift-linux-x86_64/swift-test-results
 #      - name: Upload test results
@@ -140,6 +140,7 @@ jobs:
         with:
           name: macos-test-results
           path: ./swift-test-results.tar.gz
+
   macos_smoke_test:
     name: Run smoke tests on macOS
     runs-on: macos-latest
@@ -176,15 +177,15 @@ jobs:
           name: macos-hello.wasm
           path: hello.wasm
 
-  ubuntu_1804_smoke_test:
+  ubuntu1804_smoke_test:
     name: Run smoke tests on Ubuntu 18.04
     runs-on: ubuntu-18.04
-    needs: ubuntu_1804_build
+    needs: ubuntu1804_build
     steps:
       - name: Download installable Ubuntu 18.04 archive
         uses: actions/download-artifact@v1
         with:
-          name: ubuntu_18.04-installable
+          name: ubuntu18.04-installable
       - name: Build hello.wasm
         shell: bash
         run: |
@@ -209,5 +210,41 @@ jobs:
       - name: Upload hello.wasm compiled with Ubuntu 18.04 package
         uses: actions/upload-artifact@v1
         with:
-          name: linux-hello.wasm
+          name: ubuntu18.04-hello.wasm
+          path: hello.wasm
+
+  ubuntu2004_smoke_test:
+    name: Run smoke tests on Ubuntu 20.04
+    runs-on: ubuntu-20.04
+    needs: ubuntu2004_build
+    steps:
+      - name: Download installable Ubuntu 20.04 archive
+        uses: actions/download-artifact@v1
+        with:
+          name: ubuntu20.04-installable
+      - name: Build hello.wasm
+        shell: bash
+        run: |
+          set -x
+          tar xf $(find . -name "swift-wasm-*.tar.gz" -type f)
+          TOOLCHAIN_PATH=$(find "$PWD" -name "swift-wasm-*" -type d)
+          echo 'print("Hello, world!")' > hello.swift
+          $TOOLCHAIN_PATH/usr/bin/swiftc \
+                -target wasm32-unknown-wasi \
+                -sdk $TOOLCHAIN_PATH/usr/share/wasi-sysroot \
+                hello.swift -o hello.wasm && \
+                echo "Successfully linked hello.wasm"
+      - name: Test SwiftPM
+        shell: bash
+        run: |
+          set -x
+          TOOLCHAIN_PATH=$(find "$PWD" -name "swift-wasm-*" -type d)
+          mkdir test
+          cd test
+          $TOOLCHAIN_PATH/usr/bin/swift package init
+          $TOOLCHAIN_PATH/usr/bin/swift build --triple wasm32-unknown-wasi
+      - name: Upload hello.wasm compiled with Ubuntu 20.04 package
+        uses: actions/upload-artifact@v1
+        with:
+          name: ubuntu2004-hello.wasm
           path: hello.wasm

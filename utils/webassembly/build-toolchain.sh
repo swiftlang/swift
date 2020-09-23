@@ -14,7 +14,14 @@ case $(uname -s) in
     HOST_SUFFIX=macosx-x86_64
   ;;
   Linux)
-    OS_SUFFIX=linux
+    if [ $(grep RELEASE /etc/lsb-release) == "DISTRIB_RELEASE=18.04" ]; then
+      OS_SUFFIX=ubuntu18.04
+    elif [ $(grep RELEASE /etc/lsb-release) == "DISTRIB_RELEASE=20.04" ]; then
+      OS_SUFFIX=ubuntu20.04
+    else
+      echo "Unknown Ubuntu version"
+      exit 1
+    fi
     HOST_PRESET=webassembly-linux-host
     TARGET_PRESET=webassembly-linux-target
     HOST_SUFFIX=linux-x86_64
