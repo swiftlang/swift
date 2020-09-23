@@ -83,7 +83,7 @@
                 "icu": "release-65-1",
                 "yams": "3.0.1",
                 "cmake": "v3.16.5",
-                "indexstore-db": "master",
+                "indexstore-db": "main",
                 "sourcekit-lsp": "master",
                 "swift-format": "master",
                 "tensorflow-swift-apis": "master"
@@ -114,7 +114,7 @@
                 "icu": "release-65-1",
                 "yams": "3.0.1",
                 "cmake": "v3.16.5",
-                "indexstore-db": "master",
+                "indexstore-db": "main",
                 "sourcekit-lsp": "master",
                 "swift-format": "master",
                 "tensorflow-swift-apis": "master"
@@ -135,7 +135,7 @@
                 "swift-integration-tests": "swift-3.0-branch",
                 "swift-xcode-playground-support": "swift-3.0-branch",
                 "ninja": "release",
-                "indexstore-db": "master",
+                "indexstore-db": "main",
                 "sourcekit-lsp": "master",
                 "swift-format": "master"
             }
@@ -156,7 +156,7 @@
                 "swift-integration-tests": "swift-3.1-branch",
                 "swift-xcode-playground-support": "swift-3.1-branch",
                 "ninja": "release",
-                "indexstore-db": "master",
+                "indexstore-db": "main",
                 "sourcekit-lsp": "master",
                 "swift-format": "master"
             }
@@ -177,7 +177,7 @@
                 "swift-integration-tests": "swift-4.0-branch",
                 "swift-xcode-playground-support": "swift-4.0-branch",
                 "ninja": "release",
-                "indexstore-db": "master",
+                "indexstore-db": "main",
                 "sourcekit-lsp": "master",
                 "swift-format": "master"
             }
@@ -198,7 +198,7 @@
                 "swift-integration-tests": "swift-4.1-branch",
                 "swift-xcode-playground-support": "swift-4.1-branch",
                 "ninja": "release",
-                "indexstore-db": "master",
+                "indexstore-db": "main",
                 "sourcekit-lsp": "master",
                 "swift-format": "master"
             }
@@ -219,7 +219,7 @@
                 "swift-integration-tests": "swift-4.2-branch",
                 "swift-xcode-playground-support": "swift-4.2-branch",
                 "ninja": "release",
-                "indexstore-db": "master",
+                "indexstore-db": "main",
                 "sourcekit-lsp": "master",
                 "swift-format": "master"
             }
@@ -241,7 +241,7 @@
                 "swift-xcode-playground-support": "swift-5.0-branch",
                 "ninja": "release",
                 "icu": "release-61-1",
-                "indexstore-db": "master",
+                "indexstore-db": "main",
                 "sourcekit-lsp": "master",
                 "swift-format": "master"
             }
@@ -339,7 +339,7 @@
                 "icu": "release-65-1",
                 "yams": "3.0.1",
                 "cmake": "v3.16.5",
-                "indexstore-db": "master",
+                "indexstore-db": "main",
                 "sourcekit-lsp": "master",
                 "swift-format": "master"
             }
