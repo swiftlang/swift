@@ -345,17 +345,10 @@ public:
   virtual SourceRange sourceRangeForDeferredExpansion() const;
 
 public:
-  virtual NullablePtr<AbstractStorageDecl>
-  getEnclosingAbstractStorageDecl() const;
-
   bool isATypeDeclScope() const;
 
 private:
   virtual ScopeCreator &getScopeCreator();
-
-#pragma mark - - creation queries
-public:
-  virtual bool isThisAnAbstractStorageDecl() const { return false; }
 
 #pragma mark - lookup
 
@@ -849,9 +842,6 @@ protected:
   void printSpecifics(llvm::raw_ostream &out) const override;
 
 public:
-  NullablePtr<AbstractStorageDecl>
-  getEnclosingAbstractStorageDecl() const override;
-
   NullablePtr<const void> addressForPrinting() const override {
     return paramList;
   }
@@ -887,9 +877,6 @@ public:
   virtual NullablePtr<Decl> getDeclIfAny() const override { return decl; }
   Decl *getDecl() const { return decl; }
 
-  NullablePtr<AbstractStorageDecl>
-  getEnclosingAbstractStorageDecl() const override;
-
   NullablePtr<const void> getReferrent() const override;
 
 protected:
@@ -914,8 +901,7 @@ protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
 
 private:
-  AnnotatedInsertionPoint
-  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
   SourceLoc fixupEndForBadInput(SourceRange) const;
 
 public:
@@ -924,17 +910,16 @@ public:
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   virtual NullablePtr<DeclContext> getDeclContext() const override;
 
-  NullablePtr<AbstractStorageDecl>
-  getEnclosingAbstractStorageDecl() const override;
   NullablePtr<const void> addressForPrinting() const override { return params; }
 };
 
-class AbstractFunctionBodyScope : public ASTScopeImpl {
+/// Body of functions, methods, constructors, destructors and accessors.
+class FunctionBodyScope : public ASTScopeImpl {
 public:
   AbstractFunctionDecl *const decl;
 
-  AbstractFunctionBodyScope(AbstractFunctionDecl *e) : decl(e) {}
-  virtual ~AbstractFunctionBodyScope() {}
+  FunctionBodyScope(AbstractFunctionDecl *e) : decl(e) {}
+  virtual ~FunctionBodyScope() {}
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
@@ -956,17 +941,9 @@ protected:
   bool lookupLocalsOrMembers(DeclConsumer) const override;
 
 public:
+  std::string getClassName() const override;
   NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion() override;
   SourceRange sourceRangeForDeferredExpansion() const override;
-};
-
-/// Body of functions and methods.
-class FunctionBodyScope final : public AbstractFunctionBodyScope {
-public:
-  FunctionBodyScope(AbstractFunctionDecl *e)
-      : AbstractFunctionBodyScope(e) {}
-  std::string getClassName() const override;
-  bool lookupLocalsOrMembers(DeclConsumer consumer) const override;
 };
 
 class DefaultArgumentInitializerScope final : public ASTScopeImpl {
@@ -1001,17 +978,19 @@ public:
 
 class AttachedPropertyWrapperScope final : public ASTScopeImpl {
 public:
-  VarDecl *const decl;
+  CustomAttr *attr;
+  VarDecl *decl;
+
   /// Because we have to avoid request cycles, we approximate the test for an
   /// AttachedPropertyWrapper with one based on source location. We might get
   /// false positives, that that doesn't hurt anything. However, the result of
   /// the conservative source range computation doesn't seem to be stable. So
   /// keep the original here, and use it for source range queries.
-
   const SourceRange sourceRangeWhenCreated;
 
-  AttachedPropertyWrapperScope(VarDecl *e)
-      : decl(e), sourceRangeWhenCreated(getSourceRangeOfVarDecl(e)) {
+  AttachedPropertyWrapperScope(CustomAttr *attr, VarDecl *decl)
+      : attr(attr), decl(decl),
+        sourceRangeWhenCreated(attr->getTypeRepr()->getSourceRange()) {
     ASTScopeAssert(sourceRangeWhenCreated.isValid(),
                    "VarDecls must have ranges to be looked-up");
   }
@@ -1027,7 +1006,10 @@ public:
   NullablePtr<const void> addressForPrinting() const override { return decl; }
   virtual NullablePtr<DeclContext> getDeclContext() const override;
 
-  static SourceRange getSourceRangeOfVarDecl(const VarDecl *);
+  NullablePtr<DeclAttribute> getDeclAttributeIfAny() const override {
+    return attr;
+  }
+  NullablePtr<const void> getReferrent() const override;
 
 private:
   void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
@@ -1068,11 +1050,8 @@ public:
 
 protected:
   void printSpecifics(llvm::raw_ostream &out) const override;
-  void forEachVarDeclWithLocalizableAccessors(
-      ScopeCreator &scopeCreator, function_ref<void(VarDecl *)> foundOne) const;
 
 public:
-  bool isLastEntry() const;
   NullablePtr<Decl> getDeclIfAny() const override { return decl; }
   Decl *getDecl() const { return decl; }
 };
@@ -1116,8 +1095,7 @@ protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
 
 private:
-  AnnotatedInsertionPoint
-  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
 
 public:
   std::string getClassName() const override;
@@ -1296,9 +1274,6 @@ public:
     return specializeAttr;
   }
 
-  NullablePtr<AbstractStorageDecl>
-  getEnclosingAbstractStorageDecl() const override;
-
   NullablePtr<DeclAttribute> getDeclAttributeIfAny() const override {
     return specializeAttr;
   }
@@ -1328,9 +1303,6 @@ public:
   NullablePtr<const void> addressForPrinting() const override {
     return differentiableAttr;
   }
-
-  NullablePtr<AbstractStorageDecl>
-  getEnclosingAbstractStorageDecl() const override;
 
   NullablePtr<DeclAttribute> getDeclAttributeIfAny() const override {
     return differentiableAttr;
@@ -1373,44 +1345,6 @@ public:
 
 protected:
   NullablePtr<const GenericParamList> genericParams() const override;
-  NullablePtr<AbstractStorageDecl>
-  getEnclosingAbstractStorageDecl() const override {
-    return decl;
-  }
-public:
-  bool isThisAnAbstractStorageDecl() const override { return true; }
-};
-
-class VarDeclScope final : public ASTScopeImpl {
-
-public:
-  VarDecl *const decl;
-  VarDeclScope(VarDecl *e) : decl(e) {}
-  virtual ~VarDeclScope() {}
-
-protected:
-  ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
-
-private:
-  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
-
-public:
-  std::string getClassName() const override;
-  SourceRange
-  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
-
-protected:
-  void printSpecifics(llvm::raw_ostream &out) const override;
-
-public:
-  virtual NullablePtr<Decl> getDeclIfAny() const override { return decl; }
-  Decl *getDecl() const { return decl; }
-  NullablePtr<const void> getReferrent() const override;
-  NullablePtr<AbstractStorageDecl>
-  getEnclosingAbstractStorageDecl() const override {
-    return decl;
-  }
-  bool isThisAnAbstractStorageDecl() const override { return true; }
 };
 
 class EnumElementScope : public ASTScopeImpl {
