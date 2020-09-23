@@ -353,10 +353,6 @@ public:
 private:
   virtual ScopeCreator &getScopeCreator();
 
-#pragma mark - - creation queries
-public:
-  virtual bool isThisAnAbstractStorageDecl() const { return false; }
-
 #pragma mark - lookup
 
 public:
@@ -1370,8 +1366,6 @@ protected:
   getEnclosingAbstractStorageDecl() const override {
     return decl;
   }
-public:
-  bool isThisAnAbstractStorageDecl() const override { return true; }
 };
 
 class VarDeclScope final : public ASTScopeImpl {
@@ -1403,7 +1397,6 @@ public:
   getEnclosingAbstractStorageDecl() const override {
     return decl;
   }
-  bool isThisAnAbstractStorageDecl() const override { return true; }
 };
 
 class EnumElementScope : public ASTScopeImpl {
