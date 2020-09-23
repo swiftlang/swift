@@ -80,7 +80,7 @@ jobs:
             ${{ runner.os }}-sccache-v10-
       - name: Build macOS installable archive
         run: |
-          sudo xcode-select --switch /Applications/Xcode_12_beta.app/Contents/Developer/
+          sudo xcode-select --switch /Applications/Xcode_12.app/Contents/Developer/
           ./utils/webassembly/ci.sh
       - name: Upload macOS installable archive
         uses: actions/upload-artifact@v1
