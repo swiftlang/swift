@@ -157,9 +157,6 @@ def disable_target_os_checking :
 def crosscheck_unqualified_lookup : Flag<["-"], "crosscheck-unqualified-lookup">,
   HelpText<"Compare legacy DeclContext- to ASTScope-based unqualified name lookup (for debugging)">;
 
-def stress_astscope_lookup : Flag<["-"], "stress-astscope-lookup">,
-  HelpText<"Stress ASTScope-based unqualified name lookup (for testing)">;
-  
 def use_clang_function_types : Flag<["-"], "use-clang-function-types">,
   HelpText<"Use stored Clang function types for computing canonical types.">;
 

@@ -5740,19 +5740,19 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(TypeVariableType, Type)
 /// because the expression is ambiguous. This type is only used by the
 /// constraint solver and transformed into UnresolvedType to be used in AST.
 class HoleType : public TypeBase {
-  using OriginatorType =
-      llvm::PointerUnion<TypeVariableType *, DependentMemberType *>;
+  using Originator = llvm::PointerUnion<TypeVariableType *,
+                                        DependentMemberType *, VarDecl *>;
 
-  OriginatorType Originator;
+  Originator O;
 
-  HoleType(ASTContext &C, OriginatorType originator,
+  HoleType(ASTContext &C, Originator originator,
            RecursiveTypeProperties properties)
-      : TypeBase(TypeKind::Hole, &C, properties), Originator(originator) {}
+      : TypeBase(TypeKind::Hole, &C, properties), O(originator) {}
 
 public:
-  static Type get(ASTContext &ctx, OriginatorType originatorType);
+  static Type get(ASTContext &ctx, Originator originator);
 
-  OriginatorType getOriginatorType() const { return Originator; }
+  Originator getOriginator() const { return O; }
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Hole;

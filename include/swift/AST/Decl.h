@@ -1948,8 +1948,6 @@ private:
   CaptureInfo getCaptureInfo() const { return Captures; }
   void setCaptureInfo(CaptureInfo captures) { Captures = captures; }
 
-  unsigned getNumBoundVariables() const;
-
 private:
   SourceLoc getLastAccessorEndLoc() const;
 };

@@ -105,9 +105,9 @@
             }
         },
        "main": {
-            "aliases": ["master", "swift/master", "main"],
+            "aliases": ["master", "swift/main", "main"],
             "repos": {
-                "llvm-project": "swift/master",
+                "llvm-project": "swift/main",
                 "swift": "main",
                 "cmark": "main",
                 "llbuild": "main",
@@ -133,11 +133,11 @@
         },
         "next" : {
             "aliases": ["next", "master-next",
-                        "swift/master-next",
+                        "swift/next",
                         "stable-next", "upstream",
                         "next-upstream", "upstream-with-swift"],
             "repos": {
-                "llvm-project": "swift/master-next",
+                "llvm-project": "swift/next",
                 "swift": "next",
                 "cmark": "main",
                 "llbuild": "main",
