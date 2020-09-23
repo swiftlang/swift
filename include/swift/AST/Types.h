@@ -3888,7 +3888,7 @@ class SILFunctionType final
       public llvm::FoldingSetNode,
       private llvm::TrailingObjects<SILFunctionType, SILParameterInfo,
                                     SILResultInfo, SILYieldInfo,
-                                    SubstitutionMap, CanType> {
+                                    SubstitutionMap, CanType, ClangTypeInfo> {
   friend TrailingObjects;
 
   size_t numTrailingObjects(OverloadToken<SILParameterInfo>) const {
@@ -3910,6 +3910,10 @@ class SILFunctionType final
   size_t numTrailingObjects(OverloadToken<SubstitutionMap>) const {
     return size_t(hasPatternSubstitutions()) +
            size_t(hasInvocationSubstitutions());
+  }
+
+  size_t numTrailingObjects(OverloadToken<ClangTypeInfo>) const {
+    return Bits.SILFunctionType.HasClangTypeInfo ? 1 : 0;
   }
 
 public:
