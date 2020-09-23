@@ -948,7 +948,6 @@ CREATES_NEW_INSERTION_POINT(ASTSourceFileScope)
 CREATES_NEW_INSERTION_POINT(ConditionalClauseScope)
 CREATES_NEW_INSERTION_POINT(GuardStmtScope)
 CREATES_NEW_INSERTION_POINT(PatternEntryDeclScope)
-CREATES_NEW_INSERTION_POINT(PatternEntryInitializerScope)
 CREATES_NEW_INSERTION_POINT(GenericTypeOrExtensionScope)
 CREATES_NEW_INSERTION_POINT(BraceStmtScope)
 CREATES_NEW_INSERTION_POINT(TopLevelCodeScope)
@@ -958,6 +957,7 @@ NO_NEW_INSERTION_POINT(AbstractFunctionDeclScope)
 NO_NEW_INSERTION_POINT(AttachedPropertyWrapperScope)
 NO_NEW_INSERTION_POINT(EnumElementScope)
 NO_NEW_INSERTION_POINT(ParameterListScope)
+NO_NEW_INSERTION_POINT(PatternEntryInitializerScope)
 
 NO_NEW_INSERTION_POINT(CaptureListScope)
 NO_NEW_INSERTION_POINT(CaseStmtScope)
@@ -1046,19 +1046,12 @@ PatternEntryDeclScope::expandAScopeThatCreatesANewInsertionPoint(
                              "code just goes in the same scope as this one"};
 }
 
-AnnotatedInsertionPoint
-PatternEntryInitializerScope::expandAScopeThatCreatesANewInsertionPoint(
+void
+PatternEntryInitializerScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   // Create a child for the initializer expression.
   scopeCreator.addToScopeTree(ASTNode(getPatternEntry().getOriginalInit()),
                               this);
-  if (handleUseBeforeDef)
-    return {this, "PatternEntryDeclScope::expand.* needs initializer scope to "
-                  "get its endpoint in order to push back start of "
-                  "PatternEntryUseScope"};
-
-  // null pointer here blows up request printing
-  return {getParent().get(), "Unused"};
 }
 
 AnnotatedInsertionPoint
