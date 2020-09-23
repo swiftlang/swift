@@ -362,8 +362,7 @@ SourceRange AbstractFunctionDeclScope::getSourceRangeOfThisASTNode(
 
 SourceRange ParameterListScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
-  const auto rangeForGoodInput =
-      getSourceRangeOfEnclosedParamsOfASTNode(omitAssertions);
+  auto rangeForGoodInput = params->getSourceRange();
   auto r = SourceRange(rangeForGoodInput.Start,
                        fixupEndForBadInput(rangeForGoodInput));
   ASTScopeAssert(getSourceManager().rangeContains(
@@ -670,52 +669,6 @@ void ASTScopeImpl::widenSourceRangeForIgnoredASTNode(const ASTNode n) {
     sourceRangeOfIgnoredASTNodes = r;
   else
     sourceRangeOfIgnoredASTNodes.widen(r);
-}
-
-#pragma mark getSourceRangeOfEnclosedParamsOfASTNode
-
-SourceRange ASTScopeImpl::getSourceRangeOfEnclosedParamsOfASTNode(
-    const bool omitAssertions) const {
-  return getParent().get()->getSourceRangeOfEnclosedParamsOfASTNode(
-      omitAssertions);
-}
-
-SourceRange EnumElementScope::getSourceRangeOfEnclosedParamsOfASTNode(
-    bool omitAssertions) const {
-  auto *pl = decl->getParameterList();
-  return pl ? pl->getSourceRange() : SourceRange();
-}
-
-SourceRange SubscriptDeclScope::getSourceRangeOfEnclosedParamsOfASTNode(
-    const bool omitAssertions) const {
-  auto r = SourceRange(decl->getIndices()->getLParenLoc(), decl->getEndLoc());
-  // Because of "subscript(x: MyStruct#^PARAM_1^#) -> Int { return 0 }"
-  // Cannot just use decl->getEndLoc()
-  r.widen(decl->getIndices()->getRParenLoc());
-  return r;
-}
-
-SourceRange AbstractFunctionDeclScope::getSourceRangeOfEnclosedParamsOfASTNode(
-    const bool omitAssertions) const {
-  const auto s = getParmsSourceLocOfAFD(decl);
-  const auto e = getSourceRangeOfThisASTNode(omitAssertions).End;
-  return s.isInvalid() || e.isInvalid() ? SourceRange() : SourceRange(s, e);
-}
-
-SourceLoc
-AbstractFunctionDeclScope::getParmsSourceLocOfAFD(AbstractFunctionDecl *decl) {
-  if (auto *c = dyn_cast<ConstructorDecl>(decl))
-    return c->getParameters()->getLParenLoc();
-
-  if (auto *dd = dyn_cast<DestructorDecl>(decl))
-    return dd->getNameLoc();
-
-  auto *fd = cast<FuncDecl>(decl);
-  // clang-format off
-  return isa<AccessorDecl>(fd) ? fd->getLoc()
-       : fd->isDeferBody()     ? fd->getNameLoc()
-       :                         fd->getParameters()->getLParenLoc();
-  // clang-format on
 }
 
 SourceLoc getLocAfterExtendedNominal(const ExtensionDecl *const ext) {
