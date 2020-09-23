@@ -945,7 +945,6 @@ ASTScopeImpl *ASTScopeImpl::expandAndBeCurrent(ScopeCreator &scopeCreator) {
   ASTScopeImpl *Scope::expandSpecifically(ScopeCreator &) { return this; }
 
 CREATES_NEW_INSERTION_POINT(ASTSourceFileScope)
-CREATES_NEW_INSERTION_POINT(ParameterListScope)
 CREATES_NEW_INSERTION_POINT(ConditionalClauseScope)
 CREATES_NEW_INSERTION_POINT(GuardStmtScope)
 CREATES_NEW_INSERTION_POINT(PatternEntryDeclScope)
@@ -958,6 +957,7 @@ NO_NEW_INSERTION_POINT(FunctionBodyScope)
 NO_NEW_INSERTION_POINT(AbstractFunctionDeclScope)
 NO_NEW_INSERTION_POINT(AttachedPropertyWrapperScope)
 NO_NEW_INSERTION_POINT(EnumElementScope)
+NO_NEW_INSERTION_POINT(ParameterListScope)
 
 NO_NEW_INSERTION_POINT(CaptureListScope)
 NO_NEW_INSERTION_POINT(CaseStmtScope)
@@ -1000,8 +1000,8 @@ ASTSourceFileScope::expandAScopeThatCreatesANewInsertionPoint(
   return {insertionPoint, "Next time decls are added they go here."};
 }
 
-AnnotatedInsertionPoint
-ParameterListScope::expandAScopeThatCreatesANewInsertionPoint(
+void
+ParameterListScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   // Each initializer for a function parameter is its own, sibling, scope.
   // Unlike generic parameters or pattern initializers, it cannot refer to a
@@ -1012,7 +1012,6 @@ ParameterListScope::expandAScopeThatCreatesANewInsertionPoint(
           .constructExpandAndInsertUncheckable<DefaultArgumentInitializerScope>(
               this, pd);
   }
-  return {this, "body of func goes under me"};
 }
 
 AnnotatedInsertionPoint

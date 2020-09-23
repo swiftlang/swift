@@ -910,8 +910,7 @@ protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
 
 private:
-  AnnotatedInsertionPoint
-  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
   SourceLoc fixupEndForBadInput(SourceRange) const;
 
 public:
