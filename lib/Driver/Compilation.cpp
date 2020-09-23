@@ -108,7 +108,6 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          std::unique_ptr<DerivedArgList> TranslatedArgs,
                          InputFileList InputsWithTypes,
                          std::string CompilationRecordPath,
-                         bool OutputCompilationRecordForModuleOnlyBuild,
                          StringRef ArgsHash,
                          llvm::sys::TimePoint<> StartTime,
                          llvm::sys::TimePoint<> LastBuildTime,
@@ -140,8 +139,6 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     BuildStartTime(StartTime),
     LastBuildTime(LastBuildTime),
     EnableIncrementalBuild(EnableIncrementalBuild),
-    OutputCompilationRecordForModuleOnlyBuild(
-        OutputCompilationRecordForModuleOnlyBuild),
     EnableBatchMode(EnableBatchMode),
     BatchSeed(BatchSeed),
     BatchCount(BatchCount),
@@ -1815,12 +1812,6 @@ int Compilation::performJobsImpl(bool &abnormalExit,
     checkForOutOfDateInputs(Diags, InputInfo);
     writeCompilationRecord(CompilationRecordPath, ArgsHash, BuildStartTime,
                            InputInfo);
-
-    if (OutputCompilationRecordForModuleOnlyBuild) {
-      // TODO: Optimize with clonefile(2) ?
-      llvm::sys::fs::copy_file(CompilationRecordPath,
-                               CompilationRecordPath + "~moduleonly");
-    }
   }
   abnormalExit = State.hadAnyAbnormalExit();
   return State.getResult();

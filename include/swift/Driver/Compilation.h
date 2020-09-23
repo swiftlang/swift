@@ -206,15 +206,6 @@ private:
   /// of date.
   bool EnableIncrementalBuild;
 
-  /// When true, emit duplicated compilation record file whose filename is
-  /// suffixed with '~moduleonly'.
-  ///
-  /// This compilation record is used by '-emit-module'-only incremental builds
-  /// so that module-only builds do not affect compilation record file for
-  /// normal builds, while module-only incremental builds are able to use
-  /// artifacts of normal builds if they are already up to date.
-  bool OutputCompilationRecordForModuleOnlyBuild = false;
-
   /// Indicates whether groups of parallel frontend jobs should be merged
   /// together and run in composite "batch jobs" when possible, to reduce
   /// redundant work.
@@ -313,7 +304,6 @@ public:
               std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs,
               InputFileList InputsWithTypes,
               std::string CompilationRecordPath,
-              bool OutputCompilationRecordForModuleOnlyBuild,
               StringRef ArgsHash, llvm::sys::TimePoint<> StartTime,
               llvm::sys::TimePoint<> LastBuildTime,
               size_t FilelistThreshold,
