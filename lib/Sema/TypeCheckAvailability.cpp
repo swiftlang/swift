@@ -1566,7 +1566,10 @@ static bool isInsideCompatibleUnavailableDeclaration(
   auto IsUnavailable = [platform](const Decl *D) {
     auto EnclosingUnavailable =
         D->getAttrs().getUnavailable(D->getASTContext());
-    return EnclosingUnavailable && EnclosingUnavailable->Platform == platform;
+    return EnclosingUnavailable &&
+        (EnclosingUnavailable->Platform == platform ||
+         inheritsAvailabilityFromPlatform(platform,
+           EnclosingUnavailable->Platform));
   };
 
   return someEnclosingDeclMatches(ReferenceRange, ReferenceDC, IsUnavailable);
