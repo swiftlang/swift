@@ -499,7 +499,7 @@ struct PrintOptions {
   }
 
   /// Retrieve the set of options suitable for diagnostics printing.
-  static PrintOptions printForDiagnostics() {
+  static PrintOptions printForDiagnostics(AccessLevel accessFilter) {
     PrintOptions result = printVerbose();
     result.PrintAccess = true;
     result.Indent = 4;
@@ -512,7 +512,7 @@ struct PrintOptions {
     result.ExcludeAttrList.push_back(DAK_Optimize);
     result.ExcludeAttrList.push_back(DAK_Rethrows);
     result.PrintOverrideKeyword = false;
-    result.AccessFilter = AccessLevel::Public;
+    result.AccessFilter = accessFilter;
     result.PrintIfConfig = false;
     result.ShouldQualifyNestedDeclarations =
         QualifyNestedDeclarations::TypesOnly;
@@ -522,7 +522,7 @@ struct PrintOptions {
 
   /// Retrieve the set of options suitable for interface generation.
   static PrintOptions printInterface() {
-    PrintOptions result = printForDiagnostics();
+    PrintOptions result = printForDiagnostics(AccessLevel::Public);
     result.SkipUnavailable = true;
     result.SkipImplicit = true;
     result.SkipSwiftPrivateClangDecls = true;
