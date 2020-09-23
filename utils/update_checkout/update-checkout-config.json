@@ -58,7 +58,7 @@
             "aliases": ["master", "swift/master", "main"],
             "repos": {
                 "llvm-project": "swift/master",
-                "swift": "master",
+                "swift": "main",
                 "cmark": "main",
                 "llbuild": "main",
                 "swift-tools-support-core": "main",
