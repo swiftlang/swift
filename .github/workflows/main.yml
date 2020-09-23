@@ -184,7 +184,7 @@ jobs:
       - name: Download installable Linux archive
         uses: actions/download-artifact@v1
         with:
-          name: linux-installable
+          name: ubuntu_18.04-installable
       - name: Build hello.wasm
         shell: bash
         run: |
