@@ -8531,6 +8531,12 @@ bool ConstraintSystem::simplifyAppliedOverloadsImpl(
     Constraint *disjunction, TypeVariableType *fnTypeVar,
     const FunctionType *argFnType, unsigned numOptionalUnwraps,
     ConstraintLocatorBuilder locator) {
+  // Don't attempt to filter overloads when solving for code completion
+  // because presence of code completion token means that any call
+  // could be malformed e.g. missing arguments e.g. `foo([.#^MEMBER^#`
+  if (isForCodeCompletion())
+    return false;
+
   if (shouldAttemptFixes()) {
     auto arguments = argFnType->getParams();
     bool allHoles =
