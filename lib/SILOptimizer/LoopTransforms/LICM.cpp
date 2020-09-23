@@ -505,6 +505,7 @@ class LoopTreeOptimization {
   llvm::DenseMap<SILLoop *, std::unique_ptr<LoopNestSummary>>
       LoopNestSummaryMap;
   SmallVector<SILLoop *, 8> BotUpWorkList;
+  InstSet toDelete;
   SILLoopInfo *LoopInfo;
   AliasAnalysis *AA;
   SideEffectAnalysis *SEA;
@@ -525,6 +526,8 @@ class LoopTreeOptimization {
   InstVector SinkDown;
 
   /// Load and store instructions that we may be able to move out of the loop.
+  /// All loads and stores within a block must be in instruction order to
+  /// simplify replacement of values after SSA update.
   InstVector LoadsAndStores;
 
   /// All access paths of the \p LoadsAndStores instructions.
@@ -561,12 +564,22 @@ protected:
   /// Collect a set of instructions that can be hoisted
   void analyzeCurrentLoop(std::unique_ptr<LoopNestSummary> &CurrSummary);
 
+  SingleValueInstruction *splitLoad(SILValue splitAddress,
+                                    ArrayRef<AccessPath::Index> remainingPath,
+                                    SILBuilder &builder,
+                                    SmallVectorImpl<LoadInst *> &Loads,
+                                    unsigned ldStIdx);
+
+  /// Given an \p accessPath that is only loaded and stored, split loads that
+  /// are wider than \p accessPath.
+  bool splitLoads(SmallVectorImpl<LoadInst *> &Loads, AccessPath accessPath,
+                  SILValue storeAddr);
+
   /// Optimize the current loop nest.
   bool optimizeLoop(std::unique_ptr<LoopNestSummary> &CurrSummary);
 
-  /// Move all loads and stores from/to \p access out of the \p loop.
-  void hoistLoadsAndStores(AccessPath accessPath, SILLoop *loop,
-                           InstVector &toDelete);
+  /// Move all loads and stores from/to \p accessPath out of the \p loop.
+  void hoistLoadsAndStores(AccessPath accessPath, SILLoop *loop);
 
   /// Move all loads and stores from all addresses in LoadAndStoreAddrs out of
   /// the \p loop.
@@ -799,6 +812,8 @@ static bool analyzeBeginAccess(BeginAccessInst *BI,
 // We *need* to discover all SideEffectInsts -
 // even if the loop is otherwise skipped!
 // This is because outer loops will depend on the inner loop's writes.
+//
+// This may split some loads into smaller loads.
 void LoopTreeOptimization::analyzeCurrentLoop(
     std::unique_ptr<LoopNestSummary> &CurrSummary) {
   InstSet &sideEffects = CurrSummary->SideEffectInsts;
@@ -915,15 +930,22 @@ void LoopTreeOptimization::analyzeCurrentLoop(
 
   // Collect memory locations for which we can move all loads and stores out
   // of the loop.
+  //
+  // Note: The Loads set and LoadsAndStores set may mutate during this loop.
   for (StoreInst *SI : Stores) {
     // Use AccessPathWithBase to recover a base address that can be used for
     // newly inserted memory operations. If we instead teach hoistLoadsAndStores
     // how to rematerialize global_addr, then we don't need this base.
     auto access = AccessPathWithBase::compute(SI->getDest());
-    if (access.accessPath.isValid() && isLoopInvariant(access.base, Loop)) {
+    auto accessPath = access.accessPath;
+    if (accessPath.isValid() && isLoopInvariant(access.base, Loop)) {
       if (isOnlyLoadedAndStored(AA, sideEffects, Loads, Stores, SI->getDest(),
-                                access.accessPath)) {
-        LoadAndStoreAddrs.insert(accessPath);
+                                accessPath)) {
+        if (!LoadAndStoreAddrs.count(accessPath)) {
+          if (splitLoads(Loads, accessPath, SI->getDest())) {
+            LoadAndStoreAddrs.insert(accessPath);
+          }
+        }
       }
     }
   }
@@ -950,6 +972,172 @@ void LoopTreeOptimization::analyzeCurrentLoop(
   }
 }
 
+// Recursively determine whether the innerAddress is a direct tuple or struct
+// projection chain from outerPath. Populate \p reversePathIndices with the path
+// difference.
+static bool
+computeInnerAccessPath(AccessPath::PathNode outerPath,
+                       AccessPath::PathNode innerPath, SILValue innerAddress,
+                       SmallVectorImpl<AccessPath::Index> &reversePathIndices) {
+  if (outerPath == innerPath)
+    return true;
+
+  if (!isa<StructElementAddrInst>(innerAddress)
+      && !isa<TupleElementAddrInst>(innerAddress)) {
+    return false;
+  }
+  assert(ProjectionIndex(innerAddress).Index
+         == innerPath.getIndex().getSubObjectIndex());
+
+  reversePathIndices.push_back(innerPath.getIndex());
+  SILValue srcAddr = cast<SingleValueInstruction>(innerAddress)->getOperand(0);
+  if (!computeInnerAccessPath(outerPath, innerPath.getParent(), srcAddr,
+                              reversePathIndices)) {
+    return false;
+  }
+  return true;
+}
+
+/// Split a load from \p outerAddress recursively following remainingPath.
+///
+/// Creates a load with identical \p accessPath and a set of
+/// non-overlapping loads. Add the new non-overlapping loads to HoistUp.
+///
+/// \p ldstIdx is the index into LoadsAndStores of the original outer load.
+///
+/// Return the aggregate produced by merging the loads.
+SingleValueInstruction *LoopTreeOptimization::splitLoad(
+    SILValue splitAddress, ArrayRef<AccessPath::Index> remainingPath,
+    SILBuilder &builder, SmallVectorImpl<LoadInst *> &Loads, unsigned ldstIdx) {
+  auto loc = LoadsAndStores[ldstIdx]->getLoc();
+  // Recurse until we have a load that matches accessPath.
+  if (remainingPath.empty()) {
+    // Create a load that matches the stored access path.
+    LoadInst *load = builder.createLoad(loc, splitAddress,
+                                        LoadOwnershipQualifier::Unqualified);
+    Loads.push_back(load);
+    // Replace the outer load in the list of loads and stores to hoist and
+    // sink. LoadsAndStores must remain in instruction order.
+    LoadsAndStores[ldstIdx] = load;
+    LLVM_DEBUG(llvm::dbgs() << "Created load from stored path: " << *load);
+    return load;
+  }
+  auto recordDisjointLoad = [&](LoadInst *newLoad) {
+    Loads.push_back(newLoad);
+    LoadsAndStores.insert(LoadsAndStores.begin() + ldstIdx + 1, newLoad);
+  };
+  auto subIndex = remainingPath.back().getSubObjectIndex();
+  SILType loadTy = splitAddress->getType();
+  if (CanTupleType tupleTy = loadTy.getAs<TupleType>()) {
+    SmallVector<SILValue, 4> elements;
+    for (int tupleIdx : range(tupleTy->getNumElements())) {
+      auto *projection = builder.createTupleElementAddr(
+          loc, splitAddress, tupleIdx, loadTy.getTupleElementType(tupleIdx));
+      SILValue elementVal;
+      if (tupleIdx == subIndex) {
+        elementVal = splitLoad(projection, remainingPath.drop_back(), builder,
+                               Loads, ldstIdx);
+      } else {
+        elementVal = builder.createLoad(loc, projection,
+                                        LoadOwnershipQualifier::Unqualified);
+        recordDisjointLoad(cast<LoadInst>(elementVal));
+      }
+      elements.push_back(elementVal);
+    }
+    return builder.createTuple(loc, elements);
+  }
+  auto structTy = loadTy.getStructOrBoundGenericStruct();
+  assert(structTy && "tuple and struct elements are checked earlier");
+  auto &module = builder.getModule();
+  auto expansionContext = builder.getFunction().getTypeExpansionContext();
+
+  SmallVector<SILValue, 4> elements;
+  int fieldIdx = 0;
+  for (auto *field : structTy->getStoredProperties()) {
+    SILType fieldTy = loadTy.getFieldType(field, module, expansionContext);
+    auto *projection =
+        builder.createStructElementAddr(loc, splitAddress, field, fieldTy);
+    SILValue fieldVal;
+    if (fieldIdx++ == subIndex)
+      fieldVal = splitLoad(projection, remainingPath.drop_back(), builder,
+                           Loads, ldstIdx);
+    else {
+      fieldVal = builder.createLoad(loc, projection,
+                                    LoadOwnershipQualifier::Unqualified);
+      recordDisjointLoad(cast<LoadInst>(fieldVal));
+    }
+    elements.push_back(fieldVal);
+  }
+  return builder.createStruct(loc, loadTy.getObjectType(), elements);
+}
+
+/// Find all loads that contain \p accessPath. Split them into a load with
+/// identical accessPath and a set of non-overlapping loads. Add the new
+/// non-overlapping loads to LoadsAndStores and HoistUp.
+///
+/// TODO: The \p storeAddr parameter is only needed until we have an
+/// AliasAnalysis interface that handles AccessPath.
+bool LoopTreeOptimization::splitLoads(SmallVectorImpl<LoadInst *> &Loads,
+                                      AccessPath accessPath,
+                                      SILValue storeAddr) {
+  // The Loads set may mutate during this loop, but we only want to visit the
+  // original set.
+  for (unsigned loadsIdx = 0, endIdx = Loads.size(); loadsIdx != endIdx;
+       ++loadsIdx) {
+    auto *load = Loads[loadsIdx];
+    if (toDelete.count(load))
+      continue;
+
+    if (!AA->mayReadFromMemory(load, storeAddr))
+      continue;
+
+    AccessPath loadAccessPath = AccessPath::compute(load->getOperand());
+    if (accessPath.contains(loadAccessPath))
+      continue;
+
+    assert(loadAccessPath.contains(accessPath));
+    LLVM_DEBUG(llvm::dbgs() << "Overlaps with loop stores: " << *load);
+    SmallVector<AccessPath::Index, 4> reversePathIndices;
+    if (!computeInnerAccessPath(loadAccessPath.getPathNode(),
+                                accessPath.getPathNode(), storeAddr,
+                                reversePathIndices)) {
+      return false;
+    }
+    // Found a load wider than the store to accessPath.
+    //
+    // SplitLoads is called for each unique access path in the loop that is
+    // only loaded from and stored to and this loop takes time proportional to:
+    //   num-wide-loads x num-fields x num-loop-memops
+    //
+    // For each load wider than the store, it creates a new load for each field
+    // in that type. Each new load is inserted in the LoadsAndStores vector.  To
+    // avoid super-linear behavior for large types (e.g. giant tuples), limit
+    // growth of new loads to an arbitrary constant factor per access path.
+    if (Loads.size() >= endIdx + 6) {
+      LLVM_DEBUG(llvm::dbgs() << "...Refusing to split more loads\n");
+      return false;
+    }
+    LLVM_DEBUG(llvm::dbgs() << "...Splitting load\n");
+
+    unsigned ldstIdx = [this, load]() {
+      auto ldstIter = llvm::find(LoadsAndStores, load);
+      assert(ldstIter != LoadsAndStores.end() && "outerLoad missing");
+      return std::distance(LoadsAndStores.begin(), ldstIter);
+    }();
+
+    SILBuilderWithScope builder(load);
+
+    SILValue aggregateVal = splitLoad(load->getOperand(), reversePathIndices,
+                                      builder, Loads, ldstIdx);
+
+    load->replaceAllUsesWith(aggregateVal);
+    auto iterAndInserted = toDelete.insert(load);
+    (void)iterAndInserted;
+    assert(iterAndInserted.second && "the same load should only be split once");
+  }
+  return true;
+}
+
 bool LoopTreeOptimization::optimizeLoop(
     std::unique_ptr<LoopNestSummary> &CurrSummary) {
   auto *CurrentLoop = CurrSummary->Loop;
@@ -964,6 +1152,8 @@ bool LoopTreeOptimization::optimizeLoop(
   currChanged |= sinkInstructions(CurrSummary, DomTree, LoopInfo, SinkDown);
   currChanged |=
       hoistSpecialInstruction(CurrSummary, DomTree, LoopInfo, SpecialHoist);
+
+  assert(toDelete.empty() && "only hostAllLoadsAndStores deletes");
   return currChanged;
 }
 
@@ -1089,8 +1279,8 @@ storesCommonlyDominateLoopExits(AccessPath accessPath,
   return true;
 }
 
-void LoopTreeOptimization::hoistLoadsAndStores(
-    AccessPath accessPath, SILLoop *loop, InstVector &toDelete) {
+void LoopTreeOptimization::
+hoistLoadsAndStores(AccessPath accessPath, SILLoop *loop) {
   SmallVector<SILBasicBlock *, 4> exitingAndLatchBlocks;
   loop->getExitingAndLatchBlocks(exitingAndLatchBlocks);
 
@@ -1171,7 +1361,7 @@ void LoopTreeOptimization::hoistLoadsAndStores(
     if (auto *SI = isStoreToAccess(I, accessPath)) {
       LLVM_DEBUG(llvm::dbgs() << "Deleting reloaded store " << *SI);
       currentVal = SI->getSrc();
-      toDelete.push_back(SI);
+      toDelete.insert(SI);
       continue;
     }
     auto loadWithAccess = isLoadWithinAccess(I, accessPath);
@@ -1190,7 +1380,7 @@ void LoopTreeOptimization::hoistLoadsAndStores(
     LLVM_DEBUG(llvm::dbgs() << "Replacing stored load " << *load << " with "
                             << projectedValue);
     load->replaceAllUsesWith(projectedValue);
-    toDelete.push_back(load);
+    toDelete.insert(load);
   }
 
   // Store back the value at all loop exits.
@@ -1215,17 +1405,20 @@ void LoopTreeOptimization::hoistLoadsAndStores(
 }
 
 bool LoopTreeOptimization::hoistAllLoadsAndStores(SILLoop *loop) {
-  InstVector toDelete;
   for (AccessPath accessPath : LoadAndStoreAddrs) {
-    hoistLoadsAndStores(accessPath, loop, toDelete);
+    hoistLoadsAndStores(accessPath, loop);
   }
   LoadsAndStores.clear();
   LoadAndStoreAddrs.clear();
 
+  if (toDelete.empty())
+    return false;
+
   for (SILInstruction *I : toDelete) {
-    I->eraseFromParent();
+    recursivelyDeleteTriviallyDeadInstructions(I, /*force*/ true);
   }
-  return !toDelete.empty();
+  toDelete.clear();
+  return true;
 }
 
 namespace {
