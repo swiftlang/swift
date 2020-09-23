@@ -1061,7 +1061,6 @@ namespace {
                          AccessSemantics semantics) {
       auto choice = overload.choice;
       auto openedType = overload.openedType;
-      auto openedFullType = overload.openedFullType;
 
       ValueDecl *member = choice.getDecl();
 
@@ -1097,13 +1096,15 @@ namespace {
         return result;
       }
 
+      auto refTy = simplifyType(overload.openedFullType);
+
       // If we're referring to the member of a module, it's just a simple
       // reference.
       if (baseTy->is<ModuleType>()) {
         assert(semantics == AccessSemantics::Ordinary &&
                "Direct property access doesn't make sense for this");
         auto ref = new (context) DeclRefExpr(memberRef, memberLoc, Implicit);
-        cs.setType(ref, simplifyType(openedFullType));
+        cs.setType(ref, refTy);
         ref->setFunctionRefKind(choice.getFunctionRefKind());
         auto *DSBI = cs.cacheType(new (context) DotSyntaxBaseIgnoredExpr(
             base, dotLoc, ref, cs.getType(ref)));
@@ -1113,8 +1114,6 @@ namespace {
       bool isUnboundInstanceMember =
         (!baseIsInstance && member->isInstanceMember());
       bool isPartialApplication = shouldBuildCurryThunk(choice, baseIsInstance);
-
-      auto refTy = simplifyType(openedFullType);
 
       // The formal type of the 'self' value for the member's declaration.
       Type containerTy = getBaseType(refTy->castTo<FunctionType>());
@@ -1278,8 +1277,8 @@ namespace {
           = new (context) MemberRefExpr(base, dotLoc, memberRef,
                                         memberLoc, Implicit, semantics);
         memberRefExpr->setIsSuper(isSuper);
+        cs.setType(memberRefExpr, refTy->castTo<FunctionType>()->getResult());
 
-        cs.setType(memberRefExpr, simplifyType(openedType));
         Expr *result = memberRefExpr;
         closeExistential(result, locator);
 
