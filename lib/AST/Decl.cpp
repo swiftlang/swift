@@ -1560,12 +1560,6 @@ VarDecl *PatternBindingEntry::getAnchoringVarDecl() const {
   return variables[0];
 }
 
-unsigned PatternBindingEntry::getNumBoundVariables() const {
-  unsigned varCount = 0;
-  getPattern()->forEachVariable([&](VarDecl *) { ++varCount; });
-  return varCount;
-}
-
 SourceLoc PatternBindingEntry::getLastAccessorEndLoc() const {
   SourceLoc lastAccessorEnd;
   getPattern()->forEachVariable([&](VarDecl *var) {

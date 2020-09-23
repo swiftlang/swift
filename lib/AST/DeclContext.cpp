@@ -768,7 +768,6 @@ ArrayRef<Decl *> IterableDeclContext::getSemanticMembers() const {
 void IterableDeclContext::addMember(Decl *member, Decl *Hint) {
   // Add the member to the list of declarations without notification.
   addMemberSilently(member, Hint);
-  ++MemberCount;
 
   // Notify our parent declaration that we have added the member, which can
   // be used to update the lookup tables.
@@ -845,12 +844,6 @@ bool IterableDeclContext::hasUnparsedMembers() const {
   }
 
   return true;
-}
-
-unsigned IterableDeclContext::getMemberCount() const {
-  if (hasUnparsedMembers())
-    loadAllMembers();
-  return MemberCount;
 }
 
 void IterableDeclContext::loadAllMembers() const {
