@@ -1079,6 +1079,7 @@ public:
 
 protected:
   bool lookupLocalsOrMembers(DeclConsumer) const override;
+  bool isLabeledStmtLookupTerminator() const override;
 };
 
 class PatternEntryInitializerScope final : public AbstractPatternEntryScope {

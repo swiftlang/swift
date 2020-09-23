@@ -510,6 +510,10 @@ bool CaseStmtBodyScope::isLabeledStmtLookupTerminator() const {
   return false;
 }
 
+bool PatternEntryDeclScope::isLabeledStmtLookupTerminator() const {
+  return false;
+}
+
 llvm::SmallVector<LabeledStmt *, 4>
 ASTScopeImpl::lookupLabeledStmts(SourceFile *sourceFile, SourceLoc loc) {
   // Find the innermost scope from which to start our search.
