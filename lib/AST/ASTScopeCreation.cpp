@@ -1440,10 +1440,6 @@ void AbstractPatternEntryScope::forEachVarDeclWithLocalizableAccessors(
   });
 }
 
-bool AbstractPatternEntryScope::isLastEntry() const {
-  return patternEntryIndex + 1 == decl->getPatternList().size();
-}
-
 // Following must be after uses to ensure templates get instantiated
 #pragma mark getEnclosingAbstractStorageDecl
 

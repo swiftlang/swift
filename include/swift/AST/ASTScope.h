@@ -1065,7 +1065,6 @@ protected:
       ScopeCreator &scopeCreator, function_ref<void(VarDecl *)> foundOne) const;
 
 public:
-  bool isLastEntry() const;
   NullablePtr<Decl> getDeclIfAny() const override { return decl; }
   Decl *getDecl() const { return decl; }
 };
