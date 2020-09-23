@@ -3,7 +3,7 @@
 # Swift Programming Language
 
 
-| | **Architecture** | **Master** | **Package** |
+| | **Architecture** | **main** | **Package** |
 |---|:---:|:---:|:---:|
 | **macOS**        | x86_64 |[![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-osx/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-osx)|[![Build Status](https://ci.swift.org/job/oss-swift-package-osx/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-osx)|
 | **Ubuntu 16.04** | x86_64 | [![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_04)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_04)|
@@ -89,7 +89,7 @@ We also have an [FAQ](/docs/HowToGuides/FAQ.md) that answers common questions.
 #### Building
 
 Swift toolchains are created using the script
-[build-toolchain](https://github.com/apple/swift/blob/master/utils/build-toolchain). This
+[build-toolchain](https://github.com/apple/swift/blob/main/utils/build-toolchain). This
 script is used by swift.org's CI to produce snapshots and can allow for one to
 locally reproduce such builds for development or distribution purposes. A typical 
 invocation looks like the following:

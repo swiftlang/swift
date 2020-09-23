@@ -200,7 +200,7 @@ These commands will:
 3. Compare the obtained data to the baseline (stored in git) and HEAD (version of a compiler built without the PR changes)
 4. Report the results in a pull request comment
 
-For the detailed explanation of how compiler performance is measured, please refer to [this document](https://github.com/apple/swift/blob/master/docs/CompilerPerformance.md).
+For the detailed explanation of how compiler performance is measured, please refer to [this document](https://github.com/apple/swift/blob/main/docs/CompilerPerformance.md).
 
 ## Cross Repository Testing
 

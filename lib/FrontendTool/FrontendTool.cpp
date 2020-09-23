@@ -292,7 +292,7 @@ static bool isClangOverlayOf(ModuleDecl *potentialOverlay,
 }
 
 // TODO: Delete this once changes from https://reviews.llvm.org/D83449 land on
-// apple/llvm-project's swift/master branch.
+// apple/llvm-project's swift/main branch.
 template <typename SetLike, typename Item>
 static bool contains(const SetLike &setLike, Item item) {
   return setLike.find(item) != setLike.end();
