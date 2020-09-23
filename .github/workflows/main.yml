@@ -176,10 +176,10 @@ jobs:
           name: macos-hello.wasm
           path: hello.wasm
 
-  ubuntu_18.04_smoke_test:
+  ubuntu_1804_smoke_test:
     name: Run smoke tests on Linux
     runs-on: ubuntu-18.04
-    needs: ubuntu_18.04_build
+    needs: ubuntu_1804_build
     steps:
       - name: Download installable Linux archive
         uses: actions/download-artifact@v1
