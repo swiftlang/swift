@@ -7,6 +7,9 @@ func globalFunc() { }
 func acceptClosure<T>(_: () -> T) { }
 func acceptEscapingClosure<T>(_: @escaping () -> T) { }
 
+func acceptAsyncClosure<T>(_: () async -> T) { }
+func acceptEscapingAsyncClosure<T>(_: @escaping () async -> T) { }
+
 // ----------------------------------------------------------------------
 // Actor state isolation restrictions
 // ----------------------------------------------------------------------
@@ -28,7 +31,7 @@ actor class MyActor: MySuperActor {
   class func synchronousClass() { }
   static func synchronousStatic() { }
 
-  func synchronous() -> String { text.first ?? "nothing" } // expected-note 8{{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
+  func synchronous() -> String { text.first ?? "nothing" } // expected-note 18{{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
   func asynchronous() async -> String { synchronous() }
 }
 
@@ -62,8 +65,14 @@ extension MyActor {
     _ = mutableGlobal // expected-warning{{reference to var 'mutableGlobal' is not concurrency-safe because it involves shared mutable state}}
 
     // Partial application
-    _ = synchronous  // expected-error{{actor-isolated instance method 'synchronous()' can not be partially applied}}
-    _ = super.superMethod // expected-error{{actor-isolated instance method 'superMethod()' can not be partially applied}}
+    _ = synchronous  // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from an '@actorIndependent' context}}
+    _ = super.superMethod // expected-error{{actor-isolated instance method 'superMethod()' can not be referenced from an '@actorIndependent' context}}
+    acceptClosure(synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from an '@actorIndependent' context}}
+    acceptClosure(self.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from an '@actorIndependent' context}}
+    acceptClosure(otherActor.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can only be referenced on 'self'}}
+    acceptEscapingClosure(synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from an '@actorIndependent' context}}}}
+    acceptEscapingClosure(self.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from an '@actorIndependent'}}
+    acceptEscapingClosure(otherActor.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can only be referenced on 'self'}}
 
     return 5
   }
@@ -145,7 +154,16 @@ extension MyActor {
 
     // Partial application
     _ = synchronous  // expected-error{{actor-isolated instance method 'synchronous()' can not be partially applied}}
-    _ = super.superMethod // expected-error{{actor-isolated instance method 'superMethod()' can not be partially applied}}
+    _ = super.superMethod // expected-error{{actor-isolated instance method 'superMethod()' is unsafe to reference in code that may execute concurrently}}
+    acceptClosure(synchronous)
+    acceptClosure(self.synchronous)
+    acceptClosure(otherActor.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can only be referenced on 'self'}}
+    acceptEscapingClosure(synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be partially applied}}
+    acceptEscapingClosure(self.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be partially applied}}
+    acceptEscapingClosure(otherActor.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can only be referenced on 'self'}}
+
+    acceptAsyncClosure(self.asynchronous)
+    acceptEscapingAsyncClosure(self.asynchronous)
   }
 }
 
