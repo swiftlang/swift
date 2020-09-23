@@ -1773,14 +1773,14 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
   case AnyFunctionType::Representation::Swift:
   case AnyFunctionType::Representation::Thin:
     // Source is native, so we can convert signature first.
-    destTy = adjustFunctionType(destRepTy,
-                                srcTy->getRepresentation());
+    destTy = adjustFunctionType(destRepTy, srcTy->getRepresentation(),
+                                srcTy->getClangTypeInfo());
     break;
   case AnyFunctionType::Representation::Block:
   case AnyFunctionType::Representation::CFunctionPointer:
     // Source is foreign, so do the representation change first.
-    srcTy = adjustFunctionType(srcRepTy,
-                               destRepTy->getRepresentation());
+    srcTy = adjustFunctionType(srcRepTy, destRepTy->getRepresentation(),
+                               destRepTy->getClangTypeInfo());
   }
 
   auto result = SGF.emitRValueAsSingleValue(e->getSubExpr());

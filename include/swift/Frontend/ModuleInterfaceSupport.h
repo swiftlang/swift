@@ -32,7 +32,7 @@ struct ModuleInterfaceOptions {
   /// interface, or should we fully-qualify them?
   bool PreserveTypesAsWritten = false;
 
-  /// Should we emit the cType when printing @convention(c) or no?
+  /// See \ref FrontendOptions.PrintFullConvention.
   /// [TODO: Clang-type-plumbing] This check should go away.
   bool PrintFullConvention = false;
 

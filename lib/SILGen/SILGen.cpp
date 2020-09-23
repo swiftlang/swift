@@ -450,8 +450,6 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
 
 SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   ASTContext &C = getASTContext();
-  auto extInfo = SILFunctionType::ExtInfo()
-    .withRepresentation(SILFunctionType::Representation::CFunctionPointer);
 
   // Use standard library types if we have them; otherwise, fall back to
   // builtins.
@@ -481,6 +479,14 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
     SILParameterInfo(Int32Ty, ParameterConvention::Direct_Unowned),
     SILParameterInfo(PtrPtrInt8Ty, ParameterConvention::Direct_Unowned),
   };
+  SILResultInfo results[] = {SILResultInfo(Int32Ty, ResultConvention::Unowned)};
+
+  auto rep = SILFunctionType::Representation::CFunctionPointer;
+  auto *clangTy = C.getCanonicalClangFunctionType(params, results[0], rep);
+  auto extInfo = SILFunctionType::ExtInfoBuilder()
+                     .withRepresentation(rep)
+                     .withClangFunctionType(clangTy)
+                     .build();
 
   CanSILFunctionType topLevelType = SILFunctionType::get(nullptr, extInfo,
                                    SILCoroutineKind::None,
