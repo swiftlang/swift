@@ -88,7 +88,7 @@
                         "next-upstream", "upstream-with-swift"],
             "repos": {
                 "llvm-project": "swift/master-next",
-                "swift": "master-next",
+                "swift": "next",
                 "cmark": "main",
                 "llbuild": "main",
                 "swift-tools-support-core": "main",
