@@ -45,6 +45,28 @@ introduces [reabstraction](#reabstraction) conversions when a value is used with
 different abstraction pattern. (This is where the infamous "reabstraction
 thunk helpers" sometimes seen in Swift backtraces come from.)
 
+## access path
+
+Broadly, an "access path" is a list of "accesses" which must be chained together
+to compute some output from an input. For instance, the generics system has a
+type called a `ConformanceAccessPath` which explains how to, for example,
+walk from `T: Collection` to `T: Sequence` to `T.Iterator: IteratorProtocol`.
+There are several different kinds of "access path" in different parts of the compiler,
+but they all follow this basic theme.
+
+In the specific context of imports, an "access path" is the `Bar` portion of a scoped
+import like `import class Foo.Bar`. Theoretically, it could have several identifiers
+to designate a nested type, although the compiler doesn't currently support this. It can
+also be empty, matching all top-level declarations in the module.
+
+Note, however, that there has historically been some confusion about the meaning of
+"access path" with regards to imports. You might see some code use "access path"
+to include the `Foo` part or even to describe a chain of submodule names where a
+declaration is not valid at all. (Strictly, the chain of module names is a "module path"
+and the combination of module path + access path is an "import path".)
+
+See `ImportPath` and the types nested inside it for more on this.
+
 ## archetype
 
 A placeholder for a generic parameter or an associated type within a
@@ -78,18 +100,6 @@ These can usually be directly compared to test whether two types are the
 same; the exception is when generics get involved. In this case you'll need
 a [generic environment](#generic-environment). Contrast with [sugared type](#sugared-type).
 
-## cascading dependency
-
-A kind of dependency edge relevant to the incremental name tracking
-subsystem. A cascading dependency (as opposed to a
-[private dependency](#private-dependency) requires the Swift driver to
-transitively consider dependency edges in the file that defines the used
-name when incremental compilation is enabled. A cascading dependency is much
-safer to produce than its private counterpart, but it comes at the cost of
-increased usage of compilation resources - even if those resources are being
-wasted on rebuilding a file that didn't actually require rebuilding.
-See [DependencyAnalysis.md](DependencyAnalysis.md).
-
 ## Clang importer
 
 The part of the compiler that reads C and Objective-C declarations and
@@ -110,6 +120,11 @@ the AST level. See also [witness table](#witness-table).
 2. The type of a value or declaration from inside a potentially generic
    context. This type may contain [archetypes](#archetype) and cannot be
    used directly from outside the context. Compare with [interface type](#interface-type).
+
+## critical edge
+
+An edge in a control flow graph where the destination has multiple predecessors
+and the source has multiple successors.
 
 ## customization point
 
@@ -424,18 +439,6 @@ See also [SR](#SR).
 The file currently being compiled, as opposed to the other files that are
 only needed for context. See also
 [Whole-Module Optimization](#wmo-whole-module-optimization).
-
-## private dependency
-
-A kind of dependency edge relevant to the incremental name tracking
-subsystem. A private dependency (as opposed to a
-[cascading dependency](#cascading-dependency)) declares a dependency edge
-from one file to a name referenced in that file that does not
-require further transitive evaluation of dependency edges by the Swift
-driver. Private dependencies are therefore cheaper than cascading
-dependencies, but must be used with the utmost care or dependent files will
-fail to rebuild and the result will most certainly be a miscompile.
-See [DependencyAnalysis](DependencyAnalysis.md).
 
 ## QoI
 

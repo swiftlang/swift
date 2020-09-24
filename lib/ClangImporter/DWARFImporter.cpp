@@ -44,16 +44,16 @@ public:
     return nullptr;
   }
 
-  virtual void lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
+  virtual void lookupVisibleDecls(ImportPath::Access accessPath,
                                   VisibleDeclConsumer &consumer,
                                   NLKind lookupKind) const override {}
 
   virtual void
-  lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
+  lookupClassMembers(ImportPath::Access accessPath,
                      VisibleDeclConsumer &consumer) const override {}
 
   virtual void
-  lookupClassMember(ModuleDecl::AccessPathTy accessPath, DeclName name,
+  lookupClassMember(ImportPath::Access accessPath, DeclName name,
                     SmallVectorImpl<ValueDecl *> &decls) const override {}
 
   void lookupObjCMethods(
@@ -99,7 +99,7 @@ static_assert(IsTriviallyDestructible<DWARFModuleUnit>::value,
               "DWARFModuleUnits are BumpPtrAllocated; the d'tor is not called");
 
 ModuleDecl *ClangImporter::Implementation::loadModuleDWARF(
-    SourceLoc importLoc, ArrayRef<Located<Identifier>> path) {
+    SourceLoc importLoc, ImportPath::Module path) {
   // There's no importing from debug info if no importer is installed.
   if (!DWARFImporter)
     return nullptr;
@@ -118,7 +118,9 @@ ModuleDecl *ClangImporter::Implementation::loadModuleDWARF(
   decl->addFile(*wrapperUnit);
 
   // Force load overlay modules for all imported modules.
-  (void) namelookup::getAllImports(decl);
+  assert(namelookup::getAllImports(decl).size() == 1 &&
+         namelookup::getAllImports(decl).front().importedModule == decl &&
+         "DWARF module depends on additional modules?");
 
   // Register the module with the ASTContext so it is available for lookups.
   if (!SwiftContext.getLoadedModule(name))

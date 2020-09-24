@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
@@ -1040,7 +1041,8 @@ public:
       case StmtConditionElement::CK_Boolean: {
         auto *E = elt.getBoolean();
         if (shouldVerifyChecked(E))
-          checkSameType(E->getType(), Ctx.getBoolDecl()->getDeclaredType(),
+          checkSameType(E->getType(),
+                        Ctx.getBoolDecl()->getDeclaredInterfaceType(),
                         "condition type");
         break;
       }
@@ -1633,7 +1635,8 @@ public:
         abort();
       }
 
-      checkSameType(E->getType(), anyHashableDecl->getDeclaredType(),
+      checkSameType(E->getType(),
+                    anyHashableDecl->getDeclaredInterfaceType(),
                     "AnyHashableErasureExpr and the standard AnyHashable type");
 
       if (E->getConformance().getRequirement() != hashableDecl) {
@@ -1799,7 +1802,7 @@ public:
         E->dump(Out);
         Out << "\n";
         abort();
-      } else if (E->throws() && !FT->throws()) {
+      } else if (E->throws() && !FT->isThrowing()) {
         Out << "apply expression is marked as throwing, but function operand"
                "does not have a throwing function type\n";
         E->dump(Out);
@@ -2992,8 +2995,23 @@ public:
         }
       }
 
-      // Throwing @objc methods must have a foreign error convention.
+      // Asynchronous @objc methods must have a foreign async convention.
       if (AFD->isObjC() &&
+          static_cast<bool>(AFD->getForeignAsyncConvention())
+            != AFD->hasAsync()) {
+        if (AFD->hasAsync())
+          Out << "@objc method async but does not have a foreign async "
+              << "convention";
+        else
+          Out << "@objc method has a foreign async convention but is not "
+              << "async";
+        abort();
+      }
+
+      // Synchronous throwing @objc methods must have a foreign error
+      // convention.
+      if (AFD->isObjC() &&
+          !AFD->hasAsync() &&
           static_cast<bool>(AFD->getForeignErrorConvention())
             != AFD->hasThrows()) {
         if (AFD->hasThrows())
@@ -3022,7 +3040,7 @@ public:
       if (AFD->hasImplicitSelfDecl())
         fnTy = fnTy->getResult()->castTo<FunctionType>();
 
-      if (AFD->hasThrows() != fnTy->getExtInfo().throws()) {
+      if (AFD->hasThrows() != fnTy->getExtInfo().isThrowing()) {
         Out << "function 'throws' flag does not match function type\n";
         AFD->dump(Out);
         abort();
@@ -3355,7 +3373,7 @@ public:
 
     Type checkExceptionTypeExists(const char *where) {
       auto exn = Ctx.getErrorDecl();
-      if (exn) return exn->getDeclaredType();
+      if (exn) return exn->getDeclaredInterfaceType();
 
       Out << "exception type does not exist in " << where << "\n";
       abort();

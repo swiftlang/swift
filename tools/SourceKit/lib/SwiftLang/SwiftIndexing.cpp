@@ -211,12 +211,12 @@ static void indexModule(llvm::MemoryBuffer *Input,
                         CompilerInstance &CI,
                         ArrayRef<const char *> Args) {
   ASTContext &Ctx = CI.getASTContext();
-  std::unique_ptr<SerializedModuleLoader> Loader;
+  std::unique_ptr<ImplicitSerializedModuleLoader> Loader;
   ModuleDecl *Mod = nullptr;
   if (ModuleName == Ctx.StdlibModuleName.str()) {
-    Mod = Ctx.getModule({ {Ctx.StdlibModuleName, SourceLoc()} });
+    Mod = Ctx.getModuleByIdentifier(Ctx.StdlibModuleName);
   } else {
-    Loader = SerializedModuleLoader::create(Ctx);
+    Loader = ImplicitSerializedModuleLoader::create(Ctx);
     auto Buf = std::unique_ptr<llvm::MemoryBuffer>(
         llvm::MemoryBuffer::getMemBuffer(Input->getBuffer(),
                                          Input->getBufferIdentifier()));

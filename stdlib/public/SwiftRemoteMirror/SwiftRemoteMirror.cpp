@@ -174,6 +174,17 @@ ReflectionSection<Iterator> sectionFromInfo(const swift_reflection_info_t &Info,
              (uintptr_t)Section.section.End - (uintptr_t)Section.section.Begin);
 }
 
+template <typename Iterator>
+ReflectionSection<Iterator> reflectionSectionFromLocalAndRemote(
+    const swift_reflection_section_mapping_t &Section) {
+  auto RemoteSectionStart = (uint64_t)Section.remote_section.StartAddress;
+
+  auto Start = RemoteRef<void>(RemoteSectionStart, Section.local_section.Begin);
+
+  return ReflectionSection<Iterator>(Start,
+                                     (uintptr_t)Section.remote_section.Size);
+}
+
 void
 swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
                                    swift_reflection_info_t Info) {
@@ -198,6 +209,26 @@ swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
     sectionFromInfo<const void *>(Info, Info.type_references),
     sectionFromInfo<const void *>(Info, Info.reflection_strings)};
   
+  Context->addReflectionInfo(ContextInfo);
+}
+
+void swift_reflection_addReflectionMappingInfo(
+    SwiftReflectionContextRef ContextRef,
+    swift_reflection_mapping_info_t Info) {
+  auto Context = ContextRef->nativeContext;
+
+  ReflectionInfo ContextInfo{
+      reflectionSectionFromLocalAndRemote<FieldDescriptorIterator>(Info.field),
+      reflectionSectionFromLocalAndRemote<AssociatedTypeIterator>(
+          Info.associated_types),
+      reflectionSectionFromLocalAndRemote<BuiltinTypeDescriptorIterator>(
+          Info.builtin_types),
+      reflectionSectionFromLocalAndRemote<CaptureDescriptorIterator>(
+          Info.capture),
+      reflectionSectionFromLocalAndRemote<const void *>(Info.type_references),
+      reflectionSectionFromLocalAndRemote<const void *>(
+          Info.reflection_strings)};
+
   Context->addReflectionInfo(ContextInfo);
 }
 
@@ -267,7 +298,7 @@ swift_reflection_typeRefForMangledTypeName(SwiftReflectionContextRef ContextRef,
                                            const char *MangledTypeName,
                                            uint64_t Length) {
   auto Context = ContextRef->nativeContext;
-  auto TR = Context->readTypeFromMangledName(MangledTypeName, Length);
+  auto TR = Context->readTypeFromMangledName(MangledTypeName, Length).getType();
   return reinterpret_cast<swift_typeref_t>(TR);
 }
 
@@ -416,6 +447,12 @@ static swift_childinfo_t convertChild(const TypeInfo *TI, unsigned Index) {
     FieldInfo = &(RecordTI->getFields()[Index]);
   } else {
     assert(false && "convertChild(TI): TI must be record or enum typeinfo");
+    return {
+      "unknown TypeInfo kind",
+      0,
+      SWIFT_UNKNOWN,
+      0,
+    };
   }
 
   return {
@@ -440,7 +477,7 @@ swift_reflection_infoForTypeRef(SwiftReflectionContextRef ContextRef,
                                 swift_typeref_t OpaqueTypeRef) {
   auto Context = ContextRef->nativeContext;
   auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
-  auto TI = Context->getTypeInfo(TR);
+  auto TI = Context->getTypeInfo(TR, nullptr);
   return convertTypeInfo(TI);
 }
 
@@ -450,7 +487,7 @@ swift_reflection_childOfTypeRef(SwiftReflectionContextRef ContextRef,
                                 unsigned Index) {
   auto Context = ContextRef->nativeContext;
   auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
-  auto *TI = Context->getTypeInfo(TR);
+  auto *TI = Context->getTypeInfo(TR, nullptr);
   return convertChild(TI, Index);
 }
 
@@ -458,7 +495,7 @@ swift_typeinfo_t
 swift_reflection_infoForMetadata(SwiftReflectionContextRef ContextRef,
                                  uintptr_t Metadata) {
   auto Context = ContextRef->nativeContext;
-  auto *TI = Context->getMetadataTypeInfo(Metadata);
+  auto *TI = Context->getMetadataTypeInfo(Metadata, nullptr);
   return convertTypeInfo(TI);
 }
 
@@ -467,7 +504,7 @@ swift_reflection_childOfMetadata(SwiftReflectionContextRef ContextRef,
                                  uintptr_t Metadata,
                                  unsigned Index) {
   auto Context = ContextRef->nativeContext;
-  auto *TI = Context->getMetadataTypeInfo(Metadata);
+  auto *TI = Context->getMetadataTypeInfo(Metadata, nullptr);
   return convertChild(TI, Index);
 }
 
@@ -475,7 +512,7 @@ swift_typeinfo_t
 swift_reflection_infoForInstance(SwiftReflectionContextRef ContextRef,
                                  uintptr_t Object) {
   auto Context = ContextRef->nativeContext;
-  auto *TI = Context->getInstanceTypeInfo(Object);
+  auto *TI = Context->getInstanceTypeInfo(Object, nullptr);
   return convertTypeInfo(TI);
 }
 
@@ -484,7 +521,7 @@ swift_reflection_childOfInstance(SwiftReflectionContextRef ContextRef,
                                  uintptr_t Object,
                                  unsigned Index) {
   auto Context = ContextRef->nativeContext;
-  auto *TI = Context->getInstanceTypeInfo(Object);
+  auto *TI = Context->getInstanceTypeInfo(Object, nullptr);
   return convertChild(TI, Index);
 }
 
@@ -498,10 +535,9 @@ int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
   auto RemoteExistentialAddress = RemoteAddress(ExistentialAddress);
   const TypeRef *InstanceTR = nullptr;
   RemoteAddress RemoteStartOfInstanceData(nullptr);
-  auto Success = Context->projectExistential(RemoteExistentialAddress,
-                                             ExistentialTR,
-                                             &InstanceTR,
-                                             &RemoteStartOfInstanceData);
+  auto Success = Context->projectExistential(
+      RemoteExistentialAddress, ExistentialTR, &InstanceTR,
+      &RemoteStartOfInstanceData, nullptr);
 
   if (Success) {
     *InstanceTypeRef = reinterpret_cast<swift_typeref_t>(InstanceTR);
@@ -518,10 +554,11 @@ int swift_reflection_projectEnumValue(SwiftReflectionContextRef ContextRef,
   auto Context = ContextRef->nativeContext;
   auto EnumTR = reinterpret_cast<const TypeRef *>(EnumTypeRef);
   auto RemoteEnumAddress = RemoteAddress(EnumAddress);
-  if (!Context->projectEnumValue(RemoteEnumAddress, EnumTR, CaseIndex)) {
+  if (!Context->projectEnumValue(RemoteEnumAddress, EnumTR, CaseIndex,
+                                 nullptr)) {
     return false;
   }
-  auto TI = Context->getTypeInfo(EnumTR);
+  auto TI = Context->getTypeInfo(EnumTR, nullptr);
   auto *RecordTI = dyn_cast<EnumTypeInfo>(TI);
   assert(RecordTI != nullptr);
   if (static_cast<size_t>(*CaseIndex) >= RecordTI->getNumCases()) {
@@ -543,7 +580,7 @@ void swift_reflection_dumpInfoForTypeRef(SwiftReflectionContextRef ContextRef,
                                          swift_typeref_t OpaqueTypeRef) {
   auto Context = ContextRef->nativeContext;
   auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
-  auto TI = Context->getTypeInfo(TR);
+  auto TI = Context->getTypeInfo(TR, nullptr);
   if (TI == nullptr) {
     fprintf(stdout, "<null type info>\n");
   } else {
@@ -568,7 +605,7 @@ void swift_reflection_dumpInfoForTypeRef(SwiftReflectionContextRef ContextRef,
 void swift_reflection_dumpInfoForMetadata(SwiftReflectionContextRef ContextRef,
                                           uintptr_t Metadata) {
   auto Context = ContextRef->nativeContext;
-  auto TI = Context->getMetadataTypeInfo(Metadata);
+  auto TI = Context->getMetadataTypeInfo(Metadata, nullptr);
   if (TI == nullptr) {
     fprintf(stdout, "<null type info>\n");
   } else {
@@ -579,7 +616,7 @@ void swift_reflection_dumpInfoForMetadata(SwiftReflectionContextRef ContextRef,
 void swift_reflection_dumpInfoForInstance(SwiftReflectionContextRef ContextRef,
                                           uintptr_t Object) {
   auto Context = ContextRef->nativeContext;
-  auto TI = Context->getInstanceTypeInfo(Object);
+  auto TI = Context->getInstanceTypeInfo(Object, nullptr);
   if (TI == nullptr) {
     fprintf(stdout, "%s", "<null type info>\n");
   } else {
@@ -643,6 +680,25 @@ const char *swift_reflection_metadataAllocationTagName(
   auto Context = ContextRef->nativeContext;
   auto Result = Context->metadataAllocationTagName(Tag);
   return returnableCString(ContextRef, Result);
+}
+
+int swift_reflection_metadataAllocationCacheNode(
+    SwiftReflectionContextRef ContextRef,
+    swift_metadata_allocation_t Allocation,
+    swift_metadata_cache_node_t *OutNode) {
+  auto Context = ContextRef->nativeContext;
+  MetadataAllocation<Runtime> ConvertedAllocation;
+  ConvertedAllocation.Tag = Allocation.Tag;
+  ConvertedAllocation.Ptr = Allocation.Ptr;
+  ConvertedAllocation.Size = Allocation.Size;
+
+  auto Result = Context->metadataAllocationCacheNode(ConvertedAllocation);
+  if (!Result)
+    return 0;
+
+  OutNode->Left = Result->Left;
+  OutNode->Right = Result->Right;
+  return 1;
 }
 
 const char *swift_reflection_iterateMetadataAllocationBacktraces(

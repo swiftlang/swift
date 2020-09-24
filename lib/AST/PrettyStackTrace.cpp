@@ -217,7 +217,7 @@ void PrettyStackTraceClangType::print(llvm::raw_ostream &out) const {
     out << "NULL clang type!\n";
     return;
   }
-  TheType->dump(out);
+  TheType->dump(out, Context);
 }
 
 void PrettyStackTraceTypeRepr::print(llvm::raw_ostream &out) const {

@@ -17,7 +17,10 @@
 #ifndef SWIFT_RUNTIME_PRIVATE_H
 #define SWIFT_RUNTIME_PRIVATE_H
 
+#include <functional>
+
 #include "swift/Demangling/Demangler.h"
+#include "swift/Demangling/TypeLookupError.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Metadata.h"
 
@@ -77,6 +80,8 @@ public:
   const Metadata *getMetadata() const { return Response.Value; }
   MetadataResponse getResponse() const { return Response; }
 
+  operator bool() const { return getMetadata(); }
+
 #define REF_STORAGE(Name, ...) \
   bool is##Name() const { return ReferenceOwnership.is##Name(); }
 #include "swift/AST/ReferenceStorage.def"
@@ -103,9 +108,11 @@ public:
 // value here.
 #    define SWIFT_ISA_MASK 0xfffffffffffffff8ULL
 #  elif __arm64__
+// The ISA mask used when ptrauth is available.
+#  define SWIFT_ISA_MASK_PTRAUTH 0x007ffffffffffff8ULL
 // ARM64 simulators always use the ARM64e mask.
 #    if __has_feature(ptrauth_calls) || TARGET_OS_SIMULATOR
-#      define SWIFT_ISA_MASK 0x007ffffffffffff8ULL
+#      define SWIFT_ISA_MASK SWIFT_ISA_MASK_PTRAUTH
 #    else
 #      if TARGET_OS_OSX
 #      define SWIFT_ISA_MASK 0x00007ffffffffff8ULL
@@ -209,7 +216,7 @@ public:
   static inline
   bool objectUsesNativeSwiftReferenceCounting(const void *object) {
     assert(!isObjCTaggedPointerOrNull(object));
-#if SWIFT_HAS_OPAQUE_ISAS
+#if SWIFT_OBJC_INTEROP && SWIFT_HAS_OPAQUE_ISAS
     // Fast path for opaque ISAs.  We don't want to call
     // _swift_getClassOfAllocated as that will call object_getClass.
     // Instead we can look at the bits in the ISA and tell if its a
@@ -367,7 +374,7 @@ public:
   /// \p substWitnessTable Function that provides witness tables given a
   /// particular dependent conformance index.
   SWIFT_CC(swift)
-  TypeInfo swift_getTypeByMangledNode(
+  TypeLookupErrorOr<TypeInfo> swift_getTypeByMangledNode(
                                MetadataRequest request,
                                Demangler &demangler,
                                Demangle::NodePointer node,
@@ -382,7 +389,7 @@ public:
   /// \p substWitnessTable Function that provides witness tables given a
   /// particular dependent conformance index.
   SWIFT_CC(swift)
-  TypeInfo swift_getTypeByMangledName(
+  TypeLookupErrorOr<TypeInfo> swift_getTypeByMangledName(
                                MetadataRequest request,
                                StringRef typeName,
                                const void * const *arguments,
@@ -445,12 +452,12 @@ public:
   /// generic requirements (e.g., those that need to be
   /// passed to an instantiation function) will be added to this vector.
   ///
-  /// \returns true if an error occurred, false otherwise.
-  bool _checkGenericRequirements(
-                    llvm::ArrayRef<GenericRequirementDescriptor> requirements,
-                    llvm::SmallVectorImpl<const void *> &extraArguments,
-                    SubstGenericParameterFn substGenericParam,
-                    SubstDependentWitnessTableFn substWitnessTable);
+  /// \returns the error if an error occurred, None otherwise.
+  llvm::Optional<TypeLookupError> _checkGenericRequirements(
+      llvm::ArrayRef<GenericRequirementDescriptor> requirements,
+      llvm::SmallVectorImpl<const void *> &extraArguments,
+      SubstGenericParameterFn substGenericParam,
+      SubstDependentWitnessTableFn substWitnessTable);
 
   /// A helper function which avoids performing a store if the destination
   /// address already contains the source value.  This is useful when

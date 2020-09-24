@@ -188,3 +188,9 @@ void swift::runtime::environment::initialize(void *context) {
               "will not be flagged.");
 }
 #endif
+
+SWIFT_RUNTIME_EXPORT
+bool swift_COWChecksEnabled() {
+  return runtime::environment::SWIFT_DEBUG_ENABLE_COW_CHECKS();
+}
+

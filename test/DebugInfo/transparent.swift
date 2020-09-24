@@ -19,7 +19,6 @@ use(z)
 // CHECK-SAME: !dbg ![[SP:[0-9]+]]
 // CHECK-NEXT: entry:
 // CHECK-NEXT: !dbg ![[ZERO:[0-9]+]]
-// CHECK-NEXT: !dbg ![[ZERO]]
 // CHECK-NEXT: }
 
 // CHECK: ![[FILE:[0-9]+]] = {{.*}}"<compiler-generated>"

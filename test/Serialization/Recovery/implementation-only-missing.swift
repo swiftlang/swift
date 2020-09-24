@@ -81,11 +81,24 @@ struct StructWithOverride: HiddenProtocolWithOverride {
   func hiddenOverride() {}
 }
 
+internal protocol RefinesHiddenProtocol: HiddenProtocol {
+
+}
+
+public struct PublicStructConformsToHiddenProtocol: RefinesHiddenProtocol {
+  public typealias Value = Int
+
+  public init() { }
+}
+
 #elseif CLIENT_APP
 
 import public_lib
 
 var s = PublicStruct()
 print(s.nonWrappedVar)
+
+var p = PublicStructConformsToHiddenProtocol()
+print(p)
 
 #endif

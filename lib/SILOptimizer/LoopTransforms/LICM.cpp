@@ -214,8 +214,8 @@ static void getDominatingBlocks(SmallVectorImpl<SILBasicBlock *> &domBlocks,
                                 SILLoop *Loop, DominanceInfo *DT) {
   auto HeaderBB = Loop->getHeader();
   auto DTRoot = DT->getNode(HeaderBB);
-  SmallVector<SILBasicBlock *, 8> ExitingBBs;
-  Loop->getExitingBlocks(ExitingBBs);
+  SmallVector<SILBasicBlock *, 8> ExitingAndLatchBBs;
+  Loop->getExitingAndLatchBlocks(ExitingAndLatchBBs);
   for (llvm::df_iterator<DominanceInfoNode *> It = llvm::df_begin(DTRoot),
                                               E = llvm::df_end(DTRoot);
        It != E;) {
@@ -223,7 +223,7 @@ static void getDominatingBlocks(SmallVectorImpl<SILBasicBlock *> &domBlocks,
 
     // Don't decent into control-dependent code. Only traverse into basic blocks
     // that dominate all exits.
-    if (!std::all_of(ExitingBBs.begin(), ExitingBBs.end(),
+    if (!std::all_of(ExitingAndLatchBBs.begin(), ExitingAndLatchBBs.end(),
                      [=](SILBasicBlock *ExitBB) {
           return DT->dominates(CurBB, ExitBB);
         })) {
@@ -700,19 +700,18 @@ static bool analyzeBeginAccess(BeginAccessInst *BI,
                                InstSet &SideEffectInsts,
                                AccessedStorageAnalysis *ASA,
                                DominanceInfo *DT) {
-  const AccessedStorage &storage =
-      findAccessedStorageNonNested(BI->getSource());
+  const AccessedStorage &storage = findAccessedStorage(BI->getSource());
   if (!storage) {
     return false;
   }
 
-  auto BIAccessedStorageNonNested = findAccessedStorageNonNested(BI);
+  auto BIAccessedStorageNonNested = findAccessedStorage(BI);
   auto safeBeginPred = [&](BeginAccessInst *OtherBI) {
     if (BI == OtherBI) {
       return true;
     }
     return BIAccessedStorageNonNested.isDistinctFrom(
-        findAccessedStorageNonNested(OtherBI));
+        findAccessedStorage(OtherBI));
   };
 
   if (!std::all_of(BeginAccesses.begin(), BeginAccesses.end(), safeBeginPred))
@@ -1063,8 +1062,8 @@ void LoopTreeOptimization::hoistLoadsAndStores(SILValue addr, SILLoop *loop, Ins
   LLVM_DEBUG(llvm::dbgs() << "Creating preload " << *initialLoad);
 
   SILSSAUpdater ssaUpdater;
-  ssaUpdater.Initialize(initialLoad->getType());
-  ssaUpdater.AddAvailableValue(preheader, initialLoad);
+  ssaUpdater.initialize(initialLoad->getType());
+  ssaUpdater.addAvailableValue(preheader, initialLoad);
 
   // Set all stored values as available values in the ssaUpdater.
   // If there are multiple stores in a block, only the last one counts.
@@ -1079,7 +1078,7 @@ void LoopTreeOptimization::hoistLoadsAndStores(SILValue addr, SILLoop *loop, Ins
       if (isLoadFromAddr(dyn_cast<LoadInst>(SI->getSrc()), addr))
         return;
 
-      ssaUpdater.AddAvailableValue(SI->getParent(), SI->getSrc());
+      ssaUpdater.addAvailableValue(SI->getParent(), SI->getSrc());
     }
   }
 
@@ -1100,7 +1099,7 @@ void LoopTreeOptimization::hoistLoadsAndStores(SILValue addr, SILLoop *loop, Ins
       // If we didn't see a store in this block yet, get the current value from
       // the ssaUpdater.
       if (!currentVal)
-        currentVal = ssaUpdater.GetValueInMiddleOfBlock(block);
+        currentVal = ssaUpdater.getValueInMiddleOfBlock(block);
       SILValue projectedValue = projectLoadValue(LI->getOperand(), addr,
                                                  currentVal, LI);
       LLVM_DEBUG(llvm::dbgs() << "Replacing stored load " << *LI << " with "
@@ -1118,8 +1117,8 @@ void LoopTreeOptimization::hoistLoadsAndStores(SILValue addr, SILLoop *loop, Ins
                "should have split critical edges");
         SILBuilder B(succ->begin());
         auto *SI = B.createStore(loc.getValue(),
-                                 ssaUpdater.GetValueInMiddleOfBlock(succ),
-                                 addr, StoreOwnershipQualifier::Unqualified);
+                                 ssaUpdater.getValueInMiddleOfBlock(succ), addr,
+                                 StoreOwnershipQualifier::Unqualified);
         (void)SI;
         LLVM_DEBUG(llvm::dbgs() << "Creating loop-exit store " << *SI);
       }

@@ -24,7 +24,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileUnit.h"
-#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
@@ -48,6 +48,7 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
+#include "clang/Basic/SourceManager.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ConvertUTF.h"
@@ -57,6 +58,11 @@
 #include <queue>
 
 using namespace swift;
+
+// Defined here to avoid repeatedly paying the price of template instantiation.
+const std::function<bool(const ExtensionDecl *)>
+    PrintOptions::defaultPrintExtensionContentAsMembers
+        = [] (const ExtensionDecl *) { return false; };
 
 void PrintOptions::setBaseType(Type T) {
   if (T->is<ErrorType>())
@@ -169,6 +175,24 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(bool preferTypeRepr,
       if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
         if (!shouldPrint(ED->getExtendedNominal(), options))
           return false;
+
+        // Skip extensions to implementation-only imported types that have
+        // no public members.
+        auto localModule = ED->getParentModule();
+        auto nominalModule = ED->getExtendedNominal()->getParentModule();
+        if (localModule != nominalModule &&
+            localModule->isImportedImplementationOnly(nominalModule)) {
+
+          bool shouldPrintMembers = llvm::any_of(
+                                      ED->getMembers(),
+                                      [&](const Decl *member) -> bool {
+            return shouldPrint(member, options);
+          });
+
+          if (!shouldPrintMembers)
+            return false;
+        }
+
         for (const Requirement &req : ED->getGenericRequirements()) {
           if (!isPublicOrUsableFromInline(req.getFirstType()))
             return false;
@@ -1079,7 +1103,9 @@ void PrintAST::printTypedPattern(const TypedPattern *TP) {
     if (auto decl = named->getDecl())
       isIUO = decl->isImplicitlyUnwrappedOptional();
 
-  printTypeLocForImplicitlyUnwrappedOptional(TP->getTypeLoc(), isIUO);
+  const auto TyLoc = TypeLoc(TP->getTypeRepr(),
+                             TP->hasType() ? TP->getType() : Type());
+  printTypeLocForImplicitlyUnwrappedOptional(TyLoc, isIUO);
 }
 
 /// Determines if we are required to print the name of a property declaration,
@@ -1192,12 +1218,12 @@ void PrintAST::printPattern(const Pattern *pattern) {
     // FIXME: Print expr.
     break;
 
-  case PatternKind::Var:
+  case PatternKind::Binding:
     if (!Options.SkipIntroducerKeywords)
-      Printer << (cast<VarPattern>(pattern)->isLet() ? tok::kw_let
-                                                     : tok::kw_var)
+      Printer << (cast<BindingPattern>(pattern)->isLet() ? tok::kw_let
+                                                         : tok::kw_var)
               << " ";
-    printPattern(cast<VarPattern>(pattern)->getSubPattern());
+    printPattern(cast<BindingPattern>(pattern)->getSubPattern());
   }
 }
 
@@ -1295,9 +1321,9 @@ bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req) {
   bool inWhereClause;
 
   switch (req.getKind()) {
+  case RequirementKind::Layout:
   case RequirementKind::Conformance:
-  case RequirementKind::Superclass:
-  case RequirementKind::Layout: {
+  case RequirementKind::Superclass: {
     auto subject = req.getFirstType();
     auto result = findRelevantDeclAndDirectUse(subject);
 
@@ -1349,6 +1375,15 @@ void PrintAST::printInheritedFromRequirementSignature(ProtocolDecl *proto,
                             proto->getRequirementSignature()),
       PrintInherited,
       [&](const Requirement &req) {
+        // Skip the inferred 'Self : AnyObject' constraint if this is an
+        // @objc protocol.
+        if (req.getKind() == RequirementKind::Layout &&
+            req.getFirstType()->isEqual(proto->getProtocolSelfType()) &&
+            req.getLayoutConstraint()->getKind() == LayoutConstraintKind::Class &&
+            proto->isObjC()) {
+          return false;
+        }
+
         auto location = bestRequirementPrintLocation(proto, req);
         return location.AttachedTo == attachingTo && !location.InWhereClause;
       });
@@ -2164,25 +2199,25 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
   getModuleEntities(decl, ModuleEnts);
 
   ArrayRef<ModuleEntity> Mods = ModuleEnts;
-  interleave(decl->getFullAccessPath(),
-             [&](const ImportDecl::AccessPathElement &Elem) {
-               if (!Mods.empty()) {
-                 Identifier Name = Elem.Item;
-                 if (Options.MapCrossImportOverlaysToDeclaringModule) {
-                   if (auto *MD = Mods.front().getAsSwiftModule()) {
-                     ModuleDecl *Declaring = const_cast<ModuleDecl*>(MD)
-                       ->getDeclaringModuleIfCrossImportOverlay();
-                     if (Declaring)
-                       Name = Declaring->getName();
-                   }
-                 }
-                 Printer.printModuleRef(Mods.front(), Name);
-                 Mods = Mods.slice(1);
-               } else {
-                 Printer << Elem.Item.str();
-               }
-             },
-             [&] { Printer << "."; });
+  llvm::interleave(decl->getImportPath(),
+                   [&](const ImportPath::Element &Elem) {
+                     if (!Mods.empty()) {
+                       Identifier Name = Elem.Item;
+                       if (Options.MapCrossImportOverlaysToDeclaringModule) {
+                         if (auto *MD = Mods.front().getAsSwiftModule()) {
+                           ModuleDecl *Declaring = const_cast<ModuleDecl*>(MD)
+                             ->getDeclaringModuleIfCrossImportOverlay();
+                           if (Declaring)
+                             Name = Declaring->getName();
+                         }
+                       }
+                       Printer.printModuleRef(Mods.front(), Name);
+                       Mods = Mods.slice(1);
+                     } else {
+                       Printer << Elem.Item.str();
+                     }
+                   },
+                   [&] { Printer << "."; });
 }
 
 static void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,
@@ -2459,14 +2494,14 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
     Printer << " = ";
     // FIXME: An inferred associated type witness type alias may reference
     // an opaque type, but OpaqueTypeArchetypes are always canonicalized
-    // so lose type sugar for generic params. Bind the generic environment so
-    // we can map params back into the generic environment and print them
+    // so lose type sugar for generic params. Bind the generic signature so
+    // we can map params back into the generic signature and print them
     // correctly.
     //
     // Remove this when we have a way to represent non-canonical archetypes
     // preserving sugar.
-    llvm::SaveAndRestore<GenericEnvironment*> setGenericEnv(Options.GenericEnv,
-                                                decl->getGenericEnvironment());
+    llvm::SaveAndRestore<const GenericSignatureImpl *> setGenericSig(
+        Options.GenericSig, decl->getGenericSignature().getPointer());
     printTypeLoc(TypeLoc(decl->getUnderlyingTypeRepr(), Ty));
     printDeclGenericRequirements(decl);
   }
@@ -2811,12 +2846,9 @@ void PrintAST::printOneParameter(const ParamDecl *param,
     Printer << " = ";
 
     switch (param->getDefaultArgumentKind()) {
-    case DefaultArgumentKind::File:
-    case DefaultArgumentKind::Line:
-    case DefaultArgumentKind::Column:
-    case DefaultArgumentKind::Function:
-    case DefaultArgumentKind::DSOHandle:
-    case DefaultArgumentKind::NilLiteral:
+#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+    case DefaultArgumentKind::NAME:
+#include "swift/AST/MagicIdentifierKinds.def"
       Printer.printKeyword(defaultArgStr, Options);
       break;
     default:
@@ -2858,6 +2890,9 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
 
   printParameterList(BodyParams, parameterListTypes,
                      AFD->argumentNameIsAPIByDefault());
+
+  if (AFD->hasAsync())
+    Printer << " " << "async";
 
   if (AFD->hasThrows()) {
     if (AFD->getAttrs().hasAttribute<RethrowsAttr>())
@@ -2937,8 +2972,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
   if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
     SourceLoc StartLoc = decl->getStartLoc();
     SourceLoc EndLoc;
-    if (!decl->getBodyResultTypeLoc().isNull()) {
-      EndLoc = decl->getBodyResultTypeLoc().getSourceRange().End;
+    if (decl->getResultTypeRepr()) {
+      EndLoc = decl->getResultTypeSourceRange().End;
     } else {
       EndLoc = decl->getSignatureSourceRange().End;
     }
@@ -2975,7 +3010,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
 
     Type ResultTy = decl->getResultInterfaceType();
     if (ResultTy && !ResultTy->isVoid()) {
-      TypeLoc ResultTyLoc = decl->getBodyResultTypeLoc();
+      TypeLoc ResultTyLoc(decl->getResultTypeRepr(), ResultTy);
 
       // When printing a protocol requirement with types substituted for a
       // conforming class, replace occurrences of the 'Self' generic parameter
@@ -3155,9 +3190,8 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   });
   Printer << " -> ";
 
-  TypeLoc elementTy = decl->getElementTypeLoc();
-  if (!elementTy.getTypeRepr())
-    elementTy = TypeLoc::withoutLoc(decl->getElementInterfaceType());
+  TypeLoc elementTy(decl->getElementTypeRepr(),
+                    decl->getElementInterfaceType());
   Printer.printDeclResultTypePre(decl, elementTy);
   Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
 
@@ -3601,7 +3635,7 @@ void printCType(ASTContext &Ctx, ASTPrinter &Printer, ExtInfo &info) {
   auto *cml = Ctx.getClangModuleLoader();
   SmallString<64> buf;
   llvm::raw_svector_ostream os(buf);
-  info.getUncommonInfo().getValue().printClangFunctionType(cml, os);
+  info.getClangTypeInfo().printType(cml, os);
   Printer << ", cType: " << QuotedString(os.str());
 }
 
@@ -3769,8 +3803,11 @@ public:
   }
 
   void visitErrorType(ErrorType *T) {
-    if (auto originalType = T->getOriginalType())
+    if (auto originalType = T->getOriginalType()) {
+      if (Options.PrintInSILBody)
+        Printer << "@error_type ";
       visit(originalType);
+    }
     else
       Printer << "<<error type>>";
   }
@@ -3780,6 +3817,24 @@ public:
       Printer << "<<unresolvedtype>>";
     else
       Printer << "_";
+  }
+
+  void visitHoleType(HoleType *T) {
+    if (Options.PrintTypesForDebugging) {
+      Printer << "<<hole for ";
+      auto originator = T->getOriginator();
+      if (auto *typeVar = originator.dyn_cast<TypeVariableType *>()) {
+        visit(typeVar);
+      } else if (auto *VD = originator.dyn_cast<VarDecl *>()) {
+        Printer << "decl = ";
+        Printer << VD->getName();
+      } else {
+        visit(originator.get<DependentMemberType *>());
+      }
+      Printer << ">>";
+    } else {
+      Printer << "<<hole>>";
+    }
   }
 
 #ifdef ASTPRINTER_HANDLE_BUILTINTYPE
@@ -4005,8 +4060,8 @@ public:
           info.getSILRepresentation() == SILFunctionType::Representation::Thick)
         return;
 
-      bool printNameOnly = Options.PrintFunctionRepresentationAttrs ==
-                           PrintOptions::FunctionRepresentationMode::NameOnly;
+      bool printClangType = Options.PrintFunctionRepresentationAttrs ==
+                            PrintOptions::FunctionRepresentationMode::Full;
       Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
       Printer.printAttrName("@convention");
       Printer << "(";
@@ -4019,14 +4074,13 @@ public:
         break;
       case SILFunctionType::Representation::Block:
         Printer << "block";
+        if (printClangType && !info.getClangTypeInfo().empty())
+          printCType(Ctx, Printer, info);
         break;
       case SILFunctionType::Representation::CFunctionPointer:
         Printer << "c";
-        // FIXME: [clang-function-type-serialization] Once we start serializing
-        // Clang function types, we should be able to remove the second check.
-        if (printNameOnly || !info.getUncommonInfo().hasValue())
-          break;
-        printCType(Ctx, Printer, info);
+        if (printClangType && !info.getClangTypeInfo().empty())
+          printCType(Ctx, Printer, info);
         break;
       case SILFunctionType::Representation::Method:
         Printer << "method";
@@ -4073,8 +4127,8 @@ public:
           info.getRepresentation() == SILFunctionType::Representation::Thick)
         break;
 
-      bool printNameOnly = Options.PrintFunctionRepresentationAttrs ==
-                           PrintOptions::FunctionRepresentationMode::NameOnly;
+      bool printClangType = Options.PrintFunctionRepresentationAttrs ==
+                            PrintOptions::FunctionRepresentationMode::Full;
       Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
       Printer.printAttrName("@convention");
       Printer << "(";
@@ -4086,14 +4140,13 @@ public:
         break;
       case SILFunctionType::Representation::Block:
         Printer << "block";
+        if (printClangType)
+          printCType(Ctx, Printer, info);
         break;
       case SILFunctionType::Representation::CFunctionPointer:
         Printer << "c";
-        // FIXME: [clang-function-type-serialization] Once we start serializing
-        // Clang function types, we should be able to remove the second check.
-        if (printNameOnly || !info.getUncommonInfo().hasValue())
-          break;
-        printCType(Ctx, Printer, info);
+        if (printClangType)
+          printCType(Ctx, Printer, info);
         break;
       case SILFunctionType::Representation::Method:
         Printer << "method";
@@ -4104,7 +4157,8 @@ public:
       case SILFunctionType::Representation::WitnessMethod:
         Printer << "witness_method: ";
         printTypeDeclName(
-            witnessMethodConformance.getRequirement()->getDeclaredType());
+            witnessMethodConformance.getRequirement()->getDeclaredType()
+                ->castTo<ProtocolType>());
         break;
       case SILFunctionType::Representation::Closure:
         Printer << "closure";
@@ -4120,6 +4174,9 @@ public:
     }
     if (info.isNoEscape()) {
       Printer.printSimpleAttr("@noescape") << " ";
+    }
+    if (info.isAsync()) {
+      Printer.printSimpleAttr("@async") << " ";
     }
   }
 
@@ -4168,7 +4225,10 @@ public:
     // If we're stripping argument labels from types, do it when printing.
     visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/false);
 
-    if (T->throws())
+    if (T->isAsync())
+      Printer << " " << "async";
+
+    if (T->isThrowing())
       Printer << " " << tok::kw_throws;
 
     Printer << " -> ";
@@ -4208,7 +4268,10 @@ public:
 
    visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/true);
 
-    if (T->throws())
+    if (T->isAsync())
+      Printer << " " << "async";
+
+    if (T->isThrowing())
       Printer << " " << tok::kw_throws;
 
     Printer << " -> ";
@@ -4229,6 +4292,12 @@ public:
       return;
     }
     llvm_unreachable("bad convention");
+  }
+
+  void printSILAsyncAttr(bool isAsync) {
+    if (isAsync) {
+      Printer << "@async ";
+    }
   }
 
   void printCalleeConvention(ParameterConvention conv) {
@@ -4276,7 +4345,7 @@ public:
     Optional<TypePrinter> subBuffer;
     PrintOptions subOptions = Options;
     if (auto substitutions = T->getPatternSubstitutions()) {
-      subOptions.GenericEnv = nullptr;
+      subOptions.GenericSig = nullptr;
       subBuffer.emplace(Printer, subOptions);
       sub = &*subBuffer;
 
@@ -4368,7 +4437,7 @@ public:
       // A box layout has its own independent generic environment. Don't try
       // to print it with the environment's generic params.
       PrintOptions subOptions = Options;
-      subOptions.GenericEnv = nullptr;
+      subOptions.GenericSig = nullptr;
       TypePrinter sub(Printer, subOptions);
 
       // Capture list used here to ensure we don't print anything using `this`
@@ -4551,10 +4620,10 @@ public:
         }
       }
 
-      // When printing SIL types, use a generic environment to map them from
+      // When printing SIL types, use a generic signature to map them from
       // canonical types to sugared types.
-      if (Options.GenericEnv)
-        T = Options.GenericEnv->getSugaredType(T);
+      if (Options.GenericSig)
+        T = Options.GenericSig->getSugaredType(T);
     }
 
     auto Name = T->getName();
@@ -5041,7 +5110,7 @@ swift::getInheritedForPrinting(const Decl *decl, const PrintOptions &options,
           isa<EnumDecl>(decl) &&
           cast<EnumDecl>(decl)->hasRawType())
         continue;
-      Results.push_back(TypeLoc::withoutLoc(proto->getDeclaredType()));
+      Results.push_back(TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()));
     }
   }
 }

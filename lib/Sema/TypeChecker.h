@@ -164,12 +164,17 @@ enum class TypeCheckExprFlags {
   /// not all type variables have been determined.  In this case, the constraint
   /// system is not applied to the expression AST, but the ConstraintSystem is
   /// left in-tact.
-  AllowUnresolvedTypeVariables = 0x08,
+  AllowUnresolvedTypeVariables = 0x02,
 
   /// If set, this expression isn't embedded in a larger expression or
   /// statement. This should only be used for syntactic restrictions, and should
   /// not affect type checking itself.
-  IsExprStmt = 0x20,
+  IsExprStmt = 0x04,
+
+  /// Don't try to type check closure expression bodies, and leave them
+  /// unchecked. This is used by source tooling functionalities such as code
+  /// completion.
+  LeaveClosureBodyUnchecked = 0x08,
 };
 
 using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;
@@ -181,29 +186,12 @@ inline TypeCheckExprOptions operator|(TypeCheckExprFlags flag1,
 
 /// Flags that can be used to control name lookup.
 enum class NameLookupFlags {
-  /// Whether we know that this lookup is always a private dependency.
-  KnownPrivate = 0x01,
-  /// Whether name lookup should be able to find protocol members.
-  ProtocolMembers = 0x02,
-  /// Whether we should map the requirement to the witness if we
-  /// find a protocol member and the base type is a concrete type.
-  ///
-  /// If this is not set but ProtocolMembers is set, we will
-  /// find protocol extension members, but not protocol requirements
-  /// that do not yet have a witness (such as inferred associated
-  /// types, or witnesses for derived conformances).
-  PerformConformanceCheck = 0x04,
-  /// Whether to perform 'dynamic' name lookup that finds @objc
-  /// members of any class or protocol.
-  DynamicLookup = 0x08,
   /// Whether to ignore access control for this lookup, allowing inaccessible
   /// results to be returned.
-  IgnoreAccessControl = 0x10,
+  IgnoreAccessControl = 1 << 0,
   /// Whether to include results from outside the innermost scope that has a
   /// result.
-  IncludeOuterResults = 0x20,
-  /// Whether to consider synonyms declared through @_implements().
-  IncludeAttributeImplements = 0x40,
+  IncludeOuterResults = 1 << 1,
 };
 
 /// A set of options that control name lookup.
@@ -215,24 +203,13 @@ inline NameLookupOptions operator|(NameLookupFlags flag1,
 }
 
 /// Default options for member name lookup.
-const NameLookupOptions defaultMemberLookupOptions
-  = NameLookupFlags::ProtocolMembers |
-    NameLookupFlags::PerformConformanceCheck;
-
-/// Default options for constructor lookup.
-const NameLookupOptions defaultConstructorLookupOptions
-  = NameLookupFlags::ProtocolMembers |
-    NameLookupFlags::PerformConformanceCheck;
+const NameLookupOptions defaultMemberLookupOptions;
 
 /// Default options for member type lookup.
-const NameLookupOptions defaultMemberTypeLookupOptions
-  = NameLookupFlags::ProtocolMembers |
-    NameLookupFlags::PerformConformanceCheck;
+const NameLookupOptions defaultMemberTypeLookupOptions;
 
 /// Default options for unqualified name lookup.
-const NameLookupOptions defaultUnqualifiedLookupOptions
-  = NameLookupFlags::ProtocolMembers |
-    NameLookupFlags::PerformConformanceCheck;
+const NameLookupOptions defaultUnqualifiedLookupOptions;
 
 /// Describes the result of comparing two entities, of which one may be better
 /// or worse than the other, or they are unordered.
@@ -278,52 +255,6 @@ struct ParentConditionalConformance {
                            ArrayRef<ParentConditionalConformance> conformances);
 };
 
-/// An abstract interface that is used by `checkGenericArguments`.
-class GenericRequirementsCheckListener {
-public:
-  virtual ~GenericRequirementsCheckListener();
-
-  /// Callback invoked before trying to check generic requirement placed
-  /// between given types. Note: if either of the types assigned to the
-  /// requirement is generic parameter or dependent member, this callback
-  /// method is going to get their substitutions.
-  ///
-  /// \param kind The kind of generic requirement to check.
-  ///
-  /// \param first The left-hand side type assigned to the requirement,
-  /// possibly represented by its generic substitute.
-  ///
-  /// \param second The right-hand side type assigned to the requirement,
-  /// possibly represented by its generic substitute.
-  ///
-  ///
-  /// \returns true if it's ok to validate requirement, false otherwise.
-  virtual bool shouldCheck(RequirementKind kind, Type first, Type second);
-
-  /// Callback to report the result of a satisfied conformance requirement.
-  ///
-  /// \param depTy The dependent type, from the signature.
-  /// \param replacementTy The type \c depTy was replaced with.
-  /// \param conformance The conformance itself.
-  virtual void satisfiedConformance(Type depTy, Type replacementTy,
-                                    ProtocolConformanceRef conformance);
-
-  /// Callback to diagnose problem with unsatisfied generic requirement.
-  ///
-  /// \param req The unsatisfied generic requirement.
-  ///
-  /// \param first The left-hand side type assigned to the requirement,
-  /// possibly represented by its generic substitute.
-  ///
-  /// \param second The right-hand side type assigned to the requirement,
-  /// possibly represented by its generic substitute.
-  ///
-  /// \returns true if problem has been diagnosed, false otherwise.
-  virtual bool diagnoseUnsatisfiedRequirement(
-      const Requirement &req, Type first, Type second,
-      ArrayRef<ParentConditionalConformance> parents);
-};
-
 /// The result of `checkGenericRequirement`.
 enum class RequirementCheckResult {
   Success, Failure, SubstitutionFailure
@@ -356,7 +287,11 @@ Type getOptionalType(SourceLoc loc, Type elementType);
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
 /// returning the resultant expression.  Context is the DeclContext used
 /// for the lookup.
-Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context);
+///
+/// \param replaceInvalidRefsWithErrors Indicates whether it's allowed
+/// to replace any discovered invalid member references with `ErrorExpr`.
+Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
+                         bool replaceInvalidRefsWithErrors);
 
 /// Check for unsupported protocol types in the given declaration.
 void checkUnsupportedProtocolType(Decl *decl);
@@ -533,7 +468,8 @@ bool typesSatisfyConstraint(Type t1, Type t2, bool openArchetypes,
 /// of the function, set the result type of the expression to that sugar type.
 Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
 
-bool typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);
+void typeCheckASTNode(ASTNode &node, DeclContext *DC,
+                      bool LeaveBodyUnchecked = false);
 
 /// Try to apply the function builder transform of the given builder type
 /// to the body of the function.
@@ -633,14 +569,16 @@ std::string gatherGenericParamBindingsText(
 /// \param requirements The requirements against which the generic arguments
 /// should be checked.
 /// \param substitutions Substitutions from interface types of the signature.
-/// \param listener The generic check listener used to pick requirements and
-/// notify callers about diagnosed errors.
 RequirementCheckResult checkGenericArguments(
     DeclContext *dc, SourceLoc loc, SourceLoc noteLoc, Type owner,
     TypeArrayView<GenericTypeParamType> genericParams,
     ArrayRef<Requirement> requirements, TypeSubstitutionFn substitutions,
-    GenericRequirementsCheckListener *listener = nullptr,
     SubstOptions options = None);
+
+bool checkContextualRequirements(GenericTypeDecl *decl,
+                                 Type parentTy,
+                                 SourceLoc loc,
+                                 DeclContext *dc);
 
 /// Add any implicitly-defined constructors required for the given
 /// struct or class.
@@ -678,7 +616,6 @@ Type typeCheckExpression(Expr *&expr, DeclContext *dc,
 
 Optional<constraints::SolutionApplicationTarget>
 typeCheckExpression(constraints::SolutionApplicationTarget &target,
-                    bool &unresolvedTypeExprs,
                     TypeCheckExprOptions options = TypeCheckExprOptions());
 
 /// Return the type of operator function for specified LHS, or a null
@@ -695,8 +632,11 @@ FunctionType *getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
 /// it doesn't mutate given expression, even if there is a single valid
 /// solution, and constraint solver is allowed to produce partially correct
 /// solutions. Such solutions can have any number of holes in them.
-void typeCheckForCodeCompletion(
-    Expr *expr, DeclContext *DC, Type contextualType, ContextualTypePurpose CTP,
+///
+/// \returns `true` if target was applicable and it was possible to infer
+/// types for code completion, `false` othrewise.
+bool typeCheckForCodeCompletion(
+    constraints::SolutionApplicationTarget &target,
     llvm::function_ref<void(const constraints::Solution &)> callback);
 
 /// Check the key-path expression.
@@ -732,15 +672,6 @@ void checkSwitchExhaustiveness(const SwitchStmt *stmt, const DeclContext *DC,
 ///
 /// \returns true if an error occurred, false otherwise.
 bool typeCheckCondition(Expr *&expr, DeclContext *dc);
-
-/// Type check the given 'if', 'while', or 'guard' statement condition.
-///
-/// \param stmt The conditional statement to type-check, which will be modified
-/// in place.
-///
-/// \returns true if an error occurred, false otherwise.
-bool typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
-                                    DeclContext *dc);
 
 /// Determine the semantics of a checked cast operation.
 ///
@@ -987,17 +918,6 @@ LookupTypeResult
 lookupMemberType(DeclContext *dc, Type type, DeclNameRef name,
                  NameLookupOptions options = defaultMemberTypeLookupOptions);
 
-/// Look up the constructors of the given type.
-///
-/// \param dc The context that needs the constructor.
-/// \param type The type for which we will look for constructors.
-/// \param options Options that control name lookup.
-///
-/// \returns the constructors found for this type.
-LookupResult lookupConstructors(
-    DeclContext *dc, Type type,
-    NameLookupOptions options = defaultConstructorLookupOptions);
-
 /// Given an expression that's known to be an infix operator,
 /// look up its precedence group.
 PrecedenceGroupDecl *lookupPrecedenceGroupForInfixOperator(DeclContext *dc,
@@ -1006,9 +926,18 @@ PrecedenceGroupDecl *lookupPrecedenceGroupForInfixOperator(DeclContext *dc,
 PrecedenceGroupLookupResult
 lookupPrecedenceGroup(DeclContext *dc, Identifier name, SourceLoc nameLoc);
 
+enum class UnsupportedMemberTypeAccessKind : uint8_t {
+  None,
+  TypeAliasOfUnboundGeneric,
+  TypeAliasOfExistential,
+  AssociatedTypeOfUnboundGeneric,
+  AssociatedTypeOfExistential
+};
+
 /// Check whether the given declaration can be written as a
 /// member of the given base type.
-bool isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl);
+UnsupportedMemberTypeAccessKind
+isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl);
 
 /// @}
 
@@ -1198,12 +1127,11 @@ void diagnoseIfDeprecated(SourceRange SourceRange,
 void checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name);
 
 /// Check error handling in the given type-checked top-level code.
-void checkTopLevelErrorHandling(TopLevelCodeDecl *D);
-void checkFunctionErrorHandling(AbstractFunctionDecl *D);
-void checkInitializerErrorHandling(Initializer *I, Expr *E);
-void checkEnumElementErrorHandling(EnumElementDecl *D, Expr *expr);
-void checkPropertyWrapperErrorHandling(PatternBindingDecl *binding,
-                                       Expr *expr);
+void checkTopLevelEffects(TopLevelCodeDecl *D);
+void checkFunctionEffects(AbstractFunctionDecl *D);
+void checkInitializerEffects(Initializer *I, Expr *E);
+void checkEnumElementEffects(EnumElementDecl *D, Expr *expr);
+void checkPropertyWrapperEffects(PatternBindingDecl *binding, Expr *expr);
 
 /// If an expression references 'self.init' or 'super.init' in an
 /// initializer context, returns the implicit 'self' decl of the constructor.
@@ -1286,6 +1214,18 @@ bool requirePointerArgumentIntrinsics(ASTContext &ctx, SourceLoc loc);
 /// Require that the library intrinsics for creating
 /// array literals exist.
 bool requireArrayLiteralIntrinsics(ASTContext &ctx, SourceLoc loc);
+
+/// Gets the \c UnresolvedMemberExpr at the base of a chain of member accesses.
+/// If \c expr is not part of a member chain or the base is something other than
+/// an \c UnresolvedMemberExpr, \c nullptr is returned.
+UnresolvedMemberExpr *getUnresolvedMemberChainBase(Expr *expr);
+
+/// Checks whether a function builder type has a well-formed function builder
+/// method with the given name. If provided and non-empty, the argument labels
+/// are verified against any candidates.
+bool typeSupportsBuilderOp(Type builderType, DeclContext *dc, Identifier fnName,
+                           ArrayRef<Identifier> argLabels = {},
+                           SmallVectorImpl<ValueDecl *> *allResults = nullptr);
 }; // namespace TypeChecker
 
 /// Temporary on-stack storage and unescaping for encoded diagnostic
@@ -1419,8 +1359,7 @@ bool areGenericRequirementsSatisfied(const DeclContext *DC,
 /// Check for restrictions on the use of the @unknown attribute on a
 /// case statement.
 void checkUnknownAttrRestrictions(
-    ASTContext &ctx, CaseStmt *caseBlock, CaseStmt *fallthroughDest,
-    bool &limitExhaustivityChecks);
+    ASTContext &ctx, CaseStmt *caseBlock, bool &limitExhaustivityChecks);
 
 /// Bind all of the pattern variables that occur within a case statement and
 /// all of its case items to their "parent" pattern variables, forming chains
@@ -1441,7 +1380,7 @@ void checkUnknownAttrRestrictions(
 /// Each of the "x" variables must eventually have the same type, and agree on
 /// let vs. var. This function does not perform any of that validation, leaving
 /// it to later stages.
-void bindSwitchCasePatternVars(CaseStmt *stmt);
+void bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *stmt);
 
 } // end namespace swift
 

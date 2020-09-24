@@ -95,6 +95,7 @@ module ucrt [system] {
 
         module stat {
           header "sys/stat.h"
+          header "direct.h"
           export *
         }
 

@@ -57,6 +57,11 @@ using llvm::SmallDenseSet;
 using llvm::SmallMapVector;
 using llvm::SmallSet;
 
+/// This flag enables experimental `@differentiable(linear)` function
+/// transposition.
+static llvm::cl::opt<bool> EnableExperimentalLinearMapTransposition(
+    "enable-experimental-linear-map-transposition", llvm::cl::init(false));
+
 /// This flag is used to disable `differentiable_function_extract` instruction
 /// folding for SIL testing purposes.
 static llvm::cl::opt<bool> SkipFoldingDifferentiableFunctionExtraction(
@@ -89,6 +94,12 @@ private:
                                            SILBuilder &builder, SILLocation loc,
                                            DifferentiationInvoker invoker);
 
+  /// Given a `linear_function` instruction that is missing a transpose operand,
+  /// return a new `linear_function` instruction with the transpose filled in.
+  SILValue promoteToLinearFunction(LinearFunctionInst *inst,
+                                   SILBuilder &builder, SILLocation loc,
+                                   DifferentiationInvoker invoker);
+
 public:
   /// Construct an `DifferentiationTransformer` for the given module.
   explicit DifferentiationTransformer(SILModuleTransform &transform)
@@ -112,6 +123,10 @@ public:
   /// Process the given `differentiable_function` instruction, filling in
   /// missing derivative functions if necessary.
   bool processDifferentiableFunctionInst(DifferentiableFunctionInst *dfi);
+
+  /// Process the given `linear_function` instruction, filling in the missing
+  /// transpose function if necessary.
+  bool processLinearFunctionInst(LinearFunctionInst *lfi);
 
   /// Fold `differentiable_function_extract` users of the given
   /// `differentiable_function` instruction, directly replacing them with
@@ -143,8 +158,7 @@ static bool diagnoseNoReturn(ADContext &context, SILFunction *original,
 /// flow unsupported" error at appropriate source locations. Returns true if
 /// error is emitted.
 ///
-/// Update as control flow support is added. Currently, branching terminators
-/// other than `br`, `cond_br`, `switch_enum` are not supported.
+/// Update as control flow support is added.
 static bool diagnoseUnsupportedControlFlow(ADContext &context,
                                            SILFunction *original,
                                            DifferentiationInvoker invoker) {
@@ -158,7 +172,7 @@ static bool diagnoseUnsupportedControlFlow(ADContext &context,
         isa<SwitchEnumInst>(term) || isa<SwitchEnumAddrInst>(term) ||
         isa<CheckedCastBranchInst>(term) ||
         isa<CheckedCastValueBranchInst>(term) ||
-        isa<CheckedCastAddrBranchInst>(term))
+        isa<CheckedCastAddrBranchInst>(term) || isa<TryApplyInst>(term))
       continue;
     // If terminator is an unsupported branching terminator, emit an error.
     if (term->isBranch()) {
@@ -408,7 +422,7 @@ static SILValue reapplyFunctionConversion(
              "one argument");
       auto *dfi = context.createDifferentiableFunction(
           builder, loc, parameterIndices, resultIndices, newArgs.back());
-      context.addDifferentiableFunctionInstToWorklist(dfi);
+      context.getDifferentiableFunctionInstWorklist().push_back(dfi);
       newArgs.back() = dfi;
     }
     // Compute substitution map for reapplying `partial_apply`.
@@ -771,8 +785,8 @@ static SILFunction *createEmptyVJP(ADContext &context, SILFunction *original,
               witness->getConfig()))
           .str();
   CanGenericSignature vjpCanGenSig;
-  if (auto jvpGenSig = witness->getDerivativeGenericSignature())
-    vjpCanGenSig = jvpGenSig->getCanonicalSignature();
+  if (auto vjpGenSig = witness->getDerivativeGenericSignature())
+    vjpCanGenSig = vjpGenSig->getCanonicalSignature();
   GenericEnvironment *vjpGenericEnv = nullptr;
   if (vjpCanGenSig && !vjpCanGenSig->areAllParamsConcrete())
     vjpGenericEnv = vjpCanGenSig->getGenericEnvironment();
@@ -857,9 +871,7 @@ static void emitFatalError(ADContext &context, SILFunction *f,
                     ResultConvention::Unowned);
   // Fatal error function must have type `@convention(thin) () -> Never`.
   auto fatalErrorFnType = SILFunctionType::get(
-      /*genericSig*/ nullptr,
-      SILFunctionType::ExtInfo().withRepresentation(
-          SILFunctionTypeRepresentation::Thin),
+      /*genericSig*/ nullptr, SILFunctionType::ExtInfo::getThin(),
       SILCoroutineKind::None, ParameterConvention::Direct_Unowned, {},
       /*interfaceYields*/ {}, neverResultInfo,
       /*interfaceErrorResults*/ None, {}, {}, context.getASTContext());
@@ -1005,8 +1017,10 @@ static SILValue promoteCurryThunkApplicationToDifferentiableFunction(
   // Construct new curry thunk type with `@differentiable` function
   // result.
   auto diffResultFnTy = resultFnTy->getWithExtInfo(
-      resultFnTy->getExtInfo().withDifferentiabilityKind(
-          DifferentiabilityKind::Normal));
+      resultFnTy->getExtInfo()
+          .intoBuilder()
+          .withDifferentiabilityKind(DifferentiabilityKind::Normal)
+          .build());
   auto newThunkResult = thunkResult.getWithInterfaceType(diffResultFnTy);
   auto thunkType = SILFunctionType::get(
       thunkTy->getSubstGenericSignature(), thunkTy->getExtInfo(),
@@ -1046,7 +1060,7 @@ static SILValue promoteCurryThunkApplicationToDifferentiableFunction(
     retInst->eraseFromParent();
 
     context.recordGeneratedFunction(newThunk);
-    context.addDifferentiableFunctionInstToWorklist(dfi);
+    context.getDifferentiableFunctionInstWorklist().push_back(dfi);
     if (dt.processDifferentiableFunctionInst(dfi))
       return nullptr;
   }
@@ -1198,8 +1212,29 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
   auto *newDiffFn = context.createDifferentiableFunction(
       builder, loc, parameterIndices, resultIndices, origFnCopy,
       std::make_pair(derivativeFns[0], derivativeFns[1]));
-  context.addDifferentiableFunctionInstToWorklist(dfi);
+  context.getDifferentiableFunctionInstWorklist().push_back(dfi);
   return newDiffFn;
+}
+
+SILValue DifferentiationTransformer::promoteToLinearFunction(
+    LinearFunctionInst *lfi, SILBuilder &builder, SILLocation loc,
+    DifferentiationInvoker invoker) {
+  // Note: for now, this function creates a new `linear_function` instruction
+  // with an undef transpose function operand. Eventually, a legitimate
+  // transpose function operand should be created and used.
+  auto origFnOperand = lfi->getOriginalFunction();
+  auto origFnCopy = builder.emitCopyValueOperation(loc, origFnOperand);
+  auto *parameterIndices = lfi->getParameterIndices();
+  auto originalType = origFnOperand->getType().castTo<SILFunctionType>();
+  auto transposeFnType = originalType->getAutoDiffTransposeFunctionType(
+      parameterIndices, context.getTypeConverter(),
+      LookUpConformanceInModule(builder.getModule().getSwiftModule()));
+  auto transposeType = SILType::getPrimitiveObjectType(transposeFnType);
+  auto transposeFn = SILUndef::get(transposeType, builder.getFunction());
+  auto *newLinearFn = context.createLinearFunction(
+      builder, loc, parameterIndices, origFnCopy, SILValue(transposeFn));
+  context.getLinearFunctionInstWorklist().push_back(lfi);
+  return newLinearFn;
 }
 
 /// Fold `differentiable_function_extract` users of the given
@@ -1288,6 +1323,39 @@ bool DifferentiationTransformer::processDifferentiableFunctionInst(
   return false;
 }
 
+bool DifferentiationTransformer::processLinearFunctionInst(
+    LinearFunctionInst *lfi) {
+  PrettyStackTraceSILNode dfiTrace("canonicalizing `linear_function`",
+                                   cast<SILInstruction>(lfi));
+  PrettyStackTraceSILFunction fnTrace("...in", lfi->getFunction());
+  LLVM_DEBUG({
+    auto &s = getADDebugStream() << "Processing LinearFunctionInst:\n";
+    lfi->printInContext(s);
+  });
+
+  // If `lfi` already has a transpose function, do not process.
+  if (lfi->hasTransposeFunction())
+    return false;
+
+  SILFunction *parent = lfi->getFunction();
+  auto loc = lfi->getLoc();
+  SILBuilderWithScope builder(lfi);
+  auto linearFnValue = promoteToLinearFunction(lfi, builder, loc, lfi);
+  // Mark `lfi` as processed so that it won't be reprocessed after deletion.
+  context.markLinearFunctionInstAsProcessed(lfi);
+  if (!linearFnValue)
+    return true;
+  // Replace all uses of `lfi`.
+  lfi->replaceAllUsesWith(linearFnValue);
+  // Destroy the original operand.
+  builder.emitDestroyValueOperation(loc, lfi->getOriginalFunction());
+  lfi->eraseFromParent();
+
+  transform.invalidateAnalysis(parent,
+                               SILAnalysis::InvalidationKind::FunctionBody);
+  return false;
+}
+
 /// Automatic differentiation transform entry.
 void Differentiation::run() {
   auto &module = *getModule();
@@ -1308,22 +1376,26 @@ void Differentiation::run() {
     context.addInvoker(&witness);
   }
 
-  // Register all the `differentiable_function` instructions in the module that
-  // trigger differentiation.
+  // Register all the `differentiable_function` and `linear_function`
+  // instructions in the module that trigger differentiation.
   for (SILFunction &f : module) {
     for (SILBasicBlock &bb : f) {
       for (SILInstruction &i : bb) {
-        if (auto *dfi = dyn_cast<DifferentiableFunctionInst>(&i))
-          context.addDifferentiableFunctionInstToWorklist(dfi);
-        // Reject uncanonical `linear_function` instructions.
-        // FIXME(SR-11850): Add support for linear map transposition.
-        else if (auto *lfi = dyn_cast<LinearFunctionInst>(&i)) {
-          if (!lfi->hasTransposeFunction()) {
-            astCtx.Diags.diagnose(
+        if (auto *dfi = dyn_cast<DifferentiableFunctionInst>(&i)) {
+          context.getDifferentiableFunctionInstWorklist().push_back(dfi);
+        } else if (auto *lfi = dyn_cast<LinearFunctionInst>(&i)) {
+          // If linear map transposition is not enabled and an uncanonical
+          // `linear_function` instruction is encountered, emit a diagnostic.
+          // FIXME(SR-11850): Finish support for linear map transposition.
+          if (!EnableExperimentalLinearMapTransposition) {
+            if (!lfi->hasTransposeFunction()) {
+              astCtx.Diags.diagnose(
                 lfi->getLoc().getSourceLoc(),
                 diag::autodiff_conversion_to_linear_function_not_supported);
-            errorOccurred = true;
+              errorOccurred = true;
+            }
           }
+          context.getLinearFunctionInstWorklist().push_back(lfi);
         }
       }
     }
@@ -1331,7 +1403,8 @@ void Differentiation::run() {
 
   // If nothing has triggered differentiation, there's nothing to do.
   if (context.getInvokers().empty() &&
-      context.isDifferentiableFunctionInstsWorklistEmpty())
+      context.getDifferentiableFunctionInstWorklist().empty() &&
+      context.getLinearFunctionInstWorklist().empty())
     return;
 
   // Differentiation relies on the stdlib (the Swift module).
@@ -1346,8 +1419,9 @@ void Differentiation::run() {
     if (!context.getInvokers().empty()) {
       loc = context.getInvokers().front().second.getLocation();
     } else {
-      assert(!context.isDifferentiableFunctionInstsWorklistEmpty());
-      loc = context.popDifferentiableFunctionInstFromWorklist()
+      assert(!context.getDifferentiableFunctionInstWorklist().empty());
+      loc = context.getDifferentiableFunctionInstWorklist()
+                .pop_back_val()
                 ->getLoc()
                 .getSourceLoc();
     }
@@ -1368,11 +1442,21 @@ void Differentiation::run() {
   }
 
   // Iteratively process `differentiable_function` instruction worklist.
-  while (auto *dfi = context.popDifferentiableFunctionInstFromWorklist()) {
+  while (!context.getDifferentiableFunctionInstWorklist().empty()) {
+    auto *dfi = context.getDifferentiableFunctionInstWorklist().pop_back_val();
     // Skip instructions that have been already been processed.
     if (context.isDifferentiableFunctionInstProcessed(dfi))
       continue;
     errorOccurred |= transformer.processDifferentiableFunctionInst(dfi);
+  }
+
+  // Iteratively process `linear_function` instruction worklist.
+  while (!context.getLinearFunctionInstWorklist().empty()) {
+    auto *lfi = context.getLinearFunctionInstWorklist().pop_back_val();
+    // Skip instructions that have been already been processed.
+    if (context.isLinearFunctionInstProcessed(lfi))
+      continue;
+    errorOccurred |= transformer.processLinearFunctionInst(lfi);
   }
 
   // If any error occurred while processing witnesses or

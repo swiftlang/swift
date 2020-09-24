@@ -16,6 +16,7 @@ add_swift_target_library(swift_Differentiation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPE
   DifferentiationUtilities.swift
   AnyDifferentiable.swift
   ArrayDifferentiation.swift
+  OptionalDifferentiation.swift
 
   GYB_SOURCES
     FloatingPointDifferentiation.swift.gyb

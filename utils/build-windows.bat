@@ -14,6 +14,7 @@
 :: Additionally, it needs the following variables:
 :: - CMAKE_BUILD_TYPE: Kind of build: Release, RelWithDebInfo, Debug.
 :: - PYTHON_HOME: The Python installation directory.
+:: - REPO_SCHEME: Optional. The scheme name to checkout.
 
 :: REQUIRED PERMISSIONS
 :: Practically, it is easier to be in the Adminstrators group to run the
@@ -24,6 +25,8 @@
 :: @echo off
 
 setlocal enableextensions enabledelayedexpansion
+
+PATH=%PATH%;%PYTHON_HOME%
 
 set icu_version_major=64
 set icu_version_minor=2
@@ -53,7 +56,7 @@ set install_directory=%build_root%\Library\Developer\Toolchains\unknown-Asserts-
 md %build_root%\tmp
 set TMPDIR=%build_root%\tmp
 
-md %build_root%\tmp\org.llvm.clang
+md %build_root%\tmp\org.llvm.clang.9999
 set CUSTOM_CLANG_MODULE_CACHE=%build_root%\tmp\org.llvm.clang.9999
 
 md %build_root%\tmp\org.swift.package-manager
@@ -89,20 +92,33 @@ endlocal
 :: It supposes the %CD% is the source root.
 setlocal enableextensions enabledelayedexpansion
 
+if defined REPO_SCHEME SET "scheme_arg=--scheme %REPO_SCHEME%"
+
 git -C "%source_root%\swift" config --local core.autocrlf input
 git -C "%source_root%\swift" config --local core.symlink true
 git -C "%source_root%\swift" checkout-index --force --all
 
-git clone --depth 1 --single-branch https://github.com/apple/swift-cmark cmark %exitOnError%
-git clone --depth 1 --single-branch --branch swift/master https://github.com/apple/llvm-project llvm-project %exitOnError%
-mklink /D "%source_root%\clang" "%source_root%\llvm-project\clang"
-mklink /D "%source_root%\llvm" "%source_root%\llvm-project\llvm"
-mklink /D "%source_root%\lld" "%source_root%\llvm-project\lld"
-mklink /D "%source_root%\lldb" "%source_root%\llvm-project\lldb"
-mklink /D "%source_root%\compiler-rt" "%source_root%\llvm-project\compiler-rt"
-mklink /D "%source_root%\libcxx" "%source_root%\llvm-project\libcxx"
-mklink /D "%source_root%\clang-tools-extra" "%source_root%\llvm-project\clang-tools-extra"
-git clone --depth 1 --single-branch https://github.com/apple/swift-corelibs-libdispatch %exitOnError%
+:: Always skip Swift, since it is checked out by Jenkins
+@set "skip_repositories_arg=--skip-repository swift"
+@set "skip_repositories_arg=%skip_repositories_arg% --skip-repository llbuild"
+@set "skip_repositories_arg=%skip_repositories_arg% --skip-repository indexstore-db"
+@set "skip_repositories_arg=%skip_repositories_arg% --skip-repository ninja"
+@set "skip_repositories_arg=%skip_repositories_arg% --skip-repository sourcekit-lsp"
+@set "skip_repositories_arg=%skip_repositories_arg% --skip-repository swift-argument-parser"
+@set "skip_repositories_arg=%skip_repositories_arg% --skip-repository swift-corelibs-foundation"
+@set "skip_repositories_arg=%skip_repositories_arg% --skip-repository swift-corelibs-xctest"
+@set "skip_repositories_arg=%skip_repositories_arg% --skip-repository swift-driver"
+@set "skip_repositories_arg=%skip_repositories_arg% --skip-repository swift-format"
+@set "skip_repositories_arg=%skip_repositories_arg% --skip-repository swift-integration-tests"
+@set "skip_repositories_arg=%skip_repositories_arg% --skip-repository swiftpm"
+@set "skip_repositories_arg=%skip_repositories_arg% --skip-repository swift-stress-tester"
+@set "skip_repositories_arg=%skip_repositories_arg% --skip-repository swift-syntax"
+@set "skip_repositories_arg=%skip_repositories_arg% --skip-repository swift-tools-support-core"
+@set "skip_repositories_arg=%skip_repositories_arg% --skip-repository swift-xcode-playground-support"
+@set "skip_repositories_arg=%skip_repositories_arg% --skip-repository tensorflow-swift-apis"
+@set "skip_repositories_arg=%skip_repositories_arg% --skip-repository yams"
+
+call "%source_root%\swift\utils\update-checkout.cmd" %scheme_arg% %skip_repositories_arg% --clone --skip-history --github-comment "%ghprbCommentBody%" >NUL 2>NUL
 
 goto :eof
 endlocal
@@ -176,6 +192,7 @@ cmake^
     -DLLVM_ENABLE_OCAMLDOC:BOOL=NO^
     -DLLVM_ENABLE_LIBXML2:BOOL=NO^
     -DLLVM_ENABLE_ZLIB:BOOL=NO^
+    -DLLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN=ON^
     -DENABLE_X86_RELAX_RELOCATIONS:BOOL=YES^
     -DLLVM_INSTALL_BINUTILS_SYMLINKS:BOOL=YES^
     -DLLVM_INSTALL_TOOLCHAIN_ONLY:BOOL=YES^
@@ -184,7 +201,7 @@ cmake^
     -DCMAKE_CXX_FLAGS:STRING="/GS- /Oy"^
     -DCMAKE_EXE_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
     -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
-    -S "%source_root%\llvm" %exitOnError%
+    -S "%source_root%\llvm-project\llvm" %exitOnError%
 
 cmake --build "%build_root%\llvm" %exitOnError%
 cmake --build "%build_root%\llvm" --target install %exitOnError%
@@ -232,6 +249,7 @@ cmake^
     -DSWIFT_PATH_TO_CMARK_SOURCE:PATH=%source_root%\cmark^
     -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE:PATH=%source_root%\swift-corelibs-libdispatch^
     -DLLVM_DIR:PATH=%build_root%\llvm\lib\cmake\llvm^
+    -DLLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN=ON^
     -DSWIFT_INCLUDE_DOCS:BOOL=NO^
     -DSWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE:PATH=%source_root%\icu-%icu_version%\include\unicode^
     -DSWIFT_WINDOWS_x86_64_ICU_UC:PATH=%source_root%\icu-%icu_version%\lib64\icuuc.lib^
@@ -277,8 +295,8 @@ cmake^
     -B "%build_root%\lldb"^
     -G Ninja^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
-    -DCMAKE_C_COMPILER=clang-cl^
-    -DCMAKE_CXX_COMPILER=clang-cl^
+    -DCMAKE_C_COMPILER=cl^
+    -DCMAKE_CXX_COMPILER=cl^
     -DCMAKE_INSTALL_PREFIX:PATH=%install_directory%^
     -DLLVM_DIR:PATH=%build_root%\llvm\lib\cmake\llvm^
     -DClang_DIR:PATH=%build_root%\llvm\lib\cmake\clang^
@@ -291,7 +309,8 @@ cmake^
     -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
     -DLLDB_DISABLE_PYTHON=YES^
     -DLLDB_INCLUDE_TESTS:BOOL=NO^
-    -S "%source_root%\lldb" %exitOnError%
+    -DLLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN=ON^
+    -S "%source_root%\llvm-project\lldb" %exitOnError%
 
 cmake --build "%build_root%\lldb" %exitOnError%
 cmake --build "%build_root%\lldb" --target install %exitOnError%

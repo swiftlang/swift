@@ -75,6 +75,9 @@ SIMPLE_LOCATOR_PATH_ELT(FunctionArgument)
 /// The result type of a function.
 SIMPLE_LOCATOR_PATH_ELT(FunctionResult)
 
+/// The result type of a function builder body.
+SIMPLE_LOCATOR_PATH_ELT(FunctionBuilderBodyResult)
+
 /// A generic argument.
 /// FIXME: Add support for named generic arguments?
 CUSTOM_LOCATOR_PATH_ELT(GenericArgument)
@@ -188,6 +191,9 @@ CUSTOM_LOCATOR_PATH_ELT(PatternMatch)
 /// failures because it allows to express in the locator kind
 /// of a problem.
 CUSTOM_LOCATOR_PATH_ELT(ArgumentAttribute)
+
+/// The result of a chain of member accesses off an UnresolvedMemberExpr
+SIMPLE_LOCATOR_PATH_ELT(UnresolvedMemberChainResult)
 
 #undef LOCATOR_PATH_ELT
 #undef CUSTOM_LOCATOR_PATH_ELT

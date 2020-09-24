@@ -172,14 +172,13 @@ ValidationInfo validateSerializedAST(
 ///   Status::Valid.
 /// - \p moduleBufferID and \p moduleDocBufferID are the buffer identifiers
 ///   of the module input and doc input buffers respectively (\ref 
-///   SerializedModuleLoader::loadAST, \ref ModuleFile::load).
+///   SerializedModuleLoaderBase::loadAST, \ref ModuleFile::load).
 /// - \p loadedModuleFile is an invalid loaded module.
 /// - \p ModuleName is the name used to refer to the module in diagnostics.
 void diagnoseSerializedASTLoadFailure(
     ASTContext &Ctx, SourceLoc diagLoc, const ValidationInfo &loadInfo,
-    const ExtendedValidationInfo &extendedInfo, StringRef moduleBufferID,
-    StringRef moduleDocBufferID, ModuleFile *loadedModuleFile,
-    Identifier ModuleName);
+    StringRef moduleBufferID, StringRef moduleDocBufferID,
+    ModuleFile *loadedModuleFile, Identifier ModuleName);
 
 } // end namespace serialization
 } // end namespace swift

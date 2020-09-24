@@ -253,8 +253,9 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
         // type.
         if (var->isPropertyMemberwiseInitializedWithWrappedType()) {
           varInterfaceType = var->getPropertyWrapperInitValueInterfaceType();
-          isAutoClosure =
-            var->isInnermostPropertyWrapperInitUsesEscapingAutoClosure();
+
+          auto wrapperInfo = var->getPropertyWrapperBackingPropertyInfo();
+          isAutoClosure = wrapperInfo.wrappedValuePlaceholder->isAutoClosure();
         } else {
           varInterfaceType = backingPropertyType;
         }
@@ -322,11 +323,11 @@ synthesizeStubBody(AbstractFunctionDecl *fn, void *) {
   }
 
   auto *staticStringDecl = ctx.getStaticStringDecl();
-  auto staticStringType = staticStringDecl->getDeclaredType();
+  auto staticStringType = staticStringDecl->getDeclaredInterfaceType();
   auto staticStringInit = ctx.getStringBuiltinInitDecl(staticStringDecl);
 
   auto *uintDecl = ctx.getUIntDecl();
-  auto uintType = uintDecl->getDeclaredType();
+  auto uintType = uintDecl->getDeclaredInterfaceType();
   auto uintInit = ctx.getIntBuiltinInitDecl(uintDecl);
 
   // Create a call to Swift._unimplementedInitializer
@@ -355,7 +356,7 @@ synthesizeStubBody(AbstractFunctionDecl *fn, void *) {
   initName->setBuiltinInitializer(staticStringInit);
 
   auto *file = new (ctx) MagicIdentifierLiteralExpr(
-    MagicIdentifierLiteralExpr::File, loc, /*Implicit=*/true);
+    MagicIdentifierLiteralExpr::FileID, loc, /*Implicit=*/true);
   file->setType(staticStringType);
   file->setBuiltinInitializer(staticStringInit);
 
@@ -549,10 +550,11 @@ configureInheritedDesignatedInitAttributes(ClassDecl *classDecl,
 
   // If the superclass constructor is @objc but the subclass constructor is
   // not representable in Objective-C, add @nonobjc implicitly.
+  Optional<ForeignAsyncConvention> asyncConvention;
   Optional<ForeignErrorConvention> errorConvention;
   if (superclassCtor->isObjC() &&
       !isRepresentableInObjC(ctor, ObjCReason::MemberOfObjCSubclass,
-                             errorConvention))
+                             asyncConvention, errorConvention))
     ctor->getAttrs().add(new (ctx) NonObjCAttr(/*isImplicit=*/true));
 }
 
@@ -910,8 +912,8 @@ static bool canInheritDesignatedInits(Evaluator &eval, ClassDecl *decl) {
 
 static void collectNonOveriddenSuperclassInits(
     ClassDecl *subclass, SmallVectorImpl<ConstructorDecl *> &results) {
-  auto superclassTy = subclass->getSuperclass();
-  assert(superclassTy);
+  auto *superclassDecl = subclass->getSuperclassDecl();
+  assert(superclassDecl);
 
   // Record all of the initializers the subclass has overriden, excluding stub
   // overrides, which we don't want to consider as viable delegates for
@@ -923,11 +925,17 @@ static void collectNonOveriddenSuperclassInits(
         if (auto overridden = ctor->getOverriddenDecl())
           overriddenInits.insert(overridden);
 
-  auto superclassCtors = TypeChecker::lookupConstructors(
-      subclass, superclassTy, NameLookupFlags::IgnoreAccessControl);
+  superclassDecl->synthesizeSemanticMembersIfNeeded(
+    DeclBaseName::createConstructor());
 
-  for (auto memberResult : superclassCtors) {
-    auto superclassCtor = cast<ConstructorDecl>(memberResult.getValueDecl());
+  NLOptions subOptions = (NL_QualifiedDefault | NL_IgnoreAccessControl);
+  SmallVector<ValueDecl *, 4> lookupResults;
+  subclass->lookupQualified(
+      superclassDecl, DeclNameRef::createConstructor(),
+      subOptions, lookupResults);
+
+  for (auto decl : lookupResults) {
+    auto superclassCtor = cast<ConstructorDecl>(decl);
 
     // Skip invalid superclass initializers.
     if (superclassCtor->isInvalid())
@@ -957,12 +965,7 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
   decl->setAddedImplicitInitializers();
 
   // We can only inherit initializers if we have a superclass.
-  // FIXME: We should be bailing out earlier in the function, but unfortunately
-  // that currently regresses associated type inference for cases like
-  // compiler_crashers_2_fixed/0124-sr5825.swift due to the fact that we no
-  // longer eagerly compute the interface types of the other constructors.
-  auto superclassTy = decl->getSuperclass();
-  if (!superclassTy)
+  if (!decl->getSuperclassDecl() || !decl->getSuperclass())
     return;
 
   // Check whether the user has defined a designated initializer for this class,

@@ -35,7 +35,6 @@
 using namespace swift;
 using namespace ast_scope;
 
-static SourceLoc getStartOfFirstParam(ClosureExpr *closure);
 static SourceLoc getLocEncompassingPotentialLookups(const SourceManager &,
                                                     SourceLoc endLoc);
 static SourceLoc getLocAfterExtendedNominal(const ExtensionDecl *);
@@ -67,6 +66,14 @@ ASTScopeImpl::widenSourceRangeForChildren(const SourceRange range,
   if (range.isInvalid())
     return childRange;
   auto r = range;
+
+  // HACK: For code completion. If the range of the child is from another
+  // source buffer, don't widen using that range.
+  if (const auto &replacedRange = getSourceManager().getReplacedRange()) {
+    if (getSourceManager().rangeContains(replacedRange.Original, range) &&
+        getSourceManager().rangeContains(replacedRange.New, childRange))
+      return r;
+  }
   r.widen(childRange);
   return r;
 }
@@ -114,6 +121,14 @@ bool ASTScopeImpl::verifyThatChildrenAreContainedWithin(
                   getChildren().back()->getSourceRangeOfScope().End);
   if (getSourceManager().rangeContains(range, rangeOfChildren))
     return true;
+
+  // HACK: For code completion. Handle replaced range.
+  if (const auto &replacedRange = getSourceManager().getReplacedRange()) {
+    if (getSourceManager().rangeContains(replacedRange.Original, range) &&
+        getSourceManager().rangeContains(replacedRange.New, rangeOfChildren))
+      return true;
+  }
+
   auto &out = verificationError() << "children not contained in its parent\n";
   if (getChildren().size() == 1) {
     out << "\n***Only Child node***\n";
@@ -198,9 +213,9 @@ SourceRange DifferentiableAttributeScope::getSourceRangeOfThisASTNode(
   return differentiableAttr->getRange();
 }
 
-SourceRange AbstractFunctionBodyScope::getSourceRangeOfThisASTNode(
+SourceRange FunctionBodyScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
-  return decl->getBodySourceRange();
+  return decl->getOriginalBodySourceRange();
 }
 
 SourceRange TopLevelCodeScope::getSourceRangeOfThisASTNode(
@@ -218,11 +233,6 @@ EnumElementScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
   return decl->getSourceRange();
 }
 
-SourceRange WholeClosureScope::getSourceRangeOfThisASTNode(
-    const bool omitAssertions) const {
-  return closureExpr->getSourceRange();
-}
-
 SourceRange AbstractStmtScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
   return getStmt()->getSourceRange();
@@ -237,16 +247,6 @@ SourceRange DefaultArgumentInitializerScope::getSourceRangeOfThisASTNode(
 
 SourceRange PatternEntryDeclScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
-  // TODO: Once the creation of two PatternBindingDecls at same location is
-  // eliminated, the following may be able to be simplified.
-  if (!getChildren().empty()) { // why needed???
-    bool hasOne = false;
-    getPattern()->forEachVariable([&](VarDecl *) { hasOne = true; });
-    if (!hasOne)
-      return SourceRange(); // just the init
-    if (!getPatternEntry().getInit())
-      return SourceRange(); // just the var decls
-  }
   return getPatternEntry().getSourceRange();
 }
 
@@ -256,12 +256,6 @@ SourceRange PatternEntryInitializerScope::getSourceRangeOfThisASTNode(
   // Search for "When the initializer is removed we don't actually clear the
   // pointer" because we do!
   return initAsWrittenWhenCreated->getSourceRange();
-}
-
-SourceRange
-VarDeclScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
-  const auto br = decl->getBracesRange();
-  return br.isValid() ? br : decl->getSourceRange();
 }
 
 SourceRange GenericParamScope::getSourceRangeOfThisASTNode(
@@ -357,13 +351,12 @@ SourceRange AbstractFunctionDeclScope::getSourceRangeOfThisASTNode(
     ASTScopeAssert(r.End.isValid(), "Start valid imples end valid.");
     return r;
   }
-  return decl->getBodySourceRange();
+  return decl->getOriginalBodySourceRange();
 }
 
 SourceRange ParameterListScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
-  const auto rangeForGoodInput =
-      getSourceRangeOfEnclosedParamsOfASTNode(omitAssertions);
+  auto rangeForGoodInput = params->getSourceRange();
   auto r = SourceRange(rangeForGoodInput.Start,
                        fixupEndForBadInput(rangeForGoodInput));
   ASTScopeAssert(getSourceManager().rangeContains(
@@ -392,20 +385,13 @@ SourceRange ForEachPatternScope::getSourceRangeOfThisASTNode(
 }
 
 SourceRange
-CaseStmtScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
-  // The scope of the case statement begins at the first guard expression,
-  // if there is one, and extends to the end of the body.
-  // FIXME: Figure out what to do about multiple pattern bindings. We might
-  // want a more restrictive rule in those cases.
-  for (const auto &caseItem : stmt->getCaseLabelItems()) {
-    if (auto guardExpr = caseItem.getGuardExpr())
-      return SourceRange(guardExpr->getStartLoc(),
-                         stmt->getBody()->getEndLoc());
-  }
+CaseLabelItemScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
+  return item.getGuardExpr()->getSourceRange();
+}
 
-  // Otherwise, it covers the body.
-  return stmt->getBody()
-      ->getSourceRange(); // The scope of the case statement begins
+SourceRange
+CaseStmtBodyScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
+  return stmt->getBody()->getSourceRange();
 }
 
 SourceRange
@@ -438,21 +424,15 @@ SourceRange ConditionalClausePatternUseScope::getSourceRangeOfThisASTNode(
 
 SourceRange
 CaptureListScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
-  auto *const closure = expr->getClosureBody();
-  return SourceRange(expr->getStartLoc(), getStartOfFirstParam(closure));
+  auto *closureExpr = expr->getClosureBody();
+  if (!omitAssertions)
+    ASTScopeAssert(closureExpr->getInLoc().isValid(),
+                   "We don't create these if no in loc");
+  return SourceRange(closureExpr->getInLoc(), closureExpr->getEndLoc());
 }
 
 SourceRange ClosureParametersScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
-  if (!omitAssertions)
-    ASTScopeAssert(closureExpr->getInLoc().isValid(),
-                   "We don't create these if no in loc");
-  return SourceRange(getStartOfFirstParam(closureExpr),
-                     closureExpr->getInLoc());
-}
-
-SourceRange
-ClosureBodyScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
   if (closureExpr->getInLoc().isValid())
     return SourceRange(closureExpr->getInLoc(), closureExpr->getEndLoc());
 
@@ -510,8 +490,6 @@ void ASTScopeImpl::computeAndCacheSourceRangeOfScope(
 }
 
 bool ASTScopeImpl::checkLazySourceRange(const ASTContext &ctx) const {
-  if (!ctx.LangOpts.LazyASTScopes)
-    return true;
   const auto unexpandedRange = sourceRangeForDeferredExpansion();
   const auto expandedRange = computeSourceRangeOfScopeWithChildASTNodes();
   if (unexpandedRange.isInvalid() || expandedRange.isInvalid())
@@ -608,8 +586,8 @@ SourceRange ASTScopeImpl::sourceRangeForDeferredExpansion() const {
 SourceRange IterableTypeScope::sourceRangeForDeferredExpansion() const {
   return portion->sourceRangeForDeferredExpansion(this);
 }
-SourceRange AbstractFunctionBodyScope::sourceRangeForDeferredExpansion() const {
-  const auto bsr = decl->getBodySourceRange();
+SourceRange FunctionBodyScope::sourceRangeForDeferredExpansion() const {
+  const auto bsr = decl->getOriginalBodySourceRange();
   const SourceLoc endEvenIfNoCloseBraceAndEndsWithInterpolatedStringLiteral =
       getLocEncompassingPotentialLookups(getSourceManager(), bsr.End);
   return SourceRange(bsr.Start,
@@ -685,64 +663,6 @@ void ASTScopeImpl::widenSourceRangeForIgnoredASTNode(const ASTNode n) {
     sourceRangeOfIgnoredASTNodes = r;
   else
     sourceRangeOfIgnoredASTNodes.widen(r);
-}
-
-static SourceLoc getStartOfFirstParam(ClosureExpr *closure) {
-  if (auto *parms = closure->getParameters()) {
-    if (parms->size())
-      return parms->get(0)->getStartLoc();
-  }
-  if (closure->getInLoc().isValid())
-    return closure->getInLoc();
-  if (closure->getBody())
-    return closure->getBody()->getLBraceLoc();
-  return closure->getStartLoc();
-}
-
-#pragma mark getSourceRangeOfEnclosedParamsOfASTNode
-
-SourceRange ASTScopeImpl::getSourceRangeOfEnclosedParamsOfASTNode(
-    const bool omitAssertions) const {
-  return getParent().get()->getSourceRangeOfEnclosedParamsOfASTNode(
-      omitAssertions);
-}
-
-SourceRange EnumElementScope::getSourceRangeOfEnclosedParamsOfASTNode(
-    bool omitAssertions) const {
-  auto *pl = decl->getParameterList();
-  return pl ? pl->getSourceRange() : SourceRange();
-}
-
-SourceRange SubscriptDeclScope::getSourceRangeOfEnclosedParamsOfASTNode(
-    const bool omitAssertions) const {
-  auto r = SourceRange(decl->getIndices()->getLParenLoc(), decl->getEndLoc());
-  // Because of "subscript(x: MyStruct#^PARAM_1^#) -> Int { return 0 }"
-  // Cannot just use decl->getEndLoc()
-  r.widen(decl->getIndices()->getRParenLoc());
-  return r;
-}
-
-SourceRange AbstractFunctionDeclScope::getSourceRangeOfEnclosedParamsOfASTNode(
-    const bool omitAssertions) const {
-  const auto s = getParmsSourceLocOfAFD(decl);
-  const auto e = getSourceRangeOfThisASTNode(omitAssertions).End;
-  return s.isInvalid() || e.isInvalid() ? SourceRange() : SourceRange(s, e);
-}
-
-SourceLoc
-AbstractFunctionDeclScope::getParmsSourceLocOfAFD(AbstractFunctionDecl *decl) {
-  if (auto *c = dyn_cast<ConstructorDecl>(decl))
-    return c->getParameters()->getLParenLoc();
-
-  if (auto *dd = dyn_cast<DestructorDecl>(decl))
-    return dd->getNameLoc();
-
-  auto *fd = cast<FuncDecl>(decl);
-  // clang-format off
-  return isa<AccessorDecl>(fd) ? fd->getLoc()
-       : fd->isDeferBody()     ? fd->getNameLoc()
-       :                         fd->getParameters()->getLParenLoc();
-  // clang-format on
 }
 
 SourceLoc getLocAfterExtendedNominal(const ExtensionDecl *const ext) {

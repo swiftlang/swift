@@ -374,7 +374,7 @@ public:
     OperandValueArrayRef Operands(X->getAllOperands());
     return llvm::hash_combine(X->getKind(),
                               X->getLookupType().getPointer(),
-                              X->getMember().getHashCode(),
+                              X->getMember(),
                               X->getConformance(),
                               X->getType(),
                               !X->getTypeDependentOperands().empty(),
@@ -428,9 +428,6 @@ bool llvm::DenseMapInfo<SimpleValue>::isEqual(SimpleValue LHS,
       return false;
 
     // ... and other constraints are equal.
-    if (LHSArchetypeTy->requiresClass() != RHSArchetypeTy->requiresClass())
-      return false;
-
     if (LHSArchetypeTy->getSuperclass().getPointer() !=
         RHSArchetypeTy->getSuperclass().getPointer())
       return false;
@@ -832,6 +829,14 @@ static bool isLazyPropertyGetter(ApplyInst *ai) {
   SILFunction *callee = ai->getReferencedFunctionOrNull();
   if (!callee || callee->isExternalDeclaration() ||
       !callee->isLazyPropertyGetter())
+    return false;
+
+  // Only handle classes, but not structs.
+  // Lazy property getters of structs have an indirect inout self parameter.
+  // We don't know if the whole struct is overwritten between two getter calls.
+  // In such a case, the lazy property could be reset to an Optional.none.
+  // TODO: We could check this case with AliasAnalysis.
+  if (ai->getArgument(0)->getType().isAddress())
     return false;
 
   // Check if the first block has a switch_enum of an Optional.

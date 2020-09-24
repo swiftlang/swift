@@ -146,7 +146,8 @@ public:
 
   std::string mangleGlobalVariableFull(const VarDecl *decl);
 
-  std::string mangleGlobalInit(const VarDecl *decl, int counter,
+  std::string mangleGlobalInit(const PatternBindingDecl *decl,
+                               unsigned entry,
                                bool isInitFunc);
 
   std::string mangleReabstractionThunkHelper(CanSILFunctionType ThunkType,
@@ -212,6 +213,9 @@ public:
                                       ResilienceExpansion expansion);
 
   std::string mangleTypeForDebugger(Type decl, const DeclContext *DC);
+
+  /// Create a mangled name to be used for _typeName constant propagation.
+  std::string mangleTypeForTypeName(Type type);
 
   std::string mangleOpaqueTypeDescriptor(const OpaqueTypeDecl *decl);
   

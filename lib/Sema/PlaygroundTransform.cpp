@@ -293,8 +293,8 @@ public:
         TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Return);
         BraceStmt *NB = transformBraceStmt(B);
         if (NB != B) {
-          FD->setBody(NB);
-          TypeChecker::checkFunctionErrorHandling(FD);
+          FD->setBody(NB, AbstractFunctionDecl::BodyKind::TypeChecked);
+          TypeChecker::checkFunctionEffects(FD);
         }
       }
     } else if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
@@ -757,8 +757,7 @@ public:
 
     VarDecl *VD =
         new (Context) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
-                              /*IsCaptureList*/false, SourceLoc(),
-                              Context.getIdentifier(NameBuf),
+                              SourceLoc(), Context.getIdentifier(NameBuf),
                               TypeCheckDC);
     VD->setInterfaceType(MaybeLoadInitExpr->getType()->mapTypeOutOfContext());
     VD->setImplicit();
@@ -892,8 +891,8 @@ void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
             Instrumenter I(ctx, FD, RNG, HighPerformance, TmpNameIndex);
             BraceStmt *NewBody = I.transformBraceStmt(Body);
             if (NewBody != Body) {
-              FD->setBody(NewBody);
-              TypeChecker::checkFunctionErrorHandling(FD);
+              FD->setBody(NewBody, AbstractFunctionDecl::BodyKind::TypeChecked);
+              TypeChecker::checkFunctionEffects(FD);
             }
             return false;
           }
@@ -905,7 +904,7 @@ void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
             BraceStmt *NewBody = I.transformBraceStmt(Body, true);
             if (NewBody != Body) {
               TLCD->setBody(NewBody);
-              TypeChecker::checkTopLevelErrorHandling(TLCD);
+              TypeChecker::checkTopLevelEffects(TLCD);
             }
             return false;
           }

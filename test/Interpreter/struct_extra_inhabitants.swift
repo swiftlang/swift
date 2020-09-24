@@ -5,6 +5,7 @@
 
 // -- run tests
 // RUN: %target-build-swift -parse-stdlib -Xfrontend -verify-type-layout -Xfrontend PairWithPointerFirst -Xfrontend -verify-type-layout -Xfrontend PairWithPointerSecond -Xfrontend -verify-type-layout -Xfrontend PairWithPointerSecondAndPhantomParam_Int -Xfrontend -verify-type-layout -Xfrontend GenericPairWithPointerFirst_Int -Xfrontend -verify-type-layout -Xfrontend GenericPairWithPointerFirst_AnyObject -Xfrontend -verify-type-layout -Xfrontend GenericPairWithPointerSecond_Int -Xfrontend -verify-type-layout -Xfrontend GenericPairWithPointerSecond_AnyObject -Xfrontend -verify-type-layout -Xfrontend StringAlike32 -Xfrontend -verify-type-layout -Xfrontend StringAlike64 -I %t -o %t/a.out.tests %s %t/ExtraInhabitantResilientTypes.o
+// RUN: %target-codesign %t/a.out.tests
 // RUN: %target-run %t/a.out.tests 2>&1
 
 // Type layout verifier is only compiled into the runtime in asserts builds.

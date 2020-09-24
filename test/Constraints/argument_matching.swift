@@ -305,6 +305,93 @@ variadics6(x: 1, 2, 3) // expected-error{{missing argument for parameter 'z' in 
 variadics6(x: 1) // expected-error{{missing argument for parameter 'z' in call}}
 variadics6() // expected-error{{missing argument for parameter 'z' in call}}
 
+func variadics7(_ x: Int..., y: Int...) { }
+
+// Using multiple variadics (in order, complete)
+variadics7(1, y: 2)
+variadics7(1, 2, 3, y: 4, 5, 6)
+variadics7(1, 2, y: 2)
+variadics7(1, y: 2, 1)
+
+// multiple variadics, in order, some missing
+variadics7(y: 1)
+variadics7(1)
+variadics7(y: 4, 5, 6)
+variadics7(1, 2, 3)
+
+func variadics8(x: Int..., y: Int...) { }
+
+// multiple variadics, out of order
+variadics8(y: 1, x: 2) // expected-error {{argument 'x' must precede argument 'y'}} {{12-12=x: 2, }} {{16-22=}}
+variadics8(y: 1, 2, 3, x: 4) // expected-error {{argument 'x' must precede argument 'y'}} {{12-12=x: 4, }} {{22-28=}}
+variadics8(y: 1, x: 2, 3, 4) // expected-error {{argument 'x' must precede argument 'y'}} {{12-12=x: 2, 3, 4, }} {{16-28=}}
+variadics8(y: 1, 2, 3, x: 4, 5, 6) // expected-error {{argument 'x' must precede argument 'y'}} {{12-12=x: 4, 5, 6, }} {{22-34=}}
+
+func variadics9(_ a: Int..., b: Int, _ c: Int...) { } // expected-note {{'variadics9(_:b:_:)' declared here}}
+
+// multiple split variadics, in order, complete
+variadics9(1, b: 2, 3)
+variadics9(1, 2, 3, b: 2, 3)
+variadics9(1, b: 2, 3, 2, 1)
+variadics9(1, 2, 3, b: 2, 3, 2, 1)
+
+// multiple split variadics, in order, some missing
+variadics9(b: 2, 3)
+variadics9(1, b: 2)
+variadics9(1, 2, b: 2)
+variadics9(b: 2, 3, 2, 1)
+
+// multiple split variadics, required missing
+variadics9(1) // expected-error {{missing argument for parameter 'b' in call}}
+
+func variadics10(_ a: Int..., b: Int = 2, _ c: Int...) { }
+
+// multiple unlabeled variadics split by defaulted param, in order, complete
+variadics10(1, b: 2, 3)
+variadics10(1, 2, 3, b: 2, 3)
+variadics10(1, b: 2, 3, 2, 1)
+variadics10(1, 2, 3, b: 2, 3, 2, 1)
+
+// multiple unlabeled variadics split by defaulted param, in order, some missing
+variadics10(1, 2, 3)
+variadics10(1, 2, 3, b: 3)
+variadics10(b: 3)
+
+func variadics11(_ a: Int..., b: Bool = false, _ c: String...) { }
+
+variadics11(1, 2, 3, b: true, "hello", "world")
+variadics11(b: true, "hello", "world")
+variadics11(1, 2, 3, b: true)
+variadics11(b: true)
+variadics11()
+variadics11(1, 2, 3, "hello", "world") // expected-error 2 {{cannot convert value of type 'String' to expected argument type 'Int'}}
+
+func variadics12(a: Int..., b: Int, c: Int...) { }
+
+variadics12(a: 1, 2, 3, b: 4, c: 5, 6, 7)
+variadics12(b: 4, c: 5, 6, 7)
+variadics12(a: 1, 2, 3, b: 4)
+
+variadics12(c: 5, 6, 7, b: 4, a: 1, 2, 3) // expected-error {{incorrect argument labels in call (have 'c:_:_:b:a:_:_:', expected 'a:b:c:')}} {{13-14=a}} {{19-19=b: }} {{22-22=c: }} {{25-28=}} {{31-34=}}
+
+
+// Edge cases involving multiple trailing closures and forward matching.
+func variadics13(a: Int..., b: (()->Void)...) {}
+
+variadics13()
+variadics13(a: 1, 2, 3) {} _: {} _: {}
+variadics13() {} _: {} _: {}
+variadics13(a: 1, 2, 3)
+variadics13(a: 1, 2, 3) {}
+
+func variadics14(a: (()->Void)..., b: (()->Void)...) {} // expected-note {{'variadics14(a:b:)' declared here}}
+
+variadics14(a: {}, {}, b: {}, {})
+variadics14(a: {}, {}) {} _: {}
+variadics14 {} _: {} b: {} _: {}
+variadics14 {} b: {}
+variadics14 {} // expected-warning {{backward matching of the unlabeled trailing closure is deprecated; label the argument with 'b' to suppress this warning}}
+
 func outOfOrder(_ a : Int, b: Int) {
   outOfOrder(b: 42, 52)  // expected-error {{unnamed argument #2 must precede argument 'b'}} {{14-14=52, }} {{19-23=}}
 }
@@ -1336,6 +1423,26 @@ d = sub2[d] // expected-error{{missing argument label 'd:' in subscript}} {{10-1
 d = sub2[d: d]
 d = sub2[f: d] // expected-error{{incorrect argument label in subscript (have 'f:', expected 'd:')}} {{10-11=d}}
 
+struct Sub3 {
+  subscript (a: Int..., b b: Int...) -> Int { 42 }
+}
+
+let sub3 = Sub3()
+_ = sub3[1, 2, 3, b: 4, 5, 6]
+_ = sub3[b: 4, 5, 6]
+_ = sub3[1, 2, 3]
+_ = sub3[1, c: 4] // expected-error {{incorrect argument label in subscript (have '_:c:', expected '_:b:')}}
+
+struct Sub4 {
+  subscript (a: Int..., b b: Int = 0, c: Int...) -> Int { 42 }
+}
+
+let sub4 = Sub4()
+_ = sub4[1, 2, 3, b: 2, 1, 2, 3]
+_ = sub4[1, 2, 3, b: 2]
+_ = sub4[1, 2, 3]
+_ = sub4[]
+
 // -------------------------------------------
 // Closures
 // -------------------------------------------
@@ -1418,7 +1525,7 @@ struct RelabelAndTrailingClosure {
   func f2(aa: Int, bb: Int, _ cc: () -> Void = {}) {}
 
   func test() {
-    f1(aax: 1, bbx: 2) {} // expected-error {{incorrect argument labels in call (have 'aax:bbx:_:', expected 'aa:bb:cc:')}} {{8-11=aa}} {{16-19=bb}} {{none}}
+    f1(aax: 1, bbx: 2) {} // expected-error {{incorrect argument labels in call (have 'aax:bbx:_:', expected 'aa:bb:_:')}} {{8-11=aa}} {{16-19=bb}} {{none}}
     f2(aax: 1, bbx: 2) {} // expected-error {{incorrect argument labels in call (have 'aax:bbx:_:', expected 'aa:bb:_:')}} {{8-11=aa}} {{16-19=bb}} {{none}}
 
     f1(aax: 1, bbx: 2) // expected-error {{incorrect argument labels in call (have 'aax:bbx:', expected 'aa:bb:')}} {{8-11=aa}} {{16-19=bb}} {{none}}
@@ -1623,3 +1730,18 @@ func sr13135() {
 
   foo(Foo().bar, [baz])
 }
+
+// SR-13240
+func twoargs(_ x: String, _ y: String) {}
+
+func test() {
+  let x = 1
+  twoargs(x, x) // expected-error 2 {{cannot convert value of type 'Int' to expected argument type 'String'}}
+}
+
+infix operator ---
+
+func --- (_ lhs: String, _ rhs: String) -> Bool { true }
+
+let x = 1
+x --- x // expected-error 2 {{cannot convert value of type 'Int' to expected argument type 'String'}}

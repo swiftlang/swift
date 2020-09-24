@@ -70,13 +70,13 @@ struct UnboundImport {
 
   /// The module names being imported. There will usually be just one for the
   /// top-level module, but a submodule import will have more.
-  ModuleDecl::AccessPathTy modulePath;
+  ImportPath::Module modulePath;
 
   /// If this is a scoped import, the names of the declaration being imported;
   /// otherwise empty. (Currently the compiler doesn't support nested scoped
   /// imports, so there should always be zero or one elements, but
-  /// \c AccessPathTy is the common currency type for this.)
-  ModuleDecl::AccessPathTy declPath;
+  /// \c ImportPath::Access is the common currency type for this.)
+  ImportPath::Access accessPath;
 
   // Names of explicitly imported SPI groups via @_spi.
   ArrayRef<Identifier> spiGroups;
@@ -141,7 +141,7 @@ struct UnboundImport {
   /// Create an \c ImportedModuleDesc from the information in this
   /// UnboundImport.
   ImportedModuleDesc makeDesc(ModuleDecl *module) const {
-    return ImportedModuleDesc({ declPath, module }, options,
+    return ImportedModuleDesc({ accessPath, module }, options,
                               privateImportFileName, spiGroups);
   }
 
@@ -202,7 +202,7 @@ public:
     for (auto &import : SF.getParentModule()->getImplicitImports()) {
       assert(!(SF.Kind == SourceFileKind::SIL &&
                import.Module->isStdlibModule()));
-      ImportedModule importedMod{ModuleDecl::AccessPathTy(), import.Module};
+      ImportedModule importedMod{ImportPath::Access(), import.Module};
       boundImports.emplace_back(importedMod, import.Options);
     }
   }
@@ -260,7 +260,7 @@ private:
   /// Load a module referenced by an import statement.
   ///
   /// Returns null if no module can be loaded.
-  ModuleDecl *getModule(ArrayRef<Located<Identifier>> ModuleID);
+  ModuleDecl *getModule(ImportPath::Module ModuleID);
 };
 } // end anonymous namespace
 
@@ -297,6 +297,8 @@ void swift::performImportResolution(SourceFile &SF) {
 
   // Resolve each import declaration.
   for (auto D : SF.getTopLevelDecls())
+    resolver.visit(D);
+  for (auto D : SF.getHoistedDecls())
     resolver.visit(D);
 
   SF.setImports(resolver.getFinishedImports());
@@ -366,7 +368,7 @@ void ImportResolver::addImport(const UnboundImport &I, ModuleDecl *M) {
 //===----------------------------------------------------------------------===//
 
 ModuleDecl *
-ImportResolver::getModule(ArrayRef<Located<Identifier>> modulePath) {
+ImportResolver::getModule(ImportPath::Module modulePath) {
   assert(!modulePath.empty());
   auto moduleID = modulePath[0];
 
@@ -445,7 +447,7 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
 
   // Add any modules we were asked to implicitly import.
   for (auto moduleName : importInfo.ModuleNames) {
-    auto *importModule = ctx.getModule({{moduleName, SourceLoc()}});
+    auto *importModule = ctx.getModuleByIdentifier(moduleName);
     if (!importModule) {
       ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import, moduleName.str());
       if (ctx.SearchPathOpts.SDKPath.empty() &&
@@ -479,7 +481,7 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
   // Implicitly import the underlying Clang half of this module if needed.
   if (importInfo.ShouldImportUnderlyingModule) {
     auto *underlyingMod = clangImporter->loadModule(
-        SourceLoc(), {Located<Identifier>(module->getName(), SourceLoc())});
+        SourceLoc(), ImportPath::Module::Builder(module->getName()).get());
     if (underlyingMod) {
       imports.emplace_back(underlyingMod, ImportFlags::Exported);
     } else {
@@ -498,7 +500,7 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
 /// Create an UnboundImport for a user-written import declaration.
 UnboundImport::UnboundImport(ImportDecl *ID)
   : importLoc(ID->getLoc()), options(), privateImportFileName(),
-    modulePath(ID->getModulePath()), declPath(ID->getDeclPath()),
+    modulePath(ID->getModulePath()), accessPath(ID->getAccessPath()),
     importOrUnderlyingModuleDecl(ID)
 {
   if (ID->isExported())
@@ -556,10 +558,10 @@ bool UnboundImport::checkModuleLoaded(ModuleDecl *M, SourceFile &SF) {
   ASTContext &ctx = SF.getASTContext();
 
   SmallString<64> modulePathStr;
-  interleave(modulePath, [&](ImportDecl::AccessPathElement elem) {
-               modulePathStr += elem.Item.str();
-             },
-             [&] { modulePathStr += "."; });
+  llvm::interleave(modulePath, [&](ImportPath::Element elem) {
+                     modulePathStr += elem.Item.str();
+                   },
+                   [&] { modulePathStr += "."; });
 
   auto diagKind = diag::sema_no_import;
   if (ctx.LangOpts.DebuggerSupport)
@@ -847,7 +849,7 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
   /// we've performed import resolution, since that can introduce additional
   /// imports (such as cross-import overlays) which could provide the declaration.
   auto &ctx = module->getASTContext();
-  auto declPath = import->getDeclPath();
+  auto accessPath = import->getAccessPath();
   auto modulePath = import->getModulePath();
   auto *topLevelModule = module->getTopLevelModule();
 
@@ -855,18 +857,18 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
   // the Clang importer currently handles submodules by importing their decls
   // into the top-level module.
   // FIXME: Doesn't handle scoped testable imports correctly.
-  assert(declPath.size() == 1 && "can't handle sub-decl imports");
+  assert(accessPath.size() == 1 && "can't handle sub-decl imports");
   SmallVector<ValueDecl *, 8> decls;
-  lookupInModule(topLevelModule, declPath.front().Item, decls,
+  lookupInModule(topLevelModule, accessPath.front().Item, decls,
                  NLKind::QualifiedLookup, ResolutionKind::Overloadable,
                  import->getDeclContext()->getModuleScopeContext());
 
   auto importLoc = import->getLoc();
   if (decls.empty()) {
     ctx.Diags.diagnose(importLoc, diag::decl_does_not_exist_in_module,
-                       static_cast<unsigned>(importKind), declPath.front().Item,
-                       modulePath.front().Item)
-      .highlight(SourceRange(declPath.front().Loc, declPath.back().Loc));
+                       static_cast<unsigned>(importKind),
+                       accessPath.front().Item, modulePath.front().Item)
+      .highlight(accessPath.getSourceRange());
     return ArrayRef<ValueDecl *>();
   }
 
@@ -874,7 +876,7 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
   if (!actualKind.hasValue()) {
     // FIXME: print entire module name?
     ctx.Diags.diagnose(importLoc, diag::ambiguous_decl_in_module,
-                       declPath.front().Item, module->getName());
+                       accessPath.front().Item, module->getName());
     for (auto next : decls)
       ctx.Diags.diagnose(next, diag::found_candidate);
 
@@ -895,8 +897,9 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
           getImportKindString(importKind)));
     } else {
       emittedDiag.emplace(ctx.Diags.diagnose(
-          importLoc, diag::imported_decl_is_wrong_kind, declPath.front().Item,
-          getImportKindString(importKind), static_cast<unsigned>(*actualKind)));
+          importLoc, diag::imported_decl_is_wrong_kind,
+          accessPath.front().Item, getImportKindString(importKind),
+          static_cast<unsigned>(*actualKind)));
     }
 
     emittedDiag->fixItReplace(SourceRange(import->getKindLoc()),
@@ -929,14 +932,16 @@ UnboundImport::UnboundImport(ASTContext &ctx, const UnboundImport &base,
                              const ImportedModuleDesc &declaringImport,
                              const ImportedModuleDesc &bystandingImport)
     : importLoc(base.importLoc), options(), privateImportFileName(),
-      modulePath(),
+      // Cross-imports are not backed by an ImportDecl, so we need to provide
+      // our own storage for their module paths.
+      modulePath(
+         ImportPath::Module::Builder(overlayName, base.modulePath[0].Loc)
+                    .copyTo(ctx)),
       // If the declaring import was scoped, inherit that scope in the
       // overlay's import.
-      declPath(declaringImport.module.accessPath),
-      importOrUnderlyingModuleDecl(declaringImport.module.importedModule) {
-  modulePath = ctx.AllocateCopy(
-      ModuleDecl::AccessPathTy( { overlayName, base.modulePath[0].Loc }));
-
+      accessPath(declaringImport.module.accessPath),
+      importOrUnderlyingModuleDecl(declaringImport.module.importedModule)
+{
   // A cross-import is never private or testable, and never comes from a private
   // or testable import.
   assert(canCrossImport(declaringImport));
@@ -1134,8 +1139,7 @@ void ImportResolver::addCrossImportableModules(ImportedModuleDesc importDesc) {
     // cannot possibly expose anything new. Skip it.
     if (!importDesc.module.accessPath.empty() &&
         !nextImport.accessPath.empty() &&
-        !ModuleDecl::isSameAccessPath(importDesc.module.accessPath,
-                                      nextImport.accessPath))
+        !importDesc.module.accessPath.isSameAs(nextImport.accessPath))
       continue;
 
     // If we are importing a submodule, treat it as though we imported its
@@ -1169,7 +1173,7 @@ void ImportResolver::addCrossImportableModules(ImportedModuleDesc importDesc) {
 
     // Add the module's re-exports to worklist.
     nextImport.importedModule->getImportedModules(
-        importsWorklist, ModuleDecl::ImportFilterKind::Public);
+        importsWorklist, ModuleDecl::ImportFilterKind::Exported);
   }
 }
 

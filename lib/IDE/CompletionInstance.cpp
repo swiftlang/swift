@@ -85,8 +85,6 @@ template <typename Range> Decl *getElementAt(const Range &Decls, unsigned N) {
 /// Find the equivalent \c DeclContext with \p DC from \p SF AST.
 /// This assumes the AST which contains \p DC has exact the same structure with
 /// \p SF.
-/// FIXME: This doesn't support IfConfigDecl blocks. If \p DC is in an inactive
-///        config block, this function returns \c false.
 static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
                                                            SourceFile *SF) {
   PrettyStackTraceDeclContext trace("getting equivalent decl context for", DC);
@@ -129,7 +127,6 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
     }
 
     // Not found in the decl context tree.
-    // FIXME: Probably DC is in an inactive #if block.
     if (N == ~0U) {
       return nullptr;
     }
@@ -278,7 +275,7 @@ static bool areAnyDependentFilesInvalidated(
 } // namespace
 
 bool CompletionInstance::performCachedOperationIfPossible(
-    const swift::CompilerInvocation &Invocation, llvm::hash_code ArgsHash,
+   llvm::hash_code ArgsHash,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     DiagnosticConsumer *DiagC,
@@ -288,13 +285,14 @@ bool CompletionInstance::performCachedOperationIfPossible(
 
   if (!CachedCI)
     return false;
-  if (CachedReuseCount >= MaxASTReuseCount)
+  if (CachedReuseCount >= Opts.MaxASTReuseCount)
     return false;
   if (CachedArgHash != ArgsHash)
     return false;
 
   auto &CI = *CachedCI;
   auto *oldSF = CI.getCodeCompletionFile();
+  assert(oldSF->getBufferID());
 
   auto *oldState = oldSF->getDelayedParserState();
   assert(oldState->hasCodeCompletionDelayedDeclState());
@@ -302,12 +300,12 @@ bool CompletionInstance::performCachedOperationIfPossible(
 
   auto &SM = CI.getSourceMgr();
   auto bufferName = completionBuffer->getBufferIdentifier();
-  if (SM.getIdentifierForBuffer(SM.getCodeCompletionBufferID()) != bufferName)
+  if (SM.getIdentifierForBuffer(*oldSF->getBufferID()) != bufferName)
     return false;
 
   if (shouldCheckDependencies()) {
     if (areAnyDependentFilesInvalidated(
-            CI, *FileSystem, SM.getCodeCompletionBufferID(),
+            CI, *FileSystem, *oldSF->getBufferID(),
             DependencyCheckedTimestamp, InMemoryDependencyHash))
       return false;
     DependencyCheckedTimestamp = std::chrono::system_clock::now();
@@ -325,8 +323,10 @@ bool CompletionInstance::performCachedOperationIfPossible(
   TypeCheckerOptions typeckOpts = CI.getASTContext().TypeCheckerOpts;
   SearchPathOptions searchPathOpts = CI.getASTContext().SearchPathOpts;
   DiagnosticEngine tmpDiags(tmpSM);
+  ClangImporterOptions clangOpts;
   std::unique_ptr<ASTContext> tmpCtx(
-      ASTContext::get(langOpts, typeckOpts, searchPathOpts, tmpSM, tmpDiags));
+      ASTContext::get(langOpts, typeckOpts, searchPathOpts, clangOpts, tmpSM,
+                      tmpDiags));
   registerParseRequestFunctions(tmpCtx->evaluator);
   registerIDERequestFunctions(tmpCtx->evaluator);
   registerTypeCheckerRequestFunctions(tmpCtx->evaluator);
@@ -410,9 +410,14 @@ bool CompletionInstance::performCachedOperationIfPossible(
     oldInfo.PrevOffset = newInfo.PrevOffset;
     oldState->restoreCodeCompletionDelayedDeclState(oldInfo);
 
+    auto newBufferStart = SM.getRangeForBuffer(newBufferID).getStart();
+    SourceRange newBodyRange(newBufferStart.getAdvancedLoc(newInfo.StartOffset),
+                             newBufferStart.getAdvancedLoc(newInfo.EndOffset));
+
     auto *AFD = cast<AbstractFunctionDecl>(DC);
-    if (AFD->isBodySkipped())
-      AFD->setBodyDelayed(AFD->getBodySourceRange());
+    AFD->setBodyToBeReparsed(newBodyRange);
+    SM.setReplacedRange({AFD->getOriginalBodySourceRange(), newBodyRange});
+    oldSF->clearScope();
 
     traceDC = AFD;
     break;
@@ -482,8 +487,6 @@ bool CompletionInstance::performCachedOperationIfPossible(
   }
 
   CachedReuseCount += 1;
-  cacheDependencyHashIfNeeded(CI, SM.getCodeCompletionBufferID(),
-                              InMemoryDependencyHash);
 
   return true;
 }
@@ -567,20 +570,21 @@ bool CompletionInstance::shouldCheckDependencies() const {
   assert(CachedCI);
   using namespace std::chrono;
   auto now = system_clock::now();
-  return DependencyCheckedTimestamp + seconds(DependencyCheckIntervalSecond) <
-         now;
+  auto threshold = DependencyCheckedTimestamp +
+                   seconds(Opts.DependencyCheckIntervalSecond);
+  return threshold < now;
 }
 
-void CompletionInstance::setDependencyCheckIntervalSecond(unsigned Value) {
+void CompletionInstance::setOptions(CompletionInstance::Options NewOpts) {
   std::lock_guard<std::mutex> lock(mtx);
-  DependencyCheckIntervalSecond = Value;
+  Opts = NewOpts;
 }
 
 bool swift::ide::CompletionInstance::performOperation(
     swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
-    bool EnableASTCaching, std::string &Error, DiagnosticConsumer *DiagC,
+    std::string &Error, DiagnosticConsumer *DiagC,
     llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
 
   // Always disable source location resolutions from .swiftsourceinfo file
@@ -598,32 +602,23 @@ bool swift::ide::CompletionInstance::performOperation(
   // We don't need token list.
   Invocation.getLangOptions().CollectParsedToken = false;
 
-  // FIXME: ASTScopeLookup doesn't support code completion yet.
-  Invocation.disableASTScopeLookup();
+  // Compute the signature of the invocation.
+  llvm::hash_code ArgsHash(0);
+  for (auto arg : Args)
+    ArgsHash = llvm::hash_combine(ArgsHash, StringRef(arg));
 
-  if (EnableASTCaching) {
-    // Compute the signature of the invocation.
-    llvm::hash_code ArgsHash(0);
-    for (auto arg : Args)
-      ArgsHash = llvm::hash_combine(ArgsHash, StringRef(arg));
+  // Concurrent completions will block so that they have higher chance to use
+  // the cached completion instance.
+  std::lock_guard<std::mutex> lock(mtx);
 
-    // Concurrent completions will block so that they have higher chance to use
-    // the cached completion instance.
-    std::lock_guard<std::mutex> lock(mtx);
+  if (performCachedOperationIfPossible(ArgsHash, FileSystem, completionBuffer,
+                                       Offset, DiagC, Callback)) {
+    return true;
+  }
 
-    if (performCachedOperationIfPossible(Invocation, ArgsHash, FileSystem,
-                                         completionBuffer, Offset, DiagC,
-                                         Callback))
-      return true;
-
-    if (performNewOperation(ArgsHash, Invocation, FileSystem, completionBuffer,
-                            Offset, Error, DiagC, Callback))
-      return true;
-  } else {
-    // Concurrent completions may happen in parallel when caching is disabled.
-    if (performNewOperation(None, Invocation, FileSystem, completionBuffer,
-                            Offset, Error, DiagC, Callback))
-      return true;
+  if(performNewOperation(ArgsHash, Invocation, FileSystem, completionBuffer,
+                         Offset, Error, DiagC, Callback)) {
+    return true;
   }
 
   assert(!Error.empty());

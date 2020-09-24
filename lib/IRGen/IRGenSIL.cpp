@@ -38,6 +38,7 @@
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVisitor.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "llvm/ADT/MapVector.h"
@@ -818,6 +819,17 @@ public:
                                     SILType SILTy, const SILDebugScope *DS,
                                     VarDecl *VarDecl, SILDebugVariable VarInfo,
                                     IndirectionKind Indirection = DirectValue) {
+    // TODO: fix demangling for C++ types (SR-13223).
+    if (swift::TypeBase *ty = SILTy.getASTType().getPointer()) {
+      if (MetatypeType *metaTy = dyn_cast<MetatypeType>(ty))
+        ty = metaTy->getRootClass().getPointer();
+      if (ty->getStructOrBoundGenericStruct() &&
+          ty->getStructOrBoundGenericStruct()->getClangDecl() &&
+          isa<clang::CXXRecordDecl>(
+              ty->getStructOrBoundGenericStruct()->getClangDecl()))
+        return;
+    }
+
     assert(IGM.DebugInfo && "debug info not enabled");
     if (VarInfo.ArgNo) {
       PrologueLocation AutoRestore(IGM.DebugInfo.get(), Builder);
@@ -1926,12 +1938,12 @@ void IRGenSILFunction::
 visitLinearFunctionExtractInst(LinearFunctionExtractInst *i) {
   unsigned structFieldOffset = i->getExtractee().rawValue;
   unsigned fieldSize = 1;
-  auto fnRepr = i->getFunctionOperand()->getType().getFunctionRepresentation();
+  auto fnRepr = i->getOperand()->getType().getFunctionRepresentation();
   if (fnRepr == SILFunctionTypeRepresentation::Thick) {
     structFieldOffset *= 2;
     fieldSize = 2;
   }
-  auto diffFnExp = getLoweredExplosion(i->getFunctionOperand());
+  auto diffFnExp = getLoweredExplosion(i->getOperand());
   assert(diffFnExp.size() == fieldSize * 2);
   Explosion e;
   e.add(diffFnExp.getRange(structFieldOffset, structFieldOffset + fieldSize));
@@ -3627,15 +3639,15 @@ void IRGenSILFunction::visitRetainValueInst(swift::RetainValueInst *i) {
 }
 
 void IRGenSILFunction::visitRetainValueAddrInst(swift::RetainValueAddrInst *i) {
-  assert(i->getAtomicity() == RefCountingInst::Atomicity::Atomic &&
-         "Non atomic retains are not supported");
   SILValue operandValue = i->getOperand();
   Address addr = getLoweredAddress(operandValue);
   SILType addrTy = operandValue->getType();
   SILType objectT = addrTy.getObjectType();
   llvm::Type *llvmType = addr.getAddress()->getType();
   const TypeInfo &addrTI = getTypeInfo(addrTy);
-  auto *outlinedF = IGM.getOrCreateRetainFunction(addrTI, objectT, llvmType);
+  auto atomicity = i->isAtomic() ? Atomicity::Atomic : Atomicity::NonAtomic;
+  auto *outlinedF = IGM.getOrCreateRetainFunction(
+      addrTI, objectT, llvmType, atomicity);
   llvm::Value *args[] = {addr.getAddress()};
   llvm::CallInst *call = Builder.CreateCall(outlinedF, args);
   call->setCallingConv(IGM.DefaultCC);
@@ -3702,16 +3714,15 @@ void IRGenSILFunction::visitReleaseValueInst(swift::ReleaseValueInst *i) {
 
 void IRGenSILFunction::visitReleaseValueAddrInst(
     swift::ReleaseValueAddrInst *i) {
-  assert(i->getAtomicity() == RefCountingInst::Atomicity::Atomic &&
-         "Non atomic retains are not supported");
   SILValue operandValue = i->getOperand();
   Address addr = getLoweredAddress(operandValue);
   SILType addrTy = operandValue->getType();
   SILType objectT = addrTy.getObjectType();
   llvm::Type *llvmType = addr.getAddress()->getType();
   const TypeInfo &addrTI = getTypeInfo(addrTy);
+  auto atomicity = i->isAtomic() ? Atomicity::Atomic : Atomicity::NonAtomic;
   auto *outlinedF = IGM.getOrCreateReleaseFunction(
-      addrTI, objectT, llvmType);
+      addrTI, objectT, llvmType, atomicity);
   llvm::Value *args[] = {addr.getAddress()};
   llvm::CallInst *call = Builder.CreateCall(outlinedF, args);
   call->setCallingConv(IGM.DefaultCC);

@@ -82,20 +82,20 @@ public:
   /// Find ValueDecls in the module and pass them to the given consumer object.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
-  virtual void lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
+  virtual void lookupVisibleDecls(ImportPath::Access accessPath,
                                   VisibleDeclConsumer &consumer,
                                   NLKind lookupKind) const {}
 
   /// Finds all class members defined in this file.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
-  virtual void lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
+  virtual void lookupClassMembers(ImportPath::Access accessPath,
                                   VisibleDeclConsumer &consumer) const {}
 
   /// Finds class members defined in this file with the given name.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
-  virtual void lookupClassMember(ModuleDecl::AccessPathTy accessPath,
+  virtual void lookupClassMember(ImportPath::Access accessPath,
                                  DeclName name,
                                  SmallVectorImpl<ValueDecl*> &results) const {}
 
@@ -241,7 +241,7 @@ public:
   /// \see ModuleDecl::getImportedModulesForLookup
   virtual void getImportedModulesForLookup(
       SmallVectorImpl<ModuleDecl::ImportedModule> &imports) const {
-    return getImportedModules(imports, ModuleDecl::ImportFilterKind::Public);
+    return getImportedModules(imports, ModuleDecl::ImportFilterKind::Exported);
   }
 
   /// Generates the list of libraries needed to link this file, based on its

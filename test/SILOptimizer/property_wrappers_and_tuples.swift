@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t) 
 // RUN: %target-build-swift %s -module-name=a -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: executable_test

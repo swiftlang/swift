@@ -55,17 +55,14 @@ enum class TypeResolutionFlags : uint16_t {
   /// Whether this is a resolution based on a non-inferred type pattern.
   FromNonInferredPattern = 1 << 6,
 
-  /// Whether this type resolution is guaranteed not to affect downstream files.
-  KnownNonCascadingDependency = 1 << 7,
-
   /// Whether we are at the direct base of a type expression.
-  Direct = 1 << 8,
+  Direct = 1 << 7,
 
   /// Whether we should not produce diagnostics if the type is invalid.
-  SilenceErrors = 1 << 9,
+  SilenceErrors = 1 << 8,
 
   /// Whether to allow module declaration types.
-  AllowModule = 1 << 10
+  AllowModule = 1 << 9,
 };
 
 /// Type resolution contexts that require special handling.
@@ -371,9 +368,11 @@ public:
   /// to create a well-formed type.
   ///
   /// \param TyR The type representation to check.
+  /// \param silParams Used to look up generic parameters in SIL mode.
   ///
   /// \returns A well-formed type that is never null, or an \c ErrorType in case of an error.
-  Type resolveType(TypeRepr *TyR) const;
+  Type resolveType(TypeRepr *TyR,
+                   GenericParamList *silParams=nullptr) const;
 
   /// Whether this type resolution uses archetypes (vs. generic parameters).
   bool usesArchetypes() const;

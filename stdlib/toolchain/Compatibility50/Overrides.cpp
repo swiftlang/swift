@@ -16,7 +16,7 @@
 
 #include "Overrides.h"
 #include "../Compatibility51/Overrides.h"
-#include "../../public/runtime/CompatibilityOverride.h"
+#include "CompatibilityOverride.h"
 
 #include <dlfcn.h>
 #include <mach-o/dyld.h>
@@ -28,7 +28,7 @@ struct OverrideSection {
   uintptr_t version;
 #define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
   Override_ ## name name;
-#include "../../public/runtime/CompatibilityOverride.def"
+#include "CompatibilityOverride.def"
 };
   
 OverrideSection Swift50Overrides

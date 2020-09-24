@@ -226,6 +226,36 @@ void eraseUsesOfInstruction(
 /// value itself)
 void eraseUsesOfValue(SILValue value);
 
+/// Gets the concrete value which is stored in an existential box.
+/// Returns %value in following pattern:
+///
+///    %existentialBox = alloc_existential_box $Error, $ConcreteError
+///    %a = project_existential_box $ConcreteError in %existentialBox : $Error
+///    store %value to %a : $*ConcreteError
+///
+/// Returns an invalid SILValue in case there are multiple stores or any unknown
+/// users of \p existentialBox.
+/// The \p ignoreUser is ignored in the user list of \p existentialBox.
+SILValue
+getConcreteValueOfExistentialBox(AllocExistentialBoxInst *existentialBox,
+                                 SILInstruction *ignoreUser);
+
+/// Gets the concrete value which is stored in an existential box, which itself
+/// is stored in \p addr.
+/// Returns %value in following pattern:
+///
+///    %b = alloc_existential_box $Error, $ConcreteError
+///    %a = project_existential_box $ConcreteError in %b : $Error
+///    store %value to %a : $*ConcreteError
+///    %addr = alloc_stack $Error
+///    store %b to %addr : $*Error
+///
+/// Returns an invalid SILValue in case there are multiple stores or any unknown
+/// users of \p addr or the existential box.
+/// The \p ignoreUser is ignored in the user list of \p addr.
+SILValue getConcreteValueOfExistentialBoxAddr(SILValue addr,
+                                              SILInstruction *ignoreUser);
+
 FullApplySite findApplyFromDevirtualizedResult(SILValue value);
 
 /// Cast a value into the expected, ABI compatible type if necessary.
@@ -269,11 +299,6 @@ TermInst *addArgumentToBranch(SILValue val, SILBasicBlock *dest,
 /// the given linkage.
 SILLinkage getSpecializedLinkage(SILFunction *f, SILLinkage linkage);
 
-/// Tries to optimize a given apply instruction if it is a concatenation of
-/// string literals. Returns a new instruction if optimization was possible.
-SingleValueInstruction *tryToConcatenateStrings(ApplyInst *ai,
-                                                SILBuilder &builder);
-
 /// Tries to perform jump-threading on all checked_cast_br instruction in
 /// function \p Fn.
 bool tryCheckedCastBrJumpThreading(
@@ -283,21 +308,22 @@ bool tryCheckedCastBrJumpThreading(
 /// A structure containing callbacks that are called when an instruction is
 /// removed or added.
 struct InstModCallbacks {
-  std::function<void(SILInstruction *)> deleteInst = [](SILInstruction *inst) {
-    inst->eraseFromParent();
-  };
-  std::function<void(SILInstruction *)> createdNewInst = [](SILInstruction *) {
-  };
-  std::function<void(SILValue, SILValue)> replaceValueUsesWith =
-      [](SILValue oldValue, SILValue newValue) {
-        oldValue->replaceAllUsesWith(newValue);
-      };
+  static const std::function<void(SILInstruction *)> defaultDeleteInst;
+  static const std::function<void(SILInstruction *)> defaultCreatedNewInst;
+  static const std::function<void(SILValue, SILValue)> defaultReplaceValueUsesWith;
+  static const std::function<void(SingleValueInstruction *, SILValue)>
+      defaultEraseAndRAUWSingleValueInst;
+
+  std::function<void(SILInstruction *)> deleteInst =
+      InstModCallbacks::defaultDeleteInst;
+  std::function<void(SILInstruction *)> createdNewInst =
+      InstModCallbacks::defaultCreatedNewInst;
+  std::function<void(SILValue, SILValue)>
+      replaceValueUsesWith =
+          InstModCallbacks::defaultReplaceValueUsesWith;
   std::function<void(SingleValueInstruction *, SILValue)>
       eraseAndRAUWSingleValueInst =
-          [](SingleValueInstruction *i, SILValue newValue) {
-            i->replaceAllUsesWith(newValue);
-            i->eraseFromParent();
-          };
+          InstModCallbacks::defaultEraseAndRAUWSingleValueInst;
 
   InstModCallbacks(decltype(deleteInst) deleteInst,
                    decltype(createdNewInst) createdNewInst,
@@ -305,10 +331,7 @@ struct InstModCallbacks {
       : deleteInst(deleteInst), createdNewInst(createdNewInst),
         replaceValueUsesWith(replaceValueUsesWith),
         eraseAndRAUWSingleValueInst(
-            [](SingleValueInstruction *i, SILValue newValue) {
-              i->replaceAllUsesWith(newValue);
-              i->eraseFromParent();
-            }) {}
+            InstModCallbacks::defaultEraseAndRAUWSingleValueInst) {}
 
   InstModCallbacks(
       decltype(deleteInst) deleteInst, decltype(createdNewInst) createdNewInst,
@@ -497,11 +520,7 @@ bool calleesAreStaticallyKnowable(SILModule &module, SILDeclRef decl);
 
 /// Do we have enough information to determine all callees that could
 /// be reached by calling the function represented by Decl?
-bool calleesAreStaticallyKnowable(SILModule &module, AbstractFunctionDecl *afd);
-
-/// Do we have enough information to determine all callees that could
-/// be reached by calling the function represented by Decl?
-bool calleesAreStaticallyKnowable(SILModule &module, EnumElementDecl *eed);
+bool calleesAreStaticallyKnowable(SILModule &module, ValueDecl *vd);
 
 // Attempt to get the instance for , whose static type is the same as
 // its exact dynamic type, returning a null SILValue() if we cannot find it.

@@ -233,7 +233,7 @@ public ilist_node_traits<::swift::SILGlobalVariable> {
   using SILGlobalVariable = ::swift::SILGlobalVariable;
 
 public:
-  static void deleteNode(SILGlobalVariable *V) {}
+  static void deleteNode(SILGlobalVariable *V) { V->~SILGlobalVariable(); }
   
 private:
   void createNode(const SILGlobalVariable &);
@@ -260,8 +260,7 @@ SILFunction *getCalleeOfOnceCall(BuiltinInst *BI);
 /// Given an addressor, AddrF, find the call to the global initializer if
 /// present, otherwise return null. If an initializer is returned, then
 /// `CallToOnce` is initialized to the corresponding builtin "once" call.
-SILFunction *findInitializer(SILModule *Module, SILFunction *AddrF,
-                             BuiltinInst *&CallToOnce);
+SILFunction *findInitializer(SILFunction *AddrF, BuiltinInst *&CallToOnce);
 
 /// Helper for getVariableOfGlobalInit(), so GlobalOpts can deeply inspect and
 /// rewrite the initialization pattern.

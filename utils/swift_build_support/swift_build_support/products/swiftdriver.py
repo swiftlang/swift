@@ -47,6 +47,13 @@ class SwiftDriver(product.Product):
                 xctest.XCTest,
                 llbuild.LLBuild]
 
+    def should_clean(self, host_target):
+        return self.args.clean_swift_driver
+
+    def clean(self, host_target):
+        indexstoredb.run_build_script_helper(
+            'clean', host_target, self, self.args)
+
     def build(self, host_target):
         indexstoredb.run_build_script_helper(
             'build', host_target, self, self.args)

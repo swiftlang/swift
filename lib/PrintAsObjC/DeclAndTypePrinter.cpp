@@ -18,6 +18,7 @@
 #include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -32,6 +33,7 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/CharInfo.h"
+#include "clang/Basic/SourceManager.h"
 
 using namespace swift;
 using namespace swift::objc_translation;
@@ -463,6 +465,7 @@ private:
 
   Type getForeignResultType(AbstractFunctionDecl *AFD,
                             FunctionType *methodTy,
+                            Optional<ForeignAsyncConvention> asyncConvention,
                             Optional<ForeignErrorConvention> errorConvention) {
     // A foreign error convention can affect the result type as seen in
     // Objective-C.
@@ -481,6 +484,11 @@ private:
       case ForeignErrorConvention::ZeroPreservedResult:
         break;
       }
+    }
+
+    // Asynchronous methods return their results via completion handler.
+    if (asyncConvention) {
+      return getASTContext().TheEmptyTupleType;
     }
 
     auto result = methodTy->getResult();
@@ -512,16 +520,20 @@ private:
       }
     }
 
+    Optional<ForeignAsyncConvention> asyncConvention
+      = AFD->getForeignAsyncConvention();
     Optional<ForeignErrorConvention> errorConvention
       = AFD->getForeignErrorConvention();
     Type rawMethodTy = AFD->getMethodInterfaceType();
     auto methodTy = rawMethodTy->castTo<FunctionType>();
-    auto resultTy = getForeignResultType(AFD, methodTy, errorConvention);
+    auto resultTy = getForeignResultType(
+        AFD, methodTy, asyncConvention, errorConvention);
 
     // Constructors and methods returning DynamicSelf return
     // instancetype.
     if (isa<ConstructorDecl>(AFD) ||
-        (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->hasDynamicSelfResult())) {
+        (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->hasDynamicSelfResult() &&
+         !AFD->hasAsync())) {
       if (errorConvention && errorConvention->stripsResultOptionality()) {
         printNullability(OTK_Optional, NullabilityPrintKind::ContextSensitive);
       } else if (auto ctor = dyn_cast<ConstructorDecl>(AFD)) {
@@ -576,6 +588,16 @@ private:
       // Retrieve the selector piece.
       StringRef piece = selectorPieces[i].empty() ? StringRef("")
                                                   : selectorPieces[i].str();
+
+      // If we have an async convention and this is the completion handler
+      // parameter, print it.
+      if (asyncConvention &&
+          i == asyncConvention->completionHandlerParamIndex()) {
+        os << piece << ":(";
+        print(asyncConvention->completionHandlerType(), None);
+        os << ")completionHandler";
+        continue;
+      }
 
       // If we have an error convention and this is the error
       // parameter, print it.
@@ -659,7 +681,9 @@ private:
       if (looksLikeInitMethod(AFD->getObjCSelector())) {
         os << " SWIFT_METHOD_FAMILY(none)";
       }
-      if (methodTy->getResult()->isUninhabited()) {
+      if (asyncConvention) {
+        // Async methods don't have result types to annotate.
+      } else if (methodTy->getResult()->isUninhabited()) {
         os << " SWIFT_NORETURN";
       } else if (!methodTy->getResult()->isVoid() &&
                  !AFD->getAttrs().hasAttribute<DiscardableResultAttr>()) {
@@ -696,12 +720,15 @@ private:
 
   void printAbstractFunctionAsFunction(FuncDecl *FD) {
     printDocumentationComment(FD);
+    Optional<ForeignAsyncConvention> asyncConvention
+      = FD->getForeignAsyncConvention();
     Optional<ForeignErrorConvention> errorConvention
       = FD->getForeignErrorConvention();
     assert(!FD->getGenericSignature() &&
            "top-level generic functions not supported here");
     auto funcTy = FD->getInterfaceType()->castTo<FunctionType>();
-    auto resultTy = getForeignResultType(FD, funcTy, errorConvention);
+    auto resultTy = getForeignResultType(
+        FD, funcTy, asyncConvention, errorConvention);
 
     // The result type may be a partial function type we need to close
     // up later.
@@ -850,6 +877,9 @@ private:
         break;
       case PlatformKind::watchOSApplicationExtension:
         plat = "watchos_app_extension";
+        break;
+      case PlatformKind::OpenBSD:
+        plat = "openbsd";
         break;
       case PlatformKind::none:
         llvm_unreachable("handled above");
@@ -1339,6 +1369,7 @@ private:
     return true;
   }
 
+public:
   /// If \p nominal is bridged to an Objective-C class (via a conformance to
   /// _ObjectiveCBridgeable), return that class.
   ///
@@ -1369,6 +1400,7 @@ private:
     return objcType->getClassOrBoundGenericClass();
   }
 
+private:
   /// If the nominal type is bridged to Objective-C (via a conformance
   /// to _ObjectiveCBridgeable), print the bridged type.
   void printObjCBridgeableType(const NominalTypeDecl *swiftNominal,
@@ -1570,12 +1602,16 @@ private:
   }
 
   bool printImportedAlias(const TypeAliasDecl *alias,
+                          ArrayRef<Type> genericArgs,
                           Optional<OptionalTypeKind> optionalKind) {
     if (!alias->hasClangNode())
       return false;
 
     if (auto *clangTypeDecl =
           dyn_cast<clang::TypeDecl>(alias->getClangDecl())) {
+      assert(!alias->isGeneric()
+             && "generic typealias backed by clang typedecl?");
+
       maybePrintTagKeyword(alias);
       os << getNameForObjC(alias);
 
@@ -1583,12 +1619,19 @@ private:
         printNullability(optionalKind);
     } else if (auto *clangObjCClass
                = dyn_cast<clang::ObjCInterfaceDecl>(alias->getClangDecl())){
+      assert(!alias->isGeneric()
+             && "generic typealias backed by clang interface?");
+
       os << clangObjCClass->getName() << " *";
       printNullability(optionalKind);
     } else {
       auto *clangCompatAlias =
       cast<clang::ObjCCompatibleAliasDecl>(alias->getClangDecl());
-      os << clangCompatAlias->getName() << " *";
+
+      os << clangCompatAlias->getName();
+      if (!genericArgs.empty())
+        printGenericArgs(genericArgs);
+      os << " *";
       printNullability(optionalKind);
     }
 
@@ -1598,10 +1641,12 @@ private:
   void visitTypeAliasType(TypeAliasType *aliasTy,
                                Optional<OptionalTypeKind> optionalKind) {
     const TypeAliasDecl *alias = aliasTy->getDecl();
+    auto genericArgs = aliasTy->getDirectGenericArgs();
+
     if (printIfKnownSimpleType(alias, optionalKind))
       return;
 
-    if (printImportedAlias(alias, optionalKind))
+    if (printImportedAlias(alias, genericArgs, optionalKind))
       return;
 
     visitPart(aliasTy->getSinglyDesugaredType(), optionalKind);
@@ -1735,8 +1780,12 @@ private:
   }
 
   void printGenericArgs(BoundGenericType *BGT) {
+    printGenericArgs(BGT->getGenericArgs());
+  }
+
+  void printGenericArgs(ArrayRef<Type> genericArgs) {
     os << '<';
-    interleave(BGT->getGenericArgs(),
+    interleave(genericArgs,
                [this](Type t) { print(t, None); },
                [this] { os << ", "; });
     os << '>';
@@ -1890,7 +1939,7 @@ private:
       assert(extension->getGenericSignature().getCanonicalSignature() ==
                  extendedClass->getGenericSignature().getCanonicalSignature() &&
              "constrained extensions or custom generic parameters?");
-      type = extendedClass->getGenericEnvironment()->getSugaredType(type);
+      type = extendedClass->getGenericSignature()->getSugaredType(type);
       decl = type->getDecl();
     }
 
@@ -2065,6 +2114,14 @@ void DeclAndTypePrinter::printAdHocCategory(
 
 bool DeclAndTypePrinter::isEmptyExtensionDecl(const ExtensionDecl *ED) {
   return getImpl().isEmptyExtensionDecl(ED);
+}
+
+const TypeDecl *DeclAndTypePrinter::getObjCTypeDecl(const TypeDecl* TD) {
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(TD))
+    if (auto *bridged = getImpl().getObjCBridgedClass(nominal))
+      return bridged;
+
+  return TD;
 }
 
 StringRef

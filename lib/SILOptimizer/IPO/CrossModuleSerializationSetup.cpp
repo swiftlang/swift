@@ -96,8 +96,10 @@ private:
   SILInstruction *result = nullptr;
 
 public:
-  InstructionVisitor(SILFunction *F, CrossModuleSerializationSetup &CMS) :
-    SILCloner(*F), CMS(CMS) {}
+  InstructionVisitor(SILInstruction *I, CrossModuleSerializationSetup &CMS) :
+    SILCloner(*I->getFunction()), CMS(CMS) {
+    Builder.setInsertionPoint(I);
+  }
 
   SILType remapType(SILType Ty) {
     CMS.makeTypeUsableFromInline(Ty.getASTType());
@@ -124,11 +126,9 @@ public:
   SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) { return BB; }
 
   static void visitInst(SILInstruction *I, CrossModuleSerializationSetup &CMS) {
-    InstructionVisitor visitor(I->getFunction(), CMS);
+    InstructionVisitor visitor(I, CMS);
     visitor.visit(I);
-
-    SILInstruction::destroy(visitor.result);
-    CMS.M.deallocateInst(visitor.result);
+    visitor.result->eraseFromParent();
   }
 };
 
@@ -336,9 +336,6 @@ bool CrossModuleSerializationSetup::canSerialize(SILInstruction *inst,
             canUse = false;
         });
     return canUse;
-  }
-  if (auto *GAI = dyn_cast<GlobalAddrInst>(inst)) {
-    return !GAI->getReferencedGlobal()->getName().startswith("globalinit_");
   }
   if (auto *MI = dyn_cast<MethodInst>(inst)) {
     return !MI->getMember().isForeign;

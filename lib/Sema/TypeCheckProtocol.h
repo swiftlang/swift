@@ -96,7 +96,63 @@ public:
 /// \returns an empty result on success, or a description of the error.
 CheckTypeWitnessResult checkTypeWitness(Type type,
                                         AssociatedTypeDecl *assocType,
-                                        NormalProtocolConformance *Conf);
+                                        const NormalProtocolConformance *Conf,
+                                        SubstOptions options = None);
+
+/// Describes the means of inferring an abstract type witness.
+enum class AbstractTypeWitnessKind : uint8_t {
+  /// The type witness was inferred via a same-type-to-concrete constraint
+  /// in a protocol requirement signature.
+  Fixed,
+
+  /// The type witness was inferred via a defaulted associated type.
+  Default,
+
+  /// The type witness was inferred to a generic parameter of the
+  /// conforming type.
+  GenericParam,
+};
+
+/// A type witness inferred without the aid of a specific potential
+/// value witness.
+class AbstractTypeWitness {
+  AbstractTypeWitnessKind Kind;
+  AssociatedTypeDecl *AssocType;
+  Type TheType;
+
+  /// When this is a default type witness, the declaration responsible for it.
+  /// May not necessarilly match \c AssocType.
+  AssociatedTypeDecl *DefaultedAssocType;
+
+  AbstractTypeWitness(AbstractTypeWitnessKind Kind,
+                      AssociatedTypeDecl *AssocType, Type TheType,
+                      AssociatedTypeDecl *DefaultedAssocType)
+      : Kind(Kind), AssocType(AssocType), TheType(TheType),
+        DefaultedAssocType(DefaultedAssocType) {
+    assert(AssocType && TheType);
+  }
+
+public:
+  static AbstractTypeWitness forFixed(AssociatedTypeDecl *assocType, Type type);
+
+  static AbstractTypeWitness forDefault(AssociatedTypeDecl *assocType,
+                                        Type type,
+                                        AssociatedTypeDecl *defaultedAssocType);
+
+  static AbstractTypeWitness forGenericParam(AssociatedTypeDecl *assocType,
+                                             Type type);
+
+public:
+  AbstractTypeWitnessKind getKind() const { return Kind; }
+
+  AssociatedTypeDecl *getAssocType() const { return AssocType; }
+
+  Type getType() const { return TheType; }
+
+  AssociatedTypeDecl *getDefaultedAssocType() const {
+    return DefaultedAssocType;
+  }
+};
 
 /// The set of associated types that have been inferred by matching
 /// the given value witness to its corresponding requirement.
@@ -179,6 +235,9 @@ enum class MatchKind : uint8_t {
   /// The witness would match if an additional requirement were met.
   MissingRequirement,
 
+  /// The witness and requirement disagree on 'async'.
+  AsyncConflict,
+
   /// The witness throws, but the requirement does not.
   ThrowsConflict,
 
@@ -208,6 +267,9 @@ enum class MatchKind : uint8_t {
 
   /// The witness is explicitly @nonobjc but the requirement is @objc.
   NonObjC,
+
+  /// The witness is part of actor-isolated state.
+  ActorIsolatedWitness,
 
   /// The witness is missing a `@differentiable` attribute from the requirement.
   MissingDifferentiableAttr,
@@ -438,8 +500,10 @@ struct RequirementMatch {
     case MatchKind::NonMutatingConflict:
     case MatchKind::ConsumingConflict:
     case MatchKind::RethrowsConflict:
+    case MatchKind::AsyncConflict:
     case MatchKind::ThrowsConflict:
     case MatchKind::NonObjC:
+    case MatchKind::ActorIsolatedWitness:
     case MatchKind::MissingDifferentiableAttr:
     case MatchKind::EnumCaseWithAssociatedValues:
       return false;
@@ -469,8 +533,10 @@ struct RequirementMatch {
     case MatchKind::NonMutatingConflict:
     case MatchKind::ConsumingConflict:
     case MatchKind::RethrowsConflict:
+    case MatchKind::AsyncConflict:
     case MatchKind::ThrowsConflict:
     case MatchKind::NonObjC:
+    case MatchKind::ActorIsolatedWitness:
     case MatchKind::MissingDifferentiableAttr:
     case MatchKind::EnumCaseWithAssociatedValues:
       return false;
@@ -582,6 +648,31 @@ enum class MissingWitnessDiagnosisKind {
 class AssociatedTypeInference;
 class MultiConformanceChecker;
 
+/// Describes a missing witness during conformance checking.
+class MissingWitness {
+public:
+  /// The requirement that is missing a witness.
+  ValueDecl *requirement;
+
+  /// The set of potential matching witnesses.
+  std::vector<RequirementMatch> matches;
+
+  MissingWitness(ValueDecl *requirement,
+                 ArrayRef<RequirementMatch> matches)
+    : requirement(requirement),
+      matches(matches.begin(), matches.end()) { }
+};
+
+/// Capture missing witnesses that have been delayed and will be stored
+/// in the ASTContext for later.
+class DelayedMissingWitnesses : public MissingWitnessesBase {
+public:
+  std::vector<MissingWitness> missingWitnesses;
+
+  DelayedMissingWitnesses(ArrayRef<MissingWitness> missingWitnesses)
+      : missingWitnesses(missingWitnesses.begin(), missingWitnesses.end()) { }
+};
+
 /// The protocol conformance checker.
 ///
 /// This helper class handles most of the details of checking whether a
@@ -604,7 +695,7 @@ class ConformanceChecker : public WitnessChecker {
   /// Keep track of missing witnesses, either type or value, for later
   /// diagnosis emits. This may contain witnesses that are external to the
   /// protocol under checking.
-  llvm::SetVector<ValueDecl*> &GlobalMissingWitnesses;
+  llvm::SetVector<MissingWitness> &GlobalMissingWitnesses;
 
   /// Keep track of the slice in GlobalMissingWitnesses that is local to
   /// this protocol under checking.
@@ -685,7 +776,7 @@ class ConformanceChecker : public WitnessChecker {
          ValueDecl *requirement, bool isError,
          std::function<void(NormalProtocolConformance *)> fn);
 
-  ArrayRef<ValueDecl*> getLocalMissingWitness() {
+  ArrayRef<MissingWitness> getLocalMissingWitness() {
     return GlobalMissingWitnesses.getArrayRef().
       slice(LocalMissingWitnessesStartIndex,
             GlobalMissingWitnesses.size() - LocalMissingWitnessesStartIndex);
@@ -703,7 +794,7 @@ public:
   void emitDelayedDiags();
 
   ConformanceChecker(ASTContext &ctx, NormalProtocolConformance *conformance,
-                     llvm::SetVector<ValueDecl *> &GlobalMissingWitnesses,
+                     llvm::SetVector<MissingWitness> &GlobalMissingWitnesses,
                      bool suppressDiagnostics = true);
 
   /// Resolve all of the type witnesses.
@@ -812,23 +903,22 @@ private:
     const llvm::SetVector<AssociatedTypeDecl *> &assocTypes);
 
   /// Compute a "fixed" type witness for an associated type, e.g.,
-  /// if the refined protocol requires it to be equivalent to some other
-  /// concrete type.
+  /// if the refined protocol requires it to be equivalent to some other type.
   Type computeFixedTypeWitness(AssociatedTypeDecl *assocType);
 
   /// Compute the default type witness from an associated type default,
   /// if there is one.
-  Type computeDefaultTypeWitness(AssociatedTypeDecl *assocType);
+  Optional<AbstractTypeWitness>
+  computeDefaultTypeWitness(AssociatedTypeDecl *assocType);
 
   /// Compute the "derived" type witness for an associated type that is
   /// known to the compiler.
   std::pair<Type, TypeDecl *>
   computeDerivedTypeWitness(AssociatedTypeDecl *assocType);
 
-  /// Compute a type witness without using a specific potential witness,
-  /// e.g., using a fixed type (from a refined protocol), default type
-  /// on an associated type, or deriving the type.
-  Type computeAbstractTypeWitness(AssociatedTypeDecl *assocType);
+  /// Compute a type witness without using a specific potential witness.
+  Optional<AbstractTypeWitness>
+  computeAbstractTypeWitness(AssociatedTypeDecl *assocType);
 
   /// Substitute the current type witnesses into the given interface type.
   Type substCurrentTypeWitnesses(Type type);
@@ -846,6 +936,15 @@ private:
   /// Check the current type witnesses against the
   /// requirements of the given constrained extension.
   bool checkConstrainedExtension(ExtensionDecl *ext);
+
+  /// Validate the current tentative solution represented by \p typeWitnesses
+  /// and attempt to resolve abstract type witnesses for associated types that
+  /// could not be inferred otherwise.
+  ///
+  /// \returns \c nullptr, or the associated type that failed.
+  AssociatedTypeDecl *
+  completeSolution(ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes,
+                   unsigned reqDepth);
 
   /// Top-level operation to find solutions for the given unresolved
   /// associated types.
@@ -960,4 +1059,26 @@ void diagnoseConformanceFailure(Type T,
 
 }
 
+namespace llvm {
+
+template<>
+struct DenseMapInfo<swift::MissingWitness> {
+  using MissingWitness = swift::MissingWitness;
+  using RequirementPointerTraits = DenseMapInfo<swift::ValueDecl *>;
+
+  static inline MissingWitness getEmptyKey() {
+    return MissingWitness(RequirementPointerTraits::getEmptyKey(), {});
+  }
+  static inline MissingWitness getTombstoneKey() {
+    return MissingWitness(RequirementPointerTraits::getTombstoneKey(), {});
+  }
+  static inline unsigned getHashValue(MissingWitness missing) {
+    return RequirementPointerTraits::getHashValue(missing.requirement);
+  }
+  static bool isEqual(MissingWitness a, MissingWitness b) {
+    return a.requirement == b.requirement;
+  }
+};
+
+}
 #endif // SWIFT_SEMA_PROTOCOL_H

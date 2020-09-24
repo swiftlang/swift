@@ -16,12 +16,14 @@
 
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeDeclFinder.h"
 #include "swift/ClangImporter/ClangImporter.h"
 
 #include "clang/AST/Decl.h"
+#include "clang/Basic/Module.h"
 
 #include "llvm/Support/raw_ostream.h"
 
@@ -56,7 +58,6 @@ class ReferencedTypeFinder : public TypeDeclFinder {
   Action visitTypeAliasType(TypeAliasType *aliasTy) override {
     if (aliasTy->getDecl()->hasClangNode() &&
         !aliasTy->getDecl()->isCompatibilityAlias()) {
-      assert(!aliasTy->getDecl()->isGeneric());
       Callback(*this, aliasTy->getDecl());
     } else {
       Type(aliasTy->getSinglyDesugaredType()).walk(*this);
@@ -235,6 +236,8 @@ public:
   }
 
   bool forwardDeclareMemberTypes(DeclRange members, const Decl *container) {
+    PrettyStackTraceDecl
+        entry("printing forward declarations needed by members of", container);
     switch (container->getKind()) {
     case DeclKind::Class:
     case DeclKind::Protocol:
@@ -247,6 +250,7 @@ public:
     bool hadAnyDelayedMembers = false;
     SmallVector<ValueDecl *, 4> nestedTypes;
     for (auto member : members) {
+      PrettyStackTraceDecl loopEntry("printing for member", member);
       auto VD = dyn_cast<ValueDecl>(member);
       if (!VD || !printer.shouldInclude(VD))
         continue;
@@ -269,8 +273,13 @@ public:
       ReferencedTypeFinder::walk(VD->getInterfaceType(),
                                  [&](ReferencedTypeFinder &finder,
                                      const TypeDecl *TD) {
+        PrettyStackTraceDecl
+            entry("walking its interface type, currently at", TD);
         if (TD == container)
           return;
+
+        // Bridge, if necessary.
+        TD = printer.getObjCTypeDecl(TD);
 
         if (finder.needsDefinition() && isa<NominalTypeDecl>(TD)) {
           // We can delay individual members of classes; do so if necessary.
@@ -310,8 +319,10 @@ public:
         } else if (auto PD = dyn_cast<ProtocolDecl>(TD)) {
           forwardDeclare(PD);
         } else if (auto TAD = dyn_cast<TypeAliasDecl>(TD)) {
+          bool imported = false;
           if (TAD->hasClangNode())
-            (void)addImport(TD);
+            imported = addImport(TD);
+          assert((imported || !TAD->isGeneric()) && "referencing non-imported generic typealias?");
         } else if (addImport(TD)) {
           return;
         } else if (auto ED = dyn_cast<EnumDecl>(TD)) {

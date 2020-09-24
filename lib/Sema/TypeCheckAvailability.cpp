@@ -1136,7 +1136,7 @@ static void findAvailabilityFixItNodes(SourceRange ReferenceRange,
         if (Expr *ParentExpr = Parent.getAsExpr()) {
           auto *ParentClosure = dyn_cast<ClosureExpr>(ParentExpr);
           if (!ParentClosure ||
-              ParentClosure->wasSeparatelyTypeChecked()) {
+              ParentClosure->isSeparatelyTypeChecked()) {
             return false;
           }
         } else if (auto *ParentStmt = Parent.getAsStmt()) {
@@ -2067,6 +2067,7 @@ void swift::diagnoseUnavailableOverride(ValueDecl *override,
 
   diagnoseExplicitUnavailability(base, override->getLoc(),
                                  override->getDeclContext(),
+                                 /*Flags*/None,
                                  [&](InFlightDiagnostic &diag) {
     ParsedDeclName parsedName = parseDeclName(attr->Rename);
     if (!parsedName || parsedName.isPropertyAccessor() ||
@@ -2097,10 +2098,11 @@ void swift::diagnoseUnavailableOverride(ValueDecl *override,
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
 bool swift::diagnoseExplicitUnavailability(const ValueDecl *D,
-                                                 SourceRange R,
-                                                 const DeclContext *DC,
-                                                 const ApplyExpr *call) {
-  return diagnoseExplicitUnavailability(D, R, DC,
+                                           SourceRange R,
+                                           const DeclContext *DC,
+                                           const ApplyExpr *call,
+                                           DeclAvailabilityFlags Flags) {
+  return diagnoseExplicitUnavailability(D, R, DC, Flags,
                                         [=](InFlightDiagnostic &diag) {
     fixItAvailableAttrRename(diag, R, D, AvailableAttr::isUnavailable(D),
                              call);
@@ -2172,6 +2174,7 @@ bool swift::diagnoseExplicitUnavailability(
     const ValueDecl *D,
     SourceRange R,
     const DeclContext *DC,
+    DeclAvailabilityFlags Flags,
     llvm::function_ref<void(InFlightDiagnostic &)> attachRenameFixIts) {
   auto *Attr = AvailableAttr::isUnavailable(D);
   if (!Attr)
@@ -2229,6 +2232,14 @@ bool swift::diagnoseExplicitUnavailability(
     break;
   }
 
+  // TODO: Consider removing this.
+  // ObjC keypaths components weren't checked previously, so errors are demoted
+  // to warnings to avoid source breakage. In some cases unavailable or
+  // obsolete decls still map to valid ObjC runtime names, so behave correctly
+  // at runtime, even though their use would produce an error outside of a
+  // #keyPath expression.
+  bool warnInObjCKeyPath = Flags.contains(DeclAvailabilityFlag::ForObjCKeyPath);
+
   if (!Attr->Rename.empty()) {
     SmallString<32> newNameBuf;
     Optional<ReplacementDeclKind> replaceKind =
@@ -2238,7 +2249,9 @@ bool swift::diagnoseExplicitUnavailability(
     StringRef newName = replaceKind ? newNameBuf.str() : Attr->Rename;
       EncodedDiagnosticMessage EncodedMessage(Attr->Message);
       auto diag =
-          diags.diagnose(Loc, diag::availability_decl_unavailable_rename,
+          diags.diagnose(Loc, warnInObjCKeyPath
+                         ? diag::availability_decl_unavailable_rename_warn
+                         : diag::availability_decl_unavailable_rename,
                          RawAccessorKind, Name, replaceKind.hasValue(),
                          rawReplaceKind, newName, EncodedMessage.Message);
       attachRenameFixIts(diag);
@@ -2253,7 +2266,9 @@ bool swift::diagnoseExplicitUnavailability(
   } else {
     EncodedDiagnosticMessage EncodedMessage(Attr->Message);
     diags
-        .diagnose(Loc, diag::availability_decl_unavailable, RawAccessorKind,
+        .diagnose(Loc, warnInObjCKeyPath
+                  ? diag::availability_decl_unavailable_warn
+                  : diag::availability_decl_unavailable, RawAccessorKind,
                   Name, platform.empty(), platform, EncodedMessage.Message)
         .highlight(R);
   }
@@ -2501,6 +2516,10 @@ private:
   /// Walk a keypath expression, checking all of its components for
   /// availability.
   void maybeDiagKeyPath(KeyPathExpr *KP) {
+    auto flags = DeclAvailabilityFlags();
+    if (KP->isObjC())
+      flags = DeclAvailabilityFlag::ForObjCKeyPath;
+
     for (auto &component : KP->getComponents()) {
       switch (component.getKind()) {
       case KeyPathExpr::Component::Kind::Property:
@@ -2508,7 +2527,7 @@ private:
         auto *decl = component.getDeclRef().getDecl();
         auto loc = component.getLoc();
         SourceRange range(loc, loc);
-        diagAvailability(decl, range, nullptr);
+        diagAvailability(decl, range, nullptr, flags);
         break;
       }
 
@@ -2522,6 +2541,7 @@ private:
       case KeyPathExpr::Component::Kind::OptionalWrap:
       case KeyPathExpr::Component::Kind::OptionalForce:
       case KeyPathExpr::Component::Kind::Identity:
+      case KeyPathExpr::Component::Kind::DictionaryKey:
         break;
       }
     }
@@ -2627,7 +2647,7 @@ AvailabilityWalker::diagAvailability(ConcreteDeclRef declRef, SourceRange R,
       if (TypeChecker::diagnoseInlinableDeclRef(R.Start, declRef, DC, FragileKind))
         return true;
 
-  if (diagnoseExplicitUnavailability(D, R, DC, call))
+  if (diagnoseExplicitUnavailability(D, R, DC, call, Flags))
     return true;
 
   // Make sure not to diagnose an accessor's deprecation if we already
@@ -2834,39 +2854,46 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *Decl,
   return AW.diagAvailability(const_cast<ValueDecl *>(Decl), R, nullptr, Flags);
 }
 
-/// Should we warn that \p valueDecl needs an explicit availability annotation
-/// in -require-explicit-availaiblity mode?
-static bool declNeedsExplicitAvailability(const ValueDecl *valueDecl) {
-  AccessScope scope =
-    valueDecl->getFormalAccessScope(/*useDC*/nullptr,
-                                  /*treatUsableFromInlineAsPublic*/true);
-  if (!scope.isPublic() ||
-      valueDecl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+/// Should we warn that \p decl needs an explicit availability annotation
+/// in -require-explicit-availability mode?
+static bool declNeedsExplicitAvailability(const Decl *decl) {
+  // Skip non-public decls.
+  if (auto valueDecl = dyn_cast<const ValueDecl>(decl)) {
+    AccessScope scope =
+      valueDecl->getFormalAccessScope(/*useDC*/nullptr,
+                                      /*treatUsableFromInlineAsPublic*/true);
+    if (!scope.isPublic())
+      return false;
+  }
+
+  // Skip functions emitted into clients or SPI.
+  if (decl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
+      decl->isSPI())
     return false;
 
   // Warn on decls without an introduction version.
-  auto &ctx = valueDecl->getASTContext();
-  auto safeRangeUnderApprox = AvailabilityInference::availableRange(valueDecl, ctx);
+  auto &ctx = decl->getASTContext();
+  auto safeRangeUnderApprox = AvailabilityInference::availableRange(decl, ctx);
   return !safeRangeUnderApprox.getOSVersion().hasLowerEndpoint() &&
-         !valueDecl->getAttrs().isUnavailable(ctx);
+         !decl->getAttrs().isUnavailable(ctx);
 }
 
 void swift::checkExplicitAvailability(Decl *decl) {
-  // Check only if the command line option was set.
-  if (!decl->getASTContext().LangOpts.RequireExplicitAvailability)
+  // Skip if the command line option was not set and
+  // accessors as we check the pattern binding decl instead.
+  if (!decl->getASTContext().LangOpts.RequireExplicitAvailability ||
+      isa<AccessorDecl>(decl))
     return;
 
-  // Skip nominal type members as the type should be annotated.
-  auto declContext = decl->getDeclContext();
-  if (isa<NominalTypeDecl>(declContext))
-    return;
+  // Only look at decls at module level or in extensions.
+  // This could be changed to force having attributes on all decls.
+  if (!decl->getDeclContext()->isModuleScopeContext() &&
+      !isa<ExtensionDecl>(decl->getDeclContext())) return;
 
-  ValueDecl *valueDecl = dyn_cast<ValueDecl>(decl);
-  if (valueDecl == nullptr) {
+  if (auto extension = dyn_cast<ExtensionDecl>(decl)) {
     // decl should be either a ValueDecl or an ExtensionDecl.
-    auto extension = cast<ExtensionDecl>(decl);
-    valueDecl = extension->getExtendedNominal();
-    if (!valueDecl)
+    auto extended = extension->getExtendedNominal();
+    if (!extended || !extended->getFormalAccessScope().isPublic())
       return;
 
     // Skip extensions without public members or conformances.
@@ -2889,12 +2916,25 @@ void swift::checkExplicitAvailability(Decl *decl) {
     });
 
     if (!hasMembers && !hasProtocols) return;
+
+  } else if (auto pbd = dyn_cast<PatternBindingDecl>(decl)) {
+    // Check the first var instead.
+    if (pbd->getNumPatternEntries() == 0)
+      return;
+
+    llvm::SmallVector<VarDecl *, 2> vars;
+    pbd->getPattern(0)->collectVariables(vars);
+    if (vars.empty())
+      return;
+
+    decl = vars.front();
   }
 
-  if (declNeedsExplicitAvailability(valueDecl)) {
+  if (declNeedsExplicitAvailability(decl)) {
     auto diag = decl->diagnose(diag::public_decl_needs_availability);
 
-    auto suggestPlatform = decl->getASTContext().LangOpts.RequireExplicitAvailabilityTarget;
+    auto suggestPlatform =
+      decl->getASTContext().LangOpts.RequireExplicitAvailabilityTarget;
     if (!suggestPlatform.empty()) {
       auto InsertLoc = decl->getAttrs().getStartLoc(/*forModifiers=*/false);
       if (InsertLoc.isInvalid())
@@ -2907,7 +2947,7 @@ void swift::checkExplicitAvailability(Decl *decl) {
       {
          llvm::raw_string_ostream Out(AttrText);
 
-         auto &ctx = valueDecl->getASTContext();
+         auto &ctx = decl->getASTContext();
          StringRef OriginalIndent = Lexer::getIndentationForLine(
            ctx.SourceMgr, InsertLoc);
          Out << "@available(" << suggestPlatform << ", *)\n"

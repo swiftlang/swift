@@ -1544,3 +1544,17 @@ bb0:
   dealloc_stack %1 : $*Builtin.Int32
   return %3 : $Builtin.Int32
 } // CHECK: Returns int: 23
+
+// CHECK-LABEL: @interpretCoverageInstrumentationSkip
+sil @interpretCoverageInstrumentationSkip : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 25
+  %1 = string_literal utf8 "$s2os6LoggerV3logyyAA12OSLogMessageVF" // user: %77
+  %2 = integer_literal $Builtin.Int64, 0
+  %3 = integer_literal $Builtin.Int32, 1
+  %4 = integer_literal $Builtin.Int32, 0
+  // This builtin should be skipped
+  %5 = builtin "int_instrprof_increment"(%1 : $Builtin.RawPointer, %2 : $Builtin.Int64, %3 : $Builtin.Int32, %4 : $Builtin.Int32) : $()
+  return %0 : $(Builtin.Int64)
+} // CHECK: Returns int: 25
+

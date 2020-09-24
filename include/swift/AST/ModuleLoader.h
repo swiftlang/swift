@@ -18,12 +18,14 @@
 #define SWIFT_AST_MODULE_LOADER_H
 
 #include "swift/AST/Identifier.h"
+#include "swift/AST/Import.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Located.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "swift/AST/ModuleDependencies.h"
+#include <system_error>
 
 namespace llvm {
 class FileCollector;
@@ -103,17 +105,18 @@ struct SubCompilerInstanceInfo {
 
 /// Abstract interface to run an action in a sub ASTContext.
 struct InterfaceSubContextDelegate {
-  virtual bool runInSubContext(StringRef moduleName,
-                               StringRef interfacePath,
-                               StringRef outputPath,
-                               SourceLoc diagLoc,
-  llvm::function_ref<bool(ASTContext&,ArrayRef<StringRef>,
-                          ArrayRef<StringRef>, StringRef)> action) = 0;
-  virtual bool runInSubCompilerInstance(StringRef moduleName,
-                                        StringRef interfacePath,
-                                        StringRef outputPath,
-                                        SourceLoc diagLoc,
-                    llvm::function_ref<bool(SubCompilerInstanceInfo&)> action) = 0;
+  virtual std::error_code runInSubContext(StringRef moduleName,
+                                          StringRef interfacePath,
+                                          StringRef outputPath,
+                                          SourceLoc diagLoc,
+    llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*,
+                                       ArrayRef<StringRef>,
+                                       ArrayRef<StringRef>, StringRef)> action) = 0;
+  virtual std::error_code runInSubCompilerInstance(StringRef moduleName,
+                                                   StringRef interfacePath,
+                                                   StringRef outputPath,
+                                                   SourceLoc diagLoc,
+    llvm::function_ref<std::error_code(SubCompilerInstanceInfo&)> action) = 0;
 
   virtual ~InterfaceSubContextDelegate() = default;
 };
@@ -141,7 +144,7 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  virtual bool canImportModule(Located<Identifier> named) = 0;
+  virtual bool canImportModule(ImportPath::Element named) = 0;
 
   /// Import a module with the given module path.
   ///
@@ -153,8 +156,7 @@ public:
   /// \returns the module referenced, if it could be loaded. Otherwise,
   /// emits a diagnostic and returns NULL.
   virtual
-  ModuleDecl *loadModule(SourceLoc importLoc,
-                         ArrayRef<Located<Identifier>> path) = 0;
+  ModuleDecl *loadModule(SourceLoc importLoc, ImportPath::Module path) = 0;
 
   /// Load extensions to the given nominal type.
   ///

@@ -301,13 +301,9 @@ bool DeclContext::isGenericContext() const {
       if (auto GC = decl->getAsGenericContext()) {
         if (GC->getGenericParams())
           return true;
-
-        // Extensions do not capture outer generic parameters.
-        if (isa<ExtensionDecl>(decl))
-          break;
       }
     }
-  } while ((dc = dc->getParent()));
+  } while ((dc = dc->getParentForLookup()));
 
   return false;
 }
@@ -447,52 +443,6 @@ bool DeclContext::isInnermostContextGeneric() const {
     if (auto GC = Decl->getAsGenericContext())
       return GC->isGeneric();
   return false;
-}
-
-bool
-DeclContext::isCascadingContextForLookup(bool functionsAreNonCascading) const {
-  // FIXME: This is explicitly checking for attributes in some cases because
-  // it can be called before access control is computed.
-  switch (getContextKind()) {
-  case DeclContextKind::AbstractClosureExpr:
-    break;
-
-  case DeclContextKind::SerializedLocal:
-    llvm_unreachable("should not perform lookups in deserialized contexts");
-
-  case DeclContextKind::Initializer:
-    // Default arguments still require a type.
-    if (isa<DefaultArgumentInitializer>(this))
-      return false;
-    break;
-
-  case DeclContextKind::TopLevelCodeDecl:
-    // FIXME: Pattern initializers at top-level scope end up here.
-    return true;
-
-  case DeclContextKind::AbstractFunctionDecl:
-    if (functionsAreNonCascading)
-      return false;
-    break;
-
-  case DeclContextKind::SubscriptDecl:
-    break;
-
-  case DeclContextKind::EnumElementDecl:
-    break;
-
-  case DeclContextKind::Module:
-  case DeclContextKind::FileUnit:
-    return true;
-
-  case DeclContextKind::GenericTypeDecl:
-    break;
-
-  case DeclContextKind::ExtensionDecl:
-    return true;
-  }
-
-  return getParent()->isCascadingContextForLookup(true);
 }
 
 unsigned DeclContext::getSyntacticDepth() const {
@@ -797,11 +747,27 @@ DeclRange IterableDeclContext::getMembers() const {
   return getCurrentMembersWithoutLoading();
 }
 
+ArrayRef<Decl *> IterableDeclContext::getParsedMembers() const {
+  ASTContext &ctx = getASTContext();
+  auto mutableThis = const_cast<IterableDeclContext *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator, ParseMembersRequest{mutableThis},
+      FingerprintAndMembers())
+    .members;
+}
+
+ArrayRef<Decl *> IterableDeclContext::getSemanticMembers() const {
+  ASTContext &ctx = getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator,
+      SemanticMembersRequest{const_cast<IterableDeclContext *>(this)},
+      ArrayRef<Decl *>());
+}
+
 /// Add a member to this context.
 void IterableDeclContext::addMember(Decl *member, Decl *Hint) {
   // Add the member to the list of declarations without notification.
   addMemberSilently(member, Hint);
-  ++MemberCount;
 
   // Notify our parent declaration that we have added the member, which can
   // be used to update the lookup tables.
@@ -880,12 +846,6 @@ bool IterableDeclContext::hasUnparsedMembers() const {
   return true;
 }
 
-unsigned IterableDeclContext::getMemberCount() const {
-  if (hasUnparsedMembers())
-    loadAllMembers();
-  return MemberCount;
-}
-
 void IterableDeclContext::loadAllMembers() const {
   ASTContext &ctx = getASTContext();
 
@@ -895,10 +855,7 @@ void IterableDeclContext::loadAllMembers() const {
     // members to this context, this call is important for recording the
     // dependency edge.
     auto mutableThis = const_cast<IterableDeclContext *>(this);
-    auto members =
-        evaluateOrDefault(ctx.evaluator, ParseMembersRequest{mutableThis},
-                          FingerprintAndMembers())
-            .members;
+    auto members = getParsedMembers();
 
     // If we haven't already done so, add these members to this context.
     if (!AddedParsedMembers) {

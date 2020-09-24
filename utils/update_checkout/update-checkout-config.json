@@ -43,12 +43,6 @@
             "remote": { "id": "KitWare/CMake" },
             "platforms": [ "Linux" ]
         },
-        "pythonkit": {
-            "remote": { "id": "pvieito/PythonKit" }
-        },
-        "tensorflow-swift-apis": {
-            "remote": { "id": "tensorflow/swift-apis" }
-        },
        "indexstore-db": {
             "remote": { "id": "apple/indexstore-db" } },
         "sourcekit-lsp": {
@@ -58,67 +52,63 @@
         "llvm-project": {
             "remote": { "id": "apple/llvm-project" } }
     },
-    "default-branch-scheme": "master",
+    "default-branch-scheme": "main",
     "branch-schemes": {
-       "master": {
-            "aliases": ["master", "swift/master"],
+       "main": {
+            "aliases": ["master", "swift/main", "main"],
             "repos": {
-                "llvm-project": "swift/master",
-                "swift": "master",
-                "cmark": "master",
-                "llbuild": "master",
-                "swift-tools-support-core": "master",
-                "swiftpm": "master",
-                "swift-argument-parser": "0.0.6",
-                "swift-driver": "master",
-                "swift-syntax": "master",
-                "swift-stress-tester": "master",
-                "swift-corelibs-xctest": "master",
-                "swift-corelibs-foundation": "master",
-                "swift-corelibs-libdispatch": "master",
-                "swift-integration-tests": "master",
-                "swift-xcode-playground-support": "master",
+                "llvm-project": "swift/main",
+                "swift": "main",
+                "cmark": "main",
+                "llbuild": "main",
+                "swift-tools-support-core": "main",
+                "swiftpm": "main",
+                "swift-argument-parser": "0.3.0",
+                "swift-driver": "main",
+                "swift-syntax": "main",
+                "swift-stress-tester": "main",
+                "swift-corelibs-xctest": "main",
+                "swift-corelibs-foundation": "main",
+                "swift-corelibs-libdispatch": "main",
+                "swift-integration-tests": "main",
+                "swift-xcode-playground-support": "main",
                 "ninja": "release",
                 "icu": "release-65-1",
                 "yams": "3.0.1",
                 "cmake": "v3.16.5",
-                "indexstore-db": "master",
-                "sourcekit-lsp": "master",
-                "swift-format": "master",
-                "pythonkit": "master",
-                "tensorflow-swift-apis": "master"
+                "indexstore-db": "main",
+                "sourcekit-lsp": "main",
+                "swift-format": "main"
             }
         },
         "next" : {
             "aliases": ["next", "master-next",
-                        "swift/master-next",
+                        "swift/next",
                         "stable-next", "upstream",
                         "next-upstream", "upstream-with-swift"],
             "repos": {
-                "llvm-project": "swift/master-next",
-                "swift": "master-next",
-                "cmark": "master",
-                "llbuild": "master",
-                "swift-tools-support-core": "master",
-                "swiftpm": "master",
-                "swift-argument-parser": "0.0.6",
-                "swift-driver": "master",
-                "swift-syntax": "master",
-                "swift-stress-tester": "master",
-                "swift-corelibs-xctest": "master",
-                "swift-corelibs-foundation": "master",
-                "swift-corelibs-libdispatch": "master",
-                "swift-integration-tests": "master",
-                "swift-xcode-playground-support": "master",
+                "llvm-project": "swift/next",
+                "swift": "next",
+                "cmark": "main",
+                "llbuild": "main",
+                "swift-tools-support-core": "main",
+                "swiftpm": "main",
+                "swift-argument-parser": "0.3.0",
+                "swift-driver": "main",
+                "swift-syntax": "main",
+                "swift-stress-tester": "main",
+                "swift-corelibs-xctest": "main",
+                "swift-corelibs-foundation": "main",
+                "swift-corelibs-libdispatch": "main",
+                "swift-integration-tests": "main",
+                "swift-xcode-playground-support": "main",
                 "ninja": "release",
                 "icu": "release-65-1",
                 "yams": "3.0.1",
                 "cmake": "v3.16.5",
-                "indexstore-db": "master",
-                "sourcekit-lsp": "master",
-                "swift-format": "master",
-                "pythonkit": "master",
-                "tensorflow-swift-apis": "master"
+                "indexstore-db": "main",
+                "sourcekit-lsp": "main",
+                "swift-format": "main"
             }
         },
        "swift-3.0-branch" : {
@@ -128,17 +118,17 @@
                 "cmark": "swift-3.0-branch",
                 "llbuild": "swift-3.0-branch",
                 "swiftpm": "swift-3.0-branch",
-                "swift-syntax": "master",
-                "swift-stress-tester": "master",
+                "swift-syntax": "main",
+                "swift-stress-tester": "main",
                 "swift-corelibs-xctest": "swift-3.0-branch",
                 "swift-corelibs-foundation": "swift-3.0-branch",
                 "swift-corelibs-libdispatch": "swift-3.0-branch",
                 "swift-integration-tests": "swift-3.0-branch",
                 "swift-xcode-playground-support": "swift-3.0-branch",
                 "ninja": "release",
-                "indexstore-db": "master",
-                "sourcekit-lsp": "master",
-                "swift-format": "master"
+                "indexstore-db": "main",
+                "sourcekit-lsp": "main",
+                "swift-format": "main"
             }
         },
         "swift-3.1-branch" : {
@@ -149,17 +139,17 @@
                 "cmark": "swift-3.1-branch",
                 "llbuild": "swift-3.1-branch",
                 "swiftpm": "swift-3.1-branch",
-                "swift-syntax": "master",
-                "swift-stress-tester": "master",
+                "swift-syntax": "main",
+                "swift-stress-tester": "main",
                 "swift-corelibs-xctest": "swift-3.1-branch",
                 "swift-corelibs-foundation": "swift-3.1-branch",
                 "swift-corelibs-libdispatch": "swift-3.1-branch",
                 "swift-integration-tests": "swift-3.1-branch",
                 "swift-xcode-playground-support": "swift-3.1-branch",
                 "ninja": "release",
-                "indexstore-db": "master",
-                "sourcekit-lsp": "master",
-                "swift-format": "master"
+                "indexstore-db": "main",
+                "sourcekit-lsp": "main",
+                "swift-format": "main"
             }
         },
         "swift-4.0-branch" : {
@@ -170,17 +160,17 @@
                 "cmark": "swift-4.0-branch",
                 "llbuild": "swift-4.0-branch",
                 "swiftpm": "swift-4.0-branch",
-                "swift-syntax": "master",
-                "swift-stress-tester": "master",
+                "swift-syntax": "main",
+                "swift-stress-tester": "main",
                 "swift-corelibs-xctest": "swift-4.0-branch",
                 "swift-corelibs-foundation": "swift-4.0-branch",
                 "swift-corelibs-libdispatch": "swift-4.0-branch",
                 "swift-integration-tests": "swift-4.0-branch",
                 "swift-xcode-playground-support": "swift-4.0-branch",
                 "ninja": "release",
-                "indexstore-db": "master",
-                "sourcekit-lsp": "master",
-                "swift-format": "master"
+                "indexstore-db": "main",
+                "sourcekit-lsp": "main",
+                "swift-format": "main"
             }
         },
         "swift-4.1-branch" : {
@@ -191,17 +181,17 @@
                 "cmark": "swift-4.1-branch",
                 "llbuild": "swift-4.1-branch",
                 "swiftpm": "swift-4.1-branch",
-                "swift-syntax": "master",
-                "swift-stress-tester": "master",
+                "swift-syntax": "main",
+                "swift-stress-tester": "main",
                 "swift-corelibs-xctest": "swift-4.1-branch",
                 "swift-corelibs-foundation": "swift-4.1-branch",
                 "swift-corelibs-libdispatch": "swift-4.1-branch",
                 "swift-integration-tests": "swift-4.1-branch",
                 "swift-xcode-playground-support": "swift-4.1-branch",
                 "ninja": "release",
-                "indexstore-db": "master",
-                "sourcekit-lsp": "master",
-                "swift-format": "master"
+                "indexstore-db": "main",
+                "sourcekit-lsp": "main",
+                "swift-format": "main"
             }
         },
         "swift-4.2-branch" : {
@@ -213,16 +203,16 @@
                 "llbuild": "swift-4.2-branch",
                 "swiftpm": "swift-4.2-branch",
                 "swift-syntax": "swift-4.2-branch",
-                "swift-stress-tester": "master",
+                "swift-stress-tester": "main",
                 "swift-corelibs-xctest": "swift-4.2-branch",
                 "swift-corelibs-foundation": "swift-4.2-branch",
                 "swift-corelibs-libdispatch": "swift-4.2-branch",
                 "swift-integration-tests": "swift-4.2-branch",
                 "swift-xcode-playground-support": "swift-4.2-branch",
                 "ninja": "release",
-                "indexstore-db": "master",
-                "sourcekit-lsp": "master",
-                "swift-format": "master"
+                "indexstore-db": "main",
+                "sourcekit-lsp": "main",
+                "swift-format": "main"
             }
         },
         "swift-5.0-branch" : {
@@ -242,9 +232,9 @@
                 "swift-xcode-playground-support": "swift-5.0-branch",
                 "ninja": "release",
                 "icu": "release-61-1",
-                "indexstore-db": "master",
-                "sourcekit-lsp": "master",
-                "swift-format": "master"
+                "indexstore-db": "main",
+                "sourcekit-lsp": "main",
+                "swift-format": "main"
             }
         },
        "swift-5.1-branch" : {
@@ -266,7 +256,7 @@
                 "icu": "release-61-1",
                 "indexstore-db": "swift-5.1-branch",
                 "sourcekit-lsp": "swift-5.1-branch",
-                "swift-format": "master"
+                "swift-format": "main"
             }
         },
        "swift-5.2-branch": {
@@ -290,7 +280,7 @@
                 "cmake": "v3.15.1",
                 "indexstore-db": "swift-5.2-branch",
                 "sourcekit-lsp": "swift-5.2-branch",
-                "swift-format": "master"
+                "swift-format": "main"
             }
         },
        "release/5.3": {
@@ -314,33 +304,7 @@
                 "cmake": "v3.16.5",
                 "indexstore-db": "release/5.3",
                 "sourcekit-lsp": "release/5.3",
-                "swift-format": "master",
-                "pythonkit": "master",
-                "tensorflow-swift-apis": "master"
-            }
-        },
-       "master-rebranch": {
-            "aliases": ["master-rebranch", "swift/master-rebranch"],
-            "repos": {
-                "llvm-project": "swift/master-rebranch",
-                "swift": "master-rebranch",
-                "cmark": "master",
-                "llbuild": "master",
-                "swift-tools-support-core": "master",
-                "swiftpm": "master",
-                "swift-syntax": "master",
-                "swift-stress-tester": "master",
-                "swift-corelibs-xctest": "master",
-                "swift-corelibs-foundation": "master",
-                "swift-corelibs-libdispatch": "master",
-                "swift-integration-tests": "master",
-                "swift-xcode-playground-support": "master",
-                "ninja": "release",
-                "icu": "release-65-1",
-                "cmake": "v3.16.5",
-                "indexstore-db": "master",
-                "sourcekit-lsp": "master",
-                "swift-format": "master"
+                "swift-format": "main"
             }
         }
     }

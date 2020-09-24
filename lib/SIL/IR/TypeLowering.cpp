@@ -11,9 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "libsil"
+
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/CanTypeVisitor.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
@@ -392,7 +394,8 @@ namespace {
     } \
     RetTy visit##Name##StorageType(Can##Name##StorageType type, \
                                    AbstractionPattern origType) { \
-      auto referentType = type->getReferentType(); \
+      auto referentType = \
+        type->getReferentType()->lookThroughSingleOptionalType(); \
       auto concreteType = getConcreteReferenceStorageReferent(referentType); \
       if (Name##StorageType::get(concreteType, TC.Context) \
             ->isLoadable(Expansion.getResilienceExpansion())) { \
@@ -418,10 +421,6 @@ namespace {
 
     RetTy visitArchetypeType(CanArchetypeType type,
                              AbstractionPattern origType) {
-      if (type->requiresClass()) {
-        return asImpl().handleReference(type);
-      }
-
       auto LayoutInfo = type->getLayoutConstraint();
       if (LayoutInfo) {
         if (LayoutInfo->isFixedSizeTrivial()) {
@@ -667,6 +666,26 @@ namespace {
       return B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
     }
 
+    SILValue emitLoweredLoad(SILBuilder &B, SILLocation loc, SILValue addr,
+                             LoadOwnershipQualifier qual,
+                             TypeExpansionKind) const override {
+      if (B.getFunction().hasOwnership())
+        return B.createLoad(loc, addr, LoadOwnershipQualifier::Trivial);
+      return B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
+    }
+
+    void emitLoweredStore(SILBuilder &B, SILLocation loc, SILValue value,
+                          SILValue addr, StoreOwnershipQualifier qual,
+                          Lowering::TypeLowering::TypeExpansionKind
+                              expansionKind) const override {
+      auto storeQual = [&]() -> StoreOwnershipQualifier {
+        if (B.getFunction().hasOwnership())
+          return StoreOwnershipQualifier::Trivial;
+        return StoreOwnershipQualifier::Unqualified;
+      }();
+      B.createStore(loc, value, addr, storeQual);
+    }
+
     void emitDestroyAddress(SILBuilder &B, SILLocation loc,
                             SILValue addr) const override {
       // Trivial
@@ -758,8 +777,56 @@ namespace {
       if (qual != LoadOwnershipQualifier::Copy)
         return loadValue;
 
+      // Otherwise, emit the copy value operation and return our original
+      // value. This is a small non-ownership optimization to not destabilize
+      // the optimizer pipeline.
+      //
+      // TODO: Once the pass pipeline is fixed, we should evaluate if we can do
+      // this again.
+      B.emitCopyValueOperation(loc, loadValue);
+      return loadValue;
+    }
+
+    SILValue emitLoweredLoad(SILBuilder &B, SILLocation loc, SILValue addr,
+                             LoadOwnershipQualifier qual,
+                             TypeExpansionKind expansionKind) const override {
+      if (B.getFunction().hasOwnership())
+        return B.createLoad(loc, addr, qual);
+
+      SILValue loadValue =
+          B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
+
+      // If we do not have a copy, just return the value...
+      if (qual != LoadOwnershipQualifier::Copy)
+        return loadValue;
+
       // Otherwise, emit the copy value operation.
-      return B.emitCopyValueOperation(loc, loadValue);
+      B.emitLoweredCopyValueOperation(loc, loadValue, expansionKind);
+
+      // Otherwise, emit the copy value operation and return our original
+      // value. This is a small non-ownership optimization to not destabilize
+      // the optimizer pipeline.
+      //
+      // TODO: Once the pass pipeline is fixed, we should evaluate if we can do
+      // this again.
+      return loadValue;
+    }
+
+    void emitLoweredStore(SILBuilder &B, SILLocation loc, SILValue value,
+                          SILValue addr, StoreOwnershipQualifier qual,
+                          Lowering::TypeLowering::TypeExpansionKind
+                              expansionKind) const override {
+      if (B.getFunction().hasOwnership()) {
+        B.createStore(loc, value, addr, qual);
+        return;
+      }
+
+      if (qual == StoreOwnershipQualifier::Assign) {
+        SILValue oldValue = B.emitLoadValueOperation(
+            loc, addr, LoadOwnershipQualifier::Unqualified);
+        B.emitLoweredDestroyValueOperation(loc, oldValue, expansionKind);
+      }
+      B.createStore(loc, value, addr, StoreOwnershipQualifier::Unqualified);
     }
   };
 
@@ -801,6 +868,32 @@ namespace {
                                        forExpansion) {
     }
 
+    /// CRTP Default implementation of destructuring an aggregate value.
+    ///
+    /// Uses getChildren() and emitRValueProject() to create projections for
+    /// each child. Subclasses should override this to customize on how
+    /// destructuring is done.
+    ///
+    /// NOTE: Due to the CRTP, this must always be called as
+    /// asImpl().destructureAggregate() to ensure that one gets the proper
+    /// implementation!
+    void destructureAggregate(
+        SILBuilder &B, SILLocation loc, SILValue aggValue, bool skipTrivial,
+        function_ref<void(unsigned, SILValue, const TypeLowering &)> visitor)
+        const {
+      for (auto pair : llvm::enumerate(getChildren(B.getModule().Types))) {
+        auto &child = pair.value();
+        auto &childLowering = child.getLowering();
+        // Skip trivial children.
+        if (skipTrivial && childLowering.isTrivial())
+          continue;
+        auto childIndex = child.getIndex();
+        auto childValue = asImpl().emitRValueProject(B, loc, aggValue,
+                                                     childIndex, childLowering);
+        visitor(pair.index(), childValue, childLowering);
+      }
+    }
+
     virtual SILValue rebuildAggregate(SILBuilder &B, SILLocation loc,
                                       ArrayRef<SILValue> values) const = 0;
 
@@ -819,16 +912,12 @@ namespace {
     void forEachNonTrivialChild(SILBuilder &B, SILLocation loc,
                                 SILValue aggValue,
                                 const T &operation) const {
-      for (auto &child : getChildren(B.getModule().Types)) {
-        auto &childLowering = child.getLowering();
-        // Skip trivial children.
-        if (childLowering.isTrivial())
-          continue;
-        auto childIndex = child.getIndex();
-        auto childValue = asImpl().emitRValueProject(B, loc, aggValue,
-                                                   childIndex, childLowering);
-        operation(B, loc, childIndex, childValue, childLowering);
-      }
+      asImpl().destructureAggregate(B, loc, aggValue, true /*skipTrivial*/,
+                                    [&](unsigned, SILValue childValue,
+                                        const TypeLowering &childLowering) {
+                                      operation(B, loc, childValue,
+                                                childLowering);
+                                    });
     }
 
     using SimpleOperationTy = void (TypeLowering::*)(SILBuilder &B,
@@ -838,10 +927,11 @@ namespace {
                                 SILValue aggValue,
                                 SimpleOperationTy operation) const {
       forEachNonTrivialChild(B, loc, aggValue,
-        [operation](SILBuilder &B, SILLocation loc, IndexType index,
-                     SILValue childValue, const TypeLowering &childLowering) {
-          (childLowering.*operation)(B, loc, childValue);
-        });
+                             [operation](SILBuilder &B, SILLocation loc,
+                                         SILValue childValue,
+                                         const TypeLowering &childLowering) {
+                               (childLowering.*operation)(B, loc, childValue);
+                             });
     }
 
     SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
@@ -859,21 +949,24 @@ namespace {
         return emitCopyValue(B, loc, aggValue);
       }
 
-      llvm::SmallVector<SILValue, 8> loweredChildValues;
-      for (auto &child : getChildren(B.getModule().Types)) {
-        auto &childLowering = child.getLowering();
-        SILValue childValue = asImpl().emitRValueProject(B, loc, aggValue,
-                                                         child.getIndex(),
-                                                         childLowering);
-        if (!childLowering.isTrivial()) {
-          SILValue loweredChildValue = childLowering.emitLoweredCopyChildValue(
-              B, loc, childValue, style);
-          loweredChildValues.push_back(loweredChildValue);
-        } else {
-          loweredChildValues.push_back(childValue);
-        }
-      }
+      SmallVector<SILValue, 8> loweredChildValues;
+      asImpl().destructureAggregate(
+          B, loc, aggValue, false /*skipTrivial*/,
+          [&](unsigned childIndex, SILValue childValue,
+              const TypeLowering &childLowering) {
+            if (!childLowering.isTrivial())
+              childValue = childLowering.emitLoweredCopyChildValue(
+                  B, loc, childValue, style);
+            loweredChildValues.push_back(childValue);
+          });
 
+      // Without ownership, return our original value. This is a small
+      // non-ownership optimization to not destabilize the optimizer pipeline.
+      //
+      // TODO: Once the pass pipeline is fixed, we should evaluate if we can do
+      // this again.
+      if (!B.hasOwnership())
+        return aggValue;
       return rebuildAggregate(B, loc, loweredChildValues);
     }
 
@@ -910,6 +1003,8 @@ namespace {
   /// A lowering for loadable but non-trivial tuple types.
   class LoadableTupleTypeLowering final
       : public LoadableAggTypeLowering<LoadableTupleTypeLowering, unsigned> {
+    using Super = LoadableAggTypeLowering<LoadableTupleTypeLowering, unsigned>;
+
   public:
     LoadableTupleTypeLowering(CanType type, RecursiveProperties properties,
                               TypeExpansionContext forExpansion)
@@ -918,8 +1013,33 @@ namespace {
     SILValue emitRValueProject(SILBuilder &B, SILLocation loc,
                                SILValue tupleValue, unsigned index,
                                const TypeLowering &eltLowering) const {
+      assert(!B.hasOwnership() &&
+             "Shouldn't call this when ownership is enabled?! Destructure "
+             "non-trivial tuples instead");
       return B.createTupleExtract(loc, tupleValue, index,
                                   eltLowering.getLoweredType());
+    }
+
+    void destructureAggregate(
+        SILBuilder &B, SILLocation loc, SILValue aggValue, bool skipTrivial,
+        function_ref<void(unsigned childIndex, SILValue childValue,
+                          const TypeLowering &childLowering)>
+            visitor) const {
+      // Without ownership, use our parent.
+      if (!B.hasOwnership())
+        return Super::destructureAggregate(B, loc, aggValue, skipTrivial,
+                                           visitor);
+
+      // Otherwise, emit a destructure tuple and do the loop.
+      auto *dti = B.createDestructureTuple(loc, aggValue);
+      for (auto pair : llvm::enumerate(dti->getResults())) {
+        SILValue childValue = pair.value();
+        auto &childLowering =
+            B.getFunction().getTypeLowering(childValue->getType());
+        if (skipTrivial && childLowering.isTrivial())
+          continue;
+        visitor(pair.index(), childValue, childLowering);
+      }
     }
 
     SILValue rebuildAggregate(SILBuilder &B, SILLocation loc,
@@ -946,7 +1066,10 @@ namespace {
 
   /// A lowering for loadable but non-trivial struct types.
   class LoadableStructTypeLowering final
-      : public LoadableAggTypeLowering<LoadableStructTypeLowering, VarDecl*> {
+      : public LoadableAggTypeLowering<LoadableStructTypeLowering, VarDecl *> {
+    using Super =
+        LoadableAggTypeLowering<LoadableStructTypeLowering, VarDecl *>;
+
   public:
     LoadableStructTypeLowering(CanType type, RecursiveProperties properties,
                                TypeExpansionContext forExpansion)
@@ -957,6 +1080,26 @@ namespace {
                                const TypeLowering &fieldLowering) const {
       return B.createStructExtract(loc, structValue, field,
                                    fieldLowering.getLoweredType());
+    }
+
+    void destructureAggregate(
+        SILBuilder &B, SILLocation loc, SILValue aggValue, bool skipTrivial,
+        function_ref<void(unsigned childIndex, SILValue childValue,
+                          const TypeLowering &childLowering)>
+            visitor) const {
+      if (!B.hasOwnership())
+        return Super::destructureAggregate(B, loc, aggValue, skipTrivial,
+                                           visitor);
+
+      auto *dsi = B.createDestructureStruct(loc, aggValue);
+      for (auto pair : llvm::enumerate(dsi->getResults())) {
+        SILValue childValue = pair.value();
+        auto &childLowering =
+            B.getFunction().getTypeLowering(childValue->getType());
+        if (skipTrivial && childLowering.isTrivial())
+          continue;
+        visitor(pair.index(), childValue, childLowering);
+      }
     }
 
     SILValue rebuildAggregate(SILBuilder &B, SILLocation loc,
@@ -978,7 +1121,7 @@ namespace {
       }
     }
   };
-  
+
   /// A lowering for loadable but non-trivial enum types.
   class LoadableEnumTypeLowering final : public NonTrivialLoadableTypeLowering {
   public:
@@ -1240,6 +1383,20 @@ namespace {
       llvm_unreachable("calling emitLoad on non-loadable type");
     }
 
+    SILValue emitLoweredLoad(SILBuilder &B, SILLocation loc, SILValue addr,
+                             LoadOwnershipQualifier qual,
+                             Lowering::TypeLowering::TypeExpansionKind
+                                 expansionKind) const override {
+      llvm_unreachable("calling emitLoweredLoad on non-loadable type?!");
+    }
+
+    void emitLoweredStore(SILBuilder &B, SILLocation loc, SILValue value,
+                          SILValue addr, StoreOwnershipQualifier qual,
+                          Lowering::TypeLowering::TypeExpansionKind
+                              expansionKind) const override {
+      llvm_unreachable("calling emitLoweredStore on non-loadable type?!");
+    }
+
     void emitDestroyAddress(SILBuilder &B, SILLocation loc,
                             SILValue addr) const override {
       if (!isTrivial())
@@ -1451,7 +1608,7 @@ namespace {
       if (handleResilience(structType, D, properties))
         return handleAddressOnly(structType, properties);
 
-      if (D->isCxxNotTriviallyCopyable()) {
+      if (D->isCxxNonTrivial()) {
         properties.setAddressOnly();
         properties.setNonTrivial();
       }
@@ -1462,7 +1619,7 @@ namespace {
       for (auto field : D->getStoredProperties()) {
         auto substFieldType =
           field->getInterfaceType().subst(subMap)
-               ->getCanonicalType(D->getGenericSignature());
+               ->getCanonicalType();
         
         // We are determining the recursive properties of the struct here,
         // not the lowered types of the fields, so instead of lowering the
@@ -1515,7 +1672,7 @@ namespace {
         
         auto substEltType =
           elt->getArgumentInterfaceType().subst(subMap)
-             ->getCanonicalType(D->getGenericSignature());
+             ->getCanonicalType();
         
         auto origEltType = origType.unsafeGetSubstFieldType(elt,
                               elt->getArgumentInterfaceType()
@@ -1796,18 +1953,18 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
       // If the formal type uses a C convention, it is not formally
       // abstractable, and it may be subject to implicit bridging.
       auto extInfo = substFnType->getExtInfo();
-      if (getSILFunctionLanguage(extInfo.getSILRepresentation()) ==
-          SILFunctionLanguage::C) {
+      auto rep = extInfo.getRepresentation();
+      SILFunctionTypeRepresentation silRep = convertRepresentation(rep);
+      if (getSILFunctionLanguage(silRep) == SILFunctionLanguage::C) {
         // The importer only applies fully-reversible bridging to the
         // component types of C function pointers.
         auto bridging = Bridgeability::Full;
-        if (extInfo.getSILRepresentation() ==
-            SILFunctionTypeRepresentation::CFunctionPointer)
+        if (silRep == SILFunctionTypeRepresentation::CFunctionPointer)
           bridging = Bridgeability::None;
 
         // Bridge the parameters and result of the function type.
         auto bridgedFnType =
-            TC.getBridgedFunctionType(origType, substFnType, extInfo, bridging);
+            TC.getBridgedFunctionType(origType, substFnType, bridging, silRep);
         substFnType = bridgedFnType;
 
         // Also rewrite the type of the abstraction pattern.
@@ -1819,8 +1976,24 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
         }
       }
 
-      return ::getNativeSILFunctionType(TC, forExpansion, origType,
-                                        substFnType);
+      AnyFunctionType::ExtInfo baseExtInfo;
+      if (auto origFnType = origType.getAs<AnyFunctionType>()) {
+        baseExtInfo = origFnType->getExtInfo();
+      } else {
+        baseExtInfo = substFnType->getExtInfo();
+      }
+      const clang::Type *clangType = baseExtInfo.getClangTypeInfo().getType();
+      if (shouldStoreClangType(rep) && !clangType) {
+        clangType = TC.Context.getClangFunctionType(
+            substFnType->getParams(), substFnType->getResult(), rep);
+      }
+      auto silExtInfo =
+          SILExtInfoBuilder(
+              baseExtInfo.intoBuilder().withClangFunctionType(clangType), false)
+              .build();
+
+      return ::getNativeSILFunctionType(TC, forExpansion, origType, substFnType,
+                                        silExtInfo);
     }
 
     // Ignore dynamic self types.
@@ -2051,6 +2224,17 @@ static CanAnyFunctionType getGlobalAccessorType(CanType varType) {
   return CanFunctionType::get({}, C.TheRawPointerType);
 }
 
+/// Removes @noescape from the given type if it's a function type. Otherwise,
+/// returns the original type.
+static CanType removeNoEscape(CanType resultType) {
+  if (auto funTy = resultType->getAs<AnyFunctionType>()) {
+    auto newExtInfo = funTy->getExtInfo().withNoEscape(false);
+    return adjustFunctionType(cast<AnyFunctionType>(resultType), newExtInfo);
+  }
+
+  return resultType;
+}
+
 /// Get the type of a default argument generator, () -> T.
 static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
                                                      SILDeclRef c) {
@@ -2067,11 +2251,7 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
 
   // Remove @noescape from function return types. A @noescape
   // function return type is a contradiction.
-  if (auto funTy = canResultTy->getAs<AnyFunctionType>()) {
-    auto newExtInfo = funTy->getExtInfo().withNoEscape(false);
-    canResultTy =
-        adjustFunctionType(cast<AnyFunctionType>(canResultTy), newExtInfo);
-  }
+  canResultTy = removeNoEscape(canResultTy);
 
   // Get the generic signature from the surrounding context.
   auto sig = vd->getInnermostDeclContext()->getGenericSignatureOfContext();
@@ -2102,6 +2282,8 @@ static CanAnyFunctionType getStoredPropertyInitializerInterfaceType(
     if (originalProperty->isPropertyMemberwiseInitializedWithWrappedType()) {
       resultTy = originalProperty->getPropertyWrapperInitValueInterfaceType()
                                      ->getCanonicalType();
+      // Stored property initializers can't return @noescape functions
+      resultTy = removeNoEscape(resultTy);
     }
   }
 
@@ -2140,15 +2322,16 @@ static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
 
   assert((!isForeign || isDeallocating)
          && "There are no foreign destroying destructors");
-  auto extInfo =
-            AnyFunctionType::ExtInfo(FunctionType::Representation::Thin,
-                                     /*throws*/ false);
+  auto extInfoBuilder =
+      AnyFunctionType::ExtInfoBuilder(FunctionType::Representation::Thin,
+                                      /*throws*/ false);
   if (isForeign)
-    extInfo = extInfo
-      .withSILRepresentation(SILFunctionTypeRepresentation::ObjCMethod);
+    extInfoBuilder = extInfoBuilder.withSILRepresentation(
+        SILFunctionTypeRepresentation::ObjCMethod);
   else
-    extInfo = extInfo
-      .withSILRepresentation(SILFunctionTypeRepresentation::Method);
+    extInfoBuilder = extInfoBuilder.withSILRepresentation(
+        SILFunctionTypeRepresentation::Method);
+  auto extInfo = extInfoBuilder.build();
 
   auto &C = dd->getASTContext();
   CanType resultTy = (isDeallocating
@@ -2174,11 +2357,14 @@ static CanAnyFunctionType getIVarInitDestroyerInterfaceType(ClassDecl *cd,
   auto resultType = (isDestroyer
                      ? TupleType::getEmpty(cd->getASTContext())
                      : classType);
-  auto extInfo = AnyFunctionType::ExtInfo(FunctionType::Representation::Thin,
-                                          /*throws*/ false);
-  extInfo = extInfo
-    .withSILRepresentation(isObjC? SILFunctionTypeRepresentation::ObjCMethod
-                           : SILFunctionTypeRepresentation::Method);
+  auto extInfoBuilder =
+      AnyFunctionType::ExtInfoBuilder(FunctionType::Representation::Thin,
+                                      /*throws*/ false);
+  auto extInfo = extInfoBuilder
+                     .withSILRepresentation(
+                         isObjC ? SILFunctionTypeRepresentation::ObjCMethod
+                                : SILFunctionTypeRepresentation::Method)
+                     .build();
 
   resultType = CanFunctionType::get({}, resultType, extInfo);
   auto sig = cd->getGenericSignature();
@@ -2200,8 +2386,10 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
   auto closure = *constant.getAnyFunctionRef();
   auto genericSig = getEffectiveGenericSignature(closure, captureInfo);
 
-  auto innerExtInfo = AnyFunctionType::ExtInfo(FunctionType::Representation::Thin,
-                                               funcType->throws());
+  auto innerExtInfo =
+      AnyFunctionType::ExtInfoBuilder(FunctionType::Representation::Thin,
+                                      funcType->isThrowing())
+          .build();
 
   return CanAnyFunctionType::get(
       getCanonicalSignatureOrNull(genericSig),
@@ -2512,10 +2700,13 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
             collectAccessorCaptures(AccessorKind::MutableAddress);
             break;
           case ReadWriteImplKind::Modify:
-          case ReadWriteImplKind::StoredWithSimpleDidSet:
-          case ReadWriteImplKind::InheritedWithSimpleDidSet:
             collectAccessorCaptures(AccessorKind::Modify);
             break;
+          case ReadWriteImplKind::StoredWithDidSet:
+            // We've already processed the didSet operation.
+            break;
+          case ReadWriteImplKind::InheritedWithDidSet:
+            llvm_unreachable("inherited local variable");
           }
         }
 

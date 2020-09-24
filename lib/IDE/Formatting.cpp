@@ -61,6 +61,13 @@ getLocForContentStartOnSameLine(SourceManager &SM, SourceLoc Loc) {
   return LineStart.getAdvancedLoc(Indentation.size());
 }
 
+/// \returns true if the line at \c Loc is either empty or only contains whitespace
+static bool isLineAtLocEmpty(SourceManager &SM, SourceLoc Loc) {
+  SourceLoc LineStart = Lexer::getLocForStartOfLine(SM, Loc);
+  SourceLoc Next = Lexer::getTokenAtLocation(SM, LineStart, CommentRetentionMode::ReturnAsTokens).getLoc();
+  return Next.isInvalid() || !isOnSameLine(SM, Loc, Next);
+}
+
 /// \returns the first token after the token at \c Loc.
 static Optional<Token>
 getTokenAfter(SourceManager &SM, SourceLoc Loc, bool SkipComments = true) {
@@ -134,6 +141,21 @@ static ClosureExpr *findTrailingClosureFromArgument(Expr *arg) {
   if (auto TCL = dyn_cast_or_null<CaptureListExpr>(arg))
     return TCL->getClosureBody();
   return nullptr;
+}
+
+static size_t calcVisibleWhitespacePrefix(StringRef Line,
+                                          CodeFormatOptions Options) {
+  size_t Indent = 0;
+  for (auto Char : Line) {
+    if (Char == '\t') {
+      Indent += Options.TabWidth;
+    } else if (Char == ' ' || Char == '\v' || Char == '\f') {
+      Indent++;
+    } else {
+      break;
+    }
+  }
+  return Indent;
 }
 
 /// An indentation context of the target location
@@ -258,16 +280,14 @@ class FormatContext {
   Optional<IndentContext> InnermostCtx;
   bool InDocCommentBlock;
   bool InCommentLine;
-  bool InStringLiteral;
 
 public:
   FormatContext(SourceManager &SM,
                 Optional<IndentContext> IndentCtx,
                 bool InDocCommentBlock = false,
-                bool InCommentLine = false,
-                bool InStringLiteral = false)
+                bool InCommentLine = false)
     :SM(SM), InnermostCtx(IndentCtx), InDocCommentBlock(InDocCommentBlock),
-     InCommentLine(InCommentLine), InStringLiteral(InStringLiteral) { }
+     InCommentLine(InCommentLine) { }
 
   bool IsInDocCommentBlock() {
     return InDocCommentBlock;
@@ -275,10 +295,6 @@ public:
 
   bool IsInCommentLine() {
     return InCommentLine;
-  }
-
-  bool IsInStringLiteral() const {
-    return InStringLiteral;
   }
 
   void padToExactColumn(StringBuilder &Builder,
@@ -485,7 +501,7 @@ private:
       bool SafeToAskForGenerics = !isa<ExtensionDecl>(D) &&
         !isa<ProtocolDecl>(D);
       if (SafeToAskForGenerics) {
-        if (auto *GP = GC->getGenericParams()) {
+        if (auto *GP = GC->getParsedGenericParams()) {
           if (!handleAngles(GP->getLAngleLoc(), GP->getRAngleLoc(), ContextLoc))
             return Stop;
         }
@@ -501,18 +517,14 @@ private:
     } else if (auto *VD = dyn_cast<VarDecl>(D)) {
       if (!handleBraces(VD->getBracesRange(), VD->getNameLoc()))
         return Stop;
-    } else if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-      if (auto *PL = AFD->getParameters()) {
-        if (!handleParens(PL->getLParenLoc(), PL->getRParenLoc(), ContextLoc))
+    } else if (isa<AbstractFunctionDecl>(D) || isa<SubscriptDecl>(D)) {
+      if (isa<SubscriptDecl>(D)) {
+        if (!handleBraces(cast<SubscriptDecl>(D)->getBracesRange(), ContextLoc))
           return Stop;
       }
-    } else if (auto *SD = dyn_cast<SubscriptDecl>(D)) {
-      if (!handleBraces(SD->getBracesRange(), ContextLoc))
+      auto *PL = getParameterList(cast<ValueDecl>(D));
+      if (!handleParens(PL->getLParenLoc(), PL->getRParenLoc(), ContextLoc))
         return Stop;
-      if (auto *PL = SD->getIndices()) {
-        if (!handleParens(PL->getLParenLoc(), PL->getRParenLoc(), ContextLoc))
-          return Stop;
-      }
     } else if (auto *PGD = dyn_cast<PrecedenceGroupDecl>(D)) {
       SourceRange Braces(PGD->getLBraceLoc(), PGD->getRBraceLoc());
       if (!handleBraces(Braces, ContextLoc))
@@ -1212,8 +1224,9 @@ class FormatWalker : public ASTWalker {
   bool InDocCommentBlock = false;
   /// Whether the target location appears within a line comment.
   bool InCommentLine = false;
-  /// Whether the target location appears within a string literal.
-  bool InStringLiteral = false;
+
+  /// The range of the string literal the target is inside of (if any, invalid otherwise).
+  CharSourceRange StringLiteralRange;
 
 public:
   explicit FormatWalker(SourceFile &SF, SourceManager &SM, CodeFormatOptions &Options)
@@ -1228,7 +1241,8 @@ public:
     CtxOverride.clear();
     TargetLocation = Loc;
     TargetLineLoc = Lexer::getLocForStartOfLine(SM, TargetLocation);
-    InDocCommentBlock = InCommentLine = InStringLiteral = false;
+    InDocCommentBlock = InCommentLine = false;
+    StringLiteralRange = CharSourceRange();
     NodesToSkip.clear();
     CurrentTokIt = TokenList.begin();
 
@@ -1238,14 +1252,99 @@ public:
     if (InnermostCtx)
       CtxOverride.applyIfNeeded(SM, *InnermostCtx);
 
+    if (StringLiteralRange.isValid()) {
+      assert(!InDocCommentBlock && !InCommentLine &&
+             "Target is in both a string and comment");
+      InnermostCtx = indentWithinStringLiteral();
+    } else {
+      assert(!InDocCommentBlock || !InCommentLine &&
+             "Target is in both a doc comment block and comment line");
+    }
+
     return FormatContext(SM, InnermostCtx, InDocCommentBlock,
-                         InCommentLine, InStringLiteral);
+                         InCommentLine);
   }
 
+private:
+
+  Optional<IndentContext> indentWithinStringLiteral() {
+    assert(StringLiteralRange.isValid() && "Target is not within a string literal");
+
+    // This isn't ideal since if the user types """""" and then an enter
+    // inside after, we won't indent the end quotes. But indenting the end
+    // quotes could lead to an error in the rest of the string, so best to
+    // avoid it entirely for now.
+    if (isOnSameLine(SM, TargetLineLoc, StringLiteralRange.getEnd()))
+      return IndentContext {TargetLocation, false, IndentContext::Exact};
+
+    // If there's contents before the end quotes then it's likely the quotes
+    // are actually the start quotes of the next string in the file. Pretend
+    // they don't exist so their indent doesn't affect the indenting.
+    SourceLoc EndLineContentLoc =
+        getLocForContentStartOnSameLine(SM, StringLiteralRange.getEnd());
+    bool HaveEndQuotes = CharSourceRange(SM, EndLineContentLoc,
+                                         StringLiteralRange.getEnd())
+        .str().equals(StringRef("\"\"\""));
+
+    if (!HaveEndQuotes) {
+      // Indent to the same indentation level as the first non-empty line
+      // before the target. If that line is the start line then either use
+      // the same indentation of the start quotes if they are on their own
+      // line, or an extra indentation otherwise.
+      //
+      // This will indent lines with content on it as well, which should be
+      // fine since it is quite unlikely anyone would format a range that
+      // includes an unterminated string.
+
+      SourceLoc AlignLoc = TargetLineLoc;
+      while (SM.isBeforeInBuffer(StringLiteralRange.getStart(), AlignLoc)) {
+        AlignLoc = Lexer::getLocForStartOfLine(SM, AlignLoc.getAdvancedLoc(-1));
+        if (!isLineAtLocEmpty(SM, AlignLoc)) {
+          AlignLoc = getLocForContentStartOnSameLine(SM, AlignLoc);
+          break;
+        }
+      }
+
+      if (isOnSameLine(SM, AlignLoc, StringLiteralRange.getStart())) {
+        SourceLoc StartLineContentLoc =
+            getLocForContentStartOnSameLine(SM, StringLiteralRange.getStart());
+        bool StartLineOnlyQuotes = CharSourceRange(SM, StartLineContentLoc,
+                                                   StringLiteralRange.getEnd())
+            .str().startswith(StringRef("\"\"\""));
+        if (!StartLineOnlyQuotes)
+          return IndentContext {StringLiteralRange.getStart(), true};
+
+        AlignLoc = StringLiteralRange.getStart();
+      }
+
+      return IndentContext {AlignLoc, false, IndentContext::Exact};
+    }
+
+    // If there are end quotes, only enforce a minimum indentation. We don't
+    // want to add any other indentation since that could add unintended
+    // whitespace to existing strings. Could change this if the full range
+    // was passed rather than a single line - in that case we *would* indent
+    // if the range was a single empty line.
+
+    CharSourceRange TargetIndentRange =
+        CharSourceRange(SM, Lexer::getLocForStartOfLine(SM, TargetLocation),
+                        TargetLocation);
+    CharSourceRange EndIndentRange =
+        CharSourceRange(SM, Lexer::getLocForStartOfLine(SM, EndLineContentLoc),
+                        EndLineContentLoc);
+
+    size_t TargetIndent =
+        calcVisibleWhitespacePrefix(TargetIndentRange.str(), FmtOptions);
+    size_t EndIndent =
+        calcVisibleWhitespacePrefix(EndIndentRange.str(), FmtOptions);
+    if (TargetIndent >= EndIndent)
+      return IndentContext {TargetLocation, false, IndentContext::Exact};
+
+    return IndentContext {EndLineContentLoc, false, IndentContext::Exact};
+  }
 
 #pragma mark ASTWalker overrides and helpers
 
-private:
   bool walkCustomAttributes(Decl *D) {
     // CustomAttrs of non-param VarDecls are handled when this method is called
     // on their containing PatternBindingDecls (below).
@@ -1334,7 +1433,7 @@ private:
         SM.isBeforeInBuffer(E->getStartLoc(), TargetLocation) &&
         SM.isBeforeInBuffer(TargetLocation,
                             Lexer::getLocForEndOfToken(SM, E->getEndLoc()))) {
-      InStringLiteral = true;
+      StringLiteralRange = Lexer::getCharSourceRangeFromSourceRange(SM, E->getSourceRange());
     }
 
     // Create a default indent context for all top-level expressions
@@ -1356,7 +1455,7 @@ private:
 
     // Don't visit the child expressions of interpolated strings directly -
     // visit only the argument of each appendInterpolation call instead, and
-    // update InStringLiteral for each segment.
+    // set StringLiteralRange if needed for each segment.
     if (auto *ISL = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
       if (Action.shouldVisitChildren()) {
         llvm::SaveAndRestore<ASTWalker::ParentTy>(Parent, ISL);
@@ -1368,7 +1467,8 @@ private:
               // Handle the preceeding string segment.
               CharSourceRange StringRange(SM, PrevStringStart, CE->getStartLoc());
               if (StringRange.contains(TargetLocation)) {
-                InStringLiteral = true;
+                StringLiteralRange =
+                    Lexer::getCharSourceRangeFromSourceRange(SM, E->getSourceRange());
                 return;
               }
               // Walk into the interpolation segment.
@@ -1382,7 +1482,8 @@ private:
         SourceLoc End = Lexer::getLocForEndOfToken(SM, ISL->getStartLoc());
         CharSourceRange StringRange(SM, PrevStringStart, End);
         if (StringRange.contains(TargetLocation))
-          InStringLiteral = true;
+          StringLiteralRange =
+              Lexer::getCharSourceRangeFromSourceRange(SM, E->getSourceRange());
 
         return {false, E};
       }
@@ -1471,7 +1572,7 @@ private:
   }
 
   void scanTokensUntil(SourceLoc Loc) {
-    if (InDocCommentBlock || InCommentLine)
+    if (InDocCommentBlock || InCommentLine || StringLiteralRange.isValid())
       return;
     for (auto Invalid = Loc.isInvalid(); CurrentTokIt != TokenList.end() &&
          (Invalid || SM.isBeforeInBuffer(CurrentTokIt->getLoc(), Loc));
@@ -1481,16 +1582,16 @@ private:
         SourceLoc StartLineLoc = Lexer::getLocForStartOfLine(
             SM, CommentRange.getStart());
 
-        // The -1 is needed in case the past-the-end position is a newline
-        // character. In that case getLocForStartOfLine returns the start of
-        // the next line.
         SourceLoc EndLineLoc = Lexer::getLocForStartOfLine(
-            SM, CommentRange.getEnd().getAdvancedLoc(-1));
+            SM, CommentRange.getEnd());
         auto TokenStr = CurrentTokIt->getRange().str();
         InDocCommentBlock |= SM.isBeforeInBuffer(StartLineLoc, TargetLineLoc) && !SM.isBeforeInBuffer(EndLineLoc, TargetLineLoc) &&
             TokenStr.startswith("/*");
         InCommentLine |= StartLineLoc == TargetLineLoc &&
             TokenStr.startswith("//");
+      } else if (CurrentTokIt->getKind() == tok::unknown &&
+                 CurrentTokIt->getRange().str().startswith("\"\"\"")) {
+        StringLiteralRange = CurrentTokIt->getRange();
       }
     }
   }
@@ -1587,7 +1688,9 @@ private:
         return Ctx;
       if (auto Ctx = getIndentContextFrom(AFD->getParameters(), ContextLoc))
         return Ctx;
-      if (auto Ctx = getIndentContextFrom(AFD->getGenericParams(), ContextLoc, D))
+      if (auto Ctx = getIndentContextFrom(AFD->getParsedGenericParams(), ContextLoc, D))
+        return Ctx;
+      if (auto Ctx = getIndentContextFrom(AFD->getTrailingWhereClause(), ContextLoc, D))
         return Ctx;
 
       if (TrailingTarget)
@@ -1602,7 +1705,7 @@ private:
         return Ctx;
       if (auto Ctx = getIndentContextFromBraces(NTD->getBraces(), ContextLoc, NTD))
         return Ctx;
-      if (auto Ctx = getIndentContextFrom(NTD->getGenericParams(), ContextLoc, D))
+      if (auto Ctx = getIndentContextFrom(NTD->getParsedGenericParams(), ContextLoc, D))
         return Ctx;
       if (auto Ctx = getIndentContextFrom(NTD->getTrailingWhereClause(), ContextLoc, D))
         return Ctx;
@@ -1660,7 +1763,9 @@ private:
         return Ctx;
       if (auto Ctx = getIndentContextFrom(SD->getIndices(), ContextLoc))
         return Ctx;
-      if (auto Ctx = getIndentContextFrom(SD->getGenericParams(), ContextLoc, D))
+      if (auto Ctx = getIndentContextFrom(SD->getParsedGenericParams(), ContextLoc, D))
+        return Ctx;
+      if (auto Ctx = getIndentContextFrom(SD->getTrailingWhereClause(), ContextLoc, D))
         return Ctx;
 
       if (TrailingTarget)
@@ -1756,7 +1861,11 @@ private:
     if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
       SourceLoc ContextLoc = TAD->getStartLoc();
 
-      if (auto Ctx = getIndentContextFrom(TAD->getGenericParams(), ContextLoc,
+      if (auto Ctx = getIndentContextFrom(TAD->getParsedGenericParams(), ContextLoc,
+                                          D)) {
+        return Ctx;
+      }
+      if (auto Ctx = getIndentContextFrom(TAD->getTrailingWhereClause(), ContextLoc,
                                           D)) {
         return Ctx;
       }
@@ -1878,11 +1987,6 @@ private:
         return Ctx;
     }
 
-    SourceRange TrailingRange = GP->getTrailingWhereClauseSourceRange();
-    if (auto Ctx = getIndentContextFromWhereClause(GP->getRequirements(),
-                                                   TrailingRange, ContextLoc,
-                                                   WalkableParent))
-      return Ctx;
     return None;
   }
 
@@ -2798,12 +2902,6 @@ public:
   std::pair<LineRange, std::string> indent(unsigned LineIndex,
                                            FormatContext &FC,
                                            StringRef Text) {
-    if (FC.IsInStringLiteral()) {
-      return std::make_pair(
-          LineRange(LineIndex, 1),
-          swift::ide::getTextForLine(LineIndex, Text, /*Trim*/ false).str());
-    }
-
     if (FC.isExact()) {
       StringRef Line = swift::ide::getTextForLine(LineIndex, Text, /*Trim*/true);
       StringBuilder Builder;

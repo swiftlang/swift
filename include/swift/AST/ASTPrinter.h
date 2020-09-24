@@ -325,7 +325,7 @@ public:
   ExtraIndentStreamPrinter(raw_ostream &out, StringRef extraIndent)
   : StreamPrinter(out), ExtraIndent(extraIndent) { }
 
-  virtual void printIndent() {
+  virtual void printIndent() override {
     printText(ExtraIndent);
     StreamPrinter::printIndent();
   }

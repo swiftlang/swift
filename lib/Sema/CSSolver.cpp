@@ -135,6 +135,15 @@ Solution ConstraintSystem::finalize() {
     solution.DisjunctionChoices.insert(choice);
   }
 
+  // Remember all of the trailing closure matching choices we made.
+  for (auto &trailingClosureMatch : trailingClosureMatchingChoices) {
+    auto inserted = solution.trailingClosureMatchingChoices.insert(
+        trailingClosureMatch);
+    assert((inserted.second ||
+            inserted.first->second == trailingClosureMatch.second));
+    (void)inserted;
+  }
+
   // Remember the opened types.
   for (const auto &opened : OpenedTypes) {
     // We shouldn't ever register opened types multiple times,
@@ -215,6 +224,11 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   // Register the solution's disjunction choices.
   for (auto &choice : solution.DisjunctionChoices) {
     DisjunctionChoices.push_back(choice);
+  }
+
+  // Remember all of the trailing closure matching choices we made.
+  for (auto &trailingClosureMatch : solution.trailingClosureMatchingChoices) {
+    trailingClosureMatchingChoices.push_back(trailingClosureMatch);
   }
 
   // Register the solution's opened types.
@@ -436,11 +450,11 @@ ConstraintSystem::SolverState::~SolverState() {
   // Update the "largest" statistics if this system is larger than the
   // previous one.  
   // FIXME: This is not at all thread-safe.
-  if (NumStatesExplored > LargestNumStatesExplored.Value) {
-    LargestSolutionAttemptNumber.Value = SolutionAttempt-1;
+  if (NumStatesExplored > LargestNumStatesExplored.getValue()) {
+    LargestSolutionAttemptNumber = SolutionAttempt-1;
     ++LargestSolutionAttemptNumber;
     #define CS_STATISTIC(Name, Description) \
-      JOIN2(Largest,Name).Value = Name-1; \
+      JOIN2(Largest,Name) = Name-1; \
       ++JOIN2(Largest,Name);
     #include "ConstraintSolverStats.def"
   }
@@ -456,6 +470,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numFixes = cs.Fixes.size();
   numFixedRequirements = cs.FixedRequirements.size();
   numDisjunctionChoices = cs.DisjunctionChoices.size();
+  numTrailingClosureMatchingChoices = cs.trailingClosureMatchingChoices.size();
   numOpenedTypes = cs.OpenedTypes.size();
   numOpenedExistentialTypes = cs.OpenedExistentialTypes.size();
   numDefaultedConstraints = cs.DefaultedConstraints.size();
@@ -509,6 +524,10 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any disjunction choices.
   truncate(cs.DisjunctionChoices, numDisjunctionChoices);
+
+  // Remove any trailing closure matching choices;
+  truncate(
+      cs.trailingClosureMatchingChoices, numTrailingClosureMatchingChoices);
 
   // Remove any opened types.
   truncate(cs.OpenedTypes, numOpenedTypes);
@@ -1387,47 +1406,47 @@ void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {
   }
 }
 
-void ConstraintSystem::solveForCodeCompletion(
-    Expr *expr, DeclContext *DC, Type contextualType, ContextualTypePurpose CTP,
-    llvm::function_ref<void(const Solution &)> callback) {
-  // First, pre-check the expression, validating any types that occur in the
-  // expression and folding sequence expressions.
-  if (ConstraintSystem::preCheckExpression(expr, DC))
-    return;
-
-  ConstraintSystemOptions options;
-  options |= ConstraintSystemFlags::AllowFixes;
-  options |= ConstraintSystemFlags::SuppressDiagnostics;
-
-  ConstraintSystem cs(DC, options);
-
-  if (CTP != ContextualTypePurpose::CTP_Unused)
-    cs.setContextualType(expr, TypeLoc::withoutLoc(contextualType), CTP);
+bool ConstraintSystem::solveForCodeCompletion(
+    SolutionApplicationTarget &target, SmallVectorImpl<Solution> &solutions) {
+  auto *expr = target.getAsExpr();
+  // Tell the constraint system what the contextual type is.
+  setContextualType(expr, target.getExprContextualTypeLoc(),
+                    target.getExprContextualTypePurpose());
 
   // Set up the expression type checker timer.
-  cs.Timer.emplace(expr, cs);
+  Timer.emplace(expr, *this);
 
-  cs.shrink(expr);
+  shrink(expr);
 
-  if (cs.generateConstraints(expr, DC))
-    return;
+  if (isDebugMode()) {
+    auto &log = llvm::errs();
+    log << "--- Code Completion ---\n";
+  }
 
-  llvm::SmallVector<Solution, 4> solutions;
+  if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
+    return false;
 
   {
-    SolverState state(cs, FreeTypeVariableBinding::Disallow);
+    SolverState state(*this, FreeTypeVariableBinding::Disallow);
 
     // Enable "diagnostic mode" by default, this means that
     // solver would produce "fixed" solutions alongside valid
     // ones, which helps code completion to rank choices.
     state.recordFixes = true;
 
-    cs.solveImpl(solutions);
+    solveImpl(solutions);
   }
 
-  for (const auto &solution : solutions) {
-    callback(solution);
+  if (isDebugMode()) {
+    auto &log = llvm::errs();
+    log << "--- Discovered " << solutions.size() << " solutions ---\n";
+    for (const auto &solution : solutions) {
+      log << "--- Solution ---\n";
+      solution.dump(log);
+    }
   }
+
+  return true;
 }
 
 void ConstraintSystem::collectDisjunctions(
@@ -2380,7 +2399,7 @@ void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
   if (typeVar->getImpl().getFixedType(nullptr))
     return;
 
-  auto bindings = cs.getPotentialBindings(typeVar);
+  auto bindings = cs.inferBindingsFor(typeVar);
   if (bindings.InvolvesTypeVariables || bindings.Bindings.size() != 1)
     return;
 

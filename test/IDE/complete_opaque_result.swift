@@ -143,7 +143,7 @@ class TestClass :
 // OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithConstraintAndDefault() -> ConcreteMyProtocol {|};
 // OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithAnyObjectConstraint() -> some MyProtocol & AnyObject {|}
 // OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithConstraintOnProto() -> some MyProtocol {|}
-// OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithSameTypeConstraint() -> AssocWithSameTypeConstraint {|}
+// OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithSameTypeConstraint() -> ConcreteMyProtocol {|}
 // OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithConformanceConstraintGeneric<T>(arg: T) -> AssocWithConformanceConstraintGeneric {|}
 // OVERRIDE: End completions
 }

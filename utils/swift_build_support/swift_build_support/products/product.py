@@ -11,6 +11,7 @@
 # ----------------------------------------------------------------------------
 
 import abc
+import os
 
 from .. import cmake
 from .. import targets
@@ -76,6 +77,20 @@ class Product(object):
     @classmethod
     def get_dependencies(cls):
         """Return a list of products that this product depends upon"""
+        raise NotImplementedError
+
+    def should_clean(self, host_target):
+        """should_clean() -> Bool
+
+        Whether or not this product should be cleaned before being built
+        """
+        return False
+
+    def clean(self, host_target):
+        """clean() -> void
+
+        Perform the clean, for a non-build-script-impl product.
+        """
         raise NotImplementedError
 
     def should_build(self, host_target):
@@ -148,13 +163,17 @@ class Product(object):
         """
         return is_release_variant(self.args.build_variant)
 
-    def install_toolchain_path(self):
+    def install_toolchain_path(self, host_target):
         """toolchain_path() -> string
 
         Returns the path to the toolchain that is being created as part of this
         build.
         """
-        return targets.toolchain_path(self.args.install_destdir,
+        install_destdir = self.args.install_destdir
+        if self.args.cross_compile_hosts:
+            build_root = os.path.dirname(self.build_dir)
+            install_destdir = '%s/intermediate-install/%s' % (build_root, host_target)
+        return targets.toolchain_path(install_destdir,
                                       self.args.install_prefix)
 
 

@@ -1,6 +1,14 @@
 // RUN: %target-build-swift -O %s -module-name=test -Xfrontend -sil-verify-all -emit-sil | %FileCheck %s
 // RUN: %target-build-swift -Onone %s -module-name=test -Xfrontend -sil-verify-all -emit-sil | %FileCheck %s
-// RUN: %target-run-simple-swift
+
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift -O -module-name=test %s -o %t/O.out
+// RUN: %target-codesign %t/O.out
+// RUN: %target-run %t/O.out
+// RUN: %target-build-swift -Onone -module-name=test %s -o %t/Onone.out
+// RUN: %target-codesign %t/Onone.out
+// RUN: %target-run %t/Onone.out
+
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -10,6 +18,10 @@ let TypeNameTests = TestSuite("TypeName")
 class C {}
 struct S {}
 enum E {}
+
+// Test unicode type names.
+struct 🙂 { }
+struct 🙃 { }
 
 protocol P {}
 protocol P2 {}
@@ -60,6 +72,7 @@ func printTypename(_ s: String) {
 // CHECK-LABEL: sil {{.*}} @$s4test0A21TypenameInterpolationyyF :
 // CHECK-NOT:     $ss26DefaultStringInterpolationV06appendC0yyxlF
 // CHECK-NOT:     _print_unlocked
+// CHECK-NOT:     _typeName
 // CHECK:       } // end sil function '$s4test0A21TypenameInterpolationyyF'
 @inline(never)
 func testTypenameInterpolation() {
@@ -82,6 +95,8 @@ func testTypenameInterpolation() {
     "\(PP2.self)")
   expectEqual("Any", "\(Any.self)")
   expectEqual("P & P2", "\((P & P2).self)")
+
+  expectEqual("🙂+🙃", "\(🙂.self)+\(🙃.self)")
 
 
   expectEqual("SomeInnerStruct",

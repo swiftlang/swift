@@ -814,13 +814,13 @@ class CaseLabelItem {
     Default,
   };
 
-  Pattern *CasePattern;
+  llvm::PointerIntPair<Pattern *, 1, bool> CasePatternAndResolved;
   SourceLoc WhereLoc;
   llvm::PointerIntPair<Expr *, 1, Kind> GuardExprAndKind;
 
   CaseLabelItem(Kind kind, Pattern *casePattern, SourceLoc whereLoc,
                 Expr *guardExpr)
-    : CasePattern(casePattern), WhereLoc(whereLoc),
+    : CasePatternAndResolved(casePattern, false), WhereLoc(whereLoc),
       GuardExprAndKind(guardExpr, kind) {}
 
 public:
@@ -848,9 +848,19 @@ public:
   SourceLoc getEndLoc() const;
   SourceRange getSourceRange() const;
 
-  Pattern *getPattern() { return CasePattern; }
-  const Pattern *getPattern() const { return CasePattern; }
-  void setPattern(Pattern *CasePattern) { this->CasePattern = CasePattern; }
+  Pattern *getPattern() {
+    return CasePatternAndResolved.getPointer();
+  }
+  const Pattern *getPattern() const {
+    return CasePatternAndResolved.getPointer();
+  }
+  bool isPatternResolved() const {
+    return CasePatternAndResolved.getInt();
+  }
+  void setPattern(Pattern *CasePattern, bool resolved) {
+    this->CasePatternAndResolved.setPointer(CasePattern);
+    this->CasePatternAndResolved.setInt(resolved);
+  }
 
   /// Return the guard expression if present, or null if the case label has
   /// no guard.
@@ -1072,6 +1082,10 @@ public:
       return MutableArrayRef<VarDecl *>();
     return *CaseBodyVariables;
   }
+
+  /// Find the next case statement within the same 'switch' or 'do-catch',
+  /// if there is one.
+  CaseStmt *findNextCaseStmt() const;
 
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Case; }
 
@@ -1351,6 +1365,13 @@ class PoundAssertStmt : public Stmt {
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::PoundAssert;
   }
+};
+
+inline void simple_display(llvm::raw_ostream &out, Stmt *S) {
+  if (S)
+    out << Stmt::getKindName(S->getKind());
+  else
+    out << "(null)";
 };
 
 } // end namespace swift

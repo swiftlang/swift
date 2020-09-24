@@ -1773,14 +1773,14 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
   case AnyFunctionType::Representation::Swift:
   case AnyFunctionType::Representation::Thin:
     // Source is native, so we can convert signature first.
-    destTy = adjustFunctionType(destRepTy,
-                                srcTy->getRepresentation());
+    destTy = adjustFunctionType(destRepTy, srcTy->getRepresentation(),
+                                srcTy->getClangTypeInfo());
     break;
   case AnyFunctionType::Representation::Block:
   case AnyFunctionType::Representation::CFunctionPointer:
     // Source is foreign, so do the representation change first.
-    srcTy = adjustFunctionType(srcRepTy,
-                               destRepTy->getRepresentation());
+    srcTy = adjustFunctionType(srcRepTy, destRepTy->getRepresentation(),
+                               destRepTy->getClangTypeInfo());
   }
 
   auto result = SGF.emitRValueAsSingleValue(e->getSubExpr());
@@ -1868,7 +1868,7 @@ RValue SILGenFunction::emitAnyHashableErasure(SILLocation loc,
   auto convertFn = SGM.getConvertToAnyHashable(loc);
   if (!convertFn)
     return emitUndefRValue(
-        loc, getASTContext().getAnyHashableDecl()->getDeclaredType());
+        loc, getASTContext().getAnyHashableDecl()->getDeclaredInterfaceType());
 
   // Construct the substitution for T: Hashable.
   auto subMap = SubstitutionMap::getProtocolSubstitutions(
@@ -2742,7 +2742,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
     params.push_back({loweredBaseTy, paramConvention});
     auto &C = SGM.getASTContext();
     if (!indexes.empty())
-      params.push_back({C.getUnsafeRawPointerDecl()->getDeclaredType()
+      params.push_back({C.getUnsafeRawPointerDecl()->getDeclaredInterfaceType()
                                                    ->getCanonicalType(),
                         ParameterConvention::Direct_Unowned});
     
@@ -2893,7 +2893,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
                         : paramConvention});
     // indexes
     if (!indexes.empty())
-      params.push_back({C.getUnsafeRawPointerDecl()->getDeclaredType()
+      params.push_back({C.getUnsafeRawPointerDecl()->getDeclaredInterfaceType()
                                                    ->getCanonicalType(),
                         ParameterConvention::Direct_Unowned});
     
@@ -3040,10 +3040,10 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
   }
 
   auto &C = SGM.getASTContext();
-  auto unsafeRawPointerTy = C.getUnsafeRawPointerDecl()->getDeclaredType()
+  auto unsafeRawPointerTy = C.getUnsafeRawPointerDecl()->getDeclaredInterfaceType()
                                                        ->getCanonicalType();
-  auto boolTy = C.getBoolDecl()->getDeclaredType()->getCanonicalType();
-  auto intTy = C.getIntDecl()->getDeclaredType()->getCanonicalType();
+  auto boolTy = C.getBoolDecl()->getDeclaredInterfaceType()->getCanonicalType();
+  auto intTy = C.getIntDecl()->getDeclaredInterfaceType()->getCanonicalType();
 
   auto hashableProto = C.getProtocol(KnownProtocolKind::Hashable);
 
@@ -3734,6 +3734,11 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
     case KeyPathExpr::Component::Kind::UnresolvedProperty:
     case KeyPathExpr::Component::Kind::UnresolvedSubscript:
       llvm_unreachable("not resolved");
+      break;
+
+    case KeyPathExpr::Component::Kind::DictionaryKey:
+      llvm_unreachable("DictionaryKey only valid in #keyPath");
+      break;
     }
   }
   
@@ -3771,12 +3776,12 @@ visitKeyPathApplicationExpr(KeyPathApplicationExpr *E, SGFContext C) {
 RValue RValueEmitter::
 visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
   switch (E->getKind()) {
-  case MagicIdentifierLiteralExpr::File:
-  case MagicIdentifierLiteralExpr::FilePath:
-  case MagicIdentifierLiteralExpr::Function:
-  case MagicIdentifierLiteralExpr::Line:
-  case MagicIdentifierLiteralExpr::Column:
+#define MAGIC_POINTER_IDENTIFIER(NAME, STRING, SYNTAX_KIND)
+#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+  case MagicIdentifierLiteralExpr::NAME:
+#include "swift/AST/MagicIdentifierKinds.def"
     return SGF.emitLiteral(E, C);
+    
   case MagicIdentifierLiteralExpr::DSOHandle: {
     auto SILLoc = SILLocation(E);
     auto UnsafeRawPointer = SGF.getASTContext().getUnsafeRawPointerDecl();

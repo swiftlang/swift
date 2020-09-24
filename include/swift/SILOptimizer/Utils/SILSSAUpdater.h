@@ -18,9 +18,14 @@
 #include "swift/SIL/SILValue.h"
 
 namespace llvm {
-  template<typename T> class SSAUpdaterTraits;
-  template<typename T> class SmallVectorImpl;
-}
+
+template <typename T>
+class SSAUpdaterTraits;
+
+template <typename T>
+class SmallVectorImpl;
+
+} // namespace llvm
 
 namespace swift {
 
@@ -31,7 +36,7 @@ class SILUndef;
 
 /// Independent utility that canonicalizes BB arguments by reusing structurally
 /// equivalent arguments and replacing the original arguments with casts.
-SILValue replaceBBArgWithCast(SILPhiArgument *Arg);
+SILValue replaceBBArgWithCast(SILPhiArgument *arg);
 
 /// This class updates SSA for a set of SIL instructions defined in multiple
 /// blocks.
@@ -40,16 +45,16 @@ class SILSSAUpdater {
 
   // A map of basic block to available phi value.
   using AvailableValsTy = llvm::DenseMap<SILBasicBlock *, SILValue>;
-  std::unique_ptr<AvailableValsTy> AV;
+  std::unique_ptr<AvailableValsTy> blockToAvailableValueMap;
 
-  SILType ValType;
+  SILType type;
 
   // The SSAUpdaterTraits specialization uses this sentinel to mark 'new' phi
   // nodes (all the incoming edge arguments have this sentinel set).
-  std::unique_ptr<SILUndef, void(*)(SILUndef *)> PHISentinel;
+  std::unique_ptr<SILUndef, void (*)(SILUndef *)> phiSentinel;
 
   // If not null updated with inserted 'phi' nodes (SILArgument).
-  SmallVectorImpl<SILPhiArgument *> *InsertedPHIs;
+  SmallVectorImpl<SILPhiArgument *> *insertedPhis;
 
   // Not copyable.
   void operator=(const SILSSAUpdater &) = delete;
@@ -57,21 +62,21 @@ class SILSSAUpdater {
 
 public:
   explicit SILSSAUpdater(
-      SmallVectorImpl<SILPhiArgument *> *InsertedPHIs = nullptr);
+      SmallVectorImpl<SILPhiArgument *> *insertedPhis = nullptr);
   ~SILSSAUpdater();
 
-  void setInsertedPhis(SmallVectorImpl<SILPhiArgument *> *insertedPhis) {
-    InsertedPHIs = insertedPhis;
+  void setInsertedPhis(SmallVectorImpl<SILPhiArgument *> *inputInsertedPhis) {
+    insertedPhis = inputInsertedPhis;
   }
 
   /// Initialize for a use of a value of type.
-  void Initialize(SILType T);
+  void initialize(SILType type);
 
-  bool HasValueForBlock(SILBasicBlock *BB) const;
-  void AddAvailableValue(SILBasicBlock *BB, SILValue V);
+  bool hasValueForBlock(SILBasicBlock *block) const;
+  void addAvailableValue(SILBasicBlock *block, SILValue value);
 
   /// Construct SSA for a value that is live at the *end* of a basic block.
-  SILValue GetValueAtEndOfBlock(SILBasicBlock *BB);
+  SILValue getValueAtEndOfBlock(SILBasicBlock *block);
 
   /// Construct SSA for a value that is live in the middle of a block.
   /// This handles the case where the use is before a definition of the value.
@@ -85,15 +90,15 @@ public:
   ///
   /// In this case we need to insert a 'PHI' node at the beginning of BB2
   /// merging val_1 and val_2.
-  SILValue GetValueInMiddleOfBlock(SILBasicBlock *BB);
+  SILValue getValueInMiddleOfBlock(SILBasicBlock *block);
 
-  void RewriteUse(Operand &Op);
+  void rewriteUse(Operand &operand);
 
-  void *allocate(unsigned Size, unsigned Align) const;
-  static void deallocateSentinel(SILUndef *U);
+  void *allocate(unsigned size, unsigned align) const;
+  static void deallocateSentinel(SILUndef *undef);
+
 private:
-
-  SILValue GetValueAtEndOfBlockInternal(SILBasicBlock *BB);
+  SILValue getValueAtEndOfBlockInternal(SILBasicBlock *block);
 };
 
 /// Utility to wrap 'Operand's to deal with invalidation of
@@ -112,15 +117,15 @@ private:
 /// identify the use allowing us to reconstruct the use after the branch has
 /// been changed.
 class UseWrapper {
-  Operand *U;
-  SILBasicBlock *Parent;
+  Operand *wrappedUse;
+  SILBasicBlock *parent;
   enum {
     kRegularUse,
     kBranchUse,
     kCondBranchUseTrue,
     kCondBranchUseFalse
-  } Type;
-  unsigned Idx;
+  } type;
+  unsigned index;
 
 public:
 
@@ -131,7 +136,7 @@ public:
   /// (ValueUseIterator) become invalid as they point to freed operands.
   /// Instead we store the branch's parent and the idx so that we can
   /// reconstruct the use.
-  UseWrapper(Operand *Use);
+  UseWrapper(Operand *use);
 
   Operand *getOperand();
 

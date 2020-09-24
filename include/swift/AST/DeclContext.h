@@ -508,14 +508,6 @@ public:
   /// FIXME: do this for Protocols, too someday
   bool canBeParentOfExtension() const;
 
-  /// Returns true if lookups within this context could affect downstream files.
-  ///
-  /// \param functionsAreNonCascading If true, functions are considered non-
-  /// cascading contexts. If false, functions are considered non-cascading only
-  /// if implicitly or explicitly marked private. When concerned only with a
-  /// function's body, pass true.
-  bool isCascadingContextForLookup(bool functionsAreNonCascading) const;
-
   /// Look for the set of declarations with the given name within a type,
   /// its extensions and, optionally, its supertypes.
   ///
@@ -720,13 +712,6 @@ class IterableDeclContext {
   /// member loading, as a key when doing lookup in this IDC.
   serialization::DeclID SerialID;
 
-  /// Because \c parseDelayedDecl and lazy member adding can add members *after*
-  /// an \c ASTScope tree is created, there must be some way for the tree to
-  /// detect when a member has been added. A bit would suffice,
-  /// but would be more fragile, The scope code could count the members each
-  /// time, but I think it's a better trade to just keep a count here.
-  unsigned MemberCount : 29;
-
   /// Whether we have already added the parsed members into the context.
   unsigned AddedParsedMembers : 1;
 
@@ -749,7 +734,6 @@ class IterableDeclContext {
 public:
   IterableDeclContext(IterableDeclContextKind kind)
     : LastDeclAndKind(nullptr, kind) {
-    MemberCount = 0;
     AddedParsedMembers = 0;
     HasOperatorDeclarations = 0;
     HasNestedClassDeclarations = 0;
@@ -783,6 +767,16 @@ public:
   /// Retrieve the set of members in this context.
   DeclRange getMembers() const;
 
+  /// Get the members that were syntactically present in the source code,
+  /// and will not contain any members that are implicitly synthesized by
+  /// the implementation.
+  ArrayRef<Decl *> getParsedMembers() const;
+
+  /// Get all the members that are semantically within this context,
+  /// including any implicitly-synthesized members.
+  /// The resulting list of members will be stable across translation units.
+  ArrayRef<Decl *> getSemanticMembers() const;
+
   /// Retrieve the set of members in this context without loading any from the
   /// associated lazy loader; this should only be used as part of implementing
   /// abstractions on top of member loading, such as a name lookup table.
@@ -791,9 +785,6 @@ public:
   /// Add a member to this context. If the hint decl is specified, the new decl
   /// is inserted immediately after the hint.
   void addMember(Decl *member, Decl *hint = nullptr);
-
-  /// See \c MemberCount
-  unsigned getMemberCount() const;
 
   /// Check whether there are lazily-loaded members.
   bool hasLazyMembers() const {

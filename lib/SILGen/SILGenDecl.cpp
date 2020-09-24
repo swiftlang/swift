@@ -470,10 +470,6 @@ public:
     assert(!isa<ParamDecl>(vd)
            && "should not bind function params on this path");
     if (vd->getParentPatternBinding() && !vd->getParentInitializer()) {
-      // This value is uninitialized (and unbound) if it has a pattern binding
-      // decl, with no initializer value.
-      assert(!vd->hasNonPatternBindingInit() && "Bound values aren't uninit!");
-      
       // If this is a let-value without an initializer, then we need a temporary
       // buffer.  DI will make sure it is only assigned to once.
       needsTemporaryBuffer = true;
@@ -1041,7 +1037,7 @@ struct InitializationForPattern
   InitializationPtr visitTypedPattern(TypedPattern *P) {
     return visit(P->getSubPattern());
   }
-  InitializationPtr visitVarPattern(VarPattern *P) {
+  InitializationPtr visitBindingPattern(BindingPattern *P) {
     return visit(P->getSubPattern());
   }
 

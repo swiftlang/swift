@@ -13,6 +13,8 @@
 // would be excluded in the coarse-grained graph. But since these will be jobs
 // that have already been scheduled, downstream mechanisms will filter them out.
 
+// \c \c findExternallyDependentUntracedJobs may also return duplicates
+
 // To debug a test, create the \c ModuleDepGraph and pass true as the second
 // argument to the constructor, then find the dot files in the directory
 // where the tests run,

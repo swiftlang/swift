@@ -1,9 +1,12 @@
 // RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/clang-module-cache
-// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -emit-dependencies -emit-dependencies-path %t/deps.d -import-objc-header %S/Inputs/CHeaders/Bridging.h -swift-version 4 -disable-implicit-swift-modules -Xcc -Xclang -Xcc -fno-implicit-modules
+// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -emit-dependencies -emit-dependencies-path %t/deps.d -import-objc-header %S/Inputs/CHeaders/Bridging.h -swift-version 4
 
 // Check the contents of the JSON output
 // RUN: %FileCheck %s < %t/deps.json
+
+// Check the contents of the JSON output
+// RUN: %FileCheck %s -check-prefix CHECK-NO-SEARCH-PATHS < %t/deps.json
 
 // Check the make-style dependencies file
 // RUN: %FileCheck %s -check-prefix CHECK-MAKE-DEPS < %t/deps.d
@@ -52,13 +55,13 @@ import SubE
 // CHECK-NEXT: "swift": "SwiftOnoneSupport"
 // CHECK-NEXT: }
 // CHECK-NEXT: {
+// CHECK-NEXT:   "swift": "_cross_import_E"
+// CHECK-NEXT: }
+// CHECK-NEXT: {
 // CHECK-NEXT: "swift": "F"
 // CHECK-NEXT: }
 // CHECK-NEXT: {
 // CHECK-NEXT: "swift": "A"
-// CHECK-NEXT: }
-// CHECK-NEXT: {
-// CHECK-NEXT:   "swift": "_cross_import_E"
 // CHECK-NEXT: }
 // CHECK-NEXT: ],
 
@@ -67,7 +70,7 @@ import SubE
 // CHECK-NEXT:    "-target",
 // CHECK-NEXT:    "-Xcc",
 // CHECK:         "-fapinotes-swift-version=4"
-
+// CHECK-NOT: "error: cannot open Swift placeholder dependency module map from"
 // CHECK: "bridgingHeader":
 // CHECK-NEXT: "path":
 // CHECK-SAME: Bridging.h
@@ -102,7 +105,6 @@ import SubE
 // CHECK-NEXT: "-only-use-extra-clang-opts"
 // CHECK-NEXT: "-Xcc"
 // CHECK-NEXT: "clang"
-// CHECK: "-fno-implicit-modules"
 
 /// --------Swift module E
 // CHECK: "swift": "E"
@@ -122,6 +124,9 @@ import SubE
 // CHECK-NEXT: },
 // CHECK-NEXT: {
 // CHECK-NEXT:   "clang": "G"
+// CHECK-NEXT: },
+// CHECK-NEXT: {
+// CHECK-NEXT:   "swift": "SwiftOnoneSupport"
 // CHECK-NEXT: }
 // CHECK-NEXT: ],
 // CHECK-NEXT: "details": {
@@ -130,7 +135,6 @@ import SubE
 // CHECK: "commandLine": [
 // CHECK: "-compile-module-from-interface"
 // CHECK: "-target"
-// CHECK: "-sdk"
 // CHECK: "-module-name"
 // CHECK: "G"
 // CHECK: "-swift-version"
@@ -147,6 +151,22 @@ import SubE
 // CHECK: directDependencies
 // CHECK-NEXT: {
 // CHECK-NEXT: "clang": "SwiftShims"
+
+/// --------Swift module F
+// CHECK:      "modulePath": "F.swiftmodule",
+// CHECK-NEXT: "sourceFiles": [
+// CHECK-NEXT: ],
+// CHECK-NEXT: "directDependencies": [
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "swift": "Swift"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "clang": "F"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "swift": "SwiftOnoneSupport"
+// CHECK-NEXT:   }
+// CHECK-NEXT: ],
 
 /// --------Swift module A
 // CHECK-LABEL: "modulePath": "A.swiftmodule",
@@ -174,6 +194,8 @@ import SubE
 /// --------Clang module SwiftShims
 // CHECK-LABEL: "modulePath": "SwiftShims.pcm",
 
+// CHECK-NO-SEARCH-PATHS-NOT: "-sdk"
+// CHECK-NO-SEARCH-PATHS-NOT: "-prebuilt-module-cache-path"
 
 // Check make-style dependencies
 // CHECK-MAKE-DEPS: module_deps.swift

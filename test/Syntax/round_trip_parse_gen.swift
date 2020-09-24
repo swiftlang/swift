@@ -103,12 +103,14 @@ class C {
   init!(a: Int) {}
   init?(a: Int) {}
   public init(a: Int) throws {}
+  init(a: Int..., b: Double...) {}
 
   @objc deinit {}
   private deinit {}
 
   internal subscript(x: Int) -> Int { get {} set {} }
   subscript() -> Int { return 1 }
+  subscript(x: Int..., y y: String...) -> Int { return 1 }
 
   var x: Int {
     address { fatalError() }
@@ -197,7 +199,8 @@ func foo(_ _: Int,
          d _: Int = true ? 2: 3,
          @objc e: X = true,
          f: inout Int,
-         g: Int...) throws -> [Int: String] {}
+         g: Int...,
+         h: Bool...) throws -> [Int: String] {}
 
 func foo(_ a: Int) throws -> Int {}
 func foo( a: Int) rethrows -> Int {}

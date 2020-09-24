@@ -171,9 +171,6 @@ private:
   /// but kept alive for debug info generation.
   FunctionListType zombieFunctions;
 
-  /// Stores the names of zombie functions.
-  llvm::BumpPtrAllocator zombieFunctionNames;
-
   /// Lookup table for SIL vtables from class decls.
   llvm::DenseMap<const ClassDecl *, SILVTable *> VTableMap;
 
@@ -340,7 +337,7 @@ public:
   /// Specialization can cause a function that was erased before by dead function
   /// elimination to become alive again. If this happens we need to remove it
   /// from the list of zombies.
-  void removeFromZombieList(StringRef Name);
+  SILFunction *removeFromZombieList(StringRef Name);
 
   /// Erase a global SIL variable from the module.
   void eraseGlobalVariable(SILGlobalVariable *G);
@@ -653,6 +650,19 @@ public:
   /// invariants.
   void verify() const;
 
+  /// Check if there are any leaking instructions.
+  ///
+  /// Aborts with an error if more instructions are allocated than contained in
+  /// the module.
+  void checkForLeaks() const;
+
+  /// Check if there are any leaking instructions after the SILModule is
+  /// destructed.
+  ///
+  /// The SILModule destructor already calls checkForLeaks(). This function is
+  /// useful to check if the destructor itself destroys all data structures.
+  static void checkForLeaksAfterDestruction();
+
   /// Pretty-print the module.
   void dump(bool Verbose = false) const;
 
@@ -671,8 +681,7 @@ public:
   /// \param Opts The SIL options, used to determine printing verbosity and
   ///        and sorting.
   /// \param PrintASTDecls If set to true print AST decls.
-  void print(raw_ostream& OS,
-             ModuleDecl *M = nullptr,
+  void print(raw_ostream &OS, ModuleDecl *M = nullptr,
              const SILOptions &Opts = SILOptions(),
              bool PrintASTDecls = true) const {
     SILPrintContext PrintCtx(OS, Opts);

@@ -49,6 +49,8 @@
 #endif
 #if SWIFT_PTRAUTH
 #include <ptrauth.h>
+#endif
+#if SWIFT_OBJC_INTEROP
 extern "C" void _objc_setClassCopyFixupHandler(void (* _Nonnull newFixupHandler)
     (Class _Nonnull oldClass, Class _Nonnull newClass));
 #endif
@@ -268,6 +270,11 @@ namespace {
     GenericCacheEntry(MetadataCacheKey key, Args &&...args)
       : VariadicMetadataCacheEntryBase(key) {}
 
+    AllocationResult allocate(const Metadata *candidate) {
+      return {const_cast<Metadata *>(candidate),
+              PrivateMetadataState::Complete};
+    }
+
     AllocationResult allocate(const TypeContextDescriptor *description,
                               const void * const *arguments) {
       // Find a pattern.  Currently we always use the default pattern.
@@ -390,7 +397,7 @@ static GenericMetadataCache &unsafeGetInitializedCache(
   return lazyCache->unsafeGetAlreadyInitialized();
 }
 
-#if SWIFT_PTRAUTH
+#if SWIFT_PTRAUTH && SWIFT_OBJC_INTEROP
 static void swift_objc_classCopyFixupHandler(Class oldClass, Class newClass) {
   auto oldClassMetadata = reinterpret_cast<const ClassMetadata *>(oldClass);
 
@@ -435,6 +442,28 @@ SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
 #if SWIFT_OBJC_INTEROP
 extern "C" void *_objc_empty_cache;
 #endif
+
+template <> bool Metadata::isStaticallySpecializedGenericMetadata() const {
+  if (auto *metadata = dyn_cast<StructMetadata>(this))
+    return metadata->isStaticallySpecializedGenericMetadata();
+  if (auto *metadata = dyn_cast<EnumMetadata>(this))
+    return metadata->isStaticallySpecializedGenericMetadata();
+  if (auto *metadata = dyn_cast<ClassMetadata>(this))
+    return metadata->isStaticallySpecializedGenericMetadata();
+
+  return false;
+}
+
+template <> const TypeContextDescriptor *Metadata::getDescription() const {
+  if (auto *metadata = dyn_cast<StructMetadata>(this))
+    return metadata->getDescription();
+  if (auto *metadata = dyn_cast<EnumMetadata>(this))
+    return metadata->getDescription();
+  if (auto *metadata = dyn_cast<ClassMetadata>(this))
+    return metadata->getDescription();
+
+  return nullptr;
+}
 
 template <>
 bool Metadata::isCanonicalStaticallySpecializedGenericMetadata() const {
@@ -673,12 +702,111 @@ swift::swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description
   return metadata;
 }
 
+MetadataResponse swift::swift_getCanonicalSpecializedMetadata(
+    MetadataRequest request, const Metadata *candidate,
+    const Metadata **cacheMetadataPtr) {
+  assert(candidate->isStaticallySpecializedGenericMetadata() &&
+         !candidate->isCanonicalStaticallySpecializedGenericMetadata());
+  auto *description = candidate->getDescription();
+  assert(description);
+
+  using CachedMetadata = std::atomic<const Metadata *>;
+  auto cachedMetadataAddr = ((CachedMetadata *)cacheMetadataPtr);
+  auto *cachedMetadata = cachedMetadataAddr->load(SWIFT_MEMORY_ORDER_CONSUME);
+  if (SWIFT_LIKELY(cachedMetadata != nullptr)) {
+    // Cached metadata pointers are always complete.
+    return MetadataResponse{(const Metadata *)cachedMetadata,
+                            MetadataState::Complete};
+  }
+
+  auto &cache = getCache(*description);
+  assert(description->getFullGenericContextHeader().Base.NumKeyArguments ==
+         cache.NumKeyParameters + cache.NumWitnessTables);
+  if (auto *classDescription = dyn_cast<ClassDescriptor>(description)) {
+    auto canonicalMetadataAccessors = classDescription->getCanonicalMetadataPrespecializationAccessors();
+    for (auto &canonicalMetadataAccessorPtr : canonicalMetadataAccessors) {
+      auto *canonicalMetadataAccessor = canonicalMetadataAccessorPtr.get();
+      auto response = canonicalMetadataAccessor(request);
+      auto *canonicalMetadata = response.Value;
+      const void *const *arguments =
+          reinterpret_cast<const void *const *>(canonicalMetadata->getGenericArgs());
+      auto key = MetadataCacheKey(cache.NumKeyParameters, cache.NumWitnessTables,
+                                  arguments);
+      auto result = cache.getOrInsert(key, MetadataRequest(MetadataState::Complete, /*isNonBlocking*/true), canonicalMetadata);
+      (void)result;
+      assert(result.second.Value == canonicalMetadata);
+    }
+  } else {
+    auto canonicalMetadatas = description->getCanonicicalMetadataPrespecializations();
+    for (auto &canonicalMetadataPtr : canonicalMetadatas) {
+      Metadata *canonicalMetadata = canonicalMetadataPtr.get();
+      const void *const *arguments =
+          reinterpret_cast<const void *const *>(canonicalMetadata->getGenericArgs());
+      auto key = MetadataCacheKey(cache.NumKeyParameters, cache.NumWitnessTables,
+                                  arguments);
+      auto result = cache.getOrInsert(key, MetadataRequest(MetadataState::Complete, /*isNonBlocking*/true), canonicalMetadata);
+      (void)result;
+      assert(result.second.Value == canonicalMetadata);
+    }
+  }
+  const void *const *arguments =
+      reinterpret_cast<const void *const *>(candidate->getGenericArgs());
+  auto key = MetadataCacheKey(cache.NumKeyParameters, cache.NumWitnessTables,
+                              arguments);
+  auto result = cache.getOrInsert(key, request, candidate);
+
+  cachedMetadataAddr->store(result.second.Value, std::memory_order_release);
+
+  return result.second;
+}
+
+// Look into the canonical prespecialized metadata attached to the type
+// descriptor and return matching records, if any.
+static Metadata *
+findCanonicalSpecializedMetadata(MetadataRequest request,
+                                 const void *const *arguments,
+                                 const TypeContextDescriptor *description) {
+  auto &cache = getCache(*description);
+  auto key = MetadataCacheKey(cache.NumKeyParameters, cache.NumWitnessTables,
+                              arguments);
+  auto prespecializedMetadatas =
+      description->getCanonicicalMetadataPrespecializations();
+  int index = 0;
+  for (auto &prespecializedMetadataPtr : prespecializedMetadatas) {
+    Metadata *prespecializationMetadata = prespecializedMetadataPtr.get();
+    const void *const *prespecializationArguments =
+        reinterpret_cast<const void *const *>(
+            prespecializationMetadata->getGenericArgs());
+    auto prespecializationKey =
+        MetadataCacheKey(cache.NumKeyParameters, cache.NumWitnessTables,
+                         prespecializationArguments);
+    if (key == prespecializationKey) {
+      if (auto *classDescription = dyn_cast<ClassDescriptor>(description)) {
+        auto canonicalMetadataAccessors =
+            classDescription->getCanonicalMetadataPrespecializationAccessors();
+        auto &canonicalMetadataAccessorPtr = canonicalMetadataAccessors[index];
+        auto *canonicalMetadataAccessor = canonicalMetadataAccessorPtr.get();
+        auto response = canonicalMetadataAccessor(request);
+        return const_cast<Metadata *>(response.Value);
+      } else {
+        return prespecializationMetadata;
+      }
+    }
+    ++index;
+  }
+  return nullptr;
+}
+
 /// The primary entrypoint.
 MetadataResponse
 swift::swift_getGenericMetadata(MetadataRequest request,
                                 const void * const *arguments,
                                 const TypeContextDescriptor *description) {
   description = swift_auth_data_non_address(description, SpecialPointerAuthDiscriminators::TypeDescriptor);
+  if (auto *prespecialization =
+          findCanonicalSpecializedMetadata(request, arguments, description)) {
+    return {prespecialization, MetadataState::Complete};
+  }
   auto &cache = getCache(*description);
   assert(description->getFullGenericContextHeader().Base.NumKeyArguments ==
          cache.NumKeyParameters + cache.NumWitnessTables);
@@ -2790,24 +2918,22 @@ getSuperclassMetadata(MetadataRequest request, const ClassMetadata *self) {
     StringRef superclassName =
       Demangle::makeSymbolicMangledNameStringRef(superclassNameBase);
     SubstGenericParametersFromMetadata substitutions(self);
-    MetadataResponse response =
-      swift_getTypeByMangledName(request, superclassName,
-        substitutions.getGenericArgs(),
+    auto result = swift_getTypeByMangledName(
+        request, superclassName, substitutions.getGenericArgs(),
         [&substitutions](unsigned depth, unsigned index) {
           return substitutions.getMetadata(depth, index);
         },
         [&substitutions](const Metadata *type, unsigned index) {
           return substitutions.getWitnessTable(type, index);
-        }).getResponse();
-    auto superclass = response.Value;
-    if (!superclass) {
-      fatalError(0,
-                 "failed to demangle superclass of %s from mangled name '%s'\n",
-                 self->getDescription()->Name.get(),
-                 superclassName.str().c_str());
+        });
+    if (auto *error = result.getError()) {
+      fatalError(
+          0, "failed to demangle superclass of %s from mangled name '%s': %s\n",
+          self->getDescription()->Name.get(), superclassName.str().c_str(),
+          error->copyErrorString());
     }
 
-    return response;
+    return result.getType().getResponse();
   } else {
     return MetadataResponse();
   }
@@ -4535,12 +4661,13 @@ static void initializeResilientWitnessTable(
   }
 }
 
-/// Instantiate a brand new witness table for a resilient or generic
-/// protocol conformance.
-WitnessTable *
-WitnessTableCacheEntry::allocate(
-                               const ProtocolConformanceDescriptor *conformance,
-                               const void * const *instantiationArgs) {
+// Instantiate a generic or resilient witness table into a `buffer`
+// that has already been allocated of the appropriate size and zeroed out.
+static WitnessTable *
+instantiateWitnessTable(const Metadata *Type,
+                        const ProtocolConformanceDescriptor *conformance,
+                        const void * const *instantiationArgs,
+                        void **fullTable) {
   auto protocol = conformance->getProtocol();
   auto genericTable = conformance->getGenericWitnessTable();
 
@@ -4555,12 +4682,6 @@ WitnessTableCacheEntry::allocate(
 
   // Number of bytes for any private storage used by the conformance itself.
   size_t privateSizeInWords = genericTable->getWitnessTablePrivateSizeInWords();
-
-  // Find the allocation.
-  void **fullTable = reinterpret_cast<void**>(this + 1);
-
-  // Zero out the witness table.
-  memset(fullTable, 0, getWitnessTableSize(conformance));
 
   // Advance the address point; the private storage area is accessed via
   // negative offsets.
@@ -4617,6 +4738,57 @@ WitnessTableCacheEntry::allocate(
 
   return castTable;
 }
+/// Instantiate a brand new witness table for a resilient or generic
+/// protocol conformance.
+WitnessTable *
+WitnessTableCacheEntry::allocate(
+                               const ProtocolConformanceDescriptor *conformance,
+                               const void * const *instantiationArgs) {
+  // Find the allocation.
+  void **fullTable = reinterpret_cast<void**>(this + 1);
+
+  // Zero out the witness table.
+  memset(fullTable, 0, getWitnessTableSize(conformance));
+
+  // Instantiate the table.
+  return instantiateWitnessTable(Type, Conformance, instantiationArgs, fullTable);
+}
+
+/// Instantiate the witness table for a nondependent conformance that only has
+/// one possible instantiation.
+static WitnessTable *
+getNondependentWitnessTable(const ProtocolConformanceDescriptor *conformance,
+                            const Metadata *type) {
+  // Check whether the table has already been instantiated.
+  auto tablePtr = reinterpret_cast<std::atomic<WitnessTable*> *>(
+                     conformance->getGenericWitnessTable()->PrivateData.get());
+  
+  auto existingTable = tablePtr->load(SWIFT_MEMORY_ORDER_CONSUME);
+  if (existingTable) {
+    return existingTable;
+  }
+
+  // Allocate space for the table.
+  auto tableSize = WitnessTableCacheEntry::getWitnessTableSize(conformance);
+  TaggedMetadataAllocator<SingletonGenericWitnessTableCacheTag> allocator;
+  auto buffer = (void **)allocator.Allocate(tableSize, alignof(void*));
+  memset(buffer, 0, tableSize);
+  
+  // Instantiate the table.
+  auto table = instantiateWitnessTable(type, conformance, nullptr, buffer);
+  
+  // See whether we can claim to be the one true table.
+  WitnessTable *orig = nullptr;
+  if (!tablePtr->compare_exchange_strong(orig, table, std::memory_order_release,
+                                         SWIFT_MEMORY_ORDER_CONSUME)) {
+    // Someone beat us to the punch. Throw away our table and return the
+    // existing one.
+    allocator.Deallocate(buffer);
+    return orig;
+  }
+  
+  return table;
+}
 
 const WitnessTable *
 swift::swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
@@ -4638,10 +4810,23 @@ swift::swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
 
   // When there is no generic table, or it doesn't require instantiation,
   // use the pattern directly.
-  // accessor directly.
   auto genericTable = conformance->getGenericWitnessTable();
   if (!genericTable || doesNotRequireInstantiation(conformance, genericTable)) {
     return uniqueForeignWitnessTableRef(conformance->getWitnessTablePattern());
+  }
+  
+  // If the conformance is not dependent on generic arguments in the conforming
+  // type, then there is only one instantiation possible, so we can try to
+  // allocate only the table without the concurrent map structure.
+  //
+  // TODO: There is no metadata flag that directly encodes the "nondependent"
+  // as of the Swift 5.3 ABI. However, we can check whether the conforming
+  // type is generic; a nongeneric type's conformance can never be dependent (at
+  // least, not today). However, a generic type conformance may also be
+  // nondependent if it 
+  auto typeDescription = conformance->getTypeDescriptor();
+  if (typeDescription && !typeDescription->isGeneric()) {
+    return getNondependentWitnessTable(conformance, type);
   }
 
   auto &cache = getCache(genericTable);
@@ -4743,12 +4928,12 @@ swift_getAssociatedTypeWitnessSlowImpl(
     Demangle::makeSymbolicMangledNameStringRef(mangledNameBase);
 
   // Demangle the associated type.
-  MetadataResponse response;
+  TypeLookupErrorOr<TypeInfo> result = TypeInfo();
   if (inProtocolContext) {
     // The protocol's Self is the only generic parameter that can occur in the
     // type.
-    response =
-      swift_getTypeByMangledName(request, mangledName, nullptr,
+    result = swift_getTypeByMangledName(
+        request, mangledName, nullptr,
         [conformingType](unsigned depth, unsigned index) -> const Metadata * {
           if (depth == 0 && index == 0)
             return conformingType;
@@ -4765,7 +4950,7 @@ swift_getAssociatedTypeWitnessSlowImpl(
           return swift_getAssociatedConformanceWitness(wtable, conformingType,
                                                        type, reqBase,
                                                        dependentDescriptor);
-        }).getResponse();
+        });
   } else {
     // The generic parameters in the associated type name are those of the
     // conforming type.
@@ -4775,29 +4960,30 @@ swift_getAssociatedTypeWitnessSlowImpl(
     auto originalConformingType = findConformingSuperclass(conformingType,
                                                            conformance);
     SubstGenericParametersFromMetadata substitutions(originalConformingType);
-    response = swift_getTypeByMangledName(request, mangledName,
-      substitutions.getGenericArgs(),
-      [&substitutions](unsigned depth, unsigned index) {
-        return substitutions.getMetadata(depth, index);
-      },
-      [&substitutions](const Metadata *type, unsigned index) {
-        return substitutions.getWitnessTable(type, index);
-      }).getResponse();
+    result = swift_getTypeByMangledName(
+        request, mangledName, substitutions.getGenericArgs(),
+        [&substitutions](unsigned depth, unsigned index) {
+          return substitutions.getMetadata(depth, index);
+        },
+        [&substitutions](const Metadata *type, unsigned index) {
+          return substitutions.getWitnessTable(type, index);
+        });
   }
+  auto *error = result.getError();
+  MetadataResponse response = result.getType().getResponse();
   auto assocTypeMetadata = response.Value;
-
-  if (!assocTypeMetadata) {
+  if (error || !assocTypeMetadata) {
+    const char *errStr = error ? error->copyErrorString()
+                               : "NULL metadata but no error was provided";
     auto conformingTypeNameInfo = swift_getTypeName(conformingType, true);
     StringRef conformingTypeName(conformingTypeNameInfo.data,
                                  conformingTypeNameInfo.length);
     StringRef assocTypeName = findAssociatedTypeName(protocol, assocType);
     fatalError(0,
                "failed to demangle witness for associated type '%s' in "
-               "conformance '%s: %s' from mangled name '%s'\n",
-               assocTypeName.str().c_str(),
-               conformingTypeName.str().c_str(),
-               protocol->Name.get(),
-               mangledName.str().c_str());
+               "conformance '%s: %s' from mangled name '%s' - %s\n",
+               assocTypeName.str().c_str(), conformingTypeName.str().c_str(),
+               protocol->Name.get(), mangledName.str().c_str(), errStr);
   }
 
   assert((uintptr_t(assocTypeMetadata) &
@@ -5750,7 +5936,7 @@ void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
                           nullptr,
                           [](unsigned, unsigned){ return nullptr; },
                           [](const Metadata *, unsigned) { return nullptr; })
-      .getMetadata();
+      .getType().getMetadata();
   if (metadata != result)
     swift::warning(RuntimeErrorFlagNone,
                    "Metadata mangled name failed to roundtrip: %p -> %s -> %p\n",

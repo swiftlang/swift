@@ -234,7 +234,7 @@ static void collectVisibleMemberDecls(const DeclContext *CurrDC, LookupState LS,
 }
 
 static void
-synthesizePropertyWrapperStorageWrapperProperties(IterableDeclContext *IDC);
+synthesizePropertyWrapperVariables(IterableDeclContext *IDC);
 
 /// Lookup members in extensions of \p LookupType, using \p BaseType as the
 /// underlying type when checking any constraints on the extensions.
@@ -253,7 +253,7 @@ static void doGlobalExtensionLookup(Type BaseType,
                                                        extension)), false))
       continue;
 
-    synthesizePropertyWrapperStorageWrapperProperties(extension);
+    synthesizePropertyWrapperVariables(extension);
 
     collectVisibleMemberDecls(CurrDC, LS, BaseType, extension, FoundDecls);
   }
@@ -503,8 +503,9 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
     // Add members from any extensions.
     if (LS.isIncludingProtocolExtensionMembers()) {
       SmallVector<ValueDecl *, 2> FoundDecls;
-      doGlobalExtensionLookup(BaseTy, Proto->getDeclaredType(), FoundDecls,
-                              FromContext, LS, ReasonForThisProtocol);
+      doGlobalExtensionLookup(BaseTy, Proto->getDeclaredInterfaceType(),
+                              FoundDecls, FromContext, LS,
+                              ReasonForThisProtocol);
       for (auto *VD : FoundDecls)
         Consumer.foundDecl(VD, ReasonForThisProtocol);
     }
@@ -519,26 +520,28 @@ lookupVisibleMemberDeclsImpl(Type BaseTy, VisibleDeclConsumer &Consumer,
                              VisitedSet &Visited);
 
 static void
-  lookupVisibleProtocolMemberDecls(Type BaseTy, ProtocolType *PT,
+  lookupVisibleProtocolMemberDecls(Type BaseTy, ProtocolDecl *PD,
                                    VisibleDeclConsumer &Consumer,
                                    const DeclContext *CurrDC, LookupState LS,
                                    DeclVisibilityKind Reason,
                                    GenericSignatureBuilder *GSB,
                                    VisitedSet &Visited) {
-  if (!Visited.insert(PT->getDecl()).second)
+  if (!Visited.insert(PD).second)
     return;
 
-  for (auto Proto : PT->getDecl()->getInheritedProtocols())
-    lookupVisibleProtocolMemberDecls(BaseTy, Proto->getDeclaredType(), Consumer, CurrDC,
-                                     LS, getReasonForSuper(Reason),
+  for (auto Proto : PD->getInheritedProtocols())
+    lookupVisibleProtocolMemberDecls(BaseTy, Proto,
+                                     Consumer, CurrDC, LS,
+                                     getReasonForSuper(Reason),
                                      GSB, Visited);
-  lookupTypeMembers(BaseTy, PT, Consumer, CurrDC, LS, Reason);
+  lookupTypeMembers(BaseTy, PD->getDeclaredInterfaceType(),
+                    Consumer, CurrDC, LS, Reason);
 }
 
-// Generate '$' and '_' prefixed variables that have attached property
+// Generate '$' and '_' prefixed variables for members that have attached property
 // wrappers.
 static void
-synthesizePropertyWrapperStorageWrapperProperties(IterableDeclContext *IDC) {
+synthesizePropertyWrapperVariables(IterableDeclContext *IDC) {
   auto SF = IDC->getAsGenericContext()->getParentSourceFile();
   if (!SF || SF->Kind == SourceFileKind::Interface)
     return;
@@ -575,7 +578,7 @@ static void synthesizeMemberDeclsForLookup(NominalTypeDecl *NTD,
                                            /*useResolver=*/true);
   }
 
-  synthesizePropertyWrapperStorageWrapperProperties(NTD);
+  synthesizePropertyWrapperVariables(NTD);
 }
 
 static void lookupVisibleMemberDeclsImpl(
@@ -621,7 +624,7 @@ static void lookupVisibleMemberDeclsImpl(
   // special and can't have extensions.
   if (ModuleType *MT = BaseTy->getAs<ModuleType>()) {
     AccessFilteringDeclConsumer FilteringConsumer(CurrDC, Consumer);
-    MT->getModule()->lookupVisibleDecls(ModuleDecl::AccessPathTy(),
+    MT->getModule()->lookupVisibleDecls(ImportPath::Access(),
                                         FilteringConsumer,
                                         NLKind::QualifiedLookup);
     return;
@@ -635,7 +638,8 @@ static void lookupVisibleMemberDeclsImpl(
 
   // If the base is a protocol, enumerate its members.
   if (ProtocolType *PT = BaseTy->getAs<ProtocolType>()) {
-    lookupVisibleProtocolMemberDecls(BaseTy, PT, Consumer, CurrDC, LS, Reason,
+    lookupVisibleProtocolMemberDecls(BaseTy, PT->getDecl(),
+                                     Consumer, CurrDC, LS, Reason,
                                      GSB, Visited);
     return;
   }
@@ -652,7 +656,7 @@ static void lookupVisibleMemberDeclsImpl(
   if (ArchetypeType *Archetype = BaseTy->getAs<ArchetypeType>()) {
     for (auto Proto : Archetype->getConformsTo())
       lookupVisibleProtocolMemberDecls(
-          BaseTy, Proto->getDeclaredType(), Consumer, CurrDC, LS,
+          BaseTy, Proto, Consumer, CurrDC, LS,
           Reason, GSB, Visited);
 
     if (auto superclass = Archetype->getSuperclass())
@@ -675,7 +679,7 @@ static void lookupVisibleMemberDeclsImpl(
       // Conformances
       for (const auto &Conforms : EquivClass->conformsTo) {
         lookupVisibleProtocolMemberDecls(
-            BaseTy, Conforms.first->getDeclaredType(), Consumer, CurrDC,
+            BaseTy, Conforms.first, Consumer, CurrDC,
             LS, getReasonForSuper(Reason), GSB, Visited);
       }
 
@@ -942,17 +946,22 @@ public:
                         /*wouldConflictInSwift5*/nullptr,
                         /*skipProtocolExtensionCheck*/true)) {
           FoundConflicting = true;
-          // Prefer derived requirements over their witnesses.
-          if (Reason ==
-                DeclVisibilityKind::MemberOfProtocolDerivedByCurrentNominal ||
-              VD->getFormalAccess() > OtherVD->getFormalAccess() ||
-              //Prefer available one.
-              (!AvailableAttr::isUnavailable(VD) &&
-               AvailableAttr::isUnavailable(OtherVD))) {
-            FilteredResults.remove(
-                FoundDeclTy(OtherVD, DeclVisibilityKind::LocalVariable, {}));
-            FilteredResults.insert(DeclAndReason);
-            *I = VD;
+
+          if (!AvailableAttr::isUnavailable(VD)) {
+            bool preferVD = (
+                // Prefer derived requirements over their witnesses.
+                Reason == DeclVisibilityKind::
+                              MemberOfProtocolDerivedByCurrentNominal ||
+                // Prefer available one.
+                AvailableAttr::isUnavailable(OtherVD) ||
+                // Prefer more accessible one.
+                VD->getFormalAccess() > OtherVD->getFormalAccess());
+            if (preferVD) {
+              FilteredResults.remove(
+                  FoundDeclTy(OtherVD, DeclVisibilityKind::LocalVariable, {}));
+              FilteredResults.insert(DeclAndReason);
+              *I = VD;
+            }
           }
         }
       }

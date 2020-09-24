@@ -131,7 +131,7 @@ default:
 
 // <rdar://problem/19382878> Introduce new x? pattern
 switch Optional(42) {
-case let x?: break // expected-warning{{immutable value 'x' was never used; consider replacing with '_' or removing it}}
+case let x?: break // expected-warning{{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{10-11=_}}
 case nil: break
 }
 
@@ -296,8 +296,7 @@ switch staticMembers {
   // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
 
   case .prop: break
-  // TODO: repeated error message
-  case .optProp: break // expected-error* {{not unwrapped}}
+  case .optProp: break
 
   case .method: break // expected-error{{member 'method' expects argument of type 'Int'}}
   case .method(0): break
@@ -311,9 +310,6 @@ switch staticMembers {
 
   case .optMethod: break // expected-error{{member 'optMethod' expects argument of type 'Int'}}
   case .optMethod(0): break
-  // expected-error@-1 {{value of optional type 'StaticMembers?' must be unwrapped to a value of type 'StaticMembers'}}
-  // expected-note@-2 {{coalesce}}
-  // expected-note@-3 {{force-unwrap}}
 }
 
 _ = 0

@@ -776,6 +776,7 @@ recur:
     case 'V': return demangleAnyGenericType(Node::Kind::Structure);
     case 'W': return demangleWitness();
     case 'X': return demangleSpecialType();
+    case 'Y': return createNode(Node::Kind::AsyncAnnotation);
     case 'Z': return createWithChild(Node::Kind::Static, popNode(isEntity));
     case 'a': return demangleAnyGenericType(Node::Kind::TypeAlias);
     case 'c': return popFunctionType(Node::Kind::FunctionType);
@@ -1230,6 +1231,7 @@ NodePointer Demangler::demanglePlainFunction() {
 NodePointer Demangler::popFunctionType(Node::Kind kind) {
   NodePointer FuncType = createNode(kind);
   addChild(FuncType, popNode(Node::Kind::ThrowsAnnotation));
+  addChild(FuncType, popNode(Node::Kind::AsyncAnnotation));
 
   FuncType = addChild(FuncType, popFunctionParams(Node::Kind::ArgumentTuple));
   FuncType = addChild(FuncType, popFunctionParams(Node::Kind::ReturnType));
@@ -1261,9 +1263,14 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
       FuncType->getKind() != Node::Kind::NoEscapeFunctionType)
     return nullptr;
 
-  auto ParameterType = FuncType->getFirstChild();
-  if (ParameterType->getKind() == Node::Kind::ThrowsAnnotation)
-    ParameterType = FuncType->getChild(1);
+  unsigned FirstChildIdx = 0;
+  if (FuncType->getChild(FirstChildIdx)->getKind()
+        == Node::Kind::ThrowsAnnotation)
+    ++FirstChildIdx;
+  if (FuncType->getChild(FirstChildIdx)->getKind()
+        == Node::Kind::AsyncAnnotation)
+    ++FirstChildIdx;
+  auto ParameterType = FuncType->getChild(FirstChildIdx);
 
   assert(ParameterType->getKind() == Node::Kind::ArgumentTuple);
 
@@ -1911,8 +1918,13 @@ NodePointer Demangler::demangleMetatype() {
     case 'j':
       return createWithChild(Node::Kind::OpaqueTypeDescriptorAccessorKey,
                              popNode());
+    case 'J':
+      return createWithChild(Node::Kind::NoncanonicalSpecializedGenericTypeMetadataCache, popNode());
     case 'k':
       return createWithChild(Node::Kind::OpaqueTypeDescriptorAccessorVar,
+                             popNode());
+    case 'K':
+      return createWithChild(Node::Kind::MetadataInstantiationCache,
                              popNode());
     case 'l':
       return createWithPoppedType(
@@ -1926,6 +1938,9 @@ NodePointer Demangler::demangleMetatype() {
           Node::Kind::CanonicalSpecializedGenericMetaclass);
     case 'n':
       return createWithPoppedType(Node::Kind::NominalTypeDescriptor);
+    case 'N':
+      return createWithPoppedType(
+          Node::Kind::NoncanonicalSpecializedGenericTypeMetadata);
     case 'o':
       return createWithPoppedType(Node::Kind::ClassMetadataBaseOffset);
     case 'p':
@@ -2654,7 +2669,7 @@ NodePointer Demangler::demangleSpecAttributes(Node::Kind SpecKind) {
 }
 
 NodePointer Demangler::demangleWitness() {
-  switch (nextChar()) {
+  switch (char c = nextChar()) {
     case 'C':
       return createWithChild(Node::Kind::EnumCase,
                              popNode(isEntity));
@@ -2795,6 +2810,30 @@ NodePointer Demangler::demangleWitness() {
       default:
         return nullptr;
       }
+    }
+    case 'Z':
+    case 'z': {
+      auto declList = createNode(Node::Kind::GlobalVariableOnceDeclList);
+      std::vector<NodePointer> vars;
+      while (auto sig = popNode(Node::Kind::FirstElementMarker)) {
+        auto identifier = popNode(isDeclName);
+        if (!identifier)
+          return nullptr;
+        vars.push_back(identifier);
+      }
+      for (auto i = vars.rbegin(); i != vars.rend(); ++i) {
+        declList->addChild(*i, *this);
+      }
+      
+      auto context = popContext();
+      if (!context)
+        return nullptr;
+      Node::Kind kind = c == 'Z'
+        ? Node::Kind::GlobalVariableOnceFunction
+        : Node::Kind::GlobalVariableOnceToken;
+      return createWithChildren(kind,
+                                context,
+                                declList);
     }
     default:
       return nullptr;

@@ -1014,7 +1014,9 @@ entry(%0 : $Builtin.Int63):
 // CHECK-64: entry:
 // CHECK-64:   [[T:%.*]] = trunc i64 %0 to i63
 // CHECK-64:   [[DATA_ADDR:%.*]] = bitcast %T11enum_future21SinglePayloadSpareBitO* %1 to i63*
-// CHECK-64:   store i63 [[T]], i63* [[DATA_ADDR]]
+// CHECK-64:   [[BYTE_ADDR:%.*]] = bitcast i63* [[DATA_ADDR]] to i64*
+// CHECK-64:   [[BYTE:%.*]] = zext i63 [[T]] to i64
+// CHECK-64:   store i64 [[BYTE]], i64* [[BYTE_ADDR]]
 // CHECK-64:   ret void
 // CHECK-64: }
 sil @single_payload_spare_bit_inject_x_indirect : $(Builtin.Int63, @inout SinglePayloadSpareBit) -> () {
@@ -1788,7 +1790,9 @@ entry(%0 : $Builtin.Int62):
 // CHECK-64: entry:
 // CHECK-64:   [[NATIVECC_TRUNC:%.*]] = trunc i64 %0 to i62
 // CHECK-64:   [[DATA_ADDR:%.*]] = bitcast %T11enum_future23MultiPayloadOneSpareBitO* %1 to i62*
-// CHECK-64:   store i62 [[NATIVECC_TRUNC]], i62* [[DATA_ADDR]]
+// CHECK-64:   [[BYTE_ADDR:%.*]] = bitcast i62* [[DATA_ADDR]] to i64*
+// CHECK-64:   [[VAL:%.*]] = zext i62 [[NATIVECC_TRUNC]] to i64
+// CHECK-64:   store i64 [[VAL]], i64* [[BYTE_ADDR]]
 // CHECK-64:   [[PAYLOAD_ADDR:%.*]] = bitcast %T11enum_future23MultiPayloadOneSpareBitO* %1 to i64*
 // CHECK-64:   [[PAYLOAD:%.*]] = load i64, i64* [[PAYLOAD_ADDR]]
 // --                                                   0x7FFF_FFFF_FFFF_FFFF
@@ -1829,7 +1833,9 @@ entry(%0 : $Builtin.Int63):
 // CHECK-64: entry:
 // CHECK-64:   [[NATIVECC_TRUNC:%.*]] = trunc i64 %0 to i63
 // CHECK-64:   [[DATA_ADDR:%.*]] = bitcast %T11enum_future23MultiPayloadOneSpareBitO* %1 to i63*
-// CHECK-64:   store i63 [[NATIVECC_TRUNC]], i63* [[DATA_ADDR]]
+// CHECK-64:   [[BYTE_ADDR:%.*]] = bitcast i63* [[DATA_ADDR]] to i64*
+// CHECK-64:   [[VAL:%.*]] = zext i63 [[NATIVECC_TRUNC]] to i64
+// CHECK-64:   store i64 [[VAL]], i64* [[BYTE_ADDR]]
 // CHECK-64:   [[PAYLOAD_ADDR:%.*]] = bitcast %T11enum_future23MultiPayloadOneSpareBitO* %1 to i64*
 // CHECK-64:   [[PAYLOAD:%.*]] = load i64, i64* [[PAYLOAD_ADDR]]
 // --                                                   0x7FFF_FFFF_FFFF_FFFF
@@ -2028,7 +2034,9 @@ entry(%0 : $Builtin.Int62):
 // CHECK-64: entry:
 // CHECK-64:   [[NATIVECC_TRUNC:%.*]] = trunc i64 %0 to i62
 // CHECK-64:   [[DATA_ADDR:%.*]] = bitcast %T11enum_future24MultiPayloadTwoSpareBitsO* %1 to i62*
-// CHECK-64:   store i62 [[NATIVECC_TRUNC]], i62* [[DATA_ADDR]]
+// CHECK-64:   [[BYTE_ADDR:%.*]] = bitcast i62* [[DATA_ADDR]] to i64*
+// CHECK-64:   [[VAL:%.*]] = zext i62 [[NATIVECC_TRUNC]] to i64
+// CHECK-64:   store i64 [[VAL]], i64* [[BYTE_ADDR]]
 // CHECK-64:   [[PAYLOAD_ADDR:%.*]] = bitcast %T11enum_future24MultiPayloadTwoSpareBitsO* %1 to i64*
 // CHECK-64:   [[PAYLOAD:%.*]] = load i64, i64* [[PAYLOAD_ADDR]]
 // --                                                   0x3FFF_FFFF_FFFF_FFFF
@@ -2064,7 +2072,9 @@ entry(%0 : $Builtin.Int60):
 // CHECK-64: entry:
 // CHECK-64:   [[NATIVECC_TRUNC:%.*]] = trunc i64 %0 to i60
 // CHECK-64:   [[DATA_ADDR:%.*]] = bitcast %T11enum_future24MultiPayloadTwoSpareBitsO* %1 to i60*
-// CHECK-64:   store i60 [[NATIVECC_TRUNC]], i60* [[DATA_ADDR]]
+// CHECK-64:   [[BYTE_ADDR:%.*]] = bitcast i60* [[DATA_ADDR]] to i64*
+// CHECK-64:   [[VAL:%.*]] = zext i60 [[NATIVECC_TRUNC]] to i64
+// CHECK-64:   store i64 [[VAL]], i64* [[BYTE_ADDR]]
 // CHECK-64:   [[PAYLOAD_ADDR:%.*]] = bitcast %T11enum_future24MultiPayloadTwoSpareBitsO* %1 to i64*
 // CHECK-64:   [[PAYLOAD:%.*]] = load i64, i64* [[PAYLOAD_ADDR]]
 // --                                                   0x3FFF_FFFF_FFFF_FFFF

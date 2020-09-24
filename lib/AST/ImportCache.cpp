@@ -73,8 +73,7 @@ static void collectExports(ModuleDecl::ImportedModule next,
     else if (exported.accessPath.empty()) {
       exported.accessPath = next.accessPath;
       stack.push_back(exported);
-    } else if (ModuleDecl::isSameAccessPath(next.accessPath,
-                                            exported.accessPath)) {
+    } else if (next.accessPath.isSameAs(exported.accessPath)) {
       stack.push_back(exported);
     }
   }
@@ -139,12 +138,9 @@ ImportCache::getImportSet(ASTContext &ctx,
   // getImportedModulesForLookup().
   if (ImportSet *result = ImportSets.FindNodeOrInsertPos(ID, InsertPos))
     return *result;
-
-  void *mem = ctx.Allocate(
-    sizeof(ImportSet) +
-    sizeof(ModuleDecl::ImportedModule) * topLevelImports.size() +
-    sizeof(ModuleDecl::ImportedModule) * transitiveImports.size(),
-    alignof(ImportSet), AllocationArena::Permanent);
+  
+  size_t bytes = ImportSet::totalSizeToAlloc<ModuleDecl::ImportedModule>(topLevelImports.size() + transitiveImports.size());
+  void *mem = ctx.Allocate(bytes, alignof(ImportSet), AllocationArena::Permanent);
 
   auto *result = new (mem) ImportSet(hasHeaderImportModule,
                                      topLevelImports,
@@ -176,11 +172,12 @@ ImportSet &ImportCache::getImportSet(const DeclContext *dc) {
   SmallVector<ModuleDecl::ImportedModule, 4> imports;
 
   imports.emplace_back(
-      ModuleDecl::ImportedModule{ModuleDecl::AccessPathTy(), mod});
+      ModuleDecl::ImportedModule{ImportPath::Access(), mod});
 
   if (file) {
+    // Should include both SPI & non-SPI.
     file->getImportedModules(imports,
-                             {ModuleDecl::ImportFilterKind::Private,
+                             {ModuleDecl::ImportFilterKind::Default,
                               ModuleDecl::ImportFilterKind::ImplementationOnly,
                               ModuleDecl::ImportFilterKind::SPIAccessControl});
   }
@@ -191,18 +188,18 @@ ImportSet &ImportCache::getImportSet(const DeclContext *dc) {
   return result;
 }
 
-ArrayRef<ModuleDecl::AccessPathTy> ImportCache::allocateArray(
+ArrayRef<ImportPath::Access> ImportCache::allocateArray(
     ASTContext &ctx,
-    SmallVectorImpl<ModuleDecl::AccessPathTy> &results) {
+    SmallVectorImpl<ImportPath::Access> &results) {
   if (results.empty())
-    return ArrayRef<ModuleDecl::AccessPathTy>();
+    return {};
   else if (results.size() == 1 && results[0].empty())
     return {&EmptyAccessPath, 1};
   else
     return ctx.AllocateCopy(results);
 }
 
-ArrayRef<ModuleDecl::AccessPathTy>
+ArrayRef<ImportPath::Access>
 ImportCache::getAllVisibleAccessPaths(const ModuleDecl *mod,
                                       const DeclContext *dc) {
   dc = dc->getModuleScopeContext();
@@ -219,7 +216,7 @@ ImportCache::getAllVisibleAccessPaths(const ModuleDecl *mod,
   if (ctx.Stats)
     ++ctx.Stats->getFrontendCounters().ModuleVisibilityCacheMiss;
 
-  SmallVector<ModuleDecl::AccessPathTy, 1> accessPaths;
+  SmallVector<ImportPath::Access, 1> accessPaths;
   for (auto next : getImportSet(dc).getAllImports()) {
     // If we found 'mod', record the access path.
     if (next.importedModule == mod) {
@@ -234,7 +231,7 @@ ImportCache::getAllVisibleAccessPaths(const ModuleDecl *mod,
   return result;
 }
 
-ArrayRef<ModuleDecl::AccessPathTy>
+ArrayRef<ImportPath::Access>
 ImportCache::getAllAccessPathsNotShadowedBy(const ModuleDecl *mod,
                                             const ModuleDecl *other,
                                             const DeclContext *dc) {
@@ -244,7 +241,7 @@ ImportCache::getAllAccessPathsNotShadowedBy(const ModuleDecl *mod,
 
   // Fast path.
   if (currentMod == other)
-    return ArrayRef<ModuleDecl::AccessPathTy>();
+    return {};
 
   auto key = std::make_tuple(mod, other, dc);
   auto found = ShadowCache.find(key);
@@ -261,16 +258,17 @@ ImportCache::getAllAccessPathsNotShadowedBy(const ModuleDecl *mod,
   llvm::SmallDenseSet<ModuleDecl::ImportedModule, 32> visited;
 
   stack.emplace_back(
-      ModuleDecl::ImportedModule{ModuleDecl::AccessPathTy(), currentMod});
+      ModuleDecl::ImportedModule{ImportPath::Access(), currentMod});
 
   if (auto *file = dyn_cast<FileUnit>(dc)) {
+    // Should include both SPI & non-SPI
     file->getImportedModules(stack,
-                             {ModuleDecl::ImportFilterKind::Private,
+                             {ModuleDecl::ImportFilterKind::Default,
                               ModuleDecl::ImportFilterKind::ImplementationOnly,
                               ModuleDecl::ImportFilterKind::SPIAccessControl});
   }
 
-  SmallVector<ModuleDecl::AccessPathTy, 4> accessPaths;
+  SmallVector<ImportPath::Access, 4> accessPaths;
 
   while (!stack.empty()) {
     auto next = stack.pop_back_val();

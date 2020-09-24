@@ -89,12 +89,9 @@ toolchains::Darwin::constructInvocation(const InterpretJobAction &job,
 }
 
 static StringRef
-getDarwinLibraryNameSuffixForTriple(const llvm::Triple &triple,
-                                    bool distinguishSimulator = true) {
+getDarwinLibraryNameSuffixForTriple(const llvm::Triple &triple) {
   const DarwinPlatformKind kind = getDarwinPlatformKind(triple);
-  const DarwinPlatformKind effectiveKind =
-      distinguishSimulator ? kind : getNonSimulatorPlatform(kind);
-  switch (effectiveKind) {
+  switch (kind) {
   case DarwinPlatformKind::MacOS:
     return "osx";
   case DarwinPlatformKind::IPhoneOS:
@@ -202,6 +199,19 @@ static bool findXcodeClangPath(llvm::SmallVectorImpl<char> &path) {
   return !path.empty();
 }
 
+static bool findXcodeClangLibPath(const Twine &libName,
+                                  llvm::SmallVectorImpl<char> &path) {
+  assert(path.empty());
+
+  if (!findXcodeClangPath(path)) {
+    return false;
+  }
+  llvm::sys::path::remove_filename(path); // 'clang'
+  llvm::sys::path::remove_filename(path); // 'bin'
+  llvm::sys::path::append(path, "lib", libName);
+  return true;
+}
+
 static void addVersionString(const ArgList &inputArgs, ArgStringList &arguments,
                              unsigned major, unsigned minor, unsigned micro) {
   llvm::SmallString<8> buf;
@@ -239,12 +249,15 @@ toolchains::Darwin::addLinkerInputArgs(InvocationInfo &II,
     Arguments.push_back("-filelist");
     Arguments.push_back(context.getTemporaryFilePath("inputs", "LinkFileList"));
     II.FilelistInfos.push_back(
-        {Arguments.back(), file_types::TY_Object,
+        {Arguments.back(), context.OI.CompilerOutputType,
          FilelistInfo::WhichFiles::InputJobsAndSourceInputActions});
   } else {
     addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                            file_types::TY_Object);
+    addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
+                           file_types::TY_LLVM_BC);
     addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
+    addInputsOfType(Arguments, context.InputActions, file_types::TY_LLVM_BC);
   }
 
 
@@ -274,11 +287,7 @@ static void findARCLiteLibPath(const toolchains::Darwin &TC,
     // If we don't have a 'lib/arc/' directory, find the "arclite" library
     // relative to the Clang in the active Xcode.
     ARCLiteLib.clear();
-    if (findXcodeClangPath(ARCLiteLib)) {
-      llvm::sys::path::remove_filename(ARCLiteLib); // 'clang'
-      llvm::sys::path::remove_filename(ARCLiteLib); // 'bin'
-      llvm::sys::path::append(ARCLiteLib, "lib", "arc");
-    }
+    findXcodeClangLibPath("arc", ARCLiteLib);
   }
 }
 
@@ -304,6 +313,15 @@ toolchains::Darwin::addArgsToLinkARCLite(ArgStringList &Arguments,
     // Arclite depends on CoreFoundation.
     Arguments.push_back("-framework");
     Arguments.push_back("CoreFoundation");
+  }
+}
+
+void toolchains::Darwin::addLTOLibArgs(ArgStringList &Arguments,
+                                       const JobContext &context) const {
+  llvm::SmallString<128> LTOLibPath;
+  if (findXcodeClangLibPath("libLTO.dylib", LTOLibPath)) {
+    Arguments.push_back("-lto_library");
+    Arguments.push_back(context.Args.MakeArgString(LTOLibPath));
   }
 }
 
@@ -501,60 +519,11 @@ toolchains::Darwin::addProfileGenerationArgs(ArgStringList &Arguments,
   }
 }
 
-/// Remap the given version number via the version map, or produce \c None if
-/// there is no mapping for this version.
-static Optional<llvm::VersionTuple> remapVersion(
-    const llvm::StringMap<llvm::VersionTuple> &versionMap,
-    llvm::VersionTuple version) {
-  // The build number is never used in the lookup.
-  version = version.withoutBuild();
-
-  // Look for this specific version.
-  auto known = versionMap.find(version.getAsString());
-  if (known != versionMap.end())
-    return known->second;
-
-  // If an extra ".0" was specified (in the subminor version), drop that
-  // and look again.
-  if (!version.getSubminor() || *version.getSubminor() != 0)
-    return None;
-
-  version = llvm::VersionTuple(version.getMajor(), *version.getMinor());
-  known = versionMap.find(version.getAsString());
-  if (known != versionMap.end())
-    return known->second;
-
-  // If another extra ".0" wa specified (in the minor version), drop that
-  // and look again.
-  if (!version.getMinor() || *version.getMinor() != 0)
-    return None;
-
-  version = llvm::VersionTuple(version.getMajor());
-  known = versionMap.find(version.getAsString());
-  if (known != versionMap.end())
-    return known->second;
-
-  return None;
-}
-
 Optional<llvm::VersionTuple>
 toolchains::Darwin::getTargetSDKVersion(const llvm::Triple &triple) const {
   if (!SDKInfo)
     return None;
-
-  // Retrieve the SDK version.
-  auto SDKVersion = SDKInfo->getVersion();
-
-  // For the Mac Catalyst environment, we have a macOS SDK with a macOS
-  // SDK version. Map that to the corresponding iOS version number to pass
-  // down to the linker.
-  if (tripleIsMacCatalystEnvironment(triple)) {
-    return remapVersion(
-        SDKInfo->getVersionMap().MacOS2iOSMacMapping, SDKVersion)
-          .getValueOr(llvm::VersionTuple(0, 0, 0));
-  }
-
-  return SDKVersion;
+  return swift::getTargetSDKVersion(*SDKInfo, triple);
 }
 
 void
@@ -624,14 +593,6 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
           major = firstMacARM64e.getMajor();
           minor = firstMacARM64e.getMinor().getValueOr(0);
           micro = firstMacARM64e.getSubminor().getValueOr(0);
-        }
-
-        // Temporary hack: adjust macOS version passed to the linker from
-        // 11 down to 10.16, but only for x86.
-        if (triple.isX86() && major == 11) {
-          major = 10;
-          minor = 16;
-          micro = 0;
         }
 
         break;
@@ -758,12 +719,16 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
   llvm::sys::path::append(
       CompilerRTPath,
       Twine("libclang_rt.") +
-        getDarwinLibraryNameSuffixForTriple(Triple, /*simulator*/false) +
+        getDarwinLibraryNameSuffixForTriple(Triple) +
         ".a");
   if (llvm::sys::fs::exists(CompilerRTPath))
     Arguments.push_back(context.Args.MakeArgString(CompilerRTPath));
 
   addArgsToLinkARCLite(Arguments, context);
+
+  if (job.shouldPerformLTO()) {
+    addLTOLibArgs(Arguments, context);
+  }
 
   for (const Arg *arg :
        context.Args.filtered(options::OPT_F, options::OPT_Fsystem)) {
@@ -837,14 +802,17 @@ toolchains::Darwin::constructInvocation(const StaticLinkJobAction &job,
   if (context.shouldUseInputFileList()) {
     Arguments.push_back("-filelist");
     Arguments.push_back(context.getTemporaryFilePath("inputs", "LinkFileList"));
-    II.FilelistInfos.push_back({Arguments.back(), file_types::TY_Object,
+    II.FilelistInfos.push_back({Arguments.back(), context.OI.CompilerOutputType,
                                 FilelistInfo::WhichFiles::InputJobs});
   } else {
     addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                            file_types::TY_Object);
+    addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
+                           file_types::TY_LLVM_BC);
   }
 
   addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
+  addInputsOfType(Arguments, context.InputActions, file_types::TY_LLVM_BC);
 
   Arguments.push_back("-o");
 

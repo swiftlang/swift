@@ -14,9 +14,9 @@ sil @PrivateA_yesOverrides : $@convention(method) (@guaranteed PrivateA) -> ()
 sil @PrivateA_isFinal      : $@convention(method) (@guaranteed PrivateA) -> ()
 
 // NOWMO-LABEL: sil_vtable PrivateA {
-// NOWMO:         #PrivateA.noOverrides{{.*}} [nonoverridden]
+// NOWMO:         #PrivateA.noOverrides{{[^[]]*}}
 // NOWMO-NOT:     #PrivateA.yesOverrides{{.*}} [nonoverridden]
-// NOWMO:         #PrivateA.isFinal{{.*}} [nonoverridden]
+// NOWMO:         #PrivateA.isFinal{{[^[]]*}}
 
 // WMO-LABEL: sil_vtable PrivateA {
 // WMO:         #PrivateA.noOverrides{{.*}} [nonoverridden]
@@ -34,6 +34,15 @@ private class PrivateB: PrivateA {
 
 sil @PrivateB_yesOverrides : $@convention(method) (@guaranteed PrivateB) -> ()
 
+// NOWMO-LABEL: sil_vtable PrivateB {
+// NOWMO:         #PrivateA.noOverrides{{[^[]]*}}
+// NOWMO-NOT:     #PrivateA.yesOverrides{{.*}} [nonoverridden]
+// NOWMO:         #PrivateA.isFinal{{[^[]]*}}
+
+// WMO-LABEL: sil_vtable PrivateB {
+// WMO:         #PrivateA.noOverrides{{.*}} [nonoverridden]
+// WMO-NOT:     #PrivateA.yesOverrides{{.*}} [nonoverridden]
+// WMO:         #PrivateA.isFinal{{.*}} [nonoverridden]
 sil_vtable PrivateB {
   #PrivateA.noOverrides:  @PrivateA_noOverrides  [inherited]
   #PrivateA.yesOverrides: @PrivateB_yesOverrides [override]
@@ -53,7 +62,7 @@ sil @InternalA_isFinal      : $@convention(method) (@guaranteed InternalA) -> ()
 // NOWMO-LABEL: sil_vtable InternalA {
 // NOWMO-NOT:     #InternalA.noOverrides{{.*}} [nonoverridden]
 // NOWMO-NOT:     #InternalA.yesOverrides{{.*}} [nonoverridden]
-// NOWMO:         #InternalA.isFinal{{.*}} [nonoverridden]
+// NOWMO:         #InternalA.isFinal{{[^[]]*}}
 
 // WMO-LABEL: sil_vtable InternalA {
 // WMO:         #InternalA.noOverrides{{.*}} [nonoverridden]
@@ -71,6 +80,15 @@ internal class InternalB: InternalA {
 
 sil @InternalB_yesOverrides : $@convention(method) (@guaranteed InternalB) -> ()
 
+// NOWMO-LABEL: sil_vtable InternalB {
+// NOWMO-NOT:     #InternalA.noOverrides{{.*}} [nonoverridden]
+// NOWMO-NOT:     #InternalA.yesOverrides{{.*}} [nonoverridden]
+// NOWMO:         #InternalA.isFinal{{[^[]]*}}
+
+// WMO-LABEL: sil_vtable InternalB {
+// WMO:         #InternalA.noOverrides{{.*}} [nonoverridden]
+// WMO-NOT:     #InternalA.yesOverrides{{.*}} [nonoverridden]
+// WMO:         #InternalA.isFinal{{.*}} [nonoverridden]
 sil_vtable InternalB {
   #InternalA.noOverrides:  @InternalA_noOverrides  [inherited]
   #InternalA.yesOverrides: @InternalB_yesOverrides [override]
@@ -90,7 +108,7 @@ sil @PublicA_isFinal      : $@convention(method) (@guaranteed PublicA) -> ()
 // NOWMO-LABEL: sil_vtable PublicA {
 // NOWMO-NOT:     #PublicA.noOverrides{{.*}} [nonoverridden]
 // NOWMO-NOT:     #PublicA.yesOverrides{{.*}} [nonoverridden]
-// NOWMO:         #PublicA.isFinal{{.*}} [nonoverridden]
+// NOWMO:         #PublicA.isFinal{{[^[]]*}}
 
 // WMO-LABEL: sil_vtable PublicA {
 // WMO:         #PublicA.noOverrides{{.*}} [nonoverridden]
@@ -108,6 +126,15 @@ public class PublicB: PublicA {
 
 sil @PublicB_yesOverrides : $@convention(method) (@guaranteed PublicB) -> ()
 
+// NOWMO-LABEL: sil_vtable PublicB {
+// NOWMO-NOT:     #PublicA.noOverrides{{.*}} [nonoverridden]
+// NOWMO-NOT:     #PublicA.yesOverrides{{.*}} [nonoverridden]
+// NOWMO:         #PublicA.isFinal{{[^[]]*}}
+
+// WMO-LABEL: sil_vtable PublicB {
+// WMO:         #PublicA.noOverrides{{.*}} [nonoverridden]
+// WMO-NOT:     #PublicA.yesOverrides{{.*}} [nonoverridden]
+// WMO:         #PublicA.isFinal{{.*}} [nonoverridden]
 sil_vtable PublicB {
   #PublicA.noOverrides:  @PublicA_noOverrides  [inherited]
   #PublicA.yesOverrides: @PublicB_yesOverrides [override]
@@ -127,7 +154,7 @@ sil @OpenA_isFinal      : $@convention(method) (@guaranteed OpenA) -> ()
 // NOWMO-LABEL: sil_vtable OpenA {
 // NOWMO-NOT:     #OpenA.noOverrides{{.*}} [nonoverridden]
 // NOWMO-NOT:     #OpenA.yesOverrides{{.*}} [nonoverridden]
-// NOWMO:         #OpenA.isFinal{{.*}} [nonoverridden]
+// NOWMO:         #OpenA.isFinal{{[^[]]*}}
 
 // WMO-LABEL: sil_vtable OpenA {
 // WMO-NOT:     #OpenA.noOverrides{{.*}} [nonoverridden]
@@ -145,6 +172,15 @@ open class OpenB: OpenA {
 
 sil @OpenB_yesOverrides : $@convention(method) (@guaranteed OpenB) -> ()
 
+// NOWMO-LABEL: sil_vtable OpenB {
+// NOWMO-NOT:     #OpenA.noOverrides{{.*}} [nonoverridden]
+// NOWMO-NOT:     #OpenA.yesOverrides{{.*}} [nonoverridden]
+// NOWMO:         #OpenA.isFinal{{[^[]]*}}
+
+// WMO-LABEL: sil_vtable OpenB {
+// WMO-NOT:     #OpenA.noOverrides{{.*}} [nonoverridden]
+// WMO-NOT:     #OpenA.yesOverrides{{.*}} [nonoverridden]
+// WMO:         #OpenA.isFinal{{.*}} [nonoverridden]
 sil_vtable OpenB {
   #OpenA.noOverrides:  @PublicA_noOverrides [inherited]
   #OpenA.yesOverrides: @OpenB_yesOverrides  [override]

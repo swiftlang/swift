@@ -48,6 +48,14 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
       llvm::errs() << "use of an unavailable declaration";
       break;
 
+    case SK_AsyncSyncMismatch:
+      llvm::errs() << "async/synchronous mismatch";
+      break;
+
+    case SK_ForwardTrailingClosure:
+      llvm::errs() << "forward scan when matching a trailing closure";
+      break;
+
     case SK_Fix:
       llvm::errs() << "attempting to fix the source";
       break;
@@ -563,13 +571,15 @@ bool CompareDeclSpecializationRequest::evaluate(
   case SelfTypeRelationship::ConformsTo:
     assert(conformance);
     cs.addConstraint(ConstraintKind::ConformsTo, selfTy1,
-                     cast<ProtocolDecl>(outerDC2)->getDeclaredType(), locator);
+                     cast<ProtocolDecl>(outerDC2)->getDeclaredInterfaceType(),
+                     locator);
     break;
 
   case SelfTypeRelationship::ConformedToBy:
     assert(conformance);
     cs.addConstraint(ConstraintKind::ConformsTo, selfTy2,
-                     cast<ProtocolDecl>(outerDC1)->getDeclaredType(), locator);
+                     cast<ProtocolDecl>(outerDC1)->getDeclaredInterfaceType(),
+                     locator);
     break;
   }
 

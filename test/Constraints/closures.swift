@@ -456,13 +456,7 @@ extension Collection {
   }
 }
 func fn_r28909024(n: Int) {
-  // FIXME(diagnostics): Unfortunately there is no easy way to fix this diagnostic issue at the moment
-  // because the problem is related to ordering of the bindings - we'd attempt to bind result of the expression
-  // to contextual type of `Void` which prevents solver from discovering correct types for range - 0..<10
-  // (since both arguments are literal they are ranked lower than contextual type).
-  //
-  // Good diagnostic for this is - `unexpected non-void return value in void function`
-  return (0..<10).r28909024 { // expected-error {{type of expression is ambiguous without more context}}
+  return (0..<10).r28909024 { // expected-error {{unexpected non-void return value in void function}} // expected-note {{did you mean to add a return type?}}
     _ in true
   }
 }
@@ -1005,11 +999,13 @@ func rdar52204414() {
   // expected-error@-1 {{declared closure result 'Int' is incompatible with contextual type 'Void'}}
 }
 
-// SR-12291 - trailing closure is used as an argument to the last (positionally) parameter
-func overloaded_with_default(a: () -> Int, b: Int = 0, c: Int = 0) {}
-func overloaded_with_default(b: Int = 0, c: Int = 0, a: () -> Int) {}
+// SR-12291 - trailing closure is used as an argument to the last (positionally) parameter.
+// Note that this was accepted prior to Swift 5.3. SE-0286 changed the
+// order of argument resolution and made it ambiguous.
+func overloaded_with_default(a: () -> Int, b: Int = 0, c: Int = 0) {} // expected-note{{found this candidate}}
+func overloaded_with_default(b: Int = 0, c: Int = 0, a: () -> Int) {} // expected-note{{found this candidate}}
 
-overloaded_with_default { 0 } // Ok (could be ambiguous if trailing was allowed to match `a:` in first overload)
+overloaded_with_default { 0 } // expected-error{{ambiguous use of 'overloaded_with_default'}}
 
 func overloaded_with_default_and_autoclosure<T>(_ a: @autoclosure () -> T, b: Int = 0) {}
 func overloaded_with_default_and_autoclosure<T>(b: Int = 0, c: @escaping () -> T?) {}
@@ -1033,4 +1029,16 @@ func sr12815() {
     s.doesntExist1 { v in } // expected-error {{value of type 'S' has no member 'doesntExist1'}}
      .doesntExist2() { $0 }
   }
+}
+
+// Make sure we can infer generic arguments in an explicit result type.
+let explicitUnboundResult1 = { () -> Array in [0] }
+let explicitUnboundResult2: (Array<Bool>) -> Array<Int> = {
+  (arr: Array) -> Array in [0]
+}
+// FIXME: Should we prioritize the contextual result type and infer Array<Int>
+// rather than using a type variable in these cases?
+// expected-error@+1 {{unable to infer closure type in the current context}}
+let explicitUnboundResult3: (Array<Bool>) -> Array<Int> = {
+  (arr: Array) -> Array in [true]
 }

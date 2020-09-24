@@ -62,7 +62,7 @@ void ASTScopeImpl::dumpOneScopeMapLocation(
 
   namelookup::ASTScopeDeclGatherer gatherer;
   // Print the local bindings introduced by this scope.
-  locScope->lookupLocalsOrMembers({this}, gatherer);
+  locScope->lookupLocalsOrMembers(gatherer);
   if (!gatherer.getDecls().empty()) {
     llvm::errs() << "Local bindings: ";
     llvm::interleave(
@@ -185,10 +185,6 @@ void ConditionalClauseScope::printSpecifics(llvm::raw_ostream &out) const {
 }
 
 void SubscriptDeclScope::printSpecifics(llvm::raw_ostream &out) const {
-  decl->dumpRef(out);
-}
-
-void VarDeclScope::printSpecifics(llvm::raw_ostream &out) const {
   decl->dumpRef(out);
 }
 

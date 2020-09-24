@@ -55,66 +55,40 @@ SILCombiner::visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
   //   debug_value %6#0 : $Error
   //   strong_release %6#0 : $Error
 
-  StoreInst *SingleStore = nullptr;
-  StrongReleaseInst *SingleRelease = nullptr;
-  ProjectExistentialBoxInst *SingleProjection = nullptr;
-
-  // For each user U of the alloc_existential_box...
-  for (auto U : getNonDebugUses(AEBI)) {
-
-    if (auto *PEBI = dyn_cast<ProjectExistentialBoxInst>(U->getUser())) {
-      if (SingleProjection) return nullptr;
-      SingleProjection = PEBI;
-      for (auto AddrUse : getNonDebugUses(PEBI)) {
-        // Record stores into the box.
-        if (auto *SI = dyn_cast<StoreInst>(AddrUse->getUser())) {
-          // If this is not the only store into the box then bail out.
-          if (SingleStore) return nullptr;
-          SingleStore = SI;
-          continue;
-        }
-        // If there are other users to the box value address then bail out.
-        return nullptr;
-      }
-      continue;
-    }
-
-    // Record releases of the box.
-    if (auto *RI = dyn_cast<StrongReleaseInst>(U->getUser())) {
-      // If this is not the only release of the box then bail out.
-      if (SingleRelease) return nullptr;
-      SingleRelease = RI;
-      continue;
-    }
-
-    // If there are other users to the box then bail out.
+  SILValue boxedValue =
+    getConcreteValueOfExistentialBox(AEBI, /*ignoreUser*/ nullptr);
+  if (!boxedValue)
     return nullptr;
+
+  // Check if the box is released at a single place. That's the end of its
+  // lifetime.
+  StrongReleaseInst *singleRelease = nullptr;
+  for (Operand *use : AEBI->getUses()) {
+    if (auto *RI = dyn_cast<StrongReleaseInst>(use->getUser())) {
+      // If this is not the only release of the box then bail out.
+      if (singleRelease)
+        return nullptr;
+      singleRelease = RI;
+    }
   }
+  if (!singleRelease)
+    return nullptr;
 
-  if (SingleStore && SingleRelease) {
-    assert(SingleProjection && "store without a projection");
-    // Release the value that was stored into the existential box. The box
-    // is going away so we need to release the stored value.
-    // NOTE: It's important that the release is inserted at the single
-    // release of the box and not at the store, because a balancing retain could
-    // be _after_ the store, e.g:
-    //      %box = alloc_existential_box
-    //      %addr = project_existential_box %box
-    //      store %value to %addr
-    //      retain_value %value    // must insert the release after this retain
-    //      strong_release %box
-    Builder.setInsertionPoint(SingleRelease);
-    Builder.createReleaseValue(AEBI->getLoc(), SingleStore->getSrc(),
-                               SingleRelease->getAtomicity());
+  // Release the value that was stored into the existential box. The box
+  // is going away so we need to release the stored value.
+  // NOTE: It's important that the release is inserted at the single
+  // release of the box and not at the store, because a balancing retain could
+  // be _after_ the store, e.g:
+  //      %box = alloc_existential_box
+  //      %addr = project_existential_box %box
+  //      store %value to %addr
+  //      retain_value %value    // must insert the release after this retain
+  //      strong_release %box
+  Builder.setInsertionPoint(singleRelease);
+  Builder.createReleaseValue(AEBI->getLoc(), boxedValue,
+                             singleRelease->getAtomicity());
 
-    // Erase the instruction that stores into the box and the release that
-    // releases the box, and finally, release the box.
-    eraseInstFromFunction(*SingleRelease);
-    eraseInstFromFunction(*SingleStore);
-    eraseInstFromFunction(*SingleProjection);
-    return eraseInstFromFunction(*AEBI);
-  }
-
+  eraseInstIncludingUsers(AEBI);
   return nullptr;
 }
 
@@ -580,7 +554,8 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
   // Be careful with open archetypes, because they cannot be moved before
   // their definitions.
   if (IEI && !OEI &&
-      !IEI->getLoweredConcreteType().isOpenedExistential()) {
+      !IEI->getLoweredConcreteType().hasOpenedExistential()) {
+    assert(!IEI->getLoweredConcreteType().isOpenedExistential());
     auto *ConcAlloc = Builder.createAllocStack(
         AS->getLoc(), IEI->getLoweredConcreteType(), AS->getVarInfo());
     IEI->replaceAllUsesWith(ConcAlloc);

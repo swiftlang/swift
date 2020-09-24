@@ -622,14 +622,20 @@ static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
     // The generic parameter has a layout constraint.
     // Check that the substitution has the same constraint.
     auto AIReplacement = Type(Param).subst(AISubs);
-    auto AIArchetype = AIReplacement->getAs<ArchetypeType>();
-    if (!AIArchetype)
-      return false;
-    auto AILayout = AIArchetype->getLayoutConstraint();
-    if (!AILayout)
-      return false;
-    if (AILayout != Layout)
-      return false;
+
+    if (Layout->isClass()) {
+      if (!AIReplacement->satisfiesClassConstraint())
+        return false;
+    } else {
+      auto AIArchetype = AIReplacement->getAs<ArchetypeType>();
+      if (!AIArchetype)
+        return false;
+      auto AILayout = AIArchetype->getLayoutConstraint();
+      if (!AILayout)
+        return false;
+      if (AILayout != Layout)
+        return false;
+    }
   }
   return true;
 }

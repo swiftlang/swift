@@ -632,9 +632,10 @@ public:
                                  SubstitutionMap substitutions,
                                  unsigned ordinal) override {
     auto underlyingType = Reader
-      .readUnderlyingTypeForOpaqueTypeDescriptor(opaqueDescriptor.getAddressData(),
-                                                 ordinal);
-    
+                              .readUnderlyingTypeForOpaqueTypeDescriptor(
+                                  opaqueDescriptor.getAddressData(), ordinal)
+                              .getType();
+
     if (!underlyingType)
       return getFailure<Type>();
     

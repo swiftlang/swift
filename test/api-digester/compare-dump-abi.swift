@@ -18,5 +18,5 @@
 // RUN: not %api-digester -diagnose-sdk -print-module -baseline-dir %t.baseline -module cake -I %t.mod2 -I %S/Inputs/APINotesLeft -module-cache-path %t.module-cache %clang-importer-sdk-nosource -abi -o %t.result -compiler-style-diags 2> %t.abi.compiler.diags
 // RUN: %FileCheck %s < %t.abi.compiler.diags
 
-// CHECK: cake_current/cake.swift:39:15: error: cake: Struct C6 is now with @frozen
-// CHECK: cake_current/cake.swift:41:13: error: cake: Enum IceKind is now without @frozen
+// CHECK: cake_current/cake.swift:39:15: error: ABI breakage: struct C6 is now with @frozen
+// CHECK: cake_current/cake.swift:41:13: error: ABI breakage: enum IceKind is now without @frozen

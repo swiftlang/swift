@@ -78,10 +78,13 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STATIC_METHOD_AFTERPAREN_2 | %FileCheck %s -check-prefix=STATIC_METHOD_AFTERPAREN_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STATIC_METHOD_SECOND | %FileCheck %s -check-prefix=STATIC_METHOD_SECOND
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STATIC_METHOD_SKIPPED | %FileCheck %s -check-prefix=STATIC_METHOD_SKIPPED
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STATIC_METHOD_OVERLOADED | %FileCheck %s -check-prefix=STATIC_METHOD_OVERLOADED
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_AFTERPAREN_1 | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_AFTERPAREN_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_AFTERPAREN_2 | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_AFTERPAREN_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_AFTERPAREN_3 | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_AFTERPAREN_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_SECOND | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SECOND
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_SKIPPED | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SKIPPED
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_OVERLOADED | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_OVERLOADED
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_1_AFTERPAREN_1 | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_AFTERPAREN_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_1_AFTERPAREN_2 | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_AFTERPAREN_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_1_SECOND | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SECOND
@@ -90,6 +93,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_2_AFTERPAREN_2 | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_AFTERPAREN_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_2_SECOND | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SECOND
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_2_SKIPPED | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SKIPPED
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_2_OVERLOADED | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_OVERLOADED
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARCHETYPE_GENERIC_1 | %FileCheck %s -check-prefix=ARCHETYPE_GENERIC_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PARAM_WITH_ERROR_AUTOCLOSURE| %FileCheck %s -check-prefix=PARAM_WITH_ERROR_AUTOCLOSURE
@@ -550,7 +554,7 @@ func curry<T1, T2, R>(_ f: @escaping (T1, T2) -> R) -> (T1) -> (T2) -> R {
   return { t1 in { t2 in f(#^NESTED_CLOSURE^#, t2) } }
   // NESTED_CLOSURE: Begin completions
   // FIXME: Should be '/TypeRelation[Invalid]: t2[#T2#]'
-  // NESTED_CLOSURE: Decl[LocalVar]/Local:               t2; name=t2
+  // NESTED_CLOSURE: Decl[LocalVar]/Local:               t2[#_#]; name=t2
   // NESTED_CLOSURE: Decl[LocalVar]/Local:               t1[#T1#]; name=t1
 }
 
@@ -578,10 +582,12 @@ func testTupleShuffle() {
 // SHUFFLE_2-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: s1[#String#]; name=s1
 // SHUFFLE_2-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: s2[#String#]; name=s2
 
-// SHUFFLE_3: Begin completions, 3 items
+// SHUFFLE_3: Begin completions, 4 items
 // SHUFFLE_3-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     foo[#SimpleEnum#]; name=foo
 // SHUFFLE_3-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     bar[#SimpleEnum#]; name=bar
 // SHUFFLE_3-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     baz[#SimpleEnum#]; name=baz
+// SHUFFLE_3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:     hash({#(self): SimpleEnum#})[#(into: inout Hasher) -> Void#]; name=hash(self: SimpleEnum)
+
 
 class HasSubscript {
   subscript(idx: Int) -> String {}
@@ -599,8 +605,8 @@ func testSubscript(obj: HasSubscript, intValue: Int, strValue: String) {
 // SUBSCRIPT_1_DOT: Begin completions
 // SUBSCRIPT_1_DOT-NOT: i1
 // SUBSCRIPT_1_DOT-NOT: s1
-// SUBSCRIPT_1_DOT-DAG: Decl[StaticVar]/ExprSpecific/IsSystem: max[#Int#]; name=max
-// SUBSCRIPT_1_DOT-DAG: Decl[StaticVar]/ExprSpecific/IsSystem: min[#Int#]; name=min
+// SUBSCRIPT_1_DOT-DAG: Decl[StaticVar]/ExprSpecific/IsSystem/TypeRelation[Identical]: max[#Int#]; name=max
+// SUBSCRIPT_1_DOT-DAG: Decl[StaticVar]/ExprSpecific/IsSystem/TypeRelation[Identical]: min[#Int#]; name=min
 
   let _ = obj[42, #^SUBSCRIPT_2^#
 // SUBSCRIPT_2: Begin completions, 1 items
@@ -664,6 +670,8 @@ class TestStaticMemberCall {
   static func create2(_ arg1: Int, arg2: Int = 0, arg3: Int = 1, arg4: Int = 2) -> TestStaticMemberCall {
     return TestStaticMemberCall()
   }
+  static func createOverloaded(arg1: Int) -> TestStaticMemberCall { TestStaticMemberCall() }
+  static func createOverloaded(arg1: String) -> String { arg1 }
 }
 func testStaticMemberCall() {
   let _ = TestStaticMemberCall.create1(#^STATIC_METHOD_AFTERPAREN_1^#)
@@ -692,20 +700,31 @@ func testStaticMemberCall() {
 // STATIC_METHOD_SKIPPED: Pattern/ExprSpecific: {#arg3: Int#}[#Int#];
 // STATIC_METHOD_SKIPPED: Pattern/ExprSpecific: {#arg4: Int#}[#Int#];
 // STATIC_METHOD_SKIPPED: End completions
+
+  let _ = TestStaticMemberCall.createOverloaded(#^STATIC_METHOD_OVERLOADED^#)
+// STATIC_METHOD_OVERLOADED: Begin completions, 2 items
+// STATIC_METHOD_OVERLOADED-DAG: Decl[StaticMethod]/CurrNominal:     ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1: Int
+// STATIC_METHOD_OVERLOADED-DAG: Decl[StaticMethod]/CurrNominal:     ['(']{#arg1: String#}[')'][#String#]; name=arg1: String
+// STATIC_METHOD_OVERLOADED: End completions
 }
 func testImplicitMember() {
   let _: TestStaticMemberCall = .create1(#^IMPLICIT_MEMBER_AFTERPAREN_1^#)
 // IMPLICIT_MEMBER_AFTERPAREN_1: Begin completions, 1 items
-// IMPLICIT_MEMBER_AFTERPAREN_1: Decl[StaticMethod]/CurrNominal:     ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1: Int
+// IMPLICIT_MEMBER_AFTERPAREN_1: Decl[StaticMethod]/CurrNominal/TypeRelation[Identical]: ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1: Int
 // IMPLICIT_MEMBER_AFTERPAREN_1: End completions
 
   let _: TestStaticMemberCall = .create2(#^IMPLICIT_MEMBER_AFTERPAREN_2^#)
 // IMPLICIT_MEMBER_AFTERPAREN_2: Begin completions
-// IMPLICIT_MEMBER_AFTERPAREN_2-DAG: Decl[StaticMethod]/CurrNominal:     ['(']{#(arg1): Int#}[')'][#TestStaticMemberCall#];
-// IMPLICIT_MEMBER_AFTERPAREN_2-DAG: Decl[StaticMethod]/CurrNominal:     ['(']{#(arg1): Int#}, {#arg2: Int#}, {#arg3: Int#}, {#arg4: Int#}[')'][#TestStaticMemberCall#];
+// IMPLICIT_MEMBER_AFTERPAREN_2-DAG: Decl[StaticMethod]/CurrNominal/TypeRelation[Identical]: ['(']{#(arg1): Int#}[')'][#TestStaticMemberCall#];
+// IMPLICIT_MEMBER_AFTERPAREN_2-DAG: Decl[StaticMethod]/CurrNominal/TypeRelation[Identical]: ['(']{#(arg1): Int#}, {#arg2: Int#}, {#arg3: Int#}, {#arg4: Int#}[')'][#TestStaticMemberCall#];
 // IMPLICIT_MEMBER_AFTERPAREN_2-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem/TypeRelation[Identical]: Int[#Int#];
 // IMPLICIT_MEMBER_AFTERPAREN_2-DAG: Literal[Integer]/None/TypeRelation[Identical]: 0[#Int#];
 // IMPLICIT_MEMBER_AFTERPAREN_2: End completions
+
+  let _: TestStaticMemberCall? = .create1(#^IMPLICIT_MEMBER_AFTERPAREN_3^#)
+// IMPLICIT_MEMBER_AFTERPAREN_3: Begin completions, 1 items
+// IMPLICIT_MEMBER_AFTERPAREN_3: Decl[StaticMethod]/CurrNominal/TypeRelation[Convertible]: ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1: Int
+// IMPLICIT_MEMBER_AFTERPAREN_3: End completions
 
   let _: TestStaticMemberCall = .create2(1, #^IMPLICIT_MEMBER_SECOND^#)
 // IMPLICIT_MEMBER_SECOND: Begin completions, 3 items
@@ -720,6 +739,12 @@ func testImplicitMember() {
 // IMPLICIT_MEMBER_SKIPPED: Pattern/ExprSpecific: {#arg3: Int#}[#Int#];
 // IMPLICIT_MEMBER_SKIPPED: Pattern/ExprSpecific: {#arg4: Int#}[#Int#];
 // IMPLICIT_MEMBER_SKIPPED: End completions
+
+  let _: TestStaticMemberCall = .createOverloaded(#^IMPLICIT_MEMBER_OVERLOADED^#)
+// IMPLICIT_MEMBER_OVERLOADED: Begin completions, 2 items
+// IMPLICIT_MEMBER_OVERLOADED: Decl[StaticMethod]/CurrNominal/TypeRelation[Identical]: ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1: Int
+// IMPLICIT_MEMBER_OVERLOADED: Decl[StaticMethod]/CurrNominal:     ['(']{#arg1: String#}[')'][#String#]; name=arg1: String
+// IMPLICIT_MEMBER_OVERLOADED: End completions
 }
 func testImplicitMemberInArrayLiteral() {
   struct Receiver {
@@ -733,8 +758,12 @@ func testImplicitMemberInArrayLiteral() {
     // Same as IMPLICIT_MEMBER_AFTERPAREN_1.
   ])
   Receiver([
+    .create1(x: 1),
     .create2(#^IMPLICIT_MEMBER_ARRAY_1_AFTERPAREN_2^#),
     // Same as IMPLICIT_MEMBER_AFTERPAREN_2.
+  ])
+  Receiver([
+    .create1(x: 1),
     .create2(1, #^IMPLICIT_MEMBER_ARRAY_1_SECOND^#
     // Same as IMPLICIT_MEMBER_SECOND.
   ])
@@ -743,15 +772,22 @@ func testImplicitMemberInArrayLiteral() {
     // Same as IMPLICIT_MEMBER_SKIPPED.
     .create1(x: 12)
   ])
+  Receiver(arg1: 12, arg2: [
+    .create1(x: 12),
+    .createOverloaded(#^IMPLICIT_MEMBER_ARRAY_1_OVERLOADED^#)
+    // Same as IMPLICIT_MEMBER_OVERLOADED.
+  ])
   let _: [TestStaticMemberCall] = [
     .create1(#^IMPLICIT_MEMBER_ARRAY_2_AFTERPAREN_1^#),
-    // Same as STATIC_METHOD_AFTERPAREN_1.
+    // Same as IMPLICIT_MEMBER_AFTERPAREN_1.
     .create2(#^IMPLICIT_MEMBER_ARRAY_2_AFTERPAREN_2^#),
-    // Same as STATIC_METHOD_AFTERPAREN_2.
+    // Same as IMPLICIT_MEMBER_AFTERPAREN_2.
     .create2(1, #^IMPLICIT_MEMBER_ARRAY_2_SECOND^#),
-    // Same as STATIC_METHOD_SECOND.
+    // Same as IMPLICIT_MEMBER_SECOND.
     .create2(1, arg3: 2, #^IMPLICIT_MEMBER_ARRAY_2_SKIPPED^#),
-    // Same as STATIC_METHOD_SKIPPED.
+    // Same as IMPLICIT_MEMBER_SKIPPED.
+    .createOverloaded(#^IMPLICIT_MEMBER_ARRAY_2_OVERLOADED^#),
+    // Same as IMPLICIT_MEMBER_OVERLOADED
   ]
 }
 
@@ -827,10 +863,11 @@ func testPamrameterFlags(_: Int, inoutArg: inout Int, autoclosureArg: @autoclosu
 
 func testTupleElement(arg: (SimpleEnum, SimpleEnum)) {
   testTupleElement(arg: (.foo, .#^TUPLEELEM_1^#))
-// TUPLEELEM_1: Begin completions, 3 items
+// TUPLEELEM_1: Begin completions, 4 items
 // TUPLEELEM_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     foo[#SimpleEnum#]; name=foo
 // TUPLEELEM_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     bar[#SimpleEnum#]; name=bar
 // TUPLEELEM_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     baz[#SimpleEnum#]; name=baz
+// TUPLEELEM_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:     hash({#(self): SimpleEnum#})[#(into: inout Hasher) -> Void#]; name=hash(self: SimpleEnum)
 // TUPLEELEM_1: End completions
   testTupleElement(arg: (.foo, .bar, .#^TUPLEELEM_2^#))
 // TUPLEELEM_2-NOT: Begin completions
@@ -846,10 +883,11 @@ func testKeyPathThunkInBase() {
     func foo(_ fn: (TestKP) -> Int) -> TestKPResult { TestKPResult() }
 
     foo(\.value).testFunc(.#^KEYPATH_THUNK_BASE^#)
-// KEYPATH_THUNK_BASE: Begin completions, 3 items
+// KEYPATH_THUNK_BASE: Begin completions, 4 items
 // KEYPATH_THUNK_BASE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     foo[#SimpleEnum#]; name=foo
 // KEYPATH_THUNK_BASE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     bar[#SimpleEnum#]; name=bar
 // KEYPATH_THUNK_BASE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     baz[#SimpleEnum#]; name=baz
+// KEYPATH_THUNK_BASE-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:     hash({#(self): SimpleEnum#})[#(into: inout Hasher) -> Void#]; name=hash(self: SimpleEnum)
 // KEYPATH_THUNK_BASE: End completions
 }
 

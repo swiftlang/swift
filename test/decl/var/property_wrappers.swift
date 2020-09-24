@@ -446,6 +446,15 @@ struct UseWillSetDidSet {
   }
 }
 
+struct DidSetUsesSelf {
+  @Wrapper
+  var x: Int {
+    didSet {
+      print(self)
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Mutating/nonmutating
 // ---------------------------------------------------------------------------
@@ -872,6 +881,14 @@ struct TestInvalidRedeclaration2 {
 struct TestInvalidRedeclaration3 {
   @WrapperWithInitialValue var foo1 = 123 // expected-note {{'_foo1' synthesized for property wrapper backing storage}}
   var _foo1 = 123 // expected-error {{invalid redeclaration of synthesized property '_foo1'}}
+}
+
+// Diagnose when wrapped property uses the name we use for lazy variable storage property.
+struct TestInvalidRedeclaration4 {
+  @WrapperWithProjectedValue var __lazy_storage_$_foo: Int
+  // expected-error@-1 {{invalid redeclaration of synthesized property '$__lazy_storage_$_foo'}}
+  // expected-note@-2 {{'$__lazy_storage_$_foo' synthesized for property wrapper projected value}}
+  lazy var foo = 1
 }
 
 // ---------------------------------------------------------------------------
@@ -1724,7 +1741,7 @@ extension SR_11288_P4 where Self: AnyObject { // expected-note {{requirement spe
 }
 
 struct SR_11288_S4: SR_11288_P4 {
-  @SR_11288_Wrapper4 var answer = 42 // expected-error {{'SR_11288_S4.SR_11288_Wrapper4' (aka 'SR_11288_S0') requires that 'SR_11288_S4' be a class type}}
+  @SR_11288_Wrapper4 var answer = 42 // expected-error {{'Self.SR_11288_Wrapper4' (aka 'SR_11288_S0') requires that 'SR_11288_S4' be a class type}}
 }
 
 class SR_11288_C0: SR_11288_P4 {
@@ -2020,4 +2037,14 @@ public struct NonVisibleImplicitInit {
   public var wrappedValue: Bool {
     return false
   }
+}
+
+@propertyWrapper
+struct OptionalWrapper<T> {
+  init() {}
+  var wrappedValue: T? { nil }
+}
+
+struct UseOptionalWrapper {
+  @OptionalWrapper var p: Int?? // Okay
 }

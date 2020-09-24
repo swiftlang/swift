@@ -337,7 +337,11 @@ swift_stdlib_readLine_stdin(unsigned char **LinePtr) {
   return Pos;
 #else
   size_t Capacity = 0;
-  return getline((char **)LinePtr, &Capacity, stdin);
+  int result;
+  do {
+    result = getline((char **)LinePtr, &Capacity, stdin);
+  } while (result < 0 && errno == EINTR);
+  return result;
 #endif
 }
 
@@ -506,5 +510,9 @@ int _swift_stdlib_putc_stderr(int C) {
 }
 
 size_t _swift_stdlib_getHardwareConcurrency() {
+#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+  return 1;
+#else
   return std::thread::hardware_concurrency();
+#endif
 }

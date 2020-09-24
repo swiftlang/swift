@@ -211,7 +211,7 @@ struct S {
   override func f() { } // expected-error{{'override' can only be specified on class members}} {{3-12=}}
 }
 extension S {
-  override func ef() {} // expected-error{{method does not override any method from its superclass}}
+  override func ef() {} // expected-error{{'override' can only be specified on class members}} {{3-12=}}
 }
 
 enum E {
@@ -219,7 +219,10 @@ enum E {
 }
 
 protocol P {
-  override func f() // FIXME wording: expected-error{{method does not override any method from its superclass}}
+  override func f() // expected-error{{method does not override any method from its parent protocol}}
+  override var g: Int { get } // expected-error{{property does not override any property from its parent protocol}}
+  override subscript(h: Int) -> Bool { get } // expected-error{{subscript does not override any subscript from its parent protocol}}
+  override init(i: Int) // expected-error{{initializer does not override a designated initializer from its parent protocol}}
 }
 
 override func f() { } // expected-error{{'override' can only be specified on class members}} {{1-10=}}
@@ -587,7 +590,7 @@ class SR_4206_Base_7<T> {
 }
 
 class SR_4206_Derived_7<T>: SR_4206_Base_7<T> {
-  override func foo1() where T: SR_4206_Protocol_2 {} // expected-error {{overridden method 'foo1' has generic signature <T where T : SR_4206_Protocol_2> which is incompatible with base method's generic signature <T where T : SR_4206_Protocol_1>; expected generic signature to be <T where τ_0_0 : SR_4206_Protocol_1>}}
+  override func foo1() where T: SR_4206_Protocol_2 {} // expected-error {{overridden method 'foo1' has generic signature <T where T : SR_4206_Protocol_2> which is incompatible with base method's generic signature <T where T : SR_4206_Protocol_1>; expected generic signature to be <T where T : SR_4206_Protocol_1>}}
 
   override func foo2() {} // OK
 }
@@ -624,7 +627,7 @@ class SR_4206_Base_10<T> {
   func foo() where T: SR_4206_Protocol_1 {} // expected-note {{overridden declaration is here}}
 }
 class SR_4206_Derived_10<T, U>: SR_4206_Base_10<T> {
-  override func foo() where U: SR_4206_Protocol_1 {} // expected-error {{overridden method 'foo' has generic signature <T, U where U : SR_4206_Protocol_1> which is incompatible with base method's generic signature <T where T : SR_4206_Protocol_1>; expected generic signature to be <T, U where τ_0_0 : SR_4206_Protocol_1>}}
+  override func foo() where U: SR_4206_Protocol_1 {} // expected-error {{overridden method 'foo' has generic signature <T, U where U : SR_4206_Protocol_1> which is incompatible with base method's generic signature <T where T : SR_4206_Protocol_1>; expected generic signature to be <T, U where T : SR_4206_Protocol_1>}}
 }
 
 // Override with return type specialization

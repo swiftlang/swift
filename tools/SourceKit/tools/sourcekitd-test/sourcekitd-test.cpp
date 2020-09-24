@@ -538,15 +538,17 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
 
   case SourceKitRequest::GlobalConfiguration:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestGlobalConfiguration);
-    if (Opts.OptimizeForIde.hasValue())
-      sourcekitd_request_dictionary_set_int64(
-          Req, KeyOptimizeForIDE,
-          static_cast<int64_t>(Opts.OptimizeForIde.getValue()));
-    if (Opts.CompletionCheckDependencyInterval.hasValue())
-      sourcekitd_request_dictionary_set_int64(
-          Req, KeyCompletionCheckDependencyInterval,
-          static_cast<int64_t>(
-              Opts.CompletionCheckDependencyInterval.getValue()));
+
+    for (auto &Opt : Opts.RequestOptions) {
+      auto KeyValue = StringRef(Opt).split('=');
+      std::string KeyStr("key.");
+      KeyStr.append(KeyValue.first.str());
+      sourcekitd_uid_t Key = sourcekitd_uid_get_from_cstr(KeyStr.c_str());
+
+      int64_t Value = 0;
+      KeyValue.second.getAsInteger(0, Value);
+      sourcekitd_request_dictionary_set_int64(Req, Key, Value);
+    }
     break;
 
   case SourceKitRequest::ProtocolVersion:
@@ -1350,9 +1352,24 @@ static void getSemanticInfoImpl(sourcekitd_variant_t Info) {
     sourcekitd_variant_dictionary_get_value(Info, KeyDiagnostics);
 }
 
-static void getSemanticInfo(sourcekitd_variant_t Info, StringRef Filename) {
-  getSemanticInfoImpl(Info);
+static void getSemanticInfoImplAfterDocUpdate(sourcekitd_variant_t EditOrOpen,
+                                              sourcekitd_variant_t DocUpdate) {
+  if (sourcekitd_variant_dictionary_get_uid(EditOrOpen, KeyDiagnosticStage) ==
+      SemaDiagnosticStage) {
+    // FIXME: currently we only return annotations once, so if the original edit
+    // or open request was slow enough, it may "take" the annotations. If that
+    // is fixed, we can skip checking the diagnostic stage and always use the
+    // DocUpdate variant.
+    assert(sourcekitd_variant_get_type(sourcekitd_variant_dictionary_get_value(
+               DocUpdate, KeyAnnotations)) == SOURCEKITD_VARIANT_TYPE_NULL);
 
+    getSemanticInfoImpl(EditOrOpen);
+  } else {
+    getSemanticInfoImpl(DocUpdate);
+  }
+}
+
+static void getSemanticInfo(sourcekitd_variant_t Info, StringRef Filename) {
   // Wait for the notification that semantic info is available.
   // But only for 1 min.
   bool expired = semaSemaphore.wait(60 * 1000);
@@ -1364,7 +1381,9 @@ static void getSemanticInfo(sourcekitd_variant_t Info, StringRef Filename) {
     llvm::report_fatal_error(
       llvm::Twine("Got notification for different doc name: ") + semaName);
   }
-  getSemanticInfoImpl(sourcekitd_response_get_value(semaResponse));
+
+  getSemanticInfoImplAfterDocUpdate(
+      Info, sourcekitd_response_get_value(semaResponse));
 }
 
 static int printAnnotations() {

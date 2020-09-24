@@ -92,9 +92,11 @@ macOS platform               | @swift-ci Please smoke benchmark              | S
 Linux platform               | @swift-ci Please test Linux platform          | Swift Test Linux Platform (smoke test)<br>Swift Test Linux Platform
 Linux platform               | @swift-ci Please clean test Linux platform    | Swift Test Linux Platform (smoke test)<br>Swift Test Linux Platform
 macOS platform               | @swift-ci Please ASAN test                    | Swift ASAN Test OS X Platform
-Ubuntu 20.04                | @swift-ci Please test Ubuntu 20.04 platform    | Swift Test Ubuntu 20.04 Platform
-CentOS 8                    | @swift-ci Please test CentOS 8 platform    | Swift Test CentOS 8 Platform
-Amazon Linux 2              | @swift-ci Please test Amazon Linux 2 platform    | Swift Test Amazon Linux 2 Platform
+Ubuntu 18.04                 | @swift-ci Please test Ubuntu 18.04 platform   | Swift Test Ubuntu 18.04 Platform
+Ubuntu 20.04                 | @swift-ci Please test Ubuntu 20.04 platform   | Swift Test Ubuntu 20.04 Platform
+CentOS 7                     | @swift-ci Please test CentOS 7 platform       | Swift Test CentOS 7 Platform
+CentOS 8                     | @swift-ci Please test CentOS 8 platform       | Swift Test CentOS 8 Platform
+Amazon Linux 2               | @swift-ci Please test Amazon Linux 2 platform | Swift Test Amazon Linux 2 Platform
 
 The core principles of validation testing is that:
 
@@ -198,7 +200,7 @@ These commands will:
 3. Compare the obtained data to the baseline (stored in git) and HEAD (version of a compiler built without the PR changes)
 4. Report the results in a pull request comment
 
-For the detailed explanation of how compiler performance is measured, please refer to [this document](https://github.com/apple/swift/blob/master/docs/CompilerPerformance.md).
+For the detailed explanation of how compiler performance is measured, please refer to [this document](https://github.com/apple/swift/blob/main/docs/CompilerPerformance.md).
 
 ## Cross Repository Testing
 

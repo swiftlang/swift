@@ -216,11 +216,9 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
           .forwardInto(SGF, Loc, init.get());
         ++elti;
       } else {
-#ifndef NDEBUG
-        assert(
-            field->getType()->isEqual(field->getParentInitializer()->getType())
-              && "Checked by sema");
-#endif
+        assert(field->getType()->getReferenceStorageReferent()->isEqual(
+                   field->getParentInitializer()->getType()) &&
+               "Initialization of field with mismatched type!");
 
         // Cleanup after this initialization.
         FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
@@ -230,8 +228,9 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
         // the property wrapper backing initializer.
         if (auto *wrappedVar = field->getOriginalWrappedProperty()) {
           auto wrappedInfo = wrappedVar->getPropertyWrapperBackingPropertyInfo();
-          if (wrappedInfo.originalInitialValue) {
-            auto arg = SGF.emitRValue(wrappedInfo.originalInitialValue);
+          auto *placeholder = wrappedInfo.wrappedValuePlaceholder;
+          if (placeholder && placeholder->getOriginalWrappedValue()) {
+            auto arg = SGF.emitRValue(placeholder->getOriginalWrappedValue());
             maybeEmitPropertyWrapperInitFromValue(SGF, Loc, field, subs,
                                                   std::move(arg))
               .forwardInto(SGF, Loc, init.get());
@@ -274,8 +273,9 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
       // memberwise initialized, use the original wrapped value if it exists.
       if (auto *wrappedVar = field->getOriginalWrappedProperty()) {
         auto wrappedInfo = wrappedVar->getPropertyWrapperBackingPropertyInfo();
-        if (wrappedInfo.originalInitialValue) {
-          init = wrappedInfo.originalInitialValue;
+        auto *placeholder = wrappedInfo.wrappedValuePlaceholder;
+        if (placeholder && placeholder->getOriginalWrappedValue()) {
+          init = placeholder->getOriginalWrappedValue();
         }
       }
 
@@ -393,9 +393,9 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     emitMemberInitializers(ctor, selfDecl, nominal);
   }
 
-  emitProfilerIncrement(ctor->getBody());
+  emitProfilerIncrement(ctor->getTypecheckedBody());
   // Emit the constructor body.
-  emitStmt(ctor->getBody());
+  emitStmt(ctor->getTypecheckedBody());
 
   
   // Build a custom epilog block, since the AST representation of the
@@ -622,7 +622,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   SILValue initedSelfValue = emitApplyWithRethrow(Loc, initVal.forward(*this),
                                                   initTy, subMap, args);
 
-  emitProfilerIncrement(ctor->getBody());
+  emitProfilerIncrement(ctor->getTypecheckedBody());
 
   // Return the initialized 'self'.
   B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(Loc),
@@ -632,7 +632,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
 void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(ctor);
 
-  assert(ctor->getBody() && "Class constructor without a body?");
+  assert(ctor->getTypecheckedBody() && "Class constructor without a body?");
 
   // True if this constructor delegates to a peer constructor with self.init().
   bool isDelegating = false;
@@ -775,9 +775,9 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     emitMemberInitializers(ctor, selfDecl, selfClassDecl);
   }
 
-  emitProfilerIncrement(ctor->getBody());
+  emitProfilerIncrement(ctor->getTypecheckedBody());
   // Emit the constructor body.
-  emitStmt(ctor->getBody());
+  emitStmt(ctor->getTypecheckedBody());
 
   // Emit the call to super.init() right before exiting from the initializer.
   if (NeedsBoxForSelf) {
@@ -937,9 +937,9 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
                           cast<TypedPattern>(pattern)->getSubPattern(),
                           std::move(src));
 
-  case PatternKind::Var:
+  case PatternKind::Binding:
     return emitMemberInit(SGF, selfDecl,
-                          cast<VarPattern>(pattern)->getSubPattern(),
+                          cast<BindingPattern>(pattern)->getSubPattern(),
                           std::move(src));
 
 #define PATTERN(Name, Parent)

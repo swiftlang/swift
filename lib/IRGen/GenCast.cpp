@@ -357,7 +357,7 @@ llvm::Value *irgen::emitReferenceToObjCProtocol(IRGenFunction &IGF,
 /// The function's output type is (value, witnessTable...)
 ///
 /// The value is NULL if the cast failed.
-static llvm::Function *
+static llvm::Constant *
 emitExistentialScalarCastFn(IRGenModule &IGM,
                             unsigned numProtocols,
                             CheckedCastMode mode,
@@ -385,13 +385,7 @@ emitExistentialScalarCastFn(IRGenModule &IGM,
     }
   }
   
-  // See if we already defined this function.
-  
-  if (auto fn = IGM.Module.getFunction(name))
-    return fn;
-  
   // Build the function type.
-  
   llvm::SmallVector<llvm::Type *, 4> argTys;
   llvm::SmallVector<llvm::Type *, 4> returnTys;
   argTys.push_back(IGM.Int8PtrTy);
@@ -405,84 +399,77 @@ emitExistentialScalarCastFn(IRGenModule &IGM,
   }
   
   llvm::Type *returnTy = llvm::StructType::get(IGM.getLLVMContext(), returnTys);
-  
-  auto fnTy = llvm::FunctionType::get(returnTy, argTys, /*vararg*/ false);
-  auto fn = llvm::Function::Create(fnTy, llvm::GlobalValue::PrivateLinkage,
-                                   llvm::Twine(name), IGM.getModule());
-  fn->setAttributes(IGM.constructInitialAttributes());
-  
-  IRGenFunction IGF(IGM, fn);
-  if (IGM.DebugInfo)
-    IGM.DebugInfo->emitArtificialFunction(IGF, fn);
-  Explosion args = IGF.collectParameters();
 
-  auto value = args.claimNext();
-  auto ref = args.claimNext();
-  auto failBB = IGF.createBasicBlock("fail");
-  auto conformsToProtocol = IGM.getConformsToProtocolFn();
-  
-  Explosion rets;
-  rets.add(value);
+  return IGM.getOrCreateHelperFunction(name, returnTy, argTys,
+                                       [&](IRGenFunction &IGF) {
+    Explosion args = IGF.collectParameters();
 
-  // Check the class constraint if necessary.
-  if (checkSuperclassConstraint) {
-    auto superclassMetadata = args.claimNext();
-    auto castFn = IGF.IGM.getDynamicCastMetatypeFn();
-    auto castResult = IGF.Builder.CreateCall(castFn, {ref,
-                                                      superclassMetadata});
+    auto value = args.claimNext();
+    auto ref = args.claimNext();
+    auto failBB = IGF.createBasicBlock("fail");
+    auto conformsToProtocol = IGM.getConformsToProtocolFn();
 
-    auto cc = cast<llvm::Function>(castFn)->getCallingConv();
+    Explosion rets;
+    rets.add(value);
 
-    // FIXME: Eventually, we may want to throw.
-    castResult->setCallingConv(cc);
-    castResult->setDoesNotThrow();
+    // Check the class constraint if necessary.
+    if (checkSuperclassConstraint) {
+      auto superclassMetadata = args.claimNext();
+      auto castFn = IGF.IGM.getDynamicCastMetatypeFn();
+      auto castResult = IGF.Builder.CreateCall(castFn, {ref,
+                                                        superclassMetadata});
 
-    auto isClass = IGF.Builder.CreateICmpNE(
-        castResult,
-        llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy));
+      auto cc = cast<llvm::Function>(castFn)->getCallingConv();
 
-    auto contBB = IGF.createBasicBlock("cont");
-    IGF.Builder.CreateCondBr(isClass, contBB, failBB);
-    IGF.Builder.emitBlock(contBB);
-  } else if (checkClassConstraint) {
-    auto isClass = IGF.Builder.CreateCall(IGM.getIsClassTypeFn(), ref);
-    auto contBB = IGF.createBasicBlock("cont");
-    IGF.Builder.CreateCondBr(isClass, contBB, failBB);
-    IGF.Builder.emitBlock(contBB);
-  }
+      // FIXME: Eventually, we may want to throw.
+      castResult->setCallingConv(cc);
+      castResult->setDoesNotThrow();
 
-  // Look up each protocol conformance we want.
-  for (unsigned i = 0; i < numProtocols; ++i) {
-    auto proto = args.claimNext();
-    auto witness = IGF.Builder.CreateCall(conformsToProtocol, {ref, proto});
-    auto isNull = IGF.Builder.CreateICmpEQ(witness,
-                     llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
-    auto contBB = IGF.createBasicBlock("cont");
-    IGF.Builder.CreateCondBr(isNull, failBB, contBB);
+      auto isClass = IGF.Builder.CreateICmpNE(
+          castResult,
+          llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy));
+
+      auto contBB = IGF.createBasicBlock("cont");
+      IGF.Builder.CreateCondBr(isClass, contBB, failBB);
+      IGF.Builder.emitBlock(contBB);
+    } else if (checkClassConstraint) {
+      auto isClass = IGF.Builder.CreateCall(IGM.getIsClassTypeFn(), ref);
+      auto contBB = IGF.createBasicBlock("cont");
+      IGF.Builder.CreateCondBr(isClass, contBB, failBB);
+      IGF.Builder.emitBlock(contBB);
+    }
+
+    // Look up each protocol conformance we want.
+    for (unsigned i = 0; i < numProtocols; ++i) {
+      auto proto = args.claimNext();
+      auto witness = IGF.Builder.CreateCall(conformsToProtocol, {ref, proto});
+      auto isNull = IGF.Builder.CreateICmpEQ(witness,
+                       llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
+      auto contBB = IGF.createBasicBlock("cont");
+      IGF.Builder.CreateCondBr(isNull, failBB, contBB);
+
+      IGF.Builder.emitBlock(contBB);
+      rets.add(witness);
+    }
+
+    // If we succeeded, return the witnesses.
+    IGF.emitScalarReturn(returnTy, rets);
     
-    IGF.Builder.emitBlock(contBB);
-    rets.add(witness);
-  }
+    // If we failed, return nil or trap.
+    IGF.Builder.emitBlock(failBB);
+    switch (mode) {
+    case CheckedCastMode::Conditional: {
+      auto null = llvm::ConstantStruct::getNullValue(returnTy);
+      IGF.Builder.CreateRet(null);
+      break;
+    }
 
-  // If we succeeded, return the witnesses.
-  IGF.emitScalarReturn(returnTy, rets);
-  
-  // If we failed, return nil or trap.
-  IGF.Builder.emitBlock(failBB);
-  switch (mode) {
-  case CheckedCastMode::Conditional: {
-    auto null = llvm::ConstantStruct::getNullValue(returnTy);
-    IGF.Builder.CreateRet(null);
-    break;
-  }
-
-  case CheckedCastMode::Unconditional: {
-    IGF.emitTrap("type cast failed", /*EmitUnreachable=*/true);
-    break;
-  }
-  }
-  
-  return fn;
+    case CheckedCastMode::Unconditional: {
+      IGF.emitTrap("type cast failed", /*EmitUnreachable=*/true);
+      break;
+    }
+    }
+  });
 }
 
 llvm::Value *irgen::emitMetatypeToAnyObjectDowncast(IRGenFunction &IGF,

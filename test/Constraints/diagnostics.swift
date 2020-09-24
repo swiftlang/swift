@@ -207,7 +207,7 @@ func r17020197(_ x : Int?, y : Int) {
 
 // <rdar://problem/20714480> QoI: Boolean expr not treated as Bool type when function return type is different
 func validateSaveButton(_ text: String) {
-  return (text.count > 0) ? true : false  // expected-error {{unexpected non-void return value in void function}}
+  return (text.count > 0) ? true : false  // expected-error {{unexpected non-void return value in void function}} expected-note {{did you mean to add a return type?}}
 }
 
 // <rdar://problem/20201968> QoI: poor diagnostic when calling a class method via a metatype
@@ -409,6 +409,7 @@ enum Color {
 
 let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) })
 // expected-error@-1 {{cannot convert value of type 'Array<(Int, _)>' to specified type '(Int, Color)'}}
+// expected-error@-2 {{cannot infer contextual base in reference to member 'Unknown'}}
 
 let _: [(Int, Color)] = [1,2].map({ ($0, .Unknown("")) })// expected-error {{missing argument label 'description:' in call}}
 
@@ -423,7 +424,7 @@ let _ : Color = .rainbow(42)  // expected-error {{argument passed to call that t
 
 let _ : (Int, Float) = (42.0, 12)  // expected-error {{cannot convert value of type '(Double, Float)' to specified type '(Int, Float)'}}
 
-let _ : Color = .rainbow  // expected-error {{member 'rainbow()' is a function; did you mean to call it?}} {{25-25=()}}
+let _ : Color = .rainbow  // expected-error {{member 'rainbow()' is a function that produces expected type 'Color'; did you mean to call it?}} {{25-25=()}}
 
 let _: Color = .overload(a : 1.0)  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: Color = .overload(1.0)  // expected-error {{no exact matches in call to static method 'overload'}}
@@ -687,7 +688,9 @@ enum AssocTest {
   case one(Int)
 }
 
-if AssocTest.one(1) == AssocTest.one(1) {} // expected-error{{referencing operator function '==' on 'Equatable' requires that 'AssocTest' conform to 'Equatable'}}
+// FIXME(rdar://problem/65688291) - on iOS simulator this diagnostic is flaky,
+// either `referencing operator function '==' on 'Equatable'` or `operator function '==' requires`
+if AssocTest.one(1) == AssocTest.one(1) {} // expected-error{{requires that 'AssocTest' conform to 'Equatable'}}
 // expected-note @-1 {{binary operator '==' cannot be synthesized for enums with associated values}}
 
 
@@ -1100,13 +1103,10 @@ func rdar17170728() {
   }
 
   let _ = [i, j, k].reduce(0 as Int?) {
-    // expected-error@-1 3 {{cannot convert value of type 'Int?' to expected element type 'Int'}}
+    // expected-error@-1{{missing argument label 'into:' in call}}
+    // expected-error@-2{{cannot convert value of type 'Int?' to expected argument type}}
     $0 && $1 ? $0 + $1 : ($0 ? $0 : ($1 ? $1 : nil))
-    // expected-error@-1 2 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
-    // expected-error@-2   {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
-    // expected-error@-3 2 {{optional type 'Int?' cannot be used as a boolean; test for '!= nil' instead}}
-    // expected-note@-4:16 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
-    // expected-note@-5:16 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+    // expected-error@-1 {{binary operator '+' cannot be applied to two 'Bool' operands}}
   }
 }
 

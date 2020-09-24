@@ -58,7 +58,8 @@ SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
 }
 
 SILGlobalVariable::~SILGlobalVariable() {
-  getModule().GlobalVariableMap.erase(Name);
+  StaticInitializerBlock.dropAllReferences();
+  StaticInitializerBlock.clearStaticInitializerBlock(Module);
 }
 
 /// Get this global variable's fragile attribute.
@@ -157,7 +158,6 @@ bool SILGlobalVariable::isValidStaticInitializerInst(const SILInstruction *I,
       switch (cast<StringLiteralInst>(I)->getEncoding()) {
         case StringLiteralInst::Encoding::Bytes:
         case StringLiteralInst::Encoding::UTF8:
-        case StringLiteralInst::Encoding::UTF16:
           return true;
         case StringLiteralInst::Encoding::ObjCSelector:
           // Objective-C selector string literals cannot be used in static
@@ -220,9 +220,9 @@ SILGlobalVariable *swift::getVariableOfGlobalInit(SILFunction *AddrF) {
   // and the globalinit_func is called by "once" from a single location,
   // continue; otherwise bail.
   BuiltinInst *CallToOnce;
-  auto *InitF = findInitializer(&AddrF->getModule(), AddrF, CallToOnce);
+  auto *InitF = findInitializer(AddrF, CallToOnce);
 
-  if (!InitF || !InitF->getName().startswith("globalinit_"))
+  if (!InitF)
     return nullptr;
 
   // If the globalinit_func is trivial, continue; otherwise bail.
@@ -247,8 +247,8 @@ SILFunction *swift::getCalleeOfOnceCall(BuiltinInst *BI) {
 }
 
 // Find the globalinit_func by analyzing the body of the addressor.
-SILFunction *swift::findInitializer(SILModule *Module, SILFunction *AddrF,
-                             BuiltinInst *&CallToOnce) {
+SILFunction *swift::findInitializer(SILFunction *AddrF,
+                                    BuiltinInst *&CallToOnce) {
   // We only handle a single SILBasicBlock for now.
   if (AddrF->size() != 1)
     return nullptr;
@@ -272,7 +272,10 @@ SILFunction *swift::findInitializer(SILModule *Module, SILFunction *AddrF,
   }
   if (!CallToOnce)
     return nullptr;
-  return getCalleeOfOnceCall(CallToOnce);
+  SILFunction *callee = getCalleeOfOnceCall(CallToOnce);
+  if (!callee->isGlobalInitOnceFunction())
+    return nullptr;
+  return callee;
 }
 
 SILGlobalVariable *

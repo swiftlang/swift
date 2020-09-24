@@ -559,30 +559,6 @@ compilers on hand while you're working.
        0.0001 (100.0%)   0.0001 (100.0%)   0.0001 (100.0%)   0.0490 (100.0%)  Total
     ```
 
-  - `-Xfrontend -debug-time-compilation`: asks each frontend to print out timers
-    for each phase of its execution. Its output (per-frontend) looks like this:
-
-    ```
-    ===-------------------------------------------------------------------------===
-                                 Swift compilation
-    ===-------------------------------------------------------------------------===
-    Total Execution Time: 0.0876 seconds (0.0877 wall clock)
-
-     ---User Time---   --System Time--   --User+System--   ---Wall Time---  --- Name ---
-     0.0241 ( 53.9%)   0.0394 ( 92.0%)   0.0635 ( 72.5%)   0.0635 ( 72.5%)  Import resolution
-     0.0170 ( 38.0%)   0.0025 (  5.8%)   0.0195 ( 22.3%)   0.0195 ( 22.2%)  Type checking / Semantic analysis
-     0.0013 (  3.0%)   0.0004 (  0.8%)   0.0017 (  1.9%)   0.0017 (  1.9%)  LLVM output
-     0.0010 (  2.3%)   0.0003 (  0.7%)   0.0013 (  1.5%)   0.0013 (  1.5%)  SILGen
-     0.0006 (  1.4%)   0.0002 (  0.4%)   0.0008 (  0.9%)   0.0008 (  0.9%)  IRGen
-     0.0004 (  0.8%)   0.0000 (  0.1%)   0.0004 (  0.5%)   0.0004 (  0.5%)  SIL optimization
-     0.0002 (  0.5%)   0.0001 (  0.1%)   0.0003 (  0.3%)   0.0003 (  0.3%)  LLVM optimization
-     0.0001 (  0.1%)   0.0000 (  0.1%)   0.0001 (  0.1%)   0.0001 (  0.1%)  Parsing
-     0.0000 (  0.0%)   0.0000 (  0.0%)   0.0000 (  0.0%)   0.0000 (  0.0%)  SIL verification (pre-optimization)
-     0.0000 (  0.0%)   0.0000 (  0.0%)   0.0000 (  0.0%)   0.0000 (  0.0%)  SIL verification (post-optimization)
-     0.0000 (  0.0%)   0.0000 (  0.0%)   0.0000 (  0.0%)   0.0000 (  0.0%)  AST verification
-     0.0448 (100.0%)   0.0428 (100.0%)   0.0876 (100.0%)   0.0877 (100.0%)  Total
-    ```
-
   - `-Xfrontend -debug-time-function-bodies`: asks each frontend to print out
     the time spent typechecking _every function_ in the program, sorted by time
     taken. The output is therefore voluminous, but can help when reducing a
@@ -906,9 +882,9 @@ judge whether a revision contains a bug looks something like this:
 #!/bin/sh
 THRESHOLD=500000000
 CURR=$(git describe)
-utils/update-checkout --scheme master --reset-to-remote --clone --clean
+utils/update-checkout --scheme main --reset-to-remote --clone --clean
 git checkout ${CURR}
-utils/update-checkout --scheme master --match-timestamp
+utils/update-checkout --scheme main --match-timestamp
 git checkout ${CURR}
 if utils/build-script -r
 then
@@ -1053,10 +1029,8 @@ getting slower between versions:
      parameter of the script). Reconfirm that _just those two isolated frontend
      processes_ still show the regression you're interested in isolating.
 
-  6. Check high-level diagnostic output between the two compilers, either the
-     newer unified stats reporter (`-stats-output-dir`) or the older flags
-     (`-Xfrontend -debug-time-compilation` and friends). Comparing the two will
-     often guide the search.
+  6. Check the value of performance counters between the two compilers via the
+     unified stats reporter (`-stats-output-dir`).
 
   7. Run both frontend processes under a profiler and compare the profiles in
      detail. At this point there ought to be _some_ sign of a difference, either
@@ -1091,7 +1065,7 @@ getting slower between versions:
      of the compiler from swift.org. While only a handful of recent snapshots
      are linked on the swift.org webpage, all historical snapshots remain
      available to download by substituting the appropriate timestamp into the
-     snapshot URL. For example, the master-branch, macOS snapshot from June 9
+     snapshot URL. For example, the main-branch, macOS snapshot from June 9
      2017 is available
      at
      [https://swift.org/builds/development/xcode/swift-DEVELOPMENT-SNAPSHOT-2017-06-09-a/swift-DEVELOPMENT-SNAPSHOT-2017-06-09-a-osx.pkg](https://swift.org/builds/development/xcode/swift-DEVELOPMENT-SNAPSHOT-2017-06-09-a/swift-DEVELOPMENT-SNAPSHOT-2017-06-09-a-osx.pkg),

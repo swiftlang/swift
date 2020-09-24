@@ -534,22 +534,22 @@ InsertExplicitCall *InsertExplicitCall::create(ConstraintSystem &cs,
 
 bool UsePropertyWrapper::diagnose(const Solution &solution, bool asNote) const {
   ExtraneousPropertyWrapperUnwrapFailure failure(
-      solution, Wrapped, UsingStorageWrapper, Base, Wrapper, getLocator());
+      solution, Wrapped, UsingProjection, Base, Wrapper, getLocator());
   return failure.diagnose(asNote);
 }
 
 UsePropertyWrapper *UsePropertyWrapper::create(ConstraintSystem &cs,
                                                VarDecl *wrapped,
-                                               bool usingStorageWrapper,
+                                               bool usingProjection,
                                                Type base, Type wrapper,
                                                ConstraintLocator *locator) {
   return new (cs.getAllocator()) UsePropertyWrapper(
-      cs, wrapped, usingStorageWrapper, base, wrapper, locator);
+      cs, wrapped, usingProjection, base, wrapper, locator);
 }
 
 bool UseWrappedValue::diagnose(const Solution &solution, bool asNote) const {
   MissingPropertyWrapperUnwrapFailure failure(solution, PropertyWrapper,
-                                              usingStorageWrapper(), Base,
+                                              usingProjection(), Base,
                                               Wrapper, getLocator());
   return failure.diagnose(asNote);
 }
@@ -1317,21 +1317,6 @@ RemoveInvalidCall *RemoveInvalidCall::create(ConstraintSystem &cs,
   return new (cs.getAllocator()) RemoveInvalidCall(cs, locator);
 }
 
-bool AllowInvalidUseOfTrailingClosure::diagnose(const Solution &solution,
-                                                bool asNote) const {
-  InvalidUseOfTrailingClosure failure(solution, getFromType(), getToType(),
-                                      getLocator());
-  return failure.diagnose(asNote);
-}
-
-AllowInvalidUseOfTrailingClosure *
-AllowInvalidUseOfTrailingClosure::create(ConstraintSystem &cs, Type argType,
-                                         Type paramType,
-                                         ConstraintLocator *locator) {
-  return new (cs.getAllocator())
-      AllowInvalidUseOfTrailingClosure(cs, argType, paramType, locator);
-}
-
 bool TreatEphemeralAsNonEphemeral::diagnose(const Solution &solution,
                                             bool asNote) const {
   NonEphemeralConversionFailure failure(solution, getLocator(), getFromType(),
@@ -1507,4 +1492,114 @@ bool SpecifyKeyPathRootType::diagnose(const Solution &solution,
   UnableToInferKeyPathRootFailure failure(solution, getLocator());
   
   return failure.diagnose(asNote);
+}
+
+bool UnwrapOptionalBaseKeyPathApplication::diagnose(const Solution &solution,
+                                                    bool asNote) const {
+  MissingOptionalUnwrapKeyPathFailure failure(solution, getFromType(),
+                                              getToType(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+UnwrapOptionalBaseKeyPathApplication *
+UnwrapOptionalBaseKeyPathApplication::attempt(ConstraintSystem &cs, Type baseTy,
+                                              Type rootTy,
+                                              ConstraintLocator *locator) {
+  if(baseTy->hasTypeVariable() || rootTy->hasTypeVariable())
+    return nullptr;
+
+  if (!isExpr<SubscriptExpr>(locator->getAnchor()))
+    return nullptr;
+  
+  // Only diagnose this if base is an optional type and we only have a
+  // single level of optionality so we can safely suggest unwrapping.
+  auto nonOptionalTy = baseTy->getOptionalObjectType();
+  if (!nonOptionalTy || nonOptionalTy->getOptionalObjectType())
+    return nullptr;
+
+  auto result =
+      cs.matchTypes(nonOptionalTy, rootTy, ConstraintKind::Subtype,
+                    ConstraintSystem::TypeMatchFlags::TMF_ApplyingFix, locator);
+  if (result.isFailure())
+    return nullptr;
+
+  return new (cs.getAllocator())
+      UnwrapOptionalBaseKeyPathApplication(cs, baseTy, rootTy, locator);
+}
+
+bool SpecifyLabelToAssociateTrailingClosure::diagnose(const Solution &solution,
+                                                      bool asNote) const {
+  TrailingClosureRequiresExplicitLabel failure(solution, getLocator());
+  return failure.diagnose(asNote);
+}
+
+SpecifyLabelToAssociateTrailingClosure *
+SpecifyLabelToAssociateTrailingClosure::create(ConstraintSystem &cs,
+                                               ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      SpecifyLabelToAssociateTrailingClosure(cs, locator);
+}
+
+bool AllowKeyPathWithoutComponents::diagnose(const Solution &solution,
+                                             bool asNote) const {
+  InvalidEmptyKeyPathFailure failure(solution, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowKeyPathWithoutComponents *
+AllowKeyPathWithoutComponents::create(ConstraintSystem &cs,
+                                      ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AllowKeyPathWithoutComponents(cs, locator);
+}
+
+bool IgnoreInvalidFunctionBuilderBody::diagnose(const Solution &solution,
+                                                bool asNote) const {
+  switch (Phase) {
+  // Handled below
+  case ErrorInPhase::PreCheck:
+    break;
+  case ErrorInPhase::ConstraintGeneration:
+    return true; // Already diagnosed by `matchFunctionBuilder`.
+  }
+
+  auto *S = getAnchor().get<Stmt *>();
+
+  class PreCheckWalker : public ASTWalker {
+    DeclContext *DC;
+    DiagnosticTransaction Transaction;
+
+  public:
+    PreCheckWalker(DeclContext *dc)
+        : DC(dc), Transaction(dc->getASTContext().Diags) {}
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      auto hasError = ConstraintSystem::preCheckExpression(
+          E, DC, /*replaceInvalidRefsWithErrors=*/true);
+      return std::make_pair(false, hasError ? nullptr : E);
+    }
+
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+      return std::make_pair(true, S);
+    }
+
+    // Ignore patterns because function builder pre-check does so as well.
+    std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
+      return std::make_pair(false, P);
+    }
+
+    bool diagnosed() const {
+      return Transaction.hasErrors();
+    }
+  };
+
+  PreCheckWalker walker(solution.getDC());
+  S->walk(walker);
+
+  return walker.diagnosed();
+}
+
+IgnoreInvalidFunctionBuilderBody *IgnoreInvalidFunctionBuilderBody::create(
+    ConstraintSystem &cs, ErrorInPhase phase, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreInvalidFunctionBuilderBody(cs, phase, locator);
 }

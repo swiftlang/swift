@@ -109,7 +109,7 @@ public:
   void parse(ImmutableTextSnapshotRef Snapshot, SwiftLangSupport &Lang,
              bool BuildSyntaxTree,
              swift::SyntaxParsingCache *SyntaxCache = nullptr);
-  void readSyntaxInfo(EditorConsumer &consumer);
+  void readSyntaxInfo(EditorConsumer &consumer, bool ReportDiags);
   void readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
                         EditorConsumer& Consumer);
 
@@ -222,13 +222,13 @@ public:
 
 namespace TypeContextInfo {
 struct Options {
-  bool reuseASTContextIfPossible = true;
+  // TypeContextInfo doesn't receive any options at this point.
 };
 } // namespace TypeContextInfo
 
 namespace ConformingMethodList {
 struct Options {
-  bool reuseASTContextIfPossible = true;
+  // ConformingMethodList doesn't receive any options at this point.
 };
 } // namespace ConformingMethodList
 
@@ -465,7 +465,7 @@ public:
       llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
       ArrayRef<const char *> Args,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-      bool EnableASTCaching, std::string &Error,
+      std::string &Error,
       llvm::function_ref<void(swift::CompilerInstance &, bool)> Callback);
 
   //==========================================================================//

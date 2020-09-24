@@ -393,14 +393,6 @@ public:
 
   NodeT *getInterface() const { return interface; }
   NodeT *getImplementation() const { return implementation; }
-
-  /// When creating an arc to represent a link from def to use, the use end of
-  /// the arc depends on if the dependency is a cascading one. Centralize that
-  /// choice here.
-  /// ("use" in the name represents the noun, not the verb.)
-  NodeT *useDependingOnCascading(bool ifCascades) {
-    return ifCascades ? interface : implementation;
-  }
 };
 
 //==============================================================================
@@ -500,13 +492,6 @@ public:
   /// Given some type of provided entity compute the name field of the key.
   template <NodeKind kind, typename Entity>
   static std::string computeNameForProvidedEntity(Entity);
-
-  /// Given some type of depended-upon entity create the key.
-  static DependencyKey createDependedUponKey(StringRef mangledHolderName,
-                                             StringRef memberBaseName);
-
-  template <NodeKind kind>
-  static DependencyKey createDependedUponKey(StringRef);
 
   static DependencyKey createKeyForWholeSourceFile(DeclAspect,
                                                    StringRef swiftDeps);

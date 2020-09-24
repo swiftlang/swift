@@ -167,7 +167,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc) {
           return error(Status::FailedToLoadBridgingHeader);
       }
       ModuleDecl *importedHeaderModule = clangImporter->getImportedHeaderModule();
-      dependency.Import = ModuleDecl::ImportedModule{ModuleDecl::AccessPathTy(),
+      dependency.Import = ModuleDecl::ImportedModule{ImportPath::Access(),
                                                      importedHeaderModule};
       continue;
     }
@@ -187,28 +187,21 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc) {
       continue;
     }
 
-    StringRef modulePathStr = dependency.Core.RawPath;
-    StringRef scopePath;
-    if (dependency.isScoped()) {
-      auto splitPoint = modulePathStr.find_last_of('\0');
-      assert(splitPoint != StringRef::npos);
-      scopePath = modulePathStr.substr(splitPoint+1);
-      modulePathStr = modulePathStr.slice(0, splitPoint);
+    ImportPath::Builder builder(ctx, dependency.Core.RawPath,
+                                /*separator=*/'\0');
+    for (const auto &elem : builder) {
+      assert(!elem.Item.empty() && "invalid import path name");
     }
 
-    SmallVector<Identifier, 4> modulePath;
-    while (!modulePathStr.empty()) {
-      StringRef nextComponent;
-      std::tie(nextComponent, modulePathStr) = modulePathStr.split('\0');
-      modulePath.push_back(ctx.getIdentifier(nextComponent));
-      assert(!modulePath.back().empty() &&
-             "invalid module name (submodules not yet supported)");
-    }
+    auto importPath = builder.copyTo(ctx);
+    auto modulePath = importPath.getModulePath(dependency.isScoped());
+    auto accessPath = importPath.getAccessPath(dependency.isScoped());
+
     auto module = getModule(modulePath, /*allowLoading*/true);
     if (!module || module->failedToLoad()) {
       // If we're missing the module we're an overlay for, treat that specially.
       if (modulePath.size() == 1 &&
-          modulePath.front() == file->getParentModule()->getName()) {
+          modulePath.front().Item == file->getParentModule()->getName()) {
         return error(Status::MissingUnderlyingModule);
       }
 
@@ -219,17 +212,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc) {
       continue;
     }
 
-    if (scopePath.empty()) {
-      dependency.Import =
-          ModuleDecl::ImportedModule{ModuleDecl::AccessPathTy(), module};
-    } else {
-      auto scopeID = ctx.getIdentifier(scopePath);
-      assert(!scopeID.empty() &&
-             "invalid decl name (non-top-level decls not supported)");
-      Located<Identifier> accessPathElem = { scopeID, SourceLoc() };
-      dependency.Import = ModuleDecl::ImportedModule{
-          ctx.AllocateCopy(llvm::makeArrayRef(accessPathElem)), module};
-    }
+    dependency.Import = ModuleDecl::ImportedModule{accessPath, module};
 
     // SPI
     StringRef spisStr = dependency.Core.RawSPIs;
@@ -349,17 +332,14 @@ ModuleFile::getModuleName(ASTContext &Ctx, StringRef modulePath,
     llvm::MemoryBuffer::getMemBuffer(llvm::MemoryBufferRef(*moduleBuf.get()),
     /*RequiresNullTerminator=*/false);
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
-  ExtendedValidationInfo ExtInfo;
   bool isFramework = false;
   serialization::ValidationInfo loadInfo =
      ModuleFileSharedCore::load(modulePath.str(),
                       std::move(newBuf),
                       nullptr,
                       nullptr,
-                      /*isFramework*/isFramework, loadedModuleFile,
-                      &ExtInfo);
-
-  Name = loadedModuleFile->Name;
+                      /*isFramework*/isFramework, loadedModuleFile);
+  Name = loadedModuleFile->Name.str();
   return std::move(moduleBuf.get());
 }
 
@@ -447,7 +427,7 @@ void ModuleFile::getImportedModules(
 
   for (auto &dep : Dependencies) {
     if (dep.isExported()) {
-      if (!filter.contains(ModuleDecl::ImportFilterKind::Public))
+      if (!filter.contains(ModuleDecl::ImportFilterKind::Exported))
         continue;
 
     } else if (dep.isImplementationOnly()) {
@@ -460,7 +440,7 @@ void ModuleFile::getImportedModules(
       }
 
     } else {
-      if (!filter.contains(ModuleDecl::ImportFilterKind::Private))
+      if (!filter.contains(ModuleDecl::ImportFilterKind::Default))
         continue;
     }
 
@@ -478,26 +458,18 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
       if (Dep.isHeader())
         continue;
 
-      StringRef ModulePathStr = Dep.Core.RawPath;
-      StringRef ScopePath;
-      if (Dep.isScoped())
-        std::tie(ModulePathStr, ScopePath) = ModulePathStr.rsplit('\0');
+      ImportPath::Builder importPath(Ctx, Dep.Core.RawPath, /*separator=*/'\0');
 
-      SmallVector<Located<swift::Identifier>, 1> AccessPath;
-      while (!ModulePathStr.empty()) {
-        StringRef NextComponent;
-        std::tie(NextComponent, ModulePathStr) = ModulePathStr.split('\0');
-        AccessPath.push_back({Ctx.getIdentifier(NextComponent), SourceLoc()});
-      }
-
-      if (AccessPath.size() == 1 && AccessPath[0].Item == Ctx.StdlibModuleName)
+      if (importPath.size() == 1
+          && importPath.front().Item == Ctx.StdlibModuleName)
         continue;
 
-      ModuleDecl *M = Ctx.getLoadedModule(AccessPath);
+      auto modulePath = importPath.get().getModulePath(Dep.isScoped());
+      ModuleDecl *M = Ctx.getLoadedModule(modulePath);
 
       auto Kind = ImportKind::Module;
-      if (!ScopePath.empty()) {
-        auto ScopeID = Ctx.getIdentifier(ScopePath);
+      if (Dep.isScoped()) {
+        auto ScopeID = importPath.get().getAccessPath(true).front().Item;
         assert(!ScopeID.empty() &&
                "invalid decl name (non-top-level decls not supported)");
 
@@ -508,24 +480,22 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
         } else {
           // Lookup the decl in the top-level module.
           ModuleDecl *TopLevelModule = M;
-          if (AccessPath.size() > 1)
-            TopLevelModule = Ctx.getLoadedModule(AccessPath.front().Item);
+          if (importPath.size() > 1)
+            TopLevelModule = Ctx.getLoadedModule(modulePath.getTopLevelPath());
 
           SmallVector<ValueDecl *, 8> Decls;
           TopLevelModule->lookupQualified(
               TopLevelModule, DeclNameRef(ScopeID),
-              NL_QualifiedDefault | NL_KnownNoDependency, Decls);
+              NL_QualifiedDefault, Decls);
           Optional<ImportKind> FoundKind = ImportDecl::findBestImportKind(Decls);
           assert(FoundKind.hasValue() &&
                  "deserialized imports should not be ambiguous");
           Kind = *FoundKind;
         }
-
-        AccessPath.push_back({ ScopeID, SourceLoc() });
       }
 
       auto *ID = ImportDecl::create(Ctx, FileContext, SourceLoc(), Kind,
-                                    SourceLoc(), AccessPath);
+                                    SourceLoc(), importPath.get());
       ID->setModule(M);
       if (Dep.isExported())
         ID->getAttrs().add(
@@ -537,7 +507,7 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
   Results.append(ImportDecls.begin(), ImportDecls.end());
 }
 
-void ModuleFile::lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
+void ModuleFile::lookupVisibleDecls(ImportPath::Access accessPath,
                                     VisibleDeclConsumer &consumer,
                                     NLKind lookupKind) {
   PrettyStackTraceModuleFile stackEntry(*this);
@@ -735,7 +705,7 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
   return results;
 }
 
-void ModuleFile::lookupClassMember(ModuleDecl::AccessPathTy accessPath,
+void ModuleFile::lookupClassMember(ImportPath::Access accessPath,
                                    DeclName name,
                                    SmallVectorImpl<ValueDecl*> &results) {
   PrettyStackTraceModuleFile stackEntry(*this);
@@ -785,7 +755,7 @@ void ModuleFile::lookupClassMember(ModuleDecl::AccessPathTy accessPath,
   }
 }
 
-void ModuleFile::lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
+void ModuleFile::lookupClassMembers(ImportPath::Access accessPath,
                                     VisibleDeclConsumer &consumer) {
   PrettyStackTraceModuleFile stackEntry(*this);
   assert(accessPath.size() <= 1 && "can only refer to top-level decls");

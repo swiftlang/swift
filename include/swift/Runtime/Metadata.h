@@ -320,6 +320,26 @@ MetadataResponse
 swift_getSingletonMetadata(MetadataRequest request,
                            const TypeContextDescriptor *description);
 
+/// Fetch a uniqued metadata object for the generic nominal type described by
+/// the provided candidate metadata, using that candidate metadata if there is
+/// not already a canonical metadata.
+///
+/// Runtime availability: Swift 5.4
+///
+/// \param candidate A prespecialized metadata record for a type which is not
+///                  statically made to be canonical which will be canonicalized
+///                  if no other canonical metadata exists for the type.
+/// \param cache A pointer to a cache which will be set to the canonical 
+///              metadata record for the type described by the candidate 
+///              metadata record.  If the cache has already been populated, its
+///              contents will be returned.
+/// \returns The canonical metadata for the specialized generic type described
+///          by the provided candidate metadata.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift) MetadataResponse
+    swift_getCanonicalSpecializedMetadata(MetadataRequest request,
+                                          const Metadata *candidate,
+                                          const Metadata **cache);
+
 /// Fetch a uniqued metadata object for a generic nominal type.
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 MetadataResponse

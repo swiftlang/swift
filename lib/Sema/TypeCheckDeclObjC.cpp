@@ -179,7 +179,7 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
 
       if (!PD->isObjC()) {
         diags.diagnose(TypeRange.Start, diag::not_objc_protocol,
-                       PD->getDeclaredType());
+                       PD->getDeclaredInterfaceType());
         return;
       }
     }
@@ -200,7 +200,13 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   }
 
   if (auto fnTy = T->getAs<FunctionType>()) {
-    if (fnTy->getExtInfo().throws() ) {
+    if (fnTy->getExtInfo().isAsync()) {
+      diags.diagnose(TypeRange.Start, diag::not_objc_function_type_async)
+        .highlight(TypeRange);
+      return;
+    }
+
+    if (fnTy->getExtInfo().isThrowing()) {
       diags.diagnose(TypeRange.Start, diag::not_objc_function_type_throwing)
         .highlight(TypeRange);
       return;
@@ -488,8 +494,11 @@ static bool isValidObjectiveCErrorResultType(DeclContext *dc, Type type) {
 bool swift::isRepresentableInObjC(
        const AbstractFunctionDecl *AFD,
        ObjCReason Reason,
+       Optional<ForeignAsyncConvention> &asyncConvention,
        Optional<ForeignErrorConvention> &errorConvention) {
-  // Clear out the error convention. It will be added later if needed.
+  // Clear out the async and error conventions. They will be added later if
+  // needed.
+  asyncConvention = None;
   errorConvention = None;
 
   // If you change this function, you must add or modify a test in PrintAsObjC.
@@ -519,16 +528,21 @@ bool swift::isRepresentableInObjC(
         Reason != ObjCReason::WitnessToObjC &&
         Reason != ObjCReason::MemberOfObjCProtocol) {
       if (Diagnose) {
-        auto error = accessor->isGetter()
-                  ? (isa<VarDecl>(storage)
-                       ? diag::objc_getter_for_nonobjc_property
-                       : diag::objc_getter_for_nonobjc_subscript)
-                  : (isa<VarDecl>(storage)
-                       ? diag::objc_setter_for_nonobjc_property
-                       : diag::objc_setter_for_nonobjc_subscript);
+        if (accessor->isGetter()) {
+          auto error = isa<VarDecl>(storage)
+                         ? diag::objc_getter_for_nonobjc_property
+                         : diag::objc_getter_for_nonobjc_subscript;
 
-        accessor->diagnose(error);
-        describeObjCReason(accessor, Reason);
+          accessor->diagnose(error);
+          describeObjCReason(accessor, Reason);
+        } else if (accessor->isSetter()) {
+          auto error = isa<VarDecl>(storage)
+                         ? diag::objc_setter_for_nonobjc_property
+                         : diag::objc_setter_for_nonobjc_subscript;
+
+          accessor->diagnose(error);
+          describeObjCReason(accessor, Reason);
+        }
       }
       return false;
     }
@@ -590,7 +604,8 @@ bool swift::isRepresentableInObjC(
 
   if (auto FD = dyn_cast<FuncDecl>(AFD)) {
     Type ResultType = FD->mapTypeIntoContext(FD->getResultInterfaceType());
-    if (!ResultType->hasError() &&
+    if (!FD->hasAsync() &&
+        !ResultType->hasError() &&
         !ResultType->isVoid() &&
         !ResultType->isUninhabited() &&
         !ResultType->isRepresentableIn(ForeignLanguage::ObjectiveC,
@@ -598,17 +613,103 @@ bool swift::isRepresentableInObjC(
       if (Diagnose) {
         AFD->diagnose(diag::objc_invalid_on_func_result_type,
                       getObjCDiagnosticAttrKind(Reason));
-        SourceRange Range =
-            FD->getBodyResultTypeLoc().getTypeRepr()->getSourceRange();
-        diagnoseTypeNotRepresentableInObjC(FD, ResultType, Range);
+        diagnoseTypeNotRepresentableInObjC(FD, ResultType,
+                                           FD->getResultTypeSourceRange());
         describeObjCReason(FD, Reason);
       }
       return false;
     }
   }
 
-  // Throwing functions must map to a particular error convention.
-  if (AFD->hasThrows()) {
+  if (AFD->hasAsync()) {
+    // Asynchronous functions move all of the result value and thrown error
+    // information into a completion handler.
+    auto FD = dyn_cast<FuncDecl>(AFD);
+    if (!FD) {
+      if (Diagnose) {
+        AFD->diagnose(diag::not_objc_function_async)
+          .highlight(AFD->getAsyncLoc());
+        describeObjCReason(AFD, Reason);
+      }
+
+      return false;
+    }
+
+    // The completion handler transformation cannot properly represent a
+    // dynamic 'Self' type, so disallow @objc for such methods.
+    if (FD->hasDynamicSelfResult()) {
+      if (Diagnose) {
+        AFD->diagnose(diag::async_objc_dynamic_self)
+            .highlight(AFD->getAsyncLoc());
+        describeObjCReason(AFD, Reason);
+      }
+
+      return false;
+    }
+
+    // The completion handler parameter always goes at the end.
+    unsigned completionHandlerParamIndex = AFD->getParameters()->size();
+
+    // Decompose the return type to form the parameter type of the completion
+    // handler.
+    SmallVector<AnyFunctionType::Param, 2> completionHandlerParams;
+    auto addCompletionHandlerParam = [&](Type type) {
+      // For a throwing asynchronous function, make each parameter type optional
+      // if that's representable in Objective-C.
+      if (AFD->hasThrows() &&
+          !type->getOptionalObjectType() &&
+          isValidObjectiveCErrorResultType(const_cast<FuncDecl *>(FD), type)) {
+        type = OptionalType::get(type);
+      }
+
+      completionHandlerParams.push_back(AnyFunctionType::Param(type));
+
+      // Make sure that the paraneter type is representable in Objective-C.
+      if (!type->isRepresentableIn(
+              ForeignLanguage::ObjectiveC, const_cast<FuncDecl *>(FD))) {
+        if (Diagnose) {
+          AFD->diagnose(diag::objc_invalid_on_func_result_type,
+                        getObjCDiagnosticAttrKind(Reason));
+          diagnoseTypeNotRepresentableInObjC(FD, type,
+                                             FD->getResultTypeSourceRange());
+          describeObjCReason(FD, Reason);
+        }
+
+        return true;
+      }
+
+      return false;
+    };
+
+    // Translate the result type of the function into parameters for the
+    // completion handler parameter, exploding one level of tuple if needed.
+    Type resultType = FD->mapTypeIntoContext(FD->getResultInterfaceType());
+    if (auto tupleType = resultType->getAs<TupleType>()) {
+      for (const auto &tupleElt : tupleType->getElements()) {
+        addCompletionHandlerParam(tupleElt.getType());
+      }
+    } else {
+      addCompletionHandlerParam(resultType);
+    }
+
+    // For a throwing asynchronous function, an Error? parameter is added
+    // to the completion handler parameter, and will be non-nil to signal
+    // a thrown error.
+    Optional<unsigned> completionHandlerErrorParamIndex;
+    if (FD->hasThrows()) {
+      completionHandlerErrorParamIndex = completionHandlerParams.size();
+      addCompletionHandlerParam(OptionalType::get(ctx.getExceptionType()));
+    }
+
+    Type completionHandlerType = FunctionType::get(
+        completionHandlerParams, TupleType::getEmpty(ctx),
+        ASTExtInfoBuilder(FunctionTypeRepresentation::Block, false).build());
+
+    asyncConvention = ForeignAsyncConvention(
+        completionHandlerType->getCanonicalType(), completionHandlerParamIndex,
+        completionHandlerErrorParamIndex);
+  } else if (AFD->hasThrows()) {
+    // Synchronous throwing functions must map to a particular error convention.
     DeclContext *dc = const_cast<AbstractFunctionDecl *>(AFD);
     SourceLoc throwsLoc;
     Type resultType;
@@ -656,7 +757,7 @@ bool swift::isRepresentableInObjC(
         return false;
       }
 
-      errorResultType = boolDecl->getDeclaredType()->getCanonicalType();
+      errorResultType = boolDecl->getDeclaredInterfaceType()->getCanonicalType();
     } else if (!resultType->getOptionalObjectType() &&
                isValidObjectiveCErrorResultType(dc, resultType)) {
       // Functions that return a (non-optional) type bridged to Objective-C
@@ -912,7 +1013,7 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   if (!IndexResult)
     TypeRange = SD->getIndices()->getSourceRange();
   else
-    TypeRange = SD->getElementTypeLoc().getSourceRange();
+    TypeRange = SD->getElementTypeSourceRange();
   SD->diagnose(diag::objc_invalid_on_subscript,
                getObjCDiagnosticAttrKind(Reason))
     .highlight(TypeRange);
@@ -932,9 +1033,10 @@ bool swift::canBeRepresentedInObjC(const ValueDecl *decl) {
     return false;
 
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    Optional<ForeignAsyncConvention> asyncConvention;
     Optional<ForeignErrorConvention> errorConvention;
     return isRepresentableInObjC(func, ObjCReason::MemberOfObjCMembersClass,
-                                 errorConvention);
+                                 asyncConvention, errorConvention);
   }
 
   if (auto var = dyn_cast<VarDecl>(decl))
@@ -1291,6 +1393,7 @@ static bool isEnumObjC(EnumDecl *enumDecl) {
 
 /// Record that a declaration is @objc.
 static void markAsObjC(ValueDecl *D, ObjCReason reason,
+                       Optional<ForeignAsyncConvention> asyncConvention,
                        Optional<ForeignErrorConvention> errorConvention);
 
 
@@ -1329,8 +1432,8 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
       for (auto inherited : proto->getInheritedProtocols()) {
         if (!inherited->isObjC()) {
           proto->diagnose(diag::objc_protocol_inherits_non_objc_protocol,
-                          proto->getDeclaredType(),
-                          inherited->getDeclaredType());
+                          proto->getDeclaredInterfaceType(),
+                          inherited->getDeclaredInterfaceType());
           inherited->diagnose(diag::kind_declname_declared_here,
                               DescriptiveDeclKind::Protocol,
                               inherited->getName());
@@ -1345,19 +1448,9 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
     // Cannot be @objc.
   }
 
-  // Perform some icky stateful hackery to mark this declaration as
-  // not being @objc.
-  auto makeNotObjC = [&] {
-    if (auto objcAttr = VD->getAttrs().getAttribute<ObjCAttr>()) {
-      objcAttr->setInvalid();
-    }
-  };
-
   // If this declaration should not be exposed to Objective-C, we're done.
-  if (!isObjC) {
-    makeNotObjC();
+  if (!isObjC)
     return false;
-  }
 
   if (auto accessor = dyn_cast<AccessorDecl>(VD)) {
     auto storage = accessor->getStorage();
@@ -1378,28 +1471,24 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   }
 
   // If needed, check whether this declaration is representable in Objective-C.
+  Optional<ForeignAsyncConvention> asyncConvention;
   Optional<ForeignErrorConvention> errorConvention;
   if (auto var = dyn_cast<VarDecl>(VD)) {
-    if (!isRepresentableInObjC(var, *isObjC)) {
-      makeNotObjC();
+    if (!isRepresentableInObjC(var, *isObjC))
       return false;
-    }
   } else if (auto subscript = dyn_cast<SubscriptDecl>(VD)) {
-    if (!isRepresentableInObjC(subscript, *isObjC)) {
-      makeNotObjC();
+    if (!isRepresentableInObjC(subscript, *isObjC))
       return false;
-    }
   } else if (isa<DestructorDecl>(VD)) {
     // Destructors need no additional checking.
   } else if (auto func = dyn_cast<AbstractFunctionDecl>(VD)) {
-    if (!isRepresentableInObjC(func, *isObjC, errorConvention)) {
-      makeNotObjC();
+    if (!isRepresentableInObjC(
+            func, *isObjC, asyncConvention, errorConvention))
       return false;
-    }
   }
 
   // Note that this declaration is exposed to Objective-C.
-  markAsObjC(VD, *isObjC, errorConvention);
+  markAsObjC(VD, *isObjC, asyncConvention, errorConvention);
 
   return true;
 }
@@ -1555,6 +1644,7 @@ static ObjCSelector inferObjCName(ValueDecl *decl) {
 /// If the declaration has a @nonobjc attribute, diagnose an error
 /// using the given Reason, if present.
 void markAsObjC(ValueDecl *D, ObjCReason reason,
+                Optional<ForeignAsyncConvention> asyncConvention,
                 Optional<ForeignErrorConvention> errorConvention) {
   ASTContext &ctx = D->getASTContext();
 
@@ -1572,19 +1662,28 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
   }
 
   if (auto method = dyn_cast<AbstractFunctionDecl>(D)) {
-    // Determine the foreign error convention.
-    Optional<ForeignErrorConvention> inheritedConvention;
-    AbstractFunctionDecl *declProvidingInheritedConvention = nullptr;
+    // Determine the foreign async and error conventions.
+    Optional<ForeignAsyncConvention> inheritedAsyncConvention;
+    AbstractFunctionDecl *declProvidingInheritedAsyncConvention = nullptr;
+    Optional<ForeignErrorConvention> inheritedErrorConvention;
+    AbstractFunctionDecl *declProvidingInheritedErrorConvention = nullptr;
     if (auto baseMethod = method->getOverriddenDecl()) {
-      // If the overridden method has a foreign error convention,
-      // adopt it.  Set the foreign error convention for a throwing
-      // method.  Note that the foreign error convention affects the
+      // If the overridden method has a foreign async or error convention,
+      // adopt it. Note that the foreign async or error convention affects the
       // selector, so we perform this before inferring a selector.
+      if (method->hasAsync()) {
+        if (auto baseAsyncConvention
+              = baseMethod->getForeignAsyncConvention()) {
+          inheritedAsyncConvention = baseAsyncConvention;
+          declProvidingInheritedAsyncConvention = baseMethod;
+        }
+      }
+
       if (method->hasThrows()) {
         if (auto baseErrorConvention
               = baseMethod->getForeignErrorConvention()) {
-          inheritedConvention = baseErrorConvention;
-          declProvidingInheritedConvention = baseMethod;
+          inheritedErrorConvention = baseErrorConvention;
+          declProvidingInheritedErrorConvention = baseMethod;
         }
       }
     }
@@ -1592,42 +1691,78 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
     for (auto req : findWitnessedObjCRequirements(method)) {
       auto reqMethod = dyn_cast<AbstractFunctionDecl>(req);
       if (!reqMethod) continue;
-      
+
+      // If the method witnesses an ObjC requirement that is async, adopt its
+      // async convention.
+      if (reqMethod->hasAsync()) {
+        if (auto reqAsyncConvention = reqMethod->getForeignAsyncConvention()) {
+          // Check for a conflict among protocol conformances or inherited
+          // methods.
+          if (declProvidingInheritedAsyncConvention
+              && inheritedAsyncConvention != reqAsyncConvention) {
+            method->diagnose(diag::objc_ambiguous_async_convention,
+                             method->getName());
+            declProvidingInheritedAsyncConvention->diagnose(
+                diag::objc_ambiguous_async_convention_candidate,
+                declProvidingInheritedAsyncConvention->getName());
+            reqMethod->diagnose(diag::objc_ambiguous_async_convention_candidate,
+                                reqMethod->getName());
+            break;
+          }
+
+          inheritedAsyncConvention = reqAsyncConvention;
+          declProvidingInheritedAsyncConvention = reqMethod;
+        }
+      }
+
       // If the method witnesses an ObjC requirement that throws, adopt its
       // error convention.
       if (reqMethod->hasThrows()) {
         if (auto reqErrorConvention = reqMethod->getForeignErrorConvention()) {
           // Check for a conflict among protocol conformances or inherited
           // methods.
-          if (declProvidingInheritedConvention
-              && inheritedConvention != reqErrorConvention) {
+          if (declProvidingInheritedErrorConvention
+              && inheritedErrorConvention != reqErrorConvention) {
             method->diagnose(diag::objc_ambiguous_error_convention,
                              method->getName());
-            declProvidingInheritedConvention->diagnose(
-                             diag::objc_ambiguous_error_convention_candidate,
-                             declProvidingInheritedConvention->getName());
+            declProvidingInheritedErrorConvention->diagnose(
+                diag::objc_ambiguous_error_convention_candidate,
+                declProvidingInheritedErrorConvention->getName());
             reqMethod->diagnose(diag::objc_ambiguous_error_convention_candidate,
                                 reqMethod->getName());
             break;
           }
 
-          inheritedConvention = reqErrorConvention;
-          declProvidingInheritedConvention = reqMethod;
+          inheritedErrorConvention = reqErrorConvention;
+          declProvidingInheritedErrorConvention = reqMethod;
         }
       }
     }
 
+    // Attach the foreign async convention.
+    if (inheritedAsyncConvention) {
+      if (!method->hasAsync())
+        method->diagnose(diag::satisfy_async_objc,
+                         isa<ConstructorDecl>(method));
+      else
+        method->setForeignAsyncConvention(*inheritedAsyncConvention);
+
+    } else if (method->hasAsync()) {
+      assert(asyncConvention && "Missing async convention");
+      method->setForeignAsyncConvention(*asyncConvention);
+    }
+
     // Attach the foreign error convention.
-    if (inheritedConvention) {
+    if (inheritedErrorConvention) {
       // Diagnose if this is a method that does not throw
-      // but inherits an ObjC error convention.
+      // but inherits an ObjC error convention.
       if (!method->hasThrows())
         method->diagnose(diag::satisfy_throws_objc,
                          isa<ConstructorDecl>(method));
       else
-        method->setForeignErrorConvention(*inheritedConvention);
+        method->setForeignErrorConvention(*inheritedErrorConvention);
 
-    } else if (method->hasThrows()) {
+    } else if (method->hasThrows() && !method->hasAsync()) {
       assert(errorConvention && "Missing error convention");
       method->setForeignErrorConvention(*errorConvention);
     }

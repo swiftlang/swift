@@ -11,10 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "CodeCompletionOrganizer.h"
-#include "SourceKit/Support/FuzzyStringMatcher.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
 #include "swift/IDE/CodeCompletionResultPrinter.h"
+#include "swift/IDE/FuzzyStringMatcher.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Markup/XMLUtils.h"
 #include "clang/Basic/CharInfo.h"
@@ -156,8 +156,6 @@ std::vector<Completion *> SourceKit::CodeCompletion::extendCompletions(
 
   return results;
 }
-
-static StringRef copyString(llvm::BumpPtrAllocator &allocator, StringRef str);
 
 bool SourceKit::CodeCompletion::addCustomCompletions(
     CompletionSink &sink, std::vector<Completion *> &completions,
@@ -355,10 +353,10 @@ ImportDepth::ImportDepth(ASTContext &context,
 
   // Private imports from this module.
   // FIXME: only the private imports from the current source file.
-  // FIXME: ImportFilterKind::ShadowedBySeparateOverlay?
+  // FIXME: ImportFilterKind::ShadowedByCrossImportOverlay?
   SmallVector<ModuleDecl::ImportedModule, 16> mainImports;
   main->getImportedModules(mainImports,
-                           {ModuleDecl::ImportFilterKind::Private,
+                           {ModuleDecl::ImportFilterKind::Default,
                             ModuleDecl::ImportFilterKind::ImplementationOnly});
   for (auto &import : mainImports) {
     uint8_t depth = 1;
@@ -404,12 +402,6 @@ ImportDepth::ImportDepth(ASTContext &context,
 //===----------------------------------------------------------------------===//
 // CodeCompletionOrganizer::Impl utilities
 //===----------------------------------------------------------------------===//
-
-static StringRef copyString(llvm::BumpPtrAllocator &allocator, StringRef str) {
-  char *newStr = allocator.Allocate<char>(str.size());
-  std::copy(str.begin(), str.end(), newStr);
-  return StringRef(newStr, str.size());
-}
 
 static std::unique_ptr<Group> make_group(StringRef name) {
   auto g = std::make_unique<Group>();
@@ -1209,72 +1201,6 @@ bool LimitedResultView::walk(CodeCompletionView::Walker &walker) const {
 // CompletionBuilder
 //===----------------------------------------------------------------------===//
 
-void CompletionBuilder::getFilterName(CodeCompletionString *str,
-                                      raw_ostream &OS) {
-  using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
-
-  // FIXME: we need a more uniform way to handle operator completions.
-  if (str->getChunks().size() == 1 && str->getChunks()[0].is(ChunkKind::Dot)) {
-    OS << ".";
-    return;
-  } else if (str->getChunks().size() == 2 &&
-             str->getChunks()[0].is(ChunkKind::QuestionMark) &&
-             str->getChunks()[1].is(ChunkKind::Dot)) {
-    OS << "?.";
-    return;
-  }
-
-  auto FirstTextChunk = str->getFirstTextChunkIndex();
-  if (FirstTextChunk.hasValue()) {
-    auto chunks = str->getChunks().slice(*FirstTextChunk);
-    for (auto i = chunks.begin(), e = chunks.end(); i != e; ++i) {
-      auto &C = *i;
-
-      if (C.is(ChunkKind::BraceStmtWithCursor))
-        break; // Don't include brace-stmt in filter name.
-
-      if (C.is(ChunkKind::Equal)) {
-        OS << C.getText();
-        break;
-      }
-
-      bool shouldPrint = !C.isAnnotation();
-      switch (C.getKind()) {
-      case ChunkKind::TypeAnnotation:
-      case ChunkKind::CallParameterInternalName:
-      case ChunkKind::CallParameterClosureType:
-      case ChunkKind::CallParameterClosureExpr:
-      case ChunkKind::CallParameterType:
-      case ChunkKind::DeclAttrParamColon:
-      case ChunkKind::Comma:
-      case ChunkKind::Whitespace:
-      case ChunkKind::Ellipsis:
-      case ChunkKind::Ampersand:
-      case ChunkKind::OptionalMethodCallTail:
-        continue;
-      case ChunkKind::CallParameterTypeBegin:
-      case ChunkKind::TypeAnnotationBegin: {
-        // Skip call parameter type or type annotation structure.
-        auto nestingLevel = C.getNestingLevel();
-        do { ++i; } while (i != e && !i->endsPreviousNestedGroup(nestingLevel));
-        --i;
-        continue;
-      }
-      case ChunkKind::CallParameterColon:
-        // Since we don't add the type, also don't add the space after ':'.
-        if (shouldPrint)
-          OS << ":";
-        continue;
-      default:
-        break;
-      }
-
-      if (C.hasText() && shouldPrint)
-        OS << C.getText();
-    }
-  }
-}
-
 CompletionBuilder::CompletionBuilder(CompletionSink &sink, SwiftResult &base)
     : sink(sink), current(base) {
   typeRelation = current.getExpectedTypeRelation();
@@ -1286,7 +1212,7 @@ CompletionBuilder::CompletionBuilder(CompletionSink &sink, SwiftResult &base)
   // strings for our inner "." result.
   if (current.getCompletionString()->getFirstTextChunkIndex().hasValue()) {
     llvm::raw_svector_ostream OSS(originalName);
-    getFilterName(current.getCompletionString(), OSS);
+    ide::printCodeCompletionResultFilterName(current, OSS);
   }
 }
 
@@ -1336,7 +1262,7 @@ Completion *CompletionBuilder::finish() {
     }
 
     llvm::raw_svector_ostream OSS(nameStorage);
-    getFilterName(base.getCompletionString(), OSS);
+    ide::printCodeCompletionResultFilterName(base, OSS);
     name = OSS.str();
   }
 

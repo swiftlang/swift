@@ -109,9 +109,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERICPARAM_21 | %FileCheck %s -check-prefix=GENERICPARAM_1
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DECL_MEMBER_INIT_1 | %FileCheck %s -check-prefix=UNRESOLVED_3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_1 | %FileCheck %s -check-prefix=UNRESOLVED_3_NOTIDEAL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_2 | %FileCheck %s -check-prefix=UNRESOLVED_3_NOTIDEAL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_3 | %FileCheck %s -check-prefix=UNRESOLVED_3_NOTIDEAL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_1 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_2 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_3 | %FileCheck %s -check-prefix=UNRESOLVED_3
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPEPARAM_IN_CONTEXTTYPE_1 | %FileCheck %s -check-prefix=TYPEPARAM_IN_CONTEXTTYPE_1
 
@@ -122,6 +122,11 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_5 | %FileCheck %s -check-prefix=UNRESOLVED_3_NOTIDEAL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_6 | %FileCheck %s -check-prefix=UNRESOLVED_3_NOTIDEAL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_CONDITION | %FileCheck %s -check-prefix=TERNARY_CONDITION
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOADED_CLOSURE_RETURN | %FileCheck %s -check-prefix=OVERLOADED_CLOSURE_RETURN
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AUTOCLOSURE | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AUTOCLOSURE_OPT | %FileCheck %s -check-prefix=UNRESOLVED_3_OPT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AUTOCLOSURE_FUNCTY | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AUTOCLOSURE_FUNCTY_OPT | %FileCheck %s -check-prefix=UNRESOLVED_3_OPT
 
 enum SomeEnum1 {
   case South
@@ -221,7 +226,8 @@ class C2 {
 // UNRESOLVED_1-DAG:  Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: Option1[#SomeOptions1#]; name=Option1
 // UNRESOLVED_1-DAG:  Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: Option2[#SomeOptions1#]; name=Option2
 // UNRESOLVED_1-DAG:  Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: Option3[#SomeOptions1#]; name=Option3
-// UNRESOLVED_1-NOT:  Not
+// UNRESOLVED_1-DAG:  Decl[StaticVar]/CurrNominal:        NotOption[#Int#]; name=NotOption
+// UNRESOLVED_1-NOT:  NotStaticOption
 
 // UNRESOLVED_1_NOTIDEAL:  Begin completions
 // UNRESOLVED_1_NOTIDEAL-NOT:  SomeEnum1
@@ -229,7 +235,8 @@ class C2 {
 // UNRESOLVED_1_NOTIDEAL-DAG:  Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option1[#SomeOptions1#]; name=Option1
 // UNRESOLVED_1_NOTIDEAL-DAG:  Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option2[#SomeOptions1#]; name=Option2
 // UNRESOLVED_1_NOTIDEAL-DAG:  Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option3[#SomeOptions1#]; name=Option3
-// UNRESOLVED_1_NOTIDEAL-NOT:  Not
+// UNRESOLVED_1_NOTIDEAL-DAG:  Decl[StaticVar]/CurrNominal:        NotOption[#Int#]; name=NotOption
+// UNRESOLVED_1_NOTIDEAL-NOT:  NotStaticOption
 }
 
 class C3 {
@@ -269,39 +276,49 @@ class C4 {
     var _: SomeEnum1??? = .#^UNRESOLVED_OPT_3^#
   }
 }
-// UNRESOLVED_3: Begin completions, 2 items
+// UNRESOLVED_3: Begin completions, 3 items
 // UNRESOLVED_3-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: North[#SomeEnum1#]; name=North
 // UNRESOLVED_3-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: South[#SomeEnum1#]; name=South
+// UNRESOLVED_3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): SomeEnum1#})[#(into: inout Hasher) -> Void#]; name=hash(self: SomeEnum1)
 // UNRESOLVED_3-NOT: SomeOptions1
 // UNRESOLVED_3-NOT: SomeOptions2
 // UNRESOLVED_3-NOT: none
 // UNRESOLVED_3-NOT: some(
 
-// UNRESOLVED_3_NOTIDEAL: Begin completions, 2 items
+// UNRESOLVED_3_NOTIDEAL: Begin completions, 3 items
 // UNRESOLVED_3_NOTIDEAL-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: North[#SomeEnum1#]; name=North
 // UNRESOLVED_3_NOTIDEAL-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: South[#SomeEnum1#]; name=South
+// UNRESOLVED_3_NOTIDEAL-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): SomeEnum1#})[#(into: inout Hasher) -> Void#]; name=hash(self: SomeEnum1)
 // UNRESOLVED_3_NOTIDEAL-NOT: SomeOptions1
 // UNRESOLVED_3_NOTIDEAL-NOT: SomeOptions2
 // UNRESOLVED_3_NOTIDEAL-NOT: none
 // UNRESOLVED_3_NOTIDEAL-NOT: some(
 
-// UNRESOLVED_3_OPT: Begin completions, 5 items
+// UNRESOLVED_3_OPT: Begin completions, 9 items
 // UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]: North[#SomeEnum1#];
 // UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]: South[#SomeEnum1#];
-// UNRESOLVED_3_OPT-DAG: Keyword[nil]/None/Erase[1]: nil[#SomeEnum1?#]; name=nil
-// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem: none[#Optional<SomeEnum1>#]; name=none
-// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem: some({#SomeEnum1#})[#Optional<SomeEnum1>#];
+// UNRESOLVED_3_OPT-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): SomeEnum1#})[#(into: inout Hasher) -> Void#];
+// UNRESOLVED_3_OPT-DAG: Keyword[nil]/None/Erase[1]/TypeRelation[Identical]: nil[#SomeEnum1?#]; name=nil
+// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: none[#Optional<SomeEnum1>#]; name=none
+// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: some({#SomeEnum1#})[#Optional<SomeEnum1>#];
+// UNRESOLVED_3_OPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map({#(self): Optional<SomeEnum1>#})[#((SomeEnum1) throws -> U) -> U?#];
+// UNRESOLVED_3_OPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap({#(self): Optional<SomeEnum1>#})[#((SomeEnum1) throws -> U?) -> U?#];
 // UNRESOLVED_3_OPT-NOT: init({#(some):
 // UNRESOLVED_3_OPT-NOT: init({#nilLiteral:
+// UNRESOLVED_3_OPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem/TypeRelation[Invalid]: hash({#(self): Optional<SomeEnum1>#})[#(into: inout Hasher) -> Void#];
 
-// UNRESOLVED_3_OPTOPTOPT: Begin completions, 5 items
+// UNRESOLVED_3_OPTOPTOPT: Begin completions, 9 items
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]: North[#SomeEnum1#];
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]: South[#SomeEnum1#];
-// UNRESOLVED_3_OPTOPTOPT-DAG: Keyword[nil]/None/Erase[1]: nil[#SomeEnum1???#]; name=nil
-// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem: none[#Optional<SomeEnum1??>#]; name=none
-// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem: some({#SomeEnum1??#})[#Optional<SomeEnum1??>#];
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): SomeEnum1#})[#(into: inout Hasher) -> Void#];
+// UNRESOLVED_3_OPTOPTOPT-DAG: Keyword[nil]/None/Erase[1]/TypeRelation[Identical]: nil[#SomeEnum1???#]; name=nil
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: none[#Optional<SomeEnum1??>#]; name=none
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: some({#SomeEnum1??#})[#Optional<SomeEnum1??>#];
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map({#(self): Optional<SomeEnum1??>#})[#((SomeEnum1??) throws -> U) -> U?#];
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap({#(self): Optional<SomeEnum1??>#})[#((SomeEnum1??) throws -> U?) -> U?#];
 // UNRESOLVED_3_OPTOPTOPT-NOT: init({#(some):
 // UNRESOLVED_3_OPTOPTOPT-NOT: init({#nilLiteral:
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem/TypeRelation[Invalid]: hash({#(self): Optional<SomeEnum1??>#})[#(into: inout Hasher) -> Void#];
 
 enum Somewhere {
   case earth, mars
@@ -312,14 +329,18 @@ extension Optional where Wrapped == Somewhere {
 }
 func testOptionalWithCustomExtension() {
   var _: Somewhere? = .#^UNRESOLVED_OPT_4^#
-// UNRESOLVED_OPT_4: Begin completions, 7 items
+// UNRESOLVED_OPT_4: Begin completions, 11 items
 // UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]:     earth[#Somewhere#];
 // UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]:     mars[#Somewhere#];
-// UNRESOLVED_OPT_4-DAG: Keyword[nil]/None/Erase[1]: nil[#Somewhere?#]; name=nil
-// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/CurrNominal/IsSystem: none[#Optional<Somewhere>#]; name=none
-// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/CurrNominal/IsSystem: some({#Somewhere#})[#Optional<Somewhere>#];
-// UNRESOLVED_OPT_4-DAG: Decl[Constructor]/CurrNominal: init({#str: String#})[#Optional<Somewhere>#]; name=init(str: String)
+// UNRESOLVED_OPT_4-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): Somewhere#})[#(into: inout Hasher) -> Void#];
+// UNRESOLVED_OPT_4-DAG: Keyword[nil]/None/Erase[1]/TypeRelation[Identical]: nil[#Somewhere?#]; name=nil
+// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: none[#Optional<Somewhere>#]; name=none
+// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: some({#Somewhere#})[#Optional<Somewhere>#];
+// UNRESOLVED_OPT_4-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init({#str: String#})[#Optional<Somewhere>#]; name=init(str: String)
 // UNRESOLVED_OPT_4-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: nowhere[#Optional<Somewhere>#]; name=nowhere
+// UNRESOLVED_OPT_4-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map({#(self): Optional<Somewhere>#})[#((Somewhere) throws -> U) -> U?#];
+// UNRESOLVED_OPT_4-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap({#(self): Optional<Somewhere>#})[#((Somewhere) throws -> U?) -> U?#];
+// UNRESOLVED_OPT_4-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem/TypeRelation[Invalid]: hash({#(self): Optional<Somewhere>#})[#(into: inout Hasher) -> Void#];
 // UNRESOLVED_OPT_4-NOT: init({#(some):
 // UNRESOLVED_OPT_4-NOT: init({#nilLiteral:
 // UNRESOLVED_OPT_4: End completions
@@ -428,10 +449,11 @@ let _: [SomeEnum3:SomeEnum1] = [.Payload(.South):.South, .Payload(.#^UNRESOLVED_
 func testAvail1(_ x: EnumAvail1) {
   testAvail1(.#^ENUM_AVAIL_1^#)
 }
-// ENUM_AVAIL_1: Begin completions, 2 items
+// ENUM_AVAIL_1: Begin completions, 3 items
 // ENUM_AVAIL_1-NOT: AAA
 // ENUM_AVAIL_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: aaa[#EnumAvail1#];
 // ENUM_AVAIL_1-DAG: Decl[EnumElement]/ExprSpecific/NotRecommended/TypeRelation[Identical]: BBB[#EnumAvail1#];
+// ENUM_AVAIL_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): EnumAvail1#})[#(into: inout Hasher) -> Void#];
 // ENUM_AVAIL_1-NOT: AAA
 // ENUM_AVAIL_1: End completions
 
@@ -439,11 +461,11 @@ func testAvail2(_ x: OptionsAvail1) {
   testAvail2(.#^OPTIONS_AVAIL_1^#)
 }
 // OPTIONS_AVAIL_1: Begin completions
-// ENUM_AVAIL_1-NOT: AAA
+// OPTIONS_AVAIL_1-NOT: AAA
 // OPTIONS_AVAIL_1-DAG: Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: aaa[#OptionsAvail1#];
 // OPTIONS_AVAIL_1-DAG: Decl[StaticVar]/ExprSpecific/NotRecommended/TypeRelation[Identical]: BBB[#OptionsAvail1#];
 // OPTIONS_AVAIL_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init({#rawValue: Int#})[#OptionsAvail1#]
-// ENUM_AVAIL_1-NOT: AAA
+// OPTIONS_AVAIL_1-NOT: AAA
 // OPTIONS_AVAIL_1: End completions
 
 func testWithLiteral1() {
@@ -455,8 +477,9 @@ func testWithLiteral1() {
   }
   let s: S
   _ = s.takeEnum(thing: .#^WITH_LITERAL_1^#, other: 1.0)
-// WITH_LITERAL_1: Begin completions, 1 items
+// WITH_LITERAL_1: Begin completions, 2 items
 // WITH_LITERAL_1-NEXT: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: myCase[#S.MyEnum#];
+// WITH_LITERAL_1-NEXT: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): S.MyEnum#})[#(into: inout Hasher) -> Void#];
 // WITH_LITERAL_1-NEXT: End completions
 }
 func testWithLiteral2() {
@@ -479,8 +502,9 @@ func testWithLiteral3() {
     func takeEnum(thing: MyEnum, other: Double) {}
     func test(s: S) {
       _ = s.takeEnum(thing: .#^WITH_LITERAL_3^#, other: 1.0)
-// WITH_LITERAL_3: Begin completions, 1 items
+// WITH_LITERAL_3: Begin completions, 2 items
 // WITH_LITERAL_3-NEXT: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: myCase[#MyEnum#];
+// WITH_LITERAL_3-NEXT: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): MyEnum#})[#(into: inout Hasher) -> Void#];
 // WITH_LITERAL_3-NEXT: End completions
     }
   }
@@ -516,11 +540,13 @@ func testNonOptSet() {
   let x: NonOptSet
   x = .#^NON_OPT_SET_1^#
 }
-// NON_OPT_SET_1: Begin completions, 4 items
+// NON_OPT_SET_1: Begin completions, 6 items
 // NON_OPT_SET_1-DAG: Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]:    a[#NonOptSet#]
+// NON_OPT_SET_1-DAG: Decl[StaticVar]/CurrNominal:        wrongType[#Int#];
 // NON_OPT_SET_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]:  init({#x: Int#}, {#y: Int#})[#NonOptSet#]
 // NON_OPT_SET_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]:  init()[#NonOptSet#]
 // NON_OPT_SET_1-DAG: Decl[StaticMethod]/ExprSpecific/TypeRelation[Identical]: b()[#NonOptSet#]
+// NON_OPT_SET_1-DAG: Decl[InstanceMethod]/CurrNominal: notStatic({#(self): NonOptSet#})[#() -> NonOptSet#];
 // NON_OPT_SET_1: End completions
 
 func testNonOptSet() {
@@ -557,12 +583,12 @@ struct AnotherTy: MyProtocol {}
 func testSubType() {
   var _: BaseClass = .#^SUBTYPE_1^#
 }
-// SUBTYPE_1: Begin completions, 3 items
-// SUBTYPE_1-NOT: init(failable:
+// SUBTYPE_1: Begin completions, 4 items
 // SUBTYPE_1-NOT: Concrete1(
 // SUBTYPE_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init()[#BaseClass#];
 // SUBTYPE_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: SubClass()[#BaseClass.SubClass#];
 // SUBTYPE_1-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Convertible]: subInstance[#BaseClass.SubClass#];
+// SUBTYPE_1-DAG: Decl[Constructor]/CurrNominal:      init({#failable: Void#})[#BaseClass?#];
 // SUBTYPE_1: End completions
 
 func testMemberTypealias() {
@@ -589,21 +615,21 @@ switch Generic<Int>.empty {
 case let .#^GENERIC_4^#
 }
 // GENERIC_1_INT: Begin completions
-// GENERIC_1_INT-DAG: Decl[EnumElement]/ExprSpecific: contains({#content: Int#})[#Generic<Int>#];
-// GENERIC_1_INT-DAG: Decl[EnumElement]/ExprSpecific: empty[#Generic<Int>#];
-// GENERIC_1_INT-DAG: Decl[StaticMethod]/ExprSpecific: create({#Int#})[#Generic<Int>#];
+// GENERIC_1_INT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: contains({#content: Int#})[#Generic<Int>#];
+// GENERIC_1_INT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: empty[#Generic<Int>#];
+// GENERIC_1_INT-DAG: Decl[StaticMethod]/ExprSpecific/TypeRelation[Identical]: create({#Int#})[#Generic<Int>#];
 // GENERIC_1_INT: End completions
 
 // GENERIC_1_INT_NOTIDEAL: Begin completions
-// GENERIC_1_INT_NOTIDEAL-DAG: Decl[EnumElement]/CurrNominal: contains({#content: Int#})[#Generic<Int>#];
-// GENERIC_1_INT_NOTIDEAL-DAG: Decl[EnumElement]/CurrNominal: empty[#Generic<Int>#];
-// GENERIC_1_INT_NOTIDEAL-DAG: Decl[StaticMethod]/CurrNominal: create({#Int#})[#Generic<Int>#];
+// GENERIC_1_INT_NOTIDEAL-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: contains({#content: Int#})[#Generic<Int>#];
+// GENERIC_1_INT_NOTIDEAL-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: empty[#Generic<Int>#];
+// GENERIC_1_INT_NOTIDEAL-DAG: Decl[StaticMethod]/CurrNominal/TypeRelation[Identical]: create({#Int#})[#Generic<Int>#];
 // GENERIC_1_INT_NOTIDEAL: End completions
 
 // GENERIC_1_U: Begin completions
-// GENERIC_1_U-DAG: Decl[EnumElement]/CurrNominal: contains({#content: U#})[#Generic<U>#];
-// GENERIC_1_U-DAG: Decl[EnumElement]/CurrNominal: empty[#Generic<U>#];
-// GENERIC_1_U-DAG: Decl[StaticMethod]/CurrNominal: create({#U#})[#Generic<U>#];
+// GENERIC_1_U-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: contains({#content: U#})[#Generic<U>#];
+// GENERIC_1_U-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: empty[#Generic<U>#];
+// GENERIC_1_U-DAG: Decl[StaticMethod]/CurrNominal/TypeRelation[Identical]: create({#U#})[#Generic<U>#];
 // GENERIC_1_U: End completions
 
 struct HasCreator {
@@ -613,11 +639,11 @@ struct HasCreator {
 func testHasStaticClosure() {
   let _: HasCreator = .#^STATIC_CLOSURE_1^#
 }
-// STATIC_CLOSURE_1: Begin completions, 2 items
+// STATIC_CLOSURE_1: Begin completions, 3 items
 // STATIC_CLOSURE_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init()[#HasCreator#];
 // FIXME: Suggest 'create()[#HasCreateor#]', not 'create'.
 // STATIC_CLOSURE_1-DAG: Decl[StaticVar]/CurrNominal:        create[#() -> HasCreator#];
-// STATIC_CLOSURE_1-NOT: create_curried
+// STATIC_CLOSURE_1-DAG: Decl[StaticVar]/CurrNominal:        create_curried[#() -> () -> HasCreator#];
 // STATIC_CLOSURE_1: End completions
 
 struct HasOverloaded {
@@ -628,11 +654,13 @@ struct HasOverloaded {
 }
 func testOverload(val: HasOverloaded) {
   let _ = val.takeEnum(.#^OVERLOADED_METHOD_1^#)
-// OVERLOADED_METHOD_1: Begin completions, 4 items
+// OVERLOADED_METHOD_1: Begin completions, 6 items
 // OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: South[#SomeEnum1#]; name=South
 // OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: North[#SomeEnum1#]; name=North
+// OVERLOADED_METHOD_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): SomeEnum1#})[#(into: inout Hasher) -> Void#];
 // OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: East[#SomeEnum2#]; name=East
 // OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: West[#SomeEnum2#]; name=West
+// OVERLOADED_METHOD_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): SomeEnum2#})[#(into: inout Hasher) -> Void#];
 // OVERLOADED_METHOD_1: End completions
 
   let _ = HasOverloaded.init(e: .#^OVERLOADED_INIT_1^#)
@@ -649,7 +677,7 @@ func receiveHasStatic<T: HasStatic>(x: T)  {}
 func testingGenericParam1<T: HasStatic>(x: inout T, fn: (T) -> Void) -> T {
   x = .#^GENERICPARAM_1^#
 // GENERICPARAM_1: Begin completions, 1 items
-// GENERICPARAM_1: Decl[StaticVar]/CurrNominal: instance[#HasStatic#]; name=instance
+// GENERICPARAM_1: Decl[StaticVar]/{{ExprSpecific|CurrNominal}}/TypeRelation[Identical]: instance[#HasStatic#]; name=instance
 // GENERICPARAM_1: End completions
 
   /* Parser sync. */;
@@ -756,10 +784,10 @@ extension MyStruct where T: OtherProtocol {
 func receiveMyStructOfMyProtocol<T: MyProtocol>(value: MyStruct<T>) {}
 func testTypeParamInContextType() {
   receiveMyStructOfMyProtocol(value: .#^TYPEPARAM_IN_CONTEXTTYPE_1^#)
-// TYPEPARAM_IN_CONTEXTTYPE_1: Begin completions, 2 items
-// TYPEPARAM_IN_CONTEXTTYPE_1-NOT: otherProtocolOption
-// TYPEPARAM_IN_CONTEXTTYPE_1-DAG: Decl[Constructor]/CurrNominal:      init()[#MyStruct<MyProtocol>#];
+// TYPEPARAM_IN_CONTEXTTYPE_1: Begin completions, 3 items
+// TYPEPARAM_IN_CONTEXTTYPE_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]:      init()[#MyStruct<MyProtocol>#];
 // TYPEPARAM_IN_CONTEXTTYPE_1-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Convertible]: myProtocolOption[#MyStruct<ConcreteMyProtocol>#];
+// TYPEPARAM_IN_CONTEXTTYPE_1-DAG: Decl[StaticVar]/CurrNominal:        otherProtocolOption[#MyStruct<ConcreteOtherProtocol>#];
 // TYPEPARAM_IN_CONTEXTTYPE_1: End completions
 }
 
@@ -782,4 +810,36 @@ func testTernaryOperator2(cond: Bool) {
 // TERNARY_CONDITION: Begin completions
 // TERNARY_CONDITION-DAG: Decl[Constructor]/CurrNominal/IsSystem/TypeRelation[Identical]: init()[#Bool#]; name=init()
 // TERNARY_CONDITION: End completions
+}
+
+func overloadedClosureRcv(_: () -> SomeEnum1) {}
+func overloadedClosureRcv(_: () -> SomeEnum2) {}
+func testClosureReturnTypeForOverloaded() {
+  overloadedClosureRcv {
+    .#^OVERLOADED_CLOSURE_RETURN^#
+  }
+// OVERLOADED_CLOSURE_RETURN: Begin completions, 6 items
+// OVERLOADED_CLOSURE_RETURN-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: South[#SomeEnum1#];
+// OVERLOADED_CLOSURE_RETURN-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: North[#SomeEnum1#];
+// OVERLOADED_CLOSURE_RETURN-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): SomeEnum1#})[#(into: inout Hasher) -> Void#];
+// OVERLOADED_CLOSURE_RETURN-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: East[#SomeEnum2#];
+// OVERLOADED_CLOSURE_RETURN-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: West[#SomeEnum2#];
+// OVERLOADED_CLOSURE_RETURN-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): SomeEnum2#})[#(into: inout Hasher) -> Void#];
+// OVERLOADED_CLOSURE_RETURN: End completions
+}
+
+func receiveAutoclosure(_: @autoclosure () -> SomeEnum1) {}
+func receiveAutoclosureOpt(_: @autoclosure () -> SomeEnum1?) {}
+func testAutoclosre() {
+  receiveAutoclosure(.#^AUTOCLOSURE^#)
+  // Same as UNRESOLVED_3
+
+  receiveAutoclosureOpt(.#^AUTOCLOSURE_OPT^#)
+  // Same as UNRESOLVED_3_OPT
+}
+func testAutoclosreFuncTy(fn: (@autoclosure () -> SomeEnum1) -> Void, fnOpt: (@autoclosure () -> SomeEnum1?) -> Void) {
+  fn(.#^AUTOCLOSURE_FUNCTY^#)
+  // Same as UNRESOLVED_3
+  fnOpt(.#^AUTOCLOSURE_FUNCTY_OPT^#)
+  // Same as UNRESOLVED_3_OPT
 }

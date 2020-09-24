@@ -53,6 +53,20 @@ public:
     }
   }
 
+  /// Construct an AnyFunctionRef from a decl context that might be
+  /// some sort of function.
+  static Optional<AnyFunctionRef> fromDeclContext(DeclContext *dc) {
+    if (auto fn = dyn_cast<AbstractFunctionDecl>(dc)) {
+      return AnyFunctionRef(fn);
+    }
+
+    if (auto ace = dyn_cast<AbstractClosureExpr>(dc)) {
+      return AnyFunctionRef(ace);
+    }
+
+    return None;
+  }
+
   CaptureInfo getCaptureInfo() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getCaptureInfo();
@@ -123,9 +137,9 @@ public:
     return cast<AutoClosureExpr>(ACE)->getBody();
   }
 
-  void setBody(BraceStmt *stmt, bool isSingleExpression) {
+  void setTypecheckedBody(BraceStmt *stmt, bool isSingleExpression) {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
-      AFD->setBody(stmt);
+      AFD->setBody(stmt, AbstractFunctionDecl::BodyKind::TypeChecked);
       AFD->setHasSingleExpressionBody(isSingleExpression);
       return;
     }

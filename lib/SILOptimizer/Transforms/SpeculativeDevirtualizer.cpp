@@ -616,7 +616,7 @@ namespace {
         }
       }
 
-      OptRemark::Emitter ORE(DEBUG_TYPE, CurFn.getModule());
+      OptRemark::Emitter ORE(DEBUG_TYPE, CurFn);
       // Go over the collected calls and try to insert speculative calls.
       for (auto AI : ToSpecialize)
         Changed |= tryToSpeculateTarget(AI, CHA, ORE);

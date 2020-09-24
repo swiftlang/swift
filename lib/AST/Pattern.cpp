@@ -48,7 +48,7 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS, PatternKind kind) {
     return OS << "prefix 'is' pattern";
   case PatternKind::Expr:
     return OS << "expression pattern";
-  case PatternKind::Var:
+  case PatternKind::Binding:
     return OS << "'var' binding pattern";
   case PatternKind::EnumElement:
     return OS << "enum case matching pattern";
@@ -187,7 +187,6 @@ namespace {
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
       return { false, S };
     }
-    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
     bool walkToTypeReprPre(TypeRepr *T) override { return false; }
     bool walkToParameterListPre(ParameterList *PL) override { return false; }
     bool walkToDeclPre(Decl *D) override { return false; }
@@ -214,7 +213,7 @@ void Pattern::forEachVariable(llvm::function_ref<void(VarDecl *)> fn) const {
 
   case PatternKind::Paren:
   case PatternKind::Typed:
-  case PatternKind::Var:
+  case PatternKind::Binding:
     return getSemanticsProvidingPattern()->forEachVariable(fn);
 
   case PatternKind::Tuple:
@@ -262,8 +261,8 @@ void Pattern::forEachNode(llvm::function_ref<void(Pattern*)> f) {
     return cast<ParenPattern>(this)->getSubPattern()->forEachNode(f);
   case PatternKind::Typed:
     return cast<TypedPattern>(this)->getSubPattern()->forEachNode(f);
-  case PatternKind::Var:
-    return cast<VarPattern>(this)->getSubPattern()->forEachNode(f);
+  case PatternKind::Binding:
+    return cast<BindingPattern>(this)->getSubPattern()->forEachNode(f);
 
   case PatternKind::Tuple:
     for (auto elt : cast<TuplePattern>(this)->getElements())
@@ -407,15 +406,6 @@ TypedPattern::TypedPattern(Pattern *pattern, TypeRepr *tr)
   Bits.TypedPattern.IsPropagatedType = false;
 }
 
-TypeLoc TypedPattern::getTypeLoc() const {
-  TypeLoc loc = TypeLoc(PatTypeRepr);
-
-  if (hasType())
-    loc.setType(getType());
-
-  return loc;
-}
-
 SourceLoc TypedPattern::getLoc() const {
   if (SubPattern->isImplicit() && PatTypeRepr)
     return PatTypeRepr->getSourceRange().Start;
@@ -527,7 +517,7 @@ SourceRange ExprPattern::getSourceRange() const {
 // dependency.
 
 struct PatternTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
-  void traceName(const void *Entity, raw_ostream &OS) const {
+  void traceName(const void *Entity, raw_ostream &OS) const override {
     if (!Entity)
       return;
     const Pattern *P = static_cast<const Pattern *>(Entity);
@@ -536,7 +526,7 @@ struct PatternTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
     }
   }
   void traceLoc(const void *Entity, SourceManager *SM,
-                clang::SourceManager *CSM, raw_ostream &OS) const {
+                clang::SourceManager *CSM, raw_ostream &OS) const override {
     if (!Entity)
       return;
     const Pattern *P = static_cast<const Pattern *>(Entity);

@@ -94,20 +94,26 @@ public:
   /// Resolve type variables present in the raw type, if any.
   Type resolveType(Type rawType, bool reconstituteSugar = false,
                    bool wantRValue = true) const {
-    if (!rawType->hasTypeVariable()) {
-      if (reconstituteSugar)
-        rawType = rawType->reconstituteSugar(/*recursive*/ true);
-      return wantRValue ? rawType->getRValueType() : rawType;
+    auto &cs = getConstraintSystem();
+
+    if (rawType->hasTypeVariable() || rawType->hasHole()) {
+      rawType = rawType.transform([&](Type type) {
+        if (auto *typeVar = type->getAs<TypeVariableType>()) {
+          auto resolvedType = S.simplifyType(typeVar);
+          Type GP = typeVar->getImpl().getGenericParameter();
+          return resolvedType->is<UnresolvedType>() && GP
+                     ? GP
+                     : resolvedType;
+        }
+
+        return type->isHole() ? Type(cs.getASTContext().TheUnresolvedType)
+                              : type;
+      });
     }
 
-    auto &cs = getConstraintSystem();
-    return cs.simplifyTypeImpl(rawType, [&](TypeVariableType *typeVar) -> Type {
-      auto fixed = S.simplifyType(typeVar);
-      auto *genericParam = typeVar->getImpl().getGenericParameter();
-      if (fixed->isHole() && genericParam)
-        return genericParam;
-      return resolveType(fixed, reconstituteSugar, wantRValue);
-    });
+    if (reconstituteSugar)
+      rawType = rawType->reconstituteSugar(/*recursive*/ true);
+    return wantRValue ? rawType->getRValueType() : rawType;
   }
 
   template <typename... ArgTypes>
@@ -785,7 +791,7 @@ public:
       : ContextualFailure(solution, fromType, toType, locator) {
     auto fnType1 = fromType->castTo<FunctionType>();
     auto fnType2 = toType->castTo<FunctionType>();
-    assert(fnType1->throws() != fnType2->throws());
+    assert(fnType1->isThrowing() != fnType2->isThrowing());
   }
 
   bool diagnoseAsError() override;
@@ -968,20 +974,20 @@ public:
 
 class PropertyWrapperReferenceFailure : public ContextualFailure {
   VarDecl *Property;
-  bool UsingStorageWrapper;
+  bool UsingProjection;
 
 public:
   PropertyWrapperReferenceFailure(const Solution &solution, VarDecl *property,
-                                  bool usingStorageWrapper, Type base,
+                                  bool usingProjection, Type base,
                                   Type wrapper, ConstraintLocator *locator)
       : ContextualFailure(solution, base, wrapper, locator), Property(property),
-        UsingStorageWrapper(usingStorageWrapper) {}
+        UsingProjection(usingProjection) {}
 
   VarDecl *getProperty() const { return Property; }
 
   Identifier getPropertyName() const { return Property->getName(); }
 
-  bool usingStorageWrapper() const { return UsingStorageWrapper; }
+  bool usingProjection() const { return UsingProjection; }
 
   ValueDecl *getReferencedMember() const {
     auto *locator = getLocator();
@@ -1074,6 +1080,14 @@ private:
   /// Tailored diagnostics for collection literal with unresolved member expression
   /// that defaults the element type. e.g. _ = [.e]
   bool diagnoseInLiteralCollectionContext() const;
+
+  /// Tailored diagnostics for missing subscript member on a tuple base type.
+  /// e.g
+  /// ```swift
+  ///   let tuple: (Int, Int) = (0, 0)
+  ///   _ = tuple[0] // -> tuple.0.
+  ///  ```
+  bool diagnoseForSubscriptMemberWithTupleBase() const;
 
   static DeclName findCorrectEnumCaseName(Type Ty,
                                           TypoCorrectionResults &corrections,
@@ -1293,9 +1307,10 @@ private:
   bool isPropertyWrapperInitialization() const;
 
   /// Gather information associated with expression that represents
-  /// a call - function, arguments, # of arguments and whether it has
-  /// a trailing closure.
-  std::tuple<Expr *, Expr *, unsigned, bool> getCallInfo(ASTNode anchor) const;
+  /// a call - function, arguments, # of arguments and the position of
+  /// the first trailing closure.
+  std::tuple<Expr *, Expr *, unsigned, Optional<unsigned>>
+      getCallInfo(ASTNode anchor) const;
 
   /// Transform given argument into format suitable for a fix-it
   /// text e.g. `[<label>:]? <#<type#>`
@@ -1636,6 +1651,8 @@ public:
       : ContextualFailure(solution, eltType, contextualType, locator) {}
 
   bool diagnoseAsError() override;
+
+  bool diagnoseMergedLiteralElements();
 };
 
 class MissingContextualConformanceFailure final : public ContextualFailure {
@@ -1814,6 +1831,10 @@ public:
   /// property wrapper initialization via implicit `init(wrappedValue:)`
   /// or now deprecated `init(initialValue:)`.
   bool diagnosePropertyWrapperMismatch() const;
+
+  /// Tailored diagnostics for argument mismatches associated with trailing
+  /// closures being passed to non-closure parameters.
+  bool diagnoseTrailingClosureMismatch() const;
 
 protected:
   /// \returns The position of the argument being diagnosed, starting at 1.
@@ -1998,7 +2019,7 @@ public:
                                           ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), MemberName(member) {}
 
-  bool diagnoseAsError();
+  bool diagnoseAsError() override;
 };
 
 class UnableToInferClosureParameterType final : public FailureDiagnostic {
@@ -2007,7 +2028,7 @@ public:
                                     ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
 
-  bool diagnoseAsError();
+  bool diagnoseAsError() override;
 };
 
 class UnableToInferClosureReturnType final : public FailureDiagnostic {
@@ -2016,7 +2037,7 @@ public:
                                  ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
 
-  bool diagnoseAsError();
+  bool diagnoseAsError() override;
 };
 
 class UnableToInferProtocolLiteralType final : public FailureDiagnostic {
@@ -2050,7 +2071,7 @@ public:
                                       ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
 
-  bool diagnoseAsError();
+  bool diagnoseAsError() override;
 };
 
 /// Emits a warning about an attempt to use the 'as' operator as the 'as!'
@@ -2189,6 +2210,62 @@ public:
 
 private:
   void fixIt(InFlightDiagnostic &diagnostic) const override;
+};
+
+/// Diagnose a key path optional base that should be unwraped in order to 
+/// apply key path subscript.
+///
+/// \code
+/// func f(_ bar: Bar? , keyPath: KeyPath<Bar, Int>) {
+///   bar[keyPath: keyPath]
+/// }
+/// \endcode
+class MissingOptionalUnwrapKeyPathFailure final : public ContextualFailure {
+public:
+  MissingOptionalUnwrapKeyPathFailure(const Solution &solution, Type lhs,
+                                      Type rhs, ConstraintLocator *locator)
+      : ContextualFailure(solution, lhs, rhs, locator) {}
+
+  bool diagnoseAsError() override;
+  SourceLoc getLoc() const override;
+};
+
+/// Diagnose situations when trailing closure has been matched to a specific
+/// parameter via a deprecated backward scan.
+///
+/// \code
+/// func multiple_trailing_with_defaults(
+///   duration: Int,
+///   animations: (() -> Void)? = nil,
+///   completion: (() -> Void)? = nil) {}
+///
+/// multiple_trailing_with_defaults(duration: 42) {} // picks `completion:`
+/// \endcode
+class TrailingClosureRequiresExplicitLabel final : public FailureDiagnostic {
+public:
+  TrailingClosureRequiresExplicitLabel(const Solution &solution,
+                                       ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+
+private:
+  void fixIt(InFlightDiagnostic &diagnostic,
+             const FunctionArgApplyInfo &info) const;
+};
+
+/// Diagnose situations where we have a key path with no components.
+///
+/// \code
+/// let _ : KeyPath<A, B> = \A
+/// \endcode
+class InvalidEmptyKeyPathFailure final : public FailureDiagnostic {
+public:
+  InvalidEmptyKeyPathFailure(const Solution &solution,
+                             ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
 };
 
 } // end namespace constraints

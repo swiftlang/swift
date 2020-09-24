@@ -464,8 +464,8 @@ bool ConformanceLookupTable::addProtocol(ProtocolDecl *protocol, SourceLoc loc,
 }
 
 void ConformanceLookupTable::addInheritedProtocols(
-                          llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-                          ConformanceSource source) {
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
+    ConformanceSource source) {
   // Find all of the protocols in the inheritance list.
   bool anyObject = false;
   for (const auto &found :

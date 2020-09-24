@@ -38,7 +38,6 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/STLExtras.h"
-#include "swift/Basic/Timer.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Strings.h"
@@ -121,21 +120,23 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(ASTContext &Context, Expr *expr) {
 
   if (auto E = dyn_cast<MagicIdentifierLiteralExpr>(expr)) {
     switch (E->getKind()) {
-    case MagicIdentifierLiteralExpr::File:
-    case MagicIdentifierLiteralExpr::FilePath:
-    case MagicIdentifierLiteralExpr::Function:
-      return TypeChecker::getProtocol(
-          Context, expr->getLoc(),
+#define MAGIC_STRING_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+    case MagicIdentifierLiteralExpr::NAME: \
+      return TypeChecker::getProtocol( \
+          Context, expr->getLoc(), \
           KnownProtocolKind::ExpressibleByStringLiteral);
 
-    case MagicIdentifierLiteralExpr::Line:
-    case MagicIdentifierLiteralExpr::Column:
-      return TypeChecker::getProtocol(
-          Context, expr->getLoc(),
+#define MAGIC_INT_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+    case MagicIdentifierLiteralExpr::NAME: \
+      return TypeChecker::getProtocol( \
+          Context, expr->getLoc(), \
           KnownProtocolKind::ExpressibleByIntegerLiteral);
 
-    case MagicIdentifierLiteralExpr::DSOHandle:
+#define MAGIC_POINTER_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+    case MagicIdentifierLiteralExpr::NAME: \
       return nullptr;
+
+#include "swift/AST/MagicIdentifierKinds.def"
     }
   }
 
@@ -214,11 +215,17 @@ void swift::bindExtensions(ModuleDecl &mod) {
     if (!SF)
       continue;
 
-    for (auto D : SF->getTopLevelDecls()) {
+    auto visitTopLevelDecl = [&](Decl *D) {
       if (auto ED = dyn_cast<ExtensionDecl>(D))
         if (!tryBindExtension(ED))
-          worklist.push_back(ED);
-    }
+          worklist.push_back(ED);;
+    };
+
+    for (auto *D : SF->getTopLevelDecls())
+      visitTopLevelDecl(D);
+
+    for (auto *D : SF->getHoistedDecls())
+      visitTopLevelDecl(D);
   }
 
   // Phase 2 - repeatedly go through the worklist and attempt to bind each
@@ -250,8 +257,7 @@ static void typeCheckDelayedFunctions(SourceFile &SF) {
          ++currentFunctionIdx) {
       auto *AFD = SF.DelayedFunctions[currentFunctionIdx];
       assert(!AFD->getDeclContext()->isLocalContext());
-
-      TypeChecker::typeCheckAbstractFunctionBody(AFD);
+      (void)AFD->getTypecheckedBody();
     }
 
     // Type check synthesized functions and their bodies.
@@ -284,9 +290,8 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
   // scope-based lookups. Only the top-level scopes because extensions have not
   // been bound yet.
   auto &Ctx = SF->getASTContext();
-  if (Ctx.LangOpts.EnableASTScopeLookup)
-    SF->getScope()
-        .buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals();
+  SF->getScope()
+      .buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals();
 
   BufferIndirectlyCausingDiagnosticRAII cpr(*SF);
 
@@ -357,27 +362,14 @@ bool swift::isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF) {
   return isDifferentiableProgrammingEnabled(SF);
 }
 
-bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
-                                   DeclContext *DC,
-                                   bool ProduceDiagnostics) {
-  return performTypeLocChecking(
-                            Ctx, T,
-                            /*isSILMode=*/false,
-                            /*isSILType=*/false,
-                            /*GenericEnv=*/DC->getGenericEnvironmentOfContext(),
-                            DC, ProduceDiagnostics);
-}
-
-bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
-                                   bool isSILMode,
-                                   bool isSILType,
-                                   GenericEnvironment *GenericEnv,
-                                   DeclContext *DC,
-                                   bool ProduceDiagnostics) {
+Type swift::performTypeResolution(TypeRepr *TyR, ASTContext &Ctx,
+                                  bool isSILMode, bool isSILType,
+                                  GenericEnvironment *GenericEnv,
+                                  GenericParamList *GenericParams,
+                                  DeclContext *DC, bool ProduceDiagnostics) {
   TypeResolutionOptions options = None;
-  if (isSILMode) {
+  if (isSILMode)
     options |= TypeResolutionFlags::SILMode;
-  }
   if (isSILType)
     options |= TypeResolutionFlags::SILType;
 
@@ -393,15 +385,31 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   if (!ProduceDiagnostics)
     suppression.emplace(Ctx.Diags);
 
-  // If we've already validated this type, don't do so again.
-  if (T.wasValidated()) {
-    return T.isError();
-  }
-
-  auto type = resolution.resolveType(T.getTypeRepr());
-  T.setType(type);
-  return type->hasError();
+  return resolution.resolveType(TyR, GenericParams);
 }
+
+namespace {
+  class BindGenericParamsWalker : public ASTWalker {
+    DeclContext *dc;
+    GenericParamList *params;
+
+  public:
+    BindGenericParamsWalker(DeclContext *dc,
+                            GenericParamList *params)
+        : dc(dc), params(params) {}
+
+    bool walkToTypeReprPre(TypeRepr *T) override {
+      if (auto *ident = dyn_cast<IdentTypeRepr>(T)) {
+        auto firstComponent = ident->getComponentRange().front();
+        auto name = firstComponent->getNameRef().getBaseIdentifier();
+        if (auto *paramDecl = params->lookUpGenericParam(name))
+          firstComponent->setValue(paramDecl, dc);
+      }
+
+      return true;
+    }
+  };
+};
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
 GenericEnvironment *
@@ -411,15 +419,21 @@ swift::handleSILGenericParams(GenericParamList *genericParams,
     return nullptr;
 
   SmallVector<GenericParamList *, 2> nestedList;
-  for (; genericParams; genericParams = genericParams->getOuterParameters()) {
-    nestedList.push_back(genericParams);
+  for (auto *innerParams = genericParams;
+       innerParams != nullptr;
+       innerParams = innerParams->getOuterParameters()) {
+    nestedList.push_back(innerParams);
   }
 
   std::reverse(nestedList.begin(), nestedList.end());
 
+  BindGenericParamsWalker walker(DC, genericParams);
+
   for (unsigned i = 0, e = nestedList.size(); i < e; ++i) {
     auto genericParams = nestedList[i];
     genericParams->setDepth(i);
+
+    genericParams->walk(walker);
   }
 
   auto sig =
@@ -441,12 +455,11 @@ void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
   TypeChecker::typeCheckPatternBinding(PBD, bindingIndex);
 }
 
-bool swift::typeCheckAbstractFunctionBodyAtLoc(AbstractFunctionDecl *AFD,
-                                               SourceLoc TargetLoc) {
-  auto &Ctx = AFD->getASTContext();
+bool swift::typeCheckASTNodeAtLoc(DeclContext *DC, SourceLoc TargetLoc) {
+  auto &Ctx = DC->getASTContext();
   DiagnosticSuppression suppression(Ctx.Diags);
   return !evaluateOrDefault(Ctx.evaluator,
-                            TypeCheckFunctionBodyAtLocRequest{AFD, TargetLoc},
+                            TypeCheckASTNodeAtLocRequest{DC, TargetLoc},
                             true);
 }
 

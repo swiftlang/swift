@@ -404,10 +404,8 @@ public:
   }
 
   const TupleTypeRef *createTupleType(llvm::ArrayRef<const TypeRef *> elements,
-                                      std::string &&labels, bool isVariadic) {
-    // FIXME: Add uniqueness checks in TupleTypeRef::Profile and
-    // unittests/Reflection/TypeRef.cpp if using labels for identity.
-    return TupleTypeRef::create(*this, elements, isVariadic);
+                                      std::string &&labels) {
+    return TupleTypeRef::create(*this, elements, std::move(labels));
   }
 
   const FunctionTypeRef *createFunctionType(
@@ -445,7 +443,7 @@ public:
       break;
     }
 
-    auto result = createTupleType({}, "", false);
+    auto result = createTupleType({}, "");
     return FunctionTypeRef::create(*this, {}, result, funcFlags);
   }
 
@@ -618,8 +616,8 @@ public:
       }),
       OpaqueUnderlyingTypeReader(
       [&reader](uint64_t descriptorAddr, unsigned ordinal) -> const TypeRef* {
-        return reader.readUnderlyingTypeForOpaqueTypeDescriptor(descriptorAddr,
-                                                                ordinal);
+        return reader.readUnderlyingTypeForOpaqueTypeDescriptor(
+          descriptorAddr, ordinal).getType();
       })
   {}
 
@@ -634,16 +632,14 @@ public:
                     const std::string &Member,
                     StringRef Protocol);
 
-  const TypeRef *
-  lookupSuperclass(const TypeRef *TR);
+  const TypeRef *lookupSuperclass(const TypeRef *TR);
 
   /// Load unsubstituted field types for a nominal type.
-  RemoteRef<FieldDescriptor>
-  getFieldTypeInfo(const TypeRef *TR);
+  RemoteRef<FieldDescriptor> getFieldTypeInfo(const TypeRef *TR);
 
   /// Get the parsed and substituted field types for a nominal type.
-  bool getFieldTypeRefs(const TypeRef *TR,
-                        RemoteRef<FieldDescriptor> FD,
+  bool getFieldTypeRefs(const TypeRef *TR, RemoteRef<FieldDescriptor> FD,
+                        remote::TypeInfoProvider *ExternalTypeInfo,
                         std::vector<FieldTypeInfo> &Fields);
 
   /// Get the primitive type lowering for a builtin type.

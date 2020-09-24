@@ -1,6 +1,7 @@
 target_sources(swiftSILOptimizer PRIVATE
   AADumper.cpp
   AccessSummaryDumper.cpp
+  AccessedStorageAnalysisDumper.cpp
   AccessedStorageDumper.cpp
   BasicCalleePrinter.cpp
   BasicInstructionPropertyDumper.cpp

@@ -24,7 +24,6 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Basic/Timer.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/ParseSILSupport.h"
@@ -204,7 +203,7 @@ void Parser::performCodeCompletionSecondPassImpl(
 
   case CodeCompletionDelayedDeclKind::FunctionBody: {
     auto *AFD = cast<AbstractFunctionDecl>(DC);
-    AFD->setBodyParsed(parseAbstractFunctionBodyImpl(AFD).getPtrOrNull());
+    (void)parseAbstractFunctionBodyImpl(AFD);
     break;
   }
   }
@@ -661,7 +660,7 @@ void Parser::skipSingle() {
   switch (Tok.getKind()) {
   case tok::l_paren:
     consumeToken();
-    skipUntil(tok::r_paren);
+    skipUntil(tok::r_paren, tok::r_brace);
     consumeIf(tok::r_paren);
     break;
   case tok::l_brace:
@@ -671,7 +670,7 @@ void Parser::skipSingle() {
     break;
   case tok::l_square:
     consumeToken();
-    skipUntil(tok::r_square);
+    skipUntil(tok::r_square, tok::r_brace);
     consumeIf(tok::r_square);
     break;
   case tok::pound_if:
@@ -696,8 +695,9 @@ void Parser::skipSingle() {
 void Parser::skipUntil(tok T1, tok T2) {
   // tok::NUM_TOKENS is a sentinel that means "don't skip".
   if (T1 == tok::NUM_TOKENS && T2 == tok::NUM_TOKENS) return;
-  
-  while (Tok.isNot(T1, T2, tok::eof, tok::pound_endif, tok::code_complete))
+
+  while (Tok.isNot(T1, T2, tok::eof, tok::pound_endif, tok::pound_else,
+                   tok::pound_elseif))
     skipSingle();
 }
 
@@ -826,11 +826,11 @@ void Parser::skipUntilConditionalBlockClose() {
   }
 }
 
-bool Parser::skipUntilTokenOrEndOfLine(tok T1) {
-  while (Tok.isNot(tok::eof, T1) && !Tok.isAtStartOfLine())
+bool Parser::skipUntilTokenOrEndOfLine(tok T1, tok T2) {
+  while (Tok.isNot(tok::eof, T1, T2) && !Tok.isAtStartOfLine())
     skipSingle();
 
-  return Tok.is(T1) && !Tok.isAtStartOfLine();
+  return Tok.isAny(T1, T2) && !Tok.isAtStartOfLine();
 }
 
 bool Parser::loadCurrentSyntaxNodeFromCache() {
@@ -1102,8 +1102,8 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
       return Status;
     }
     // If we haven't made progress, or seeing any error, skip ahead.
-    if (Tok.getLoc() == StartLoc || Status.isError()) {
-      assert(Status.isError() && "no progress without error");
+    if (Tok.getLoc() == StartLoc || Status.isErrorOrHasCompletion()) {
+      assert(Status.isErrorOrHasCompletion() && "no progress without error");
       skipListUntilDeclRBrace(LeftLoc, RightK, tok::comma);
       if (Tok.is(RightK) || Tok.isNot(tok::comma))
         break;
@@ -1136,7 +1136,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
 
   ListContext.reset();
 
-  if (Status.isError()) {
+  if (Status.isErrorOrHasCompletion()) {
     // If we've already got errors, don't emit missing RightK diagnostics.
     if (Tok.is(RightK)) {
       RightLoc = consumeToken();
@@ -1185,11 +1185,40 @@ Parser::getStringLiteralIfNotInterpolated(SourceLoc Loc,
                                                Segments.front().Length));
 }
 
+bool Parser::
+shouldSuppressSingleExpressionBodyTransform(ParserStatus Status,
+                                            MutableArrayRef<ASTNode> BodyElems) {
+  if (BodyElems.size() != 1)
+    return true;
+
+  if (!Status.hasCodeCompletion())
+    return false;
+
+  struct HasMemberCompletion: public ASTWalker {
+    bool Value = false;
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (auto *CCE = dyn_cast<CodeCompletionExpr>(E)) {
+        // If it has a base expression this is member completion, which is
+        // performed using the new solver-based mechanism, so it's ok to go
+        // ahead with the transform (and necessary to pick up the correct
+        // expected type).
+        Value = CCE->getBase();
+        return {false, nullptr};
+      }
+      return {true, E};
+    }
+  };
+  HasMemberCompletion Check;
+  BodyElems.front().walk(Check);
+  return !Check.Value;
+}
+
 struct ParserUnit::Implementation {
   std::shared_ptr<SyntaxParseActions> SPActions;
   LangOptions LangOpts;
   TypeCheckerOptions TypeCheckerOpts;
   SearchPathOptions SearchPathOpts;
+  ClangImporterOptions clangImporterOpts;
   DiagnosticEngine Diags;
   ASTContext &Ctx;
   SourceFile *SF;
@@ -1201,8 +1230,8 @@ struct ParserUnit::Implementation {
                  std::shared_ptr<SyntaxParseActions> spActions)
       : SPActions(std::move(spActions)), LangOpts(Opts),
         TypeCheckerOpts(TyOpts), Diags(SM),
-        Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SearchPathOpts, SM,
-                             Diags)) {
+        Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SearchPathOpts,
+                             clangImporterOpts, SM, Diags)) {
     auto parsingOpts = SourceFile::getDefaultParsingOptions(LangOpts);
     parsingOpts |= ParsingFlags::DisableDelayedBodies;
     parsingOpts |= ParsingFlags::DisablePoundIfEvaluation;

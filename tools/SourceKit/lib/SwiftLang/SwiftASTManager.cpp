@@ -40,36 +40,6 @@ using namespace SourceKit;
 using namespace swift;
 using namespace swift::sys;
 
-namespace {
-class StreamDiagConsumer : public DiagnosticConsumer {
-  llvm::raw_ostream &OS;
-
-public:
-  StreamDiagConsumer(llvm::raw_ostream &OS) : OS(OS) {}
-
-  void handleDiagnostic(SourceManager &SM,
-                        const DiagnosticInfo &Info) override {
-    // FIXME: Print location info if available.
-    switch (Info.Kind) {
-    case DiagnosticKind::Error:
-      OS << "error: ";
-      break;
-    case DiagnosticKind::Warning:
-      OS << "warning: ";
-      break;
-    case DiagnosticKind::Note:
-      OS << "note: ";
-      break;
-    case DiagnosticKind::Remark:
-      OS << "remark: ";
-      break;
-    }
-    DiagnosticEngine::formatDiagnosticText(OS, Info.FormatString,
-                                           Info.FormatArgs);
-  }
-};
-} // end anonymous namespace
-
 void SwiftASTConsumer::failed(StringRef Error) { }
 
 //===----------------------------------------------------------------------===//
@@ -433,46 +403,6 @@ convertFileContentsToInputs(const SmallVectorImpl<FileContent> &contents) {
   return inputsAndOutputs;
 }
 
-static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
-    FrontendInputsAndOutputs &inputsAndOutputs, StringRef UnresolvedPrimaryFile,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    std::string &Error) {
-  assert(FileSystem);
-
-  llvm::SmallString<128> PrimaryFile;
-  if (auto err = FileSystem->getRealPath(UnresolvedPrimaryFile, PrimaryFile))
-    PrimaryFile = UnresolvedPrimaryFile;
-
-  unsigned primaryCount = 0;
-  // FIXME: The frontend should be dealing with symlinks, maybe similar to
-  // clang's FileManager ?
-  FrontendInputsAndOutputs replacementInputsAndOutputs;
-  for (const InputFile &input : inputsAndOutputs.getAllInputs()) {
-    llvm::SmallString<128> newFilename;
-    if (auto err = FileSystem->getRealPath(input.file(), newFilename))
-      newFilename = input.file();
-    llvm::sys::path::native(newFilename);
-    bool newIsPrimary = input.isPrimary() ||
-                        (!PrimaryFile.empty() && PrimaryFile == newFilename);
-    if (newIsPrimary) {
-      ++primaryCount;
-    }
-    assert(primaryCount < 2 && "cannot handle multiple primaries");
-    replacementInputsAndOutputs.addInput(
-        InputFile(newFilename.str(), newIsPrimary, input.buffer()));
-  }
-
-  if (PrimaryFile.empty() || primaryCount == 1) {
-    return replacementInputsAndOutputs;
-  }
-
-  llvm::SmallString<64> Err;
-  llvm::raw_svector_ostream OS(Err);
-  OS << "'" << PrimaryFile << "' is not part of the input files";
-  Error = std::string(OS.str());
-  return replacementInputsAndOutputs;
-}
-
 bool SwiftASTManager::initCompilerInvocation(
     CompilerInvocation &Invocation, ArrayRef<const char *> OrigArgs,
     DiagnosticEngine &Diags, StringRef UnresolvedPrimaryFile,
@@ -488,101 +418,10 @@ bool SwiftASTManager::initCompilerInvocation(
     DiagnosticEngine &Diags, StringRef UnresolvedPrimaryFile,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     std::string &Error) {
-  SmallVector<const char *, 16> Args;
-  // Make sure to put '-resource-dir' and '-diagnostic-documentation-path' at
-  // the top to allow overriding them with the passed in arguments.
-  Args.push_back("-resource-dir");
-  Args.push_back(Impl.RuntimeResourcePath.c_str());
-  Args.push_back("-Xfrontend");
-  Args.push_back("-diagnostic-documentation-path");
-  Args.push_back("-Xfrontend");
-  Args.push_back(Impl.DiagnosticDocumentationPath.c_str());
-  Args.append(OrigArgs.begin(), OrigArgs.end());
-
-  SmallString<32> ErrStr;
-  llvm::raw_svector_ostream ErrOS(ErrStr);
-  StreamDiagConsumer DiagConsumer(ErrOS);
-  Diags.addConsumer(DiagConsumer);
-
-  bool HadError = driver::getSingleFrontendInvocationFromDriverArguments(
-      Args, Diags, [&](ArrayRef<const char *> FrontendArgs) {
-    return Invocation.parseArgs(FrontendArgs, Diags);
-  }, /*ForceNoOutputs=*/true);
-
-  // Remove the StreamDiagConsumer as it's no longer needed.
-  Diags.removeConsumer(DiagConsumer);
-
-  if (HadError) {
-    Error = std::string(ErrOS.str());
-    return true;
-  }
-
-  Invocation.getFrontendOptions().InputsAndOutputs =
-      resolveSymbolicLinksInInputs(
-          Invocation.getFrontendOptions().InputsAndOutputs,
-          UnresolvedPrimaryFile, FileSystem, Error);
-  if (!Error.empty())
-    return true;
-
-  ClangImporterOptions &ImporterOpts = Invocation.getClangImporterOptions();
-  ImporterOpts.DetailedPreprocessingRecord = true;
-
-  assert(!Invocation.getModuleName().empty());
-
-  auto &LangOpts = Invocation.getLangOptions();
-  LangOpts.AttachCommentsToDecls = true;
-  LangOpts.DiagnosticsEditorMode = true;
-  LangOpts.CollectParsedToken = true;
-  if (LangOpts.PlaygroundTransform) {
-    // The playground instrumenter changes the AST in ways that disrupt the
-    // SourceKit functionality. Since we don't need the instrumenter, and all we
-    // actually need is the playground semantics visible to the user, like
-    // silencing the "expression resolves to an unused l-value" error, disable it.
-    LangOpts.PlaygroundTransform = false;
-  }
-
-  // Disable the index-store functionality for the sourcekitd requests.
-  auto &FrontendOpts = Invocation.getFrontendOptions();
-  FrontendOpts.IndexStorePath.clear();
-  ImporterOpts.IndexStorePath.clear();
-
-  // Force the action type to be -typecheck. This affects importing the
-  // SwiftONoneSupport module.
-  FrontendOpts.RequestedAction = FrontendOptions::ActionType::Typecheck;
-
-  // We don't care about LLVMArgs
-  FrontendOpts.LLVMArgs.clear();
-
-  // SwiftSourceInfo files provide source location information for decls coming
-  // from loaded modules. For most IDE use cases it either has an undesirable
-  // impact on performance with no benefit (code completion), results in stale
-  // locations being used instead of more up-to-date indexer locations (cursor
-  // info), or has no observable effect (diagnostics, which are filtered to just
-  // those with a location in the primary file, and everything else).
-  if (Impl.Config->shouldOptimizeForIDE())
-    FrontendOpts.IgnoreSwiftSourceInfo = true;
-
-  // To save the time for module validation, consider the lifetime of ASTManager
-  // as a single build session.
-  // NOTE: Do this only if '-disable-modules-validate-system-headers' is *not*
-  //       explicitly enabled.
-  auto &SearchPathOpts = Invocation.getSearchPathOptions();
-  if (!SearchPathOpts.DisableModulesValidateSystemDependencies) {
-    // NOTE: 'SessionTimestamp - 1' because clang compares it with '<=' that may
-    //       cause unnecessary validations if they happens within one second
-    //       from the SourceKit startup.
-    ImporterOpts.ExtraArgs.push_back("-fbuild-session-timestamp=" +
-                                     std::to_string(Impl.SessionTimestamp - 1));
-    ImporterOpts.ExtraArgs.push_back(
-        "-fmodules-validate-once-per-build-session");
-
-    SearchPathOpts.DisableModulesValidateSystemDependencies = true;
-  }
-
-  // Disable expensive SIL options to reduce time spent in SILGen.
-  disableExpensiveSILOptions(Invocation.getSILOptions());
-
-  return false;
+  return ide::initCompilerInvocation(
+      Invocation, OrigArgs, Diags, UnresolvedPrimaryFile, FileSystem,
+      Impl.RuntimeResourcePath, Impl.DiagnosticDocumentationPath,
+      Impl.Config->shouldOptimizeForIDE(), Impl.SessionTimestamp, Error);
 }
 
 bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &CompInvok,
@@ -872,7 +711,7 @@ bool ASTProducer::shouldRebuild(
       Invok.Opts.Invok.getFrontendOptions().InputsAndOutputs.inputCount());
   for (const auto &input :
        Invok.Opts.Invok.getFrontendOptions().InputsAndOutputs.getAllInputs()) {
-    const std::string &File = input.file();
+    const std::string &File = input.getFileName();
     bool FoundSnapshot = false;
     for (auto &Snap : Snapshots) {
       if (Snap->getFilename() == File) {
@@ -908,13 +747,13 @@ static void collectModuleDependencies(ModuleDecl *TopMod,
   auto ClangModuleLoader = TopMod->getASTContext().getClangModuleLoader();
 
   ModuleDecl::ImportFilter ImportFilter = {
-      ModuleDecl::ImportFilterKind::Public,
-      ModuleDecl::ImportFilterKind::Private};
+      ModuleDecl::ImportFilterKind::Exported,
+      ModuleDecl::ImportFilterKind::Default};
   if (Visited.empty()) {
     // Only collect implementation-only dependencies from the main module.
     ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
   }
-  // FIXME: ImportFilterKind::ShadowedBySeparateOverlay?
+  // FIXME: ImportFilterKind::ShadowedByCrossImportOverlay?
   SmallVector<ModuleDecl::ImportedModule, 8> Imports;
   TopMod->getImportedModules(Imports, ImportFilter);
 
@@ -1067,7 +906,7 @@ void ASTProducer::findSnapshotAndOpenFiles(
   const InvocationOptions &Opts = InvokRef->Impl.Opts;
   for (const auto &input :
        Opts.Invok.getFrontendOptions().InputsAndOutputs.getAllInputs()) {
-    const std::string &File = input.file();
+    const std::string &File = input.getFileName();
     bool IsPrimary = input.isPrimary();
     bool FoundSnapshot = false;
     for (auto &Snap : Snapshots) {

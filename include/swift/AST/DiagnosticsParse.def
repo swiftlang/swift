@@ -112,8 +112,8 @@ ERROR(lex_single_quote_string,none,
 ERROR(lex_invalid_curly_quote,none,
       "unicode curly quote found, replace with '\"'", ())
 NOTE(lex_confusable_character,none,
-      "unicode character '%0' looks similar to '%1'; did you mean to use '%1'?",
-      (StringRef, StringRef))
+      "unicode character '%0' (%1) looks similar to '%2' (%3); did you mean to use '%2' (%3)?",
+      (StringRef, StringRef, StringRef, StringRef))
 WARNING(lex_nonbreaking_space,none,
         "non-breaking space (U+00A0) used instead of regular space", ())
 
@@ -727,10 +727,9 @@ ERROR(generic_non_function,PointsToFirstBadToken,
 ERROR(rethrowing_function_type,none,
       "only function declarations may be marked 'rethrows'; "
       "did you mean 'throws'?", ())
-ERROR(throws_in_wrong_position,none,
-      "'throws' may only occur before '->'", ())
-ERROR(rethrows_in_wrong_position,none,
-      "'rethrows' may only occur before '->'", ())
+ERROR(async_or_throws_in_wrong_position,none,
+      "%select{'throws'|'rethrows'|'async'}0 may only occur before '->'",
+      (unsigned))
 ERROR(throw_in_function_type,none,
       "expected throwing specifier; did you mean 'throws'?", ())
 ERROR(expected_type_before_arrow,none,
@@ -742,6 +741,9 @@ ERROR(function_type_argument_label,none,
       (Identifier))
 ERROR(expected_dynamic_func_attr,none,
       "expected a dynamically_replaceable function", ())
+ERROR(async_after_throws,none,
+      "'async' must precede %select{'throws'|'rethrows'}0", (bool))
+ERROR(async_init,none, "initializer cannot be marked 'async'", ())
 
 // Enum Types
 ERROR(expected_expr_enum_case_raw_value,PointsToFirstBadToken,
@@ -880,8 +882,6 @@ ERROR(expected_parameter_colon,PointsToFirstBadToken,
       "expected ':' following argument label and parameter name", ())
 ERROR(expected_assignment_instead_of_comparison_operator,none,
       "expected '=' instead of '==' to assign default value for parameter", ())
-ERROR(multiple_parameter_ellipsis,none,
-      "only a single variadic parameter '...' is permitted", ())
 ERROR(parameter_vararg_default,none,
       "variadic parameter cannot have a default value", ())
 ERROR(parameter_specifier_as_attr_disallowed,none,
@@ -914,6 +914,8 @@ ERROR(initializer_as_typed_pattern,none,
 
 ERROR(unlabeled_parameter_following_variadic_parameter,none,
       "a parameter following a variadic parameter requires a label", ())
+ERROR(closure_unlabeled_parameter_following_variadic_parameter,none,
+      "no parameters may follow a variadic parameter in a closure", ())
 
 ERROR(enum_element_empty_arglist,none,
       "enum element with associated values must have at least one "
@@ -1254,6 +1256,10 @@ ERROR(expected_colon_after_if_question,none,
       "expected ':' after '? ...' in ternary expression", ())
 ERROR(expected_expr_after_if_colon,none,
       "expected expression after '? ... :' in ternary expression", ())
+ERROR(expected_expr_after_try, none,
+      "expected expression after 'try'", ())
+ERROR(expected_expr_after_await, none,
+      "expected expression after 'await'", ())
 
 // Cast expressions
 ERROR(expected_type_after_is,none,
@@ -1318,8 +1324,6 @@ ERROR(replace_equal_with_colon_for_value,none,
       "'=' has been replaced with ':' in attribute arguments", ())
 ERROR(expected_attribute_name,none,
       "expected an attribute name", ())
-ERROR(unknown_attribute,none,
-      "unknown attribute '%0'", (StringRef))
 ERROR(unexpected_lparen_in_attribute,none,
       "unexpected '(' in attribute '%0'", (StringRef))
 ERROR(duplicate_attribute,none,
@@ -1743,6 +1747,11 @@ ERROR(pound_available_package_description_not_allowed, none,
 
 ERROR(availability_query_repeated_platform, none,
       "version for '%0' already specified", (StringRef))
+
+ERROR(attr_requires_concurrency,none,
+      "'%0' %select{attribute|modifier}1 is only valid when experimental "
+      "concurrency is enabled",
+      (StringRef, bool))
 
 //------------------------------------------------------------------------------
 // MARK: syntax parsing diagnostics

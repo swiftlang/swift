@@ -3,6 +3,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD2 | %FileCheck %s -check-prefix=KEYWORD2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD3 | %FileCheck %s -check-prefix=KEYWORD3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD3_2 | %FileCheck %s -check-prefix=KEYWORD3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD3 -enable-experimental-concurrency | %FileCheck %s -check-prefix=KEYWORD3_ASYNC
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD4 | %FileCheck %s -check-prefix=KEYWORD4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD5 | %FileCheck %s -check-prefix=KEYWORD5
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ON_GLOBALVAR | %FileCheck %s -check-prefix=ON_GLOBALVAR
@@ -39,6 +40,7 @@ struct MyStruct {}
 // AVAILABILITY1-NEXT: Keyword/None:                       macOSApplicationExtension[#Platform#]; name=macOSApplicationExtension{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       macCatalyst[#Platform#]; name=macCatalyst
 // AVAILABILITY1-NEXT: Keyword/None:                       macCatalystApplicationExtension[#Platform#]; name=macCatalystApplicationExtension
+// AVAILABILITY1-NEXT: Keyword/None:                       OpenBSD[#Platform#]; name=OpenBSD{{$}}
 // AVAILABILITY1-NEXT: End completions
 
 @available(*, #^AVAILABILITY2^#)
@@ -89,6 +91,8 @@ struct MyStruct {}
 // KEYWORD3-NEXT:             Keyword/None:                       usableFromInline[#Class Attribute#]; name=usableFromInline
 // KEYWORD3-NEXT:             Keyword/None:                       propertyWrapper[#Class Attribute#]; name=propertyWrapper
 // KEYWORD3-NEXT:             End completions
+
+// KEYWORD3_ASYNC: Keyword/None: actor[#Class Attribute#]; name=actor
 
 @#^KEYWORD3_2^#IB class C2 {}
 // Same as KEYWORD3.

@@ -45,16 +45,17 @@ public:
 
   // Only handle callbacks for suffix completions.
   // {
-  void completeDotExpr(Expr *E, SourceLoc DotLoc) override;
+  void completeDotExpr(CodeCompletionExpr *E, SourceLoc DotLoc) override;
   void completePostfixExpr(Expr *E, bool hasSpace) override;
   // }
 
   void doneParsing() override;
 };
 
-void ConformingMethodListCallbacks::completeDotExpr(Expr *E, SourceLoc DotLoc) {
+void ConformingMethodListCallbacks::completeDotExpr(CodeCompletionExpr *E,
+                                                    SourceLoc DotLoc) {
   CurDeclContext = P.CurDeclContext;
-  ParsedExpr = E;
+  ParsedExpr = E->getBase();
 }
 
 void ConformingMethodListCallbacks::completePostfixExpr(Expr *E,
@@ -154,7 +155,7 @@ void ConformingMethodListCallbacks::getMatchingMethods(
           Result(result) {}
 
     void foundDecl(ValueDecl *VD, DeclVisibilityKind reason,
-                   DynamicLookupInfo) {
+                   DynamicLookupInfo) override {
       if (isMatchingMethod(VD) && !VD->shouldHideFromEditor())
         Result.push_back(VD);
     }

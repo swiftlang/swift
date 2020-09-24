@@ -156,8 +156,8 @@ public:
   bool isConcrete() const;
   bool isConcreteAfterSubstitutions(const GenericArgumentMap &Subs) const;
 
-  const TypeRef *
-  subst(TypeRefBuilder &Builder, const GenericArgumentMap &Subs) const;
+  const TypeRef *subst(TypeRefBuilder &Builder,
+                       const GenericArgumentMap &Subs) const;
 
   llvm::Optional<GenericArgumentMap> getSubstMap() const;
 
@@ -301,38 +301,49 @@ public:
 };
 
 class TupleTypeRef final : public TypeRef {
+protected:
   std::vector<const TypeRef *> Elements;
-  bool Variadic;
+  std::string Labels;
 
   static TypeRefID Profile(const std::vector<const TypeRef *> &Elements,
-                           bool Variadic) {
+                           const std::string &Labels) {
     TypeRefID ID;
     for (auto Element : Elements)
       ID.addPointer(Element);
-
-    ID.addInteger(static_cast<uint32_t>(Variadic));
+    ID.addString(Labels);
     return ID;
   }
 
 public:
-  TupleTypeRef(std::vector<const TypeRef *> Elements, bool Variadic=false)
-    : TypeRef(TypeRefKind::Tuple), Elements(std::move(Elements)),
-      Variadic(Variadic) {}
+  TupleTypeRef(std::vector<const TypeRef *> Elements, std::string &&Labels)
+      : TypeRef(TypeRefKind::Tuple), Elements(std::move(Elements)),
+        Labels(Labels) {}
 
   template <typename Allocator>
   static const TupleTypeRef *create(Allocator &A,
                                     std::vector<const TypeRef *> Elements,
-                                    bool Variadic = false) {
-    FIND_OR_CREATE_TYPEREF(A, TupleTypeRef, Elements, Variadic);
+                                    std::string &&Labels) {
+    FIND_OR_CREATE_TYPEREF(A, TupleTypeRef, Elements, Labels);
   }
 
-  const std::vector<const TypeRef *> &getElements() const {
-    return Elements;
+  const std::vector<const TypeRef *> &getElements() const { return Elements; };
+  const std::string &getLabelString() const { return Labels; };
+  std::vector<llvm::StringRef> getLabels() const {
+    std::vector<llvm::StringRef> Vec;
+    std::string::size_type End, Start = 0;
+    while (true) {
+      End = Labels.find(' ', Start);
+      if (End == std::string::npos)
+        break;
+      Vec.push_back(llvm::StringRef(Labels.data() + Start, End - Start));
+      Start = End + 1;
+    }
+    // A canonicalized TypeRef has an empty label string.
+    // Pad the vector with empty labels.
+    for (unsigned N = Vec.size(); N < Elements.size(); ++N)
+      Vec.push_back({});
+    return Vec;
   };
-
-  bool isVariadic() const {
-    return Variadic;
-  }
 
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::Tuple;

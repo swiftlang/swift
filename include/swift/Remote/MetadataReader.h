@@ -463,7 +463,8 @@ public:
   }
 
   /// Given a demangle tree, attempt to turn it into a type.
-  BuiltType decodeMangledType(NodePointer Node) {
+  TypeLookupErrorOr<typename BuilderType::BuiltType>
+  decodeMangledType(NodePointer Node) {
     return swift::Demangle::decodeMangledType(Builder, Node);
   }
 
@@ -509,6 +510,7 @@ public:
     if (!meta || meta->getKind() != MetadataKind::Class)
       return None;
 
+#if SWIFT_OBJC_INTEROP
     // The following algorithm only works on the non-fragile Apple runtime.
 
     // Grab the RO-data pointer.  This part is not ABI.
@@ -524,6 +526,23 @@ public:
       return None;
 
     return start;
+#else
+    // All swift class instances start with an isa pointer,
+    // followed by the retain counts (which are the size of a long long).
+    size_t isaAndRetainCountSize = sizeof(StoredSize) + sizeof(long long);
+    size_t start = isaAndRetainCountSize;
+
+    auto classMeta = cast<TargetClassMetadata<Runtime>>(meta);
+    while (classMeta->Superclass) {
+      classMeta = cast<TargetClassMetadata<Runtime>>(
+          readMetadata(classMeta->Superclass));
+
+      // Subtract the size contribution of the isa and retain counts from 
+      // the super class.
+      start += classMeta->InstanceSize - isaAndRetainCountSize;
+    }
+    return start;
+#endif
   }
 
   /// Given a pointer to the metadata, attempt to read the value
@@ -759,8 +778,8 @@ public:
           !Reader->readString(RemoteAddress(tupleMeta->Labels), labels))
         return BuiltType();
 
-      auto BuiltTuple = Builder.createTupleType(elementTypes, std::move(labels),
-                                                /*variadic*/ false);
+      auto BuiltTuple =
+          Builder.createTupleType(elementTypes, std::move(labels));
       TypeCache[MetadataAddress] = BuiltTuple;
       return BuiltTuple;
     }
@@ -785,7 +804,8 @@ public:
 
       auto flags = FunctionTypeFlags()
                        .withConvention(Function->getConvention())
-                       .withThrows(Function->throws())
+                       .withAsync(Function->isAsync())
+                       .withThrows(Function->isThrowing())
                        .withParameterFlags(Function->hasParameterFlags())
                        .withEscaping(Function->isEscaping());
       auto BuiltFunction =
@@ -906,8 +926,8 @@ public:
     swift_runtime_unreachable("Unhandled MetadataKind in switch");
   }
 
-  BuiltType readTypeFromMangledName(const char *MangledTypeName,
-                                    size_t Length) {
+  TypeLookupErrorOr<typename BuilderType::BuiltType>
+  readTypeFromMangledName(const char *MangledTypeName, size_t Length) {
     Demangle::Demangler Dem;
     Demangle::NodePointer Demangled =
       Dem.demangleSymbol(StringRef(MangledTypeName, Length));
@@ -1164,14 +1184,14 @@ public:
                                 MangledNameKind::Type, Dem);
   }
 
-  BuiltType
+  TypeLookupErrorOr<typename BuilderType::BuiltType>
   readUnderlyingTypeForOpaqueTypeDescriptor(StoredPointer contextAddr,
                                             unsigned ordinal) {
     Demangle::Demangler Dem;
     auto node = readUnderlyingTypeManglingForOpaqueTypeDescriptor(contextAddr,
                                                                   ordinal, Dem);
     if (!node)
-      return BuiltType();
+      return TypeLookupError("Failed to read type mangling for descriptor.");
     return decodeMangledType(node);
   }
 

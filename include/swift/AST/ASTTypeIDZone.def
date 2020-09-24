@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+SWIFT_TYPEID(ActorIsolation)
 SWIFT_TYPEID(AncestryFlags)
 SWIFT_TYPEID(CtorInitializerKind)
 SWIFT_TYPEID(FunctionBuilderBodyPreCheck)
@@ -28,6 +29,7 @@ SWIFT_TYPEID(Requirement)
 SWIFT_TYPEID(ResilienceExpansion)
 SWIFT_TYPEID(FragileFunctionKind)
 SWIFT_TYPEID(TangentPropertyInfo)
+SWIFT_TYPEID(SymbolSourceMap)
 SWIFT_TYPEID(Type)
 SWIFT_TYPEID(TypePair)
 SWIFT_TYPEID(TypeWitnessAndDecl)

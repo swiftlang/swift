@@ -119,10 +119,9 @@ lookupUnqualifiedEnumMemberElement(DeclContext *DC, DeclNameRef name,
   // FIXME: We should probably pay attention to argument labels someday.
   name = name.withoutArgumentLabels();
 
-  auto lookupOptions = defaultUnqualifiedLookupOptions;
-  lookupOptions |= NameLookupFlags::KnownPrivate;
   auto lookup =
-      TypeChecker::lookupUnqualified(DC, name, SourceLoc(), lookupOptions);
+      TypeChecker::lookupUnqualified(DC, name, UseLoc,
+                                     defaultUnqualifiedLookupOptions);
   return filterForEnumElement(DC, UseLoc,
                               /*unqualifiedLookup=*/true, lookup);
 }
@@ -286,7 +285,7 @@ public:
   ALWAYS_RESOLVED_PATTERN(Bool)
 #undef ALWAYS_RESOLVED_PATTERN
 
-  Pattern *visitVarPattern(VarPattern *P) {
+  Pattern *visitBindingPattern(BindingPattern *P) {
     // Keep track of the fact that we're inside of a var/let pattern.  This
     // affects how unqualified identifiers are processed.
     P->setSubPattern(visit(P->getSubPattern()));
@@ -446,18 +445,12 @@ public:
   // Unresolved member syntax '.Element' forms an EnumElement pattern. The
   // element will be resolved when we type-check the pattern.
   Pattern *visitUnresolvedMemberExpr(UnresolvedMemberExpr *ume) {
-    // If the unresolved member has an argument, turn it into a subpattern.
-    Pattern *subPattern = nullptr;
-    if (auto arg = ume->getArgument()) {
-      subPattern = getSubExprPattern(arg);
-    }
-    
     if (ume->getName().getBaseName().isSpecial())
       return nullptr;
 
     return new (Context)
         EnumElementPattern(ume->getDotLoc(), ume->getNameLoc(), ume->getName(),
-                           subPattern, ume);
+                           nullptr, ume);
   }
   
   // Member syntax 'T.Element' forms a pattern if 'T' is an enum and the
@@ -530,9 +523,10 @@ public:
       
     
     // Perform unqualified name lookup to find out what the UDRE is.
-    return getSubExprPattern(TypeChecker::resolveDeclRefExpr(ude, DC));
+    return getSubExprPattern(TypeChecker::resolveDeclRefExpr(
+        ude, DC, /*replaceInvalidRefsWithErrors=*/true));
   }
-  
+
   // Call syntax forms a pattern if:
   // - the callee in 'Element(x...)' or '.Element(x...)'
   //   references an enum element. The arguments then form a tuple
@@ -545,6 +539,18 @@ public:
     // Let it be diagnosed as an expression.
     if (isa<UnresolvedSpecializeExpr>(ce->getFn()))
       return nullptr;
+
+    if (isa<UnresolvedMemberExpr>(ce->getFn())) {
+      auto *P = visit(ce->getFn());
+      if (!P)
+        return nullptr;
+
+      auto *EEP = cast<EnumElementPattern>(P);
+      EEP->setSubPattern(getSubExprPattern(ce->getArg()));
+      EEP->setUnresolvedOriginalExpr(ce);
+
+      return P;
+    }
 
     SmallVector<ComponentIdentTypeRepr *, 2> components;
     if (!ExprToIdentTypeRepr(components, Context).visit(ce->getFn()))
@@ -643,11 +649,11 @@ Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC,
   if (auto *TP = dyn_cast<TypedPattern>(P))
     InnerP = TP->getSubPattern();
 
-  // If the pattern was valid, check for an implicit VarPattern on the outer
+  // If the pattern was valid, check for an implicit BindingPattern on the outer
   // level.  If so, we have an "if let" condition and we want to enforce some
   // more structure on it.
-  if (isStmtCondition && isa<VarPattern>(InnerP) && InnerP->isImplicit()) {
-    auto *Body = cast<VarPattern>(InnerP)->getSubPattern();
+  if (isStmtCondition && isa<BindingPattern>(InnerP) && InnerP->isImplicit()) {
+    auto *Body = cast<BindingPattern>(InnerP)->getSubPattern();
 
     // If they wrote a "x?" pattern, they probably meant "if let x".
     // Check for this and recover nicely if they wrote that.
@@ -757,12 +763,12 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
   // Type-check paren patterns by checking the sub-pattern and
   // propagating that type out.
   case PatternKind::Paren:
-  case PatternKind::Var: {
+  case PatternKind::Binding: {
     Pattern *SP;
     if (auto *PP = dyn_cast<ParenPattern>(P))
       SP = PP->getSubPattern();
     else
-      SP = cast<VarPattern>(P)->getSubPattern();
+      SP = cast<BindingPattern>(P)->getSubPattern();
     Type subType = TypeChecker::typeCheckPattern(
         pattern.forSubPattern(SP, /*retainTopLevel=*/true));
     if (subType->hasError())
@@ -1011,9 +1017,9 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     PP->setType(sub->getType());
     return P;
   }
-  case PatternKind::Var: {
-    auto VP = cast<VarPattern>(P);
-    
+  case PatternKind::Binding: {
+    auto VP = cast<BindingPattern>(P);
+
     Pattern *sub = VP->getSubPattern();
     sub = coercePatternToType(
         pattern.forSubPattern(sub, /*retainTopLevel=*/false), type, subOptions);
@@ -1319,6 +1325,9 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       diags.diagnose(IP->getLoc(),
                      diag::isa_collection_downcast_pattern_value_unimplemented,
                      IP->getCastType());
+      IP->setType(ErrorType::get(Context));
+      if (Pattern *sub = IP->getSubPattern())
+        sub->forEachVariable([](VarDecl *VD) { VD->setInvalid(); });
       return P;
     }
 

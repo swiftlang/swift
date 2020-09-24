@@ -278,7 +278,15 @@ DispatchAPI.test("DispatchTime.SchedulerTimeType.Stridable") {
 	    let time1 = DispatchQueue.SchedulerTimeType(.init(uptimeNanoseconds: 10000))
 	    let time2 = DispatchQueue.SchedulerTimeType(.init(uptimeNanoseconds: 10431))
 	    let addedTime = time2.distance(to: time1)
-	    expectEqual(addedTime.magnitude, (10000 - 10431))
+            // The magnitude of the time sum is in nanosecond units.  Although
+            // the units match up, the internal representation of the
+            // DispatchTime may round up to multiples of Mach timebase.  This
+            // requires the difference being converted, which is performed here
+            // by constructing a `DispatchTime` from the delta.  However, the
+            // parameter is a `UInt64` which requires us to perform the negation
+            // manually.
+	    expectEqual(-Int(DispatchTime(uptimeNanoseconds: 10431 - 10000).uptimeNanoseconds),
+                        addedTime.magnitude)
 	}
 }
 

@@ -824,9 +824,9 @@ getActualImportControl(unsigned rawValue) {
   // values.
   switch (rawValue) {
   case static_cast<unsigned>(serialization::ImportControl::Normal):
-    return ModuleDecl::ImportFilterKind::Private;
+    return ModuleDecl::ImportFilterKind::Default;
   case static_cast<unsigned>(serialization::ImportControl::Exported):
-    return ModuleDecl::ImportFilterKind::Public;
+    return ModuleDecl::ImportFilterKind::Exported;
   case static_cast<unsigned>(serialization::ImportControl::ImplementationOnly):
     return ModuleDecl::ImportFilterKind::ImplementationOnly;
   default:
@@ -1087,8 +1087,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
-    bool isFramework, serialization::ValidationInfo &info,
-    serialization::ExtendedValidationInfo *extInfo)
+    bool isFramework, serialization::ValidationInfo &info)
     : ModuleInputBuffer(std::move(moduleInputBuffer)),
       ModuleDocInputBuffer(std::move(moduleDocInputBuffer)),
       ModuleSourceInfoInputBuffer(std::move(moduleSourceInfoInputBuffer)) {
@@ -1134,10 +1133,11 @@ ModuleFileSharedCore::ModuleFileSharedCore(
         return;
       }
 
+      ExtendedValidationInfo extInfo;
       info = validateControlBlock(cursor, scratch,
                                   {SWIFTMODULE_VERSION_MAJOR,
                                    SWIFTMODULE_VERSION_MINOR},
-                                  extInfo);
+                                  &extInfo);
       if (info.status != Status::Valid) {
         error(info.status);
         return;
@@ -1145,7 +1145,11 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       Name = info.name;
       TargetTriple = info.targetTriple;
       CompatibilityVersion = info.compatibilityVersion;
-      IsSIB = extInfo->isSIB();
+      Bits.ArePrivateImportsEnabled = extInfo.arePrivateImportsEnabled();
+      Bits.IsSIB = extInfo.isSIB();
+      Bits.IsTestable = extInfo.isTestable();
+      Bits.ResilienceStrategy = unsigned(extInfo.getResilienceStrategy());
+      Bits.IsImplicitDynamicEnabled = extInfo.isImplicitDynamicEnabled();
       MiscVersion = info.miscVersion;
 
       hasValidControlBlock = true;

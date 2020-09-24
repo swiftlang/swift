@@ -48,10 +48,22 @@ typedef struct swift_reflection_section {
   void *End;
 } swift_reflection_section_t;
 
+/// Represents the remote address and size of an image's section
+typedef struct swift_remote_reflection_section {
+    uintptr_t StartAddress;
+    uintptr_t Size;
+} swift_remote_reflection_section_t;
+
 typedef struct swift_reflection_section_pair {
   swift_reflection_section_t section;
   swift_reflection_ptr_t offset; ///< DEPRECATED. Must be zero
 } swift_reflection_section_pair_t;
+
+/// Represents the mapping between an image sections's local and remote addresses
+typedef struct swift_reflection_section_mapping {
+  swift_reflection_section_t local_section;
+  swift_remote_reflection_section_t remote_section;
+} swift_reflection_section_mapping_t;
 
 /// Represents the set of Swift reflection sections of an image.
 /// Not all sections may be present.
@@ -70,6 +82,16 @@ typedef struct swift_reflection_info {
   swift_reflection_ptr_t LocalStartAddress;
   swift_reflection_ptr_t RemoteStartAddress;
 } swift_reflection_info_t;
+
+/// Represents the set of Swift reflection sections of an image,
+typedef struct swift_reflection_mapping_info {
+  swift_reflection_section_mapping_t field;
+  swift_reflection_section_mapping_t associated_types;
+  swift_reflection_section_mapping_t builtin_types;
+  swift_reflection_section_mapping_t capture;
+  swift_reflection_section_mapping_t type_references;
+  swift_reflection_section_mapping_t reflection_strings;
+} swift_reflection_mapping_info_t;
 
 /// The layout kind of a Swift type.
 typedef enum swift_layout_kind {
@@ -161,6 +183,11 @@ typedef struct swift_metadata_allocation {
   /// The size of the allocation in bytes.
   unsigned Size;
 } swift_metadata_allocation_t;
+
+typedef struct swift_metadata_cache_node {
+  swift_reflection_ptr_t Left;
+  swift_reflection_ptr_t Right;
+} swift_metadata_cache_node_t;
 
 /// An opaque pointer to a context which maintains state and
 /// caching of reflection structure for heap instances.

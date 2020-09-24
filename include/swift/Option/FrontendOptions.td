@@ -157,15 +157,6 @@ def disable_target_os_checking :
 def crosscheck_unqualified_lookup : Flag<["-"], "crosscheck-unqualified-lookup">,
   HelpText<"Compare legacy DeclContext- to ASTScope-based unqualified name lookup (for debugging)">;
 
-def stress_astscope_lookup : Flag<["-"], "stress-astscope-lookup">,
-  HelpText<"Stress ASTScope-based unqualified name lookup (for testing)">;
-  
-def warn_if_astscope_lookup : Flag<["-"], "warn-if-astscope-lookup">,
-  HelpText<"Print a warning if ASTScope lookup is used">;
-  
-def lazy_astscopes : Flag<["-"], "lazy-astscopes">,
-  HelpText<"Build ASTScopes lazily">;
-
 def use_clang_function_types : Flag<["-"], "use-clang-function-types">,
   HelpText<"Use stored Clang function types for computing canonical types.">;
 
@@ -224,8 +215,19 @@ def swift_module_file
 def explict_swift_module_map
   : Separate<["-"], "explicit-swift-module-map-file">, MetaVarName<"<path>">,
     HelpText<"Specify a JSON file containing information of explict Swift modules">;
-}
 
+def placeholder_dependency_module_map
+  : Separate<["-"], "placeholder-dependency-module-map-file">, MetaVarName<"<path>">,
+    HelpText<"Specify a JSON file containing information of external Swift module dependencies">;
+
+def batch_scan_input_file
+  : Separate<["-"], "batch-scan-input-file">, MetaVarName<"<path>">,
+    HelpText<"Specify a JSON file containing modules to perform batch dependencies scanning">;
+
+def import_prescan : Flag<["-"], "import-prescan">,
+   HelpText<"When performing a dependency scan, only dentify all imports of the main Swift module sources">;
+
+}
 
 // HIDDEN FLAGS
 let Flags = [FrontendOption, NoDriverOption, HelpHidden] in {
@@ -252,6 +254,9 @@ def debug_forbid_typecheck_prefix : Separate<["-"], "debug-forbid-typecheck-pref
   HelpText<"Triggers llvm fatal_error if typechecker tries to typecheck a decl "
            "with the provided prefix name">;
 
+def debug_emit_invalid_swiftinterface_syntax : Flag<["-"], "debug-emit-invalid-swiftinterface-syntax">,
+  HelpText<"Write an invalid declaration into swiftinterface files">;
+
 def debug_cycles : Flag<["-"], "debug-cycles">,
   HelpText<"Print out debug dumps when cycles are detected in evaluation">;
 def build_request_dependency_graph : Flag<["-"], "build-request-dependency-graph">,
@@ -259,8 +264,6 @@ def build_request_dependency_graph : Flag<["-"], "build-request-dependency-graph
 def output_request_graphviz : Separate<["-"], "output-request-graphviz">,
   HelpText<"Emit GraphViz output visualizing the request dependency graph">;
 
-def debug_time_compilation : Flag<["-"], "debug-time-compilation">,
-  HelpText<"Prints the time taken by each compilation phase">;
 def debug_time_function_bodies : Flag<["-"], "debug-time-function-bodies">,
   HelpText<"Dumps the time it takes to type-check each function body">;
 def debug_time_expression_type_checking : Flag<["-"], "debug-time-expression-type-checking">,
@@ -327,6 +330,9 @@ def disable_llvm_verify : Flag<["-"], "disable-llvm-verify">,
 def disable_llvm_value_names : Flag<["-"], "disable-llvm-value-names">,
   HelpText<"Don't add names to local values in LLVM IR">;
 
+def dump_jit : JoinedOrSeparate<["-"], "dump-jit">,
+  HelpText<"Dump JIT contents">;
+
 def enable_llvm_value_names : Flag<["-"], "enable-llvm-value-names">,
   HelpText<"Add names to local values in LLVM IR">;
 
@@ -382,6 +388,10 @@ def enable_large_loadable_types : Flag<["-"], "enable-large-loadable-types">,
 def enable_experimental_static_assert :
   Flag<["-"], "enable-experimental-static-assert">,
   HelpText<"Enable experimental #assert">;
+
+def enable_experimental_concurrency :
+  Flag<["-"], "enable-experimental-concurrency">,
+  HelpText<"Enable experimental concurrency model">;
 
 def enable_subst_sil_function_types_for_function_values :
   Flag<["-"], "enable-subst-sil-function-types-for-function-values">,
@@ -456,6 +466,9 @@ def warn_long_expression_type_checking_EQ : Joined<["-"], "warn-long-expression-
 
 def Rmodule_interface_rebuild : Flag<["-"], "Rmodule-interface-rebuild">,
   HelpText<"Emits a remark if an imported module needs to be re-compiled from its module interface">;
+
+def enable_volatile_modules : Flag<["-"], "enable-volatile-modules">,
+  HelpText<"Load Swift modules in memory">;
 
 def solver_expression_time_threshold_EQ : Joined<["-"], "solver-expression-time-threshold=">;
 
@@ -567,6 +580,11 @@ def sil_debug_serialization : Flag<["-"], "sil-debug-serialization">,
   HelpText<"Do not eliminate functions in Mandatory Inlining/SILCombine dead "
            "functions. (for debugging only)">;
 
+def sil_stop_optzns_before_lowering_ownership :
+  Flag<["-"], "sil-stop-optzns-before-lowering-ownership">,
+  HelpText<"Stop optimizing at SIL time before we lower ownership from SIL. "
+           "Intended only for SIL ossa tests">;
+
 def print_inst_counts : Flag<["-"], "print-inst-counts">,
   HelpText<"Before IRGen, count all the various SIL instructions. Must be used "
            "in conjunction with -print-stats.">;
@@ -581,6 +599,9 @@ def print_llvm_inline_tree : Flag<["-"], "print-llvm-inline-tree">,
 def disable_incremental_llvm_codegeneration :
   Flag<["-"], "disable-incremental-llvm-codegen">,
        HelpText<"Disable incremental llvm code generation.">;
+
+def ignore_always_inline : Flag<["-"], "ignore-always-inline">,
+  HelpText<"Ignore @inline(__always) attributes.">;
 
 def emit_sorted_sil : Flag<["-"], "emit-sorted-sil">,
   HelpText<"When printing SIL, print out all sil entities sorted by name to "
@@ -629,15 +650,26 @@ def build_module_from_parseable_interface :
   Alias<compile_module_from_interface>,
   ModeOpt;
 
+def typecheck_module_from_interface :
+  Flag<["-"], "typecheck-module-from-interface">,
+  HelpText<"Treat the (single) input as a swiftinterface and typecheck it">,
+  ModeOpt;
+
 def module_interface_preserve_types_as_written :
   Flag<["-"], "module-interface-preserve-types-as-written">,
   HelpText<"When emitting a module interface, preserve types as they were "
            "written in the source">;
 
+def experimental_spi_imports :
+  Flag<["-"], "experimental-spi-imports">,
+  HelpText<"Enable experimental support for SPI imports">;
+
+// [FIXME: Clang-type-plumbing] Make this a SIL-only option once we start
+// unconditionally emitting non-canonical Clang types in swiftinterfaces.
 def experimental_print_full_convention :
  Flag<["-"], "experimental-print-full-convention">,
- HelpText<"When emitting a module interface, emit additional @convention "
-          "arguments, regardless of whether they were written in the source">;
+ HelpText<"When emitting a module interface or SIL, emit additional @convention"
+          " arguments, regardless of whether they were written in the source">;
 
 def experimental_one_way_closure_params :
   Flag<["-"], "experimental-one-way-closure-params">,
@@ -721,4 +753,12 @@ def target_variant_sdk_version : Separate<["-"], "target-variant-sdk-version">,
 
 def extra_clang_options_only : Flag<["-"], "only-use-extra-clang-opts">,
   HelpText<"Options passed via -Xcc are sufficient for Clang configuration">;
+
+def candidate_module_file
+  : Separate<["-"], "candidate-module-file">, MetaVarName<"<path>">,
+    HelpText<"Specify Swift module may be ready to use for an interface">;
+
+def use_static_resource_dir
+  : Flag<["-"], "use-static-resource-dir">,
+    HelpText<"Use resources in the static resource directory">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

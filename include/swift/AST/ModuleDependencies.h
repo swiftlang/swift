@@ -35,6 +35,29 @@ class Identifier;
 /// Which kind of module dependencies we are looking for.
 enum class ModuleDependenciesKind : int8_t {
   Swift,
+  // Placeholder dependencies are a kind of dependencies used only by the
+  // dependency scanner. They are swift modules that the scanner will not be
+  // able to locate in its search paths and which are the responsibility of the
+  // scanner's client to ensure are provided.
+  //
+  // Placeholder dependencies will be specified in the scanner's output
+  // dependency graph where it is the responsibility of the scanner's client to
+  // ensure required post-processing takes place to "resolve" them. In order to
+  // do so, the client (swift driver, or any other client build system) is
+  // expected to have access to a full dependency graph of all placeholder
+  // dependencies and be able to replace placeholder nodes in the dependency
+  // graph with their full dependency trees, `uniquing` common dependency module
+  // nodes in the process.
+  //
+  // One example where placeholder dependencies are employed is when using
+  // SwiftPM in Explicit Module Build mode. SwiftPM constructs a build plan for
+  // all targets ahead-of-time. When planning a build for a target that depends
+  // on other targets, the dependency scanning action is not able to locate
+  // dependency target modules, because they have not yet been built. Instead,
+  // the build system treats them as placeholder dependencies and resolves them
+  // with `actual` dependencies in a post-processing step once dependency graphs
+  // of all targets, individually, have been computed.
+  SwiftPlaceholder,
   Clang,
 };
 
@@ -43,11 +66,11 @@ enum class ModuleDependenciesKind : int8_t {
 /// This class is mostly an implementation detail for \c ModuleDependencies.
 class ModuleDependenciesStorageBase {
 public:
-  const bool isSwiftModule;
+  const ModuleDependenciesKind dependencyKind;
 
-  ModuleDependenciesStorageBase(bool isSwiftModule,
+  ModuleDependenciesStorageBase(ModuleDependenciesKind dependencyKind,
                                 const std::string &compiledModulePath)
-      : isSwiftModule(isSwiftModule),
+      : dependencyKind(dependencyKind),
         compiledModulePath(compiledModulePath) { }
 
   virtual ModuleDependenciesStorageBase *clone() const = 0;
@@ -69,6 +92,9 @@ public:
   /// The Swift interface file, if it can be used to generate the module file.
   const Optional<std::string> swiftInterfaceFile;
 
+  /// Potentially ready-to-use compiled modules for the interface file.
+  const std::vector<std::string> compiledModuleCandidates;
+
   /// The Swift frontend invocation arguments to build the Swift module from the
   /// interface.
   const std::vector<std::string> buildCommandLine;
@@ -80,6 +106,9 @@ public:
 
   /// The hash value that will be used for the generated module
   const std::string contextHash;
+
+  /// A flag that indicates this dependency is a framework
+  const bool isFramework;
 
   /// Bridging header file, if there is one.
   Optional<std::string> bridgingHeaderFile;
@@ -96,21 +125,26 @@ public:
   SwiftModuleDependenciesStorage(
       const std::string &compiledModulePath,
       const Optional<std::string> &swiftInterfaceFile,
+      ArrayRef<std::string> compiledModuleCandidates,
       ArrayRef<StringRef> buildCommandLine,
       ArrayRef<StringRef> extraPCMArgs,
-      StringRef contextHash
-  ) : ModuleDependenciesStorageBase(/*isSwiftModule=*/true, compiledModulePath),
+      StringRef contextHash,
+      bool isFramework
+  ) : ModuleDependenciesStorageBase(ModuleDependenciesKind::Swift,
+                                    compiledModulePath),
       swiftInterfaceFile(swiftInterfaceFile),
+      compiledModuleCandidates(compiledModuleCandidates.begin(),
+                               compiledModuleCandidates.end()),
       buildCommandLine(buildCommandLine.begin(), buildCommandLine.end()),
       extraPCMArgs(extraPCMArgs.begin(), extraPCMArgs.end()),
-      contextHash(contextHash) { }
+      contextHash(contextHash), isFramework(isFramework) { }
 
   ModuleDependenciesStorageBase *clone() const override {
     return new SwiftModuleDependenciesStorage(*this);
   }
 
   static bool classof(const ModuleDependenciesStorageBase *base) {
-    return base->isSwiftModule;
+    return base->dependencyKind == ModuleDependenciesKind::Swift;
   }
 };
 
@@ -137,7 +171,7 @@ public:
       const std::string &contextHash,
       const std::vector<std::string> &nonPathCommandLine,
       const std::vector<std::string> &fileDependencies
-  ) : ModuleDependenciesStorageBase(/*isSwiftModule=*/false,
+  ) : ModuleDependenciesStorageBase(ModuleDependenciesKind::Clang,
                                     compiledModulePath),
       moduleMapFile(moduleMapFile),
       contextHash(contextHash),
@@ -149,7 +183,35 @@ public:
   }
 
   static bool classof(const ModuleDependenciesStorageBase *base) {
-    return !base->isSwiftModule;
+    return base->dependencyKind == ModuleDependenciesKind::Clang;
+  }
+};
+
+/// Describes an placeholder Swift module dependency module stub.
+///
+/// This class is mostly an implementation detail for \c ModuleDependencies.
+class PlaceholderSwiftModuleDependencyStorage : public ModuleDependenciesStorageBase {
+public:
+  PlaceholderSwiftModuleDependencyStorage(const std::string &compiledModulePath,
+                                       const std::string &moduleDocPath,
+                                       const std::string &sourceInfoPath)
+      : ModuleDependenciesStorageBase(ModuleDependenciesKind::SwiftPlaceholder,
+                                      compiledModulePath),
+        moduleDocPath(moduleDocPath),
+        sourceInfoPath(sourceInfoPath) {}
+
+  ModuleDependenciesStorageBase *clone() const override {
+    return new PlaceholderSwiftModuleDependencyStorage(*this);
+  }
+
+  /// The path to the .swiftModuleDoc file.
+  const std::string moduleDocPath;
+
+  /// The path to the .swiftSourceInfo file.
+  const std::string sourceInfoPath;
+
+  static bool classof(const ModuleDependenciesStorageBase *base) {
+    return base->dependencyKind == ModuleDependenciesKind::SwiftPlaceholder;
   }
 };
 
@@ -181,23 +243,25 @@ public:
   /// built from a Swift interface file (\c .swiftinterface).
   static ModuleDependencies forSwiftInterface(
       const std::string &swiftInterfaceFile,
+      ArrayRef<std::string> compiledCandidates,
       ArrayRef<StringRef> buildCommands,
       ArrayRef<StringRef> extraPCMArgs,
-      StringRef contextHash) {
+      StringRef contextHash,
+      bool isFramework) {
     std::string compiledModulePath;
     return ModuleDependencies(
         std::make_unique<SwiftModuleDependenciesStorage>(
-          compiledModulePath, swiftInterfaceFile, buildCommands,
-          extraPCMArgs, contextHash));
+          compiledModulePath, swiftInterfaceFile, compiledCandidates, buildCommands,
+          extraPCMArgs, contextHash, isFramework));
   }
 
   /// Describe the module dependencies for a serialized or parsed Swift module.
   static ModuleDependencies forSwiftModule(
-      const std::string &compiledModulePath) {
+      const std::string &compiledModulePath, bool isFramework) {
     return ModuleDependencies(
         std::make_unique<SwiftModuleDependenciesStorage>(
-          compiledModulePath, None, ArrayRef<StringRef>(),
-          ArrayRef<StringRef>(), StringRef()));
+          compiledModulePath, None, ArrayRef<std::string>(), ArrayRef<StringRef>(),
+          ArrayRef<StringRef>(), StringRef(), isFramework));
   }
 
   /// Describe the main Swift module.
@@ -205,8 +269,8 @@ public:
     std::string compiledModulePath;
     return ModuleDependencies(
         std::make_unique<SwiftModuleDependenciesStorage>(
-          compiledModulePath, None, ArrayRef<StringRef>(), extraPCMArgs,
-          StringRef()));
+          compiledModulePath, None, ArrayRef<std::string>(),
+          ArrayRef<StringRef>(), extraPCMArgs, StringRef(), false));
   }
 
   /// Describe the module dependencies for a Clang module that can be
@@ -223,6 +287,16 @@ public:
           fileDependencies));
   }
 
+  /// Describe a placeholder dependency swift module.
+  static ModuleDependencies forPlaceholderSwiftModuleStub(
+      const std::string &compiledModulePath,
+      const std::string &moduleDocPath,
+      const std::string &sourceInfoPath) {
+    return ModuleDependencies(
+        std::make_unique<PlaceholderSwiftModuleDependencyStorage>(
+          compiledModulePath, moduleDocPath, sourceInfoPath));
+  }
+
   /// Retrieve the path to the compiled module.
   const std::string getCompiledModulePath() const {
     return storage->compiledModulePath;
@@ -236,9 +310,11 @@ public:
   /// Whether the dependencies are for a Swift module.
   bool isSwiftModule() const;
 
+  /// Whether this represents a placeholder module stub
+  bool isPlaceholderSwiftModule() const;
+
   ModuleDependenciesKind getKind() const {
-    return isSwiftModule() ? ModuleDependenciesKind::Swift
-                           : ModuleDependenciesKind::Clang;
+    return storage->dependencyKind;
   }
   /// Retrieve the dependencies for a Swift module.
   const SwiftModuleDependenciesStorage *getAsSwiftModule() const;
@@ -246,9 +322,13 @@ public:
   /// Retrieve the dependencies for a Clang module.
   const ClangModuleDependenciesStorage *getAsClangModule() const;
 
+  /// Retrieve the dependencies for a placeholder dependency module stub.
+  const PlaceholderSwiftModuleDependencyStorage *
+  getAsPlaceholderDependencyModule() const;
+
   /// Add a dependency on the given module, if it was not already in the set.
   void addModuleDependency(StringRef module,
-                           llvm::StringSet<> &alreadyAddedModules);
+                           llvm::StringSet<> *alreadyAddedModules = nullptr);
 
   /// Add all of the module dependencies for the imports in the given source
   /// file to the set of module dependencies.
@@ -285,6 +365,9 @@ class ModuleDependenciesCache {
 
   /// Dependencies for Swift modules that have already been computed.
   llvm::StringMap<ModuleDependencies> SwiftModuleDependencies;
+
+  /// Dependencies for Swift placeholder dependency modules.
+  llvm::StringMap<ModuleDependencies> PlaceholderSwiftModuleDependencies;
 
   /// Dependencies for Clang modules that have already been computed.
   llvm::StringMap<ModuleDependencies> ClangModuleDependencies;

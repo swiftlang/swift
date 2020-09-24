@@ -58,9 +58,10 @@ public:
   FoundResult findChild(AbstractFunctionDecl *Parent) {
     auto NextIndex = consumeNext();
     if (!NextIndex) {
-      if (auto Func = dyn_cast<FuncDecl>(Parent))
-        return findChild(Func->getBodyResultTypeLoc());
-      if (auto Init = dyn_cast<ConstructorDecl>(Parent)) {
+      if (auto Func = dyn_cast<FuncDecl>(Parent)) {
+        if (auto *const TyRepr = Func->getResultTypeRepr())
+          return visit(TyRepr);
+      } else if (auto Init = dyn_cast<ConstructorDecl>(Parent)) {
         SourceLoc End = Init->getFailabilityLoc();
         bool Optional = End.isValid();
         if (!Optional)
@@ -73,7 +74,7 @@ public:
 
     for (auto *Param: *Parent->getParameters()) {
       if (!--NextIndex) {
-        return findChild(Param->getTypeRepr());
+        return visit(Param->getTypeRepr());
       }
     }
     llvm_unreachable("child index out of bounds");
@@ -98,12 +99,6 @@ private:
       }
     }
     return false;
-  }
-
-  FoundResult findChild(TypeLoc Loc) {
-    if (!Loc.hasLocation())
-      return {SourceRange(), false, false, false};
-    return visit(Loc.getTypeRepr());
   }
 
 public:
@@ -1257,7 +1252,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     switch (DiffItem->DiffKind) {
     case NodeAnnotation::GetterToProperty: {
       auto FuncLoc = FD->getFuncLoc();
-      auto ReturnTyLoc = FD->getBodyResultTypeLoc().getSourceRange().Start;
+      auto ReturnTyLoc = FD->getResultTypeSourceRange().Start;
       auto NameLoc = FD->getNameLoc();
       if (FuncLoc.isInvalid() || ReturnTyLoc.isInvalid() || NameLoc.isInvalid())
         break;

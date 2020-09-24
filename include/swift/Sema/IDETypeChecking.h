@@ -22,6 +22,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/SourceLoc.h"
 #include <memory>
+#include <tuple>
 
 namespace swift {
   class AbstractFunctionDecl;
@@ -133,8 +134,7 @@ namespace swift {
   bool typeCheckExpression(DeclContext *DC, Expr *&parsedExpr);
 
   /// Type check a function body element which is at \p TagetLoc .
-  bool typeCheckAbstractFunctionBodyAtLoc(AbstractFunctionDecl *AFD,
-                                          SourceLoc TargetLoc);
+  bool typeCheckASTNodeAtLoc(DeclContext *DC, SourceLoc TargetLoc);
 
   /// Typecheck top-level code parsed during code completion.
   ///
@@ -255,6 +255,34 @@ namespace swift {
                             bool IncludeProtocolRequirements = true,
                             bool Transitive = false);
 
+  /// Enumerates the various kinds of "build" functions within a function
+  /// builder.
+  enum class FunctionBuilderBuildFunction {
+    BuildBlock,
+    BuildExpression,
+    BuildOptional,
+    BuildEitherFirst,
+    BuildEitherSecond,
+    BuildArray,
+    BuildLimitedAvailability,
+    BuildFinalResult,
+  };
+
+  /// Try to infer the component type of a function builder from the type
+  /// of buildBlock or buildExpression, if it was there.
+  Type inferFunctionBuilderComponentType(NominalTypeDecl *builder);
+
+  /// Print the declaration for a function builder "build" function, for use
+  /// in Fix-Its, code completion, and so on.
+  void printFunctionBuilderBuildFunction(
+      NominalTypeDecl *builder, Type componentType,
+      FunctionBuilderBuildFunction function,
+      Optional<std::string> stubIndent, llvm::raw_ostream &out);
+
+  /// Compute the insertion location, indentation string, and component type
+  /// for a Fix-It that adds a new build* function to a function builder.
+  std::tuple<SourceLoc, std::string, Type>
+  determineFunctionBuilderBuildFixItInfo(NominalTypeDecl *builder);
 }
 
 #endif

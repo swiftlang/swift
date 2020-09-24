@@ -201,9 +201,11 @@ public:
         getModule(), vjpSubstMap, TypeExpansionContext::minimal());
     pullbackType = pullbackType.subst(getModule(), vjpSubstMap);
     auto pullbackFnType = pullbackType.castTo<SILFunctionType>();
-
     auto pullbackSubstType =
         pullbackPartialApply->getType().castTo<SILFunctionType>();
+
+    // If necessary, convert the pullback value to the returned pullback
+    // function type.
     SILValue pullbackValue;
     if (pullbackSubstType == pullbackFnType) {
       pullbackValue = pullbackPartialApply;
@@ -213,11 +215,8 @@ public:
           builder.createConvertFunction(loc, pullbackPartialApply, pullbackType,
                                         /*withoutActuallyEscaping*/ false);
     } else {
-      // When `diag::autodiff_loadable_value_addressonly_tangent_unsupported`
-      // applies, the return type may be ABI-incomaptible with the type of the
-      // partially applied pullback. In these cases, produce an undef and rely
-      // on other code to emit a diagnostic.
-      pullbackValue = SILUndef::get(pullbackType, *vjp);
+      llvm::report_fatal_error("Pullback value type is not ABI-compatible "
+                               "with the returned pullback type");
     }
 
     // Return a tuple of the original result and pullback.
@@ -458,9 +457,14 @@ public:
             if (!originalFnTy->getParameters()[paramIndex]
                      .getSILStorageInterfaceType()
                      .isDifferentiable(getModule())) {
-              context.emitNondifferentiabilityError(
-                  ai->getArgumentsWithoutIndirectResults()[paramIndex], invoker,
-                  diag::autodiff_nondifferentiable_argument);
+              auto arg = ai->getArgumentsWithoutIndirectResults()[paramIndex];
+              auto startLoc = arg.getLoc().getStartSourceLoc();
+              auto endLoc = arg.getLoc().getEndSourceLoc();
+              context
+                  .emitNondifferentiabilityError(
+                      arg, invoker, diag::autodiff_nondifferentiable_argument)
+                  .fixItInsert(startLoc, "withoutDerivative(at: ")
+                  .fixItInsertAfter(endLoc, ")");
               errorOccurred = true;
               return true;
             }
@@ -478,8 +482,14 @@ public:
                                        .getSILStorageInterfaceType();
             }
             if (!remappedResultType.isDifferentiable(getModule())) {
-              context.emitNondifferentiabilityError(
-                  origCallee, invoker, diag::autodiff_nondifferentiable_result);
+              auto startLoc = ai->getLoc().getStartSourceLoc();
+              auto endLoc = ai->getLoc().getEndSourceLoc();
+              context
+                  .emitNondifferentiabilityError(
+                      origCallee, invoker,
+                      diag::autodiff_nondifferentiable_result)
+                  .fixItInsert(startLoc, "withoutDerivative(at: ")
+                  .fixItInsertAfter(endLoc, ")");
               errorOccurred = true;
               return true;
             }
@@ -529,7 +539,7 @@ public:
           getBuilder(), loc, indices.parameters, indices.results, origCallee);
 
       // Record the `differentiable_function` instruction.
-      context.addDifferentiableFunctionInstToWorklist(diffFuncInst);
+      context.getDifferentiableFunctionInstWorklist().push_back(diffFuncInst);
 
       auto borrowedADFunc = builder.emitBeginBorrowOperation(loc, diffFuncInst);
       auto extractedVJP = getBuilder().createDifferentiableFunctionExtract(
@@ -618,12 +628,32 @@ public:
             getOpValue(origCallee)->getDefiningInstruction());
   }
 
+  void visitTryApplyInst(TryApplyInst *tai) {
+    // Build pullback struct value for original block.
+    auto *pbStructVal = buildPullbackValueStructValue(tai);
+    // Create a new `try_apply` instruction.
+    auto args = getOpValueArray<8>(tai->getArguments());
+    getBuilder().createTryApply(
+        tai->getLoc(), getOpValue(tai->getCallee()),
+        getOpSubstitutionMap(tai->getSubstitutionMap()), args,
+        createTrampolineBasicBlock(tai, pbStructVal, tai->getNormalBB()),
+        createTrampolineBasicBlock(tai, pbStructVal, tai->getErrorBB()));
+  }
+
   void visitDifferentiableFunctionInst(DifferentiableFunctionInst *dfi) {
     // Clone `differentiable_function` from original to VJP, then add the cloned
     // instruction to the `differentiable_function` worklist.
     TypeSubstCloner::visitDifferentiableFunctionInst(dfi);
     auto *newDFI = cast<DifferentiableFunctionInst>(getOpValue(dfi));
-    context.addDifferentiableFunctionInstToWorklist(newDFI);
+    context.getDifferentiableFunctionInstWorklist().push_back(newDFI);
+  }
+
+  void visitLinearFunctionInst(LinearFunctionInst *lfi) {
+    // Clone `linear_function` from original to VJP, then add the cloned
+    // instruction to the `linear_function` worklist.
+    TypeSubstCloner::visitLinearFunctionInst(lfi);
+    auto *newLFI = cast<LinearFunctionInst>(getOpValue(lfi));
+    context.getLinearFunctionInstWorklist().push_back(newLFI);
   }
 };
 
@@ -725,6 +755,8 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
         pattern, tanType, TypeExpansionContext::minimal());
     ParameterConvention conv;
     switch (origResConv) {
+    case ResultConvention::Unowned:
+    case ResultConvention::UnownedInnerPointer:
     case ResultConvention::Owned:
     case ResultConvention::Autoreleased:
       if (tl.isAddressOnly()) {
@@ -733,10 +765,6 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
         conv = tl.isTrivial() ? ParameterConvention::Direct_Unowned
                               : ParameterConvention::Direct_Guaranteed;
       }
-      break;
-    case ResultConvention::Unowned:
-    case ResultConvention::UnownedInnerPointer:
-      conv = ParameterConvention::Direct_Unowned;
       break;
     case ResultConvention::Indirect:
       conv = ParameterConvention::Indirect_In_Guaranteed;

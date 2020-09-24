@@ -654,12 +654,6 @@ bool SILCombiner::eraseApply(FullApplySite FAS, const UserListTy &Users) {
   return true;
 }
 
-SILInstruction *
-SILCombiner::optimizeConcatenationOfStringLiterals(ApplyInst *AI) {
-  // String literals concatenation optimizer.
-  return tryToConcatenateStrings(AI, Builder);
-}
-
 /// This routine replaces the old witness method inst with a new one.
 void SILCombiner::replaceWitnessMethodInst(
     WitnessMethodInst *WMI, SILBuilderContext &BuilderCtx, CanType ConcreteType,
@@ -812,6 +806,8 @@ void SILCombiner::buildConcreteOpenedExistentialInfos(
       // BuilderContext before rewriting any uses of the ConcreteType.
       OpenedArchetypesTracker.addOpenedArchetypeDef(
           cast<ArchetypeType>(CEI.ConcreteType), CEI.ConcreteTypeDef);
+    } else if (auto *I = CEI.ConcreteValue->getDefiningInstruction()) {
+      OpenedArchetypesTracker.registerUsedOpenedArchetypes(I);
     }
   }
 }
@@ -1464,12 +1460,6 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   }
 
   if (SF) {
-    if (SF->getEffectsKind() < EffectsKind::ReleaseNone) {
-      // Try to optimize string concatenation.
-      if (auto I = optimizeConcatenationOfStringLiterals(AI)) {
-        return I;
-      }
-    }
     if (SF->hasSemanticsAttr(semantics::ARRAY_UNINITIALIZED)) {
       UserListTy Users;
       // If the uninitialized array is only written into then it can be removed.

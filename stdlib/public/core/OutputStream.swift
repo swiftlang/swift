@@ -225,10 +225,7 @@ public protocol LosslessStringConvertible: CustomStringConvertible {
 ///
 ///     let p = Point(x: 21, y: 30)
 ///     print(String(reflecting: p))
-///     // Prints "p: Point = {
-///     //           x = 21
-///     //           y = 30
-///     //         }"
+///     // Prints "Point(x: 21, y: 30)"
 ///
 /// After adding `CustomDebugStringConvertible` conformance by implementing the
 /// `debugDescription` property, `Point` provides its own custom debugging
@@ -236,12 +233,12 @@ public protocol LosslessStringConvertible: CustomStringConvertible {
 ///
 ///     extension Point: CustomDebugStringConvertible {
 ///         var debugDescription: String {
-///             return "Point(x: \(x), y: \(y))"
+///             return "(\(x), \(y))"
 ///         }
 ///     }
 ///
 ///     print(String(reflecting: p))
-///     // Prints "Point(x: 21, y: 30)"
+///     // Prints "(21, 30)"
 public protocol CustomDebugStringConvertible {
   /// A textual representation of this instance, suitable for debugging.
   ///
@@ -557,6 +554,7 @@ extension String: TextOutputStreamable {
   /// Writes the string into the given output stream.
   ///
   /// - Parameter target: An output stream.
+  @inlinable
   public func write<Target: TextOutputStream>(to target: inout Target) {
     target.write(self)
   }

@@ -163,6 +163,21 @@ static void validateProfilingArgs(DiagnosticEngine &diags,
   }
 }
 
+static void validateDependencyScanningArgs(DiagnosticEngine &diags,
+                                           const ArgList &args) {
+  const Arg *ExternalDependencyMap = args.getLastArg(options::OPT_placeholder_dependency_module_map);
+  const Arg *ScanDependencies = args.getLastArg(options::OPT_scan_dependencies);
+  const Arg *Prescan = args.getLastArg(options::OPT_import_prescan);
+  if (ExternalDependencyMap && !ScanDependencies) {
+    diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
+                   "-placeholder-dependency-module-map-file", "-scan-dependencies");
+  }
+  if (Prescan && !ScanDependencies) {
+    diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
+                   "-import-prescan", "-scan-dependencies");
+  }
+}
+
 static void validateDebugInfoArgs(DiagnosticEngine &diags,
                                   const ArgList &args) {
   // Check for missing debug option when verifying debug info.
@@ -261,6 +276,7 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &args,
   validateBridgingHeaderArgs(diags, args);
   validateWarningControlArgs(diags, args);
   validateProfilingArgs(diags, args);
+  validateDependencyScanningArgs(diags, args);
   validateDebugInfoArgs(diags, args);
   validateCompilationConditionArgs(diags, args);
   validateSearchPathArgs(diags, args);
@@ -1433,12 +1449,29 @@ static bool isSDKTooOld(StringRef sdkPath, const llvm::Triple &target) {
 void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
                              const bool BatchMode, const InputFileList &Inputs,
                              OutputInfo &OI) const {
+
+  if (const Arg *A = Args.getLastArg(options::OPT_lto)) {
+    auto LTOVariant =
+        llvm::StringSwitch<Optional<OutputInfo::LTOKind>>(A->getValue())
+            .Case("llvm-thin", OutputInfo::LTOKind::LLVMThin)
+            .Case("llvm-full", OutputInfo::LTOKind::LLVMFull)
+            .Default(llvm::None);
+    if (LTOVariant)
+      OI.LTOVariant = LTOVariant.getValue();
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+  }
+
+  auto CompilerOutputType = OI.LTOVariant != OutputInfo::LTOKind::None
+                             ? file_types::TY_LLVM_BC
+                             : file_types::TY_Object;
   // By default, the driver does not link its output; this will be updated
   // appropriately below if linking is required.
 
   OI.CompilerOutputType = driverKind == DriverKind::Interactive
                               ? file_types::TY_Nothing
-                              : file_types::TY_Object;
+                              : CompilerOutputType;
 
   if (const Arg *A = Args.getLastArg(options::OPT_num_threads)) {
     if (BatchMode) {
@@ -1468,14 +1501,14 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
                        diag::error_static_emit_executable_disallowed);
                        
       OI.LinkAction = LinkKind::Executable;
-      OI.CompilerOutputType = file_types::TY_Object;
+      OI.CompilerOutputType = CompilerOutputType;
       break;
 
     case options::OPT_emit_library:
       OI.LinkAction = Args.hasArg(options::OPT_static) ?
                       LinkKind::StaticLibrary :
                       LinkKind::DynamicLibrary;
-      OI.CompilerOutputType = file_types::TY_Object;
+      OI.CompilerOutputType = CompilerOutputType;
       break;
 
     case options::OPT_static:
@@ -1993,6 +2026,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_BitstreamOptRecord:
       case file_types::TY_SwiftModuleInterfaceFile:
       case file_types::TY_PrivateSwiftModuleInterfaceFile:
+      case file_types::TY_SwiftModuleSummaryFile:
       case file_types::TY_SwiftCrossImportDir:
       case file_types::TY_SwiftOverlayFile:
       case file_types::TY_JSONDependencies:
@@ -2119,15 +2153,16 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     MergeModuleAction = C.createAction<MergeModuleJobAction>(AllModuleInputs);
   }
 
+  bool shouldPerformLTO = OI.LTOVariant != OutputInfo::LTOKind::None;
   if (OI.shouldLink() && !AllLinkerInputs.empty()) {
     JobAction *LinkAction = nullptr;
 
     if (OI.LinkAction == LinkKind::StaticLibrary) {
-      LinkAction = C.createAction<StaticLinkJobAction>(AllLinkerInputs,
-                                                    OI.LinkAction);
+      LinkAction =
+          C.createAction<StaticLinkJobAction>(AllLinkerInputs, OI.LinkAction);
     } else {
-      LinkAction = C.createAction<DynamicLinkJobAction>(AllLinkerInputs,
-                                                 OI.LinkAction);
+      LinkAction = C.createAction<DynamicLinkJobAction>(
+          AllLinkerInputs, OI.LinkAction, shouldPerformLTO);
     }
 
     // On ELF platforms there's no built in autolinking mechanism, so we
@@ -2149,9 +2184,10 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
         AutolinkExtractInputs.push_back(A);
       }
     const bool AutolinkExtractRequired =
-        (Triple.getObjectFormat() == llvm::Triple::ELF && !Triple.isPS4()) ||
-        Triple.getObjectFormat() == llvm::Triple::Wasm ||
-        Triple.isOSCygMing();
+        ((Triple.getObjectFormat() == llvm::Triple::ELF && !Triple.isPS4()) ||
+         Triple.getObjectFormat() == llvm::Triple::Wasm ||
+         Triple.isOSCygMing()) &&
+        !shouldPerformLTO;
     if (!AutolinkExtractInputs.empty() && AutolinkExtractRequired) {
       auto *AutolinkExtractAction =
           C.createAction<AutolinkExtractJobAction>(AutolinkExtractInputs);
@@ -2196,6 +2232,31 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     if (MergeModuleAction)
       TopLevelActions.push_back(MergeModuleAction);
     TopLevelActions.append(AllLinkerInputs.begin(), AllLinkerInputs.end());
+  }
+
+#ifdef NDEBUG
+  bool verifyInterfacesByDefault = false;
+#else
+  bool verifyInterfacesByDefault = true;
+#endif
+
+  if (MergeModuleAction
+      && Args.hasArg(options::OPT_enable_library_evolution)
+      && Args.hasFlag(options::OPT_verify_emitted_module_interface,
+                      options::OPT_no_verify_emitted_module_interface,
+                      verifyInterfacesByDefault)) {
+    if (Args.hasArgNoClaim(options::OPT_emit_module_interface,
+                           options::OPT_emit_module_interface_path)) {
+      TopLevelActions.push_back(
+          C.createAction<VerifyModuleInterfaceJobAction>(MergeModuleAction,
+              file_types::TY_SwiftModuleInterfaceFile));
+    }
+
+    if (Args.hasArgNoClaim(options::OPT_emit_private_module_interface_path)) {
+      TopLevelActions.push_back(
+          C.createAction<VerifyModuleInterfaceJobAction>(MergeModuleAction,
+              file_types::TY_PrivateSwiftModuleInterfaceFile));
+    }
   }
 }
 
@@ -2253,6 +2314,13 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
     if (const Arg *resourceDirArg = Args.getLastArg(options::OPT_resource_dir)) {
       commandLine.push_back("-resource-dir");
       commandLine.push_back(resourceDirArg->getValue());
+    }
+
+    if (Args.hasFlag(options::OPT_static_executable,
+                     options::OPT_no_static_executable, false) ||
+        Args.hasFlag(options::OPT_static_stdlib, options::OPT_no_static_stdlib,
+                     false)) {
+      commandLine.push_back("-use-static-resource-dir");
     }
 
     std::string executable = getSwiftProgramPath();
@@ -2813,6 +2881,10 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
                                       Output.get());
   }
 
+  if (isa<CompileJobAction>(JA)) {
+    chooseModuleSummaryPath(C, OutputMap, workingDirectory, Buf, Output.get());
+  }
+
   if (isa<MergeModuleJobAction>(JA) ||
       (isa<CompileJobAction>(JA) &&
        OI.CompilerMode == OutputInfo::Mode::SingleCompile)) {
@@ -3164,6 +3236,22 @@ void Driver::chooseModuleInterfacePath(Compilation &C, const JobAction *JA,
       C.getOutputInfo(), C.getArgs(), pathOpt, fileType,
       /*TreatAsTopLevelOutput*/true, workingDirectory, buffer);
   output->setAdditionalOutputForType(fileType, outputPath);
+}
+
+void Driver::chooseModuleSummaryPath(Compilation &C,
+                                     const TypeToPathMap *OutputMap,
+                                     StringRef workingDirectory,
+                                     llvm::SmallString<128> &Buf,
+                                     CommandOutput *Output) const {
+  StringRef pathFromArgs;
+  if (const Arg *A =
+          C.getArgs().getLastArg(options::OPT_emit_module_summary_path)) {
+    pathFromArgs = A->getValue();
+  }
+
+  addAuxiliaryOutput(C, *Output, file_types::TY_SwiftModuleSummaryFile,
+                     OutputMap, workingDirectory, pathFromArgs,
+                     /*requireArg=*/options::OPT_emit_module_summary);
 }
 
 void Driver::chooseSerializedDiagnosticsPath(Compilation &C,

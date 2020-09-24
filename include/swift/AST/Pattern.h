@@ -34,7 +34,6 @@ namespace swift {
   class Expr;
   enum class CheckedCastKind : unsigned;
   class TypeExpr;
-  class TypeLoc;
 
 /// PatternKind - The classification of different kinds of
 /// value-matching pattern.
@@ -73,7 +72,7 @@ protected:
     Value : 1
   );
 
-  SWIFT_INLINE_BITFIELD(VarPattern, Pattern, 1,
+  SWIFT_INLINE_BITFIELD(BindingPattern, Pattern, 1,
     /// True if this is a let pattern, false if a var pattern.
     IsLet : 1
   );
@@ -113,7 +112,7 @@ public:
   /// Find the smallest subpattern which obeys the property that matching it is
   /// equivalent to matching this pattern.
   ///
-  /// Looks through ParenPattern, VarPattern, and TypedPattern.
+  /// Looks through ParenPattern, BindingPattern, and TypedPattern.
   Pattern *getSemanticsProvidingPattern();
   const Pattern *getSemanticsProvidingPattern() const {
     return const_cast<Pattern*>(this)->getSemanticsProvidingPattern();
@@ -190,14 +189,6 @@ public:
   bool isRefutablePattern() const;
 
   bool isNeverDefaultInitializable() const;
-
-  /// Mark all vardecls in this pattern as having non-pattern initial
-  /// values bound into them.
-  void markHasNonPatternBindingInit() {
-    forEachVariable([&](VarDecl *VD) {
-      VD->setHasNonPatternBindingInit();
-    });
-  }
 
   /// Mark all vardecls in this pattern as having an owning statement for
   /// the pattern.
@@ -447,7 +438,6 @@ public:
 
   TypeRepr *getTypeRepr() const { return PatTypeRepr; }
 
-  TypeLoc getTypeLoc() const;
   SourceLoc getLoc() const;
   SourceRange getSourceRange() const;
 
@@ -555,6 +545,9 @@ public:
   }
   bool hasUnresolvedOriginalExpr() const {
     return ElementDeclOrUnresolvedOriginalExpr.is<Expr*>();
+  }
+  void setUnresolvedOriginalExpr(Expr *e) {
+    ElementDeclOrUnresolvedOriginalExpr = e;
   }
 
   DeclNameLoc getNameLoc() const { return NameLoc; }
@@ -692,22 +685,23 @@ public:
 /// semantics of its own, but has a syntactic effect on the subpattern. Bare
 /// identifiers in the subpattern create new variable bindings instead of being
 /// parsed as expressions referencing existing entities.
-class VarPattern : public Pattern {
+class BindingPattern : public Pattern {
   SourceLoc VarLoc;
   Pattern *SubPattern;
 public:
-  VarPattern(SourceLoc loc, bool isLet, Pattern *sub)
-      : Pattern(PatternKind::Var), VarLoc(loc), SubPattern(sub) {
-    Bits.VarPattern.IsLet = isLet;
+  BindingPattern(SourceLoc loc, bool isLet, Pattern *sub)
+      : Pattern(PatternKind::Binding), VarLoc(loc), SubPattern(sub) {
+    Bits.BindingPattern.IsLet = isLet;
   }
 
-  static VarPattern *createImplicit(ASTContext &Ctx, bool isLet, Pattern *sub) {
-    auto *VP = new (Ctx) VarPattern(SourceLoc(), isLet, sub);
+  static BindingPattern *createImplicit(ASTContext &Ctx, bool isLet,
+                                        Pattern *sub) {
+    auto *VP = new (Ctx) BindingPattern(SourceLoc(), isLet, sub);
     VP->setImplicit();
     return VP;
   }
 
-  bool isLet() const { return Bits.VarPattern.IsLet; }
+  bool isLet() const { return Bits.BindingPattern.IsLet; }
 
   SourceLoc getLoc() const { return VarLoc; }
   SourceRange getSourceRange() const {
@@ -722,17 +716,16 @@ public:
   void setSubPattern(Pattern *p) { SubPattern = p; }
 
   static bool classof(const Pattern *P) {
-    return P->getKind() == PatternKind::Var;
+    return P->getKind() == PatternKind::Binding;
   }
 };
-
 
 inline Pattern *Pattern::getSemanticsProvidingPattern() {
   if (auto *pp = dyn_cast<ParenPattern>(this))
     return pp->getSubPattern()->getSemanticsProvidingPattern();
   if (auto *tp = dyn_cast<TypedPattern>(this))
     return tp->getSubPattern()->getSemanticsProvidingPattern();
-  if (auto *vp = dyn_cast<VarPattern>(this))
+  if (auto *vp = dyn_cast<BindingPattern>(this))
     return vp->getSubPattern()->getSemanticsProvidingPattern();
   return this;
 }

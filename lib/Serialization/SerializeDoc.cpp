@@ -313,17 +313,13 @@ static bool hasDoubleUnderscore(Decl *D) {
   // base names.
   static StringRef Prefix = "__";
 
-  if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-    // If it's a function with a parameter with leading double underscore,
-    // it's a private function.
-    if (AFD->getParameters()->hasInternalParameter(Prefix))
+  // If it's a function or subscript with a parameter with leading
+  // double underscore, it's a private function or subscript.
+  if (isa<AbstractFunctionDecl>(D) || isa<SubscriptDecl>(D)) {
+    if (getParameterList(cast<ValueDecl>(D))->hasInternalParameter(Prefix))
       return true;
   }
 
-  if (auto SubscriptD = dyn_cast<SubscriptDecl>(D)) {
-    if (SubscriptD->getIndices()->hasInternalParameter(Prefix))
-      return true;
-  }
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
     auto Name = VD->getBaseName();
     if (!Name.isSpecial() &&
@@ -451,7 +447,6 @@ static void writeDeclCommentTable(
       return { false, E };
     }
 
-    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
     bool walkToTypeReprPre(TypeRepr *T) override { return false; }
     bool walkToParameterListPre(ParameterList *PL) override { return false; }
   };
@@ -689,7 +684,6 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
 
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override { return { false, S };}
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override { return { false, E };}
-  bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
   bool walkToTypeReprPre(TypeRepr *T) override { return false; }
   bool walkToParameterListPre(ParameterList *PL) override { return false; }
 

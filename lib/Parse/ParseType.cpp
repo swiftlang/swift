@@ -354,7 +354,7 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
 ///     attribute-list type-function
 ///
 ///   type-function:
-///     type-composition 'throws'? '->' type
+///     type-composition 'async'? 'throws'? '->' type
 ///
 ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
                                          bool HandleCodeCompletion,
@@ -410,13 +410,22 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   auto tyR = ty.get();
   auto status = ParserStatus(ty);
 
+  // Parse an async specifier.
+  SourceLoc asyncLoc;
+  if (shouldParseExperimentalConcurrency() &&
+      Tok.isContextualKeyword("async")) {
+    asyncLoc = consumeToken();
+  }
+
   // Parse a throws specifier.
-  // Don't consume 'throws', if the next token is not '->', so we can emit a
-  // more useful diagnostic when parsing a function decl.
+  // Don't consume 'throws', if the next token is not '->' or 'async', so we
+  // can emit a more useful diagnostic when parsing a function decl.
   SourceLoc throwsLoc;
   if (Tok.isAny(tok::kw_throws, tok::kw_rethrows, tok::kw_throw, tok::kw_try) &&
-      peekToken().is(tok::arrow)) {
-    if (Tok.isNot(tok::kw_throws)) {
+      (peekToken().is(tok::arrow) ||
+       (shouldParseExperimentalConcurrency() &&
+        peekToken().isContextualKeyword("async")))) {
+    if (Tok.isAny(tok::kw_rethrows, tok::kw_throw, tok::kw_try)) {
       // 'rethrows' is only allowed on function declarations for now.
       // 'throw' or 'try' are probably typos for 'throws'.
       Diag<> DiagID = Tok.is(tok::kw_rethrows) ?
@@ -425,18 +434,25 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
         .fixItReplace(Tok.getLoc(), "throws");
     }
     throwsLoc = consumeToken();
+
+    // 'async' must preceed 'throws'; accept this but complain.
+    if (shouldParseExperimentalConcurrency() &&
+        Tok.isContextualKeyword("async")) {
+      asyncLoc = consumeToken();
+
+      diagnose(asyncLoc, diag::async_after_throws, false)
+        .fixItRemove(asyncLoc)
+        .fixItInsert(throwsLoc, "async ");
+    }
   }
 
   if (Tok.is(tok::arrow)) {
     // Handle type-function if we have an arrow.
     SourceLoc arrowLoc = consumeToken();
-    if (Tok.is(tok::kw_throws)) {
-      Diag<> DiagID = diag::throws_in_wrong_position;
-      diagnose(Tok.getLoc(), DiagID)
-          .fixItInsert(arrowLoc, "throws ")
-          .fixItRemove(Tok.getLoc());
-      throwsLoc = consumeToken();
-    }
+
+    // Handle async/throws in the wrong place.
+    parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, /*rethrows=*/nullptr);
+
     ParserResult<TypeRepr> SecondHalf =
         parseType(diag::expected_type_function_result);
     if (SecondHalf.isNull()) {
@@ -451,6 +467,8 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       Builder.useArrow(SyntaxContext->popToken());
       if (throwsLoc.isValid())
         Builder.useThrowsOrRethrowsKeyword(SyntaxContext->popToken());
+      if (asyncLoc.isValid())
+        Builder.useAsyncKeyword(SyntaxContext->popToken());
 
       auto InputNode(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
       if (auto TupleTypeNode = InputNode.getAs<ParsedTupleTypeSyntax>()) {
@@ -560,8 +578,8 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       }
     }
 
-    tyR = new (Context) FunctionTypeRepr(generics, argsTyR, throwsLoc, arrowLoc,
-                                         SecondHalf.get(),
+    tyR = new (Context) FunctionTypeRepr(generics, argsTyR, asyncLoc, throwsLoc,
+                                         arrowLoc, SecondHalf.get(),
                                          patternGenerics, patternSubsTypes,
                                          invocationSubsTypes);
   } else if (auto firstGenerics = generics ? generics : patternGenerics) {
@@ -606,19 +624,19 @@ ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
 
   auto result = parseType(MessageID);
 
-  if (!result.isParseError() && Tok.is(tok::r_square)) {
+  if (!result.isParseErrorOrHasCompletion() && Tok.is(tok::r_square)) {
     auto diag = diagnose(Tok, diag::extra_rbracket);
     diag.fixItInsert(result.get()->getStartLoc(), getTokenText(tok::l_square));
     consumeToken();
     return makeParserErrorResult(new (Context)
                                      ErrorTypeRepr(getTypeErrorLoc()));
-  } else if (!result.isParseError() && Tok.is(tok::colon)) {
+  } else if (!result.isParseErrorOrHasCompletion() && Tok.is(tok::colon)) {
     auto colonTok = consumeToken();
     auto secondType = parseType(diag::expected_dictionary_value_type);
 
     auto diag = diagnose(colonTok, diag::extra_colon);
     diag.fixItInsert(result.get()->getStartLoc(), getTokenText(tok::l_square));
-    if (!secondType.isParseError()) {
+    if (!secondType.isParseErrorOrHasCompletion()) {
       if (Tok.is(tok::r_square)) {
         consumeToken();
       } else {
@@ -732,7 +750,7 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
       SmallVector<TypeRepr*, 8> GenericArgs;
       if (startsWithLess(Tok)) {
         auto genericArgsStatus = parseGenericArguments(GenericArgs, LAngle, RAngle);
-        if (genericArgsStatus.isError())
+        if (genericArgsStatus.isErrorOrHasCompletion())
           return genericArgsStatus;
       }
       EndLoc = Loc.getEndLoc();
@@ -753,7 +771,7 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
     // unless <anything> is 'Type'.
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix))) {
       if (peekToken().is(tok::code_complete)) {
-        Status.setHasCodeCompletion();
+        Status.setHasCodeCompletionAndIsError();
         break;
       }
       if (!peekToken().isContextualKeyword("Type")
@@ -775,7 +793,7 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
       }
     } else if (Tok.is(tok::code_complete)) {
       if (!Tok.isAtStartOfLine())
-        Status.setHasCodeCompletion();
+        Status.setHasCodeCompletionAndIsError();
       break;
     }
     break;
@@ -965,7 +983,7 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
   if (startsWithGreater(Tok)) {
     RAngleLoc = consumeStartingGreater();
   } else {
-    if (Status.isSuccess()) {
+    if (Status.isSuccess() && !Status.hasCodeCompletion()) {
       diagnose(Tok, diag::expected_rangle_protocol);
       diagnose(LAngleLoc, diag::opening_angle);
       Status.setIsParseError();
@@ -978,7 +996,7 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
   auto composition = CompositionTypeRepr::create(
     Context, Protocols, ProtocolLoc, {LAngleLoc, RAngleLoc});
 
-  if (Status.isSuccess()) {
+  if (Status.isSuccess() && !Status.hasCodeCompletion()) {
     // Only if we have complete protocol<...> construct, diagnose deprecated.
     SmallString<32> replacement;
     if (Protocols.empty()) {
@@ -1305,7 +1323,7 @@ SyntaxParserResult<ParsedTypeSyntax, TypeRepr> Parser::parseTypeCollection() {
     return Status;
 
   // If we couldn't parse anything for one of the types, propagate the error.
-  if (Status.isError())
+  if (Status.isErrorOrHasCompletion())
     return makeParserError();
 
   TypeRepr *TyR;
@@ -1569,12 +1587,31 @@ bool Parser::canParseType() {
     }
     break;
   }
-  
+
+  // Handle type-function if we have an 'async'.
+  if (shouldParseExperimentalConcurrency() &&
+      Tok.isContextualKeyword("async")) {
+    consumeToken();
+
+    // 'async' isn't a valid type without being followed by throws/rethrows
+    // or a return.
+    if (!Tok.isAny(tok::kw_throws, tok::kw_rethrows, tok::arrow))
+      return false;
+  }
+
   // Handle type-function if we have an arrow or 'throws'/'rethrows' modifier.
   if (Tok.isAny(tok::kw_throws, tok::kw_rethrows)) {
     consumeToken();
+
+    // Allow 'async' here even though it is ill-formed, so we can provide
+    // a better error.
+    if (shouldParseExperimentalConcurrency() &&
+        Tok.isContextualKeyword("async"))
+      consumeToken();
+
     // "throws" or "rethrows" isn't a valid type without being followed by
-    // a return.
+    // a return. We also accept 'async' here so we can provide a better
+    // error.
     if (!Tok.is(tok::arrow))
       return false;
   }

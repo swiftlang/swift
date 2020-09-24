@@ -147,6 +147,10 @@ public:
     return nullptr;
   }
 
+  // Erases \p inst and all of its users, recursively.
+  // The caller has to make sure that all users are removable (e.g. dead).
+  void eraseInstIncludingUsers(SILInstruction *inst);
+
   SILInstruction *eraseInstFromFunction(SILInstruction &I,
                                         bool AddOperandsToWorklist = true) {
     SILBasicBlock::iterator nullIter;
