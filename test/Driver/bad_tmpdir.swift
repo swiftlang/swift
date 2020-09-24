@@ -6,7 +6,7 @@
 //
 // REQUIRES: OS=macosx
 
-// SR-12362: This test is failing on master-next.
+// SR-12362: This test is failing on next branch.
 // XFAIL: *
 
 // RUN: env TMP="%t/fake/" TMPDIR="%t/fake/" not %target-build-swift -c -driver-filelist-threshold=0 %s 2>&1 | %FileCheck -check-prefix=CHECK-SOURCES %s

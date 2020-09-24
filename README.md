@@ -5,7 +5,7 @@
 | **macOS** | Google Kokoro | ![Build Status](https://storage.googleapis.com/tensorflow-kokoro-build-badges/macos-swift-tf-release.svg) | - |
 | **Ubuntu 16.04** | Swift.org CI | [![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow) | [![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow-gpu/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow-gpu) |
 
-| | **Architecture** | **Master** | **Package** |
+| | **Architecture** | **main** | **Package** |
 |---|:---:|:---:|:---:|
 | **macOS**        | x86_64 |[![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-osx/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-osx)|[![Build Status](https://ci.swift.org/job/oss-swift-package-osx/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-osx)|
 | **Ubuntu 16.04** | x86_64 | [![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_04)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_04)|

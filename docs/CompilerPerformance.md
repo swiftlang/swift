@@ -882,9 +882,9 @@ judge whether a revision contains a bug looks something like this:
 #!/bin/sh
 THRESHOLD=500000000
 CURR=$(git describe)
-utils/update-checkout --scheme master --reset-to-remote --clone --clean
+utils/update-checkout --scheme main --reset-to-remote --clone --clean
 git checkout ${CURR}
-utils/update-checkout --scheme master --match-timestamp
+utils/update-checkout --scheme main --match-timestamp
 git checkout ${CURR}
 if utils/build-script -r
 then
@@ -1065,7 +1065,7 @@ getting slower between versions:
      of the compiler from swift.org. While only a handful of recent snapshots
      are linked on the swift.org webpage, all historical snapshots remain
      available to download by substituting the appropriate timestamp into the
-     snapshot URL. For example, the master-branch, macOS snapshot from June 9
+     snapshot URL. For example, the main-branch, macOS snapshot from June 9
      2017 is available
      at
      [https://swift.org/builds/development/xcode/swift-DEVELOPMENT-SNAPSHOT-2017-06-09-a/swift-DEVELOPMENT-SNAPSHOT-2017-06-09-a-osx.pkg](https://swift.org/builds/development/xcode/swift-DEVELOPMENT-SNAPSHOT-2017-06-09-a/swift-DEVELOPMENT-SNAPSHOT-2017-06-09-a-osx.pkg),
