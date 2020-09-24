@@ -302,19 +302,13 @@ bool CaseStmtBodyScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
   return false;
 }
 
-bool AbstractFunctionBodyScope::lookupLocalsOrMembers(
+bool FunctionBodyScope::lookupLocalsOrMembers(
     DeclConsumer consumer) const {
   if (auto *paramList = decl->getParameters()) {
     for (auto *paramDecl : *paramList)
       if (consumer.consume({paramDecl}, DeclVisibilityKind::FunctionParameter))
         return true;
   }
-  return false;
-}
-
-bool FunctionBodyScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
-  if (AbstractFunctionBodyScope::lookupLocalsOrMembers(consumer))
-    return true;
 
   if (decl->getDeclContext()->isTypeContext()) {
     return consumer.consume({decl->getImplicitSelfDecl()},

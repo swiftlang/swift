@@ -59,13 +59,13 @@
         "llvm-project": {
             "remote": { "id": "apple/llvm-project" } }
     },
-    "default-branch-scheme": "master",
+    "default-branch-scheme": "main",
     "branch-schemes": {
-       "master": {
-            "aliases": ["master", "swift/master", "main"],
+       "main": {
+            "aliases": ["master", "swift/main", "main"],
             "repos": {
-                "llvm-project": "swift/master",
-                "swift": "master",
+                "llvm-project": "swift/main",
+                "swift": "main",
                 "cmark": "main",
                 "llbuild": "main",
                 "swift-tools-support-core": "main",
@@ -85,18 +85,18 @@
                 "cmake": "v3.16.5",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
-                "swift-format": "master"
+                "swift-format": "main"
                 "tensorflow-swift-apis": "master"
             }
         },
         "next" : {
             "aliases": ["next", "master-next",
-                        "swift/master-next",
+                        "swift/next",
                         "stable-next", "upstream",
                         "next-upstream", "upstream-with-swift"],
             "repos": {
-                "llvm-project": "swift/master-next",
-                "swift": "master-next",
+                "llvm-project": "swift/next",
+                "swift": "next",
                 "cmark": "main",
                 "llbuild": "main",
                 "swift-tools-support-core": "main",
@@ -116,7 +116,7 @@
                 "cmake": "v3.16.5",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
-                "swift-format": "master",
+                "swift-format": "main"
                 "tensorflow-swift-apis": "master"
             }
         },
@@ -137,7 +137,7 @@
                 "ninja": "release",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
-                "swift-format": "master"
+                "swift-format": "main"
             }
         },
         "swift-3.1-branch" : {
@@ -158,7 +158,7 @@
                 "ninja": "release",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
-                "swift-format": "master"
+                "swift-format": "main"
             }
         },
         "swift-4.0-branch" : {
@@ -179,7 +179,7 @@
                 "ninja": "release",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
-                "swift-format": "master"
+                "swift-format": "main"
             }
         },
         "swift-4.1-branch" : {
@@ -200,7 +200,7 @@
                 "ninja": "release",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
-                "swift-format": "master"
+                "swift-format": "main"
             }
         },
         "swift-4.2-branch" : {
@@ -221,7 +221,7 @@
                 "ninja": "release",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
-                "swift-format": "master"
+                "swift-format": "main"
             }
         },
         "swift-5.0-branch" : {
@@ -243,7 +243,7 @@
                 "icu": "release-61-1",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
-                "swift-format": "master"
+                "swift-format": "main"
             }
         },
        "swift-5.1-branch" : {
@@ -265,7 +265,7 @@
                 "icu": "release-61-1",
                 "indexstore-db": "swift-5.1-branch",
                 "sourcekit-lsp": "swift-5.1-branch",
-                "swift-format": "master"
+                "swift-format": "main"
             }
         },
        "swift-5.2-branch": {
@@ -289,7 +289,7 @@
                 "cmake": "v3.15.1",
                 "indexstore-db": "swift-5.2-branch",
                 "sourcekit-lsp": "swift-5.2-branch",
-                "swift-format": "master"
+                "swift-format": "main"
             }
         },
        "release/5.3": {
@@ -313,35 +313,8 @@
                 "cmake": "v3.16.5",
                 "indexstore-db": "release/5.3",
                 "sourcekit-lsp": "release/5.3",
-                "swift-format": "master",
+                "swift-format": "main"
                 "tensorflow-swift-apis": "master"
-            }
-        },
-       "master-rebranch": {
-            "aliases": ["master-rebranch", "swift/master-rebranch"],
-            "repos": {
-                "llvm-project": "swift/master-rebranch",
-                "swift": "master-rebranch",
-                "cmark": "main",
-                "llbuild": "main",
-                "swift-tools-support-core": "main",
-                "swiftpm": "main",
-                "swift-argument-parser": "0.3.0",
-                "swift-driver": "main",
-                "swift-syntax": "main",
-                "swift-stress-tester": "main",
-                "swift-corelibs-xctest": "main",
-                "swift-corelibs-foundation": "main",
-                "swift-corelibs-libdispatch": "main",
-                "swift-integration-tests": "main",
-                "swift-xcode-playground-support": "main",
-                "ninja": "release",
-                "icu": "release-65-1",
-                "yams": "3.0.1",
-                "cmake": "v3.16.5",
-                "indexstore-db": "main",
-                "sourcekit-lsp": "main",
-                "swift-format": "master"
             }
        },
 

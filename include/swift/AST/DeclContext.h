@@ -712,13 +712,6 @@ class IterableDeclContext {
   /// member loading, as a key when doing lookup in this IDC.
   serialization::DeclID SerialID;
 
-  /// Because \c parseDelayedDecl and lazy member adding can add members *after*
-  /// an \c ASTScope tree is created, there must be some way for the tree to
-  /// detect when a member has been added. A bit would suffice,
-  /// but would be more fragile, The scope code could count the members each
-  /// time, but I think it's a better trade to just keep a count here.
-  unsigned MemberCount : 29;
-
   /// Whether we have already added the parsed members into the context.
   unsigned AddedParsedMembers : 1;
 
@@ -741,7 +734,6 @@ class IterableDeclContext {
 public:
   IterableDeclContext(IterableDeclContextKind kind)
     : LastDeclAndKind(nullptr, kind) {
-    MemberCount = 0;
     AddedParsedMembers = 0;
     HasOperatorDeclarations = 0;
     HasNestedClassDeclarations = 0;
@@ -793,9 +785,6 @@ public:
   /// Add a member to this context. If the hint decl is specified, the new decl
   /// is inserted immediately after the hint.
   void addMember(Decl *member, Decl *hint = nullptr);
-
-  /// See \c MemberCount
-  unsigned getMemberCount() const;
 
   /// Check whether there are lazily-loaded members.
   bool hasLazyMembers() const {

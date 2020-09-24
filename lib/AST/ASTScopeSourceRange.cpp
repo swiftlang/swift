@@ -213,7 +213,7 @@ SourceRange DifferentiableAttributeScope::getSourceRangeOfThisASTNode(
   return differentiableAttr->getRange();
 }
 
-SourceRange AbstractFunctionBodyScope::getSourceRangeOfThisASTNode(
+SourceRange FunctionBodyScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
   return decl->getOriginalBodySourceRange();
 }
@@ -256,12 +256,6 @@ SourceRange PatternEntryInitializerScope::getSourceRangeOfThisASTNode(
   // Search for "When the initializer is removed we don't actually clear the
   // pointer" because we do!
   return initAsWrittenWhenCreated->getSourceRange();
-}
-
-SourceRange
-VarDeclScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
-  const auto br = decl->getBracesRange();
-  return br.isValid() ? br : decl->getSourceRange();
 }
 
 SourceRange GenericParamScope::getSourceRangeOfThisASTNode(
@@ -592,7 +586,7 @@ SourceRange ASTScopeImpl::sourceRangeForDeferredExpansion() const {
 SourceRange IterableTypeScope::sourceRangeForDeferredExpansion() const {
   return portion->sourceRangeForDeferredExpansion(this);
 }
-SourceRange AbstractFunctionBodyScope::sourceRangeForDeferredExpansion() const {
+SourceRange FunctionBodyScope::sourceRangeForDeferredExpansion() const {
   const auto bsr = decl->getOriginalBodySourceRange();
   const SourceLoc endEvenIfNoCloseBraceAndEndsWithInterpolatedStringLiteral =
       getLocEncompassingPotentialLookups(getSourceManager(), bsr.End);
