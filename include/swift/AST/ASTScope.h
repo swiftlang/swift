@@ -354,7 +354,7 @@ public:
 
   /// Entry point into ASTScopeImpl-land for lookups
   static void
-  unqualifiedLookup(SourceFile *, DeclNameRef, SourceLoc, DeclConsumer);
+  unqualifiedLookup(SourceFile *, SourceLoc, DeclConsumer);
 
   /// Entry point into ASTScopeImpl-land for labeled statement lookups.
   static llvm::SmallVector<LabeledStmt *, 4>
@@ -366,7 +366,6 @@ public:
 #pragma mark - - lookup- starting point
 private:
   static const ASTScopeImpl *findStartingScopeForLookup(SourceFile *,
-                                                        const DeclNameRef name,
                                                         const SourceLoc where);
 
 protected:

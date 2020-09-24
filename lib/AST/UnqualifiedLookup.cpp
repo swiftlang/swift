@@ -303,7 +303,9 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
                                   DC->getParentSourceFile());
 
   if (Loc.isValid()) {
-    lookInASTScopes();
+    // Operator lookup is always global, for the time being.
+    if (!Name.isOperator())
+      lookInASTScopes();
   } else {
     assert(DC->isModuleScopeContext() &&
            "Unqualified lookup without a source location must start from "
@@ -543,8 +545,7 @@ void UnqualifiedLookupFactory::lookInASTScopes() {
   stopForDebuggingIfStartingTargetLookup(true);
 #endif
 
-  ASTScope::unqualifiedLookup(DC->getParentSourceFile(),
-                              Name, Loc, consumer);
+  ASTScope::unqualifiedLookup(DC->getParentSourceFile(), Loc, consumer);
 }
 
 void ASTScopeDeclConsumerForUnqualifiedLookup::maybeUpdateSelfDC(

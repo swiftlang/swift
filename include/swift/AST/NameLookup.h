@@ -681,7 +681,7 @@ public:
   /// Flesh out the tree for dumping
   void buildFullyExpandedTree();
 
-  static void unqualifiedLookup(SourceFile *, DeclNameRef, SourceLoc,
+  static void unqualifiedLookup(SourceFile *, SourceLoc,
                                 namelookup::AbstractASTScopeDeclConsumer &);
 
   /// Entry point to record the visible statement labels from the given

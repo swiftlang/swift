@@ -39,11 +39,11 @@ using namespace ast_scope;
 #pragma mark ASTScope
 
 void ASTScope::unqualifiedLookup(
-    SourceFile *SF, DeclNameRef name, SourceLoc loc,
+    SourceFile *SF, SourceLoc loc,
     namelookup::AbstractASTScopeDeclConsumer &consumer) {
   if (auto *s = SF->getASTContext().Stats)
     ++s->getFrontendCounters().NumASTScopeLookups;
-  ASTScopeImpl::unqualifiedLookup(SF, name, loc, consumer);
+  ASTScopeImpl::unqualifiedLookup(SF, loc, consumer);
 }
 
 llvm::SmallVector<LabeledStmt *, 4> ASTScope::lookupLabeledStmts(
