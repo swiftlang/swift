@@ -459,7 +459,7 @@ void SILType::dump() const {
 static void printSILFunctionNameAndType(
     llvm::raw_ostream &OS, const SILFunction *function,
     llvm::DenseMap<CanType, Identifier> &sugaredTypeNames,
-    bool printFullConvention = false) {
+    const SILPrintContext *silPrintContext = nullptr) {
   function->printName(OS);
   OS << " : $";
   auto *genEnv = function->getGenericEnvironment();
@@ -496,7 +496,7 @@ static void printSILFunctionNameAndType(
         sugaredTypeNames[archetypeTy->getCanonicalType()] = name;
     }
   }
-  auto printOptions = PrintOptions::printSIL(printFullConvention);
+  auto printOptions = PrintOptions::printSIL(silPrintContext);
   printOptions.GenericSig = genSig;
   printOptions.AlternativeTypeNames =
       sugaredTypeNames.empty() ? nullptr : &sugaredTypeNames;
@@ -571,8 +571,7 @@ public:
       SILPrintContext &PrintCtx,
       llvm::DenseMap<CanType, Identifier> *AlternativeTypeNames = nullptr)
       : Ctx(PrintCtx), PrintState{{PrintCtx.OS()},
-                                  PrintOptions::printSIL(
-                                      PrintCtx.printFullConvention())},
+                                  PrintOptions::printSIL(&PrintCtx)},
         LastBufferID(0) {
     PrintState.ASTOptions.AlternativeTypeNames = AlternativeTypeNames;
     PrintState.ASTOptions.PrintForSIL = true;
@@ -2685,8 +2684,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     OS << "[ossa] ";
 
   llvm::DenseMap<CanType, Identifier> sugaredTypeNames;
-  printSILFunctionNameAndType(OS, this, sugaredTypeNames,
-                              PrintCtx.printFullConvention());
+  printSILFunctionNameAndType(OS, this, sugaredTypeNames, &PrintCtx);
 
   if (!isExternalDeclaration()) {
     if (auto eCount = getEntryCount()) {
@@ -2971,7 +2969,7 @@ static void printFileIDMap(SILPrintContext &Ctx, const FileIDMap map) {
 }
 
 void SILProperty::print(SILPrintContext &Ctx) const {
-  PrintOptions Options = PrintOptions::printSIL(Ctx.printFullConvention());
+  PrintOptions Options = PrintOptions::printSIL(&Ctx);
 
   auto &OS = Ctx.OS();
   OS << "sil_property ";
@@ -3611,4 +3609,21 @@ ID SILPrintContext::getID(const SILNode *node) {
 
   ID R = {ID::SSAValue, ValueToIDMap[node]};
   return R;
+}
+
+PrintOptions PrintOptions::printSIL(const SILPrintContext *ctx) {
+  PrintOptions result;
+  result.PrintLongAttrsOnSeparateLines = true;
+  result.PrintStorageRepresentationAttrs = true;
+  result.AbstractAccessors = false;
+  result.PrintForSIL = true;
+  result.PrintInSILBody = true;
+  result.PreferTypeRepr = false;
+  result.PrintIfConfig = false;
+  result.OpaqueReturnTypePrinting =
+     OpaqueReturnTypePrintingMode::StableReference;
+  if (ctx && ctx->printFullConvention())
+   result.PrintFunctionRepresentationAttrs =
+       PrintOptions::FunctionRepresentationMode::Full;
+  return result;
 }
