@@ -409,6 +409,7 @@ enum Color {
 
 let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) })
 // expected-error@-1 {{cannot convert value of type 'Array<(Int, _)>' to specified type '(Int, Color)'}}
+// expected-error@-2 {{cannot infer contextual base in reference to member 'Unknown'}}
 
 let _: [(Int, Color)] = [1,2].map({ ($0, .Unknown("")) })// expected-error {{missing argument label 'description:' in call}}
 

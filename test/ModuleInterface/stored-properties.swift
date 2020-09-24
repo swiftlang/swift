@@ -83,6 +83,9 @@ public struct BagOfVariables {
   // COMMON: public let a: Swift.Int = 0
   public let a: Int = 0
 
+  // COMMON: public let (x, y): (Swift.Int, Swift.Int) = (0, 0)
+  public let (x, y) = (0, 0)
+
   // COMMON: public var b: Swift.Bool = false
   public var b: Bool = false
 

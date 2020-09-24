@@ -733,8 +733,8 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // Lower the witness thunk type with the requirement's abstraction level.
   auto witnessSILFnType = getNativeSILFunctionType(
       M.Types, TypeExpansionContext::minimal(), AbstractionPattern(reqtOrigTy),
-      reqtSubstTy, requirement, witnessRef, witnessSubsForTypeLowering,
-      conformance);
+      reqtSubstTy, requirementInfo.SILFnType->getExtInfo(), requirement,
+      witnessRef, witnessSubsForTypeLowering, conformance);
 
   // Mangle the name of the witness thunk.
   Mangle::ASTMangler NewMangler;

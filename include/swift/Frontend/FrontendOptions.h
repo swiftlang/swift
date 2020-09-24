@@ -244,6 +244,9 @@ public:
   /// output path is configured.
   Optional<IntermoduleDepTrackingMode> IntermoduleDependencyTracking;
 
+  /// Should we emit the cType when printing @convention(c) or no?
+  bool PrintFullConvention = false;
+
   /// Should we serialize the hashes of dependencies (vs. the modification
   /// times) when compiling a module interface?
   bool SerializeModuleInterfaceDependencyHashes = false;
@@ -268,6 +271,10 @@ public:
   /// Disable implicitly built Swift modules because they are explicitly
   /// built and given to the compiler invocation.
   bool DisableImplicitModules = false;
+
+  /// When performing a dependency scanning action, only identify and output all imports
+  /// of the main Swift module's source files.
+  bool ImportPrescan = false;
 
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {

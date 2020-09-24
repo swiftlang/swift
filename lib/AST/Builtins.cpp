@@ -1540,19 +1540,25 @@ static ValueDecl *getOnceOperation(ASTContext &Context,
   
   auto HandleTy = Context.TheRawPointerType;
   auto VoidTy = Context.TheEmptyTupleType;
+  SmallVector<AnyFunctionType::Param, 1> CFuncParams;
+  swift::CanType ContextTy;
+  if (withContext) {
+    ContextTy = Context.TheRawPointerType;
+    auto ContextArg = FunctionType::Param(ContextTy);
+    CFuncParams.push_back(ContextArg);
+  }
+  auto Rep = FunctionTypeRepresentation::CFunctionPointer;
+  auto ClangType = Context.getClangFunctionType(CFuncParams, VoidTy, Rep);
   auto Thin =
       FunctionType::ExtInfoBuilder(FunctionTypeRepresentation::CFunctionPointer,
                                    /*throws*/ false)
+          .withClangFunctionType(ClangType)
           .build();
-  if (withContext) {
-    auto ContextTy = Context.TheRawPointerType;
-    auto ContextArg = FunctionType::Param(ContextTy);
-    auto BlockTy = FunctionType::get({ContextArg}, VoidTy, Thin);
-    return getBuiltinFunction(Id, {HandleTy, BlockTy, ContextTy}, VoidTy);
-  } else {
-    auto BlockTy = FunctionType::get({}, VoidTy, Thin);
-    return getBuiltinFunction(Id, {HandleTy, BlockTy}, VoidTy);
-  }
+  auto BlockTy = FunctionType::get(CFuncParams, VoidTy, Thin);
+  SmallVector<swift::Type, 3> ArgTypes = {HandleTy, BlockTy};
+  if (withContext)
+    ArgTypes.push_back(ContextTy);
+  return getBuiltinFunction(Id, ArgTypes, VoidTy);
 }
 
 static ValueDecl *getPolymorphicBinaryOperation(ASTContext &ctx,
