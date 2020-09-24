@@ -27,7 +27,7 @@ We use multiple approaches to test the Swift toolchain.
   [Smoke testing](ContinuousIntegration.md#smoke-testing)
   skips the iOS, tvOS, and watchOS platforms.
 
-The [test/lit.cfg](https://github.com/apple/swift/blob/master/test/lit.cfg)
+The [test/lit.cfg](https://github.com/apple/swift/blob/main/test/lit.cfg)
 uses an iOS 10.3 simulator configuration named "iPhone 5" for 32-bit testing.
 
 1.  Download and install the iOS 10.3 simulator runtime, in Xcode's

@@ -357,7 +357,7 @@ def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
 def dump_repo_hashes(args, config, branch_scheme_name='repro'):
     """
     Dumps the current state of the repo into a new config file that contains a
-    master branch scheme with the relevant branches set to the appropriate
+    main branch scheme with the relevant branches set to the appropriate
     hashes.
     """
     new_config = {}
