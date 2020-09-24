@@ -92,6 +92,9 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.ImportPrescan |= Args.hasArg(OPT_import_prescan);
 
+  Opts.EnableExperimentalCrossModuleIncrementalBuild |=
+      Args.hasArg(OPT_enable_experimental_cross_module_incremental_build);
+
   // Always track system dependencies when scanning dependencies.
   if (const Arg *ModeArg = Args.getLastArg(OPT_modes_Group)) {
     if (ModeArg->getOption().matches(OPT_scan_dependencies)) {
