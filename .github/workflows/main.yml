@@ -39,9 +39,9 @@ jobs:
       - uses: actions/cache@v1
         with:
           path: ../build-cache
-          key: ${{ runner.os }}-sccache-v10-${{ steps.cache_timestamp.outputs.timestamp }}
+          key: ubuntu-18.04-sccache-v10-${{ steps.cache_timestamp.outputs.timestamp }}
           restore-keys: |
-            ${{ runner.os }}-sccache-v10-
+            ubuntu-18.04-sccache-v10-
       - name: Build Ubuntu 18.04 installable archive
         run: |
           ./utils/webassembly/ci.sh
@@ -85,9 +85,9 @@ jobs:
       - uses: actions/cache@v1
         with:
           path: ../build-cache
-          key: ${{ runner.os }}-sccache-v10-${{ steps.cache_timestamp.outputs.timestamp }}
+          key: ubuntu-20.04-sccache-v10-${{ steps.cache_timestamp.outputs.timestamp }}
           restore-keys: |
-            ${{ runner.os }}-sccache-v10-
+            ubuntu-20.04-sccache-v10-
       - name: Build Ubuntu 20.04 installable archive
         run: |
           ./utils/webassembly/ci.sh
