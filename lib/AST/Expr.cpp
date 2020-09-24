@@ -2463,6 +2463,11 @@ void swift::simple_display(llvm::raw_ostream &out,
   simple_display(out, expr->getDefaultArgsOwner().getDecl());
 }
 
+void swift::simple_display(llvm::raw_ostream &out,
+                           const Expr *expr) {
+  out << "expression";
+}
+
 SourceLoc swift::extractNearestSourceLoc(const DefaultArgumentExpr *expr) {
   return expr->getLoc();
 }

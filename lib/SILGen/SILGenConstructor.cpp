@@ -303,8 +303,8 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     return emitImplicitValueConstructor(*this, ctor);
 
   // True if this constructor delegates to a peer constructor with self.init().
-  bool isDelegating = ctor->getDelegatingOrChainedInitKind(nullptr) ==
-    ConstructorDecl::BodyInitKind::Delegating;
+  bool isDelegating = ctor->getDelegatingOrChainedInitKind().initKind ==
+      BodyInitKind::Delegating;
 
   // Get the 'self' decl and type.
   VarDecl *selfDecl = ctor->getImplicitSelfDecl();
@@ -637,8 +637,8 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // True if this constructor delegates to a peer constructor with self.init().
   bool isDelegating = false;
   if (!ctor->hasStubImplementation()) {
-    isDelegating = ctor->getDelegatingOrChainedInitKind(nullptr) ==
-      ConstructorDecl::BodyInitKind::Delegating;
+    isDelegating = ctor->getDelegatingOrChainedInitKind().initKind ==
+        BodyInitKind::Delegating;
   }
 
   // Set up the 'self' argument.  If this class has a superclass, we set up

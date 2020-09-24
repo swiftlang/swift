@@ -121,6 +121,9 @@ SWIFT_REQUEST(TypeChecker, InheritsSuperclassInitializersRequest,
               bool(ClassDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InitKindRequest,
               CtorInitializerKind(ConstructorDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, BodyInitKindRequest,
+              BodyInitKindAndExpr(ConstructorDecl *), Cached,
+              NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InterfaceTypeRequest,
               Type(ValueDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsAccessorTransparentRequest, bool(AccessorDecl *),

@@ -1428,8 +1428,8 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
     if (auto *ctor = dyn_cast<ConstructorDecl>(getDC())) {
       if (auto *baseRef = dyn_cast<DeclRefExpr>(member->getBase())) {
         if (baseRef->getDecl() == ctor->getImplicitSelfDecl() &&
-            ctor->getDelegatingOrChainedInitKind(nullptr) ==
-            ConstructorDecl::BodyInitKind::Delegating) {
+            ctor->getDelegatingOrChainedInitKind().initKind ==
+            BodyInitKind::Delegating) {
           emitDiagnosticAt(loc, diag::assignment_let_property_delegating_init,
                            member->getName());
           if (auto overload = getOverloadChoiceIfAvailable(
