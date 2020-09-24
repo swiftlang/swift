@@ -2007,6 +2007,28 @@ Expr *AutoClosureExpr::getSingleExpressionBody() const {
 }
 
 Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
+  auto maybeUnwrapOpenExistential = [](Expr *expr) {
+    if (auto *openExistential = dyn_cast<OpenExistentialExpr>(expr)) {
+      expr = openExistential->getSubExpr()->getSemanticsProvidingExpr();
+      if (auto *ICE = dyn_cast<ImplicitConversionExpr>(expr))
+        expr = ICE->getSyntacticSubExpr();
+    }
+
+    return expr;
+  };
+
+  auto maybeUnwrapOptionalEval = [](Expr *expr) {
+    if (auto optEval = dyn_cast<OptionalEvaluationExpr>(expr))
+      expr = optEval->getSubExpr();
+    if (auto inject = dyn_cast<InjectIntoOptionalExpr>(expr))
+      expr = inject->getSubExpr();
+    if (auto erasure = dyn_cast<ErasureExpr>(expr))
+      expr = erasure->getSubExpr();
+    if (auto bind = dyn_cast<BindOptionalExpr>(expr))
+      expr = bind->getSubExpr();
+    return expr;
+  };
+
   switch (getThunkKind()) {
   case AutoClosureExpr::Kind::None:
     break;
@@ -2014,10 +2036,8 @@ Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
   case AutoClosureExpr::Kind::SingleCurryThunk: {
     auto *body = getSingleExpressionBody();
     body = body->getSemanticsProvidingExpr();
-
-    if (auto *openExistential = dyn_cast<OpenExistentialExpr>(body)) {
-      body = openExistential->getSubExpr()->getSemanticsProvidingExpr();
-    }
+    body = maybeUnwrapOpenExistential(body);
+    body = maybeUnwrapOptionalEval(body);
 
     if (auto *outerCall = dyn_cast<ApplyExpr>(body)) {
       return outerCall->getFn();
@@ -2034,18 +2054,12 @@ Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
                AutoClosureExpr::Kind::SingleCurryThunk);
       auto *innerBody = innerClosure->getSingleExpressionBody();
       innerBody = innerBody->getSemanticsProvidingExpr();
-
-      if (auto *openExistential = dyn_cast<OpenExistentialExpr>(innerBody)) {
-        innerBody = openExistential->getSubExpr()->getSemanticsProvidingExpr();
-        if (auto *ICE = dyn_cast<ImplicitConversionExpr>(innerBody))
-          innerBody = ICE->getSyntacticSubExpr();
-      }
+      innerBody = maybeUnwrapOpenExistential(innerBody);
+      innerBody = maybeUnwrapOptionalEval(innerBody);
 
       if (auto *outerCall = dyn_cast<ApplyExpr>(innerBody)) {
         if (auto *innerCall = dyn_cast<ApplyExpr>(outerCall->getFn())) {
-          if (auto *declRef = dyn_cast<DeclRefExpr>(innerCall->getFn())) {
-            return declRef;
-          }
+          return innerCall->getFn();
         }
       }
     }

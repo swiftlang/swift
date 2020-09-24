@@ -358,21 +358,8 @@ static Optional<PartialApplyThunkInfo> decomposePartialApplyThunk(
         != AutoClosureExpr::Kind::DoubleCurryThunk)
     return None;
 
-  // Check for the inner closure in the thunk.
-  auto innerAutoclosure = dyn_cast<AutoClosureExpr>(
-      outerAutoclosure->getSingleExpressionBody());
-  if (!innerAutoclosure ||
-      innerAutoclosure->getThunkKind()
-          != AutoClosureExpr::Kind::SingleCurryThunk)
-    return None;
-
-  auto innerCall = dyn_cast<CallExpr>(
-      innerAutoclosure->getSingleExpressionBody());
-  if (!innerCall)
-    return None;
-
-  auto memberCall = dyn_cast<DotSyntaxCallExpr>(innerCall->getFn());
-  if (!memberCall)
+  auto memberFn = outerAutoclosure->getUnwrappedCurryThunkExpr();
+  if (!memberFn)
     return None;
 
   // Determine whether the partial apply thunk was immediately converted to
@@ -383,8 +370,7 @@ static Optional<PartialApplyThunkInfo> decomposePartialApplyThunk(
     isEscaping = fnType && !fnType->isNoEscape();
   }
 
-  return PartialApplyThunkInfo{
-      apply->getArg(), memberCall->getFn(), isEscaping};
+  return PartialApplyThunkInfo{apply->getArg(), memberFn, isEscaping};
 }
 
 /// Find the immediate member reference in the given expression.
