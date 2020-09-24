@@ -124,6 +124,7 @@ class ScalarTypeLayoutEntry : public TypeLayoutEntry,
 public:
   const TypeInfo &typeInfo;
   SILType representative;
+
   ScalarTypeLayoutEntry(const TypeInfo &ti, SILType representative)
       : TypeLayoutEntry(TypeLayoutEntryKind::Scalar), typeInfo(ti),
         representative(representative) {}
@@ -134,7 +135,8 @@ public:
 
   // Support for FoldingSet.
   void Profile(llvm::FoldingSetNodeID &id) const;
-  static void Profile(llvm::FoldingSetNodeID &ID, const TypeInfo &ti);
+  static void Profile(llvm::FoldingSetNodeID &ID, const TypeInfo &ti,
+                      SILType ty);
 
   llvm::Value *alignmentMask(IRGenFunction &IGF) const override;
   llvm::Value *size(IRGenFunction &IGF) const override;
