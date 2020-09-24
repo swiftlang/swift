@@ -337,6 +337,13 @@ def emit_loaded_module_trace_path_EQ : Joined<["-"], "emit-loaded-module-trace-p
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
          SupplementaryOutput]>,
   Alias<emit_loaded_module_trace_path>;
+def emit_module_import_graph_path : Separate<["-"],
+    "emit-module-import-graph-path">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+         SupplementaryOutput]>,
+  HelpText<"Emit a module import graph in GraphViz DOT format to <path>. The key used is Exp = @_exported, Def = default, IO = @_implementationOnly, SPI = @_spi, SCOO = shadowed by cross-import overlay, (C) = Clang module, (S) = Swift module, Ov = Swift overlay for Clang module, X-Ov = Cross-import overlay.">,
+  // GraphViz doesn't seem to have a proper way to add a legend to a graph. :(
+  MetaVarName<"<path>">;
 def emit_cross_import_remarks : Flag<["-"], "Rcross-import">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit a remark if a cross-import of a module is triggered.">;

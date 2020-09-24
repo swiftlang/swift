@@ -1189,11 +1189,10 @@ SourceFile::getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &modu
       requiredFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
     else if (desc.importOptions.contains(ImportFlags::SPIAccessControl))
       requiredFilter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
+    else if (!separatelyImportedOverlays.lookup(desc.module.importedModule).empty())
+      requiredFilter |= ModuleDecl::ImportFilterKind::ShadowedBySeparateOverlay;
     else
       requiredFilter |= ModuleDecl::ImportFilterKind::Private;
-
-    if (!separatelyImportedOverlays.lookup(desc.module.importedModule).empty())
-      requiredFilter |= ModuleDecl::ImportFilterKind::ShadowedBySeparateOverlay;
 
     if (filter.contains(requiredFilter))
       modules.push_back(desc.module);

@@ -2022,6 +2022,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_PCH:
       case file_types::TY_ImportedModules:
       case file_types::TY_ModuleTrace:
+      case file_types::TY_ModuleImportGraph:
       case file_types::TY_YAMLOptRecord:
       case file_types::TY_BitstreamOptRecord:
       case file_types::TY_SwiftModuleInterfaceFile:

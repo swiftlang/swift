@@ -625,6 +625,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_SwiftRanges:
   case file_types::TY_CompiledSource:
   case file_types::TY_ModuleTrace:
+  case file_types::TY_ModuleImportGraph:
   case file_types::TY_TBD:
   case file_types::TY_YAMLOptRecord:
   case file_types::TY_BitstreamOptRecord:
@@ -887,6 +888,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_CompiledSource:
     case file_types::TY_Remapping:
     case file_types::TY_ModuleTrace:
+    case file_types::TY_ModuleImportGraph:
     case file_types::TY_YAMLOptRecord:
     case file_types::TY_BitstreamOptRecord:
     case file_types::TY_SwiftModuleInterfaceFile:

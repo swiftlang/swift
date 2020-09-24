@@ -127,6 +127,9 @@ public:
   std::string loadedModuleTracePath() const {
     return getPrimarySpecificPaths().SupplementaryOutputs.LoadedModuleTracePath;
   }
+  std::string moduleImportGraphPath() const {
+    return getPrimarySpecificPaths().SupplementaryOutputs.ModuleImportGraphPath;
+  }
   std::string serializedDiagnosticsPath() const {
     return getPrimarySpecificPaths().SupplementaryOutputs
         .SerializedDiagnosticsPath;

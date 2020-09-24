@@ -297,6 +297,8 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
       options::OPT_emit_fixits_path);
   auto loadedModuleTrace = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_loaded_module_trace_path);
+  auto moduleImportGraph = getSupplementaryFilenamesFromArguments(
+      options::OPT_emit_module_import_graph_path);
   auto TBD = getSupplementaryFilenamesFromArguments(options::OPT_emit_tbd_path);
   auto moduleInterfaceOutput = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_module_interface_path);
@@ -310,9 +312,10 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
       options::OPT_emit_module_summary_path);
   if (!objCHeaderOutput || !moduleOutput || !moduleDocOutput ||
       !dependenciesFile || !referenceDependenciesFile ||
-      !serializedDiagnostics || !fixItsOutput || !loadedModuleTrace || !TBD ||
-      !moduleInterfaceOutput || !privateModuleInterfaceOutput ||
-      !moduleSourceInfoOutput || !ldAddCFileOutput || !moduleSummaryOutput) {
+      !serializedDiagnostics || !fixItsOutput || !loadedModuleTrace ||
+      !moduleImportGraph || !TBD || !moduleInterfaceOutput ||
+      !privateModuleInterfaceOutput || !moduleSourceInfoOutput ||
+      !ldAddCFileOutput || !moduleSummaryOutput) {
     return None;
   }
   std::vector<SupplementaryOutputPaths> result;
@@ -331,6 +334,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
     sop.SerializedDiagnosticsPath = (*serializedDiagnostics)[i];
     sop.FixItsOutputPath = (*fixItsOutput)[i];
     sop.LoadedModuleTracePath = (*loadedModuleTrace)[i];
+    sop.ModuleImportGraphPath = (*moduleImportGraph)[i];
     sop.TBDPath = (*TBD)[i];
     sop.ModuleInterfaceOutputPath = (*moduleInterfaceOutput)[i];
     sop.PrivateModuleInterfaceOutputPath = (*privateModuleInterfaceOutput)[i];
@@ -412,6 +416,12 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
       file_types::TY_ModuleTrace, "",
       defaultSupplementaryOutputPathExcludingExtension);
 
+  auto moduleImportGraphPath = determineSupplementaryOutputFilename(
+      OPT_emit_module_import_graph_path,
+      pathsFromArguments.ModuleImportGraphPath,
+      file_types::TY_ModuleImportGraph, "",
+      defaultSupplementaryOutputPathExcludingExtension);
+
   auto tbdPath = determineSupplementaryOutputFilename(
       OPT_emit_tbd, pathsFromArguments.TBDPath, file_types::TY_TBD, "",
       defaultSupplementaryOutputPathExcludingExtension);
@@ -458,6 +468,7 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.SerializedDiagnosticsPath = serializedDiagnosticsPath;
   sop.FixItsOutputPath = fixItsOutputPath;
   sop.LoadedModuleTracePath = loadedModuleTracePath;
+  sop.ModuleImportGraphPath = moduleImportGraphPath;
   sop.TBDPath = tbdPath;
   sop.ModuleInterfaceOutputPath = ModuleInterfaceOutputPath;
   sop.PrivateModuleInterfaceOutputPath = PrivateModuleInterfaceOutputPath;
@@ -567,6 +578,7 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
         options::OPT_emit_swift_ranges_path,
         options::OPT_serialize_diagnostics_path,
         options::OPT_emit_loaded_module_trace_path,
+        options::OPT_emit_module_import_graph_path,
         options::OPT_emit_module_interface_path,
         options::OPT_emit_private_module_interface_path,
         options::OPT_emit_module_source_info_path,
