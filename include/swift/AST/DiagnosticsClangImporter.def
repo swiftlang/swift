@@ -196,6 +196,13 @@ NOTE(note_cannot_import_is_worse_than_alternative,none,
 NOTE(note_cannot_import_alias_for_unavailable_case,none,
      "cannot import alias %0 for %1 %2 because it is unavailable",
      (Identifier, DescriptiveDeclKind, ValueDecl *))
+NOTE(note_cannot_import_subscript_setter_type_mismatch,none,
+     "cannot import %0 %1 as a subscript setter matching getter %3 %4 because "
+     "the setter's %select{element|index}6 type, %2, does not match the "
+     "getter's, %5",
+     (/*setterInfo=*/StringRef, const clang::NamedDecl *, Type,
+      /*getterInfo=*/StringRef, const clang::NamedDecl *, Type,
+      /*isParamType=*/bool))
 
 NOTE(note_imported_from_swift_part,none,
      "replaced by definition for %0 %1 from the Swift %select{part of|overlay "

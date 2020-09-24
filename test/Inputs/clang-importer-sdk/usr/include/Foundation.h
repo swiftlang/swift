@@ -158,6 +158,8 @@ __attribute__((availability(ios,introduced=8.0)))
 // expected-note@-4 {{a better candidate, Objective-C method '-[NSArray initWithObjects:count:]', is already being imported with the name 'init(objects:count:)' and the same signature}}
 - (nonnull ObjectType)objectAtIndexedSubscript:(NSUInteger)idx;
 // expected-remark@-1 {{Objective-C method '-[NSArray objectAtIndexedSubscript:]' imported as unavailable instance method 'objectAtIndexedSubscript'}}
+// expected-remark@-2 {{Objective-C method '-[NSArray objectAtIndexedSubscript:]' also imported as getter for subscript 'subscript(_:)'}}
+// expected-remark@-3 {{Objective-C method '-[NSArray objectAtIndexedSubscript:]' also imported as subscript 'subscript(_:)'}}
 - description;
 // expected-remark@-1 {{Objective-C method '-[NSArray description]' imported as instance method 'description()'}}
 - (void)makeObjectsPerformSelector:(nonnull SEL)aSelector;
@@ -187,7 +189,8 @@ __attribute__((availability(ios,introduced=8.0)))
 // expected-remark@-1 {{Objective-C class interface 'DummyClass' imported as class 'DummyClass'}}
 - (nonnull id)objectAtIndexedSubscript:(NSUInteger)idx;
 // expected-remark@-1 {{Objective-C method '-[DummyClass objectAtIndexedSubscript:]' imported as unavailable instance method 'objectAtIndexedSubscript'}}
-// FIXME: Subscript???
+// expected-remark@-2 {{Objective-C method '-[DummyClass objectAtIndexedSubscript:]' also imported as getter for subscript 'subscript(_:)'}}
+// expected-remark@-3 {{Objective-C method '-[DummyClass objectAtIndexedSubscript:]' also imported as subscript 'subscript(_:)'}}
 - description;
 // expected-remark@-1 {{Objective-C method '-[DummyClass description]' imported as instance method 'description()'}}
 
@@ -282,7 +285,8 @@ __attribute__((availability(ios,introduced=8.0)))
 // expected-remark@-1 {{Objective-C category 'NSDictionary(NSExtendedDictionary)' imported as extension of 'NSDictionary'}}
 - (nullable ObjectType)objectForKeyedSubscript:(nonnull KeyType)key;
 // expected-remark@-1 {{Objective-C method '-[NSDictionary(NSExtendedDictionary) objectForKeyedSubscript:]' imported as unavailable instance method 'objectForKeyedSubscript'}}
-// FIXME: Subscript?
+// expected-remark@-2 {{Objective-C method '-[NSDictionary(NSExtendedDictionary) objectForKeyedSubscript:]' also imported as getter for subscript 'subscript(_:)'}}
+// expected-remark@-3 {{Objective-C method '-[NSDictionary(NSExtendedDictionary) objectForKeyedSubscript:]' also imported as subscript 'subscript(_:)'}}
 @end
 
 @interface NSDictionary (Inits)
@@ -523,17 +527,21 @@ typedef NSPoint *NSPointArray;
 // expected-remark@-1 {{Objective-C class interface 'BadCollection' imported as class 'BadCollection'}}
 - (id)objectForKeyedSubscript:(id)key;
 // expected-remark@-1 {{Objective-C method '-[BadCollection objectForKeyedSubscript:]' imported as unavailable instance method 'objectForKeyedSubscript'}}
-// FIXME: Subscript?
+// expected-remark@-2 {{Objective-C method '-[BadCollection objectForKeyedSubscript:]' also imported as getter for subscript 'subscript(_:)'}}
+// expected-remark@-3 {{Objective-C method '-[BadCollection objectForKeyedSubscript:]' also imported as subscript 'subscript(_:)'}}
+// expected-note@-4 {{cannot import Objective-C method '-[BadCollection setObject:forKeyedSubscript:]' as a subscript setter matching getter Objective-C method '-[BadCollection objectForKeyedSubscript:]' because the setter's index type, 'String?', does not match the getter's, 'Any?'}}
 - (void)setObject:(id)object forKeyedSubscript:(NSString *)key;
 // expected-remark@-1 {{Objective-C method '-[BadCollection setObject:forKeyedSubscript:]' imported as instance method 'setObject(_:forKeyedSubscript:)'}}
-// FIXME: Subscript?
 @end
 
 @interface BadCollectionParent
 // expected-remark@-1 {{Objective-C class interface 'BadCollectionParent' imported as class 'BadCollectionParent'}}
 - (id)objectForKeyedSubscript:(NSString *)key;
 // expected-remark@-1 {{Objective-C method '-[BadCollectionParent objectForKeyedSubscript:]' imported as unavailable instance method 'objectForKeyedSubscript'}}
-// FIXME: Subscript?
+// expected-remark@-2 {{Objective-C method '-[BadCollectionParent objectForKeyedSubscript:]' also imported as getter for subscript 'subscript(_:)'}}
+// expected-remark@-3 {{Objective-C method '-[BadCollectionParent objectForKeyedSubscript:]' also imported as subscript 'subscript(_:)'}}
+// expected-note@-4 {{cannot import Objective-C method '-[BadCollectionChild setObject:forKeyedSubscript:]' as a subscript setter matching getter Objective-C method '-[BadCollectionParent objectForKeyedSubscript:]' because the setter's index type, 'Any?', does not match the getter's, 'String?'}}
+// expected-note@-5 {{cannot import Objective-C method '-[ReadOnlyCollectionChild setObject:forKeyedSubscript:]' as a subscript setter matching getter Objective-C method '-[BadCollectionParent objectForKeyedSubscript:]' because the setter's index type, 'Any?', does not match the getter's, 'String?'}}
 @end
 
 @interface BadCollectionChild : BadCollectionParent
@@ -1287,6 +1295,8 @@ typedef NS_OPTIONS(NSUInteger, NSExplicitlyUnavailableOnOSXOptions) {
 
 - (id)objectAtIndexedSubscript:(NSUInteger)idx;
 // expected-remark@-1 {{Objective-C method '-[NSWobbling objectAtIndexedSubscript:]' imported as unavailable instance method 'objectAtIndexedSubscript'}}
+// expected-remark@-2 {{Objective-C method '-[NSWobbling objectAtIndexedSubscript:]' also imported as getter for subscript 'subscript(_:)'}}
+// expected-remark@-3 {{Objective-C method '-[NSWobbling objectAtIndexedSubscript:]' also imported as subscript 'subscript(_:)'}}
 @end
 
 @protocol NSMaybeInitWobble
@@ -2008,8 +2018,11 @@ void takeNullableId(_Nullable id);
 // expected-remark@-1 {{Objective-C class interface 'ColorArray' imported as class 'ColorArray'}}
 - (ColorDescriptor *)objectAtIndexedSubscript:(NSUInteger)attachmentIndex;
 // expected-remark@-1 {{Objective-C method '-[ColorArray objectAtIndexedSubscript:]' imported as unavailable instance method 'objectAtIndexedSubscript'}}
+// expected-remark@-2 {{Objective-C method '-[ColorArray objectAtIndexedSubscript:]' also imported as getter for subscript 'subscript(_:)'}}
+// expected-remark@-3 {{Objective-C method '-[ColorArray objectAtIndexedSubscript:]' also imported as subscript 'subscript(_:)'}}
 - (void)setObject:(nullable ColorDescriptor *)attachment atIndexedSubscript:(NSUInteger)attachmentIndex;
 // expected-remark@-1 {{Objective-C method '-[ColorArray setObject:atIndexedSubscript:]' imported as unavailable instance method 'setObject(_:atIndexedSubscript:)'}}
+// expected-remark@-2 {{Objective-C method '-[ColorArray setObject:atIndexedSubscript:]' also imported as setter for subscript 'subscript(_:)'}}
 @end
 
 @interface PaletteDescriptor : NSObject <NSCopying>

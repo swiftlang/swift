@@ -1684,8 +1684,9 @@ static void makeStructRawValuedWithBridge(
 /// Build a declaration for an Objective-C subscript getter.
 static AccessorDecl *
 buildSubscriptGetterDecl(ClangImporter::Implementation &Impl,
-                         SubscriptDecl *subscript, const FuncDecl *getter,
-                         Type elementTy, DeclContext *dc, ParamDecl *index) {
+                         SubscriptDecl *subscript, FuncDecl *getter,
+                         Type elementTy, DeclContext *dc, ParamDecl *index,
+                         ImportDecision &decision) {
   auto &C = Impl.SwiftContext;
   auto loc = getter->getLoc();
 
@@ -1714,15 +1715,18 @@ buildSubscriptGetterDecl(ClangImporter::Implementation &Impl,
   thunk->setIsDynamic(getter->isDynamic());
   // FIXME: Should we record thunks?
 
+  decision.importAlternate(getter, thunk);
+
   return thunk;
 }
 
 /// Build a declaration for an Objective-C subscript setter.
 static AccessorDecl *
 buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
-                         SubscriptDecl *subscript, const FuncDecl *setter,
+                         SubscriptDecl *subscript, FuncDecl *setter,
                          Type elementInterfaceTy,
-                         DeclContext *dc, ParamDecl *index) {
+                         DeclContext *dc, ParamDecl *index,
+                         ImportDecision &decision) {
   auto &C = Impl.SwiftContext;
   auto loc = setter->getLoc();
 
@@ -1765,6 +1769,8 @@ buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
     thunk->getAttrs().add(objcAttr->clone(C));
   thunk->setIsObjC(setter->isObjC());
   thunk->setIsDynamic(setter->isDynamic());
+
+  decision.importAlternate(setter, thunk);
 
   return thunk;
 }
@@ -5219,7 +5225,7 @@ namespace {
         if (importedName.isSubscriptAccessor()) {
           // If this was a subscript accessor, try to create a
           // corresponding subscript declaration.
-          (void)importSubscript(result, decl);
+          (void)importSubscript(result, decl, decision);
         } else if (shouldAlsoImportAsClassMethod(result)) {
           // If we should import this instance method also as a class
           // method, do so and mark the result as an alternate
@@ -5294,7 +5300,8 @@ namespace {
     /// Given either the getter or setter for a subscript operation,
     /// create the Swift subscript declaration.
     SubscriptDecl *importSubscript(Decl *decl,
-                                   const clang::ObjCMethodDecl *objcMethod);
+                                   const clang::ObjCMethodDecl *objcMethod,
+                                   ImportDecision &decision);
 
     /// Given either the getter, the setter, or both getter & setter
     /// for a subscript operation, create the Swift subscript declaration.
@@ -7580,7 +7587,8 @@ void SwiftDeclConverter::recordObjCOverride(SubscriptDecl *subscript) {
 /// create the Swift subscript declaration.
 SubscriptDecl *
 SwiftDeclConverter::importSubscript(Decl *decl,
-                                    const clang::ObjCMethodDecl *objcMethod) {
+                                    const clang::ObjCMethodDecl *objcMethod,
+                                    ImportDecision &decision) {
   assert(objcMethod->isInstanceMethod() && "Caller must filter");
 
   // If the method we're attempting to import has the
@@ -7640,26 +7648,38 @@ SwiftDeclConverter::importSubscript(Decl *decl,
         Impl.importDecl(counterpart, getActiveSwiftVersion()));
   };
 
-  // Determine the selector of the counterpart.
+  clang::Selector counterpartSelector;
+  // If we find a counterpart, an ImportDecision for it will be constructed
+  // here.
+  Optional<ImportDecision> counterpartDecision;
+
   FuncDecl *getter = nullptr, *setter = nullptr;
   const clang::ObjCMethodDecl *getterObjCMethod = nullptr,
                               *setterObjCMethod = nullptr;
-  clang::Selector counterpartSelector;
+  // One will point to `decision`; the other will remain null or point to
+  // `counterpartDecision`.
+  ImportDecision *getterDecision = nullptr, *setterDecision = nullptr;
+
+  // Determine the selector of the counterpart.
   if (objcMethod->getSelector() == Impl.objectAtIndexedSubscript) {
     getter = cast<FuncDecl>(decl);
     getterObjCMethod = objcMethod;
+    getterDecision = &decision;
     counterpartSelector = Impl.setObjectAtIndexedSubscript;
   } else if (objcMethod->getSelector() == Impl.setObjectAtIndexedSubscript) {
     setter = cast<FuncDecl>(decl);
     setterObjCMethod = objcMethod;
+    setterDecision = &decision;
     counterpartSelector = Impl.objectAtIndexedSubscript;
   } else if (objcMethod->getSelector() == Impl.objectForKeyedSubscript) {
     getter = cast<FuncDecl>(decl);
     getterObjCMethod = objcMethod;
+    getterDecision = &decision;
     counterpartSelector = Impl.setObjectForKeyedSubscript;
   } else if (objcMethod->getSelector() == Impl.setObjectForKeyedSubscript) {
     setter = cast<FuncDecl>(decl);
     setterObjCMethod = objcMethod;
+    setterDecision = &decision;
     counterpartSelector = Impl.objectForKeyedSubscript;
   } else {
     llvm_unreachable("Unknown getter/setter selector");
@@ -7682,6 +7702,11 @@ SwiftDeclConverter::importSubscript(Decl *decl,
       if (optionalMethods)
         optionalMethods = (counterpartMethod->getImplementationControl() ==
                            clang::ObjCMethodDecl::Optional);
+
+      counterpartDecision.emplace(Impl, counterpartMethod, version);
+      // The original import decision has already been made; we're just adding
+      // alternates.
+      counterpartDecision->alreadyDecided();
     }
 
     assert(!counterpart || !counterpart->isStatic());
@@ -7689,9 +7714,11 @@ SwiftDeclConverter::importSubscript(Decl *decl,
     if (getter) {
       setter = counterpart;
       setterObjCMethod = counterpartMethod;
+      setterDecision = counterpartDecision.getPointer();
     } else {
       getter = counterpart;
       getterObjCMethod = counterpartMethod;
+      getterDecision = counterpartDecision.getPointer();
     }
   }
 
@@ -7702,6 +7729,8 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   // Check whether we've already created a subscript operation for
   // this getter/setter pair.
   if (auto subscript = Impl.Subscripts[{getter, setter}]) {
+    // Not marking decision as alreadyDecided() because we are only deciding
+    // alternates in this method.
     return subscript->getDeclContext() == decl->getDeclContext() ? subscript
                                                                  : nullptr;
   }
@@ -7710,8 +7739,19 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   ParamDecl *getterIndex;
   {
     auto params = getter->getParameters();
-    if (params->size() != 1)
+    if (params->size() != 1) {
+      // Note on `decision`, rather than `getterDecision`, so that the user will
+      // actually see it even if the getter is the counterpart.
+      //
+      // FIXME: This feels like a flaw in ImportDecision's handling of alternate
+      // decls. Perhaps we ought to model alternate decls as their own
+      // ImportDecisions with their own success or failure outcomes.
+      decision.note(getterObjCMethod->getLocation(),
+                    diag::note_cannot_import_clang_ast_inconsistent,
+                    "would-be subscript getter has a one-argument selector, "
+                    "but its arity != 1");
       return nullptr;
+    }
     getterIndex = params->get(0);
   }
 
@@ -7731,6 +7771,27 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   bool getterAndSetterInSameType = false;
   bool isIUO = getter->isImplicitlyUnwrappedOptional();
   if (setter) {
+    auto noteTypeMismatch =
+        [&](bool isParamType, Type getterType, Type setterType) {
+          // Even if we import something, we didn't import this alternate, and
+          // we want ot make the reason known.
+          ImportRemark::Note::Conditions either{
+            ImportRemark::Outcome::Imported, ImportRemark::Outcome::NotImported
+          };
+          // We note on the setter so that we report subclasses that try to add
+          // a setter, but fail. We note *only* on the setter so we don't
+          // double-report if we also notice this condition while we're
+          // importing the getter.
+          setterDecision->
+              noteIf(either, getterObjCMethod->getLocation(),
+                     diag::note_cannot_import_subscript_setter_type_mismatch,
+                     getClangDescriptiveKind(setterObjCMethod),
+                     setterObjCMethod, setterType,
+                     getClangDescriptiveKind(getterObjCMethod),
+                     getterObjCMethod, getterType,
+                     isParamType);
+        };
+
     // Whether there is an existing read-only subscript for which
     // we have now found a setter.
     SubscriptDecl *existingSubscript = Impl.Subscripts[{getter, nullptr}];
@@ -7754,8 +7815,10 @@ SwiftDeclConverter::importSubscript(Decl *decl,
     // type.
     auto importedType = rectifySubscriptTypes(elementTy, isIUO, setterElementTy,
                                               canUpdateSubscriptType);
-    if (!importedType)
+    if (!importedType) {
+      noteTypeMismatch(false, elementTy, setterElementTy);
       return decl == getter ? existingSubscript : nullptr;
+    }
 
     isIUO = importedType.isImplicitlyUnwrapped();
 
@@ -7765,6 +7828,8 @@ SwiftDeclConverter::importSubscript(Decl *decl,
     // Make sure that the index types are equivalent.
     // FIXME: Rectify these the same way we do for element types.
     if (!setterIndex->getType()->isEqual(getterIndex->getType())) {
+      noteTypeMismatch(true, getterIndex->getType(), setterIndex->getType());
+
       // If there is an existing subscript operation, we're done.
       if (existingSubscript)
         return decl == getter ? existingSubscript : nullptr;
@@ -7774,6 +7839,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
       setter = nullptr;
       setterObjCMethod = nullptr;
       setterIndex = nullptr;
+      setterDecision = nullptr;
     }
 
     // If there is an existing subscript within this context, we
@@ -7785,7 +7851,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
         // Create the setter thunk.
         auto setterThunk = buildSubscriptSetterDecl(
             Impl, existingSubscript, setter, elementTy,
-            setter->getDeclContext(), setterIndex);
+            setter->getDeclContext(), setterIndex, *setterDecision);
 
         // Set the computed setter.
         existingSubscript->setComputedSetter(setterThunk);
@@ -7834,16 +7900,17 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   // Build the thunks.
   AccessorDecl *getterThunk =
       buildSubscriptGetterDecl(Impl, subscript, getter, elementTy,
-                               dc, getterIndex);
+                               dc, getterIndex, *getterDecision);
 
   AccessorDecl *setterThunk = nullptr;
   if (setter)
     setterThunk =
         buildSubscriptSetterDecl(Impl, subscript, setter, elementTy,
-                                 dc, setterIndex);
+                                 dc, setterIndex, *setterDecision);
 
   // Record the subscript as an alternative declaration.
-  Impl.addAlternateDecl(associateWithSetter ? setter : getter, subscript);
+  (associateWithSetter ? setterDecision : getterDecision)
+    ->importAndCacheAlternate(associateWithSetter ? setter : getter, subscript);
 
   // Import attributes for the accessors if there is a pair.
   Impl.importAttributes(getterObjCMethod, getterThunk);
