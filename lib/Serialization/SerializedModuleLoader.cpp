@@ -673,7 +673,7 @@ getOSAndVersionForDiagnostics(const llvm::Triple &triple) {
   return {osName, version};
 }
 
-FileUnit *SerializedModuleLoaderBase::loadAST(
+LoadedFile *SerializedModuleLoaderBase::loadAST(
     ModuleDecl &M, Optional<SourceLoc> diagLoc,
     StringRef moduleInterfacePath,
     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,

@@ -153,7 +153,7 @@ public:
   ///
   /// If the AST cannot be loaded and \p diagLoc is present, a diagnostic is
   /// printed. (Note that \p diagLoc is allowed to be invalid.)
-  FileUnit *
+  LoadedFile *
   loadAST(ModuleDecl &M, Optional<SourceLoc> diagLoc,
           StringRef moduleInterfacePath,
           std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
