@@ -696,12 +696,10 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     };
     auto NSApplicationMainType = SILFunctionType::get(
         nullptr,
-        SILFunctionType::ExtInfoBuilder()
-            // Should be C calling convention, but NSApplicationMain
-            // has an overlay to fix the type of argv.
-            .withRepresentation(SILFunctionType::Representation::Thin)
-            .build(),
-        SILCoroutineKind::None, ParameterConvention::Direct_Unowned, argTypes,
+        // Should be C calling convention, but NSApplicationMain
+        // has an overlay to fix the type of argv.
+        SILFunctionType::ExtInfo::getThin(), SILCoroutineKind::None,
+        ParameterConvention::Direct_Unowned, argTypes,
         /*yields*/ {},
         SILResultInfo(argc->getType().getASTType(), ResultConvention::Unowned),
         /*error result*/ None, SubstitutionMap(), SubstitutionMap(),

@@ -275,7 +275,8 @@ class ASTExtInfoBuilder {
       : bits(bits), clangTypeInfo(clangTypeInfo) {}
 
 public:
-  // Constructor with all defaults.
+  /// An ExtInfoBuilder for a typical Swift function: @convention(swift),
+  /// @escaping, non-throwing, non-differentiable.
   ASTExtInfoBuilder()
       : ASTExtInfoBuilder(Representation::Swift, false, false,
                           DifferentiabilityKind::NonDifferentiable, nullptr) {}
@@ -447,6 +448,8 @@ class ASTExtInfo {
   };
 
 public:
+  /// An ExtInfo for a typical Swift function: @convention(swift), @escaping,
+  /// non-throwing, non-differentiable.
   ASTExtInfo() : builder() { builder.checkInvariants(); };
 
   /// Create a builder with the same state as \c this.
@@ -598,10 +601,14 @@ class SILExtInfoBuilder {
   }
 
 public:
-  // Constructor with all defaults.
-  SILExtInfoBuilder() : SILExtInfoBuilder(0, ClangTypeInfo(nullptr)) {}
+  /// An ExtInfoBuilder for a typical Swift function: thick, @escaping,
+  /// non-pseudogeneric, non-differentiable.
+  SILExtInfoBuilder()
+      : SILExtInfoBuilder(makeBits(SILFunctionTypeRepresentation::Thick, false,
+                                   false, false,
+                                   DifferentiabilityKind::NonDifferentiable),
+                          ClangTypeInfo(nullptr)) {}
 
-  // Constructor for polymorphic type.
   SILExtInfoBuilder(Representation rep, bool isPseudogeneric, bool isNoEscape,
                     bool isAsync, DifferentiabilityKind diffKind,
                     const clang::Type *type)
@@ -609,6 +616,7 @@ public:
                                    diffKind),
                           ClangTypeInfo(type)) {}
 
+  // Constructor for polymorphic type.
   SILExtInfoBuilder(ASTExtInfoBuilder info, bool isPseudogeneric)
       : SILExtInfoBuilder(makeBits(info.getSILRepresentation(), isPseudogeneric,
                                    info.isNoEscape(), info.isAsync(),
@@ -686,25 +694,30 @@ public:
 
   // Note that we don't have setters. That is by design, use
   // the following with methods instead of mutating these objects.
+  LLVM_NODISCARD
   SILExtInfoBuilder withRepresentation(Representation rep) const {
     return SILExtInfoBuilder((bits & ~RepresentationMask) | (unsigned)rep,
                              shouldStoreClangType(rep) ? clangTypeInfo
                                                        : ClangTypeInfo());
   }
+  LLVM_NODISCARD
   SILExtInfoBuilder withIsPseudogeneric(bool isPseudogeneric = true) const {
     return SILExtInfoBuilder(isPseudogeneric ? (bits | PseudogenericMask)
                                              : (bits & ~PseudogenericMask),
                              clangTypeInfo);
   }
+  LLVM_NODISCARD
   SILExtInfoBuilder withNoEscape(bool noEscape = true) const {
     return SILExtInfoBuilder(noEscape ? (bits | NoEscapeMask)
                                       : (bits & ~NoEscapeMask),
                              clangTypeInfo);
   }
+  LLVM_NODISCARD
   SILExtInfoBuilder withAsync(bool isAsync = true) const {
     return SILExtInfoBuilder(isAsync ? (bits | AsyncMask) : (bits & ~AsyncMask),
                              clangTypeInfo);
   }
+  LLVM_NODISCARD
   SILExtInfoBuilder
   withDifferentiabilityKind(DifferentiabilityKind differentiability) const {
     return SILExtInfoBuilder(
@@ -750,6 +763,8 @@ class SILExtInfo {
   };
 
 public:
+  /// An ExtInfo for a typical Swift function: thick, @escaping,
+  /// non-pseudogeneric, non-differentiable.
   SILExtInfo() : builder() { builder.checkInvariants(); };
 
   SILExtInfo(ASTExtInfo info, bool isPseudogeneric)
@@ -757,6 +772,7 @@ public:
     builder.checkInvariants();
   }
 
+  /// A default ExtInfo but with a Thin convention.
   static SILExtInfo getThin() {
     return SILExtInfoBuilder(SILExtInfoBuilder::Representation::Thin, false,
                              false, false,

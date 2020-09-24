@@ -83,17 +83,10 @@ class BugReducerTester : public SILFunctionTransform {
     ResultInfoArray.push_back(
         SILResultInfo(EmptyTupleCanType, ResultConvention::Unowned));
     auto FuncType = SILFunctionType::get(
-        nullptr,
-        SILFunctionType::ExtInfoBuilder(
-            SILFunctionType::Representation::Thin, false /*isPseudoGeneric*/,
-            false /*noescape*/, false /*async*/,
-            DifferentiabilityKind::NonDifferentiable,
-            nullptr /*clangFunctionType*/)
-            .build(),
-        SILCoroutineKind::None, ParameterConvention::Direct_Unowned,
-        ArrayRef<SILParameterInfo>(), ArrayRef<SILYieldInfo>(), ResultInfoArray,
-        None, SubstitutionMap(), SubstitutionMap(),
-        getFunction()->getModule().getASTContext());
+        nullptr, SILFunctionType::ExtInfo::getThin(), SILCoroutineKind::None,
+        ParameterConvention::Direct_Unowned, ArrayRef<SILParameterInfo>(),
+        ArrayRef<SILYieldInfo>(), ResultInfoArray, None, SubstitutionMap(),
+        SubstitutionMap(), getFunction()->getModule().getASTContext());
 
     SILOptFunctionBuilder FunctionBuilder(*this);
     SILFunction *F = FunctionBuilder.getOrCreateSharedFunction(

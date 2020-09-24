@@ -4149,6 +4149,9 @@ ERROR(actor_isolated_self_independent_context,none,
         "actor-isolated %0 %1 can not be referenced from an "
         "'@actorIndependent' context",
         (DescriptiveDeclKind, DeclName))
+ERROR(actor_isolated_partial_apply,none,
+        "actor-isolated %0 %1 can not be partially applied",
+        (DescriptiveDeclKind, DeclName))
 WARNING(concurrent_access_local,none,
         "local %0 %1 is unsafe to reference in code that may execute "
         "concurrently",
