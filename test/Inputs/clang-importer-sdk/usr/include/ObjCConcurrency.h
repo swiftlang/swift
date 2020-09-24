@@ -13,4 +13,12 @@
 @property(readwrite) void (^completionHandler)(NSInteger);
 @end
 
+@protocol RefrigeratorDelegate<NSObject>
+- (void)someoneDidOpenRefrigerator:(id)fridge;
+- (void)refrigerator:(id)fridge didGetFilledWithItems:(NSArray *)items;
+- (void)refrigerator:(id)fridge didGetFilledWithIntegers:(NSInteger *)items count:(NSInteger)count;
+- (void)refrigerator:(id)fridge willAddItem:(id)item;
+- (BOOL)refrigerator:(id)fridge didRemoveItem:(id)item;
+@end
+
 #pragma clang assume_nonnull end

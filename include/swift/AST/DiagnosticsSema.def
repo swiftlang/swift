@@ -4121,6 +4121,9 @@ ERROR(asynchandler_async,none,
 ERROR(asynchandler_inout_parameter,none,
       "'inout' parameter is not allowed in '@asyncHandler' function",
       ())
+ERROR(asynchandler_unsafe_pointer_parameter,none,
+      "'%0' parameter is not allowed in `@asyncHandler` function",
+      ())
 ERROR(asynchandler_mutating,none,
       "'@asyncHandler' function cannot be 'mutating'",
       ())

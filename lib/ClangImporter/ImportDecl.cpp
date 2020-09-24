@@ -40,6 +40,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Config.h"
 #include "swift/Parse/Lexer.h"
@@ -7575,6 +7576,46 @@ bool importer::isSpecialUIKitStructZeroProperty(const clang::NamedDecl *decl) {
   return ident->isStr("UIEdgeInsetsZero") || ident->isStr("UIOffsetZero");
 }
 
+/// Determine whether any of the parameters to the given function is of an
+/// unsafe pointer type.
+static bool hasAnyUnsafePointerParameters(FuncDecl *func) {
+  for (auto param : *func->getParameters()) {
+    Type paramType =
+        param->toFunctionParam().getPlainType()->lookThroughAllOptionalTypes();
+    if (paramType->getAnyPointerElementType()) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/// Determine whether the given Objective-C method is likely to be an
+/// asynchronous handler based on its name.
+static bool isObjCMethodLikelyAsyncHandler(
+    const clang::ObjCMethodDecl *method) {
+  auto selector = method->getSelector();
+
+  for (unsigned argIdx : range(std::max(selector.getNumArgs(), 1u))) {
+    auto selectorPiece = selector.getNameForSlot(argIdx);
+    // For the first selector piece, look for the word "did" anywhere.
+    if (argIdx == 0) {
+      for (auto word : camel_case::getWords(selectorPiece)) {
+        if (word == "did" || word == "Did")
+          return true;
+      }
+
+      continue;
+    }
+
+    // Otherwise, check whether any subsequent selector piece starts with "did".
+    if (camel_case::getFirstWord(selectorPiece) == "did")
+      return true;
+  }
+
+  return false;
+}
+
 /// Import Clang attributes as Swift attributes.
 void ClangImporter::Implementation::importAttributes(
     const clang::NamedDecl *ClangDecl,
@@ -7812,6 +7853,24 @@ void ClangImporter::Implementation::importAttributes(
   // Map __attribute__((pure)).
   if (ClangDecl->hasAttr<clang::PureAttr>()) {
     MappedDecl->getAttrs().add(new (C) EffectsAttr(EffectsKind::ReadOnly));
+  }
+
+  // Infer @asyncHandler on imported protocol methods that meet the semantic
+  // requirements.
+  if (SwiftContext.LangOpts.EnableExperimentalConcurrency) {
+    if (auto func = dyn_cast<FuncDecl>(MappedDecl)) {
+      if (auto proto = dyn_cast<ProtocolDecl>(func->getDeclContext())) {
+        if (proto->isObjC() && isa<clang::ObjCMethodDecl>(ClangDecl) &&
+            func->isInstanceMember() && !isa<AccessorDecl>(func) &&
+            isObjCMethodLikelyAsyncHandler(
+                cast<clang::ObjCMethodDecl>(ClangDecl)) &&
+            func->canBeAsyncHandler() &&
+            !hasAnyUnsafePointerParameters(func)) {
+          MappedDecl->getAttrs().add(
+              new (C) AsyncHandlerAttr(/*IsImplicit=*/false));
+        }
+      }
+    }
   }
 }
 
