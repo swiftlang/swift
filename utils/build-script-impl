@@ -2431,30 +2431,36 @@ for host in "${ALL_HOSTS[@]}"; do
                         echo "copying compiler-rt embedded builtins from ${HOST_CXX_BUILTINS_DIR} into the local clang build directory ${DEST_BUILTINS_DIR}."
 
                         for OS in ios watchos tvos; do
-                            # Copy over the device .a
+                            # Copy over the device .a when necessary
                             LIB_NAME="libclang_rt.$OS.a"
                             HOST_LIB_PATH="$HOST_CXX_BUILTINS_DIR/$LIB_NAME"
-                            if [[ -f "${HOST_LIB_PATH}" ]]; then
-                                call cp "${HOST_LIB_PATH}" "${DEST_BUILTINS_DIR}/${LIB_NAME}"
-                            elif [[ "${VERBOSE_BUILD}" ]]; then
-                                echo "no file exists at ${HOST_LIB_PATH}"
+                            DEST_LIB_PATH="${DEST_BUILTINS_DIR}/${LIB_NAME}"
+                            if [[ ! -f "${DEST_LIB_PATH}" ]]; then
+                                if [[ -f "${HOST_LIB_PATH}" ]]; then
+                                    call cp "${HOST_LIB_PATH}" "${DEST_LIB_PATH}"
+                                elif [[ "${VERBOSE_BUILD}" ]]; then
+                                    echo "no file exists at ${HOST_LIB_PATH}"
+                                fi
                             fi
-                            # Copy over the simulator .a
+                            # Copy over the simulator .a when necessary
                             SIM_LIB_NAME="libclang_rt.${OS}sim.a"
                             HOST_SIM_LIB_PATH="$HOST_CXX_BUILTINS_DIR/$SIM_LIB_NAME"
-                            if [[ -f "${HOST_SIM_LIB_PATH}" ]]; then
-                                call cp "${HOST_SIM_LIB_PATH}" "${DEST_BUILTINS_DIR}/${SIM_LIB_NAME}"
-                            elif [[ -f "${HOST_LIB_PATH}" ]]; then
-                                # The simulator .a might not exist if the host
-                                # Xcode is old. In that case, copy over the
-                                # device library to the simulator location to allow
-                                # clang to find it. The device library has the simulator
-                                # slices in Xcode that doesn't have the simulator .a, so
-                                # the link is still valid.
-                                echo "copying over faux-sim library ${HOST_LIB_PATH} to ${SIM_LIB_NAME}"
-                                call cp "${HOST_LIB_PATH}" "${DEST_BUILTINS_DIR}/${SIM_LIB_NAME}"
-                            elif [[ "${VERBOSE_BUILD}" ]]; then
-                                echo "no file exists at ${HOST_SIM_LIB_PATH}"
+                            DEST_SIM_LIB_PATH="${DEST_BUILTINS_DIR}/${SIM_LIB_NAME}"
+                            if [[ ! -f "${DEST_SIM_LIB_PATH}" ]]; then
+                                if [[ -f "${HOST_SIM_LIB_PATH}" ]]; then
+                                    call cp "${HOST_SIM_LIB_PATH}" "${DEST_SIM_LIB_PATH}"
+                                elif [[ -f "${HOST_LIB_PATH}" ]]; then
+                                    # The simulator .a might not exist if the host
+                                    # Xcode is old. In that case, copy over the
+                                    # device library to the simulator location to allow
+                                    # clang to find it. The device library has the simulator
+                                    # slices in Xcode that doesn't have the simulator .a, so
+                                    # the link is still valid.
+                                    echo "copying over faux-sim library ${HOST_LIB_PATH} to ${SIM_LIB_NAME}"
+                                    call cp "${HOST_LIB_PATH}" "${DEST_SIM_LIB_PATH}"
+                                elif [[ "${VERBOSE_BUILD}" ]]; then
+                                    echo "no file exists at ${HOST_SIM_LIB_PATH}"
+                                fi
                             fi
                         done
                     done
