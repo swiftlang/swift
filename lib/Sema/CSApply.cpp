@@ -925,7 +925,6 @@ namespace {
 
       case ValueOwnership::Owned:
       case ValueOwnership::Shared:
-        // Ensure that the argument type matches up exactly.
         auto selfArgTy = ParenType::get(context,
                                         selfParam.getPlainType(),
                                         selfParam.getParameterFlags());
