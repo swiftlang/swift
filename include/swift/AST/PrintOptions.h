@@ -38,7 +38,7 @@ class ModuleDecl;
 enum DeclAttrKind : unsigned;
 class SynthesizedExtensionAnalyzer;
 struct PrintOptions;
-
+class SILPrintContext;
 
 /// Necessary information for archetype transformation during printing.
 struct TypeTransformContext {
@@ -594,22 +594,7 @@ struct PrintOptions {
   static PrintOptions printDocInterface();
 
   /// Retrieve the set of options suitable for printing SIL functions.
-  static PrintOptions printSIL(bool printFullConvention = false) {
-    PrintOptions result;
-    result.PrintLongAttrsOnSeparateLines = true;
-    result.PrintStorageRepresentationAttrs = true;
-    result.AbstractAccessors = false;
-    result.PrintForSIL = true;
-    result.PrintInSILBody = true;
-    result.PreferTypeRepr = false;
-    result.PrintIfConfig = false;
-    result.OpaqueReturnTypePrinting =
-        OpaqueReturnTypePrintingMode::StableReference;
-    if (printFullConvention)
-      result.PrintFunctionRepresentationAttrs =
-          PrintOptions::FunctionRepresentationMode::Full;
-    return result;
-  }
+  static PrintOptions printSIL(const SILPrintContext *silPrintCtx = nullptr);
 
   static PrintOptions printQualifiedSILType() {
     PrintOptions result = PrintOptions::printSIL();

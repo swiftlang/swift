@@ -3792,6 +3792,7 @@ namespace {
 
       OS << "\n";
       Indent += 2;
+      // [TODO: Improve-Clang-type-printing]
       if (!T->getClangTypeInfo().empty()) {
         std::string s;
         llvm::raw_string_ostream os(s);
@@ -3842,6 +3843,7 @@ namespace {
       OS << '\n';
       T->getInvocationSubstitutions().dump(OS, SubstitutionMap::DumpStyle::Full,
                                            Indent+2);
+      // [TODO: Improve-Clang-type-printing]
       if (!T->getClangTypeInfo().empty()) {
         std::string s;
         llvm::raw_string_ostream os(s);
