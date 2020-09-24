@@ -15,7 +15,7 @@
 // it is written to a file which is read by the driver in order to decide which
 // source files require recompilation.
 
-#include "swift/AST/FrontendSourceFileDepGraphFactory.h"
+#include "FrontendSourceFileDepGraphFactory.h"
 
 // may not all be needed
 #include "swift/AST/ASTContext.h"
