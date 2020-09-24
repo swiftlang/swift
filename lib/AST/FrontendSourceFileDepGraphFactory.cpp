@@ -15,7 +15,7 @@
 // it is written to a file which is read by the driver in order to decide which
 // source files require recompilation.
 
-#include "swift/AST/FrontendSourceFileDepGraphFactory.h"
+#include "FrontendSourceFileDepGraphFactory.h"
 
 // may not all be needed
 #include "swift/AST/ASTContext.h"
@@ -298,16 +298,13 @@ std::string FrontendSourceFileDepGraphFactory::getFingerprint(SourceFile *SF) {
 // MARK: FrontendSourceFileDepGraphFactory - adding collections of defined Decls
 //==============================================================================
 //==============================================================================
-// MARK: SourceFileDeclFinder
+// MARK: DeclFinder
 //==============================================================================
 
 namespace {
 /// Takes all the Decls in a SourceFile, and collects them into buckets by
 /// groups of DeclKinds. Also casts them to more specific types
-/// TODO: Factor with SourceFileDeclFinder
-struct SourceFileDeclFinder {
-
-public:
+struct DeclFinder {
   /// Existing system excludes private decls in some cases.
   /// In the future, we might not want to do this, so use bool to decide.
   const bool includePrivateDecls;
@@ -324,11 +321,16 @@ public:
   ConstPtrPairVec<NominalTypeDecl, ValueDecl> valuesInExtensions;
   ConstPtrVec<ValueDecl> classMembers;
 
+  using LookupClassMember = llvm::function_ref<void(VisibleDeclConsumer &)>;
+
+public:
   /// Construct me and separates the Decls.
   // clang-format off
-    SourceFileDeclFinder(const SourceFile *const SF, const bool includePrivateDecls)
+    DeclFinder(ArrayRef<Decl *> topLevelDecls,
+               const bool includePrivateDecls,
+               LookupClassMember lookupClassMember)
     : includePrivateDecls(includePrivateDecls) {
-      for (const Decl *const D : SF->getTopLevelDecls()) {
+      for (const Decl *const D : topLevelDecls) {
         select<ExtensionDecl, DeclKind::Extension>(D, extensions, false) ||
         select<OperatorDecl, DeclKind::InfixOperator, DeclKind::PrefixOperator,
         DeclKind::PostfixOperator>(D, operators, false) ||
@@ -345,7 +347,7 @@ public:
     findNominalsFromExtensions();
     findNominalsInTopNominals();
     findValuesInExtensions();
-    findClassMembers(SF);
+    findClassMembers(lookupClassMember);
   }
 
 private:
@@ -419,7 +421,7 @@ private:
   }
 
   /// Class members are needed for dynamic lookup dependency nodes.
-  void findClassMembers(const SourceFile *const SF) {
+  void findClassMembers(LookupClassMember lookup) {
     struct Collector : public VisibleDeclConsumer {
       ConstPtrVec<ValueDecl> &classMembers;
       Collector(ConstPtrVec<ValueDecl> &classMembers)
@@ -429,7 +431,7 @@ private:
         classMembers.push_back(VD);
       }
     } collector{classMembers};
-    SF->lookupClassMembers({}, collector);
+    lookup(collector);
   }
 
   /// Check \p D to see if it is one of the DeclKinds in the template
@@ -470,7 +472,10 @@ void FrontendSourceFileDepGraphFactory::addAllDefinedDecls() {
 
   // Many kinds of Decls become top-level depends.
 
-  SourceFileDeclFinder declFinder(SF, includePrivateDeps);
+  DeclFinder declFinder(SF->getTopLevelDecls(), includePrivateDeps,
+                        [this](VisibleDeclConsumer &consumer) {
+    SF->lookupClassMembers({}, consumer);
+  });
 
   addAllDefinedDeclsOfAGivenType<NodeKind::topLevel>(
       declFinder.precedenceGroups);
