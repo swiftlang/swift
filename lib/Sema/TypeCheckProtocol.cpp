@@ -4201,6 +4201,8 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
 #pragma mark Protocol conformance checking
 
 void ConformanceChecker::resolveValueWitnesses() {
+  SmallVector<ValueDecl *, 4> objcRequirementsWithDefaultImpl;
+
   for (auto member : Proto->getMembers()) {
     auto requirement = dyn_cast<ValueDecl>(member);
     if (!requirement)
@@ -4231,8 +4233,8 @@ void ConformanceChecker::resolveValueWitnesses() {
           // Default implementations of '@objc' requirements are not allowed.
           if (auto ED = dyn_cast<ExtensionDecl>(witness->getDeclContext())) {
             if (auto proto = ED->getExtendedProtocolDecl()) {
-              C.Diags.diagnose(diagLoc, diag::witness_objc_default_implementation,
-                             witness->getName(), proto->getName());
+              // Store the requirement so we can use it to print stubs.
+              objcRequirementsWithDefaultImpl.push_back(requirement);
             }
           } else {
             bool isOptional =
@@ -4365,6 +4367,41 @@ void ConformanceChecker::resolveValueWitnesses() {
     case ResolveWitnessResult::Missing:
       // Let it get diagnosed later.
       break;
+    }
+  }
+
+  // Emit a tailored diagnostic when we have witnesses to
+  // '@objc' requirements which are default implementations.
+  if (!objcRequirementsWithDefaultImpl.empty()) {
+    SourceLoc FixItLocation;
+    SourceLoc TypeLoc;
+    auto DC = Conformance->getDeclContext();
+    if (auto Extension = dyn_cast<ExtensionDecl>(DC)) {
+      FixItLocation = Extension->getBraces().Start;
+      TypeLoc = Extension->getStartLoc();
+    } else if (auto Nominal = dyn_cast<NominalTypeDecl>(DC)) {
+      FixItLocation = Nominal->getBraces().Start;
+      TypeLoc = Nominal->getStartLoc();
+    } else {
+      llvm_unreachable("Unknown adopter kind");
+    }
+
+    auto &Diags = getASTContext().Diags;
+    Diags.diagnose(TypeLoc, diag::type_does_not_conform, Conformance->getType(),
+                   Proto->getDeclaredInterfaceType());
+    Diags.diagnose(TypeLoc, diag::witness_objc_default_implementation);
+
+    if (getASTContext().LangOpts.DiagnosticsEditorMode) {
+      llvm::SmallString<128> FixItString;
+      llvm::raw_svector_ostream FixItStream(FixItString);
+      for (auto requirement : objcRequirementsWithDefaultImpl) {
+        printRequirementStub(requirement, Conformance->getDeclContext(),
+                             Conformance->getType(), TypeLoc, FixItStream);
+      }
+      if (!FixItString.empty()) {
+        Diags.diagnose(TypeLoc, diag::missing_witnesses_general)
+            .fixItInsert(FixItLocation, FixItString.str());
+      }
     }
   }
 }
