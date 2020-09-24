@@ -347,6 +347,8 @@ def create_argument_parser():
            help='the path to install debug symbols into')
     option('--install-destdir', store_path,
            help='the path to use as the filesystem root for the installation')
+
+    # Deprecated, remove at a later point
     option('--install-all', toggle_true,
            help='Assume all built products should be installed')
 
@@ -548,9 +550,6 @@ def create_argument_parser():
 
     # -------------------------------------------------------------------------
     in_group('Options to select projects')
-
-    option('--infer', toggle_true('infer_dependencies'),
-           help='Infer any downstream dependencies from enabled projects')
 
     option(['-l', '--lldb'], toggle_true('build_lldb'),
            help='build LLDB')

@@ -162,7 +162,6 @@ EXPECTED_DEFAULTS = {
     'host_test': False,
     'only_executable_test': False,
     'only_non_executable_test': False,
-    'infer_dependencies': False,
     'install_prefix': targets.install_prefix(),
     'install_symroot': None,
     'install_destdir': None,
@@ -488,7 +487,6 @@ EXPECTED_OPTIONS = [
     SetTrueOption('-p', dest='build_swiftpm'),
 
     SetTrueOption('--legacy-impl', dest='legacy_impl'),
-    SetTrueOption('--infer', dest='infer_dependencies'),
 
     EnableOption('--android'),
     EnableOption('--build-external-benchmarks'),
