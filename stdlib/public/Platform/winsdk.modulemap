@@ -251,6 +251,13 @@ module WinSDK [system] {
     link "OleAut32.Lib"
   }
 
+  module Printing {
+    header "winspool.h"
+    export *
+
+    link "WinSpool.Lib"
+  }
+
   module RichEdit {
     header "Richedit.h"
     export *
