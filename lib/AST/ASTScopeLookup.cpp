@@ -248,7 +248,7 @@ bool GenericTypeOrExtensionWhereOrBodyPortion::lookupMembersOf(
   auto nt = scope->getCorrespondingNominalTypeDecl().getPtrOrNull();
   if (!nt)
     return false;
-  return consumer.lookInMembers(scope->getDeclContext().get(), nt);
+  return consumer.lookInMembers(scope->getGenericContext(), nt);
 }
 
 bool GenericTypeOrExtensionWherePortion::lookupMembersOf(
