@@ -257,9 +257,6 @@ namespace swift {
     /// Someday, ASTScopeLookup will supplant lookup in the parser
     bool DisableParserLookup = false;
 
-    /// Should  we stress ASTScope-based resolution for debugging?
-    bool StressASTScopeLookup = false;
-
     /// Whether to enable the new operator decl and precedencegroup lookup
     /// behavior. This is a staging flag, and will be removed in the future.
     bool EnableNewOperatorLookup = false;
@@ -367,10 +364,6 @@ namespace swift {
     /// Whether to enable experimental `AdditiveArithmetic` derived
     /// conformances.
     bool EnableExperimentalAdditiveArithmeticDerivedConformances = false;
-
-    /// Whether to enable a more aggressive mode of incremental dependency
-    /// gathering that never captures cascading edges.
-    bool DirectIntramoduleDependencies = true;
 
     /// Enable verification when every SubstitutionMap is constructed.
     bool VerifyAllSubstitutionMaps = false;

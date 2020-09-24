@@ -1953,18 +1953,18 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
       // If the formal type uses a C convention, it is not formally
       // abstractable, and it may be subject to implicit bridging.
       auto extInfo = substFnType->getExtInfo();
-      if (getSILFunctionLanguage(extInfo.getSILRepresentation()) ==
-          SILFunctionLanguage::C) {
+      auto rep = extInfo.getRepresentation();
+      SILFunctionTypeRepresentation silRep = convertRepresentation(rep);
+      if (getSILFunctionLanguage(silRep) == SILFunctionLanguage::C) {
         // The importer only applies fully-reversible bridging to the
         // component types of C function pointers.
         auto bridging = Bridgeability::Full;
-        if (extInfo.getSILRepresentation() ==
-            SILFunctionTypeRepresentation::CFunctionPointer)
+        if (silRep == SILFunctionTypeRepresentation::CFunctionPointer)
           bridging = Bridgeability::None;
 
         // Bridge the parameters and result of the function type.
         auto bridgedFnType =
-            TC.getBridgedFunctionType(origType, substFnType, bridging);
+            TC.getBridgedFunctionType(origType, substFnType, bridging, silRep);
         substFnType = bridgedFnType;
 
         // Also rewrite the type of the abstraction pattern.
@@ -1976,8 +1976,24 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
         }
       }
 
-      return ::getNativeSILFunctionType(TC, forExpansion, origType,
-                                        substFnType);
+      AnyFunctionType::ExtInfo baseExtInfo;
+      if (auto origFnType = origType.getAs<AnyFunctionType>()) {
+        baseExtInfo = origFnType->getExtInfo();
+      } else {
+        baseExtInfo = substFnType->getExtInfo();
+      }
+      const clang::Type *clangType = baseExtInfo.getClangTypeInfo().getType();
+      if (shouldStoreClangType(rep) && !clangType) {
+        clangType = TC.Context.getClangFunctionType(
+            substFnType->getParams(), substFnType->getResult(), rep);
+      }
+      auto silExtInfo =
+          SILExtInfoBuilder(
+              baseExtInfo.intoBuilder().withClangFunctionType(clangType), false)
+              .build();
+
+      return ::getNativeSILFunctionType(TC, forExpansion, origType, substFnType,
+                                        silExtInfo);
     }
 
     // Ignore dynamic self types.
@@ -2684,10 +2700,13 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
             collectAccessorCaptures(AccessorKind::MutableAddress);
             break;
           case ReadWriteImplKind::Modify:
-          case ReadWriteImplKind::StoredWithSimpleDidSet:
-          case ReadWriteImplKind::InheritedWithSimpleDidSet:
             collectAccessorCaptures(AccessorKind::Modify);
             break;
+          case ReadWriteImplKind::StoredWithDidSet:
+            // We've already processed the didSet operation.
+            break;
+          case ReadWriteImplKind::InheritedWithDidSet:
+            llvm_unreachable("inherited local variable");
           }
         }
 

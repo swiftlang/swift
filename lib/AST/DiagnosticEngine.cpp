@@ -846,6 +846,20 @@ void DiagnosticEngine::emitTentativeDiagnostics() {
   TentativeDiagnostics.clear();
 }
 
+/// Returns the access level of the least accessible PrettyPrintedDeclarations
+/// buffer that \p decl should appear in.
+///
+/// This is always \c Public unless \p decl is a \c ValueDecl and its
+/// access level is below \c Public. (That can happen with @testable and
+/// @_private imports.)
+static AccessLevel getBufferAccessLevel(const Decl *decl) {
+  AccessLevel level = AccessLevel::Public;
+  if (auto *VD = dyn_cast<ValueDecl>(decl))
+    level = VD->getFormalAccessScope().accessLevelForDiagnostics();
+  if (level > AccessLevel::Public) level = AccessLevel::Public;
+  return level;
+}
+
 Optional<DiagnosticInfo>
 DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
   auto behavior = state.determineBehavior(diagnostic.getID());
@@ -867,21 +881,31 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
       if (ppLoc.isInvalid()) {
         class TrackingPrinter : public StreamPrinter {
           SmallVectorImpl<std::pair<const Decl *, uint64_t>> &Entries;
+          AccessLevel bufferAccessLevel;
 
         public:
           TrackingPrinter(
               SmallVectorImpl<std::pair<const Decl *, uint64_t>> &Entries,
-              raw_ostream &OS) :
-            StreamPrinter(OS), Entries(Entries) {}
+              raw_ostream &OS, AccessLevel bufferAccessLevel) :
+            StreamPrinter(OS), Entries(Entries),
+            bufferAccessLevel(bufferAccessLevel) {}
 
           void printDeclLoc(const Decl *D) override {
-            Entries.push_back({ D, OS.tell() });
+            if (getBufferAccessLevel(D) == bufferAccessLevel)
+              Entries.push_back({ D, OS.tell() });
           }
         };
         SmallVector<std::pair<const Decl *, uint64_t>, 8> entries;
         llvm::SmallString<128> buffer;
         llvm::SmallString<128> bufferName;
         {
+          // The access level of the buffer we want to print. Declarations below
+          // this access level will be omitted from the buffer; declarations
+          // above it will be printed, but (except for Open declarations in the
+          // Public buffer) will not be recorded in PrettyPrintedDeclarations as
+          // the "true" SourceLoc for the declaration.
+          AccessLevel bufferAccessLevel = getBufferAccessLevel(decl);
+
           // Figure out which declaration to print. It's the top-most
           // declaration (not a module).
           const Decl *ppDecl = decl;
@@ -942,10 +966,21 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
             bufferName += ext->getExtendedType().getString();
           }
 
+          // If we're using a lowered access level, give the buffer a distinct
+          // name.
+          if (bufferAccessLevel != AccessLevel::Public) {
+            assert(bufferAccessLevel < AccessLevel::Public
+                   && "Above-public access levels should use public buffer");
+            bufferName += " (";
+            bufferName += getAccessLevelSpelling(bufferAccessLevel);
+            bufferName += ")";
+          }
+
           // Pretty-print the declaration we've picked.
           llvm::raw_svector_ostream out(buffer);
-          TrackingPrinter printer(entries, out);
-          ppDecl->print(printer, PrintOptions::printForDiagnostics());
+          TrackingPrinter printer(entries, out, bufferAccessLevel);
+          ppDecl->print(printer,
+                        PrintOptions::printForDiagnostics(bufferAccessLevel));
         }
 
         // Build a buffer with the pretty-printed declaration.

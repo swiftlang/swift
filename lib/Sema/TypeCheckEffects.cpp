@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "TypeCheckConcurrency.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Initializer.h"
@@ -1513,7 +1514,21 @@ private:
     ContextScope scope(*this, Context::forClosure(E));
     scope.enterSubFunction();
     scope.resetCoverageForAutoclosureBody();
+
+    // Curry thunks aren't actually a call to the asynchronous function.
+    // Assume that async is covered in such contexts.
+    switch (E->getThunkKind()) {
+    case AutoClosureExpr::Kind::DoubleCurryThunk:
+    case AutoClosureExpr::Kind::SingleCurryThunk:
+      Flags.set(ContextFlags::IsAsyncCovered);
+      break;
+
+    case AutoClosureExpr::Kind::None:
+      break;
+    }
+
     E->getBody()->walk(*this);
+
     scope.preserveCoverageFromAutoclosureBody();
     return ShouldNotRecurse;
   }

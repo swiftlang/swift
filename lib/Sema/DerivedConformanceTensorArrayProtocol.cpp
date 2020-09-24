@@ -87,10 +87,9 @@ deriveBodyTensorArrayProtocol_unpackTensorHandles(
 
   // Create an `if var` statement for the current address.
   VarDecl *currAddressDecl = new (C) VarDecl(
-      /*IsStatic*/ false, VarDecl::Introducer::Var, /*IsCaptureList*/ false,
+      /*IsStatic*/ false, VarDecl::Introducer::Var,
       SourceLoc(), C.getIdentifier("currentAddress"), funcDecl);
   currAddressDecl->setImplicit();
-  currAddressDecl->setHasNonPatternBindingInit(true);
   currAddressDecl->setInterfaceType(baseAddressType);
 
   Pattern *currAddressPat = NamedPattern::createImplicit(C, currAddressDecl);
@@ -441,10 +440,9 @@ deriveBodyTensorArrayProtocol_init(AbstractFunctionDecl *funcDecl, void *) {
 
   // Create an `if var` statement for the current address.
   VarDecl *currAddressDecl = new (C) VarDecl(
-      /*IsStatic*/ false, VarDecl::Introducer::Var, /*IsCaptureList*/ false,
+      /*IsStatic*/ false, VarDecl::Introducer::Var,
       SourceLoc(), C.getIdentifier("currentAddress"), funcDecl);
   currAddressDecl->setImplicit();
-  currAddressDecl->setHasNonPatternBindingInit(true);
   currAddressDecl->setInterfaceType(baseAddressType);
 
   Pattern *currAddressPat = NamedPattern::createImplicit(C, currAddressDecl);

@@ -56,34 +56,35 @@ namespace {
       UnqualifiedLookupFactory *const factory;
       /// Nontypes are formally members of the base type, i.e. the dynamic type
       /// of the activation record.
-      DeclContext *const dynamicContext;
+      const DeclContext *const dynamicContext;
       /// Types are formally members of the metatype, i.e. the static type of the
       /// activation record.
-      DeclContext *const staticContext;
+      const DeclContext *const staticContext;
       using SelfBounds = SmallVector<NominalTypeDecl *, 2>;
       SelfBounds selfBounds;
       
     public:
       /// \p staticContext is also the context from which to derive the self types
       ResultFinderForTypeContext(UnqualifiedLookupFactory *factory,
-                                 DeclContext *dynamicContext,
-                                 DeclContext *staticContext);
-      
+                                 const DeclContext *dynamicContext,
+                                 const DeclContext *staticContext);
+
       SWIFT_DEBUG_DUMP;
       
     private:
-      SelfBounds findSelfBounds(DeclContext *dc);
-      
+      SelfBounds findSelfBounds(const DeclContext *dc);
+
       // Classify this declaration.
       // Types are formally members of the metatype.
-      DeclContext *whereValueIsMember(const ValueDecl *const member) const {
+      const DeclContext *
+      whereValueIsMember(const ValueDecl *const member) const {
         return isa<TypeDecl>(member) ? staticContext : dynamicContext;
       }
-      
+
     public:
       /// Do the lookups and add matches to results.
-      void findResults(const DeclNameRef &Name, bool isCascadingUse,
-                       NLOptions baseNLOptions, DeclContext *contextForLookup,
+      void findResults(const DeclNameRef &Name, NLOptions baseNLOptions,
+                       const DeclContext *contextForLookup,
                        SmallVectorImpl<LookupResultEntry> &results) const;
     };
     
@@ -159,7 +160,7 @@ namespace {
     void performUnqualifiedLookup();
     
   private:
-    void lookUpTopLevelNamesInModuleScopeContext(DeclContext *);
+    void lookUpTopLevelNamesInModuleScopeContext(const DeclContext *);
 
     void lookInASTScopes();
 
@@ -175,35 +176,30 @@ namespace {
 #pragma mark context-based lookup declarations
 
     bool isOutsideBodyOfFunction(const AbstractFunctionDecl *const AFD) const;
-    
+
     /// For diagnostic purposes, move aside the unavailables, and put
     /// them back as a last-ditch effort.
     /// Could be cleaner someday with a richer interface to UnqualifiedLookup.
     void setAsideUnavailableResults(size_t firstPossiblyUnavailableResult);
-    
-    void addImportedResults(DeclContext *const dc);
-    
-    void addNamesKnownToDebugClient(DeclContext *dc);
-    
+
+    void addImportedResults(const DeclContext *const dc);
+
+    void addNamesKnownToDebugClient(const DeclContext *dc);
+
     void addUnavailableInnerResults();
-    
-    void lookForAModuleWithTheGivenName(DeclContext *const dc);
-    
+
+    void lookForAModuleWithTheGivenName(const DeclContext *dc);
+
 #pragma mark common helper declarations
     static NLOptions
     computeBaseNLOptions(const UnqualifiedLookupOptions options,
                          const bool isOriginallyTypeLookup);
 
-    Optional<bool> getInitialIsCascadingUse() const {
-      return options.contains(Flags::KnownPrivate) ? Optional<bool>(false)
-                                                   : None;
-    }
-
     void findResultsAndSaveUnavailables(
-                                        DeclContext *lookupContextForThisContext,
-                                        ResultFinderForTypeContext &&resultFinderForTypeContext,
-                                        bool isCascadingUse, NLOptions baseNLOptions);
-    
+        const DeclContext *lookupContextForThisContext,
+        ResultFinderForTypeContext &&resultFinderForTypeContext,
+        NLOptions baseNLOptions);
+
   public:
     SWIFT_DEBUG_DUMP;
     SWIFT_DEBUG_DUMPER(dumpResults());
@@ -231,19 +227,25 @@ class ASTScopeDeclConsumerForUnqualifiedLookup
     : public AbstractASTScopeDeclConsumer {
   UnqualifiedLookupFactory &factory;
 
+  /// The 'self' parameter from the innermost scope containing the lookup
+  /// location to be used when an instance member of a type is accessed,
+  /// or nullptr if instance members should not be 'self' qualified.
+  DeclContext *candidateSelfDC;
+
 public:
   ASTScopeDeclConsumerForUnqualifiedLookup(UnqualifiedLookupFactory &factory)
-      : factory(factory) {}
+      : factory(factory), candidateSelfDC(nullptr) {}
 
   virtual ~ASTScopeDeclConsumerForUnqualifiedLookup() = default;
+
+  void maybeUpdateSelfDC(VarDecl *var);
 
   bool consume(ArrayRef<ValueDecl *> values, DeclVisibilityKind vis,
                NullablePtr<DeclContext> baseDC = nullptr) override;
 
-  /// returns true if finished and new value for isCascadingUse
-  bool lookInMembers(NullablePtr<DeclContext> selfDC,
-                     DeclContext *const scopeDC, NominalTypeDecl *const nominal,
-                     function_ref<bool(Optional<bool>)>) override;
+  /// returns true if finished
+  bool lookInMembers(DeclContext *const scopeDC,
+                     NominalTypeDecl *const nominal) override;
 
 #ifndef NDEBUG
   void startingNextLookupStep() override {
@@ -322,12 +324,14 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
 }
 
 void UnqualifiedLookupFactory::lookUpTopLevelNamesInModuleScopeContext(
-    DeclContext *DC) {
+    const DeclContext *DC) {
   // TODO: Does the debugger client care about compound names?
   if (Name.isSimpleName() && !Name.isSpecial() && DebugClient &&
-      DebugClient->lookupOverrides(Name.getBaseName(), DC, Loc,
-                                   isOriginallyTypeLookup, Results))
+      DebugClient->lookupOverrides(Name.getBaseName(),
+                                   const_cast<DeclContext *>(DC), Loc,
+                                   isOriginallyTypeLookup, Results)) {
     return;
+  }
 
   addImportedResults(DC);
   addNamesKnownToDebugClient(DC);
@@ -352,20 +356,18 @@ bool UnqualifiedLookupFactory::isOutsideBodyOfFunction(
 }
 
 void UnqualifiedLookupFactory::ResultFinderForTypeContext::findResults(
-    const DeclNameRef &Name, bool isCascadingUse, NLOptions baseNLOptions,
-    DeclContext *contextForLookup,
+    const DeclNameRef &Name, NLOptions baseNLOptions,
+    const DeclContext *contextForLookup,
     SmallVectorImpl<LookupResultEntry> &results) const {
   // An optimization:
   if (selfBounds.empty())
     return;
-  const NLOptions options =
-      baseNLOptions | (isCascadingUse ? NL_KnownCascadingDependency
-                                      : NL_KnownNonCascadingDependency);
 
   SmallVector<ValueDecl *, 4> Lookup;
-  contextForLookup->lookupQualified(selfBounds, Name, options, Lookup);
+  contextForLookup->lookupQualified(selfBounds, Name, baseNLOptions, Lookup);
   for (auto Result : Lookup) {
-    results.push_back(LookupResultEntry(whereValueIsMember(Result), Result));
+    results.emplace_back(const_cast<DeclContext *>(whereValueIsMember(Result)),
+                         Result);
 #ifndef NDEBUG
     factory->addedResult(results.back());
 #endif
@@ -404,13 +406,13 @@ void UnqualifiedLookupFactory::setAsideUnavailableResults(
   filterForDiscriminator(Results, DebugClient);
 }
 
-void UnqualifiedLookupFactory::addImportedResults(DeclContext *const dc) {
+void UnqualifiedLookupFactory::addImportedResults(const DeclContext *const dc) {
   using namespace namelookup;
   SmallVector<ValueDecl *, 8> CurModuleResults;
   auto resolutionKind = isOriginallyTypeLookup ? ResolutionKind::TypesOnly
                                                : ResolutionKind::Overloadable;
-  lookupInModule(dc, Name.getFullName(), CurModuleResults, NLKind::UnqualifiedLookup,
-                 resolutionKind, dc);
+  lookupInModule(dc, Name.getFullName(), CurModuleResults,
+                 NLKind::UnqualifiedLookup, resolutionKind, dc);
 
   // Always perform name shadowing for type lookup.
   if (options.contains(Flags::TypeLookup)) {
@@ -427,9 +429,11 @@ void UnqualifiedLookupFactory::addImportedResults(DeclContext *const dc) {
   filterForDiscriminator(Results, DebugClient);
 }
 
-void UnqualifiedLookupFactory::addNamesKnownToDebugClient(DeclContext *dc) {
+void UnqualifiedLookupFactory::addNamesKnownToDebugClient(
+    const DeclContext *dc) {
   if (Name.isSimpleName() && DebugClient)
-    DebugClient->lookupAdditions(Name.getBaseName(), dc, Loc,
+    DebugClient->lookupAdditions(Name.getBaseName(),
+                                 const_cast<DeclContext *>(dc), Loc,
                                  isOriginallyTypeLookup, Results);
 }
 
@@ -438,7 +442,7 @@ void UnqualifiedLookupFactory::addUnavailableInnerResults() {
 }
 
 void UnqualifiedLookupFactory::lookForAModuleWithTheGivenName(
-    DeclContext *const dc) {
+    const DeclContext *const dc) {
   using namespace namelookup;
   if (!Name.isSimpleName() || Name.isSpecial())
     return;
@@ -468,17 +472,15 @@ void UnqualifiedLookupFactory::lookForAModuleWithTheGivenName(
 
 #pragma mark common helper definitions
 
-
 void UnqualifiedLookupFactory::findResultsAndSaveUnavailables(
-       DeclContext *lookupContextForThisContext,
-       ResultFinderForTypeContext &&resultFinderForTypeContext,
-       bool isCascadingUse, NLOptions baseNLOptions) {
+    const DeclContext *lookupContextForThisContext,
+    ResultFinderForTypeContext &&resultFinderForTypeContext,
+    NLOptions baseNLOptions) {
   auto firstPossiblyUnavailableResult = Results.size();
-  resultFinderForTypeContext.findResults(Name, isCascadingUse, baseNLOptions,
+  resultFinderForTypeContext.findResults(Name, baseNLOptions,
                                          lookupContextForThisContext, Results);
   setAsideUnavailableResults(firstPossiblyUnavailableResult);
 }
-
 
 NLOptions UnqualifiedLookupFactory::computeBaseNLOptions(
     const UnqualifiedLookupOptions options,
@@ -493,8 +495,7 @@ NLOptions UnqualifiedLookupFactory::computeBaseNLOptions(
   return baseNLOptions;
 }
 
-bool UnqualifiedLookupFactory::isFirstResultEnough()
-    const {
+bool UnqualifiedLookupFactory::isFirstResultEnough() const {
   return !Results.empty() && !options.contains(Flags::IncludeOuterResults);
 }
 
@@ -506,15 +507,14 @@ void UnqualifiedLookupFactory::recordCompletionOfAScope() {
 
 UnqualifiedLookupFactory::ResultFinderForTypeContext::
     ResultFinderForTypeContext(UnqualifiedLookupFactory *factory,
-                               DeclContext *dynamicContext,
-                               DeclContext *staticContext)
-    : factory(factory),
-      dynamicContext(dynamicContext), staticContext(staticContext),
-      selfBounds(findSelfBounds(staticContext)) {}
+                               const DeclContext *dynamicContext,
+                               const DeclContext *staticContext)
+    : factory(factory), dynamicContext(dynamicContext),
+      staticContext(staticContext), selfBounds(findSelfBounds(staticContext)) {}
 
 UnqualifiedLookupFactory::ResultFinderForTypeContext::SelfBounds
 UnqualifiedLookupFactory::ResultFinderForTypeContext::findSelfBounds(
-    DeclContext *dc) {
+    const DeclContext *dc) {
   auto nominal = dc->getSelfNominalTypeDecl();
   if (!nominal)
     return {};
@@ -544,7 +544,47 @@ void UnqualifiedLookupFactory::lookInASTScopes() {
 #endif
 
   ASTScope::unqualifiedLookup(DC->getParentSourceFile(),
-                              Name, Loc, DC, consumer);
+                              Name, Loc, consumer);
+}
+
+void ASTScopeDeclConsumerForUnqualifiedLookup::maybeUpdateSelfDC(
+    VarDecl *var) {
+  // We have a binding named 'self'.
+  //
+  // There are three possibilities:
+  //
+  // 1) This binding is the 'self' parameter of a method,
+  // 2) This binding is a bona-fide 'self' capture, meaning a capture
+  //    list entry named 'self' with initial value expression 'self',
+  // 3) None of the above.
+  //
+  // How we handle these cases depends on whether we've already seen
+  // another 'self' binding.
+  if (candidateSelfDC == nullptr) {
+    // We haven't seen one yet, so record it.
+    if (var->isSelfParameter())
+      candidateSelfDC = var->getDeclContext();
+    else if (var->isSelfParamCapture())
+      candidateSelfDC = var->getParentCaptureList()->getClosureBody();
+  } else {
+    // If we see a binding named 'self' that is not a bona-fide
+    // 'self', we have to forget about the previous 'self' capture
+    // because it's not going to be the right one for accessing
+    // instance members of the innermost nominal type. Eg,
+    //
+    // class C {
+    //   func bar() {}
+    //   func foo() {
+    //     _ { [self=12] { [self] bar() } }
+    //   }
+    // }
+    //
+    // Instead, we're going to move on and look for the next-innermost
+    // 'self' binding.
+    if (!var->isSelfParameter() &&
+        !var->isSelfParamCapture())
+      candidateSelfDC = nullptr;
+  }
 }
 
 bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
@@ -553,6 +593,15 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
   for (auto *value: values) {
     if (factory.isOriginallyTypeLookup && !isa<TypeDecl>(value))
       continue;
+
+    // Try to resolve the base for unqualified instance member
+    // references. This is used by lookInMembers().
+    if (auto *var = dyn_cast<VarDecl>(value)) {
+      if (var->getName() == factory.Ctx.Id_self) {
+        maybeUpdateSelfDC(var);
+      }
+    }
+
     if (!value->getName().matchesRef(factory.Name.getFullName()))
       continue;
 
@@ -586,22 +635,33 @@ bool ASTScopeDeclGatherer::consume(ArrayRef<ValueDecl *> valuesArg,
 
 // TODO: in future, migrate this functionality into ASTScopes
 bool ASTScopeDeclConsumerForUnqualifiedLookup::lookInMembers(
-    NullablePtr<DeclContext> selfDC, DeclContext *const scopeDC,
-    NominalTypeDecl *const nominal,
-    function_ref<bool(Optional<bool>)> calculateIsCascadingUse) {
-  if (selfDC) {
-    if (auto *d = selfDC.get()->getAsDecl()) {
-      if (auto *afd = dyn_cast<AbstractFunctionDecl>(d))
-        assert(!factory.isOutsideBodyOfFunction(afd) && "Should be inside");
+    DeclContext *const scopeDC,
+    NominalTypeDecl *const nominal) {
+  if (candidateSelfDC) {
+    if (auto *afd = dyn_cast<AbstractFunctionDecl>(candidateSelfDC)) {
+      assert(!factory.isOutsideBodyOfFunction(afd) && "Should be inside");
     }
   }
+
+  // We're looking for members of a type.
+  //
+  // If we started the looking from inside a scope where a 'self' parameter
+  // is visible, instance members are returned with the 'self' parameter's
+  // DeclContext as the base, which is how the expression checker knows to
+  // convert the unqualified reference into a self member access.
   auto resultFinder = UnqualifiedLookupFactory::ResultFinderForTypeContext(
-      &factory, selfDC ? selfDC.get() : scopeDC, scopeDC);
-  const bool isCascadingUse =
-      calculateIsCascadingUse(factory.getInitialIsCascadingUse());
+      &factory, candidateSelfDC ? candidateSelfDC : scopeDC, scopeDC);
   factory.findResultsAndSaveUnavailables(scopeDC, std::move(resultFinder),
-                                         isCascadingUse, factory.baseNLOptions);
+                                         factory.baseNLOptions);
   factory.recordCompletionOfAScope();
+
+  // We're done looking inside a nominal type declaration. It is possible
+  // that this nominal type is nested inside of another type, in which case
+  // we will visit the outer type next. Make sure to clear out the known
+  // 'self' parameeter context, since any members of the outer type are
+  // not accessed via the innermost 'self' parameter.
+  candidateSelfDC = nullptr;
+
   return factory.isFirstResultEnough();
 }
 
@@ -635,7 +695,9 @@ void UnqualifiedLookupFactory::ResultFinderForTypeContext::dump() const {
 
 void UnqualifiedLookupFactory::dump() const { print(llvm::errs()); }
 void UnqualifiedLookupFactory::dumpScopes() const { printScopes(llvm::errs()); }
-void UnqualifiedLookupFactory::dumpResults() const { printResults(llvm::errs()); }
+void UnqualifiedLookupFactory::dumpResults() const {
+  printResults(llvm::errs());
+}
 
 void UnqualifiedLookupFactory::printScopes(raw_ostream &out) const {
   out << "\n\nScopes:\n";

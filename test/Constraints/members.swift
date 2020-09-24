@@ -718,3 +718,11 @@ func testSR13359(_ pair: (Int, Int), _ alias: Pair, _ void: Void, labeled: (a: I
   _ = labeled[""] // expected-error {{cannot access element using subscript for tuple type '(a: Int, b: Int)'; use '.' notation instead}} {{none}}
 
 }
+
+// rdar://problem/66891544 - incorrect diagnostic ("type is ambiguous") when base type of a reference cannot be determined
+func rdar66891544() {
+  func foo<T>(_: T, defaultT: T? = nil) {}
+  func foo<U>(_: U, defaultU: U? = nil) {}
+
+  foo(.bar) // expected-error {{cannot infer contextual base in reference to member 'bar'}}
+}

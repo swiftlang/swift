@@ -207,8 +207,6 @@ namespace {
 static UnqualifiedLookupOptions
 convertToUnqualifiedLookupOptions(NameLookupOptions options) {
   UnqualifiedLookupOptions newOptions = UnqualifiedLookupFlags::AllowProtocolMembers;
-  if (options.contains(NameLookupFlags::KnownPrivate))
-    newOptions |= UnqualifiedLookupFlags::KnownPrivate;
   if (options.contains(NameLookupFlags::IgnoreAccessControl))
     newOptions |= UnqualifiedLookupFlags::IgnoreAccessControl;
   if (options.contains(NameLookupFlags::IncludeOuterResults))
@@ -255,9 +253,7 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclNameRef name,
       if (!typeDC->isTypeContext()) {
         // If we don't have a type context this is an implicit 'self' reference.
         if (auto *CE = dyn_cast<ClosureExpr>(typeDC)) {
-          // If we found the result in a self capture, look through the capture.
-          assert(CE->getCapturedSelfDecl());
-          typeDC = found.getValueDecl()->getDeclContext();
+          typeDC = typeDC->getInnermostTypeContext();
         } else {
           // Otherwise, we must have the method context.
           typeDC = typeDC->getParent();
@@ -314,8 +310,6 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
 
   LookupResult result;
   NLOptions subOptions = (NL_QualifiedDefault | NL_ProtocolMembers);
-  if (options.contains(NameLookupFlags::KnownPrivate))
-    subOptions |= NL_KnownNonCascadingDependency;
   if (options.contains(NameLookupFlags::IgnoreAccessControl))
     subOptions |= NL_IgnoreAccessControl;
 
@@ -390,8 +384,6 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
   SmallVector<ValueDecl *, 4> decls;
   NLOptions subOptions = (NL_QualifiedDefault | NL_OnlyTypes | NL_ProtocolMembers);
 
-  if (options.contains(NameLookupFlags::KnownPrivate))
-    subOptions |= NL_KnownNonCascadingDependency;
   if (options.contains(NameLookupFlags::IgnoreAccessControl))
     subOptions |= NL_IgnoreAccessControl;
 

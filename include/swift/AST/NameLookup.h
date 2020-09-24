@@ -215,18 +215,16 @@ public:
 };
 
 enum class UnqualifiedLookupFlags {
-  /// This lookup is known to not affect downstream files.
-  KnownPrivate = 0x01,
   /// This lookup should only return types.
-  TypeLookup = 0x02,
+  TypeLookup            = 1 << 0,
   /// This lookup should consider declarations within protocols to which the
   /// context type conforms.
-  AllowProtocolMembers = 0x04,
+  AllowProtocolMembers  = 1 << 2,
   /// Don't check access when doing lookup into a type.
-  IgnoreAccessControl = 0x08,
+  IgnoreAccessControl   = 1 << 3,
   /// This lookup should include results from outside the innermost scope with
   /// results.
-  IncludeOuterResults = 0x10,
+  IncludeOuterResults   = 1 << 4,
 };
 
 using UnqualifiedLookupOptions = OptionSet<UnqualifiedLookupFlags>;
@@ -507,9 +505,6 @@ template <typename Result>
 void filterForDiscriminator(SmallVectorImpl<Result> &results,
                             DebuggerClient *debugClient);
 
-void recordLookupOfTopLevelName(DeclContext *topLevelContext, DeclName name,
-                                bool isCascading);
-
 } // end namespace namelookup
 
 /// Retrieve the set of nominal type declarations that are directly
@@ -633,9 +628,8 @@ public:
 
   /// Eventually this functionality should move into ASTScopeLookup
   virtual bool
-  lookInMembers(NullablePtr<DeclContext> selfDC, DeclContext *const scopeDC,
-                NominalTypeDecl *const nominal,
-                function_ref<bool(Optional<bool>)> calculateIsCascadingUse) = 0;
+  lookInMembers(DeclContext *const scopeDC,
+                NominalTypeDecl *const nominal) = 0;
 
 #ifndef NDEBUG
   virtual void startingNextLookupStep() = 0;
@@ -656,9 +650,8 @@ public:
                NullablePtr<DeclContext> baseDC = nullptr) override;
 
   /// Eventually this functionality should move into ASTScopeLookup
-  bool lookInMembers(NullablePtr<DeclContext>, DeclContext *const,
-                     NominalTypeDecl *const,
-                     function_ref<bool(Optional<bool>)>) override {
+  bool lookInMembers(DeclContext *const,
+                     NominalTypeDecl *const) override {
     return false;
   }
 
@@ -688,15 +681,8 @@ public:
   /// Flesh out the tree for dumping
   void buildFullyExpandedTree();
 
-  /// \return the scopes traversed
-  static llvm::SmallVector<const ast_scope::ASTScopeImpl *, 0>
-  unqualifiedLookup(SourceFile *, DeclNameRef, SourceLoc,
-                    const DeclContext *startingContext,
-                    namelookup::AbstractASTScopeDeclConsumer &);
-
-  static Optional<bool>
-  computeIsCascadingUse(ArrayRef<const ast_scope::ASTScopeImpl *> history,
-                        Optional<bool> initialIsCascadingUse);
+  static void unqualifiedLookup(SourceFile *, DeclNameRef, SourceLoc,
+                                namelookup::AbstractASTScopeDeclConsumer &);
 
   /// Entry point to record the visible statement labels from the given
   /// point.

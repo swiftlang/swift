@@ -52,7 +52,12 @@ SourceLoc swift::extractNearestSourceLoc(const IRGenDescriptor &desc) {
   return SourceLoc();
 }
 
-TinyPtrVector<FileUnit *> IRGenDescriptor::getFiles() const {
+TinyPtrVector<FileUnit *> IRGenDescriptor::getFilesToEmit() const {
+  // If we've been asked to emit a specific set of symbols, we don't emit any
+  // whole files.
+  if (SymbolsToEmit)
+    return {};
+
   // For a whole module, we emit IR for all files.
   if (auto *mod = Ctx.dyn_cast<ModuleDecl *>())
     return TinyPtrVector<FileUnit *>(mod->getFiles());
@@ -76,15 +81,19 @@ ModuleDecl *IRGenDescriptor::getParentModule() const {
   return Ctx.get<ModuleDecl *>();
 }
 
-std::vector<std::string> IRGenDescriptor::getLinkerDirectives() const {
-  auto opts = TBDOpts;
-  opts.LinkerDirectivesOnly = true;
+TBDGenDescriptor IRGenDescriptor::getTBDGenDescriptor() const {
   if (auto *file = Ctx.dyn_cast<FileUnit *>()) {
-    return getPublicSymbols(TBDGenDescriptor::forFile(file, opts));
+    return TBDGenDescriptor::forFile(file, TBDOpts);
   } else {
     auto *M = Ctx.get<ModuleDecl *>();
-    return getPublicSymbols(TBDGenDescriptor::forModule(M, opts));
+    return TBDGenDescriptor::forModule(M, TBDOpts);
   }
+}
+
+std::vector<std::string> IRGenDescriptor::getLinkerDirectives() const {
+  auto desc = getTBDGenDescriptor();
+  desc.getOptions().LinkerDirectivesOnly = true;
+  return getPublicSymbols(std::move(desc));
 }
 
 evaluator::DependencySource IRGenRequest::readDependencySource(
@@ -93,11 +102,11 @@ evaluator::DependencySource IRGenRequest::readDependencySource(
 
   // We don't track dependencies in whole-module mode.
   if (auto *mod = desc.Ctx.dyn_cast<ModuleDecl *>()) {
-    return {nullptr, e.getActiveSourceScope()};
+    return nullptr;
   }
 
   auto *primary = desc.Ctx.get<FileUnit *>();
-  return {dyn_cast<SourceFile>(primary), evaluator::DependencyScope::Cascading};
+  return dyn_cast<SourceFile>(primary);
 }
 
 // Define request evaluation functions for each of the IRGen requests.

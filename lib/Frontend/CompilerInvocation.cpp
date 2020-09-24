@@ -137,9 +137,13 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
   if (SearchPathOpts.SkipRuntimeLibraryImportPaths)
     return;
 
-  if (!Triple.isOSDarwin())
-    llvm::sys::path::append(LibPath, swift::getMajorArchitectureName(Triple));
   SearchPathOpts.RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
+
+  // This is compatibility for <=5.3
+  if (!Triple.isOSDarwin()) {
+    llvm::sys::path::append(LibPath, swift::getMajorArchitectureName(Triple));
+    SearchPathOpts.RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
+  }
 
   if (!SearchPathOpts.SDKPath.empty()) {
     if (tripleIsMacCatalystEnvironment(Triple)) {
@@ -422,7 +426,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
   
   Opts.DisableParserLookup |= Args.hasArg(OPT_disable_parser_lookup);
-  Opts.StressASTScopeLookup |= Args.hasArg(OPT_stress_astscope_lookup);
   Opts.EnableNewOperatorLookup = Args.hasFlag(OPT_enable_new_operator_lookup,
                                               OPT_disable_new_operator_lookup,
                                               /*default*/ false);
@@ -448,11 +451,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
     Opts.EnableExperimentalAdditiveArithmeticDerivedConformances = true;
-
-  Opts.DirectIntramoduleDependencies =
-      Args.hasFlag(OPT_enable_direct_intramodule_dependencies,
-                   OPT_disable_direct_intramodule_dependencies,
-                   Opts.DirectIntramoduleDependencies);
 
   Opts.EnableExperimentalForwardModeDifferentiation |=
       Args.hasArg(OPT_enable_experimental_forward_mode_differentiation);
@@ -1143,7 +1141,11 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
   Opts.EmitSortedSIL |= Args.hasArg(OPT_emit_sorted_sil);
+  Opts.PrintFullConvention |=
+      Args.hasArg(OPT_experimental_print_full_convention);
   Opts.PrintInstCounts |= Args.hasArg(OPT_print_inst_counts);
+  Opts.StopOptimizationBeforeLoweringOwnership |=
+      Args.hasArg(OPT_sil_stop_optzns_before_lowering_ownership);
   if (const Arg *A = Args.getLastArg(OPT_external_pass_pipeline_filename))
     Opts.ExternalPassPipelineFilename = A->getValue();
 

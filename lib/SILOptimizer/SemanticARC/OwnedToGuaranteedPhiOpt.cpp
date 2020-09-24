@@ -16,14 +16,15 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "Context.h"
 #include "OwnershipPhiOperand.h"
-#include "SemanticARCOptVisitor.h"
+#include "Transforms.h"
 
 using namespace swift;
 using namespace swift::semanticarc;
 
 static bool canEliminatePhi(
-    SemanticARCOptVisitor::FrozenMultiMapRange optimizableIntroducerRange,
+    Context::FrozenMultiMapRange optimizableIntroducerRange,
     ArrayRef<OwnershipPhiOperand> incomingValueOperandList,
     SmallVectorImpl<OwnedValueIntroducer> &ownedValueIntroducerAccumulator) {
   for (auto incomingValueOperand : incomingValueOperandList) {
@@ -120,18 +121,18 @@ static bool getIncomingJoinedLiveRangeOperands(
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
-bool SemanticARCOptVisitor::performPostPeepholeOwnedArgElimination() {
+bool swift::semanticarc::tryConvertOwnedPhisToGuaranteedPhis(Context &ctx) {
   bool madeChange = false;
 
   // First freeze our multi-map so we can use it for map queries. Also, setup a
   // defer of the reset so we do not forget to reset the map when we are done.
-  joinedOwnedIntroducerToConsumedOperands.setFrozen();
-  SWIFT_DEFER { joinedOwnedIntroducerToConsumedOperands.reset(); };
+  ctx.joinedOwnedIntroducerToConsumedOperands.setFrozen();
+  SWIFT_DEFER { ctx.joinedOwnedIntroducerToConsumedOperands.reset(); };
 
   // Now for each phi argument that we have in our multi-map...
   SmallVector<OwnershipPhiOperand, 4> incomingValueOperandList;
   SmallVector<OwnedValueIntroducer, 4> ownedValueIntroducers;
-  for (auto pair : joinedOwnedIntroducerToConsumedOperands.getRange()) {
+  for (auto pair : ctx.joinedOwnedIntroducerToConsumedOperands.getRange()) {
     SWIFT_DEFER {
       incomingValueOperandList.clear();
       ownedValueIntroducers.clear();
@@ -211,7 +212,7 @@ bool SemanticARCOptVisitor::performPostPeepholeOwnedArgElimination() {
           incomingValueUpdates.emplace_back(cvi->getOperand(), updateOffset);
         }
         std::move(lr).convertToGuaranteedAndRAUW(cvi->getOperand(),
-                                                 getCallbacks());
+                                                 ctx.instModCallbacks);
         continue;
       }
       llvm_unreachable("Unhandled optimizable introducer!");
@@ -227,7 +228,7 @@ bool SemanticARCOptVisitor::performPostPeepholeOwnedArgElimination() {
     // Then convert the phi's live range to be guaranteed.
     std::move(joinedLiveRange)
         .convertJoinedLiveRangePhiToGuaranteed(
-            getDeadEndBlocks(), lifetimeFrontier, getCallbacks());
+            ctx.getDeadEndBlocks(), ctx.lifetimeFrontier, ctx.instModCallbacks);
 
     // Now if our phi operand consumes/forwards its guaranteed input, insert a
     // begin_borrow along the incoming value edges. We have to do this after
@@ -248,9 +249,7 @@ bool SemanticARCOptVisitor::performPostPeepholeOwnedArgElimination() {
     }
 
     madeChange = true;
-    if (VerifyAfterTransform) {
-      F.verify();
-    }
+    ctx.verify();
   }
 
   return madeChange;

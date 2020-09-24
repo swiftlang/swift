@@ -824,9 +824,9 @@ getActualImportControl(unsigned rawValue) {
   // values.
   switch (rawValue) {
   case static_cast<unsigned>(serialization::ImportControl::Normal):
-    return ModuleDecl::ImportFilterKind::Private;
+    return ModuleDecl::ImportFilterKind::Default;
   case static_cast<unsigned>(serialization::ImportControl::Exported):
-    return ModuleDecl::ImportFilterKind::Public;
+    return ModuleDecl::ImportFilterKind::Exported;
   case static_cast<unsigned>(serialization::ImportControl::ImplementationOnly):
     return ModuleDecl::ImportFilterKind::ImplementationOnly;
   default:

@@ -440,13 +440,12 @@ static void printSILTypeColorAndSigil(raw_ostream &OS, SILType t) {
   // Potentially add a leading sigil for the value category.
   ::print(OS, t.getCategory());
 }
-      
-void SILType::print(raw_ostream &OS) const {
+
+void SILType::print(raw_ostream &OS, const PrintOptions &PO) const {
   printSILTypeColorAndSigil(OS, *this);
   
   // Print other types as their Swift representation.
-  PrintOptions SubPrinter = PrintOptions::printSIL();
-  getASTType().print(OS, SubPrinter);
+  getASTType().print(OS, PO);
 }
 
 void SILType::dump() const {
@@ -459,7 +458,8 @@ void SILType::dump() const {
 /// result in `sugaredTypeNames`.
 static void printSILFunctionNameAndType(
     llvm::raw_ostream &OS, const SILFunction *function,
-    llvm::DenseMap<CanType, Identifier> &sugaredTypeNames) {
+    llvm::DenseMap<CanType, Identifier> &sugaredTypeNames,
+    const SILPrintContext *silPrintContext = nullptr) {
   function->printName(OS);
   OS << " : $";
   auto *genEnv = function->getGenericEnvironment();
@@ -496,7 +496,7 @@ static void printSILFunctionNameAndType(
         sugaredTypeNames[archetypeTy->getCanonicalType()] = name;
     }
   }
-  auto printOptions = PrintOptions::printSIL();
+  auto printOptions = PrintOptions::printSIL(silPrintContext);
   printOptions.GenericSig = genSig;
   printOptions.AlternativeTypeNames =
       sugaredTypeNames.empty() ? nullptr : &sugaredTypeNames;
@@ -570,8 +570,8 @@ public:
   SILPrinter(
       SILPrintContext &PrintCtx,
       llvm::DenseMap<CanType, Identifier> *AlternativeTypeNames = nullptr)
-      : Ctx(PrintCtx),
-        PrintState{{PrintCtx.OS()}, PrintOptions::printSIL()},
+      : Ctx(PrintCtx), PrintState{{PrintCtx.OS()},
+                                  PrintOptions::printSIL(&PrintCtx)},
         LastBufferID(0) {
     PrintState.ASTOptions.AlternativeTypeNames = AlternativeTypeNames;
     PrintState.ASTOptions.PrintForSIL = true;
@@ -2684,7 +2684,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     OS << "[ossa] ";
 
   llvm::DenseMap<CanType, Identifier> sugaredTypeNames;
-  printSILFunctionNameAndType(OS, this, sugaredTypeNames);
+  printSILFunctionNameAndType(OS, this, sugaredTypeNames, &PrintCtx);
 
   if (!isExternalDeclaration()) {
     if (auto eCount = getEntryCount()) {
@@ -2702,9 +2702,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
       
 /// Pretty-print the SILFunction's name using SIL syntax,
 /// '@function_mangled_name'.
-void SILFunction::printName(raw_ostream &OS) const {
-  OS << "@" << Name;  
-}
+void SILFunction::printName(raw_ostream &OS) const { OS << "@" << Name; }
 
 /// Pretty-print a global variable to the designated stream.
 void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
@@ -2971,8 +2969,8 @@ static void printFileIDMap(SILPrintContext &Ctx, const FileIDMap map) {
 }
 
 void SILProperty::print(SILPrintContext &Ctx) const {
-  PrintOptions Options = PrintOptions::printSIL();
-  
+  PrintOptions Options = PrintOptions::printSIL(&Ctx);
+
   auto &OS = Ctx.OS();
   OS << "sil_property ";
   if (isSerialized())
@@ -3495,19 +3493,20 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
 //===----------------------------------------------------------------------===//
 
 SILPrintContext::SILPrintContext(llvm::raw_ostream &OS, bool Verbose,
-                bool SortedSIL) :
-  OutStream(OS), Verbose(Verbose), SortedSIL(SortedSIL),
-  DebugInfo(SILPrintDebugInfo) { }
+                                 bool SortedSIL, bool PrintFullConvention)
+    : OutStream(OS), Verbose(Verbose), SortedSIL(SortedSIL),
+      DebugInfo(SILPrintDebugInfo), PrintFullConvention(PrintFullConvention) {}
 
-SILPrintContext::SILPrintContext(llvm::raw_ostream &OS,
-                                 const SILOptions &Opts) :
-  OutStream(OS), Verbose(Opts.EmitVerboseSIL), SortedSIL(Opts.EmitSortedSIL),
-  DebugInfo(SILPrintDebugInfo) {}
+SILPrintContext::SILPrintContext(llvm::raw_ostream &OS, const SILOptions &Opts)
+    : OutStream(OS), Verbose(Opts.EmitVerboseSIL),
+      SortedSIL(Opts.EmitSortedSIL), DebugInfo(SILPrintDebugInfo),
+      PrintFullConvention(Opts.PrintFullConvention) {}
 
 SILPrintContext::SILPrintContext(llvm::raw_ostream &OS, bool Verbose,
-                                 bool SortedSIL, bool DebugInfo) :
-  OutStream(OS), Verbose(Verbose), SortedSIL(SortedSIL),
-  DebugInfo(DebugInfo) { }
+                                 bool SortedSIL, bool DebugInfo,
+                                 bool PrintFullConvention)
+    : OutStream(OS), Verbose(Verbose), SortedSIL(SortedSIL),
+      DebugInfo(DebugInfo), PrintFullConvention(PrintFullConvention) {}
 
 void SILPrintContext::setContext(const void *FunctionOrBlock) {
   if (FunctionOrBlock != ContextFunctionOrBlock) {
@@ -3610,4 +3609,21 @@ ID SILPrintContext::getID(const SILNode *node) {
 
   ID R = {ID::SSAValue, ValueToIDMap[node]};
   return R;
+}
+
+PrintOptions PrintOptions::printSIL(const SILPrintContext *ctx) {
+  PrintOptions result;
+  result.PrintLongAttrsOnSeparateLines = true;
+  result.PrintStorageRepresentationAttrs = true;
+  result.AbstractAccessors = false;
+  result.PrintForSIL = true;
+  result.PrintInSILBody = true;
+  result.PreferTypeRepr = false;
+  result.PrintIfConfig = false;
+  result.OpaqueReturnTypePrinting =
+     OpaqueReturnTypePrintingMode::StableReference;
+  if (ctx && ctx->printFullConvention())
+   result.PrintFunctionRepresentationAttrs =
+       PrintOptions::FunctionRepresentationMode::Full;
+  return result;
 }

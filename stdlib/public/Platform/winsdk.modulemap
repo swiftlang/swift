@@ -43,6 +43,8 @@ module WinSDK [system] {
 
     module console {
       header "consoleapi.h"
+      header "consoleapi2.h"
+      header "consoleapi3.h"
       export *
     }
 
@@ -134,9 +136,18 @@ module WinSDK [system] {
     link "AuthZ.Lib"
   }
 
-  module CommCtrl {
-    header "CommCtrl.h"
-    export *
+  module Controls {
+    module CommCtrl {
+      header "CommCtrl.h"
+      export *
+    }
+
+    module CommDlg {
+      header "commdlg.h"
+      export *
+
+      link "ComDlg32.Lib"
+    }
   }
 
   // FIXME(compnerd) this is a hack for the HWND typedef for DbgHelp
@@ -174,6 +185,44 @@ module WinSDK [system] {
     link "Cabinet.Lib"
   }
 
+  module Internationalization {
+    module WinNLS {
+      header "winnls.h"
+      export *
+    }
+
+    module IMM {
+      header "immdev.h"
+      export *
+
+      link "Imm32.lib"
+    }
+  }
+
+  module Multimedia {
+    module DigitalVideo {
+      header "Digitalv.h"
+      export *
+    }
+
+    module Video {
+      header "Vfw.h"
+      export *
+
+      link "Vfw32.Lib"
+    }
+
+    header "mmeapi.h"
+    header "mmddk.h"
+    header "mmsystem.h"
+    header "mmiscapi.h"
+    header "timeapi.h"
+    header "joystickapi.h"
+    export *
+
+    link "WinMM.Lib"
+  }
+
   module Shell {
     header "ShlObj.h"
     export *
@@ -200,6 +249,13 @@ module WinSDK [system] {
     export *
 
     link "OleAut32.Lib"
+  }
+
+  module Printing {
+    header "winspool.h"
+    export *
+
+    link "WinSpool.Lib"
   }
 
   module RichEdit {

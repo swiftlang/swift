@@ -3888,7 +3888,7 @@ class SILFunctionType final
       public llvm::FoldingSetNode,
       private llvm::TrailingObjects<SILFunctionType, SILParameterInfo,
                                     SILResultInfo, SILYieldInfo,
-                                    SubstitutionMap, CanType> {
+                                    SubstitutionMap, CanType, ClangTypeInfo> {
   friend TrailingObjects;
 
   size_t numTrailingObjects(OverloadToken<SILParameterInfo>) const {
@@ -3910,6 +3910,10 @@ class SILFunctionType final
   size_t numTrailingObjects(OverloadToken<SubstitutionMap>) const {
     return size_t(hasPatternSubstitutions()) +
            size_t(hasInvocationSubstitutions());
+  }
+
+  size_t numTrailingObjects(OverloadToken<ClangTypeInfo>) const {
+    return Bits.SILFunctionType.HasClangTypeInfo ? 1 : 0;
   }
 
 public:
@@ -5736,19 +5740,19 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(TypeVariableType, Type)
 /// because the expression is ambiguous. This type is only used by the
 /// constraint solver and transformed into UnresolvedType to be used in AST.
 class HoleType : public TypeBase {
-  using OriginatorType =
-      llvm::PointerUnion<TypeVariableType *, DependentMemberType *>;
+  using Originator = llvm::PointerUnion<TypeVariableType *,
+                                        DependentMemberType *, VarDecl *>;
 
-  OriginatorType Originator;
+  Originator O;
 
-  HoleType(ASTContext &C, OriginatorType originator,
+  HoleType(ASTContext &C, Originator originator,
            RecursiveTypeProperties properties)
-      : TypeBase(TypeKind::Hole, &C, properties), Originator(originator) {}
+      : TypeBase(TypeKind::Hole, &C, properties), O(originator) {}
 
 public:
-  static Type get(ASTContext &ctx, OriginatorType originatorType);
+  static Type get(ASTContext &ctx, Originator originator);
 
-  OriginatorType getOriginatorType() const { return Originator; }
+  Originator getOriginator() const { return O; }
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Hole;
@@ -6035,10 +6039,8 @@ inline ArrayRef<AnyFunctionType::Param> AnyFunctionType::getParams() const {
   }
 }
 
-/// If this is a method in a type or extension thereof, compute
-/// and return a parameter to be used for the 'self' argument.  The type of
-/// the parameter is the empty Type() if no 'self' argument should exist. This
-/// can only be used after types have been resolved.
+/// If this is a method in a type or extension thereof, return the
+/// 'self' parameter.
 ///
 /// \param isInitializingCtor Specifies whether we're computing the 'self'
 /// type of an initializing constructor, which accepts an instance 'self'

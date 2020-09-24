@@ -129,6 +129,19 @@ static bool addOutputsOfType(ArgStringList &Arguments,
   return Added;
 }
 
+static void addLTOArgs(const OutputInfo &OI, ArgStringList &arguments) {
+  switch (OI.LTOVariant) {
+  case OutputInfo::LTOKind::None:
+    break;
+  case OutputInfo::LTOKind::LLVMThin:
+    arguments.push_back("-lto=llvm-thin");
+    break;
+  case OutputInfo::LTOKind::LLVMFull:
+    arguments.push_back("-lto=llvm-full");
+    break;
+  }
+}
+
 void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
                                       const CommandOutput &output,
                                       const ArgList &inputArgs,
@@ -268,9 +281,6 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
       options::OPT_disable_fuzzy_forward_scan_trailing_closure_matching);
   inputArgs.AddLastArg(arguments,
                        options::OPT_verify_incremental_dependencies);
-  inputArgs.AddLastArg(arguments,
-                       options::OPT_enable_direct_intramodule_dependencies,
-                       options::OPT_disable_direct_intramodule_dependencies);
 
   // SWIFT_ENABLE_TENSORFLOW
   inputArgs.AddLastArg(
@@ -301,6 +311,8 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     arguments.push_back("-Xcc");
     arguments.push_back(inputArgs.MakeArgString(workingDirectory));
   }
+
+  addLTOArgs(OI, arguments);
 
   // -g implies -enable-anonymous-context-mangled-names, because the extra
   // metadata aids debugging.

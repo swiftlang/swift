@@ -112,12 +112,12 @@ public:
 
    static Dependency forHeader(StringRef headerPath, bool exported) {
      auto importControl =
-         exported ? ImportFilterKind::Public : ImportFilterKind::Private;
+         exported ? ImportFilterKind::Exported : ImportFilterKind::Default;
      return Dependency(headerPath, StringRef(), true, importControl, false);
     }
 
     bool isExported() const {
-      return getImportControl() == ImportFilterKind::Public;
+      return getImportControl() == ImportFilterKind::Exported;
     }
     bool isImplementationOnly() const {
       return getImportControl() == ImportFilterKind::ImplementationOnly;

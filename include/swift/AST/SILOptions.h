@@ -78,8 +78,15 @@ public:
   /// variables by name when we print it out. This eases diffing of SIL files.
   bool EmitSortedSIL = false;
 
+  /// See \ref FrontendOptions.PrintFullConvention
+  bool PrintFullConvention = false;
+
   /// Whether to stop the optimization pipeline after serializing SIL.
   bool StopOptimizationAfterSerialization = false;
+
+  /// Whether to stop the optimization pipeline right before we lower ownership
+  /// and go from OSSA to non-ownership SIL.
+  bool StopOptimizationBeforeLoweringOwnership = false;
 
   /// Whether to skip emitting non-inlinable function bodies.
   bool SkipNonInlinableFunctionBodies = false;

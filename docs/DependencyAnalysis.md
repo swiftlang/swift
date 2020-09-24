@@ -56,33 +56,6 @@ Note:
 > may change its members drastically.
 
 
-Cascading vs. Non-Cascading Dependencies
-========================================
-
-If file A depends on file B, and file B depends on file C, does file A depend
-on file C? The answer is: maybe! It depends how file B is using file C. If all
-uses are inside function bodies, for example, then changing file C only
-requires rebuilding file B, not file A. The terminology here is that file B has
-a *non-cascading* dependency on file C.
-
-By contrast, if changing file C affects the interface of file B, then the
-dependency is said to be *cascading,* and changing file C would require
-rebuilding both file B and file A.
-
-The various dependency tracking throughout the compiler will look at the
-context in which information is being used and attempt to determine whether or
-not a particular dependency should be considered cascading. If there's not
-enough context to decide, the compiler has to go with the conservative choice
-and record it as cascading.
-
-
-Note:
-
-> In the current on-disk representation of dependency information, cascading
-> dependencies are the default. Non-cascading dependencies are marked
-> `private` by analogy with the Swift `private` keyword.
-
-
 External Dependencies
 =====================
 

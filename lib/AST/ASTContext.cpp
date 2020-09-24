@@ -313,7 +313,8 @@ struct ASTContext::Implementation {
   /// Map from normal protocol conformances to missing witnesses that have
   /// been delayed until the conformance is fully checked, so that we can
   /// issue a fixit that fills the entire protocol stub.
-  llvm::DenseMap<NormalProtocolConformance *, std::vector<ValueDecl*>>
+  llvm::DenseMap<
+      NormalProtocolConformance *, std::unique_ptr<MissingWitnessesBase>>
     DelayedMissingWitnesses;
 
   /// Stores information about lazy deserialization of various declarations.
@@ -2307,22 +2308,24 @@ bool ASTContext::hasDelayedConformanceErrors() const {
   return false;
 }
 
+MissingWitnessesBase::~MissingWitnessesBase() { }
+
 void ASTContext::addDelayedConformanceDiag(
        NormalProtocolConformance *conformance,
        DelayedConformanceDiag fn) {
   getImpl().DelayedConformanceDiags[conformance].push_back(std::move(fn));
 }
 
-void ASTContext::
-addDelayedMissingWitnesses(NormalProtocolConformance *conformance,
-                           ArrayRef<ValueDecl*> witnesses) {
-  auto &bucket = getImpl().DelayedMissingWitnesses[conformance];
-  bucket.insert(bucket.end(), witnesses.begin(), witnesses.end());
+void ASTContext::addDelayedMissingWitnesses(
+    NormalProtocolConformance *conformance,
+    std::unique_ptr<MissingWitnessesBase> missingWitnesses) {
+  getImpl().DelayedMissingWitnesses[conformance] = std::move(missingWitnesses);
 }
 
-std::vector<ValueDecl*> ASTContext::
-takeDelayedMissingWitnesses(NormalProtocolConformance *conformance) {
-  std::vector<ValueDecl*> result;
+std::unique_ptr<MissingWitnessesBase>
+ASTContext::takeDelayedMissingWitnesses(
+    NormalProtocolConformance *conformance) {
+  std::unique_ptr<MissingWitnessesBase> result;
   auto known = getImpl().DelayedMissingWitnesses.find(conformance);
   if (known != getImpl().DelayedMissingWitnesses.end()) {
     result = std::move(known->second);
@@ -2565,13 +2568,9 @@ Type ErrorType::get(Type originalType) {
   return entry = new (mem) ErrorType(ctx, originalType, properties);
 }
 
-Type HoleType::get(ASTContext &ctx, OriginatorType originator) {
+Type HoleType::get(ASTContext &ctx, Originator originator) {
   assert(originator);
-  auto properties = reinterpret_cast<TypeBase *>(originator.getOpaqueValue())
-                        ->getRecursiveProperties();
-  properties |= RecursiveTypeProperties::HasTypeHole;
-
-  auto arena = getArena(properties);
+  auto arena = getArena(RecursiveTypeProperties::HasTypeHole);
   return new (ctx, arena)
       HoleType(ctx, originator, RecursiveTypeProperties::HasTypeHole);
 }
@@ -3424,6 +3423,9 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
   // point.
   bool isCanonical = isGenericFunctionTypeCanonical(sig, params, result);
 
+  assert(info.getClangTypeInfo().empty() &&
+         "Generic functions do not have Clang types at the moment.");
+
   if (auto funcTy
         = ctx.getImpl().GenericFunctionTypes.FindNodeOrInsertPos(id, insertPos)) {
     return funcTy;
@@ -3543,6 +3545,7 @@ SILFunctionType::SILFunctionType(
          "Bits were dropped!");
   static_assert(SILExtInfoBuilder::NumMaskBits == NumSILExtInfoBits,
                 "ExtInfo and SILFunctionTypeBitfields must agree on bit size");
+  Bits.SILFunctionType.HasClangTypeInfo = !ext.getClangTypeInfo().empty();
   Bits.SILFunctionType.CoroutineKind = unsigned(coroutineKind);
   NumParameters = params.size();
   if (coroutineKind == SILCoroutineKind::None) {
@@ -3580,6 +3583,9 @@ SILFunctionType::SILFunctionType(
     getMutableFormalResultsCache() = CanType();
     getMutableAllResultsCache() = CanType();
   }
+  if (!ext.getClangTypeInfo().empty())
+    *getTrailingObjects<ClangTypeInfo>() = ext.getClangTypeInfo();
+
 #ifndef NDEBUG
   if (ext.getRepresentation() == Representation::WitnessMethod)
     assert(!WitnessMethodConformance.isInvalid() &&
@@ -3702,6 +3708,21 @@ CanSILFunctionType SILFunctionType::get(
   
   patternSubs = patternSubs.getCanonical();
   invocationSubs = invocationSubs.getCanonical();
+
+  // [FIXME: Clang-type-plumbing]
+  if (ctx.LangOpts.UseClangFunctionTypes) {
+    if (auto error = ext.checkClangType()) {
+      error.getValue().dump();
+      llvm_unreachable("Unexpected Clang type in SILExtInfo.");
+    }
+  } else if (!ext.getClangTypeInfo().empty()) {
+    // Unlike AnyFunctionType, SILFunctionType is always canonical. Hence,
+    // conditionalizing canonical type computation based on
+    // UseClangFunctionTypes like AnyFunctionType is not feasible. It is simpler
+    // to drop the Clang type altogether.
+    ext = ext.intoBuilder().withClangFunctionType(nullptr).build();
+  }
+
   
   llvm::FoldingSetNodeID id;
   SILFunctionType::Profile(id, genericSig, ext, coroutineKind, callee, params,
@@ -3719,12 +3740,11 @@ CanSILFunctionType SILFunctionType::get(
 
   // See [NOTE: SILFunctionType-layout]
   bool hasResultCache = normalResults.size() > 1;
-  size_t bytes =
-    totalSizeToAlloc<SILParameterInfo, SILResultInfo, SILYieldInfo,
-                     SubstitutionMap, CanType>(
+  size_t bytes = totalSizeToAlloc<SILParameterInfo, SILResultInfo, SILYieldInfo,
+                                  SubstitutionMap, CanType, ClangTypeInfo>(
       params.size(), normalResults.size() + (errorResult ? 1 : 0),
       yields.size(), (patternSubs ? 1 : 0) + (invocationSubs ? 1 : 0),
-      hasResultCache ? 2 : 0);
+      hasResultCache ? 2 : 0, ext.getClangTypeInfo().empty() ? 0 : 1);
 
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
@@ -4102,8 +4122,7 @@ GenericEnvironment *OpenedArchetypeType::getGenericEnvironment() const {
   auto thisType = Type(const_cast<OpenedArchetypeType*>(this));
   auto &ctx = thisType->getASTContext();
   // Create a generic environment to represent the opened type.
-  auto signature =
-      ctx.getOpenedArchetypeSignature(Opened->getCanonicalType(), nullptr);
+  auto signature = ctx.getOpenedArchetypeSignature(Opened);
   auto *builder = signature->getGenericSignatureBuilder();
   auto *env = GenericEnvironment::getIncomplete(signature, builder);
   env->addMapping(signature->getGenericParams()[0], thisType);
@@ -4732,9 +4751,10 @@ CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
 // Type::getExistentialLayout()). In particular, the opened archetype signature
 // does not have requirements for conformances inherited from superclass
 // constraints while existential values do.
-CanGenericSignature ASTContext::getOpenedArchetypeSignature(CanType existential,
-                                                            ModuleDecl *mod) {
-  assert(existential.isExistentialType());
+CanGenericSignature ASTContext::getOpenedArchetypeSignature(Type type) {
+  assert(type->isExistentialType());
+
+  const CanType existential = type->getCanonicalType();
 
   // The opened archetype signature for a protocol type is identical
   // to the protocol's own canonical generic signature.

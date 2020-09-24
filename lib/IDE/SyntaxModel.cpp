@@ -990,7 +990,9 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     if (bracesRange.isValid())
       SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, bracesRange);
     SourceLoc NRStart = VD->getNameLoc();
-    SourceLoc NREnd = NRStart.getAdvancedLoc(VD->getName().getLength());
+    SourceLoc NREnd = (!VD->getName().empty()
+                       ? NRStart.getAdvancedLoc(VD->getName().getLength())
+                       : NRStart);
     SN.NameRange = CharSourceRange(SM, NRStart, NREnd);
     SN.TypeRange = charSourceRangeFromSourceRange(SM,
                                         VD->getTypeSourceRangeForDiagnostics());

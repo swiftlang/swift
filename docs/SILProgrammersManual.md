@@ -102,7 +102,7 @@ Lowered application of the closure has two applied arguments:
 
 The mapping between `SILFunctionType` and `SILFunctionArgument`, which depends
 on the SIL stage, is managed by the
-[SILFunctionConventions](https://github.com/apple/swift/blob/master/include/swift/SIL/SILFunctionConventions.h)
+[SILFunctionConventions](https://github.com/apple/swift/blob/main/include/swift/SIL/SILFunctionConventions.h)
 abstraction. This API follows naming conventions to communicate the meaning of the integer indices:
 
 - "Parameters" refer to the function signature's tuple of arguments.

@@ -197,10 +197,12 @@ KNOWN_SETTINGS=(
     swift-runtime-macho-no-dyld                   "0"               "whether to build stdlib assuming the runtime environment does not support dynamic modules"
     swift-stdlib-single-threaded-runtime          "0"               "whether to build stdlib as a single-threaded runtime only"
     swift-stdlib-os-versioning                    "1"               "whether to build stdlib with availability based on OS versions (Darwin only)"
+    swift-stdlib-stable-abi                       ""                "should stdlib be built with stable ABI, if not set defaults to true on Darwin, false otherwise"
 
     ## FREESTANDING Stdlib Options
     swift-freestanding-sdk                      ""                "which SDK to use when building the FREESTANDING stdlib"
     swift-freestanding-triple-name              ""                "which triple name (e.g. 'none-macho') to use when building the FREESTANDING stdlib"
+    swift-freestanding-module-name              ""                "which .swiftmodule name (e.g. 'freestanding') to use when building the FREESTANDING stdlib"
     swift-freestanding-archs                    ""                "space-separated list of which architectures to build when building the FREESTANDING stdlib"
 
     ## Uncategorised
@@ -631,17 +633,6 @@ function set_build_options_for_host() {
             fi
 
             cmake_os_sysroot="$(xcrun --sdk ${platform} --show-sdk-path)"
-
-            # Customize the CMake `find_*` search paths to search the SDK
-            # sysroot before searching `pkg-config` paths. This prevents compile
-            # failures caused when `pkg-config` returns CommandLineTools paths
-            # instead of Xcode paths.
-            #
-            # These search paths can be user customized either by setting the
-            # `CMAKE_PREFIX_PATH` environment variable, or by setting the same
-            # CMake variable via the command line (`-DCMAKE_PREFIX_PATH`).
-            # See https://cmake.org/cmake/help/latest/command/find_path.html
-            export CMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH}:${cmake_os_sysroot}/usr"
 
             cmark_cmake_options=(
                 -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
@@ -1627,6 +1618,12 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DLLVM_ENABLE_PROJECTS="$(join ";" ${llvm_enable_projects[@]})"
                 )
 
+                # NOTE: This is not a dead option! It is relied upon for certain
+                # bots/build-configs!
+                #
+                # TODO: In the future when we are always cross compiling and
+                # using Toolchain files, we should put this in either a
+                # toolchain file or a cmake cache.
                 if [[ "${BUILD_TOOLCHAIN_ONLY}" ]]; then
                     cmake_options+=(
                     -DLLVM_BUILD_TOOLS=NO
@@ -1808,6 +1805,29 @@ for host in "${ALL_HOSTS[@]}"; do
                     "${swift_cmake_options[@]}"
                 )
 
+                # NOTE: This is not a dead option! It is relied upon for certain
+                # bots/build-configs!
+                #
+                # TODO: In the future when we are always cross compiling and
+                # using Toolchain files, we should put this in either a
+                # toolchain file or a cmake cache.
+                if [[ "${BUILD_TOOLCHAIN_ONLY}" ]]; then
+                    cmake_options+=(
+                    -DSWIFT_TOOL_SIL_OPT_BUILD=FALSE
+                    -DSWIFT_TOOL_SWIFT_IDE_TEST_BUILD=FALSE
+                    -DSWIFT_TOOL_SWIFT_REMOTEAST_TEST_BUILD=FALSE
+                    -DSWIFT_TOOL_LLDB_MODULEIMPORT_TEST_BUILD=FALSE
+                    -DSWIFT_TOOL_SIL_EXTRACT_BUILD=FALSE
+                    -DSWIFT_TOOL_SWIFT_LLVM_OPT_BUILD=FALSE
+                    -DSWIFT_TOOL_SWIFT_SDK_ANALYZER_BUILD=FALSE
+                    -DSWIFT_TOOL_SWIFT_SDK_DIGESTER_BUILD=FALSE
+                    -DSWIFT_TOOL_SOURCEKITD_TEST_BUILD=FALSE
+                    -DSWIFT_TOOL_SOURCEKITD_REPL_BUILD=FALSE
+                    -DSWIFT_TOOL_COMPLETE_TEST_BUILD=FALSE
+                    -DSWIFT_TOOL_SWIFT_REFLECTION_DUMP_BUILD=FALSE
+                    )
+                fi
+
                 cmake_options=(
                     "${cmake_options[@]}"
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
@@ -1860,6 +1880,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
+                if [[ "${SWIFT_STDLIB_STABLE_ABI}" ]] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_STDLIB_STABLE_ABI:BOOL=$(true_false "${SWIFT_STDLIB_STABLE_ABI}")
+                    )
+                fi
+
                 if [ "${SWIFT_INSTALL_COMPONENTS}" ] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
@@ -1878,6 +1905,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_FREESTANDING_TRIPLE_NAME:STRING="${SWIFT_FREESTANDING_TRIPLE_NAME}"
+                    )
+                fi
+
+                if [ "${SWIFT_FREESTANDING_MODULE_NAME}" ] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_FREESTANDING_MODULE_NAME:STRING="${SWIFT_FREESTANDING_MODULE_NAME}"
                     )
                 fi
 
@@ -2403,30 +2437,36 @@ for host in "${ALL_HOSTS[@]}"; do
                         echo "copying compiler-rt embedded builtins from ${HOST_CXX_BUILTINS_DIR} into the local clang build directory ${DEST_BUILTINS_DIR}."
 
                         for OS in ios watchos tvos; do
-                            # Copy over the device .a
+                            # Copy over the device .a when necessary
                             LIB_NAME="libclang_rt.$OS.a"
                             HOST_LIB_PATH="$HOST_CXX_BUILTINS_DIR/$LIB_NAME"
-                            if [[ -f "${HOST_LIB_PATH}" ]]; then
-                                call cp "${HOST_LIB_PATH}" "${DEST_BUILTINS_DIR}/${LIB_NAME}"
-                            elif [[ "${VERBOSE_BUILD}" ]]; then
-                                echo "no file exists at ${HOST_LIB_PATH}"
+                            DEST_LIB_PATH="${DEST_BUILTINS_DIR}/${LIB_NAME}"
+                            if [[ ! -f "${DEST_LIB_PATH}" ]]; then
+                                if [[ -f "${HOST_LIB_PATH}" ]]; then
+                                    call cp "${HOST_LIB_PATH}" "${DEST_LIB_PATH}"
+                                elif [[ "${VERBOSE_BUILD}" ]]; then
+                                    echo "no file exists at ${HOST_LIB_PATH}"
+                                fi
                             fi
-                            # Copy over the simulator .a
+                            # Copy over the simulator .a when necessary
                             SIM_LIB_NAME="libclang_rt.${OS}sim.a"
                             HOST_SIM_LIB_PATH="$HOST_CXX_BUILTINS_DIR/$SIM_LIB_NAME"
-                            if [[ -f "${HOST_SIM_LIB_PATH}" ]]; then
-                                call cp "${HOST_SIM_LIB_PATH}" "${DEST_BUILTINS_DIR}/${SIM_LIB_NAME}"
-                            elif [[ -f "${HOST_LIB_PATH}" ]]; then
-                                # The simulator .a might not exist if the host
-                                # Xcode is old. In that case, copy over the
-                                # device library to the simulator location to allow
-                                # clang to find it. The device library has the simulator
-                                # slices in Xcode that doesn't have the simulator .a, so
-                                # the link is still valid.
-                                echo "copying over faux-sim library ${HOST_LIB_PATH} to ${SIM_LIB_NAME}"
-                                call cp "${HOST_LIB_PATH}" "${DEST_BUILTINS_DIR}/${SIM_LIB_NAME}"
-                            elif [[ "${VERBOSE_BUILD}" ]]; then
-                                echo "no file exists at ${HOST_SIM_LIB_PATH}"
+                            DEST_SIM_LIB_PATH="${DEST_BUILTINS_DIR}/${SIM_LIB_NAME}"
+                            if [[ ! -f "${DEST_SIM_LIB_PATH}" ]]; then
+                                if [[ -f "${HOST_SIM_LIB_PATH}" ]]; then
+                                    call cp "${HOST_SIM_LIB_PATH}" "${DEST_SIM_LIB_PATH}"
+                                elif [[ -f "${HOST_LIB_PATH}" ]]; then
+                                    # The simulator .a might not exist if the host
+                                    # Xcode is old. In that case, copy over the
+                                    # device library to the simulator location to allow
+                                    # clang to find it. The device library has the simulator
+                                    # slices in Xcode that doesn't have the simulator .a, so
+                                    # the link is still valid.
+                                    echo "copying over faux-sim library ${HOST_LIB_PATH} to ${SIM_LIB_NAME}"
+                                    call cp "${HOST_LIB_PATH}" "${DEST_SIM_LIB_PATH}"
+                                elif [[ "${VERBOSE_BUILD}" ]]; then
+                                    echo "no file exists at ${HOST_SIM_LIB_PATH}"
+                                fi
                             fi
                         done
                     done

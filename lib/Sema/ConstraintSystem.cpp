@@ -247,11 +247,7 @@ LookupResult &ConstraintSystem::lookupMember(Type base, DeclNameRef name) {
   if (result) return *result;
 
   // Lookup the member.
-  NameLookupOptions lookupOptions = defaultMemberLookupOptions;
-  if (isa<AbstractFunctionDecl>(DC))
-    lookupOptions |= NameLookupFlags::KnownPrivate;
-
-  result = TypeChecker::lookupMember(DC, base, name, lookupOptions);
+  result = TypeChecker::lookupMember(DC, base, name, defaultMemberLookupOptions);
 
   // If we aren't performing dynamic lookup, we're done.
   if (!*result || !base->isAnyObject())
@@ -1896,27 +1892,21 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
         TVO_CanBindToNoEscape);
     FunctionType::Param arg(escapeClosure);
-    auto bodyClosure = FunctionType::get(
-        arg, result,
-        FunctionType::ExtInfoBuilder(FunctionType::Representation::Swift,
-                                     /*noescape*/ true,
-                                     /*throws*/ true,
-                                     DifferentiabilityKind::NonDifferentiable,
-                                     /*clangFunctionType*/ nullptr)
-            .build());
+    auto bodyClosure = FunctionType::get(arg, result,
+                                         FunctionType::ExtInfoBuilder()
+                                             .withNoEscape(true)
+                                             .withThrows(true)
+                                             .build());
     FunctionType::Param args[] = {
       FunctionType::Param(noescapeClosure),
       FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
     };
 
-    auto refType = FunctionType::get(
-        args, result,
-        FunctionType::ExtInfoBuilder(FunctionType::Representation::Swift,
-                                     /*noescape*/ false,
-                                     /*throws*/ true,
-                                     DifferentiabilityKind::NonDifferentiable,
-                                     /*clangFunctionType*/ nullptr)
-            .build());
+    auto refType = FunctionType::get(args, result,
+                                     FunctionType::ExtInfoBuilder()
+                                         .withNoEscape(false)
+                                         .withThrows(true)
+                                         .build());
     return {refType, refType};
   }
   case DeclTypeCheckingSemantics::OpenExistential: {
@@ -1935,26 +1925,20 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
         TVO_CanBindToNoEscape);
     FunctionType::Param bodyArgs[] = {FunctionType::Param(openedTy)};
-    auto bodyClosure = FunctionType::get(
-        bodyArgs, result,
-        FunctionType::ExtInfoBuilder(FunctionType::Representation::Swift,
-                                     /*noescape*/ true,
-                                     /*throws*/ true,
-                                     DifferentiabilityKind::NonDifferentiable,
-                                     /*clangFunctionType*/ nullptr)
-            .build());
+    auto bodyClosure = FunctionType::get(bodyArgs, result,
+                                         FunctionType::ExtInfoBuilder()
+                                             .withNoEscape(true)
+                                             .withThrows(true)
+                                             .build());
     FunctionType::Param args[] = {
       FunctionType::Param(existentialTy),
       FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
     };
-    auto refType = FunctionType::get(
-        args, result,
-        FunctionType::ExtInfoBuilder(FunctionType::Representation::Swift,
-                                     /*noescape*/ false,
-                                     /*throws*/ true,
-                                     DifferentiabilityKind::NonDifferentiable,
-                                     /*clangFunctionType*/ nullptr)
-            .build());
+    auto refType = FunctionType::get(args, result,
+                                     FunctionType::ExtInfoBuilder()
+                                         .withNoEscape(false)
+                                         .withThrows(true)
+                                         .build());
     return {refType, refType};
   }
   }
@@ -2232,7 +2216,7 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
       // Okay, resolve the pattern.
       Pattern *pattern = LabelItem.getPattern();
       if (!LabelItem.isPatternResolved()) {
-        pattern = TypeChecker::resolvePattern(pattern, CS.DC,
+        pattern = TypeChecker::resolvePattern(pattern, DC,
                                        /*isStmtCondition*/false);
         if (!pattern) return false;
 
@@ -2247,7 +2231,7 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
         Type castType;
         if (auto castTypeRepr = isp->getCastTypeRepr()) {
           castType = TypeResolution::forContextual(
-                         CS.DC, TypeResolverContext::InExpression,
+                         DC, TypeResolverContext::InExpression,
                          /*unboundTyOpener*/ nullptr)
                          .resolveType(castTypeRepr);
         } else {
@@ -5230,4 +5214,22 @@ void ConstraintSystem::recordFixedRequirement(ConstraintLocator *reqLocator,
     FixedRequirements.insert(
         std::make_tuple(GP, reqKind, requirementTy.getPointer()));
   }
+}
+
+// Replace any error types encountered with holes.
+Type ConstraintSystem::getVarType(const VarDecl *var) {
+  auto type = var->getType();
+
+  // If this declaration is used as part of a code completion
+  // expression, solver needs to glance over the fact that
+  // it might be invalid to avoid failing constraint generation
+  // and produce completion results.
+  if (!isForCodeCompletion())
+    return type;
+
+  return type.transform([&](Type type) {
+    if (!type->is<ErrorType>())
+      return type;
+    return HoleType::get(Context, const_cast<VarDecl *>(var));
+  });
 }

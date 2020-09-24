@@ -1124,7 +1124,7 @@ bb0(%0 : $UnsafePointer<Int32>, %1 : $*Int32):
   return %v : $()
 }
 
-// <rdar://problem/41660554> Swift CI (macOS release master, OSS): SIL verification failed: Unknown formal access pattern: storage
+// <rdar://problem/41660554> Swift CI (macOS release main, OSS): SIL verification failed: Unknown formal access pattern: storage
 // Test access marker verification of a KeyPath projection with nested @inout access after inlining.
 sil @takeInoutInt : $@convention(thin) (@inout Int) -> ()
 

@@ -6693,8 +6693,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     // Ignore access control so we get candidates that might have been missed
     // before.
     lookupOptions |= NameLookupFlags::IgnoreAccessControl;
-    // This is only used for diagnostics, so always use KnownPrivate.
-    lookupOptions |= NameLookupFlags::KnownPrivate;
 
     auto lookup =
         TypeChecker::lookupMember(DC, instanceTy, memberName, lookupOptions);
@@ -7016,7 +7014,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       // type but a hole.
       auto shouldRecordFixForHole = [&](HoleType *baseType) {
         auto *originator =
-            baseType->getOriginatorType().dyn_cast<TypeVariableType *>();
+            baseType->getOriginator().dyn_cast<TypeVariableType *>();
 
         if (!originator)
           return false;
@@ -7289,10 +7287,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
           auto descriptor = UnqualifiedLookupDescriptor(
               DeclNameRef(param->getName()),
-              paramDecl->getDeclContext()->getParentForLookup(),
-              paramDecl->getStartLoc(),
-              UnqualifiedLookupFlags::KnownPrivate |
-                  UnqualifiedLookupFlags::TypeLookup);
+              paramDecl->getDeclContext()->getParentSourceFile(),
+              SourceLoc(),
+              UnqualifiedLookupFlags::TypeLookup);
           auto lookup = evaluateOrDefault(
               Context.evaluator, UnqualifiedLookupRequest{descriptor}, {});
           for (auto &result : lookup) {
@@ -8534,6 +8531,12 @@ bool ConstraintSystem::simplifyAppliedOverloadsImpl(
     Constraint *disjunction, TypeVariableType *fnTypeVar,
     const FunctionType *argFnType, unsigned numOptionalUnwraps,
     ConstraintLocatorBuilder locator) {
+  // Don't attempt to filter overloads when solving for code completion
+  // because presence of code completion token means that any call
+  // could be malformed e.g. missing arguments e.g. `foo([.#^MEMBER^#`
+  if (isForCodeCompletion())
+    return false;
+
   if (shouldAttemptFixes()) {
     auto arguments = argFnType->getParams();
     bool allHoles =

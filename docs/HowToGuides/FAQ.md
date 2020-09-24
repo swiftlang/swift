@@ -99,7 +99,7 @@ This compiles the `.rst` files in the `docs` directory into HTML in the
 
 For the Markdown documentation, you can view the rendered HTML directly on
 GitHub. For example, this file is rendered on GitHub at
-https://github.com/apple/swift/tree/master/docs/HowToGuides/FAQ.md .
+https://github.com/apple/swift/tree/main/docs/HowToGuides/FAQ.md .
 
 HTML documentation for the standard library on Darwin platforms is hosted on the
 [Apple Developer website](https://developer.apple.com/documentation/swift/swift_standard_library).

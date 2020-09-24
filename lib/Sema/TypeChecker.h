@@ -186,14 +186,12 @@ inline TypeCheckExprOptions operator|(TypeCheckExprFlags flag1,
 
 /// Flags that can be used to control name lookup.
 enum class NameLookupFlags {
-  /// Whether we know that this lookup is always a private dependency.
-  KnownPrivate = 0x01,
   /// Whether to ignore access control for this lookup, allowing inaccessible
   /// results to be returned.
-  IgnoreAccessControl = 0x10,
+  IgnoreAccessControl = 1 << 0,
   /// Whether to include results from outside the innermost scope that has a
   /// result.
-  IncludeOuterResults = 0x20,
+  IncludeOuterResults = 1 << 1,
 };
 
 /// A set of options that control name lookup.
@@ -1384,13 +1382,6 @@ void checkUnknownAttrRestrictions(
 /// let vs. var. This function does not perform any of that validation, leaving
 /// it to later stages.
 void bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *stmt);
-
-/// Add notes suggesting the addition of 'async' or '@asyncHandler', as
-/// appropriate, to a diagnostic for a function that isn't an async context.
-void addAsyncNotes(FuncDecl *func);
-
-/// Check actor isolation rules.
-void checkActorIsolation(const Expr *expr, const DeclContext *dc);
 
 } // end namespace swift
 

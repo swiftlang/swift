@@ -292,7 +292,7 @@ static bool isClangOverlayOf(ModuleDecl *potentialOverlay,
 }
 
 // TODO: Delete this once changes from https://reviews.llvm.org/D83449 land on
-// apple/llvm-project's swift/master branch.
+// apple/llvm-project's swift/main branch.
 template <typename SetLike, typename Item>
 static bool contains(const SetLike &setLike, Item item) {
   return setLike.find(item) != setLike.end();
@@ -305,11 +305,11 @@ static void getImmediateImports(
     ModuleDecl *module,
     SmallPtrSetImpl<ModuleDecl *> &imports,
     ModuleDecl::ImportFilter importFilter = {
-      ModuleDecl::ImportFilterKind::Public,
-      ModuleDecl::ImportFilterKind::Private,
+      ModuleDecl::ImportFilterKind::Exported,
+      ModuleDecl::ImportFilterKind::Default,
       ModuleDecl::ImportFilterKind::ImplementationOnly,
       ModuleDecl::ImportFilterKind::SPIAccessControl,
-      ModuleDecl::ImportFilterKind::ShadowedBySeparateOverlay
+      ModuleDecl::ImportFilterKind::ShadowedByCrossImportOverlay
     }) {
   SmallVector<ModuleDecl::ImportedModule, 8> importList;
   module->getImportedModules(importList, importFilter);
@@ -507,7 +507,7 @@ bool ABIDependencyEvaluator::isOverlayOfClangModule(ModuleDecl *swiftModule) {
 
   llvm::SmallPtrSet<ModuleDecl *, 8> importList;
   ::getImmediateImports(swiftModule, importList,
-                        {ModuleDecl::ImportFilterKind::Public});
+                        {ModuleDecl::ImportFilterKind::Exported});
   bool isOverlay =
       llvm::any_of(importList, [&](ModuleDecl *importedModule) -> bool {
         return isClangOverlayOf(swiftModule, importedModule);
@@ -642,7 +642,7 @@ void ABIDependencyEvaluator::computeABIDependenciesForSwiftModule(
 
   SmallPtrSet<ModuleDecl *, 32> reexportedImports;
   ::getImmediateImports(module, reexportedImports,
-                        {ModuleDecl::ImportFilterKind::Public});
+                        {ModuleDecl::ImportFilterKind::Exported});
   for (auto reexportedImport: reexportedImports) {
     reexposeImportedABI(module, reexportedImport);
   }

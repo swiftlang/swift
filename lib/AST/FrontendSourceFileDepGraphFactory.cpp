@@ -15,7 +15,7 @@
 // it is written to a file which is read by the driver in order to decide which
 // source files require recompilation.
 
-#include "swift/AST/FrontendSourceFileDepGraphFactory.h"
+#include "FrontendSourceFileDepGraphFactory.h"
 
 // may not all be needed
 #include "swift/AST/ASTContext.h"
@@ -233,47 +233,6 @@ std::string DependencyKey::computeNameForProvidedEntity<
 }
 
 //==============================================================================
-// MARK: createDependedUponKey
-//==============================================================================
-
-template <>
-DependencyKey
-DependencyKey::createDependedUponKey<NodeKind::topLevel>(StringRef name) {
-  return DependencyKey(NodeKind::topLevel, DeclAspect::interface, "",
-                       name.str());
-}
-
-template <>
-DependencyKey
-DependencyKey::createDependedUponKey<NodeKind::dynamicLookup>(StringRef name) {
-  return DependencyKey(NodeKind::dynamicLookup, DeclAspect::interface, "",
-                       name.str());
-}
-
-template <>
-DependencyKey
-DependencyKey::createDependedUponKey<NodeKind::externalDepend>(StringRef name) {
-  return DependencyKey(NodeKind::externalDepend, DeclAspect::interface, "",
-                       name.str());
-}
-
-template <>
-DependencyKey
-DependencyKey::createDependedUponKey<NodeKind::nominal>(StringRef mangledName) {
-  return DependencyKey(NodeKind::nominal, DeclAspect::interface,
-                       mangledName.str(), "");
-}
-
-DependencyKey DependencyKey::createDependedUponKey(StringRef mangledHolderName,
-                                                   StringRef memberBaseName) {
-  const bool isMemberBlank = memberBaseName.empty();
-  const auto kind =
-      isMemberBlank ? NodeKind::potentialMember : NodeKind::member;
-  return DependencyKey(kind, DeclAspect::interface, mangledHolderName.str(),
-                       isMemberBlank ? "" : memberBaseName.str());
-}
-
-//==============================================================================
 // MARK: Entry point into frontend graph construction
 //==============================================================================
 
@@ -339,16 +298,13 @@ std::string FrontendSourceFileDepGraphFactory::getFingerprint(SourceFile *SF) {
 // MARK: FrontendSourceFileDepGraphFactory - adding collections of defined Decls
 //==============================================================================
 //==============================================================================
-// MARK: SourceFileDeclFinder
+// MARK: DeclFinder
 //==============================================================================
 
 namespace {
 /// Takes all the Decls in a SourceFile, and collects them into buckets by
 /// groups of DeclKinds. Also casts them to more specific types
-/// TODO: Factor with SourceFileDeclFinder
-struct SourceFileDeclFinder {
-
-public:
+struct DeclFinder {
   /// Existing system excludes private decls in some cases.
   /// In the future, we might not want to do this, so use bool to decide.
   const bool includePrivateDecls;
@@ -365,11 +321,16 @@ public:
   ConstPtrPairVec<NominalTypeDecl, ValueDecl> valuesInExtensions;
   ConstPtrVec<ValueDecl> classMembers;
 
+  using LookupClassMember = llvm::function_ref<void(VisibleDeclConsumer &)>;
+
+public:
   /// Construct me and separates the Decls.
   // clang-format off
-    SourceFileDeclFinder(const SourceFile *const SF, const bool includePrivateDecls)
+    DeclFinder(ArrayRef<Decl *> topLevelDecls,
+               const bool includePrivateDecls,
+               LookupClassMember lookupClassMember)
     : includePrivateDecls(includePrivateDecls) {
-      for (const Decl *const D : SF->getTopLevelDecls()) {
+      for (const Decl *const D : topLevelDecls) {
         select<ExtensionDecl, DeclKind::Extension>(D, extensions, false) ||
         select<OperatorDecl, DeclKind::InfixOperator, DeclKind::PrefixOperator,
         DeclKind::PostfixOperator>(D, operators, false) ||
@@ -386,7 +347,7 @@ public:
     findNominalsFromExtensions();
     findNominalsInTopNominals();
     findValuesInExtensions();
-    findClassMembers(SF);
+    findClassMembers(lookupClassMember);
   }
 
 private:
@@ -460,7 +421,7 @@ private:
   }
 
   /// Class members are needed for dynamic lookup dependency nodes.
-  void findClassMembers(const SourceFile *const SF) {
+  void findClassMembers(LookupClassMember lookup) {
     struct Collector : public VisibleDeclConsumer {
       ConstPtrVec<ValueDecl> &classMembers;
       Collector(ConstPtrVec<ValueDecl> &classMembers)
@@ -470,7 +431,7 @@ private:
         classMembers.push_back(VD);
       }
     } collector{classMembers};
-    SF->lookupClassMembers({}, collector);
+    lookup(collector);
   }
 
   /// Check \p D to see if it is one of the DeclKinds in the template
@@ -511,7 +472,10 @@ void FrontendSourceFileDepGraphFactory::addAllDefinedDecls() {
 
   // Many kinds of Decls become top-level depends.
 
-  SourceFileDeclFinder declFinder(SF, includePrivateDeps);
+  DeclFinder declFinder(SF->getTopLevelDecls(), includePrivateDeps,
+                        [this](VisibleDeclConsumer &consumer) {
+    SF->lookupClassMembers({}, consumer);
+  });
 
   addAllDefinedDeclsOfAGivenType<NodeKind::topLevel>(
       declFinder.precedenceGroups);
@@ -578,9 +542,7 @@ public:
 public:
   void enumerateAllUses() {
     auto &Ctx = SF->getASTContext();
-    std::unordered_set<std::string> holdersOfCascadingMembers;
     Ctx.evaluator.enumerateReferencesInFile(SF, [&](const auto &ref) {
-      const auto cascades = ref.cascades;
       std::string name = ref.name.userFacingName().str();
       const auto *nominal = ref.subject;
       using Kind = evaluator::DependencyCollector::Reference::Kind;
@@ -590,56 +552,36 @@ public:
       case Kind::Tombstone:
         llvm_unreachable("Cannot enumerate dead reference!");
       case Kind::TopLevel:
-        return enumerateUse<NodeKind::topLevel>("", name, cascades);
+        return enumerateUse<NodeKind::topLevel>("", name);
       case Kind::Dynamic:
-        return enumerateUse<NodeKind::dynamicLookup>("", name, cascades);
+        return enumerateUse<NodeKind::dynamicLookup>("", name);
       case Kind::PotentialMember: {
         std::string context = DependencyKey::computeContextForProvidedEntity<
             NodeKind::potentialMember>(nominal);
-        appendHolderOfCascadingMembers(holdersOfCascadingMembers, nominal,
-                                       cascades);
-        return enumerateUse<NodeKind::potentialMember>(context, "", cascades);
+        return enumerateUse<NodeKind::potentialMember>(context, "");
       }
       case Kind::UsedMember: {
         std::string context =
             DependencyKey::computeContextForProvidedEntity<NodeKind::member>(
                 nominal);
-        appendHolderOfCascadingMembers(holdersOfCascadingMembers, nominal,
-                                       cascades);
-        return enumerateUse<NodeKind::member>(context, name, cascades);
+        return enumerateUse<NodeKind::member>(context, name);
       }
       }
     });
     enumerateExternalUses();
-    enumerateNominalUses(std::move(holdersOfCascadingMembers));
+    enumerateNominalUses();
   }
 
 private:
   template <NodeKind kind>
-  void enumerateUse(StringRef context, StringRef name, bool isCascadingUse) {
+  void enumerateUse(StringRef context, StringRef name) {
     // Assume that what is depended-upon is the interface
     createDefUse(
         DependencyKey(kind, DeclAspect::interface, context.str(), name.str()),
-        isCascadingUse ? sourceFileInterface : sourceFileImplementation);
+        sourceFileImplementation);
   }
 
-  void appendHolderOfCascadingMembers(std::unordered_set<std::string> &holders,
-                                      const NominalTypeDecl *subject,
-                                      bool isCascading) {
-    bool isPrivate = subject->isPrivateToEnclosingFile();
-    if (isPrivate && !includeIntrafileDeps)
-      return;
-
-    std::string context =
-        DependencyKey::computeContextForProvidedEntity<NodeKind::nominal>(
-            subject);
-    if (isCascading) {
-      holders.insert(context);
-    }
-  }
-
-  void enumerateNominalUses(
-      const std::unordered_set<std::string> &&holdersOfCascadingMembers) {
+  void enumerateNominalUses() {
     auto &Ctx = SF->getASTContext();
     Ctx.evaluator.enumerateReferencesInFile(SF, [&](const auto &ref) {
       const NominalTypeDecl *subject = ref.subject;
@@ -655,15 +597,13 @@ private:
       std::string context =
           DependencyKey::computeContextForProvidedEntity<NodeKind::nominal>(
               subject);
-      const bool isCascadingUse = holdersOfCascadingMembers.count(context) != 0;
-      enumerateUse<NodeKind::nominal>(context, "", isCascadingUse);
+      enumerateUse<NodeKind::nominal>(context, "");
     });
   }
 
   void enumerateExternalUses() {
-    // external dependencies always cascade
     for (StringRef s : depTracker.getDependencies())
-      enumerateUse<NodeKind::externalDepend>("", s, true);
+      enumerateUse<NodeKind::externalDepend>("", s);
   }
 };
 } // end namespace

@@ -427,7 +427,7 @@ void ModuleFile::getImportedModules(
 
   for (auto &dep : Dependencies) {
     if (dep.isExported()) {
-      if (!filter.contains(ModuleDecl::ImportFilterKind::Public))
+      if (!filter.contains(ModuleDecl::ImportFilterKind::Exported))
         continue;
 
     } else if (dep.isImplementationOnly()) {
@@ -440,7 +440,7 @@ void ModuleFile::getImportedModules(
       }
 
     } else {
-      if (!filter.contains(ModuleDecl::ImportFilterKind::Private))
+      if (!filter.contains(ModuleDecl::ImportFilterKind::Default))
         continue;
     }
 
@@ -486,7 +486,7 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
           SmallVector<ValueDecl *, 8> Decls;
           TopLevelModule->lookupQualified(
               TopLevelModule, DeclNameRef(ScopeID),
-              NL_QualifiedDefault | NL_KnownNoDependency, Decls);
+              NL_QualifiedDefault, Decls);
           Optional<ImportKind> FoundKind = ImportDecl::findBestImportKind(Decls);
           assert(FoundKind.hasValue() &&
                  "deserialized imports should not be ambiguous");

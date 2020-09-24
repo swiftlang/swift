@@ -411,14 +411,7 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
                     : ParameterConvention::Indirect_In_Guaranteed },
   };
 
-  auto extInfo =
-      SILFunctionType::ExtInfoBuilder(SILFunctionTypeRepresentation::Thin,
-                                      /*pseudogeneric*/ false,
-                                      /*non-escaping*/ false,
-                                      /*async*/ false,
-                                      DifferentiabilityKind::NonDifferentiable,
-                                      /*clangFunctionType*/ nullptr)
-          .build();
+  auto extInfo = SILFunctionType::ExtInfo::getThin();
 
   auto functionTy = SILFunctionType::get(sig, extInfo,
                                          SILCoroutineKind::YieldOnce,
@@ -450,8 +443,6 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
 
 SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   ASTContext &C = getASTContext();
-  auto extInfo = SILFunctionType::ExtInfo()
-    .withRepresentation(SILFunctionType::Representation::CFunctionPointer);
 
   // Use standard library types if we have them; otherwise, fall back to
   // builtins.
@@ -481,6 +472,14 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
     SILParameterInfo(Int32Ty, ParameterConvention::Direct_Unowned),
     SILParameterInfo(PtrPtrInt8Ty, ParameterConvention::Direct_Unowned),
   };
+  SILResultInfo results[] = {SILResultInfo(Int32Ty, ResultConvention::Unowned)};
+
+  auto rep = SILFunctionType::Representation::CFunctionPointer;
+  auto *clangTy = C.getCanonicalClangFunctionType(params, results[0], rep);
+  auto extInfo = SILFunctionType::ExtInfoBuilder()
+                     .withRepresentation(rep)
+                     .withClangFunctionType(clangTy)
+                     .build();
 
   CanSILFunctionType topLevelType = SILFunctionType::get(nullptr, extInfo,
                                    SILCoroutineKind::None,
@@ -1885,7 +1884,8 @@ class SILGenModuleRAII {
 
 public:
   void emitSourceFile(SourceFile *sf) {
-    assert(sf->ASTStage == SourceFile::TypeChecked);
+    // Type-check the file if we haven't already.
+    performTypeChecking(*sf);
 
     SourceFileScope scope(SGM, sf);
     for (Decl *D : sf->getTopLevelDecls()) {
@@ -1909,6 +1909,9 @@ public:
         continue;
       SGM.visit(TD);
     }
+  }
+  void emitSILFunctionDefinition(SILDeclRef ref) {
+    SGM.emitFunctionDefinition(ref, SGM.getFunction(ref, ForDefinition));
   }
 
   explicit SILGenModuleRAII(SILModule &M) : SGM{M, M.getSwiftModule()} {}
@@ -1942,19 +1945,25 @@ ASTLoweringRequest::evaluate(Evaluator &evaluator,
     return llvm::cantFail(evaluator(ParseSILModuleRequest{desc}));
   }
 
-  // Otherwise perform SIL generation of the passed SourceFiles.
   auto silMod = SILModule::createEmptyModule(desc.context, desc.conv,
                                              desc.opts);
   SILGenModuleRAII scope(*silMod);
 
-  for (auto file : desc.getFiles()) {
+  // Emit a specific set of SILDeclRefs if needed.
+  if (auto refs = desc.refsToEmit) {
+    for (auto ref : *refs)
+      scope.emitSILFunctionDefinition(ref);
+  }
+
+  // Emit any whole-files needed.
+  for (auto file : desc.getFilesToEmit()) {
     if (auto *nextSF = dyn_cast<SourceFile>(file))
       scope.emitSourceFile(nextSF);
   }
 
   // Also make sure to process any intermediate files that may contain SIL.
   bool shouldDeserialize =
-      llvm::any_of(desc.getFiles(), [](const FileUnit *File) -> bool {
+      llvm::any_of(desc.getFilesToEmit(), [](const FileUnit *File) -> bool {
         return isa<SerializedASTFile>(File);
       });
   if (shouldDeserialize) {
