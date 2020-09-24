@@ -531,27 +531,22 @@ static bool fixMissingParameters(InFlightDiagnostic &diag, ValueDecl *decl,
       fixIt << ", ";
     }
     
+    auto paraNameStr = paraName.empty() ? " _" : paraName.str();
+    auto argNameStr = argName.empty() ? " _" : argName.str();
     if (paraName == argName) {
-      if (argName.empty()) {
-        fixIt << "_ : ";
-      } else {
-        fixIt << argName << ": ";
-      }
+      fixIt << argNameStr << ": ";
     } else {
-      // e.g. func foo(a _: Int) {}
-      // this doesn't make sense, maybe should be improve.
-      if (argName.empty()) {
-        fixIt << "_ " << paraName << ": ";
-      } else {
-        fixIt << argName << " " << paraName << ": ";
-      }
+      fixIt << argNameStr << " " << paraNameStr << ": ";
     }
     
     if (baseParam->isInOut())
       fixIt << "inout ";
     
-    if (!baseParamTy->isNoEscape()) {
-      fixIt << "@escaping ";
+    auto type = baseParamTy->getCanonicalType();
+    if (auto funcTy = dyn_cast<FunctionType>(type)) {
+      if (!funcTy->isNoEscape()) {
+        fixIt << "@escaping ";
+      }
     }
       
     if (baseParam->isVariadic()) {
