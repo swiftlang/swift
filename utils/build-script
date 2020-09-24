@@ -18,6 +18,8 @@ from __future__ import absolute_import, print_function, unicode_literals
 
 import json
 import os
+import subprocess
+import shutil
 import pipes
 import platform
 import sys
@@ -147,6 +149,38 @@ def print_xcodebuild_versions(file=sys.stdout):
     print(fmt.format(version=version, sdks=sdks), file=file)
     file.flush()
 
+def get_host_build_target(swiftc_path):
+    """Returns the target-triple of the current host."""
+    try:
+        target_info_json = subprocess.check_output([swiftc_path, '-print-target-info'],
+                                                   stderr=subprocess.PIPE,
+                                                   universal_newlines=True).strip()
+        target_info = json.loads(target_info_json)
+        return target_info['target']['unversionedTriple']
+    except Exception as e:
+        fatal_error("Host Triple query failed: " + str(e))
+
+def substitute_integrated_driver(swift_bin_path, swift_driver_build_path):
+    """
+    Replaces the `swift` and `swiftc` symlinks with the new
+    integrated SwiftDriver binary
+    """
+    swift_path = os.path.join(swift_bin_path, 'swift')
+    swiftc_path = os.path.join(swift_bin_path, 'swiftc')
+    host_triple = get_host_build_target(swiftc_path)
+
+    swift_driver_path = os.path.join(swift_driver_build_path, host_triple, 'release',
+                                     'swift-driver')
+    print("Replacing: %s \nWith: %s" % (swiftc_path, swift_driver_path))
+    if os.path.islink(swiftc_path):
+      os.unlink(swiftc_path)
+    shutil.copyfile(swift_driver_path, swiftc_path)
+    shutil.copymode(swift_driver_path, swiftc_path)
+    print("Replacing: %s \nWith: %s" % (swift_path, swift_driver_path))
+    if os.path.islink(swift_path):
+      os.unlink(swift_path)
+    shutil.copyfile(swift_driver_path, swift_path)
+    shutil.copymode(swift_driver_path, swift_path)
 
 def tar(source, destination):
     """
@@ -231,6 +265,11 @@ def validate_arguments(toolchain, args):
             "--legacy-impl is incompatible with building packages needing "
             "a toolchain (%s)" % ", ".join(targets_needing_toolchain))
 
+    if args.use_integrated_driver:
+        if args.build_swift_driver is False:
+            fatal_error(
+                "--swift-driver is required when specifying "
+                "--use-integrated-driver.")
 
 def default_stdlib_deployment_targets(args):
     """
@@ -981,6 +1020,23 @@ class BuildScriptInvocation(object):
                    (self.install_all and product.should_build(host_target)):
                     print("--- Installing %s ---" % product_name)
                     product.install(host_target)
+
+        # If --use-integrated-driver is specified,
+        # swap out the C++ driver for the integrated driver.it 
+        if self.args.use_integrated_driver:
+            print("--- Patching in the integrated SwiftDriver ---")
+            swift_bin_path = os.path.join(
+              SWIFT_BUILD_ROOT, self.args.build_subdir,
+              '{}-{}'.format('swift', self.args.host_target), 'bin')
+            swift_driver_build_path = self.workspace.build_dir(host_target, 'swiftdriver')
+            substitute_integrated_driver(swift_bin_path, swift_driver_build_path)
+
+            # If the Swift product was installed, patch the installed version as well
+            toolchain_path = targets.toolchain_path(self.args.install_destdir,
+                                                    self.args.install_prefix)
+            toolchain_bin_path = os.path.join(toolchain_path, 'bin')
+            if (os.path.isfile(os.path.join(toolchain_bin_path, 'swiftc'))):
+                substitute_integrated_driver(toolchain_bin_path, swift_driver_build_path)
 
         # Extract symbols...
         for host_target in all_hosts:

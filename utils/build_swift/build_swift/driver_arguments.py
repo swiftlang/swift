@@ -582,6 +582,9 @@ def create_argument_parser():
     option(['--swift-driver'], toggle_true('build_swift_driver'),
            help='build swift-driver')
 
+    option(['--use-integrated-driver'], toggle_true('use_integrated_driver'),
+           help='default to the new integrated swift-driver')
+
     option(['--indexstore-db'], toggle_true('build_indexstoredb'),
            help='build IndexStoreDB')
     option('--test-indexstore-db-sanitize-all',
