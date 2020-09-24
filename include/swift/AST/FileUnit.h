@@ -241,7 +241,7 @@ public:
   /// \see ModuleDecl::getImportedModulesForLookup
   virtual void getImportedModulesForLookup(
       SmallVectorImpl<ModuleDecl::ImportedModule> &imports) const {
-    return getImportedModules(imports, ModuleDecl::ImportFilterKind::Public);
+    return getImportedModules(imports, ModuleDecl::ImportFilterKind::Exported);
   }
 
   /// Generates the list of libraries needed to link this file, based on its

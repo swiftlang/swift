@@ -19,6 +19,7 @@
 
 #include "llvm/ADT/None.h"
 
+#include <cassert>
 #include <type_traits>
 #include <cstdint>
 #include <initializer_list>
@@ -96,6 +97,14 @@ public:
   /// Check if this option set contains the exact same options as the given set.
   constexpr bool containsOnly(OptionSet set) const {
     return Storage == set.Storage;
+  }
+
+  /// Check if this option set contains any options from \p set.
+  ///
+  /// \pre \p set must be non-empty.
+  bool containsAny(OptionSet set) const {
+    assert((bool)set && "argument must be non-empty");
+    return (bool)((*this) & set);
   }
 
   // '==' and '!=' are deliberately not defined because they provide a pitfall

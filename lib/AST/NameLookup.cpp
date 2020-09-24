@@ -286,11 +286,27 @@ static void recordShadowedDeclsAfterTypeMatch(
       return false;
     };
 
+    auto isPrivateImport = [&](ModuleDecl *module) {
+      auto file = dc->getParentSourceFile();
+      if (!file) return false;
+      for (const auto &import : file->getImports()) {
+        if (import.importOptions.contains(
+                SourceFile::ImportFlags::PrivateImport)
+            && import.module.importedModule == module
+            && import.module.accessPath.matches(name))
+          return true;
+      }
+      return false;
+    };
+
+    bool firstPrivate = isPrivateImport(firstModule);
+
     for (unsigned secondIdx : range(firstIdx + 1, decls.size())) {
       // Determine whether one module takes precedence over another.
       auto secondDecl = decls[secondIdx];
       auto secondModule = secondDecl->getModuleContext();
       bool secondTopLevel = secondDecl->getDeclContext()->isModuleScopeContext();
+      bool secondPrivate = isPrivateImport(secondModule);
 
       // For member types, we skip most of the below rules. Instead, we allow
       // member types defined in a subclass to shadow member types defined in
@@ -344,6 +360,18 @@ static void recordShadowedDeclsAfterTypeMatch(
           shadowed.insert(firstDecl);
           break;
         } else if (isShadowed(secondPaths)) {
+          shadowed.insert(secondDecl);
+          continue;
+        }
+
+        // If neither module shadows the other, but one was imported with
+        // '@_private import' in dc, we want to favor that module. This makes
+        // name lookup in this file behave more like name lookup in the file we
+        // imported from, avoiding headaches for source-transforming tools.
+        if (!firstPrivate && secondPrivate) {
+          shadowed.insert(firstDecl);
+          break;
+        } else if (firstPrivate && !secondPrivate) {
           shadowed.insert(secondDecl);
           continue;
         }
