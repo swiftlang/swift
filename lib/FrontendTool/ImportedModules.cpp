@@ -80,8 +80,8 @@ bool swift::emitImportedModules(ModuleDecl *mainModule,
     if (!clangImporter->importBridgingHeader(implicitHeaderPath, mainModule)) {
       SmallVector<ModuleDecl::ImportedModule, 16> imported;
       clangImporter->getImportedHeaderModule()->getImportedModules(
-          imported, {ModuleDecl::ImportFilterKind::Public,
-                     ModuleDecl::ImportFilterKind::Private,
+          imported, {ModuleDecl::ImportFilterKind::Exported,
+                     ModuleDecl::ImportFilterKind::Default,
                      ModuleDecl::ImportFilterKind::ImplementationOnly,
                      ModuleDecl::ImportFilterKind::SPIAccessControl});
 

@@ -175,8 +175,9 @@ ImportSet &ImportCache::getImportSet(const DeclContext *dc) {
       ModuleDecl::ImportedModule{ImportPath::Access(), mod});
 
   if (file) {
+    // Should include both SPI & non-SPI.
     file->getImportedModules(imports,
-                             {ModuleDecl::ImportFilterKind::Private,
+                             {ModuleDecl::ImportFilterKind::Default,
                               ModuleDecl::ImportFilterKind::ImplementationOnly,
                               ModuleDecl::ImportFilterKind::SPIAccessControl});
   }
@@ -260,8 +261,9 @@ ImportCache::getAllAccessPathsNotShadowedBy(const ModuleDecl *mod,
       ModuleDecl::ImportedModule{ImportPath::Access(), currentMod});
 
   if (auto *file = dyn_cast<FileUnit>(dc)) {
+    // Should include both SPI & non-SPI
     file->getImportedModules(stack,
-                             {ModuleDecl::ImportFilterKind::Private,
+                             {ModuleDecl::ImportFilterKind::Default,
                               ModuleDecl::ImportFilterKind::ImplementationOnly,
                               ModuleDecl::ImportFilterKind::SPIAccessControl});
   }

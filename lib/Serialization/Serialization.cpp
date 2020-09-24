@@ -1026,8 +1026,8 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
 
   SmallVector<ModuleDecl::ImportedModule, 8> allImports;
   M->getImportedModules(allImports,
-                        {ModuleDecl::ImportFilterKind::Public,
-                         ModuleDecl::ImportFilterKind::Private,
+                        {ModuleDecl::ImportFilterKind::Exported,
+                         ModuleDecl::ImportFilterKind::Default,
                          ModuleDecl::ImportFilterKind::ImplementationOnly,
                          ModuleDecl::ImportFilterKind::SPIAccessControl});
   ModuleDecl::removeDuplicateImports(allImports);
@@ -1035,11 +1035,15 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   // Collect the public and private imports as a subset so that we can
   // distinguish them.
   ImportSet publicImportSet =
-      getImportsAsSet(M, ModuleDecl::ImportFilterKind::Public);
+      getImportsAsSet(M, ModuleDecl::ImportFilterKind::Exported);
   ImportSet privateImportSet =
-      getImportsAsSet(M, ModuleDecl::ImportFilterKind::Private);
+      getImportsAsSet(M, ModuleDecl::ImportFilterKind::Default);
   ImportSet spiImportSet =
-      getImportsAsSet(M, ModuleDecl::ImportFilterKind::SPIAccessControl);
+      getImportsAsSet(M, {
+          ModuleDecl::ImportFilterKind::Exported,
+          ModuleDecl::ImportFilterKind::Default,
+          ModuleDecl::ImportFilterKind::SPIAccessControl
+      });
 
   auto clangImporter =
     static_cast<ClangImporter *>(M->getASTContext().getClangModuleLoader());

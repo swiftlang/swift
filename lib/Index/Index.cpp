@@ -126,8 +126,8 @@ public:
   void
   getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &Modules) const {
     constexpr ModuleDecl::ImportFilter ImportFilter = {
-        ModuleDecl::ImportFilterKind::Public,
-        ModuleDecl::ImportFilterKind::Private,
+        ModuleDecl::ImportFilterKind::Exported,
+        ModuleDecl::ImportFilterKind::Default,
         ModuleDecl::ImportFilterKind::ImplementationOnly};
 
     if (auto *SF = SFOrMod.dyn_cast<SourceFile *>()) {
@@ -1599,9 +1599,9 @@ void IndexSwiftASTWalker::collectRecursiveModuleImports(
   }
 
   ModuleDecl::ImportFilter ImportFilter;
-  ImportFilter |= ModuleDecl::ImportFilterKind::Public;
-  ImportFilter |= ModuleDecl::ImportFilterKind::Private;
-  // FIXME: ImportFilterKind::ShadowedBySeparateOverlay?
+  ImportFilter |= ModuleDecl::ImportFilterKind::Exported;
+  ImportFilter |= ModuleDecl::ImportFilterKind::Default;
+  // FIXME: ImportFilterKind::ShadowedByCrossImportOverlay?
   SmallVector<ModuleDecl::ImportedModule, 8> Imports;
   TopMod.getImportedModules(Imports);
 
