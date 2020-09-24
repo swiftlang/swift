@@ -404,10 +404,7 @@ class Driver::InputInfoMap
 using InputInfoMap = Driver::InputInfoMap;
 
 /// Get the filename for build record. Returns true if failed.
-/// Additionally, set 'outputBuildRecordForModuleOnlyBuild' to true if this is
-/// full compilation with swiftmodule.
 static bool getCompilationRecordPath(std::string &buildRecordPath,
-                                     bool &outputBuildRecordForModuleOnlyBuild,
                                      const OutputInfo &OI,
                                      const Optional<OutputFileMap> &OFM,
                                      DiagnosticEngine *Diags) {
@@ -428,17 +425,6 @@ static bool getCompilationRecordPath(std::string &buildRecordPath,
                       diag::incremental_requires_build_record_entry,
                       file_types::getTypeName(file_types::TY_SwiftDeps));
     return true;
-  }
-
-  // In 'emit-module' only mode, use build-record filename suffixed with
-  // '~moduleonly'. So that module-only mode doesn't mess up build-record
-  // file for full compilation.
-  if (OI.CompilerOutputType == file_types::TY_SwiftModuleFile) {
-    buildRecordPath = buildRecordPath.append("~moduleonly");
-  } else if (OI.ShouldTreatModuleAsTopLevelOutput) {
-    // If we emit module along with full compilation, emit build record
-    // file for '-emit-module' only mode as well.
-    outputBuildRecordForModuleOnlyBuild = true;
   }
 
   return false;
@@ -960,8 +946,7 @@ Driver::buildCompilation(const ToolChain &TC,
       computeIncremental(ArgList.get(), ShowIncrementalBuildDecisions);
 
   std::string buildRecordPath;
-  bool outputBuildRecordForModuleOnlyBuild = false;
-  getCompilationRecordPath(buildRecordPath, outputBuildRecordForModuleOnlyBuild,
+  getCompilationRecordPath(buildRecordPath,
                            OI, OFM, Incremental ? &Diags : nullptr);
 
   SmallString<32> ArgsHash;
@@ -1050,7 +1035,6 @@ Driver::buildCompilation(const ToolChain &TC,
         std::move(TranslatedArgList),
         std::move(Inputs),
         buildRecordPath,
-        outputBuildRecordForModuleOnlyBuild,
         ArgsHash,
         StartTime,
         LastBuildTime,
