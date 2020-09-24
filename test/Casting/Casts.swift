@@ -309,7 +309,7 @@ CastsTests.test("Casts from @objc Type") {
 #endif
 
 #if _runtime(_ObjC)
-// rdar://44467533 (Swift master branch: conditional casts for _ObjectiveCBridgeable miscompile in swift-corelibs-foundation)
+// rdar://44467533 (Swift main branch: conditional casts for _ObjectiveCBridgeable miscompile in swift-corelibs-foundation)
 CastsTests.test("Conditional NSNumber -> Bool casts") {
   let x = NSNumber(value: -1) as? Bool
   expectNil(x)

@@ -90,8 +90,8 @@ toolchain as a one-off, there are a couple of differences:
    This should list directories like `llvm-project`, `swiftpm` and so on.
 4. Checkout the right branch/tag:
    If you are building the toolchain for local development, you can skip this
-   step, as Step 2 will checkout `swift`'s `master` branch and matching
-   branches for other projects. <!-- [TODO: master-to-main-rename] -->
+   step, as Step 2 will checkout `swift`'s `main` branch and matching
+   branches for other projects.
    If you are building the toolchain as a one-off, it is more likely that you
    want a specific branch or a tag, often corresponding to a specific release
    or a specific snapshot. You can update the branch/tag for all repositories

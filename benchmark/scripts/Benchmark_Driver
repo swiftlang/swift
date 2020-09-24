@@ -975,9 +975,9 @@ def parse_args(args):
     )
     compare_parser.add_argument(
         "--baseline-branch",
-        default="master",
+        default="main",
         help="attempt to compare results to baseline results for specified "
-        "branch (default: master)",
+        "branch (default: main)",
     )
     compare_parser.set_defaults(func=compare)
 

@@ -1,6 +1,6 @@
 ## 64-Bit Architecture Register Usage
 
-From Swift 5, the calling convention register allocation for 64-bit architectures is largely based on [existing](https://developer.apple.com/library/content/documentation/Xcode/Conceptual/iPhoneOSABIReference/Articles/ARM64FunctionCallingConventions.html) [standards](https://developer.apple.com/library/content/documentation/DeveloperTools/Conceptual/LowLevelABI/140-x86-64_Function_Calling_Conventions/x86_64.html), with the addition of the context and error return registers discussed in the [ABI stability manifesto](https://github.com/apple/swift/blob/master/docs/ABIStabilityManifesto.md):
+From Swift 5, the calling convention register allocation for 64-bit architectures is largely based on [existing](https://developer.apple.com/library/content/documentation/Xcode/Conceptual/iPhoneOSABIReference/Articles/ARM64FunctionCallingConventions.html) [standards](https://developer.apple.com/library/content/documentation/DeveloperTools/Conceptual/LowLevelABI/140-x86-64_Function_Calling_Conventions/x86_64.html), with the addition of the context and error return registers discussed in the [ABI stability manifesto](https://github.com/apple/swift/blob/main/docs/ABIStabilityManifesto.md):
 
 | Register Purpose | ARM64 | x86_64 |
 | ------------- |:-------------:| ----- |
