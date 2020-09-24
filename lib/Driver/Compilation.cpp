@@ -127,7 +127,8 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          bool FineGrainedDependenciesIncludeIntrafileOnes,
                          bool EnableSourceRangeDependencies,
                          bool CompareIncrementalSchemes,
-                         StringRef CompareIncrementalSchemesPath)
+                         StringRef CompareIncrementalSchemesPath,
+                         bool EnableCrossModuleIncrementalBuild)
   : Diags(Diags), TheToolChain(TC),
     TheOutputInfo(OI),
     Level(Level),
@@ -155,7 +156,8 @@ Compilation::Compilation(DiagnosticEngine &Diags,
       EmitFineGrainedDependencyDotFileAfterEveryImport),
     FineGrainedDependenciesIncludeIntrafileOnes(
       FineGrainedDependenciesIncludeIntrafileOnes),
-    EnableSourceRangeDependencies(EnableSourceRangeDependencies)
+    EnableSourceRangeDependencies(EnableSourceRangeDependencies),
+    EnableCrossModuleIncrementalBuild(EnableCrossModuleIncrementalBuild)
     {
     if (CompareIncrementalSchemes)
       IncrementalComparator.emplace(

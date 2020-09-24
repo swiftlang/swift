@@ -1027,6 +1027,8 @@ Driver::buildCompilation(const ToolChain &TC,
             OPT_driver_emit_fine_grained_dependency_dot_file_after_every_import);
     const bool FineGrainedDependenciesIncludeIntrafileOnes =
         ArgList->hasArg(options::OPT_fine_grained_dependency_include_intrafile);
+    const bool EnableCrossModuleDependencies = ArgList->hasArg(
+        options::OPT_enable_experimental_cross_module_incremental_build);
 
     // clang-format off
     C = std::make_unique<Compilation>(
@@ -1054,7 +1056,8 @@ Driver::buildCompilation(const ToolChain &TC,
         FineGrainedDependenciesIncludeIntrafileOnes,
         EnableSourceRangeDependencies,
         CompareIncrementalSchemes,
-        CompareIncrementalSchemesPath);
+        CompareIncrementalSchemesPath,
+        EnableCrossModuleDependencies);
     // clang-format on
   }
 
